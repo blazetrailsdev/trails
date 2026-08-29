@@ -237,17 +237,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   ): CollectionProxy<T> {
     const targetModel = this._targetModelFor(record, assocName, assocDef);
     const Ctor = collectionProxyClassFor(targetModel);
-    return new Ctor(record, assocName, assocDef) as CollectionProxy<T>;
+    const association = record.association(assocName) as unknown as CollectionAssociation;
+    return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
-  constructor(record: Base, assocName: string, assocDef: AssociationDefinition) {
-    const targetModel = CollectionProxy._targetModelFor(record, assocName, assocDef);
-    super(targetModel, targetModel.arelTable);
-    this._record = record;
-    this._assocName = assocName;
-    this._association = record.association(assocName) as unknown as CollectionAssociation;
+  constructor(klass: typeof Base, association: CollectionAssociation) {
+    super(klass, klass.arelTable);
+    this._association = association;
+    this._record = association.owner;
+    this._assocName = association.reflection.name;
 
-    const extensions = this._association.extensions;
+    const extensions = association.extensions;
     if (extensions.length > 0) {
       const wrapped = wrapWithScopeProxy(this as unknown as Relation<T>);
       for (const mod of extensions) {

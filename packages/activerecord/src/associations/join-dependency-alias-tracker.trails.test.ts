@@ -4,7 +4,7 @@ import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
-import { AliasTracker } from "./alias-tracker.js";
+import { AliasCounts, AliasTracker } from "./alias-tracker.js";
 
 describe("JoinDependency AliasTracker wiring", () => {
   fixtures({});
@@ -51,13 +51,10 @@ describe("JoinDependency AliasTracker wiring", () => {
 
   it("adopts an external AliasTracker passed to joinConstraints", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
-    const externalTracker = new AliasTracker(
-      undefined,
-      new Map([
-        ["posts", 1],
-        ["comments", 1],
-      ]),
-    );
+    const aliases = new AliasCounts(() => 0);
+    aliases.set("posts", 1);
+    aliases.set("comments", 1);
+    const externalTracker = new AliasTracker(undefined, aliases);
     jd.joinConstraints([], externalTracker);
     expect((jd as any)._aliasTracker).toBe(externalTracker);
   });

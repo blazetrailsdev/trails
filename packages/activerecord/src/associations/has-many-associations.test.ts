@@ -1752,7 +1752,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm);
 
     const firm = new DepFirm({ name: "Test" });
-    const proxy = new CollectionProxy(
+    const proxy = CollectionProxy._create(
       firm,
       "stiCompanies",
       (DepFirm as any)._reflectOnAssociation("stiCompanies"),
@@ -1794,7 +1794,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm2);
 
     const firm = new DepFirm2({ name: "Test" });
-    const proxy = new CollectionProxy(
+    const proxy = CollectionProxy._create(
       firm,
       "stiCompany2s",
       (DepFirm2 as any)._reflectOnAssociation("stiCompany2s"),
@@ -1836,7 +1836,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm3);
 
     const firm = new DepFirm3({ name: "Test" });
-    const proxy = new CollectionProxy(
+    const proxy = CollectionProxy._create(
       firm,
       "stiCompany3s",
       (DepFirm3 as any)._reflectOnAssociation("stiCompany3s"),
@@ -1875,7 +1875,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm4);
 
     const firm = new DepFirm4({ name: "Test" });
-    const proxy = new CollectionProxy(
+    const proxy = CollectionProxy._create(
       firm,
       "stiCompany4s",
       (DepFirm4 as any)._reflectOnAssociation("stiCompany4s"),
@@ -1921,7 +1921,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DepFirm5);
 
     const firm = new DepFirm5({ name: "Test" });
-    const proxy = new CollectionProxy(
+    const proxy = CollectionProxy._create(
       firm,
       "stiCompany5s",
       (DepFirm5 as any)._reflectOnAssociation("stiCompany5s"),

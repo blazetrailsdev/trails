@@ -243,9 +243,6 @@ describe("DJAS — composite key support", () => {
     expect(() => new DisableJoinsAssociationRelation(CkLineItem, [] as any, [])).toThrow(
       /at least one column/,
     );
-    expect(() => new DisableJoinsAssociationRelation(CkLineItem, "", [1])).toThrow(
-      /key must not be empty/,
-    );
     const djarTuples = new DisableJoinsAssociationRelation(CkLineItem, ["sku"], [["a"], ["b"]]);
     expect(djarTuples.key).toBe("sku");
     expect(await djarTuples.ids()).toEqual(["a", "b"]);

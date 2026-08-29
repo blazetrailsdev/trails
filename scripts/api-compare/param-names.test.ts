@@ -166,4 +166,31 @@ describe("positions with no identifier to compare", () => {
       ),
     ).toEqual([]);
   });
+  it("lets an anonymous splat cover the positional list the port spells out", () => {
+    // connection_adapters/postgresql/column.rb:9
+    // `initialize(*, serial: nil, identity: nil, generated: nil, **)` forwards
+    // its positionals to `super` without naming them; the port has to spell
+    // them out, so the one `*` slot stands for all four.
+    expect(
+      compareParamNames(
+        [
+          { name: "*", kind: "rest" },
+          kwopt("serial"),
+          kwopt("identity"),
+          kwopt("generated"),
+          kwrest("**"),
+        ],
+        [req("name"), opt("defaultValue"), opt("sqlTypeMetadata"), opt("null_"), opt("options")],
+      ),
+    ).toEqual([]);
+  });
+
+  it("still flags a rename in the named slot beside a widened anonymous splat", () => {
+    expect(
+      compareParamNames(
+        [{ name: "*", kind: "rest" }, kwopt("serial")],
+        [req("name"), opt("defaultValue"), opt("isSerial")],
+      ),
+    ).toEqual([{ position: 2, ruby: "serial", ts: "isSerial" }]);
+  });
 });

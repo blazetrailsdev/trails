@@ -196,9 +196,11 @@ export async function _updateRecord(
 /** @internal */
 export async function _createRecord(
   this: DirtyPrivateHost,
-  superFn: () => Promise<unknown>,
+  attributeNames: string[] | undefined,
+  superFn: (attributeNames: string[]) => Promise<unknown>,
 ): Promise<unknown> {
-  const id = await superFn();
+  attributeNames ??= attributeNamesForPartialInserts.call(this);
+  const id = await superFn(attributeNames);
   this.changesApplied();
   return id;
 }

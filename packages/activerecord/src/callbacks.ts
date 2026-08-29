@@ -66,9 +66,9 @@ export async function _createRecord(
   const ctor = this.constructor;
   return (
     (await runCallbacks(this, "create", () =>
-      dirtyCreateRecord.call(this, () =>
-        counterCacheCreateRecord.call(this, () =>
-          persistenceCreateRecord.call(this, attributeNames, block),
+      dirtyCreateRecord.call(this, attributeNames, (names: string[]) =>
+        counterCacheCreateRecord.call(this, names, (names2: string[]) =>
+          persistenceCreateRecord.call(this, names2, block),
         ),
       ),
     )) !== false
