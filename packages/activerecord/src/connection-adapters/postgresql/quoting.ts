@@ -230,16 +230,17 @@ export function lookupCastTypeFromColumn(
 export const checkIntInRange = checkIntegerRange;
 
 export function checkIntegerRange(value: bigint | number): void {
-  const exception =
-    `${value} is out of range for PostgreSQL bigint (64-bit signed integer): ` +
-    `-9223372036854775808 to 9223372036854775807`;
-  if (typeof value === "number") {
-    if (!Number.isSafeInteger(value)) {
-      throw new IntegerOutOf64BitRange(exception);
-    }
-  }
-  const bigVal = typeof value === "bigint" ? value : BigInt(value);
-  if (bigVal < PG_INT64_MIN || bigVal > PG_INT64_MAX) {
+  const bigVal = typeof value === "bigint" ? value : BigInt(Math.trunc(value));
+  if (bigVal > PG_INT64_MAX || bigVal < PG_INT64_MIN) {
+    const exception = `Provided value outside of the range of a signed 64bit integer.
+
+PostgreSQL will treat the column type in question as a numeric.
+This may result in a slow sequential scan due to a comparison
+being performed between an integer or bigint value and a numeric value.
+
+To allow for this potentially unwanted behavior, set
+ActiveRecord.raiseIntWiderThan64bit to false.
+`;
     throw new IntegerOutOf64BitRange(exception);
   }
 }
