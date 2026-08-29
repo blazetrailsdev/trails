@@ -32,6 +32,7 @@ import {
   unusedOperatorSpellings,
 } from "./api-compare/operator-order-spelling.js";
 import { resolveMixinParent } from "./rails-file-structure-mixins.js";
+import { lastSegment, resolveLastSegmentCollision } from "./rails-file-structure-collisions.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -178,6 +179,26 @@ interface Bucket {
   seen: Set<string>;
 }
 
+// Reviewed `<pkg>/<file>::<Segment>` rows for collisions resolveLastSegmentCollision
+// cannot decide; without a row such a collision fails the build below.
+const EXPECTED_UNRESOLVED_COLLISIONS: string[] = [];
+
+const unresolvedCollisions: string[] = [];
+const usedExpectedCollisions = new Set<string>();
+
+const resolveCollision = (pkg: string, collKey: string, fqns: Set<string>): string | undefined => {
+  const winner = resolveLastSegmentCollision(fqns);
+  if (winner) return winner;
+  const [file, seg] = collKey.split("\0");
+  const row = `${pkg}/${file}::${seg}`;
+  if (EXPECTED_UNRESOLVED_COLLISIONS.includes(row)) {
+    usedExpectedCollisions.add(row);
+    return undefined;
+  }
+  unresolvedCollisions.push(`${row} shared by ${[...fqns].join(", ")}`);
+  return undefined;
+};
+
 for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   const pkgDir = PACKAGE_DIRS[pkg];
   if (!pkgDir) continue;
@@ -203,12 +224,10 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     return bucket;
   };
 
-  // The bucket key is the fqn's last segment, so two class entities in one file
-  // whose last segments collide across namespaces (e.g. `Foo::Builder` and
-  // `Bar::Builder`) would silently merge into one blended order. Track fqns per
-  // (bucketFile, last-segment); a colliding bucket is DROPPED (not emitted) and
-  // warned — enforcing a blended order would be worse than no order at all.
-  // (Repo-wide this is currently vanishingly rare.)
+  // Buckets are keyed by FQN, but the manifest the rule reads is keyed by the TS
+  // class NAME — the fqn's last segment. Track the fqns competing for each
+  // (bucketFile, last-segment) so the collapse below can pick a winner; see
+  // resolveLastSegmentCollision.
   const classFqnsByKey = new Map<string, Set<string>>();
   const noteClass = (bucketFile: string, className: string, fqn: string) => {
     const collKey = `${bucketFile}\0${className}`;
@@ -217,7 +236,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     fqns.add(fqn);
   };
 
-  // (rubyFile) → class names in Rails declaration order.
+  // (rubyFile) → class fqns in Rails declaration order.
   const declarationsByFile = new Map<string, string[]>();
   const declarationsFor = (rubyFile: string): string[] => {
     let list = declarationsByFile.get(rubyFile);
@@ -248,7 +267,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       // Noting the class HERE and not only per-method is what lets a
       // last-segment collision involving a method-less class be seen at all.
       noteClass(host.file, className, host.fqn);
-      declarationsFor(host.file).push(className);
+      declarationsFor(host.file).push(host.fqn);
       // Order by source line rather than appending classMethods after
       // instanceMethods — see mergeBySourceLine for why. Tag each method with
       // `isStatic` BEFORE merging so the interleaved order keeps the class-vs-
@@ -261,7 +280,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       )) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
-        const b = bucketFor(file, className);
+        const b = bucketFor(file, host.fqn);
         // Operators are instance-only ports; resolve the class-specific spelling.
         const opCandidates = m.isStatic ? undefined : operatorSpelling(host.fqn, m.name);
         pushMethod(b.names, b.seen, m.name, m.isStatic, opCandidates);
@@ -288,7 +307,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
         )) {
           const file = m.file ?? host.file;
           noteClass(file, mixin.className, mixin.parentFqn);
-          const b = bucketFor(file, mixin.className);
+          const b = bucketFor(file, mixin.parentFqn);
           const isStatic = mixin.extendsSingleton || m.isStatic;
           const opCandidates = isStatic ? undefined : operatorSpelling(mixin.parentFqn, m.name);
           pushMethod(b.names, b.seen, m.name, isStatic, opCandidates);
@@ -311,18 +330,14 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   visitClasses(rubyPkg.classes ?? {});
   visitModules(rubyPkg.modules ?? {});
 
-  const collided = new Set<string>();
+  // (bucketFile\0className) → the one fqn that owns that manifest key.
+  const winnerByKey = new Map<string, string>();
   for (const [collKey, fqns] of classFqnsByKey) {
-    if (fqns.size > 1) {
-      collided.add(collKey);
-      const [file, seg] = collKey.split("\0");
-      console.warn(
-        `[build-rails-file-structure-manifest] last-segment collision in ${pkg}/${file}: ` +
-          `\`${seg}\` shared by ${[...fqns].join(", ")} — bucket DROPPED (no order enforced). ` +
-          `Rename the TS classes or split the file so each resolves independently.`,
-      );
-    }
+    const winner = resolveCollision(pkg, collKey, fqns);
+    if (winner) winnerByKey.set(collKey, winner);
   }
+  const owns = (rubyFile: string, fqn: string): boolean =>
+    winnerByKey.get(`${rubyFile}\0${lastSegment(fqn)}`) === fqn;
 
   const orderFor = (rubyFile: string): FileOrder => {
     const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
@@ -334,13 +349,13 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     return order;
   };
 
-  for (const [rubyFile, names] of declarationsByFile) {
+  for (const [rubyFile, fqns] of declarationsByFile) {
     const order = orderFor(rubyFile);
     const have = new Set(order.declarations);
-    for (const n of names) {
-      // A last-segment collision is dropped here too: two Ruby classes sharing
-      // a TS name give the rule no way to tell which declaration is which.
-      if (collided.has(`${rubyFile}\0${n}`) || have.has(n)) continue;
+    for (const fqn of fqns) {
+      if (!owns(rubyFile, fqn)) continue;
+      const n = lastSegment(fqn);
+      if (have.has(n)) continue;
       have.add(n);
       order.declarations.push(n);
     }
@@ -349,13 +364,14 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   for (const [rubyFile, byKey] of byFile) {
     const order = orderFor(rubyFile);
     for (const [key, bucket] of byKey) {
-      // A colliding class bucket is dropped so the lint step never enforces a
-      // blended order (see the warning above).
-      if (key !== FUNCTIONS_KEY && collided.has(`${rubyFile}\0${key as string}`)) continue;
+      // A losing fqn is dropped rather than blended into the winner's order.
+      if (key !== FUNCTIONS_KEY && !owns(rubyFile, key as string)) continue;
       // Multiple Ruby files may map to the same TS file (rare); append novel
       // names in encounter order, existing order wins for dupes.
       const target =
-        key === FUNCTIONS_KEY ? order.functions : (order.classes[key as string] ??= []);
+        key === FUNCTIONS_KEY
+          ? order.functions
+          : (order.classes[lastSegment(key as string)] ??= []);
       const have = new Set(target);
       for (const n of bucket.names) if (!have.has(n)) target.push(n);
     }
@@ -404,10 +420,30 @@ if (fileCount === 0) {
   );
 }
 
+// Fail after the manifest is written, so the emitted order stays usable and the
+// failure is purely the signal.
+if (unresolvedCollisions.length > 0) {
+  throw new Error(
+    `[build-rails-file-structure-manifest] ${unresolvedCollisions.length} unresolvable ` +
+      `last-segment collision(s): ${unresolvedCollisions.join("; ")} — rename the TS ` +
+      `classes or split the Ruby file so each resolves independently, or add the ` +
+      `\`<pkg>/<file>::<Segment>\` row to EXPECTED_UNRESOLVED_COLLISIONS in this script.`,
+  );
+}
+const staleExpectedCollisions = EXPECTED_UNRESOLVED_COLLISIONS.filter(
+  (row) => !usedExpectedCollisions.has(row),
+);
+if (staleExpectedCollisions.length > 0) {
+  throw new Error(
+    `[build-rails-file-structure-manifest] stale EXPECTED_UNRESOLVED_COLLISIONS ` +
+      `entr${staleExpectedCollisions.length === 1 ? "y" : "ies"}: ` +
+      `${staleExpectedCollisions.join(", ")} — the collision is gone; drop the row.`,
+  );
+}
+
 // Every package has been visited, so an operator entry that never resolved names a
-// class/operator the Ruby extract does not have. Unlike a last-segment collision
-// (which follows from Rails' own structure and only warns), a dead entry is always
-// a bug in a table WE maintain: it enforces nothing and reports nothing, which is
+// class/operator the Ruby extract does not have. Like an unresolvable last-segment
+// collision, a dead entry enforces nothing and reports nothing, which is
 // how the `ActiveModel::AttributeSet::LazyAttributeHash` key survived. Fail after
 // the manifest is written, so the emitted order is still correct/usable and the
 // failure is purely the signal.
