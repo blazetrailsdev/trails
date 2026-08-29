@@ -16,7 +16,6 @@ import {
   checkIntInRange,
   columnNameMatcher,
   columnNameWithOrderMatcher,
-  IntegerOutOf64BitRange,
   lookupCastTypeFromColumn,
   quote as quoteFn,
   quoteDefaultExpression,
@@ -230,12 +229,8 @@ describe("PostgreSQL quoting", () => {
     expect(quote(new DataView(new Uint8Array([0x1f, 0x8b]).buffer))).toBe("'\\x1f8b'");
   });
 
-  it("checkIntInRange is the Rails name for checkIntegerRange", () => {
-    expect(() => checkIntInRange(BigInt("9223372036854775808"))).toThrow(IntegerOutOf64BitRange);
-    expect(() => checkIntInRange(BigInt("9223372036854775807"))).not.toThrow();
-  });
-
   it("checkIntInRange raises Rails' check_int_in_range message verbatim", () => {
+    expect(() => checkIntInRange(BigInt("9223372036854775807"))).not.toThrow();
     expect(() => checkIntInRange(BigInt("9223372036854775808"))).toThrow(
       `Provided value outside of the range of a signed 64bit integer.
 

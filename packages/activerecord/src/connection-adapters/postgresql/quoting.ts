@@ -91,8 +91,14 @@ export function quotedBinary(
   return bytes ? `'${escapeBytea(bytes)}'` : `'${escapeBytea(value as string)}'`;
 }
 
-/** @missingRailsCall check_int_in_range — PERMANENT */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
+  if (
+    ActiveRecord.raiseIntWiderThan64bit &&
+    (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value)))
+  ) {
+    checkIntInRange(value);
+  }
+
   if (value instanceof XmlData) {
     return `xml '${quoteString(value.toString())}'`;
   }
@@ -111,7 +117,6 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     return quote.call(this, encodeRange.call(this, value));
   }
   if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
-    if (ActiveRecord.raiseIntWiderThan64bit) checkIntegerRange(value);
     return String(value);
   }
   return abstractQuote.call(this, value);
@@ -149,9 +154,6 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   }
   if (value instanceof Range) {
     return encodeRange.call(this, value);
-  }
-  if (typeof value === "bigint" || (typeof value === "number" && Number.isInteger(value))) {
-    if (ActiveRecord.raiseIntWiderThan64bit) checkIntegerRange(value);
   }
   return abstractTypeCast.call(this, value);
 }
@@ -227,9 +229,7 @@ export function lookupCastTypeFromColumn(
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 
-export const checkIntInRange = checkIntegerRange;
-
-export function checkIntegerRange(value: bigint | number): void {
+export function checkIntInRange(value: bigint | number): void {
   const bigVal = typeof value === "bigint" ? value : BigInt(Math.trunc(value));
   if (bigVal > PG_INT64_MAX || bigVal < PG_INT64_MIN) {
     const exception = `Provided value outside of the range of a signed 64bit integer.
