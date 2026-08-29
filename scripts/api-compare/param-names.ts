@@ -154,20 +154,16 @@ function widenAnonymousSplat(rubyList: ParamInfo[], length: number): ParamInfo[]
   return [...rubyList.slice(0, at), ...filler, ...rubyList.slice(at + 1)];
 }
 
-/** Every TS candidate form that lines up with `rubyList` position-for-position.
- *  Empty when none does — a length disagreement is arity's finding. */
-export function alignedTsForms(rubyList: ParamInfo[], ts: ParamInfo[]): ParamInfo[][] {
-  return alignedTsFormsWithProvenance(rubyList, ts).map((f) => f.params);
-}
-
-/** A TS candidate form, and whether reaching it required DROPPING a parameter —
- *  a leading receiver or a trailing ported `&block`. */
+/** A TS candidate form, and whether reaching it dropped the LEADING parameter —
+ *  the explicit receiver — which shifts every position after it. */
 interface TsForm {
   params: ParamInfo[];
-  stripped: boolean;
+  receiverStripped: boolean;
 }
 
-function alignedTsFormsWithProvenance(rubyList: ParamInfo[], ts: ParamInfo[]): TsForm[] {
+/** Every TS candidate form that lines up with `rubyList` position-for-position.
+ *  Empty when none does — a length disagreement is arity's finding. */
+function alignedTsForms(rubyList: ParamInfo[], ts: ParamInfo[]): TsForm[] {
   if (rubyList.length === 0) return [];
   return tsForms(ts).filter(
     (f) =>
@@ -185,10 +181,10 @@ function tsForms(ts: ParamInfo[]): TsForm[] {
       ? list.slice(0, -1)
       : list;
   return [
-    { params: base, stripped: false },
-    { params: noReceiver, stripped: noReceiver !== base },
-    { params: stripCallback(base), stripped: false },
-    { params: stripCallback(noReceiver), stripped: noReceiver !== base },
+    { params: base, receiverStripped: false },
+    { params: noReceiver, receiverStripped: noReceiver !== base },
+    { params: stripCallback(base), receiverStripped: false },
+    { params: stripCallback(noReceiver), receiverStripped: noReceiver !== base },
   ];
 }
 
@@ -199,11 +195,11 @@ function tsForms(ts: ParamInfo[]): TsForm[] {
  * arity's finding, and reporting it twice would double-charge one divergence.
  */
 export function compareParamNames(ruby: ParamInfo[], ts: ParamInfo[]): ParamNameMismatch[] {
-  return compareParamNamesWithProvenance(ruby, ts).rows;
+  return compareParamNamesAligned(ruby, ts).rows;
 }
 
 /**
- * As {@link compareParamNames}, plus whether a form that kept its LEADING
+ * As {@link compareParamNames}, plus whether a form that KEPT its leading
  * parameter lined up at all. The receiver strip exists to ABSORB a port
  * convention, and arity.ts states the contract it buys that with: a strip "can
  * only ever gain a match, never manufacture a mismatch". Reading the surviving
@@ -221,19 +217,16 @@ export function compareParamNames(ruby: ParamInfo[], ts: ParamInfo[]): ParamName
  * no form. The trailing-`&block` strip drops a TAIL and shifts nothing, so it
  * reports like any other form.
  */
-export function compareParamNamesWithProvenance(
-  ruby: ParamInfo[],
-  ts: ParamInfo[],
-): { aligned: boolean; rows: ParamNameMismatch[] } {
+function compareParamNamesAligned(ruby: ParamInfo[], ts: ParamInfo[]): ParamNameVerdict {
   let best: ParamNameMismatch[] | null = null;
-  let alignedUnstripped = false;
+  let alignedWithReceiver = false;
   // Several forms can align — `with_node(node)` against `withNode(node, block)`
   // lines up both as receiver-stripped `(block)` and as callback-stripped
   // `(node)`. The strips exist to ABSORB the port's conventions, so the reading
   // that absorbs the most is the honest one; taking the first would invent a
   // rename out of the very convention the strip is there to recognise.
   for (const base of rubyForms(ruby)) {
-    for (const form of alignedTsFormsWithProvenance(base, ts)) {
+    for (const form of alignedTsForms(base, ts)) {
       const rubyList =
         form.params.length === base.length ? base : widenAnonymousSplat(base, form.params.length)!;
       const mismatches: ParamNameMismatch[] = [];
@@ -247,12 +240,12 @@ export function compareParamNamesWithProvenance(
         mismatches.push({ position, ruby: expected, ts: actual });
       }
       if (mismatches.length === 0) return { aligned: true, rows: [] };
-      if (form.stripped) continue;
-      alignedUnstripped = true;
+      if (form.receiverStripped) continue;
+      alignedWithReceiver = true;
       if (best === null || mismatches.length < best.length) best = mismatches;
     }
   }
-  return { aligned: alignedUnstripped, rows: best ?? [] };
+  return { aligned: alignedWithReceiver, rows: best ?? [] };
 }
 
 export interface ParamNameVerdict {
@@ -273,14 +266,13 @@ export function matchParamNamesAgainst(
   ruby: ParamInfo[],
   candidates: ParamInfo[][],
 ): ParamNameVerdict {
-  const forms = rubyForms(ruby);
   let best: ParamNameMismatch[] | null = null;
   for (const c of candidates) {
-    // A candidate that lines up with NO form is not this method's signature at
-    // all (a 0-arg re-export binding sharing the name); letting it count as
-    // clean would clear a real rename on the implementation beside it.
-    if (forms.every((rl) => alignedTsForms(rl, c).length === 0)) continue;
-    const verdict = compareParamNamesWithProvenance(ruby, c);
+    // A candidate that lines up with NO receiver-keeping form is not this
+    // method's signature at all (a 0-arg re-export binding sharing the name, or
+    // another method's constructor reached by dropping its receiver); letting it
+    // count as clean would clear a real rename on the implementation beside it.
+    const verdict = compareParamNamesAligned(ruby, c);
     if (!verdict.aligned) continue;
     if (verdict.rows.length === 0) return { aligned: true, rows: [] };
     if (best === null || verdict.rows.length < best.length) best = verdict.rows;

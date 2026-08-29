@@ -106,7 +106,6 @@ export const CORE_LIBRARY_ALIASES = new Map<string, string[]>([["escape", ["rege
  */
 export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
   ["exist?", ["existsSync", "exists"]],
-  ["exists?", ["existsSync", "exists"]],
   ["stat", ["statSync"]],
   ["rename", ["renameSync"]],
   ["unlink", ["unlinkSync"]],
