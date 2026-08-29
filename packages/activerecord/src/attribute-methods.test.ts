@@ -1,12 +1,19 @@
 import { describe, it, expect, vi } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
-import { TimeWithZone, TimeZone, toFs, zone } from "@blazetrails/activesupport";
+import {
+  assertNotDeprecated,
+  TimeWithZone,
+  TimeZone,
+  toFs,
+  zone,
+} from "@blazetrails/activesupport";
 import { BooleanType } from "@blazetrails/activemodel";
 import { Base, DangerousAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
 import { inTimeZone } from "./cases/helper.js";
+import { deprecator } from "./deprecator.js";
 import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { registerModel } from "./associations.js";
@@ -32,6 +39,37 @@ class ToBeLoadedSecond extends Base {
     this.aliasAttribute("subject", "title");
   }
 }
+
+class ClassWithDeprecatedAliasAttributeBehaviorResolved extends Base {
+  static {
+    this.tableName = "topics";
+    this.aliasAttribute("subject", "title");
+  }
+
+  get titleWas(): string {
+    return "overridden_title_was";
+  }
+
+  get subjectWas(): string {
+    return "overridden_subject_was";
+  }
+}
+
+class ParentWithAlias extends Base {
+  static {
+    this.tableName = "topics";
+    this.aliasAttribute("parents_subject", "title");
+  }
+}
+
+class AbstractClassInBetween extends ParentWithAlias {
+  static {
+    this.abstractClass = true;
+    this.aliasAttribute("parents_subject", "title");
+  }
+}
+
+class ChildWithAnAliasFromAbstractClass extends AbstractClassInBetween {}
 
 describe("AttributeMethodsTest", () => {
   const { topics } = fixtures(["topics", "developers", "companies", "computers"]);
@@ -639,19 +677,26 @@ describe("AttributeMethodsTest", () => {
     expect(obj.subjectWas).toBeNull();
   });
   it("#alias_attribute with an overridden original method along with an overridden alias method uses the overridden alias method", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_both" });
-    expect(p.title).toBe("alias_both");
+    const obj = new ClassWithDeprecatedAliasAttributeBehaviorResolved({}) as any;
+    obj.title = "hey";
+    expect(obj.subject).toBe("hey");
+    expect(obj.subjectWas).toBe("overridden_subject_was");
   });
   it("#alias_attribute with an overridden original method along with an overridden alias method in a parent class uses the overridden alias method", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_parent" });
-    expect(p.title).toBe("alias_parent");
+    class ChildWithDeprecatedBehaviorResolved extends ClassWithDeprecatedAliasAttributeBehaviorResolved {}
+
+    const obj = new ChildWithDeprecatedBehaviorResolved({}) as any;
+    obj.title = "hey";
+    expect(obj.subject).toBe("hey");
+    expect(obj.subjectWas).toBe("overridden_subject_was");
   });
   it("#alias_attribute with the same alias as parent doesn't issue a deprecation", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_same" });
-    expect(p.id).toBeDefined();
+    new ParentWithAlias({});
+    const obj = (await assertNotDeprecated(deprecator(), () => {
+      return new ChildWithAnAliasFromAbstractClass({});
+    })) as any;
+    obj.title = "hey";
+    expect(obj.parents_subject).toBe("hey");
   });
   it("#alias_attribute method on an abstract class is available on subclasses", async () => {
     class Superclass extends Base {
@@ -671,19 +716,50 @@ describe("AttributeMethodsTest", () => {
     expect(object.id_value).toBe(123_456);
   });
   it("#alias_attribute with an _in_database method issues raises an error", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_db" });
-    expect(p.id).toBeDefined();
+    class ClassWithGeneratedAttributeMethodTarget extends Base {
+      static {
+        this.tableName = "topics";
+        this.aliasAttribute("saved_title", "title_in_database");
+      }
+    }
+
+    const message =
+      "ClassWithGeneratedAttributeMethodTarget model aliases " +
+      "`title_in_database`, but `title_in_database` is not an attribute. " +
+      "Use `alias_method :saved_title, :title_in_database` or define the method manually.";
+
+    expect(() => new ClassWithGeneratedAttributeMethodTarget({})).toThrow(message);
   });
   it("#alias_attribute with enum method raises an error", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_enum" });
-    expect(p.id).toBeDefined();
+    class ClassWithEnumMethodTarget extends Base {
+      static {
+        this.tableName = "books";
+        this.attribute("status", "string");
+        this.enum("status", { pending: "0", completed: "1" });
+        this.aliasAttribute("is_pending?", "pending?");
+      }
+    }
+
+    const message =
+      "ClassWithEnumMethodTarget model aliases `pending?`, but `pending?` is not an attribute. " +
+      "Use `alias_method :is_pending?, :pending?` or define the method manually.";
+
+    expect(() => new ClassWithEnumMethodTarget({})).toThrow(message);
   });
   it("#alias_attribute with an association method raises an error", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_assoc" });
-    expect(p.id).toBeDefined();
+    class ClassWithAssociationTarget extends Base {
+      static {
+        this.tableName = "books";
+        this.belongsTo("author");
+        this.aliasAttribute("written_by", "author");
+      }
+    }
+
+    const message =
+      "ClassWithAssociationTarget model aliases `author`, but `author` is not an attribute. " +
+      "Use `alias_method :written_by, :author` or define the method manually.";
+
+    expect(() => new ClassWithAssociationTarget({})).toThrow(message);
   });
   it("#alias_attribute method on a STI class is available on subclasses", async () => {
     class Superclass extends Base {
@@ -703,9 +779,22 @@ describe("AttributeMethodsTest", () => {
     expect(comment.text).toBe("Text");
   });
   it("#alias_attribute with a manually defined method raises an error", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_manual" });
-    expect(p.id).toBeDefined();
+    class ClassWithAliasedManuallyDefinedMethod extends Base {
+      static {
+        this.tableName = "books";
+        this.aliasAttribute("print", "publish");
+      }
+
+      publish(): string {
+        return "Publishing!";
+      }
+    }
+
+    const message =
+      "ClassWithAliasedManuallyDefinedMethod model aliases `publish`, but `publish` is not an attribute. " +
+      "Use `alias_method :print, :publish` or define the method manually.";
+
+    expect(() => new ClassWithAliasedManuallyDefinedMethod({})).toThrow(message);
   });
 
   it("#id_value alias returns the value in the id column, when id column exists", async () => {

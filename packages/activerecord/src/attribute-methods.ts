@@ -143,6 +143,13 @@ interface AttributeMethodsHost {
   generateAliasAttributes?(): void;
 }
 
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
+
 const __FILE__ = import.meta.url;
 const __LINE__ = 0;
 
@@ -239,7 +246,6 @@ export function generateAliasAttributeMethods(
   this.attributeMethodPatternsCache().clear();
 }
 
-/** @missingRailsCall has_attribute? — PERMANENT */
 export function aliasAttributeMethodDefinition(
   this: AttributeMethodsHost,
   codeGenerator: CodeGenerator,
@@ -249,11 +255,18 @@ export function aliasAttributeMethodDefinition(
 ): void {
   oldName = String(oldName);
 
-  this.defineAttributeMethodPattern(pattern, oldName, {
-    owner: codeGenerator,
-    as: newName,
-    override: true,
-  });
+  if (this.abstractClass !== true && !this._hasAttribute(oldName)) {
+    throw new ArgumentError(
+      `${this.name} model aliases \`${oldName}\`, but \`${oldName}\` is not an attribute. ` +
+        `Use \`alias_method :${newName}, :${oldName}\` or define the method manually.`,
+    );
+  } else {
+    this.defineAttributeMethodPattern(pattern, oldName, {
+      owner: codeGenerator,
+      as: newName,
+      override: true,
+    });
+  }
 }
 
 export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean {

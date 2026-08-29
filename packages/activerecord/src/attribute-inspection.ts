@@ -66,36 +66,37 @@ function inspectArray(arr: unknown[]): string {
 }
 
 export function formatForInspect(this: any, name: string, value: unknown): string {
-  if (value === null || value === undefined) return "nil";
-  const filter = inspectionFilter.call(this.constructor);
-  const filtered = filter.filterParam(name, value);
-  if (filtered instanceof InspectionMask) return filtered.toString();
-  if (filtered === null || filtered === undefined) return "nil";
-  if (typeof filtered === "string") {
-    return filtered.length > 50 ? inspect(`${filtered.substring(0, 50)}...`) : inspect(filtered);
-  }
-  if (filtered instanceof Temporal.PlainDate) {
-    return `"${dateToFs(filtered, "inspect")}"`;
-  }
-  if (filtered instanceof Temporal.Instant) {
-    return `"${toFs(filtered, "inspect")}"`;
-  }
-  if (filtered instanceof TimeWithZone) {
-    return `"${filtered.toFs("inspect")}"`;
-  }
-  // boundary: legacy custom-typed attributes may still be JS Date.
-  if (filtered instanceof Date) {
-    return Number.isNaN(filtered.getTime())
-      ? `"${String(filtered)}"`
-      : `"${filtered.toISOString()}"`;
-  }
-  if (globalThis.Array.isArray(filtered)) {
-    return inspectArray(filtered as unknown[]);
-  }
-  try {
-    const stringified = JSON.stringify(filtered);
-    return stringified === undefined ? String(filtered) : stringified;
-  } catch {
-    return String(filtered);
+  if (value === null || value === undefined) {
+    return "nil";
+  } else {
+    let inspectedValue: string;
+    if (typeof value === "string" && value.length > 50) {
+      inspectedValue = inspect(`${value.substring(0, 50)}...`);
+    } else if (value instanceof Temporal.PlainDate) {
+      inspectedValue = `"${dateToFs(value, "inspect")}"`;
+    } else if (value instanceof Temporal.Instant) {
+      inspectedValue = `"${toFs(value, "inspect")}"`;
+    } else if (value instanceof TimeWithZone) {
+      inspectedValue = `"${value.toFs("inspect")}"`;
+      // boundary: legacy custom-typed attributes may still be JS Date.
+    } else if (value instanceof Date) {
+      inspectedValue = Number.isNaN(value.getTime())
+        ? `"${String(value)}"`
+        : `"${value.toISOString()}"`;
+    } else if (typeof value === "string") {
+      inspectedValue = inspect(value);
+    } else if (globalThis.Array.isArray(value)) {
+      inspectedValue = inspectArray(value as unknown[]);
+    } else {
+      try {
+        const stringified = JSON.stringify(value);
+        inspectedValue = stringified === undefined ? String(value) : stringified;
+      } catch {
+        inspectedValue = String(value);
+      }
+    }
+
+    const filtered = inspectionFilter.call(this.constructor).filterParam(name, inspectedValue);
+    return filtered instanceof InspectionMask ? filtered.toString() : String(filtered);
   }
 }
