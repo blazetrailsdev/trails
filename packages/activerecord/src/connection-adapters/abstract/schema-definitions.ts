@@ -1554,7 +1554,7 @@ export class Table {
     return this._schema.removeCheckConstraint(this.name, ...(rest as []), options);
   }
 
-  async checkConstraintExists(...args: []): Promise<boolean>;
+  async checkConstraintExists(...args: string[]): Promise<boolean>;
   async checkConstraintExists(
     ...args: [...unknown[], { name?: string; expression?: string }]
   ): Promise<boolean>;

@@ -108,12 +108,6 @@ export class EncryptedFile {
     return (await this.readKeyFile()) !== null;
   }
 
-  /**
-   * @missingRailsCall exist? — PERMANENT. encrypted_file.rb:71 `content_path.exist?` —
-   *   `Pathname#exist?` with no Pathname to call it on; the same predicate is
-   *   `await fs.exists(path)` on the async fs adapter. See the `initialize ->
-   *   new` row above.
-   */
   async read(): Promise<string> {
     const key = await this.key();
     const fs = await getFsAsync();
@@ -210,11 +204,6 @@ export class EncryptedFile {
     return v && v.length > 0 ? v : null;
   }
 
-  /**
-   * @missingRailsCall exist? — PERMANENT. encrypted_file.rb:121 `key_path.exist?` — same
-   *   Pathname substitution as `read -> exist?` above: `await
-   *   fs.exists(this.keyPath)`.
-   */
   private async readKeyFile(): Promise<string | null> {
     if (this.keyFileChecked) return this.keyFileContents;
     this.keyFileChecked = true;

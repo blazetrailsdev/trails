@@ -89,9 +89,37 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
  */
 export const CORE_LIBRARY_ALIASES = new Map<string, string[]>([["escape", ["regexpEscape"]]]);
 
+/**
+ * Ruby `File` class methods whose faithful port goes through trails' fs adapter
+ * (`activesupport/src/fs-adapter.ts`), whose members carry NODE's spellings —
+ * `File.exist?` is `getFs().existsSync`, `File.stat` is `statSync`, and so on.
+ * Ruby's name is not available: the adapter is the Node `fs` surface, so the
+ * port cannot spell the call `exist` without inventing a wrapper Rails does not
+ * have. Same silence-only contract as {@link JS_ENUMERABLE_ALIASES} — an alias
+ * only decides whether a TS body already makes a call and can never manufacture
+ * a mismatch — and kept a separate table for the same reason
+ * {@link CORE_LIBRARY_ALIASES} is: these KEYS are not lint-calls.ts noise.
+ *
+ * Both spellings are listed per name because the adapter exposes the sync
+ * member (`existsSync`) while a promise-shaped seam spells it bare (`exists`).
+ * Each is the WHOLE call's analogue, never a building block.
+ */
+export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
+  ["exist?", ["existsSync", "exists"]],
+  ["stat", ["statSync"]],
+  ["rename", ["renameSync"]],
+  ["unlink", ["unlinkSync"]],
+  ["realpath", ["realpathSync"]],
+]);
+
 /** JS call names that count as making Ruby call `rubyCall`. */
 export function jsEnumerableAliases(rubyCall: string): string[] {
-  return JS_ENUMERABLE_ALIASES.get(rubyCall) ?? CORE_LIBRARY_ALIASES.get(rubyCall) ?? [];
+  return (
+    JS_ENUMERABLE_ALIASES.get(rubyCall) ??
+    CORE_LIBRARY_ALIASES.get(rubyCall) ??
+    FS_ADAPTER_ALIASES.get(rubyCall) ??
+    []
+  );
 }
 
 /**

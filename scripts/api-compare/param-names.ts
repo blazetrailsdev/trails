@@ -154,24 +154,38 @@ function widenAnonymousSplat(rubyList: ParamInfo[], length: number): ParamInfo[]
   return [...rubyList.slice(0, at), ...filler, ...rubyList.slice(at + 1)];
 }
 
+/** A TS candidate form, and whether reaching it dropped the LEADING parameter —
+ *  the explicit receiver — which shifts every position after it. */
+interface TsForm {
+  params: ParamInfo[];
+  receiverStripped: boolean;
+}
+
 /** Every TS candidate form that lines up with `rubyList` position-for-position.
  *  Empty when none does — a length disagreement is arity's finding. */
-export function alignedTsForms(rubyList: ParamInfo[], ts: ParamInfo[]): ParamInfo[][] {
+function alignedTsForms(rubyList: ParamInfo[], ts: ParamInfo[]): TsForm[] {
   if (rubyList.length === 0) return [];
   return tsForms(ts).filter(
-    (f) => f.length === rubyList.length || widenAnonymousSplat(rubyList, f.length) !== null,
+    (f) =>
+      f.params.length === rubyList.length ||
+      widenAnonymousSplat(rubyList, f.params.length) !== null,
   );
 }
 
 /** The TS candidate forms, in the order arity.ts tries them. */
-function tsForms(ts: ParamInfo[]): ParamInfo[][] {
+function tsForms(ts: ParamInfo[]): TsForm[] {
   const base = stripThis(ts);
   const noReceiver = base.length > 0 && isReceiverParam(base[0]) ? base.slice(1) : base;
   const stripCallback = (list: ParamInfo[]): ParamInfo[] =>
     list.length > 0 && TRAILING_CALLBACK_NAMES.has(list[list.length - 1].name)
       ? list.slice(0, -1)
       : list;
-  return [base, noReceiver, stripCallback(base), stripCallback(noReceiver)];
+  return [
+    { params: base, receiverStripped: false },
+    { params: noReceiver, receiverStripped: noReceiver !== base },
+    { params: stripCallback(base), receiverStripped: false },
+    { params: stripCallback(noReceiver), receiverStripped: noReceiver !== base },
+  ];
 }
 
 /**
@@ -181,7 +195,31 @@ function tsForms(ts: ParamInfo[]): ParamInfo[][] {
  * arity's finding, and reporting it twice would double-charge one divergence.
  */
 export function compareParamNames(ruby: ParamInfo[], ts: ParamInfo[]): ParamNameMismatch[] {
+  return compareParamNamesAligned(ruby, ts).rows;
+}
+
+/**
+ * As {@link compareParamNames}, plus whether a form that KEPT its leading
+ * parameter lined up at all. The receiver strip exists to ABSORB a port
+ * convention, and arity.ts states the contract it buys that with: a strip "can
+ * only ever gain a match, never manufacture a mismatch". Reading the surviving
+ * names off a receiver-stripped form breaks it, because that strip also SHIFTS
+ * every remaining position: `Relation#new(attributes)`
+ * (`relation.rb:125`) scored against `ExplainProxy#initialize(relation, options)`
+ * (`relation.rb:7`) — a different method, reachable only because dropping the
+ * `relation` receiver leaves a one-length form — reported `attributes` renamed
+ * to `options` while both signatures spell their own Rails identifiers.
+ *
+ * So a receiver-stripped form may still CLEAR a pair (its names match, which is
+ * the convention being absorbed), but never supplies the reported rows: with no
+ * receiver-keeping form aligned, the pair is left out of the parameter-name
+ * population entirely, the same way arity leaves out a pair that lines up under
+ * no form. The trailing-`&block` strip drops a TAIL and shifts nothing, so it
+ * reports like any other form.
+ */
+function compareParamNamesAligned(ruby: ParamInfo[], ts: ParamInfo[]): ParamNameVerdict {
   let best: ParamNameMismatch[] | null = null;
+  let alignedWithReceiver = false;
   // Several forms can align — `with_node(node)` against `withNode(node, block)`
   // lines up both as receiver-stripped `(block)` and as callback-stripped
   // `(node)`. The strips exist to ABSORB the port's conventions, so the reading
@@ -189,22 +227,25 @@ export function compareParamNames(ruby: ParamInfo[], ts: ParamInfo[]): ParamName
   // rename out of the very convention the strip is there to recognise.
   for (const base of rubyForms(ruby)) {
     for (const form of alignedTsForms(base, ts)) {
-      const rubyList = form.length === base.length ? base : widenAnonymousSplat(base, form.length)!;
+      const rubyList =
+        form.params.length === base.length ? base : widenAnonymousSplat(base, form.params.length)!;
       const mismatches: ParamNameMismatch[] = [];
       for (let position = 0; position < rubyList.length; position++) {
         const rubyParam = rubyList[position];
-        const tsParam = form[position];
+        const tsParam = form.params[position];
         const expected = bareIdentifier(snakeToCamel(rubyParam.name));
         const actual = bareIdentifier(tsParam.name);
         if (expected === actual) continue;
         if (isLegitimateDifference(rubyParam, tsParam)) continue;
         mismatches.push({ position, ruby: expected, ts: actual });
       }
-      if (mismatches.length === 0) return [];
+      if (mismatches.length === 0) return { aligned: true, rows: [] };
+      if (form.receiverStripped) continue;
+      alignedWithReceiver = true;
       if (best === null || mismatches.length < best.length) best = mismatches;
     }
   }
-  return best ?? [];
+  return { aligned: alignedWithReceiver, rows: best ?? [] };
 }
 
 export interface ParamNameVerdict {
@@ -225,16 +266,16 @@ export function matchParamNamesAgainst(
   ruby: ParamInfo[],
   candidates: ParamInfo[][],
 ): ParamNameVerdict {
-  const forms = rubyForms(ruby);
   let best: ParamNameMismatch[] | null = null;
   for (const c of candidates) {
-    // A candidate that lines up with NO form is not this method's signature at
-    // all (a 0-arg re-export binding sharing the name); letting it count as
-    // clean would clear a real rename on the implementation beside it.
-    if (forms.every((rl) => alignedTsForms(rl, c).length === 0)) continue;
-    const rows = compareParamNames(ruby, c);
-    if (rows.length === 0) return { aligned: true, rows: [] };
-    if (best === null || rows.length < best.length) best = rows;
+    // A candidate that lines up with NO receiver-keeping form is not this
+    // method's signature at all (a 0-arg re-export binding sharing the name, or
+    // another method's constructor reached by dropping its receiver); letting it
+    // count as clean would clear a real rename on the implementation beside it.
+    const verdict = compareParamNamesAligned(ruby, c);
+    if (!verdict.aligned) continue;
+    if (verdict.rows.length === 0) return { aligned: true, rows: [] };
+    if (best === null || verdict.rows.length < best.length) best = verdict.rows;
   }
   return best === null ? { aligned: false, rows: [] } : { aligned: true, rows: best };
 }

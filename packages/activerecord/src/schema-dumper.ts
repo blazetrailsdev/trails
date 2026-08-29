@@ -4,7 +4,6 @@ import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
 import type { Base } from "./base.js";
 import type { Type } from "@blazetrails/activemodel";
-import { defaultValue } from "@blazetrails/activemodel";
 
 let _base: typeof Base | undefined;
 
@@ -160,11 +159,7 @@ class AdapterSchemaSource implements SchemaSource {
   }
 
   lookupCastTypeFromColumn(column: ColumnInfo): Type {
-    return (
-      (this._adapter.lookupCastTypeFromColumn(
-        column as { sqlType: string | null },
-      ) as Type | null) ?? defaultValue()
-    );
+    return this._adapter.lookupCastTypeFromColumn(column as { sqlType: string | null });
   }
 
   /** @internal */
