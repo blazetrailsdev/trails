@@ -8,6 +8,8 @@ import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 class Topic extends Model {
+  declare content: string | null;
+  declare title: string | null;
   declare static attribute: AttributesClassHalf["attribute"];
 
   static {

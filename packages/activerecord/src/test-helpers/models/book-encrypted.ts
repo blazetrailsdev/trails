@@ -112,6 +112,7 @@ export class EncryptedBookWithUnencryptedDataOptedIn extends Base {
 }
 
 export class EncryptedBookWithBinary extends Base {
+  declare logo: unknown;
   static _tableName = "encrypted_books";
 
   static {
@@ -138,6 +139,7 @@ export class EncryptedBookWithSerializedSecondBinary extends Base {
 }
 
 export class EncryptedBookWithSerializedDeterministicName extends Base {
+  declare name: unknown;
   static _tableName = "encrypted_books";
 
   static {

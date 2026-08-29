@@ -19,6 +19,8 @@ import { adapterType } from "./test-adapter.js";
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 class OverloadedType extends Base {
+  declare non_existent_decimal: any;
+  declare overloaded_float: any;
   static {
     this.tableName = "overloaded_types";
     this.attribute("overloaded_float", "integer");
@@ -32,6 +34,7 @@ class OverloadedType extends Base {
 class ChildOfOverloadedType extends OverloadedType {}
 
 class GrandchildOfOverloadedType extends ChildOfOverloadedType {
+  declare overloaded_float: any;
   static {
     this.attribute("overloaded_float", "float");
   }
@@ -133,6 +136,8 @@ describe("CustomPropertiesTest", () => {
 
   it("attributes with overridden types keep their type when a default value is configured separately", () => {
     class Child extends OverloadedType {
+      declare non_existent_decimal: any;
+      declare overloaded_float: any;
       static {
         this.attribute("overloaded_float", { default: "123" });
       }
@@ -493,6 +498,7 @@ describe("DefineAttributeTest", () => {
   it("define_attribute registers a type object directly", () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
+      declare status: string;
       static {
         this.defineAttribute("score", intType);
       }
@@ -504,6 +510,7 @@ describe("DefineAttributeTest", () => {
   it("define_attribute with default value", () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
+      declare status: string;
       static {
         this.defineAttribute("rating", intType, { default: 5 });
       }
@@ -516,6 +523,7 @@ describe("DefineAttributeTest", () => {
     const strType = typeRegistry.lookup("string");
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
+      declare status: string;
       static {
         this.defineAttribute("score", strType, { default: "10" });
         this.defineAttribute("score", intType);
@@ -528,6 +536,7 @@ describe("DefineAttributeTest", () => {
   it("define_attribute with userProvidedDefault false uses database cast", () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
+      declare status: string;
       static {
         this.defineAttribute("views", intType, { default: "0", userProvidedDefault: false });
       }
@@ -539,6 +548,7 @@ describe("DefineAttributeTest", () => {
   it("define_attribute builds a UserProvidedDefault when the default is user-provided", () => {
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
+      declare status: string;
       static {
         this.defineAttribute("score", intType, { default: "5" });
       }
@@ -551,6 +561,7 @@ describe("DefineAttributeTest", () => {
     const strType = typeRegistry.lookup("string");
     const intType = typeRegistry.lookup("integer");
     class Post extends Base {
+      declare status: string;
       static {
         this.defineAttribute("score", strType);
       }
@@ -566,6 +577,7 @@ describe("DefineAttributeTest", () => {
 describe("DefaultAttributesTest", () => {
   it("_default_attributes returns an AttributeSet", () => {
     class Post extends Base {
+      declare status: string;
       static {
         this.attribute("title", "string");
       }
@@ -576,6 +588,7 @@ describe("DefaultAttributesTest", () => {
 
   it("_default_attributes includes declared attributes", () => {
     class Post extends Base {
+      declare status: string;
       static {
         this.attribute("title", "string", { default: "Untitled" });
       }
@@ -586,6 +599,7 @@ describe("DefaultAttributesTest", () => {
 
   it("_default_attributes is cached", () => {
     class Post extends Base {
+      declare status: string;
       static {
         this.attribute("title", "string");
       }
@@ -595,6 +609,7 @@ describe("DefaultAttributesTest", () => {
 
   it("_default_attributes cache is invalidated when attribute is defined", () => {
     class Post extends Base {
+      declare status: string;
       static {
         this.attribute("title", "string");
       }
@@ -608,6 +623,7 @@ describe("DefaultAttributesTest", () => {
 
   it("new record attributes are seeded from _default_attributes", () => {
     class Post extends Base {
+      declare status: string;
       static {
         this.attribute("status", "string", { default: "draft" });
       }
@@ -617,7 +633,9 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("_defaultAttributes seeds schema columns via fromDatabase then replays user pending queue", () => {
-    class Post extends Base {}
+    class Post extends Base {
+      declare status: string;
+    }
     Post.attribute("title", "string", { default: "untitled" });
     (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
       views: { name: "views", default: 0 },
@@ -629,7 +647,9 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("user attribute() declaration overrides schema column type via pending queue", () => {
-    class Post extends Base {}
+    class Post extends Base {
+      declare status: string;
+    }
     Post.attribute("score", "string");
     (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
       score: { name: "score", default: 0 },
@@ -640,7 +660,9 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("resetDefaultAttributes reloads the schema from cache", () => {
-    class Post extends Base {}
+    class Post extends Base {
+      declare status: string;
+    }
     (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
       score: { name: "score", default: 5 },
     };
@@ -653,7 +675,9 @@ describe("DefaultAttributesTest", () => {
   });
 
   it("attribute() overriding only type preserves the schema default", () => {
-    class Post extends Base {}
+    class Post extends Base {
+      declare status: string;
+    }
     Post.attribute("score", "string");
     (Post as unknown as { _columnsHash?: Record<string, unknown> })._columnsHash = {
       score: { name: "score", default: 5 },
@@ -700,6 +724,7 @@ describe("DefineAttributeSTITest", () => {
   it("defineAttribute for id does not install an accessor", () => {
     const strType = typeRegistry.lookup("string");
     class Post extends Base {
+      declare status: string;
       static {
         this.attribute("title", "string");
       }
@@ -713,6 +738,7 @@ describe("DefineAttributeSTITest", () => {
 describe("ResetDefaultAttributesCascadeTest", () => {
   it("adding an attribute to a superclass invalidates an AR subclass _defaultAttributes cache", () => {
     class Post extends Base {
+      declare status: string;
       static {
         this.attribute("title", "string");
       }

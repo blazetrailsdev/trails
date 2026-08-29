@@ -17,6 +17,8 @@ afterAll(async () => {
 describe("bigint model round-trip (all adapters)", () => {
   function makeModel() {
     class Metric extends Base {
+      declare label: string;
+      declare score: unknown;
       static {
         this.attribute("score", "big_integer");
         this.attribute("label", "string");

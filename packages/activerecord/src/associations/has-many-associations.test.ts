@@ -2544,7 +2544,7 @@ describe("HasManyAssociationsTest", () => {
     await proxy.reload();
     expect(proxy.loaded).toBe(true);
     expect(proxy.target.length).toBe(1);
-    expect(proxy.target[0].title).toBe("A");
+    expect((proxy.target[0] as ReloadUlPost).title).toBe("A");
   });
   it("find all with include and conditions", async () => {
     registerModel(Developer);
@@ -3851,7 +3851,7 @@ describe("HasManyAssociationsTest", () => {
 
     const comments = await findHasManyTarget(author, "helloPostComments");
     expect(comments.length).toBe(1);
-    expect(comments[0].body).toBe("hello");
+    expect((comments[0] as HcComment).body).toBe("hello");
   });
   it("include checks if record exists if target not loaded", async () => {
     class InclAuthor extends Base {
@@ -6064,13 +6064,13 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 
   it("has many assignment with custom primary key", async () => {
     const david = people("david");
-    const names = (await association(david, "essays")).map((e) => e.name);
+    const names = (await association(david, "essays")).map((e) => (e as HmEssay).name);
     expect(names).toEqual(["A Modest Proposal"]);
 
     const remote = await HmEssay.create({ name: "Remote Work" });
     await association(david, "essays").replace([remote]);
 
-    const names2 = (await association(david, "essays")).map((e) => e.name);
+    const names2 = (await association(david, "essays")).map((e) => (e as HmEssay).name);
     expect(names2).toEqual(["Remote Work"]);
   });
 });

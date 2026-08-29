@@ -217,7 +217,7 @@ describe("AutomaticInverseFindingTests", () => {
   it("has many with scoped belongs to does not find inverse automatically", async () => {
     const book = books("tlg");
     await (book as any).updateAttribute("author_visibility", 1);
-    expect(await association(book, "subscriptions").build({}).book).toBeNull();
+    expect(await (association(book, "subscriptions").build({}) as Subscription).book).toBeNull();
 
     const subscriptionReflection = (Book as any).reflectOnAssociation("subscriptions");
     const bookReflection = (Subscription as any).reflectOnAssociation("book");
@@ -225,7 +225,7 @@ describe("AutomaticInverseFindingTests", () => {
     expect(bookReflection.scope).toBeTruthy();
 
     await withAutomaticScopeInversing([bookReflection, subscriptionReflection], async () => {
-      expect(await association(book, "subscriptions").build({}).book).toBeNull();
+      expect(await (association(book, "subscriptions").build({}) as Subscription).book).toBeNull();
     });
   });
 

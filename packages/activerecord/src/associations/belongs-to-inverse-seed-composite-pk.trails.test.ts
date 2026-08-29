@@ -77,7 +77,7 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
       parent,
     );
 
-    expect((child as Record<string, unknown>).composite_pk_parent_id).toBe(42);
+    expect((child as unknown as Record<string, unknown>).composite_pk_parent_id).toBe(42);
   });
 
   it("infers id as the association primary key for a [tenant_key, id]-PK target", () => {

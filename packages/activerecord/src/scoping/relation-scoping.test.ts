@@ -183,7 +183,7 @@ describe("RelationScopingTest", () => {
 
   it("scoped find select", async () => {
     await Developer.select("id, name").scoping(async () => {
-      const developer = (await Developer.where("name = 'David'").first()) as Base;
+      const developer = (await Developer.where("name = 'David'").first()) as Developer;
       expect(developer.name).toBe("David");
       expect(developer.hasAttribute("salary")).toBe(false);
     });
@@ -191,7 +191,9 @@ describe("RelationScopingTest", () => {
 
   it("scope select concatenates", async () => {
     await Developer.select("id, name").scoping(async () => {
-      const developer = (await Developer.select("salary").where("name = 'David'").first()) as Base;
+      const developer = (await Developer.select("salary")
+        .where("name = 'David'")
+        .first()) as Developer;
       expect(developer.salary).toBe(80000);
       expect(developer.hasAttribute("id")).toBe(true);
       expect(developer.hasAttribute("name")).toBe(true);
@@ -213,7 +215,7 @@ describe("RelationScopingTest", () => {
     await Developer.annotate("scoped").scoping(async () => {
       const sql = Developer.where("name = 'David'").toSql();
       expect(sql).toContain("/* scoped */");
-      const developer = (await Developer.where("name = 'David'").first()) as Base;
+      const developer = (await Developer.where("name = 'David'").first()) as Developer;
       expect(developer.name).toBe("David");
     });
   });
@@ -224,7 +226,7 @@ describe("RelationScopingTest", () => {
       .scoping(async () => {
         const sql = Developer.where("name = 'David'").toSql();
         expect(sql).not.toContain("/* scoped */");
-        const developer = (await Developer.where("name = 'David'").first()) as Base;
+        const developer = (await Developer.where("name = 'David'").first()) as Developer;
         expect(developer.name).toBe("David");
       });
   });
@@ -232,7 +234,7 @@ describe("RelationScopingTest", () => {
   it("find with annotation unscope", async () => {
     const rel = Developer.annotate("unscope").where("name = 'David'").unscope("annotate");
     expect(rel.toSql()).not.toContain("/* unscope */");
-    const developer = (await rel.first()) as Base;
+    const developer = (await rel.first()) as Developer;
     expect(developer.name).toBe("David");
   });
 
@@ -326,9 +328,9 @@ describe("RelationScopingTest", () => {
 
   it("update all default scope filters on joins", async () => {
     await DeveloperFilteredOnJoins.updateAll({ salary: 65000 });
-    const david = (await Developer.find(developers("david").id)) as Base;
+    const david = await Developer.find(developers("david").id);
     expect(david.salary).toBe(65000);
-    const jamis = (await Developer.find(developers("jamis").id)) as Base;
+    const jamis = await Developer.find(developers("jamis").id);
     expect(jamis.salary).not.toBe(65000);
   });
 
@@ -412,15 +414,15 @@ describe("RelationScopingTest", () => {
 
   it("scoping applies to update with all queries", async () => {
     await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
-    const dev = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
+    const dev = (await Author.where({ organization_id: "agency_1" }).first()) as Author;
     await Author.where({ organization_id: "agency_1" }).scoping(async () => {
       await (dev as any).update({ name: "Eileen" });
     });
-    expect(((await Author.find(dev.id)) as Base).name).toBe("Eileen");
+    expect((await Author.find(dev.id)).name).toBe("Eileen");
     await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
       await (dev as any).update({ name: "Not Eileen" });
     });
-    expect(((await Author.find(dev.id)) as Base).name).toBe("Not Eileen");
+    expect((await Author.find(dev.id)).name).toBe("Not Eileen");
   });
 
   it("scoping applies to delete with all queries", async () => {
@@ -504,9 +506,11 @@ describe("NestedRelationScopingTest", () => {
   it("replace options", async () => {
     await Developer.where({ name: "David" }).scoping(async () => {
       await Developer.unscoped(async () => {
-        expect(((await Developer.where({ name: "Jamis" }).first()) as Base).name).toBe("Jamis");
+        expect(((await Developer.where({ name: "Jamis" }).first()) as Developer).name).toBe(
+          "Jamis",
+        );
       });
-      expect(((await Developer.first()) as Base).name).toBe("David");
+      expect(((await Developer.first()) as Developer).name).toBe("David");
     });
   });
 

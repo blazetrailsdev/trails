@@ -1199,7 +1199,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
   it("has and belongs to many is usable with belongs to required by default", async () => {
     const before = await ((await Project.first())! as any).developersRequiredByDefault.size();
-    await ((await Project.first())!.developersRequiredByDefault as any).createBang({
+    await (await Project.first())!.developersRequiredByDefault.createBang({
       name: "Sean",
       salary: 50000,
     });

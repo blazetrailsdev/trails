@@ -9,6 +9,9 @@ import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 class Topic extends Model {
+  declare authorName: string | null;
+  declare content: string | null;
+  declare title: string | null;
   declare static attribute: AttributesClassHalf["attribute"];
 
   static {
@@ -26,6 +29,7 @@ class Topic extends Model {
 interface Topic extends Attributes {}
 
 class Person extends Model {
+  declare karma: string | null;
   declare static attribute: AttributesClassHalf["attribute"];
 
   static {

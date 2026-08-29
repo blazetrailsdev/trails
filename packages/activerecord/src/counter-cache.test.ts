@@ -521,7 +521,7 @@ describe("CounterCacheTest", () => {
       [
         async () => {
           await aircraft.reload();
-          return aircraft.wheels_count as number;
+          return aircraft.wheels_count;
         },
       ],
       1,
@@ -534,7 +534,7 @@ describe("CounterCacheTest", () => {
       [
         async () => {
           await aircraft.reload();
-          return aircraft.wheels_count as number;
+          return aircraft.wheels_count;
         },
       ],
       -1,

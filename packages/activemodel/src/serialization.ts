@@ -3,7 +3,6 @@ import { asJson } from "@blazetrails/activesupport";
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
 export interface SerializationRecord {
-  [key: string]: unknown;
   _attributes?: unknown;
   attributes?: Record<string, unknown>;
   constructor: { name: string };
@@ -45,10 +44,11 @@ export function serializableHash(
 
   if (options.methods) {
     for (const method of options.methods) {
-      if (typeof record[method] === "function") {
-        safeSet(result, method, (record[method] as () => unknown)());
+      const value = (record as Record<string, unknown>)[method];
+      if (typeof value === "function") {
+        safeSet(result, method, (value as () => unknown).call(record));
       } else if (method in record) {
-        safeSet(result, method, record[method]);
+        safeSet(result, method, value);
       } else {
         throw new NoMethodError(
           `undefined method '${method}' for an instance of ${record.constructor.name}`,
@@ -353,7 +353,7 @@ function sendAssociation(record: SerializationRecord, name: string): unknown {
       `undefined method '${name}' for an instance of ${record.constructor.name}`,
     );
   }
-  const reader = record[name];
+  const reader = (record as Record<string, unknown>)[name];
   return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
 }
 

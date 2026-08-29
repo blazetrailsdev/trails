@@ -5,6 +5,7 @@ import { fixtures } from "./test-fixtures.js";
 let addCallbackCalled: NwcBird[] = [];
 
 class NwcBird extends Base {
+  declare name: string;
   static {
     this._tableName = "birds";
     this.attribute("name", "string");

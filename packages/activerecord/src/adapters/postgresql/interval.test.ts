@@ -7,6 +7,11 @@ import { Base } from "../../index.js";
 import { Column as PostgreSQLColumn } from "../../connection-adapters/postgresql/column.js";
 
 class IntervalDataType extends Base {
+  declare all_terms: unknown;
+  declare default_term: unknown;
+  declare legacy_term: string;
+  declare maximum_term: unknown;
+  declare minimum_term: unknown;
   static {
     this.tableName = "interval_data_types";
     this.attribute("id", "integer");

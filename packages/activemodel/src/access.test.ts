@@ -9,6 +9,8 @@ import { Attributes, type AttributesClassHalf } from "./attributes.js";
 
 describe("AccessTest", () => {
   class SliceModel extends Model {
+    declare age: number;
+    declare name: string;
     declare static attribute: AttributesClassHalf["attribute"];
 
     static {

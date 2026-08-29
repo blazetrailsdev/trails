@@ -6,6 +6,7 @@ export class MutableDerivedSecretKeyProvider extends DerivedSecretKeyProvider {
 }
 
 export class EncryptedPost extends Base {
+  declare title: string;
   static _tableName = "posts";
 
   static {

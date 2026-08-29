@@ -38,7 +38,7 @@ describe("StoreTest", () => {
   it("writing store attributes does not update unchanged value", () => {
     const adminUser = new AdminUser({ homepage: null });
     (adminUser as any).homepage = null;
-    expect((adminUser.settings as HashWithIndifferentAccess).size).toBe(0);
+    expect(adminUser.settings.size).toBe(0);
   });
 
   it("reading store attributes through accessors with prefix", () => {
@@ -57,22 +57,20 @@ describe("StoreTest", () => {
   });
 
   it("accessing attributes not exposed by accessors", async () => {
-    (john.settings as HashWithIndifferentAccess).set("icecream", "graeters");
+    john.settings.set("icecream", "graeters");
     await john.save();
 
-    expect(((await john.reload()).settings as HashWithIndifferentAccess).get("icecream")).toBe(
-      "graeters",
-    );
+    expect((await john.reload()).settings.get("icecream")).toBe("graeters");
   });
 
   it("overriding a read accessor", () => {
-    (john.settings as HashWithIndifferentAccess).set("phoneNumber", "1234567890");
+    john.settings.set("phoneNumber", "1234567890");
 
     expect((john as any).phoneNumber).toBe("(123) 456-7890");
   });
 
   it("overriding a read accessor using super", () => {
-    (john.settings as HashWithIndifferentAccess).set("color", null);
+    john.settings.set("color", null);
 
     expect(john.color).toBe("red");
   });
@@ -146,21 +144,21 @@ describe("StoreTest", () => {
   });
 
   it("dirty methods for suffixed accessors", () => {
-    (john.configs as HashWithIndifferentAccess).set("twoFactorAuth", true);
+    john.configs.set("twoFactorAuth", true);
     expect((john as any).twoFactorAuth_configsChanged()).toBe(true);
     expect((john as any).twoFactorAuth_configsWas()).toBeNull();
     expect((john as any).twoFactorAuth_configsChange()).toEqual([null, true]);
   });
 
   it("dirty methods for prefixed accessors", () => {
-    (john.spouse as HashWithIndifferentAccess).set("name", "Lena");
+    john.spouse.set("name", "Lena");
     expect((john as any).partner_nameChanged()).toBe(true);
     expect((john as any).partner_nameWas()).toBe("Dallas");
     expect((john as any).partner_nameChange()).toEqual(["Dallas", "Lena"]);
   });
 
   it("saved changes tracking for accessors", async () => {
-    (john.spouse as HashWithIndifferentAccess).set("name", "Lena");
+    john.spouse.set("name", "Lena");
     expect((john as any).partner_nameChanged()).toBe(true);
 
     await john.save();
@@ -196,7 +194,7 @@ describe("StoreTest", () => {
   it("overriding a write accessor", () => {
     (john as any).phoneNumber = "(123) 456-7890";
 
-    expect((john.settings as HashWithIndifferentAccess).get("phoneNumber")).toBe("1234567890");
+    expect(john.settings.get("phoneNumber")).toBe("1234567890");
   });
 
   it("overriding a write accessor using super", () => {
@@ -220,11 +218,7 @@ describe("StoreTest", () => {
     });
 
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(
-      ((user.settings as HashWithIndifferentAccess).get("color") as HashWithIndifferentAccess).get(
-        "jenny",
-      ),
-    ).toBe("blue");
+    expect((user.settings.get("color") as HashWithIndifferentAccess).get("jenny")).toBe("blue");
     expect((user.color as HashWithIndifferentAccess).get("jenny")).toBe("blue");
   });
 
@@ -233,19 +227,19 @@ describe("StoreTest", () => {
     (user as any).homepage = "not rails";
     await user.update({ settings: new HashWithIndifferentAccess({ homepage: "rails" }) });
 
-    expect((user.settings as HashWithIndifferentAccess).get("homepage")).toBe("rails");
+    expect(user.settings.get("homepage")).toBe("rails");
     expect((user as any).homepage).toBe("rails");
   });
 
   it("convert store attributes from Hash to HashWithIndifferentAccess saving the data and access attributes indifferently", async () => {
     const user = adminUsers("jamis");
-    expect((user.settings as HashWithIndifferentAccess).get("symbol")).toBe("symbol");
-    expect((user.settings as HashWithIndifferentAccess).get("string")).toBe("string");
+    expect(user.settings.get("symbol")).toBe("symbol");
+    expect(user.settings.get("string")).toBe("string");
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
 
     (user as any).height = "low";
-    expect((user.settings as HashWithIndifferentAccess).get("symbol")).toBe("symbol");
-    expect((user.settings as HashWithIndifferentAccess).get("string")).toBe("string");
+    expect(user.settings.get("symbol")).toBe("symbol");
+    expect(user.settings.get("string")).toBe("string");
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
@@ -341,7 +335,7 @@ describe("StoreTest", () => {
   });
 
   it("YAML coder initializes the store when a Nil value is given", () => {
-    expect((john.params as HashWithIndifferentAccess).size).toBe(0);
+    expect(john.params.size).toBe(0);
   });
 
   it("dump, load and dump again a model", async () => {
@@ -356,33 +350,33 @@ describe("StoreTest", () => {
   });
 
   it("read store attributes through accessors with default suffix", () => {
-    (john.configs as HashWithIndifferentAccess).set("twoFactorAuth", true);
+    john.configs.set("twoFactorAuth", true);
     expect((john as any).twoFactorAuth_configs).toBe(true);
   });
 
   it("write store attributes through accessors with default suffix", () => {
     (john as any).twoFactorAuth_configs = false;
-    expect((john.configs as HashWithIndifferentAccess).get("twoFactorAuth")).toBe(false);
+    expect(john.configs.get("twoFactorAuth")).toBe(false);
   });
 
   it("read store attributes through accessors with custom suffix", () => {
-    (john.configs as HashWithIndifferentAccess).set("loginRetry", 3);
+    john.configs.set("loginRetry", 3);
     expect((john as any).loginRetry_config).toBe(3);
   });
 
   it("write store attributes through accessors with custom suffix", () => {
     (john as any).loginRetry_config = 5;
-    expect((john.configs as HashWithIndifferentAccess).get("loginRetry")).toBe(5);
+    expect(john.configs.get("loginRetry")).toBe(5);
   });
 
   it("read accessor without pre/suffix in the same store as other pre/suffixed accessors still works", () => {
-    (john.configs as HashWithIndifferentAccess).set("secretQuestion", "What is your high school?");
+    john.configs.set("secretQuestion", "What is your high school?");
     expect((john as any).secretQuestion).toBe("What is your high school?");
   });
 
   it("write accessor without pre/suffix in the same store as other pre/suffixed accessors still works", () => {
     (john as any).secretQuestion = "What was the Rails version when you first worked on it?";
-    expect((john.configs as HashWithIndifferentAccess).get("secretQuestion")).toBe(
+    expect(john.configs.get("secretQuestion")).toBe(
       "What was the Rails version when you first worked on it?",
     );
   });

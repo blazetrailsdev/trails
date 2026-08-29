@@ -11,6 +11,10 @@ beforeAll(async () => {
 });
 
 class NumericData extends Base {
+  declare bank_balance: unknown;
+  declare big_bank_balance: unknown;
+  declare my_house_population: unknown;
+  declare world_population: unknown;
   static _tableName = "numeric_data";
   static {
     this.attribute("world_population", "big_integer");

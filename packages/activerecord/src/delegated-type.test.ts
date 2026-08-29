@@ -213,6 +213,7 @@ describe("DelegatedTypeTest", () => {
     }
     registerModel("Access::NoticeMessage", AccessNoticeMessage);
     class Entry4 extends Base {
+      declare entryable_type: string;
       static {
         this.attribute("entryable_id", "integer");
         this.attribute("entryable_type", "string");

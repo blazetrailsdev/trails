@@ -165,3 +165,14 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(e.duration).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainTime>();
   });
 });
+
+describe("undefined attribute reads", () => {
+  it("reading a name the model never declared is a compile error", () => {
+    const u = new User({ name: "dean" });
+    // @ts-expect-error `mumbo` is not an attribute of User; Ruby's method_missing raises NoMethodError at run time, TypeScript refuses the read at build time.
+    expectTypeOf(u.mumbo);
+
+    // @ts-expect-error the write half is refused for the same reason.
+    u.mumbo = 1;
+  });
+});

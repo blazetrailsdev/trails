@@ -45,6 +45,8 @@ describe("BasicsTest", () => {
 
   it("switching between table name", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.tableName = "people";
       }
@@ -53,12 +55,17 @@ describe("BasicsTest", () => {
   });
 
   it("auto id", () => {
-    class User extends Base {}
+    class User extends Base {
+      declare active: boolean;
+      declare name: string;
+    }
     expect(User.primaryKey).toBe("id");
   });
 
   it("has attribute", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -70,6 +77,8 @@ describe("BasicsTest", () => {
 
   it("initialize with attributes", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -81,6 +90,8 @@ describe("BasicsTest", () => {
 
   it("equality", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -92,6 +103,8 @@ describe("BasicsTest", () => {
 
   it("equality of new records", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -103,6 +116,8 @@ describe("BasicsTest", () => {
 
   it("all", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -114,6 +129,8 @@ describe("BasicsTest", () => {
 
   it("null fields", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -124,6 +141,8 @@ describe("BasicsTest", () => {
 
   it("select symbol", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -134,6 +153,8 @@ describe("BasicsTest", () => {
 
   it("previously new record returns boolean", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -146,6 +167,8 @@ describe("BasicsTest", () => {
 
   it("previously changed", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -159,6 +182,8 @@ describe("BasicsTest", () => {
 
   it("records without an id have unique hashes", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -170,6 +195,8 @@ describe("BasicsTest", () => {
 
   it("distinct delegates to scoped", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -180,6 +207,8 @@ describe("BasicsTest", () => {
 
   it("#present? and #blank? on ActiveRecord::Base classes", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -192,6 +221,8 @@ describe("BasicsTest", () => {
 
   it("limit should take value from latest limit", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -202,6 +233,8 @@ describe("BasicsTest", () => {
 
   it("create after initialize without block", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -213,6 +246,8 @@ describe("BasicsTest", () => {
 
   it("readonly attributes", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -223,6 +258,8 @@ describe("BasicsTest", () => {
 
   it("scoped can take a values hash", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -243,6 +280,8 @@ describe("BasicsTest", () => {
 
   it("many mutations", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -256,6 +295,8 @@ describe("BasicsTest", () => {
 
   it("custom mutator", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -267,6 +308,8 @@ describe("BasicsTest", () => {
 
   it("equality of destroyed records", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -279,6 +322,8 @@ describe("BasicsTest", () => {
 
   it("hashing", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -290,6 +335,8 @@ describe("BasicsTest", () => {
 
   it("create after initialize with block", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -301,6 +348,8 @@ describe("BasicsTest", () => {
 
   it("previously changed dup", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -313,6 +362,8 @@ describe("BasicsTest", () => {
 
   it("default values on empty strings", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string", { default: "default" });
       }
@@ -323,6 +374,8 @@ describe("BasicsTest", () => {
 
   it("successful comparison of like class records", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -334,6 +387,8 @@ describe("BasicsTest", () => {
 
   it("failed comparison of unlike class records", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -350,6 +405,8 @@ describe("BasicsTest", () => {
 
   it("table name guesses with inherited prefixes and suffixes", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.tableNamePrefix = "app_";
       }
@@ -359,6 +416,8 @@ describe("BasicsTest", () => {
 
   it("limit without comma", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -386,6 +445,7 @@ describe("BasicsTest", () => {
 
   it("comparison with different objects in array", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -408,6 +468,7 @@ describe("BasicsTest", () => {
 
   it("previously new record on destroyed record", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -422,6 +483,7 @@ describe("BasicsTest", () => {
 
   it("create after initialize with array param", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -432,6 +494,7 @@ describe("BasicsTest", () => {
 
   it("load with condition", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -444,6 +507,7 @@ describe("BasicsTest", () => {
 
   it("find by slug", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -466,6 +530,7 @@ describe("BasicsTest", () => {
 
   it("preserving date objects", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -489,6 +554,7 @@ describe("BasicsTest", () => {
 
   it("create without prepared statement", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -499,6 +565,7 @@ describe("BasicsTest", () => {
 
   it("destroy without prepared statement", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -521,6 +588,7 @@ describe("BasicsTest", () => {
 
   it("equality of relation and array", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -578,7 +646,9 @@ describe("BasicsTest", () => {
   });
 
   it("column types typecast", async () => {
-    class Topic extends Base {}
+    class Topic extends Base {
+      declare title: string;
+    }
     const seed = await Topic.create({
       title: "The First Topic",
       author_name: "David",
@@ -632,6 +702,7 @@ describe("BasicsTest", () => {
 
   it("ignored columns not included in SELECT", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -643,6 +714,7 @@ describe("BasicsTest", () => {
 
   it("column names are escaped", () => {
     class User extends Base {
+      declare active: boolean;
       static {
         this.attribute("order", "string");
       }
@@ -671,6 +743,7 @@ describe("BasicsTest", () => {
   });
   it("primary key with no id", () => {
     class Widget extends Base {
+      declare name: string;
       static {
         this.primaryKey = "widget_id";
       }
@@ -700,6 +773,8 @@ describe("BasicsTest", () => {
   });
   it("invalid limit", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -708,6 +783,8 @@ describe("BasicsTest", () => {
   });
   it("limit should sanitize sql injection for limit without commas", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -718,6 +795,8 @@ describe("BasicsTest", () => {
   });
   it("limit should sanitize sql injection for limit with commas", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -726,6 +805,7 @@ describe("BasicsTest", () => {
   });
   it("preserving time objects", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("written_on", "datetime");
         this.attribute("bonus_time", "time");
@@ -764,6 +844,7 @@ describe("BasicsTest", () => {
   it("preserving time objects with local time conversion to default timezone utc", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Topic extends Base {
+        declare title: string;
         static {
           this.attribute("written_on", "datetime");
         }
@@ -779,6 +860,7 @@ describe("BasicsTest", () => {
   it("preserving time objects with time with zone conversion to default timezone utc", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Topic extends Base {
+        declare title: string;
         static {
           this.attribute("written_on", "datetime");
         }
@@ -794,6 +876,7 @@ describe("BasicsTest", () => {
   it("preserving time objects with utc time conversion to default timezone local", async () => {
     await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
       class Topic extends Base {
+        declare title: string;
         static {
           this.attribute("written_on", "datetime");
         }
@@ -813,6 +896,7 @@ describe("BasicsTest", () => {
   it("preserving time objects with time with zone conversion to default timezone local", async () => {
     await withTimezoneConfig({ awareAttributes: true, zone: "America/New_York" }, async () => {
       class Topic extends Base {
+        declare title: string;
         static {
           this.attribute("written_on", "datetime");
         }
@@ -863,6 +947,7 @@ describe("BasicsTest", () => {
   it("utc as time zone", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
       class Topic extends Base {
+        declare title: string;
         static {
           this.attribute("bonus_time", "time");
         }
@@ -878,6 +963,7 @@ describe("BasicsTest", () => {
   it("utc as time zone and new", async () => {
     await withTimezoneConfig({ default: "utc" }, () => {
       class Topic extends Base {
+        declare title: string;
         static {
           this.attribute("bonus_time", "time");
         }
@@ -898,6 +984,7 @@ describe("BasicsTest", () => {
   });
   it("out of range slugs", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -911,6 +998,7 @@ describe("BasicsTest", () => {
   });
   it("find by slug with array", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -926,6 +1014,7 @@ describe("BasicsTest", () => {
   });
   it("find by slug with range", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -984,6 +1073,8 @@ describe("BasicsTest", () => {
   });
   it("readonly attributes on a new record", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
         this.attrReadonly("name");
@@ -1096,6 +1187,7 @@ describe("BasicsTest", () => {
   it("attributes on dummy time", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       class Topic extends Base {
+        declare title: string;
         static {
           this.attribute("bonus_time", "time");
         }
@@ -1116,6 +1208,7 @@ describe("BasicsTest", () => {
   });
   it("attributes on dummy time with invalid time", async () => {
     class DummyTopic extends Base {
+      declare bonus_time: any;
       static tableName = "topics";
       static {
         this.attribute("bonus_time", "time");
@@ -1128,6 +1221,8 @@ describe("BasicsTest", () => {
   });
   it("previously persisted returns boolean", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1146,6 +1241,8 @@ describe("BasicsTest", () => {
   });
   it("dup does not copy associations", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1157,6 +1254,8 @@ describe("BasicsTest", () => {
   });
   it("clone preserves subtype", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1167,6 +1266,8 @@ describe("BasicsTest", () => {
   });
   it("bignum pk", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1176,6 +1277,8 @@ describe("BasicsTest", () => {
   });
   it("default char types", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string", { default: "" });
       }
@@ -1284,6 +1387,8 @@ describe("BasicsTest", () => {
   });
   it("column name properly quoted", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1293,6 +1398,7 @@ describe("BasicsTest", () => {
   });
   it("quoting arrays", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -1307,6 +1413,8 @@ describe("BasicsTest", () => {
   });
   it("dont clear sequence name when setting explicitly", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.sequenceName = "my_seq";
       }
@@ -1317,6 +1425,8 @@ describe("BasicsTest", () => {
   });
   it("set table name symbol converted to string", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.tableName = "custom_table";
       }
@@ -1352,6 +1462,8 @@ describe("BasicsTest", () => {
   });
   it("find multiple ordered last", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1379,6 +1491,7 @@ describe("BasicsTest", () => {
   });
   it("assert queries count", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -1500,6 +1613,8 @@ describe("BasicsTest", () => {
   });
   it("ignored columns are stored as an array of string", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.ignoredColumns = ["col1", "col2"];
       }
@@ -1538,6 +1653,8 @@ describe("BasicsTest", () => {
   });
   it("column names are quoted when using #from clause and model has ignored columns", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
         this.attribute("secret", "string");
@@ -1724,6 +1841,7 @@ describe("BasicsTest", () => {
   });
   it("default values", () => {
     class Widget extends Base {
+      declare name: string;
       static {
         this.attribute("name", "string", { default: "unnamed" });
       }
@@ -1733,6 +1851,8 @@ describe("BasicsTest", () => {
   });
   it("quote", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1744,6 +1864,8 @@ describe("BasicsTest", () => {
 
   it("toggle attribute", async () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("active", "boolean", { default: false });
       }
@@ -1755,6 +1877,8 @@ describe("BasicsTest", () => {
 
   it("has attribute with symbol", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1765,6 +1889,8 @@ describe("BasicsTest", () => {
 
   it("no limit offset", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.attribute("name", "string");
       }
@@ -1776,6 +1902,7 @@ describe("BasicsTest", () => {
 
   function makeTopic() {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
         this.attribute("author_name", "string");
@@ -1859,6 +1986,7 @@ describe("BasicsTest", () => {
   fixtures([]);
 
   class PostInner extends Base {
+    declare title: string;
     static {
       this.tableName = "topics";
       this.attribute("title", "string");
@@ -1873,6 +2001,7 @@ describe("BasicsTest", () => {
 
   it("clone of new object with defaults", () => {
     class Item extends Base {
+      declare name: string;
       static {
         this.attribute("name", "string", { default: "default" });
       }
@@ -1932,6 +2061,7 @@ describe("BasicsTest", () => {
 
   it("default values are deeply dupped", () => {
     class M extends Base {
+      declare name: string;
       static {
         this.attribute("name", "string", { default: "val" });
       }
@@ -1984,12 +2114,16 @@ describe("BasicsTest", () => {
   fixtures([]);
 
   it("table name guesses", () => {
-    class User extends Base {}
+    class User extends Base {
+      declare active: boolean;
+      declare name: string;
+    }
     expect(User.tableName).toBe("users");
   });
 
   it("reload", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -2004,6 +2138,8 @@ describe("BasicsTest", () => {
   });
   it("table name guesses with prefixes and suffixes", () => {
     class User extends Base {
+      declare active: boolean;
+      declare name: string;
       static {
         this.tableNamePrefix = "app_";
       }

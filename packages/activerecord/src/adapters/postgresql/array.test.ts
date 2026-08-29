@@ -81,6 +81,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
       }
       class PgArraySerialized extends Base {
+        declare tags: any;
         static tableName = "pg_arrays";
         static {
           this.attribute("id", "integer");

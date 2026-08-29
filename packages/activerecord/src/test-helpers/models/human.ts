@@ -5,6 +5,7 @@ import type { MixedCaseMonkey } from "./mixed-case-monkey.js";
 import { Base } from "../../base.js";
 
 export class Human extends Base {
+  declare name: string;
   declare face: Face | null;
   declare autosaveFace: Face | null;
   declare polymorphicFace: Face | null;

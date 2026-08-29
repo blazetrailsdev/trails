@@ -44,6 +44,7 @@ export class CategoryPost extends Base {
 }
 
 export class Post extends Base {
+  declare comments_count: number;
   declare static containingTheLetterA: () => Relation<Post>;
   declare static titledWithAnApostrophe: () => Relation<Post>;
   declare static rankedByComments: () => Relation<Post>;

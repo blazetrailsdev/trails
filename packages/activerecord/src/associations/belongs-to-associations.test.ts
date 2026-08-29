@@ -2024,6 +2024,7 @@ describe("BelongsToAssociationsTest", () => {
 
   it("runs parent presence check if parent changed or nil", async () => {
     class ShipRequired extends Base {
+      declare name: any;
       declare developer: Developer | null;
       declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
 
@@ -2054,6 +2055,7 @@ describe("BelongsToAssociationsTest", () => {
 
   it("skips parent presence check if parent has not changed", async () => {
     class ShipRequired extends Base {
+      declare name: any;
       declare developer: Developer | null;
       declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
 
@@ -2079,6 +2081,7 @@ describe("BelongsToAssociationsTest", () => {
 
     try {
       class TempShip extends Base {
+        declare name: any;
         declare developer: Developer | null;
         declare loadBelongsTo: (name: "developer") => Promise<Developer | null>;
 

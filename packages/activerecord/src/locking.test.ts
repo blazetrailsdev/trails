@@ -111,6 +111,8 @@ describe("OptimisticLockingTest", () => {
 
   it("lock destroy", async () => {
     class LockPerson extends Base {
+      declare first_name: string;
+      declare lock_version: number;
       static {
         this.attribute("id", "integer");
         this._tableName = "people";

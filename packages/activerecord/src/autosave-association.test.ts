@@ -364,7 +364,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.create({ name: "parrots_1" });
 
     const parrots = await proxy;
-    for (const p of parrots) p.name = "";
+    for (const p of parrots) (p as InstanceType<typeof Parrot>).name = "";
     expect(await pirate.isValid()).toBe(false);
 
     for (const p of parrots) p.markForDestruction();
@@ -673,6 +673,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
   it("assign ids with belongs to cpk model", async () => {
     class AiCpkOrder extends Base {
+      declare orderAgreementIds: any;
       declare shop_id: number | null;
       declare status: string | null;
       declare orderAgreements: AssociationProxy<AiCpkOrderAgreement>;
@@ -728,6 +729,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
   it("assign ids with cpk for two models", async () => {
     class AiCpkTwoOrder extends Base {
+      declare bookIds: any;
       declare shop_id: number | null;
       declare status: string | null;
       declare books: AssociationProxy<AiCpkTwoBook>;
@@ -795,7 +797,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     expect(await order.bookIds).toEqual(bookIds);
     const loadedBooks = await association(order, "books");
     expect(loadedBooks).toHaveLength(2);
-    const loadedTitles = loadedBooks.map((b) => b.title);
+    const loadedTitles = loadedBooks.map((b) => (b as AiCpkTwoBook).title);
     expect(loadedTitles).toContain("First");
     expect(loadedTitles).toContain("Second");
   });
@@ -1376,7 +1378,9 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     (ship as any).pirate = pirate;
     await pirate.save();
     const reloaded = await Pirate.find(pirate.id!);
-    const reloadedShip = (await reloaded.association("ship").loadTarget()) as Base;
+    const reloadedShip = (await reloaded.association("ship").loadTarget()) as InstanceType<
+      typeof Ship
+    >;
     expect(reloadedShip.name).toBe("Black Pearl");
   });
 

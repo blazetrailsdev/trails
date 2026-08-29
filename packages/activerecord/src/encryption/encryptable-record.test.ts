@@ -653,7 +653,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await assertEncryptedAttribute(book, "original_name", "Dune");
 
     const reloaded = await Book.find(book.id);
-    expect(reloaded.name).toBe("Dune");
+    expect((reloaded as unknown as { name: string }).name).toBe("Dune");
   });
 
   it("binary data can be encrypted", async () => {
