@@ -451,23 +451,22 @@ export abstract class Store {
   }
 
   fetchMulti(
-    ...namesAndBlock:
+    ...names:
       | [...string[], StoreOptions, (key: string) => unknown]
       | [...string[], (key: string) => unknown]
   ): Record<string, unknown> {
-    const block = namesAndBlock.pop() as ((key: string) => unknown) | undefined;
+    const block = (names as unknown[]).pop() as ((key: string) => unknown) | undefined;
     if (typeof block !== "function")
       throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
-    if (namesAndBlock.length === 0) return {};
-    let options = extractOptions(namesAndBlock as unknown[]);
-    const names = namesAndBlock as string[];
+    if (names.length === 0) return {};
+    let options = extractOptions(names as unknown[]);
     options = this.mergedOptions(options);
-    const keys = names.map((name) => this.normalizeKey(name, options));
+    const keys = (names as string[]).map((name) => this.normalizeKey(name, options));
     const writes: Record<string, unknown> = {};
     const ordered = this.instrumentMulti("read_multi", keys, options, (payload) => {
-      const reads = options.force ? {} : this.readMultiEntries(names, options);
+      const reads = options.force ? {} : this.readMultiEntries(names as string[], options);
       const result: Record<string, unknown> = {};
-      for (const name of names) {
+      for (const name of names as string[]) {
         result[name] = Object.prototype.hasOwnProperty.call(reads, name)
           ? reads[name]
           : (writes[name] = block(name));
@@ -567,7 +566,7 @@ export abstract class Store {
     options?: StoreOptions,
     block?: (payload: EventPayload) => T,
   ): T {
-    return this._instrument(operation, false, key, options, block);
+    return this._instrument(operation, false, options, { key }, block);
   }
 
   protected instrumentMulti<T>(
@@ -576,17 +575,18 @@ export abstract class Store {
     options?: StoreOptions,
     block?: (payload: EventPayload) => T,
   ): T {
-    return this._instrument(operation, true, keys, options, block);
+    return this._instrument(operation, true, options, { key: keys }, block);
   }
 
   private _instrument<T>(
     operation: string,
     multi: boolean,
-    key: unknown,
     options: StoreOptions | undefined,
+    payload: EventPayload,
     block?: (payload: EventPayload) => T,
   ): T {
     if (Store.logger?.isDebug?.() && !this.silence) {
+      const key = payload.key;
       const multiSize = Array.isArray(key)
         ? key.length
         : key && typeof key === "object"
@@ -601,7 +601,7 @@ export abstract class Store {
         options && Object.keys(options).length > 0 ? ` (${JSON.stringify(options)})` : "";
       Store.logger.debug?.(`Cache ${operation}${debugKey}${debugOptions}`);
     }
-    const payload: EventPayload = { key, store: this.constructor.name };
+    payload.store = this.constructor.name;
     if (options) Object.assign(payload, options);
     return Notifications.instrument<T>(`cache_${operation}.active_support`, payload, () =>
       block ? block(payload) : (undefined as T),
@@ -673,8 +673,8 @@ export abstract class Store {
     return hash;
   }
 
-  protected deleteMultiEntries(keys: string[], options: StoreOptions): number {
-    return keys.filter((k) => this.deleteEntry(k, options)).length;
+  protected deleteMultiEntries(entries: string[], options: StoreOptions): number {
+    return entries.filter((key) => this.deleteEntry(key, options)).length;
   }
 
   /**

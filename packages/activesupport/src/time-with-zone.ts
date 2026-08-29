@@ -590,13 +590,13 @@ export class TimeWithZone {
    * (core_ext/time/zones.rb), so every argument class, unmatched offset and bad
    * name raises there rather than here.
    */
-  inTimeZone(zone?: unknown): TimeWithZone {
-    if (zone == null) {
+  inTimeZone(newZone?: unknown): TimeWithZone {
+    if (newZone == null) {
       const currentZone = timeZone();
       if (!currentZone) return this;
-      zone = currentZone;
+      newZone = currentZone;
     }
-    const tz = findZoneBang(zone) as TimeZone;
+    const tz = findZoneBang(newZone) as TimeZone;
     if (tz.tzinfo.identifier === this._timeZone.tzinfo.identifier) return this;
     return new TimeWithZone(this._zoned.toInstant(), tz);
   }
@@ -801,8 +801,8 @@ export class TimeWithZone {
   }
 
   /** Alias for plus */
-  since(seconds: number): TimeWithZone {
-    return this.plus(seconds);
+  since(other: number): TimeWithZone {
+    return this.plus(other);
   }
 
   /**
@@ -816,8 +816,8 @@ export class TimeWithZone {
   }
 
   /** Alias for since — matches Rails `in` method */
-  in(seconds: number): TimeWithZone {
-    return this.plus(seconds);
+  in(other: number): TimeWithZone {
+    return this.plus(other);
   }
 
   // ---------------------------------------------------------------------------

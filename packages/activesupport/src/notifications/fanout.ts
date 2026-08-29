@@ -330,10 +330,10 @@ export class Fanout {
 
   subscribe(
     pattern: string | RegExp | null,
-    listener: EventedListener | TimedCallback | EventObjectCallback | CallableListener,
+    callable: EventedListener | TimedCallback | EventObjectCallback | CallableListener,
     monotonic = false,
   ): Evented {
-    const subscriber = Subscribers.new(pattern, listener, monotonic);
+    const subscriber = Subscribers.new(pattern, callable, monotonic);
 
     if (typeof pattern === "string") {
       let list = this.stringSubscribers.get(pattern);

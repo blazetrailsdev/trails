@@ -29,8 +29,21 @@ function applyInflections(
   }
 }
 
-export function pluralize(word: string, locale = "en"): string {
-  return applyInflections(word, inflections(locale).plurals, locale);
+export function pluralize(word: string, locale?: string): string;
+export function pluralize(word: string, count: number | null, locale?: string): string;
+/**
+ * Mirrors `ActiveSupport::Inflector.pluralize` (inflector/methods.rb:39-41) and
+ * the `String#pluralize(count = nil, locale = :en)` that fronts it
+ * (core_ext/string/inflections.rb:35-42) — Ruby routes on the argument's class,
+ * a Symbol standing for the locale and an Integer for the count.
+ */
+export function pluralize(word: string, count?: number | string | null, locale = "en"): string {
+  if (typeof count === "string") locale = count;
+  if (count === 1) {
+    return word;
+  } else {
+    return applyInflections(word, inflections(locale).plurals, locale);
+  }
 }
 
 export function singularize(word: string, locale = "en"): string {
@@ -358,8 +371,11 @@ export function safeConstantize(camelCasedWord: string): unknown {
   }
 }
 
-export function foreignKey(className: string, separateWithUnderscore: boolean = true): string {
-  return underscore(demodulize(className)) + (separateWithUnderscore ? "_id" : "id");
+export function foreignKey(
+  className: string,
+  separateClassNameAndIdWithUnderscore: boolean = true,
+): string {
+  return underscore(demodulize(className)) + (separateClassNameAndIdWithUnderscore ? "_id" : "id");
 }
 
 /**

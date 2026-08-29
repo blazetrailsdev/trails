@@ -121,6 +121,11 @@ const RECEIVER_PARAM_NAMES = new Set([
   "tags",
   "controller",
   "collection",
+  // `core_ext/string/*.rb` methods are String instance methods, so the port's
+  // leading argument is the receiving string (`Inflector.humanize`'s
+  // `lower_case_and_underscored_word`, `Inflector.pluralize`'s `word`).
+  "word",
+  "lowerCaseAndUnderscoredWord",
   // A `*Validator` instance passed positionally: in Rails these methods are
   // instance methods ON the validator, so the leading param IS the receiver.
   "validator",

@@ -125,12 +125,12 @@ export class HashWithIndifferentAccess<V = unknown> {
    * argument it is `Hash#default`, the plain default value; with one it is
    * `Hash#default(key)` over the converted key, which runs the default_proc.
    */
-  default(...args: string[]): V | undefined {
-    if (args.length === 0) {
+  default(...key: [] | [string]): V | undefined {
+    if (key.length === 0) {
       return this._default;
     } else {
-      const key = this.convertKey(args[0]);
-      return this._defaultProc ? this._defaultProc(this, key) : this._default;
+      const convertedKey = this.convertKey(key[0]);
+      return this._defaultProc ? this._defaultProc(this, convertedKey) : this._default;
     }
   }
 
@@ -193,8 +193,8 @@ export class HashWithIndifferentAccess<V = unknown> {
    * `alias_method :regular_update, :update` (hash_with_indifferent_access.rb:92)
    * — the un-converting `Hash#update`.
    */
-  regularUpdate(other: HashWithIndifferentAccess<V>, block?: BlockFn<V>): this {
-    for (const [k, v] of other.entries()) {
+  regularUpdate(otherHashes: HashWithIndifferentAccess<V>, block?: BlockFn<V>): this {
+    for (const [k, v] of otherHashes.entries()) {
       this.data.set(k, block && this.data.has(k) ? block(k, this.data.get(k)!, v) : v);
     }
     return this;
@@ -465,10 +465,11 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Mirror Rails `select` (hash_with_indifferent_access.rb:323-326), which
    * delegates to `Hash#select!` and so yields `|key, value|`.
    */
-  select(fn: (key: string, value: V) => boolean): HashWithIndifferentAccess<V> {
+  select(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V> {
+    const block = args[args.length - 1];
     const result = new HashWithIndifferentAccess<V>();
     for (const [k, v] of this.data) {
-      if (fn(k, v)) {
+      if (block(k, v)) {
         result.set(k, v);
       }
     }
@@ -479,8 +480,9 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Mirror Rails `reject` (hash_with_indifferent_access.rb:328-331), which
    * delegates to `Hash#reject!` and so yields `|key, value|`.
    */
-  reject(fn: (key: string, value: V) => boolean): HashWithIndifferentAccess<V> {
-    return this.select((k, v) => !fn(k, v));
+  reject(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V> {
+    const block = args[args.length - 1];
+    return this.select((k, v) => !block(k, v));
   }
 
   /**

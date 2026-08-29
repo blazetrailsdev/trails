@@ -41,17 +41,19 @@ export class OrderedHash<K, V> extends Map<K, V> {
   }
 
   /** select — returns new OrderedHash with entries satisfying the predicate. */
-  select(predicate: (key: K, value: V) => boolean): OrderedHash<K, V> {
+  select(...args: [(key: K, value: V) => boolean]): OrderedHash<K, V> {
+    const block = args[args.length - 1];
     const result = new OrderedHash<K, V>();
     for (const [k, v] of this) {
-      if (predicate(k, v)) result.set(k, v);
+      if (block(k, v)) result.set(k, v);
     }
     return result;
   }
 
   /** reject — returns new OrderedHash without entries satisfying the predicate. */
-  reject(predicate: (key: K, value: V) => boolean): OrderedHash<K, V> {
-    return this.select((k, v) => !predicate(k, v));
+  reject(...args: [(key: K, value: V) => boolean]): OrderedHash<K, V> {
+    const block = args[args.length - 1];
+    return this.select((k, v) => !block(k, v));
   }
 
   /** deleteIf — removes entries satisfying the predicate in-place. */

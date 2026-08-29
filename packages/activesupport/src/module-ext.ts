@@ -21,12 +21,10 @@ import { Delegation, type DelegateOptions } from "./delegation.js";
  * so neither keyword has a counterpart to carry.
  *
  * Usage:
- *   delegate(MyClass.prototype, "street", "city", { to: "place" });
- *   delegate(MyClass.prototype, "name", { to: "place", prefix: true });
+ *   delegate(MyClass.prototype, ["street", "city"], { to: "place" });
+ *   delegate(MyClass.prototype, ["name"], { to: "place", prefix: true });
  */
-export function delegate(target: object, ...args: [...string[], DelegateOptions]): string[] {
-  const options = args[args.length - 1] as DelegateOptions;
-  const methods = args.slice(0, -1) as string[];
+export function delegate(target: object, methods: string[], options: DelegateOptions): string[] {
   const { to, prefix, allowNil } = options;
 
   return Delegation.generate(target, methods, { to, prefix, allowNil });
@@ -42,11 +40,11 @@ export function delegate(target: object, ...args: [...string[], DelegateOptions]
  * rather than mutating `target` in place.
  */
 export function delegateMissingTo<T extends object>(
-  target: T,
-  property: string,
+  host: T,
+  target: string,
   { allowNil }: { allowNil?: boolean } = {},
 ): T {
-  return Delegation.generateMethodMissing(target, property, { allowNil });
+  return Delegation.generateMethodMissing(host, target, { allowNil });
 }
 
 export interface MattrOptions {
@@ -62,13 +60,6 @@ function assertValidAttrName(name: string): void {
   if (!VALID_ATTR_NAME.test(name)) {
     throw new Error(`Invalid attribute name: ${name}`);
   }
-}
-
-function popMattrOptions(namesAndOptions: (string | MattrOptions)[]): MattrOptions {
-  return typeof namesAndOptions[namesAndOptions.length - 1] === "object" &&
-    namesAndOptions[namesAndOptions.length - 1] !== null
-    ? (namesAndOptions.pop() as MattrOptions)
-    : {};
 }
 
 /**
@@ -118,9 +109,7 @@ function setMattrDefault(
  * Mirrors: Module#mattr_reader (`module/attribute_accessors.rb:54-73`).
 
  */
-export function mattrReader(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
-  const options = popMattrOptions(namesAndOptions);
-  const syms = namesAndOptions as string[];
+export function mattrReader(target: any, syms: string[], options: MattrOptions = {}): void {
   const instanceReader = options.instanceReader !== false;
   const instanceAccessor = options.instanceAccessor !== false;
 
@@ -149,9 +138,7 @@ export const cattrReader = mattrReader;
  *
  * Mirrors: Module#mattr_writer (`module/attribute_accessors.rb:121-139`).
  */
-export function mattrWriter(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
-  const options = popMattrOptions(namesAndOptions);
-  const syms = namesAndOptions as string[];
+export function mattrWriter(target: any, syms: string[], options: MattrOptions = {}): void {
   const instanceWriter = options.instanceWriter !== false;
   const instanceAccessor = options.instanceAccessor !== false;
 
@@ -194,14 +181,12 @@ export const cattrWriter = mattrWriter;
  * trails drops `default` before the writer call instead, which is the same
  * no-op reached without evaluating a function-valued default a second time.
  */
-export function mattrAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
-  const options = popMattrOptions(namesAndOptions);
-  const syms = namesAndOptions as string[];
+export function mattrAccessor(target: any, syms: string[], options: MattrOptions = {}): void {
   const writerOptions: MattrOptions = { ...options };
   delete writerOptions.default;
 
-  mattrReader(target, ...syms, options);
-  mattrWriter(target, ...syms, writerOptions);
+  mattrReader(target, syms, options);
+  mattrWriter(target, syms, writerOptions);
 }
 
 /**
@@ -219,8 +204,8 @@ export const cattrAccessor = mattrAccessor;
  * manifest cannot back it here because trails hosts it in module-ext.ts rather than a
  * configurable.ts, and the manifest keys private names by the .rb they live in.
  */
-export function configAccessor(target: any, ...namesAndOptions: (string | MattrOptions)[]): void {
-  mattrAccessor(target, ...namesAndOptions);
+export function configAccessor(target: any, syms: string[], options: MattrOptions = {}): void {
+  mattrAccessor(target, syms, options);
 }
 
 let _attrInternalNamingFormat = "_%s";
@@ -247,8 +232,8 @@ function internalStorageKey(name: string): string {
 /**
  * attrInternalReader — defines a reader for an attribute stored in a prefixed key.
  */
-export function attrInternalReader(target: object, ...names: string[]): void {
-  for (const name of names) {
+export function attrInternalReader(target: object, ...attrs: string[]): void {
+  for (const name of attrs) {
     assertValidAttrName(name);
     const storageKey = internalStorageKey(name);
     defineAccessorHalf(target, name, {
@@ -262,8 +247,8 @@ export function attrInternalReader(target: object, ...names: string[]): void {
 /**
  * attrInternalWriter — defines a writer for an attribute stored in a prefixed key.
  */
-export function attrInternalWriter(target: object, ...names: string[]): void {
-  for (const name of names) {
+export function attrInternalWriter(target: object, ...attrs: string[]): void {
+  for (const name of attrs) {
     assertValidAttrName(name);
     const storageKey = internalStorageKey(name);
     defineAccessorHalf(target, name, {
@@ -400,17 +385,17 @@ function getRescueHandlers(target: object): RescueEntry[] {
  * Mirrors Rails Rescuable::ClassMethods#rescue_from.
  *
  * Usage:
- *   rescueFrom(MyClass, SomeError, { with: (e) => console.log(e) });
- *   rescueFrom(MyClass, SomeError, { with: "handleError" });
+ *   rescueFrom(MyClass, [SomeError], { with: (e) => console.log(e) });
+ *   rescueFrom(MyClass, [SomeError], { with: "handleError" });
  */
-export function rescueFrom(target: any, ...errorClassesAndOptions: any[]): void {
-  const lastArg = errorClassesAndOptions[errorClassesAndOptions.length - 1];
-  const hasOptions = typeof lastArg === "object" && lastArg !== null && !lastArg.prototype;
-  const options: { with?: ErrorHandler } = hasOptions ? errorClassesAndOptions.pop() : {};
-  const errorClasses = errorClassesAndOptions as Array<new (...args: any[]) => Error>;
+export function rescueFrom(
+  target: any,
+  klasses: Array<new (...args: any[]) => Error>,
+  options: { with?: ErrorHandler } = {},
+): void {
   const handler = options.with;
   if (!handler) throw new Error("rescueFrom requires a :with handler");
-  getRescueHandlers(target).push({ errorClasses, handler });
+  getRescueHandlers(target).push({ errorClasses: klasses, handler });
 }
 
 /**

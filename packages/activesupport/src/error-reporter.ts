@@ -116,8 +116,8 @@ export class ErrorReporter {
    * returns the result of `fallback.call`, or `null` if `fallback` is not
    * specified.
    */
-  handle<T>(fn: () => T): T | null;
-  handle<T>(opts: HandleOptions, fn: () => T): T | null;
+  handle<T>(...args: [fn: () => T]): T | null;
+  handle<T>(...args: [opts: HandleOptions, fn: () => T]): T | null;
   handle<T>(...args: [...errorClasses: ErrorClass[], fn: () => T]): T | null;
   handle<T>(...args: [...errorClasses: ErrorClass[], opts: HandleOptions, fn: () => T]): T | null;
   handle<T>(...args: unknown[]): T | null {
@@ -142,8 +142,8 @@ export class ErrorReporter {
    * Evaluates the given block, reporting and re-raising any unhandled error.
    * If no error is raised, returns the return value of the block.
    */
-  record<T>(fn: () => T): T;
-  record<T>(opts: RecordOptions, fn: () => T): T;
+  record<T>(...args: [fn: () => T]): T;
+  record<T>(...args: [opts: RecordOptions, fn: () => T]): T;
   record<T>(...args: [...errorClasses: ErrorClass[], fn: () => T]): T;
   record<T>(...args: [...errorClasses: ErrorClass[], opts: RecordOptions, fn: () => T]): T;
   record<T>(...args: unknown[]): T {

@@ -154,9 +154,11 @@ export class Notifications {
    * async and its result is awaited/returned.
    */
   static subscribed<T>(
-    callback: NotificationCallback,
-    block: () => T | Promise<T>,
-    options?: { monotonic?: boolean },
+    ...args: [
+      callback: NotificationCallback,
+      block: () => T | Promise<T>,
+      options?: { monotonic?: boolean },
+    ]
   ): Promise<T>;
   static subscribed<T>(
     callback: NotificationCallback,
@@ -268,8 +270,8 @@ export class Notifications {
    * Mirrors ActiveSupport::Notifications.publish → notifier.publish, which runs
    * every matching subscriber under iterate_guarding_exceptions (re-raising).
    */
-  static publish(name: string, payload?: EventPayload): void {
-    const resolved = payload ?? {};
+  static publish(name: string, ...args: [EventPayload?]): void {
+    const resolved = args[0] ?? {};
     const event = this.instrumenter.newEvent(name, resolved);
     event.startBang();
     // Deliver the passed payload object itself, not Event#initialize's dup.

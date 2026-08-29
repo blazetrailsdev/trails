@@ -8,11 +8,19 @@ import { isBlank } from "./string-utils.js";
 /**
  * Sum the collection, optionally mapping each element first.
  */
-export function sum<T>(collection: T[], fn?: (item: T) => number): number {
-  if (fn) {
-    return collection.reduce((acc, item) => acc + fn(item), 0);
+export function sum<T>(collection: T[], fn?: (item: T) => number): number;
+export function sum<T>(collection: T[], initialValue: number, fn?: (item: T) => number): number;
+export function sum<T>(
+  collection: T[],
+  initialValueOrFn?: number | ((item: T) => number),
+  fn?: (item: T) => number,
+): number {
+  const initialValue = typeof initialValueOrFn === "number" ? initialValueOrFn : 0;
+  const block = typeof initialValueOrFn === "function" ? initialValueOrFn : fn;
+  if (block) {
+    return collection.reduce((acc, item) => acc + block(item), initialValue);
   }
-  return collection.reduce((acc, item) => acc + (item as unknown as number), 0);
+  return collection.reduce((acc, item) => acc + (item as unknown as number), initialValue);
 }
 
 /**
@@ -67,26 +75,31 @@ export function groupBy<T, K>(collection: T[], fn: (item: T) => K): Map<K, T[]> 
 }
 
 /**
- * Extract a single property from each element.
+ * Extract the given key from each element in the enumerable.
  */
-export function pluck<T, K extends keyof T>(collection: T[], key: K): T[K][] {
-  return collection.map((item) => item[key]);
+export function pluck<T, K extends keyof T>(collection: T[], ...keys: K[]): T[K][] | T[K][][] {
+  if (keys.length > 1) {
+    return collection.map((element) => keys.map((key) => element[key]));
+  } else {
+    const key = keys[0];
+    return collection.map((element) => element[key]);
+  }
 }
 
 /**
  * Find the maximum value in a collection using a mapper function.
  */
-export function maximum<T>(collection: T[], fn: (item: T) => number): number | undefined {
+export function maximum<T>(collection: T[], key: (item: T) => number): number | undefined {
   if (collection.length === 0) return undefined;
-  return Math.max(...collection.map(fn));
+  return Math.max(...collection.map(key));
 }
 
 /**
  * Find the minimum value in a collection using a mapper function.
  */
-export function minimum<T>(collection: T[], fn: (item: T) => number): number | undefined {
+export function minimum<T>(collection: T[], key: (item: T) => number): number | undefined {
   if (collection.length === 0) return undefined;
-  return Math.min(...collection.map(fn));
+  return Math.min(...collection.map(key));
 }
 
 /**
@@ -163,16 +176,16 @@ export function filterMap<T, U>(collection: T[], fn: (item: T) => U | null | und
 /**
  * excluding — remove elements from collection (alias for without).
  */
-export function excluding<T>(collection: T[], ...others: T[]): T[] {
-  const set = new Set(others);
+export function excluding<T>(collection: T[], ...elements: T[]): T[] {
+  const set = new Set(elements);
   return collection.filter((item) => !set.has(item));
 }
 
 /**
  * including — append elements to collection.
  */
-export function including<T>(collection: T[], ...others: T[]): T[] {
-  return [...collection, ...others];
+export function including<T>(collection: T[], ...elements: T[]): T[] {
+  return [...collection, ...elements];
 }
 
 /**
@@ -221,18 +234,18 @@ export function eachSlice<T>(collection: T[], n: number): T[][] {
  */
 export function inOrderOf<T>(
   collection: T[],
-  fn: (item: T) => unknown,
+  key: (item: T) => unknown,
   series: unknown[],
   options: { filter?: boolean } = {},
 ): T[] {
   const filter = options.filter !== false;
   if (filter) {
-    return valuesAt(groupBy(collection, fn), ...series)
+    return valuesAt(groupBy(collection, key), ...series)
       .flat(1)
       .filter((v): v is T => v != null);
   } else {
     const position = (v: T): number => {
-      const index = series.indexOf(fn(v));
+      const index = series.indexOf(key(v));
       return index === -1 ? series.length : index;
     };
     return [...collection].sort((a, b) => position(a) - position(b)).filter((v) => v != null);
@@ -243,24 +256,32 @@ export function inOrderOf<T>(
  * exclude? — true if the element is NOT in the collection.
  * Mirrors Enumerable#exclude? from Rails.
  */
-export function exclude<T>(collection: T[], value: T): boolean {
-  return !collection.includes(value);
+export function exclude<T>(collection: T[], object: T): boolean {
+  return !collection.includes(object);
 }
 
 /**
  * without — alias for excluding (Rails uses both names).
  */
-export function without<T>(collection: T[], ...others: T[]): T[] {
-  return excluding(collection, ...others);
+export function without<T>(collection: T[], ...elements: T[]): T[] {
+  return excluding(collection, ...elements);
 }
 
 /**
- * pick — returns the value of the first key from each element.
+ * pick — returns the value of the given key from the first element.
  * Mirrors Enumerable#pick: `payments.pick(:price)` → first price value.
- * In TS: pick(collection, key) → collection[0][key]
  */
-export function pick<T, K extends keyof T>(collection: T[], key: K): T[K] | undefined {
-  return collection[0]?.[key];
+export function pick<T, K extends keyof T>(
+  collection: T[],
+  ...keys: K[]
+): T[K] | T[K][] | undefined {
+  if (collection.length === 0) return undefined;
+
+  if (keys.length > 1) {
+    return keys.map((key) => collection[0][key]);
+  } else {
+    return collection[0][keys[0]];
+  }
 }
 
 /**

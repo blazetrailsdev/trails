@@ -279,15 +279,15 @@ export class LogSubscriber extends Subscriber {
 
   protected color(
     text: string,
-    colorValue: string | symbol,
+    color: string | symbol,
     modeOptions: Record<string, boolean> = {},
   ): string {
     if (!this.colorizeLogging) return text;
     let c: string;
-    if (typeof colorValue === "string" && colorValue.startsWith("\x1b")) {
-      c = colorValue;
+    if (typeof color === "string" && color.startsWith("\x1b")) {
+      c = color;
     } else {
-      const name = String(colorValue).toUpperCase();
+      const name = String(color).toUpperCase();
       c = (this.constructor as any)[name] ?? "";
     }
     const mode = this._modeFrom(modeOptions);

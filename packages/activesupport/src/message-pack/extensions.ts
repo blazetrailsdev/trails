@@ -246,9 +246,9 @@ export const Extensions = {
     });
   },
 
-  writeRational(value: Rational, packer: Packer): void {
-    packer.write(value.numerator);
-    if (value.numerator !== 0) packer.write(value.denominator);
+  writeRational(rational: Rational, packer: Packer): void {
+    packer.write(rational.numerator);
+    if (rational.numerator !== 0) packer.write(rational.denominator);
   },
 
   readRational(unpacker: Unpacker): Rational {
