@@ -1,4 +1,3 @@
-
 import { expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
@@ -23,10 +22,8 @@ import { MessagePackMessageSerializer } from "./message-pack-message-serializer.
 export { withEncryptionContext, withoutEncryption } from "../encryption.js";
 export { Decryption, Encryption };
 
-
 export { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "./test-keys.js";
 import { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "./test-keys.js";
-
 
 interface ConfigSnapshot {
   primaryKey: string | string[] | undefined;
@@ -86,7 +83,6 @@ export function configureEncryption(
 
 export const AUTHOR_NAME_LIMIT = 100;
 
-
 const ENCRYPTION_CANONICAL_TABLES = [
   "posts",
   "encrypted_books",
@@ -103,7 +99,6 @@ export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   await installEncryptionSchema(adapter);
   return adapter;
 }
-
 
 export function makePlainPost(adapter: DatabaseAdapter) {
   return class PlainPost extends Base {
@@ -348,7 +343,6 @@ export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
     }
   } as any;
 }
-
 
 /** @internal */
 function _isBinaryAttribute(model: any, attrName: string): boolean {

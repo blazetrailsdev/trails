@@ -460,7 +460,6 @@ async function performClassUpdate(
   return record;
 }
 
-
 function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   return ctor.isScopeAttributes();
 }
@@ -1239,7 +1238,6 @@ export class Base extends Model {
 
   declare static generatedTokenVerifier: _MessageVerifier | null;
 
-
   static encrypts(...args: Array<string | EncryptsOptions>): void {
     encryptionHooks.encrypts(this, ...args);
   }
@@ -1310,7 +1308,6 @@ export class Base extends Model {
   /** @internal */
   declare static detectNegativeEnumConditionsBang: typeof _EnumModule.detectNegativeEnumConditionsBang;
 
-
   declare static collectingQueriesForExplain: typeof _collectingQueriesForExplain;
 
   declare static execExplain: typeof _execExplain;
@@ -1320,7 +1317,6 @@ export class Base extends Model {
 
   /** @internal */
   declare static buildExplainClause: typeof _buildExplainClause;
-
 
   static delegatedType(
     role: string,
@@ -1345,7 +1341,6 @@ export class Base extends Model {
       options: options as import("./delegated-type.js").DelegatedTypeOptions,
     });
   }
-
 
   declare static store: typeof _StoreClassMethods.store;
 
@@ -1408,7 +1403,6 @@ export class Base extends Model {
   declare static defaultScoped: typeof NamedScoping.defaultScoped;
   declare static defaultExtensions: typeof NamedScoping.defaultExtensions;
 
-
   static async scoping<R>(rel: any, fn: () => R | Promise<R>): Promise<R>;
   static async scoping<R>(
     rel: any,
@@ -1438,7 +1432,6 @@ export class Base extends Model {
   static scopeRegistry = _scopeRegistry;
 
   static isScopeAttributes = _isScopeAttributes;
-
 
   declare static find: {
     <T extends typeof Base>(
@@ -1542,7 +1535,6 @@ export class Base extends Model {
     return this.all().where(conditionsOrSql);
   }
 
-
   static update<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>,
@@ -1592,7 +1584,6 @@ export class Base extends Model {
     return record;
   }
 
-
   static updateBang<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>,
@@ -1623,7 +1614,6 @@ export class Base extends Model {
   }
 
   declare static touchAll: typeof Timestamp.touchAll;
-
 
   static createOrFindBy<T extends typeof Base>(
     this: T,
@@ -1877,7 +1867,6 @@ export class Base extends Model {
       ) as InstanceType<T>;
     }
 
-
     (ModelSchema.loadSchema as any).call(this);
 
     const hadOwnSuppress = Object.prototype.hasOwnProperty.call(
@@ -1924,7 +1913,6 @@ export class Base extends Model {
     void runCallbacks(record, "initialize", undefined, { strict: "sync" });
     return record;
   }
-
 
   _newRecord = true;
   _destroyed = false;
@@ -2070,9 +2058,7 @@ export class Base extends Model {
 
   declare id: PrimaryKeyValue;
 
-
   declare static validatesUniquenessOf: typeof _Validations.validatesUniquenessOf;
-
 
   private async _createOrUpdate(block?: (record: this) => void): Promise<boolean> {
     const ctor = this.constructor as typeof Base;
@@ -2118,8 +2104,6 @@ export class Base extends Model {
   set recordTimestamps(value: boolean) {
     this._instanceRecordTimestamps = value;
   }
-
-
 
   /** @internal */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
@@ -2218,7 +2202,6 @@ export class Base extends Model {
     return true;
   }
 
-
   static async delete(id: unknown): Promise<number> {
     if (id === null || id === undefined || (Array.isArray(id) && id.length === 0)) {
       return 0;
@@ -2246,7 +2229,6 @@ export class Base extends Model {
       .deleteAll();
   }
 
-
   declare lockBang: typeof LockingPessimistic.lockBang;
   declare withLock: typeof LockingPessimistic.withLock;
 
@@ -2255,7 +2237,6 @@ export class Base extends Model {
   declare inspect: () => string;
   declare prettyPrint: typeof _Core.prettyPrint;
   declare attributeForInspect: (attr: string) => string;
-
 
   toGid(
     options?: import("@blazetrails/globalid").GlobalIDOptions,
@@ -2310,11 +2291,9 @@ export class Base extends Model {
     return found;
   }
 
-
   declare touch: typeof TouchLater.touch;
   declare touchLater: typeof TouchLater.touchLater;
   declare beforeCommittedBang: typeof TouchLater.beforeCommittedBang;
-
 
   declare hasAttribute: (name: string) => boolean;
   declare attributePresent: (name: string) => boolean;
@@ -2404,7 +2383,6 @@ export class Base extends Model {
     this._runCommitCallbacksOnFirstSavedInstancesInTransaction = value;
   }
 
-
   static get defaultConnectionHandler(): ConnectionHandler {
     return this._connectionHandler;
   }
@@ -2426,7 +2404,6 @@ export class Base extends Model {
   static destroyAssociationAsyncJob = _Core.destroyAssociationAsyncJob;
 
   static destroyAssociationAsyncBatchSize: number | null = null;
-
 
   static primaryKeyPrefixType: string | null = null;
 
@@ -2504,7 +2481,6 @@ export class Base extends Model {
   declare compare: (other: unknown) => number | undefined;
 
   declare hash: () => unknown;
-
 
   async transaction<R>(
     fn: (tx: any) => Promise<R>,
@@ -2676,7 +2652,6 @@ export class Base extends Model {
 
   static override setCallback = _txSetCallback;
 
-
   override async isValid(context?: ValidationContextArg): Promise<boolean> {
     const effectiveContext =
       context ?? this._validationContext ?? defaultValidationContext.call(this);
@@ -2684,10 +2659,8 @@ export class Base extends Model {
     return this.errors.empty && output;
   }
 
-
   declare isPresent: () => boolean;
   declare isBlank: () => boolean;
-
 
   static async tableExists(): Promise<boolean> {
     return ModelSchema.tableExists.call(this);
@@ -2816,7 +2789,6 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   becomes<K extends typeof Base>(klass: K): InstanceType<K>;
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;
 }
-
 
 extend(Base, ConnectionHandling.ClassMethods);
 extend(Base, Inheritance.ClassMethods);
@@ -3285,7 +3257,6 @@ Table.engine = {
     return pool.activeConnection ?? pool.leaseConnectionSync();
   },
 };
-
 
 _registerBaseWithQueryCache(Base);
 _registerBaseWithSchemaMigration(Base);

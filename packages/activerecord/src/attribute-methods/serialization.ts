@@ -1,4 +1,3 @@
-
 import { classAttribute, extend, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { type AttributeOptions, type Type, ArgumentError } from "@blazetrails/activemodel";

@@ -6,7 +6,6 @@ import { User } from "./test-helpers/models/user.js";
 import { fixtures } from "./test-fixtures.js";
 import { pp } from "./pretty-print.js";
 
-
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
 describe("FilterAttributesTest", () => {
