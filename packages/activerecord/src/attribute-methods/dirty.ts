@@ -184,9 +184,11 @@ export function _touchRow(
 /** @internal */
 export async function _updateRecord(
   this: DirtyPrivateHost,
-  superFn: () => Promise<unknown>,
+  attributeNames: string[] | undefined,
+  superFn: (attributeNames: string[]) => Promise<unknown>,
 ): Promise<unknown> {
-  const affectedRows = await superFn();
+  attributeNames ??= attributeNamesForPartialUpdates.call(this);
+  const affectedRows = await superFn(attributeNames);
   this.changesApplied();
   return affectedRows;
 }
