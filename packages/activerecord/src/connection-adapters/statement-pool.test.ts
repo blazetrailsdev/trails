@@ -88,9 +88,9 @@ describe("StatementPoolTest", () => {
     await pool.set("b", "2");
     await pool.set("c", "3");
     expect(pool.length).toBe(2);
-    expect(pool.has("a")).toBe(false);
-    expect(pool.has("b")).toBe(true);
-    expect(pool.has("c")).toBe(true);
+    expect(pool.isKey("a")).toBe(false);
+    expect(pool.isKey("b")).toBe(true);
+    expect(pool.isKey("c")).toBe(true);
     expect(dealloced).toEqual(["1"]);
   });
 
@@ -100,9 +100,9 @@ describe("StatementPoolTest", () => {
     await pool.set("b", "2");
     pool.get("a");
     await pool.set("c", "3");
-    expect(pool.has("a")).toBe(true);
-    expect(pool.has("b")).toBe(false);
-    expect(pool.has("c")).toBe(true);
+    expect(pool.isKey("a")).toBe(true);
+    expect(pool.isKey("b")).toBe(false);
+    expect(pool.isKey("c")).toBe(true);
   });
 
   it("isKey is an alias for has", async () => {
@@ -161,7 +161,7 @@ describe("SQLite3 StatementPool integration", () => {
     pool.get("a");
     await pool.set("c", "stmt_c");
     expect(pool.length).toBe(2);
-    expect(pool.has("a")).toBe(true);
+    expect(pool.isKey("a")).toBe(true);
     expect(dealloced).toEqual(["stmt_b"]);
   });
 

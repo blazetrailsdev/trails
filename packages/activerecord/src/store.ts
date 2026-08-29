@@ -2,7 +2,7 @@ import { ConfigurationError } from "./errors.js";
 import type { Base } from "./base.js";
 import { HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
-import type { YamlColumnOptions } from "./coders/yaml-column.js";
+import { YAMLColumn, type YamlColumnOptions } from "./coders/yaml-column.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 
 interface CoderLike {
@@ -11,33 +11,22 @@ interface CoderLike {
 }
 
 export class IndifferentCoder {
-  readonly storeAttribute: string;
-  readonly coder: CoderLike | null;
+  private readonly coder: CoderLike;
 
-  constructor(storeAttribute: string, coder?: CoderLike | null) {
-    this.storeAttribute = storeAttribute;
-    this.coder = coder ?? null;
+  constructor(attrName: string, coderOrClassName?: CoderLike | null) {
+    this.coder =
+      typeof (coderOrClassName as CoderLike | null)?.load === "function" &&
+      typeof (coderOrClassName as CoderLike | null)?.dump === "function"
+        ? (coderOrClassName as CoderLike)
+        : (new YAMLColumn(attrName, (coderOrClassName ?? Object) as never) as unknown as CoderLike);
   }
 
   dump(obj: unknown): unknown {
-    if (this.coder) return this.coder.dump(asRegularHash(obj));
-    return JSON.stringify(asRegularHash(obj));
+    return this.coder.dump(asRegularHash(obj));
   }
 
-  load(value: unknown): HashWithIndifferentAccess<unknown> {
-    if (this.coder) {
-      const coerced = value === null || value === undefined || value === false ? "" : value;
-      return asIndifferentHash(this.coder.load(coerced));
-    }
-    if (value === null || value === undefined || value === "") return asIndifferentHash(null);
-    if (typeof value === "string") {
-      try {
-        return asIndifferentHash(JSON.parse(value));
-      } catch {
-        return asIndifferentHash(null);
-      }
-    }
-    return asIndifferentHash(value);
+  load(yaml: unknown): HashWithIndifferentAccess<unknown> {
+    return asIndifferentHash(this.coder.load(yaml ?? ""));
   }
 
   /**
@@ -284,15 +273,6 @@ function dig(obj: unknown, key: string): unknown {
 
 function store(this: typeof Base, storeAttribute: string, options: StoreOptions = {}): void {
   const coder = buildColumnSerializer(storeAttribute, options.coder, Object, options.yaml);
-  if (
-    coder != null &&
-    (typeof (coder as any).dump !== "function" || typeof (coder as any).load !== "function")
-  ) {
-    throw new ConfigurationError(
-      `store coder for '${storeAttribute}' must implement dump() and load(), ` +
-        `but got ${typeof coder}.`,
-    );
-  }
   this.serialize(storeAttribute, {
     coder: new IndifferentCoder(storeAttribute, coder as CoderLike | null) as any,
   });

@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { _preloadedHolderTarget, _associateRecordsToOwner } from "../associations.js";
+import { associationInstanceGet, _associateRecordsToOwner } from "../associations.js";
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
@@ -426,9 +426,9 @@ export class Association {
     if (cached !== undefined && (cached as unknown) !== (this as unknown)) {
       return cached.target as Base | Base[] | null;
     }
-    const preloaded = _preloadedHolderTarget(owner, name);
-    if (preloaded) {
-      return preloaded.value;
+    const holder = associationInstanceGet.call(owner, name) as Association | null;
+    if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
+      return holder.target ?? null;
     }
     return undefined;
   }

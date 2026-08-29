@@ -149,6 +149,21 @@ export class SchemaCache {
       );
     }
 
+    if (coder["columns_hash"] instanceof Map) {
+      this._columnsHash = coder["columns_hash"] as Map<string, Record<string, Column>>;
+    } else if (coder["columns_hash"] && typeof coder["columns_hash"] === "object") {
+      this._columnsHash = new Map(
+        Object.entries(coder["columns_hash"] as Record<string, Record<string, unknown>>).map(
+          ([table, hash]) => [
+            table,
+            Object.fromEntries(
+              Object.entries(hash).map(([name, col]) => [name, rehydrateColumn(col)]),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (coder["primary_keys"] instanceof Map) {
       this._primaryKeys = coder["primary_keys"] as Map<string, string | string[] | null>;
     } else if (coder["primary_keys"] && typeof coder["primary_keys"] === "object") {
@@ -274,7 +289,8 @@ export class SchemaCache {
       for (const col of cols) {
         hash[col.name] = col;
       }
-      this._columnsHash.set(tableName, hash);
+      Object.freeze(hash);
+      this._columnsHash.set(deepDeduplicate(tableName), hash);
       return hash;
     }
     return undefined;

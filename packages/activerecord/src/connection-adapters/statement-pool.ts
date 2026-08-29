@@ -35,12 +35,8 @@ export class StatementPool<T = unknown> {
     if (deallocating.length > 0) return Promise.all(deallocating).then(() => {});
   }
 
-  has(key: string): boolean {
-    return this.cache.has(key);
-  }
-
   isKey(key: string): boolean {
-    return this.has(key);
+    return this.cache.has(key);
   }
 
   delete(key: string): T | undefined | Promise<T | undefined> {

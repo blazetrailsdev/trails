@@ -321,24 +321,6 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 }
 
 /** @internal */
-export function _preloadedHolderTarget(
-  record: Base,
-  assocName: string,
-): { value: Base | Base[] | null } | null {
-  const instance = record._associationInstances.get(assocName) as
-    | {
-        isLoaded(): boolean;
-        isStaleTarget(): boolean;
-        _staleStateIsSnapshotted: boolean;
-        target?: Base | Base[] | null;
-      }
-    | undefined;
-  if (instance == null || !instance.isLoaded()) return null;
-  if (instance._staleStateIsSnapshotted && instance.isStaleTarget()) return null;
-  return { value: instance.target ?? null };
-}
-
-/** @internal */
 export function _hmtNotFound(
   ctor: typeof Base,
   assocName: string,
@@ -808,7 +790,11 @@ export function association<T extends Base = Base>(
   const existing = record._collectionProxies.get(assocName) as AssociationProxy<T> | undefined;
   if (existing) {
     if (!existing.loaded) {
-      const preloaded = _preloadedHolderTarget(record, assocName)?.value;
+      const holder = associationInstanceGet.call(record, assocName) as AssociationInstance | null;
+      const preloaded =
+        holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())
+          ? holder.target
+          : null;
       if (preloaded != null) {
         const records = Array.isArray(preloaded) ? preloaded : [preloaded];
         _associateRecordsToOwner(existing.proxyAssociation, records as T[]);
@@ -848,7 +834,11 @@ export function association<T extends Base = Base>(
     }
   )._create(record, assocName, assocDef);
 
-  const preloaded = _preloadedHolderTarget(record, assocName)?.value;
+  const holder = associationInstanceGet.call(record, assocName) as AssociationInstance | null;
+  const preloaded =
+    holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())
+      ? holder.target
+      : null;
   if (preloaded != null) {
     const records = Array.isArray(preloaded) ? preloaded : [preloaded];
     _associateRecordsToOwner(proxy.proxyAssociation, records as T[]);
