@@ -565,11 +565,30 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
   if (reflected) {
     this._schemaLoaded = true;
     this._defaultAttributes();
-    (this as unknown as { _columns?: unknown })._columns = undefined;
+    defineAttributeMethodsAfterLoad(this);
     return;
   }
 
   this._columnsHash = {};
+}
+
+/**
+ * Rails generates attribute methods on demand: `method_missing` calls
+ * `define_attribute_methods` and retries (activemodel/attribute_methods.rb:474-486),
+ * while `load_schema!` itself defines nothing (model_schema.rb:587-597). A
+ * trails reader is a property, not a method, so there is no miss to hook (see
+ * CLAUDE.md, "Generated attribute readers are properties"); the demand point
+ * is instead the end of a schema load — the columns just reflected are exactly
+ * the ones an instance is about to read. It runs *after* `_schemaLoaded` is
+ * set, so `define_attribute_methods`' own `load_schema` (attribute_methods.rb:114)
+ * returns immediately instead of re-entering the load.
+ *
+ * @noRailsEquivalent Rails needs no such hook: its readers are methods, so
+ * `method_missing` is the trigger.
+ */
+function defineAttributeMethodsAfterLoad(host: SchemaHost): void {
+  (host as unknown as { defineAttributeMethods?: () => boolean }).defineAttributeMethods?.();
+  (host as unknown as { _columns?: unknown })._columns = undefined;
 }
 
 function getColumnsHash(host: SchemaHost): Record<string, unknown> {
