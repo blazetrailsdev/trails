@@ -718,6 +718,7 @@ export class PostgreSQLAdapter
   ): AsyncGenerator<string, void, void> {
     const baseQuery = [
       "SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput,",
+      '       format_type(t.oid, NULL) AS "formatType",',
       "       r.rngsubtype, t.typtype, t.typbasetype",
       "FROM pg_type as t",
       "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
@@ -737,6 +738,25 @@ export class PostgreSQLAdapter
     yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeNames()}`;
     yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeTypes()}`;
     yield `${baseQuery}\n${initializer.queryConditionsForArrayTypes()}`;
+    yield this.nativeTypeNamesQuery();
+  }
+
+  private nativeTypeNamesQuery(): string {
+    const names: string[] = [];
+    for (const [key, type] of Object.entries(this.nativeDatabaseTypes())) {
+      if (key === "primary_key") continue;
+      const name = typeof type === "string" ? type : type?.name;
+      if (name == null || names.includes(name)) continue;
+      names.push(name, `${name}[]`);
+    }
+    return [
+      'SELECT t.oid, t.typname, format_type(t.oid, NULL) AS "formatType",',
+      '       a.name AS "aliasName", t.typelem, t.typdelim, t.typinput,',
+      "       r.rngsubtype, t.typtype, t.typbasetype",
+      `FROM unnest(ARRAY[${names.map((name) => this.quote(name)).join(", ")}]::text[]) AS a(name)`,
+      "JOIN pg_type as t ON t.oid = to_regtype(a.name)",
+      "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
+    ].join("\n");
   }
 
   async reloadTypeMap(): Promise<void> {
@@ -1844,13 +1864,23 @@ export class PostgreSQLAdapter
     return pgTypeCast.call(this, value);
   }
 
-  /** @internal */
-  async lookupCastType(sqlType: string | null): Promise<Type> {
-    const oid = await this.queryValue(`SELECT ${this.quote(sqlType)}::regtype::oid`, "SCHEMA");
-    return this.typeMap.lookup(Number(oid));
+  /**
+   * @internal
+   * @missingRailsCall query_value — PERMANENT
+   * @missingRailsCall quote — PERMANENT
+   * @missingRailsCall to_i — PERMANENT
+   */
+  override lookupCastType(sqlType: string | null): Type {
+    if (typeof sqlType === "string") {
+      sqlType = sqlType
+        .replace(/\([^)]*\)/, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+    return super.lookupCastType(sqlType);
   }
 
-  override quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
+  override quoteDefaultExpression(value: unknown, column: unknown): string {
     return pgQuoteDefaultExpression.call(this, value, column as DefaultExpressionColumn);
   }
 

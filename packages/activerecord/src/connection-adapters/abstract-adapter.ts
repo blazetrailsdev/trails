@@ -760,7 +760,7 @@ export class AbstractAdapter implements Quoting {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
-  quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
+  quoteDefaultExpression(value: unknown, column: unknown): string {
     return abstractQuoteDefaultExpression.call(this, value, column as { sqlType?: string | null });
   }
 
@@ -2097,11 +2097,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   /** @internal */
-  lookupCastType(sqlType: string | null): Type | Promise<Type> {
+  lookupCastType(sqlType: string | null): Type {
     return abstractLookupCastType.call(this as unknown as { typeMap: TypeMap }, sqlType);
   }
 
-  lookupCastTypeFromColumn(column: { sqlType: string | null }): Type | Promise<Type> {
+  lookupCastTypeFromColumn(column: { sqlType: string | null }): Type {
     return this.lookupCastType(column.sqlType);
   }
 }

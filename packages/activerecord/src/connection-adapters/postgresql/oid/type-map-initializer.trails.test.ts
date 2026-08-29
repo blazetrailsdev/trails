@@ -81,6 +81,43 @@ describe("PostgreSQL::OID::TypeMapInitializer", () => {
     expect(store.lookup(1231)).toBeInstanceOf(OidArray);
   });
 
+  it("aliases each type's format_type spelling onto its OID", () => {
+    const store = new HashLookupTypeMap();
+    store.registerType("int4", integerSubtype);
+    store.registerType("varchar", integerSubtype);
+
+    new TypeMapInitializer(store).run([
+      row({ oid: 23, typname: "int4", formatType: "integer" }),
+      row({ oid: 1043, typname: "varchar", formatType: "character varying" }),
+      row({ oid: 25, typname: "text", formatType: "text" }),
+    ]);
+
+    expect(store.lookup("integer")).toBe(integerSubtype);
+    expect(store.lookup("character varying")).toBe(integerSubtype);
+    expect(store.isKey("text")).toBe(false);
+  });
+
+  it("aliases a SQL type name format_type cannot spell", () => {
+    const store = new HashLookupTypeMap();
+    store.registerType("numeric", integerSubtype);
+
+    new TypeMapInitializer(store).run([
+      row({ oid: 1700, typname: "numeric", formatType: "numeric", aliasName: "decimal" }),
+      row({
+        oid: 1231,
+        typname: "_numeric",
+        typinput: "array_in",
+        typelem: 1700,
+        formatType: "numeric[]",
+        aliasName: "decimal[]",
+      }),
+    ]);
+
+    expect(store.lookup("decimal")).toBe(integerSubtype);
+    expect(store.isKey("numeric[]")).toBe(true);
+    expect(store.isKey("decimal[]")).toBe(true);
+  });
+
   it("builds query condition fragments", () => {
     const store = new HashLookupTypeMap();
     store.registerType("int4", integerSubtype);

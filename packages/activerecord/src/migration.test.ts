@@ -2108,7 +2108,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 3, postgres: 3 });
+    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 3, postgres: 2 });
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
@@ -2133,7 +2133,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 7, postgres: 5 });
+    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 7, postgres: 4 });
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });

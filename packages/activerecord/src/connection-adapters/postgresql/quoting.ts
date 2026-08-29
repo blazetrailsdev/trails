@@ -121,7 +121,7 @@ export function quoteDefaultExpression(
   this: QuotingDispatchHost & CastTypeLookupHost,
   value: unknown,
   column: DefaultExpressionColumn,
-): string | Promise<string> {
+): string {
   if (typeof value === "function") {
     return (value as () => unknown)() as string;
   } else if (column?.type === "uuid" && typeof value === "string" && value.includes("()")) {

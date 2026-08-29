@@ -1240,6 +1240,33 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
+  describe("lookupCastType", () => {
+    it("resolves a SQL type name format_type cannot spell", async () => {
+      await adapter.exec("SELECT 1");
+
+      expect(adapter.lookupCastType("decimal").constructor.name).toBe(
+        adapter.lookupCastType("numeric").constructor.name,
+      );
+      expect(adapter.lookupCastType("float").constructor.name).toBe(
+        adapter.lookupCastType("double precision").constructor.name,
+      );
+      expect(adapter.lookupCastType("timestamptz").constructor.name).toBe(
+        adapter.lookupCastType("timestamp with time zone").constructor.name,
+      );
+    });
+
+    it("quotes an array default whose sqlType carries an aliased element type", async () => {
+      await adapter.exec("SELECT 1");
+
+      expect(adapter.quoteDefaultExpression([1.23, 3.45], { sqlType: "decimal[]" })).toBe(
+        "'{1.23,3.45}'",
+      );
+      expect(adapter.quoteDefaultExpression(["a", "b"], { sqlType: "character varying[]" })).toBe(
+        "'{a,b}'",
+      );
+    });
+  });
+
   describe("buildChangeColumnDefaultDefinition", () => {
     beforeEach(async () => {
       await adapter.exec(`

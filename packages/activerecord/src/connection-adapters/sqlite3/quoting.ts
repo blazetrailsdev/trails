@@ -116,7 +116,7 @@ export function quoteDefaultExpression(
   this: QuotingDispatchHost & QuotingHost,
   value: unknown,
   column: { sqlType?: string | null },
-): string | Promise<string> {
+): string {
   if (typeof value === "function") {
     const called = (value as () => unknown)() as string;
     return /^\w+\(.*\)$/.test(called) ? `(${called})` : called;

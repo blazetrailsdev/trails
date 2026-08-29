@@ -9,6 +9,8 @@ import { Vector } from "./vector.js";
 export interface PgTypeRow {
   oid: number | string;
   typname: string;
+  formatType?: string | null;
+  aliasName?: string | null;
   typelem: number | string;
   typdelim: string;
   typtype: string;
@@ -40,6 +42,8 @@ export class TypeMapInitializer {
     arrays.forEach((row) => this.registerArrayType(row));
     ranges.forEach((row) => this.registerRangeType(row));
     composites.forEach((row) => this.registerCompositeType(row));
+
+    records.forEach((row) => this.registerSqlTypeName(row));
   }
 
   runInitializer(records: PgTypeRow[]): void {
@@ -59,6 +63,15 @@ export class TypeMapInitializer {
     const knownTypeOids = this.store.keys().filter((key) => typeof key !== "string");
     if (knownTypeOids.length === 0) return "WHERE\n  1=0\n";
     return `WHERE\n  t.typelem IN (${knownTypeOids.join(", ")})\n`;
+  }
+
+  private registerSqlTypeName(row: PgTypeRow): void {
+    const oid = toInt(row.oid);
+    if (!this.store.isKey(oid)) return;
+    for (const name of [row.formatType, row.aliasName]) {
+      if (name == null || this.store.isKey(name)) continue;
+      this.store.aliasType(name, oid);
+    }
   }
 
   private registerMappedType(row: PgTypeRow): void {

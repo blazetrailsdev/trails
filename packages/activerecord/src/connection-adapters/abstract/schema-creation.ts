@@ -80,7 +80,7 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected quoteDefaultExpression(value: unknown, column: unknown): string | Promise<string> {
+  protected quoteDefaultExpression(value: unknown, column: unknown): string {
     return this.conn.quoteDefaultExpression(value, column);
   }
 
