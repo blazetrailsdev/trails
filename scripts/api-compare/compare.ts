@@ -93,6 +93,7 @@ import {
   PACKAGES,
   ROOT_DIR,
   SCRIPT_DIR,
+  isTestHelperFile,
   packageSrcDir,
 } from "./config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
@@ -535,6 +536,46 @@ export function significantMissingCalls(
 }
 
 /**
+ * Widen a TS call-set with the un-prefixed spelling of every Rails-private
+ * `_`-prefixed call it makes (RFC 0126).
+ *
+ * The repo ports a Rails PRIVATE method as `_foo` — a documented convention the
+ * extra-surface side already understands (`walkTsFileSurface` filters the
+ * prefix, extra-surface.ts:992). The call side did not, so a body calling
+ * `this._connectionLease()` read as omitting Rails' `connection_lease`
+ * (connection_pool.rb:711, private) at every one of its call sites: six
+ * baseline rows on `ConnectionPool` alone — `checkin`, `lease_connection`,
+ * `permanent_lease?`, `pin_connection!`, `release_connection`,
+ * `with_connection` — all naming the same callee, and #5343 had to carry a
+ * hollow `connectionLease(pool)` free function whose whole body was
+ * `pool._connectionLease()` purely so the name resolved.
+ *
+ * The un-prefixed spelling is ADDED, never substituted, so a Ruby call that is
+ * genuinely named `_foo` (`_read_attribute`, `_ensure_no_duplicate_errors`) goes
+ * on matching the TS `_foo` it always did. And a TS `_foo` some Ruby call in
+ * this body already claims under its own prefixed name is left alone: a body
+ * calling BOTH `read_attribute` and `_read_attribute` must not let the one TS
+ * `_readAttribute` answer for both.
+ */
+export function widenRailsPrivateTsCalls(
+  tsCalls: ReadonlySet<string>,
+  rubyCalls: readonly string[],
+  mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
+): Set<string> {
+  const claimedByPrefixedRuby = new Set<string>();
+  for (const rc of rubyCalls) {
+    if (!rc.startsWith("_")) continue;
+    for (const c of mapCall(rc) ?? []) claimedByPrefixedRuby.add(c);
+  }
+  const out = new Set(tsCalls);
+  for (const c of tsCalls) {
+    if (!c.startsWith("_") || claimedByPrefixedRuby.has(c)) continue;
+    out.add(c.slice(1));
+  }
+  return out;
+}
+
+/**
  * The TS names that TWO OR MORE of a body's Ruby calls could be ported as, so
  * no position in the TS sequence can be attributed to either of them (RFC 0084
  * `extractor-predicate-and-closure-order-artifacts`).
@@ -699,9 +740,19 @@ export function resolvePortedWithArgsSigs(
   writerSigs: ReadonlySet<readonly ParamInfo[]> = new Set(),
 ): ParamInfo[][] {
   const readers = (sigs: ParamInfo[][]): ParamInfo[][] => sigs.filter((s) => !writerSigs.has(s));
-  const sameFile = byFileName.get(tsFile)?.get(name);
-  if (sameFile && sameFile.length > 0) return readers(sameFile);
-  return readers(byNameInPkg.get(name) ?? []);
+  // The Rails-private `_` prefix is asked for LAST, after the name's own
+  // spelling has come up empty in both scopes: `connection_lease` maps to
+  // `connectionLease`, and the method that actually carries the port is
+  // `_connectionLease` (see widenRailsPrivateTsCalls).
+  for (const n of name.startsWith("_") ? [name] : [name, `_${name}`]) {
+    const sameFile = byFileName.get(tsFile)?.get(n);
+    if (sameFile && sameFile.length > 0) return readers(sameFile);
+  }
+  for (const n of name.startsWith("_") ? [name] : [name, `_${name}`]) {
+    const inPkg = byNameInPkg.get(n);
+    if (inPkg && inPkg.length > 0) return readers(inPkg);
+  }
+  return [];
 }
 
 /**
@@ -3066,7 +3117,7 @@ export function main() {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
-      if (scope === "package") {
+      if (scope === "package" && !isTestHelperFile(file)) {
         const pkgSigs = tsParamsByNameInPkg.get(m.name) ?? [];
         pkgSigs.push(m.params);
         tsParamsByNameInPkg.set(m.name, pkgSigs);
@@ -3688,7 +3739,7 @@ export function main() {
         const missing = significantMissingCalls(
           rubyName,
           rubyCalls,
-          tsCalls,
+          widenRailsPrivateTsCalls(tsCalls, rubyOwned?.calls ?? rubyCalls),
           // A `this:` receiver is not an argument — counting it would
           // promote zero-arg readers (`spawn`, `readonlyAttributeQ`) past the
           // gate the moment alias bindings started carrying real params.

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { compareLiteral, compareDefaults, constantNameMatches } from "./literals.js";
+import {
+  compareLiteral,
+  compareDefaults,
+  constantNameMatches,
+  normalizeConstantSpelling,
+} from "./literals.js";
 import type { LiteralValue, ParamInfo } from "@blazetrails/parity/types";
 
 describe("compareLiteral", () => {
@@ -156,5 +161,34 @@ describe("constantNameMatches", () => {
 
   it("accepts a camelized port of a lowercase Ruby constant", () => {
     expect(constantNameMatches("default_timeout", "defaultTimeout")).toBe(true);
+  });
+});
+
+describe("normalizeConstantSpelling", () => {
+  it("gives Ruby Float::INFINITY and every JS spelling of it one key", () => {
+    const infinity = normalizeConstantSpelling("INFINITY");
+    expect(infinity).not.toBeNull();
+    expect(normalizeConstantSpelling("Infinity")).toBe(infinity);
+    expect(normalizeConstantSpelling("POSITIVE_INFINITY")).toBe(infinity);
+  });
+
+  it("gives Ruby Float::NAN and every JS spelling of it one key", () => {
+    const nan = normalizeConstantSpelling("NAN");
+    expect(nan).not.toBeNull();
+    expect(normalizeConstantSpelling("NaN")).toBe(nan);
+  });
+
+  it("keeps the negative infinity spelling apart from the positive one", () => {
+    expect(normalizeConstantSpelling("NEGATIVE_INFINITY")).not.toBe(
+      normalizeConstantSpelling("POSITIVE_INFINITY"),
+    );
+  });
+
+  it("is a closed table — a constant that differs in VALUE is not folded", () => {
+    // Float::MAX (1.7976931348623157e308) and Number.MAX_VALUE happen to agree,
+    // but Float::MIN and Number.MIN_VALUE do NOT, so neither family is listed.
+    for (const name of ["MAX", "MAX_VALUE", "MIN", "MIN_VALUE", "EPSILON", "PI"]) {
+      expect(normalizeConstantSpelling(name)).toBeNull();
+    }
   });
 });

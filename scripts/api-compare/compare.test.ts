@@ -29,6 +29,7 @@ import {
   reorderedCalls,
   ORDER_PREFIX,
   resolvePortedWithArgsSigs,
+  widenRailsPrivateTsCalls,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
   NEGATED_ALIASES,
@@ -3214,5 +3215,67 @@ describe("misplacedClusterVerdict", () => {
     expect(
       misplacedClusterVerdict(["nope"], new Set(["compileInsert"]), "cluster.ts", bodyless, bodied),
     ).toEqual({ kind: "absent" });
+  });
+});
+
+describe("widenRailsPrivateTsCalls", () => {
+  it("lets a Rails-private `_foo` port answer for Rails' `foo` call", () => {
+    // connection_pool.rb:711 — `connection_lease` is private, ported as
+    // `_connectionLease`, and every caller spells `this._connectionLease()`.
+    const widened = widenRailsPrivateTsCalls(new Set(["_connectionLease"]), ["connection_lease"]);
+    expect(widened.has("connectionLease")).toBe(true);
+    expect(widened.has("_connectionLease")).toBe(true);
+  });
+
+  it("leaves a call-set with no `_`-prefixed call alone", () => {
+    const calls = new Set(["save", "reload"]);
+    expect([...widenRailsPrivateTsCalls(calls, ["save", "reload"])].sort()).toEqual([
+      "reload",
+      "save",
+    ]);
+  });
+
+  it("does not let a TS `_foo` answer for `foo` when the body also calls Ruby `_foo`", () => {
+    // A Rails method genuinely NAMED `_read_attribute` is distinct from
+    // `read_attribute`; one `_readAttribute` must not satisfy both.
+    const widened = widenRailsPrivateTsCalls(new Set(["_readAttribute"]), [
+      "read_attribute",
+      "_read_attribute",
+    ]);
+    expect(widened.has("readAttribute")).toBe(false);
+  });
+});
+
+describe("resolvePortedWithArgsSigs (Rails-private prefix)", () => {
+  const sig = (n: number): ParamInfo[] =>
+    Array.from({ length: n }, (_, i) => ({ name: `a${i}`, kind: "required" }) as ParamInfo);
+
+  it("resolves a name against the `_`-prefixed port of a Rails-private method", () => {
+    const byFileName = new Map([["connection-pool.ts", new Map([["_connectionLease", [sig(1)]]])]]);
+    const byNameInPkg = new Map([["_connectionLease", [sig(1)]]]);
+    expect(
+      resolvePortedWithArgsSigs(byFileName, byNameInPkg, "connection-pool.ts", "connectionLease"),
+    ).toEqual([sig(1)]);
+  });
+
+  it("prefers the unprefixed name when the file declares both", () => {
+    const byFileName = new Map([
+      [
+        "pool.ts",
+        new Map([
+          ["lease", [sig(2)]],
+          ["_lease", [sig(1)]],
+        ]),
+      ],
+    ]);
+    expect(resolvePortedWithArgsSigs(byFileName, new Map(), "pool.ts", "lease")).toEqual([sig(2)]);
+  });
+
+  it("does not strip a prefix the Ruby name itself carries", () => {
+    const byFileName = new Map([["m.ts", new Map([["readAttribute", [sig(1)]]])]]);
+    const byNameInPkg = new Map([["readAttribute", [sig(1)]]]);
+    expect(resolvePortedWithArgsSigs(byFileName, byNameInPkg, "m.ts", "_readAttribute")).toEqual(
+      [],
+    );
   });
 });

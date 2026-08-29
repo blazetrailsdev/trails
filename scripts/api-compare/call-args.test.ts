@@ -1061,3 +1061,21 @@ describe("comparableRubySites", () => {
     expect(kept).toEqual([]);
   });
 });
+
+describe("normalizeArg (value-equivalent constant spellings)", () => {
+  it("compares Ruby Float::INFINITY equal to JS Infinity", () => {
+    // cache/coder.rb:17 `dump_compressed(entry, Float::INFINITY)` against the
+    // port's `dumpCompressed(entry, Infinity)`.
+    expect(normalizeArg("const:INFINITY")).toBe(normalizeArg("const:Infinity"));
+    expect(normalizeArg("const:INFINITY")).toBe(normalizeArg("const:POSITIVE_INFINITY"));
+  });
+
+  it("compares Ruby Float::NAN equal to JS NaN", () => {
+    expect(normalizeArg("const:NAN")).toBe(normalizeArg("const:NaN"));
+  });
+
+  it("leaves every other constant comparing by its own token", () => {
+    expect(normalizeArg("const:MAX_VALUE")).toBe("const:MAX_VALUE");
+    expect(normalizeArg("const:MAX_VALUE")).not.toBe(normalizeArg("const:MAX"));
+  });
+});

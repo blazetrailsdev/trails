@@ -11,7 +11,6 @@ export class BoundSqlLiteral extends NodeExpression {
   readonly positionalBinds: unknown[] | null;
   readonly namedBinds: Record<string, unknown> | null;
 
-  /** @missingRailsCall uniq — PERMANENT */
   constructor(
     sqlWithPlaceholders: string,
     positionalBinds: unknown[] | null,

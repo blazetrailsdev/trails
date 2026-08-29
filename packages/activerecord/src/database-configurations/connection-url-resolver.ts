@@ -8,11 +8,7 @@ export class ConnectionUrlResolver {
   private readonly _query: string | null;
   private readonly _emptyAuthority: boolean;
 
-  /**
-   * @missingRailsCall parse — PERMANENT
-   * @missingRailsCall query — PERMANENT
-   * @missingRailsCall split — PERMANENT
-   */
+  /** @missingRailsCall split — PERMANENT */
   constructor(url: string) {
     if (!url || url.trim() === "") {
       throw new Error("Database URL cannot be empty");
