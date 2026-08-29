@@ -1283,10 +1283,8 @@ export function extractFromProgram(
       //     it unresolvable. Instead, harvest the object's method keys directly
       //     onto the host — same treatment as the inline-object and
       //     property-access branches above.
-      //
-      //     `defineModule(publicSection, protectedSection, privateSection)`
-      //     (activesupport/include.ts) composes one such module out of its
-      //     visibility sections, so its arguments are harvested in its place.
+      //     `defineModule(...)` (activesupport/include.ts) composes one such
+      //     module out of its sections, so its arguments are harvested instead.
       if (ts.isIdentifier(modArg)) {
         const sym0 = checker.getSymbolAtLocation(modArg);
         const sym =
@@ -2130,14 +2128,6 @@ export function isConstantCaseName(name: string): boolean {
   return /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(name);
 }
 
-/**
- * The object literals a module identifier denotes, for key harvesting.
- *
- * A mixin module reaches `include()` either as a `const` object literal or as a
- * `defineModule(publicSection, protectedSection, privateSection)` composition of
- * them (`activesupport/src/include.ts`), whose arguments are themselves such
- * consts. Both forms carry the same method keys, so both are followed here.
- */
 function moduleObjectLiterals(
   sym: ts.Symbol | undefined,
   checker: ts.TypeChecker,
@@ -2164,7 +2154,6 @@ function moduleObjectLiterals(
   return out;
 }
 
-/** Strip `as const` / `satisfies` wrappers to reach the raw expression. */
 function unwrapAssertions(expr: ts.Expression): ts.Expression {
   let cur = expr;
   while (ts.isAsExpression(cur) || ts.isSatisfiesExpression(cur)) cur = cur.expression;

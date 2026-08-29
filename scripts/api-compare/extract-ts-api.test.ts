@@ -1455,12 +1455,6 @@ describe("extractFromProgram — include() detection", () => {
   });
 
   it("harvests every section of a defineModule() mixin onto the host", () => {
-    // `defineModule(publicSection, protectedSection, privateSection)` composes
-    // one module out of its visibility sections (activesupport/include.ts), so
-    // the keys live on the section consts rather than on one object literal.
-    // All three sections are Relation members, and an alias entry
-    // (`buildHavingClause: buildWhereClause`, query_methods.rb:1654) counts
-    // under the name it is bound to.
     const info = extractFromFiles("/p", {
       "relation.ts": `export class Relation {}`,
       "relation/query-methods.ts": `

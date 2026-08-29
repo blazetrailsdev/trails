@@ -303,6 +303,9 @@ function assertSectionsDisjoint(sections: ModuleVisibility): void {
  * so the class form cannot see them and reports every prototype member. Only a
  * `#`-private field and a `defineModule` section are visible here; enforcement
  * of the rest is a compare-time gate rather than this runtime walk.
+ *
+ * `includeSuper` is inert on a `Module`, whose carrier `include()` copies into
+ * rather than links behind, so its own and inherited methods are one flat table.
  */
 export function publicInstanceMethods(
   mod: ModuleObject | AnyClass | Module,
