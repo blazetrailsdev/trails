@@ -26,8 +26,9 @@ describe("measure", () => {
   });
 
   it("ignores rows from an ungated package, and reports zero with none", () => {
-    expect(measure([])).toEqual(zeroed());
-    expect(measure([row("activerecord", "a.rb")])).toEqual(zeroed());
+    const empty = zeroed();
+    expect(measure([])).toEqual(empty);
+    expect(measure([row("activerecord", "a.rb")])).toEqual(empty);
   });
 });
 
