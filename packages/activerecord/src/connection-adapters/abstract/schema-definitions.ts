@@ -1,4 +1,5 @@
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
+import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";
 import { singularize, pluralize, assertValidKeys } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -1517,21 +1518,19 @@ export class Table {
     return this._schema.removeForeignKey(this.name, toTableOrOptions);
   }
 
-  async foreignKeyExists(
-    args?: string | Record<string, unknown>,
-    options: Record<string, unknown> = {},
-  ): Promise<boolean> {
-    if (typeof args === "string") {
-      if (Object.keys(options).length === 0) {
-        return this._schema.foreignKeyExists(this.name, args);
-      }
-      return this._schema.foreignKeyExists(this.name, args, options);
+  async foreignKeyExists(...args: string[]): Promise<boolean>;
+  async foreignKeyExists(...args: [...unknown[], Record<string, unknown>]): Promise<boolean>;
+  async foreignKeyExists(...args: unknown[]): Promise<boolean> {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as Record<
+      string,
+      unknown
+    >;
+    if (Object.keys(options).length === 0) {
+      return this._schema.foreignKeyExists(this.name, ...(rest as []));
     }
-    const opts = { ...args, ...options };
-    if (Object.keys(opts).length === 0) {
-      return this._schema.foreignKeyExists(this.name);
-    }
-    return this._schema.foreignKeyExists(this.name, opts);
+    return this._schema.foreignKeyExists(this.name, ...(rest as []), options);
   }
 
   async checkConstraint(expression: string, options: Record<string, unknown> = {}): Promise<void> {
@@ -1541,21 +1540,18 @@ export class Table {
     return this._schema.addCheckConstraint(this.name, expression, options);
   }
 
-  async removeCheckConstraint(
-    args?: string | { name?: string },
-    options: { name?: string } = {},
-  ): Promise<void> {
-    if (typeof args === "string") {
-      if (Object.keys(options).length === 0) {
-        return this._schema.removeCheckConstraint(this.name, args);
-      }
-      return this._schema.removeCheckConstraint(this.name, args, options);
+  async removeCheckConstraint(...args: string[]): Promise<void>;
+  async removeCheckConstraint(...args: [...unknown[], { name?: string }]): Promise<void>;
+  async removeCheckConstraint(...args: unknown[]): Promise<void> {
+    const rest = [...args];
+    const last = rest[rest.length - 1];
+    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as {
+      name?: string;
+    };
+    if (Object.keys(options).length === 0) {
+      return this._schema.removeCheckConstraint(this.name, ...(rest as []));
     }
-    const opts = { ...args, ...options };
-    if (Object.keys(opts).length === 0) {
-      return this._schema.removeCheckConstraint(this.name);
-    }
-    return this._schema.removeCheckConstraint(this.name, opts);
+    return this._schema.removeCheckConstraint(this.name, ...(rest as []), options);
   }
 
   async checkConstraintExists(...args: []): Promise<boolean>;
@@ -1602,93 +1598,4 @@ export class Table {
       );
     }
   }
-}
-
-export interface SchemaStatementsLike {
-  addColumn(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options?: ColumnOptions,
-  ): Promise<void>;
-  removeColumn(
-    tableName: string,
-    columnName: string,
-    type?: string,
-    options?: { ifExists?: boolean },
-  ): Promise<void>;
-  removeColumns(
-    tableName: string,
-    ...columnsOrOptions: Array<string | ColumnOptions>
-  ): Promise<void>;
-  renameColumn(tableName: string, oldName: string, newName: string): Promise<void>;
-  addIndex(tableName: string, columns: string | string[], options?: AddIndexOptions): Promise<void>;
-  removeIndex(
-    tableName: string,
-    columnOrOptions?:
-      | string
-      | string[]
-      | { column?: string | string[]; name?: string; ifExists?: boolean },
-    options?: { column?: string | string[]; name?: string; ifExists?: boolean },
-  ): Promise<void>;
-  addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
-  removeReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
-  addTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
-  removeTimestamps(tableName: string, options?: ColumnOptions): Promise<void>;
-  columnExists(
-    tableName: string,
-    columnName: string,
-    type?: ColumnType,
-    options?: Record<string, unknown>,
-  ): Promise<boolean>;
-  indexExists(
-    tableName: string,
-    columnName: string | string[],
-    options?: Record<string, unknown>,
-  ): Promise<boolean>;
-  renameIndex(tableName: string, oldName: string, newName: string): Promise<void>;
-  changeColumn(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options?: ColumnOptions,
-  ): Promise<void>;
-  changeColumnDefault(
-    tableName: string,
-    columnName: string,
-    defaultOrChanges: unknown,
-  ): Promise<void>;
-  changeColumnNull(
-    tableName: string,
-    columnName: string,
-    isNull: boolean,
-    defaultValue?: unknown,
-  ): Promise<void>;
-  addForeignKey(
-    tableName: string,
-    toTable: string,
-    options?: Record<string, unknown>,
-  ): Promise<void>;
-  removeForeignKey(
-    tableName: string,
-    toTableOrOptions?: string | Record<string, unknown>,
-    options?: Record<string, unknown>,
-  ): Promise<void>;
-  foreignKeyExists(
-    tableName: string,
-    toTableOrOptions?: string | Record<string, unknown>,
-    options?: Record<string, unknown>,
-  ): Promise<boolean>;
-  addCheckConstraint(
-    tableName: string,
-    expression: string,
-    options?: Record<string, unknown>,
-  ): Promise<void>;
-  removeCheckConstraint(
-    tableName: string,
-    expressionOrOptions?: string | Record<string, unknown>,
-    options?: Record<string, unknown>,
-  ): Promise<void>;
-  checkConstraintExists(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
-  primaryKey?(tableName: string): Promise<string | string[] | null>;
 }
