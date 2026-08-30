@@ -86,7 +86,16 @@ async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
       return false;
     }
   }
-  return Boolean((conn as unknown as { _inTransaction?: boolean })._inTransaction);
+  const sqlite = conn as unknown as { exec(sql: string): Promise<void> };
+  try {
+    await sqlite.exec("BEGIN");
+  } catch {
+    return true;
+  }
+  try {
+    await sqlite.exec("ROLLBACK");
+  } catch {}
+  return false;
 }
 
 function sleep(ms: number): Promise<void> {
