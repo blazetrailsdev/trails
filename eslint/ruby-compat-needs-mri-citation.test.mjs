@@ -4,9 +4,9 @@ import * as path from "path";
 import { RuleTester } from "eslint";
 import rule from "./ruby-compat-needs-mri-citation.mjs";
 
-// A stand-in for `vendor/ruby/` at the pinned SHA: one file, 20 lines. The real
-// tree is fetched rather than committed, so reading it would make the outcome
-// depend on whether the runner had run `pnpm vendor:fetch`.
+// A stand-in for `vendor/ruby/` at the pinned SHA: one file, 20 lines. Reading
+// the real (fetched, uncommitted) tree would make the outcome depend on whether
+// the runner had run `pnpm vendor:fetch`.
 const vendorRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ruby-compat-citation-"));
 fs.writeFileSync(path.join(vendorRoot, "rational.c"), "x\n".repeat(20));
 
@@ -21,9 +21,8 @@ const tester = new RuleTester({
   settings: { rubyCompatVendorRoot: vendorRoot },
 });
 
-// The vendor tree is fetched, not committed: with it absent the rule reports
-// nothing at all, so a contributor who has not fetched it is not blocked by a
-// citation they wrote correctly.
+// With the vendor tree absent the rule reports nothing at all, so a contributor
+// who has not fetched it is not blocked by a citation they wrote correctly.
 const withoutVendorTree = new RuleTester({
   languageOptions,
   settings: { rubyCompatVendorRoot: null },
@@ -47,8 +46,8 @@ export function add(a: number, b: number): number { return a + b; }`,
  * @noRailsEquivalent PERMANENT
  */
 export class Rational {}`,
-    // A file-level receipt-and-citation block covers the declarations below it,
-    // the way the extractor reads a file-level `@noRailsEquivalent`.
+    // A file-level block covers the declarations below it, the way the
+    // extractor reads a file-level `@noRailsEquivalent`.
     `/**
  * Mirrors ${cite(3)}.
  *
@@ -78,8 +77,7 @@ export function add(a: number, b: number): number { return a + b; }`,
       errors: [{ messageId: "missingReceipt" }],
     },
     {
-      // CONVERGEABLE is a category error here: there is no Rails method for a
-      // Ruby primitive to converge onto.
+      // CONVERGEABLE is a category error here: nothing to converge onto.
       code: `/**
  * Mirrors ${cite(12)}.
  *

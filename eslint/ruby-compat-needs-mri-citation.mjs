@@ -3,22 +3,19 @@
  *
  * `@blazetrails/ruby-compat` is the one package `parity:api` can never enroll.
  * MRI's surface is C, so `scripts/api-compare/extract-ruby-api.rb` extracts
- * nothing from it — the same finding that put `compareApi: false` on the `date`
+ * nothing from it — the finding that put `compareApi: false` on the `date`
  * entry in `vendor/sources.ts`. RFC 0089 read that as "this package has no
- * anchor"; with `vendor/ruby/` in the tree it has one, and the anchor is a
- * CITATION rather than an extraction — checkable, which is what separates it
- * from a JSDoc habit. So every exported declaration under
- * `packages/ruby-compat/src/` carries BOTH halves of the package contract (see
- * the README, "Every export carries BOTH a vendor/ruby citation and a
- * receipt"):
+ * anchor"; with `vendor/ruby/` in the tree it has one, and it is a CITATION
+ * rather than an extraction — checkable, which is what separates it from a
+ * JSDoc habit. So every exported declaration under `packages/ruby-compat/src/`
+ * carries BOTH halves of the package contract (see the README):
  *
- *   - a `vendor/ruby/<file>:<line>` citation naming the MRI source it mirrors,
- *     RESOLVED against the pinned tree — the file has to exist at the pinned
- *     SHA and the line has to be within it, so a citation naming a file the pin
- *     does not contain is an error rather than a well-formed string; and
- *   - a `@noRailsEquivalent PERMANENT` receipt, which is what re-enters the
- *     member into the measured surface (RFC 0121) and is `PERMANENT` because
- *     there is no Rails method for a Ruby primitive to converge onto.
+ *   - a `vendor/ruby/<file>:<line>` citation, RESOLVED against the pinned tree
+ *     rather than pattern-matched: the file has to exist at the pinned SHA and
+ *     the line has to be within it; and
+ *   - a `@noRailsEquivalent PERMANENT` receipt, which re-enters the member into
+ *     the measured surface (RFC 0121) and is `PERMANENT` because there is no
+ *     Rails method for a Ruby primitive to converge onto.
  *
  * WHEN `vendor/ruby/` IS ABSENT the rule SKIPS, reporting nothing: the vendor
  * tree is fetched rather than committed, so a contributor who has not run
@@ -27,7 +24,7 @@
  * (eslint/rails-private-jsdoc.config.mjs); a local green proves nothing here.
  *
  * Precedent for a manifest-backed JSDoc requirement is
- * `blazetrails/rails-private-jsdoc` over `eslint/rails-private-methods.json`.
+ * `blazetrails/rails-private-jsdoc`.
  */
 import * as fs from "fs";
 import * as path from "path";
@@ -49,9 +46,9 @@ function repoRoot() {
 
 /**
  * Test seam: `settings.rubyCompatVendorRoot` points the resolver at a fixture
- * tree, or at `null` to install the "vendor tree absent" state the skip branch
- * is about. It lives in the config rather than in module state because a
- * RuleTester case runs long after the test file's own body has finished.
+ * tree, or at `null` for the "vendor tree absent" state. It lives in the config
+ * rather than in module state because a RuleTester case runs long after the
+ * test file's own body has finished.
  */
 function vendorRoot(context) {
   const override = context.settings?.rubyCompatVendorRoot;
@@ -88,11 +85,9 @@ function docBlockFor(node, sourceCode) {
   return null;
 }
 
-/**
- * The file-level block a whole-file receipt lives in, read the way
- * `fileLevelNoRailsEquivalentReason` in extract-ts-api.ts reads it: a block
- * above the imports, or one a blank line separates from what follows.
- */
+/** Read the way `fileLevelNoRailsEquivalentReason` in extract-ts-api.ts reads a
+ *  file-level receipt: a block above the imports, or one a blank line separates
+ *  from what follows. */
 function fileLevelBlock(sourceCode) {
   const first = sourceCode.ast.body[0];
   if (!first) return null;
@@ -180,9 +175,8 @@ const rule = {
       "Program > ExportNamedDeclaration > TSTypeAliasDeclaration"(node) {
         check(context, node, node.id?.name);
       },
-      // Interfaces are exempt by KIND in `parity:api:extra` ("its MEMBERS are
-      // exempt with it"), so requiring a receipt on one would demand a tag the
-      // extractor scores STALE.
+      // Interfaces are exempt by KIND in `parity:api:extra`, so a receipt on
+      // one would be a tag the extractor scores STALE.
     };
   },
 };

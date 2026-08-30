@@ -33,21 +33,15 @@ tester.run("no-ruby-compat-reimplementation", rule, {
       code: `class Store { fetch(name: string): unknown { return name; } }`,
     },
     {
-      // Rails-anchored homonym: `ActionDispatch::Request::Session#dig`
-      // (actionpack/lib/action_dispatch/middleware/session/abstract_store.rb).
+      // Rails-anchored homonyms: `ActionDispatch::Request::Session#dig` and
+      // `ActionController::Parameters#dig`.
       filename: FLAGGED,
-      code: `class Session { dig(...keys: string[]): unknown { return keys; } }`,
-    },
-    {
-      // Rails-anchored homonym: `ActionController::Parameters#dig`
-      // (actionpack/lib/action_controller/metal/strong_parameters.rb).
-      filename: FLAGGED,
-      code: `class Parameters { dig(...keys: string[]): unknown { return keys; } }`,
+      code: `class Session { dig(...keys: string[]): unknown { return keys; } }
+class Parameters { dig(...keys: string[]): unknown { return keys; } }`,
     },
     {
       // `ActiveRecord::Core#<=>` (activerecord/lib/active_record/core.rb:665)
-      // ports to a function named `compare`; `compare` is deliberately not in
-      // the register, which is what keeps this green.
+      // ports to a function named `compare`, which is why it is not registered.
       filename: FLAGGED,
       code: `export function compare(a: unknown, b: unknown): number { return 0; }`,
     },

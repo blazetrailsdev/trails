@@ -407,9 +407,8 @@ export default defineConfig(
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
       "packages/arel/src/**/*.ts",
-      // Every ruby-compat member is absent from the rails-private manifest by
-      // construction, so the receipt pairing is mandatory package-wide there
-      // rather than case-by-case (RFC 0129).
+      // Absent from the rails-private manifest by construction, so the
+      // receipt pairing is mandatory package-wide there (RFC 0129).
       "packages/ruby-compat/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
@@ -673,12 +672,9 @@ export default defineConfig(
   },
 
   // ── no-ruby-compat-reimplementation: a Ruby primitive is declared once, in
-  //    @blazetrails/ruby-compat, and called everywhere else. Today's copies are
-  //    grandfathered one row each in
-  //    eslint/no-ruby-compat-reimplementation-exclude.json, which is
-  //    ONLY-SHRINK — a row is deleted by the move story that converges it, and
-  //    never added for new code. See eslint/no-ruby-compat-reimplementation.mjs
-  //    for what the name-based rule cannot catch. ──
+  //    @blazetrails/ruby-compat, and called everywhere else. Today's copies
+  //    hold one row each in the ONLY-SHRINK
+  //    eslint/no-ruby-compat-reimplementation-exclude.json. ──
   {
     files: noRubyCompatReimplementationFiles,
     ignores: noRubyCompatReimplementationIgnores,
@@ -690,8 +686,8 @@ export default defineConfig(
   // ── ruby-compat-needs-mri-citation: `parity:api` can never enroll
   //    ruby-compat (MRI's surface is C), so its anchor is a RESOLVED
   //    `vendor/ruby/<file>:<line>` citation plus a `@noRailsEquivalent
-  //    PERMANENT` receipt on every export. Skips when vendor/ruby is absent —
-  //    CI fetches it, so CI is the enforcing run. ──
+  //    PERMANENT` receipt on every export. Skips where vendor/ruby is absent;
+  //    the rails-comparison job fetches it and is the enforcing run. ──
   {
     files: ["packages/ruby-compat/src/**/*.ts"],
     ignores: ["**/*.test.ts"],

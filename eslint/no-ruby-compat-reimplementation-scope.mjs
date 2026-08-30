@@ -27,19 +27,19 @@ export const noRubyCompatReimplementationIgnores = [
  *
  * Each entry is a name plus the CONTEXT that makes it unambiguous, because a
  * bare name list would flag Rails ports. `kind: "function"` matches a
- * standalone function declaration (or a `const f = () => …`) only, never a
- * class method: a method named `isSymbol` is `Journey::Nodes::Node#symbol?`
+ * standalone function declaration (or a `const f = () => …`), never a class
+ * method: a method named `isSymbol` is `Journey::Nodes::Node#symbol?`
  * (`actionpack/lib/action_dispatch/journey/nodes/node.rb:103`) and one named
  * `fetch` is `ActiveSupport::Cache::Store#fetch`
- * (`activesupport/lib/active_support/cache.rb:444`). `firstParamType` narrows
- * further, separating a local `fetch(hash, key, default)` over a `Record` from
- * anything else spelled `fetch`.
+ * (`activesupport/lib/active_support/cache.rb:444`). `firstParamType` separates
+ * a local `fetch(hash, key, default)` over a `Record` from anything else
+ * spelled `fetch`.
  *
- * `compare` is deliberately NOT registered even though it is a Comparable
- * spelling: `ActiveRecord::Core#<=>` (`activerecord/lib/active_record/core.rb:665`)
- * and `DateAndTime::Calculations#<=>` port to a function named exactly that, and
- * nothing in the declaration distinguishes those from a hand-rolled comparator.
- * `cmp` and `spaceship` carry no such Rails port and are registered.
+ * `compare` is deliberately NOT registered: `ActiveRecord::Core#<=>`
+ * (`activerecord/lib/active_record/core.rb:665`) and
+ * `DateAndTime::Calculations#<=>` port to a function named exactly that, and
+ * nothing in the declaration distinguishes those from a hand-rolled
+ * comparator. `cmp` and `spaceship` carry no such port and are registered.
  */
 export const rubyCompatAliases = [
   { name: "regexpEscape", kind: "function", primitive: "Regexp.escape" },

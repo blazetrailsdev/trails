@@ -72,9 +72,8 @@ export default [
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
       "packages/arel/src/**/*.ts",
-      // Every ruby-compat member is absent from the rails-private manifest by
-      // construction, so the receipt pairing is mandatory package-wide there
-      // rather than case-by-case (RFC 0129).
+      // Absent from the rails-private manifest by construction, so the
+      // receipt pairing is mandatory package-wide there (RFC 0129).
       "packages/ruby-compat/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
@@ -89,9 +88,9 @@ export default [
     rules: { "blazetrails/unbacked-internal-needs-receipt": "error" },
   },
   // ruby-compat's MRI citations RESOLVE against `vendor/ruby/`, and this is the
-  // one CI job that fetches the vendor tree — the standalone Lint job has no
-  // vendor/ruby, where the rule skips by design. So this block is the enforcing
-  // run, the same way the manifest-backed rules above only go live here.
+  // one CI job that fetches it — the standalone Lint job has none, where the
+  // rule skips by design. So this block is the enforcing run, the same way the
+  // manifest-backed rules above only go live here.
   {
     files: ["packages/ruby-compat/src/**/*.ts"],
     ignores: ["**/*.test.ts"],
