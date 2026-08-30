@@ -7,13 +7,11 @@
  * / `Included<>` is ActiveSupport's, and this package takes no workspace
  * dependencies).
  *
- * The nullable return is the whole point. Ruby's `<=>` answers **nil** for an
+ * The nullable return is the whole point: Ruby's `<=>` answers **nil** for an
  * operand it cannot place (`Float::NAN <=> 0`, `Object#<=>` against an
- * unrelated object), and a `cmp` typed `number` silently loses that arm — the
- * "a predicate returns a value, not necessarily a boolean" trap in another
- * suit. Every derived operator here goes through {@link cmpint}, which turns
- * that nil into `rb_cmperr`'s `ArgumentError`, exactly as `compar.c` does;
- * `equals` is the one that does not raise.
+ * unrelated object), and a `cmp` typed `number` silently loses that arm. Every
+ * derived operator goes through {@link cmpint}, which turns that nil into
+ * `rb_cmperr`'s `ArgumentError`; `equals` is the one that does not raise.
  *
  * @boundary-file: a JS `Date` is compared as epoch millis, since Ruby's
  *   `Time#<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by the instant and
@@ -115,9 +113,7 @@ function rbObjClass(x: Comparable): string {
 /**
  * Ruby's `cmpint` (`vendor/ruby/compar.c:91`), the one body every operator
  * below is derived from: a `nil` `<=>` is an `ArgumentError`, not a `false`.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — `cmpint`
- * (`vendor/ruby/compar.c:91`), which Rails inherits rather than defines.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmpint` (`vendor/ruby/compar.c:91`).
  */
 export function cmpint(this: Comparable, other: unknown): number {
   const c = this.compareTo(other);
@@ -127,9 +123,7 @@ export function cmpint(this: Comparable, other: unknown): number {
 
 /**
  * Ruby `Comparable#<` (`vendor/ruby/compar.c:133` `cmp_lt`).
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — `cmp_lt`
- * (`vendor/ruby/compar.c:133`), which Rails inherits rather than defines.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_lt` (`vendor/ruby/compar.c:133`).
  */
 export function lessThan(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) < 0;
@@ -137,9 +131,7 @@ export function lessThan(this: Comparable, other: unknown): boolean {
 
 /**
  * Ruby `Comparable#<=` (`vendor/ruby/compar.c:147` `cmp_le`).
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — `cmp_le`
- * (`vendor/ruby/compar.c:147`), which Rails inherits rather than defines.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_le` (`vendor/ruby/compar.c:147`).
  */
 export function lessThanOrEqual(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) <= 0;
@@ -147,9 +139,7 @@ export function lessThanOrEqual(this: Comparable, other: unknown): boolean {
 
 /**
  * Ruby `Comparable#>` (`vendor/ruby/compar.c:105` `cmp_gt`).
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — `cmp_gt`
- * (`vendor/ruby/compar.c:105`), which Rails inherits rather than defines.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_gt` (`vendor/ruby/compar.c:105`).
  */
 export function greaterThan(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) > 0;
@@ -157,9 +147,7 @@ export function greaterThan(this: Comparable, other: unknown): boolean {
 
 /**
  * Ruby `Comparable#>=` (`vendor/ruby/compar.c:119` `cmp_ge`).
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — `cmp_ge`
- * (`vendor/ruby/compar.c:119`), which Rails inherits rather than defines.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_ge` (`vendor/ruby/compar.c:119`).
  */
 export function greaterThanOrEqual(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) >= 0;
@@ -170,9 +158,7 @@ export function greaterThanOrEqual(this: Comparable, other: unknown): boolean {
  * derived operator that does NOT raise: an incomparable operand — a `nil`
  * `<=>` — is `false` here. An identical object is `true` before `<=>` is sent
  * at all.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — `cmp_equal`
- * (`vendor/ruby/compar.c:79`), which Rails inherits rather than defines.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_equal` (`vendor/ruby/compar.c:79`).
  */
 export function equals(this: Comparable, other: unknown): boolean {
   if ((this as unknown) === other) return true;
@@ -184,9 +170,7 @@ export function equals(this: Comparable, other: unknown): boolean {
 /**
  * Ruby `Comparable#between?` (`vendor/ruby/compar.c:168` `cmp_between`), which
  * is `cmpint` on both ends and so raises for an operand `<=>` cannot place.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — `cmp_between`
- * (`vendor/ruby/compar.c:168`), which Rails inherits rather than defines.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_between` (`vendor/ruby/compar.c:168`).
  */
 export function isBetween(this: Comparable, min: unknown, max: unknown): boolean {
   return cmpint.call(this, min) >= 0 && cmpint.call(this, max) <= 0;
