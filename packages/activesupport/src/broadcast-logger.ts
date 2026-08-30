@@ -65,10 +65,6 @@ export class BroadcastLogger extends Logger {
     this.level = level;
   }
 
-  /**
-   * `broadcast_logger.rb:156-160` — dispatches the value unchanged, so each
-   * broadcast's own `local_level=` decides the Symbol/String/Integer arm.
-   */
   set localLevel(value: number | LogLevel | null) {
     this.dispatch((logger) => {
       if ("localLevel" in logger) {

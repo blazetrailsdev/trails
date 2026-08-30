@@ -30,12 +30,7 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
-/**
- * `Logger::Severity.coerce` — Ruby's own, which `Logger#level=` and
- * `Logger.new(level:)` route through. An Integer passes; a Symbol or a String
- * is looked up by its downcased name; anything else raises.
- */
-function coerceSeverity(severity: number | string): number {
+function coerce(severity: number | string): number {
   if (typeof severity === "number") return severity;
   const name = severity.startsWith(":") ? severity.slice(1) : severity;
   const level = LOG_LEVELS[`:${name.toLowerCase()}` as LogLevel];
@@ -43,12 +38,6 @@ function coerceSeverity(severity: number | string): number {
   return level;
 }
 
-/**
- * A severity *Symbol* — `:debug` (logger_thread_safe_level.rb:17). CLAUDE.md
- * spells a Ruby Symbol value as its own name with the leading colon kept, which
- * is what makes `local_level=`'s Symbol arm distinguishable from its String
- * arm, where `"debug"` falls through to the `else` that raises.
- */
 export type LogLevel = ":debug" | ":info" | ":warn" | ":error" | ":fatal" | ":unknown";
 
 export const LOG_LEVELS: Record<LogLevel, number> = {
@@ -60,7 +49,6 @@ export const LOG_LEVELS: Record<LogLevel, number> = {
   ":unknown": 5,
 };
 
-/** `logger.rb`'s `SEV_LABEL` — the label `format_severity` prints, not a Symbol. */
 const LEVEL_NAMES: Record<number, string> = {
   0: "debug",
   1: "info",
@@ -168,15 +156,8 @@ export class Logger {
     return this.localLevel ?? this._level;
   }
 
-  /**
-   * Ruby's own `Logger#level=` is `@level = Severity.coerce(severity)`, and
-   * `coerce` takes an Integer, a Symbol OR a String — `logger.level = "debug"`
-   * and `logger.level = :debug` are the same call, and only an unrecognized
-   * name raises. That is the opposite of `local_level=` below, which
-   * discriminates the two.
-   */
-  set level(value: number | LogLevel | string) {
-    this._level = coerceSeverity(value);
+  set level(severity: number | LogLevel | string) {
+    this._level = coerce(severity);
   }
 
   /**
@@ -194,13 +175,6 @@ export class Logger {
     return IsolatedExecutionState.get<number>(this.localLevelKey) ?? null;
   }
 
-  /**
-   * `logger_thread_safe_level.rb:14-22` — four arms. An Integer passes through,
-   * a Symbol goes through `Logger::Severity.const_get` (NameError on an unknown
-   * name), `nil` clears the level, and everything else — a String included —
-   * reaches the `else` that raises ArgumentError. `":debug"` is the Symbol and
-   * `"debug"` is the String, so both arms are live here exactly as in Ruby.
-   */
   set localLevel(level: number | LogLevel | null) {
     let value: number | null;
     if (typeof level === "number") {

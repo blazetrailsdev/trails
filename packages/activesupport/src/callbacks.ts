@@ -319,7 +319,11 @@ export class InstanceExec2 implements CallTemplate {
  * be discriminated where Ruby dispatches for free.
  */
 export class ProcCall implements CallTemplate {
-  constructor(readonly overrideTarget: ((...args: any[]) => unknown) | Value | null) {}
+  readonly overrideTarget: ((...args: any[]) => unknown) | Value | null;
+
+  constructor(target: ((...args: any[]) => unknown) | Value | null) {
+    this.overrideTarget = target;
+  }
 
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
     return [this.overrideTarget ?? target, block, "call", target, value];
@@ -336,12 +340,6 @@ export class ProcCall implements CallTemplate {
   }
 }
 
-/**
- * `(@override_target || target).call(target, value, &block)`
- * (callbacks.rb:475, :481). Ruby reaches a Proc and a `Conditionals::Value`
- * through the one `#call`; a JS function's own `.call` has different
- * semantics, so the union has to be discriminated here.
- */
 function call(
   receiver: ((...args: any[]) => unknown) | Value | object,
   target: object,
