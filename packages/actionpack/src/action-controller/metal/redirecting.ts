@@ -31,7 +31,7 @@ const SCHEME_OR_PROTOCOL_RELATIVE_RE = /^([a-z][a-z\d\-+.]*:|\/\/).*/i;
 
 export interface RedirectingHost {
   request: { referer?: string | null; host?: string; protocol?: string; hostWithPort?: string };
-  redirectTo(url: string, options?: Record<string, unknown>): void;
+  redirectTo(options: string, responseOptions?: Record<string, unknown>): void;
   urlFor?(options: unknown): string;
 }
 

@@ -291,14 +291,14 @@ export class Parameters {
     return this;
   }
 
-  deepMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
+  deepMerge(other: Parameters | Record<string, unknown>): Parameters {
+    const otherData = other instanceof Parameters ? other._toRawHash() : other;
     const merged = deepMergeObjects(this._data, otherData);
     return this._newWithInheritedPermitted(merged);
   }
 
-  deepMergeBang(otherHash: Parameters | Record<string, unknown>): this {
-    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
+  deepMergeBang(other: Parameters | Record<string, unknown>): this {
+    const otherData = other instanceof Parameters ? other._toRawHash() : other;
     this._data = deepMergeObjects(this._data, otherData);
     return this;
   }
