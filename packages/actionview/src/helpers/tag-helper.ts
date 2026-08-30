@@ -343,7 +343,7 @@ export function tag(
  */
 export function contentTag(
   name: string,
-  contentOrOptions?: unknown,
+  contentOrOptionsWithBlock?: unknown,
   options?: Record<string, unknown> | null,
   escape?: boolean,
   block?: () => unknown,
@@ -353,15 +353,15 @@ export function contentTag(
 
   if (block) {
     const isPlainOpts =
-      typeof contentOrOptions === "object" &&
-      contentOrOptions !== null &&
-      !(contentOrOptions instanceof SafeBuffer) &&
-      !Array.isArray(contentOrOptions);
-    const opts = isPlainOpts ? (contentOrOptions as Record<string, unknown>) : options;
+      typeof contentOrOptionsWithBlock === "object" &&
+      contentOrOptionsWithBlock !== null &&
+      !(contentOrOptionsWithBlock instanceof SafeBuffer) &&
+      !Array.isArray(contentOrOptionsWithBlock);
+    const opts = isPlainOpts ? (contentOrOptionsWithBlock as Record<string, unknown>) : options;
     return contentTagString(name, block(), opts ?? undefined, esc);
   }
 
-  return contentTagString(name, contentOrOptions, options ?? undefined, esc);
+  return contentTagString(name, contentOrOptionsWithBlock, options ?? undefined, esc);
 }
 
 function contentTagString(
@@ -448,9 +448,9 @@ export class TagBuilder {
   /**
    * attributes() — transforms a hash into HTML attributes string.
    */
-  attributes(attrs: Record<string, unknown> | null | undefined): SafeBuffer {
-    if (!attrs) return htmlSafe("");
-    const result = tagOptions(attrs).trim();
+  attributes(attributes: Record<string, unknown> | null | undefined): SafeBuffer {
+    if (!attributes) return htmlSafe("");
+    const result = tagOptions(attributes).trim();
     return htmlSafe(result);
   }
 

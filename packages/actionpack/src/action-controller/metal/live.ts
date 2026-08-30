@@ -388,7 +388,11 @@ export async function newControllerThread(
 }
 
 /** @internal No-op — Ruby clears copied thread-locals; JS shares one context. */
-export function cleanUpThreadLocals(this: LiveControllerHost, _l: unknown, _t: unknown): void {}
+export function cleanUpThreadLocals(
+  this: LiveControllerHost,
+  _locals: unknown,
+  _thread: unknown,
+): void {}
 
 /** Pre-test-override alias; Rails' test_case.rb re-aliases the public method
  *  to run inline, so the originals stay available for parity. */

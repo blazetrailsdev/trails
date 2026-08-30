@@ -10,8 +10,8 @@ import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
 
 export class ActionControllerError extends Error {
-  constructor(message?: string) {
-    super(message ?? "");
+  constructor(msg?: string) {
+    super(msg ?? "");
     this.name = "ActionControllerError";
   }
 }

@@ -201,7 +201,7 @@ export function excerpt(
 
 /** @internal */
 function cutExcerptPart(
-  position: "first" | "second",
+  partPosition: "first" | "second",
   part: string | null,
   separator: string,
   options: ExcerptOptions,
@@ -220,7 +220,7 @@ function cutExcerptPart(
 
   const affix = tokens.length > radius ? omission : "";
   const sliced =
-    position === "first"
+    partPosition === "first"
       ? tokens.slice(Math.max(0, tokens.length - radius))
       : tokens.slice(0, radius);
 
@@ -296,8 +296,8 @@ export function simpleFormat(
  * concat — append +value+ to the host's output buffer. Use inside non-output
  * code blocks where you cannot use `<%= %>`. Mirrors `ActionView::Helpers::TextHelper#concat`.
  */
-export function concat(this: TextHelperHost, value: unknown): OutputBuffer {
-  this.outputBuffer.append(value);
+export function concat(this: TextHelperHost, string: unknown): OutputBuffer {
+  this.outputBuffer.append(string);
   return this.outputBuffer;
 }
 
@@ -305,8 +305,8 @@ export function concat(this: TextHelperHost, value: unknown): OutputBuffer {
  * safe_concat — like {@link concat}, but appends the value as HTML-safe.
  * Mirrors `ActionView::Helpers::TextHelper#safe_concat`.
  */
-export function safeConcat(this: TextHelperHost, value: unknown): OutputBuffer {
-  this.outputBuffer.safeAppend(value);
+export function safeConcat(this: TextHelperHost, string: unknown): OutputBuffer {
+  this.outputBuffer.safeAppend(string);
   return this.outputBuffer;
 }
 

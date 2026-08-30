@@ -80,13 +80,13 @@ function splitHeader(value: string | null | undefined): string[] {
 }
 
 /** @internal */
-function wrapIpv6(address: string): string {
+function wrapIpv6(host: string): string {
   // Rails: only wrap if not already bracketed and has >1 colon (IPv6 has multiple colons;
   // host:port has exactly one and must not be wrapped).
-  if (address && !address.startsWith("[") && address.split(":").length - 1 > 1) {
-    return `[${address}]`;
+  if (host && !host.startsWith("[") && host.split(":").length - 1 > 1) {
+    return `[${host}]`;
   }
-  return address;
+  return host;
 }
 
 /** @internal */
@@ -146,18 +146,18 @@ export class Request {
     this.env[key] = value;
   }
 
-  addHeader(key: string, value: string): void {
+  addHeader(key: string, v: string): void {
     const existing = this.env[key];
     if (existing) {
-      this.env[key] = existing + "," + value;
+      this.env[key] = existing + "," + v;
     } else {
-      this.env[key] = value;
+      this.env[key] = v;
     }
   }
 
-  deleteHeader(key: string): any {
-    const val = this.env[key];
-    delete this.env[key];
+  deleteHeader(name: string): any {
+    const val = this.env[name];
+    delete this.env[name];
     return val;
   }
 
@@ -432,27 +432,27 @@ export class Request {
     return { ...this.GET, ...this.POST };
   }
 
-  updateParam(key: string, value: any): void {
+  updateParam(k: string, v: any): void {
     const get = this.GET;
     const post = this.POST;
-    if (key in post) {
-      post[key] = value;
+    if (k in post) {
+      post[k] = v;
     } else {
-      get[key] = value;
+      get[k] = v;
     }
   }
 
-  deleteParam(key: string): any {
+  deleteParam(k: string): any {
     const post = this.POST;
-    if (key in post) {
-      const val = post[key];
-      delete post[key];
+    if (k in post) {
+      const val = post[k];
+      delete post[k];
       return val;
     }
     const get = this.GET;
-    if (key in get) {
-      const val = get[key];
-      delete get[key];
+    if (k in get) {
+      const val = get[k];
+      delete get[k];
       return val;
     }
     return undefined;
@@ -731,8 +731,8 @@ export class Request {
   }
 
   /** @internal */
-  parseQuery(qs: string, separator = "&"): Record<string, any> {
-    return this.queryParser().parseNestedQuery(qs, separator);
+  parseQuery(qs: string, d = "&"): Record<string, any> {
+    return this.queryParser().parseNestedQuery(qs, d);
   }
 
   /** @internal */

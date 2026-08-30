@@ -3,12 +3,31 @@
     "total": 0,
     "byFile": {}
   },
+  "actioncontroller": {
+    "total": 11,
+    "byFile": {
+      "base.rb": 1,
+      "metal/allow_browser.rb": 1,
+      "metal/flash.rb": 1,
+      "metal/logging.rb": 2,
+      "metal/request_forgery_protection.rb": 3,
+      "metal/strong_parameters.rb": 1,
+      "template_assertions.rb": 2
+    }
+  },
   "actiondispatch": {
     "total": 5,
     "byFile": {
       "http/headers.rb": 1,
       "http/request.rb": 1,
       "middleware/stack.rb": 3
+    }
+  },
+  "actionview": {
+    "total": 3,
+    "byFile": {
+      "buffers.rb": 1,
+      "renderer/object_renderer.rb": 2
     }
   },
   "activemodel": {
@@ -30,6 +49,14 @@
   "globalid": {
     "total": 0,
     "byFile": {}
+  },
+  "rack": {
+    "total": 3,
+    "byFile": {
+      "files.rb": 1,
+      "headers.rb": 1,
+      "method_override.rb": 1
+    }
   },
   "trailties": {
     "total": 0,

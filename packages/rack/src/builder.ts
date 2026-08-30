@@ -92,8 +92,8 @@ export class Builder {
     return this;
   }
 
-  warmup(block: (app: RackApp) => void): this {
-    this._warmupBlock = block;
+  warmup(prc: (app: RackApp) => void): this {
+    this._warmupBlock = prc;
     return this;
   }
 

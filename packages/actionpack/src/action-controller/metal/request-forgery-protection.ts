@@ -167,8 +167,8 @@ export class SessionStore {
   write(session: Record<string, unknown>, token: string): void {
     session[this._tokenKey] = token;
   }
-  store(session: Record<string, unknown>, token: string): void {
-    this.write(session, token);
+  store(session: Record<string, unknown>, csrfToken: string): void {
+    this.write(session, csrfToken);
   }
   reset(session: Record<string, unknown>): void {
     delete session[this._tokenKey];
@@ -189,8 +189,8 @@ export class CookieStore {
   write(cookies: Record<string, string>, token: string): void {
     cookies[this._cookieName] = token;
   }
-  store(cookies: Record<string, string>, token: string): void {
-    this.write(cookies, token);
+  store(cookies: Record<string, string>, csrfToken: string): void {
+    this.write(cookies, csrfToken);
   }
   reset(cookies: Record<string, string>): void {
     delete cookies[this._cookieName];
@@ -403,17 +403,17 @@ export function generateCsrfToken(): string {
 }
 
 /** @internal */
-export function encodeCsrfToken(rawToken: Buffer): string {
+export function encodeCsrfToken(csrfToken: Buffer): string {
   // Rails: Base64.urlsafe_encode64(csrf_token, padding: false)
-  return rawToken.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return csrfToken.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /** @internal */
-export function decodeCsrfToken(encodedToken: string): Buffer {
+export function decodeCsrfToken(encodedCsrfToken: string): Buffer {
   // Rails: Base64.urlsafe_decode64 — raises ArgumentError on invalid input.
-  if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(encodedToken)) throw new TypeError("invalid base64");
+  if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(encodedCsrfToken)) throw new TypeError("invalid base64");
   // Reject impossible base64 lengths (length % 4 === 1 cannot encode any bytes).
-  const stripped = encodedToken.replace(/=+$/, "");
+  const stripped = encodedCsrfToken.replace(/=+$/, "");
   if (stripped.length % 4 === 1) throw new TypeError("invalid base64 length");
   return Buffer.from(stripped.replace(/-/g, "+").replace(/_/g, "/"), "base64");
 }
@@ -472,10 +472,10 @@ export function maskToken(rawToken: Buffer): string {
 }
 
 /** @internal */
-export function unmaskToken(masked: Buffer): Buffer {
+export function unmaskToken(maskedToken: Buffer): Buffer {
   return xorByteStrings(
-    masked.subarray(0, AUTHENTICITY_TOKEN_LENGTH),
-    masked.subarray(AUTHENTICITY_TOKEN_LENGTH),
+    maskedToken.subarray(0, AUTHENTICITY_TOKEN_LENGTH),
+    maskedToken.subarray(AUTHENTICITY_TOKEN_LENGTH),
   );
 }
 
@@ -547,12 +547,12 @@ export function isValidPerFormCsrfToken(
 export function isValidAuthenticityToken(
   this: CsrfController,
   session: unknown,
-  encoded: unknown,
+  encodedMaskedToken: unknown,
 ): boolean {
-  if (typeof encoded !== "string" || encoded.length === 0) return false;
+  if (typeof encodedMaskedToken !== "string" || encodedMaskedToken.length === 0) return false;
   let masked: Buffer;
   try {
-    masked = decodeCsrfToken(encoded);
+    masked = decodeCsrfToken(encodedMaskedToken);
   } catch {
     return false;
   }
@@ -593,8 +593,8 @@ export function protectionMethodClass(
 }
 
 /** @internal */
-export function isStorageStrategy(o: unknown): o is CsrfTokenStorage {
-  const s = o as CsrfTokenStorage | null;
+export function isStorageStrategy(object: unknown): object is CsrfTokenStorage {
+  const s = object as CsrfTokenStorage | null;
   return (
     !!s &&
     typeof s.fetch === "function" &&

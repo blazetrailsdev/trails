@@ -94,18 +94,12 @@ export function unescape(s: string): string {
   return decodeURIComponent(s.replace(/\+/g, " "));
 }
 
-export function parseQuery(
-  qs: string,
-  separator?: string,
-): Record<string, string | string[] | null> {
-  return _defaultQueryParser.parseQuery(qs, separator);
+export function parseQuery(qs: string, d?: string): Record<string, string | string[] | null> {
+  return _defaultQueryParser.parseQuery(qs, d);
 }
 
-export function parseNestedQuery(
-  qs: string | null | undefined,
-  separator?: string,
-): Record<string, any> {
-  return _defaultQueryParser.parseNestedQuery(qs, separator);
+export function parseNestedQuery(qs: string | null | undefined, d?: string): Record<string, any> {
+  return _defaultQueryParser.parseNestedQuery(qs, d);
 }
 
 export function buildQuery(params: Record<string, string | string[] | null>): string {
@@ -143,9 +137,9 @@ export class ArgumentError extends Error {
   }
 }
 
-export function qValues(header: string): [string, number][] {
-  if (!header) return [];
-  return header.split(",").map((part) => {
+export function qValues(qValueHeader: string): [string, number][] {
+  if (!qValueHeader) return [];
+  return qValueHeader.split(",").map((part) => {
     const [value, ...paramParts] = part.split(";").map((s) => s.trim());
     let quality = 1.0;
     const params = paramParts.join(";");
@@ -156,13 +150,13 @@ export function qValues(header: string): [string, number][] {
 }
 
 export function forwardedValues(
-  header: string | null | undefined,
+  forwardedHeader: string | null | undefined,
 ): Record<string, string[]> | null {
-  if (!header) return null;
-  header = header.replace(/\n/g, ";");
+  if (!forwardedHeader) return null;
+  forwardedHeader = forwardedHeader.replace(/\n/g, ";");
   const result: Record<string, string[]> = {};
 
-  for (const field of header.split(";")) {
+  for (const field of forwardedHeader.split(";")) {
     for (const pair of field.split(",")) {
       const trimmed = pair.trim().replace(/\s*=\s*/, "=");
       if (!trimmed) continue;
@@ -176,8 +170,8 @@ export function forwardedValues(
   return result;
 }
 
-export function bestQMatch(header: string, availableMimes: string[]): string | null {
-  const values = qValues(header);
+export function bestQMatch(qValueHeader: string, availableMimes: string[]): string | null {
+  const values = qValues(qValueHeader);
   let bestMatch: string | null = null;
   let bestScore = -Infinity;
 
@@ -194,9 +188,9 @@ export function bestQMatch(header: string, availableMimes: string[]): string | n
   return bestMatch;
 }
 
-export function escapeHtml(s: any): string {
-  if (s === null || s === undefined) return "";
-  return String(s)
+export function escapeHtml(string: any): string {
+  if (string === null || string === undefined) return "";
+  return String(string)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -205,18 +199,18 @@ export function escapeHtml(s: any): string {
 }
 
 export function selectBestEncoding(
-  available: string[],
+  availableEncodings: string[],
   acceptEncoding: [string, number][],
 ): string | null {
   const expanded: [string, number, number][] = [];
 
   for (const [m, q] of acceptEncoding) {
-    const preference = available.indexOf(m);
-    const pref = preference === -1 ? available.length : preference;
+    const preference = availableEncodings.indexOf(m);
+    const pref = preference === -1 ? availableEncodings.length : preference;
 
     if (m === "*") {
       const acceptNames = acceptEncoding.map((a) => a[0]);
-      for (const m2 of available.filter((a) => !acceptNames.includes(a))) {
+      for (const m2 of availableEncodings.filter((a) => !acceptNames.includes(a))) {
         expanded.push([m2, q, pref]);
       }
     } else {
@@ -240,7 +234,7 @@ export function selectBestEncoding(
   }
 
   for (const c of candidates) {
-    if (available.includes(c)) return c;
+    if (availableEncodings.includes(c)) return c;
   }
   return null;
 }

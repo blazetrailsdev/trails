@@ -25,11 +25,11 @@ export class Deflater {
     | null;
   private sync: boolean | null;
 
-  constructor(app: any, opts: DeflaterOptions = {}) {
+  constructor(app: any, options: DeflaterOptions = {}) {
     this.app = app;
-    this.include = opts.include || null;
-    this.condition = opts.if || null;
-    this.sync = opts.sync !== undefined ? opts.sync : true;
+    this.include = options.include || null;
+    this.condition = options.if || null;
+    this.sync = options.sync !== undefined ? options.sync : true;
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {

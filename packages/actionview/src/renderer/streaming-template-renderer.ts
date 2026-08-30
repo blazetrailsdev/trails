@@ -154,8 +154,9 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
 const streamingCompletionOnException = "";
 
 /** Mirrors `Body#log_error`. @internal */
-function logError(err: unknown): void {
-  const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+function logError(exception: unknown): void {
+  const message =
+    exception instanceof Error ? `${exception.name}: ${exception.message}` : String(exception);
   // Use console.error in the absence of ActionView::Base.logger.
 
   console.error(`\n${message}\n`);

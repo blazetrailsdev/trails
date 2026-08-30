@@ -270,17 +270,17 @@ export class Parameters {
     return this._newWithInheritedPermitted(result);
   }
 
-  merge(other: Parameters | Record<string, unknown>): Parameters {
-    const otherData = other instanceof Parameters ? other._toRawHash() : other;
+  merge(otherHash: Parameters | Record<string, unknown>): Parameters {
+    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
     return this._newWithInheritedPermitted({ ...this._data, ...otherData });
   }
 
   /** Mutating merge — merges other into self, returns self. */
   mergeBang(
-    other: Parameters | Record<string, unknown>,
+    otherHash: Parameters | Record<string, unknown>,
     block?: (key: string, left: unknown, right: unknown) => unknown,
   ): this {
-    const otherData = other instanceof Parameters ? other._toRawHash() : other;
+    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
     for (const [k, v] of Object.entries(otherData)) {
       if (block && k in this._data) {
         this._data[k] = block(k, this._data[k], v);
@@ -303,19 +303,19 @@ export class Parameters {
     return this;
   }
 
-  reverseMerge(other: Parameters | Record<string, unknown>): Parameters {
-    const otherData = other instanceof Parameters ? other._toRawHash() : other;
+  reverseMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
+    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
     return this._newWithInheritedPermitted({ ...otherData, ...this._data });
   }
 
   /** Alias for reverseMerge */
-  withDefaults(other: Parameters | Record<string, unknown>): Parameters {
-    return this.reverseMerge(other);
+  withDefaults(otherHash: Parameters | Record<string, unknown>): Parameters {
+    return this.reverseMerge(otherHash);
   }
 
   /** Mutating reverse merge — merges other into self (self wins), returns self. */
-  reverseMergeBang(other: Parameters | Record<string, unknown>): this {
-    const otherData = other instanceof Parameters ? other._toRawHash() : other;
+  reverseMergeBang(otherHash: Parameters | Record<string, unknown>): this {
+    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
     for (const [k, v] of Object.entries(otherData)) {
       if (!(k in this._data)) {
         this._data[k] = v;
@@ -325,13 +325,13 @@ export class Parameters {
   }
 
   /** Alias for reverseMergeBang */
-  withDefaultsBang(other: Parameters | Record<string, unknown>): this {
-    return this.reverseMergeBang(other);
+  withDefaultsBang(otherHash: Parameters | Record<string, unknown>): this {
+    return this.reverseMergeBang(otherHash);
   }
 
   /** @deprecated Use reverseMerge instead */
-  reversemerge(other: Parameters | Record<string, unknown>): Parameters {
-    return this.reverseMerge(other);
+  reversemerge(otherHash: Parameters | Record<string, unknown>): Parameters {
+    return this.reverseMerge(otherHash);
   }
 
   transform(fn: (key: string, value: unknown) => unknown): Parameters {
@@ -596,10 +596,10 @@ export class Parameters {
     return this._convertedArrays;
   }
 
-  toQuery(prefix?: string): string {
+  toQuery(args?: string): string {
     const parts: string[] = [];
     for (const [k, v] of Object.entries(this._data)) {
-      const key = prefix ? `${prefix}[${k}]` : k;
+      const key = args ? `${args}[${k}]` : k;
       parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`);
     }
     return parts.join("&");
@@ -671,9 +671,9 @@ export class Parameters {
     return params;
   }
 
-  private _permittedScalarFilter(params: Parameters, key: string): void {
-    if (key in this._data && isPermittedScalar(this._data[key])) {
-      params._data[key] = this._data[key];
+  private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
+    if (permittedKey in this._data && isPermittedScalar(this._data[permittedKey])) {
+      params._data[permittedKey] = this._data[permittedKey];
     }
     // Rails also walks every existing key to copy multi-parameter keys
     // — e.g. `zipcode(90210i)` permitted under the bare `zipcode`. The
@@ -683,7 +683,7 @@ export class Parameters {
       const m = re.exec(k);
       if (!m) continue;
       const prefix = k.slice(0, m.index);
-      if (prefix === key && isPermittedScalar(this._data[k])) {
+      if (prefix === permittedKey && isPermittedScalar(this._data[k])) {
         params._data[k] = this._data[k];
       }
     }
@@ -948,8 +948,8 @@ export class Parameters {
   }
 
   /** Rails `permitted_scalar_filter(params, key)` — copies a scalar value across into `params` when it passes the scalar-type check. @internal */
-  permittedScalarFilter(params: Parameters, key: string): void {
-    this._permittedScalarFilter(params, key);
+  permittedScalarFilter(params: Parameters, permittedKey: string): void {
+    this._permittedScalarFilter(params, permittedKey);
   }
 
   /** Rails `non_scalar?(value)` — true for arrays and Parameters. @internal */

@@ -99,10 +99,10 @@ export class Metal extends AbstractController {
   }
 
   static build(
-    name: string,
+    action: string,
     app?: (env: Record<string, unknown>) => Promise<Response>,
   ): (env: Record<string, unknown>) => Promise<Response> {
-    return app ?? this.action(name);
+    return app ?? this.action(action);
   }
 
   controllerPath(): string {
@@ -117,8 +117,8 @@ export class Metal extends AbstractController {
     return `#<${this.constructor.name}>`;
   }
 
-  urlFor(str: string): string {
-    return str;
+  urlFor(string: string): string {
+    return string;
   }
 
   protected _status: number = 200;
@@ -126,13 +126,13 @@ export class Metal extends AbstractController {
   protected _contentType: string | null = null;
 
   /** Dispatch an action in the context of a request/response. */
-  async dispatch(action: string, request: Request, response: Response): Promise<Response> {
+  async dispatch(name: string, request: Request, response: Response): Promise<Response> {
     this.setRequestBang(request);
     this.setResponseBang(response);
     const reqParams = request.parameters;
     this.params = reqParams instanceof Parameters ? reqParams : new Parameters(reqParams);
 
-    await this.processAction(action);
+    await this.processAction(name);
 
     // Commit the response
     this.response.status = this._status;

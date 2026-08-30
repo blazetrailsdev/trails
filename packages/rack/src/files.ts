@@ -76,13 +76,13 @@ export class BaseIterator {
   }
 
   /** @internal */
-  private eachRangePart(fd: number, range: [number, number], cb: (chunk: string) => void): void {
+  private eachRangePart(file: number, range: [number, number], cb: (chunk: string) => void): void {
     let remaining = range[1] - range[0] + 1;
     let offset = range[0];
     while (remaining > 0) {
       const len = Math.min(8192, remaining);
       const buf = Buffer.alloc(len);
-      const read = getFs().readSync(fd, buf, 0, len, offset);
+      const read = getFs().readSync(file, buf, 0, len, offset);
       if (read === 0) break;
       cb(buf.slice(0, read).toString("binary"));
       offset += read;
@@ -207,7 +207,7 @@ export class Files {
   fail(
     status: number,
     body: string,
-    extra: Record<string, string> = {},
+    headers: Record<string, string> = {},
   ): [number, Record<string, any>, any] {
     const msg = body + "\n";
     return [
@@ -216,7 +216,7 @@ export class Files {
         [CONTENT_TYPE]: "text/plain",
         [CONTENT_LENGTH]: String(Buffer.byteLength(msg)),
         "x-cascade": "pass",
-        ...extra,
+        ...headers,
       },
       [msg],
     ];
