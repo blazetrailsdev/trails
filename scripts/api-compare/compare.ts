@@ -1024,13 +1024,18 @@ interface CallResult {
  * sides run through {@link foldSkeletonTokens} and otherwise UNCOLLAPSED — no
  * `effectiveTsCalls` delegation union, no
  * `includeGraphCalls` merge, no dedup. Those are set operations by
- * construction; a sequence needs its own merge rule, and until
- * call-sequence-parity decides what it is, carrying the body's own stream and
- * nothing else is the honest shape. Recorded for every compared pair, not just
- * the flagged ones: this is the population call-sequence-parity seeds from, not
- * a mismatch list. Signal only (RFC 0084) — written to its own
- * output/call-skeletons.json, so call-mismatches.json and its ratchet read
- * exactly what they read before, and nothing gates on it yet.
+ * construction, and a sequence needs its own merge rule; RFC 0113 decided it
+ * (`report-arms.ts:ArmVerdict`, which carries why the two rejected options
+ * were rejected): project each stream onto its CONTROL tokens — if / loop /
+ * try / throw — take the multiset difference for a `count` verdict, and let
+ * the projection's order decide only when the multisets agree. Both unions
+ * above stay out of this artifact deliberately: the rule reads the reaches only
+ * to discard them, so carrying the body's own stream and nothing else remains
+ * the honest shape. Recorded for every compared pair, not just the flagged
+ * ones: this is the population the arms report reads, not a mismatch list.
+ * Signal only (RFC 0084) — written to its own output/call-skeletons.json, so
+ * call-mismatches.json and its ratchet read exactly what they read before, and
+ * nothing gates on it yet.
  */
 interface CallSkeleton {
   rubyFile: string;
