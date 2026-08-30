@@ -679,7 +679,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("beginning_of_week with sunday start", () => {
     // Wednesday 2023-01-11 -> Sunday 2023-01-08
-    const result = asDate(beginningOfWeek(d(2023, 1, 11), 0));
+    const result = asDate(beginningOfWeek(d(2023, 1, 11), "sunday"));
     expect(result.getDay()).toBe(0); // Sunday
     expect(result.getDate()).toBe(8);
   });

@@ -15,12 +15,13 @@ import { ArgumentError } from "./hash-utils.js";
 import { zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
-
-const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+import { DAYS_INTO_WEEK } from "./core-ext/date-and-time/calculations.js";
+import { beginningOfWeek as beginningOfWeekDefault } from "./core-ext/date/calculations.js";
+import { KeyError } from "./core-ext/key-error.js";
 
 function dayIndex(day: string): number {
-  const idx = DAY_NAMES.indexOf(day.toLowerCase());
-  if (idx === -1) throw new Error(`Unknown day: ${day}`);
+  const idx = DAYS_INTO_WEEK[day.toLowerCase()];
+  if (idx === undefined) throw new KeyError(`key not found: :${day}`);
   return idx;
 }
 
@@ -127,25 +128,31 @@ export { endOfMinute as atEndOfMinute };
 
 // ---------------------------------------------------------------------------
 // Week boundaries
-// startDay: 0 = Sunday, 1 = Monday (default Rails)
+// startDay is a day name (`"sunday"`..`"saturday"`), Rails' `DAYS_INTO_WEEK` key.
 // ---------------------------------------------------------------------------
 
 /** @internal */
-function _beginningOfWeekDate(date: Date, startDay = 1): Date {
+function _beginningOfWeekDate(date: Date, startDay: string = beginningOfWeekDefault()): Date {
   const d = clone(date);
   const currentDay = d.getDay();
-  let diff = currentDay - startDay;
+  let diff = currentDay - dayIndex(startDay);
   if (diff < 0) diff += 7;
   d.setDate(d.getDate() - diff);
   d.setHours(0, 0, 0, 0);
   return d;
 }
 
-export function beginningOfWeek(date: Date, startDay = 1): Temporal.Instant {
+export function beginningOfWeek(
+  date: Date,
+  startDay: string = beginningOfWeekDefault(),
+): Temporal.Instant {
   return instantFrom(_beginningOfWeekDate(date, startDay));
 }
 
-export function endOfWeek(date: Date, startDay = 1): Temporal.Instant {
+export function endOfWeek(
+  date: Date,
+  startDay: string = beginningOfWeekDefault(),
+): Temporal.Instant {
   const d = _beginningOfWeekDate(date, startDay);
   d.setDate(d.getDate() + 6);
   d.setHours(23, 59, 59, 999);
@@ -217,22 +224,22 @@ export function endOfYear(date: Date): Temporal.Instant {
 // next/prev Week/Month/Year/Day
 // ---------------------------------------------------------------------------
 
-export function nextWeek(date: Date, day = "monday"): Temporal.Instant {
+export function nextWeek(date: Date, day: string = beginningOfWeekDefault()): Temporal.Instant {
   const targetDay = dayIndex(day);
   const d = clone(date);
   d.setDate(d.getDate() + 7);
-  const bow = _beginningOfWeekDate(d, 1); // Monday-based
+  const bow = _beginningOfWeekDate(d, "monday");
   const diff = (targetDay - 1 + 7) % 7; // offset from Monday
   bow.setDate(bow.getDate() + diff);
   bow.setHours(0, 0, 0, 0);
   return instantFrom(bow);
 }
 
-export function prevWeek(date: Date, day = "monday"): Temporal.Instant {
+export function prevWeek(date: Date, day: string = beginningOfWeekDefault()): Temporal.Instant {
   const targetDay = dayIndex(day);
   const d = clone(date);
   d.setDate(d.getDate() - 7);
-  const bow = _beginningOfWeekDate(d, 1);
+  const bow = _beginningOfWeekDate(d, "monday");
   const diff = (targetDay - 1 + 7) % 7;
   bow.setDate(bow.getDate() + diff);
   bow.setHours(0, 0, 0, 0);
@@ -409,7 +416,7 @@ export function allDay(date: Date): { start: Temporal.Instant; end: Temporal.Ins
 
 export function allWeek(
   date: Date,
-  startDay = 1,
+  startDay: string = beginningOfWeekDefault(),
 ): { start: Temporal.Instant; end: Temporal.Instant } {
   return { start: beginningOfWeek(date, startDay), end: endOfWeek(date, startDay) };
 }
@@ -773,7 +780,10 @@ export function rfc3339(str: string): Temporal.Instant {
 /**
  * lastWeek — returns the start of last week.
  */
-export function lastWeek(date: Date, startDay = "monday"): Temporal.Instant {
+export function lastWeek(
+  date: Date,
+  startDay: string = beginningOfWeekDefault(),
+): Temporal.Instant {
   return prevWeek(date, startDay);
 }
 

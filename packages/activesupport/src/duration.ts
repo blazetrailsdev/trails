@@ -236,22 +236,47 @@ export class Duration {
     return this.plus(other.negate());
   }
 
-  times(other: number): Duration {
-    return new Duration(
-      this.value * other,
-      this.transformValues((number) => number * other),
-      this._variable,
-    );
+  times(other: Duration | Scalar | number): Duration {
+    if (other instanceof Scalar || other instanceof Duration) {
+      const otherValue = other.value;
+      return new Duration(
+        this.value * otherValue,
+        this.transformValues((number) => number * otherValue),
+        this._variable || other.isVariable(),
+      );
+    }
+    if (typeof other === "number") {
+      return new Duration(
+        this.value * other,
+        this.transformValues((number) => number * other),
+        this._variable,
+      );
+    }
+    this.raiseTypeError(other);
   }
 
-  // Mirrors Rails `/` with a Numeric (duration.rb:297-305): divides each
-  // part, preserving the receiver's variable flag.
-  dividedBy(other: number): Duration {
-    return new Duration(
-      this.value / other,
-      this.transformValues((number) => number / other),
-      this._variable,
-    );
+  dividedBy(other: Duration): number;
+  dividedBy(other: Scalar | number): Duration;
+  dividedBy(other: Duration | Scalar | number): Duration | number {
+    if (other instanceof Scalar) {
+      const otherValue = other.value;
+      return new Duration(
+        this.value / otherValue,
+        this.transformValues((number) => number / otherValue),
+        this._variable,
+      );
+    }
+    if (other instanceof Duration) {
+      return this.value / other.value;
+    }
+    if (typeof other === "number") {
+      return new Duration(
+        this.value / other,
+        this.transformValues((number) => number / other),
+        this._variable,
+      );
+    }
+    this.raiseTypeError(other);
   }
 
   /** @internal Rails' `@parts.transform_values` (`duration.rb:288`, `:299`). */
@@ -271,11 +296,14 @@ export class Duration {
     );
   }
 
-  modulo(other: Duration | number): Duration {
-    if (other instanceof Duration) {
+  modulo(other: Duration | Scalar | number): Duration {
+    if (other instanceof Duration || other instanceof Scalar) {
       return Duration.build(this.value % other.value);
     }
-    return Duration.build(this.value % other);
+    if (typeof other === "number") {
+      return Duration.build(this.value % other);
+    }
+    this.raiseTypeError(other);
   }
 
   // ---------------------------------------------------------------------------
