@@ -20,12 +20,31 @@ that the ruby-compat ports cite are readable in-tree — `rational.c`
 (`range_include_internal`, `str_upto_each`), `re.c` (`rb_reg_s_quote`),
 `object.c` (`rb_equal`).
 
-The pin is 3.3.11 because that is the build the existing citations were written
-against: `.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`,
-the host toolchain is `ruby 3.3.11 (2026-03-26 revision 1f2d15125a)`, and
-`packages/date/src/date.ts:1229-1231` states its behavioural claim as "on ruby
-3.3.11". The `date` gem keeps its own `v3.4.1` ref; interpreter and gem refs
-move independently.
+### Why not a newer ref
+
+The pin is deliberately not the newest release. An anchor is only useful if it
+is the build the citations were authored against, and the four cited files
+churn across minors:
+
+| vs the pin                         | `rational.c` `range.c` `re.c` `object.c` |
+| ---------------------------------- | ---------------------------------------- |
+| `v3_3_12` (newest on the 3.3 line) | zero diff — byte-identical               |
+| `v3_4_10` (newest stable)          | +581 / -285                              |
+
+So bumping to current stable would leave a reviewer chasing
+`range_include_internal` through code `range-ext.ts` was never written against.
+The host toolchain is `ruby 3.3.11 (2026-03-26 revision 1f2d15125a)` — the SHA
+this ref resolves to — and `packages/date/src/date.ts:1229-1231` states its
+claim as "on ruby 3.3.11".
+
+`.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`, which
+floats to the newest patch on that line, so it constrains the line rather than
+the patch; since `v3_3_12` is byte-identical here, the two are interchangeable
+for this anchor and `.11` wins only as the revision the host and the date port
+name.
+
+The `date` gem keeps its own `v3.4.1` ref; interpreter and gem refs move
+independently.
 
 It is **never enrolled in `parity:api`** (`compareApi: false`) — MRI's surface
 is C and `extract-ruby-api.rb` globs `**/*.rb`, so it would extract nothing

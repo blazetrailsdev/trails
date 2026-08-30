@@ -259,13 +259,22 @@ export const SOURCES: readonly UpstreamSource[] = [
       // ports that cite C source by symbol (`rational.c`, `range.c`, `re.c`,
       // `object.c` — see vendor/README.md for the call sites).
       //
-      // Pinned to 3.3.11 because that is the build every existing citation was
-      // written against: `.github/workflows/ci.yml:1413,1686,1799` pin
-      // `ruby-version: "3.3"`, the host toolchain is
-      // `ruby 3.3.11 (2026-03-26 revision 1f2d15125a)` — the SHA this ref
-      // resolves to — and `packages/date/src/date.ts:1229-1231` writes its
-      // behavioural claim as "on ruby 3.3.11 `(Rational(1,2) * 12).class` is
-      // `Rational`". Pinning any other ref makes those citations unverifiable.
+      // Deliberately NOT the newest ref. The anchor has to be the build the
+      // existing citations were written against, and moving to the current
+      // stable (v3_4_10) rewrites the very files they point at: measured
+      // `git diff v3_3_11 v3_4_10 -- rational.c range.c re.c object.c` is
+      // +581/-285. The host toolchain is `ruby 3.3.11 (2026-03-26 revision
+      // 1f2d15125a)` — the SHA this ref resolves to — and
+      // `packages/date/src/date.ts:1229-1231` writes its behavioural claim as
+      // "on ruby 3.3.11 `(Rational(1,2) * 12).class` is `Rational`".
+      //
+      // `.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`,
+      // which floats to the newest patch on that line (v3_3_12 today) rather
+      // than to .11 — so it constrains the LINE, not the patch. That is not a
+      // gap: v3_3_12 is byte-identical to v3_3_11 across all four cited files,
+      // so the two are interchangeable for this anchor and .11 wins only as
+      // the revision the host and the date port name.
+      //
       // The `date` gem above keeps its own `v3.4.1` ref: interpreter and gem
       // refs move independently.
       ref: "v3_3_11",
