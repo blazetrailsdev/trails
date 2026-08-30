@@ -144,7 +144,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /** @internal */
   private get _callbackHost(): CallbackHost {
     return {
-      owner: this._record,
+      owner: this._association.owner,
       reflection: this.reflection,
       callback: assocCallback,
       callbacksFor: assocCallbacksFor,
@@ -191,11 +191,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
-  /** @internal */
-  private get _record(): Base {
-    return this._association.owner;
-  }
-
   constructor(klass: typeof Base, association: CollectionAssociation) {
     super(klass, klass.arelTable);
     this._association = association;
@@ -220,7 +215,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private async _execLoad(): Promise<T[]> {
     const results = (await this._findTargetViaAssociation()) as T[];
-    const association = this._record.association(this._assocName) as unknown as {
+    const association = this._association.owner.association(this._assocName) as unknown as {
       setStrictLoading?: (record: Base) => Base;
     };
     if (typeof association.setStrictLoading === "function") {
@@ -241,7 +236,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return [];
     }
     const { _buildAssociationInstance } = await import("./instance-methods.js");
-    const assoc = _buildAssociationInstance.call(this._record, this.reflection) as unknown as {
+    const assoc = _buildAssociationInstance.call(
+      this._association.owner,
+      this.reflection,
+    ) as unknown as {
       _queryExecutor?: () => Promise<Base[]>;
       findTarget(): Promise<Base[]>;
     };
@@ -274,7 +272,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _staleWrapper(): StaleWrapper | undefined {
-    const rec = this._record as unknown as {
+    const rec = this._association.owner as unknown as {
       association?: (n: string) => StaleWrapper;
     };
     return typeof rec.association === "function" ? rec.association(this._assocName) : undefined;
@@ -286,7 +284,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    const association = this._record.association(
+    const association = this._association.owner.association(
       this._assocName,
     ) as unknown as CollectionAssociation;
     return (
@@ -333,7 +331,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stripThenable(this._proxySelf ?? this);
     }
 
-    const assoc = this._record.association(this._assocName) as unknown as {
+    const assoc = this._association.owner.association(this._assocName) as unknown as {
       concat: (...records: Base[]) => Promise<Base[] | undefined>;
     };
     const concatResult = await assoc.concat(...(records as unknown as Base[]));
@@ -342,7 +340,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
-    const assoc = this._record.association(this._assocName) as unknown as ThroughAssociationHandle;
+    const assoc = this._association.owner.association(
+      this._assocName,
+    ) as unknown as ThroughAssociationHandle;
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
@@ -425,7 +425,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override find(id: unknown): Promise<T>;
   override find(...ids: unknown[]): Promise<T | T[]>;
   override async find(...args: unknown[]): Promise<T | T[]> {
-    const assoc = this._record.association(this._assocName) as unknown as {
+    const assoc = this._association.owner.association(this._assocName) as unknown as {
       find(...args: unknown[]): Promise<Base | Base[] | null>;
     };
     return (await assoc.find(...args)) as T | T[];
@@ -460,7 +460,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   scope(): any {
-    const assoc = this._record.association(this._assocName) as unknown as {
+    const assoc = this._association.owner.association(this._assocName) as unknown as {
       scope(): unknown;
     };
     return (this._scope ??= assoc.scope() as any);
