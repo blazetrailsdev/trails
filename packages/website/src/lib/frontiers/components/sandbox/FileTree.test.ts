@@ -19,10 +19,10 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 function seedFiles() {
-  vfs.write("src/app/models/user.ts", "class User {}");
-  vfs.write("src/app/models/post.ts", "class Post {}");
-  vfs.write("src/app/controllers/application-controller.ts", "class AppController {}");
-  vfs.write("src/config/routes.ts", "// routes");
+  vfs.write("app/models/user.ts", "class User {}");
+  vfs.write("app/models/post.ts", "class Post {}");
+  vfs.write("app/controllers/application-controller.ts", "class AppController {}");
+  vfs.write("config/routes.ts", "// routes");
   vfs.write("db/migrate/001_create_users.ts", "migration");
   vfs.write("package.json", "{}");
 }
@@ -67,7 +67,7 @@ describe("FileTree", () => {
 
     it("hides .gitkeep files but shows their parent directories", async () => {
       vfs.write("src/.gitkeep", "");
-      vfs.write("src/app/.gitkeep", "");
+      vfs.write("app/.gitkeep", "");
       vfs.write("test.ts", "content");
       render(FileTree, { props: { vfs } });
       await waitFor(() => expect(screen.getByText("src")).toBeTruthy());
@@ -88,15 +88,15 @@ describe("FileTree", () => {
       render(FileTree, { props: { vfs } });
       await waitFor(() => expect(screen.getAllByTestId("tree-dir").length).toBeGreaterThan(0));
 
-      const srcDir = screen
+      const appDir = screen
         .getAllByTestId("tree-dir")
-        .find((el) => el.getAttribute("data-path") === "src");
-      expect(srcDir).toBeTruthy();
-      expect(srcDir!.getAttribute("aria-expanded")).toBe("true");
+        .find((el) => el.getAttribute("data-path") === "app");
+      expect(appDir).toBeTruthy();
+      expect(appDir!.getAttribute("aria-expanded")).toBe("true");
 
-      const button = srcDir!.querySelector("button")!;
+      const button = appDir!.querySelector("button")!;
       await fireEvent.click(button);
-      expect(srcDir!.getAttribute("aria-expanded")).toBe("false");
+      expect(appDir!.getAttribute("aria-expanded")).toBe("false");
     });
 
     it("re-expands a collapsed directory", async () => {
@@ -104,13 +104,13 @@ describe("FileTree", () => {
       render(FileTree, { props: { vfs } });
       await waitFor(() => expect(screen.getAllByTestId("tree-dir").length).toBeGreaterThan(0));
 
-      const srcDir = screen
+      const appDir = screen
         .getAllByTestId("tree-dir")
-        .find((el) => el.getAttribute("data-path") === "src");
-      const button = srcDir!.querySelector("button")!;
+        .find((el) => el.getAttribute("data-path") === "app");
+      const button = appDir!.querySelector("button")!;
       await fireEvent.click(button);
       await fireEvent.click(button);
-      expect(srcDir!.getAttribute("aria-expanded")).toBe("true");
+      expect(appDir!.getAttribute("aria-expanded")).toBe("true");
     });
   });
 

@@ -51,7 +51,7 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > config.ts 1`] = `
 "// This file is used by Rack-based servers to start the application.
 import { Trails } from "@blazetrails/trailties";
 
-import "./src/config/environment.js";
+import "./config/environment.js";
 
 export default Trails.application;
 "
@@ -64,7 +64,7 @@ export class MyApp extends Application {
   // Configuration for the application, engines, and trailties goes here.
   //
   // These settings can be overridden in specific environments using the files
-  // in src/config/environments, which are processed later.
+  // in config/environments, which are processed later.
   //
   // config.timeZone = "Central Time (US & Canada)";
   // config.eagerLoadPaths.push("extras");
@@ -177,11 +177,11 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > vite.config.ts 1`
 "import { defineConfig } from "vite";
 
 export default defineConfig({
-  root: "src/app/assets",
+  root: "app/assets",
   base: "/assets/",
-  publicDir: "../../../public",
+  publicDir: "../../public",
   build: {
-    outDir: "../../../public/assets",
+    outDir: "../../public/assets",
     manifest: true,
     rollupOptions: {
       input: {

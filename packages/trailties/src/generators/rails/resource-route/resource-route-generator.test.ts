@@ -8,12 +8,12 @@ import { assertNoRubySource } from "../../../template-builder/testing.js";
 let tmpDir: string;
 const mk = (name: string): ResourceRouteGenerator =>
   new ResourceRouteGenerator({ cwd: tmpDir, output: () => {}, name });
-const read = (): string => fs.readFileSync(path.join(tmpDir, "src/config/routes.ts"), "utf-8");
+const read = (): string => fs.readFileSync(path.join(tmpDir, "config/routes.ts"), "utf-8");
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-route-"));
-  fs.mkdirSync(path.join(tmpDir, "src/config"), { recursive: true });
+  fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
   fs.writeFileSync(
-    path.join(tmpDir, "src/config/routes.ts"),
+    path.join(tmpDir, "config/routes.ts"),
     "export function drawRoutes(router: any): void {\n  // routes\n}\n",
   );
 });

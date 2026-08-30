@@ -6,10 +6,10 @@ import { AuthenticationGenerator } from "./authentication-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
 // prettier-ignore
-const TS_EMIT = ["src/app/models/session.ts","src/app/models/user.ts","src/app/models/current.ts","src/app/controllers/sessions-controller.ts","src/app/controllers/concerns/authentication.ts","src/app/controllers/passwords-controller.ts","src/app/channels/application-cable/connection.ts","src/app/mailers/passwords-mailer.ts","test/mailers/previews/passwords-mailer-preview.ts"];
+const TS_EMIT = ["app/models/session.ts","app/models/user.ts","app/models/current.ts","app/controllers/sessions-controller.ts","app/controllers/concerns/authentication.ts","app/controllers/passwords-controller.ts","app/channels/application-cable/connection.ts","app/mailers/passwords-mailer.ts","test/mailers/previews/passwords-mailer-preview.ts"];
 // prettier-ignore
-const VIEWS = ["src/app/views/passwords-mailer/reset.html.tse","src/app/views/passwords-mailer/reset.text.tse"];
-const APP_CTRL_PATH = "src/app/controllers/application-controller.ts";
+const VIEWS = ["app/views/passwords-mailer/reset.html.tse","app/views/passwords-mailer/reset.text.tse"];
+const APP_CTRL_PATH = "app/controllers/application-controller.ts";
 const APP_CTRL_EMPTY = `import { ActionController } from "@blazetrails/actionpack";\n\nexport class ApplicationController extends ActionController.Base {\n}\n`;
 
 let tmpDir: string;
@@ -28,7 +28,7 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
   write("tsconfig.json", "{}");
   write(APP_CTRL_PATH, APP_CTRL_EMPTY);
-  write("src/config/routes.ts", "// routes\n");
+  write("config/routes.ts", "// routes\n");
 });
 afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
@@ -48,20 +48,20 @@ describe("AuthenticationGenerator", () => {
 
   it("--skip-mailer drops mailer/preview/views; --api keeps mailer but drops views", () => {
     makeGen().run({ skipMailer: true });
-    expect(exists("src/app/mailers/passwords-mailer.ts")).toBe(false);
+    expect(exists("app/mailers/passwords-mailer.ts")).toBe(false);
     expect(exists(VIEWS[0])).toBe(false);
     expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(false);
     makeGen().run({ api: true, skipMailer: false });
-    expect(exists("src/app/mailers/passwords-mailer.ts")).toBe(true);
+    expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
     expect(exists(VIEWS[0])).toBe(false);
   });
 
   it("skips the mailer and channel files while their packages are unported", () => {
     makeGen().run();
-    expect(exists("src/app/mailers/passwords-mailer.ts")).toBe(false);
+    expect(exists("app/mailers/passwords-mailer.ts")).toBe(false);
     expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(false);
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(false);
-    expect(exists("src/app/channels/application-cable/connection.ts")).toBe(false);
+    expect(exists("app/channels/application-cable/connection.ts")).toBe(false);
   });
 
   it("injects inside the class even when ApplicationController has a body", () => {
@@ -74,9 +74,9 @@ describe("AuthenticationGenerator", () => {
 
   it("no-op for missing application-controller / routes; throws clearly in JS projects", () => {
     fs.unlinkSync(path.join(tmpDir, APP_CTRL_PATH));
-    fs.unlinkSync(path.join(tmpDir, "src/config/routes.ts"));
+    fs.unlinkSync(path.join(tmpDir, "config/routes.ts"));
     expect(() => makeGen().run()).not.toThrow();
-    expect(exists("src/app/models/user.ts")).toBe(true);
+    expect(exists("app/models/user.ts")).toBe(true);
     fs.unlinkSync(path.join(tmpDir, "tsconfig.json"));
     expect(() => makeGen().run()).toThrow(/TypeScript only/);
   });
@@ -84,7 +84,7 @@ describe("AuthenticationGenerator", () => {
   it("partial pre-existing config: missing pieces filled, no duplicates", () => {
     // Pre-existing token-less passwords route, session route, extensionless import.
     write(
-      "src/config/routes.ts",
+      "config/routes.ts",
       `// routes\n  router.resources("passwords");\n  router.resource("session");\n`,
     );
     writeAC(
@@ -92,7 +92,7 @@ describe("AuthenticationGenerator", () => {
       `\nimport { Authentication } from "./concerns/authentication";\n\nexport`,
     );
     makeGen().run();
-    const routes = read("src/config/routes.ts");
+    const routes = read("config/routes.ts");
     expect(routes.match(/router\.resources\("passwords"/g)).toHaveLength(1);
     expect(routes.match(/router\.resource\("session"\)/g)).toHaveLength(1);
     const ac = read(APP_CTRL_PATH);
@@ -111,16 +111,16 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("does not clobber a pre-existing application-cable Connection", () => {
-    write("src/app/channels/application-cable/connection.ts", "// user\n");
+    write("app/channels/application-cable/connection.ts", "// user\n");
     makeGen().run({ skipActionCable: false });
-    expect(read("src/app/channels/application-cable/connection.ts")).toBe("// user\n");
+    expect(read("app/channels/application-cable/connection.ts")).toBe("// user\n");
   });
 
   it("is idempotent — re-running yields byte-identical injected files", () => {
     makeGen().run();
-    const [ac, rt] = [read(APP_CTRL_PATH), read("src/config/routes.ts")];
+    const [ac, rt] = [read(APP_CTRL_PATH), read("config/routes.ts")];
     makeGen().run();
-    expect([read(APP_CTRL_PATH), read("src/config/routes.ts")]).toEqual([ac, rt]);
+    expect([read(APP_CTRL_PATH), read("config/routes.ts")]).toEqual([ac, rt]);
     expect(parseTs(ac).diagnostics).toEqual([]);
   });
 });

@@ -116,7 +116,7 @@ export function consoleCommand(): Command {
         }
       }
       if (loadedCount > 0) {
-        console.log(`Loaded ${loadedCount} model(s) from src/app/models/`);
+        console.log(`Loaded ${loadedCount} model(s) from app/models/`);
       }
     }
 

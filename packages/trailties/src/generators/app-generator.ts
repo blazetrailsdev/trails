@@ -173,7 +173,7 @@ export class AppGenerator extends AppBase {
             "db:seed": "trails db seed",
             "db:setup": "trails db create && trails db migrate && trails db seed",
             "db:reset": "trails db drop && trails db setup",
-            prepare: "trails-tsc-views build --views src/app/views",
+            prepare: "trails-tsc-views build --views app/views",
           },
           dependencies: {
             "@blazetrails/activerecord": "*",
@@ -210,11 +210,11 @@ export class AppGenerator extends AppBase {
             esModuleInterop: true,
             skipLibCheck: true,
             allowArbitraryExtensions: true,
-            rootDir: "src",
+            rootDir: ".",
             outDir: "dist",
-            plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "src/app/views" }],
+            plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" }],
           },
-          include: ["src", ".trails/template-registry-augmentation.d.ts"],
+          include: ["app", "config", "db", ".trails/template-registry-augmentation.d.ts"],
         },
         null,
         2,
@@ -288,9 +288,9 @@ This application was generated with [trails](https://github.com/blazetrailsdev/b
 
 ## Configuration
 
-- Database: \`src/config/database.ts\`
-- Routes: \`src/config/routes.ts\`
-- Environment-specific: \`src/config/environments/\`
+- Database: \`config/database.ts\`
+- Routes: \`config/routes.ts\`
+- Environment-specific: \`config/environments/\`
 `,
     );
 
@@ -299,7 +299,7 @@ This application was generated with [trails](https://github.com/blazetrailsdev/b
       `// This file is used by Rack-based servers to start the application.
 import { Trails } from "@blazetrails/trailties";
 
-import "./src/config/environment.js";
+import "./config/environment.js";
 
 export default Trails.application;
 `,
@@ -310,11 +310,11 @@ export default Trails.application;
       `import { defineConfig } from "vite";
 
 export default defineConfig({
-  root: "src/app/assets",
+  root: "app/assets",
   base: "/assets/",
-  publicDir: "../../../public",
+  publicDir: "../../public",
   build: {
-    outDir: "../../../public/assets",
+    outDir: "../../public/assets",
     manifest: true,
     rollupOptions: {
       input: {
@@ -381,14 +381,14 @@ execSync("trails server", { stdio: "inherit" });
 
   private createConfigFiles(name: string): void {
     this.createFile(
-      "src/config/application.ts",
+      "config/application.ts",
       `import { Application } from "@blazetrails/trailties";
 
 export class ${this.appConstBase()} extends Application {
   // Configuration for the application, engines, and trailties goes here.
   //
   // These settings can be overridden in specific environments using the files
-  // in src/config/environments, which are processed later.
+  // in config/environments, which are processed later.
   //
   // config.timeZone = "Central Time (US & Canada)";
   // config.eagerLoadPaths.push("extras");
@@ -400,7 +400,7 @@ Application.register(${this.appConstBase()});
     );
 
     this.createFile(
-      "src/config/environment.ts",
+      "config/environment.ts",
       `import { Trails } from "@blazetrails/trailties";
 
 // Load the trails application.
@@ -412,7 +412,7 @@ export default await Trails.initialize();
     );
 
     this.createFile(
-      "src/config/routes.ts",
+      "config/routes.ts",
       `import type { Mapper } from "@blazetrails/actionpack";
 
 export function drawRoutes(mapper: Mapper): void {
@@ -427,11 +427,11 @@ export function drawRoutes(mapper: Mapper): void {
 `,
     );
 
-    this.createFile("src/config/database.ts", this.dbConfig(name));
+    this.createFile("config/database.ts", this.dbConfig(name));
 
     if (!this.skip("ActionCable")) {
       this.createFile(
-        "src/config/cable.ts",
+        "config/cable.ts",
         `export default {
   development: {
     adapter: "async",
@@ -450,7 +450,7 @@ export function drawRoutes(mapper: Mapper): void {
 
     if (!this.skip("ActiveStorage")) {
       this.createFile(
-        "src/config/storage.ts",
+        "config/storage.ts",
         `export default {
   local: {
     service: "Disk",
@@ -466,7 +466,7 @@ export function drawRoutes(mapper: Mapper): void {
     }
 
     this.createFile(
-      "src/config/environments/development.ts",
+      "config/environments/development.ts",
       `export default {
   cacheClasses: false,
   eagerLoad: false,
@@ -479,7 +479,7 @@ export function drawRoutes(mapper: Mapper): void {
     );
 
     this.createFile(
-      "src/config/environments/test.ts",
+      "config/environments/test.ts",
       `export default {
   cacheClasses: true,
   eagerLoad: false,
@@ -491,7 +491,7 @@ export function drawRoutes(mapper: Mapper): void {
     );
 
     this.createFile(
-      "src/config/environments/production.ts",
+      "config/environments/production.ts",
       `export default {
   cacheClasses: true,
   eagerLoad: true,
@@ -505,7 +505,7 @@ export function drawRoutes(mapper: Mapper): void {
     );
 
     this.createFile(
-      "src/config/initializers/content-security-policy.ts",
+      "config/initializers/content-security-policy.ts",
       `// Define an application-wide content security policy.
 // See the Securing Trails Guide for more information:
 // https://github.com/blazetrailsdev/blazetrails
@@ -522,7 +522,7 @@ export function drawRoutes(mapper: Mapper): void {
     );
 
     this.createFile(
-      "src/config/initializers/filter-parameter-logging.ts",
+      "config/initializers/filter-parameter-logging.ts",
       `// Configure parameters which will be filtered from the log file.
 export const filterParameters = [
   "passw", "secret", "token", "_key", "crypt",
@@ -532,7 +532,7 @@ export const filterParameters = [
     );
 
     this.createFile(
-      "src/config/initializers/inflections.ts",
+      "config/initializers/inflections.ts",
       `// Add new inflection rules using the following format:
 //
 // import { Inflector } from "@blazetrails/activesupport";
@@ -547,7 +547,7 @@ export const filterParameters = [
     );
 
     this.createFile(
-      "src/config/initializers/permissions-policy.ts",
+      "config/initializers/permissions-policy.ts",
       `// Define an application-wide HTTP permissions policy.
 //
 // export default {
@@ -562,7 +562,7 @@ export const filterParameters = [
     );
 
     this.createFile(
-      "src/config/locales/en.json",
+      "config/locales/en.json",
       JSON.stringify(
         {
           en: {
@@ -577,7 +577,7 @@ export const filterParameters = [
 
   private createAppFiles(name: string): void {
     this.createFile(
-      "src/app/controllers/application-controller.ts",
+      "app/controllers/application-controller.ts",
       tsModule({
         imports: [{ from: "@blazetrails/actionpack", named: { ActionController: "named" } }],
         declarations: [
@@ -590,10 +590,10 @@ export const filterParameters = [
       }),
     );
 
-    this.createFile("src/app/controllers/concerns/.gitkeep", "");
+    this.createFile("app/controllers/concerns/.gitkeep", "");
 
     this.createFile(
-      "src/app/models/application-record.ts",
+      "app/models/application-record.ts",
       tsModule({
         imports: [{ from: "@blazetrails/activerecord", named: { ActiveRecord: "named" } }],
         declarations: [
@@ -602,16 +602,16 @@ export const filterParameters = [
       }),
     );
 
-    this.createFile("src/app/models/concerns/.gitkeep", "");
+    this.createFile("app/models/concerns/.gitkeep", "");
 
     this.createFile(
-      "src/app/helpers/application-helper.ts",
+      "app/helpers/application-helper.ts",
       tsModule({ declarations: [tsRaw(`export const ApplicationHelper = {\n};`)] }),
     );
 
     if (!this.skip("ActiveJob")) {
       this.createFile(
-        "src/app/jobs/application-job.ts",
+        "app/jobs/application-job.ts",
         tsModule({
           declarations: [
             tsClass({
@@ -625,7 +625,7 @@ export const filterParameters = [
 
     if (!this.skip("ActionMailer")) {
       this.createFile(
-        "src/app/mailers/application-mailer.ts",
+        "app/mailers/application-mailer.ts",
         tsModule({
           declarations: [
             tsClass({
@@ -645,18 +645,18 @@ export const filterParameters = [
 
     if (!this.skip("ActionCable")) {
       this.createFile(
-        "src/app/channels/application-cable/connection.ts",
+        "app/channels/application-cable/connection.ts",
         tsModule({ declarations: [tsClass({ name: "Connection", body: [] })] }),
       );
 
       this.createFile(
-        "src/app/channels/application-cable/channel.ts",
+        "app/channels/application-cable/channel.ts",
         tsModule({ declarations: [tsClass({ name: "Channel", body: [] })] }),
       );
     }
 
     this.createFile(
-      "src/app/views/layouts/application.html.tse",
+      "app/views/layouts/application.html.tse",
       `<!DOCTYPE html>
 <html>
 <head>
@@ -674,7 +674,7 @@ export const filterParameters = [
 
     if (!this.skip("ActionMailer")) {
       this.createFile(
-        "src/app/views/layouts/mailer.html.tse",
+        "app/views/layouts/mailer.html.tse",
         `<!DOCTYPE html>
 <html>
 <head>
@@ -691,25 +691,25 @@ export const filterParameters = [
       );
 
       this.createFile(
-        "src/app/views/layouts/mailer.text.tse",
+        "app/views/layouts/mailer.text.tse",
         `<%- yield %>
 `,
       );
     }
 
     this.createFile(
-      "src/app/assets/stylesheets/application.css",
+      "app/assets/stylesheets/application.css",
       `/*
  * This is a manifest file that'll be compiled into application.css,
  * which will include all the files listed below.
  *
- * Any CSS (and SCSS, if configured) file within src/app/assets/stylesheets
+ * Any CSS (and SCSS, if configured) file within app/assets/stylesheets
  * or any plugin's vendor/assets/stylesheets directory can be referenced here.
  */
 `,
     );
 
-    this.createFile("src/app/assets/images/.gitkeep", "");
+    this.createFile("app/assets/images/.gitkeep", "");
   }
 
   private createDbFiles(): void {
@@ -719,7 +719,7 @@ export const filterParameters = [
       "db/seeds.ts",
       `// Seed your database here.
 // Example:
-//   import { User } from "../src/app/models/user.js";
+//   import { User } from "../app/models/user.js";
 //   await User.create({ name: "Admin", email: "admin@example.com" });
 `,
     );

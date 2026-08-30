@@ -66,14 +66,14 @@ describe("DevcontainerGeneratorTest", () => {
     expect(dc().forwardPorts).toContain(3306);
   });
   it("test_database_mysql", () => {
-    fs.mkdirSync(path.join(tmpDir, "src/config"), { recursive: true });
-    fs.writeFileSync(path.join(tmpDir, "src/config/database.ts"), 'host: "localhost"\n');
+    fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, "config/database.ts"), 'host: "localhost"\n');
     run({ database: "mysql" });
     expect(services().mysql).toMatchObject({ image: "mysql/mysql-server:8.0" });
     expect(cm().volumes).toHaveProperty("mysql-data");
     expect(env().DB_HOST).toBe("mysql");
     expect(dc().forwardPorts).toContain(3306);
-    expect(read("src/config/database.ts")).toMatch(/process\.env\.DB_HOST/);
+    expect(read("config/database.ts")).toMatch(/process\.env\.DB_HOST/);
   });
   it("test_database_postgresql", () => {
     run({ database: "postgresql" });

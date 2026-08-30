@@ -37,7 +37,7 @@ export class DevServer {
 
     this.server = await createServer({
       // Only set root when no config file — the project's vite.config
-      // defines its own root (e.g. "src/app/assets") which should win.
+      // defines its own root (e.g. "app/assets") which should win.
       ...(hasViteConfig ? {} : { root: this.cwd }),
       configFile,
       plugins: this.app ? [trailsPlugin({ app: this.app })] : [],

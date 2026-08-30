@@ -2,7 +2,7 @@ import { pluralize } from "@blazetrails/activesupport";
 import { NamedBase } from "../../named-base.js";
 
 // Mirrors railties/lib/rails/generators/rails/resource_route/resource_route_generator.rb.
-// Inserts router.resources() at the `// routes` marker in src/config/routes.{ts,js}
+// Inserts router.resources() at the `// routes` marker in config/routes.{ts,js}
 // (trails uses TS routes, not Ruby DSL); see generators/actions.ts. Unlike sibling
 // generators, this one does not emit a full TS module (insertIntoFile only), so
 // it does not flow through the template-builder.
@@ -23,9 +23,7 @@ export function emitResourceRouteSnippet(namespaces: string[], resource: string)
 export class ResourceRouteGenerator extends NamedBase {
   addResourceRoute(options: ResourceRouteOptions = {}): void {
     if (options.actions && options.actions.length > 0) return;
-    const routesFile = ["src/config/routes.ts", "src/config/routes.js"].find((f) =>
-      this.fileExists(f),
-    );
+    const routesFile = ["config/routes.ts", "config/routes.js"].find((f) => this.fileExists(f));
     if (!routesFile) return;
     this.insertIntoFile(
       routesFile,

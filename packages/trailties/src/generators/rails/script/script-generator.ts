@@ -12,7 +12,7 @@ export class ScriptGenerator extends NamedBase {
 
     this.createFile(
       filename,
-      `import "${upDots}src/config/environment.js";
+      `import "${upDots}config/environment.js";
 
 // Your code goes here
 `,

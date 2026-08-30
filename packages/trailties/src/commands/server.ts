@@ -50,10 +50,9 @@ export function serverCommand(): Command {
 
 /**
  * Rails' `APP_PATH` require. Trails apps ship TypeScript sources and a
- * compiled `dist/`, so every spelling of `config/application` is probed —
+ * compiled `dist/`, so both spellings of `config/application` are probed —
  * the built one first, mirroring how `bin/rails` prefers the loaded app,
- * then the Rails-layout root and the `src/`-prefixed layout `trails new`
- * currently generates.
+ * then the TypeScript source at the Rails layout's `config/application.ts`.
  */
 async function requireApplication(root: string): Promise<void> {
   const fs = await getFsAsync();
@@ -64,7 +63,6 @@ async function requireApplication(root: string): Promise<void> {
   for (const candidate of [
     p.join(root, "dist", "config", "application.js"),
     p.join(root, "config", "application.ts"),
-    p.join(root, "src", "config", "application.ts"),
   ]) {
     if (await fs.exists(candidate)) {
       await import(p.pathToFileURL(candidate).href);

@@ -20,7 +20,7 @@ function makeGen(cwd = tmpDir) {
 describe("HelperGeneratorTest", () => {
   it("helper", () => {
     makeGen().run("Account");
-    const c = fs.readFileSync(path.join(tmpDir, "src/app/helpers/account-helper.ts"), "utf-8");
+    const c = fs.readFileSync(path.join(tmpDir, "app/helpers/account-helper.ts"), "utf-8");
     expect(c).toContain("AccountHelper");
   });
 
@@ -36,26 +36,19 @@ describe("HelperGeneratorTest", () => {
 
   it("strips a trailing helper suffix", () => {
     makeGen().run("account_helper");
-    expect(fs.existsSync(path.join(tmpDir, "src/app/helpers/account-helper.ts"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/helpers/account-helper-helper.ts"))).toBe(
-      false,
-    );
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper-helper.ts"))).toBe(false);
   });
 
   it("strips a trailing dashed helper suffix", () => {
     makeGen().run("account-helper");
-    expect(fs.existsSync(path.join(tmpDir, "src/app/helpers/account-helper.ts"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/helpers/account-helper-helper.ts"))).toBe(
-      false,
-    );
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper-helper.ts"))).toBe(false);
   });
 
   it("nested namespace", () => {
     makeGen().run("admin/account");
-    const c = fs.readFileSync(
-      path.join(tmpDir, "src/app/helpers/admin/account-helper.ts"),
-      "utf-8",
-    );
+    const c = fs.readFileSync(path.join(tmpDir, "app/helpers/admin/account-helper.ts"), "utf-8");
     expect(c).toContain("AdminAccountHelper");
   });
 
@@ -63,7 +56,7 @@ describe("HelperGeneratorTest", () => {
     const jsDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-helper-js-"));
     try {
       const files = new HelperGenerator({ cwd: jsDir, output: () => {} }).run("Posts");
-      expect(files).toContain("src/app/helpers/posts-helper.js");
+      expect(files).toContain("app/helpers/posts-helper.js");
       expect(files).toContain("test/helpers/posts-helper.test.js");
     } finally {
       fs.rmSync(jsDir, { recursive: true, force: true });

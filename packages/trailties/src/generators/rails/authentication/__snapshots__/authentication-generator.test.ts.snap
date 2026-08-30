@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`AuthenticationGenerator > emits the full file set; each .ts file parses + carries no Ruby source 1`] = `
-"=== src/app/models/session.ts ===
+"=== app/models/session.ts ===
 import { ApplicationRecord } from "./application-record.js";
 
 export class Session extends ApplicationRecord {
@@ -10,7 +10,7 @@ export class Session extends ApplicationRecord {
   }
 }
 
-=== src/app/models/user.ts ===
+=== app/models/user.ts ===
 import { ApplicationRecord } from "./application-record.js";
 
 export class User extends ApplicationRecord {
@@ -23,7 +23,7 @@ export class User extends ApplicationRecord {
   }
 }
 
-=== src/app/models/current.ts ===
+=== app/models/current.ts ===
 import { CurrentAttributes } from "@blazetrails/activesupport";
 
 export class Current extends CurrentAttributes {
@@ -32,7 +32,7 @@ export class Current extends CurrentAttributes {
   }
 }
 
-=== src/app/controllers/sessions-controller.ts ===
+=== app/controllers/sessions-controller.ts ===
 import { ApplicationController } from "./application-controller.js";
 
 export class SessionsController extends ApplicationController {
@@ -49,7 +49,7 @@ export class SessionsController extends ApplicationController {
   }
 }
 
-=== src/app/controllers/concerns/authentication.ts ===
+=== app/controllers/concerns/authentication.ts ===
 export class Authentication {
   static includeInto(klass: any) {
     klass.beforeAction?.((c: any) => c.requireAuthentication());
@@ -81,7 +81,7 @@ export class Authentication {
   }
 }
 
-=== src/app/controllers/passwords-controller.ts ===
+=== app/controllers/passwords-controller.ts ===
 import { ApplicationController } from "./application-controller.js";
 
 export class PasswordsController extends ApplicationController {
@@ -106,7 +106,7 @@ export class PasswordsController extends ApplicationController {
   }
 }
 
-=== src/app/channels/application-cable/connection.ts ===
+=== app/channels/application-cable/connection.ts ===
 export class Connection {
   static identifiedBy() {
     // currentUser
@@ -121,7 +121,7 @@ export class Connection {
   }
 }
 
-=== src/app/mailers/passwords-mailer.ts ===
+=== app/mailers/passwords-mailer.ts ===
 import { ApplicationMailer } from "./application-mailer.js";
 
 export class PasswordsMailer extends ApplicationMailer {

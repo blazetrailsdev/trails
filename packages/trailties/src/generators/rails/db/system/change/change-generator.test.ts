@@ -73,14 +73,14 @@ describe("ChangeGeneratorTest", () => {
 
   it("appName defaults to basename of cwd", () => {
     new ChangeGenerator({ cwd: tmpDir, output: () => {}, to: "postgresql" }).run();
-    expect(read("src/config/database.ts")).toContain(
+    expect(read("config/database.ts")).toContain(
       `database: "${path.basename(tmpDir)}_development"`,
     );
   });
 
   it("change to postgresql", () => {
     run("postgresql");
-    const cfg = read("src/config/database.ts");
+    const cfg = read("config/database.ts");
     expect(cfg).toContain('adapter: "postgresql"');
     expect(cfg).toContain('database: "tmp_development"');
     const pkg = JSON.parse(read("package.json"));
@@ -93,7 +93,7 @@ describe("ChangeGeneratorTest", () => {
 
   it("change to mysql", () => {
     run("mysql");
-    const cfg = read("src/config/database.ts");
+    const cfg = read("config/database.ts");
     expect(cfg).toContain('adapter: "mysql2"');
     expect(cfg).toContain('database: "tmp_development"');
     const pkg = JSON.parse(read("package.json"));
@@ -107,7 +107,7 @@ describe("ChangeGeneratorTest", () => {
   it("change to sqlite3", () => {
     write("package.json", JSON.stringify({ dependencies: { pg: "^8.19.0" } }) + "\n");
     run("sqlite3");
-    expect(read("src/config/database.ts")).toContain("db/development.sqlite3");
+    expect(read("config/database.ts")).toContain("db/development.sqlite3");
     const pkg = JSON.parse(read("package.json"));
     expect(pkg.dependencies["better-sqlite3"]).toBe("^12.6.2");
     expect(pkg.dependencies.pg).toBeUndefined();
@@ -115,7 +115,7 @@ describe("ChangeGeneratorTest", () => {
 
   it("change to mariadb", () => {
     run("mariadb-mysql");
-    expect(read("src/config/database.ts")).toContain('adapter: "mysql2"');
+    expect(read("config/database.ts")).toContain('adapter: "mysql2"');
     expect(JSON.parse(read("package.json")).dependencies.mysql2).toBe("^3.18.2");
     expect(read("Dockerfile")).toContain("default-libmysqlclient-dev");
   });
@@ -132,14 +132,7 @@ describe("ChangeGeneratorTest", () => {
     fs.rmSync(path.join(tmpDir, "Dockerfile"));
     run("mysql");
     expect(exists("Dockerfile")).toBe(false);
-    expect(exists("src/config/database.ts")).toBe(true);
-  });
-
-  it("editDatabaseConfig targets existing config/database.ts when present", () => {
-    write("config/database.ts", "// existing\n");
-    run("postgresql");
-    expect(read("config/database.ts")).toContain('adapter: "postgresql"');
-    expect(exists("src/config/database.ts")).toBe(false);
+    expect(exists("config/database.ts")).toBe(true);
   });
 
   it("editPackageJson throws on unparseable JSON", () => {
@@ -150,8 +143,8 @@ describe("ChangeGeneratorTest", () => {
   it("editDatabaseConfig fallback honors isTypeScript()", () => {
     fs.rmSync(path.join(tmpDir, "tsconfig.json"));
     run("postgresql");
-    expect(exists("src/config/database.js")).toBe(true);
-    expect(exists("src/config/database.ts")).toBe(false);
+    expect(exists("config/database.js")).toBe(true);
+    expect(exists("config/database.ts")).toBe(false);
   });
 
   it("editDockerfile prefers longest-match alternation", () => {

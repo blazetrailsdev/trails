@@ -5,7 +5,7 @@
 // Unported (no trails equivalent — Ruby-shape DSL emits Ruby-shape files
 // that don't exist in a trails app):
 //   gem, gem_group, github, add_source — trails uses package.json
-//   route, environment, application      — trails uses src/config/*.ts
+//   route, environment, application      — trails uses config/*.ts
 
 import { getChildProcess, env as processEnv } from "@blazetrails/activesupport";
 

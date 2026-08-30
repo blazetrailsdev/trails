@@ -10,7 +10,7 @@ export const fixtures = {
       name: "User",
       command: "generate model User name:string email:string",
       expectedFiles: [
-        "src/app/models/user.ts",
+        "app/models/user.ts",
         "test/models/user.test.ts",
         "db/migrate/*_create_users.ts",
       ],
@@ -19,7 +19,7 @@ export const fixtures = {
       name: "Folder",
       command: "generate model Folder name:string user_id:integer parent_id:integer",
       expectedFiles: [
-        "src/app/models/folder.ts",
+        "app/models/folder.ts",
         "test/models/folder.test.ts",
         "db/migrate/*_create_folders.ts",
       ],
@@ -28,7 +28,7 @@ export const fixtures = {
       name: "Document",
       command: "generate model Document title:string body:text user_id:integer folder_id:integer",
       expectedFiles: [
-        "src/app/models/document.ts",
+        "app/models/document.ts",
         "test/models/document.test.ts",
         "db/migrate/*_create_documents.ts",
       ],
@@ -40,7 +40,7 @@ export const fixtures = {
       name: "Artist",
       command: "generate model Artist name:string bio:text",
       expectedFiles: [
-        "src/app/models/artist.ts",
+        "app/models/artist.ts",
         "test/models/artist.test.ts",
         "db/migrate/*_create_artists.ts",
       ],
@@ -49,7 +49,7 @@ export const fixtures = {
       name: "Album",
       command: "generate model Album title:string artist_id:integer release_date:date",
       expectedFiles: [
-        "src/app/models/album.ts",
+        "app/models/album.ts",
         "test/models/album.test.ts",
         "db/migrate/*_create_albums.ts",
       ],
@@ -59,7 +59,7 @@ export const fixtures = {
       command:
         "generate model Track title:string album_id:integer track_number:integer duration:integer",
       expectedFiles: [
-        "src/app/models/track.ts",
+        "app/models/track.ts",
         "test/models/track.test.ts",
         "db/migrate/*_create_tracks.ts",
       ],
@@ -68,7 +68,7 @@ export const fixtures = {
       name: "Genre",
       command: "generate model Genre name:string",
       expectedFiles: [
-        "src/app/models/genre.ts",
+        "app/models/genre.ts",
         "test/models/genre.test.ts",
         "db/migrate/*_create_genres.ts",
       ],
@@ -80,7 +80,7 @@ export const fixtures = {
       name: "Account",
       command: "generate model Account name:string balance:decimal",
       expectedFiles: [
-        "src/app/models/account.ts",
+        "app/models/account.ts",
         "test/models/account.test.ts",
         "db/migrate/*_create_accounts.ts",
       ],
@@ -89,7 +89,7 @@ export const fixtures = {
       name: "Category",
       command: "generate model Category name:string parent_id:integer",
       expectedFiles: [
-        "src/app/models/category.ts",
+        "app/models/category.ts",
         "test/models/category.test.ts",
         "db/migrate/*_create_categories.ts",
       ],
@@ -99,7 +99,7 @@ export const fixtures = {
       command:
         "generate model Transaction description:string amount:decimal account_id:integer category_id:integer date:date",
       expectedFiles: [
-        "src/app/models/transaction.ts",
+        "app/models/transaction.ts",
         "test/models/transaction.test.ts",
         "db/migrate/*_create_transactions.ts",
       ],
@@ -109,7 +109,7 @@ export const fixtures = {
       command:
         "generate model Budget category_id:integer amount:decimal period_start:date period_end:date",
       expectedFiles: [
-        "src/app/models/budget.ts",
+        "app/models/budget.ts",
         "test/models/budget.test.ts",
         "db/migrate/*_create_budgets.ts",
       ],

@@ -13,7 +13,7 @@ export function routesCommand(): Command {
       const routesFile = path.join(cwd, "src", "config", "routes.ts");
 
       if (!fs.existsSync(routesFile)) {
-        console.log("No routes file found at src/config/routes.ts");
+        console.log("No routes file found at config/routes.ts");
         return;
       }
 

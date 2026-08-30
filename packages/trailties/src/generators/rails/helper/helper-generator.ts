@@ -17,7 +17,7 @@ export class HelperGenerator extends GeneratorBase {
     const paths = helperPaths(name);
 
     this.createFile(
-      `src/app/helpers/${paths.helperFile}${ext}`,
+      `app/helpers/${paths.helperFile}${ext}`,
       `export const ${paths.helperName} = {\n};\n`,
     );
 
@@ -26,7 +26,7 @@ export class HelperGenerator extends GeneratorBase {
       this.createFile(
         `test/helpers/${paths.helperFile}.test${ext}`,
         `import { describe, it } from "vitest";
-import { ${paths.helperName} } from "${importPrefix}src/app/helpers/${paths.helperFile}.js";
+import { ${paths.helperName} } from "${importPrefix}app/helpers/${paths.helperFile}.js";
 
 describe("${paths.helperName}", () => {
   it("is defined", () => {
