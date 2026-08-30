@@ -64,10 +64,12 @@ export function _setAdapterClassResolver(
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
+  #adapterClass: (new (...args: any[]) => unknown) | null;
 
   constructor(envName: string, name: string) {
     this.envName = envName;
     this.name = name;
+    this.#adapterClass = null;
   }
 
   /** @missingRailsCall resolve — PERMANENT */
@@ -80,7 +82,7 @@ export class DatabaseConfig {
     if (!this.adapter) {
       throw new Error(`Database configuration missing adapter: ${this.inspect()}`);
     }
-    return _adapterClassResolver(this.adapter);
+    return (this.#adapterClass ??= await _adapterClassResolver(this.adapter));
   }
 
   /**

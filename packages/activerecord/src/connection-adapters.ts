@@ -40,15 +40,6 @@ export function register(name: string, loader: AdapterLoader): void {
  * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
  */
 export function validateAdapterName(adapterName: string): void {
-  if (adapters.has(adapterName)) return;
-  void resolve(adapterName).catch(() => {});
-  throw resolveErrors.get(adapterName);
-}
-
-export async function resolve(adapterName: string): Promise<AdapterClass> {
-  const cached = resolved.get(adapterName);
-  if (cached) return cached;
-
   const loader = adapters.get(adapterName);
   if (!loader) {
     const err = new AdapterNotFound(
@@ -60,6 +51,14 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
     resolveErrors.set(adapterName, err);
     throw err;
   }
+}
+
+export async function resolve(adapterName: string): Promise<AdapterClass> {
+  const cached = resolved.get(adapterName);
+  if (cached) return cached;
+
+  validateAdapterName(adapterName);
+  const loader = adapters.get(adapterName)!;
   const promise = loader()
     .then((klass) => {
       resolvedSyncCache.set(adapterName, klass);
