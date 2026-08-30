@@ -111,13 +111,13 @@ call reach while its TS lowering is a `try` plus an `if` plus a `throw`.
 Rows are numbered as `--sample=80 --seed=113` prints them.
 
 | #   | pair                                                                           | verdict        | why                                                                |
-| --- | ------------------------------------------------------------------------------ | -------------- | ------------------------------------------------------------------ | --- | --------------------- |
+| --- | ------------------------------------------------------------------------------ | -------------- | ------------------------------------------------------------------ |
 | 1   | rack `method-override.ts#methodOverrideParam`                                  | real           | the port inlines a whole form-parse implementation Rails delegates |
 | 2   | activerecord `associations/builder/association.ts#build`                       | real           | invented array + repeated dangerous-name guards                    |
 | 3   | activerecord `result.ts#castValues`                                            | artefact       | `is_a?(Array)` hoisted into one ternary                            |
 | 4   | activesupport `log-subscriber.ts#color`                                        | artefact       | Symbol test spelled as `&&` + `?? ""`                              |
 | 5   | trailties `…/change-generator.ts#editDevcontainerJson`                         | real           | reimplemented; Rails delegates to two helpers                      |
-| 6   | activerecord `coders/column-serializer.ts#load`                                | artefact       | `object                                                            |     | = …`spelled as an`if` |
+| 6   | activerecord `coders/column-serializer.ts#load`                                | artefact       | `object \|\|= …` spelled as an `if`                                |
 | 7   | activerecord `migration.ts#runWithoutLock`                                     | artefact       | `?? ""` on the error argument                                      |
 | 8   | actionview `digestor.ts#digest`                                                | real           | no cache, no dependency arm — a different method                   |
 | 9   | activerecord `associations/through-association.ts#ensureMutable`               | real           | invented macro/owner guards                                        |
@@ -126,7 +126,7 @@ Rows are numbered as `--sample=80 --seed=113` prints them.
 | 12  | activesupport `secure-compare-rotator.ts#secureCompareBang`                    | artefact       | kwarg-default lowering                                             |
 | 13  | activerecord `migration/command-recorder.ts#invertChangeColumnDefault`         | artefact       | `is_a?(Hash)` needs an extra null test                             |
 | 14  | trailties `generators/generated-attribute.ts#parse`                            | artefact       | truthiness guard on `type`                                         |
-| 15  | activerecord `result.ts#columnIndexes`                                         | extraction bug | Ruby `@x                                                           |     | =` emits no arm       |
+| 15  | activerecord `result.ts#columnIndexes`                                         | extraction bug | Ruby `@x \|\|=` emits no arm                                       |
 | 16  | activerecord `reflection.ts#checkValidityOfInverseBang`                        | artefact       | identity compare spelled as two field compares                     |
 | 17  | activerecord `associations/join-dependency.ts#constructModel`                  | real           | inlines the ported `column_aliases`                                |
 | 18  | activesupport `json/encoding.ts#encode`                                        | artefact       | `fetch` lowered to `??`                                            |
@@ -152,9 +152,9 @@ Rows are numbered as `--sample=80 --seed=113` prints them.
 | 38  | activerecord `…/envelope-encryption-key-provider.ts#primaryKeyProvider`        | real           | invented override branch                                           |
 | 39  | actioncontroller `…/strong-parameters.ts#deepTransformKeysBang`                | artefact       | duck-typed `to_unsafe_h`                                           |
 | 40  | activerecord `encryption/message-serializer.ts#validateMessageDataFormat`      | real           | invented headers-shape validation                                  |
-| 41  | actiondispatch `middleware/debug-exceptions.ts#isApiRequest`                   | artefact       | guard clause hoisted, `                                            |     | `                     |
+| 41  | actiondispatch `middleware/debug-exceptions.ts#isApiRequest`                   | artefact       | guard clause hoisted, `\|\|`                                       |
 | 42  | activerecord `relation/query-methods.ts#buildFrom`                             | real           | invented NotImplementedError arm                                   |
-| 43  | activesupport `message-encryptor.ts#lengthOfEncodedAuthTag`                    | extraction bug | Ruby `@x                                                           |     | =` emits no arm       |
+| 43  | activesupport `message-encryptor.ts#lengthOfEncodedAuthTag`                    | extraction bug | Ruby `@x \|\|=` emits no arm                                       |
 | 44  | activerecord `schema-dumper.ts#constructor`                                    | artefact       | adapter duck-typing and `??`                                       |
 | 45  | activesupport `hash-with-indifferent-access.ts#convertKey`                     | artefact       | Ruby-Symbol-as-`":name"` convention                                |
 | 46  | activerecord `table-metadata.ts#isAssociatedWith`                              | artefact       | `&.` lowered to a guard clause                                     |
@@ -171,13 +171,13 @@ Rows are numbered as `--sample=80 --seed=113` prints them.
 | 57  | activesupport `notifications.ts#subscribe`                                     | artefact       | block-vs-callable duck typing                                      |
 | 58  | activerecord `associations/preloader/branch.ts#likelyReflections`              | artefact       | `filter_map` spelled as loop + push guard                          |
 | 59  | activerecord `attribute-methods.ts#formatForInspect`                           | artefact       | body delegates to a same-file helper                               |
-| 60  | activerecord `relation/query-methods.ts#reverseSqlOrder`                       | artefact       | `case` + `                                                         |     | ` chain lowering      |
-| 61  | trailties `…/change-generator.ts#database`                                     | extraction bug | Ruby `@x                                                           |     | =` emits no arm       |
+| 60  | activerecord `relation/query-methods.ts#reverseSqlOrder`                       | artefact       | `case` + `\|\|` chain lowering                                     |
+| 61  | trailties `…/change-generator.ts#database`                                     | extraction bug | Ruby `@x \|\|=` emits no arm                                       |
 | 62  | activerecord `associations/preloader.ts#constructor`                           | real           | invented `_materialized` arm                                       |
 | 63  | activerecord `future-result.ts#executeQuery`                                   | artefact       | kwarg default `?? false`                                           |
 | 64  | activerecord `…/postgresql/schema-dumper.ts#prepareColumnOptions`              | real           | the enum arm is duplicated into an early return                    |
 | 65  | activesupport `hash-utils.ts#deepStringifyKeysBang`                            | artefact       | Ruby-Symbol convention                                             |
-| 66  | activesupport `number-helper/number-converter.ts#options`                      | extraction bug | Ruby `@x                                                           |     | =` emits no arm       |
+| 66  | activesupport `number-helper/number-converter.ts#options`                      | extraction bug | Ruby `@x \|\|=` emits no arm                                       |
 | 67  | activemodel `type/helpers/time-value.ts#fastStringToTime`                      | artefact       | Temporal needs the normalisation `Time.new` does internally        |
 | 68  | activerecord `relation/finder-methods.ts#findTake`                             | artefact       | `?? null` twice (plus bug 1)                                       |
 | 69  | actiondispatch `testing/request-encoder.ts#parser`                             | artefact       | modifier-if spelled as `&&` + ternary                              |
