@@ -413,11 +413,11 @@ async function resetPkSequence(
   tableName: string,
   serialResetCol: string,
 ): Promise<void> {
-  const seqRows = await adapter.execute(`SELECT pg_get_serial_sequence($1, $2) AS seq`, [
-    tableName,
-    serialResetCol,
-  ]);
-  const sequence = seqRows[0]?.seq as string | null | undefined;
+  const sequence = (await adapter.queryValue(
+    `SELECT pg_get_serial_sequence($1, $2) AS seq`,
+    "SQL",
+    [tableName, serialResetCol],
+  )) as string | null | undefined;
   if (!sequence) return;
   const qt = adapter.quoteTableName(tableName);
   const qc = adapter.quoteColumnName(serialResetCol);

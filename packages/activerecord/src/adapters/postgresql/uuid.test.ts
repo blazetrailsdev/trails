@@ -71,31 +71,35 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("uuid write", async () => {
       const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, [uuid]);
+      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid]);
       const rows = await adapter.execute(`SELECT guid FROM uuid_data_type`);
       expect(rows[0].guid).toBe(uuid);
     });
 
     it("uuid select", async () => {
       const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, [uuid]);
-      const rows = await adapter.execute(`SELECT guid FROM uuid_data_type WHERE guid = $1`, [uuid]);
+      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid]);
+      const rows = (
+        await adapter.execQuery(`SELECT guid FROM uuid_data_type WHERE guid = $1`, "SQL", [uuid])
+      ).toArray();
       expect(rows).toHaveLength(1);
       expect(rows[0].guid).toBe(uuid);
     });
 
     it("uuid where", async () => {
       const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, [uuid]);
-      const rows = await adapter.execute(`SELECT * FROM uuid_data_type WHERE guid = $1`, [uuid]);
+      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid]);
+      const rows = (
+        await adapter.execQuery(`SELECT * FROM uuid_data_type WHERE guid = $1`, "SQL", [uuid])
+      ).toArray();
       expect(rows).toHaveLength(1);
     });
 
     it("uuid order", async () => {
       const uuid1 = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
       const uuid2 = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, [uuid2]);
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, [uuid1]);
+      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid2]);
+      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid1]);
       const rows = await adapter.execute(`SELECT guid FROM uuid_data_type ORDER BY guid ASC`);
       expect(rows[0].guid).toBe(uuid1);
       expect(rows[1].guid).toBe(uuid2);
@@ -103,7 +107,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("uuid pluck", async () => {
       const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, [uuid]);
+      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid]);
       const rows = await adapter.execute(`SELECT guid FROM uuid_data_type`);
       expect(rows.map((r) => r.guid)).toEqual([uuid]);
     });
@@ -137,7 +141,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        await adapter.execute(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, ["test"]);
+        await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["test"]);
         const rows = await adapter.execute(`SELECT id FROM uuid_pk_test`);
         expect(rows).toHaveLength(1);
         expect(rows[0].id).toBeTruthy();
@@ -157,7 +161,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       `);
       try {
         const uuid = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-        await adapter.execute(`INSERT INTO uuid_pk_test (id, name) VALUES ($1, $2)`, [
+        await adapter.execQuery(`INSERT INTO uuid_pk_test (id, name) VALUES ($1, $2)`, "SQL", [
           uuid,
           "test",
         ]);
@@ -177,7 +181,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        await adapter.execute(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, ["auto"]);
+        await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["auto"]);
         const rows = await adapter.execute(`SELECT id, name FROM uuid_pk_test`);
         expect(rows[0].name).toBe("auto");
         expect(isValidUuid(rows[0].id as string)).toBe(true);
@@ -195,7 +199,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        await adapter.execute(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, ["created"]);
+        await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["created"]);
         const rows = await adapter.execute(`SELECT * FROM uuid_pk_test`);
         expect(rows).toHaveLength(1);
         expect(isValidUuid(rows[0].id as string)).toBe(true);
@@ -213,10 +217,12 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        await adapter.execute(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, ["findme"]);
+        await adapter.execQuery(`INSERT INTO uuid_pk_test (name) VALUES ($1)`, "SQL", ["findme"]);
         const inserted = await adapter.execute(`SELECT id FROM uuid_pk_test`);
         const id = inserted[0].id;
-        const rows = await adapter.execute(`SELECT * FROM uuid_pk_test WHERE id = $1`, [id]);
+        const rows = (
+          await adapter.execQuery(`SELECT * FROM uuid_pk_test WHERE id = $1`, "SQL", [id])
+        ).toArray();
         expect(rows).toHaveLength(1);
         expect(rows[0].name).toBe("findme");
       } finally {
@@ -235,7 +241,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("uuid gen random uuid default", async () => {
-      await adapter.execute(`INSERT INTO uuid_data_type (other_guid) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO uuid_data_type (other_guid) VALUES ($1)`, "SQL", [
         "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
       ]);
       const rows = await adapter.execute(`SELECT guid FROM uuid_data_type`);
@@ -268,9 +274,11 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        await adapter.execute(`INSERT INTO uuid_unique_test (guid) VALUES ($1)`, [uuid]);
+        await adapter.execQuery(`INSERT INTO uuid_unique_test (guid) VALUES ($1)`, "SQL", [uuid]);
         await expect(
-          adapter.execute(`INSERT INTO uuid_unique_test (guid) VALUES ($1)`, [uuid]),
+          adapter
+            .execQuery(`INSERT INTO uuid_unique_test (guid) VALUES ($1)`, "SQL", [uuid])
+            .then((r) => r.toArray()),
         ).rejects.toThrow();
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS uuid_unique_test`);
@@ -288,7 +296,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         const uuid1 = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
         const uuid2 = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-        await adapter.execute(`INSERT INTO uuid_array_test (guids) VALUES ($1)`, [
+        await adapter.execQuery(`INSERT INTO uuid_array_test (guids) VALUES ($1)`, "SQL", [
           `{${uuid1},${uuid2}}`,
         ]);
         const rows = await adapter.execute(`SELECT guids FROM uuid_array_test`);
@@ -304,12 +312,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("uuid in relation", async () => {
       const uuid1 = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
       const uuid2 = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, [uuid1]);
-      await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, [uuid2]);
-      const rows = await adapter.execute(
-        `SELECT guid FROM uuid_data_type WHERE guid IN ($1, $2) ORDER BY guid`,
-        [uuid1, uuid2],
-      );
+      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid1]);
+      await adapter.execQuery(`INSERT INTO uuid_data_type (guid) VALUES ($1)`, "SQL", [uuid2]);
+      const rows = (
+        await adapter.execQuery(
+          `SELECT guid FROM uuid_data_type WHERE guid IN ($1, $2) ORDER BY guid`,
+          "SQL",
+          [uuid1, uuid2],
+        )
+      ).toArray();
       expect(rows).toHaveLength(2);
     });
 
@@ -387,13 +398,17 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        await adapter.execute(`INSERT INTO uuid_fk_parent (name) VALUES ($1)`, ["parent"]);
+        await adapter.execQuery(`INSERT INTO uuid_fk_parent (name) VALUES ($1)`, "SQL", ["parent"]);
         const parents = await adapter.execute(`SELECT id FROM uuid_fk_parent`);
         const parentId = parents[0].id;
-        await adapter.execute(`INSERT INTO uuid_fk_child (parent_id) VALUES ($1)`, [parentId]);
-        const children = await adapter.execute(`SELECT * FROM uuid_fk_child WHERE parent_id = $1`, [
+        await adapter.execQuery(`INSERT INTO uuid_fk_child (parent_id) VALUES ($1)`, "SQL", [
           parentId,
         ]);
+        const children = (
+          await adapter.execQuery(`SELECT * FROM uuid_fk_child WHERE parent_id = $1`, "SQL", [
+            parentId,
+          ])
+        ).toArray();
         expect(children).toHaveLength(1);
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS uuid_fk_child`);
@@ -575,7 +590,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("invalid uuid dont match to nil", async () => {
       await adapter.execute(`INSERT INTO uuid_data_type (guid) VALUES (NULL)`);
       await expect(
-        adapter.execute(`SELECT * FROM uuid_data_type WHERE guid = $1`, ["foobar"]),
+        adapter
+          .execQuery(`SELECT * FROM uuid_data_type WHERE guid = $1`, "SQL", ["foobar"])
+          .then((r) => r.toArray()),
       ).rejects.toThrow();
     });
 
@@ -672,7 +689,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        await adapter.execute(`INSERT INTO uuid_gen_test (name) VALUES ($1)`, ["test"]);
+        await adapter.execQuery(`INSERT INTO uuid_gen_test (name) VALUES ($1)`, "SQL", ["test"]);
         const rows = await adapter.execute(`SELECT id FROM uuid_gen_test`);
         expect(rows[0].id).toBeTruthy();
         expect(isValidUuid(rows[0].id as string)).toBe(true);
@@ -691,7 +708,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        await adapter.execute(`INSERT INTO uuid_gen_test (name) VALUES ($1)`, ["test"]);
+        await adapter.execQuery(`INSERT INTO uuid_gen_test (name) VALUES ($1)`, "SQL", ["test"]);
         const rows = await adapter.execute(`SELECT id, other FROM uuid_gen_test`);
         expect(isValidUuid(rows[0].id as string)).toBe(true);
         expect(isValidUuid(rows[0].other as string)).toBe(true);

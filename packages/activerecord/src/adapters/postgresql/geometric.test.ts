@@ -56,7 +56,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("point write", async () => {
-      await adapter.execute(`INSERT INTO postgresql_points (x) VALUES ($1)`, ["(10,25.2)"]);
+      await adapter.execQuery(`INSERT INTO postgresql_points (x) VALUES ($1)`, "SQL", [
+        "(10,25.2)",
+      ]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
       const p = parsePoint(rows[0].x);
       expect(p!.x).toBeCloseTo(10);
@@ -83,13 +85,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("roundtrip", async () => {
-      await adapter.execute(`INSERT INTO postgresql_points (x) VALUES ($1)`, ["(10,25.2)"]);
+      await adapter.execQuery(`INSERT INTO postgresql_points (x) VALUES ($1)`, "SQL", [
+        "(10,25.2)",
+      ]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
       const p = parsePoint(rows[0].x);
       expect(p!.x).toBeCloseTo(10);
       expect(p!.y).toBeCloseTo(25.2);
 
-      await adapter.execute(`UPDATE postgresql_points SET x = $1`, ["(30,40)"]);
+      await adapter.execQuery(`UPDATE postgresql_points SET x = $1`, "SQL", ["(30,40)"]);
       const rows2 = await adapter.execute(`SELECT x FROM postgresql_points`);
       const p2 = parsePoint(rows2[0].x as string);
       expect(p2!.x).toBeCloseTo(30);
@@ -130,9 +134,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("array of points round trip", async () => {
-      await adapter.execute(`INSERT INTO postgresql_points (array_of_points) VALUES ($1)`, [
-        '{"(1,2)","(3,4)","(5,6)"}',
-      ]);
+      await adapter.execQuery(
+        `INSERT INTO postgresql_points (array_of_points) VALUES ($1)`,
+        "SQL",
+        ['{"(1,2)","(3,4)","(5,6)"}'],
+      );
       const rows = await adapter.execute(`SELECT array_of_points FROM postgresql_points`);
       const arr = rows[0].array_of_points as string[];
       expect(arr).toHaveLength(3);
@@ -162,7 +168,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("legacy roundtrip", async () => {
-      await adapter.execute(`INSERT INTO postgresql_points (x) VALUES ($1)`, ["(5,10)"]);
+      await adapter.execQuery(`INSERT INTO postgresql_points (x) VALUES ($1)`, "SQL", ["(5,10)"]);
       const rows = await adapter.execute(`SELECT x FROM postgresql_points`);
       expect(rows[0].x).toBeTruthy();
       const p = parsePoint(rows[0].x);
@@ -214,7 +220,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_line line)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_line) VALUES ($1)`, ["{2,3,5.5}"]);
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_line) VALUES ($1)`, "SQL", [
+        "{2,3,5.5}",
+      ]);
       const rows = await adapter.execute(`SELECT a_line FROM test_geometric_types`);
       expect(rows[0].a_line).toMatch(/2.*3.*5\.5/);
     });
@@ -224,7 +232,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_line line)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_line) VALUES ($1)`, ["{1,2,3}"]);
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_line) VALUES ($1)`, "SQL", [
+        "{1,2,3}",
+      ]);
       const rows = await adapter.execute(`SELECT a_line FROM test_geometric_types`);
       expect(rows[0].a_line).toBeTruthy();
     });
@@ -246,7 +256,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_lseg lseg)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_lseg) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_lseg) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4)]",
       ]);
       const rows = await adapter.execute(`SELECT a_lseg FROM test_geometric_types`);
@@ -258,7 +268,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_lseg lseg)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_lseg) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_lseg) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4)]",
       ]);
       const rows = await adapter.execute(`SELECT a_lseg FROM test_geometric_types`);
@@ -282,7 +292,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_box box)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_box) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_box) VALUES ($1)`, "SQL", [
         "(3,4),(1,2)",
       ]);
       const rows = await adapter.execute(`SELECT a_box FROM test_geometric_types`);
@@ -294,7 +304,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_box box)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_box) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_box) VALUES ($1)`, "SQL", [
         "(3,4),(1,2)",
       ]);
       const rows = await adapter.execute(`SELECT a_box FROM test_geometric_types`);
@@ -318,7 +328,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_path path)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4),(5,6)]",
       ]);
       const rows = await adapter.execute(
@@ -332,7 +342,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_path path)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, "SQL", [
         "((1,2),(3,4),(5,6))",
       ]);
       const rows = await adapter.execute(
@@ -346,7 +356,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_path path)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4)]",
       ]);
       const rows = await adapter.execute(`SELECT a_path FROM test_geometric_types`);
@@ -358,7 +368,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_path path)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_path) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4)]",
       ]);
       const rows = await adapter.execute(`SELECT a_path FROM test_geometric_types`);
@@ -382,7 +392,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_polygon polygon)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_polygon) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_polygon) VALUES ($1)`, "SQL", [
         "((1,2),(3,4),(5,6))",
       ]);
       const rows = await adapter.execute(`SELECT a_polygon FROM test_geometric_types`);
@@ -394,7 +404,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_polygon polygon)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_polygon) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_polygon) VALUES ($1)`, "SQL", [
         "((1,2),(3,4),(5,6))",
       ]);
       const rows = await adapter.execute(`SELECT a_polygon FROM test_geometric_types`);
@@ -418,7 +428,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_circle circle)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_circle) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_circle) VALUES ($1)`, "SQL", [
         "<(1,2),3>",
       ]);
       const rows = await adapter.execute(`SELECT a_circle FROM test_geometric_types`);
@@ -432,7 +442,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`
         CREATE TABLE test_geometric_types (id serial primary key, a_circle circle)
       `);
-      await adapter.execute(`INSERT INTO test_geometric_types (a_circle) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO test_geometric_types (a_circle) VALUES ($1)`, "SQL", [
         "<(1,2),3>",
       ]);
       const rows = await adapter.execute(`SELECT a_circle FROM test_geometric_types`);
@@ -553,9 +563,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("geometric types", async () => {
-      await adapter.execute(
+      await adapter.execQuery(
         `INSERT INTO postgresql_geometric (a_lseg, a_box, a_path, a_polygon, a_circle)
          VALUES ($1, $2, $3, $4, $5)`,
+        "SQL",
         ["[(1,2),(3,4)]", "(3,4),(1,2)", "[(1,2),(3,4),(5,6)]", "((1,2),(3,4),(5,6))", "<(1,2),3>"],
       );
       const rows = await adapter.execute(`SELECT * FROM postgresql_geometric`);
@@ -567,9 +578,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("alternative format", async () => {
-      await adapter.execute(
+      await adapter.execQuery(
         `INSERT INTO postgresql_geometric (a_lseg, a_box, a_path, a_polygon, a_circle)
          VALUES ($1, $2, $3, $4, $5)`,
+        "SQL",
         [
           "((1,2),(3,4))",
           "((3,4),(1,2))",
@@ -587,7 +599,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("geometric function", async () => {
-      await adapter.execute(`INSERT INTO postgresql_geometric (a_path) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO postgresql_geometric (a_path) VALUES ($1)`, "SQL", [
         "[(1,2),(3,4),(5,6)]",
       ]);
       const openRows = await adapter.execute(
@@ -596,7 +608,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(openRows[0].is_open).toBe(true);
 
       await adapter.execute(`DELETE FROM postgresql_geometric`);
-      await adapter.execute(`INSERT INTO postgresql_geometric (a_path) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO postgresql_geometric (a_path) VALUES ($1)`, "SQL", [
         "((1,2),(3,4),(5,6))",
       ]);
       const closedRows = await adapter.execute(
@@ -630,13 +642,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("geometric line type", async () => {
-      await adapter.execute(`INSERT INTO postgresql_lines (a_line) VALUES ($1)`, ["{2,3,5.5}"]);
+      await adapter.execQuery(`INSERT INTO postgresql_lines (a_line) VALUES ($1)`, "SQL", [
+        "{2,3,5.5}",
+      ]);
       const rows = await adapter.execute(`SELECT a_line FROM postgresql_lines`);
       expect(rows[0].a_line).toMatch(/2.*3.*5\.5/);
     });
 
     it("alternative format line type", async () => {
-      await adapter.execute(`INSERT INTO postgresql_lines (a_line) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO postgresql_lines (a_line) VALUES ($1)`, "SQL", [
         "[(0,0),(1,1.5)]",
       ]);
       const rows = await adapter.execute(`SELECT a_line FROM postgresql_lines`);

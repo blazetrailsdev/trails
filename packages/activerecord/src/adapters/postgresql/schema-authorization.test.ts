@@ -73,7 +73,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       for (const u of USERS) {
         await adapter.clearCacheBang();
         await adapter.sessionAuth(u);
-        const result = await adapter.execute(`SELECT name FROM ${TABLE_NAME} WHERE id = $1`, [1]);
+        const result = (
+          await adapter.execQuery(`SELECT name FROM ${TABLE_NAME} WHERE id = $1`, "SQL", [1])
+        ).toArray();
         expect(result[0]?.name).toBe(u);
         await adapter.sessionAuth("default");
       }

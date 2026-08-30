@@ -311,37 +311,25 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return expanded;
   }
 
-  async execute(
-    sql: string,
-    binds: unknown[] = [],
-    name: string | null = "SQL",
-  ): Promise<Record<string, unknown>[]> {
+  async execute(sql: string, name: string | null = "SQL"): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
     await this.ensureConnected();
     await this.materializeTransactions();
 
-    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     try {
-      return await this.log(
-        sql,
-        name,
-        binds,
-        this.typeCastedBinds(binds) ?? [],
-        false,
-        async (payload) => {
-          try {
-            return (
-              await this.performQuery(this.driver, sql, binds, driverBinds, {
-                prepare: false,
-                notificationPayload: payload,
-              })
-            ).toArray();
-          } catch (e: any) {
-            const translated = this._translateException(e, sql, binds);
-            throw translated;
-          }
-        },
-      );
+      return await this.log(sql, name, [], [], false, async (payload) => {
+        try {
+          return (
+            await this.performQuery(this.driver, sql, [], [], {
+              prepare: false,
+              notificationPayload: payload,
+            })
+          ).toArray();
+        } catch (e: any) {
+          const translated = this._translateException(e, sql, []);
+          throw translated;
+        }
+      });
     } finally {
       this.dirtyCurrentTransaction();
     }

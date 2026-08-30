@@ -475,10 +475,11 @@ class SyncLog extends Base {
 // ---------------------------------------------------------------------------
 
 async function tableExists(adapter: SQLite3Adapter, name: string): Promise<boolean> {
-  const rows = await adapter.execute(
-    `SELECT name FROM sqlite_master WHERE type='table' AND name=?`,
-    [name],
-  );
+  const rows = (
+    await adapter.execQuery(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, "SQL", [
+      name,
+    ])
+  ).toArray();
   return rows.length > 0;
 }
 
@@ -2150,10 +2151,11 @@ async function syncCompareStats(
     const headSha = row.merge_commit_sha as string;
     const prNumber = row.pr_number as number;
 
-    const logRows = await Base.adapter.execute(
-      `SELECT log_output FROM raw_job_logs WHERE job_id = ?`,
-      [jobId],
-    );
+    const logRows = (
+      await Base.adapter.execQuery(`SELECT log_output FROM raw_job_logs WHERE job_id = ?`, "SQL", [
+        jobId,
+      ])
+    ).toArray();
     if (logRows.length === 0) continue;
     const logs = logRows[0].log_output as string;
 

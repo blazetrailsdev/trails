@@ -988,7 +988,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
 
     await killConnectionFromServer(connection, connId);
 
-    await connection.execute("SELECT 1", [], "SQL", { allowRetry: true });
+    await connection.execute("SELECT 1", "SQL", { allowRetry: true });
   });
 
   it("disconnect and recover on #configure_connection failure", async () => {

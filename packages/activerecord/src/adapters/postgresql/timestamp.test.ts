@@ -62,10 +62,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       const id = await adapter.executeMutation(
         `INSERT INTO "postgresql_timestamps" ("occurred_at") VALUES ('2023-06-15 14:30:00+00')`,
       );
-      const rows = await adapter.execute(
-        `SELECT "occurred_at" FROM "postgresql_timestamps" WHERE "id" = ?`,
-        [id],
-      );
+      const rows = (
+        await adapter.execQuery(
+          `SELECT "occurred_at" FROM "postgresql_timestamps" WHERE "id" = ?`,
+          "SQL",
+          [id],
+        )
+      ).toArray();
       expect(rows[0].occurred_at).toBeInstanceOf(Temporal.Instant);
     });
 

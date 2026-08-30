@@ -93,11 +93,14 @@ export class MySQLDatabaseTasks {
     await this.establishConnection();
     const adapter = await this.connection();
     const bookkeeping = metadataTableNames();
-    const rows = (await adapter.execute(
-      "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
-        "AND table_type = 'BASE TABLE'",
-      [dbName],
-    )) as Array<{ table_name?: string; TABLE_NAME?: string }>;
+    const rows = (
+      await adapter.execQuery(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
+          "AND table_type = 'BASE TABLE'",
+        "SQL",
+        [dbName],
+      )
+    ).toArray() as Array<{ table_name?: string; TABLE_NAME?: string }>;
     const names = rows
       .map((r) => r.table_name ?? r.TABLE_NAME)
       .filter((n): n is string => typeof n === "string" && !bookkeeping.has(n));

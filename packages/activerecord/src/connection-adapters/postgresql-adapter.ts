@@ -866,26 +866,23 @@ export class PostgreSQLAdapter
 
   async execute(
     sql: string,
-    binds: unknown[] = [],
     name: string | null = "SQL",
     { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
-    const bindArray = this.typeCastedBinds(binds) ?? [];
-    const rewritten = this.rewriteBinds(sql, bindArray);
     try {
-      return await this.log(rewritten, name, binds, bindArray, false, async (payload) => {
+      return await this.log(sql, name, [], [], false, async (payload) => {
         try {
           return await this.withRawConnection({ allowRetry }, async (conn) => {
             const client = conn as unknown as pg.Client;
-            const result = await this._performQuery(client, rewritten, binds, bindArray, {
+            const result = await this._performQuery(client, sql, [], [], {
               prepare: false,
               notificationPayload: payload,
             });
             return result?.rows ?? [];
           });
         } catch (e: any) {
-          const translated = this._translateException(e, rewritten, bindArray);
+          const translated = this._translateException(e, sql, []);
           throw translated;
         }
       });

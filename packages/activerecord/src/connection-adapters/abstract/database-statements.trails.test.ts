@@ -485,7 +485,7 @@ describe("DatabaseStatements", () => {
       const host: QuoterHost = {
         pool,
         typeCastedBinds,
-        async execute(sql: string, _binds?: unknown[], name?: string | null) {
+        async execute(sql: string, name?: string | null) {
           executed.push({ sql, name, receiver: this });
         },
         quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),

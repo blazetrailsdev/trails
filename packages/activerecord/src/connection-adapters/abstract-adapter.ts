@@ -621,9 +621,8 @@ export interface AbstractAdapter {
 
   execute(
     sql: string,
-    binds?: unknown[],
-    name?: string,
-    opts?: { allowRetry?: boolean },
+    name?: string | null,
+    kwargs?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   beginTransaction(): Promise<void>;

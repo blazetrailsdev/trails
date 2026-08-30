@@ -2,7 +2,7 @@ import { Notifications } from "@blazetrails/activesupport";
 
 /** @internal */
 export interface StubbableAdapter {
-  execute: (sql: string, binds?: unknown[], name?: string) => Promise<unknown>;
+  execute: (sql: string, name?: string | null) => Promise<unknown>;
   executeMutation: (sql: string, binds?: unknown[], name?: string) => Promise<number>;
   exec?: (sql: string) => Promise<void>;
 }
@@ -13,7 +13,7 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
     executeMutation: adapter.executeMutation,
     exec: adapter.exec,
   };
-  adapter.execute = (sql: string, _binds?: unknown[], name: string = "SQL") => {
+  adapter.execute = (sql: string, name: string | null = "SQL") => {
     Notifications.instrument("sql.active_record", { sql, name });
     return Promise.resolve([]);
   };
