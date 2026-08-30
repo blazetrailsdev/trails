@@ -36,7 +36,18 @@ describe("<=>", () => {
   });
 
   it("returns nil for an unrelated object, as Object#<=> does", () => {
-    expect(cmp({}, {})).toBeNull();
+    expect(cmp({ a: 1 }, { a: 2 })).toBeNull();
+    expect(cmp({ a: 1 }, { a: 1 })).toBe(0);
+  });
+
+  it("returns nil rather than ordering values Ruby leaves to Object#<=>", () => {
+    expect(cmp(false, true)).toBeNull();
+    expect(cmp(true, true)).toBe(0);
+  });
+
+  it("returns nil for a cross-type operand", () => {
+    expect(cmp(1, "a")).toBeNull();
+    expect(cmp("a", 1)).toBeNull();
   });
 
   it("sends the receiver's own <=> under either trails spelling", () => {

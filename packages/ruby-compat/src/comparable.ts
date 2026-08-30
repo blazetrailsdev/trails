@@ -19,6 +19,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
+import { rbEqual } from "./rb-equal.js";
 
 /**
  * The Ruby class name `rb_obj_class` reports in `rb_cmperr`'s message
@@ -59,10 +60,15 @@ interface CmpSpelling {
 /**
  * Ruby's `a <=> b` over the values trails carries: the receiver's own `<=>`
  * when it has one, and otherwise the relational reading `Integer#<=>`,
- * `Float#<=>` and `String#<=>` all share. `nil` for an operand it cannot
- * place, which includes `Float::NAN` and `Object#<=>`'s unrelated-operand arm
- * (`vendor/ruby/object.c:117` `rb_obj_cmp`, `0` for an identical object and
- * `nil` otherwise).
+ * `Float#<=>` and `String#<=>` each define, falling back to the inherited
+ * `Object#<=>` (`vendor/ruby/object.c:1665` `rb_obj_cmp`) for everything else.
+ * `nil` for an operand it cannot place, which includes `Float::NAN`, a
+ * cross-type operand, and `rb_obj_cmp`'s unequal arm.
+ *
+ * @boundary: a Temporal value carries neither a `<=>` spelling nor a JS
+ * ordering, so it reaches `rb_obj_cmp` here; the one caller that orders
+ * Temporal receivers (`core-ext/date-and-time/calculations.ts`'s `compare`)
+ * hands over each side's epoch reading instead.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — the `<=>` send it is defined over
  * (`vendor/ruby/compar.c:315`), which Rails inherits rather than defines.
@@ -76,9 +82,25 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (b instanceof Date) b = b.getTime();
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
-  const av = a as number;
-  const bv = b as number;
-  return av < bv ? -1 : av > bv ? 1 : av === bv ? 0 : null;
+  if (typeof a === "number" || typeof a === "bigint") {
+    /* `Integer#<=>` (`vendor/ruby/numeric.c:4696` `rb_int_cmp`) and `Float#<=>`
+       (`vendor/ruby/numeric.c:1700` `flo_cmp`) answer nil for an operand that
+       is not a Numeric, and `flo_cmp` answers nil for a NaN on either side. */
+    if (typeof b !== "number" && typeof b !== "bigint") return null;
+    if (Number.isNaN(a as number) || Number.isNaN(b as number)) return null;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  if (typeof a === "string") {
+    /* `String#<=>` (`vendor/ruby/string.c:3803` `rb_str_cmp_m`) answers nil for
+       an operand that is not a String. */
+    if (typeof b !== "string") return null;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  /* `vendor/ruby/object.c:1665` `rb_obj_cmp` — the inherited `<=>` every other
+     receiver reaches: `0` for an `==` operand and nil otherwise. A JS value
+     with no ordering of its own lands here rather than on JS relational
+     coercion, which orders `false` before `true` where Ruby answers nil. */
+  return rbEqual(a, b) ? 0 : null;
 }
 
 function isComparable(value: unknown): value is Comparable {

@@ -14,6 +14,12 @@ describe("Hash#fetch", () => {
     expect(fetch({ offset: undefined }, "offset", 0)).toBeUndefined();
   });
 
+  it("does not read an inherited JavaScript property as a stored key", () => {
+    expect(fetch({}, "toString", "default")).toBe("default");
+    expect(() => fetch({}, "toString")).toThrow('key not found: "toString"');
+    expect(hasKey({}, "toString")).toBe(false);
+  });
+
   it("returns the default for an absent key", () => {
     expect(fetch({}, "offset", 0)).toBe(0);
   });
