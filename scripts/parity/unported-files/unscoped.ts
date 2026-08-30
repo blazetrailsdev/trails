@@ -640,6 +640,16 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   // --- Permanently not-portable: Ruby serialization formats ---
   {
+    testFile: "attribute_methods_test.rb",
+    className: "AttributeMethodsTest",
+    tests: ["YAML dumping a record with time zone-aware attribute"],
+    reason:
+      "Round-trips an Active Record object through `YAML.dump` / `YAML.unsafe_load` " +
+      "(Psych), which reconstitutes the instance from a `!ruby/object:Topic` node " +
+      "carrying its instance variables. No Node.js equivalent: JS has no object " +
+      "graph serializer that rebuilds a class instance from a tag.",
+  },
+  {
     testFile: "yaml_serialization_test.rb",
     reason:
       "Tests YAML round-trips of arbitrary Ruby objects (Psych encoding). " +
