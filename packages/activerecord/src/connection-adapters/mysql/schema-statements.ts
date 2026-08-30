@@ -1,13 +1,13 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
-import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
 import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
 } from "./schema-definitions.js";
 import { Column } from "./column.js";
+import type { Type } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-definitions.js";
@@ -255,7 +255,7 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
 /** @internal */
 export interface MysqlColumnReflectionHost {
   createTableInfo(tableName: string): Promise<string | null>;
-  lookupCastType(sqlType: string | null): unknown;
+  lookupCastType(sqlType: string | null): Type;
 }
 
 /** @internal */
@@ -314,23 +314,9 @@ export function fetchTypeMetadata(
   sqlType: string,
   extra: string = "",
 ): TypeMetadata {
-  const castType = this.lookupCastType(sqlType) as {
-    name: string;
-    limit?: number | null;
-    precision?: number | null;
-    scale?: number | null;
-  };
-  const raw = castType.name.toLowerCase();
-  const baseType = /^timestamp/.test(raw) ? "datetime" : raw;
-
-  const meta = new SqlTypeMetadata({
-    sqlType,
-    type: baseType,
-    limit: castType.limit ?? null,
-    precision: castType.precision ?? null,
-    scale: castType.scale ?? null,
+  return new TypeMetadata(BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType), {
+    extra,
   });
-  return new TypeMetadata(meta, { extra });
 }
 
 /** @internal */

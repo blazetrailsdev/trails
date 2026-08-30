@@ -470,11 +470,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async charset(): Promise<string> {
-    return String((await this.showVariable("character_set_database")) ?? "");
+    return (await this.showVariable("character_set_database")) as string;
   }
 
   async collation(): Promise<string> {
-    return String((await this.showVariable("collation_database")) ?? "");
+    return (await this.showVariable("collation_database")) as string;
   }
 
   /** @internal */

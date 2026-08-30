@@ -25,6 +25,7 @@ import {
   parseMysqlName,
 } from "./schema-statements.js";
 import type { RowFormatHost } from "./schema-statements.js";
+import type { Type } from "@blazetrails/activemodel";
 import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { Result } from "../../result.js";
@@ -105,16 +106,17 @@ describe("MySQL::SchemaStatements", () => {
     expect(td).toBeInstanceOf(MysqlTableDefinition);
   });
 
-  const baseLookupCastType = (sqlType: string | null) => ({
-    name: (sqlType ?? "")
+  const castTypeNamed = (name: string, limit: number | null = null) =>
+    ({ type: () => name, limit, precision: null, scale: null }) as unknown as Type;
+
+  const baseLookupCastType = (sqlType: string | null) => {
+    const base = (sqlType ?? "")
       .replace(/\(.*\).*$/, "")
       .trim()
       .toLowerCase()
-      .split(/\s+/)[0],
-    limit: null,
-    precision: null,
-    scale: null,
-  });
+      .split(/\s+/)[0];
+    return castTypeNamed(/^[^(]*timestamp/.test(base) ? "datetime" : base);
+  };
 
   const reflectionHost = (
     createTableInfo: string | null = null,
@@ -287,14 +289,14 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("fetchTypeMetadata: uses lookupCastType for limit/precision/scale", () => {
-    const lookup = (s: string) => ({ name: "integer", limit: 8, precision: null, scale: null });
+    const lookup = () => castTypeNamed("integer", 8);
     const meta = fetchTypeMetadata.call(reflectionHost(null, lookup), "bigint unsigned", "");
     expect(meta.type).toBe("integer");
     expect(meta.limit).toBe(8);
   });
 
   it("newColumnFromField: limit from lookupCastType is preserved on Column", async () => {
-    const lookup = (s: string) => ({ name: "integer", limit: 8, precision: null, scale: null });
+    const lookup = () => castTypeNamed("integer", 8);
     const col = await newColumnFromField.call(
       reflectionHost(null, lookup),
       "t",
@@ -311,7 +313,7 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("fetchTypeMetadata: lookupCastType boolean mapping (tinyint(1) emulation)", () => {
-    const lookup = (s: string) => ({ name: "boolean", limit: null, precision: null, scale: null });
+    const lookup = () => castTypeNamed("boolean");
     const meta = fetchTypeMetadata.call(reflectionHost(null, lookup), "tinyint(1)", "");
     expect(meta.type).toBe("boolean");
   });
