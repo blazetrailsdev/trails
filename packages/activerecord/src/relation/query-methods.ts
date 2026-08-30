@@ -1314,13 +1314,15 @@ function excludingWithCallee(callee: "excluding" | "without") {
         continue;
       }
       const primaryKey = relation.model.primaryKey;
-      const primaryKeyArray: string[] = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      const primaryKeyArray: string[] =
+        primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
       for (const record of relation._records) {
-        flatMappedIds.push(
+        const id =
           primaryKeyArray.length === 1
             ? record._readAttribute(primaryKeyArray[0])
-            : primaryKeyArray.map((column: string) => record._readAttribute(column)),
-        );
+            : primaryKeyArray.map((column: string) => record._readAttribute(column));
+        if (Array.isArray(id)) flatMappedIds.push(...id);
+        else flatMappedIds.push(id);
       }
     }
     const combined: unknown[] = [...records, ...flatMappedIds, ...deferredRelations];
