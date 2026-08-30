@@ -7,6 +7,7 @@ import type {
 } from "../sqlite-adapter.js";
 import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
+import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { ExplainOption, DatabaseStatementsHost } from "./abstract/database-statements.js";
@@ -1145,6 +1146,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       definition.column("created_at", "datetime", opts);
       definition.column("updated_at", "datetime", opts);
     });
+  }
+
+  override async addReference(
+    tableName: string,
+    refName: string,
+    options: AddReferenceOptions = {},
+  ): Promise<void> {
+    return super.addReference(tableName, refName, { type: "integer", ...options });
+  }
+
+  override async addBelongsTo(
+    tableName: string,
+    refName: string,
+    options: AddReferenceOptions = {},
+  ): Promise<void> {
+    return this.addReference(tableName, refName, options);
   }
 
   private static readonly FK_REGEX =
