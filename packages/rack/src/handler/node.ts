@@ -77,16 +77,14 @@ export class Node {
   /**
    * `Rackup::Handler::WEBrick#service(req, res)` (`webrick.rb:91-157`).
    *
-   * Three of Rails' arms branch on shapes this port does not have:
+   * Two of Rails' arms branch on shapes this port does not have.
    * `RACK_IS_HIJACK` is `true` at `webrick.rb:101` because WEBrick can hand the
    * servlet its socket, while {@link HttpResponse} exposes only `writeHead` /
    * `write` / `end` — nothing to surrender, so it is `false` and the
    * `rack.hijack` / `io_lambda` / `res.upgrade!` arms (`webrick.rb:115-121`,
-   * `:137-144`) cannot be reached; `body.respond_to?(:to_path)`
+   * `:137-144`) cannot be reached. `body.respond_to?(:to_path)`
    * (`webrick.rb:145`) selects a file body, but {@link RackBody} is always an
-   * async iterable, leaving Rails' `body.each` arm (`webrick.rb:148-152`); and
-   * `body.close` (`webrick.rb:155`) is what `for await` itself performs when
-   * the loop ends or throws.
+   * async iterable, leaving Rails' `body.each` arm (`webrick.rb:148-152`).
    */
   async service(req: HttpRequest, res: HttpResponse): Promise<void> {
     const env = await this.metaVars(req);
@@ -103,7 +101,7 @@ export class Node {
 
     env[QUERY_STRING] ??= "";
     if (env[PATH_INFO] !== "") {
-      const path = env[PATH_INFO] as string;
+      const path = new URL(env["REQUEST_URI"] as string).pathname;
       const n = (env[SCRIPT_NAME] as string).length;
       env[PATH_INFO] = path.slice(n, path.length);
     }
@@ -143,6 +141,12 @@ export class Node {
    * `HTTPS` is set by `webrick/https.rb:67-70`'s override of this method rather
    * than by the handler, so a TLS socket is read here too — and it is what
    * decides the scheme {@link parseUri} absolutizes with.
+   *
+   * `PATH_INFO` differs in isolation: WEBrick's is `@path_info`, decoded by
+   * `HTTPUtils.unescape`, where `URL#pathname` keeps the escaping. `service`
+   * overwrites it with the raw `request_uri.path` (`webrick.rb:106-107`) on
+   * every request — `url.pathname` is never `""` — so both sides hand a Rack
+   * app the same string and nothing reads the decoded one.
    */
   async metaVars(req: HttpRequest): Promise<RackEnv> {
     const scheme = req.socket.encrypted === true ? "https" : "http";
@@ -183,10 +187,9 @@ export class Node {
 /**
  * `WEBrick::HTTPRequest#parse_uri` (`httprequest.rb:503-523`). A request-line
  * target is usually a path, and Rails re-serializes it against the `Host`
- * header so `REQUEST_URI` (`:423`) carries scheme and authority; `new URL`
- * against the same base is that absolutization. Rails' leading-slash collapse
- * matters here too: `URL` reads `//host/x` as protocol-relative and would take
- * the authority from the request line.
+ * header so `REQUEST_URI` (`:423`) carries scheme and authority. Rails' leading
+ * slash collapse matters more here: `URL` reads `//host/x` as protocol-relative
+ * and would take the authority from the request line.
  */
 function parseUri(str: string, scheme: string, host: string): URL {
   return new URL(str.replace(/^\/+/, "/"), `${scheme}://${host}`);
@@ -204,15 +207,14 @@ function header(req: HttpRequest, name: string): string | undefined {
  * `Stream::Reader` `Fiber` resumes `req.body` one chunk per `read` so a large
  * upload never lands in memory whole. JS has no coroutine that can suspend an
  * async read inside the synchronous `read()` the Rack input contract requires,
- * so the body is drained up front into the `StringIO` `service` hands over —
- * the shape `mock-request.ts:147` already builds for `rack.input`.
+ * so the body is drained up front into the `StringIO` `service` hands over.
  *
- * Ruby reads the socket as `ASCII-8BIT` and `Input` passes those bytes through,
- * so a binary upload round-trips; a `StringIO` holds a JS string, so a decoding
- * has to be chosen, and UTF-8 is the one every consumer of `rack.input` here is
- * already written against (`request.ts:400`, `method-override.ts:64`,
- * `multipart/parser.ts:67`, and `mock-request.ts:147`, which wraps a JS string
- * too). Making the whole seam byte-faithful is story `rack-input-binary-safe`.
+ * Ruby reads the socket as `ASCII-8BIT` and passes those bytes through, so a
+ * binary upload round-trips; a `StringIO` holds a JS string, so a decoding is
+ * forced, and UTF-8 is what every consumer of `rack.input` here already expects
+ * (`request.ts:400`, `method-override.ts:64`, `multipart/parser.ts:67`, and
+ * `mock-request.ts:147`, which wraps a JS string too). Making that seam
+ * byte-faithful is story `rack-input-binary-safe`.
  *
  * @noRailsEquivalent PERMANENT — `MAX_BODY_SIZE` follows from that buffering,
  * not from Rails: `:InputBufferSize` (`webrick/config.rb:59`) is a per-chunk

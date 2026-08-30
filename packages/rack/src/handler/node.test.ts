@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import type { HttpRequest, StringIO } from "@blazetrails/activesupport";
+import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/activesupport";
 import { bodyFromString } from "../index.js";
-import type { RackApp, RackEnv } from "../index.js";
+import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { Node } from "./node.js";
 
 /** Serve `app` on an ephemeral port, run `body` against it, then shut down. */
@@ -29,17 +29,31 @@ async function envFor(path: string, init?: RequestInit): Promise<RackEnv> {
   return env;
 }
 
-/** For the two shapes a real socket cannot produce, `meta_vars` is called direct. */
-function metaVars(req: Partial<HttpRequest>): Promise<RackEnv> {
-  const app: RackApp = async () => [200, {}, bodyFromString("")];
-  return new Node(app).metaVars({
+/** For the shapes a real socket cannot produce, the request is built by hand. */
+async function mockReq(req: Partial<HttpRequest>): Promise<HttpRequest> {
+  const listeners: Record<string, ((...args: never[]) => void)[]> = {};
+  const built = {
     method: "GET",
     url: "/",
     httpVersion: "1.1",
     headers: { host: "localhost:3000" },
     socket: { remoteAddress: "127.0.0.1" },
+    on(event: string, listener: (...args: never[]) => void) {
+      (listeners[event] ??= []).push(listener);
+      return built;
+    },
+    destroy() {},
     ...req,
-  } as HttpRequest);
+  } as unknown as HttpRequest;
+  setTimeout(() => {
+    for (const listener of listeners["end"] ?? []) (listener as () => void)();
+  }, 0);
+  return built;
+}
+
+async function metaVars(req: Partial<HttpRequest>): Promise<RackEnv> {
+  const app: RackApp = async () => [200, {}, bodyFromString("")];
+  return new Node(app).metaVars(await mockReq(req));
 }
 
 describe("Rack::Handler::Node", () => {
@@ -51,6 +65,14 @@ describe("Rack::Handler::Node", () => {
     expect(env.QUERY_STRING).toBe("page=2");
     expect(env.HTTP_HOST).toBe(env.SERVER_NAME + ":" + env.SERVER_PORT);
     expect(env["rack.url_scheme"]).toBe("http");
+    expect(env.GATEWAY_INTERFACE).toBe("CGI/1.1");
+    expect(env.SCRIPT_NAME).toBe("");
+    expect(env.REQUEST_URI).toBe(`http://${env.HTTP_HOST as string}/users?page=2`);
+    expect(env.REQUEST_PATH).toBe("/users");
+    expect(env.SERVER_PROTOCOL).toBe("HTTP/1.1");
+    expect(env.REMOTE_ADDR).toBe("127.0.0.1");
+    expect(env.REMOTE_HOST).toBe("127.0.0.1");
+    expect(env).not.toHaveProperty("REMOTE_USER");
   });
 
   it("reads request body", async () => {
@@ -108,19 +130,6 @@ describe("Rack::Handler::Node", () => {
     expect(env.PATH_INFO).toBe("/evil.example/x");
   });
 
-  it("sets the CGI meta variables WEBrick supplies", async () => {
-    const env = await envFor("/users?page=2");
-
-    expect(env.GATEWAY_INTERFACE).toBe("CGI/1.1");
-    expect(env.SCRIPT_NAME).toBe("");
-    expect(env.REQUEST_URI).toBe(`http://${env.HTTP_HOST as string}/users?page=2`);
-    expect(env.REQUEST_PATH).toBe("/users");
-    expect(env.SERVER_PROTOCOL).toBe("HTTP/1.1");
-    expect(env.REMOTE_ADDR).toBe("127.0.0.1");
-    expect(env.REMOTE_HOST).toBe("127.0.0.1");
-    expect(env).not.toHaveProperty("REMOTE_USER");
-  });
-
   it("skips rack. headers and keeps set-cookie repeatable", async () => {
     const headers = {
       "rack.protocol": "websocket",
@@ -138,6 +147,44 @@ describe("Rack::Handler::Node", () => {
         expect(response.headers.get("vary")).toBe("accept, origin");
       },
     );
+  });
+
+  it("keeps the raw path request_uri carries", async () => {
+    const env = await envFor("/a%20b/c");
+
+    expect(env.PATH_INFO).toBe("/a%20b/c");
+    expect(env.REQUEST_PATH).toBe("/a%20b/c");
+    expect(env.REQUEST_URI).toBe(`http://${env.HTTP_HOST as string}/a%20b/c`);
+  });
+
+  it("closes the body when the response cannot be written", async () => {
+    let closed = false;
+    // A body that carries its own cleanup, the way `Rack::BodyProxy#close`
+    // does; an async generator that never started has nothing to release, so
+    // its `return()` is a no-op by spec and would prove nothing here.
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        yield "never";
+      },
+      async return() {
+        closed = true;
+        return { done: true as const, value: undefined };
+      },
+    };
+    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const boom = new Error("headers already sent");
+    const res = {
+      writeHead() {
+        throw boom;
+      },
+      write() {},
+      end() {},
+    };
+
+    await expect(
+      new Node(app).service(await mockReq({}), res as unknown as HttpResponse),
+    ).rejects.toThrow(boom);
+    expect(closed).toBe(true);
   });
 
   it("streams a multi-chunk body", async () => {
