@@ -3,7 +3,8 @@ import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
-import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
+import { quoteTableName } from "../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 
 describe("build_joins from(subquery) dedup", () => {
   fixtures([]);
@@ -49,14 +50,14 @@ describe("build_joins from(subquery) dedup", () => {
       .joins(":comments")
       .merge(Comment.joins(":post"));
     const sql = (Post.from(rel, "posts") as unknown as { toSql(): string }).toSql();
-    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    const q = (name: string) => regexpEscape(quoteTableName(name));
     expect(sql).toMatch(
       new RegExp(`FROM ${q("posts")} CROSS JOIN categories INNER JOIN ${q("comments")}`),
     );
   });
 
   it("routes a leading raw join the same way on the live path and the from-subquery path", () => {
-    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    const q = (name: string) => regexpEscape(quoteTableName(name));
     const leading = new RegExp(
       `FROM ${q("posts")} CROSS JOIN categories INNER JOIN ${q("comments")}`,
     );
@@ -73,7 +74,7 @@ describe("build_joins from(subquery) dedup", () => {
 
   it("appends a raw join that trails a named join instead of leading with it", () => {
     const build = () => Post.joins(":comments").joins("CROSS JOIN categories");
-    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    const q = (name: string) => regexpEscape(quoteTableName(name));
     for (const sql of [
       (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql(),
       (build() as unknown as { toSql(): string }).toSql(),
@@ -95,7 +96,7 @@ describe("build_joins from(subquery) dedup", () => {
     const liveSql = (
       Post.eagerLoad(":author").leftOuterJoins(":author") as unknown as { toSql(): string }
     ).toSql();
-    const q = (name: string) => escapeRegExp(quoteTableName(name));
+    const q = (name: string) => regexpEscape(quoteTableName(name));
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
     expect(liveSql).toMatch(new RegExp(`LEFT OUTER JOIN ${q("authors")} ${q("authors_posts")}`));
   });

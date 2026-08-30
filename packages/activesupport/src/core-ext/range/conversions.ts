@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 
-import { Range } from "../../range-ext.js";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { toFs as timeToFs } from "../time/conversions.js";
 import { toFs as dateToFs } from "../date/conversions.js";
 
@@ -12,7 +12,7 @@ import { toFs as dateToFs } from "../date/conversions.js";
  * settled `this`-typed-function idiom rather than through `prepend()`.
  */
 
-declare module "../../range-ext.js" {
+declare module "@blazetrails/ruby-compat/range" {
   interface Range<T> {
     toFs(format?: string): string | undefined;
     toFormattedS(format?: string): string | undefined;

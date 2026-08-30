@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-fixtures.js";
 import { Customer } from "../test-helpers/models/customer.js";
-import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
+import { quoteTableName } from "../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 
-const qualifiedName = escapeRegExp(quoteTableName("customers.name"));
+const qualifiedName = regexpEscape(quoteTableName("customers.name"));
 
 describe("order string arg stays bare", () => {
   fixtures([]);

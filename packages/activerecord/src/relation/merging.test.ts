@@ -7,7 +7,8 @@ import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
-import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
+import { quoteTableName } from "../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { Author } from "../test-helpers/models/author.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Comment, CommentThatAutomaticallyAltersPostBody } from "../test-helpers/models/comment.js";
@@ -159,7 +160,7 @@ describe("RelationMergingTest", () => {
     const authorId = quoteTableName("authors.id");
     await assertQueriesMatch(
       new RegExp(
-        `WHERE ${escapeRegExp(authorId)} NOT IN \\((?:\\?|\\W?\\w?\\d), (?:\\?|\\W?\\w?\\d)\\)$`,
+        `WHERE ${regexpEscape(authorId)} NOT IN \\((?:\\?|\\W?\\w?\\d), (?:\\?|\\W?\\w?\\d)\\)$`,
       ),
       undefined,
       false,
@@ -383,7 +384,7 @@ describe("RelationMergingTest", () => {
 
   it("merging duplicated annotations", async () => {
     const posts = Post.annotate("foo");
-    const quotedTable = escapeRegExp(Post.quotedTableName());
+    const quotedTable = regexpEscape(Post.quotedTableName());
     await assertQueriesMatch(
       new RegExp(`FROM ${quotedTable} \\/\\* foo \\*\\/$`),
       undefined,

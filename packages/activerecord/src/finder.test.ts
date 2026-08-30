@@ -22,7 +22,8 @@ import {
   assertQueriesMatch,
   assertNoQueries,
 } from "./testing/query-assertions.js";
-import { quoteTableName, escapeRegExp } from "./support/quote-regex.js";
+import { quoteTableName } from "./support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment, SpecialComment } from "./test-helpers/models/comment.js";
@@ -289,7 +290,7 @@ describe("FinderTest", () => {
 
   it("nth to last with order uses limit", async () => {
     await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
+      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
       undefined,
       false,
       async () => {
@@ -297,7 +298,7 @@ describe("FinderTest", () => {
       },
     );
     await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.updated_at"))} DESC LIMIT`, "i"),
+      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("topics.updated_at"))} DESC LIMIT`, "i"),
       undefined,
       false,
       async () => {
@@ -1567,7 +1568,7 @@ describe("FinderTest", () => {
     CanonicalTopic.implicitOrderColumn = "id";
     try {
       await assertQueriesMatch(
-        new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
+        new RegExp(`ORDER BY ${regexpEscape(quoteTableName("topics.id"))} DESC LIMIT`, "i"),
         undefined,
         false,
         async () => {
@@ -2319,7 +2320,7 @@ describe("FinderTest", () => {
 
   it("exists does not select columns without alias", async () => {
     await assertQueriesMatch(
-      new RegExp(`SELECT 1 AS one FROM ${escapeRegExp(quoteTableName("topics"))}`, "i"),
+      new RegExp(`SELECT 1 AS one FROM ${regexpEscape(quoteTableName("topics"))}`, "i"),
       undefined,
       false,
       async () => {

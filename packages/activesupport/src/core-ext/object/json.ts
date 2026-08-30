@@ -2,7 +2,7 @@ import { Temporal } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
-import { Range as RangeValue } from "../../range-ext.js";
+import { Range as RangeValue } from "@blazetrails/ruby-compat";
 import { BigDecimal as BigDecimalValue } from "../big-decimal/conversions.js";
 import * as instanceVariables from "./instance-variables.js";
 

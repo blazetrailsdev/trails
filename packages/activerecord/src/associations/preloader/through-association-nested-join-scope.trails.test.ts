@@ -8,7 +8,8 @@ import { Club } from "../../test-helpers/models/club.js";
 import { Membership, CurrentMembership } from "../../test-helpers/models/membership.js";
 import { Category } from "../../test-helpers/models/category.js";
 import { Categorization } from "../../test-helpers/models/categorization.js";
-import { quoteTableName, escapeRegExp } from "../../support/quote-regex.js";
+import { quoteTableName } from "../../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 
 registerModel(Member);
 registerModel(Club);
@@ -112,36 +113,36 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
   it("nests the two-level scope join under the source reflection on the through query", async () => {
     const groucho = members("groucho");
     const sql = await throughScopeSql([groucho], "davidCategorizedClub");
-    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
-    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${regexpEscape(quoteTableName("categories"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${regexpEscape(quoteTableName("categorizations"))}`));
     expect(sql).toMatch(
-      new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
+      new RegExp(`WHERE.*${regexpEscape(quoteTableName("categorizations.author_id"))}`),
     );
   });
 
   it("nests an explicit scope includes under the source reflection on the through query", async () => {
     const groucho = members("groucho");
     const sql = await throughScopeSql([groucho], "davidIncludedCategorizedClub");
-    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
-    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${regexpEscape(quoteTableName("categories"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${regexpEscape(quoteTableName("categorizations"))}`));
     expect(sql).toMatch(
-      new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
+      new RegExp(`WHERE.*${regexpEscape(quoteTableName("categorizations.author_id"))}`),
     );
   });
 
   it("nests a belongs_to scope includes onto the through query for a has_many-through", async () => {
     const groucho = members("groucho");
     const sql = await throughScopeSql([groucho], "generalClubs");
-    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
-    expect(sql).toMatch(new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categories.name"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${regexpEscape(quoteTableName("categories"))}`));
+    expect(sql).toMatch(new RegExp(`WHERE.*${regexpEscape(quoteTableName("categories.name"))}`));
   });
 
   it("nests a has_many-through fan-out include+predicate onto the through query via eager-load", async () => {
     const groucho = members("groucho");
     const sql = await throughScopeSql([groucho], "categorizedClubs");
-    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${regexpEscape(quoteTableName("categorizations"))}`));
     expect(sql).toMatch(
-      new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
+      new RegExp(`WHERE.*${regexpEscape(quoteTableName("categorizations.author_id"))}`),
     );
   });
 

@@ -11,7 +11,7 @@ const tester = new RuleTester({
 
 const FLAGGED = "packages/activerecord/src/support/new-helper.ts";
 /** A seeded row in eslint/no-ruby-compat-reimplementation-exclude.json. */
-const ALLOWLISTED = "packages/activerecord/src/support/quote-regex.ts";
+const ALLOWLISTED = "packages/i18n/src/backend/simple.ts";
 const IN_RUBY_COMPAT = "packages/ruby-compat/src/core-ext/regexp.ts";
 
 tester.run("no-ruby-compat-reimplementation", rule, {
@@ -22,7 +22,7 @@ tester.run("no-ruby-compat-reimplementation", rule, {
     },
     {
       filename: ALLOWLISTED,
-      code: `export function escapeRegExp(s: string): string { return s; }`,
+      code: `export function isSymbol(value: unknown): boolean { return !!value; }`,
     },
     {
       // Rails-anchored homonyms: `ActiveSupport::Cache::Store#fetch`

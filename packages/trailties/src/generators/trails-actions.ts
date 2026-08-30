@@ -6,6 +6,7 @@
 // files in a trails app; they have no Ruby counterpart.
 
 import { getFsAsync, getPathAsync, type FsAdapter } from "@blazetrails/activesupport";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { assertNoRubySource } from "../template-builder/no-ruby-source.js";
 
 type AsyncFs = FsAdapter & {
@@ -170,7 +171,7 @@ async function insertAtMarker(
   // can't shadow the real marker line. Take the LAST match — every
   // insertion goes ABOVE the marker, so the original marker line is always
   // last in file.
-  const re = new RegExp(`^([\\t ]*)${escapeRegExp(marker)}[\\t ]*$`, "gm");
+  const re = new RegExp(`^([\\t ]*)${regexpEscape(marker)}[\\t ]*$`, "gm");
   let match: RegExpExecArray | null;
   let last: RegExpExecArray | null = null;
   while ((match = re.exec(existing)) !== null) last = match;
@@ -186,10 +187,6 @@ async function insertAtMarker(
   const text = block.endsWith("\n") ? block : block + "\n";
   const updated = existing.slice(0, lineStart) + text + existing.slice(lineStart);
   await fs.writeFile(full, updated);
-}
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function summarize(s: string): string {

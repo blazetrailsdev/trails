@@ -6,7 +6,7 @@
 
 import { ArgumentError } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
-import { regexpEscape } from "./core-ext/regexp.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 
 /** The class name Ruby's `string.class.name` reports for the offending value. */
 function rubyClassName(value: unknown): string {

@@ -21,6 +21,7 @@
     }
   },
   "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",

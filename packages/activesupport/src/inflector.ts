@@ -5,7 +5,7 @@
 
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import { regexpEscape } from "./core-ext/regexp.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { I18n } from "./i18n.js";
 
 /** @internal */

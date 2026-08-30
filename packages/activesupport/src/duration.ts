@@ -7,7 +7,7 @@
  */
 
 import { Temporal } from "@blazetrails/date";
-import { rbEqual } from "./rb-equal.js";
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import { inspect } from "./core-ext/object/inspect.js";

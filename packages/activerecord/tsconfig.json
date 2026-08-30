@@ -8,6 +8,7 @@
   "include": ["src"],
   "exclude": ["src/type-virtualization/fixtures"],
   "references": [
+    { "path": "../ruby-compat" },
     { "path": "../arel" },
     { "path": "../date" },
     { "path": "../activemodel" },

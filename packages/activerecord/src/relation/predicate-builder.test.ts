@@ -11,7 +11,8 @@ import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Author } from "../test-helpers/models/author.js";
-import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
+import { quoteTableName } from "../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
@@ -52,7 +53,7 @@ describe("PredicateBuilderTest", () => {
     try {
       const sql = Topic.where({ title: new RegexFilter("rails") }).toSql();
       expect(sql).toMatch(
-        new RegExp(`${escapeRegExp(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
+        new RegExp(`${regexpEscape(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
       );
     } finally {
       (Topic as any)._predicateBuilder = null;
@@ -66,7 +67,7 @@ describe("PredicateBuilderTest", () => {
         .where({ topics: { title: new RegexFilter("rails") } })
         .toSql();
       expect(sql).toMatch(
-        new RegExp(`${escapeRegExp(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
+        new RegExp(`${regexpEscape(quoteTableName("topics.title"))} ~ 'rails'`, "i"),
       );
     } finally {
       (Topic as any)._predicateBuilder = null;
@@ -93,7 +94,7 @@ describe("PredicateBuilderTest", () => {
         .references(new Nodes.SqlLiteral("regexp_topic") as any)
         .toSql();
       expect(sql).toMatch(
-        new RegExp(`${escapeRegExp(quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),
+        new RegExp(`${regexpEscape(quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),
       );
     } finally {
       modelRegistry.delete("RegexpReply");

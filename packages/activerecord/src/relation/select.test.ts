@@ -7,14 +7,15 @@ import { fixtures } from "../test-fixtures.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
-import { quoteTableName, escapeRegExp } from "../support/quote-regex.js";
+import { quoteTableName } from "../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 
 registerModel(Post);
 registerModel(Comment);
 
 describe("SelectTest", () => {
   fixtures(["posts", "comments"]);
-  const q = (name: string) => escapeRegExp(quoteTableName(name));
+  const q = (name: string) => regexpEscape(quoteTableName(name));
 
   it("select with nil argument", () => {
     const expected = new RegExp(`^SELECT ${q("posts.title")} FROM`);

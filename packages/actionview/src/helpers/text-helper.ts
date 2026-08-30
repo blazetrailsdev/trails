@@ -7,7 +7,7 @@ import {
   truncate as stringTruncate,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
-import { regexpEscape } from "@blazetrails/activesupport";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { contentTag } from "./tag-helper.js";
 import { sanitize } from "./sanitize-helper.js";
 import { raw } from "./output-safety-helper.js";

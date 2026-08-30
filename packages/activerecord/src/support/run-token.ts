@@ -1,5 +1,7 @@
 /** @internal */
 
+import { regexpEscape } from "@blazetrails/ruby-compat";
+
 export const RUN_TOKEN_ENV = "AR_TEST_RUN_TOKEN";
 
 export const STALE_DB_AGE_MS = 6 * 60 * 60 * 1000;
@@ -20,10 +22,6 @@ export function runTokenStartedAt(runToken: string): number | null {
   return Number.isFinite(millis) && millis > 0 ? millis : null;
 }
 
-function escapeRegExp(literal: string): string {
-  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 export function runDatabasePrefix(base: string, runToken: string): string {
   return `${base}_${runToken}_`;
 }
@@ -38,7 +36,7 @@ export function splitRunDatabaseName(name: string): { base: string; suffix: stri
 }
 
 export function runTokenOfDatabase(base: string, name: string): string | null {
-  const match = new RegExp(`^${escapeRegExp(base)}2?_(${TOKEN_PATTERN})_`).exec(name);
+  const match = new RegExp(`^${regexpEscape(base)}2?_(${TOKEN_PATTERN})_`).exec(name);
   return match?.[1] ?? null;
 }
 

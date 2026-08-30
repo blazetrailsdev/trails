@@ -1,21 +1,22 @@
 import { prepend } from "../../prepend.js";
-import { Range } from "../../range-ext.js";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 /**
  * `ActiveSupport::CompareWithRange`
  * (core_ext/range/compare_range.rb:2), which Ruby `prepend`s onto `Range`.
  * `prepend()` is the trails idiom for `Module#prepend`, so `super` arrives as
- * the wrapper's first argument.
+ * the wrapper's first argument — here core Ruby's own `Range#cover?` /
+ * `Range#include?`, which live in `@blazetrails/ruby-compat`.
  *
  * @boundary-file: endpoints are compared as `number` (JS `Date` coerced to
- *   epoch millis), exactly as `range-ext.ts`'s comparators do — Ruby compares
+ *   epoch millis), exactly as ruby-compat's `range.ts` comparators do — Ruby compares
  *   any `<=>`-able endpoint.
  */
 
-// boundary: Date endpoints, as in range-ext.ts
+// boundary: Date endpoints, as in ruby-compat's range.ts
 const toNum = <T>(v: T): number => (v instanceof Date ? v.getTime() : (v as number));
 
-declare module "../../range-ext.js" {
+declare module "@blazetrails/ruby-compat/range" {
   interface Range<T> {
     caseEquals(value: Range<T> | T): boolean;
     isInclude(value: Range<T> | T): boolean;

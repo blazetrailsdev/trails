@@ -4,7 +4,8 @@ import { Batches } from "./relation/batches.js";
 import { ActiveRecord } from "./ar-config.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
-import { quoteTableName, escapeRegExp } from "./support/quote-regex.js";
+import { quoteTableName } from "./support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import {
   Post,
   PostWithDefaultScope,
@@ -190,7 +191,7 @@ describe("EachTest", () => {
 
   it("find in batches should quote batch order", async () => {
     await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))}`, "i"),
+      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))}`, "i"),
       undefined,
       false,
       async () => {
@@ -204,7 +205,7 @@ describe("EachTest", () => {
 
   it("find in batches should quote batch order with desc order", async () => {
     await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))} DESC`),
+      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
       undefined,
       false,
       async () => {
@@ -685,7 +686,7 @@ describe("EachTest", () => {
   });
 
   it("in batches executes range queries when unconstrained", async () => {
-    const quoted = escapeRegExp(quoteTableName("posts.id"));
+    const quoted = regexpEscape(quoteTableName("posts.id"));
     await assertQueriesMatch(
       new RegExp(`WHERE ${quoted} >=? .+ AND ${quoted} <= .+`, "i"),
       undefined,
@@ -700,7 +701,7 @@ describe("EachTest", () => {
   });
 
   it("in batches executes in queries when unconstrained and opted out of ranges", async () => {
-    const quoted = escapeRegExp(quoteTableName("posts.id"));
+    const quoted = regexpEscape(quoteTableName("posts.id"));
     await assertQueriesMatch(
       new RegExp(`${quoted} IN \\(.+\\)`, "i"),
       undefined,
@@ -715,7 +716,7 @@ describe("EachTest", () => {
   });
 
   it("in batches executes in queries when constrained", async () => {
-    const quoted = escapeRegExp(quoteTableName("posts.id"));
+    const quoted = regexpEscape(quoteTableName("posts.id"));
     await assertQueriesMatch(
       new RegExp(`${quoted} IN \\(.+\\)`, "i"),
       undefined,
@@ -730,7 +731,7 @@ describe("EachTest", () => {
   });
 
   it("in batches executes range queries when constrained and opted in into ranges", async () => {
-    const quoted = escapeRegExp(quoteTableName("posts.id"));
+    const quoted = regexpEscape(quoteTableName("posts.id"));
     await assertQueriesMatch(
       new RegExp(`${quoted} >=? .+ AND ${quoted} <= .+`, "i"),
       undefined,
@@ -748,7 +749,7 @@ describe("EachTest", () => {
   });
 
   it("in batches no subqueries for whole tables batching", async () => {
-    const quotedPosts = escapeRegExp(quoteTableName("posts"));
+    const quotedPosts = regexpEscape(quoteTableName("posts"));
     await assertQueriesMatch(
       new RegExp(`DELETE FROM ${quotedPosts}`, "i"),
       undefined,
@@ -776,7 +777,7 @@ describe("EachTest", () => {
 
   it("in batches should quote batch order", async () => {
     await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))}`),
+      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))}`),
       undefined,
       false,
       async () => {
@@ -790,7 +791,7 @@ describe("EachTest", () => {
 
   it("in batches should quote batch order with desc order", async () => {
     await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))} DESC`),
+      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
       undefined,
       false,
       async () => {
@@ -804,7 +805,7 @@ describe("EachTest", () => {
 
   it("in batches enumerator should quote batch order with desc order", async () => {
     await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))} DESC`),
+      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
       undefined,
       false,
       async () => {
@@ -821,7 +822,7 @@ describe("EachTest", () => {
 
   it("in batches enumerator each record should quote batch order with desc order", async () => {
     await assertQueriesMatch(
-      new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("posts.id"))} DESC`),
+      new RegExp(`ORDER BY ${regexpEscape(quoteTableName("posts.id"))} DESC`),
       undefined,
       false,
       async () => {
