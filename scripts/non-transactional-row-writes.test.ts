@@ -278,6 +278,35 @@ describe("non-transactional row writes", () => {
     expect(isOffender(src)).toBe(false);
   });
 
+  it("clears a model bound through the adapter field the setter assigns", () => {
+    const src = `describe("x", () => {
+  beforeAll(async () => {
+    (Invoice as unknown as { _adapter: PostgreSQLAdapter })._adapter = connection;
+  });
+
+  it("writes", async () => {
+    await Invoice.create({ start_date: "2020-01-01" });
+  });
+});
+`;
+    expect(isOffender(src)).toBe(false);
+  });
+
+  it("counts leaseConnection even on a model the file bound its own adapter to", () => {
+    const src = `describe("x", () => {
+  beforeAll(async () => {
+    (Invoice as unknown as { _adapter: PostgreSQLAdapter })._adapter = connection;
+  });
+
+  it("writes", async () => {
+    await (await Invoice.leaseConnection()).setConstraints("deferred", "c");
+    await Invoice.create({ start_date: "2020-01-01" });
+  });
+});
+`;
+    expect(isOffender(src)).toBe(true);
+  });
+
   it("clears a lowercase receiver whose update writes no row", () => {
     const src = `describe("x", () => {
   it("encrypts", () => {
