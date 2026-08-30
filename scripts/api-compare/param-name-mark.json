@@ -4,12 +4,13 @@
     "byFile": {}
   },
   "actioncontroller": {
-    "total": 7,
+    "total": 10,
     "byFile": {
       "base.rb": 1,
       "metal/allow_browser.rb": 1,
       "metal/flash.rb": 1,
       "metal/logging.rb": 2,
+      "metal/request_forgery_protection.rb": 3,
       "template_assertions.rb": 2
     }
   },

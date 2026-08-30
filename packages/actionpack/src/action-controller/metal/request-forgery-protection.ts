@@ -161,17 +161,17 @@ export class SessionStore {
     const token = session[this._tokenKey];
     return typeof token === "string" ? token : null;
   }
-  fetch(request: Record<string, unknown>): string | null {
-    return this.read(request);
+  fetch(session: Record<string, unknown>): string | null {
+    return this.read(session);
   }
   write(session: Record<string, unknown>, token: string): void {
     session[this._tokenKey] = token;
   }
-  store(request: Record<string, unknown>, csrfToken: string): void {
-    this.write(request, csrfToken);
+  store(session: Record<string, unknown>, csrfToken: string): void {
+    this.write(session, csrfToken);
   }
-  reset(request: Record<string, unknown>): void {
-    delete request[this._tokenKey];
+  reset(session: Record<string, unknown>): void {
+    delete session[this._tokenKey];
   }
 }
 
@@ -183,17 +183,17 @@ export class CookieStore {
   read(cookies: Record<string, string>): string | null {
     return cookies[this._cookieName] ?? null;
   }
-  fetch(request: Record<string, string>): string | null {
-    return this.read(request);
+  fetch(cookies: Record<string, string>): string | null {
+    return this.read(cookies);
   }
   write(cookies: Record<string, string>, token: string): void {
     cookies[this._cookieName] = token;
   }
-  store(request: Record<string, string>, csrfToken: string): void {
-    this.write(request, csrfToken);
+  store(cookies: Record<string, string>, csrfToken: string): void {
+    this.write(cookies, csrfToken);
   }
-  reset(request: Record<string, string>): void {
-    delete request[this._cookieName];
+  reset(cookies: Record<string, string>): void {
+    delete cookies[this._cookieName];
   }
 }
 
