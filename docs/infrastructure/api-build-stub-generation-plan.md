@@ -294,7 +294,8 @@ its migration, and nothing here changes `@missingRailsCall` or the `parity:api:b
 design.
 
 ```text
-@noRailsEquivalent <reason prose, may wrap onto following lines>
+@noRailsEquivalent PERMANENT
+@noRailsEquivalent CONVERGEABLE <story-id>
 ```
 
 The two tags answer the same question — "this method diverges from Rails; is
@@ -316,10 +317,12 @@ report). They therefore share:
   — a tagged class name is an extractor-shape artifact whose members do have
   Ruby counterparts. Most interface declaration names never need the tag at
   all; see "Interface declaration names are exempt by kind" below.
-- **Grammar** — free prose after the tag; where a key token precedes the
-  reason it is em-dash-separated (`@missingRailsCall` takes a Ruby call name
-  as that token, `@noRailsEquivalent` takes none); continuation lines with no
-  `@` attach to the preceding tag, so long curated reasons survive verbatim.
+- **Grammar** — the tag keeps its tokens and nothing else. `@missingRailsCall`
+  and `@missingRailsArgs` take a Ruby call name as their subject, em-dash-separated
+  from the permanence claim that follows; `@noRailsEquivalent` takes the
+  permanence claim directly. Everything after the claim is prose, and
+  `no-freeform-comments` strips it (`renderTag`, `eslint/no-freeform-comments.mjs`)
+  — see "Permanence claim" below for the two shapes that survive.
 - **Structural advantage over the JSON baselines** — the justification
   travels with the declaration across renames and file moves; there is no
   `package + tsFile + name` key to go stale for path reasons.
@@ -491,7 +494,7 @@ Two boundaries follow from the extra set being a flat set of bare names:
 per package as `totalInterfaceExempt` in the JSON, so the one allowance with no
 tag to count stays measurable.
 
-### Permanence claim: open the reason with `PERMANENT` or `CONVERGEABLE`
+### Permanence claim: the receipt is `PERMANENT` or `CONVERGEABLE <story-id>`
 
 The RFC 0080 tag audit found 42 of 79 `@noRailsEquivalent` tags describing
 **convergeable** surface — unfinished porting, a fixable collision, a
@@ -502,12 +505,20 @@ because each reason was accurate about its mechanism and merely drew
 a **stale** tag (one on a name that no longer flags) fails the run; a tag that
 should never have been written does not.
 
-So the reason states its claim as a leading token:
+So the receipt has exactly two shapes and carries no prose:
 
 ```text
-@noRailsEquivalent PERMANENT. Rails gains these bodies with `include SchemaStatements`…
-@noRailsEquivalent CONVERGEABLE — <mechanism>; story <story-slug>.
+@noRailsEquivalent PERMANENT
+@noRailsEquivalent CONVERGEABLE <story-id>
 ```
+
+`PERMANENT` is the whole receipt — the token stands alone. `CONVERGEABLE`
+points at a registered story, and the story IS the receipt: the mechanism, the
+bar it fails, and the disposition live there, not in the tag.
+`no-freeform-comments` strips anything else, and `lintBareConvergeable`
+(`scripts/api-compare/lint-missing-rails-call-reasons.ts`, RFC 0124) fails a
+`CONVERGEABLE` that names no story across all three receipt tags —
+`classifyReason` alone reads only the token, so the story id is gated there.
 
 `classifyReason` (`extra-surface.ts`) reads the first word; anything else is
 **unclassified**, and `parity:api:extra` reports the unclassified count, a
@@ -525,7 +536,7 @@ JSON report shape is unchanged — only the exit code moved.
 
 A `CONVERGEABLE` tag is a documented exception to "not for deferred work"
 above, not a licence for it: it is written only alongside a registered story
-that removes it, and the reason names that story.
+that removes it, and the tag names that story's id.
 
 ### Re-audit cadence
 
