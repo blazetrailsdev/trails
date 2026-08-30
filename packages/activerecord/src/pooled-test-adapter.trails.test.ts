@@ -4,9 +4,6 @@ import { createPooledTestAdapter, _resetPooledTestAdapterForTests } from "./test
 import { withExecutionContext } from "./connection-adapters/abstract/connection-pool/execution-context.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 
-type Execable = { exec(sql: string): Promise<void> };
-const asExec = (a: unknown) => a as Execable;
-
 describe("createPooledTestAdapter (Phase B smoke)", () => {
   afterAll(() => {
     _resetPooledTestAdapterForTests();
@@ -22,8 +19,8 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
     const { adapter, pool } = await createPooledTestAdapter();
     const tableName = "pooled_smoke_columns";
     try {
-      await asExec(adapter).exec(`DROP TABLE IF EXISTS ${tableName}`);
-      await asExec(adapter).exec(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT)`);
+      await adapter.execute(`DROP TABLE IF EXISTS ${tableName}`);
+      await adapter.execute(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY, name TEXT)`);
       const cache = adapter.internalSchemaCache;
       expect(cache).toBeTruthy();
       const cols = await cache.columns(pool, tableName);
@@ -31,7 +28,7 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
       const names = (cols ?? []).map((c) => (c as { name: string }).name).sort();
       expect(names).toEqual(["id", "name"]);
     } finally {
-      await asExec(adapter).exec(`DROP TABLE IF EXISTS ${tableName}`);
+      await adapter.execute(`DROP TABLE IF EXISTS ${tableName}`);
     }
   });
 
@@ -40,14 +37,14 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
     async () => {
       const { adapter: setupAdapter, pool } = await createPooledTestAdapter();
       const tableName = "pooled_smoke_pin_rollback";
-      await asExec(setupAdapter).exec(`DROP TABLE IF EXISTS ${tableName}`);
-      await asExec(setupAdapter).exec(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY)`);
+      await setupAdapter.execute(`DROP TABLE IF EXISTS ${tableName}`);
+      await setupAdapter.execute(`CREATE TABLE ${tableName} (id INTEGER PRIMARY KEY)`);
       try {
         await withExecutionContext(async () => {
           await pool.pinConnectionBang(false);
           try {
             const pinned = await pool.checkout();
-            await asExec(pinned).exec(`INSERT INTO ${tableName} (id) VALUES (1)`);
+            await pinned.execute(`INSERT INTO ${tableName} (id) VALUES (1)`);
             const inside = await pinned.execute(`SELECT count(*) AS c FROM ${tableName}`);
             expect(Number((inside[0] as { c: number }).c)).toBe(1);
           } finally {
@@ -59,7 +56,7 @@ describe("createPooledTestAdapter (Phase B smoke)", () => {
         const after = await setupAdapter.execute(`SELECT count(*) AS c FROM ${tableName}`);
         expect(Number((after[0] as { c: number }).c)).toBe(0);
       } finally {
-        await asExec(setupAdapter).exec(`DROP TABLE IF EXISTS ${tableName}`);
+        await setupAdapter.execute(`DROP TABLE IF EXISTS ${tableName}`);
       }
     },
   );

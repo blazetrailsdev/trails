@@ -135,7 +135,7 @@ export interface DatabaseStatementsHost {
   /** @internal */
   buildTruncateStatement?(tableName: string): string;
   /** @internal */
-  buildTruncateStatements?(tableNames: string[]): string[];
+  buildTruncateStatements(tableNames: string[]): string[];
   beginDbTransaction?(): Promise<void>;
   beginIsolatedDbTransaction?(isolation: string): Promise<void>;
   commitDbTransaction?(): Promise<void>;
@@ -356,19 +356,13 @@ export async function truncateTables(
   this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
   ...tableNames: string[]
 ): Promise<void> {
-  const schemaMigrationTable = this.pool.schemaMigration.tableName;
-  const internalMetadataTable = this.pool.internalMetadata.tableName;
-  const filtered = tableNames.filter(
-    (t) => t !== schemaMigrationTable && t !== internalMetadataTable,
-  );
+  const excluded = [this.pool.schemaMigration.tableName, this.pool.internalMetadata.tableName];
+  tableNames = tableNames.filter((t) => !excluded.includes(t));
 
-  if (filtered.length === 0) return;
+  if (tableNames.length === 0) return;
 
   await this.disableReferentialIntegrity(async () => {
-    const statements = (this.buildTruncateStatements ?? buildTruncateStatements).call(
-      this,
-      filtered,
-    );
+    const statements = this.buildTruncateStatements(tableNames);
     await this.executeBatch(statements, "Truncate Tables");
   });
 }

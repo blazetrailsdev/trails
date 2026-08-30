@@ -44,6 +44,8 @@ function makeAdapter(): DatabaseAdapter {
     disableReferentialIntegrity: async (fn: () => Promise<void>) => {
       await fn();
     },
+    executeBatch: vi.fn(async () => {}),
+    transaction: async <T>(fn: () => Promise<T> | T) => fn(),
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,
     quoteColumnName: (n: string) => `"${n}"`,
@@ -754,9 +756,10 @@ describe("FixtureSet.createFixtures", () => {
 
     await FixtureSet.createFixtures(adapter, Topic, { rails: { title: "Rails" } });
 
-    const sqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls.map(
-      (c: unknown[]) => c[0] as string,
-    );
+    const sqls = (
+      (adapter as unknown as { executeBatch: ReturnType<typeof vi.fn> }).executeBatch.mock
+        .calls as unknown[][]
+    ).flatMap((c) => c[0] as string[]);
     const deleteIdx = sqls.findIndex((s) => s.includes("DELETE FROM"));
     const insertIdx = sqls.findIndex((s) => s.includes("INSERT INTO"));
     expect(deleteIdx).toBeGreaterThanOrEqual(0);

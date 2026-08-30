@@ -69,9 +69,14 @@ const typeCastedBinds: DatabaseStatementsHost["typeCastedBinds"] = (binds) => bi
 
 const hostDefaults: Pick<
   DatabaseStatementsHost,
-  "execute" | "executeBatch" | "disableReferentialIntegrity" | "transaction"
+  | "execute"
+  | "executeBatch"
+  | "disableReferentialIntegrity"
+  | "transaction"
+  | "buildTruncateStatements"
 > = {
   execute: async () => undefined,
+  buildTruncateStatements,
   executeBatch: async () => undefined,
   disableReferentialIntegrity: async (fn) => {
     await fn();

@@ -28,10 +28,22 @@ function makeAdapter(): DatabaseAdapter {
     createSavepoint: vi.fn(async () => {}),
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
+    executeBatch: vi.fn(async () => {}),
+    disableReferentialIntegrity: async (fn: () => Promise<void>) => {
+      await fn();
+    },
+    transaction: async <T>(fn: () => Promise<T> | T) => fn(),
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,
     quoteColumnName: (n: string) => `"${n}"`,
   } as unknown as DatabaseAdapter;
+}
+
+function executedStatements(adapter: DatabaseAdapter): string[] {
+  return (
+    (adapter as unknown as { executeBatch: ReturnType<typeof vi.fn> }).executeBatch.mock
+      .calls as unknown[][]
+  ).flatMap((c) => c[0] as string[]);
 }
 
 function makeModel(tableName: string, pk = "id") {
@@ -110,9 +122,9 @@ describe("topicFixtureData", () => {
     expect(topics.first).toBeTruthy();
     expect(topics.second).toBeTruthy();
 
-    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("topics"));
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("topics"),
+    );
     const secondInsert = findInsertWithPk(insertSqls, topicFixtureData.second.id);
     expect(secondInsert).toBeTruthy();
     expectValueInRow(secondInsert, topicFixtureData.first.id);
@@ -157,9 +169,9 @@ describe("commentFixtureData", () => {
 
     await defineFixtures(adapter, Comment, commentFixtureData);
 
-    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("comments"));
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("comments"),
+    );
     const greetingsInsert = findInsertWithPk(insertSqls, commentFixtureData.greetings.id);
     expect(greetingsInsert).toBeTruthy();
     expectValueInRow(greetingsInsert, postFixtureData.welcome.id);
@@ -195,9 +207,9 @@ describe("authorFixtureData", () => {
 
     await defineFixtures(adapter, Author, authorFixtureData);
 
-    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("authors"));
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("authors"),
+    );
     const davidInsert = findInsertWithPk(insertSqls, authorFixtureData.david.id);
     expect(davidInsert).toBeTruthy();
     expectValueInRow(davidInsert, authorAddressFixtureData.david_address.id);
@@ -231,9 +243,9 @@ describe("bookFixtureData", () => {
 
     await defineFixtures(adapter, Book, bookFixtureData);
 
-    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("books"));
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("books"),
+    );
     const awdrInsert = findInsertWithPk(insertSqls, bookFixtureData.awdr.id);
     expect(awdrInsert).toBeTruthy();
     expectValueInRow(awdrInsert, authorFixtureData.david.id);
@@ -254,9 +266,9 @@ describe("bookFixtureData", () => {
     await defineFixtures(adapter, Author, authorFixtureData);
     await defineFixtures(adapter, Book, bookFixtureData);
 
-    const bookInserts = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("books"));
+    const bookInserts = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("books"),
+    );
     const awdrInsert = findInsertWithPk(bookInserts, bookFixtureData.awdr.id);
     expect(awdrInsert).toBeTruthy();
     expectValueInRow(awdrInsert, authorFixtureData.david.id);
@@ -322,9 +334,9 @@ describe("companyFixtureData", () => {
 
     await defineFixtures(adapter, Company, companyFixtureData);
 
-    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("companies"));
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("companies"),
+    );
     const clientInsert = findInsertWithPk(insertSqls, companyFixtureData.first_client.id);
     expect(clientInsert).toBeTruthy();
     expectValueInRow(clientInsert, companyFixtureData.first_firm.id);
@@ -373,9 +385,9 @@ describe("accountFixtureData", () => {
 
     await defineFixtures(adapter, Account, accountFixtureData);
 
-    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("accounts"));
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("accounts"),
+    );
     const signals37Insert = findInsertWithPk(insertSqls, accountFixtureData.signals37.id);
     expect(signals37Insert).toBeTruthy();
     expectValueInRow(signals37Insert, companyFixtureData.first_firm.id);
@@ -409,9 +421,9 @@ describe("developerFixtureData", () => {
       seedRows(Developer, k, developerFixtureData, { name: developerFixtureData[k].name });
     }
     await defineFixtures(adapter, Developer, developerFixtureData);
-    const insertSqls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("developers"));
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("developers"),
+    );
     expect(findInsertWithPk(insertSqls, developerFixtureData.david.id)).toBeTruthy();
   });
 });

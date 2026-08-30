@@ -28,10 +28,22 @@ function makeAdapter(): DatabaseAdapter {
     createSavepoint: vi.fn(async () => {}),
     releaseSavepoint: vi.fn(async () => {}),
     rollbackToSavepoint: vi.fn(async () => {}),
+    executeBatch: vi.fn(async () => {}),
+    disableReferentialIntegrity: async (fn: () => Promise<void>) => {
+      await fn();
+    },
+    transaction: async <T>(fn: () => Promise<T> | T) => fn(),
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
     quoteTableName: (n: string) => `"${n}"`,
     quoteColumnName: (n: string) => `"${n}"`,
   } as unknown as DatabaseAdapter;
+}
+
+function executedStatements(adapter: DatabaseAdapter): string[] {
+  return (
+    (adapter as unknown as { executeBatch: ReturnType<typeof vi.fn> }).executeBatch.mock
+      .calls as unknown[][]
+  ).flatMap((c) => c[0] as string[]);
 }
 
 function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>>, pk = "id") {
@@ -106,9 +118,7 @@ describe("defineFixtures", () => {
 
     expect(users.david).toEqual({ id: fixtureId("david"), name: "David" });
     expect(users.mary).toEqual({ id: fixtureId("mary"), name: "Mary" });
-    const deleteSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("DELETE FROM"));
+    const deleteSql = executedStatements(adapter).find((s) => s.includes("DELETE FROM"));
     expect(deleteSql).toContain('"users"');
   });
 
@@ -126,9 +136,7 @@ describe("defineFixtures", () => {
       welcome: { title: "Welcome", author_id: ref("users", "david") },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO"));
+    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain(String(fixtureId("david")));
   });
 
@@ -147,9 +155,9 @@ describe("defineFixtures", () => {
       sub1: { subscriber_id: ref("subscribers", "second") },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO") && s.includes("subscriptions"));
+    const insertSql = executedStatements(adapter).find(
+      (s) => s.includes("INSERT INTO") && s.includes("subscriptions"),
+    );
     expect(insertSql).toMatch(/webster132/);
   });
 
@@ -164,9 +172,7 @@ describe("defineFixtures", () => {
       welcome: { title: "Welcome", author: davidInstance },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO"));
+    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain(String(fixtureId("david")));
   });
 
@@ -191,9 +197,7 @@ describe("defineFixtures", () => {
       findBy: vi.fn(async () => ({ shop_id: 1, id: 1 })),
     } as any;
     await defineFixtures(adapter, Model, { order1: { status: "paid" } });
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO"));
+    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     const base = fixtureId("order1");
     expect(insertSql).toContain(String(base));
     expect(insertSql).toContain(String((base * 2) % (2 ** 30 - 1)));
@@ -209,9 +213,7 @@ describe("defineFixtures", () => {
       welcome_rails: { post_id: ref("posts", "welcome"), tag_id: ref("tags", "rails") },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO"));
+    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toMatch(/, 1, /);
     expect(insertSql).not.toContain(String(fixtureId("welcome")));
     expect(insertSql).toContain(String(fixtureId("rails")));
@@ -228,9 +230,7 @@ describe("defineFixtures", () => {
       david: { author_address_extra_id: ref("author_addresses", "david_address_extra") },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO"));
+    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain(", 2)");
     expect(insertSql).not.toContain(String(fixtureId("david_address_extra")));
   });
@@ -256,9 +256,9 @@ describe("defineFixtures", () => {
       david_trails: { developer_id: "david", project_id: "trails" },
     });
 
-    const insertCalls = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .filter((s) => s.includes("INSERT INTO") && s.includes("developers_projects"));
+    const insertCalls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("developers_projects"),
+    );
     expect(insertCalls.length).toBeGreaterThan(0);
     expect(insertCalls[0]).toContain(String(fixtureId("david")));
     expect(insertCalls[0]).toContain(String(fixtureId("trails")));
@@ -295,9 +295,9 @@ describe("defineFixtures", () => {
       david: { name: "David", categorizedPosts: ["welcome"] },
     });
 
-    const joinInsert = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO") && s.includes("categorizations"));
+    const joinInsert = executedStatements(adapter).find(
+      (s) => s.includes("INSERT INTO") && s.includes("categorizations"),
+    );
     expect(joinInsert).toBeDefined();
     expect(joinInsert).toContain(String(fixtureId("david")));
     expect(joinInsert).toMatch(/, 1\)/);
@@ -314,9 +314,9 @@ describe("defineFixtures", () => {
         david: { name: "David", categorizedPosts: ["welcome"] },
       }),
     ).rejects.toThrow(/join table "categorizations" is not loaded/);
-    const joinInsert = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO") && s.includes("categorizations"));
+    const joinInsert = executedStatements(adapter).find(
+      (s) => s.includes("INSERT INTO") && s.includes("categorizations"),
+    );
     expect(joinInsert).toBeUndefined();
   });
 
@@ -373,9 +373,9 @@ describe("defineFixtures", () => {
       welcome_tag: { taggable: postInstance as any },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO") && s.includes("taggings"));
+    const insertSql = executedStatements(adapter).find(
+      (s) => s.includes("INSERT INTO") && s.includes("taggings"),
+    );
     expect(insertSql).toContain("taggable_type");
     expect(insertSql).toContain("Post");
     expect(insertSql).toContain(String(postId));
@@ -393,9 +393,9 @@ describe("defineFixtures", () => {
       welcome_tag: { taggable_type: "CustomPost", taggable_id: 999 },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO") && s.includes("taggings"));
+    const insertSql = executedStatements(adapter).find(
+      (s) => s.includes("INSERT INTO") && s.includes("taggings"),
+    );
     expect(insertSql).toContain("CustomPost");
     expect(insertSql).toContain("999");
   });
@@ -412,9 +412,9 @@ describe("defineFixtures", () => {
       untagged: { taggable: null },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO") && s.includes("taggings"));
+    const insertSql = executedStatements(adapter).find(
+      (s) => s.includes("INSERT INTO") && s.includes("taggings"),
+    );
     expect(insertSql).toContain("taggable_type");
     expect(insertSql).toContain("taggable_id");
     const nullCount = (insertSql!.match(/\bnull\b/g) ?? []).length;
@@ -470,9 +470,7 @@ describe("defineFixtures", () => {
     const result = await defineFixtures(adapter, Model, { thing: { id: "abc", name: "x" } });
     expect((result.thing as { id: string }).id).toBe("abc");
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO"));
+    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain("abc");
   });
 
@@ -500,9 +498,7 @@ describe("defineFixtures", () => {
       admin_user: { name: "Admin", type: "AdminUser" },
     });
 
-    const insertSql = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
-      .map((c: unknown[]) => c[0] as string)
-      .find((s) => s.includes("INSERT INTO"));
+    const insertSql = executedStatements(adapter).find((s) => s.includes("INSERT INTO"));
     expect(insertSql).toContain("type");
     expect(insertSql).toContain("AdminUser");
   });
