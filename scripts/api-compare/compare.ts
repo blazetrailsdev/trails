@@ -2790,7 +2790,9 @@ export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, C
  * `test_request.rb` from 13 matched methods to 9 with no warning (PR #5405).
  * So an unseparated tie resolves to nothing, the way `includeGraphEntities`
  * drops an edge name that resolves to more than one entity, and `onAmbiguous`
- * reports it (RFC 0126).
+ * reports it (RFC 0126). A tie at a POSITIVE score keeps its winner: those
+ * candidates do share a directory prefix with the child, which is the signal
+ * this heuristic exists to read; only a tie at zero is pure enumeration order.
  */
 export function resolveEntityByDeclaringFile(
   candidates: ClassInfo[],
@@ -2824,9 +2826,6 @@ export function resolveEntityByDeclaringFile(
       bestCount++;
     }
   }
-  // A tie at a POSITIVE score still shares a directory prefix with the child,
-  // which is the signal this heuristic exists to read; only a tie at zero is
-  // pure enumeration order.
   if (bestScore === 0 && bestCount > 1) {
     onAmbiguous?.(candidates.filter((c) => c.file !== childFile));
     return null;
@@ -3256,11 +3255,6 @@ export function main() {
 
       const entityKey = (e: ClassInfo) => `${e.file}:${e.name}`;
 
-      // Short names whose candidates no proximity score separates, so the walk
-      // followed no parent at all. Reported once per name per package below —
-      // the counterpart of the file-structure manifest's unresolvable
-      // last-segment collisions, so a rename cannot silently move matched
-      // counts (RFC 0126).
       const ambiguousParents = new Map<string, number>();
 
       const resolveParent = (name: string, childFile: string, declFile?: string) =>

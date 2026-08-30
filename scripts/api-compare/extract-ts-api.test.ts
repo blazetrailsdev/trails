@@ -3524,9 +3524,7 @@ describe("extract-ts-api — MethodInfo emit-site inventory", () => {
 });
 
 describe("extractFromProgram — a namespace nested inside a namespace", () => {
-  // The `module ClassMethods` inside `module Configurable` shape
-  // (activesupport/lib/active_support/configurable.rb:28), which the settled
-  // trails mixin idiom ports literally.
+  // activesupport/lib/active_support/configurable.rb:28.
   const info = extractFromFiles("/p", {
     "configurable.ts": `
       export namespace Configurable {

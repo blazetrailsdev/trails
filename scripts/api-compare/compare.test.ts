@@ -1421,9 +1421,6 @@ describe("resolveEntityByDeclaringFile", () => {
   });
 
   it("resolves to nothing when no candidate shares a leading segment with the child", () => {
-    // The PR #5405 shape: `TestRequest` lives under `testing/`, and neither
-    // `Request` candidate is under it. `candidates[0]` used to win by
-    // enumeration order, silently re-parenting the child.
     const http = entity("http/request.ts", "Request");
     const csp = entity("http/content-security-policy.ts", "Request");
     expect(resolveEntityByDeclaringFile([http, csp], "testing/test-request.ts")).toBeNull();
@@ -1440,8 +1437,6 @@ describe("resolveEntityByDeclaringFile", () => {
   });
 
   it("still picks a winner when a tie is broken at a positive score", () => {
-    // Two candidates share `connection-adapters/` with the child, a third
-    // shares nothing — a real prefix signal, not enumeration order.
     const sqlite3 = entity("connection-adapters/sqlite3/schema-statements.ts");
     const abstract = entity("connection-adapters/abstract/schema-statements.ts");
     const stray = entity("model-schema.ts");

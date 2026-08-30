@@ -1087,10 +1087,6 @@ describe("buildReport — novel vs moved classification", () => {
               instanceMethods: [method("primaryMethod")],
               classMethods: [],
             },
-            // The sibling TS class that ports the nested Ruby one, the shape
-            // trails actually uses (re-attached as `static readonly
-            // LoaderQuery = LoaderQuery`). `preloader/loader_query.rb` does not
-            // exist, so `loader-query.ts` must not be expected either.
             LoaderQuery: {
               name: "LoaderQuery",
               file: "preloader/association.ts",
@@ -1838,9 +1834,7 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
 });
 
 describe("buildReport — nested-class method allowances", () => {
-  // `ActiveModel::Attribute::FromDatabase` declares `type_cast`; the enclosing
-  // `ActiveModel::Attribute` does not (activemodel/lib/active_model/
-  // attribute.rb:154-160).
+  // activemodel/lib/active_model/attribute.rb:154-160.
   const rubyManifest = (): ApiManifest => ({
     source: "ruby",
     generatedAt: "",

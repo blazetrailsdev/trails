@@ -140,7 +140,15 @@ interface RubyEntity {
    * double-count its methods.
    */
   nameOnly?: boolean;
-  /** A Ruby `class` (rather than a `module`) — see `nestedIn`. */
+  /**
+   * A Ruby `class` rather than a `module`, on both halves of `nestedIn`: only a
+   * class encloses, and only a class is enclosed. `Arel::Nodes` is an (empty)
+   * module entity filed at nodes/casted.rb because that is where the namespace
+   * was first seen, and reading it as an enclosure would scope `Casted`'s own
+   * methods away from the file-wide set they belong to; a `Foo::ClassMethods`
+   * submodule is the mixin idiom, whose methods really do land on the enclosing
+   * host (`foldClassMethodsModules`) rather than on a separate declaration.
+   */
   isClass?: boolean;
   /**
    * Set on a Ruby class nested inside another entity the SAME file declares
@@ -155,7 +163,8 @@ interface RubyEntity {
    * shape PR #5458 shipped) bought that at the cost of precision: a
    * trails-invented method on `AbstractAdapter` sharing a name with one on
    * `AbstractAdapter::Version` stopped flagging. Scoping the allowance to the
-   * porting declaration keeps both (RFC 0126).
+   * porting declaration keeps both (RFC 0126). Resolved in a second pass over
+   * each file's entities, once every entity of that file is known.
    */
   nestedIn?: string;
 }
@@ -1061,6 +1070,11 @@ function walkTsFileSurface(
  * `undefined` where the name is also a declaration name or a top-level
  * function. A scoped allowance (see `RubyEntity.nestedIn`) applies only when
  * EVERY site declaring the name is the porting declaration.
+ *
+ * An `interface` member is not one of those sites: it is the type of the
+ * declaration that ports the name (`RequestedInit` beside `Requested`,
+ * actionview/lib/action_view/template_details.rb:5-7), so counting it would
+ * defeat every scoped allowance whose nested class carries an init interface.
  */
 export function collectTsNameOwners(
   file: string,
@@ -1075,10 +1089,6 @@ export function collectTsNameOwners(
     modules,
     fileFunctions,
   )) {
-    // An `interface` member is not a second port of the name — it is the type
-    // of the declaration that ports it (`RequestedInit` beside `Requested`,
-    // template_details.rb:5-7). Counting it as an owner would defeat every
-    // scoped allowance whose nested class carries an options/init interface.
     if (interfaceMemberOf !== null) continue;
     if (owner === null) {
       out.set(name, null);
@@ -1384,7 +1394,10 @@ function collectAllowedNames(
   fileHashKeyNames: string[] = [],
   /**
    * Out-param: TS declaration name -> the names allowed ONLY on it. Filled for
-   * every entity carrying `nestedIn`; see that field.
+   * every entity carrying `nestedIn`; see that field. The mixin walk's
+   * `visited` set is keyed per target, so a module already walked into the
+   * file-wide set is still walked into a nested class's scoped set rather than
+   * leaving it short of whatever a sibling reached first.
    */
   scoped?: Map<string, Set<string>>,
 ): Set<string> {
@@ -1449,9 +1462,6 @@ function collectAllowedNames(
   // the way the TS sites do (compare.ts `resolveEntityByDeclaringFile`).
   const walkMixin = (incName: string, contextFqn: string, target: Set<string> = allowed): void => {
     const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
-    // `visited` is per-target: a module already walked into the file-wide set
-    // must still be walked into a nested class's scoped set, or the scoped set
-    // would be missing whatever a sibling reached first.
     const visitKey = target === allowed ? fqn : `${contextFqn}\u0000${fqn}`;
     if (visited.has(visitKey)) return;
     visited.add(visitKey);
@@ -1514,11 +1524,6 @@ function collectAllowedNames(
     const short = fqn.split("::").pop();
     if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
     if (nameOnly) continue;
-    // A nested class's members are surface of the nested class, not of the
-    // file: they are allowed on the TS declaration that ports it and nowhere
-    // else. `nestedIn` is only ever set when `short` is, and the key is the TS
-    // spelling of the Ruby constant (`rubyConstantCandidates` leaves a
-    // CamelCase constant alone).
     let target = allowed;
     if (nestedIn !== undefined && short !== undefined && scoped !== undefined) {
       target = scoped.get(short) ?? new Set<string>();
@@ -1870,17 +1875,7 @@ function buildPackageReport(
     if (!info.file) continue;
     pushTo(rubyFiles, info.file, { fqn, info, ...(foldedFqns.has(fqn) ? { nameOnly: true } : {}) });
   }
-  // Second pass, once every entity of a file is known: mark each nested CLASS
-  // with the same-file entity that encloses it. Modules are left alone — a
-  // `Foo::ClassMethods` submodule is the mixin idiom, whose methods really do
-  // land on the enclosing host (`foldClassMethodsModules`), not a separate
-  // declaration.
   for (const entities of rubyFiles.values()) {
-    // Only a CLASS encloses: `Arel::Nodes` is an (empty) module entity filed at
-    // nodes/casted.rb because that is where the namespace was first seen, and
-    // reading it as an enclosing declaration would scope `Casted`'s own methods
-    // to a `Casted` TS class — the file's primary port, whose members are
-    // exactly what the file-wide allow-set is for.
     const classFqns = new Set(entities.filter((e) => e.isClass === true).map((e) => e.fqn));
     for (const e of entities) {
       if (e.isClass !== true) continue;
@@ -2035,7 +2030,6 @@ function buildPackageReport(
       scopedAllowed.size === 0
         ? undefined
         : collectTsNameOwners(expectedTs, classes, modules, fileFns);
-    /** Allowed only on the TS declaration porting a nested Ruby class. */
     const scopedAllows = (name: string): boolean => {
       const owners = tsNameOwners?.get(name);
       if (owners === undefined || owners === null || owners.length === 0) return false;
