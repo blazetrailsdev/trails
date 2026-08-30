@@ -49,9 +49,9 @@ describeIfSqlite("SQLite3StatementPoolTest", () => {
   it("clearCacheBang clears the pool without throwing on next query", async () => {
     const adapter = track(new BetterSQLite3Adapter(":memory:"));
     await adapter.exec(`CREATE TABLE t (id INTEGER)`);
-    await adapter.execute("SELECT * FROM t WHERE id = ?", [1]);
+    await adapter.execQuery("SELECT * FROM t WHERE id = ?", "SQL", [1]);
     await adapter.clearCacheBang();
-    await adapter.execute("SELECT * FROM t WHERE id = ?", [2]);
+    await adapter.execQuery("SELECT * FROM t WHERE id = ?", "SQL", [2]);
     await adapter.exec(`DROP TABLE IF EXISTS t`);
   });
 });

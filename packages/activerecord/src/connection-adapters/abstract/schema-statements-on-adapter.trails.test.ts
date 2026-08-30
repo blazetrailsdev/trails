@@ -39,9 +39,9 @@ class CapturingAdapter extends AbstractAdapter {
   override get typeRegistryKey() {
     return this.dialect as any;
   }
-  execute(sql: string, params?: unknown[]) {
+  execute(sql: string) {
     this.lastSql = sql;
-    this.lastParams = params ?? [];
+    this.lastParams = [];
     return Promise.resolve([] as Record<string, unknown>[]);
   }
   executeMutation(_sql: string) {

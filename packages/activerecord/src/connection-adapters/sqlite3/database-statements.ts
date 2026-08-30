@@ -72,14 +72,6 @@ export function highPrecisionCurrentTimestamp(): string {
   return "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')";
 }
 
-export async function execute(
-  adapter: ExecutableAdapter,
-  sql: string,
-  binds?: unknown[],
-): Promise<unknown> {
-  return adapter.execute(sql, binds);
-}
-
 export async function resetIsolationLevel(
   adapter: ExecutableAdapter,
   previousReadUncommitted: number | null,

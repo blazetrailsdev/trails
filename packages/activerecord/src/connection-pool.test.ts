@@ -64,11 +64,7 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
   readonly inTransaction = false;
 
-  async execute(
-    _sql: string,
-    _binds?: unknown[],
-    _name?: string,
-  ): Promise<Record<string, unknown>[]> {
+  async execute(_sql: string, _name?: string | null): Promise<Record<string, unknown>[]> {
     return [];
   }
   async executeMutation(_sql: string, _binds?: unknown[], _name?: string): Promise<number> {
@@ -80,11 +76,11 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   async createSavepoint(_name: string): Promise<void> {}
   async releaseSavepoint(_name: string): Promise<void> {}
   async rollbackToSavepoint(_name: string): Promise<void> {}
-  async selectAll(sql: string, _n?: string | null, b?: unknown[]) {
-    return Result.fromRowHashes(await this.execute(sql, b));
+  async selectAll(sql: string, _n?: string | null, _b?: unknown[]) {
+    return Result.fromRowHashes(await this.execute(sql));
   }
-  async selectOne(sql: string, _n?: string | null, b?: unknown[]) {
-    return (await this.execute(sql, b))[0];
+  async selectOne(sql: string, _n?: string | null, _b?: unknown[]) {
+    return (await this.execute(sql))[0];
   }
   async selectValue(_s: string) {
     return undefined;
@@ -95,11 +91,11 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   async selectRows(_s: string) {
     return [];
   }
-  async execQuery(sql: string, _n?: string | null, b?: unknown[]) {
-    return Result.fromRowHashes(await this.execute(sql, b));
+  async execQuery(sql: string, _n?: string | null, _b?: unknown[]) {
+    return Result.fromRowHashes(await this.execute(sql));
   }
-  async execInsert(sql: string, _n?: string | null, b?: unknown[]) {
-    return Result.fromRowHashes(await this.execute(sql, b));
+  async execInsert(sql: string, _n?: string | null, _b?: unknown[]) {
+    return Result.fromRowHashes(await this.execute(sql));
   }
   async execDelete(sql: string, _n?: string | null, b?: unknown[]) {
     return this.executeMutation(sql, b);

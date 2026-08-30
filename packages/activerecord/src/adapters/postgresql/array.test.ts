@@ -242,8 +242,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
       const rows = await adapter.execute(`SELECT id FROM pg_arrays`);
       const id = rows[0].id;
-      await adapter.execute(`UPDATE pg_arrays SET tags = '{"1","2","3","4"}' WHERE id = $1`, [id]);
-      const updated = await adapter.execute(`SELECT tags FROM pg_arrays WHERE id = $1`, [id]);
+      await adapter.execQuery(
+        `UPDATE pg_arrays SET tags = '{"1","2","3","4"}' WHERE id = $1`,
+        "SQL",
+        [id],
+      );
+      const updated = (
+        await adapter.execQuery(`SELECT tags FROM pg_arrays WHERE id = $1`, "SQL", [id])
+      ).toArray();
       expect(updated[0].tags).toEqual(["1", "2", "3", "4"]);
     });
 
@@ -257,8 +263,12 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
       const rows = await adapter.execute(`SELECT id FROM pg_arrays`);
       const id = rows[0].id;
-      await adapter.execute(`UPDATE pg_arrays SET ratings = '{2,3,4}' WHERE id = $1`, [id]);
-      const updated = await adapter.execute(`SELECT ratings FROM pg_arrays WHERE id = $1`, [id]);
+      await adapter.execQuery(`UPDATE pg_arrays SET ratings = '{2,3,4}' WHERE id = $1`, "SQL", [
+        id,
+      ]);
+      const updated = (
+        await adapter.execQuery(`SELECT ratings FROM pg_arrays WHERE id = $1`, "SQL", [id])
+      ).toArray();
       expect(updated[0].ratings).toEqual([2, 3, 4]);
     });
 
@@ -328,7 +338,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("strings with quotes", async () => {
       const tags = ["this has", 'some "s that need to be escaped"'];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(tags),
       ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
@@ -337,7 +347,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("strings with commas", async () => {
       const tags = ["this,has", "many,values"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(tags),
       ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
@@ -346,7 +356,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("strings with array delimiters", async () => {
       const tags = ["{", "}"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(tags),
       ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
@@ -355,7 +365,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("strings with null strings", async () => {
       const tags = ["NULL", "NULL"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(tags),
       ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
@@ -407,7 +417,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("escaping", async () => {
       const unknown = 'foo\\",bar,baz,\\';
       const tags = [`hello_${unknown}`];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(tags),
       ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
@@ -429,7 +439,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         "ten\r",
         "NULL",
       ];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(tags),
       ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
@@ -452,18 +462,20 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("mutate array", async () => {
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(["one", "two"]),
       ]);
       const rows = await adapter.execute(`SELECT id, tags FROM pg_arrays`);
       const id = rows[0].id;
       const tags = rows[0].tags as string[];
       tags.push("three");
-      await adapter.execute(`UPDATE pg_arrays SET tags = $1 WHERE id = $2`, [
+      await adapter.execQuery(`UPDATE pg_arrays SET tags = $1 WHERE id = $2`, "SQL", [
         textArray.serialize(tags),
         id,
       ]);
-      const updated = await adapter.execute(`SELECT tags FROM pg_arrays WHERE id = $1`, [id]);
+      const updated = (
+        await adapter.execQuery(`SELECT tags FROM pg_arrays WHERE id = $1`, "SQL", [id])
+      ).toArray();
       expect(updated[0].tags).toEqual(["one", "two", "three"]);
     });
 
@@ -605,7 +617,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("encoding arrays of utf8 strings", async () => {
       const tags = ["nový", "ファイル"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
         textArray.serialize(tags),
       ]);
       const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);

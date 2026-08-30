@@ -475,6 +475,7 @@ describe("DatabaseStatements", () => {
 
   describe("truncate / insertFixture quoter dispatch", () => {
     type QuoterHost = DatabaseStatementsHost &
+      Required<Pick<DatabaseStatementsHost, "execute">> &
       Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">;
 
     function makeHost(): {
@@ -485,7 +486,7 @@ describe("DatabaseStatements", () => {
       const host: QuoterHost = {
         pool,
         typeCastedBinds,
-        async execute(sql: string, _binds?: unknown[], name?: string | null) {
+        async execute(sql: string, name?: string | null) {
           executed.push({ sql, name, receiver: this });
         },
         quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),

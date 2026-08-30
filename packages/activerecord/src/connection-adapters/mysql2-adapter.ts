@@ -477,19 +477,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   async execute(
     sql: string,
-    binds: unknown[] = [],
     name: string | null = "SQL",
     { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
     const driverSql = this.mysqlQuote(sql);
-    const driverBinds = this.mysqlBinds(binds);
-    const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
-    return this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
+    return this.log(driverSql, name, [], [], false, async (payload) => {
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          const raw = await this.performQuery(mysqlConn, driverSql, binds, driverBinds, {
+          const raw = await this.performQuery(mysqlConn, driverSql, [], [], {
             prepare: false,
             notificationPayload: payload,
           });
@@ -504,10 +501,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch (e: any) {
         const translated =
           e instanceof MismatchedForeignKey
-            ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
+            ? await this._translateAndEnrich(e.cause ?? e, driverSql, [])
             : e instanceof ActiveRecordError
               ? e
-              : await this._translateAndEnrich(e, driverSql, driverBinds);
+              : await this._translateAndEnrich(e, driverSql, []);
         throw translated;
       }
     });

@@ -9,7 +9,8 @@ import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
-import type { ExplainOption } from "./abstract/database-statements.js";
+import type { ExplainOption, DatabaseStatementsHost } from "./abstract/database-statements.js";
+import { execute as abstractExecute } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -313,38 +314,18 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async execute(
     sql: string,
-    binds: unknown[] = [],
     name: string | null = "SQL",
+    { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
-    sql = this.preprocessQuery(sql);
-    await this.ensureConnected();
-    await this.materializeTransactions();
-
-    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    try {
-      return await this.log(
-        sql,
-        name,
-        binds,
-        this.typeCastedBinds(binds) ?? [],
-        false,
-        async (payload) => {
-          try {
-            return (
-              await this.performQuery(this.driver, sql, binds, driverBinds, {
-                prepare: false,
-                notificationPayload: payload,
-              })
-            ).toArray();
-          } catch (e: any) {
-            const translated = this._translateException(e, sql, binds);
-            throw translated;
-          }
-        },
-      );
-    } finally {
-      this.dirtyCurrentTransaction();
-    }
+    const result = (await abstractExecute.call(
+      this as unknown as DatabaseStatementsHost,
+      sql,
+      name,
+      {
+        allowRetry,
+      },
+    )) as { toArray(): Record<string, unknown>[] } | null | undefined;
+    return result?.toArray() ?? [];
   }
 
   /** @internal */

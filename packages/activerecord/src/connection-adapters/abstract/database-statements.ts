@@ -73,7 +73,7 @@ export interface DatabaseStatementsHost {
     async: boolean,
     block: (payload: Record<string, unknown>) => Promise<T>,
   ): Promise<T>;
-  execute?(sql: string, binds?: unknown[], name?: string | null): Promise<unknown>;
+  execute?(sql: string, name?: string | null, kwargs?: { allowRetry?: boolean }): Promise<unknown>;
   selectAll?(
     sql: string,
     name?: string | null,
@@ -313,8 +313,13 @@ export async function query(
   return result.rows;
 }
 
-export function execute(_sql: string, _binds?: unknown[], _name?: string | null): Promise<unknown> {
-  throw new Error("execute must be implemented by adapter subclass");
+export function execute(
+  this: DatabaseStatementsHost,
+  sql: string,
+  name: string | null = null,
+  { allowRetry = false }: { allowRetry?: boolean } = {},
+): Promise<unknown> {
+  return (this.internalExecute ?? internalExecute).call(this, sql, name, [], { allowRetry });
 }
 
 export function execInsertAll(
@@ -337,12 +342,14 @@ export function explain(
 }
 
 export async function truncate(
-  this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
+  this: DatabaseStatementsHost &
+    Required<Pick<DatabaseStatementsHost, "execute">> &
+    Pick<Quoting, "quoteTableName">,
   tableName: string,
   name: string | null = null,
 ): Promise<unknown> {
   const sql = (this.buildTruncateStatement ?? buildTruncateStatement).call(this, tableName);
-  return (this.execute ?? execute).call(this, sql, [], name);
+  return this.execute(sql, name);
 }
 
 export async function truncateTables(
@@ -603,7 +610,9 @@ export async function resetSequenceBang(
 ): Promise<void> {}
 
 export async function insertFixture(
-  this: DatabaseStatementsHost & Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">,
+  this: DatabaseStatementsHost &
+    Required<Pick<DatabaseStatementsHost, "execute">> &
+    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">,
   fixture: Record<string, unknown>,
   tableName: string,
 ): Promise<unknown> {
@@ -633,7 +642,7 @@ export async function insertFixture(
       ? `INSERT INTO ${this.quoteTableName(tableName)} (${columns.map((c) => this.quoteColumnName(c)).join(", ")}) VALUES (${values.join(", ")})`
       : `INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`;
 
-  return (this.execute ?? execute).call(this, sql, [], "Fixture Insert");
+  return this.execute(sql, "Fixture Insert");
 }
 
 export async function insertFixturesSet(
@@ -802,8 +811,7 @@ export async function internalExecQuery(
       "internalExecQuery requires internalExecute on the adapter when binds are provided",
     );
   }
-  const doExecute = this?.execute?.bind(this) ?? execute;
-  const result = await doExecute(sql, [], name);
+  const result = await (this.execute ?? execute).call(this, sql, name);
   return normalizeResult(result);
 }
 
@@ -842,9 +850,8 @@ interface DatabaseStatementsDefaultsHost {
   typeCastedBinds(binds: unknown[] | null | undefined): unknown[] | undefined;
   execute(
     sql: string,
-    binds?: unknown[],
     name?: string | null,
-    opts?: { allowRetry?: boolean },
+    kwargs?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string | null): Promise<number>;
   selectAll(

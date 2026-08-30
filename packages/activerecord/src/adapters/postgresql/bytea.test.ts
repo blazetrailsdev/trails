@@ -71,7 +71,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("read value", async () => {
       const data = Buffer.from([0x1f]);
-      await connection.execute(`INSERT INTO bytea_data_type (payload) VALUES ($1)`, [
+      await connection.execQuery(`INSERT INTO bytea_data_type (payload) VALUES ($1)`, "SQL", [
         new BinaryData(data),
       ]);
       const record = await (ByteaDataType as any).first();

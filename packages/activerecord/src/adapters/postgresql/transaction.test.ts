@@ -58,7 +58,9 @@ describeIfPg("PostgreSQLAdapter", () => {
           slowError = e;
         });
         await new Promise<void>((r) => setTimeout(r, 500));
-        const sent = await other.execute("SELECT pg_cancel_backend(?) AS ok", [pid]);
+        const sent = (
+          await other.execQuery("SELECT pg_cancel_backend(?) AS ok", "SQL", [pid])
+        ).toArray();
         expect((sent[0] as { ok: boolean }).ok).toBe(true);
         await slow;
         expect(slowError).toBeInstanceOf(QueryCanceled);
@@ -124,11 +126,14 @@ describeIfPg("PostgreSQLAdapter", () => {
           const deadline = Date.now() + 3000;
           let waiting = false;
           while (Date.now() < deadline) {
-            const rows = await canceler.execute(
-              "SELECT 1 AS n FROM pg_stat_activity " +
-                "WHERE pid = ? AND state = 'active' AND wait_event_type = 'Lock'",
-              [otherPid],
-            );
+            const rows = (
+              await canceler.execQuery(
+                "SELECT 1 AS n FROM pg_stat_activity " +
+                  "WHERE pid = ? AND state = 'active' AND wait_event_type = 'Lock'",
+                "SQL",
+                [otherPid],
+              )
+            ).toArray();
             if (rows.length === 1) {
               waiting = true;
               break;
@@ -136,7 +141,9 @@ describeIfPg("PostgreSQLAdapter", () => {
             await new Promise<void>((r) => setTimeout(r, 50));
           }
           expect(waiting).toBe(true);
-          const sent = await canceler.execute("SELECT pg_cancel_backend(?) AS ok", [otherPid]);
+          const sent = (
+            await canceler.execQuery("SELECT pg_cancel_backend(?) AS ok", "SQL", [otherPid])
+          ).toArray();
           expect((sent[0] as { ok: boolean }).ok).toBe(true);
           await blocked;
           expect(blockedError).toBeInstanceOf(QueryCanceled);

@@ -139,7 +139,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("exec insert with quote", async () => {
     await createExampleTable();
     await adapter.executeMutation(`insert into "ex" (number) VALUES (?)`, [10]);
-    const rows = await adapter.execute(`select number from "ex" where number = ?`, [10]);
+    const rows = (
+      await adapter.execQuery(`select number from "ex" where number = ?`, "SQL", [10])
+    ).toArray();
     expect(rows).toHaveLength(1);
     expect(rows[0].number).toBe(10);
   });
@@ -259,7 +261,9 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       "widget",
       10,
     ]);
-    const rows = await adapter.execute(`SELECT * FROM "items" WHERE "name" = ?`, ["widget"]);
+    const rows = (
+      await adapter.execQuery(`SELECT * FROM "items" WHERE "name" = ?`, "SQL", ["widget"])
+    ).toArray();
     expect(rows).toHaveLength(1);
     expect(rows[0].price).toBe(10);
   });

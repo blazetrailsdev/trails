@@ -98,8 +98,9 @@ export class AdapterSchemaSource implements SchemaSource {
     }
 
     if (t === "postgres") {
-      const rows = await this.adapter.execute(
-        `SELECT i.relname AS name, ix.indisunique AS unique,
+      const rows = (
+        await this.adapter.execQuery(
+          `SELECT i.relname AS name, ix.indisunique AS unique,
                 array_agg(a.attname ORDER BY array_position(ix.indkey::int2[], a.attnum::int2)) AS columns
          FROM pg_class t
          JOIN pg_index ix ON t.oid = ix.indrelid
@@ -107,8 +108,10 @@ export class AdapterSchemaSource implements SchemaSource {
          JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
          WHERE t.oid = ?::regclass AND NOT ix.indisprimary
          GROUP BY i.relname, ix.indisunique`,
-        [tableName],
-      );
+          "SQL",
+          [tableName],
+        )
+      ).toArray();
       return (rows as any[]).map((r: any) => ({
         columns: Array.isArray(r.columns) ? r.columns : [r.columns],
         unique: r.unique,
