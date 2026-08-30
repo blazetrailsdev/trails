@@ -1702,8 +1702,14 @@ export function inlinedModuleMembers(
 }
 
 /**
- * The Rails side of a package that has none. `foldClassMethodsModules` mutates
- * `rubyPkg.modules`, so this is a factory rather than a shared frozen constant.
+ * The Rails side of a `TS_ONLY_PACKAGES` package — one with no gem at all, so
+ * no file of it maps onto any Ruby file, every TS file lands in the
+ * `rubyFile === null` slice and every public name in it scores novel. That is
+ * the measurement `ruby-compat` is gated on (RFC 0129), and it falls out of the
+ * scoring the no-counterpart slice already does rather than needing its own arm.
+ *
+ * A factory rather than a shared constant: `foldClassMethodsModules` mutates
+ * `rubyPkg.modules`.
  */
 function emptyRubyPackage(): PackageInfo {
   return { classes: {}, modules: {} };
@@ -1723,11 +1729,6 @@ function buildPackageReport(
   fileTagRejections: FileTagRejection[],
   concernHooks: Map<string, Set<string>>,
 ): PackageTotals {
-  // A TS-only package (`TS_ONLY_PACKAGES` — a Ruby port, not a Rails one) has
-  // no gem entry to walk, so it scores against an EMPTY Rails package: no file
-  // maps onto any of its TS files, every one of them lands in the
-  // `rubyFile === null` slice below, and every public name in it is extra
-  // surface by construction. That is the whole point of measuring it.
   const rubyPkg = ruby.packages[pkg] ?? emptyRubyPackage();
   const tsPkg = ts.packages[pkg];
   const result: PackageTotals = {
