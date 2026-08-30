@@ -996,22 +996,14 @@ describeIfSupports("foreign_keys", "Migration", () => {
     );
   });
 
-  interface ChangeColumnTables {
-    rockets: string;
-    astronauts: string;
-    withChangeColumnTables: (body: (conn: AbstractAdapter) => Promise<void>) => Promise<void>;
-    createRocketWithAstronaut: (conn: AbstractAdapter) => Promise<void>;
-    rocketName: (conn: AbstractAdapter) => Promise<string>;
-  }
-
-  function changeColumnTables(prefix: string, suffix: string): ChangeColumnTables {
+  function changeColumnTables(prefix: string, suffix: string) {
     const rockets = `${prefix}rockets${suffix}`;
     const astronauts = `${prefix}astronauts${suffix}`;
 
     return {
       rockets,
       astronauts,
-      withChangeColumnTables: async (body) => {
+      withChangeColumnTables: async (body: (conn: AbstractAdapter) => Promise<void>) => {
         const conn = await ambientConnection();
         await conn.dropTable(astronauts, rockets, { ifExists: true });
         const migration = new CreateRocketsMigration();
@@ -1023,7 +1015,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           await conn.dropTable(astronauts, rockets, { ifExists: true });
         }
       },
-      createRocketWithAstronaut: async (conn) => {
+      createRocketWithAstronaut: async (conn: AbstractAdapter) => {
         await conn.executeMutation(
           `INSERT INTO ${conn.quoteTableName(rockets)} (name) VALUES ('myrocket')`,
         );
@@ -1034,7 +1026,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           `INSERT INTO ${conn.quoteTableName(astronauts)} (rocket_id) VALUES (${rows[0].id})`,
         );
       },
-      rocketName: async (conn) => {
+      rocketName: async (conn: AbstractAdapter): Promise<string> => {
         const rows = (await conn.execute(
           `SELECT name FROM ${conn.quoteTableName(rockets)} ORDER BY id`,
         )) as Array<{ name: string }>;
