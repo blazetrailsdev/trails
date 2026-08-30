@@ -17,7 +17,7 @@ import * as date from "../date/calculations.js";
 import * as time from "../../time-ext.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { instantFrom } from "../../temporal.js";
-import { Range } from "../../range-ext.js";
+import { Range } from "@blazetrails/ruby-compat";
 import { KeyError } from "../key-error.js";
 import { Object } from "../object/acts-like.js";
 

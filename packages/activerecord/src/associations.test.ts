@@ -33,12 +33,10 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
+import { regexpEscape } from "@blazetrails/ruby-compat";
+
 import { Preloader } from "./associations/preloader.js";
 import { LoaderQuery } from "./associations/preloader/association.js";
-
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 function expectQuotedColumnInSql(
   sql: string,
@@ -49,7 +47,7 @@ function expectQuotedColumnInSql(
     qualifiedColumn,
   );
   if (options.inWhere) {
-    expect(sql).toMatch(new RegExp(`WHERE[\\s\\S]*${escapeRegExp(quoted)} =`));
+    expect(sql).toMatch(new RegExp(`WHERE[\\s\\S]*${regexpEscape(quoted)} =`));
   } else {
     expect(sql).toContain(`${quoted} =`);
   }

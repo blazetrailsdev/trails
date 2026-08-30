@@ -145,6 +145,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
       playwright:
         specifier: '>=1.40.0'
         version: 1.60.0
@@ -160,6 +163,9 @@ importers:
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../did-you-mean
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
@@ -202,6 +208,9 @@ importers:
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -244,6 +253,9 @@ importers:
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../i18n
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
@@ -345,6 +357,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
       commander:
         specifier: ^14.0.0
         version: 14.0.3

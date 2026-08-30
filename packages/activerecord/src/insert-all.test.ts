@@ -7,7 +7,8 @@ import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
 import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
-import { escapeRegExp, quoteTableName } from "./support/quote-regex.js";
+import { quoteTableName } from "./support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { captureLogOutput } from "./testing/sql-capture.js";
 import { adapterSupports, itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
@@ -970,13 +971,13 @@ describe("InsertAllTest", () => {
   it.skipIf(!supportsInsertReturning)(
     "insert all returning uses schema-cache primary keys not the model primary key",
     async () => {
-      const returningId = new RegExp(`RETURNING ${escapeRegExp(quoteTableName("id"))}`);
+      const returningId = new RegExp(`RETURNING ${regexpEscape(quoteTableName("id"))}`);
       await assertQueriesMatch(returningId, undefined, false, async () => {
         await DivergentPrimaryKeyBook.insertAll([
           { name: "Divergent", isbn: "9990000000001", author_id: 1 },
         ]);
       });
-      const returningIsbn = new RegExp(`RETURNING ${escapeRegExp(quoteTableName("isbn"))}`);
+      const returningIsbn = new RegExp(`RETURNING ${regexpEscape(quoteTableName("isbn"))}`);
       await assertNoQueriesMatch(returningIsbn, false, async () => {
         await DivergentPrimaryKeyBook.insertAll([
           { name: "Divergent II", isbn: "9990000000002", author_id: 1 },

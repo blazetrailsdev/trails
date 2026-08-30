@@ -1,5 +1,5 @@
 import { Entry } from "./entry.js";
-import { regexpEscape } from "../core-ext/regexp.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
 import { getFormatVersion } from "./format-version-slot.js";

@@ -196,7 +196,6 @@ export const sweptFilesInsideUnsweptTrees = [
   "packages/activesupport/src/core-ext/pathname/blank.test.ts",
   "packages/activesupport/src/core-ext/pathname/existence.test.ts",
   "packages/activesupport/src/core-ext/regexp-ext.test.ts",
-  "packages/activesupport/src/core-ext/regexp-ext.trails.test.ts",
   "packages/activesupport/src/core-ext/secure-random.test.ts",
   "packages/activesupport/src/delegation.test.ts",
   "packages/activesupport/src/dependencies.test.ts",

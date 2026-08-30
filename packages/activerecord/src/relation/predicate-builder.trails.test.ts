@@ -13,7 +13,8 @@ import {
 } from "../test-helpers/models/cpk.js";
 import { registerModel } from "../associations.js";
 import type { Base } from "../index.js";
-import { escapeRegExp, quoteTableName, quoteColumnName } from "../support/quote-regex.js";
+import { quoteTableName, quoteColumnName } from "../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { TableMetadata } from "../table-metadata.js";
 
@@ -64,7 +65,7 @@ describe("PredicateBuilder nested-hash recursion skips dot re-normalization", ()
     const sql = Author.where({ posts: { "comments.body": "hi" } }).toSql();
     expect(sql).toMatch(
       new RegExp(
-        `${escapeRegExp(quoteTableName("posts"))}\\.${escapeRegExp(quoteColumnName("comments.body"))}`,
+        `${regexpEscape(quoteTableName("posts"))}\\.${regexpEscape(quoteColumnName("comments.body"))}`,
       ),
     );
     expect(sql).not.toContain(quoteTableName("comments.body"));

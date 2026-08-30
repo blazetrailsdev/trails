@@ -6,7 +6,7 @@
  */
 
 import { PeriodNotFound, TimeZone, TimezonePeriod } from "./values/time-zone.js";
-import { Range } from "./range-ext.js";
+import { Range } from "@blazetrails/ruby-compat";
 import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";

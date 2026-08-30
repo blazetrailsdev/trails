@@ -1,5 +1,5 @@
 import { prepend } from "../../prepend.js";
-import { Range } from "../../range-ext.js";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { TimeWithZone } from "../../time-with-zone.js";
 
 /**

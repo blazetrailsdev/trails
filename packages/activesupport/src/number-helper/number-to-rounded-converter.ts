@@ -2,7 +2,7 @@ import { NumberConverter } from "./number-converter.js";
 import { RoundingHelper } from "./rounding-helper.js";
 import { NumberToDelimitedConverter } from "./number-to-delimited-converter.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
-import { regexpEscape } from "../core-ext/regexp.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { NumberToRoundedOptions } from "../number-helper.js";
 
 export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOptions> {

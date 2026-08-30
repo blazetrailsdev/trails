@@ -245,12 +245,12 @@ but:
 ## 8. Ranges: a `Range` class
 
 Ruby's `Range` (`1..10`, `1...10`, `Date.new(..)..Date.new(..)`) is a
-core class with no JS equivalent, so ActiveSupport ports it as a
+core class with no JS equivalent, so `@blazetrails/ruby-compat` ports it as a
 `Range` class carrying `begin`, `end` and `excludeEnd`, which Rails'
 `core_ext/range/*` reopenings extend. `where({ age: new Range(18, 65)
 })` lowers to the right SQL via Arel.
 
-See `packages/activesupport/src/range-ext.ts`.
+See `packages/ruby-compat/src/range.ts`.
 
 ## 9. Numeric types
 

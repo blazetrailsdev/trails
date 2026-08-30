@@ -82,7 +82,7 @@ export function delimiter(this: ClusivityHost): unknown {
 export function inclusionMethod(enumerable: unknown): "include?" | "cover?" {
   if (enumerable instanceof Range) {
     const endpoint = enumerable.begin ?? enumerable.end;
-    // boundary: range-ext's comparators accept JS Date alongside number,
+    // boundary: ruby-compat's `Range` comparators accept JS Date alongside number,
     if (typeof endpoint === "number" || endpoint instanceof Date) return "cover?";
   }
   return "include?";

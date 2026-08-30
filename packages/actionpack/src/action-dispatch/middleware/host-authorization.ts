@@ -8,7 +8,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
-import { regexpEscape } from "@blazetrails/activesupport";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { Logger } from "./debug-exceptions.js";
 
 /** @internal */

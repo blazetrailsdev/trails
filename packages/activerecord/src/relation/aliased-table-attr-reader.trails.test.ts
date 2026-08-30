@@ -4,7 +4,8 @@ import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
-import { escapeRegExp, quoteTableName } from "../support/quote-regex.js";
+import { quoteTableName } from "../support/quote-regex.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { assertQueriesMatch } from "../testing/query-assertions.js";
 
 registerModel(Post);
@@ -26,7 +27,7 @@ describe("Relation on an aliased table", () => {
   it("qualifies select columns against the alias", () => {
     const sql = aliased().select("id").toSql();
     expect(sql).toContain(`${aliasQ}.${idQ}`);
-    expect(sql).not.toMatch(new RegExp(`SELECT ${escapeRegExp(`${baseQ}.${idQ}`)}`));
+    expect(sql).not.toMatch(new RegExp(`SELECT ${regexpEscape(`${baseQ}.${idQ}`)}`));
   });
 
   it("qualifies the default reverse order against the alias", () => {
@@ -47,7 +48,7 @@ describe("Relation on an aliased table", () => {
 
   it("qualifies plucked columns against the alias", async () => {
     await assertQueriesMatch(
-      new RegExp(escapeRegExp(`${aliasQ}.${idQ}`)),
+      new RegExp(regexpEscape(`${aliasQ}.${idQ}`)),
       undefined,
       false,
       async () => {
@@ -59,12 +60,12 @@ describe("Relation on an aliased table", () => {
   it("roots the limited-id subquery on the alias", () => {
     const sql = aliased().eagerLoad(":comments").limit(1).toSql();
     expect(sql).toContain(`${aliasQ}.${idQ}`);
-    expect(sql).not.toMatch(new RegExp(`SELECT DISTINCT ${escapeRegExp(`${baseQ}.${idQ}`)}`));
+    expect(sql).not.toMatch(new RegExp(`SELECT DISTINCT ${regexpEscape(`${baseQ}.${idQ}`)}`));
   });
 
   it("roots the materialized limited-id query on the alias", async () => {
     await assertQueriesMatch(
-      new RegExp(`SELECT DISTINCT ${escapeRegExp(`${aliasQ}.${idQ}`)}`),
+      new RegExp(`SELECT DISTINCT ${regexpEscape(`${aliasQ}.${idQ}`)}`),
       undefined,
       false,
       async () => {

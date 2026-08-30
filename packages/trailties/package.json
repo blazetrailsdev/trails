@@ -26,6 +26,7 @@
     "bin"
   ],
   "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/rack": "workspace:*",

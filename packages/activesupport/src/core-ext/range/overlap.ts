@@ -1,4 +1,4 @@
-import { Range } from "../../range-ext.js";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 /**
  * `Range#overlap?` / `#overlaps?` (core_ext/range/overlap.rb:8,39), which Ruby
@@ -7,11 +7,11 @@ import { Range } from "../../range-ext.js";
  * where Ruby closes `class Range`.
  *
  * @boundary-file: endpoints are compared as `number` (JS `Date` coerced to
- *   epoch millis), as `range-ext.ts`'s sibling comparators do — Ruby compares
+ *   epoch millis), as ruby-compat's `range.ts` sibling comparators do — Ruby compares
  *   any `<=>`-able endpoint.
  */
 
-// boundary: Date endpoints, as in range-ext.ts
+// boundary: Date endpoints, as in ruby-compat's range.ts
 const toNum = <T extends number | Date>(v: T): number => (v instanceof Date ? v.getTime() : v);
 
 /** Ruby's `b == e` on two endpoints, which for `Date` is a value comparison. */
@@ -61,7 +61,7 @@ export function overlap<T extends number | Date>(this: Range<T>, other: Range<T>
 
 export const overlaps = overlap;
 
-declare module "../../range-ext.js" {
+declare module "@blazetrails/ruby-compat/range" {
   interface Range<T> {
     overlap(other: Range<T>): boolean;
     overlaps(other: Range<T>): boolean;

@@ -1,5 +1,5 @@
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { regexpEscape } from "./core-ext/regexp.js";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 
 /**
  * = Active Support Parameter Filter
