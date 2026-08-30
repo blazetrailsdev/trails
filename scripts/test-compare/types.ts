@@ -50,6 +50,13 @@ export interface TestCaseInfo {
   description: string;
   /** Ancestor describe blocks from outermost to innermost */
   ancestors: string[];
+  /**
+   * The enclosing Ruby test class (`ActiveRecord::Migration::ForeignKeyTest` →
+   * `"ForeignKeyTest"`). Distinct from `ancestors.at(-1)`, which is a
+   * minitest-spec `describe` label wherever a class body nests one. Ruby
+   * extractor only.
+   */
+  rubyClass?: string;
   /** Source file */
   file: string;
   /** Line number in source */

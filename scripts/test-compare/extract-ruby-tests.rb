@@ -857,10 +857,15 @@ class TestExtractor
   end
 
   # Attach a :gate to a test_case from its dir gate, the enclosing
-  # `current_adapter?` stack, and any in-body `skip ... if/unless` guards.
+  # `current_adapter?` stack, and any in-body `skip ... if/unless` guards, plus
+  # the enclosing test CLASS. `ancestors` cannot stand in for the class: it is
+  # `@describe_stack`, which minitest-spec `describe`/`context` blocks push onto
+  # too (arel/attributes_test.rb:6,15 nests two inside one class), so its last
+  # entry is a describe label there rather than the class name.
   # `body_gate` defaults to `:compute` (derive from `body_node`); module tests
   # pass their precomputed in-body skip gate instead, since the sexp is gone.
   def add_gate(test_case, body_node, body_gate: :compute)
+    test_case[:rubyClass] = @class_stack.last unless @class_stack.empty?
     parts = []
     parts << { adapters: @file_adapter_gate } if @file_adapter_gate
     @gate_stack.each { |g| parts << g }

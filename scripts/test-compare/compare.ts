@@ -172,13 +172,13 @@ function normalizeErb(s: string): string {
 }
 
 /**
- * The test CLASS a Rails test case belongs to — the innermost ancestor the Ruby
- * extractor records, which is the `class …Test < ActiveSupport::TestCase` name
- * (outer ancestors are the enclosing modules). `undefined` for a case with no
- * enclosing class.
+ * The test CLASS a Rails test case belongs to, as the Ruby extractor recorded
+ * it. Read off `rubyClass` rather than `ancestors`: the latter is the describe
+ * stack, which minitest-spec `describe`/`context` blocks inside a class body
+ * push onto too. `undefined` for a case with no enclosing class.
  */
-function rubyTestClass(ancestors: string[]): string | undefined {
-  return ancestors.length > 0 ? normalizeErb(ancestors[ancestors.length - 1]) : undefined;
+function rubyTestClass(tc: { rubyClass?: string }): string | undefined {
+  return tc.rubyClass === undefined ? undefined : normalizeErb(tc.rubyClass);
 }
 
 /**
@@ -639,7 +639,7 @@ export function main(args: string[] = process.argv.slice(2)) {
         }
       const rubyClassesByDesc = new Map<string, Set<string>>();
       for (const tc of file.testCases) {
-        const klass = rubyTestClass(tc.ancestors);
+        const klass = rubyTestClass(tc);
         if (klass === undefined) continue;
         const nd = normalize(tc.description);
         const seen = rubyClassesByDesc.get(nd);
@@ -818,7 +818,7 @@ export function main(args: string[] = process.argv.slice(2)) {
         if (candidates) {
           let bestScore = -1;
           const rubyParts = np.split(" > ");
-          const rubyClass = rubyTestClass(tc.ancestors);
+          const rubyClass = rubyTestClass(tc);
           const classCount = rubyClassesByDesc.get(nd)?.size ?? 0;
           for (const idx of candidates) {
             if (consumedTs.has(idx)) continue;

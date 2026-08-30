@@ -41,7 +41,9 @@ describe("Ruby extractor gate detection", () => {
 
   /** Every extracted case in file order — `rubyGates` keys by name, which two
    * same-named arms of one conditional would collapse. */
-  function rubyCases(fixtures: Record<string, string>): { description: string; gate?: TestGate }[] {
+  function rubyCases(
+    fixtures: Record<string, string>,
+  ): { description: string; gate?: TestGate; rubyClass?: string; ancestors: string[] }[] {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gate-rb-"));
     try {
       for (const [rel, src] of Object.entries(fixtures)) {
@@ -58,7 +60,7 @@ describe("Ruby extractor gate detection", () => {
           ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
         end
         out = []
-        ex.test_files.each { |f| f[:testCases].each { |tc| out << { description: tc[:description], gate: tc[:gate] } } }
+        ex.test_files.each { |f| f[:testCases].each { |tc| out << { description: tc[:description], gate: tc[:gate], rubyClass: tc[:rubyClass], ancestors: tc[:ancestors] } } }
         puts JSON.generate(out)
       `;
       return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
@@ -567,6 +569,23 @@ describe("Ruby extractor gate detection", () => {
     expect(cases.map((c) => [c.description, c.gate])).toEqual([
       ["add invalid foreign key", { features: ["validate_constraints"], source: ["class"] }],
       ["add invalid foreign key", { guards: ["no_validate_constraints"], source: ["class"] }],
+    ]);
+  });
+
+  it("records the enclosing class, not the innermost describe label", () => {
+    const cases = rubyCases({
+      "cases/arel/attributes_test.rb": `
+        class AttributesTest < ActiveSupport::TestCase
+          describe "Attributes" do
+            describe "equality" do
+              def test_is_equal_with_equal_ivars; end
+            end
+          end
+        end
+      `,
+    });
+    expect(cases.map((c) => [c.rubyClass, c.ancestors])).toEqual([
+      ["AttributesTest", ["AttributesTest", "Attributes", "equality"]],
     ]);
   });
 });
