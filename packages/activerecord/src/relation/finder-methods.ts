@@ -792,18 +792,18 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   if ((this as any).selectValues.length > 0) {
     relation = relation.select(this.table.get(this.model.primaryKey as string));
   }
-  const records: any[] = await relation.records();
+  const result: any[] = await relation.records();
 
-  const primaryKey = this.model.primaryKey as string;
-
-  if (records.length === ids.length) {
+  if (result.length === ids.length) {
     return inOrderOf(
-      records,
+      result,
       (record: any) => record.id,
-      ids.map((id) => (this.model as any).typeForAttribute(primaryKey).cast(id)),
+      ids.map((id) =>
+        (this.model as any).typeForAttribute(this.model.primaryKey as string).cast(id),
+      ),
     );
   } else {
-    this.raiseRecordNotFoundExceptionBang(ids, records.length, ids.length);
+    this.raiseRecordNotFoundExceptionBang(ids, result.length, ids.length);
   }
 }
 

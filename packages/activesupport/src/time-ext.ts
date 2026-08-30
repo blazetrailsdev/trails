@@ -128,7 +128,6 @@ export { endOfMinute as atEndOfMinute };
 
 // ---------------------------------------------------------------------------
 // Week boundaries
-// startDay is a day name (`"sunday"`..`"saturday"`), Rails' `DAYS_INTO_WEEK` key.
 // ---------------------------------------------------------------------------
 
 /** @internal */

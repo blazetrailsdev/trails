@@ -238,10 +238,9 @@ export class Duration {
 
   times(other: Duration | Scalar | number): Duration {
     if (other instanceof Scalar || other instanceof Duration) {
-      const otherValue = other.value;
       return new Duration(
-        this.value * otherValue,
-        this.transformValues((number) => number * otherValue),
+        this.value * other.value,
+        this.transformValues((number) => number * other.value),
         this._variable || other.isVariable(),
       );
     }
@@ -259,10 +258,9 @@ export class Duration {
   dividedBy(other: Scalar | number): Duration;
   dividedBy(other: Duration | Scalar | number): Duration | number {
     if (other instanceof Scalar) {
-      const otherValue = other.value;
       return new Duration(
-        this.value / otherValue,
-        this.transformValues((number) => number / otherValue),
+        this.value / other.value,
+        this.transformValues((number) => number / other.value),
         this._variable,
       );
     }

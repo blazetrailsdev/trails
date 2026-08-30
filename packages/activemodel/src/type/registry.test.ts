@@ -3,8 +3,9 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { TypeRegistry, type TypeFactory } from "./registry.js";
 
 class FooClass {
+  readonly args: unknown[];
   constructor(...args: unknown[]) {
-    Object.assign(this, { args });
+    this.args = args;
   }
 }
 
