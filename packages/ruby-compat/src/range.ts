@@ -12,8 +12,8 @@
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 
-/** Ruby's `a <=> b` (`vendor/ruby/compar.c:79` `cmp_equal`) over the
- *  endpoint types trails' ranges carry. */
+/** Ruby's `a <=> b`, the comparison `vendor/ruby/range.c:199` `r_less` makes
+ *  on every endpoint, over the types trails' ranges carry. */
 function cmp(a: unknown, b: unknown): number {
   // boundary: Date endpoints are compared as epoch millis.
   const av = a instanceof Date ? a.getTime() : a;
