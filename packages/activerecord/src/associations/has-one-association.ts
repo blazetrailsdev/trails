@@ -106,7 +106,7 @@ export class HasOneAssociation extends SingularAssociation {
         this.enqueueDestroyAssociation({
           ownerModelName: this.owner.constructor.name,
           ownerId: (this.owner as any).id,
-          associationClass: String((this.reflection.klass as typeof Base).name),
+          associationClass: String(this.reflection.klass.name),
           associationIds: [id],
           associationPrimaryKeyColumn: primaryKeyColumn,
           ensuringOwnerWasMethod:

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { Range, RangeType } from "./range.js";
+import { Range } from "@blazetrails/activesupport";
+import { RangeType } from "./range.js";
 
 const integerSubtype = {
   cast: (value: unknown) => (value == null ? null : Number(value)),

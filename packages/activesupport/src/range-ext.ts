@@ -29,7 +29,7 @@ function cmp(a: unknown, b: unknown): number {
  * classes (`Arel::Nodes::Range`, PG `OID::Range`) are unrelated node/type
  * classes.
  */
-export class Range<T> {
+export class Range<T = unknown> {
   constructor(
     readonly begin: T | null, // null = beginless
     readonly end: T | null, // null = endless

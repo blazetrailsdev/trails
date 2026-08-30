@@ -38,7 +38,7 @@ export class BelongsToAssociation extends SingularAssociation {
           id = this.reflection.foreignKey.map((col) => (this.owner as any)[col]);
         } else {
           primaryKeyColumn = (this.reflection as any).activeRecordPrimaryKey;
-          id = (this.owner as any)[this.reflection.foreignKey as string];
+          id = (this.owner as any)[this.reflection.foreignKey];
         }
 
         const associationClass = (this.reflection as any).isPolymorphic()

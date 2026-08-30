@@ -10,8 +10,9 @@ interface RetryLoopSeams {
 describeIfPg("PostgreSQLAdapter savepoint statements dirty the parent (trails)", () => {
   let adapter: PostgreSQLAdapter;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    await adapter.connectBang();
   });
   afterEach(async () => {
     vi.restoreAllMocks();

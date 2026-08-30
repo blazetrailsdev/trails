@@ -585,7 +585,7 @@ describe("WhereTest", () => {
     const bob = authors("bob") as any;
     const r1 = await Author.where({ id: [3, 9223372036854775808n] });
     expect(ids(r1)).toStrictEqual([bob.id]);
-    const r2 = await Author.where({ id: new Range(3, 9223372036854775808n) });
+    const r2 = await Author.where({ id: new Range<unknown>(3, 9223372036854775808n) });
     expect(ids(r2)).toStrictEqual([bob.id]);
   });
 
@@ -593,7 +593,7 @@ describe("WhereTest", () => {
     const bob = authors("bob") as any;
     const sql1 = Author.where({ id: [3, 9223372036854775808n] }).toSql();
     expect(ids(await Author.findBySql(sql1))).toStrictEqual([bob.id]);
-    const sql2 = Author.where({ id: new Range(3, 9223372036854775808n) }).toSql();
+    const sql2 = Author.where({ id: new Range<unknown>(3, 9223372036854775808n) }).toSql();
     expect(ids(await Author.findBySql(sql2))).toStrictEqual([bob.id]);
   });
 

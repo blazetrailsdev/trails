@@ -1,21 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
+import { Range } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
-
-export class Range {
-  readonly begin: unknown;
-  readonly end: unknown;
-  readonly excludeEnd: boolean;
-
-  constructor(begin: unknown, end?: unknown, excludeEnd: boolean = false) {
-    this.begin = begin;
-    this.end = end;
-    this.excludeEnd = excludeEnd;
-  }
-
-  toString(): string {
-    return `[${rangeBoundLiteral(this.begin)},${rangeBoundLiteral(this.end)}${this.excludeEnd ? ")" : "]"}`;
-  }
-}
 
 /**
  * @internal
@@ -34,7 +19,7 @@ export interface RangeSubtype {
   userInputInTimeZone?(value: unknown): unknown;
 }
 
-export class RangeType extends ValueType<Range> {
+export class RangeType extends ValueType<Range<unknown>> {
   readonly name: string;
   readonly subtype: RangeSubtype;
 
@@ -56,9 +41,9 @@ export class RangeType extends ValueType<Range> {
     return inspect(value).replace(/Infinity/g, "::Float::INFINITY");
   }
 
-  castValue(value: unknown): Range | null {
+  castValue(value: unknown): Range<unknown> | null {
     if (value == null || value === "empty" || value === "") return null;
-    if (typeof value !== "string") return value as Range | null;
+    if (typeof value !== "string") return value as Range<unknown> | null;
 
     const extracted = this.extractBounds(value);
     const from = this.typeCastSingle(extracted.from);
@@ -74,11 +59,11 @@ export class RangeType extends ValueType<Range> {
     return new Range(begin, end, extracted.excludeEnd);
   }
 
-  cast(value: unknown): Range | null {
+  cast(value: unknown): Range<unknown> | null {
     return this.castValue(value);
   }
 
-  override deserialize(value: unknown): Range | null {
+  override deserialize(value: unknown): Range<unknown> | null {
     return this.castValue(value);
   }
 
@@ -89,7 +74,7 @@ export class RangeType extends ValueType<Range> {
     return new Range(from, to, value.excludeEnd);
   }
 
-  override map(value: Range, block: (value: unknown) => unknown): Range {
+  override map(value: Range<unknown>, block: (value: unknown) => unknown): Range<unknown> {
     const newBegin = block(value.begin);
     const newEnd = block(value.end);
     return new Range(newBegin, newEnd, value.excludeEnd);

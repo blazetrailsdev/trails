@@ -6,7 +6,7 @@ import { adapterType } from "./test-adapter.js";
 import { quoteColumnName } from "./support/quote-regex.js";
 import { association } from "./associations.js";
 import { connectedToStack } from "./core.js";
-import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
+import { Range as ArRange } from "@blazetrails/activesupport";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";

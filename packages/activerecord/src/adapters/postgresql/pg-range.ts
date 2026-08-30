@@ -2,11 +2,11 @@ import {
   findRangeSeparator,
   unquoteRangeBound,
 } from "../../connection-adapters/postgresql/oid/range.js";
-import { Range } from "../../relation.js";
+import { Range } from "@blazetrails/activesupport";
 
 export type SubtypeCast = (value: string) => unknown;
 
-export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
+export function parseRange(input: string, subtype?: SubtypeCast): Range<unknown> | null {
   if (!input || input === "empty") return null;
 
   const excludeBegin = input[0] === "(";
@@ -39,7 +39,7 @@ export function parseRange(input: string, subtype?: SubtypeCast): Range | null {
 
 export type SubtypeSerialize = (value: unknown) => string;
 
-export function serializeRange(range: Range, subtype?: SubtypeSerialize): string {
+export function serializeRange(range: Range<unknown>, subtype?: SubtypeSerialize): string {
   const serializeBound = (v: unknown): string => {
     if (v === null || v === undefined) return "";
     const s = subtype ? subtype(v) : String(v);

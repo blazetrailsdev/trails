@@ -137,8 +137,14 @@ export class Array extends ValueType<unknown> {
     this.subtype = subtype;
     this.delimiter = delimiter;
 
-    this.pgEncoder = new PgTextEncoderArray({ name: `${this.type()}[]`, delimiter: delimiter });
-    this.pgDecoder = new PgTextDecoderArray({ name: `${this.type()}[]`, delimiter: delimiter });
+    this.pgEncoder = new PgTextEncoderArray({
+      name: `${this.type() ?? ""}[]`,
+      delimiter: delimiter,
+    });
+    this.pgDecoder = new PgTextDecoderArray({
+      name: `${this.type() ?? ""}[]`,
+      delimiter: delimiter,
+    });
   }
 
   override get limit(): number | undefined {
@@ -157,11 +163,10 @@ export class Array extends ValueType<unknown> {
     return this.subtype.userInputInTimeZone!(value);
   }
 
-  override type(): string {
+  override type(): string | undefined {
     const subtypeType = this.subtype.type;
-    if (typeof subtypeType === "function") return subtypeType.call(this.subtype) ?? "array";
-    if (typeof subtypeType === "string") return subtypeType;
-    return "array";
+    if (typeof subtypeType === "function") return subtypeType.call(this.subtype);
+    return subtypeType;
   }
 
   override isMutable(): boolean {

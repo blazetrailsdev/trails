@@ -10,17 +10,6 @@ import { parkNestedReaderLoad } from "../nested-attributes.js";
 import { camelize, except, safeConstantize, singularize } from "@blazetrails/activesupport";
 import { AssociationTargetReplacedDuringLoad, AssociationTypeMismatch } from "../errors.js";
 
-/** @noRailsEquivalent CONVERGEABLE retire-ad-hoc-association-definition-holders */
-function _richReflectionFor(owner: Base, reflection: AssociationDefinition): AssociationDefinition {
-  if (Object.getPrototypeOf(reflection) !== Object.prototype) return reflection;
-  const rich = (owner.constructor as typeof Base)._reflectOnAssociation?.(reflection.name);
-  if (!rich) return reflection;
-  return Object.create(
-    rich as object,
-    Object.getOwnPropertyDescriptors(reflection),
-  ) as AssociationDefinition;
-}
-
 export class Association {
   owner: Base;
   readonly reflection: AssociationDefinition;
@@ -75,7 +64,7 @@ export class Association {
 
   constructor(owner: Base, reflection: AssociationDefinition) {
     this.owner = owner;
-    this.reflection = _richReflectionFor(owner, reflection);
+    this.reflection = reflection;
     this.disableJoins = this.reflection.options.disableJoins || false;
 
     validateReflectionValidity(owner.constructor as typeof Base, reflection.name);
@@ -270,26 +259,19 @@ export class Association {
   }
 
   get klass(): typeof Base {
-    return this.reflection.klass as typeof Base;
+    return this.reflection.klass;
   }
 
-  /** @missingRailsCall order:scopeFor,unscoped — PERMANENT */
   get extensions(): any[] {
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => AssociationDefinition | null;
-    };
-    const reflection = (ctor._reflectOnAssociation?.(this.reflection.name) ??
-      this.reflection) as AssociationDefinition;
-
     let extensions = [
-      ...new Set([...this.klass.defaultExtensions(), ...(reflection.extensions?.() ?? [])]),
+      ...new Set([...this.klass.defaultExtensions(), ...this.reflection.extensions()]),
     ];
 
-    if (reflection.scope) {
+    if (this.reflection.scope) {
       extensions = [
         ...new Set([
           ...extensions,
-          ...reflection.scopeFor!(this.klass.unscoped(), this.owner).extensions,
+          ...this.reflection.scopeFor(this.klass.unscoped(), this.owner).extensions,
         ]),
       ];
     }

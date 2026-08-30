@@ -1,6 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
+import { Range } from "@blazetrails/activesupport";
 import type { PredicateBuilder } from "../predicate-builder.js";
-import { Range } from "../../connection-adapters/postgresql/oid/range.js";
+
 import { isBaseInstance } from "./is-base-instance.js";
 
 export class NullPredicate {}
@@ -19,7 +20,7 @@ export class ArrayHandler {
 
     const values: unknown[] = [];
     let hasNull = false;
-    const ranges: Range[] = [];
+    const ranges: Range<unknown>[] = [];
 
     for (const item of value) {
       if (item === null || item === undefined) {

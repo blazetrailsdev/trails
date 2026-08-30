@@ -11,7 +11,7 @@ import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
 import { Data as ArrayData, PgTextEncoderArray } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
-import { Range } from "./oid/range.js";
+import { Range } from "@blazetrails/activesupport";
 import { Data as XmlData } from "./oid/xml.js";
 import {
   checkIntInRange,

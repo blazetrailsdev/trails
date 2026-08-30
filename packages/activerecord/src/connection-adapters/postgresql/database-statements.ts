@@ -85,7 +85,6 @@ export interface PerformQueryHost extends HandleWarningsHost {
   verifiedBang(): void;
   /** @internal */
   handleWarnings(sql: unknown): void;
-  _commandSettled: boolean;
 }
 
 /** @internal */
@@ -112,7 +111,6 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
       try {
         const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
         notificationPayload.statement_name = stmtKey;
-        this._commandSettled = false;
         raw = await query(rawConnection, {
           name: stmtKey,
           text: sql,
@@ -136,10 +134,8 @@ export async function performQuery<R extends pg.QueryResult = pg.QueryResult>(
       }
     }
   } else if (binds == null || binds.length === 0) {
-    this._commandSettled = false;
     raw = await query(rawConnection, rowMode ? { text: sql, rowMode } : sql);
   } else {
-    this._commandSettled = false;
     raw = await query(rawConnection, { text: sql, values: typeCastedBinds, rowMode });
   }
 

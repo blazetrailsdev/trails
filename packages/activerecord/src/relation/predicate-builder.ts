@@ -1,6 +1,6 @@
 import { Nodes, sql } from "@blazetrails/arel";
-import { wrap, toS } from "@blazetrails/activesupport";
-import { Range } from "../connection-adapters/postgresql/oid/range.js";
+import { wrap, toS, Range } from "@blazetrails/activesupport";
+
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
 import { RangeHandler } from "./predicate-builder/range-handler.js";

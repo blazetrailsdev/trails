@@ -252,11 +252,9 @@ async function loadHasOneThrough(
   } else if (throughAssoc.macro === "belongsTo") {
     throughRecord = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
   } else if (throughAssoc.macro === "hasMany") {
-    const throughHolder = _buildAssociationInstance.call(record, {
-      name: throughAssoc.name,
-      type: "hasMany",
-      options: throughAssoc.options,
-    }) as unknown as { findTarget(): Promise<Base[]> };
+    const throughHolder = _buildAssociationInstance.call(record, throughAssoc) as unknown as {
+      findTarget(): Promise<Base[]>;
+    };
     const throughRecords = await throughHolder.findTarget();
     throughRecord = throughRecords[0] ?? null;
   } else {
