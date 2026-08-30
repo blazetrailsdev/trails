@@ -45,7 +45,11 @@ export interface QuotingDispatchHost {
   unquotedFalse(): boolean | number;
 }
 
-export type QuotedTimeValue = TimeValue | Temporal.PlainTime | Temporal.PlainDateTime;
+export type QuotedTimeValue =
+  | TimeValue
+  | Temporal.PlainTime
+  | Temporal.PlainDateTime
+  | TimeWithZone;
 
 export type TemporalDateLike =
   | TimeWithZone
@@ -262,7 +266,14 @@ export function quotedDate(value: TemporalDateLike): string {
 
 export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
-    value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
+    const obj = value.getobj();
+    value =
+      obj instanceof TimeWithZone
+        ? obj.change({ year: 2000, month: 1, day: 1 })
+        : obj.toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
+  }
+  if (value instanceof TimeWithZone) {
+    return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "");
   }
   value =
     value instanceof Temporal.PlainTime

@@ -21,7 +21,7 @@ import {
 import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Value as TimeValue } from "../../type/time.js";
 import { Temporal } from "@blazetrails/date";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 import { toS } from "@blazetrails/activesupport";
 
@@ -78,7 +78,14 @@ export function quoteTableNameForAssignment(_table: string, attr: string): strin
 
 export function quotedTime(value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
-    value = value.getobj().toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
+    const obj = value.getobj();
+    value =
+      obj instanceof TimeWithZone
+        ? obj.change({ year: 2000, month: 1, day: 1 })
+        : obj.toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
+  }
+  if (value instanceof TimeWithZone) {
+    return abstractQuotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
   }
   value =
     value instanceof Temporal.PlainTime

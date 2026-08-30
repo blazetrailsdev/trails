@@ -608,8 +608,20 @@ describe("AttributeMethodsTest", () => {
       expect(record.bonus_time).toBeNull();
     });
   });
-  it.skip("setting a time zone-aware time with DST", async () => {
-    // BLOCKED: saving a tz-aware `time` attribute holding a TimeWithZone clears the in-memory value — see fix-time-column-write-back-drops-time-with-zone
+  it("setting a time zone-aware time with DST", async () => {
+    await inTimeZone("Pacific Time (US & Canada)", async () => {
+      const currentTime = zone()!.local(2014, 6, 15, 10);
+      const record = target.new({ bonus_time: currentTime }) as any;
+      const timeBeforeSave = record.bonus_time;
+
+      await record.save();
+      await record.reload();
+
+      expect(record.bonus_time.utc().toTime().epochNanoseconds).toBe(
+        timeBeforeSave.utc().toTime().epochNanoseconds,
+      );
+      expect(record.bonus_time.timeZone.name).toBe("Pacific Time (US & Canada)");
+    });
   });
   it("setting invalid string to a zone-aware time attribute", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
