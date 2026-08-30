@@ -172,11 +172,9 @@ const rule = {
       "Program > ExportNamedDeclaration > VariableDeclaration > VariableDeclarator"(node) {
         check(context, node.parent, node.id?.name);
       },
-      "Program > ExportNamedDeclaration > TSTypeAliasDeclaration"(node) {
-        check(context, node, node.id?.name);
-      },
-      // Interfaces are exempt by KIND in `parity:api:extra`, so a receipt on
-      // one would be a tag the extractor scores STALE.
+      // Interfaces and type aliases are not measured surface — the extractor
+      // reads members off classes, functions and variables — so a receipt on
+      // one would be a tag `parity:api:extra` scores STALE.
     };
   },
 };

@@ -39,7 +39,6 @@ tester.run("ruby-compat-needs-mri-citation", rule, {
  * @noRailsEquivalent PERMANENT
  */
 export function add(a: number, b: number): number { return a + b; }`,
-    // A class export, cited the same way.
     `/**
  * Mirrors ${cite(1)}.
  *
@@ -56,9 +55,8 @@ export class Rational {}`,
 import { x } from "./x.js";
 
 export function add(a: number, b: number): number { return a + b + x; }`,
-    // Not exported: not part of the package's surface.
+    // Not exported, and an interface: neither is measured surface.
     `function add(a: number, b: number): number { return a + b; }`,
-    // An interface is exempt by kind in `parity:api:extra`.
     `export interface Rational { numerator: number; }`,
   ],
   invalid: [
