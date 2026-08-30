@@ -685,15 +685,19 @@ describe("preprocessQuery", () => {
       expect(seen).toEqual([host]);
     });
 
-    it("does not double-apply when a transformer re-enters preprocessQuery", () => {
+    it("still tags the outer sql when a transformer re-enters preprocessQuery", () => {
       const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
       let nested = "";
+      let depth = 0;
       withTransformers(
         [
           {
             ...hostDefaults,
             call(sql) {
-              nested = preprocessQuery.call(host, "SELECT inner");
+              if (depth === 0) {
+                depth++;
+                nested = preprocessQuery.call(host, "SELECT inner");
+              }
               return `${sql} /*outer*/`;
             },
           },
@@ -702,7 +706,7 @@ describe("preprocessQuery", () => {
           expect(preprocessQuery.call(host, "SELECT 1")).toBe("SELECT 1 /*outer*/");
         },
       );
-      expect(nested).toBe("SELECT inner");
+      expect(nested).toBe("SELECT inner /*outer*/");
     });
   });
 });

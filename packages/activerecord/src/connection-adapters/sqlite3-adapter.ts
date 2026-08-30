@@ -1743,7 +1743,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     for (const [srcCol, destCol] of Object.entries(rename)) columnMappings[destCol] = srcCol;
     const fromColumns = (await this.columns(from)).map((c) => c.name);
     columns = columns.filter((col) => fromColumns.includes(columnMappings[col]));
-    if (!columns.length) return;
     const fromColumnsToCopy = columns.map((col) => columnMappings[col]);
     const quotedColumns = columns.map((col) => quoteColumnName(col)).join(", ");
     const quotedFromColumns = fromColumnsToCopy.map((col) => quoteColumnName(col)).join(", ");

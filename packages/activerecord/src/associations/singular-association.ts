@@ -3,7 +3,6 @@ import type { AssociationDefinition } from "../associations.js";
 import {
   _builtAssociationScope,
   _ownerChainReflection,
-  _routeThroughViaAssociationScope,
   _loadSingularViaStatementCache,
   _resolveInverseName,
   _scopeForAssociation,
@@ -136,14 +135,6 @@ export class SingularAssociation extends Association {
 
       if (this.isViolatesStrictLoading()) {
         strictLoadingViolationBang({ owner: owner.constructor, reflection });
-      }
-
-      if (!isBelongsTo && options.through) {
-        if (!_routeThroughViaAssociationScope(owner, reflection, options)) {
-          return (
-            this as unknown as { loadHasOneThrough(): Promise<Base | null> }
-          ).loadHasOneThrough();
-        }
       }
 
       let targetModel: typeof Base;

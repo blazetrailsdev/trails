@@ -126,7 +126,7 @@ describe("TestDatabasesTest", () => {
     expect(dbConfig.database).toBe("test/db/primary.sqlite3-5");
   });
 
-  it("does not suffix in-memory SQLite databases", async () => {
+  it("suffixes in-memory SQLite databases like any other config", async () => {
     const mockReconstructFromSchema = vi
       .spyOn(DatabaseTasks, "reconstructFromSchema")
       .mockResolvedValue(undefined);
@@ -146,7 +146,7 @@ describe("TestDatabasesTest", () => {
     Base.configurations(stubConfigurations([mockConfig]));
 
     await createAndLoadSchema(7, { envName: "arunit" });
-    expect(suffixed).toBeUndefined();
+    expect(suffixed).toBe(":memory:-7");
     expect(mockReconstructFromSchema).toHaveBeenCalled();
   });
 
