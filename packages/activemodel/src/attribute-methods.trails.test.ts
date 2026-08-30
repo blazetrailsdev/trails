@@ -12,6 +12,7 @@ import { include } from "@blazetrails/activesupport";
 describe("AttributeMethodsTest (trails)", () => {
   it("generating alias attribute methods clears the attribute method patterns cache", () => {
     class Person extends Model {
+      declare name: string;
       declare static attributeMethodPatternsCache: AttributesClassHalf["attributeMethodPatternsCache"];
       declare static attributeMethodPatternsMatching: AttributesClassHalf["attributeMethodPatternsMatching"];
       declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
@@ -38,6 +39,7 @@ describe("AttributeMethodsTest (trails)", () => {
 
   it("alias attribute overrides a method inherited from a parent class", () => {
     class Person extends Model {
+      declare name: string;
       declare static attribute: AttributesClassHalf["attribute"];
       declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
 
@@ -73,6 +75,7 @@ describe("AttributeMethodsTest (trails)", () => {
   it("the bare pattern generates the reader through the define_method_attribute hook", () => {
     const seen: string[] = [];
     class Person extends Model {
+      declare name: string;
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {
@@ -102,6 +105,7 @@ describe("AttributeMethodsTest (trails)", () => {
 
   it("alias_attribute and attribute_method_suffix write only the declaring class", () => {
     class Person extends Model {
+      declare name: string;
       declare static attribute: AttributesClassHalf["attribute"];
       declare static attributeAliases: AttributesClassHalf["attributeAliases"];
       declare static attributeMethodPatterns: AttributesClassHalf["attributeMethodPatterns"];
@@ -132,6 +136,7 @@ describe("AttributeMethodsTest (trails)", () => {
 
   it("_read_attribute raises for a name with no reader, as __send__ does", () => {
     class Person extends Model {
+      declare name: string;
       declare static attribute: AttributesClassHalf["attribute"];
 
       static {

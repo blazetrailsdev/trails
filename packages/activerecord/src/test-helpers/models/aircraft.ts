@@ -4,6 +4,8 @@ import type { Wheel } from "./wheel.js";
 import { Base } from "../../base.js";
 
 export class Aircraft extends Base {
+  declare name: string;
+  declare wheels_count: number;
   declare engines: AssociationProxy<Engine>;
   declare wheels: AssociationProxy<Wheel>;
 

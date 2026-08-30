@@ -21,6 +21,7 @@ describe("RequiredAssociationsTest", () => {
       (Base as any).belongsToRequiredByDefault = false;
       class Parent extends Base {}
       class Child extends Base {
+        declare parent: any;
         static {
           this.attribute("parent_id", "integer");
         }
@@ -46,6 +47,7 @@ describe("RequiredAssociationsTest", () => {
   it("required belongs_to associations have presence validated", async () => {
     class Parent extends Base {}
     class Child extends Base {
+      declare parent: any;
       static {
         this.attribute("parent_id", "integer");
       }
@@ -69,6 +71,7 @@ describe("RequiredAssociationsTest", () => {
   it("required belongs_to validates target exists, not just the foreign key", async () => {
     class Parent extends Base {}
     class Child extends Base {
+      declare parent: any;
       static {
         this.attribute("parent_id", "integer");
       }
@@ -103,6 +106,7 @@ describe("RequiredAssociationsTest", () => {
       (Base as any).belongsToRequiredByDefault = true;
       class Parent extends Base {}
       class Child extends Base {
+        declare parent: any;
         static {
           this.attribute("parent_id", "integer");
         }
@@ -132,6 +136,7 @@ describe("RequiredAssociationsTest", () => {
   it("has_one associations are not required by default", async () => {
     class Parent extends Base {}
     class Child extends Base {
+      declare parent: any;
       static {
         this.attribute("parent_id", "integer");
       }
@@ -151,6 +156,7 @@ describe("RequiredAssociationsTest", () => {
   it("required has_one associations have presence validated", async () => {
     class Parent extends Base {}
     class Child extends Base {
+      declare parent: any;
       static {
         this.attribute("parent_id", "integer");
       }
@@ -175,6 +181,7 @@ describe("RequiredAssociationsTest", () => {
   it("required has_one associations have a correct error message", async () => {
     class Parent extends Base {}
     class Child extends Base {
+      declare parent: any;
       static {
         this.attribute("parent_id", "integer");
       }
@@ -196,6 +203,7 @@ describe("RequiredAssociationsTest", () => {
   it("required belongs_to associations have a correct error message", async () => {
     class Parent extends Base {}
     class Child extends Base {
+      declare parent: any;
       static {
         this.attribute("parent_id", "integer");
       }
@@ -220,6 +228,7 @@ describe("RequiredAssociationsTest", () => {
       }
     }
     class Child extends Base {
+      declare parent: any;
       static {
         this.attribute("parent_id", "integer");
       }

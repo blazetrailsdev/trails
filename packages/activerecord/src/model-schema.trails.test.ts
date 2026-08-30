@@ -10,6 +10,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
   fixtures([]);
   it("populates the shared schema cache when loading on a cold cache", async () => {
     class Post extends Base {
+      declare title: string;
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
@@ -28,6 +29,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
 
   it("a warm-cache load invalidates a columnNames memo taken off the synthesized fallback", async () => {
     class Post extends Base {
+      declare title: string;
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
@@ -47,6 +49,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
 
   it("a second save on a cold-cache declared-attribute model issues no schema-introspection query", async () => {
     class Post extends Base {
+      declare title: string;
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");

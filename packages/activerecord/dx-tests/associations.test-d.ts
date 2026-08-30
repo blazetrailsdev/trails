@@ -116,10 +116,12 @@ describe("associations DX", () => {
     expectTypeOf(blog.posts).toEqualTypeOf<AssociationProxy<Post>>();
   });
 
-  it("KNOWN GAP: without a `declare`, association accessors still return `unknown`", () => {
+  it("without a `declare`, an association accessor read is a compile error", () => {
     const post = new Post({ title: "hi", author_id: 1, published: true });
-    expectTypeOf(post.author).toBeUnknown();
+    // @ts-expect-error `belongsTo("author")` needs a `declare author: Author | null` to reach the type side.
+    expectTypeOf(post.author);
     const author = new Author({ name: "dean" });
-    expectTypeOf(author.posts).toBeUnknown();
+    // @ts-expect-error `hasMany("posts")` needs a `declare posts: AssociationProxy<Post>`.
+    expectTypeOf(author.posts);
   });
 });

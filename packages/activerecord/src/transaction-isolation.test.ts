@@ -10,6 +10,7 @@ describe("TransactionIsolationUnsupportedTest", () => {
 
   it.skipIf(adapterType !== "sqlite")("setting the isolation level raises an error", async () => {
     class Tag extends Base {
+      declare name: unknown;
       static {
         this._tableName = "tags";
       }
@@ -29,6 +30,7 @@ describe("TransactionIsolationTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   class Tag extends Base {
+    declare name: string;
     static {
       this._tableName = "tags";
     }

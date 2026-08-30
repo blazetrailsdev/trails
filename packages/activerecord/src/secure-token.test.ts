@@ -15,8 +15,9 @@ describe("SecureTokenTest", () => {
     user = new User();
   });
 
-  async function onInitializeModel(): Promise<typeof Base> {
+  async function onInitializeModel() {
     class TokenUser extends Base {
+      declare token: string;
       static _tableName = "users";
     }
     await TokenUser.loadSchema();

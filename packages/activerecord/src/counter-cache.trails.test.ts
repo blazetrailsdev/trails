@@ -52,6 +52,7 @@ describe("CounterCacheTest deferred resolution (trails)", () => {
     registerModel(Reply);
 
     class Topic extends Base {
+      declare replies_count: number;
       static {
         this.attribute("title", "string");
         this.attribute("replies_count", "integer", { default: 0 });

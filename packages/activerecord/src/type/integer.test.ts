@@ -15,6 +15,7 @@ describe("IntegerTest", () => {
 
   it("values which are out of range can be re-assigned", () => {
     class Post extends Base {
+      declare foo: number;
       static {
         this.tableName = "posts";
         this.attribute("foo", "integer");

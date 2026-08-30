@@ -29,6 +29,7 @@ describe("AttributeMethodsTest (trails)", () => {
 
   it("a class-body attribute and aliasAttribute leave one GeneratedAttributeMethods", async () => {
     class Legacy extends Base {
+      declare heading: unknown;
       static {
         this.attribute("title", "string");
         this.aliasAttribute("heading", "title");
@@ -335,6 +336,7 @@ describe("AttributeMethodsTest (trails)", () => {
 
   it("aliasAttribute generates the alias when mass generation already ran", () => {
     class Late extends Base {
+      declare heading: unknown;
       static {
         this.attribute("title", "string");
       }

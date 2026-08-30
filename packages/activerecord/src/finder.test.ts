@@ -525,6 +525,7 @@ describe("FinderTest", () => {
 
   it("count by sql", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -536,6 +537,7 @@ describe("FinderTest", () => {
 
   it("bind variables", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -547,6 +549,7 @@ describe("FinderTest", () => {
 
   it("named bind variables", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -558,6 +561,7 @@ describe("FinderTest", () => {
 
   it("condition interpolation", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -569,6 +573,7 @@ describe("FinderTest", () => {
 
   it("find doesnt have implicit ordering", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -580,6 +585,7 @@ describe("FinderTest", () => {
 
   it("find by sql with sti on joined table", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -591,6 +597,7 @@ describe("FinderTest", () => {
 
   it("select value", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -602,6 +609,7 @@ describe("FinderTest", () => {
 
   it("select values", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -614,6 +622,7 @@ describe("FinderTest", () => {
 
   it("find by ids with limit and offset", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -625,6 +634,7 @@ describe("FinderTest", () => {
 
   it("find with entire select statement", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -636,6 +646,7 @@ describe("FinderTest", () => {
 
   it("find with prepared select statement", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -647,6 +658,7 @@ describe("FinderTest", () => {
 
   it("unexisting record exception handling", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -669,6 +681,7 @@ describe("FinderTest", () => {
 
   it("condition array interpolation", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -679,6 +692,7 @@ describe("FinderTest", () => {
 
   it("find by one attribute with conditions", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -690,6 +704,7 @@ describe("FinderTest", () => {
 
   it("find by two attributes but passing only one", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
         this.attribute("content", "text");
@@ -702,6 +717,7 @@ describe("FinderTest", () => {
 
   it("find with bad sql", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -715,6 +731,7 @@ describe("FinderTest", () => {
 
   it("find by with alias", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -725,6 +742,7 @@ describe("FinderTest", () => {
   });
   it("find with string", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -736,6 +754,7 @@ describe("FinderTest", () => {
 
   it("find with large number", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -745,6 +764,7 @@ describe("FinderTest", () => {
 
   it("find by with large number", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -755,6 +775,7 @@ describe("FinderTest", () => {
 
   it("find by id with large number", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -765,6 +786,7 @@ describe("FinderTest", () => {
 
   it("find by and where consistency with active record instance", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -777,6 +799,7 @@ describe("FinderTest", () => {
 
   it("any with scope on hash includes", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -820,6 +843,7 @@ describe("FinderTest", () => {
 
   it("find with nil inside set passed for attribute", async () => {
     class Post extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string", { default: "" });
         this.attribute("body", "string", { default: "" });
@@ -832,6 +856,7 @@ describe("FinderTest", () => {
 
   it("find by bang on relation with large number", async () => {
     class Post extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string", { default: "" });
         this.attribute("body", "string", { default: "" });
@@ -844,6 +869,7 @@ describe("FinderTest", () => {
 
   it("find by on attribute that is a reserved word", async () => {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("group", "string");
       }
@@ -855,6 +881,7 @@ describe("FinderTest", () => {
 
   it("custom select takes precedence over original value", async () => {
     class Post extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string", { default: "" });
         this.attribute("body", "string", { default: "" });
@@ -867,6 +894,7 @@ describe("FinderTest", () => {
 
   function makeModel() {
     class Post extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string", { default: "" });
         this.attribute("body", "string", { default: "" });
@@ -1305,6 +1333,7 @@ describe("FinderTest", () => {
 
   function makeTopic() {
     class Topic extends Base {
+      declare title: string;
       static {
         this.attribute("title", "string");
         this.attribute("author_name", "string");
@@ -1596,6 +1625,7 @@ describe("FinderTest", () => {
 
   it("find_by with non-hash conditions returns the first matching record", async () => {
     class Item extends Base {
+      declare name: string;
       static {
         this.attribute("name", "string");
       }

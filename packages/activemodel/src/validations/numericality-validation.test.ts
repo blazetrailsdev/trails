@@ -16,6 +16,7 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 class Topic extends Model {
+  declare approved: any;
   declare static attribute: AttributesClassHalf["attribute"];
   declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
   declare static defineAttributeMethod: AttributesClassHalf["defineAttributeMethod"];
@@ -55,6 +56,7 @@ class Topic extends Model {
 interface Topic extends Attributes {}
 
 class Person extends Model {
+  declare karma: any;
   declare static attribute: AttributesClassHalf["attribute"];
 
   static {

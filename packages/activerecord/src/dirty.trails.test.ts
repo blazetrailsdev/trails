@@ -13,7 +13,7 @@ describe("Dirty restore of an in-place mutation", () => {
   });
 
   it("restoreAttributes restores a serialized attribute mutated in place", async () => {
-    const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+    const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
 
     (topic.content as Record<string, string>)["b"] = "b";
 
@@ -28,7 +28,7 @@ describe("Dirty restore of an in-place mutation", () => {
   });
 
   it("restoreAttributeBang restores a serialized attribute mutated in place", async () => {
-    const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+    const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
 
     (topic.content as Record<string, string>)["b"] = "b";
 
@@ -41,7 +41,7 @@ describe("Dirty restore of an in-place mutation", () => {
   });
 
   it("attributeChangedInPlace is true for a serialized attribute mutated in place", async () => {
-    const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+    const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
 
     (topic.content as Record<string, string>)["b"] = "b";
 

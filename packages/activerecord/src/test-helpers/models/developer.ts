@@ -19,6 +19,7 @@ import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Developer extends Base {
+  declare updated_at: any;
   declare projects: AssociationProxy<Project>;
   declare mentor: Mentor | null;
   declare strictLoadingMentor: Mentor | null;
@@ -412,6 +413,7 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
 }
 
 export class DeveloperCalledJamis extends Base {
+  declare legacy_updated_at: any;
   declare static poor: () => Relation<DeveloperCalledJamis>;
   declare static david: () => Relation<DeveloperCalledJamis>;
   declare static david2: () => Relation<DeveloperCalledJamis>;
@@ -611,6 +613,7 @@ export class DevWithAfterTouch extends Base {
 }
 
 export class MutatingSaveKlass extends Base {
+  declare legacy_updated_at: any;
   declare name: string;
 
   static {
@@ -628,6 +631,7 @@ export class MutatingSaveKlass extends Base {
 }
 
 export class MutatingUpdateKlass extends Base {
+  declare legacy_updated_at: any;
   declare name: string;
 
   static {
@@ -645,6 +649,7 @@ export class MutatingUpdateKlass extends Base {
 }
 
 export class NonMutatingUpdateKlass extends Base {
+  declare legacy_updated_at: any;
   static {
     this.tableName = "developers";
     this.aliasAttribute("created_at", "legacy_created_at");

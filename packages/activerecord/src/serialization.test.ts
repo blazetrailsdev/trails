@@ -88,7 +88,9 @@ describe("SerializationTest", () => {
       klazz.includeRootInJson = false;
       expect(Base.includeRootInJson).toBeTruthy();
       expect(klazz.includeRootInJson).toBeFalsy();
-      expect(new klazz().includeRootInJson).toBeFalsy();
+      expect(
+        (new klazz() as unknown as { includeRootInJson: boolean }).includeRootInJson,
+      ).toBeFalsy();
     } finally {
       Base.includeRootInJson = originalRootInJson;
     }

@@ -241,7 +241,7 @@ describe("declare patterns — typing runtime-attached members", () => {
     expectTypeOf(Article.notDraft()).toMatchTypeOf<Relation<Article>>();
   });
 
-  it("without a declare, instance members fall through to `unknown`; static members don't exist at all", () => {
+  it("without a declare, an instance member read is a compile error; static members don't exist at all", () => {
     class Plain extends Base {
       static {
         this.attribute("name", "string");
@@ -252,8 +252,10 @@ describe("declare patterns — typing runtime-attached members", () => {
       }
     }
     const p = new Plain({ name: "x" });
-    expectTypeOf(p.name).toBeUnknown();
-    expectTypeOf(p.posts).toBeUnknown();
+    // @ts-expect-error the runtime `attribute("name")` cannot contribute to the class's own type, so the read is refused at build time.
+    expectTypeOf(p.name);
+    // @ts-expect-error the runtime `hasMany("posts")` likewise needs a `declare` to reach the type side.
+    expectTypeOf(p.posts);
     type HasActive = "active" extends keyof typeof Plain ? true : false;
     expectTypeOf<HasActive>().toEqualTypeOf<false>();
   });

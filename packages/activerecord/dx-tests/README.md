@@ -34,7 +34,7 @@ Each file represents a real-world usage scenario:
 
 ## Gap-tracking pattern
 
-Some tests are marked `KNOWN GAP:` and assert the current (weaker) shape.
+Tests may be marked `KNOWN GAP:` to assert the current (weaker) shape.
 When the implementation tightens (e.g. `Post.where(...)` starts returning
 `Relation<Post>` instead of `any`), the corresponding assertion flips and
 fails — that's the signal to update the test and promote the assertion.

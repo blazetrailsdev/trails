@@ -43,8 +43,6 @@ export interface Model extends API, Access, Naming {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Model {
-  [key: string]: unknown;
-
   declare static paramDelimiter: string;
   declare private static _modelName: ModelName | null;
   declare static _validators: Map<string | null, Array<ValidatorLike>>;

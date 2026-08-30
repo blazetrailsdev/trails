@@ -6,6 +6,7 @@ import type { Mentor } from "./mentor.js";
 import { Base } from "../../base.js";
 
 export class Project extends Base {
+  declare developersRequiredByDefault: any;
   declare mentor: Mentor | null;
   declare developers: AssociationProxy<Developer>;
   declare readonlyDevelopers: AssociationProxy<Developer>;

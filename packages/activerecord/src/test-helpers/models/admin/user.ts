@@ -1,3 +1,4 @@
+import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Base } from "../../../base.js";
 import { YAMLColumn } from "../../../coders/yaml-column.js";
 
@@ -19,6 +20,10 @@ class Coder {
 }
 
 export class AdminUser extends Base {
+  declare configs: HashWithIndifferentAccess<unknown>;
+  declare params: HashWithIndifferentAccess<unknown>;
+  declare settings: HashWithIndifferentAccess<unknown>;
+  declare spouse: HashWithIndifferentAccess<unknown>;
   static _tableName = "admin_users";
   static moduleName = "Admin";
   static _demodulizedName = "User";

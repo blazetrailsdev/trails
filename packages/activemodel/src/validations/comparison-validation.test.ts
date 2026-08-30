@@ -14,6 +14,7 @@ import { ArgumentError } from "../attribute-assignment.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
 
 class Topic extends Model {
+  declare approved: any;
   declare static attribute: AttributesClassHalf["attribute"];
 
   static {

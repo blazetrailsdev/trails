@@ -112,6 +112,8 @@ describe("AttributeMethodsTest", () => {
 
   it("attribute keys on a new instance", async () => {
     class Post extends Base {
+      declare legacy_comments_count: any;
+      declare title: string;
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
@@ -124,6 +126,8 @@ describe("AttributeMethodsTest", () => {
 
   it("integers as nil", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("count", "integer");
       }
@@ -134,6 +138,8 @@ describe("AttributeMethodsTest", () => {
 
   it("attribute_present with booleans", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("published", "boolean");
       }
@@ -144,6 +150,8 @@ describe("AttributeMethodsTest", () => {
 
   it("array content", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -154,6 +162,8 @@ describe("AttributeMethodsTest", () => {
 
   it("hash content", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -170,6 +180,8 @@ describe("AttributeMethodsTest", () => {
 
   it("attributes_for_database", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -181,6 +193,8 @@ describe("AttributeMethodsTest", () => {
 
   it("allocated objects can be inspected", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -190,6 +204,8 @@ describe("AttributeMethodsTest", () => {
   });
   it("#id_value alias is defined if id column exist", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
@@ -202,6 +218,8 @@ describe("AttributeMethodsTest", () => {
 
   it("aliasing `id` attribute allows reading the column value", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
@@ -214,6 +232,8 @@ describe("AttributeMethodsTest", () => {
 
   it("case-sensitive attributes hash", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("Title", "string");
       }
@@ -224,6 +244,8 @@ describe("AttributeMethodsTest", () => {
 
   it("write_attribute does not raise when the attribute isn't selected", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("title", "string");
         this.attribute("body", "string");
@@ -235,6 +257,8 @@ describe("AttributeMethodsTest", () => {
 
   it("read_attribute can read aliased attributes as well", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -245,6 +269,8 @@ describe("AttributeMethodsTest", () => {
 
   it("overridden write_attribute", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("title", "string");
       }
@@ -261,6 +287,8 @@ describe("AttributeMethodsTest", () => {
 
   it("typecast attribute from select to false", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("active", "boolean");
         this.attribute("title", "string", { default: "" });
@@ -273,6 +301,8 @@ describe("AttributeMethodsTest", () => {
 
   it("typecast attribute from select to true", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("active", "boolean");
         this.attribute("title", "string", { default: "" });
@@ -291,6 +321,8 @@ describe("AttributeMethodsTest", () => {
 
   it("read attributes after type cast on a date", async () => {
     class Event extends Base {
+      declare created_at: any;
+      declare starts_on: any;
       static {
         this.attribute("occurred_at", "date");
       }
@@ -317,6 +349,8 @@ describe("AttributeMethodsTest", () => {
 
   function makeModel() {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("title", "string");
         this.attribute("body", "string", { default: "" });
@@ -793,28 +827,36 @@ describe("AttributeMethodsTest", () => {
     expect(computer.developer).toBe(99);
   });
   it("on_the_fly_super_invokable_generated_attribute_methods_via_method_missing", async () => {
-    class Klass extends Base {
+    const TopicBase = Base as unknown as Omit<typeof Base, "prototype"> &
+      (new (...args: never[]) => Base & { get title(): string });
+    class Klass extends TopicBase {
       static {
         this.tableName = "topics";
       }
       get title(): string {
-        return `${super.title as string}!`;
+        return `${super.title}!`;
       }
     }
     const realTopic = topics("first") as any;
-    expect(((await Klass.find(realTopic.id)) as any).title).toBe(`${realTopic.title}!`);
+    expect(((await (Klass as unknown as typeof Base).find(realTopic.id)) as any).title).toBe(
+      `${realTopic.title}!`,
+    );
   });
   it("on-the-fly super-invokable generated attribute predicates via method_missing", async () => {
-    class Klass extends Base {
+    const TopicBase = Base as unknown as Omit<typeof Base, "prototype"> &
+      (new (...args: never[]) => Base & { get "title?"(): boolean });
+    class Klass extends TopicBase {
       static {
         this.tableName = "topics";
       }
       get ["title?"](): boolean {
-        return !(super["title?"] as boolean);
+        return !super["title?"];
       }
     }
     const realTopic = topics("first") as any;
-    expect(((await Klass.find(realTopic.id)) as any)["title?"]).toBe(!realTopic["title?"]);
+    expect(((await (Klass as unknown as typeof Base).find(realTopic.id)) as any)["title?"]).toBe(
+      !realTopic["title?"],
+    );
   });
   it("calling super when the parent does not define method raises NoMethodError", async () => {
     const klass = newTopicLikeArClass((klass) => {
@@ -975,6 +1017,8 @@ describe("AttributeMethodsTest", () => {
 
   it("#id_value alias returns the value in the id column, when id column exists", async () => {
     class Post extends Base {
+      declare legacy_comments_count: number;
+      declare title: string;
       static {
         this.attribute("id", "integer");
         this.attribute("title", "string");
@@ -1029,6 +1073,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("respond_to? with a custom primary key", () => {
     class CustomPK extends Base {
+      declare custom_id: number;
       static {
         this.attribute("custom_id", "integer");
         this.attribute("name", "string");
@@ -1041,6 +1086,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("id_before_type_cast with a custom primary key", () => {
     class CustomPK extends Base {
+      declare custom_id: number;
       static {
         this.attribute("custom_id", "integer");
         this.attribute("name", "string");
@@ -1063,6 +1109,7 @@ describe("AttributeMethodsTest", () => {
   });
   it.skipIf(adapterType !== "mysql")("read attributes_before_type_cast on a boolean", () => {
     class PostBool extends Base {
+      declare published: boolean;
       static {
         this.attribute("title", "string");
         this.attribute("published", "boolean");
@@ -1083,6 +1130,8 @@ describe("AttributeMethodsTest", () => {
   });
   it("write time to date attribute", () => {
     class Event extends Base {
+      declare created_at: any;
+      declare starts_on: any;
       static {
         this.attribute("name", "string");
         this.attribute("starts_on", "date");
@@ -1094,6 +1143,8 @@ describe("AttributeMethodsTest", () => {
   });
   it("setting a time zone-aware attribute to UTC", () => {
     class Event extends Base {
+      declare created_at: any;
+      declare starts_on: any;
       static {
         this.attribute("name", "string");
         this.attribute("created_at", "datetime");

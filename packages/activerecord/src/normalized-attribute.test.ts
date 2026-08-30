@@ -13,6 +13,8 @@ function noon(time: Temporal.Instant): Temporal.Instant {
 }
 
 class NormalizedAircraft extends Aircraft {
+  declare manufactured_at: any;
+  declare name: any;
   declare validated_name: string | undefined;
 
   static {
@@ -170,6 +172,7 @@ describe("normalizes on Base", () => {
 
   it("normalizes attributes before persistence", async () => {
     class NormalizedUser extends Base {
+      declare name: any;
       static _tableName = "aircraft";
       static {
         this.normalizes("name", {

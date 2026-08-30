@@ -300,7 +300,7 @@ export interface SchemaHost {
   /** @internal */
   _columnNamesMemo?: { names: readonly string[] };
   connection: any;
-  prototype: Record<string, unknown>;
+  prototype: object;
   superclass?: SchemaHost;
   hookAttributeType?(name: string, type: Type): Type;
   /** @internal */

@@ -38,9 +38,9 @@ describe("ReadOnlyTest", () => {
     dev.readonlyBang();
     expect(dev.isReadonly()).toBeTruthy();
 
-    (dev as Record<string, unknown>).name = "Luscious forbidden fruit.";
+    (dev as unknown as Record<string, unknown>).name = "Luscious forbidden fruit.";
     expect(await dev.save()).toBeFalsy();
-    (dev as Record<string, unknown>).name = "Forbidden.";
+    (dev as unknown as Record<string, unknown>).name = "Forbidden.";
 
     const catchError = (p: Promise<unknown>) =>
       p.then(

@@ -81,7 +81,7 @@ describe("DirtyTest", () => {
   });
 
   it("attribute changes", async () => {
-    const pirate = new Pirate() as Rec;
+    const pirate = new Pirate() as unknown as Rec;
     expect(pirate.attributeChanged("catchphrase")).toBe(false);
     expect(pirate.attributeChanged("non_validated_parrot_id")).toBe(false);
 
@@ -110,7 +110,7 @@ describe("DirtyTest", () => {
       };
       const zone = timeZone()!;
 
-      const pirate = new Target() as Rec;
+      const pirate = new Target() as unknown as Rec;
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
@@ -136,7 +136,7 @@ describe("DirtyTest", () => {
       const Target = class extends Base {
         static tableName = "pirates";
       };
-      const pirate = (await Target.create({})) as Rec;
+      const pirate = (await Target.create({})) as unknown as Rec;
       // eslint-disable-next-line no-self-assign
       pirate.created_on = pirate.created_on;
       expect(pirate.attributeChanged("created_on")).toBe(false);
@@ -150,7 +150,7 @@ describe("DirtyTest", () => {
         static skipTimeZoneConversionForAttributes = ["created_on"];
       };
 
-      const pirate = new Target() as Rec;
+      const pirate = new Target() as unknown as Rec;
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
@@ -173,7 +173,7 @@ describe("DirtyTest", () => {
         static tableName = "pirates";
       };
 
-      const pirate = new Target() as Rec;
+      const pirate = new Target() as unknown as Rec;
       expect(pirate.attributeChanged("created_on")).toBe(false);
       expect(pirate.attributeChange("created_on")).toBeNull();
 
@@ -191,7 +191,7 @@ describe("DirtyTest", () => {
   });
 
   it("aliased attribute changes", () => {
-    const parrot = new Parrot() as Rec;
+    const parrot = new Parrot() as unknown as Rec;
     expect(call<boolean>(parrot, "titleChanged")).toBe(false);
     expect(call<unknown>(parrot, "titleChange")).toBeNull();
 
@@ -202,7 +202,7 @@ describe("DirtyTest", () => {
   });
 
   it("restore attribute!", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as Rec;
+    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as unknown as Rec;
     pirate.catchphrase = "Ahoy!";
 
     expect(pirate.catchphrase).toBe("Ahoy!");
@@ -217,7 +217,7 @@ describe("DirtyTest", () => {
   });
 
   it("clear attribute change", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as Rec;
+    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as unknown as Rec;
     pirate.catchphrase = "Ahoy!";
 
     expect(pirate.catchphrase).toBe("Ahoy!");
@@ -232,7 +232,7 @@ describe("DirtyTest", () => {
   });
 
   it("nullable number not marked as changed if new value is blank", () => {
-    const pirate = new Pirate() as Rec;
+    const pirate = new Pirate() as unknown as Rec;
 
     for (const value of ["", null]) {
       pirate.parrot_id = value;
@@ -242,7 +242,7 @@ describe("DirtyTest", () => {
   });
 
   it("nullable decimal not marked as changed if new value is blank", () => {
-    const numericData = new NumericData() as Rec;
+    const numericData = new NumericData() as unknown as Rec;
 
     for (const value of ["", null]) {
       numericData.bank_balance = value;
@@ -252,7 +252,7 @@ describe("DirtyTest", () => {
   });
 
   it("nullable float not marked as changed if new value is blank", () => {
-    const numericData = new NumericData() as Rec;
+    const numericData = new NumericData() as unknown as Rec;
 
     for (const value of ["", null]) {
       numericData.temperature = value;
@@ -267,7 +267,7 @@ describe("DirtyTest", () => {
         static tableName = "topics";
       };
 
-      const topic = (await Target.create({})) as Rec;
+      const topic = (await Target.create({})) as unknown as Rec;
       expect(topic.written_on).toBeNull();
 
       for (const value of ["", null]) {
@@ -279,7 +279,7 @@ describe("DirtyTest", () => {
   });
 
   it("integer zero to string zero not marked as changed", async () => {
-    const pirate = new Pirate() as Rec;
+    const pirate = new Pirate() as unknown as Rec;
     pirate.parrot_id = 0;
     pirate.catchphrase = "arrr";
     expect(await pirate.saveBang()).toBeTruthy();
@@ -291,7 +291,7 @@ describe("DirtyTest", () => {
   });
 
   it("integer zero to integer zero not marked as changed", async () => {
-    const pirate = new Pirate() as Rec;
+    const pirate = new Pirate() as unknown as Rec;
     pirate.parrot_id = 0;
     pirate.catchphrase = "arrr";
     expect(await pirate.saveBang()).toBeTruthy();
@@ -303,7 +303,7 @@ describe("DirtyTest", () => {
   });
 
   it("float zero to string zero not marked as changed", async () => {
-    const data = new NumericData({ temperature: 0.0 }) as Rec;
+    const data = new NumericData({ temperature: 0.0 }) as unknown as Rec;
     await data.saveBang();
 
     expect(data.isChanged).toBe(false);
@@ -319,31 +319,31 @@ describe("DirtyTest", () => {
   });
 
   it("zero to blank marked as changed", async () => {
-    let pirate = new Pirate() as Rec;
+    let pirate = new Pirate() as unknown as Rec;
     pirate.catchphrase = "Yarrrr, me hearties";
     pirate.parrot_id = 1;
     await pirate.save();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
+    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as unknown as Rec;
     pirate.parrot_id = "";
     expect(pirate.attributeChanged("parrot_id")).toBe(true);
     expect(pirate.attributeChange("parrot_id")).toEqual([1, null]);
     await pirate.save();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
+    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as unknown as Rec;
     pirate.parrot_id = 0;
     expect(pirate.attributeChanged("parrot_id")).toBe(true);
     expect(pirate.attributeChange("parrot_id")).toEqual([null, 0]);
     await pirate.save();
 
-    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as Rec;
+    pirate = (await Pirate.findBy({ catchphrase: "Yarrrr, me hearties" })) as unknown as Rec;
     pirate.parrot_id = "";
     expect(pirate.attributeChanged("parrot_id")).toBe(true);
     expect(pirate.attributeChange("parrot_id")).toEqual([0, null]);
   });
 
   it("object should be changed if any attribute is changed", async () => {
-    const pirate = new Pirate() as Rec;
+    const pirate = new Pirate() as unknown as Rec;
     expect(pirate.isChanged).toBe(false);
     expect(pirate.changedAttributeNamesToSave).toEqual([]);
     expect(pirate.changes).toEqual({});
@@ -361,7 +361,7 @@ describe("DirtyTest", () => {
   });
 
   it("attribute will change!", async () => {
-    const pirate = (await Pirate.createBang({ catchphrase: "arr" })) as Rec;
+    const pirate = (await Pirate.createBang({ catchphrase: "arr" })) as unknown as Rec;
 
     expect(pirate.attributeChanged("catchphrase")).toBe(false);
     expect((pirate as any).catchphraseWillChange()).toBeTruthy();
@@ -374,13 +374,13 @@ describe("DirtyTest", () => {
   });
 
   it("virtual attribute will change", async () => {
-    const parrot = (await Parrot.create({ name: "Ruby" })) as Rec;
+    const parrot = (await Parrot.create({ name: "Ruby" })) as unknown as Rec;
     (parrot as any).attributeWillChangeBang("cancelSaveFromCallback");
     expect(parrot.hasChangesToSave).toBe(true);
   });
 
   it("association assignment changes foreign key", async () => {
-    const pirate = (await Pirate.createBang({ catchphrase: "jarl" })) as Rec;
+    const pirate = (await Pirate.createBang({ catchphrase: "jarl" })) as unknown as Rec;
     const parrot = await Parrot.createBang({ name: "Lorre" });
     pirate.parrot = parrot;
     expect(pirate.isChanged).toBe(true);
@@ -388,7 +388,7 @@ describe("DirtyTest", () => {
   });
 
   it("attribute should be compared with type cast", () => {
-    const topic = new Topic() as Rec;
+    const topic = new Topic() as unknown as Rec;
     expect((topic as any).approved).toBe(true);
     expect(topic.attributeChanged("approved")).toBe(false);
 
@@ -398,7 +398,7 @@ describe("DirtyTest", () => {
   });
 
   it("partial update", async () => {
-    const pirate = new Pirate() as Rec;
+    const pirate = new Pirate() as unknown as Rec;
     pirate.catchphrase = "foo";
 
     await withPartialWrites(Pirate, false, async () => {
@@ -419,7 +419,7 @@ describe("DirtyTest", () => {
         await pirate.saveBang();
         await pirate.saveBang();
       });
-      expect(((await (pirate as unknown as Pirate).reload()) as Rec).updated_on).toEqual(
+      expect(((await (pirate as unknown as Pirate).reload()) as unknown as Rec).updated_on).toEqual(
         oldUpdatedOn,
       );
 
@@ -427,14 +427,14 @@ describe("DirtyTest", () => {
         pirate.catchphrase = "bar";
         await pirate.saveBang();
       });
-      expect(((await (pirate as unknown as Pirate).reload()) as Rec).updated_on).not.toEqual(
-        oldUpdatedOn,
-      );
+      expect(
+        ((await (pirate as unknown as Pirate).reload()) as unknown as Rec).updated_on,
+      ).not.toEqual(oldUpdatedOn);
     });
   });
 
   it("partial update with optimistic locking", async () => {
-    const person = new Person() as Rec;
+    const person = new Person() as unknown as Rec;
     (person as any).first_name = "foo";
 
     await withPartialWrites(Person, false, async () => {
@@ -452,34 +452,34 @@ describe("DirtyTest", () => {
         await person.saveBang();
         await person.saveBang();
       });
-      expect(((await (person as unknown as Person).reload()) as Rec).lock_version).toEqual(
-        savedLockVersion,
-      );
+      expect(
+        ((await (person as unknown as Person).reload()) as unknown as Rec).lock_version,
+      ).toEqual(savedLockVersion);
 
       await assertQueriesCount(3, false, async () => {
         (person as any).first_name = "bar";
         await person.saveBang();
       });
-      expect(((await (person as unknown as Person).reload()) as Rec).lock_version).not.toEqual(
-        savedLockVersion,
-      );
+      expect(
+        ((await (person as unknown as Person).reload()) as unknown as Rec).lock_version,
+      ).not.toEqual(savedLockVersion);
     });
   });
 
   it("changed attributes should be preserved if save failure", async () => {
-    let pirate = new Pirate() as Rec;
+    let pirate = new Pirate() as unknown as Rec;
     pirate.parrot_id = 1;
     expect(await pirate.save()).toBe(false);
     checkPirateAfterSaveFailure(pirate);
 
-    pirate = new Pirate();
+    pirate = new Pirate() as unknown as Rec;
     pirate.parrot_id = 1;
     await expect(pirate.saveBang()).rejects.toThrow();
     checkPirateAfterSaveFailure(pirate);
   });
 
   it("reload should clear changed attributes", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "shiver me timbers" })) as Rec;
+    const pirate = (await Pirate.create({ catchphrase: "shiver me timbers" })) as unknown as Rec;
     pirate.catchphrase = "*hic*";
     expect(pirate.isChanged).toBe(true);
     await pirate.reload();
@@ -487,7 +487,7 @@ describe("DirtyTest", () => {
   });
 
   it("dup objects should not copy dirty flag from creator", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "shiver me timbers" })) as Rec;
+    const pirate = (await Pirate.create({ catchphrase: "shiver me timbers" })) as unknown as Rec;
     const pirateDup = pirate.dup();
     pirateDup.restoreAttributeBang("catchphrase");
     pirate.catchphrase = "I love Rum";
@@ -497,7 +497,7 @@ describe("DirtyTest", () => {
 
   it("reverted changes are not dirty", async () => {
     const phrase = "shiver me timbers";
-    const pirate = (await Pirate.create({ catchphrase: phrase })) as Rec;
+    const pirate = (await Pirate.create({ catchphrase: phrase })) as unknown as Rec;
     pirate.catchphrase = "*hic*";
     expect(pirate.isChanged).toBe(true);
     pirate.catchphrase = phrase;
@@ -506,7 +506,7 @@ describe("DirtyTest", () => {
 
   it("reverted changes are not dirty after multiple changes", async () => {
     const phrase = "shiver me timbers";
-    const pirate = (await Pirate.create({ catchphrase: phrase })) as Rec;
+    const pirate = (await Pirate.create({ catchphrase: phrase })) as unknown as Rec;
     for (let i = 0; i < 10; i++) {
       pirate.catchphrase = "*hic*".repeat(i);
       expect(pirate.isChanged).toBe(true);
@@ -517,7 +517,7 @@ describe("DirtyTest", () => {
   });
 
   it("reverted changes are not dirty going from nil to value and back", async () => {
-    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as Rec;
+    const pirate = (await Pirate.create({ catchphrase: "Yar!" })) as unknown as Rec;
 
     pirate.parrot_id = 1;
     expect(pirate.isChanged).toBe(true);
@@ -532,7 +532,7 @@ describe("DirtyTest", () => {
 
   it("save should store serialized attributes even with partial writes", async () => {
     await withPartialWrites(Topic, true, async () => {
-      const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+      const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
 
       expect(topic.isChanged).toBe(false);
 
@@ -552,7 +552,7 @@ describe("DirtyTest", () => {
   });
 
   it("previous changes includes in place serialized attribute mutation", async () => {
-    const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+    const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
 
     expect(topic.previousChanges).toHaveProperty("content");
 
@@ -573,7 +573,7 @@ describe("DirtyTest", () => {
 
   it("save always should update timestamps when serialized attributes are present", async () => {
     await withPartialWrites(Topic, true, async () => {
-      const topic = (await Topic.createBang({ content: { a: "a" } })) as Rec;
+      const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
       await (topic as unknown as Topic).saveBang();
 
       const updatedAt = topic.updated_at;
@@ -589,18 +589,21 @@ describe("DirtyTest", () => {
 
   it("save should not save serialized attribute with partial writes if not present", async () => {
     await withPartialWrites(Topic, true, async () => {
-      const full = (await Topic.createBang({ author_name: "Bill", content: { a: "a" } })) as Rec;
+      const full = (await Topic.createBang({
+        author_name: "Bill",
+        content: { a: "a" },
+      })) as unknown as Rec;
       const topic = (await Topic.select("id", "author_name").find(
         (full as any).id,
       )) as unknown as Topic;
       await topic.updateColumns({ author_name: "John" });
-      const reloaded = (await topic.reload()) as Rec;
+      const reloaded = (await topic.reload()) as unknown as Rec;
       expect(reloaded.content).not.toBeNull();
     });
   });
 
   it("changes to save should not mutate array of hashes", async () => {
-    const topic = new Topic() as Rec;
+    const topic = new Topic() as unknown as Rec;
     topic.author_name = "Bill";
     topic.content = [{ a: "a" }];
 
@@ -610,7 +613,7 @@ describe("DirtyTest", () => {
   });
 
   it("previous changes", async () => {
-    let pirate = new Pirate() as Rec;
+    let pirate = new Pirate() as unknown as Rec;
     expect(pirate.previousChanges).toEqual({});
     pirate.catchphrase = "arrr";
     await (pirate as unknown as Pirate).save();
@@ -625,7 +628,7 @@ describe("DirtyTest", () => {
     expect(pirate.previousChanges["created_on"][1]).not.toBeNull();
     expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
 
-    pirate = new Pirate() as Rec;
+    pirate = new Pirate() as unknown as Rec;
     expect(pirate.previousChanges).toEqual({});
     pirate.catchphrase = "arrr";
     await (pirate as unknown as Pirate).save();
@@ -642,7 +645,7 @@ describe("DirtyTest", () => {
     await (pirate as unknown as Pirate).reload();
     expect(pirate.previousChanges).toEqual({});
 
-    pirate = (await Pirate.findBy({ catchphrase: "arrr" })) as Rec;
+    pirate = (await Pirate.findBy({ catchphrase: "arrr" })) as unknown as Rec;
     pirate.catchphrase = "Me Maties!";
     await (pirate as unknown as Pirate).save();
 
@@ -654,7 +657,7 @@ describe("DirtyTest", () => {
     expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
     expect(pirate.previousChanges).not.toHaveProperty("created_on");
 
-    pirate = (await Pirate.findBy({ catchphrase: "Me Maties!" })) as Rec;
+    pirate = (await Pirate.findBy({ catchphrase: "Me Maties!" })) as unknown as Rec;
     pirate.catchphrase = "Thar She Blows!";
     await (pirate as unknown as Pirate).save();
 
@@ -666,7 +669,7 @@ describe("DirtyTest", () => {
     expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
     expect(pirate.previousChanges).not.toHaveProperty("created_on");
 
-    pirate = (await Pirate.findBy({ catchphrase: "Thar She Blows!" })) as Rec;
+    pirate = (await Pirate.findBy({ catchphrase: "Thar She Blows!" })) as unknown as Rec;
     await (pirate as unknown as Pirate).update({ catchphrase: "Ahoy!" });
 
     expect(Object.keys(pirate.previousChanges)).toHaveLength(2);
@@ -677,7 +680,7 @@ describe("DirtyTest", () => {
     expect(pirate.previousChanges).not.toHaveProperty("parrot_id");
     expect(pirate.previousChanges).not.toHaveProperty("created_on");
 
-    pirate = (await Pirate.findBy({ catchphrase: "Ahoy!" })) as Rec;
+    pirate = (await Pirate.findBy({ catchphrase: "Ahoy!" })) as unknown as Rec;
     await (pirate as unknown as Pirate).updateAttribute("catchphrase", "Ninjas suck!");
 
     expect(Object.keys(pirate.previousChanges)).toHaveLength(2);
@@ -713,7 +716,7 @@ describe("DirtyTest", () => {
 
       const writtenOn = new TimeWithZone(Temporal.Instant.from("2012-12-01T12:00:00Z"), zone);
 
-      const topic = (await Target.create({ written_on: writtenOn })) as Rec;
+      const topic = (await Target.create({ written_on: writtenOn })) as unknown as Rec;
       topic.written_on = new TimeWithZone(
         (topic.written_on as TimeWithZone).utc().toTime().toInstant().add({ milliseconds: 300 }),
         zone,
@@ -737,7 +740,10 @@ describe("DirtyTest", () => {
         Temporal.Instant.from("2014-01-01T12:00:00Z"),
         timeZone()!,
       );
-      const pirate = (await Target.create({ catchphrase: "rrrr", created_on: timeInParis })) as Rec;
+      const pirate = (await Target.create({
+        catchphrase: "rrrr",
+        created_on: timeInParis,
+      })) as unknown as Rec;
 
       pirate.created_on = (pirate.created_on as TimeWithZone).inTimeZone("Tokyo").toString();
       expect(pirate.attributeChanged("created_on")).toBe(false);
@@ -749,19 +755,19 @@ describe("DirtyTest", () => {
       let jon: Rec | undefined;
       await assertNoQueriesMatch(/followers_count/, false, async () => {
         await assertQueriesMatch(/first_name/, undefined, false, async () => {
-          jon = (await Person.create({ first_name: "Jon" })) as Rec;
+          jon = (await Person.create({ first_name: "Jon" })) as unknown as Rec;
         });
       });
       await (jon as unknown as Person).reload();
-      expect((jon as Rec).first_name).toBe("Jon");
-      expect((jon as Rec).followers_count).toBe(0);
-      expect((jon as Rec).id).not.toBeNull();
+      expect((jon as unknown as Rec).first_name).toBe("Jon");
+      expect((jon as unknown as Rec).followers_count).toBe(0);
+      expect((jon as unknown as Rec).id).not.toBeNull();
     });
   });
 
   it("partial insert with empty values", async () => {
     await withPartialWrites(Aircraft, true, async () => {
-      const a = (await Aircraft.create({})) as Rec;
+      const a = (await Aircraft.create({})) as unknown as Rec;
       await a.reload();
       expect(a.id).not.toBeNull();
     });
@@ -780,7 +786,7 @@ describe("DirtyTest", () => {
       },
     });
 
-    const pirate = (await Foo.createBang({ catchphrase: "arrrr" })) as Rec;
+    const pirate = (await Foo.createBang({ catchphrase: "arrrr" })) as unknown as Rec;
 
     const newCatchphrase = "arrrr matey!";
 
@@ -792,7 +798,7 @@ describe("DirtyTest", () => {
   });
 
   it("changes is correct if override attribute reader", async () => {
-    const pirate = (await Pirate.createBang({ catchphrase: "arrrr" })) as Rec;
+    const pirate = (await Pirate.createBang({ catchphrase: "arrrr" })) as unknown as Rec;
     Object.defineProperty(pirate, "catchphrase", {
       configurable: true,
       get(this: Pirate): string | null {
@@ -827,7 +833,7 @@ describe("DirtyTest", () => {
     };
     await klass.loadSchema();
 
-    const model = new klass() as Rec;
+    const model = new klass() as unknown as Rec;
     (model as any).first_name = "Jim";
     expect(model.attributeChanged("first_name")).toBe(true);
   });
@@ -841,7 +847,7 @@ describe("DirtyTest", () => {
     };
     await klass.loadSchema();
 
-    const record = new klass({ first_name: "Sean" }) as Rec;
+    const record = new klass({ first_name: "Sean" }) as unknown as Rec;
     (record as any).nonPersistedAttributeWillChange();
 
     expect(record.attributeChanged("nonPersistedAttribute")).toBe(true);
@@ -858,7 +864,7 @@ describe("DirtyTest", () => {
       };
       await klass.loadSchema();
 
-      const record = new klass({ first_name: "Sean" }) as Rec;
+      const record = new klass({ first_name: "Sean" }) as unknown as Rec;
       (record as any).nonPersistedAttributeWillChange();
       expect(await record.save()).toBe(true);
 
@@ -868,7 +874,7 @@ describe("DirtyTest", () => {
   });
 
   it("attributes assigned but not selected are dirty", async () => {
-    const person = (await Person.select("id").first()) as Rec;
+    const person = (await Person.select("id").first()) as unknown as Rec;
     expect(person.isChanged).toBe(false);
 
     person.first_name = "Sean";
@@ -879,14 +885,14 @@ describe("DirtyTest", () => {
   });
 
   it("attributes not selected are still missing after save", async () => {
-    const person = (await Person.select("id").first()) as Rec;
+    const person = (await Person.select("id").first()) as unknown as Rec;
     expect(() => person.first_name).toThrow("missing attribute 'first_name'");
     await person.save();
     expect(() => person.first_name).toThrow("missing attribute 'first_name'");
   });
 
   it("saved_change_to_attribute? returns whether a change occurred in the last save", async () => {
-    const person = (await Person.create({ first_name: "Sean" })) as Rec;
+    const person = (await Person.create({ first_name: "Sean" })) as unknown as Rec;
 
     expect(person.isSavedChangeToAttribute("first_name")).toBe(true);
     expect(person.isSavedChangeToAttribute("gender")).toBe(false);
@@ -899,7 +905,7 @@ describe("DirtyTest", () => {
   });
 
   it("saved_change_to_attribute returns the change that occurred in the last save", async () => {
-    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as Rec;
+    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as unknown as Rec;
 
     expect(person.savedChanges["first_name"]).toEqual([null, "Sean"]);
     expect(person.savedChanges["gender"]).toEqual([null, "M"]);
@@ -911,7 +917,7 @@ describe("DirtyTest", () => {
   });
 
   it("attribute_before_last_save returns the original value before saving", async () => {
-    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as Rec;
+    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as unknown as Rec;
 
     expect(person.attributeBeforeLastSave("first_name")).toBeNull();
     expect(person.attributeBeforeLastSave("gender")).toBeNull();
@@ -928,7 +934,7 @@ describe("DirtyTest", () => {
   });
 
   it("saved_changes? returns whether the last call to save changed anything", async () => {
-    const person = (await Person.create({ first_name: "Sean" })) as Rec;
+    const person = (await Person.create({ first_name: "Sean" })) as unknown as Rec;
 
     expect(call<boolean>(person, "isSavedChanges")).toBe(true);
 
@@ -938,7 +944,7 @@ describe("DirtyTest", () => {
   });
 
   it("saved_changes returns a hash of all the changes that occurred", async () => {
-    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as Rec;
+    const person = (await Person.create({ first_name: "Sean", gender: "M" })) as unknown as Rec;
 
     expect(person.savedChanges["first_name"]).toEqual([null, "Sean"]);
     expect(person.savedChanges["gender"]).toEqual([null, "M"]);
@@ -969,7 +975,7 @@ describe("DirtyTest", () => {
       }
     };
 
-    const person = (await klass.create({ first_name: "Sean" })) as Rec;
+    const person = (await klass.create({ first_name: "Sean" })) as unknown as Rec;
     expect(person.isChanged).toBe(false);
   });
 
@@ -989,13 +995,13 @@ describe("DirtyTest", () => {
       }
     };
 
-    const person = (await klass.create({ first_name: "Sean" })) as Rec;
+    const person = (await klass.create({ first_name: "Sean" })) as unknown as Rec;
     expect(person.isChanged).toBe(false);
   });
 
   it("partial insert off with unchanged default function attribute", async () => {
     await withPartialWrites(Aircraft, false, async () => {
-      const aircraft = new Aircraft({ name: "Boeing" }) as Rec;
+      const aircraft = new Aircraft({ name: "Boeing" }) as unknown as Rec;
       expect(aircraft.name).toBe("Boeing");
 
       await (aircraft as unknown as Aircraft).saveBang();
@@ -1013,7 +1019,10 @@ describe("DirtyTest", () => {
   it("partial insert off with changed default function attribute", async () => {
     await withPartialWrites(Aircraft, false, async () => {
       const manufacturingDate = new Date("2025-01-01T00:00:00Z");
-      const aircraft = new Aircraft({ name: "Boeing2", manufactured_at: manufacturingDate }) as Rec;
+      const aircraft = new Aircraft({
+        name: "Boeing2",
+        manufactured_at: manufacturingDate,
+      }) as unknown as Rec;
 
       expect(aircraft.name).toBe("Boeing2");
       const castAt = aircraft.manufactured_at as Temporal.Instant;
@@ -1058,7 +1067,7 @@ describeIfPostgresqlAdapter("DirtyTest", () => {
       await klass.loadSchema();
 
       await withPartialWrites(klass, false, async () => {
-        const record = (await klass.createBang({ another_id: 10 })) as Rec;
+        const record = (await klass.createBang({ another_id: 10 })) as unknown as Rec;
         expect(record.another_id).toBe(10);
         expect(record.id).not.toBeNull();
       });

@@ -33,6 +33,11 @@ function indexNameLength(conn: AbstractAdapter): number {
 }
 
 class TestModel extends Base {
+  declare age: unknown;
+  declare contributor: unknown;
+  declare exgirlfriend: unknown;
+  declare first_name: unknown;
+  declare nick_name: unknown;
   static {
     this._tableName = "test_models";
   }

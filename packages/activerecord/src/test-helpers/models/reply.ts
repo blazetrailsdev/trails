@@ -2,6 +2,7 @@ import { Topic, WebTopic } from "./topic.js";
 import { registerSubclass } from "../../inheritance.js";
 
 export class Reply extends Topic {
+  declare topic: Topic | null;
   static {
     this.belongsTo("topic", {
       foreignKey: "parent_id",

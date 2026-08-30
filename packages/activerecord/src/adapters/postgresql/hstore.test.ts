@@ -26,7 +26,9 @@ class Hstore extends Base {
   }
 }
 
-class HstoreWithSerialize extends Hstore {}
+class HstoreWithSerialize extends Hstore {
+  declare tags: any;
+}
 HstoreWithSerialize.serialize("tags", { coder: TagCollection });
 
 describeIfPg("PostgreSQLAdapter", () => {
