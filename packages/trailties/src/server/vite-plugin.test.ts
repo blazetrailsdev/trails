@@ -3,7 +3,7 @@ import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 import { bodyFromString } from "@blazetrails/rack";
 import type { RackApp } from "@blazetrails/actionpack";
-import { trailsPlugin, buildRackEnv } from "./vite-plugin.js";
+import { trailsPlugin } from "./vite-plugin.js";
 
 const okApp: RackApp = async () => [200, { "content-type": "text/plain" }, bodyFromString("ok")];
 
@@ -125,93 +125,5 @@ describe("trailsPlugin", () => {
       expect(err).toBeInstanceOf(Error);
       expect((err as Error).message).toContain("too large");
     }
-  });
-});
-
-describe("buildRackEnv", () => {
-  it("builds a Rack env from a basic GET request", async () => {
-    const req = createMockReq({ method: "GET", url: "/users?page=2" });
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env.REQUEST_METHOD).toBe("GET");
-    expect(env.PATH_INFO).toBe("/users");
-    expect(env.QUERY_STRING).toBe("page=2");
-    expect(env.SERVER_PORT).toBe("3000");
-    expect(env.HTTP_HOST).toBe("localhost:3000");
-    expect(env["rack.url_scheme"]).toBe("http");
-  });
-
-  it("reads request body", async () => {
-    const req = createMockReq({ method: "POST", url: "/users", body: '{"name":"dean"}' });
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env.REQUEST_METHOD).toBe("POST");
-    expect(env["rack.input"]).toBe('{"name":"dean"}');
-  });
-
-  it("maps content-type and content-length to CGI keys", async () => {
-    const req = createMockReq({
-      headers: {
-        "content-type": "application/json",
-        "content-length": "15",
-      },
-    });
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env.CONTENT_TYPE).toBe("application/json");
-    expect(env.CONTENT_LENGTH).toBe("15");
-  });
-
-  it("maps other headers to HTTP_ prefixed keys", async () => {
-    const req = createMockReq({
-      headers: { "x-request-id": "abc-123", accept: "text/html" },
-    });
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env.HTTP_X_REQUEST_ID).toBe("abc-123");
-    expect(env.HTTP_ACCEPT).toBe("text/html");
-  });
-
-  it("normalizes array header values to comma-separated strings", async () => {
-    const req = createMockReq({
-      headers: { "set-cookie": ["a=1", "b=2"] as any },
-    });
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env.HTTP_SET_COOKIE).toBe("a=1, b=2");
-  });
-
-  it("skips undefined header values", async () => {
-    const req = createMockReq({});
-    req.headers["x-undefined"] = undefined as any;
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env).not.toHaveProperty("HTTP_X_UNDEFINED");
-  });
-
-  it("sets rack.url_scheme to https when x-forwarded-proto is https", async () => {
-    const req = createMockReq({
-      headers: { "x-forwarded-proto": "https" },
-    });
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env["rack.url_scheme"]).toBe("https");
-  });
-
-  it("sets rack.url_scheme to https for TLS sockets", async () => {
-    const req = createMockReq({});
-    (req.socket as any).encrypted = true;
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env["rack.url_scheme"]).toBe("https");
-  });
-
-  it("handles comma-separated x-forwarded-proto", async () => {
-    const req = createMockReq({
-      headers: { "x-forwarded-proto": "https, http" },
-    });
-    const env = await buildRackEnv(req, 3000);
-
-    expect(env["rack.url_scheme"]).toBe("https");
   });
 });

@@ -229,6 +229,7 @@ export default defineConfig(
       "packages/activesupport/src/async-context-adapter.ts",
       "packages/activesupport/src/child-process-adapter.ts",
       "packages/activesupport/src/os-adapter.ts",
+      "packages/activesupport/src/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activerecord-cli/src/tsc-wrapper/**",
       "packages/activerecord/src/sqlite/node-sqlite.ts",
