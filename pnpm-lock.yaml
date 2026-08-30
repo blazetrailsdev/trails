@@ -317,6 +317,8 @@ importers:
         specifier: workspace:*
         version: link:../activesupport
 
+  packages/ruby-compat: {}
+
   packages/trails-tsc:
     dependencies:
       '@blazetrails/actionview':

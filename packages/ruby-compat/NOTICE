@@ -1,0 +1,6 @@
+@blazetrails/ruby-compat
+========================
+
+This package is a TypeScript port of Ruby core and stdlib primitives from
+ruby/ruby (https://github.com/ruby/ruby), licensed under the Ruby License /
+2-clause BSDL. The MRI read-anchor is vendored at `vendor/ruby/`.
