@@ -1,14 +1,18 @@
 import { underscore } from "@blazetrails/activesupport";
 import { Configurable } from "./configurable.js";
 
+interface AutoFilteredParametersApp {
+  config: { filterParameters: Array<string | RegExp> };
+}
+
 export class AutoFilteredParameters {
-  private _filterParameters: string[];
+  private _app: AutoFilteredParametersApp;
   private _attributesByClass: Map<any, string[]>;
   private _collecting = true;
   private _hookDisposer?: () => void;
 
-  constructor(filterParameters: string[]) {
-    this._filterParameters = filterParameters;
+  constructor(app: AutoFilteredParametersApp) {
+    this._app = app;
     this._attributesByClass = new Map();
     this.installCollectingHook();
   }
@@ -34,8 +38,8 @@ export class AutoFilteredParameters {
   }
 
   /** @internal */
-  private get app(): { config: { filter_parameters: string[] } } {
-    return { config: { filter_parameters: this._filterParameters } };
+  private get app(): AutoFilteredParametersApp {
+    return this._app;
   }
 
   /** @internal */
@@ -86,8 +90,8 @@ export class AutoFilteredParameters {
       !this.isExcludedFromFilterParameters(filter) &&
       !this.isExcludedFromFilterParameters(attribute)
     ) {
-      if (!this._filterParameters.includes(filter)) {
-        this._filterParameters.push(filter);
+      if (!this.app.config.filterParameters.includes(filter)) {
+        this.app.config.filterParameters.push(filter);
       }
     }
   }

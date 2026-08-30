@@ -85,7 +85,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
   it("installing autofiltered parameters will add the encrypted attribute as a filter parameter using the dot notation", () => {
     const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
+    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
     const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
@@ -106,7 +106,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
   it("installing autofiltered parameters will work with unnamed classes", () => {
     const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
+    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
     const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
@@ -129,7 +129,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     Configurable.config.excludedFromFilterParameters = ["catchphrase"];
 
     const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
+    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
     const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
@@ -164,7 +164,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     Configurable.config.excludedFromFilterParameters = ["secret_token"];
 
     const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
+    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
     const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
