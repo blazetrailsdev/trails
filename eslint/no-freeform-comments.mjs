@@ -64,6 +64,14 @@
  * specific than what was there. The marker's own reason text is kept with it,
  * as with `eslint-disable-next-line -- <reason>`.
  *
+ * A `vendor/ruby/<file>:<line>` citation is read by
+ * `eslint/ruby-compat-needs-mri-citation.mjs`, which REQUIRES one on every
+ * `@blazetrails/ruby-compat` export and RESOLVES it against the pinned
+ * ruby/ruby checkout — deleting one reds that rule. It is the exception the
+ * paragraph above about `vendor/rails` citations does not cover: `parity:api`
+ * can never enroll that package (MRI's surface is C), so the citation is not a
+ * pointer beside a comparison, it IS the comparison.
+ *
  * `normalize-skips.ts` also accepts a third, legacy spelling, a bare
  * `PERMANENT:`, which is deliberately NOT listed here: it collides with the
  * permanence token a `@noRailsEquivalent` / `@missingRailsCall` /
@@ -72,7 +80,7 @@
  * prose instead. No skip in the repo uses the legacy form.
  */
 const DIRECTIVE_RE =
-  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=|\bdrift-ok:|\bPERMANENT-SKIP:|\bBLOCKED:/iu;
+  /^[\s*]*(?:eslint-(?:disable|enable)(?:-next-line|-line)?\b|eslint\s|globals?\s|exported\b|@ts-(?:expect-error|ignore|nocheck)\b|prettier-ignore\b|(?:v8|c8|istanbul|node:coverage)\s+ignore\b|@vitest-environment\b|#!)|\bboundary:|@boundary-file:|@nie\s+disposition=|\bdrift-ok:|\bPERMANENT-SKIP:|\bBLOCKED:|\bvendor\/ruby\/[A-Za-z0-9_./+-]+:\d+/iu;
 
 /**
  * The repo's own JSDoc flags, the only tags that survive. Each is read by a

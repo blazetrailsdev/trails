@@ -15,6 +15,7 @@
 import tseslint from "typescript-eslint";
 import railsPrivateJsdoc from "./rails-private-jsdoc.mjs";
 import unbackedInternalNeedsReceipt from "./unbacked-internal-needs-receipt.mjs";
+import rubyCompatNeedsMriCitation from "./ruby-compat-needs-mri-citation.mjs";
 
 export default [
   // Plugin registration is global (no `files`): ESLint refuses to redefine a
@@ -25,6 +26,7 @@ export default [
         rules: {
           "rails-private-jsdoc": railsPrivateJsdoc,
           "unbacked-internal-needs-receipt": unbackedInternalNeedsReceipt,
+          "ruby-compat-needs-mri-citation": rubyCompatNeedsMriCitation,
         },
       },
     },
@@ -70,6 +72,9 @@ export default [
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
       "packages/arel/src/**/*.ts",
+      // Absent from the rails-private manifest by construction, so the
+      // receipt pairing is mandatory package-wide there (RFC 0129).
+      "packages/ruby-compat/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -81,5 +86,19 @@ export default [
     },
     linterOptions: { reportUnusedDisableDirectives: "off" },
     rules: { "blazetrails/unbacked-internal-needs-receipt": "error" },
+  },
+  // ruby-compat's MRI citations RESOLVE against `vendor/ruby/`, and this is the
+  // one CI job that fetches it — the standalone Lint job has none, where the
+  // rule skips by design. So this block is the enforcing run, the same way the
+  // manifest-backed rules above only go live here.
+  {
+    files: ["packages/ruby-compat/src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: { ecmaVersion: "latest", sourceType: "module" },
+    },
+    linterOptions: { reportUnusedDisableDirectives: "off" },
+    rules: { "blazetrails/ruby-compat-needs-mri-citation": "error" },
   },
 ];
