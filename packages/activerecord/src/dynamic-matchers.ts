@@ -1,3 +1,5 @@
+import { camelize } from "@blazetrails/activesupport";
+
 interface DynamicMatchersHost {
   name: string;
   columnsHash(): Record<string, unknown>;
@@ -18,7 +20,8 @@ function match(model: DynamicMatchersHost, name: string): string[] | null {
 function valid(model: DynamicMatchersHost, attributeNames: string[]): boolean {
   const columnsHash = model.columnsHash();
   return attributeNames.every(
-    (name) => columnsHash[name] != null || model.reflectOnAggregation?.(name) != null,
+    (name) =>
+      columnsHash[name] != null || model.reflectOnAggregation?.(camelize(name, false)) != null,
   );
 }
 

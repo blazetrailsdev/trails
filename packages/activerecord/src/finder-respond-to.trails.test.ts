@@ -8,6 +8,7 @@ describe("FinderRespondToTrailsTest", () => {
 
   it("responds to find by an aggregation", () => {
     expect(Customer.respondToMissing("findByAddress")).toBe(true);
+    expect(Customer.respondToMissing("findByNonBlankGpsLocation")).toBe(true);
     expect(Customer.respondToMissing("findByNotAnAggregation")).toBe(false);
   });
 
