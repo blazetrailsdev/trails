@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isPresent } from "@blazetrails/activesupport";
-import { assertPredicate } from "@blazetrails/activesupport";
+import { assertPredicate, isPresent } from "@blazetrails/activesupport";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterType } from "../test-adapter.js";
 import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
