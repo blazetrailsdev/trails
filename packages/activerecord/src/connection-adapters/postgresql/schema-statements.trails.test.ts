@@ -933,7 +933,7 @@ describe("SchemaStatements#columns delegates to newColumnFromField", () => {
 
     const [id, name] = await ss.columns("things");
 
-    expect(id.isSerial).toBe(true);
+    expect(id.isSerial()).toBe(true);
     expect(id.null).toBe(false);
     expect(name.comment).toBe("the name");
     expect(name.null).toBe(true);

@@ -74,7 +74,7 @@ export class IntegerType extends NumericValueType {
       return isNaN(parsed) ? 0 : parsed;
     }
     try {
-      return (value as { toI(): number }).toI();
+      return (value as { toI(): number | bigint }).toI();
     } catch {
       return null;
     }
