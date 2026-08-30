@@ -263,21 +263,15 @@ export class Association {
   }
 
   get extensions(): any[] {
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (n: string) => AssociationDefinition | null;
-    };
-    const reflection = (ctor._reflectOnAssociation?.(this.reflection.name) ??
-      this.reflection) as AssociationDefinition;
-
     let extensions = [
-      ...new Set([...this.klass.defaultExtensions(), ...(reflection.extensions?.() ?? [])]),
+      ...new Set([...this.klass.defaultExtensions(), ...this.reflection.extensions()]),
     ];
 
-    if (reflection.scope) {
+    if (this.reflection.scope) {
       extensions = [
         ...new Set([
           ...extensions,
-          ...reflection.scopeFor(this.klass.unscoped(), this.owner).extensions,
+          ...this.reflection.scopeFor(this.klass.unscoped(), this.owner).extensions,
         ]),
       ];
     }

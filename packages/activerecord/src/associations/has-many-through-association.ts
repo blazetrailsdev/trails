@@ -603,12 +603,12 @@ async function loadHasManyThrough(
       const resolvedSourceName = sourceAssoc?.name ?? sourceName;
       const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
       const originalScope = throughAssoc.scope;
+      const sourceTypeScope = (rel: any) => rel.where({ [sourceTypeCol]: options.sourceType });
       const sourceTypeReflection = Object.create(throughAssoc, {
         scope: {
           value: (rel: any) => {
-            let r = rel.where({ [sourceTypeCol]: options.sourceType });
-            if (originalScope) r = originalScope(r);
-            return r;
+            const r = sourceTypeScope(rel);
+            return originalScope ? originalScope(r) : r;
           },
         },
       }) as AssociationDefinition;

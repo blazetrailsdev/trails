@@ -313,16 +313,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
-    it("a stranded command marker cannot report ACTIVE at an idle-in-transaction backend", async () => {
+    it("transaction status follows the driver's in-flight query, not adapter bookkeeping", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await other.execute("BEGIN");
-        await other.execute("SELECT 1 AS n");
+        const client = other._rawConnection as unknown as Record<string, unknown>;
 
-        const marked = other as unknown as Record<string, unknown>;
-        marked._commandSettled = false;
-        (other._rawConnection as unknown as Record<string, unknown>).readyForQuery = false;
+        expect("_commandSettled" in other).toBe(false);
 
+        expect(client._activeQuery ?? null).toBeNull();
+        expect(other.transactionStatus).toBe(2);
+
+        const inFlight = (other._rawConnection as pg.Client).query("SELECT pg_sleep(0.2)");
+        expect(client._activeQuery ?? null).not.toBeNull();
+        expect(other.transactionStatus).toBe(1);
+
+        await inFlight;
+        expect(client._activeQuery ?? null).toBeNull();
         expect(other.transactionStatus).toBe(2);
       } finally {
         await other.close();
