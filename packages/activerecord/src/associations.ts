@@ -25,10 +25,7 @@ import {
   type HasManyThroughOwnerClass,
   type HasManyThroughReflection,
 } from "./associations/errors.js";
-import {
-  AssociationNotFoundError,
-  InverseOfAssociationNotFoundError,
-} from "./associations/errors.js";
+import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 import { validateThroughReflection } from "./associations/validate-through-reflection.js";
@@ -251,23 +248,6 @@ export function resolveAssocClass(
   }
   autoloadModel(className);
   return constantize(className) as typeof Base;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function validateInverseOf(
-  owner: typeof Base,
-  targetModel: typeof Base,
-  assocName: string,
-  inverseOf: string,
-): void {
-  const targetReflections = Reflection.reflections(targetModel);
-  if (Object.keys(targetReflections).length === 0) return;
-  if (targetModel._reflectOnAssociation(inverseOf) != null) return;
-
-  throw new InverseOfAssociationNotFoundError(owner._reflectOnAssociation(assocName), targetModel);
 }
 
 /** @internal */

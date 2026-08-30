@@ -11,7 +11,6 @@ import {
   _wireInverseAssociation,
   applyAssociationScope,
   resolveAssocClass,
-  validateInverseOf,
 } from "../associations.js";
 import { Association } from "./association.js";
 import { AssociationNotFoundError } from "./errors.js";
@@ -155,10 +154,6 @@ export class SingularAssociation extends Association {
         targetModel = ctor.polymorphicClassFor(typeName);
       } else {
         targetModel = resolveAssocClass(owner, assocName, options.className ?? camelize(assocName));
-      }
-
-      if (options.inverseOf && !(isBelongsTo && options.polymorphic)) {
-        validateInverseOf(ctor, targetModel, assocName, options.inverseOf);
       }
 
       const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
