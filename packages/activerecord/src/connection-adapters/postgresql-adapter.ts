@@ -1533,7 +1533,6 @@ export class PostgreSQLAdapter
   }
 
   override resetBang(): void {
-    if (this._rawConnection) this._connectionConfigured = false;
     void this.lock
       .synchronize(async () => {
         const live = this._rawConnection;
@@ -1541,6 +1540,7 @@ export class PostgreSQLAdapter
           await this.connectBang();
           return;
         }
+        this._connectionConfigured = false;
         if (this.transactionStatus !== PQTRANS_IDLE) {
           await live.query("ROLLBACK").catch(() => {});
         }
