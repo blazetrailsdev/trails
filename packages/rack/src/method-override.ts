@@ -53,15 +53,15 @@ export class MethodOverride {
     return null;
   }
 
-  private methodOverrideParam(req: Record<string, any>): string | null {
-    const contentType = req["CONTENT_TYPE"] || "";
+  private methodOverrideParam(env: Record<string, any>): string | null {
+    const contentType = env["CONTENT_TYPE"] || "";
     const isFormData = contentType.includes("application/x-www-form-urlencoded");
     const isMultipart = contentType.includes("multipart/form-data");
 
     if (!isFormData && !isMultipart) return null;
 
     try {
-      const input = req[RACK_INPUT];
+      const input = env[RACK_INPUT];
       if (!input) return null;
       const body =
         typeof input.read === "function" ? input.read() : typeof input === "string" ? input : "";
@@ -72,7 +72,7 @@ export class MethodOverride {
         // Ruby raises EOFError for truncated multipart, we simulate by checking
         const boundary = contentType.match(/boundary=([^\s;]+)/)?.[1];
         if (boundary && !body.includes(`--${boundary}--`)) {
-          const errors = req[RACK_ERRORS];
+          const errors = env[RACK_ERRORS];
           if (errors && typeof errors.puts === "function") {
             errors.puts("Bad request content body");
           } else if (errors && typeof errors.write === "function") {
@@ -88,7 +88,7 @@ export class MethodOverride {
       const params = parseNestedQuery(body);
       return params[METHOD_OVERRIDE_PARAM_KEY] || null;
     } catch (e: any) {
-      const errors = req[RACK_ERRORS];
+      const errors = env[RACK_ERRORS];
       const msg = e.message?.includes("too deep")
         ? "Invalid or incomplete POST params"
         : e.message?.includes("Invalid")

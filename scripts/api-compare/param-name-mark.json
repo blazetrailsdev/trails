@@ -4,9 +4,10 @@
     "byFile": {}
   },
   "actioncontroller": {
-    "total": 6,
+    "total": 7,
     "byFile": {
       "base.rb": 1,
+      "metal/allow_browser.rb": 1,
       "metal/flash.rb": 1,
       "metal/logging.rb": 2,
       "template_assertions.rb": 2
@@ -48,9 +49,11 @@
     "byFile": {}
   },
   "rack": {
-    "total": 1,
+    "total": 3,
     "byFile": {
-      "headers.rb": 1
+      "files.rb": 1,
+      "headers.rb": 1,
+      "method_override.rb": 1
     }
   },
   "trailties": {

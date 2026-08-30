@@ -150,8 +150,8 @@ export class Files {
     return isFile ? this.serving(env, resolved) : this.fail(404, `File not found: ${pathInfo}`);
   }
 
-  serving(request: Record<string, any>, path: string): [number, Record<string, any>, any] {
-    const method = request["REQUEST_METHOD"];
+  serving(env: Record<string, any>, path: string): [number, Record<string, any>, any] {
+    const method = env["REQUEST_METHOD"];
 
     if (method === "OPTIONS") {
       return [200, { allow: ALLOW_HEADER, [CONTENT_LENGTH]: "0" }, []];
@@ -167,7 +167,7 @@ export class Files {
     if (!stat.isFile()) return this.fail(404, "File not found");
 
     const lastModified = stat.mtime.toUTCString();
-    const ifModSince = request["HTTP_IF_MODIFIED_SINCE"];
+    const ifModSince = env["HTTP_IF_MODIFIED_SINCE"];
     const headers: Record<string, string> = { "last-modified": lastModified };
 
     if (ifModSince && new Date(ifModSince) >= stat.mtime) return [304, headers, []]; // boundary: HTTP-date vs mtime
@@ -176,7 +176,7 @@ export class Files {
     Object.assign(headers, this.headers);
 
     const size = this.filesize(path);
-    const rawRange = request["HTTP_RANGE"] as string | undefined;
+    const rawRange = env["HTTP_RANGE"] as string | undefined;
 
     if (rawRange && size > 0) {
       const ranges = this.parseByteRanges(rawRange, size);
