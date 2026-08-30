@@ -105,12 +105,23 @@ describe("MySQL::SchemaStatements", () => {
     expect(td).toBeInstanceOf(MysqlTableDefinition);
   });
 
+  const baseLookupCastType = (sqlType: string | null) => ({
+    name: (sqlType ?? "")
+      .replace(/\(.*\).*$/, "")
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)[0],
+    limit: null,
+    precision: null,
+    scale: null,
+  });
+
   const reflectionHost = (
     createTableInfo: string | null = null,
-    lookupCastType?: MysqlColumnReflectionHost["lookupCastType"],
+    lookupCastType: MysqlColumnReflectionHost["lookupCastType"] = baseLookupCastType,
   ): MysqlColumnReflectionHost => ({
     createTableInfo: () => Promise.resolve(createTableInfo),
-    ...(lookupCastType ? { lookupCastType } : {}),
+    lookupCastType,
   });
 
   it("defaultType: parses string/integer/function defaults", async () => {
@@ -268,21 +279,16 @@ describe("MySQL::SchemaStatements", () => {
     expect(col.default).toBe("hello world");
   });
 
-  it("fetchTypeMetadata: fallback strips unsigned/zerofill modifiers", () => {
-    expect(fetchTypeMetadata("bigint unsigned").type).toBe("bigint");
-    expect(fetchTypeMetadata("int unsigned zerofill").type).toBe("int");
-  });
-
   it("fetchTypeMetadata wraps sqlType with MySQL TypeMetadata", () => {
-    const meta = fetchTypeMetadata("varchar(255)", "auto_increment");
+    const meta = fetchTypeMetadata.call(reflectionHost(), "varchar(255)", "auto_increment");
     expect(meta.sqlType).toBe("varchar(255)");
     expect(meta.extra).toBe("auto_increment");
-    expect(fetchTypeMetadata("int").extra).toBe("");
+    expect(fetchTypeMetadata.call(reflectionHost(), "int").extra).toBe("");
   });
 
   it("fetchTypeMetadata: uses lookupCastType for limit/precision/scale", () => {
     const lookup = (s: string) => ({ name: "integer", limit: 8, precision: null, scale: null });
-    const meta = fetchTypeMetadata("bigint unsigned", "", lookup);
+    const meta = fetchTypeMetadata.call(reflectionHost(null, lookup), "bigint unsigned", "");
     expect(meta.type).toBe("integer");
     expect(meta.limit).toBe(8);
   });
@@ -306,7 +312,7 @@ describe("MySQL::SchemaStatements", () => {
 
   it("fetchTypeMetadata: lookupCastType boolean mapping (tinyint(1) emulation)", () => {
     const lookup = (s: string) => ({ name: "boolean", limit: null, precision: null, scale: null });
-    const meta = fetchTypeMetadata("tinyint(1)", "", lookup);
+    const meta = fetchTypeMetadata.call(reflectionHost(null, lookup), "tinyint(1)", "");
     expect(meta.type).toBe("boolean");
   });
 

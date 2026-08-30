@@ -96,7 +96,7 @@ export async function returningColumnValues(
 }
 
 export interface MaxAllowedPacketHost {
-  showVariable(name: string): Promise<string | null>;
+  showVariable(name: string): Promise<unknown>;
   _maxAllowedPacket?: number | null;
   /** @internal */
   maxAllowedPacket(): Promise<number | null>;

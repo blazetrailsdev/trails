@@ -14,6 +14,16 @@ import {
 import { prepend } from "./prepend.js";
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
+export namespace NullSerializer {
+  export function load(value: string): string {
+    return value;
+  }
+
+  export function dump(value: unknown): unknown {
+    return value;
+  }
+}
+
 export class InvalidMessage extends Error {
   constructor(message = "Invalid message") {
     super(message);
@@ -90,7 +100,10 @@ export class MessageEncryptor extends Codec {
     this.cipher = opts.cipher ?? (this.constructor as typeof MessageEncryptor).defaultCipher();
     this.aeadMode = this.newCipher().authenticated;
     this.verifier = !this.aeadMode
-      ? new MessageVerifier(resolvedSignSecret ?? secret, { ...opts, serializer: NullSerializer })
+      ? new MessageVerifier(resolvedSignSecret ?? secret, {
+          ...opts,
+          serializer: NullSerializer as MessageSerializer,
+        })
       : undefined;
 
     initializeRotator(
@@ -230,15 +243,3 @@ export class MessageEncryptor extends Codec {
 
 Object.assign(MessageEncryptor.prototype, { rotate, onRotation, fallBackTo });
 prepend(MessageEncryptor.prototype, { readMessage: readMessageWithRotations });
-
-export namespace NullSerializer {
-  export function dump(value: unknown): string {
-    if (typeof value !== "string") {
-      throw new TypeError("NullSerializer.dump expects a string value");
-    }
-    return value;
-  }
-  export function load(value: string): string {
-    return value;
-  }
-}

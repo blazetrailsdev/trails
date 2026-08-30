@@ -541,8 +541,18 @@ export interface AbstractAdapter {
     binds?: unknown[],
     opts?: { async?: boolean },
   ): Promise<unknown[][]>;
-  queryValue(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
-  queryValues(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown[]>;
+  queryValue(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<unknown>;
+  queryValues(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<unknown[]>;
   execQuery(
     sql: string,
     name?: string | null,

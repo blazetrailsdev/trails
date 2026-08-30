@@ -25,6 +25,10 @@ describe("AbstractMysqlAdapter.dbconsole option keys", () => {
     expect(args).toContain("--port=0");
     expect(args).toContain("--socket=");
   });
+
+  it("pushes an empty-string database, as Rails' unconditional args << config.database does", () => {
+    expect(AbstractMysqlAdapter.dbconsole({ database: "" })).toEqual(["mysql", ""]);
+  });
 });
 
 describe("SQLite3Adapter.dbconsole option keys", () => {

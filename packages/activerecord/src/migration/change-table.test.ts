@@ -2,8 +2,10 @@ import { describe, it, expect, expect as vitestExpect } from "vitest";
 import { assertNot } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
-import type { SchemaStatementsLike } from "../connection-adapters/abstract/schema-statements-like.js";
-import { Table as PgTable } from "../connection-adapters/postgresql/schema-definitions.js";
+import {
+  Table as PgTable,
+  type SchemaStatementsConstraintLike,
+} from "../connection-adapters/postgresql/schema-definitions.js";
 import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";
 
 type Call = { method: string; args: unknown[] };
@@ -25,7 +27,7 @@ function normalizeArgs(args: unknown[]): unknown[] {
 }
 
 interface MockConnection {
-  base: SchemaStatementsLike;
+  base: SchemaStatementsConstraintLike;
   expect: ExpectFn;
   verify(): void;
 }
@@ -45,7 +47,7 @@ function mockConnection(): MockConnection {
         };
       },
     },
-  ) as SchemaStatementsLike;
+  ) as SchemaStatementsConstraintLike;
 
   return {
     base,

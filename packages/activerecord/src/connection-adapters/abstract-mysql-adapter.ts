@@ -470,11 +470,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async charset(): Promise<string> {
-    return (await this.showVariable("character_set_database")) ?? "";
+    return String((await this.showVariable("character_set_database")) ?? "");
   }
 
   async collation(): Promise<string> {
-    return (await this.showVariable("collation_database")) ?? "";
+    return String((await this.showVariable("collation_database")) ?? "");
   }
 
   /** @internal */
@@ -769,11 +769,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return parseTableOptions(createInfo, comment);
   }
 
-  async showVariable(name: string): Promise<string | null> {
-    if (!/^\w+$/.test(name)) return null;
+  async showVariable(name: string): Promise<unknown> {
     try {
-      const val = await this.queryValue(`SELECT @@${name}`, "SCHEMA");
-      return val == null ? null : String(val);
+      return await this.queryValue(`SELECT @@${name}`, "SCHEMA", undefined, {
+        materializeTransactions: false,
+        allowRetry: true,
+      });
     } catch (e) {
       if (e instanceof StatementInvalid) return null;
       throw e;
@@ -955,7 +956,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     } else if (isRubyTruthy(config.password) && String(config.password) !== "") {
       args.push("-p");
     }
-    if (config.database) args.push(config.database as string);
+    if (config.database !== undefined) args.push(config.database as string);
     return this.findCmdAndExec(ActiveRecord.databaseCli["mysql"], ...args);
   }
 
