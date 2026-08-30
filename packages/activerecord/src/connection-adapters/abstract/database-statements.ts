@@ -342,12 +342,14 @@ export function explain(
 }
 
 export async function truncate(
-  this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
+  this: DatabaseStatementsHost &
+    Required<Pick<DatabaseStatementsHost, "execute">> &
+    Pick<Quoting, "quoteTableName">,
   tableName: string,
   name: string | null = null,
 ): Promise<unknown> {
   const sql = (this.buildTruncateStatement ?? buildTruncateStatement).call(this, tableName);
-  return (this.execute ?? execute).call(this, sql, name);
+  return this.execute(sql, name);
 }
 
 export async function truncateTables(
@@ -608,7 +610,9 @@ export async function resetSequenceBang(
 ): Promise<void> {}
 
 export async function insertFixture(
-  this: DatabaseStatementsHost & Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">,
+  this: DatabaseStatementsHost &
+    Required<Pick<DatabaseStatementsHost, "execute">> &
+    Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName">,
   fixture: Record<string, unknown>,
   tableName: string,
 ): Promise<unknown> {
@@ -638,7 +642,7 @@ export async function insertFixture(
       ? `INSERT INTO ${this.quoteTableName(tableName)} (${columns.map((c) => this.quoteColumnName(c)).join(", ")}) VALUES (${values.join(", ")})`
       : `INSERT INTO ${this.quoteTableName(tableName)} ${emptyValue}`;
 
-  return (this.execute ?? execute).call(this, sql, "Fixture Insert");
+  return this.execute(sql, "Fixture Insert");
 }
 
 export async function insertFixturesSet(
@@ -807,7 +811,7 @@ export async function internalExecQuery(
       "internalExecQuery requires internalExecute on the adapter when binds are provided",
     );
   }
-  const result = await (this?.execute ?? execute).call(this, sql, name);
+  const result = await (this.execute ?? execute).call(this, sql, name);
   return normalizeResult(result);
 }
 
