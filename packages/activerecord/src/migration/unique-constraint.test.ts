@@ -164,9 +164,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
       await expect(
         Section.transaction(
           async () => {
-            await (
-              await Section.leaseConnection()
-            ).execQuery("SET CONSTRAINTS unique_section_position DEFERRED");
+            await connection.execQuery("SET CONSTRAINTS unique_section_position DEFERRED");
             await Section.createBang({ position: 1 });
             await section.updateBang({ position: 2 });
 

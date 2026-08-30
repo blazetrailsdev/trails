@@ -292,7 +292,7 @@ describe("non-transactional row writes", () => {
     expect(isOffender(src)).toBe(false);
   });
 
-  it("clears leaseConnection on a model the file bound its own adapter to", () => {
+  it("counts leaseConnection even on a model the file bound its own adapter to", () => {
     const src = `describe("x", () => {
   beforeAll(async () => {
     (Invoice as unknown as { _adapter: PostgreSQLAdapter })._adapter = connection;
@@ -301,17 +301,6 @@ describe("non-transactional row writes", () => {
   it("writes", async () => {
     await (await Invoice.leaseConnection()).setConstraints("deferred", "c");
     await Invoice.create({ start_date: "2020-01-01" });
-  });
-});
-`;
-    expect(isOffender(src)).toBe(false);
-  });
-
-  it("counts leaseConnection on a model the file never bound", () => {
-    const src = `describe("x", () => {
-  it("writes", async () => {
-    await (await Book.leaseConnection()).execQuery("SET CONSTRAINTS c DEFERRED");
-    await Book.create({ name: "Dune" });
   });
 });
 `;
