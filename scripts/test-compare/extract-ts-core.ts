@@ -607,14 +607,12 @@ export const DYNAMIC_TITLE_PLACEHOLDER = "<expr>";
 function getArgTitle(
   node: ts.CallExpression,
   index: number,
-  bindings?: ReadonlyMap<string, string>,
+  bindings: ReadonlyMap<string, string>,
 ): { title: string; dynamic: boolean } | null {
   const staticTitle = getArgString(node, index);
   if (staticTitle !== null) return { title: staticTitle, dynamic: false };
-  if (bindings && bindings.size > 0) {
-    const resolved = resolveTemplateTitle(node, index, bindings);
-    if (resolved !== null) return { title: resolved, dynamic: false };
-  }
+  const resolved = resolveTemplateTitle(node, index, bindings);
+  if (resolved !== null) return { title: resolved, dynamic: false };
   const skeleton = getArgTemplateSkeleton(node, index);
   return skeleton === null ? null : { title: skeleton, dynamic: true };
 }
