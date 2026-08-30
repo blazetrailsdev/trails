@@ -34,7 +34,7 @@ afterEach(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
 describe("AuthenticationGenerator", () => {
   it("emits the full file set; each .ts file parses + carries no Ruby source", () => {
-    makeGen().run();
+    makeGen().run({ skipMailer: false, skipActionCable: false });
     for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     const combined: string[] = [];
     for (const rel of TS_EMIT) {
@@ -51,9 +51,17 @@ describe("AuthenticationGenerator", () => {
     expect(exists("src/app/mailers/passwords-mailer.ts")).toBe(false);
     expect(exists(VIEWS[0])).toBe(false);
     expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(false);
-    makeGen().run({ api: true });
+    makeGen().run({ api: true, skipMailer: false });
     expect(exists("src/app/mailers/passwords-mailer.ts")).toBe(true);
     expect(exists(VIEWS[0])).toBe(false);
+  });
+
+  it("skips the mailer and channel files while their packages are unported", () => {
+    makeGen().run();
+    expect(exists("src/app/mailers/passwords-mailer.ts")).toBe(false);
+    expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(false);
+    for (const rel of VIEWS) expect(exists(rel), rel).toBe(false);
+    expect(exists("src/app/channels/application-cable/connection.ts")).toBe(false);
   });
 
   it("injects inside the class even when ApplicationController has a body", () => {
@@ -104,7 +112,7 @@ describe("AuthenticationGenerator", () => {
 
   it("does not clobber a pre-existing application-cable Connection", () => {
     write("src/app/channels/application-cable/connection.ts", "// user\n");
-    makeGen().run();
+    makeGen().run({ skipActionCable: false });
     expect(read("src/app/channels/application-cable/connection.ts")).toBe("// user\n");
   });
 

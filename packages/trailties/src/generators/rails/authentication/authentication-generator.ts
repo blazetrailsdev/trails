@@ -12,6 +12,7 @@ import {
 export interface AuthenticationRunOptions {
   api?: boolean;
   skipMailer?: boolean;
+  skipActionCable?: boolean;
 }
 
 const APP_RECORD = ref("ApplicationRecord", "./application-record.js");
@@ -29,7 +30,7 @@ export class AuthenticationGenerator extends GeneratorBase {
   run(options: AuthenticationRunOptions = {}): string[] {
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
-    const { api = false, skipMailer = false } = options;
+    const { api = false, skipMailer = true, skipActionCable = true } = options;
     this.emit("src/app/models/session.ts", "Session", APP_RECORD, [
       stub("associations", "// belongsTo: User", { static: true }),
     ]);
@@ -66,7 +67,7 @@ export class AuthenticationGenerator extends GeneratorBase {
       ],
     );
     // Don't clobber AppGenerator's Connection (or user customizations).
-    if (!this.fileExists("src/app/channels/application-cable/connection.ts"))
+    if (!skipActionCable && !this.fileExists("src/app/channels/application-cable/connection.ts"))
       this.emit("src/app/channels/application-cable/connection.ts", "Connection", undefined, [
         stub("identifiedBy", "// currentUser", { static: true }),
         asyncStub("connect", "// setCurrentUser || rejectUnauthorizedConnection"),

@@ -429,25 +429,10 @@ export function drawRoutes(mapper: Mapper): void {
 
     this.createFile("src/config/database.ts", this.dbConfig(name));
 
-    this.createFile(
-      "src/config/puma.ts",
-      `const port = parseInt(process.env.PORT || "3000", 10);
-const environment = process.env.NODE_ENV || "development";
-
-export default {
-  port,
-  environment,
-  pidfile: "tmp/pids/server.pid",
-  workers: parseInt(process.env.WEB_CONCURRENCY || "0", 10),
-  maxThreads: parseInt(process.env.TRAILS_MAX_THREADS || "5", 10),
-  minThreads: parseInt(process.env.TRAILS_MIN_THREADS || "5", 10),
-};
-`,
-    );
-
-    this.createFile(
-      "src/config/cable.ts",
-      `export default {
+    if (!this.skip("ActionCable")) {
+      this.createFile(
+        "src/config/cable.ts",
+        `export default {
   development: {
     adapter: "async",
   },
@@ -460,11 +445,13 @@ export default {
   },
 };
 `,
-    );
+      );
+    }
 
-    this.createFile(
-      "src/config/storage.ts",
-      `export default {
+    if (!this.skip("ActiveStorage")) {
+      this.createFile(
+        "src/config/storage.ts",
+        `export default {
   local: {
     service: "Disk",
     root: "storage",
@@ -475,7 +462,8 @@ export default {
   },
 };
 `,
-    );
+      );
+    }
 
     this.createFile(
       "src/config/environments/development.ts",
@@ -621,45 +609,51 @@ export const filterParameters = [
       tsModule({ declarations: [tsRaw(`export const ApplicationHelper = {\n};`)] }),
     );
 
-    this.createFile(
-      "src/app/jobs/application-job.ts",
-      tsModule({
-        declarations: [
-          tsClass({
-            name: "ApplicationJob",
-            body: [tsField("queueAs", "string", { inferType: true, initializer: '"default"' })],
-          }),
-        ],
-      }),
-    );
+    if (!this.skip("ActiveJob")) {
+      this.createFile(
+        "src/app/jobs/application-job.ts",
+        tsModule({
+          declarations: [
+            tsClass({
+              name: "ApplicationJob",
+              body: [tsField("queueAs", "string", { inferType: true, initializer: '"default"' })],
+            }),
+          ],
+        }),
+      );
+    }
 
-    this.createFile(
-      "src/app/mailers/application-mailer.ts",
-      tsModule({
-        declarations: [
-          tsClass({
-            name: "ApplicationMailer",
-            body: [
-              tsField("defaultFrom", "string", {
-                inferType: true,
-                initializer: '"from@example.com"',
-              }),
-              tsField("layout", "string", { inferType: true, initializer: '"mailer"' }),
-            ],
-          }),
-        ],
-      }),
-    );
+    if (!this.skip("ActionMailer")) {
+      this.createFile(
+        "src/app/mailers/application-mailer.ts",
+        tsModule({
+          declarations: [
+            tsClass({
+              name: "ApplicationMailer",
+              body: [
+                tsField("defaultFrom", "string", {
+                  inferType: true,
+                  initializer: '"from@example.com"',
+                }),
+                tsField("layout", "string", { inferType: true, initializer: '"mailer"' }),
+              ],
+            }),
+          ],
+        }),
+      );
+    }
 
-    this.createFile(
-      "src/app/channels/application-cable/connection.ts",
-      tsModule({ declarations: [tsClass({ name: "Connection", body: [] })] }),
-    );
+    if (!this.skip("ActionCable")) {
+      this.createFile(
+        "src/app/channels/application-cable/connection.ts",
+        tsModule({ declarations: [tsClass({ name: "Connection", body: [] })] }),
+      );
 
-    this.createFile(
-      "src/app/channels/application-cable/channel.ts",
-      tsModule({ declarations: [tsClass({ name: "Channel", body: [] })] }),
-    );
+      this.createFile(
+        "src/app/channels/application-cable/channel.ts",
+        tsModule({ declarations: [tsClass({ name: "Channel", body: [] })] }),
+      );
+    }
 
     this.createFile(
       "src/app/views/layouts/application.html.tse",
@@ -678,9 +672,10 @@ export const filterParameters = [
 `,
     );
 
-    this.createFile(
-      "src/app/views/layouts/mailer.html.tse",
-      `<!DOCTYPE html>
+    if (!this.skip("ActionMailer")) {
+      this.createFile(
+        "src/app/views/layouts/mailer.html.tse",
+        `<!DOCTYPE html>
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
@@ -693,13 +688,14 @@ export const filterParameters = [
 </body>
 </html>
 `,
-    );
+      );
 
-    this.createFile(
-      "src/app/views/layouts/mailer.text.tse",
-      `<%- yield %>
+      this.createFile(
+        "src/app/views/layouts/mailer.text.tse",
+        `<%- yield %>
 `,
-    );
+      );
+    }
 
     this.createFile(
       "src/app/assets/stylesheets/application.css",
@@ -978,7 +974,9 @@ export async function setupTestDatabase(): Promise<void> {
   private createDirectoryPlaceholders(): void {
     this.createFile("lib/tasks/.gitkeep", "");
     this.createFile("log/.gitkeep", "");
-    this.createFile("storage/.gitkeep", "");
+    if (!this.skip("ActiveStorage")) {
+      this.createFile("storage/.gitkeep", "");
+    }
     this.createFile("tmp/.gitkeep", "");
     this.createFile("tmp/pids/.gitkeep", "");
     this.createFile("vendor/.gitkeep", "");

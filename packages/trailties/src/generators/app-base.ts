@@ -36,6 +36,13 @@ export type AppBaseOptions = GeneratorOptions & {
   [k: `skip${string}`]: boolean | undefined;
 };
 
+const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
+  skipActionCable: true,
+  skipActionMailer: true,
+  skipActiveJob: true,
+  skipActiveStorage: true,
+};
+
 // Mirrors AppBase::OPTION_IMPLICATIONS: meta options activate their
 // implications unless explicitly revoked with `false`.
 export const OPTION_IMPLICATIONS: Record<string, ReadonlyArray<keyof AppBaseOptions>> = {
@@ -64,7 +71,7 @@ export abstract class AppBase extends GeneratorBase {
     const isAbs = this.path.isAbsolute ? this.path.isAbsolute(options.appPath) : true;
     this.destinationRoot = isAbs ? options.appPath : this.path.join(options.cwd, options.appPath);
     this.cwd = this.destinationRoot;
-    this.options = this.deduceImpliedOptions(options);
+    this.options = this.deduceImpliedOptions({ ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...options });
   }
 
   /** @internal */
