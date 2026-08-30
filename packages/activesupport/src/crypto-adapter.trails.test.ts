@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { Cipher, getCrypto } from "./crypto-adapter.js";
 
 describe("Cipher", () => {
@@ -43,4 +46,29 @@ describe("Cipher", () => {
 
     expect(() => cipher.update(Buffer.from("x"))).toThrow("Cipher key not set");
   });
+});
+
+describe("getCrypto", () => {
+  it("auto-registers the node adapter under a pure ESM entry module", async () => {
+    // vitest enters through CJS interop, where `require` exists and the
+    // createRequire arm covers for the seam; only a real ESM entry exercises
+    // the path a `node dist/**.js` or `tsx` host takes.
+    const module = JSON.stringify(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist", "crypto-adapter.js"),
+    );
+    const source =
+      `const { getCrypto } = await import(${module});\n` +
+      `console.log(getCrypto().randomBytes(10).toString("hex").length);`;
+
+    const { stdout, error } = await new Promise<{ stdout: string; error: string | null }>(
+      (resolve) => {
+        execFile("node", ["--input-type=module", "-e", source], (err, out) =>
+          resolve({ stdout: out.trim(), error: err ? err.message : null }),
+        );
+      },
+    );
+
+    expect(error).toBeNull();
+    expect(stdout).toBe("20");
+  }, 30_000);
 });
