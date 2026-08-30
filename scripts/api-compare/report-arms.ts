@@ -181,19 +181,84 @@ export function renderReport(artifact: SkeletonArtifact, top: number): string {
   ].join("\n");
 }
 
-async function reportMain(top: number): Promise<number> {
-  let artifact: SkeletonArtifact;
+/**
+ * A seeded 32-bit PRNG (mulberry32), so a stated `--seed` reproduces the exact
+ * sample a later reader has to be able to re-draw. `Math.random()` cannot: the
+ * audit's per-row verdicts are only checkable against the rows they were taken
+ * over.
+ */
+export function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * `size` rows drawn uniformly without replacement from the mismatch population,
+ * under `seed`. The population is sorted first so the draw does not inherit the
+ * artifact's own row order, which moves with extraction.
+ */
+export function sampleRows(
+  rows: readonly ArmMismatch[],
+  size: number,
+  seed: number,
+): ArmMismatch[] {
+  const pool = [...rows].sort((a, b) =>
+    `${a.package}/${a.tsFile}#${a.tsName}`.localeCompare(`${b.package}/${b.tsFile}#${b.tsName}`),
+  );
+  const random = mulberry32(seed);
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, size);
+}
+
+export function renderSample(artifact: SkeletonArtifact, size: number, seed: number): string {
+  const rows = artifact.skeletons.flatMap((s) => compareArms(s) ?? []);
+  const drawn = sampleRows(rows, size, seed);
+  return [
+    `call-skeleton arms sample: ${drawn.length} of ${rows.length} mismatched pair(s), seed ${seed}`,
+    ...drawn.map((r, i) =>
+      [
+        ``,
+        `[${i + 1}] ${pairLine(r)}`,
+        `    ruby ${r.rubyFile}#${r.rubyName}`,
+        `    ruby-skeleton ${r.ruby.join(" ")}`,
+        `    ts-skeleton   ${r.ts.join(" ")}`,
+      ].join("\n"),
+    ),
+  ].join("\n");
+}
+
+async function readArtifact(): Promise<SkeletonArtifact | undefined> {
   try {
-    artifact = JSON.parse(await readFile(ARTIFACT_PATH, "utf8")) as SkeletonArtifact;
+    return JSON.parse(await readFile(ARTIFACT_PATH, "utf8")) as SkeletonArtifact;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     console.error(
       `call-skeleton arms report: ${path.relative(ROOT_DIR, ARTIFACT_PATH)} is missing — ` +
         "run `pnpm parity:api --calls` first.",
     );
-    return 2;
+    return undefined;
   }
+}
+
+async function reportMain(top: number): Promise<number> {
+  const artifact = await readArtifact();
+  if (artifact === undefined) return 2;
   console.log(renderReport(artifact, top));
+  return 0;
+}
+
+async function sampleMain(size: number, seed: number): Promise<number> {
+  const artifact = await readArtifact();
+  if (artifact === undefined) return 2;
+  console.log(renderSample(artifact, size, seed));
   return 0;
 }
 
@@ -202,9 +267,21 @@ async function runAsScript(): Promise<void> {
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
   const argv = process.argv.slice(2);
+  const sampleArg = argv.find((a) => a.startsWith("--sample="));
+  if (sampleArg !== undefined) {
+    const size = Number(sampleArg.slice("--sample=".length));
+    const seedArg = argv.find((a) => a.startsWith("--seed="));
+    const seed = seedArg === undefined ? 0 : Number(seedArg.slice("--seed=".length));
+    if (!Number.isInteger(size) || size <= 0 || !Number.isInteger(seed)) {
+      console.error("call-skeleton arms sample: --sample=N and --seed=S take integers.");
+      process.exit(2);
+    }
+    process.exit(await sampleMain(size, seed));
+  }
   if (!argv.includes("--report")) {
     console.error(
-      "call-skeleton arms: the only mode is `--report` (RFC 0113 Phase 1 is advisory).",
+      "call-skeleton arms: the modes are `--report` and `--sample=N [--seed=S]` " +
+        "(RFC 0113 Phase 1 is advisory).",
     );
     process.exit(2);
   }

@@ -58,7 +58,8 @@ doesn't forward `--package` to `compare.ts`). Test numbers come from
 
 ## Verification harnesses
 
-| Doc                                                                     | Priority | Work | Notes                                                                                                                                                       |
-| ----------------------------------------------------------------------- | -------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`parity-verification.md`](activerecord/parity-verification.md)         | P1       | —    | Schema + query parity pipelines (`pnpm parity:pipeline:schema` / `pnpm parity:pipeline:query`). Both shipped; reference for adding fixtures + format bumps. |
-| [`api-compare-baselining.md`](infrastructure/api-compare-baselining.md) | P1       | —    | How to take a trustworthy `parity:api` / `parity:api:extra` baseline, and why every checkout needs a rebuild.                                               |
+| Doc                                                                         | Priority | Work | Notes                                                                                                                                                       |
+| --------------------------------------------------------------------------- | -------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`parity-verification.md`](activerecord/parity-verification.md)             | P1       | —    | Schema + query parity pipelines (`pnpm parity:pipeline:schema` / `pnpm parity:pipeline:query`). Both shipped; reference for adding fixtures + format bumps. |
+| [`api-compare-baselining.md`](infrastructure/api-compare-baselining.md)     | P1       | —    | How to take a trustworthy `parity:api` / `parity:api:extra` baseline, and why every checkout needs a rebuild.                                               |
+| [`arm-mismatch-noise-floor.md`](infrastructure/arm-mismatch-noise-floor.md) | P2       | —    | The RFC 0113 measurement: 80-row seeded audit of `parity:api:arms:report`. 57.5% lowering artefacts, 5% extraction bugs — verdict is ungated.               |

@@ -5,6 +5,9 @@ import {
   compareArms,
   controlArms,
   renderReport,
+  renderSample,
+  sampleRows,
+  type ArmMismatch,
   type SkeletonRow,
 } from "./report-arms.js";
 
@@ -100,5 +103,52 @@ describe("renderReport", () => {
     expect(report).toContain("count");
     expect(report).toContain("order");
     expect(report).toContain("activerecord/connection-adapters/sqlite3-adapter.ts");
+  });
+});
+
+function named(tsName: string, ruby: string[], ts: string[]): SkeletonRow {
+  return { ...row(ruby, ts), tsName };
+}
+
+describe("sampleRows", () => {
+  const rows = ["a", "b", "c", "d", "e", "f"].map(
+    (name) => compareArms(named(name, ["if"], ["if", "if"]))!,
+  );
+
+  it("draws the same rows for the same seed", () => {
+    const names = (drawn: ArmMismatch[]): string[] => drawn.map((r) => r.tsName);
+
+    expect(names(sampleRows(rows, 3, 113))).toEqual(names(sampleRows(rows, 3, 113)));
+  });
+
+  it("draws different rows for a different seed", () => {
+    expect(sampleRows(rows, 3, 113).map((r) => r.tsName)).not.toEqual(
+      sampleRows(rows, 3, 7).map((r) => r.tsName),
+    );
+  });
+
+  it("draws without replacement, and stops at the population size", () => {
+    const drawn = sampleRows(rows, 99, 113);
+
+    expect(drawn).toHaveLength(rows.length);
+    expect(new Set(drawn.map((r) => r.tsName)).size).toBe(rows.length);
+  });
+});
+
+describe("renderSample", () => {
+  it("states the size, the population and the seed, and prints both skeletons", () => {
+    const sample = renderSample(
+      {
+        packages: ["activerecord"],
+        skeletons: [named("translateException", ["if"], ["if", "throw"])],
+      },
+      1,
+      113,
+    );
+
+    expect(sample).toContain("1 of 1 mismatched pair(s), seed 113");
+    expect(sample).toContain("ruby active_record/connection_adapters/sqlite3_adapter.rb");
+    expect(sample).toContain("ruby-skeleton if");
+    expect(sample).toContain("ts-skeleton   if throw");
   });
 });
