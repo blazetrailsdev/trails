@@ -995,27 +995,17 @@ export class SchemaStatements {
   async indexExists(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options?: { unique?: boolean; name?: string; valid?: boolean; column?: string | string[] },
+    options: {
+      column?: string | string[];
+      name?: string;
+      unique?: boolean;
+      valid?: boolean;
+      include?: string[];
+      nullsNotDistinct?: boolean;
+      [key: string]: unknown;
+    } = {},
   ): Promise<boolean> {
-    const allIndexes = await this.indexes(tableName);
-    const isBlank = (c: string | string[] | null | undefined): boolean =>
-      c == null || c === "" || (Array.isArray(c) && c.length === 0);
-    const columns = isBlank(columnName) ? options?.column : columnName;
-    const targetCols = isBlank(columns)
-      ? null
-      : Array.isArray(columns)
-        ? columns
-        : [columns as string];
-
-    return allIndexes.some((idx) => {
-      if (options?.name && idx.name !== options.name) return false;
-      if (options?.unique !== undefined && idx.unique !== options.unique) return false;
-      if (options?.valid !== undefined && (idx as { valid?: boolean }).valid !== options.valid)
-        return false;
-      if (targetCols == null) return true;
-      const idxCols = Array.isArray(idx.columns) ? idx.columns : [idx.columns];
-      return targetCols.length === idxCols.length && targetCols.every((c, i) => c === idxCols[i]);
-    });
+    return (await this.indexes(tableName)).some((i) => i.isDefinedFor(columnName, options));
   }
 
   async foreignKeyExists(

@@ -1,7 +1,7 @@
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";
-import { singularize, pluralize, assertValidKeys } from "@blazetrails/activesupport";
+import { singularize, pluralize, assertValidKeys, isBlank } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import {
@@ -532,7 +532,7 @@ export class IndexDefinition {
   }
 
   isDefinedFor(
-    columns?: string | string[],
+    columns?: string | string[] | null,
     options: {
       column?: string | string[];
       name?: string;
@@ -542,28 +542,21 @@ export class IndexDefinition {
       nullsNotDistinct?: boolean;
     } = {},
   ): boolean {
-    const isBlank =
-      columns == null || (Array.isArray(columns) ? columns.length === 0 : columns === "");
-    if (isBlank) columns = options.column;
-    if (options.name && this.name !== options.name) return false;
-    if (options.unique !== undefined && this.unique !== options.unique) return false;
-    if (options.valid !== undefined && this.valid !== options.valid) return false;
-    if (options.include !== undefined) {
-      const a = (this.include ?? []).slice().sort();
-      const b = options.include.slice().sort();
-      if (a.length !== b.length || a.some((v, i) => v !== b[i])) return false;
-    }
-    if (
-      options.nullsNotDistinct !== undefined &&
-      this.nullsNotDistinct !== options.nullsNotDistinct
-    )
-      return false;
-    if (columns !== undefined) {
-      const cols = Array.isArray(columns) ? columns : [columns];
-      const own = Array.isArray(this.columns) ? this.columns : [this.columns];
-      if (own.length !== cols.length || own.some((c, i) => c !== cols[i])) return false;
-    }
-    return true;
+    const { name, unique, valid, include, nullsNotDistinct } = options;
+    const array = (value: string | string[] | null | undefined): string[] =>
+      value == null ? [] : Array.isArray(value) ? value : [value];
+    const equals = (a: string[], b: string[]): boolean =>
+      a.length === b.length && a.every((v, i) => v === b[i]);
+
+    if (isBlank(columns)) columns = options.column;
+    return (
+      (columns == null || equals(array(this.columns), array(columns).map(String))) &&
+      (name == null || this.name === String(name)) &&
+      (unique == null || this.unique === unique) &&
+      (valid == null || this.valid === valid) &&
+      (include == null || equals(array(this.include), array(include).map(String))) &&
+      (nullsNotDistinct == null || this.nullsNotDistinct === nullsNotDistinct)
+    );
   }
 
   /** @internal */

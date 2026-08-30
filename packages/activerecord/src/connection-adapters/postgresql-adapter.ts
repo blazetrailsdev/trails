@@ -2071,7 +2071,7 @@ export class PostgreSQLAdapter
       column = columnName;
     } else {
       column = undefined;
-      options = columnName ?? {};
+      options = { ...columnName, ...options };
     }
 
     let table = Utils.extractSchemaQualifiedName(tableName);
