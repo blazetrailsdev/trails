@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { Base } from "../base.js";
+import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
 import { createTestUniqueConstraintsTable } from "../support/load-schema-helper.js";
 import { openScratchDatabase, type ScratchDatabase } from "../support/pg-scratch-database.js";
+
+class Section extends Base {}
 
 describeIfSupports("unique_constraints", "Migration", () => {
   let scratch: ScratchDatabase;
@@ -13,6 +17,7 @@ describeIfSupports("unique_constraints", "Migration", () => {
     scratch = await openScratchDatabase("unique_constraints");
     connection = scratch.connection;
     await createTestUniqueConstraintsTable(connection);
+    (Section as unknown as { _adapter: PostgreSQLAdapter })._adapter = connection;
   }, 30000);
 
   afterAll(async () => {
@@ -79,6 +84,23 @@ describeIfSupports("unique_constraints", "Migration", () => {
       }
     });
 
+    it("unique constraints scoped to schemas", async () => {
+      await connection.addUniqueConstraint("sections", ["position"]);
+
+      const before = (await connection.uniqueConstraints("sections")).length;
+      try {
+        await connection.createSchema("test_schema");
+        // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with its schema by the `dropSchema("test_schema")` in the finally block
+        await connection.createTable("test_schema.sections", {}, (t) => {
+          t.integer("position");
+        });
+        await connection.addUniqueConstraint("test_schema.sections", ["position"]);
+        expect((await connection.uniqueConstraints("sections")).length).toBe(before);
+      } finally {
+        await connection.dropSchema("test_schema");
+      }
+    });
+
     it("add unique constraint without deferrable", async () => {
       await connection.addUniqueConstraint("sections", ["position"]);
 
@@ -119,6 +141,40 @@ describeIfSupports("unique_constraints", "Migration", () => {
       await expect(
         connection.addUniqueConstraint("sections", ["position"], { deferrable: true as never }),
       ).rejects.toThrow(ArgumentError);
+    });
+
+    it("added deferrable initially immediate unique constraint", async () => {
+      await connection.addUniqueConstraint("sections", ["position"], {
+        deferrable: "immediate",
+        name: "unique_section_position",
+      });
+
+      const section = await Section.createBang({ position: 1 });
+
+      await expect(
+        Section.transaction(
+          async () => {
+            await Section.createBang({ position: 1 });
+            await section.updateBang({ position: 2 });
+          },
+          { requiresNew: true },
+        ),
+      ).rejects.toThrow(StatementInvalid);
+
+      await expect(
+        Section.transaction(
+          async () => {
+            await (
+              await Section.leaseConnection()
+            ).execQuery("SET CONSTRAINTS unique_section_position DEFERRED");
+            await Section.createBang({ position: 1 });
+            await section.updateBang({ position: 2 });
+
+            throw new Rollback();
+          },
+          { requiresNew: true },
+        ),
+      ).resolves.not.toThrow();
     });
 
     it("add unique constraint with name and using index", async () => {
@@ -179,6 +235,18 @@ describeIfSupports("unique_constraints", "Migration", () => {
       await expect(
         connection.removeUniqueConstraint("sections", { name: "nonexistent" }),
       ).rejects.toThrow(ArgumentError);
+    });
+
+    it("renamed unique constraint", async () => {
+      await connection.addUniqueConstraint("sections", ["position"]);
+      await connection.renameColumn("sections", "position", "new_position");
+
+      const uniqueConstraints = await connection.uniqueConstraints("sections");
+      expect(uniqueConstraints.length).toBe(1);
+
+      const constraint = uniqueConstraints[0];
+      expect(constraint.tableName).toBe("sections");
+      expect(constraint.column).toEqual(["new_position"]);
     });
   });
 });

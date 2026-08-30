@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { Base } from "../base.js";
+import { Rollback, StatementInvalid } from "../errors.js";
 import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../support/supports.js";
 import { createTestExclusionConstraintsTable } from "../support/load-schema-helper.js";
 import { openScratchDatabase, type ScratchDatabase } from "../support/pg-scratch-database.js";
 
 const EXPRESSION = "daterange(start_date, end_date) WITH &&";
+
+class Invoice extends Base {}
 
 describeIfSupports("exclusion_constraints", "Migration", () => {
   let scratch: ScratchDatabase;
@@ -15,6 +19,7 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
     scratch = await openScratchDatabase("exclusion_constraints");
     connection = scratch.connection;
     await createTestExclusionConstraintsTable(connection);
+    (Invoice as unknown as { _adapter: PostgreSQLAdapter })._adapter = connection;
   }, 30000);
 
   afterAll(async () => {
@@ -77,6 +82,26 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
       }
     });
 
+    it("exclusion constraints scoped to schemas", async () => {
+      await connection.addExclusionConstraint("invoices", EXPRESSION, { using: "gist" });
+
+      const before = (await connection.exclusionConstraints("invoices")).length;
+      try {
+        await connection.createSchema("test_schema");
+        // eslint-disable-next-line blazetrails/require-table-teardown -- dropped with its schema by the `dropSchema("test_schema")` in the finally block
+        await connection.createTable("test_schema.invoices", {}, (t) => {
+          t.date("start_date");
+          t.date("end_date");
+        });
+        await connection.addExclusionConstraint("test_schema.invoices", EXPRESSION, {
+          using: "gist",
+        });
+        expect((await connection.exclusionConstraints("invoices")).length).toBe(before);
+      } finally {
+        await connection.dropSchema("test_schema");
+      }
+    });
+
     it("add exclusion constraint", async () => {
       await connection.addExclusionConstraint("invoices", EXPRESSION, { using: "gist" });
 
@@ -136,6 +161,51 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
           deferrable: true as never,
         }),
       ).rejects.toThrow('deferrable must be `"immediate"` or `"deferred"`, got: `true`');
+    });
+
+    it("added exclusion constraint ensures valid values", async () => {
+      await connection.addExclusionConstraint("invoices", EXPRESSION, { using: "gist" });
+
+      await Invoice.create({ start_date: "2020-01-01", end_date: "2021-01-01" });
+
+      await expect(
+        Invoice.create({ start_date: "2020-12-31", end_date: "2021-01-01" }),
+      ).rejects.toThrow(StatementInvalid);
+    });
+
+    it("added deferrable initially immediate exclusion constraint", async () => {
+      await connection.addExclusionConstraint("invoices", EXPRESSION, {
+        using: "gist",
+        deferrable: "immediate",
+        name: "invoices_date_overlap",
+      });
+
+      const invoice = await Invoice.create({ start_date: "2020-01-01", end_date: "2021-01-01" });
+
+      await expect(
+        Invoice.transaction(
+          async () => {
+            await Invoice.createBang({ start_date: "2020-12-31", end_date: "2021-01-01" });
+          },
+          { requiresNew: true },
+        ),
+      ).rejects.toThrow(StatementInvalid);
+
+      await expect(
+        Invoice.transaction(
+          async () => {
+            await ((await Invoice.leaseConnection()) as PostgreSQLAdapter).setConstraints(
+              "deferred",
+              "invoices_date_overlap",
+            );
+            await Invoice.createBang({ start_date: "2020-12-31", end_date: "2021-01-01" });
+            await invoice.updateBang({ end_date: "2020-12-31" });
+
+            throw new Rollback();
+          },
+          { requiresNew: true },
+        ),
+      ).resolves.not.toThrow();
     });
 
     it("remove exclusion constraint", async () => {
