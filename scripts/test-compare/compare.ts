@@ -486,14 +486,8 @@ export function main(args: string[] = process.argv.slice(2)) {
   const ruby: TestManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: TestManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
-  // TS files carrying at least one dynamically-named (`it(`${x} …`)`) test —
-  // the one-line audit for a blind spot that used to be invisible: such tests
-  // were dropped from the manifest entirely, so a TS-only group sitting in a
-  // Rails-named file was neither matched nor reported as extra.
   const dynamicFiles: { file: string; count: number }[] = [];
 
-  // Ruby files whose sibling test classes define same-named tests — the
-  // inventory behind the (class, name) keying in pass 2 below.
   const siblingClassFiles: { file: string; collisions: number }[] = [];
 
   // Build TS lookups per package.
@@ -543,10 +537,6 @@ export function main(args: string[] = process.argv.slice(2)) {
           assertionKinds: tc.assertionKinds,
           assertionValues: tc.assertionValues,
         });
-        // A dynamically-named TS test carries a recovered placeholder name
-        // (`"<expr> raises"`), not the name it runs under, so it is never a
-        // match candidate for a Rails test — it stays in `tests` and so is
-        // counted as extra (TS only), which is the whole point of recording it.
         if (tc.dynamic) {
           dynamicTests++;
           continue;
@@ -642,14 +632,6 @@ export function main(args: string[] = process.argv.slice(2)) {
         isTestCaseUnported(file.file, tc.description, tc.ancestors[0]),
       ).length;
 
-      // One Ruby file can define several test CLASSES
-      // (`ActiveRecord::Migration::ForeignKeyTest` and
-      // `…::CompositeForeignKeyTest` both live in `migration/foreign_key_test.rb`)
-      // and two siblings can define a test of the same name. Description-only
-      // matching (pass 2) keys on the name alone, so it can credit one class's
-      // Rails test against the other class's TS port. For a colliding name the
-      // class is part of the key: a candidate has to sit under a describe of the
-      // Rails test's own class.
       const tsAncestorNames = new Set<string>();
       for (const t of tsTests)
         for (const part of t.path.split(" > ").slice(0, -1)) {

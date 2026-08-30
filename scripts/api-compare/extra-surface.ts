@@ -1476,11 +1476,6 @@ function collectAllowedNames(
       visited = new Set<string>();
       visitedByTarget.set(target, visited);
     }
-    // Keyed by (methodFile, fqn), not by fqn alone: the same target set is
-    // walked once per entity registered for this file, and a reopening
-    // registration's filtered walk contributes a strictly smaller set than the
-    // primary site's unfiltered one. Collapsing them on fqn would let whichever
-    // ran first suppress the other.
     const visitKey = `${methodFile ?? ""}\u0000${fqn}`;
     if (visited.has(visitKey)) return;
     visited.add(visitKey);

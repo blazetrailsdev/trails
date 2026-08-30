@@ -846,9 +846,6 @@ class TestExtractor
     end
     return unless els.is_a?(Array)
 
-    # An `:elsif` in the else slot walks back through here with its OWN
-    # condition, so it composes: it runs on this condition being false AND its
-    # own being true.
     else_gate = gate_from_run_condition(cond, !positive)
     if else_gate
       @gate_stack.push(else_gate)

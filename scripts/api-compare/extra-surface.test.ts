@@ -2152,10 +2152,7 @@ describe("buildReport — reopened modules", () => {
       },
     });
     const opts = { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 };
-    // The primary site legitimately answers everything `Validations` includes.
     expect(buildReport(ruby, tsFor("validations.ts"), opts).packages[0].extraFiles).toEqual([]);
-    // The reopening file declares `validates_with` and nothing else, so the
-    // mixin's methods are not its to answer.
     expect(
       buildReport(ruby, tsFor("validations/with.ts"), opts).packages[0].extraFiles[0].extras.map(
         (e) => e.name,
