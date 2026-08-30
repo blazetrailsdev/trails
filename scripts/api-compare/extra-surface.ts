@@ -1394,10 +1394,14 @@ function collectAllowedNames(
   fileHashKeyNames: string[] = [],
   /**
    * Out-param: TS declaration name -> the names allowed ONLY on it. Filled for
-   * every entity carrying `nestedIn`; see that field. The mixin walk's
-   * `visited` set is keyed per target, so a module already walked into the
-   * file-wide set is still walked into a nested class's scoped set rather than
-   * leaving it short of whatever a sibling reached first.
+   * every entity carrying `nestedIn`; see that field. The mixin walk keeps one
+   * `visited` set PER target, each keyed by module FQN alone: a module already
+   * walked into the file-wide set is still walked into a nested class's scoped
+   * set, and two nested classes sharing a transitive mixin each get its whole
+   * chain rather than the second losing everything past the hop the first
+   * reached. Keying one shared set by (context, module) instead would leave
+   * that second walk short, and would stop collapsing an `include` cycle in
+   * O(1) the way an FQN-keyed set does.
    */
   scoped?: Map<string, Set<string>>,
 ): Set<string> {
@@ -1412,7 +1416,7 @@ function collectAllowedNames(
   for (const key of fileHashKeyNames) {
     for (const c of rubyHashKeyCandidates(key)) allowed.add(c);
   }
-  const visited = new Set<string>();
+  const visitedByTarget = new Map<Set<string>, Set<string>>();
 
   // `scopedSkipMirrorName`: a scoped skip that names its TS spelling means the
   // port exists but not at the mapped site (a `prepend`ed module's `initialize`,
@@ -1462,9 +1466,13 @@ function collectAllowedNames(
   // the way the TS sites do (compare.ts `resolveEntityByDeclaringFile`).
   const walkMixin = (incName: string, contextFqn: string, target: Set<string> = allowed): void => {
     const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
-    const visitKey = target === allowed ? fqn : `${contextFqn}\u0000${fqn}`;
-    if (visited.has(visitKey)) return;
-    visited.add(visitKey);
+    let visited = visitedByTarget.get(target);
+    if (visited === undefined) {
+      visited = new Set<string>();
+      visitedByTarget.set(target, visited);
+    }
+    if (visited.has(fqn)) return;
+    visited.add(fqn);
     // A Ruby core module (`include Enumerable`) supplies methods no vendored
     // gem `def`s — see CORE_MIXIN_METHODS. Added before the module lookup
     // because the same name can ALSO be a vendored core_ext reopening, which

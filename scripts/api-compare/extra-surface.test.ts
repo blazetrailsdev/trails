@@ -1907,6 +1907,80 @@ describe("buildReport — nested-class method allowances", () => {
   });
 });
 
+describe("buildReport — nested-class allowances over a shared mixin chain", () => {
+  // Two nested classes including one module that itself includes another. The
+  // mixin walk keeps one `visited` set per target, so the second nested class
+  // gets the whole chain rather than stopping at the hop the first reached.
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::Attribute": rubyClass({
+            name: "Attribute",
+            file: "attribute.rb",
+            instance: [method("value")],
+          }),
+          "ActiveModel::Attribute::FromDatabase": rubyClass({
+            name: "FromDatabase",
+            file: "attribute.rb",
+            includes: ["Casts"],
+          }),
+          "ActiveModel::Attribute::FromUser": rubyClass({
+            name: "FromUser",
+            file: "attribute.rb",
+            includes: ["Casts"],
+          }),
+        },
+        modules: {
+          "ActiveModel::Casts": {
+            ...rubyClass({ name: "Casts", file: "casts.rb", instance: [method("cast")] }),
+            includes: ["Coercions"],
+          },
+          "ActiveModel::Coercions": rubyClass({
+            name: "Coercions",
+            file: "coercions.rb",
+            instance: [method("coerce")],
+          }),
+        },
+      },
+    },
+  };
+  const tsClass = (name: string, instanceMethods: MethodInfo[]): ClassInfo => ({
+    name,
+    file: "attribute.ts",
+    includes: [],
+    extends: [],
+    instanceMethods,
+    classMethods: [],
+  });
+  const ts: ApiManifest = {
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          Attribute: tsClass("Attribute", [method("value")]),
+          FromDatabase: tsClass("FromDatabase", [method("cast"), method("coerce")]),
+          FromUser: tsClass("FromUser", [method("cast"), method("coerce")]),
+        },
+        modules: {},
+      },
+    },
+  };
+
+  it("gives every nested class the whole transitive chain, not just the first", () => {
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
+  });
+});
+
 describe("buildReport — reopened modules", () => {
   it("allows a method whose Ruby file reopens a module declared elsewhere", () => {
     // Rails: `ActiveModel::Validations` is first declared in validations.rb and
