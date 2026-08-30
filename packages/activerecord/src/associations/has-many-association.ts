@@ -13,7 +13,6 @@ import {
   applyAssociationScope,
   resolveAssocClass,
   syncToAssociationInstance,
-  validateInverseOf,
 } from "../associations.js";
 import { strictLoadingViolationBang } from "../core.js";
 import {
@@ -433,15 +432,6 @@ async function findTarget(
   }
 
   const ctor = record.constructor as typeof Base;
-  if (options.inverseOf) {
-    const className = options.className ?? camelize(singularize(assocName));
-    validateInverseOf(
-      ctor,
-      resolveAssocClass(record, assocName, className),
-      assocName,
-      options.inverseOf,
-    );
-  }
 
   const rel = scope(record, assocName, assocDef);
   if (rel === null) return [];
