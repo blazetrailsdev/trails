@@ -3,7 +3,7 @@ import { IntegerType } from "./integer.js";
 export class BigIntegerType extends IntegerType {
   readonly name: string = "big_integer";
 
-  override serializeCastValue(value: number | null): number | null {
+  override serializeCastValue(value: number | bigint | null): number | bigint | null {
     return value;
   }
 
@@ -16,7 +16,7 @@ export class BigIntegerType extends IntegerType {
   }
 
   /** @internal */
-  protected override castValue(value: unknown): number | null {
+  protected override castValue(value: unknown): number | bigint | null {
     if (typeof value === "bigint") return this.narrowBigInt(value);
     if (typeof value === "number") {
       if (isNaN(value) || !isFinite(value)) return null;
