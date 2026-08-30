@@ -371,28 +371,34 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("reset does not cancel a query issued by another chain", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
+      let resetting: Promise<void> | undefined;
       try {
         await other.beginDbTransaction();
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
-        void other.resetBang();
+        resetting = other.resetBang().catch(() => {});
         await expect(foreign).resolves.toHaveLength(1);
       } finally {
+        await resetting;
         await other.close();
       }
     });
 
     it("a query holding the lock does not wait on a reset queued behind it", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
+      let resetting: Promise<void> | undefined;
       try {
         await other.execute("SELECT 1 AS n");
-        setTimeout(() => void other.resetBang(), 0);
+        setTimeout(() => {
+          resetting = other.resetBang().catch(() => {});
+        }, 0);
         await other.lock.synchronize(async () => {
           await new Promise<void>((r) => setTimeout(r, 50));
           const rows = await other.execute("SELECT 1 AS n");
           expect(rows).toHaveLength(1);
         });
       } finally {
+        await resetting;
         await other.close();
       }
     });
