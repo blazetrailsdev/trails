@@ -13,8 +13,8 @@
  * `ArgumentError`; `equals` is the one that does not raise.
  *
  * @boundary-file: a JS `Date` is compared as epoch millis, since Ruby's
- *   `Time#<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by the instant and
- *   JS `Date` carries no relational operators of its own.
+ *  `Time#<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by the instant and
+ *  JS `Date` carries no relational operators of its own.
  */
 
 import { ArgumentError } from "./argument-error.js";
@@ -24,25 +24,27 @@ import { rbEqual } from "./rb-equal.js";
  * The Ruby class name `rb_obj_class` reports in `rb_cmperr`'s message — Ruby's
  * `Date::Infinity`, which no JS `constructor.name` can spell. A JS `Symbol`
  * because it is a brand, not a Ruby Symbol value.
- *  @noRailsEquivalent PERMANENT — the brand standing in for `rb_obj_class`
- *  (`vendor/ruby/compar.c:28`); Ruby core, not Rails.
+ * @noRailsEquivalent PERMANENT — the brand standing in for `rb_obj_class`
+ * (`vendor/ruby/compar.c:28`); Ruby core, not Rails.
  */
 export const rubyClass = Symbol.for("@blazetrails/ruby-compat:rubyClass");
 
 /**
  * The receiver of the mixin: a class that defines `<=>`, spelled `compareTo`
  * here since `Comparable#==` already claims `equals`.
- *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` (`vendor/ruby/compar.c:315`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` (`vendor/ruby/compar.c:315`).
  */
 export interface Comparable {
   compareTo(other: unknown): number | null;
   readonly [rubyClass]?: string;
 }
 
-/** The same `<=>` under the other spelling trails gives it: `@blazetrails/date`
- *  names `Date#<=>` and `Rational#<=>` `cmp`, ActiveSupport names
- *  `TimeWithZone#<=>` `compareTo`. One Ruby method, two TS names.
- *  @noRailsEquivalent PERMANENT — the one Ruby `<=>` (`vendor/ruby/compar.c:315`). */
+/**
+ * The same `<=>` under the other spelling trails gives it: `@blazetrails/date`
+ * names `Date#<=>` and `Rational#<=>` `cmp`, ActiveSupport names
+ * `TimeWithZone#<=>` `compareTo`. One Ruby method, two TS names.
+ * @noRailsEquivalent PERMANENT — the one Ruby `<=>` (`vendor/ruby/compar.c:315`).
+ */
 interface CmpSpelling {
   cmp(other: unknown): number | null;
 }
@@ -97,8 +99,9 @@ function isCmpSpelling(value: unknown): value is CmpSpelling {
   return typeof (value as { cmp?: unknown }).cmp === "function";
 }
 
-/** Ruby's `rb_cmperr` (`vendor/ruby/compar.c:28`), which names the operand by
- *  `inspect` for a special constant or a Float and by `rb_obj_class` otherwise. */
+/**
+ * Ruby's `rb_cmperr` (`vendor/ruby/compar.c:28`), which names the operand by
+ * `inspect` for a special constant or a Float and by `rb_obj_class` otherwise. */
 function rbCmperr(x: Comparable, y: unknown): never {
   const classname =
     y === null ||
@@ -115,43 +118,55 @@ function rbObjClass(x: Comparable): string {
   return x[rubyClass] ?? x.constructor.name;
 }
 
-/** Ruby's `cmpint` (`vendor/ruby/compar.c:91`), the one body every operator
- *  below is derived from: a `nil` `<=>` is an `ArgumentError`, not a `false`.
- *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmpint` (`vendor/ruby/compar.c:91`). */
+/**
+ * Ruby's `cmpint` (`vendor/ruby/compar.c:91`), the one body every operator
+ * below is derived from: a `nil` `<=>` is an `ArgumentError`, not a `false`.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmpint` (`vendor/ruby/compar.c:91`).
+ */
 export function cmpint(this: Comparable, other: unknown): number {
   const c = this.compareTo(other);
   if (c === null || c === undefined) rbCmperr(this, other);
   return c;
 }
 
-/** Ruby `Comparable#<` (`vendor/ruby/compar.c:133` `cmp_lt`).
- *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_lt` (`vendor/ruby/compar.c:133`). */
+/**
+ * Ruby `Comparable#<` (`vendor/ruby/compar.c:133` `cmp_lt`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_lt` (`vendor/ruby/compar.c:133`).
+ */
 export function lessThan(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) < 0;
 }
 
-/** Ruby `Comparable#<=` (`vendor/ruby/compar.c:147` `cmp_le`).
- *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_le` (`vendor/ruby/compar.c:147`). */
+/**
+ * Ruby `Comparable#<=` (`vendor/ruby/compar.c:147` `cmp_le`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_le` (`vendor/ruby/compar.c:147`).
+ */
 export function lessThanOrEqual(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) <= 0;
 }
 
-/** Ruby `Comparable#>` (`vendor/ruby/compar.c:105` `cmp_gt`).
- *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_gt` (`vendor/ruby/compar.c:105`). */
+/**
+ * Ruby `Comparable#>` (`vendor/ruby/compar.c:105` `cmp_gt`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_gt` (`vendor/ruby/compar.c:105`).
+ */
 export function greaterThan(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) > 0;
 }
 
-/** Ruby `Comparable#>=` (`vendor/ruby/compar.c:119` `cmp_ge`).
- *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_ge` (`vendor/ruby/compar.c:119`). */
+/**
+ * Ruby `Comparable#>=` (`vendor/ruby/compar.c:119` `cmp_ge`).
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_ge` (`vendor/ruby/compar.c:119`).
+ */
 export function greaterThanOrEqual(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) >= 0;
 }
 
-/** Ruby `Comparable#==` (`vendor/ruby/compar.c:79` `cmp_equal`), the one derived
- *  operator that does NOT raise: a `nil` `<=>` is `false`, and an identical
- *  object is `true` before `<=>` is sent at all.
- *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_equal` (`vendor/ruby/compar.c:79`). */
+/**
+ * Ruby `Comparable#==` (`vendor/ruby/compar.c:79` `cmp_equal`), the one derived
+ * operator that does NOT raise: a `nil` `<=>` is `false`, and an identical
+ * object is `true` before `<=>` is sent at all.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_equal` (`vendor/ruby/compar.c:79`).
+ */
 export function equals(this: Comparable, other: unknown): boolean {
   if ((this as unknown) === other) return true;
   const c = this.compareTo(other);
@@ -159,9 +174,11 @@ export function equals(this: Comparable, other: unknown): boolean {
   return c === 0;
 }
 
-/** Ruby `Comparable#between?` (`vendor/ruby/compar.c:168` `cmp_between`), which
- *  is `cmpint` on both ends and so raises for an operand `<=>` cannot place.
- *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_between` (`vendor/ruby/compar.c:168`). */
+/**
+ * Ruby `Comparable#between?` (`vendor/ruby/compar.c:168` `cmp_between`), which
+ * is `cmpint` on both ends and so raises for an operand `<=>` cannot place.
+ * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_between` (`vendor/ruby/compar.c:168`).
+ */
 export function isBetween(this: Comparable, min: unknown, max: unknown): boolean {
   return cmpint.call(this, min) >= 0 && cmpint.call(this, max) <= 0;
 }
