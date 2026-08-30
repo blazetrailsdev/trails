@@ -96,20 +96,12 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return this.schemaType(column);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE schema-dumpers-take-columns-not-columninfo
-   */
   private _isEnum(column: ColumnInfo): boolean {
     return typeof (column as any).isEnum === "function"
       ? (column as any).isEnum()
       : (column as any).isEnum === true;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE schema-dumpers-take-columns-not-columninfo
-   */
   private _isSerial(column: ColumnInfo): boolean {
     return typeof (column as any).isSerial === "function"
       ? (column as any).isSerial()
