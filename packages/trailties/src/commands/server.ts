@@ -22,7 +22,7 @@ export function serverCommand(): Command {
     .option("-b, --binding <host>", "Host to bind to", "127.0.0.1")
     .action(async (options) => {
       const root = cwd();
-      await requireApplicationBang(root);
+      await requireApplicationBang();
       const app = await Trails.initialize();
       const port = parseInt(options.port, 10);
       if (!(await hasViteConfig(root))) {

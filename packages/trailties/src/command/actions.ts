@@ -1,8 +1,11 @@
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { Trails } from "../rails.js";
 
 /**
- * Rails' `require APP_PATH`. Trails apps ship TypeScript sources and a
+ * Rails' `require APP_PATH`. `APP_PATH` is the constant `bin/rails` defines
+ * from its own location, which is the application root the command was run
+ * from — `cwd()` here, the same value `serverCommand` already boots against. Trails apps ship TypeScript sources and a
  * compiled `dist/`, so both spellings of `config/application` are probed —
  * the built one first, mirroring how `bin/rails` prefers the loaded app,
  * then the TypeScript source at the Rails layout's `config/application.ts`.
@@ -10,7 +13,8 @@ import { Trails } from "../rails.js";
  * Mirrors `Rails::Command::Actions#require_application!`
  * (`railties/lib/rails/command/actions.rb:13-16`).
  */
-export async function requireApplicationBang(root: string): Promise<void> {
+export async function requireApplicationBang(): Promise<void> {
+  const root = cwd();
   const fs = await getFsAsync();
   const p = await getPathAsync();
   if (!p.pathToFileURL) {
@@ -33,10 +37,8 @@ export async function requireApplicationBang(root: string): Promise<void> {
  * (`railties/lib/rails/command/actions.rb:18-21`) — `require_application!`
  * then `Rails.application.require_environment!`, which in trails is the
  * awaited `Trails.initialize()` that runs the initializers.
- *
- * @missingRailsArgs require_application! — PERMANENT
  */
-export async function bootApplicationBang(root: string): Promise<void> {
-  await requireApplicationBang(root);
+export async function bootApplicationBang(): Promise<void> {
+  await requireApplicationBang();
   await Trails.initialize();
 }

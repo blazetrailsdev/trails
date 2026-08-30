@@ -1,4 +1,3 @@
-import { cwd } from "@blazetrails/activesupport/process-adapter";
 import {
   ConsoleFormatter,
   RoutesInspector,
@@ -20,7 +19,7 @@ export function routesCommand(): Command {
     .option("-g, --grep <pattern>", "Grep routes by a specific pattern.")
     .option("-E, --expanded", "Print routes expanded vertically with parts explained.")
     .action(async (options) => {
-      await bootApplicationBang(cwd());
+      await bootApplicationBang();
       console.log(inspector().format(formatter(options), routesFilter(options)));
     });
 
