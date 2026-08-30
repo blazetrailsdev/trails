@@ -196,8 +196,13 @@ export const NON_MODEL_RECEIVERS = new Set([
 /**
  * A model bound to an adapter the file owns (`EnumTest.adapter = adapter`).
  * Writes on it land in that adapter's database, not the shared per-worker one.
+ *
+ * The `_adapter` field counts too: it is what the `adapter` setter assigns
+ * (`base.ts:912`), and a file whose model shadows a canonical name has to write
+ * the field, because the setter also runs `registerModelConstant` and would
+ * rebind that name for every sibling file in the worker.
  */
-export const EXPLICIT_ADAPTER_BINDING = /\.adapter\s*=[^=]/;
+export const EXPLICIT_ADAPTER_BINDING = /\._?adapter\s*=[^=]/;
 
 /** Whether a write's receiver is a model class rather than a known false positive. */
 export function isModelReceiver(receiver: string): boolean {
