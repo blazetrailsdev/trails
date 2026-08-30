@@ -3,6 +3,7 @@ import { Base } from "../base.js";
 import { Migration } from "../migration.js";
 import { NotNullViolation, StatementInvalid } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { withPostgresqlDatetimeType } from "../support/with-postgresql-datetime-type.js";
 import { currentAdapter } from "../support/adapter-helper.js";
@@ -11,21 +12,28 @@ import { describeIfSupports } from "../support/supports.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Column } from "../connection-adapters/column.js";
 
-function expectedDatetimeSqlType(connection: AbstractAdapter, withPrecision: boolean): string {
-  if (adapterType === "postgres") {
-    return withPrecision ? "timestamp(6) without time zone" : "timestamp without time zone";
-  }
-  if (adapterType === "mysql") return withPrecision ? "datetime(6)" : "timestamp";
-  return connection.typeToSql("datetime(6)");
-}
-
-function assertBigintColumn(eight: Column): void {
+function bigintColumn(eight: Column): void {
   if (adapterType === "sqlite") {
     expect(eight.sqlType).toBe("bigint");
     return;
   }
   expect(eight.type).toBe("integer");
   expect(eight.limit).toBe(8);
+}
+
+function datetimeSqlType(
+  connection: AbstractAdapter,
+  column: Column,
+  postgresqlType: string,
+  mysqlType: string,
+): void {
+  if (adapterType === "postgres") {
+    expect(column.sqlType).toBe(postgresqlType);
+  } else if (adapterType === "mysql") {
+    expect(column.sqlType).toBe(mysqlType);
+  } else {
+    expect(column.sqlType).toBe(connection.typeToSql("datetime(6)"));
+  }
 }
 
 class SilentMigration extends Migration {
@@ -134,7 +142,7 @@ describe("Migration", () => {
       const columns = await connection.columns("testings");
       const arrayColumn = detect(columns, "foo");
 
-      expect((arrayColumn as unknown as { isArray(): boolean }).isArray()).toBe(true);
+      expect((arrayColumn as unknown as { isArray(): boolean }).isArray()).toBeTruthy();
     });
 
     it.skipIf(adapterType !== "postgres")("create table with array column", async () => {
@@ -146,7 +154,7 @@ describe("Migration", () => {
       const columns = await connection.columns("testings");
       const arrayColumn = detect(columns, "foo");
 
-      expect((arrayColumn as unknown as { isArray(): boolean }).isArray()).toBe(true);
+      expect((arrayColumn as unknown as { isArray(): boolean }).isArray()).toBeTruthy();
     });
 
     it("create table with limits", async () => {
@@ -212,41 +220,41 @@ describe("Migration", () => {
 
     it("create table raises when redefining primary key column", async () => {
       const connection = await ambientConnection();
-      await expect(
+      const error = await assertRaises([ArgumentError], {}, () =>
         connection.createTable("testings", (t) => {
           t.column("id", "string");
         }),
-      ).rejects.toThrow(
-        new ArgumentError(
-          "you can't redefine the primary key column 'id' on 'testings'. To define a custom primary key, pass { id: false } to create_table.",
-        ),
+      );
+
+      expect(error.message).toBe(
+        "you can't redefine the primary key column 'id' on 'testings'. To define a custom primary key, pass { id: false } to create_table.",
       );
     });
 
     it("create table raises when redefining custom primary key column", async () => {
       const connection = await ambientConnection();
-      await expect(
+      const error = await assertRaises([ArgumentError], {}, () =>
         connection.createTable("testings", { primaryKey: "testing_id" }, (t) => {
           t.column("testing_id", "string");
         }),
-      ).rejects.toThrow(
-        new ArgumentError(
-          "you can't redefine the primary key column 'testing_id' on 'testings'. To define a custom primary key, pass { id: false } to create_table.",
-        ),
+      );
+
+      expect(error.message).toBe(
+        "you can't redefine the primary key column 'testing_id' on 'testings'. To define a custom primary key, pass { id: false } to create_table.",
       );
     });
 
     it("create table raises when defining existing column", async () => {
       const connection = await ambientConnection();
-      await expect(
+      const error = await assertRaises([ArgumentError], {}, () =>
         connection.createTable("testings", (t) => {
           t.column("testing_column", "string");
           t.column("testing_column", "integer");
         }),
-      ).rejects.toThrow(
-        new ArgumentError(
-          "you can't define an already defined column 'testing_column' on 'testings'.",
-        ),
+      );
+
+      expect(error.message).toBe(
+        "you can't define an already defined column 'testing_column' on 'testings'.",
       );
     });
 
@@ -302,7 +310,9 @@ describe("Migration", () => {
       await connection.execute(
         `insert into testings (${quotedId}, ${quotedFoo}) values (1, 'hello')`,
       );
-      await connection.addColumn("testings", "bar", "string", { null: false, default: "default" });
+      await assertNothingRaised(() =>
+        connection.addColumn("testings", "bar", "string", { null: false, default: "default" }),
+      );
 
       await expect(
         connection.execute(
@@ -359,7 +369,9 @@ describe("Migration", () => {
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnDefaults["wealth"]).toBe(99);
       expect(PersonKlass.columnsHash()["wealth"].null).toBe(false);
-      await personConnection.execute("insert into testings (title) values ('tester')");
+      await assertNothingRaised(() =>
+        personConnection.execute("insert into testings (title) values ('tester')"),
+      );
 
       await personConnection.changeColumnDefault("testings", "wealth", 100);
       void PersonKlass.resetColumnInformation();
@@ -408,7 +420,7 @@ describe("Migration", () => {
         await notnullMigration.migrate("up");
         expect(detect(await connection.columns("testings"), "foo").null).toBe(false);
         await notnullMigration.migrate("down");
-        expect(detect(await connection.columns("testings"), "foo").null).toBe(true);
+        expect(detect(await connection.columns("testings"), "foo").null).toBeTruthy();
       });
     });
 
@@ -418,8 +430,9 @@ describe("Migration", () => {
         t.bigint("eight_int");
       });
       const columns = await connection.columns("testings");
+      const eight = detect(columns, "eight_int");
 
-      assertBigintColumn(detect(columns, "eight_int"));
+      bigintColumn(eight);
     });
 
     it("add column with timestamp type", async () => {
@@ -431,7 +444,8 @@ describe("Migration", () => {
       const column = detect(await connection.columns("testings"), "foo");
 
       expect(column.type).toBe("datetime");
-      expect(column.sqlType).toBe(expectedDatetimeSqlType(connection, false));
+
+      datetimeSqlType(connection, column, "timestamp without time zone", "timestamp");
     });
 
     it("add column with postgresql datetime type", async () => {
@@ -443,7 +457,8 @@ describe("Migration", () => {
       const column = detect(await connection.columns("testings"), "foo");
 
       expect(column.type).toBe("datetime");
-      expect(column.sqlType).toBe(expectedDatetimeSqlType(connection, true));
+
+      datetimeSqlType(connection, column, "timestamp(6) without time zone", "datetime(6)");
     });
 
     it("change column with timestamp type", async () => {
@@ -457,7 +472,8 @@ describe("Migration", () => {
       const column = detect(await connection.columns("testings"), "foo");
 
       expect(column.type).toBe("datetime");
-      expect(column.sqlType).toBe(expectedDatetimeSqlType(connection, false));
+
+      datetimeSqlType(connection, column, "timestamp without time zone", "timestamp");
     });
 
     it("column exists", async () => {
@@ -555,12 +571,14 @@ describe("Migration", () => {
 
     it("drop table if exists nothing raised", async () => {
       const connection = await ambientConnection();
-      await connection.dropTable("nonexistent", { ifExists: true });
+      await assertNothingRaised(() => connection.dropTable("nonexistent", { ifExists: true }));
     });
 
     it("drop tables if exists nothing raised", async () => {
       const connection = await ambientConnection();
-      await connection.dropTable("nonexistent", "nonexistent_sobrinho", { ifExists: true });
+      await assertNothingRaised(() =>
+        connection.dropTable("nonexistent", "nonexistent_sobrinho", { ifExists: true }),
+      );
     });
   });
 

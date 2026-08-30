@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertRaises } from "@blazetrails/activesupport";
 
 interface TableNameLimits {
   tableNameLength(): number;
@@ -76,14 +77,15 @@ describe("Migration", () => {
       const shortName = "a".repeat(nameLimit);
 
       try {
-        await expect(connection.renameTable("test_models", longName)).rejects.toThrow(
-          new ArgumentError(
-            `Table name '${longName}' is too long; the limit is ${nameLimit} characters`,
-          ),
+        const error = await assertRaises([ArgumentError], {}, () =>
+          connection.renameTable("test_models", longName),
+        );
+        expect(error.message).toBe(
+          `Table name '${longName}' is too long; the limit is ${nameLimit} characters`,
         );
 
         await connection.renameTable("test_models", shortName);
-        expect(await connection.tableExists(shortName)).toBe(true);
+        expect(await connection.tableExists(shortName)).toBeTruthy();
       } finally {
         await connection.dropTable(shortName, { ifExists: true });
       }
