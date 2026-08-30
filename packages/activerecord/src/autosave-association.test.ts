@@ -470,6 +470,122 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const after = (await association(reloaded, "parrots")).map((p) => p.id).sort();
     expect(after).toEqual(before);
   });
+
+  it("should run add callback methods for has many", async () => {
+    const associationNameWithCallbacks = "birdsWithMethodCallbacks";
+
+    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
+    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+
+    const expected = ["before_adding_method_bird_<new>", "after_adding_method_bird_<new>"];
+
+    expect(pirate.shipLog).toEqual(expected);
+  });
+
+  it("should run add callback methods for habtm", async () => {
+    const associationNameWithCallbacks = "parrotsWithMethodCallbacks";
+
+    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
+    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+
+    const expected = ["before_adding_method_parrot_<new>", "after_adding_method_parrot_<new>"];
+
+    expect(pirate.shipLog).toEqual(expected);
+  });
+
+  it("should run remove callback methods for habtm", async () => {
+    const associationNameWithCallbacks = "parrotsWithMethodCallbacks";
+
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
+    const proxy = association(pirate, associationNameWithCallbacks);
+    await proxy.create({ name: "Crowe the One-Eyed" });
+    for (const parrot of await proxy) parrot.markForDestruction();
+    const childId = (await proxy)[0].id;
+
+    pirate.shipLog.splice(0);
+    await pirate.save();
+
+    const expected = [
+      `before_removing_method_parrot_${childId}`,
+      `after_removing_method_parrot_${childId}`,
+    ];
+
+    expect(pirate.shipLog).toEqual(expected);
+  });
+
+  it("should run add callback procs for has many", async () => {
+    const associationNameWithCallbacks = "birdsWithProcCallbacks";
+
+    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
+    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+
+    const expected = ["before_adding_proc_bird_<new>", "after_adding_proc_bird_<new>"];
+
+    expect(pirate.shipLog).toEqual(expected);
+  });
+
+  it("should run add callback procs for habtm", async () => {
+    const associationNameWithCallbacks = "parrotsWithProcCallbacks";
+
+    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
+    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+
+    const expected = ["before_adding_proc_parrot_<new>", "after_adding_proc_parrot_<new>"];
+
+    expect(pirate.shipLog).toEqual(expected);
+  });
+
+  it("should run remove callback procs for habtm", async () => {
+    const associationNameWithCallbacks = "parrotsWithProcCallbacks";
+
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
+    const proxy = association(pirate, associationNameWithCallbacks);
+    await proxy.create({ name: "Crowe the One-Eyed" });
+    for (const parrot of await proxy) parrot.markForDestruction();
+    const childId = (await proxy)[0].id;
+
+    pirate.shipLog.splice(0);
+    await pirate.save();
+
+    const expected = [
+      `before_removing_proc_parrot_${childId}`,
+      `after_removing_proc_parrot_${childId}`,
+    ];
+
+    expect(pirate.shipLog).toEqual(expected);
+  });
+
+  it("should run remove callback methods for has many", async () => {
+    const assocName = "birdsWithMethodCallbacks";
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
+    const child = await association(pirate, assocName).create({ name: "Crowe the One-Eyed" });
+    child.markForDestruction();
+    const childId = child.id;
+
+    pirate.shipLog.splice(0);
+    await pirate.save();
+
+    expect(pirate.shipLog).toEqual([
+      `before_removing_method_bird_${childId}`,
+      `after_removing_method_bird_${childId}`,
+    ]);
+  });
+
+  it("should run remove callback procs for has many", async () => {
+    const assocName = "birdsWithProcCallbacks";
+    const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
+    const child = await association(pirate, assocName).create({ name: "Crowe the One-Eyed" });
+    child.markForDestruction();
+    const childId = child.id;
+
+    pirate.shipLog.splice(0);
+    await pirate.save();
+
+    expect(pirate.shipLog).toEqual([
+      `before_removing_proc_bird_${childId}`,
+      `after_removing_proc_bird_${childId}`,
+    ]);
+  });
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
@@ -4642,30 +4758,4 @@ describe("computePrimaryKey", () => {
     const result = computePrimaryKey({ options: {} }, record);
     expect(result).toBe("id");
   });
-});
-
-describe("TestAutosaveAssociationOnACollectionRemoveCallbacks", () => {
-  fixtures([], { useTransactionalTests: false });
-  beforeAll(() => {
-    registerModel(CanonicalPirate);
-    registerModel(CanonicalBird);
-  });
-
-  for (const callbackType of ["method", "proc"] as const) {
-    it(`should run remove callback ${callbackType}s for has many`, async () => {
-      const assocName = `birdsWith${callbackType === "method" ? "Method" : "Proc"}Callbacks`;
-      const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
-      const child = await association(pirate, assocName).create({ name: "Crowe the One-Eyed" });
-      child.markForDestruction();
-      const childId = child.id;
-
-      pirate.shipLog.splice(0);
-      await pirate.save();
-
-      expect(pirate.shipLog).toEqual([
-        `before_removing_${callbackType}_bird_${childId}`,
-        `after_removing_${callbackType}_bird_${childId}`,
-      ]);
-    });
-  }
 });
