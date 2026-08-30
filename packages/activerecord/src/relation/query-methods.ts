@@ -2076,7 +2076,6 @@ export function orderColumn(this: QueryMethodsHost, field: string): unknown {
 /** @internal */
 export function processSelectArgs(this: QueryMethodsHost, fields: unknown[]): unknown[] {
   return fields.flatMap((field) => {
-    if (field === null || field === undefined) return [];
     if (isPlainObject(field)) return arelColumnAliasesFromHash.call(this, field);
     return [field];
   });
