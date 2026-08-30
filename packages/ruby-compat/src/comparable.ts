@@ -45,10 +45,9 @@ export interface Comparable {
 }
 
 /**
- * The same `<=>`, under the other spelling trails gives it: `@blazetrails/date`
- * names `Date#<=>` and `Rational#<=>` `cmp`, where ActiveSupport names
- * `TimeWithZone#<=>` and `Duration#<=>` `compareTo`. One Ruby method, two TS
- * names, so the send below answers to both.
+ * The same `<=>` under the other spelling trails gives it: `@blazetrails/date`
+ * names `Date#<=>` and `Rational#<=>` `cmp`, ActiveSupport names
+ * `TimeWithZone#<=>` `compareTo`. One Ruby method, two TS names.
  *
  * @noRailsEquivalent PERMANENT — the one Ruby `<=>`
  * (`vendor/ruby/compar.c:315`) under trails' second TS spelling of it.
@@ -65,10 +64,9 @@ interface CmpSpelling {
  * `nil` for an operand it cannot place, which includes `Float::NAN`, a
  * cross-type operand, and `rb_obj_cmp`'s unequal arm.
  *
- * @boundary: a Temporal value carries neither a `<=>` spelling nor a JS
- * ordering, so it reaches `rb_obj_cmp` here; the one caller that orders
- * Temporal receivers (`core-ext/date-and-time/calculations.ts`'s `compare`)
- * hands over each side's epoch reading instead.
+ * @boundary: a Temporal value has neither `<=>` spelling nor a JS ordering, so
+ * it reaches `rb_obj_cmp`; `calculations.ts`'s `compare` — the one caller that
+ * orders Temporal receivers — hands over each side's epoch reading instead.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — the `<=>` send it is defined over
  * (`vendor/ruby/compar.c:315`), which Rails inherits rather than defines.
@@ -83,23 +81,20 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
   if (typeof a === "number" || typeof a === "bigint") {
-    /* `Integer#<=>` (`vendor/ruby/numeric.c:4696` `rb_int_cmp`) and `Float#<=>`
-       (`vendor/ruby/numeric.c:1700` `flo_cmp`) answer nil for an operand that
-       is not a Numeric, and `flo_cmp` answers nil for a NaN on either side. */
+    /* `rb_int_cmp` (`vendor/ruby/numeric.c:4696`) and `flo_cmp`
+       (`vendor/ruby/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
     if (typeof b !== "number" && typeof b !== "bigint") return null;
     if (Number.isNaN(a as number) || Number.isNaN(b as number)) return null;
     return a < b ? -1 : a > b ? 1 : 0;
   }
   if (typeof a === "string") {
-    /* `String#<=>` (`vendor/ruby/string.c:3803` `rb_str_cmp_m`) answers nil for
-       an operand that is not a String. */
+    /* `rb_str_cmp_m` (`vendor/ruby/string.c:3803`) answers nil for a non-String. */
     if (typeof b !== "string") return null;
     return a < b ? -1 : a > b ? 1 : 0;
   }
-  /* `vendor/ruby/object.c:1665` `rb_obj_cmp` — the inherited `<=>` every other
-     receiver reaches: `0` for an `==` operand and nil otherwise. A JS value
-     with no ordering of its own lands here rather than on JS relational
-     coercion, which orders `false` before `true` where Ruby answers nil. */
+  /* `vendor/ruby/object.c:1665` `rb_obj_cmp` — the inherited `<=>`: `0` for an
+     `==` operand and nil otherwise, rather than JS relational coercion, which
+     orders `false` before `true` where Ruby answers nil. */
   return rbEqual(a, b) ? 0 : null;
 }
 
@@ -143,34 +138,26 @@ export function cmpint(this: Comparable, other: unknown): number {
   return c;
 }
 
-/**
- * Ruby `Comparable#<` (`vendor/ruby/compar.c:133` `cmp_lt`).
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_lt` (`vendor/ruby/compar.c:133`).
- */
+/** Ruby `Comparable#<` (`vendor/ruby/compar.c:133` `cmp_lt`).
+ *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_lt` (`vendor/ruby/compar.c:133`). */
 export function lessThan(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) < 0;
 }
 
-/**
- * Ruby `Comparable#<=` (`vendor/ruby/compar.c:147` `cmp_le`).
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_le` (`vendor/ruby/compar.c:147`).
- */
+/** Ruby `Comparable#<=` (`vendor/ruby/compar.c:147` `cmp_le`).
+ *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_le` (`vendor/ruby/compar.c:147`). */
 export function lessThanOrEqual(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) <= 0;
 }
 
-/**
- * Ruby `Comparable#>` (`vendor/ruby/compar.c:105` `cmp_gt`).
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_gt` (`vendor/ruby/compar.c:105`).
- */
+/** Ruby `Comparable#>` (`vendor/ruby/compar.c:105` `cmp_gt`).
+ *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_gt` (`vendor/ruby/compar.c:105`). */
 export function greaterThan(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) > 0;
 }
 
-/**
- * Ruby `Comparable#>=` (`vendor/ruby/compar.c:119` `cmp_ge`).
- * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_ge` (`vendor/ruby/compar.c:119`).
- */
+/** Ruby `Comparable#>=` (`vendor/ruby/compar.c:119` `cmp_ge`).
+ *  @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmp_ge` (`vendor/ruby/compar.c:119`). */
 export function greaterThanOrEqual(this: Comparable, other: unknown): boolean {
   return cmpint.call(this, other) >= 0;
 }

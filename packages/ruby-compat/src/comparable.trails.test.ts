@@ -40,12 +40,9 @@ describe("<=>", () => {
     expect(cmp({ a: 1 }, { a: 1 })).toBe(0);
   });
 
-  it("returns nil rather than ordering values Ruby leaves to Object#<=>", () => {
+  it("returns nil rather than ordering what Ruby leaves to Object#<=>", () => {
     expect(cmp(false, true)).toBeNull();
     expect(cmp(true, true)).toBe(0);
-  });
-
-  it("returns nil for a cross-type operand", () => {
     expect(cmp(1, "a")).toBeNull();
     expect(cmp("a", 1)).toBeNull();
   });

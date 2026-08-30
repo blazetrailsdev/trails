@@ -42,7 +42,7 @@ export function fetch(hash: Record<string, unknown>, key: string, ...rest: unkno
 export function hasKey(hash: Record<string, unknown>, key: string): boolean {
   /* `vendor/ruby/hash.c:3671` `rb_hash_has_key` reads the hash table through
      `hash_stlike_lookup`, never an ancestor: a Ruby Hash has no prototype
-     chain, so `"toString" in {}` is a JS answer Ruby never gives. */
+     chain, so `"toString" in {}` is an answer Ruby never gives. */
   return Object.hasOwn(hash, key);
 }
 
