@@ -343,8 +343,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         other.disconnectBang();
         expect(other._rawConnection).toBeNull();
 
-        void other.resetBang();
+        const resetting = other.resetBang();
         await other.lock.synchronize(async () => {});
+        await resetting;
 
         expect(other._rawConnection).not.toBeNull();
         await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
@@ -360,8 +361,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((other as unknown as { _client: unknown })._client).toBeNull();
         expect(other.transactionStatus).not.toBe(0);
 
-        void other.resetBang();
+        const resetting = other.resetBang();
         await other.lock.synchronize(async () => {});
+        await resetting;
 
         expect(other.transactionStatus).toBe(0);
       } finally {
@@ -371,15 +373,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("reset does not cancel a query issued by another chain", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
-      let resetting: Promise<void> | undefined;
       try {
         await other.beginDbTransaction();
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
-        resetting = other.resetBang().catch(() => {});
+        const resetting = other.resetBang();
         await expect(foreign).resolves.toHaveLength(1);
-      } finally {
         await resetting;
+      } finally {
         await other.close();
       }
     });
@@ -390,15 +391,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await other.execute("SELECT 1 AS n");
         setTimeout(() => {
-          resetting = other.resetBang().catch(() => {});
+          resetting = other.resetBang();
         }, 0);
         await other.lock.synchronize(async () => {
           await new Promise<void>((r) => setTimeout(r, 50));
           const rows = await other.execute("SELECT 1 AS n");
           expect(rows).toHaveLength(1);
         });
-      } finally {
         await resetting;
+      } finally {
         await other.close();
       }
     });
