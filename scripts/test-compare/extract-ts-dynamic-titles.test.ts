@@ -91,6 +91,16 @@ describe("statically expanded loop-generated it() titles", () => {
     ]);
   });
 
+  it("rejects the whole array when one element is not statically evaluable", () => {
+    expect(
+      titles(`
+        for (const format of [JSON_FORMAT, "marshal_7_0"]) {
+          it(\`\${format} serializer logs unrecognized payloads\`, () => {});
+        }
+      `),
+    ).toEqual([["<expr> serializer logs unrecognized payloads", true]]);
+  });
+
   it("leaves a span naming something other than the loop variable dynamic", () => {
     expect(
       titles(`

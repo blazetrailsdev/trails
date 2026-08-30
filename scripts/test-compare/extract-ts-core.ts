@@ -693,7 +693,10 @@ type IterableElement = { scalar: string | null; tuple: (string | null)[] | null 
  * an identifier declared once in this file with an array-literal initializer
  * (`const DELEGATED_ARRAY_METHODS = [...]`). Anything computed — `Object.keys`,
  * `.filter(...)`, an import — returns null and the loop is walked once, as
- * before.
+ * before. One unresolved element rejects the whole array, the same way the Ruby
+ * extractor's `array_literal_values` does (extract-ruby-tests.rb:686-692), so a
+ * partly-computed array keeps its single dynamic skeleton rather than emitting
+ * one duplicate skeleton per element.
  */
 function staticIterableElements(
   expr: ts.Expression,
@@ -710,9 +713,13 @@ function staticIterableElements(
   for (const element of e.elements) {
     const inner = unwrapExpression(element);
     if (ts.isArrayLiteralExpression(inner)) {
-      out.push({ scalar: null, tuple: inner.elements.map(literalValue) });
+      const tuple = inner.elements.map(literalValue);
+      if (tuple.every((value) => value === null)) return null;
+      out.push({ scalar: null, tuple });
     } else {
-      out.push({ scalar: literalValue(inner), tuple: null });
+      const scalar = literalValue(inner);
+      if (scalar === null) return null;
+      out.push({ scalar, tuple: null });
     }
   }
   return out;
