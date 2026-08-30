@@ -1,6 +1,7 @@
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
 import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
+import { Handler } from "@blazetrails/rack";
 import { Trails } from "../rails.js";
 import { DevServer } from "../server/dev-server.js";
 
@@ -22,8 +23,21 @@ export function serverCommand(): Command {
       const root = cwd();
       await requireApplication(root);
       const app = await Trails.initialize();
+      const port = parseInt(options.port, 10);
+      if (!(await hasViteConfig(root))) {
+        // `Rackup::Server#start` — `server.run(wrapped_app, **options)`.
+        const server = await Handler.Node.run(app.app(), { Port: port, Host: options.binding });
+        const address = server.address();
+        const boundPort = address && typeof address === "object" ? address.port : port;
+        console.log(
+          `=> Trails application starting in development on http://${options.binding}:${boundPort}`,
+        );
+        console.log(`=> Ctrl+C to stop`);
+        console.log("");
+        return;
+      }
       const server = new DevServer({
-        port: parseInt(options.port, 10),
+        port,
         host: options.binding,
         cwd: root,
         app: app.app(),
@@ -58,4 +72,19 @@ async function requireApplication(root: string): Promise<void> {
     }
   }
   throw new Error(`No config/application.ts found in ${root}.`);
+}
+
+/**
+ * A trails app with a `vite.config` wants Vite's asset pipeline in front of
+ * Rack, which is what {@link DevServer} mounts. Without one there is nothing
+ * for Vite to serve, so the Rack handler runs on its own — the plain
+ * `Rackup::Server` path.
+ */
+async function hasViteConfig(root: string): Promise<boolean> {
+  const fs = await getFsAsync();
+  const p = await getPathAsync();
+  return (
+    (await fs.exists(p.join(root, "vite.config.ts"))) ||
+    (await fs.exists(p.join(root, "vite.config.js")))
+  );
 }

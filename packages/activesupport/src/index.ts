@@ -66,6 +66,9 @@ export type {
   SpawnSyncResult,
 } from "./child-process-adapter.js";
 
+export { registerHttpAdapter, getHttpAsync, httpAdapterConfig } from "./http-adapter.js";
+export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-adapter.js";
+
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
 export type { OsAdapter } from "./os-adapter.js";
 
@@ -94,6 +97,7 @@ import { fsAdapterConfig } from "./fs-adapter.js";
 import { cryptoAdapterConfig } from "./crypto-adapter.js";
 import { asyncContextAdapterConfig } from "./async-context-adapter.js";
 import { childProcessAdapterConfig } from "./child-process-adapter.js";
+import { httpAdapterConfig } from "./http-adapter.js";
 import { osAdapterConfig } from "./os-adapter.js";
 import { processAdapterConfig } from "./process-adapter.js";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
@@ -152,6 +156,13 @@ export const ActiveSupport = {
   },
   set childProcessAdapter(name: string | null) {
     childProcessAdapterConfig.adapter = name;
+  },
+
+  get httpAdapter(): string | null {
+    return httpAdapterConfig.adapter;
+  },
+  set httpAdapter(name: string | null) {
+    httpAdapterConfig.adapter = name;
   },
 
   get osAdapter(): string | null {

@@ -67,3 +67,4 @@ export { CONTENT_TYPE, CONTENT_LENGTH, RACK_SESSION, RACK_SESSION_OPTIONS } from
 export { Files } from "./files.js";
 export * as Mime from "./mime.js";
 export * as Utils from "./utils.js";
+export * as Handler from "./handler/index.js";
