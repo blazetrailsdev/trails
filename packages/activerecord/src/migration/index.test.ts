@@ -7,12 +7,8 @@ import { ambientConnection } from "../support/rocket-tables.js";
 import { adapterSupports } from "../support/supports.js";
 import { adapterType } from "../test-adapter.js";
 
-function indexNameLength(connection: AbstractAdapter): number {
-  return (connection as unknown as { indexNameLength(): number }).indexNameLength();
-}
-
 function goodIndexName(connection: AbstractAdapter): string {
-  return "x".repeat(indexNameLength(connection));
+  return "x".repeat(connection.indexNameLength());
 }
 
 describe("Migration", () => {
@@ -62,7 +58,7 @@ describe("Migration", () => {
       const tooLongIndexName = goodIndexName(connection) + "x";
       await connection.addIndex(tableName, ["foo"], { name: "old_idx" });
       await expect(connection.renameIndex(tableName, "old_idx", tooLongIndexName)).rejects.toThrow(
-        new RegExp(`too long; the limit is ${indexNameLength(connection)} characters`),
+        new RegExp(`too long; the limit is ${connection.indexNameLength()} characters`),
       );
 
       expect(await connection.indexNameExists(tableName, "old_idx")).toBeTruthy();
@@ -90,7 +86,7 @@ describe("Migration", () => {
       await expect(
         connection.addIndex(tableName, "foo", { name: tooLongIndexName }),
       ).rejects.toThrow(
-        new RegExp(`too long; the limit is ${indexNameLength(connection)} characters`),
+        new RegExp(`too long; the limit is ${connection.indexNameLength()} characters`),
       );
 
       expect(await connection.indexNameExists(tableName, tooLongIndexName)).toBeFalsy();
@@ -177,7 +173,7 @@ describe("Migration", () => {
 
     it("internal index with name matching database limit", async () => {
       const connection = await ambientConnection();
-      const goodIndexName = "x".repeat(indexNameLength(connection));
+      const goodIndexName = "x".repeat(connection.indexNameLength());
       await connection.addIndex(tableName, "foo", { name: goodIndexName, internal: true });
 
       expect(await connection.indexNameExists(tableName, goodIndexName)).toBeTruthy();
