@@ -15,9 +15,16 @@ import { ArgumentError } from "./hash-utils.js";
 import { zone as timeZone } from "./time-zone-config.js";
 import { TimeWithZone } from "./time-with-zone.js";
 import { currentTime } from "./time-travel.js";
-import { DAYS_INTO_WEEK } from "./core-ext/date-and-time/calculations.js";
+import {
+  DAYS_INTO_WEEK,
+  lastWeek,
+  nextWeek,
+  prevWeek,
+} from "./core-ext/date-and-time/calculations.js";
 import { beginningOfWeek as beginningOfWeekDefault } from "./core-ext/date/calculations.js";
 import { KeyError } from "./core-ext/key-error.js";
+
+export { nextWeek, prevWeek, lastWeek };
 
 function dayIndex(day: string): number {
   const idx = DAYS_INTO_WEEK[day.toLowerCase()];
@@ -222,28 +229,6 @@ export function endOfYear(date: Date): Temporal.Instant {
 // ---------------------------------------------------------------------------
 // next/prev Week/Month/Year/Day
 // ---------------------------------------------------------------------------
-
-export function nextWeek(date: Date, day: string = beginningOfWeekDefault()): Temporal.Instant {
-  const targetDay = dayIndex(day);
-  const d = clone(date);
-  d.setDate(d.getDate() + 7);
-  const bow = _beginningOfWeekDate(d, "monday");
-  const diff = (targetDay - 1 + 7) % 7; // offset from Monday
-  bow.setDate(bow.getDate() + diff);
-  bow.setHours(0, 0, 0, 0);
-  return instantFrom(bow);
-}
-
-export function prevWeek(date: Date, day: string = beginningOfWeekDefault()): Temporal.Instant {
-  const targetDay = dayIndex(day);
-  const d = clone(date);
-  d.setDate(d.getDate() - 7);
-  const bow = _beginningOfWeekDate(d, "monday");
-  const diff = (targetDay - 1 + 7) % 7;
-  bow.setDate(bow.getDate() + diff);
-  bow.setHours(0, 0, 0, 0);
-  return instantFrom(bow);
-}
 
 export function nextMonth(date: Date, months = 1): Temporal.Instant {
   return advance(date, { months: months });
@@ -774,16 +759,6 @@ export function rfc3339(str: string): Temporal.Instant {
   const ms = Date.parse(str.replace(" ", "T"));
   if (Number.isNaN(ms)) throw new ArgumentError("invalid date");
   return instantFrom(new Date(ms));
-}
-
-/**
- * lastWeek — returns the start of last week.
- */
-export function lastWeek(
-  date: Date,
-  startDay: string = beginningOfWeekDefault(),
-): Temporal.Instant {
-  return prevWeek(date, startDay);
 }
 
 /**
