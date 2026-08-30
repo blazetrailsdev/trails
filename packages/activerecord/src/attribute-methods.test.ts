@@ -621,9 +621,6 @@ describe("AttributeMethodsTest", () => {
       ]).toEqual([2007, 12, 31, 16, 0, 0]);
     });
   });
-  it.skip("YAML dumping a record with time zone-aware attribute", async () => {
-    // PERMANENT-SKIP: Ruby-only — Psych round-trips an Active Record object
-  });
   it("setting a time zone-aware time in the current time zone", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
       const record = target.new({}) as any;
