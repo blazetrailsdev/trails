@@ -14,6 +14,28 @@ export const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
  */
 export const PACKAGES = apiComparePackages();
 
+/**
+ * Packages the TS extractor reads but the Rails comparison never scores: they
+ * have no gem on the other side, so coverage, arity and call parity over them
+ * are meaningless questions.
+ *
+ * `ruby-compat` is a port of Ruby, not of Rails (RFC 0129), and its README
+ * states plainly that `parity:api` never enrolls it — permanently. It is here
+ * only so `parity:api:extra` can COUNT it: every TS file in it lands in the
+ * `rubyFile === null` slice, so every public name scores novel, which makes the
+ * extra-surface mark an exact measure of how much MRI surface has been ported.
+ * That count is what enforces the package's "only what trails actually calls"
+ * rule mechanically instead of by review.
+ *
+ * Deliberately NOT folded into {@link PACKAGES}: that list is the Rails-parity
+ * population, and adding a Ruby port to it would put a package with no gem into
+ * every coverage denominator in the repo.
+ */
+export const TS_ONLY_PACKAGES = ["ruby-compat"] as const;
+
+/** Every package `extract-ts-api.ts` walks: the Rails population plus the Ruby ports. */
+export const TS_EXTRACT_PACKAGES: readonly string[] = [...PACKAGES, ...TS_ONLY_PACKAGES];
+
 /** Override package → directory mapping when they differ */
 export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   actiondispatch: "actionpack",
@@ -116,13 +138,13 @@ export interface PackageRoots {
 /**
  * The extraction roots of every package `parity:api` actually extracts.
  *
- * Derived from `PACKAGES` rather than a `packages/` listing so the freshness
- * guards see the same tree the extractor does: workspaces that are not
+ * Derived from `TS_EXTRACT_PACKAGES` rather than a `packages/` listing so the
+ * freshness guards see the same tree the extractor does: workspaces that are not
  * api-compared (`activerecord-cli`, `trails-tsc`, `tse-compiler`, `website`, …)
  * cannot affect the TS manifest and so must not be able to block a run.
  */
 export function apiComparePackageRoots(): PackageRoots[] {
-  return PACKAGES.map((pkg) => {
+  return TS_EXTRACT_PACKAGES.map((pkg) => {
     const dir = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
     return {
       dir,

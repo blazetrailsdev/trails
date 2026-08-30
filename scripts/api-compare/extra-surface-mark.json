@@ -6,5 +6,9 @@
   "arel": {
     "novel": 0,
     "total": 35
+  },
+  "ruby-compat": {
+    "novel": 0,
+    "total": 0
   }
 }

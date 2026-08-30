@@ -46,7 +46,7 @@ import type {
 import {
   ROOT_DIR,
   OUTPUT_DIR,
-  PACKAGES,
+  TS_EXTRACT_PACKAGES,
   PACKAGE_DIR_OVERRIDES,
   packageSrcDir,
   overlappingSubDirs,
@@ -378,7 +378,7 @@ export async function main() {
   }
   const pending: PendingExtract[] = [];
 
-  for (const pkg of PACKAGES) {
+  for (const pkg of TS_EXTRACT_PACKAGES) {
     const pkgDir = packageSrcDir(pkg);
     const files = walkTsFilesSync(pkgDir, COMPARED_TS_FILES, overlappingSubDirs(pkg));
     const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
@@ -500,8 +500,8 @@ export async function main() {
     }
   }
 
-  // Print summary in PACKAGES order (not extraction order).
-  for (const pkg of PACKAGES) {
+  // Print summary in TS_EXTRACT_PACKAGES order (not extraction order).
+  for (const pkg of TS_EXTRACT_PACKAGES) {
     const data = manifest.packages[pkg];
     const classCount = Object.keys(data.classes).length;
     const moduleCount = Object.keys(data.modules).length;
@@ -518,7 +518,7 @@ export async function main() {
     const sharedNote =
       sharedHits.size > 0 ? ` (${sharedHits.size} from the shared cross-worktree cache)` : "";
     console.log(
-      `\n  ${cacheHits.size}/${PACKAGES.length} packages served from cache${sharedNote} (set API_COMPARE_FORCE=1 to rebuild).`,
+      `\n  ${cacheHits.size}/${TS_EXTRACT_PACKAGES.length} packages served from cache${sharedNote} (set API_COMPARE_FORCE=1 to rebuild).`,
     );
   }
 
