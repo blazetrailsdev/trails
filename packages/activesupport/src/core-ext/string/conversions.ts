@@ -85,3 +85,48 @@ export function toDatetime(
   if (!isBlank(str)) return DateTime.parse(str, false);
   return undefined;
 }
+
+/**
+ * The leading integer `String#to_i` reads: optional whitespace, an optional
+ * sign, then base-10 digits with single underscores between them
+ * (`rb_str_to_inum` with `badcheck` false). Everything from the first invalid
+ * character on is discarded, so `"1__0"` is `1` and `"0x1f"` is `0`.
+ */
+const TO_I_REGEX = /^\s*[+-]?\d(?:_?\d)*/;
+
+/**
+ * Ruby `String#to_i` — the leading integer, or `0` when the string has none
+ * (`"".to_i == 0`, `"  42abc".to_i == 42`, verified on MRI 3.3).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core (`string.c`), which Rails calls
+ * without defining (`xml_mini.rb:72`), so there is no `.rb` in the vendored
+ * corpus for the port to mirror.
+ */
+export function toI(str: string): number {
+  const match = TO_I_REGEX.exec(str);
+  return match === null ? 0 : parseInt(match[0].replace(/_/g, ""), 10);
+}
+
+/**
+ * The leading float `String#to_f` reads (`rb_str_to_dbl` with `badcheck`
+ * false): the same sign-and-underscore rules as {@link TO_I_REGEX}, plus an
+ * optional fractional part, an optional bare leading `.`, and an optional
+ * exponent — each of which is only taken when a digit follows, so `"1e"` is
+ * `1.0` and `"5."` is `5.0`.
+ */
+const TO_F_REGEX =
+  /^\s*[+-]?(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)(?:[eE][+-]?\d(?:_?\d)*)?/;
+
+/**
+ * Ruby `String#to_f` — the leading float, or `0.0` when the string has none.
+ * The remainder is discarded rather than raising, so `"123,003".to_f` is
+ * `123.0` and `"abc".to_f` is `0.0` (verified on MRI 3.3).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core (`string.c`), which Rails calls
+ * without defining (`xml_mini.rb:73`), so there is no `.rb` in the vendored
+ * corpus for the port to mirror.
+ */
+export function toF(str: string): number {
+  const match = TO_F_REGEX.exec(str);
+  return match === null ? 0 : Number(match[0].replace(/_/g, "").trim());
+}
