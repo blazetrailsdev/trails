@@ -21,6 +21,7 @@
     "@blazetrails/i18n": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
-    "@blazetrails/nokogiri": "workspace:*"
+    "@blazetrails/nokogiri": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
   }
 }
