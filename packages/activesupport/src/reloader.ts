@@ -126,12 +126,6 @@ export class Reloader extends ExecutionWrapper {
   /**
    * Acquire the ActiveSupport::Dependencies::Interlock unload lock,
    * ensuring it will be released automatically
-   *
-   * `ActiveSupport::Dependencies.interlock.start_unloading` (reloader.rb:104) is
-   * not called: ESM has no autoload, so there is no interlock to hold loads off across an
-   * unload (same reason `Concurrency::LoadInterlockAwareMonitor` is a bare
-   * `Monitor`). The `@locked` bookkeeping is ported so the pairing with
-   * {@link releaseUnloadLockBang} still holds.
    */
   requireUnloadLockBang(): void {
     if (!this.#locked) {
@@ -141,9 +135,6 @@ export class Reloader extends ExecutionWrapper {
 
   /**
    * Release the unload lock if it has been previously obtained
-   *
-   * `ActiveSupport::Dependencies.interlock.done_unloading` (reloader.rb:113) is
-   * not called — see {@link requireUnloadLockBang}.
    */
   releaseUnloadLockBang(): void {
     if (this.#locked) {
