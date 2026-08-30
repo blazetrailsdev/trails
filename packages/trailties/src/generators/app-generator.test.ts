@@ -16,7 +16,19 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function makeGen(database: AppDatabase = "sqlite", opts: { skipDocker?: boolean } = {}) {
+// Every subsystem trails has no package for is skipped by default; a run that
+// exercises the templates behind those guards opts back in.
+const UNPORTED = {
+  skipActionCable: false,
+  skipActionMailer: false,
+  skipActiveJob: false,
+  skipActiveStorage: false,
+};
+
+function makeGen(
+  database: AppDatabase = "sqlite",
+  opts: { skipDocker?: boolean; [k: `skip${string}`]: boolean | undefined } = {},
+) {
   return new AppGenerator({
     cwd: tmpDir,
     output: (m) => lines.push(m),
@@ -56,9 +68,6 @@ describe("AppGenerator", () => {
     expect(exists("src/config/environment.ts")).toBe(true);
     expect(exists("src/config/routes.ts")).toBe(true);
     expect(exists("src/config/database.ts")).toBe(true);
-    expect(exists("src/config/puma.ts")).toBe(true);
-    expect(exists("src/config/cable.ts")).toBe(true);
-    expect(exists("src/config/storage.ts")).toBe(true);
     expect(exists("src/config/environments/development.ts")).toBe(true);
     expect(exists("src/config/environments/test.ts")).toBe(true);
     expect(exists("src/config/environments/production.ts")).toBe(true);
@@ -73,13 +82,7 @@ describe("AppGenerator", () => {
     expect(exists("src/app/models/application-record.ts")).toBe(true);
     expect(exists("src/app/models/concerns/.gitkeep")).toBe(true);
     expect(exists("src/app/helpers/application-helper.ts")).toBe(true);
-    expect(exists("src/app/jobs/application-job.ts")).toBe(true);
-    expect(exists("src/app/mailers/application-mailer.ts")).toBe(true);
-    expect(exists("src/app/channels/application-cable/connection.ts")).toBe(true);
-    expect(exists("src/app/channels/application-cable/channel.ts")).toBe(true);
     expect(exists("src/app/views/layouts/application.html.tse")).toBe(true);
-    expect(exists("src/app/views/layouts/mailer.html.tse")).toBe(true);
-    expect(exists("src/app/views/layouts/mailer.text.tse")).toBe(true);
     expect(exists("src/app/assets/stylesheets/application.css")).toBe(true);
     expect(exists("src/app/assets/images/.gitkeep")).toBe(true);
     expect(exists("vite.config.ts")).toBe(true);
@@ -103,10 +106,37 @@ describe("AppGenerator", () => {
 
     expect(exists("lib/tasks/.gitkeep")).toBe(true);
     expect(exists("log/.gitkeep")).toBe(true);
-    expect(exists("storage/.gitkeep")).toBe(true);
     expect(exists("tmp/.gitkeep")).toBe(true);
     expect(exists("tmp/pids/.gitkeep")).toBe(true);
     expect(exists("vendor/.gitkeep")).toBe(true);
+  });
+
+  it("skips scaffolding for subsystems trails has no package for", async () => {
+    await makeGen().run();
+
+    expect(exists("src/config/puma.ts")).toBe(false);
+    expect(exists("src/config/cable.ts")).toBe(false);
+    expect(exists("src/config/storage.ts")).toBe(false);
+    expect(exists("src/app/jobs")).toBe(false);
+    expect(exists("src/app/mailers")).toBe(false);
+    expect(exists("src/app/channels")).toBe(false);
+    expect(exists("src/app/views/layouts/mailer.html.tse")).toBe(false);
+    expect(exists("src/app/views/layouts/mailer.text.tse")).toBe(false);
+    expect(exists("storage")).toBe(false);
+  });
+
+  it("emits each subsystem's scaffolding once its skip flag is off", async () => {
+    await makeGen("sqlite", UNPORTED).run();
+
+    expect(exists("src/config/cable.ts")).toBe(true);
+    expect(exists("src/config/storage.ts")).toBe(true);
+    expect(exists("src/app/jobs/application-job.ts")).toBe(true);
+    expect(exists("src/app/mailers/application-mailer.ts")).toBe(true);
+    expect(exists("src/app/channels/application-cable/connection.ts")).toBe(true);
+    expect(exists("src/app/channels/application-cable/channel.ts")).toBe(true);
+    expect(exists("src/app/views/layouts/mailer.html.tse")).toBe(true);
+    expect(exists("src/app/views/layouts/mailer.text.tse")).toBe(true);
+    expect(exists("storage/.gitkeep")).toBe(true);
   });
 
   it("generates valid package.json", async () => {
@@ -329,7 +359,7 @@ describe("AppGenerator", () => {
   });
 
   it("snapshots emitted TypeScript sources", async () => {
-    await makeGen().run();
+    await makeGen("sqlite", UNPORTED).run();
     const read = (...segs: string[]) => fs.readFileSync(appPath(...segs), "utf-8");
     expect(read("src/app/controllers/application-controller.ts")).toMatchSnapshot(
       "application-controller.ts",
@@ -344,7 +374,6 @@ describe("AppGenerator", () => {
     expect(read("src/app/channels/application-cable/channel.ts")).toMatchSnapshot("channel.ts");
     expect(read("src/config/application.ts")).toMatchSnapshot("config/application.ts");
     expect(read("src/config/routes.ts")).toMatchSnapshot("config/routes.ts");
-    expect(read("src/config/puma.ts")).toMatchSnapshot("config/puma.ts");
     expect(read("src/config/cable.ts")).toMatchSnapshot("config/cable.ts");
     expect(read("src/config/storage.ts")).toMatchSnapshot("config/storage.ts");
     expect(read("src/config/environments/development.ts")).toMatchSnapshot(
