@@ -13,8 +13,8 @@ beforeAll(async () => {
 class NumericData extends Base {
   declare bank_balance: BigDecimal | null;
   declare big_bank_balance: BigDecimal | null;
-  declare my_house_population: number | null;
-  declare world_population: bigint | null;
+  declare my_house_population: number | bigint | null;
+  declare world_population: number | bigint | null;
   static _tableName = "numeric_data";
   static {
     this.attribute("world_population", "big_integer");
