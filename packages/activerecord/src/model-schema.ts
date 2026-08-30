@@ -586,7 +586,13 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
  * are generated: the alias half stays lazy, on Rails' own demand point
  * (`Core#init_internals`, core.rb:848), so `alias_attribute_method_definition`
  * (attribute_methods.rb:87-97) is reached when a record is built rather than
- * when a column set is reflected.
+ * when a column set is reflected. That is why the `@attribute_methods_generated`
+ * guard (attribute_methods.rb:104) is released again afterwards: this hook has
+ * generated only half of what `define_attribute_methods` generates, so leaving
+ * the guard latched would make `init_internals`' own call early-return and the
+ * alias half would never be reached. `_attributeMethodsGeneratedByLoad`
+ * records that the plain half is already in place, so the later call skips
+ * straight to the alias half instead of regenerating the readers.
  *
  * @noRailsEquivalent Rails needs no such hook: its readers are methods, so
  * `method_missing` is the trigger.
@@ -595,6 +601,12 @@ function defineAttributeMethodsAfterLoad(host: SchemaHost): void {
   withoutAliasAttributeGeneration(() =>
     (host as unknown as { defineAttributeMethods?: () => boolean }).defineAttributeMethods?.(),
   );
+  const methodHost = host as unknown as {
+    _attributeMethodsGenerated?: boolean;
+    _attributeMethodsGeneratedByLoad?: boolean;
+  };
+  methodHost._attributeMethodsGenerated = false;
+  methodHost._attributeMethodsGeneratedByLoad = true;
   (host as unknown as { _columns?: unknown })._columns = undefined;
 }
 
@@ -630,8 +642,12 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
   bag._columns = undefined;
   host._columnsHash = filteredHash;
 
-  const methodHost = host as unknown as { _attributeMethodsGenerated?: boolean };
+  const methodHost = host as unknown as {
+    _attributeMethodsGenerated?: boolean;
+    _attributeMethodsGeneratedByLoad?: boolean;
+  };
   methodHost._attributeMethodsGenerated = false;
+  methodHost._attributeMethodsGeneratedByLoad = false;
 
   encryptionHooks.applyPendingEncryptions(host);
 

@@ -2722,6 +2722,8 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   readonly changesToSave: Record<string, [unknown, unknown]>;
   readonly changedAttributeNamesToSave: string[];
   readonly attributesInDatabase: Record<string, unknown>;
+  readonly idInDatabase: unknown;
+  isSavedChanges(): boolean;
   isSavedChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
   attributeBeforeLastSave(attr: string): unknown;
   isWillSaveChangeToAttribute(attr: string, options?: DirtyOptions): boolean;

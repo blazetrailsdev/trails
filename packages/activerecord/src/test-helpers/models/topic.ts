@@ -8,6 +8,13 @@ import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
+export interface Topic {
+  get content(): unknown;
+  set content(value: unknown);
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the reader/writer accessor pair for this model's generated attributes lives in the interface merged above. */
 export class Topic extends Base {
   declare static base: () => Relation<Topic>;
   declare static writtenBefore: (time: any) => Relation<Topic>;
@@ -35,7 +42,6 @@ export class Topic extends Base {
   declare author_name: string;
   declare binary_content: Uint8Array;
   declare bonus_time: Temporal.PlainTime;
-  declare content: string;
   declare created_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
   declare group: string;
   declare important: string;

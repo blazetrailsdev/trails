@@ -612,7 +612,6 @@ export function initInternals(
   this._strictLoadingMode = klass.strictLoadingMode;
 
   klass.defineAttributeMethods();
-  klass.generateAliasAttributes();
 }
 
 export function initializeDup(
