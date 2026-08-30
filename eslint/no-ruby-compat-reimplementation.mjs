@@ -17,8 +17,8 @@
  * WHAT IT CANNOT CATCH: a copy under a name nobody has seen — it detects a
  * re-spelling only once someone has written that spelling down. The complete
  * answer is structural detection, filed separately as REPORT-ONLY
- * (`structural-duplicate-detector-report`, RFC 0129) because its
- * false-positive rate is unknown until it runs against the real tree.
+ * (`structural-duplicate-detector-report`, RFC 0129) because its false-positive
+ * rate is unknown until it runs against the real tree.
  *
  * `no-ruby-compat-reimplementation-exclude.json` holds today's copies, one row
  * per declaration, and is ONLY-SHRINK: a row is deleted by the move story that
@@ -115,6 +115,10 @@ const rule = {
       VariableDeclarator(node) {
         if (node.id?.type !== "Identifier") return;
         const init = node.init;
+        if (init?.type === "ClassExpression") {
+          check(context, node, node.id.name, "class", []);
+          return;
+        }
         if (init?.type !== "ArrowFunctionExpression" && init?.type !== "FunctionExpression") return;
         check(context, node, node.id.name, "function", init.params);
       },

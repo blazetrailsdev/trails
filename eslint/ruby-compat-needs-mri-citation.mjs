@@ -22,8 +22,7 @@
  * `pnpm vendor:fetch` would otherwise be blocked by a citation they wrote
  * correctly. The `rails-comparison` CI job fetches it and is the enforcing run
  * (eslint/rails-private-jsdoc.config.mjs); a local green proves nothing here.
- *
- * Precedent for a manifest-backed JSDoc requirement is
+ * Precedent for a manifest-backed JSDoc requirement:
  * `blazetrails/rails-private-jsdoc`.
  */
 import * as fs from "fs";
@@ -110,7 +109,8 @@ function check(context, node, name) {
   if (root === null) return;
 
   const sourceCode = context.sourceCode ?? context.getSourceCode();
-  const target = node.parent && node.parent.type === "ExportNamedDeclaration" ? node.parent : node;
+  const exportKinds = ["ExportNamedDeclaration", "ExportDefaultDeclaration"];
+  const target = exportKinds.includes(node.parent?.type) ? node.parent : node;
   const blocks = [docBlockFor(target, sourceCode), fileLevelBlock(sourceCode)].filter(Boolean);
   const text = blocks.map((c) => c.value).join("\n");
 
@@ -171,6 +171,11 @@ const rule = {
       },
       "Program > ExportNamedDeclaration > VariableDeclaration > VariableDeclarator"(node) {
         check(context, node.parent, node.id?.name);
+      },
+      "Program > ExportDefaultDeclaration > FunctionDeclaration, Program > ExportDefaultDeclaration > ClassDeclaration"(
+        node,
+      ) {
+        check(context, node, node.id?.name ?? "default");
       },
       // Interfaces and type aliases are not measured surface — the extractor
       // reads members off classes, functions and variables — so a receipt on

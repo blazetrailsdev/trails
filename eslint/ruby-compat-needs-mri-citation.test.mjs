@@ -54,6 +54,13 @@ export class Rational {}`,
 import { x } from "./x.js";
 
 export function add(a: number, b: number): number { return a + b + x; }`,
+    // A default export is held to the same contract as a named one.
+    `/**
+ * ${cite(4)}
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export default class Rational {}`,
     // Not exported, and an interface: neither is measured surface.
     `function add(a: number, b: number): number { return a + b; }`,
     `export interface Rational { numerator: number; }`,
@@ -100,6 +107,10 @@ export function add(a: number, b: number): number { return a + b; }`,
  */
 export function add(a: number, b: number): number { return a + b; }`,
       errors: [{ messageId: "unknownFile" }],
+    },
+    {
+      code: `export default class Rational {}`,
+      errors: [{ messageId: "missingReceipt" }],
     },
   ],
 });

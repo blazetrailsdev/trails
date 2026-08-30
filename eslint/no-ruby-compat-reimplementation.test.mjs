@@ -72,6 +72,11 @@ class Parameters { dig(...keys: string[]): unknown { return keys; } }`,
     },
     {
       filename: FLAGGED,
+      code: `export const KeyError = class extends Error {};`,
+      errors: [{ messageId: "reimplementation" }],
+    },
+    {
+      filename: FLAGGED,
       code: `function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T { return defaultValue; }`,
       errors: [{ messageId: "reimplementation" }],
     },
