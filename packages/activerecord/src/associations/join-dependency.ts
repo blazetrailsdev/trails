@@ -206,7 +206,6 @@ export class JoinDependency {
     treePart.columns = columns;
     treePart.immediateAssocName = assocName;
     treePart.assocType = assocType;
-    treePart.nodeReflection = reflection;
     return treePart;
   }
 

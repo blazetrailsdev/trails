@@ -15,11 +15,6 @@ export abstract class JoinPart {
   columns: string[] = [];
   assocName = "";
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  nodeReflection: any | null = null;
   immediateAssocName = "";
   parentPath: string | null = null;
   effectiveSqlName = "";

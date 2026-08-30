@@ -107,6 +107,7 @@ describe("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
 
   beforeEach(() => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    (adapter as unknown as { _typeMapEagerLoaded: boolean })._typeMapEagerLoaded = true;
     vi.spyOn(adapter, "loadAdditionalTypes").mockResolvedValue(undefined);
     adapter.typeMap.aliasType(UUID_OID, "uuid");
   });

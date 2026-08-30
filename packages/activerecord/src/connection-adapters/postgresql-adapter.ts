@@ -566,8 +566,14 @@ export class PostgreSQLAdapter
     });
   }
 
+  /** @missingRailsCall verify! — PERMANENT */
   override lookupCastTypeFromColumn(column: CastableColumn): Type {
-    return pgLookupCastTypeFromColumn.call(this, column) as Type;
+    if (!this._typeMapEagerLoaded) {
+      throw new ConnectionNotEstablished(
+        "PostgreSQL type map is not loaded; the connection has not been configured",
+      );
+    }
+    return pgLookupCastTypeFromColumn.call(this, column);
   }
 
   /**
@@ -2439,10 +2445,6 @@ export class PostgreSQLAdapter
     const num = /^\(?(-?\d+(?:\.\d*)?)\)?(?:::bigint)?$/.exec(defaultExpr);
     if (num) return num[1];
     if (/^-?\d+$/.test(defaultExpr)) return defaultExpr;
-    const parenNum = /^\((-?\d+(?:\.\d+)?)\)(?:::[\w"\s.]+)+$/.exec(defaultExpr);
-    if (parenNum) return parenNum[1];
-    const castNum = /^(-?\d+(?:\.\d+)?)(?:::[\w"\s.]+)+$/.exec(defaultExpr);
-    if (castNum) return castNum[1];
     return null;
   }
 
