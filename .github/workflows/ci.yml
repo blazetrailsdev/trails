@@ -636,6 +636,7 @@ jobs:
           packages/activesupport
           packages/date
           packages/i18n
+          packages/ruby-compat
           scripts/guides-typecheck
           scripts/tasks
           scripts/api-compare
