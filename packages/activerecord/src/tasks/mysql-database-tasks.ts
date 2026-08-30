@@ -2,7 +2,7 @@ import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/actives
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
-import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
+import { DatabaseTasks } from "./database-tasks.js";
 
 type ConfigHash = Record<string, unknown>;
 
@@ -86,33 +86,6 @@ export class MySQLDatabaseTasks {
       args.unshift(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
     }
     await this.runCmd("mysql", args, "loading");
-  }
-
-  async truncateAll(): Promise<void> {
-    const dbName = this.dbConfig.database as string;
-    await this.establishConnection();
-    const adapter = await this.connection();
-    const bookkeeping = metadataTableNames();
-    const rows = (
-      await adapter.execQuery(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema = ? " +
-          "AND table_type = 'BASE TABLE'",
-        "SQL",
-        [dbName],
-      )
-    ).toArray() as Array<{ table_name?: string; TABLE_NAME?: string }>;
-    const names = rows
-      .map((r) => r.table_name ?? r.TABLE_NAME)
-      .filter((n): n is string => typeof n === "string" && !bookkeeping.has(n));
-    if (names.length === 0) return;
-    await adapter.execute("SET FOREIGN_KEY_CHECKS = 0");
-    try {
-      for (const name of names) {
-        await adapter.execute(`TRUNCATE TABLE \`${name.replace(/`/g, "``")}\``);
-      }
-    } finally {
-      await adapter.execute("SET FOREIGN_KEY_CHECKS = 1");
-    }
   }
 
   static register(): void {

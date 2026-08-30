@@ -1,7 +1,6 @@
 import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { underscore } from "@blazetrails/activesupport";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 import { registerLoadSchemaOverride } from "./load-schema-overrides-slot.js";
 import {
@@ -190,17 +189,6 @@ type InstanceCounterHost = {
   attributeNames(): string[];
 };
 
-function derivedForeignKey(
-  reflection: { options?: Record<string, unknown> } | null | undefined,
-  nameFallback: string,
-): unknown {
-  const options = reflection?.options ?? {};
-  if (options.foreignKey != null) return options.foreignKey;
-  if (options.queryConstraints != null) return options.queryConstraints;
-  if (options.as != null) return `${underscore(String(options.as))}_id`;
-  return `${underscore(nameFallback)}_id`;
-}
-
 /** @internal */
 export async function _createRecord(
   this: InstanceCounterHost,
@@ -224,16 +212,13 @@ export async function destroyRow(
   if (affectedRows > 0) {
     for (const associationName of this.constructor.counterCachedAssociationNames) {
       const association = this.association(associationName);
-      const dba = this.destroyedByAssociation as {
-        foreignKey?: unknown;
-        options?: Record<string, unknown>;
+      const destroyedByAssociation = this.destroyedByAssociation as {
+        foreignKey: unknown;
       } | null;
-      const destroyedByForeignKey =
-        dba?.foreignKey ?? derivedForeignKey(dba, this.constructor.name);
-      const reflectionForeignKey =
-        association.reflection?.foreignKey ??
-        derivedForeignKey(association.reflection, associationName);
-      if (!dba || !_foreignKeysEqual(destroyedByForeignKey, reflectionForeignKey)) {
+      if (
+        !destroyedByAssociation ||
+        !_foreignKeysEqual(destroyedByAssociation.foreignKey, association.reflection.foreignKey)
+      ) {
         await association.decrementCounters();
       }
     }

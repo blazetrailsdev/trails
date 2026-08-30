@@ -9,7 +9,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { Base } from "../base.js";
-import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
+import { DatabaseTasks } from "./database-tasks.js";
 import { NoDatabaseError, DatabaseAlreadyExists } from "../errors.js";
 import { isInMemoryDatabase } from "../sqlite/sqlite-uri.js";
 
@@ -122,36 +122,6 @@ export class SQLiteDatabaseTasks {
     const childProcess = await getChildProcessAsync();
     const args = [...flags, this.dbConfig.database as string];
     childProcess.spawnSync("sqlite3", args, { encoding: "utf8", in: filename });
-  }
-
-  async truncateAll(): Promise<void> {
-    const adapter = await this.connection();
-    const bookkeeping = metadataTableNames();
-    const rows = (
-      (await adapter.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-      )) as Array<{ name: string }>
-    ).filter((r) => !bookkeeping.has(r.name));
-    const withFks = adapter as DatabaseAdapter & {
-      disableReferentialIntegrity?: (fn: () => Promise<void>) => Promise<void>;
-    };
-    const run = async () => {
-      for (const row of rows) {
-        await adapter.execute(`DELETE FROM "${row.name.replace(/"/g, '""')}"`);
-      }
-      const hasSequence = (await adapter.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='sqlite_sequence'",
-      )) as Array<{ name: string }>;
-      if (hasSequence.length > 0 && rows.length > 0) {
-        const list = rows.map((r) => `'${r.name.replace(/'/g, "''")}'`).join(", ");
-        await adapter.execute(`DELETE FROM sqlite_sequence WHERE name IN (${list})`);
-      }
-    };
-    if (typeof withFks.disableReferentialIntegrity === "function") {
-      await withFks.disableReferentialIntegrity(run);
-    } else {
-      await run();
-    }
   }
 
   private async connection(): Promise<DatabaseAdapter> {
