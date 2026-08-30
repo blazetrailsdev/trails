@@ -1188,21 +1188,48 @@ describe("DatabaseTasksTruncateAllTest", () => {
   });
 
   it("truncate tables", async () => {
-    const truncated: string[] = [];
-    const original = DatabaseTasks.truncateTables;
-    DatabaseTasks.truncateTables = async (dbConfig) => {
-      truncated.push(dbConfig.database ?? "");
-    };
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-truncate-all-"));
+    const dbPath = path.join(tmp, "truncate-all.sqlite3");
+    const { BetterSQLite3Adapter } =
+      await import("../connection-adapters/better-sqlite3-adapter.js");
+    const seed = new BetterSQLite3Adapter(dbPath);
+    await seed.executeMutation("CREATE TABLE courses (id INTEGER PRIMARY KEY, name TEXT)");
+    await seed.executeMutation("CREATE TABLE colleges (id INTEGER PRIMARY KEY, name TEXT)");
+    await seed.executeMutation("CREATE TABLE schema_migrations (version TEXT PRIMARY KEY)");
+    await seed.executeMutation(
+      "CREATE TABLE ar_internal_metadata (key TEXT PRIMARY KEY, value TEXT)",
+    );
+    await seed.executeMutation("INSERT INTO courses (name) VALUES ('ruby')");
+    await seed.executeMutation("INSERT INTO colleges (name) VALUES ('trails')");
+    await seed.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
+    await seed.executeMutation("INSERT INTO ar_internal_metadata (key, value) VALUES ('a', 'b')");
+    await seed.close();
+
+    DatabaseTasks.clearRegisteredTasks();
+    DatabaseTasks.registerTask(/sqlite/, class {});
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      development: { adapter: "sqlite3", database: dbPath },
+    });
+    DatabaseTasks.env = "development";
+    await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
     try {
-      DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-        test: { adapter: "abstract", database: "test-db" },
-      });
-      DatabaseTasks.env = "test";
-      await DatabaseTasks.truncateAll("test");
+      await DatabaseTasks.truncateAll("development");
     } finally {
-      DatabaseTasks.truncateTables = original;
+      await Base.removeConnection();
     }
-    expect(truncated).toEqual(["test-db"]);
+
+    const reader = new BetterSQLite3Adapter(dbPath);
+    try {
+      expect(await reader.execute("SELECT * FROM schema_migrations")).toHaveLength(1);
+      expect(await reader.execute("SELECT * FROM ar_internal_metadata")).toHaveLength(1);
+      expect(await reader.execute("SELECT * FROM courses")).toEqual([]);
+      expect(await reader.execute("SELECT * FROM colleges")).toEqual([]);
+    } finally {
+      await reader.executeMutation("DROP TABLE IF EXISTS courses");
+      await reader.executeMutation("DROP TABLE IF EXISTS colleges");
+      await reader.close();
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 
