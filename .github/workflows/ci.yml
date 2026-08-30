@@ -1511,6 +1511,13 @@ jobs:
         # `naming` rows are report-only. Reports instead of failing until the
         # seed PR lands — see the UNSEEDED arm in lint-call-args.ts.
         run: pnpm exec tsx scripts/api-compare/lint-call-args.ts
+      - name: Arm-parity report
+        # RFC 0113 Phase 1. Reports the arm (control-token) mismatches in the
+        # RFC 0084 skeleton artifact the `--calls` step above already wrote.
+        # Report-only and exits 0 on any population: nothing gates until
+        # `measure-arm-mismatch-noise-floor` puts a figure on it, and the merge
+        # rule this reads it under is documented at report-arms.ts:ArmVerdict.
+        run: pnpm exec tsx scripts/api-compare/report-arms.ts --report
       - name: Extra-surface ratchet
         # RFC 0117. Gates arel's and activerecord's extra-surface counts (public
         # TS names in a Rails-matched file with no Ruby counterpart) against the
