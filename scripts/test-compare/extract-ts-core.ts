@@ -336,6 +336,8 @@ function calleeRootName(expression: ts.Expression): string | null {
 export function extractTestsFromSource(content: string, relativePath: string): TestFileInfo {
   const sourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
   const helpers = collectHelpers(sourceFile);
+  const literalArrays = collectLiteralArrays(sourceFile);
+  const bindings = new Map<string, string>();
 
   const fileInfo: TestFileInfo = {
     file: relativePath,
@@ -394,7 +396,57 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     currentAncestors.pop();
   }
 
+  /**
+   * Walk a `for...of` body once per statically-known element, with the loop
+   * variable bound, so each iteration's `it()` title is emitted under its real
+   * name. Returns false when the iterable is not statically evaluable, leaving
+   * the ordinary single walk (and today's dynamic skeleton) in place.
+   */
+  function expandForOf(node: ts.ForOfStatement): boolean {
+    if (node.awaitModifier) return false;
+    const initializer = node.initializer;
+    if (!ts.isVariableDeclarationList(initializer) || initializer.declarations.length !== 1) {
+      return false;
+    }
+    const name = initializer.declarations[0].name;
+    const elements = staticIterableElements(node.expression, literalArrays);
+    if (!elements) return false;
+
+    let names: string[];
+    if (ts.isIdentifier(name)) {
+      names = [name.text];
+    } else if (ts.isArrayBindingPattern(name)) {
+      names = [];
+      for (const element of name.elements) {
+        if (ts.isOmittedExpression(element) || !ts.isIdentifier(element.name)) return false;
+        names.push(element.name.text);
+      }
+    } else {
+      return false;
+    }
+
+    for (const element of elements) {
+      const values = ts.isIdentifier(name) ? [element.scalar] : (element.tuple ?? []);
+      const shadowed = names.map((n) => bindings.get(n));
+      names.forEach((n, i) => {
+        const value = values[i];
+        if (value === null || value === undefined) bindings.delete(n);
+        else bindings.set(n, value);
+      });
+      visit(node.statement);
+      names.forEach((n, i) => {
+        const prior = shadowed[i];
+        if (prior === undefined) bindings.delete(n);
+        else bindings.set(n, prior);
+      });
+    }
+    return true;
+  }
+
   function visit(node: ts.Node) {
+    if (ts.isForOfStatement(node)) {
+      if (expandForOf(node)) return;
+    }
     if (ts.isCallExpression(node)) {
       const expression = node.expression;
       const root = calleeRootName(expression);
@@ -417,7 +469,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
           }
         } else if (funcName === "itIfSupports") {
           // itIfSupports("feature", "name", fn)
-          const t = getArgTitle(node, 1);
+          const t = getArgTitle(node, 1, bindings);
           if (t) {
             addTest(
               node,
@@ -429,7 +481,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
             );
           }
         } else if (funcName === "it" || funcName === "test") {
-          const t = getArgTitle(node, 0);
+          const t = getArgTitle(node, 0, bindings);
           if (t) addTest(node, t.title, funcName, false, null, t.dynamic);
         }
       } else if (
@@ -479,7 +531,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
               return;
             }
           } else if (base.text === "itIfSupports") {
-            const t = getArgTitle(node, 1);
+            const t = getArgTitle(node, 1, bindings);
             if (t) {
               const wrapperGate = gateFromWrapper(base.text, getArgString(node, 0));
               addTest(
@@ -492,7 +544,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
               );
             }
           } else if (base.text === "it" || base.text === "test") {
-            const t = getArgTitle(node, 0);
+            const t = getArgTitle(node, 0, bindings);
             if (t) addTest(node, t.title, base.text, false, inlineGate, t.dynamic);
           }
         }
@@ -507,7 +559,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
           }
         } else if (ts.isIdentifier(base) && (base.text === "it" || base.text === "test")) {
           const modifier = expression.name.text;
-          const t = getArgTitle(node, 0);
+          const t = getArgTitle(node, 0, bindings);
           if (t) {
             addTest(
               node,
@@ -555,11 +607,145 @@ export const DYNAMIC_TITLE_PLACEHOLDER = "<expr>";
 function getArgTitle(
   node: ts.CallExpression,
   index: number,
+  bindings?: ReadonlyMap<string, string>,
 ): { title: string; dynamic: boolean } | null {
   const staticTitle = getArgString(node, index);
   if (staticTitle !== null) return { title: staticTitle, dynamic: false };
+  if (bindings && bindings.size > 0) {
+    const resolved = resolveTemplateTitle(node, index, bindings);
+    if (resolved !== null) return { title: resolved, dynamic: false };
+  }
   const skeleton = getArgTemplateSkeleton(node, index);
   return skeleton === null ? null : { title: skeleton, dynamic: true };
+}
+
+/**
+ * The title a template-literal `it()` gets when every `${...}` resolves against
+ * the loop bindings in scope — `` `rollbacks in ${filter}` `` under
+ * `for (const filter of ["validation", "save"])` yields
+ * `"rollbacks in validation"` and `"rollbacks in save"`, one manifest entry per
+ * iteration, so a loop-generated case matches its Rails name instead of being
+ * double-counted as Missing plus extra. Returns null when any span is not
+ * statically evaluable, leaving the skeleton-plus-`dynamic` fallback in place.
+ */
+function resolveTemplateTitle(
+  node: ts.CallExpression,
+  index: number,
+  bindings: ReadonlyMap<string, string>,
+): string | null {
+  const arg = node.arguments[index];
+  if (!arg || !ts.isTemplateExpression(arg)) return null;
+  let out = arg.head.text;
+  for (const span of arg.templateSpans) {
+    const value = evalBoundExpression(span.expression, bindings);
+    if (value === null) return null;
+    out += value + span.literal.text;
+  }
+  return out;
+}
+
+/** A `${...}` span's value: a bound loop variable, or `JSON.stringify` of one. */
+function evalBoundExpression(
+  expr: ts.Expression,
+  bindings: ReadonlyMap<string, string>,
+): string | null {
+  const e = unwrapExpression(expr);
+  if (ts.isIdentifier(e)) return bindings.get(e.text) ?? null;
+  if (
+    ts.isCallExpression(e) &&
+    ts.isPropertyAccessExpression(e.expression) &&
+    ts.isIdentifier(e.expression.expression) &&
+    e.expression.expression.text === "JSON" &&
+    e.expression.name.text === "stringify" &&
+    e.arguments.length === 1
+  ) {
+    const inner = evalBoundExpression(e.arguments[0], bindings);
+    return inner === null ? null : JSON.stringify(inner);
+  }
+  return null;
+}
+
+/** Strip `as const`, `satisfies`, and parentheses down to the real expression. */
+function unwrapExpression(expr: ts.Expression): ts.Expression {
+  let e = expr;
+  while (ts.isAsExpression(e) || ts.isSatisfiesExpression(e) || ts.isParenthesizedExpression(e)) {
+    e = e.expression;
+  }
+  return e;
+}
+
+/** A string/number literal's value, or null when the expression is not one. */
+function literalValue(expr: ts.Expression): string | null {
+  const e = unwrapExpression(expr);
+  if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e)) return e.text;
+  if (ts.isNumericLiteral(e)) return e.text;
+  return null;
+}
+
+/**
+ * One iterable element: a scalar for `for (const x of ["a", "b"])`, or a tuple
+ * for `for (const [ruby, js] of [["to_fs", "toFs"]])`. A tuple position that is
+ * not a literal (an arrow function paired with a name) resolves to null and
+ * simply binds nothing, so a title naming it stays dynamic.
+ */
+type IterableElement = { scalar: string | null; tuple: (string | null)[] | null };
+
+/**
+ * The statically-known elements of a `for...of` iterable: an array literal, or
+ * an identifier declared once in this file with an array-literal initializer
+ * (`const DELEGATED_ARRAY_METHODS = [...]`). Anything computed — `Object.keys`,
+ * `.filter(...)`, an import — returns null and the loop is walked once, as
+ * before.
+ */
+function staticIterableElements(
+  expr: ts.Expression,
+  arrays: ReadonlyMap<string, ts.ArrayLiteralExpression>,
+): IterableElement[] | null {
+  let e = unwrapExpression(expr);
+  if (ts.isIdentifier(e)) {
+    const declared = arrays.get(e.text);
+    if (!declared) return null;
+    e = declared;
+  }
+  if (!ts.isArrayLiteralExpression(e)) return null;
+  const out: IterableElement[] = [];
+  for (const element of e.elements) {
+    const inner = unwrapExpression(element);
+    if (ts.isArrayLiteralExpression(inner)) {
+      out.push({ scalar: null, tuple: inner.elements.map(literalValue) });
+    } else {
+      out.push({ scalar: literalValue(inner), tuple: null });
+    }
+  }
+  return out;
+}
+
+/**
+ * Every `const NAME = [...]` in the file, keyed by name. A name declared more
+ * than once is dropped rather than guessed at.
+ */
+function collectLiteralArrays(
+  sourceFile: ts.SourceFile,
+): ReadonlyMap<string, ts.ArrayLiteralExpression> {
+  const arrays = new Map<string, ts.ArrayLiteralExpression>();
+  const seen = new Set<string>();
+  function walk(node: ts.Node) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined
+    ) {
+      const init = unwrapExpression(node.initializer);
+      if (ts.isArrayLiteralExpression(init)) {
+        if (seen.has(node.name.text)) arrays.delete(node.name.text);
+        else arrays.set(node.name.text, init);
+      }
+      seen.add(node.name.text);
+    }
+    ts.forEachChild(node, walk);
+  }
+  walk(sourceFile);
+  return arrays;
 }
 
 function getArgTemplateSkeleton(node: ts.CallExpression, index: number): string | null {
