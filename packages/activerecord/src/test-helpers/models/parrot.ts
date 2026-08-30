@@ -18,6 +18,10 @@ export class Parrot extends Base {
   declare created_on: Temporal.Instant | Temporal.PlainDateTime;
   declare killer_id: number;
   declare name: string;
+  declare nameChange: [unknown, unknown] | null;
+  declare titleChanged: () => boolean;
+  declare titleChange: [unknown, unknown] | null;
+  declare titleWas: string | null;
   declare parrot_sti_class: string;
   declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
   declare updated_count: number | null;

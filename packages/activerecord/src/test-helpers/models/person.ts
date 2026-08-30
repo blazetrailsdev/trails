@@ -19,6 +19,13 @@ import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
+export interface Person {
+  get first_name(): string;
+  set first_name(value: unknown);
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the reader/writer accessor pair for this model's generated attributes lives in the interface merged above. */
 export class Person extends Base {
   declare readers: AssociationProxy<Reader>;
   declare secureReaders: AssociationProxy<SecureReader>;
@@ -59,7 +66,6 @@ export class Person extends Base {
   declare cars_count: number | null;
   declare comments: string;
   declare created_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare first_name: string;
   declare followers_count: number | null;
   declare friends_too_count: number | null;
   declare gender: string | null;

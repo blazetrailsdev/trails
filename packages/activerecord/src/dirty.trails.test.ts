@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
-
-type Rec = Base & Record<string, unknown>;
 
 describe("Dirty restore of an in-place mutation", () => {
   fixtures(["topics"]);
@@ -13,7 +10,7 @@ describe("Dirty restore of an in-place mutation", () => {
   });
 
   it("restoreAttributes restores a serialized attribute mutated in place", async () => {
-    const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
+    const topic = await Topic.createBang({ content: { a: "a" } });
 
     (topic.content as Record<string, string>)["b"] = "b";
 
@@ -28,7 +25,7 @@ describe("Dirty restore of an in-place mutation", () => {
   });
 
   it("restoreAttributeBang restores a serialized attribute mutated in place", async () => {
-    const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
+    const topic = await Topic.createBang({ content: { a: "a" } });
 
     (topic.content as Record<string, string>)["b"] = "b";
 
@@ -41,7 +38,7 @@ describe("Dirty restore of an in-place mutation", () => {
   });
 
   it("attributeChangedInPlace is true for a serialized attribute mutated in place", async () => {
-    const topic = (await Topic.createBang({ content: { a: "a" } })) as unknown as Rec;
+    const topic = await Topic.createBang({ content: { a: "a" } });
 
     (topic.content as Record<string, string>)["b"] = "b";
 

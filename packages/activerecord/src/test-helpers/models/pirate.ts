@@ -13,6 +13,13 @@ import { throwAbort } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
+export interface Pirate {
+  get parrot_id(): number;
+  set parrot_id(value: unknown);
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the reader/writer accessor pair for this model's generated attributes lives in the interface merged above. */
 export class Pirate extends Base {
   declare parrotsLimit: number;
   declare catchphrase: string;
@@ -45,7 +52,6 @@ export class Pirate extends Base {
     ((name: "attackerMatey") => Promise<Matey | null>);
   declare created_on: Temporal.Instant | Temporal.PlainDateTime;
   declare non_validated_parrot_id: number;
-  declare parrot_id: number;
   declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
 
   static postTreasuresExtension = {
