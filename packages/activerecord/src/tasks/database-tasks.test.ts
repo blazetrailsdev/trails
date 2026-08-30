@@ -1188,42 +1188,36 @@ describe("DatabaseTasksTruncateAllTest", () => {
   });
 
   it("truncate tables", async () => {
-    let truncated = false;
-    DatabaseTasks.registerTask(
-      "abstract",
-      class {
-        async truncateAll(): Promise<void> {
-          truncated = true;
-        }
-      },
-    );
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      test: { adapter: "abstract", database: "test-db" },
-    });
-    DatabaseTasks.env = "test";
-    await DatabaseTasks.truncateAll("test");
-    expect(truncated).toBe(true);
+    const truncated: string[] = [];
+    const original = DatabaseTasks.truncateTables;
+    DatabaseTasks.truncateTables = async (dbConfig) => {
+      truncated.push(dbConfig.database ?? "");
+    };
+    try {
+      DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+        test: { adapter: "abstract", database: "test-db" },
+      });
+      DatabaseTasks.env = "test";
+      await DatabaseTasks.truncateAll("test");
+    } finally {
+      DatabaseTasks.truncateTables = original;
+    }
+    expect(truncated).toEqual(["test-db"]);
   });
 });
 
 describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   let truncated: string[];
+  let originalTruncateTables: typeof DatabaseTasks.truncateTables;
   beforeEach(() => {
     truncated = [];
-    DatabaseTasks.registerTask(
-      "abstract",
-      class {
-        static usingDatabaseConfigurations(): boolean {
-          return true;
-        }
-        constructor(private readonly dbConfig: DatabaseConfig) {}
-        async truncateAll(): Promise<void> {
-          truncated.push(`${this.dbConfig.envName}:${this.dbConfig.database}`);
-        }
-      },
-    );
+    originalTruncateTables = DatabaseTasks.truncateTables;
+    DatabaseTasks.truncateTables = async (dbConfig) => {
+      truncated.push(`${dbConfig.envName}:${dbConfig.database}`);
+    };
   });
   afterEach(() => {
+    DatabaseTasks.truncateTables = originalTruncateTables;
     DatabaseTasks.clearRegisteredTasks();
     DatabaseTasks.databaseConfiguration = originalConfigurations;
     DatabaseTasks.env = "development";

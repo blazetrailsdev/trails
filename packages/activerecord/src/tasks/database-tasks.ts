@@ -309,14 +309,8 @@ export class DatabaseTasks {
   }
 
   static async truncateAll(environment: string = DatabaseTasks.env): Promise<void> {
-    const configs = this.configsFor({ envName: environment });
-    for (const dbConfig of configs) {
-      const handler = this.databaseAdapterFor(dbConfig);
-      if (handler.truncateAll) {
-        await handler.truncateAll();
-      } else {
-        await this.truncateTables(dbConfig);
-      }
+    for (const dbConfig of this.configsFor({ envName: environment })) {
+      await this.truncateTables(dbConfig);
     }
   }
 
@@ -999,11 +993,6 @@ export class DatabaseTasks {
 
   /** @internal */
   static async truncateTables(dbConfig: HashConfig): Promise<void> {
-    const handler = this.databaseAdapterFor(dbConfig);
-    if (handler.truncateAll) {
-      await handler.truncateAll();
-      return;
-    }
     await this.withTemporaryConnection(dbConfig, async (conn) => {
       await conn.truncateTables(...(await conn.tables()));
     });
@@ -1045,7 +1034,6 @@ export interface DatabaseTaskInstance {
   create?(): Promise<void>;
   drop?(): Promise<void>;
   purge?(): Promise<void>;
-  truncateAll?(): Promise<void>;
   charset?(): Promise<string | null>;
   collation?(): Promise<string | null>;
   structureDump?(filename: string, flags?: string | string[] | null): Promise<void>;

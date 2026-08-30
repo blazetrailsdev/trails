@@ -1601,6 +1601,14 @@ export class Relation<T extends Base> {
     let size: unknown = 0;
     let timestamp: unknown = null;
 
+    const rubyClassName = (value: unknown): string => {
+      if (value == null) return "NilClass";
+      if (value instanceof Temporal.Instant) return "Time";
+      if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
+      if (typeof value === "string") return "String";
+      return "Object";
+    };
+
     if (this.isLoaded) {
       const records = await this.records();
       size = records.length;
@@ -1612,13 +1620,18 @@ export class Relation<T extends Base> {
             ),
           )
           .reduce((max: unknown, value: unknown) => {
-            if (max == null) return value;
-            if (value == null) return max;
-            if (max instanceof Temporal.Instant && value instanceof Temporal.Instant) {
+            if (value instanceof Temporal.Instant && max instanceof Temporal.Instant) {
               return Temporal.Instant.compare(value, max) > 0 ? value : max;
             }
+            if (value == null || max == null) {
+              throw new ArgumentError(
+                `comparison of ${rubyClassName(value)} with ${
+                  max == null ? "nil" : rubyClassName(max)
+                } failed`,
+              );
+            }
             return (value as number) > (max as number) ? value : max;
-          }, null);
+          });
       }
     } else {
       let collection: Relation<T> = this;

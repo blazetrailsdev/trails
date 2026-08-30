@@ -1587,9 +1587,9 @@ export class CreatePosts extends Migration {
     }
   });
 
-  it("SQLiteDatabaseTasks.truncateAll deletes user tables but keeps schema_migrations + ar_internal_metadata", async () => {
+  it("DatabaseTasks.truncateTables deletes user tables but keeps schema_migrations + ar_internal_metadata", async () => {
     const {
-      SQLiteDatabaseTasks,
+      DatabaseTasks,
       InternalMetadata,
       HashConfig: HC,
     } = await import("@blazetrails/activerecord");
@@ -1625,7 +1625,7 @@ export class CreatePosts extends Migration {
     const { Base } = await import("@blazetrails/activerecord");
     await Base.establishConnection({ adapter: "sqlite3", database: dbFile });
     try {
-      await new SQLiteDatabaseTasks(config).truncateAll();
+      await DatabaseTasks.truncateTables(config);
     } finally {
       await Base.removeConnection();
     }
