@@ -2,7 +2,8 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { TimeZoneConverter } from "../attribute-methods/time-zone-conversion.js";
-import { Range, RangeType } from "../connection-adapters/postgresql/oid/range.js";
+import { Range } from "@blazetrails/activesupport";
+import { RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { DateTime } from "./date-time.js";
 import { ActiveRecord } from "../ar-config.js";
 

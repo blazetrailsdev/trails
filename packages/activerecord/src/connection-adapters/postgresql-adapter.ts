@@ -329,7 +329,6 @@ export class PostgreSQLAdapter
   private _client: pg.Client | null = null;
   private _inTransaction = false;
   private _readyForQueryStatus = "I";
-  _commandSettled = true;
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
@@ -940,7 +939,6 @@ export class PostgreSQLAdapter
             payload.sql = withReturning;
             try {
               if (useSavepoint) {
-                this._commandSettled = false;
                 await client.query(`SAVEPOINT "${spName}"`);
               }
               const result = await this._performQuery(client, withReturning, originalBinds, binds, {
@@ -948,7 +946,6 @@ export class PostgreSQLAdapter
                 notificationPayload: payload,
               });
               if (useSavepoint) {
-                this._commandSettled = false;
                 await client.query(`RELEASE SAVEPOINT "${spName}"`);
               }
               const affected = this.affectedRows(result);
@@ -963,9 +960,7 @@ export class PostgreSQLAdapter
             } catch (err) {
               if (err instanceof PreparedStatementCacheExpired) throw err;
               if (useSavepoint) {
-                this._commandSettled = false;
                 await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
-                this._commandSettled = false;
                 await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
               }
               payload.sql = pgSql;
@@ -1131,9 +1126,9 @@ export class PostgreSQLAdapter
    * @noRailsEquivalent PERMANENT
    */
   get transactionStatus(): number {
-    const client = this._rawConnection as (pg.Client & { readyForQuery?: boolean }) | null;
+    const client = this._rawConnection as (pg.Client & { _activeQuery?: unknown }) | null;
     if (client == null) return PQTRANS_UNKNOWN;
-    if (client.readyForQuery !== true && !this._commandSettled) return PQTRANS_ACTIVE;
+    if (client._activeQuery != null) return PQTRANS_ACTIVE;
     switch (this._readyForQueryStatus) {
       case "T":
         return PQTRANS_INTRANS;
@@ -1147,19 +1142,13 @@ export class PostgreSQLAdapter
   /** @internal */
   private _attachReadyForQueryListener(client: pg.Client): void {
     this._readyForQueryStatus = "I";
-    this._commandSettled = true;
     const connection = (client as pg.Client & { connection?: pg.Connection }).connection;
     if (connection == null) return;
     connection.on("readyForQuery", (message: { status?: string }) => {
       if (typeof message?.status === "string") this._readyForQueryStatus = message.status;
-      this._commandSettled = true;
-    });
-    connection.on("commandComplete", () => {
-      this._commandSettled = true;
     });
     connection.on("errorMessage", () => {
       if (this._readyForQueryStatus === "T") this._readyForQueryStatus = "E";
-      this._commandSettled = true;
     });
   }
 
@@ -1198,7 +1187,9 @@ export class PostgreSQLAdapter
 
   /** @internal */
   private _blockUntilCommandSettles(client: pg.Client): Promise<void> {
-    if (this._commandSettled) return Promise.resolve();
+    if ((client as pg.Client & { _activeQuery?: unknown })._activeQuery == null) {
+      return Promise.resolve();
+    }
     const connection = (client as pg.Client & { connection?: pg.Connection }).connection;
     if (connection == null) return Promise.resolve();
     return new Promise<void>((resolve) => {
@@ -1469,7 +1460,6 @@ export class PostgreSQLAdapter
     await this.withRawConnection({}, async (conn) => {
       const client = conn as unknown as pg.Client;
       try {
-        this._commandSettled = false;
         await client.query(sql);
       } catch (e) {
         throw this._translateException(e, sql, []);
@@ -1543,16 +1533,18 @@ export class PostgreSQLAdapter
   }
 
   override resetBang(): void {
-    if (!this._rawConnection) {
-      super.resetBang();
-      return;
-    }
-    const live = this._rawConnection;
-    this._connectionConfigured = false;
+    if (this._rawConnection) this._connectionConfigured = false;
     void this.lock
       .synchronize(async () => {
-        if (this._client) {
+        const live = this._rawConnection;
+        if (!live) {
+          await this.connectBang();
+          return;
+        }
+        if (this.transactionStatus !== PQTRANS_IDLE) {
           await live.query("ROLLBACK").catch(() => {});
+        }
+        if (this._client) {
           this._client = null;
           this._inTransaction = false;
         }
@@ -1681,20 +1673,14 @@ export class PostgreSQLAdapter
     return parseInt(String(result.rows[0]?.server_version_num ?? "0"), 10);
   }
 
-  /** @missingRailsCall with_raw_connection — CONVERGEABLE arm-permanent-connection-checkout-disallowed */
   async getDatabaseVersion(): Promise<number> {
-    const conn = this._rawConnection ?? (await this._acquireFreshClient());
-    let version: number;
-    try {
-      version = await this._serverVersion(conn);
+    return await this.withRawConnection({}, async (conn) => {
+      const version = await this._serverVersion(conn as unknown as pg.Client);
       if (version === 0) {
         throw new ConnectionFailed("Could not determine PostgreSQL version");
       }
-    } catch (error) {
-      if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
-      throw error;
-    }
-    return version;
+      return version;
+    });
   }
 
   async postgresqlVersion(): Promise<number> {
@@ -2893,7 +2879,6 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     const deallocSql = `DEALLOCATE ${pgQuoteColumnName(key.name)}`;
     this._deallocating = this._deallocating
       .then(() => {
-        if (this._connection._rawConnection === client) this._connection._commandSettled = false;
         return client.query(deallocSql);
       })
       .then(

@@ -313,6 +313,55 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    it("a stranded command marker cannot report ACTIVE at an idle-in-transaction backend", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await other.execute("BEGIN");
+        await other.execute("SELECT 1 AS n");
+
+        const marked = other as unknown as Record<string, unknown>;
+        marked._commandSettled = false;
+        (other._rawConnection as unknown as Record<string, unknown>).readyForQuery = false;
+
+        expect(other.transactionStatus).toBe(2);
+      } finally {
+        await other.close();
+      }
+    });
+
+    it("reset with no raw connection reconnects instead of running super", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await other.execute("SELECT 1 AS n");
+        other.disconnectBang();
+        expect(other._rawConnection).toBeNull();
+
+        other.resetBang();
+        await other.lock.synchronize(async () => {});
+
+        expect(other._rawConnection).not.toBeNull();
+        await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
+      } finally {
+        await other.close();
+      }
+    });
+
+    it("reset rolls back a transaction the adapter did not pin", async () => {
+      const other = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await other.execute("BEGIN");
+        expect((other as unknown as { _client: unknown })._client).toBeNull();
+        expect(other.transactionStatus).not.toBe(0);
+
+        other.resetBang();
+        await other.lock.synchronize(async () => {});
+
+        expect(other.transactionStatus).toBe(0);
+      } finally {
+        await other.close();
+      }
+    });
+
     it("reset does not cancel a query issued by another chain", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {

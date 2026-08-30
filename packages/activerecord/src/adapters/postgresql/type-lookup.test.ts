@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { Range } from "../../connection-adapters/postgresql/oid/range.js";
+import { Range } from "@blazetrails/activesupport";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

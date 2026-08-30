@@ -560,17 +560,8 @@ function targetReflectionHasAssociatedRecord(
   return !columns.every((column) => isBlank(record._readAttribute(String(column))));
 }
 
-function findHasManyTarget(
-  record: Base,
-  assocName: string,
-  assocDef: Pick<AssociationDefinition, "options" | "scope">,
-): Promise<Base[]> {
-  const assoc = _buildAssociationInstance.call(record, {
-    name: assocName,
-    type: "hasMany",
-    scope: assocDef.scope,
-    options: assocDef.options,
-  });
+function findHasManyTarget(record: Base, reflection: AssociationDefinition): Promise<Base[]> {
+  const assoc = _buildAssociationInstance.call(record, reflection);
   return (assoc as unknown as { findTarget(): Promise<Base[]> }).findTarget();
 }
 
@@ -612,17 +603,18 @@ async function loadHasManyThrough(
       const resolvedSourceName = sourceAssoc?.name ?? sourceName;
       const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
       const originalScope = throughAssoc.scope;
-      const augmentedDefinition = {
-        options: throughAssoc.options,
-        scope: (rel: any) => {
-          let r = rel.where({ [sourceTypeCol]: options.sourceType });
-          if (originalScope) r = originalScope(r);
-          return r;
+      const sourceTypeReflection = Object.create(throughAssoc, {
+        scope: {
+          value: (rel: any) => {
+            let r = rel.where({ [sourceTypeCol]: options.sourceType });
+            if (originalScope) r = originalScope(r);
+            return r;
+          },
         },
-      };
-      throughRecords = await findHasManyTarget(record, throughAssoc.name, augmentedDefinition);
+      }) as AssociationDefinition;
+      throughRecords = await findHasManyTarget(record, sourceTypeReflection);
     } else {
-      throughRecords = await findHasManyTarget(record, throughAssoc.name, throughAssoc);
+      throughRecords = await findHasManyTarget(record, throughAssoc);
     }
   } else if (throughAssoc.macro === "hasOne") {
     const one = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
@@ -649,7 +641,7 @@ async function loadHasManyThrough(
   } else if (sourceAssoc?.options?.through) {
     const results: Base[] = [];
     for (const tr of throughRecords) {
-      const sub = await findHasManyTarget(tr, sourceAssoc.name, sourceAssoc);
+      const sub = await findHasManyTarget(tr, sourceAssoc as unknown as AssociationDefinition);
       results.push(...sub);
     }
     if (!assocDef.scope) return results;

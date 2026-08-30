@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ValueType } from "@blazetrails/activemodel";
 import { Array as OidArray, Data, PgTextEncoderArray } from "./array.js";
 
 const stringSubtype = {
@@ -14,6 +15,12 @@ describe("PostgreSQL::OID::Array", () => {
     const type = new OidArray(stringSubtype);
 
     expect(type.type()).toBe("string");
+  });
+
+  it("delegates type to a bare value subtype, which answers nil", () => {
+    const type = new OidArray(new ValueType());
+
+    expect(type.type()).toBeUndefined();
   });
 
   it("casts scalar values through the subtype", () => {

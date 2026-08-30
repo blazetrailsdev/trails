@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import "./relation.js";
 import type { Relation } from "./relation.js";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
@@ -93,25 +94,9 @@ export interface AssociationOptions {
   indexErrors?: boolean | "nestedAttributesOrder";
 }
 
-export interface AssociationDefinition {
-  type: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
-  name: string;
-  options: AssociationOptions & { joinTable?: string };
-  scope?: ((...args: any[]) => any) | null;
-  macro?: "belongsTo" | "hasOne" | "hasMany" | "hasAndBelongsToMany";
-  extensions?: () => any[];
-  scopeFor?: (relation: any, owner?: any) => any;
-  foreignKey?: string | string[];
-  associationPrimaryKey?: (klass?: typeof Base) => string | string[];
-  counterCacheColumn?: () => string | null;
-  hasCachedCounter?: () => boolean;
-  hasActiveCachedCounter?: () => boolean;
-  isCounterMustBeUpdatedByHasMany?: () => boolean;
-  inverseName?: () => string | null;
-  isInverseUpdatesCounterCache?: () => unknown;
-  klass?: typeof Base;
-  foreignType?: string | null;
-}
+export type AssociationDefinition = (AssociationReflection | ThroughReflection) & {
+  readonly options: AssociationOptions & { joinTable?: string };
+};
 
 /** @internal */
 export interface ReflectionLike {

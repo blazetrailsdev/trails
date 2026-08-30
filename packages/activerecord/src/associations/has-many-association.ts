@@ -131,7 +131,7 @@ export class HasManyAssociation extends CollectionAssociation {
             this.enqueueDestroyAssociation({
               ownerModelName: this.owner.constructor.name,
               ownerId: (this.owner as any).id,
-              associationClass: String((this.reflection.klass as typeof Base).name),
+              associationClass: String(this.reflection.klass.name),
               associationIds: idsBatch,
               associationPrimaryKeyColumn: primaryKeyColumn,
               ensuringOwnerWasMethod:
@@ -424,12 +424,10 @@ async function findTarget(
     const reflThrough = ctorEarly._reflectOnAssociation?.(assocName);
     if (!_routeThroughViaAssociationScope(record, reflThrough, options)) {
       const { _buildAssociationInstance } = await import("./instance-methods.js");
-      const through = _buildAssociationInstance.call(record, {
-        name: assocName,
-        type: "hasMany",
-        scope: assocDef.scope,
-        options,
-      }) as unknown as { loadHasManyThrough(): Promise<Base[]> };
+      const through = _buildAssociationInstance.call(
+        record,
+        (reflThrough ?? assocDef) as AssociationDefinition,
+      ) as unknown as { loadHasManyThrough(): Promise<Base[]> };
       return through.loadHasManyThrough();
     }
   }

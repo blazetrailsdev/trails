@@ -6,7 +6,8 @@ import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
 import { Array as ArrayType } from "../connection-adapters/postgresql/oid/array.js";
-import { Range, RangeType } from "../connection-adapters/postgresql/oid/range.js";
+import { Range } from "@blazetrails/activesupport";
+import { RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
 
 fixtures({});
@@ -187,7 +188,7 @@ describe("TimeZoneConverter#serialize containers", () => {
 
   it("leaves an infinite range bound untouched", () => {
     const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
-    const serialized = converter.serialize(new Range(-Infinity, twz(), false)) as Range;
+    const serialized = converter.serialize(new Range<unknown>(-Infinity, twz(), false)) as Range;
     expect(serialized.begin).toBe(-Infinity);
   });
 });

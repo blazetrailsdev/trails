@@ -13,10 +13,10 @@ import { Temporal } from "@blazetrails/date";
 import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
-import { Range, rangeBoundLiteral } from "./oid/range.js";
+import { rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { toS } from "@blazetrails/activesupport";
+import { Range, toS } from "@blazetrails/activesupport";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(msg: string) {
@@ -256,7 +256,7 @@ function yearOf(value: TemporalDateLike): number {
 }
 
 /** @internal */
-export function encodeRange(this: QuotingDispatchHost, range: Range): string {
+export function encodeRange(this: QuotingDispatchHost, range: Range<unknown>): string {
   const begin = rangeBoundLiteral(typeCastRangeValue.call(this, range.begin));
   const end = rangeBoundLiteral(typeCastRangeValue.call(this, range.end));
   return `[${begin},${end}${range.excludeEnd ? ")" : "]"}`;

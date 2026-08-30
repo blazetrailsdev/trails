@@ -12,7 +12,7 @@ import { AssociationNotFoundError } from "./errors.js";
 /** @internal */
 export function _buildAssociationInstance(this: Base, assocDef: AssocDef): AssociationInstance {
   const opts = (assocDef.options ?? {}) as Record<string, unknown>;
-  switch (assocDef.macro ?? assocDef.type) {
+  switch (assocDef.macro) {
     case "belongsTo":
       if (opts.polymorphic) return new BelongsToPolymorphicAssociation(this, assocDef as any);
       return new BelongsToAssociation(this, assocDef as any);

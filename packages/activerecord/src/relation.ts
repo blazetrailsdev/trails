@@ -12,9 +12,8 @@ import type { SerializeOptions } from "@blazetrails/activemodel";
 
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
-import { wrap, any, compactBlank, groupBy, indexBy } from "@blazetrails/activesupport";
+import { wrap, any, compactBlank, groupBy, indexBy, Range } from "@blazetrails/activesupport";
 
-import { Range } from "./connection-adapters/postgresql/oid/range.js";
 export { Range };
 import {
   WhereChain,

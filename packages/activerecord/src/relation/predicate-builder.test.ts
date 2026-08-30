@@ -4,7 +4,7 @@ import { Table, Visitors, Nodes, Collectors } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { WhereClause } from "./where-clause.js";
 import { Substitute } from "../statement-cache.js";
-import { Range } from "../connection-adapters/postgresql/oid/range.js";
+import { Range } from "@blazetrails/activesupport";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
 import { fixtures } from "../test-fixtures.js";

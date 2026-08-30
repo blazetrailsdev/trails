@@ -137,7 +137,7 @@ describe("EnumTest", () => {
     const big = 9223372036854775808n;
     expect((await Book.where({ status: [2, big] }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: ["2", "9223372036854775808"] }).first())?.id).toBe(book.id);
-    expect((await Book.where({ status: new Range(2, big) }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: new Range<unknown>(2, big) }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: new Range("2", "9223372036854775808") }).first())?.id).toBe(
       book.id,
     );
