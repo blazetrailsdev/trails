@@ -125,7 +125,7 @@ export async function resetCounters(
     ) as any;
     const counterName = reflection.counterCacheColumn();
 
-    const count = (await association(object, countReflection.name).count("all")) as number;
+    const count = (await association(object, countReflection.name).count(":all")) as number;
     const countWas = (object as any).readAttribute?.(counterName) ?? (object as any)[counterName];
     const sameCount =
       typeof countWas === "bigint" ? countWas === BigInt(count) : count === countWas;

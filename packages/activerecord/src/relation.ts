@@ -486,7 +486,7 @@ export class Relation<T extends Base> {
 
   async size(): Promise<number> {
     if (this.isLoaded) return (await this.records()).length;
-    return this.count("all") as Promise<number>;
+    return this.count(":all") as Promise<number>;
   }
 
   async isEmpty(): Promise<boolean> {

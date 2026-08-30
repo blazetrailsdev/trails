@@ -645,9 +645,7 @@ export function aggregateColumn(
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
   const table = rel._model.arelTable;
-  if (columnName === "*" || columnName === "all" || columnName === "1") {
-    return new Nodes.SqlLiteral(columnName === "1" ? "1" : "*");
-  }
+  if (columnName === ":all") return new Nodes.SqlLiteral("*");
   const pk = rel._model.primaryKey;
   const pks = Array.isArray(pk) ? pk : [pk];
   return arelColumn.call(rel as never, columnName, (field: string) =>
@@ -672,7 +670,7 @@ export function hasInclude(
 ): boolean {
   return (
     rel.isEagerLoading ||
-    (isPresent(rel.includesValues) && columnName != null && columnName !== "all")
+    (isPresent(rel.includesValues) && columnName != null && columnName !== ":all")
   );
 }
 
@@ -694,7 +692,7 @@ export async function performCalculation(
   let distinct: boolean | null = rel.distinctValue;
   if (operation === "count") {
     columnName ??= await selectForCount(rel);
-    if (columnName === "*" || columnName === "all") {
+    if (columnName === ":all") {
       if (!distinct) {
         if (rel.groupValues.length === 0)
           distinct = isDistinctSelect(rel, await selectForCount(rel));
@@ -739,7 +737,7 @@ function buildCountSubquery(
   columnName: string | Nodes.Node | number | null,
   distinct: boolean,
 ): SelectManager {
-  const isAll = columnName == null || columnName === "*" || columnName === "all";
+  const isAll = columnName === ":all";
   let columnAlias: Nodes.Node;
   if (isAll) {
     columnAlias = new Nodes.SqlLiteral("*");
@@ -1091,7 +1089,7 @@ export function typeCastCalculatedValue(value: unknown, operation: string, type:
 
 /** @internal */
 export async function selectForCount(rel: CalculationRelation): Promise<string> {
-  if (isEmpty(rel.selectValues)) return "*";
+  if (isEmpty(rel.selectValues)) return ":all";
   return rel.withConnection((conn) =>
     (arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[])
       .map((column) => (conn.visitor ? conn.visitor.compile(column) : String(column)))
@@ -1106,7 +1104,7 @@ export function isBuildCountSubquery(
   columnName: string | string[] | Nodes.Node | number | null,
   distinct: boolean,
 ): boolean {
-  const isAll = columnName == null || columnName === "*" || columnName === "all";
+  const isAll = columnName === ":all";
   const selectValues = rel.selectValues ?? [];
   return (
     operation === "count" &&
