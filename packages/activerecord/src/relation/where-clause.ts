@@ -54,7 +54,6 @@ export class WhereClause {
    * @missingRailsCall size — PERMANENT
    */
   invert(): WhereClause {
-    if (this.predicates.length === 0) return this.clone();
     if (this.predicates.length === 1) {
       return new WhereClause([invertPredicate(this.predicates[0])]);
     }
