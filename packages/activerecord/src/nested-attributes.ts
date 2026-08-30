@@ -693,7 +693,8 @@ function populateInMemoryExistingRecord(
   }
 
   if (callRejectIf.call(record, associationName, attrs)) return null;
-  if (isNewStub) (proxy as any).addExistingRecord(existing);
+  if (isNewStub)
+    (record.association(associationName) as any).addToTarget(existing, { skipCallbacks: true });
   return existing ?? null;
 }
 

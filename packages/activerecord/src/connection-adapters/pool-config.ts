@@ -2,7 +2,7 @@ import type { HashConfig } from "../database-configurations/hash-config.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { SchemaCache } from "./schema-cache.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
-import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-descriptor.js";
+import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-handler.js";
 import { SchemaReflection } from "./schema-cache.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { synchronize } from "@blazetrails/activesupport";

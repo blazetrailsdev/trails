@@ -17,7 +17,6 @@ async function primaryAdapter(): Promise<TestDatabaseAdapter> {
 }
 
 interface AdapterWithExec {
-  exec(sql: string): Promise<void>;
   execute(sql: string): Promise<unknown[]>;
 }
 
@@ -36,14 +35,14 @@ describe("withTransactionalFixtures", () => {
 
   beforeAll(async () => {
     adapter = await primaryAdapter();
-    await a().exec(`DROP TABLE IF EXISTS fixture_users`);
-    await a().exec(`CREATE TABLE fixture_users (id INTEGER PRIMARY KEY, name TEXT)`);
+    await a().execute(`DROP TABLE IF EXISTS fixture_users`);
+    await a().execute(`CREATE TABLE fixture_users (id INTEGER PRIMARY KEY, name TEXT)`);
   });
 
   withTransactionalFixtures(() => adapter);
 
   it("inserts a row (first run)", async () => {
-    await a().exec(`INSERT INTO fixture_users (id, name) VALUES (1, 'alice')`);
+    await a().execute(`INSERT INTO fixture_users (id, name) VALUES (1, 'alice')`);
     const rows = await a().execute(`SELECT * FROM fixture_users`);
     expect(rows).toHaveLength(1);
   });
@@ -67,7 +66,7 @@ describe("withTransactionalFixtures", () => {
   it("nested user transaction becomes a savepoint and still rolls back at teardown", async () => {
     const tm = ((await primaryAdapter()) as unknown as TmHandle).transactionManager;
     await tm.beginTransaction({});
-    await a().exec(`INSERT INTO fixture_users (id, name) VALUES (2, 'bob')`);
+    await a().execute(`INSERT INTO fixture_users (id, name) VALUES (2, 'bob')`);
     await tm.commitTransaction();
     const rows = await a().execute(`SELECT * FROM fixture_users`);
     expect(rows).toHaveLength(1);
@@ -111,8 +110,7 @@ describe("withTransactionalFixtures (raw adapter)", () => {
 
 describe("withTransactionalFixtures (pooled adapter)", () => {
   let adapter: LeasedTestAdapter;
-  const exec = (sql: string) =>
-    (adapter as unknown as { exec(s: string): Promise<void> }).exec(sql);
+  const exec = (sql: string) => adapter.execute(sql);
   const query = (sql: string) => adapter.execute(sql);
 
   beforeAll(async () => {

@@ -84,7 +84,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   private _assertBulkInsertable(): void {
-    if (this._association.reflection.options?.through) {
+    if (this.proxyAssociation.reflection.options?.through) {
       throw new ArgumentError(
         "Bulk insert or upsert is currently not supported for has_many through association",
       );
@@ -144,7 +144,9 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   protected override async execQueries(): Promise<T[]> {
-    const association = this._association.owner.association(this._association.reflection.name);
+    const association = this.proxyAssociation.owner.association(
+      this.proxyAssociation.reflection.name,
+    );
     const prevBlock = this._instantiateBlock;
     this._instantiateBlock = (record: T): void => {
       association.setInverseInstanceFromQueries(record);

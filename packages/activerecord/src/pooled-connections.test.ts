@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
+import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { rawTestAdapterConfiguration } from "./test-adapter.js";

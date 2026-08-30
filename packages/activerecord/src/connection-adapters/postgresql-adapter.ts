@@ -486,8 +486,7 @@ export class PostgreSQLAdapter
       if (val === ":default") {
         await client.query(`SET SESSION ${key} TO DEFAULT`);
       } else if (val != null) {
-        const pgVal = val === true ? "on" : val === false ? "off" : String(val);
-        await client.query(`SET SESSION ${key} TO ${this.quoteLiteral(pgVal)}`);
+        await client.query(`SET SESSION ${key} TO ${this.quote(val)}`);
       }
     }
     this._connectionConfigured = true;
@@ -1573,7 +1572,6 @@ export class PostgreSQLAdapter
   /**
    * @internal
    * @missingRailsCall internal_execute — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
-   * @missingRailsCall quote — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
    */
   async configureConnection(): Promise<void> {
     const conn = this._rawConnection;
@@ -2804,8 +2802,7 @@ export interface PostgreSQLAdapter {
   /** @internal */
   exclusionConstraintForBang(
     tableName: string,
-    expression?: string | null,
-    options?: Record<string, unknown>,
+    { expression, ...options }: Record<string, unknown>,
   ): Promise<ExclusionConstraintDefinition>;
 
   /** @internal */
@@ -2820,8 +2817,7 @@ export interface PostgreSQLAdapter {
   /** @internal */
   uniqueConstraintForBang(
     tableName: string,
-    column?: string | string[] | null,
-    options?: Record<string, unknown>,
+    { column, ...options }: Record<string, unknown>,
   ): Promise<UniqueConstraintDefinition>;
 
   /** @internal */

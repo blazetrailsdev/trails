@@ -7,9 +7,6 @@ import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Tag } from "../test-helpers/models/tag.js";
-import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
-import { Pet } from "../test-helpers/models/pet.js";
-import { Toy } from "../test-helpers/models/toy.js";
 import { Firm } from "../test-helpers/models/company.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { ShipPart } from "../test-helpers/models/ship-part.js";
@@ -311,39 +308,10 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(instance._associationIds).toBeNull();
   });
 
-  it("readTargets() returns the loaded target array (single source of truth)", async () => {
-    const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
-    expect(proxy.readTargets()).toBe(proxy.target);
-    expect(
-      proxy
-        .readTargets()
-        .map((p: Post) => p.title)
-        .sort(),
-    ).toEqual(["a", "b", "c"]);
-  });
-
-  it("targetsByPrimaryKey() keys loaded targets by primary key", async () => {
-    const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
-    const byKey = proxy.targetsByPrimaryKey() as Map<string, Post>;
-    expect(byKey.size).toBe(3);
-    for (const post of proxy.target as Post[]) {
-      expect(byKey.get(String(post.id))).toBe(post);
-    }
-  });
-
-  it("targetsByPrimaryKey() skips targets with an unassigned key", async () => {
-    const author = await authorWithPosts();
-    const proxy = association<Post>(author, "posts") as any;
-    (proxy.target as Post[]).push(new Post({ title: "unsaved", body: "unsaved" }));
-    expect((proxy.targetsByPrimaryKey() as Map<string, Post>).size).toBe(3);
-  });
-
   it("_associationCache() returns the proxy whose target is the read accessor for loaded collections", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts") as any;
-    expect((author as any)._associationCache("posts").target).toBe(proxy.readTargets());
+    expect((author as any)._associationCache("posts").target).toBe(proxy.target);
   });
 
   it("_associationCache() returns undefined when no proxy is loaded or seeded", async () => {
@@ -517,42 +485,6 @@ describe("CollectionProxy#delete / #destroy through has_many :through — nil on
     const removed = await proxy.delete(tag.id as number);
     expect(removed).toBeDefined();
     expect(await Tagging.where({ taggable_id: post.id as number }).count()).toBe(0);
-  });
-});
-
-describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () => {
-  fixtures(["cpkAuthors", "cpkBooks", "pets", "toys"]);
-
-  it("keys loaded targets by their composite primary key", async () => {
-    const owner = await CpkAuthor.create({ name: "o" });
-    await CpkBook.create({ id: [owner.id as number, 7], title: "a" });
-    await CpkBook.create({ id: [owner.id as number, 9], title: "b" });
-    const proxy = association<CpkBook>(owner, "books") as any;
-    await proxy.load();
-    const byKey = proxy.targetsByPrimaryKey() as Map<string, CpkBook>;
-    expect(byKey.size).toBe(2);
-    expect(new Set(byKey.values())).toEqual(new Set(proxy.target as CpkBook[]));
-  });
-
-  it("keys loaded targets by a custom single-column primary key", async () => {
-    const owner = await Pet.create({ name: "o" });
-    const first = await Toy.create({ name: "aaa", pet_id: owner.id as number });
-    const second = await Toy.create({ name: "bbb", pet_id: owner.id as number });
-    const proxy = association<Toy>(owner, "toys") as any;
-    await proxy.load();
-    const byKey = proxy.targetsByPrimaryKey() as Map<string, Toy>;
-    expect(byKey.size).toBe(2);
-    expect(byKey.get(String(first.id))?.id).toBe(first.id);
-    expect(byKey.get(String(second.id))?.id).toBe(second.id);
-  });
-
-  it("skips a composite new record whose key parts are unassigned", async () => {
-    const owner = await CpkAuthor.create({ name: "o" });
-    await CpkBook.create({ id: [owner.id as number, 7], title: "a" });
-    const proxy = association<CpkBook>(owner, "books") as any;
-    await proxy.load();
-    (proxy.target as CpkBook[]).push(new CpkBook({ author_id: owner.id as number }));
-    expect((proxy.targetsByPrimaryKey() as Map<string, CpkBook>).size).toBe(1);
   });
 });
 

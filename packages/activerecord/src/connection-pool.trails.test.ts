@@ -10,7 +10,7 @@ import {
   withExecutionContext,
 } from "./connection-adapters/abstract/connection-pool.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
-import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
+import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";

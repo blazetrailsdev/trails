@@ -37,7 +37,7 @@ import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
-import type { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
+import type { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { stripSqlComments } from "./sql-classification.js";
 import {
   TransactionManager,
@@ -444,7 +444,7 @@ export interface AbstractAdapter {
   /** @internal */
   checkConstraintForBang(
     tableName: string,
-    kwargs?: { name?: string; expression?: string; validate?: boolean },
+    { expression, ...options }: { name?: string; expression?: string; validate?: boolean },
   ): Promise<CheckConstraintDefinition>;
   removeCheckConstraint(
     tableName: string,
@@ -1822,11 +1822,8 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   async withRawConnection<T>(
     options: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
-    block?: (raw: AbstractAdapter | null) => Promise<T> | T,
+    block: (raw: AbstractAdapter | null) => Promise<T> | T,
   ): Promise<T> {
-    if (typeof block !== "function") {
-      throw new TypeError("withRawConnection requires a callback");
-    }
     const allowRetry = options.allowRetry ?? false;
     const materializeTransactions = options.materializeTransactions ?? true;
 

@@ -71,13 +71,6 @@ describe("AbstractAdapter connection lifecycle privates", () => {
     expect(order).toEqual([1, 2, 3]);
   });
 
-  it("withRawConnection rejects when no callback is provided", async () => {
-    const a = new AbstractAdapter();
-    await expect((a as any).withRawConnection({})).rejects.toThrow(
-      /withRawConnection requires a callback/,
-    );
-  });
-
   it("configureConnection invokes checkVersion", async () => {
     const a = new AbstractAdapter();
     let called = 0;

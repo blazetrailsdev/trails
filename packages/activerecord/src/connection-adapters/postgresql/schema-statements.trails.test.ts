@@ -532,7 +532,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("exclusionConstraintForBang raises ArgumentError for missing constraint", async () => {
       const err = await adapter
-        .exclusionConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent WITH =")
+        .exclusionConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, {
+          expression: "nonexistent WITH =",
+        })
         .catch((e) => e);
       expect(err).toBeInstanceOf(ArgumentError);
       expect(err.message).toMatch("has no exclusion constraint");
@@ -540,7 +542,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("uniqueConstraintForBang raises ArgumentError for missing constraint", async () => {
       const err = await adapter
-        .uniqueConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, "nonexistent_col")
+        .uniqueConstraintForBang(`${SCHEMA_NAME}.${TABLE_NAME}`, { column: "nonexistent_col" })
         .catch((e) => e);
       expect(err).toBeInstanceOf(ArgumentError);
       expect(err.message).toMatch("has no unique constraint");

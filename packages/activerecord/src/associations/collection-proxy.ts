@@ -89,7 +89,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /** @internal */
   static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
 
-  private _record: Base;
   private _association!: CollectionAssociation;
   private _assocName: string;
   private get _target(): T[] {
@@ -137,68 +136,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  readTargets(): T[] {
-    return this._target;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  targetsByPrimaryKey(): Map<string, T> {
-    const byKey = new Map<string, T>();
-    for (const record of this._target) {
-      const token = primaryKeyToken(record);
-      if (token != null) byKey.set(token, record);
-    }
-    return byKey;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  get owner(): Base {
-    return this._record;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  set owner(record: Base) {
-    this._record = record;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  get reflection(): AssociationDefinition {
-    const ctor = this._record.constructor as typeof Base;
-    return ctor._reflectOnAssociation(this._assocName) as unknown as AssociationDefinition;
+  /** @internal */
+  private get reflection(): AssociationDefinition {
+    return this._association.reflection;
   }
 
   /** @internal */
   private get _callbackHost(): CallbackHost {
     return {
-      owner: this._record,
+      owner: this._association.owner,
       reflection: this.reflection,
       callback: assocCallback,
       callbacksFor: assocCallbacksFor,
     };
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  get associationName(): string {
-    return this._assocName;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -244,7 +194,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   constructor(klass: typeof Base, association: CollectionAssociation) {
     super(klass, klass.arelTable);
     this._association = association;
-    this._record = association.owner;
     this._assocName = association.reflection.name;
 
     const extensions = association.extensions;
@@ -266,7 +215,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private async _execLoad(): Promise<T[]> {
     const results = (await this._findTargetViaAssociation()) as T[];
-    const association = this._record.association(this._assocName) as unknown as {
+    const association = this._association.owner.association(this._assocName) as unknown as {
       setStrictLoading?: (record: Base) => Base;
     };
     if (typeof association.setStrictLoading === "function") {
@@ -287,7 +236,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return [];
     }
     const { _buildAssociationInstance } = await import("./instance-methods.js");
-    const assoc = _buildAssociationInstance.call(this._record, this.reflection) as unknown as {
+    const assoc = _buildAssociationInstance.call(
+      this._association.owner,
+      this.reflection,
+    ) as unknown as {
       _queryExecutor?: () => Promise<Base[]>;
       findTarget(): Promise<Base[]>;
     };
@@ -320,7 +272,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private _staleWrapper(): StaleWrapper | undefined {
-    const rec = this._record as unknown as {
+    const rec = this._association.owner as unknown as {
       association?: (n: string) => StaleWrapper;
     };
     return typeof rec.association === "function" ? rec.association(this._assocName) : undefined;
@@ -332,7 +284,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    const association = this._record.association(
+    const association = this._association.owner.association(
       this._assocName,
     ) as unknown as CollectionAssociation;
     return (
@@ -351,14 +303,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return Array.isArray(attributes)
       ? this.build(attributes, block)
       : this.build(attributes, block);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  addExistingRecord(record: T): void {
-    this._association.addToTarget(record, { skipCallbacks: true });
   }
 
   async create(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
@@ -387,7 +331,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return stripThenable(this._proxySelf ?? this);
     }
 
-    const assoc = this._record.association(this._assocName) as unknown as {
+    const assoc = this._association.owner.association(this._assocName) as unknown as {
       concat: (...records: Base[]) => Promise<Base[] | undefined>;
     };
     const concatResult = await assoc.concat(...(records as unknown as Base[]));
@@ -396,7 +340,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   private async _pushThrough(records: T[], throughScope?: unknown): Promise<void> {
-    const assoc = this._record.association(this._assocName) as unknown as ThroughAssociationHandle;
+    const assoc = this._association.owner.association(
+      this._assocName,
+    ) as unknown as ThroughAssociationHandle;
     const previousThroughScope = assoc._throughScope;
     if (throughScope != null) assoc._throughScope = throughScope;
     try {
@@ -479,7 +425,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   override find(id: unknown): Promise<T>;
   override find(...ids: unknown[]): Promise<T | T[]>;
   override async find(...args: unknown[]): Promise<T | T[]> {
-    const assoc = this._record.association(this._assocName) as unknown as {
+    const assoc = this._association.owner.association(this._assocName) as unknown as {
       find(...args: unknown[]): Promise<Base | Base[] | null>;
     };
     return (await assoc.find(...args)) as T | T[];
@@ -514,7 +460,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   scope(): any {
-    const assoc = this._record.association(this._assocName) as unknown as {
+    const assoc = this._association.owner.association(this._assocName) as unknown as {
       scope(): unknown;
     };
     return (this._scope ??= assoc.scope() as any);
@@ -530,10 +476,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /** @internal */
   isFindFromTarget(): boolean {
-    return CollectionAssociation.prototype.isFindFromTarget.call(
-      this as unknown as CollectionAssociation,
-      this._targetLoaded,
-    );
+    return this._association.isFindFromTarget(this._targetLoaded);
   }
 
   // @ts-expect-error async divergence from Relation#inspect — see doc comment.
@@ -716,14 +659,3 @@ _registerRelationFamily(
   "collectionProxy",
   CollectionProxy as unknown as new (...a: never[]) => unknown,
 );
-
-/** @internal */
-function primaryKeyToken(record: Base): string | null {
-  const id = record.id;
-  if (Array.isArray(id)) {
-    if (id.some((part) => part == null)) return null;
-    return id.map((part) => String(part)).join("\u0000");
-  }
-  if (id == null) return null;
-  return String(id);
-}

@@ -73,7 +73,7 @@ export interface DatabaseStatementsHost {
     async: boolean,
     block: (payload: Record<string, unknown>) => Promise<T>,
   ): Promise<T>;
-  execute?(sql: string, name?: string | null, kwargs?: { allowRetry?: boolean }): Promise<unknown>;
+  execute(sql: string, name?: string | null, kwargs?: { allowRetry?: boolean }): Promise<unknown>;
   selectAll?(
     sql: string,
     name?: string | null,
@@ -125,9 +125,9 @@ export interface DatabaseStatementsHost {
     userTransaction?: unknown;
   };
   withinNewTransaction?<T>(opts: unknown, fn: (tx?: unknown) => Promise<T> | T): Promise<T>;
-  disableReferentialIntegrity?(fn: () => Promise<void>): Promise<void>;
+  disableReferentialIntegrity(fn: () => Promise<void>): Promise<void>;
   /** @internal */
-  executeBatch?(
+  executeBatch(
     statements: string[],
     name?: string | null,
     kwargs?: { allowRetry?: boolean; materializeTransactions?: boolean },
@@ -135,7 +135,7 @@ export interface DatabaseStatementsHost {
   /** @internal */
   buildTruncateStatement?(tableName: string): string;
   /** @internal */
-  buildTruncateStatements?(tableNames: string[]): string[];
+  buildTruncateStatements(tableNames: string[]): string[];
   beginDbTransaction?(): Promise<void>;
   beginIsolatedDbTransaction?(isolation: string): Promise<void>;
   commitDbTransaction?(): Promise<void>;
@@ -144,7 +144,7 @@ export interface DatabaseStatementsHost {
   execRestartDbTransaction?(): Promise<void>;
   resetIsolationLevel?(): void | Promise<void>;
   emptyInsertStatementValue?(pk?: string | null): string;
-  transaction?<T>(fn: (tx?: unknown) => Promise<T> | T, opts?: unknown): Promise<T | undefined>;
+  transaction<T>(fn: (tx?: unknown) => Promise<T> | T, opts?: unknown): Promise<T | undefined>;
   pool: ConnectionPool | NullPool;
   /** @internal */
   checkIfWriteQuery?(sql: string): void;
@@ -209,7 +209,7 @@ export function toSqlAndBinds(
       );
     }
 
-    const host = this as DatabaseStatementsHost | undefined;
+    const host = this as unknown as DatabaseStatementsHost | undefined;
     const visitor = (host as any)?.visitor as Visitors.ToSql;
 
     const collector = host!.collector!() as unknown as Collectors.Composite;
@@ -255,7 +255,7 @@ export function cacheableQuery(
   },
   arel: unknown,
 ): [unknown, unknown[]] {
-  const host = this as DatabaseStatementsHost;
+  const host = this as unknown as DatabaseStatementsHost;
   const visitor = (host as any).visitor as Visitors.ToSql;
 
   let ast = arel;
@@ -356,34 +356,15 @@ export async function truncateTables(
   this: DatabaseStatementsHost & Pick<Quoting, "quoteTableName">,
   ...tableNames: string[]
 ): Promise<void> {
-  const schemaMigrationTable = this.pool.schemaMigration.tableName;
-  const internalMetadataTable = this.pool.internalMetadata.tableName;
-  const filtered = tableNames.filter(
-    (t) => t !== schemaMigrationTable && t !== internalMetadataTable,
-  );
+  const excluded = [this.pool.schemaMigration.tableName, this.pool.internalMetadata.tableName];
+  tableNames = tableNames.filter((t) => !excluded.includes(t));
 
-  if (filtered.length === 0) return;
+  if (tableNames.length === 0) return;
 
-  const exec = this.execute ?? execute;
-  const doTruncate = async () => {
-    const statements = (this.buildTruncateStatements ?? buildTruncateStatements).call(
-      this,
-      filtered,
-    );
-    if (this.executeBatch) {
-      await this.executeBatch(statements, "Truncate Tables");
-    } else {
-      for (const stmt of statements) {
-        await exec.call(this, stmt);
-      }
-    }
-  };
-
-  if (this.disableReferentialIntegrity) {
-    await this.disableReferentialIntegrity(doTruncate);
-  } else {
-    await doTruncate();
-  }
+  await this.disableReferentialIntegrity(async () => {
+    const statements = this.buildTruncateStatements(tableNames);
+    await this.executeBatch(statements, "Truncate Tables");
+  });
 }
 
 export async function transaction<T>(
@@ -540,7 +521,7 @@ export async function beginDeferredTransaction(
   this: DatabaseStatementsHost | void,
   isolationLevel?: string,
 ): Promise<void> {
-  const host = this as DatabaseStatementsHost;
+  const host = this as unknown as DatabaseStatementsHost;
   if (isolationLevel) {
     return host?.beginIsolatedDbTransaction
       ? host.beginIsolatedDbTransaction.call(host, isolationLevel)
@@ -572,7 +553,7 @@ export function resetIsolationLevel(): void {}
 export async function commitDbTransaction(): Promise<void> {}
 
 export async function rollbackDbTransaction(this: DatabaseStatementsHost | void): Promise<void> {
-  const host = this as DatabaseStatementsHost;
+  const host = this as unknown as DatabaseStatementsHost;
   await (host?.execRollbackDbTransaction
     ? host.execRollbackDbTransaction.call(host)
     : execRollbackDbTransaction.call(this));
@@ -581,7 +562,7 @@ export async function rollbackDbTransaction(this: DatabaseStatementsHost | void)
 export async function execRollbackDbTransaction(): Promise<void> {}
 
 export async function restartDbTransaction(this: DatabaseStatementsHost | void): Promise<void> {
-  const host = this as DatabaseStatementsHost;
+  const host = this as unknown as DatabaseStatementsHost;
   await (host?.execRestartDbTransaction
     ? host.execRestartDbTransaction.call(host)
     : execRestartDbTransaction.call(this));
@@ -671,30 +652,14 @@ export async function insertFixturesSet(
 
   const allStatements = [...deleteStatements, ...insertStatements];
 
-  const exec = this.execute ?? execute;
-  const doInserts = async () => {
-    if (this.executeBatch) {
-      await this.executeBatch(allStatements, "Fixtures Load");
-    } else {
-      for (const stmt of allStatements) {
-        await exec.call(this, stmt);
-      }
-    }
-  };
-
-  const doLoadInTransaction = async () => {
-    if (this.disableReferentialIntegrity) {
-      await this.disableReferentialIntegrity(doInserts);
-    } else {
-      await doInserts();
-    }
-  };
-
-  if (this.transaction) {
-    await this.transaction(doLoadInTransaction, { requiresNew: true });
-  } else {
-    await doLoadInTransaction();
-  }
+  await this.transaction(
+    async () => {
+      await this.disableReferentialIntegrity(async () => {
+        await this.executeBatch(allStatements, "Fixtures Load");
+      });
+    },
+    { requiresNew: true },
+  );
 }
 
 export function emptyInsertStatementValue(_primaryKey?: string | null): string {
@@ -932,7 +897,7 @@ export const DatabaseStatements = {
   ): Promise<Result> | FutureResult | FutureResultComplete {
     arel = arelFromRelation(arel);
     const [sql, compiledBinds, compiledPreparable, compiledAllowRetry] = toSqlAndBinds.call(
-      this as DatabaseStatementsHost,
+      this as unknown as DatabaseStatementsHost,
       arel,
       binds ?? [],
       opts?.preparable ?? null,
@@ -944,7 +909,7 @@ export const DatabaseStatements = {
     );
     const async = opts?.async ?? false;
     try {
-      const result = select.call(this as DatabaseStatementsHost, sql, name, binds, {
+      const result = select.call(this as unknown as DatabaseStatementsHost, sql, name, binds, {
         prepare,
         async: async && FutureResult.SelectAll,
         allowRetry: compiledAllowRetry,
@@ -1197,7 +1162,7 @@ function affectedRows(rawResult: any): never {
 export function preprocessQuery(this: DatabaseStatementsHost, sql: string): string {
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
-  const host = this as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
+  const host = this as unknown as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
   if (host._inQueryTransformers) return sql;
   host._inQueryTransformers = true;
   try {

@@ -24,7 +24,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       t.datetime("time");
       t.virtual("time_mirror", { type: "datetime", as: "`time`" });
     });
-    await adapter.exec("INSERT INTO virtual_columns (name) VALUES ('Rails')");
+    await adapter.execute("INSERT INTO virtual_columns (name) VALUES ('Rails')");
   });
 
   afterEach(async () => {

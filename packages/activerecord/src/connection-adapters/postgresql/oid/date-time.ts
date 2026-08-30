@@ -1,5 +1,5 @@
 import { Temporal } from "@blazetrails/date";
-import { DateTimeType } from "@blazetrails/activemodel";
+import { DateTime as ArDateTime } from "../../../type/date-time.js";
 import { pgDatetimeConfig } from "../pg-datetime-config.js";
 import {
   DateInfinity,
@@ -14,7 +14,7 @@ import {
 
 type PgDateTimeResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
 
-export class DateTime extends DateTimeType {
+export class DateTime extends ArDateTime {
   override readonly name: string = "datetime";
 
   /** @missingRailsCall format — PERMANENT */

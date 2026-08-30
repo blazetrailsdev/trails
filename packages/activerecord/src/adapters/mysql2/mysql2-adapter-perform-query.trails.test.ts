@@ -12,16 +12,16 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
 
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
-    await adapter.exec(`DROP TABLE IF EXISTS pq`);
-    await adapter.exec(`DROP TABLE IF EXISTS pq_ddl`);
-    await adapter.exec(
+    await adapter.execute(`DROP TABLE IF EXISTS pq`);
+    await adapter.execute(`DROP TABLE IF EXISTS pq_ddl`);
+    await adapter.execute(
       `CREATE TABLE pq (id bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, nick varchar(255))`,
     );
   });
 
   afterEach(async () => {
     vi.restoreAllMocks();
-    await adapter.exec(`DROP TABLE IF EXISTS pq`);
+    await adapter.execute(`DROP TABLE IF EXISTS pq`);
   });
 
   it("execute runs a non-row-returning statement and returns no rows", async () => {

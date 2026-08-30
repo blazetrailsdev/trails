@@ -2180,11 +2180,13 @@ describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
   let adapter: Mysql2Adapter;
   beforeEach(async () => {
     adapter = await leaseMysqlAdapter();
-    await adapter.exec("DROP TABLE IF EXISTS delete_me");
-    await adapter.exec("CREATE TABLE delete_me (id INT NOT NULL AUTO_INCREMENT, PRIMARY KEY (id))");
+    await adapter.execute("DROP TABLE IF EXISTS delete_me");
+    await adapter.execute(
+      "CREATE TABLE delete_me (id INT NOT NULL AUTO_INCREMENT, PRIMARY KEY (id))",
+    );
   });
   afterEach(async () => {
-    await adapter.exec("DROP TABLE IF EXISTS delete_me");
+    await adapter.execute("DROP TABLE IF EXISTS delete_me");
   });
 
   itIfSupports("bulk_alter", "updating auto increment", async () => {

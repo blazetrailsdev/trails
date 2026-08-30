@@ -67,6 +67,23 @@ const log: NonNullable<DatabaseStatementsHost["log"]> = async (
 
 const typeCastedBinds: DatabaseStatementsHost["typeCastedBinds"] = (binds) => binds ?? [];
 
+const hostDefaults: Pick<
+  DatabaseStatementsHost,
+  | "execute"
+  | "executeBatch"
+  | "disableReferentialIntegrity"
+  | "transaction"
+  | "buildTruncateStatements"
+> = {
+  execute: async () => undefined,
+  buildTruncateStatements,
+  executeBatch: async () => undefined,
+  disableReferentialIntegrity: async (fn) => {
+    await fn();
+  },
+  transaction: async (fn) => fn(),
+};
+
 describe("DatabaseStatements", () => {
   fixtures({});
   describe("toSql", () => {
@@ -99,6 +116,7 @@ describe("DatabaseStatements", () => {
     it("wraps block in begin/commit on success", async () => {
       const calls: string[] = [];
       const host: DatabaseStatementsHost = {
+        ...hostDefaults,
         log,
         pool,
         typeCastedBinds,
@@ -123,6 +141,7 @@ describe("DatabaseStatements", () => {
 
     it("catches Rollback errors and returns undefined", async () => {
       const host: DatabaseStatementsHost = {
+        ...hostDefaults,
         log,
         pool,
         typeCastedBinds,
@@ -210,6 +229,7 @@ describe("DatabaseStatements", () => {
     it("sets written on open transaction for write queries", () => {
       const txn = { open: true, written: false };
       const host: DatabaseStatementsHost = {
+        ...hostDefaults,
         log,
         pool,
         typeCastedBinds,
@@ -223,6 +243,7 @@ describe("DatabaseStatements", () => {
     it("does not set written for read queries", () => {
       const txn = { open: true, written: false };
       const host: DatabaseStatementsHost = {
+        ...hostDefaults,
         log,
         pool,
         typeCastedBinds,
@@ -237,6 +258,7 @@ describe("DatabaseStatements", () => {
   describe("is transaction open", () => {
     it("returns true when transaction is open", () => {
       const host: DatabaseStatementsHost = {
+        ...hostDefaults,
         log,
         pool,
         typeCastedBinds,
@@ -247,6 +269,7 @@ describe("DatabaseStatements", () => {
 
     it("returns false when no transaction", () => {
       const host: DatabaseStatementsHost = {
+        ...hostDefaults,
         log,
         pool,
         typeCastedBinds,
@@ -419,10 +442,11 @@ describe("DatabaseStatements", () => {
       const { insertFixturesSet } = await import("./database-statements.js");
       const host: DatabaseStatementsHost &
         Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName"> = {
+        ...hostDefaults,
         pool,
         typeCastedBinds,
-        execute: async (sql: string) => {
-          executed.push(sql);
+        executeBatch: async (statements: string[]) => {
+          executed.push(...statements);
         },
         transaction: async <T>(fn: (tx?: unknown) => Promise<T> | T) => {
           transactionUsed = true;
@@ -454,10 +478,11 @@ describe("DatabaseStatements", () => {
       const executed: string[] = [];
       let wrapped = false;
       const host: DatabaseStatementsHost & Pick<Quoting, "quoteTableName"> = {
+        ...hostDefaults,
         pool,
         typeCastedBinds,
-        execute: async (sql: string) => {
-          executed.push(sql);
+        executeBatch: async (statements: string[]) => {
+          executed.push(...statements);
         },
         disableReferentialIntegrity: async (fn: () => Promise<void>) => {
           wrapped = true;
@@ -484,6 +509,7 @@ describe("DatabaseStatements", () => {
     } {
       const executed: Array<{ sql: string; name?: string | null; receiver: unknown }> = [];
       const host: QuoterHost = {
+        ...hostDefaults,
         pool,
         typeCastedBinds,
         async execute(sql: string, name?: string | null) {
@@ -606,13 +632,14 @@ describe("performQuery", () => {
 
 describe("preprocessQuery", () => {
   it("returns sql unchanged when no write guard or transaction", () => {
-    const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
+    const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
     expect(preprocessQuery.call(host, "SELECT 1")).toBe("SELECT 1");
   });
 
   it("calls checkIfWriteQuery on the host", () => {
     let checked: string | undefined;
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       log,
       pool,
       typeCastedBinds,
@@ -638,11 +665,12 @@ describe("preprocessQuery", () => {
     }
 
     it("applies registered transformers in order, threading the connection", () => {
-      const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
+      const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
       const seen: unknown[] = [];
       withTransformers(
         [
           {
+            ...hostDefaults,
             call(sql, connection) {
               seen.push(connection);
               return `${sql} /*a*/`;
@@ -658,11 +686,12 @@ describe("preprocessQuery", () => {
     });
 
     it("does not double-apply when a transformer re-enters preprocessQuery", () => {
-      const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
+      const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
       let nested = "";
       withTransformers(
         [
           {
+            ...hostDefaults,
             call(sql) {
               nested = preprocessQuery.call(host, "SELECT inner");
               return `${sql} /*outer*/`;
@@ -681,6 +710,7 @@ describe("preprocessQuery", () => {
 describe("select", () => {
   it("delegates to internalExecQuery and returns a Result", async () => {
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       log,
       pool,
       typeCastedBinds,
@@ -696,6 +726,7 @@ describe("select", () => {
 describe("execInsert", () => {
   function makeInsertHost(supportsReturning: boolean) {
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       log,
       pool,
       typeCastedBinds,
@@ -743,6 +774,7 @@ describe("internal_exec_query is a virtual call", () => {
   function makeOverrideHost() {
     const seen: string[] = [];
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       pool,
       typeCastedBinds,
       supportsInsertReturning: () => false,
@@ -776,6 +808,7 @@ describe("internal_exec_query is a virtual call", () => {
 describe("sqlForInsert", () => {
   it("returns sql and binds unchanged when adapter does not support RETURNING", async () => {
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       pool,
       typeCastedBinds,
       log,
@@ -794,6 +827,7 @@ describe("sqlForInsert", () => {
 
   it("appends RETURNING clause when pk is supplied and adapter supports it", async () => {
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       log,
       pool,
       typeCastedBinds,
@@ -806,6 +840,7 @@ describe("sqlForInsert", () => {
 
   it("uses explicit returning list when provided", async () => {
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       log,
       pool,
       typeCastedBinds,
@@ -824,6 +859,7 @@ describe("sqlForInsert", () => {
 
   it("does NOT append pk-derived RETURNING when pk is false (Rails opt-out)", async () => {
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       log,
       pool,
       typeCastedBinds,
@@ -839,6 +875,7 @@ describe("sqlForInsert", () => {
 
   it("still honours explicit returning list when pk=false", async () => {
     const host: DatabaseStatementsHost = {
+      ...hostDefaults,
       log,
       pool,
       typeCastedBinds,
@@ -899,13 +936,13 @@ describe("defaultInsertValue", () => {
 
 describe("returningColumnValues", () => {
   it("returns [first value of first row] from result", () => {
-    const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
+    const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
     const result = new Result(["id"], [[42]]);
     expect(returningColumnValues.call(host, result)).toEqual([42]);
   });
 
   it("returns [undefined] for empty result", () => {
-    const host: DatabaseStatementsHost = { pool, typeCastedBinds, log };
+    const host: DatabaseStatementsHost = { ...hostDefaults, pool, typeCastedBinds, log };
     expect(returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
   });
 });
@@ -917,6 +954,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
   function makeHost(quoter: { q?: (n: string) => string } = {}): FixtureHost {
     const q = quoter.q ?? ((n: string) => `"${n}"`);
     return {
+      ...hostDefaults,
       pool,
       typeCastedBinds,
       log,
@@ -1005,6 +1043,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
 
     it("uses adapter quote() for value escaping", () => {
       const host: FixtureHost = {
+        ...hostDefaults,
         pool,
         typeCastedBinds,
         quote: (v: unknown) => (typeof v === "string" ? `E'${v}'` : String(v)),

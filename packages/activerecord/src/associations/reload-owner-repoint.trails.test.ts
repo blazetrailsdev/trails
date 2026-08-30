@@ -12,16 +12,6 @@ describe("reload — association owner re-point", () => {
     registerModel(Post);
   });
 
-  it("exposes a reassignable owner on CollectionProxy", async () => {
-    const first = await Author.create({ name: "first" });
-    const second = await Author.create({ name: "second" });
-    const proxy = association<Post>(first, "posts");
-    expect(proxy.owner).toBe(first);
-
-    proxy.owner = second;
-    expect(proxy.owner).toBe(second);
-  });
-
   it("resolves associations against the reloaded record after reload", async () => {
     const author = await Author.create({ name: "Dev" });
     await Post.create({ title: "a", body: "a", author_id: author.id as number });
@@ -34,7 +24,7 @@ describe("reload — association owner re-point", () => {
     await author.reload();
 
     const after = association<Post>(author, "posts");
-    expect(after.owner).toBe(author);
+    expect(after.proxyAssociation.owner).toBe(author);
     await after.load();
     expect(after.target.length).toBe(2);
   });

@@ -1,5 +1,4 @@
 import type { ConnectionPool } from "./connection-pool.js";
-import { ConnectionDescriptor, type ConnectionOwner } from "./connection-descriptor.js";
 import {
   DatabaseConfig,
   _setAdapterClassResolver,
@@ -22,6 +21,7 @@ import {
   validateAdapterName,
 } from "../../connection-adapters.js";
 import { buildAdapterArg } from "../adapter-args.js";
+import { isPreventingWrites } from "../../core.js";
 
 _setAdapterClassResolver(
   (adapterName) => resolveConnectionAdapter(adapterName),
@@ -31,8 +31,32 @@ _setAdapterClassResolver(
   (adapterName) => validateAdapterName(adapterName),
 );
 
-export { ConnectionDescriptor };
-export type { ConnectionOwner };
+export interface ConnectionOwner {
+  name: string;
+  primaryClassQ(): boolean;
+}
+
+export class ConnectionDescriptor {
+  private readonly _name: string;
+  private readonly _primary: boolean;
+
+  constructor(name: string, primary: boolean = false) {
+    this._name = name;
+    this._primary = primary;
+  }
+
+  get name(): string {
+    return this.primaryClassQ() ? "ActiveRecord::Base" : this._name;
+  }
+
+  primaryClassQ(): boolean {
+    return this._primary;
+  }
+
+  currentPreventingWrites(): boolean {
+    return isPreventingWrites(this._name);
+  }
+}
 
 let _base: BaseLike | undefined;
 
