@@ -60,6 +60,111 @@ export interface CryptoAdapter {
     digest: string,
   ): Promise<Buffer>;
   timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
+  /**
+   * Key and IV sizes for a cipher name. **Optional**: only `Cipher`
+   * needs it, so adapters that never mint their own IV stay
+   * source-compatible.
+   */
+  getCipherInfo?(name: string): { keyLength: number; ivLength: number } | undefined;
+}
+
+/**
+ * An `OpenSSL::Cipher` analogue: a cipher object that exists before its
+ * IV does, so a Rails body can build the cipher, ask it for a random IV
+ * (`randomIv`, OpenSSL's `random_iv`), and assign the IV afterwards.
+ * Node's `createCipheriv` takes key and IV as construction arguments, so
+ * the underlying adapter cipher is constructed lazily on first use.
+ */
+export class Cipher {
+  readonly name: string;
+
+  private mode: "encrypt" | "decrypt" | null = null;
+  private currentKey: Uint8Array | null = null;
+  private currentIv: Uint8Array | null = null;
+  private impl: CipherAdapter | DecipherAdapter | null = null;
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  get keyLen(): number {
+    return this.cipherInfo().keyLength;
+  }
+
+  get ivLen(): number {
+    return this.cipherInfo().ivLength;
+  }
+
+  encrypt(): this {
+    this.mode = "encrypt";
+    return this;
+  }
+
+  decrypt(): this {
+    this.mode = "decrypt";
+    return this;
+  }
+
+  set key(key: Uint8Array) {
+    this.currentKey = key;
+  }
+
+  set iv(iv: Uint8Array) {
+    this.currentIv = iv;
+  }
+
+  /** Mint a random IV of this cipher's IV length and assign it. */
+  randomIv(): Buffer {
+    const iv = getCrypto().randomBytes(this.ivLen);
+    this.currentIv = iv;
+    return iv;
+  }
+
+  set authTag(tag: Uint8Array) {
+    const impl = this.started();
+    if (!impl.setAuthTag) {
+      throw new Error("Crypto adapter does not support GCM auth tags (setAuthTag)");
+    }
+    impl.setAuthTag(tag);
+  }
+
+  get authTag(): Buffer {
+    const impl = this.started() as CipherAdapter;
+    if (!impl.getAuthTag) {
+      throw new Error("Crypto adapter does not support GCM auth tags (getAuthTag)");
+    }
+    return Buffer.from(impl.getAuthTag());
+  }
+
+  update(data: Uint8Array): Buffer {
+    return Buffer.from((this.started() as CipherAdapter).update(data));
+  }
+
+  final(): Buffer {
+    return Buffer.from((this.started() as CipherAdapter).final());
+  }
+
+  private cipherInfo(): { keyLength: number; ivLength: number } {
+    const crypto = getCrypto();
+    const info = crypto.getCipherInfo?.(this.name);
+    if (!info) {
+      throw new Error(`Crypto adapter does not know cipher "${this.name}" (getCipherInfo)`);
+    }
+    return info;
+  }
+
+  private started(): CipherAdapter | DecipherAdapter {
+    if (this.impl) return this.impl;
+    if (!this.mode) throw new Error("Cipher mode not set: call encrypt() or decrypt() first");
+    if (!this.currentKey) throw new Error("Cipher key not set");
+    if (!this.currentIv) throw new Error("Cipher iv not set");
+    const crypto = getCrypto();
+    this.impl =
+      this.mode === "encrypt"
+        ? crypto.createCipheriv(this.name, this.currentKey, this.currentIv)
+        : crypto.createDecipheriv(this.name, this.currentKey, this.currentIv);
+    return this.impl;
+  }
 }
 
 /**
@@ -151,6 +256,11 @@ function wrapNodeCrypto(nodeCrypto: typeof import("node:crypto")): CryptoAdapter
     },
     timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
       return nodeCrypto.timingSafeEqual(a, b);
+    },
+    getCipherInfo(name: string): { keyLength: number; ivLength: number } | undefined {
+      const info = nodeCrypto.getCipherInfo(name);
+      if (!info || info.keyLength == null || info.ivLength == null) return undefined;
+      return { keyLength: info.keyLength, ivLength: info.ivLength };
     },
   };
 }

@@ -24,6 +24,7 @@ export {
   getCryptoAsync,
   cryptoAdapterConfig,
   pbkdf2Async,
+  Cipher,
 } from "./crypto-adapter.js";
 export type {
   CryptoAdapter,

@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/activesupport";
+import { Cipher, getCrypto } from "@blazetrails/activesupport";
 import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
 
@@ -41,29 +41,24 @@ export class Aes256Gcm {
     return { deterministic: this.deterministic };
   }
 
-  /**
-   * @missingRailsCall order:generateIv,constructor — PERMANENT
-   * @missingRailsArgs generate_iv — PERMANENT
-   */
   encrypt(clearText: string | Buffer): Message {
     this._validateKeyLength(this.secret);
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
     if (typeof clearText === "string") clearText = Buffer.from(clearText, "utf-8");
-    const iv = this.generateIv(this.deterministic, clearText);
-    const cipher = getCrypto().createCipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, iv, {
-      authTagLength: AUTH_TAG_LENGTH,
-    });
-    let encryptedData =
-      clearText.length === 0 ? Buffer.from(clearText) : Buffer.from(cipher.update(clearText));
-    encryptedData = Buffer.concat([encryptedData, Buffer.from(cipher.final())]);
-    if (!cipher.getAuthTag) {
-      throw new Configuration("Crypto adapter does not support GCM auth tags (getAuthTag)");
-    }
-    const authTag = Buffer.from(cipher.getAuthTag());
+
+    const cipher = new Cipher(Aes256Gcm.CIPHER_TYPE);
+    cipher.encrypt();
+    cipher.key = keyBuf;
+
+    const iv = this.generateIv(cipher, clearText);
+    cipher.iv = iv;
+
+    let encryptedData = clearText.length === 0 ? Buffer.from(clearText) : cipher.update(clearText);
+    encryptedData = Buffer.concat([encryptedData, cipher.final()]);
 
     const message = new Message({ payload: encryptedData });
     message.headers.iv = iv;
-    message.headers.authTag = authTag;
+    message.headers.authTag = cipher.authTag;
     return message;
   }
 
@@ -77,21 +72,19 @@ export class Aes256Gcm {
     if (authTagBuf.length !== AUTH_TAG_LENGTH) throw new EncryptedContentIntegrity();
 
     try {
-      const decipher = getCrypto().createDecipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, toBytes(iv), {
-        authTagLength: AUTH_TAG_LENGTH,
-      });
-      if (!decipher.setAuthTag) {
-        throw new Configuration("Crypto adapter does not support GCM auth tags (setAuthTag)");
-      }
-      decipher.setAuthTag(authTagBuf);
+      const cipher = new Cipher(Aes256Gcm.CIPHER_TYPE);
+
+      cipher.decrypt();
+      cipher.key = keyBuf;
+      cipher.iv = toBytes(iv);
+
+      cipher.authTag = authTagBuf;
+
       const encryptedData = toBytes(encryptedMessage.payload);
       const decryptedData =
-        encryptedData.length === 0
-          ? Buffer.from(encryptedData)
-          : Buffer.from(decipher.update(encryptedData));
-      return Buffer.concat([decryptedData, Buffer.from(decipher.final())]);
-    } catch (e) {
-      if (e instanceof Configuration) throw e;
+        encryptedData.length === 0 ? Buffer.from(encryptedData) : cipher.update(encryptedData);
+      return Buffer.concat([decryptedData, cipher.final()]);
+    } catch {
       throw new Decryption("The provided key could not decrypt the data");
     }
   }
@@ -106,11 +99,11 @@ export class Aes256Gcm {
   }
 
   /** @internal */
-  private generateIv(deterministic: boolean, clearText: Buffer): Buffer {
-    if (deterministic) {
+  private generateIv(cipher: Cipher, clearText: Buffer): Buffer {
+    if (this.deterministic) {
       return this.generateDeterministicIv(clearText);
     }
-    return getCrypto().randomBytes(IV_LENGTH);
+    return cipher.randomIv();
   }
 
   /**
