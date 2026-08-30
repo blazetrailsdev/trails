@@ -1,10 +1,11 @@
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 
 export class NumericData extends Base {
-  declare virtual_decimal_number: unknown;
-  declare world_population: bigint;
-  declare my_house_population: bigint;
-  declare atoms_in_universe: bigint;
+  declare virtual_decimal_number: BigDecimal | null;
+  declare world_population: number | bigint | null;
+  declare my_house_population: number | bigint | null;
+  declare atoms_in_universe: number | bigint | null;
   declare bank_balance: number | null;
   declare big_bank_balance: number | null;
   declare decimal_number: number;

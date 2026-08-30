@@ -567,6 +567,15 @@ true)` must be true in trails wherever it is false in Ruby. Only ActiveRecord
   its `get` from one and its `set` from another, so a generated reader property
   also carries the write half, and `define_method_attribute=`'s generated
   `name=` (`attributes.rb:92`) sits beside it rather than being its setter.
+- **The reader and writer halves carry different types.** A Rails writer takes
+  the raw value (`_write_attribute(name, value)`,
+  `activerecord/attribute_methods/write.rb:36`) and the reader returns the cast
+  one (`_read_attribute`, `read.rb:35`), so no single field type is honest. A
+  generated member is emitted as a `get name(): CastType` /
+  `set name(value: unknown)` pair — in an interface that merges with the model
+  class, since a class body cannot hold a bodiless accessor. A hand-written
+  `declare` may name the reader type alone wherever nothing writes a raw value
+  to it.
 - **A generated reader must not shadow an inherited method.** Rails may freely
   let a reader shadow `to_json`, because a Ruby reader is still an ordinary
   method; a generated `toJSON` _property_ hands `JSON.stringify` a string where

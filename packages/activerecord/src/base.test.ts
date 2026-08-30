@@ -1208,7 +1208,7 @@ describe("BasicsTest", () => {
   });
   it("attributes on dummy time with invalid time", async () => {
     class DummyTopic extends Base {
-      declare bonus_time: any;
+      declare bonus_time: Temporal.Instant | TimeWithZone | null;
       static tableName = "topics";
       static {
         this.attribute("bonus_time", "time");

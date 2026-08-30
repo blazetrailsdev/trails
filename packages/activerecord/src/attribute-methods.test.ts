@@ -321,8 +321,6 @@ describe("AttributeMethodsTest", () => {
 
   it("read attributes after type cast on a date", async () => {
     class Event extends Base {
-      declare created_at: any;
-      declare starts_on: any;
       static {
         this.attribute("occurred_at", "date");
       }
@@ -1142,8 +1140,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("write time to date attribute", () => {
     class Event extends Base {
-      declare created_at: any;
-      declare starts_on: any;
+      declare starts_on: Temporal.PlainDate | null;
       static {
         this.attribute("name", "string");
         this.attribute("starts_on", "date");
@@ -1155,8 +1152,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("setting a time zone-aware attribute to UTC", () => {
     class Event extends Base {
-      declare created_at: any;
-      declare starts_on: any;
+      declare created_at: Temporal.Instant | Temporal.PlainDateTime | null;
       static {
         this.attribute("name", "string");
         this.attribute("created_at", "datetime");

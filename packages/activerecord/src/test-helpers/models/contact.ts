@@ -46,9 +46,9 @@ async function extended(base: ContactFakeColumnsHost): Promise<void> {
 }
 
 export class Contact extends Base {
-  declare age: unknown;
-  declare avatar: unknown;
-  declare awesome: unknown;
+  declare age: number | null;
+  declare avatar: Uint8Array | null;
+  declare awesome: boolean | null;
   declare name: string;
   declare alternative: Contact | null;
   declare loadBelongsTo: (name: "alternative") => Promise<Contact | null>;

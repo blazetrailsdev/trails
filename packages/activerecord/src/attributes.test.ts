@@ -18,9 +18,8 @@ import { adapterType } from "./test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute member is an accessor pair (read.rb:35 / write.rb:36 cast asymmetry); the class/interface merge is how it surfaces on the type side.
 class OverloadedType extends Base {
-  declare non_existent_decimal: any;
-  declare overloaded_float: any;
   static {
     this.tableName = "overloaded_types";
     this.attribute("overloaded_float", "integer");
@@ -31,10 +30,17 @@ class OverloadedType extends Base {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute member is an accessor pair (read.rb:35 / write.rb:36 cast asymmetry); the class/interface merge is how it surfaces on the type side.
+interface OverloadedType {
+  get non_existent_decimal(): BigDecimal | null;
+  set non_existent_decimal(value: unknown);
+  get overloaded_float(): number | null;
+  set overloaded_float(value: unknown);
+}
+
 class ChildOfOverloadedType extends OverloadedType {}
 
 class GrandchildOfOverloadedType extends ChildOfOverloadedType {
-  declare overloaded_float: any;
   static {
     this.attribute("overloaded_float", "float");
   }
@@ -136,8 +142,6 @@ describe("CustomPropertiesTest", () => {
 
   it("attributes with overridden types keep their type when a default value is configured separately", () => {
     class Child extends OverloadedType {
-      declare non_existent_decimal: any;
-      declare overloaded_float: any;
       static {
         this.attribute("overloaded_float", { default: "123" });
       }

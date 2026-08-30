@@ -105,7 +105,28 @@ export function walk(sourceFile: ts.SourceFile, opts: WalkOptions = {}): ClassIn
   };
   visitDefineEnum(sourceFile);
 
+  recordMergedInterfaceMembers(sourceFile, out);
+
   return out;
+}
+
+function recordMergedInterfaceMembers(sourceFile: ts.SourceFile, out: readonly ClassInfo[]): void {
+  const visit = (node: ts.Node): void => {
+    if (ts.isInterfaceDeclaration(node)) {
+      for (const info of out) {
+        if (info.name !== node.name.text) continue;
+        for (const m of node.members) {
+          const name = m.name;
+          if (!name) continue;
+          if (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) {
+            info.existingMembers.add(name.text);
+          }
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
 }
 
 function resolveLexicalClassInfo(

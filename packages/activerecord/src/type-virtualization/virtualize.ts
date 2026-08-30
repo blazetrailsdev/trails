@@ -54,7 +54,9 @@ export function virtualize(
   for (const info of classes) {
     if (info.skip) continue;
     if (info.openBracePos < 0) continue;
-    const decls = synthesizeDeclares(info, {
+    const mergeAttributeInterface = canMergeInterface(info.classDecl);
+    const { classLines, interfaceLines } = synthesizeDeclares(info, {
+      mergeAttributeInterface,
       schemaColumnsByTable: options.schemaColumnsByTable,
       classNameAliases: options.classNameAliases,
       attributesNullable: options.attributesNullable,
@@ -64,14 +66,27 @@ export function virtualize(
       ancestors: ancestorsOf.get(info),
       superNameOf,
     });
-    if (decls.length === 0) continue;
-    const block = "\n" + decls.join("\n") + "\n";
-    edits.push({
-      pos: info.openBracePos,
-      text: block,
-      originalLine: sf.getLineAndCharacterOfPosition(info.openBracePos).line,
-      lineCount: decls.length + 1,
-    });
+    if (classLines.length > 0) {
+      const block = "\n" + classLines.join("\n") + "\n";
+      edits.push({
+        pos: info.openBracePos,
+        text: block,
+        originalLine: sf.getLineAndCharacterOfPosition(info.openBracePos).line,
+        lineCount: classLines.length + 1,
+      });
+    }
+    if (interfaceLines.length > 0) {
+      const prefix = isExported(info.classDecl) ? "export " : "";
+      const header = `${prefix}interface ${info.name}${typeParamsText(sf, info.classDecl)} {`;
+      const block = "\n" + [header, ...interfaceLines, "}"].join("\n") + "\n";
+      const pos = info.classDecl.getEnd();
+      edits.push({
+        pos,
+        text: block,
+        originalLine: sf.getLineAndCharacterOfPosition(pos).line,
+        lineCount: interfaceLines.length + 3,
+      });
+    }
   }
 
   edits.sort((a, b) => b.pos - a.pos);
@@ -145,6 +160,20 @@ export function virtualize(
   }
 
   return { text, deltas };
+}
+
+function canMergeInterface(cls: ts.ClassDeclaration): boolean {
+  return !(ts.getModifiers(cls) ?? []).some((m) => m.kind === ts.SyntaxKind.DefaultKeyword);
+}
+
+function isExported(cls: ts.ClassDeclaration): boolean {
+  return (ts.getModifiers(cls) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+}
+
+function typeParamsText(sf: ts.SourceFile, cls: ts.ClassDeclaration): string {
+  const params = cls.typeParameters;
+  if (!params || params.length === 0) return "";
+  return `<${sf.text.slice(params[0].pos, params[params.length - 1].end)}>`;
 }
 
 function buildInheritance(classes: readonly ClassInfo[]): {

@@ -112,7 +112,7 @@ export class EncryptedBookWithUnencryptedDataOptedIn extends Base {
 }
 
 export class EncryptedBookWithBinary extends Base {
-  declare logo: unknown;
+  declare logo: Uint8Array | null;
   static _tableName = "encrypted_books";
 
   static {

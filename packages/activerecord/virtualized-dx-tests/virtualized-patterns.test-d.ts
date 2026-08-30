@@ -79,6 +79,7 @@ class Event extends Base {
     this.attribute("starts_at", "datetime");
     this.attribute("starts_on", "date");
     this.attribute("duration", "time");
+    this.attribute("overloaded_float", "float");
   }
 }
 
@@ -163,6 +164,20 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     >();
     expectTypeOf(e.starts_on).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainDate>();
     expectTypeOf(e.duration).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainTime>();
+  });
+});
+
+describe("generated attribute accessors", () => {
+  it("the reader returns the cast value while the writer takes the raw one", () => {
+    const e = new Event({});
+    e.starts_at = "2008-01-01 00:00:00";
+    expectTypeOf(e.starts_at).toEqualTypeOf<
+      | import("@blazetrails/date").Temporal.Instant
+      | import("@blazetrails/date").Temporal.PlainDateTime
+    >();
+
+    e.overloaded_float = "1.1";
+    expectTypeOf(e.overloaded_float).toBeNumber();
   });
 });
 

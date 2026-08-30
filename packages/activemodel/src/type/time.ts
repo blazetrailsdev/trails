@@ -17,13 +17,13 @@ import { ValueType } from "./value.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (time.rb:40-42); the class/interface merge is how `include()` surfaces on the type side.
 export interface TimeType
   extends
-    Omit<InstanceMethods<Temporal.Instant>, "valueFromMultiparameterAssignment">,
+    Omit<InstanceMethods<Temporal.Instant | TimeWithZone>, "valueFromMultiparameterAssignment">,
     Omit<Included<typeof TimeValue>, "userInputInTimeZone" | "serializeCastValue"> {
-  serializeCastValue(value: Temporal.Instant | null): unknown;
+  serializeCastValue(value: Temporal.Instant | TimeWithZone | null): unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class TimeType extends ValueType<Temporal.Instant> {
+export class TimeType extends ValueType<Temporal.Instant | TimeWithZone> {
   readonly name = "time";
 
   type(): string {
@@ -58,12 +58,12 @@ export class TimeType extends ValueType<Temporal.Instant> {
   }
 
   /** @internal */
-  protected castValue(value: unknown): Temporal.Instant | null {
+  protected castValue(value: unknown): Temporal.Instant | TimeWithZone | null {
     if (typeof value !== "string") {
       if (value instanceof Temporal.PlainDateTime) {
         value = value.toZonedDateTime(this.#zoneId()).toInstant();
       }
-      return this.applySecondsPrecision(value) as Temporal.Instant | null;
+      return this.applySecondsPrecision(value) as Temporal.Instant | TimeWithZone | null;
     }
     if (value.trim() === "") return null;
 

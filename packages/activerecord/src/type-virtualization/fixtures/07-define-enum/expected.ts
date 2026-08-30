@@ -1,7 +1,6 @@
 import { defineEnum } from "@blazetrails/activerecord";
 
 export class Article extends Base {
-  declare status: number;
   declare isDraft: () => boolean;
   declare draftBang: () => Promise<true | undefined>;
   declare static draft: () => import("@blazetrails/activerecord").Relation<Article>;
@@ -15,5 +14,10 @@ export class Article extends Base {
     this.attribute("status", "integer");
   }
 }
+export interface Article {
+  get status(): number;
+  set status(value: unknown);
+}
+
 
 defineEnum(Article, "status", { draft: 0, published: 1 });

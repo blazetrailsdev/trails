@@ -92,7 +92,7 @@ export class Fullname {
 }
 
 export class Customer extends Base {
-  declare address: unknown;
+  declare address: Address | null;
   static gpsConversionWasRun = false;
 
   static {
