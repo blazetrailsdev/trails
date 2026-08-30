@@ -140,6 +140,33 @@ interface RubyEntity {
    * double-count its methods.
    */
   nameOnly?: boolean;
+  /**
+   * A Ruby `class` rather than a `module`, on both halves of `nestedIn`: only a
+   * class encloses, and only a class is enclosed. `Arel::Nodes` is an (empty)
+   * module entity filed at nodes/casted.rb because that is where the namespace
+   * was first seen, and reading it as an enclosure would scope `Casted`'s own
+   * methods away from the file-wide set they belong to; a `Foo::ClassMethods`
+   * submodule is the mixin idiom, whose methods really do land on the enclosing
+   * host (`foldClassMethodsModules`) rather than on a separate declaration.
+   */
+  isClass?: boolean;
+  /**
+   * Set on a Ruby class nested inside another entity the SAME file declares
+   * (`AbstractAdapter::Version`, `StatementCache::Substitute`). Its methods
+   * are allowed only on the TS declaration that ports it — the same-named TS
+   * class in the file — never file-wide.
+   *
+   * trails commonly ports such a class as a sibling `class Inner` re-attached
+   * with `static readonly Inner = Inner`, and `tsClassesByFile` groups by file,
+   * so `Inner`'s methods are in the file's TS name set and would score as extra
+   * without an allowance. Unioning them into the FLAT per-file allow-set (the
+   * shape PR #5458 shipped) bought that at the cost of precision: a
+   * trails-invented method on `AbstractAdapter` sharing a name with one on
+   * `AbstractAdapter::Version` stopped flagging. Scoping the allowance to the
+   * porting declaration keeps both (RFC 0126). Resolved in a second pass over
+   * each file's entities, once every entity of that file is known.
+   */
+  nestedIn?: string;
 }
 
 /**
@@ -969,6 +996,13 @@ interface SurfaceName {
   name: string;
   interfaceDeclaration: boolean;
   /**
+   * The TS class/namespace whose body declares this MEMBER, or `null` for a
+   * declaration NAME and for a top-level function. Read by
+   * `collectTsNameOwners` so a nested class's scoped allowance can be applied
+   * to the declaration that ports it and to no other.
+   */
+  owner: string | null;
+  /**
    * The `interface` whose body declares this MEMBER, or `null` for surface
    * that is not an interface member (a class/namespace member, a top-level
    * function, or a declaration name — including an interface's own).
@@ -987,10 +1021,14 @@ function walkTsFileSurface(
   fileFunctions: MethodInfo[] | undefined,
 ): SurfaceName[] {
   const out: SurfaceName[] = [];
-  const pushMember = (m: MethodInfo, interfaceMemberOf: string | null): void => {
+  const pushMember = (
+    m: MethodInfo,
+    interfaceMemberOf: string | null,
+    owner: string | null,
+  ): void => {
     if (m.internal === true) return;
     if (m.name.startsWith("_")) return;
-    out.push({ name: m.name, interfaceDeclaration: false, interfaceMemberOf });
+    out.push({ name: m.name, interfaceDeclaration: false, interfaceMemberOf, owner });
   };
   for (const c of [...classes, ...modules]) {
     if (c.file !== file) continue;
@@ -1005,6 +1043,7 @@ function walkTsFileSurface(
         name: c.name,
         interfaceDeclaration: declaredByInterface,
         interfaceMemberOf: null,
+        owner: null,
       });
     }
     const interfaceMembers = c.interfaceMembers;
@@ -1019,10 +1058,47 @@ function walkTsFileSurface(
       if (m.declaredIn !== undefined) continue;
       const fromInterface =
         c.isInterface === true && (interfaceMembers ? interfaceMembers.includes(m.name) : true);
-      pushMember(m, fromInterface ? c.name : null);
+      pushMember(m, fromInterface ? c.name : null, c.name);
     }
   }
-  for (const fn of fileFunctions ?? []) pushMember(fn, null);
+  for (const fn of fileFunctions ?? []) pushMember(fn, null, null);
+  return out;
+}
+
+/**
+ * TS name -> the declarations in the file that declare it as a MEMBER, or
+ * `undefined` where the name is also a declaration name or a top-level
+ * function. A scoped allowance (see `RubyEntity.nestedIn`) applies only when
+ * EVERY site declaring the name is the porting declaration.
+ *
+ * An `interface` member is not one of those sites: it is the type of the
+ * declaration that ports the name (`RequestedInit` beside `Requested`,
+ * actionview/lib/action_view/template_details.rb:5-7), so counting it would
+ * defeat every scoped allowance whose nested class carries an init interface.
+ */
+export function collectTsNameOwners(
+  file: string,
+  classes: ClassInfo[],
+  modules: ClassInfo[],
+  fileFunctions: MethodInfo[] | undefined,
+): Map<string, string[] | null> {
+  const out = new Map<string, string[] | null>();
+  for (const { name, owner, interfaceMemberOf } of walkTsFileSurface(
+    file,
+    classes,
+    modules,
+    fileFunctions,
+  )) {
+    if (interfaceMemberOf !== null) continue;
+    if (owner === null) {
+      out.set(name, null);
+      continue;
+    }
+    const prior = out.get(name);
+    if (prior === null) continue;
+    if (prior === undefined) out.set(name, [owner]);
+    else prior.push(owner);
+  }
   return out;
 }
 
@@ -1316,6 +1392,18 @@ function collectAllowedNames(
   fileConstantNames: string[],
   rubyFile: string,
   fileHashKeyNames: string[] = [],
+  /**
+   * Out-param: TS declaration name -> the names allowed ONLY on it. Filled for
+   * every entity carrying `nestedIn`; see that field. The mixin walk keeps one
+   * `visited` set PER target, each keyed by module FQN alone: a module already
+   * walked into the file-wide set is still walked into a nested class's scoped
+   * set, and two nested classes sharing a transitive mixin each get its whole
+   * chain rather than the second losing everything past the hop the first
+   * reached. Keying one shared set by (context, module) instead would leave
+   * that second walk short, and would stop collapsing an `include` cycle in
+   * O(1) the way an FQN-keyed set does.
+   */
+  scoped?: Map<string, Set<string>>,
 ): Set<string> {
   const allowed = new Set<string>();
   // File-level constants are declared per Ruby *file*, not per entity, so they
@@ -1328,12 +1416,20 @@ function collectAllowedNames(
   for (const key of fileHashKeyNames) {
     for (const c of rubyHashKeyCandidates(key)) allowed.add(c);
   }
-  const visited = new Set<string>();
+  const visitedByTarget = new Map<Set<string>, Set<string>>();
 
   // `scopedSkipMirrorName`: a scoped skip that names its TS spelling means the
   // port exists but not at the mapped site (a `prepend`ed module's `initialize`,
   // which has no TS constructor to wrap), so the declaration is the port.
-  const addMethods = (methods: MethodInfo[], ownerFqn: string, methodFile?: string): void => {
+  const addMethods = (
+    methods: MethodInfo[],
+    ownerFqn: string,
+    methodFile?: string,
+    target: Set<string> = allowed,
+  ): void => {
+    const allow = (c: string): void => {
+      target.add(c);
+    };
     for (const m of methods) {
       if (methodFile !== undefined && m.file !== methodFile) continue;
       // A Ruby OPERATOR (`*`, `<<`, `~@`) carries no canonical camelCase
@@ -1344,23 +1440,23 @@ function collectAllowedNames(
       // so consult it here rather than mint a second table: keyed by the
       // DECLARING class, `<<` is `bitwiseShiftLeft` on `Arel::Math` and stays
       // unmapped on `SelectManager`, where it means append.
-      for (const c of operatorSpelling(ownerFqn, m.name) ?? []) allowed.add(c);
+      for (const c of operatorSpelling(ownerFqn, m.name) ?? []) allow(c);
       // Private/protected Ruby methods (internal) still count: a TS method
       // mirroring a Rails-private method isn't *extra* surface, it's a
       // visibility divergence — the method exists in Rails. Excluding them
       // here would mislabel every public-port-of-a-private-method as drift.
       const mirror = scopedSkipMirrorName(m.name, rubyFile);
-      if (mirror !== null) allowed.add(mirror);
+      if (mirror !== null) allow(mirror);
       const candidates = rubyMethodCandidates(m.name);
       if (!candidates) continue;
-      for (const c of candidates) allowed.add(c);
+      for (const c of candidates) allow(c);
     }
   };
 
-  const addRubyName = (rubyName: string): void => {
+  const addRubyName = (rubyName: string, target: Set<string> = allowed): void => {
     const candidates = rubyMethodCandidates(rubyName);
     if (!candidates) return;
-    for (const c of candidates) allowed.add(c);
+    for (const c of candidates) target.add(c);
   };
 
   const CONCERN = "ActiveSupport::Concern";
@@ -1368,16 +1464,21 @@ function collectAllowedNames(
   // Ruby-side walk: a duplicated short name is disambiguated by the enclosing
   // namespace inside `resolveModuleName`, so this needs no declaring-file hint
   // the way the TS sites do (compare.ts `resolveEntityByDeclaringFile`).
-  const walkMixin = (incName: string, contextFqn: string): void => {
+  const walkMixin = (incName: string, contextFqn: string, target: Set<string> = allowed): void => {
     const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
+    let visited = visitedByTarget.get(target);
+    if (visited === undefined) {
+      visited = new Set<string>();
+      visitedByTarget.set(target, visited);
+    }
     if (visited.has(fqn)) return;
     visited.add(fqn);
     // A Ruby core module (`include Enumerable`) supplies methods no vendored
     // gem `def`s — see CORE_MIXIN_METHODS. Added before the module lookup
     // because the same name can ALSO be a vendored core_ext reopening, which
     // contributes its own `def`s through the walk below.
-    for (const name of CORE_MIXIN_METHODS[fqn] ?? []) addRubyName(name);
-    for (const inc of HOOK_INJECTED_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn);
+    for (const name of CORE_MIXIN_METHODS[fqn] ?? []) addRubyName(name, target);
+    for (const inc of HOOK_INJECTED_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn, target);
     // Fall back to the cross-package map: a railtie-injected mixin (see
     // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
     // in another package's modules, not this package's.
@@ -1397,7 +1498,7 @@ function collectAllowedNames(
     // Only the module's instance methods cross into the host. Class
     // methods on the module itself stay on the module (Ruby `include`
     // semantics; matches compare.flattenIncludedMethodInfos).
-    addMethods(mod.instanceMethods, fqn);
+    addMethods(mod.instanceMethods, fqn, undefined, target);
     // `include M` where `M extend ActiveSupport::Concern` also runs
     // `base.extend M::ClassMethods` and the `included` block
     // (activesupport/lib/active_support/concern.rb:137-138), so the includer
@@ -1414,13 +1515,13 @@ function collectAllowedNames(
     const isConcern = (ext: string): boolean =>
       ext === CONCERN || (ext === "Concern" && fqn.startsWith("ActiveSupport::"));
     if ((mod.extends ?? []).some(isConcern)) {
-      walkMixin(`${fqn}::ClassMethods`, fqn);
-      for (const ext of mod.extends ?? []) if (!isConcern(ext)) walkMixin(ext, fqn);
+      walkMixin(`${fqn}::ClassMethods`, fqn, target);
+      for (const ext of mod.extends ?? []) if (!isConcern(ext)) walkMixin(ext, fqn, target);
     }
-    for (const inc of mod.includes ?? []) walkMixin(inc, fqn);
+    for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target);
   };
 
-  for (const { fqn, info, nameOnly, methodFile } of entities) {
+  for (const { fqn, info, nameOnly, methodFile, nestedIn } of entities) {
     // The entity's own short name: since declaration names are TS surface
     // (`collectTsFileNames`), the Ruby constant they port has to be allowed
     // surface, or every faithfully ported class would read as drift. This
@@ -1431,14 +1532,19 @@ function collectAllowedNames(
     const short = fqn.split("::").pop();
     if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
     if (nameOnly) continue;
-    addMethods(info.instanceMethods, fqn, methodFile);
-    addMethods(info.classMethods, fqn, methodFile);
-    for (const inc of info.includes ?? []) walkMixin(inc, fqn);
-    for (const ext of info.extends ?? []) walkMixin(ext, fqn);
+    let target = allowed;
+    if (nestedIn !== undefined && short !== undefined && scoped !== undefined) {
+      target = scoped.get(short) ?? new Set<string>();
+      scoped.set(short, target);
+    }
+    addMethods(info.instanceMethods, fqn, methodFile, target);
+    addMethods(info.classMethods, fqn, methodFile, target);
+    for (const inc of info.includes ?? []) walkMixin(inc, fqn, target);
+    for (const ext of info.extends ?? []) walkMixin(ext, fqn, target);
 
-    for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn);
+    for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn, target);
 
-    for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name);
+    for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name, target);
   }
   return allowed;
 }
@@ -1771,11 +1877,19 @@ function buildPackageReport(
   const rubyFiles = new Map<string, RubyEntity[]>();
   for (const [fqn, info] of Object.entries(rubyPkg.classes)) {
     if (!info.file) continue;
-    pushTo(rubyFiles, info.file, { fqn, info });
+    pushTo(rubyFiles, info.file, { fqn, info, isClass: true });
   }
   for (const [fqn, info] of Object.entries(rubyPkg.modules)) {
     if (!info.file) continue;
     pushTo(rubyFiles, info.file, { fqn, info, ...(foldedFqns.has(fqn) ? { nameOnly: true } : {}) });
+  }
+  for (const entities of rubyFiles.values()) {
+    const classFqns = new Set(entities.filter((e) => e.isClass === true).map((e) => e.fqn));
+    for (const e of entities) {
+      if (e.isClass !== true) continue;
+      const parent = e.fqn.slice(0, e.fqn.lastIndexOf("::"));
+      if (parent !== "" && classFqns.has(parent)) e.nestedIn = parent;
+    }
   }
 
   const tsClassesByFile = new Map<string, ClassInfo[]>();
@@ -1904,6 +2018,7 @@ function buildPackageReport(
       fileFns,
     );
 
+    const scopedAllowed = new Map<string, Set<string>>();
     const allowed =
       rubyFile === null
         ? new Set<string>()
@@ -1917,7 +2032,17 @@ function buildPackageReport(
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
             rubyFile,
             rubyPkg.fileHashKeys?.[rubyFile] ?? [],
+            scopedAllowed,
           );
+    const tsNameOwners =
+      scopedAllowed.size === 0
+        ? undefined
+        : collectTsNameOwners(expectedTs, classes, modules, fileFns);
+    const scopedAllows = (name: string): boolean => {
+      const owners = tsNameOwners?.get(name);
+      if (owners === undefined || owners === null || owners.length === 0) return false;
+      return owners.every((o) => scopedAllowed.get(o)?.has(name) === true);
+    };
 
     // A NAMED re-export (`export { buildQuoted } from "./casted.js"`) is a
     // re-export site, not a port location (compare.ts:2346). When the barrel
@@ -1964,6 +2089,7 @@ function buildPackageReport(
     let interfaceExemptCount = 0;
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
+      if (scopedAllows(name)) continue;
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
       if (tagKeys.has(allowKey)) {
         matchedTagKeys.add(allowKey);

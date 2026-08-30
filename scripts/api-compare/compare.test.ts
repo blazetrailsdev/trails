@@ -1419,6 +1419,34 @@ describe("resolveEntityByDeclaringFile", () => {
       resolveEntityByDeclaringFile([self, parent], "connection-adapters/sqlite3/adapter.ts"),
     ).toBe(parent);
   });
+
+  it("resolves to nothing when no candidate shares a leading segment with the child", () => {
+    const http = entity("http/request.ts", "Request");
+    const csp = entity("http/content-security-policy.ts", "Request");
+    expect(resolveEntityByDeclaringFile([http, csp], "testing/test-request.ts")).toBeNull();
+  });
+
+  it("reports the unseparated candidates through onAmbiguous", () => {
+    const http = entity("http/request.ts", "Request");
+    const csp = entity("http/content-security-policy.ts", "Request");
+    const seen: string[][] = [];
+    resolveEntityByDeclaringFile([http, csp], "testing/test-request.ts", undefined, (cands) =>
+      seen.push(cands.map((c) => c.file ?? "")),
+    );
+    expect(seen).toEqual([["http/request.ts", "http/content-security-policy.ts"]]);
+  });
+
+  it("still picks a winner when a tie is broken at a positive score", () => {
+    const sqlite3 = entity("connection-adapters/sqlite3/schema-statements.ts");
+    const abstract = entity("connection-adapters/abstract/schema-statements.ts");
+    const stray = entity("model-schema.ts");
+    expect(
+      resolveEntityByDeclaringFile(
+        [stray, sqlite3, abstract],
+        "connection-adapters/sqlite3/adapter.ts",
+      ),
+    ).toBe(sqlite3);
+  });
 });
 
 describe("resolveModuleName", () => {
@@ -2575,11 +2603,8 @@ describe("splitOverriddenFileBuckets", () => {
     classMethods: [],
   };
 
-  it("moves a mapped reopening file's methods into a bucket of their own", () => {
-    const out = splitOverriddenFileBuckets(
-      { fqn: "ActiveSupport::Inflector", info: inflector },
-      "activesupport",
-    );
+  it("moves a reopening file's methods into a bucket of their own", () => {
+    const out = splitOverriddenFileBuckets({ fqn: "ActiveSupport::Inflector", info: inflector });
     expect(out.map((e) => e.info.file)).toEqual([
       "inflector/inflections.rb",
       "inflector/methods.rb",
@@ -2593,18 +2618,36 @@ describe("splitOverriddenFileBuckets", () => {
   });
 
   it("keeps the fqn but drops includes/extends on the split bucket", () => {
-    const out = splitOverriddenFileBuckets(
-      { fqn: "ActiveSupport::Inflector", info: inflector },
-      "activesupport",
-    );
+    const out = splitOverriddenFileBuckets({ fqn: "ActiveSupport::Inflector", info: inflector });
     expect(out[1].fqn).toBe("ActiveSupport::Inflector");
     expect(out[1].info.includes).toEqual([]);
     expect(out[0].info.includes).toEqual(["Comparable"]);
   });
 
-  it("returns the entity untouched when no reopening file is mapped in this package", () => {
-    const entity = { fqn: "ActiveSupport::Inflector", info: inflector };
-    expect(splitOverriddenFileBuckets(entity, "activerecord")).toEqual([entity]);
+  it("returns the entity untouched when nothing reopens it", () => {
+    const entity = {
+      fqn: "ActiveSupport::Inflector",
+      info: { ...inflector, instanceMethods: [m("inflections", "inflector/inflections.rb")] },
+    };
+    expect(splitOverriddenFileBuckets(entity)).toEqual([entity]);
+  });
+
+  it("splits a reopening file that carries no RUBY_FILE_TS_OVERRIDES mapping", () => {
+    const arTest: ClassInfo = {
+      name: "ARTest",
+      file: "support/config.rb",
+      includes: [],
+      extends: [],
+      instanceMethods: [],
+      classMethods: [
+        m("config", "support/config.rb"),
+        m("connection_name", "support/connection.rb"),
+        m("connect", "support/connection.rb"),
+      ],
+    };
+    const out = splitOverriddenFileBuckets({ fqn: "ARTest", info: arTest });
+    expect(out.map((e) => e.info.file)).toEqual(["support/config.rb", "support/connection.rb"]);
+    expect(out[1].info.classMethods.map((cm) => cm.name)).toEqual(["connection_name", "connect"]);
   });
 
   it("does not split the entity's own home file", () => {
@@ -2612,9 +2655,12 @@ describe("splitOverriddenFileBuckets", () => {
       fqn: "ActiveSupport::Inflector",
       info: { ...inflector, file: "inflector/methods.rb" },
     };
-    const out = splitOverriddenFileBuckets(entity, "activesupport");
+    const out = splitOverriddenFileBuckets(entity);
     expect(out[0].info.file).toBe("inflector/methods.rb");
-    expect(out[0].info.instanceMethods).toHaveLength(3);
+    expect(out[0].info.instanceMethods.map((im) => im.name)).toEqual([
+      "deconstantize",
+      "constantize",
+    ]);
   });
 });
 

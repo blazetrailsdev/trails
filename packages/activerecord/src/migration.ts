@@ -364,7 +364,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return Migration.properTableName(name, Migration.tableNameOptions());
   }
 
-  /** @missingRailsCall compatible_table_definition — PERMANENT */
+  /**
+   * @missingRailsCall compatible_table_definition — PERMANENT
+   * @noRailsEquivalent CONVERGEABLE migration-current-nested-class-holds-table-overrides
+   */
   async createTable(
     tableName: string,
     options?:
@@ -393,7 +396,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @missingRailsCall compatible_table_definition — PERMANENT */
+  /**
+   * @missingRailsCall compatible_table_definition — PERMANENT
+   * @noRailsEquivalent CONVERGEABLE migration-current-nested-class-holds-table-overrides
+   */
   async dropTable(
     ...args: Array<
       | string
@@ -778,7 +784,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.connection.removeTimestamps(tableName);
   }
 
-  /** @missingRailsCall compatible_table_definition — PERMANENT */
+  /**
+   * @missingRailsCall compatible_table_definition — PERMANENT
+   * @noRailsEquivalent CONVERGEABLE migration-current-nested-class-holds-table-overrides
+   */
   async createJoinTable(
     table1: string,
     table2: string,
@@ -808,7 +817,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  /** @missingRailsCall compatible_table_definition — PERMANENT */
+  /**
+   * @missingRailsCall compatible_table_definition — PERMANENT
+   * @noRailsEquivalent CONVERGEABLE migration-current-nested-class-holds-table-overrides
+   */
   async changeTable(
     tableName: string,
     options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },

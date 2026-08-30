@@ -1084,7 +1084,15 @@ describe("buildReport — novel vs moved classification", () => {
               file: "preloader/association.ts",
               includes: [],
               extends: [],
-              instanceMethods: [method("primaryMethod"), method("nestedHelper")],
+              instanceMethods: [method("primaryMethod")],
+              classMethods: [],
+            },
+            LoaderQuery: {
+              name: "LoaderQuery",
+              file: "preloader/association.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("nestedHelper")],
               classMethods: [],
             },
           },
@@ -1822,6 +1830,154 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
       info.fileFunctions?.["inheritance.ts"],
     );
     expect(names.has("stiClassFor")).toBe(true);
+  });
+});
+
+describe("buildReport — nested-class method allowances", () => {
+  // activemodel/lib/active_model/attribute.rb:154-160.
+  const rubyManifest = (): ApiManifest => ({
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::Attribute": rubyClass({
+            name: "Attribute",
+            file: "attribute.rb",
+            instance: [method("value")],
+          }),
+          "ActiveModel::Attribute::FromDatabase": rubyClass({
+            name: "FromDatabase",
+            file: "attribute.rb",
+            instance: [method("type_cast")],
+          }),
+        },
+        modules: {},
+      },
+    },
+  });
+
+  const tsManifest = (owner: string): ApiManifest => ({
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          Attribute: {
+            name: "Attribute",
+            file: "attribute.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [
+              method("value"),
+              ...(owner === "Attribute" ? [method("typeCast")] : []),
+            ],
+            classMethods: [],
+          },
+          FromDatabase: {
+            name: "FromDatabase",
+            file: "attribute.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: owner === "FromDatabase" ? [method("typeCast")] : [],
+            classMethods: [],
+          },
+        },
+        modules: {},
+      },
+    },
+  });
+
+  const extrasFor = (owner: string): string[] => {
+    const report = buildReport(rubyManifest(), tsManifest(owner), {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    return (report.packages[0].extraFiles[0]?.extras ?? []).map((n) => n.name);
+  };
+
+  it("allows the nested class's method on the TS declaration that ports it", () => {
+    expect(extrasFor("FromDatabase")).toEqual([]);
+  });
+
+  it("scores it as extra on the enclosing class, where Rails does not declare it", () => {
+    expect(extrasFor("Attribute")).toEqual(["typeCast"]);
+  });
+});
+
+describe("buildReport — nested-class allowances over a shared mixin chain", () => {
+  // Two nested classes including one module that itself includes another. The
+  // mixin walk keeps one `visited` set per target, so the second nested class
+  // gets the whole chain rather than stopping at the hop the first reached.
+  const ruby: ApiManifest = {
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::Attribute": rubyClass({
+            name: "Attribute",
+            file: "attribute.rb",
+            instance: [method("value")],
+          }),
+          "ActiveModel::Attribute::FromDatabase": rubyClass({
+            name: "FromDatabase",
+            file: "attribute.rb",
+            includes: ["Casts"],
+          }),
+          "ActiveModel::Attribute::FromUser": rubyClass({
+            name: "FromUser",
+            file: "attribute.rb",
+            includes: ["Casts"],
+          }),
+        },
+        modules: {
+          "ActiveModel::Casts": {
+            ...rubyClass({ name: "Casts", file: "casts.rb", instance: [method("cast")] }),
+            includes: ["Coercions"],
+          },
+          "ActiveModel::Coercions": rubyClass({
+            name: "Coercions",
+            file: "coercions.rb",
+            instance: [method("coerce")],
+          }),
+        },
+      },
+    },
+  };
+  const tsClass = (name: string, instanceMethods: MethodInfo[]): ClassInfo => ({
+    name,
+    file: "attribute.ts",
+    includes: [],
+    extends: [],
+    instanceMethods,
+    classMethods: [],
+  });
+  const ts: ApiManifest = {
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          Attribute: tsClass("Attribute", [method("value")]),
+          FromDatabase: tsClass("FromDatabase", [method("cast"), method("coerce")]),
+          FromUser: tsClass("FromUser", [method("cast"), method("coerce")]),
+        },
+        modules: {},
+      },
+    },
+  };
+
+  it("gives every nested class the whole transitive chain, not just the first", () => {
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    expect(report.packages[0].extraFiles).toEqual([]);
   });
 });
 
