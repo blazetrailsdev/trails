@@ -334,6 +334,25 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(false);
   });
 
+  it("a schema load does not mass-generate alias attribute methods", async () => {
+    class Loaded extends Base {
+      static tableName = "topics";
+      static {
+        this.aliasAttribute("heading", "not_a_column");
+      }
+    }
+    const massGenerated = Loaded as unknown as { _aliasAttributesMassGenerated?: boolean };
+    await Loaded.loadSchema();
+
+    expect(massGenerated._aliasAttributesMassGenerated).toBeFalsy();
+    expect("heading" in (Loaded.prototype as object)).toBe(false);
+
+    new Loaded();
+
+    expect(massGenerated._aliasAttributesMassGenerated).toBe(true);
+    expect("heading" in (Loaded.prototype as object)).toBe(true);
+  });
+
   it("aliasAttribute generates the alias when mass generation already ran", () => {
     class Late extends Base {
       declare heading: unknown;
