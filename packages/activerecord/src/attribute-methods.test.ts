@@ -827,10 +827,11 @@ describe("AttributeMethodsTest", () => {
     expect(computer.developer).toBe(99);
   });
   it("on_the_fly_super_invokable_generated_attribute_methods_via_method_missing", async () => {
-    const TopicBase = Base as unknown as new (...args: never[]) => Base & { get title(): string };
+    const TopicBase = Base as unknown as Omit<typeof Base, "prototype"> &
+      (new (...args: never[]) => Base & { get title(): string });
     class Klass extends TopicBase {
       static {
-        (this as unknown as typeof Base).tableName = "topics";
+        this.tableName = "topics";
       }
       get title(): string {
         return `${super.title}!`;
@@ -842,12 +843,11 @@ describe("AttributeMethodsTest", () => {
     );
   });
   it("on-the-fly super-invokable generated attribute predicates via method_missing", async () => {
-    const TopicBase = Base as unknown as new (
-      ...args: never[]
-    ) => Base & { get "title?"(): boolean };
+    const TopicBase = Base as unknown as Omit<typeof Base, "prototype"> &
+      (new (...args: never[]) => Base & { get "title?"(): boolean });
     class Klass extends TopicBase {
       static {
-        (this as unknown as typeof Base).tableName = "topics";
+        this.tableName = "topics";
       }
       get ["title?"](): boolean {
         return !super["title?"];
