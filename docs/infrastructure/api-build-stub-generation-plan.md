@@ -294,7 +294,8 @@ its migration, and nothing here changes `@missingRailsCall` or the `parity:api:b
 design.
 
 ```text
-@noRailsEquivalent <reason prose, may wrap onto following lines>
+@noRailsEquivalent PERMANENT
+@noRailsEquivalent CONVERGEABLE <story-id>
 ```
 
 The two tags answer the same question — "this method diverges from Rails; is
@@ -316,10 +317,12 @@ report). They therefore share:
   — a tagged class name is an extractor-shape artifact whose members do have
   Ruby counterparts. Most interface declaration names never need the tag at
   all; see "Interface declaration names are exempt by kind" below.
-- **Grammar** — free prose after the tag; where a key token precedes the
-  reason it is em-dash-separated (`@missingRailsCall` takes a Ruby call name
-  as that token, `@noRailsEquivalent` takes none); continuation lines with no
-  `@` attach to the preceding tag, so long curated reasons survive verbatim.
+- **Grammar** — the tag keeps its tokens and nothing else. `@missingRailsCall`
+  and `@missingRailsArgs` take a Ruby call name as their subject, em-dash-separated
+  from the permanence claim that follows; `@noRailsEquivalent` takes the
+  permanence claim directly. Everything after the claim is prose, and
+  `no-freeform-comments` strips it (`renderTag`, `eslint/no-freeform-comments.mjs`)
+  — see "Permanence claim" below for the two shapes that survive.
 - **Structural advantage over the JSON baselines** — the justification
   travels with the declaration across renames and file moves; there is no
   `package + tsFile + name` key to go stale for path reasons.
@@ -512,7 +515,10 @@ So the receipt has exactly two shapes and carries no prose:
 `PERMANENT` is the whole receipt — the token stands alone. `CONVERGEABLE`
 points at a registered story, and the story IS the receipt: the mechanism, the
 bar it fails, and the disposition live there, not in the tag.
-`no-freeform-comments` strips anything else.
+`no-freeform-comments` strips anything else, and `lintBareConvergeable`
+(`scripts/api-compare/lint-missing-rails-call-reasons.ts`, RFC 0124) fails a
+`CONVERGEABLE` that names no story across all three receipt tags —
+`classifyReason` alone reads only the token, so the story id is gated there.
 
 `classifyReason` (`extra-surface.ts`) reads the first word; anything else is
 **unclassified**, and `parity:api:extra` reports the unclassified count, a
