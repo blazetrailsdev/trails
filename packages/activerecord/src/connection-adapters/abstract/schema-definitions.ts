@@ -540,6 +540,7 @@ export class IndexDefinition {
       valid?: boolean;
       include?: string[];
       nullsNotDistinct?: boolean;
+      [key: string]: unknown;
     } = {},
   ): boolean {
     const isBlank =

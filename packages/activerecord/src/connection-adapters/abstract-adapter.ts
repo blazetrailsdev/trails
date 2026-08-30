@@ -342,8 +342,20 @@ export interface AbstractAdapter {
   indexExists(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options?: { unique?: boolean; name?: string; valid?: boolean; column?: string | string[] },
+    options?: {
+      column?: string | string[];
+      name?: string;
+      unique?: boolean;
+      valid?: boolean;
+      include?: string[];
+      nullsNotDistinct?: boolean;
+      [key: string]: unknown;
+    },
   ): Promise<boolean>;
+  indexNameExists(
+    tableName: string,
+    indexName: string,
+  ): Promise<IndexDefinition | boolean | undefined>;
   /** @internal */
   indexNameForRemove(
     tableName: string,
