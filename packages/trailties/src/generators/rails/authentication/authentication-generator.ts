@@ -30,11 +30,6 @@ export class AuthenticationGenerator extends GeneratorBase {
   run(options: AuthenticationRunOptions = {}): string[] {
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
-    // Rails guards the channel with `defined?(ActionCable::Engine)`
-    // (authentication_generator.rb:22) and emits the mailer files
-    // unconditionally (authentication_generator.rb:24-29), because both gems
-    // are real dependencies of the default stack. trails has neither package,
-    // so both default to skipped; flip a default when the package lands.
     const { api = false, skipMailer = true, skipActionCable = true } = options;
     this.emit("src/app/models/session.ts", "Session", APP_RECORD, [
       stub("associations", "// belongsTo: User", { static: true }),

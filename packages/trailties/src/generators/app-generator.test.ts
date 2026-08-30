@@ -16,8 +16,6 @@ afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-// Every subsystem trails has no package for is skipped by default; a run that
-// exercises the templates behind those guards opts back in.
 const UNPORTED = {
   skipActionCable: false,
   skipActionMailer: false,

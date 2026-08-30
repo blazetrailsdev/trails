@@ -36,14 +36,6 @@ export type AppBaseOptions = GeneratorOptions & {
   [k: `skip${string}`]: boolean | undefined;
 };
 
-// TypeScript has no `defined?`, and there is no actioncable, actionmailer,
-// activejob or activestorage package in this repo to probe for — so the guard
-// Rails writes as `defined?(ActionCable::Engine)`
-// (railties/lib/rails/generators/rails/authentication/authentication_generator.rb:22)
-// is a static table here. Rails' `skip_*` options default to false because
-// each gem is a real dependency of the default stack (app_base.rb:301-306);
-// trails defaults them to skipped until the package lands. When one does,
-// flip its row to false — the templates behind the guard are already written.
 const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
   skipActionCable: true,
   skipActionMailer: true,
@@ -79,7 +71,7 @@ export abstract class AppBase extends GeneratorBase {
     const isAbs = this.path.isAbsolute ? this.path.isAbsolute(options.appPath) : true;
     this.destinationRoot = isAbs ? options.appPath : this.path.join(options.cwd, options.appPath);
     this.cwd = this.destinationRoot;
-    this.options = this.deduceImpliedOptions(this.defaultUnportedSubsystemsToSkipped(options));
+    this.options = this.deduceImpliedOptions({ ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...options });
   }
 
   /** @internal */
@@ -111,14 +103,6 @@ export abstract class AppBase extends GeneratorBase {
   /** @internal */
   dependsOnSystemTest(): boolean {
     return !(this.skip("SystemTest") || this.skip("Test") || this.options.api);
-  }
-
-  private defaultUnportedSubsystemsToSkipped(opts: AppBaseOptions): AppBaseOptions {
-    const out: Record<string, unknown> = { ...opts };
-    for (const [flag, value] of Object.entries(UNPORTED_SUBSYSTEM_SKIP_DEFAULTS)) {
-      if (out[flag] === undefined) out[flag] = value;
-    }
-    return out as unknown as AppBaseOptions;
   }
 
   protected deduceImpliedOptions(opts: AppBaseOptions): AppBaseOptions {
