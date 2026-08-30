@@ -2,21 +2,31 @@ interface DynamicMatchersHost {
   name: string;
   columnsHash(): Record<string, unknown>;
   attributeAliases?: Record<string, string>;
+  reflectOnAggregation?(aggregation: string): unknown;
 }
 
-export function respondToMissing(this: DynamicMatchersHost, methodName: string): boolean {
-  if (this.name === "Base") return false;
-  if (!methodName.startsWith("findBy")) return false;
-  const attrPart = methodName.slice(6);
-  if (!attrPart) return false;
+function match(model: DynamicMatchersHost, name: string): string[] | null {
+  if (!name.startsWith("findBy")) return null;
+  const attrPart = name.slice(6);
+  if (!attrPart) return null;
   const snakePart = attrPart
     .replace(/^./, (c) => c.toLowerCase())
     .replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-  const attributeNames = snakePart.split("_and_");
-  const aliases = this.attributeAliases;
-  const columnsHash = this.columnsHash();
-  return attributeNames.every((name) => {
-    const resolved = aliases?.[name] ?? name;
-    return columnsHash[resolved] != null;
-  });
+  return snakePart.split("_and_").map((name) => model.attributeAliases?.[name] ?? name);
+}
+
+function valid(model: DynamicMatchersHost, attributeNames: string[]): boolean {
+  const columnsHash = model.columnsHash();
+  return attributeNames.every(
+    (name) => columnsHash[name] != null || model.reflectOnAggregation?.(name) != null,
+  );
+}
+
+export function respondToMissing(this: DynamicMatchersHost, name: string): boolean {
+  if (this.name === "Base") {
+    return false;
+  } else {
+    const matched = match(this, name);
+    return (matched !== null && valid(this, matched)) || false;
+  }
 }

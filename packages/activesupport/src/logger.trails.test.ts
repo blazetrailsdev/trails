@@ -95,11 +95,31 @@ describe("LoggerThreadSafeLevel", () => {
     const logger = new Logger({ write: () => {} });
 
     expect(() => {
-      logger.localLevel = "nope" as never;
+      logger.localLevel = ":nope" as never;
     }).toThrowError(NameError);
     expect(() => {
-      logger.localLevel = "nope" as never;
+      logger.localLevel = ":nope" as never;
     }).toThrowError("uninitialized constant Logger::Severity::NOPE");
+  });
+
+  it("raises ArgumentError on a String level, which is not the Symbol arm", () => {
+    const logger = new Logger({ write: () => {} });
+
+    expect(() => {
+      logger.localLevel = "debug" as never;
+    }).toThrowError('Invalid log level: "debug"');
+  });
+
+  it("accepts both the Symbol and the String spelling on level=", () => {
+    const logger = new Logger({ write: () => {} });
+
+    logger.level = ":error";
+    expect(logger.level).toBe(Logger.ERROR);
+    logger.level = "warn";
+    expect(logger.level).toBe(Logger.WARN);
+    expect(() => {
+      logger.level = "nope";
+    }).toThrowError("invalid log level: nope");
   });
 
   it("raises ArgumentError on a level that is neither an Integer nor a Symbol", () => {
