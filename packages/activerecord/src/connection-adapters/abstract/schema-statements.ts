@@ -745,7 +745,12 @@ export class SchemaStatements {
   async dropJoinTable(
     table1: string,
     table2: string,
-    kwargs: { tableName?: string; ifExists?: boolean; force?: boolean | "cascade" } = {},
+    kwargs: {
+      tableName?: string;
+      ifExists?: boolean;
+      force?: boolean | "cascade";
+      columnOptions?: Record<string, unknown>;
+    } = {},
   ): Promise<void> {
     const options = { ...kwargs };
     const joinTableName = this.findJoinTableName(table1, table2, options);
@@ -2002,7 +2007,9 @@ export class SchemaStatements {
 
   /** @internal */
   findJoinTableName(table1: string, table2: string, options: { tableName?: string } = {}): string {
-    return options.tableName ?? this.joinTableName(table1, table2);
+    const tableName = options.tableName;
+    delete options.tableName;
+    return tableName ?? this.joinTableName(table1, table2);
   }
 
   /** @internal */

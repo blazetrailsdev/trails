@@ -467,7 +467,12 @@ export interface AbstractAdapter {
   dropJoinTable(
     table1: string,
     table2: string,
-    kwargs?: { tableName?: string; ifExists?: boolean; force?: boolean | "cascade" },
+    kwargs?: {
+      tableName?: string;
+      ifExists?: boolean;
+      force?: boolean | "cascade";
+      columnOptions?: Record<string, unknown>;
+    },
   ): Promise<void>;
   changeTable(
     tableName: string,
