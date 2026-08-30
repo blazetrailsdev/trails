@@ -39,6 +39,10 @@ describe("<=>", () => {
     expect(cmp({}, {})).toBeNull();
   });
 
+  it("sends the receiver's own <=> under either trails spelling", () => {
+    expect(cmp({ cmp: () => -1 }, 0)).toBe(-1);
+  });
+
   it("sends the receiver's own <=> when it has one", () => {
     const receiver = { compareTo: (other: unknown) => (other === "x" ? 0 : null) };
     expect(cmp(receiver, "x")).toBe(0);
@@ -82,5 +86,13 @@ describe("Comparable", () => {
 
   it("answers false rather than raising for ==", () => {
     expect(new Sign(1).equals("x")).toBe(false);
+  });
+
+  it("answers true for an identical object before sending <=>", () => {
+    const incomparable = {
+      compareTo: () => null,
+      equals,
+    };
+    expect(incomparable.equals(incomparable)).toBe(true);
   });
 });

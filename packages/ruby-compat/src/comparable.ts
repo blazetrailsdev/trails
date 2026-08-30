@@ -46,6 +46,19 @@ export interface Comparable {
 }
 
 /**
+ * The same `<=>`, under the other spelling trails gives it: `@blazetrails/date`
+ * names `Date#<=>` and `Rational#<=>` `cmp`, where ActiveSupport names
+ * `TimeWithZone#<=>` and `Duration#<=>` `compareTo`. One Ruby method, two TS
+ * names, so the send below answers to both.
+ *
+ * @noRailsEquivalent PERMANENT — the one Ruby `<=>`
+ * (`vendor/ruby/compar.c:315`) under trails' second TS spelling of it.
+ */
+interface CmpSpelling {
+  cmp(other: unknown): number | null;
+}
+
+/**
  * Ruby's `a <=> b` over the values trails carries: the receiver's own `<=>`
  * when it has one, and otherwise the relational reading `Integer#<=>`,
  * `Float#<=>` and `String#<=>` all share. `nil` for an operand it cannot
@@ -64,6 +77,7 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (a instanceof Date) a = a.getTime();
   if (b instanceof Date) b = b.getTime();
   if (isComparable(a)) return a.compareTo(b) ?? null;
+  if (isCmpSpelling(a)) return a.cmp(b) ?? null;
   const av = a as number;
   const bv = b as number;
   return av < bv ? -1 : av > bv ? 1 : av === bv ? 0 : null;
@@ -71,6 +85,10 @@ export function cmp(a: unknown, b: unknown): number | null {
 
 function isComparable(value: unknown): value is Comparable {
   return typeof (value as { compareTo?: unknown }).compareTo === "function";
+}
+
+function isCmpSpelling(value: unknown): value is CmpSpelling {
+  return typeof (value as { cmp?: unknown }).cmp === "function";
 }
 
 /**
@@ -150,13 +168,17 @@ export function greaterThanOrEqual(this: Comparable, other: unknown): boolean {
 /**
  * Ruby `Comparable#==` (`vendor/ruby/compar.c:79` `cmp_equal`), the one
  * derived operator that does NOT raise: an incomparable operand — a `nil`
- * `<=>` — is `false` here.
+ * `<=>` — is `false` here. An identical object is `true` before `<=>` is sent
+ * at all.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — `cmp_equal`
  * (`vendor/ruby/compar.c:79`), which Rails inherits rather than defines.
  */
 export function equals(this: Comparable, other: unknown): boolean {
-  return this.compareTo(other) === 0;
+  if ((this as unknown) === other) return true;
+  const c = this.compareTo(other);
+  if (c === null || c === undefined) return false;
+  return c === 0;
 }
 
 /**
