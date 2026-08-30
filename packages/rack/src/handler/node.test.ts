@@ -98,6 +98,14 @@ describe("Rack::Handler::Node", () => {
     const env = await metaVars({ socket: { remoteAddress: "127.0.0.1", encrypted: true } });
 
     expect(env.HTTPS).toBe("on");
+    expect(env.REQUEST_URI).toBe("https://localhost:3000/");
+  });
+
+  it("collapses leading slashes rather than reading an authority", async () => {
+    const env = await metaVars({ url: "//evil.example/x" });
+
+    expect(env.REQUEST_URI).toBe("http://localhost:3000/evil.example/x");
+    expect(env.PATH_INFO).toBe("/evil.example/x");
   });
 
   it("sets the CGI meta variables WEBrick supplies", async () => {
@@ -105,7 +113,7 @@ describe("Rack::Handler::Node", () => {
 
     expect(env.GATEWAY_INTERFACE).toBe("CGI/1.1");
     expect(env.SCRIPT_NAME).toBe("");
-    expect(env.REQUEST_URI).toBe("/users?page=2");
+    expect(env.REQUEST_URI).toBe(`http://${env.HTTP_HOST as string}/users?page=2`);
     expect(env.REQUEST_PATH).toBe("/users");
     expect(env.SERVER_PROTOCOL).toBe("HTTP/1.1");
     expect(env.REMOTE_ADDR).toBe("127.0.0.1");

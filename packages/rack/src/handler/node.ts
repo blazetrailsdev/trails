@@ -110,24 +110,28 @@ export class Node {
     env[REQUEST_PATH] ??= `${env[SCRIPT_NAME] as string}${env[PATH_INFO] as string}`;
 
     const [status, headers, body] = await this.app(env);
+    try {
+      const sent: Record<string, string | string[]> = {};
+      const setCookie = headers[SET_COOKIE];
+      if (setCookie) {
+        sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
+      }
 
-    const sent: Record<string, string | string[]> = {};
-    const setCookie = headers[SET_COOKIE];
-    if (setCookie) {
-      sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
-    }
+      for (const [key, value] of Object.entries(headers)) {
+        if (key.startsWith("rack.")) continue;
+        if (key === SET_COOKIE) continue;
+        sent[key] = Array.isArray(value) ? value.join(", ") : value;
+      }
 
-    for (const [key, value] of Object.entries(headers)) {
-      if (key.startsWith("rack.")) continue;
-      if (key === SET_COOKIE) continue;
-      sent[key] = Array.isArray(value) ? value.join(", ") : value;
+      res.writeHead(status, sent);
+      for await (const chunk of body) {
+        res.write(chunk);
+      }
+      res.end();
+    } finally {
+      const close = (body as { return?: () => Promise<unknown> }).return;
+      if (close) await close.call(body);
     }
-
-    res.writeHead(status, sent);
-    for await (const chunk of body) {
-      res.write(chunk);
-    }
-    res.end();
   }
 
   /**
@@ -137,10 +141,12 @@ export class Node {
    * (`webrick.rb:93`) sweeps it back out, so this does the same.
    *
    * `HTTPS` is set by `webrick/https.rb:67-70`'s override of this method rather
-   * than by the handler, so a TLS socket is read here too.
+   * than by the handler, so a TLS socket is read here too — and it is what
+   * decides the scheme {@link parseUri} absolutizes with.
    */
   async metaVars(req: HttpRequest): Promise<RackEnv> {
-    const url = new URL(req.url ?? "/", `http://${header(req, "host") ?? "localhost"}`);
+    const scheme = req.socket.encrypted === true ? "https" : "http";
+    const url = parseUri(req.url ?? "/", scheme, header(req, "host") ?? "localhost");
     const meta: RackEnv = {};
 
     const cl = header(req, "content-length");
@@ -154,13 +160,13 @@ export class Node {
     meta["REMOTE_HOST"] = req.socket.remoteAddress ?? "";
     meta["REMOTE_USER"] = undefined;
     meta[REQUEST_METHOD] = (req.method ?? "GET").toUpperCase();
-    meta["REQUEST_URI"] = req.url ?? "/";
+    meta["REQUEST_URI"] = url.href;
     meta[SCRIPT_NAME] = "";
     meta[SERVER_NAME] = url.hostname;
-    meta[SERVER_PORT] = url.port === "" ? (url.protocol === "https:" ? "443" : "80") : url.port;
+    meta[SERVER_PORT] = url.port === "" ? (scheme === "https" ? "443" : "80") : url.port;
     meta[SERVER_PROTOCOL] = `HTTP/${req.httpVersion ?? "1.1"}`;
     meta["SERVER_SOFTWARE"] = `trails/${RELEASE}`;
-    if (req.socket.encrypted === true) meta[HTTPS] = "on";
+    if (scheme === "https") meta[HTTPS] = "on";
 
     for (const [key, rawValue] of Object.entries(req.headers)) {
       if (/^content-type$/i.test(key)) continue;
@@ -172,6 +178,18 @@ export class Node {
 
     return meta;
   }
+}
+
+/**
+ * `WEBrick::HTTPRequest#parse_uri` (`httprequest.rb:503-523`). A request-line
+ * target is usually a path, and Rails re-serializes it against the `Host`
+ * header so `REQUEST_URI` (`:423`) carries scheme and authority; `new URL`
+ * against the same base is that absolutization. Rails' leading-slash collapse
+ * matters here too: `URL` reads `//host/x` as protocol-relative and would take
+ * the authority from the request line.
+ */
+function parseUri(str: string, scheme: string, host: string): URL {
+  return new URL(str.replace(/^\/+/, "/"), `${scheme}://${host}`);
 }
 
 /** `WEBrick::HTTPRequest#[]` — one header, however Node spelled its value. */
@@ -188,6 +206,13 @@ function header(req: HttpRequest, name: string): string | undefined {
  * async read inside the synchronous `read()` the Rack input contract requires,
  * so the body is drained up front into the `StringIO` `service` hands over —
  * the shape `mock-request.ts:147` already builds for `rack.input`.
+ *
+ * Ruby reads the socket as `ASCII-8BIT` and `Input` passes those bytes through,
+ * so a binary upload round-trips; a `StringIO` holds a JS string, so a decoding
+ * has to be chosen, and UTF-8 is the one every consumer of `rack.input` here is
+ * already written against (`request.ts:400`, `method-override.ts:64`,
+ * `multipart/parser.ts:67`, and `mock-request.ts:147`, which wraps a JS string
+ * too). Making the whole seam byte-faithful is story `rack-input-binary-safe`.
  *
  * @noRailsEquivalent PERMANENT — `MAX_BODY_SIZE` follows from that buffering,
  * not from Rails: `:InputBufferSize` (`webrick/config.rb:59`) is a per-chunk
