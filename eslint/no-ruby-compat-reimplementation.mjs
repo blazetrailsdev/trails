@@ -121,9 +121,8 @@ const rule = {
         if (init?.type !== "ArrowFunctionExpression" && init?.type !== "FunctionExpression") return;
         check(context, node, node.id.name, "function", init.params);
       },
-      // Deliberately NOT matching a class METHOD: a Ruby method ported onto the
-      // class that defines it in Rails is the port, not a copy of a primitive
-      // (`Cache::Store#fetch`, `Session#dig`, `Journey::Nodes::Node#symbol?`).
+      // Deliberately NOT matching a class METHOD: a Ruby method ported onto
+      // the class that defines it in Rails is the port, not a copy.
     };
   },
 };

@@ -58,7 +58,7 @@ function vendorRoot(context) {
 
 const lineCounts = new Map();
 
-/** Line count of `<vendorRoot>/<rel>`, or `null` when the pin has no such file. */
+/** Line count, or `null` when the pin has no such file. */
 function lineCountOf(root, rel) {
   const key = `${root} ${rel}`;
   if (lineCounts.has(key)) return lineCounts.get(key);
@@ -85,8 +85,7 @@ function docBlockFor(node, sourceCode) {
 }
 
 /** Read the way `fileLevelNoRailsEquivalentReason` in extract-ts-api.ts reads a
- *  file-level receipt: a block above the imports, or one a blank line separates
- *  from what follows. */
+ *  file-level receipt: above the imports, or a blank line before what follows. */
 function fileLevelBlock(sourceCode) {
   const first = sourceCode.ast.body[0];
   if (!first) return null;
@@ -177,8 +176,7 @@ const rule = {
       ) {
         check(context, node, node.id?.name ?? "default");
       },
-      // Interfaces and type aliases are not measured surface — the extractor
-      // reads members off classes, functions and variables — so a receipt on
+      // Interfaces and type aliases are not measured surface, so a receipt on
       // one would be a tag `parity:api:extra` scores STALE.
     };
   },
