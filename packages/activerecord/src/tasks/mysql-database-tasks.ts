@@ -1,20 +1,20 @@
 import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
-import type { DatabaseConfig } from "../database-configurations/database-config.js";
+import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks, metadataTableNames } from "./database-tasks.js";
 
 type ConfigHash = Record<string, unknown>;
 
 export class MySQLDatabaseTasks {
-  private readonly dbConfig: DatabaseConfig;
+  private readonly dbConfig: HashConfig;
   private readonly configurationHash: ConfigHash;
 
   static usingDatabaseConfigurations(): boolean {
     return true;
   }
 
-  constructor(dbConfig: DatabaseConfig) {
+  constructor(dbConfig: HashConfig) {
     this.dbConfig = dbConfig;
     this.configurationHash = { ...dbConfig.configuration };
   }

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
+import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { Base } from "./base.js";
 
@@ -100,7 +101,7 @@ describe("DatabaseConfigurationsTest", () => {
   });
 
   it("registering a custom config object", () => {
-    class CustomConfig extends DatabaseConfig {
+    class CustomConfig extends HashConfig {
       constructor(envName: string, name: string, config: any) {
         super(envName, name, config);
       }

@@ -398,7 +398,7 @@ export function adapterClassSync(
     | null;
 }
 
-export function removeConnection(this: typeof Base): DatabaseConfig | undefined {
+export function removeConnection(this: typeof Base): HashConfig | undefined {
   const name = connectionSpecificationName.call(this);
   if (
     this.connectionHandler.retrieveConnectionPool(name, {
@@ -609,11 +609,8 @@ function validateConfigDefaultTimezone(config: { [key: string]: unknown }): "utc
   return raw;
 }
 
-async function establishWithDbConfig(
-  modelClass: typeof Base,
-  dbConfig: DatabaseConfig,
-): Promise<void> {
-  const config = dbConfig.configuration as Record<string, unknown>;
+async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConfig): Promise<void> {
+  const config = dbConfig.configurationHash as Record<string, unknown>;
   const tz = validateConfigDefaultTimezone(config);
 
   const { adapterName, connectUrl } = deriveAdapterAndUrl(dbConfig);
@@ -627,17 +624,19 @@ async function establishWithDbConfig(
   if (tz) ActiveRecord.defaultTimezone = tz;
 }
 
-function deriveAdapterAndUrl(dbConfig: DatabaseConfig): {
+function deriveAdapterAndUrl(dbConfig: HashConfig): {
   adapterName: string | undefined;
   connectUrl: string;
 } {
   const originalUrl =
     (dbConfig instanceof UrlConfig ? dbConfig.url : undefined) ||
-    (dbConfig.configuration.url as string) ||
+    (dbConfig.configurationHash.url as string) ||
     "";
   const adapterName =
     dbConfig.adapter || (originalUrl ? adapterNameFromUrl(originalUrl) : undefined);
-  const connectUrl = (dbConfig.configuration as { database?: string }).database ? "" : originalUrl;
+  const connectUrl = (dbConfig.configurationHash as { database?: string }).database
+    ? ""
+    : originalUrl;
   return { adapterName, connectUrl };
 }
 
@@ -646,12 +645,12 @@ async function establishWithConfig(
   adapterName: string,
   url: string,
   config?: Record<string, unknown>,
-  dbConfigOverride?: DatabaseConfig,
+  dbConfigOverride?: HashConfig,
 ): Promise<void> {
   await _loadAdapter(adapterName);
 
   const env = DatabaseConfigurations.defaultEnv;
-  let dbConfig: DatabaseConfig;
+  let dbConfig: HashConfig;
   if (dbConfigOverride) {
     dbConfig = dbConfigOverride;
   } else if (url) {
@@ -713,10 +712,7 @@ export const ClassMethods = {
 };
 
 /** @internal */
-export function resolveConfigForConnection(
-  this: typeof Base,
-  configOrEnv: unknown,
-): DatabaseConfig {
+export function resolveConfigForConnection(this: typeof Base, configOrEnv: unknown): HashConfig {
   if (!this.name) throw new Error("Anonymous class is not allowed.");
   (this as any)._connectionSpecificationName = isPrimaryClass.call(this)
     ? "ActiveRecord::Base"

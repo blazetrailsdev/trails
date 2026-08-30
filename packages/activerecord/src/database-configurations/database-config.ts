@@ -1,3 +1,4 @@
+import { NotImplementedError } from "../errors.js";
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -63,51 +64,10 @@ export function _setAdapterClassResolver(
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
-  #configuration: DatabaseConfigOptions;
 
-  constructor(envName: string, name: string, configuration: DatabaseConfigOptions = {}) {
+  constructor(envName: string, name: string) {
     this.envName = envName;
     this.name = name;
-    this.#configuration = Object.freeze({ ...configuration });
-  }
-
-  get configuration(): DatabaseConfigOptions {
-    return this.#configuration;
-  }
-
-  get configurationHash(): DatabaseConfigOptions {
-    return this.configuration;
-  }
-
-  /** @internal */
-  protected setConfigurationHash(hash: DatabaseConfigOptions): DatabaseConfigOptions {
-    this.#configuration = Object.freeze({ ...hash });
-    return this.#configuration;
-  }
-
-  inspect(): string {
-    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter=${this.adapter}>`;
-  }
-
-  get forCurrentEnv(): boolean {
-    const defaultEnv = _defaultEnvGetter ? _defaultEnvGetter() : "default_env";
-    return this.envName === defaultEnv;
-  }
-
-  get adapter(): string | undefined {
-    return this.configuration.adapter;
-  }
-
-  get database(): string | undefined {
-    return this.configuration.database;
-  }
-
-  set _database(database: string) {
-    this.#configuration = Object.freeze({ ...this.#configuration, database });
-  }
-
-  get seeds(): boolean | null {
-    return false;
   }
 
   /** @missingRailsCall resolve — PERMANENT */
@@ -121,6 +81,32 @@ export class DatabaseConfig {
       throw new Error(`Database configuration missing adapter: ${this.inspect()}`);
     }
     return _adapterClassResolver(this.adapter);
+  }
+
+  /**
+   * Synchronous companion to `adapterClass()`, for the sync `newConnection`.
+   *
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE Ruby's ConnectionAdapters.resolve is synchronous because `require` is; retires with the pool async convergence.
+   */
+  adapterClassSync(): (new (...args: any[]) => unknown) | null {
+    if (!_adapterClassResolverSync || !this.adapter) return null;
+    return _adapterClassResolverSync(this.adapter);
+  }
+
+  /**
+   * Awaits the dynamic import behind `adapterClass()` so the sync companions
+   * above it can answer.
+   *
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE the async half of the same split; retires with the pool async convergence.
+   */
+  async loadAdapter(): Promise<unknown> {
+    return this.adapterClass();
+  }
+
+  inspect(): string {
+    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter=${this.adapter}>`;
   }
 
   newConnection(): unknown {
@@ -143,80 +129,10 @@ export class DatabaseConfig {
         loadError ? { cause: loadError } : undefined,
       );
     }
-    const args = _buildAdapterArg(this.adapter, this.configuration as Record<string, unknown>);
+    const configurationHash = (this as unknown as { configurationHash: DatabaseConfigOptions })
+      .configurationHash;
+    const args = _buildAdapterArg(this.adapter, configurationHash as Record<string, unknown>);
     return new (Klass as new (...args: unknown[]) => unknown)(...args);
-  }
-
-  adapterClassSync(): (new (...args: any[]) => unknown) | null {
-    if (!_adapterClassResolverSync || !this.adapter) return null;
-    return _adapterClassResolverSync(this.adapter);
-  }
-
-  async loadAdapter(): Promise<unknown> {
-    return this.adapterClass();
-  }
-
-  get host(): string | undefined {
-    return this.configuration.host;
-  }
-
-  get socket(): string | undefined {
-    return this.configuration.socket;
-  }
-
-  get pool(): number {
-    return toInt(this.configuration.pool ?? 5);
-  }
-
-  get minThreads(): number {
-    return toInt(this.configuration.minThreads ?? 0);
-  }
-
-  get maxThreads(): number {
-    return toInt(this.configuration.maxThreads ?? this.pool);
-  }
-
-  get maxQueue(): number {
-    return this.maxThreads * 4;
-  }
-
-  get checkoutTimeout(): number {
-    return toFloat(this.configuration.checkoutTimeout ?? 5);
-  }
-
-  get idleTimeout(): number | null {
-    const raw = this.configuration.idleTimeout;
-    if (raw === null) return null;
-    const timeout = raw === undefined ? 300 : toFloat(raw);
-    return timeout > 0 ? timeout : null;
-  }
-
-  get reapingFrequency(): number | null {
-    const raw = this.configuration.reapingFrequency;
-    if (raw === null) return null;
-    if (raw === undefined) return 60.0;
-    return toFloat(raw);
-  }
-
-  get queryCache(): unknown {
-    return this.configuration.queryCache;
-  }
-
-  get replica(): boolean | undefined {
-    return this.configuration.replica;
-  }
-
-  get migrationsPaths(): string | string[] | undefined {
-    return this.configuration.migrationsPaths;
-  }
-
-  get schemaCachePath(): string | undefined {
-    return this.configuration.schemaCachePath;
-  }
-
-  get useMetadataTable(): boolean {
-    const val = this.configuration.useMetadataTable;
-    return val === undefined ? true : !!val;
   }
 
   validateBang(): true {
@@ -230,24 +146,94 @@ export class DatabaseConfig {
     }
     return true;
   }
-}
 
-function toInt(value: unknown): number {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? Math.trunc(value) : 0;
+  get host(): string | undefined {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
   }
-  const match = String(value).match(/^\s*[+-]?\d+/);
-  if (!match) return 0;
-  const n = Number(match[0]);
-  return Number.isFinite(n) ? Math.trunc(n) : 0;
-}
 
-function toFloat(value: unknown): number {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
+  get database(): string | undefined {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
   }
-  const match = String(value).match(/^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/);
-  if (!match) return 0;
-  const n = Number(match[0]);
-  return Number.isFinite(n) ? n : 0;
+
+  set _database(database: string) {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get adapter(): string | undefined {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get pool(): number {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get minThreads(): number {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get maxThreads(): number {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get maxQueue(): number {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get queryCache(): unknown {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get checkoutTimeout(): number {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get reapingFrequency(): number | null {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get idleTimeout(): number | null {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get replica(): boolean | undefined {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get migrationsPaths(): string | string[] | undefined {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get forCurrentEnv(): boolean {
+    const defaultEnv = _defaultEnvGetter ? _defaultEnvGetter() : "default_env";
+    return this.envName === defaultEnv;
+  }
+
+  get schemaCachePath(): string | undefined {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get useMetadataTable(): boolean {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
+
+  get seeds(): boolean | null {
+    // @nie disposition=TODO
+    throw new NotImplementedError();
+  }
 }

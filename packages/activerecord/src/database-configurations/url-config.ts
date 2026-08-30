@@ -33,7 +33,7 @@ export class UrlConfig extends HashConfig {
     toBooleanBang(hash, "replica");
     toBooleanBang(hash, "databaseTasks");
 
-    this.setConfigurationHash(hash as DatabaseConfigOptions);
+    this._configurationHash = Object.freeze(hash as DatabaseConfigOptions);
   }
 
   /** @internal */

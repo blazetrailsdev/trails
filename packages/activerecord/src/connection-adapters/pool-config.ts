@@ -1,4 +1,4 @@
-import type { DatabaseConfig } from "../database-configurations/database-config.js";
+import type { HashConfig } from "../database-configurations/hash-config.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { SchemaCache } from "./schema-cache.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
@@ -20,7 +20,7 @@ export class PoolConfig {
 
   readonly role: string;
   readonly shard: string;
-  readonly dbConfig: DatabaseConfig;
+  readonly dbConfig: HashConfig;
   private _pool: ConnectionPool | null = null;
   private _connectionDescriptor!: ConnectionDescriptor;
   private _schemaReflection: SchemaReflection | null = null;
@@ -28,7 +28,7 @@ export class PoolConfig {
 
   constructor(
     connectionClass: ConnectionDescriptor | ConnectionOwner,
-    dbConfig: DatabaseConfig,
+    dbConfig: HashConfig,
     role: string = "writing",
     shard: string = "default",
   ) {
@@ -232,9 +232,9 @@ export interface SQLite3Config extends SQLite3AdapterOptions {
 }
 
 export interface MysqlAdapterOptions extends TrailsAdapterOptions {
-  strict?: boolean | "default";
+  strict?: boolean | ":default";
   waitTimeout?: number | string;
-  variables?: Record<string, string | number | boolean | null | ":default" | "default">;
+  variables?: Record<string, string | number | boolean | null | ":default">;
   /** @internal */
   initSql?: string;
   /** @internal */

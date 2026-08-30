@@ -3,7 +3,7 @@ import { ActiveRecord, AsyncExecutor } from "../../ar-config.js";
 import { Executor, synchronize, type MonitorMixin } from "@blazetrails/activesupport";
 import { adapterNameFromConfig } from "../abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import type { DatabaseConfig } from "../../database-configurations/database-config.js";
+import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
 import type { ConnectionDescriptor } from "./connection-descriptor.js";
 import {
@@ -224,7 +224,7 @@ export class ExecutorHooks {
 
 export class ConnectionPool implements ReapablePool {
   readonly poolConfig: PoolConfig;
-  readonly dbConfig: DatabaseConfig;
+  readonly dbConfig: HashConfig;
   readonly role: string;
   readonly shard: string;
   readonly size: number;

@@ -37,7 +37,7 @@ describe("PostgreSQL::Column JSON round-trip", () => {
     expect(back.isArray()).toBe(true);
     expect(back.oid).toBe(1015);
     expect(back.fmod).toBe(-1);
-    expect(back.isIdentity).toBe(true);
+    expect(back.isIdentity()).toBe(true);
     expect(back.isVirtual()).toBe(true);
     expect(back).toEqual(col);
   });

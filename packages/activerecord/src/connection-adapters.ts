@@ -47,20 +47,17 @@ export function register(name: string, loader: AdapterLoader): void {
 
 /**
  * Synchronous half of `resolve(name)` — Rails does this check inline, but
- * trails' sync callers can't await the dynamic import. Raises the same
- * AdapterNotFound `resolve` raises (connection_adapters.rb:34-39).
+ * trails' sync callers can't await the dynamic import. The message stays in
+ * `resolve`, which builds it once as Ruby does (connection_adapters.rb:34-39);
+ * this raises what `resolve` recorded on its synchronous prefix.
  *
  * @internal
  * @noRailsEquivalent CONVERGEABLE the AdapterNotFound check Ruby writes inline in resolve (connection_adapters.rb:34-39), split out for the sync callers.
  */
 export function validateAdapterName(adapterName: string): void {
   if (adapters.has(adapterName)) return;
-  throw new AdapterNotFound(
-    `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
-      `Available adapters are: ${[...adapters.keys()].sort().join(", ")}. ` +
-      `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
-      `adapter package to your package.json if it's not in the list of available adapters.`,
-  );
+  void resolve(adapterName).catch(() => {});
+  throw resolveErrors.get(adapterName);
 }
 
 export async function resolve(adapterName: string): Promise<AdapterClass> {

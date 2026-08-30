@@ -969,7 +969,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** @internal */
   private _buildInitSql(): string {
     const { waitTimeout, variables: configVars } = this._poolConfig;
-    const vars: Record<string, string | number | boolean | null | ":default" | "default"> = {
+    const vars: Record<string, string | number | boolean | null | ":default"> = {
       ...(configVars ?? {}),
     };
 
@@ -983,7 +983,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const wt = typeof waitTimeout === "string" ? parseInt(waitTimeout, 10) : waitTimeout;
     vars["wait_timeout"] = Number.isInteger(wt) ? (wt as number) : 2147483;
 
-    const DEFAULTS = new Set([":default", "default"]);
+    const DEFAULTS = new Set([":default"]);
 
     let sqlMode: string | undefined;
     const varSqlMode = vars["sql_mode"];

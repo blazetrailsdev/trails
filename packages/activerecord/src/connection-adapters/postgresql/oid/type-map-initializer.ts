@@ -51,7 +51,7 @@ export class TypeMapInitializer {
   }
 
   queryConditionsForKnownTypeNames(): string {
-    const knownTypeNames = this.store.keys().map((key) => `'${String(key).replace(/'/g, "''")}'`);
+    const knownTypeNames = this.store.keys().map((key) => `'${key}'`);
     return `WHERE\n  t.typname IN (${knownTypeNames.join(", ")})\n`;
   }
 
@@ -61,7 +61,6 @@ export class TypeMapInitializer {
 
   queryConditionsForArrayTypes(): string {
     const knownTypeOids = this.store.keys().filter((key) => typeof key !== "string");
-    if (knownTypeOids.length === 0) return "WHERE\n  1=0\n";
     return `WHERE\n  t.typelem IN (${knownTypeOids.join(", ")})\n`;
   }
 

@@ -13,7 +13,7 @@ import {
   setConfigurationsStore,
   type RawConfigurations,
 } from "./database-configurations.js";
-import type { DatabaseConfig } from "./database-configurations/database-config.js";
+import type { HashConfig } from "./database-configurations/hash-config.js";
 import {
   Notifications,
   IsolatedExecutionState,
@@ -345,7 +345,7 @@ export function destroyAssociationAsyncJob(this: CoreHost, value?: any): any {
 }
 
 export function configurations(
-  config?: RawConfigurations | DatabaseConfigurations | DatabaseConfig[],
+  config?: RawConfigurations | DatabaseConfigurations | HashConfig[],
 ): DatabaseConfigurations {
   if (config !== undefined) {
     setConfigurationsStore(

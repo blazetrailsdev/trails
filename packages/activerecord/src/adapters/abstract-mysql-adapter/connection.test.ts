@@ -184,7 +184,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("mysql strict mode specified default", async () => {
-      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: "default" });
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: ":default" });
       try {
         const globalRows = await testAdapter.execute("SELECT @@GLOBAL.sql_mode AS v");
         const sessionRows = await testAdapter.execute("SELECT @@SESSION.sql_mode AS v");
@@ -239,7 +239,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("mysql set session variable to default", async () => {
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
-        variables: { default_week_format: "default" },
+        variables: { default_week_format: ":default" },
       });
       try {
         const globalRows = await testAdapter.execute("SELECT @@GLOBAL.DEFAULT_WEEK_FORMAT AS v");

@@ -73,9 +73,11 @@ export class IntegerType extends NumericValueType {
       const parsed = parseInt(value, 10);
       return isNaN(parsed) ? 0 : parsed;
     }
-    const toI = (value as { toI?: unknown } | null)?.toI;
-    if (typeof toI === "function") return toI.call(value) as number;
-    return null;
+    try {
+      return (value as { toI(): number }).toI();
+    } catch {
+      return null;
+    }
   }
 
   /** @internal */

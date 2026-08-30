@@ -49,11 +49,11 @@ export class Column extends BaseColumn {
     return super.type;
   }
 
-  get isSerial(): boolean {
+  isSerial(): boolean {
     return this._serial;
   }
 
-  get isIdentity(): boolean {
+  isIdentity(): boolean {
     return this._identity != null;
   }
 
@@ -62,11 +62,11 @@ export class Column extends BaseColumn {
    * @noRailsEquivalent PERMANENT
    */
   override deduplicateKey(): string {
-    return JSON.stringify([super.deduplicateKey(), this.isIdentity, this.isSerial]);
+    return JSON.stringify([super.deduplicateKey(), this.isIdentity(), this.isSerial()]);
   }
 
   override isAutoIncrementedByDb(): boolean {
-    return this.isSerial || this.isIdentity;
+    return this.isSerial() || this.isIdentity();
   }
 
   override isVirtual(): boolean {
@@ -85,7 +85,7 @@ export class Column extends BaseColumn {
     return this.array;
   }
 
-  get isEnum(): boolean {
+  isEnum(): boolean {
     return this.sqlTypeMetadata?.type === "enum";
   }
 
@@ -93,8 +93,8 @@ export class Column extends BaseColumn {
     return (
       other instanceof Column &&
       super.equals(other) &&
-      this.isIdentity === other.isIdentity &&
-      this.isSerial === other.isSerial
+      this.isIdentity() === other.isIdentity() &&
+      this.isSerial() === other.isSerial()
     );
   }
 

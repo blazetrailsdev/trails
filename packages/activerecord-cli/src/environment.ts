@@ -5,7 +5,6 @@ import {
   DatabaseTasks,
   HashConfig,
   UrlConfig,
-  type DatabaseConfig,
 } from "@blazetrails/activerecord";
 
 function isMemoryOrUri(database: string): boolean {
@@ -42,11 +41,11 @@ export function normalizeSqlitePaths(
   return new DatabaseConfigurations(normalized);
 }
 
-export function environmentDbConfig(env: string): DatabaseConfig | null {
+export function environmentDbConfig(env: string): HashConfig | null {
   return DatabaseTasks.databaseConfiguration?.findDbConfig(env) ?? null;
 }
 
-export async function establishEnvironmentConnection(env: string): Promise<DatabaseConfig | null> {
+export async function establishEnvironmentConnection(env: string): Promise<HashConfig | null> {
   const config = environmentDbConfig(env);
   if (!config) return null;
   await Base.establishConnection(config);
