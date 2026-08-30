@@ -136,7 +136,7 @@ export function wrapWithOutputSafetyHandling(
 }
 
 /** @internal */
-export const validFloat = (n: unknown) => parseFloat(n, false) !== null;
+export const validFloat = (number: unknown) => parseFloat(number, false) !== null;
 
 // Ruby's Float() rejects strings with trailing junk; mimic with a strict numeric regex.
 const FLOAT_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;

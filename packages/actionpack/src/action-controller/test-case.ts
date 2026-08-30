@@ -810,13 +810,13 @@ export class TestSession {
    * value at `key`; if missing, returns `fallback` (or the result of
    * `fallback()` when callable), else throws.
    */
-  fetch(key: string, fallback?: unknown): unknown {
+  fetch(key: string, args?: unknown): unknown {
     const k = String(key);
     if (this._data.has(k)) return this._data.get(k);
     if (arguments.length >= 2) {
       // Ruby `Hash#fetch(key) { |k| ... }` yields the missing key to the
-      // block; mirror by passing the stringified key when fallback is callable.
-      return typeof fallback === "function" ? (fallback as (key: string) => unknown)(k) : fallback;
+      // block; mirror by passing the stringified key when the default is callable.
+      return typeof args === "function" ? (args as (key: string) => unknown)(k) : args;
     }
     const err = new Error(`key not found: "${k}"`);
     err.name = "KeyError";

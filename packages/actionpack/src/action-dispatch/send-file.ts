@@ -70,11 +70,11 @@ export function lookupMimeType(typeOrExt: string): string {
  * Generate headers and body for sending a file.
  * Mirrors Rails' send_file.
  */
-export function sendFile(filePath: string, options: SendFileOptions = {}): SendResult {
-  const resolvedPath = getPath().resolve(filePath);
+export function sendFile(path: string, options: SendFileOptions = {}): SendResult {
+  const resolvedPath = getPath().resolve(path);
 
   if (!getFs().existsSync(resolvedPath)) {
-    throw new Error(`Cannot read file: ${filePath}`);
+    throw new Error(`Cannot read file: ${path}`);
   }
 
   const stat = getFs().statSync(resolvedPath);

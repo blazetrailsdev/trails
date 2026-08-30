@@ -76,13 +76,13 @@ export class BaseIterator {
   }
 
   /** @internal */
-  private eachRangePart(fd: number, range: [number, number], cb: (chunk: string) => void): void {
+  private eachRangePart(file: number, range: [number, number], cb: (chunk: string) => void): void {
     let remaining = range[1] - range[0] + 1;
     let offset = range[0];
     while (remaining > 0) {
       const len = Math.min(8192, remaining);
       const buf = Buffer.alloc(len);
-      const read = getFs().readSync(fd, buf, 0, len, offset);
+      const read = getFs().readSync(file, buf, 0, len, offset);
       if (read === 0) break;
       cb(buf.slice(0, read).toString("binary"));
       offset += read;
@@ -150,8 +150,8 @@ export class Files {
     return isFile ? this.serving(env, resolved) : this.fail(404, `File not found: ${pathInfo}`);
   }
 
-  serving(env: Record<string, any>, path: string): [number, Record<string, any>, any] {
-    const method = env["REQUEST_METHOD"];
+  serving(request: Record<string, any>, path: string): [number, Record<string, any>, any] {
+    const method = request["REQUEST_METHOD"];
 
     if (method === "OPTIONS") {
       return [200, { allow: ALLOW_HEADER, [CONTENT_LENGTH]: "0" }, []];
@@ -167,7 +167,7 @@ export class Files {
     if (!stat.isFile()) return this.fail(404, "File not found");
 
     const lastModified = stat.mtime.toUTCString();
-    const ifModSince = env["HTTP_IF_MODIFIED_SINCE"];
+    const ifModSince = request["HTTP_IF_MODIFIED_SINCE"];
     const headers: Record<string, string> = { "last-modified": lastModified };
 
     if (ifModSince && new Date(ifModSince) >= stat.mtime) return [304, headers, []]; // boundary: HTTP-date vs mtime
@@ -176,7 +176,7 @@ export class Files {
     Object.assign(headers, this.headers);
 
     const size = this.filesize(path);
-    const rawRange = env["HTTP_RANGE"] as string | undefined;
+    const rawRange = request["HTTP_RANGE"] as string | undefined;
 
     if (rawRange && size > 0) {
       const ranges = this.parseByteRanges(rawRange, size);
@@ -207,7 +207,7 @@ export class Files {
   fail(
     status: number,
     body: string,
-    extra: Record<string, string> = {},
+    headers: Record<string, string> = {},
   ): [number, Record<string, any>, any] {
     const msg = body + "\n";
     return [
@@ -216,7 +216,7 @@ export class Files {
         [CONTENT_TYPE]: "text/plain",
         [CONTENT_LENGTH]: String(Buffer.byteLength(msg)),
         "x-cascade": "pass",
-        ...extra,
+        ...headers,
       },
       [msg],
     ];

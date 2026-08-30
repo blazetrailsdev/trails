@@ -50,7 +50,7 @@ export function javascriptCdataSection(content: unknown): SafeBuffer {
  */
 export function javascriptTag(
   this: CaptureHelperHost | void,
-  contentOrOptions?: unknown,
+  contentOrOptionsWithBlock?: unknown,
   htmlOptions?: Record<string, unknown> | (() => unknown),
   block?: () => unknown,
 ): SafeBuffer {
@@ -66,17 +66,17 @@ export function javascriptTag(
 
   if (resolvedBlock) {
     const isHash =
-      contentOrOptions != null &&
-      typeof contentOrOptions === "object" &&
-      Object.getPrototypeOf(contentOrOptions) === Object.prototype;
+      contentOrOptionsWithBlock != null &&
+      typeof contentOrOptionsWithBlock === "object" &&
+      Object.getPrototypeOf(contentOrOptionsWithBlock) === Object.prototype;
     opts = isHash
-      ? { ...(contentOrOptions as Record<string, unknown>) }
+      ? { ...(contentOrOptionsWithBlock as Record<string, unknown>) }
       : typeof htmlOptions === "object" && htmlOptions !== null
         ? { ...htmlOptions }
         : {};
     content = capture.call(this as CaptureHelperHost, resolvedBlock);
   } else {
-    content = contentOrOptions;
+    content = contentOrOptionsWithBlock;
     opts = typeof htmlOptions === "object" && htmlOptions !== null ? { ...htmlOptions } : {};
   }
 

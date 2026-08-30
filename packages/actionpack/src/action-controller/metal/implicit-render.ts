@@ -20,10 +20,10 @@ import {
  * @internal
  */
 export function sendAction(
-  controller: { performed: boolean; head(status: number | string): void },
+  this: { performed: boolean; head(status: number | string): void },
   method: () => unknown,
 ): unknown {
-  return _sendAction(controller, method);
+  return _sendAction.call(this, method);
 }
 
 interface ImplicitRenderHost {
@@ -78,7 +78,7 @@ export function defaultRender(this: ImplicitRenderHost): void {
   this.logger?.info(
     `No template found for ${this.controllerName ?? ""}#${this.actionName}, rendering head :no_content`,
   );
-  _defaultRender(this);
+  _defaultRender.call(this);
 }
 
 /**

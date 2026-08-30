@@ -320,14 +320,14 @@ export class Parser {
 
   constructor(
     boundary: string,
-    tmpfile: ((filename: string, contentType: string) => any) | null,
+    tempfile: ((filename: string, contentType: string) => any) | null,
     bufsize: number,
     queryParser: QueryParser,
   ) {
     this.queryParser = queryParser;
     this.params = queryParser.makeParams();
     this.bufsize = bufsize;
-    this.collector = new Collector(tmpfile);
+    this.collector = new Collector(tempfile);
     this.sbuf = new SBuf("");
     const qb = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     this.bodyRegex = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)`, "s");

@@ -362,8 +362,8 @@ export class Base extends Metal {
 
   /** Redirect to a URL. */
   redirectTo(
-    url: string,
-    options: { status?: number | string; allow_other_host?: boolean } = {},
+    options: string,
+    responseOptions: { status?: number | string; allow_other_host?: boolean } = {},
   ): void {
     if (this.performed) {
       throw new DoubleRenderError(
@@ -371,11 +371,11 @@ export class Base extends Metal {
       );
     }
 
-    const status = options.status ? Metal.resolveStatus(options.status) : 302;
+    const status = responseOptions.status ? Metal.resolveStatus(responseOptions.status) : 302;
     this.status = status;
-    this.setHeader("location", url);
+    this.setHeader("location", options);
     this.contentType = "text/html; charset=utf-8";
-    this.body = `<html><body>You are being <a href="${url}">redirected</a>.</body></html>`;
+    this.body = `<html><body>You are being <a href="${options}">redirected</a>.</body></html>`;
     this.markPerformed();
   }
 
@@ -821,11 +821,11 @@ export class Base extends Metal {
 
   /** Send file content. */
   sendFile(
-    filePath: string,
+    path: string,
     options: { type?: string; disposition?: string; filename?: string } = {},
   ): void {
-    const content = getFs().readFileSync(filePath);
-    const filename = options.filename ?? getPath().basename(filePath);
+    const content = getFs().readFileSync(path);
+    const filename = options.filename ?? getPath().basename(path);
     const ext = getPath().extname(filename).toLowerCase();
 
     this.contentType = options.type ?? SEND_FILE_MIME_TYPES[ext] ?? "application/octet-stream";

@@ -101,9 +101,9 @@ export const TemplateHandlers = {
    * Register a handler and make it the default returned by
    * {@link handlerForExtension} when an unknown extension is requested.
    */
-  registerDefaultTemplateHandler(extension: string, handler: TemplateHandler): void {
-    this.registerTemplateHandler(extension, handler);
-    defaultHandler = handler;
+  registerDefaultTemplateHandler(extension: string, klass: TemplateHandler): void {
+    this.registerTemplateHandler(extension, klass);
+    defaultHandler = klass;
   },
 
   /** Handler for `extension`, falling back to the default handler. */

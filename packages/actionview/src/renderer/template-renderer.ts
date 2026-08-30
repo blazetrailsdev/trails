@@ -66,17 +66,20 @@ export class TemplateRenderer extends AbstractRenderer {
 
   /** @internal */
   private async renderTemplate(
-    context: ViewContext,
+    view: ViewContext,
     template: RenderableTemplate,
     layoutName: RenderOptions["layout"],
     locals: Record<string, unknown>,
   ): Promise<RenderedTemplate> {
-    return this.renderWithLayout(context, template, layoutName, locals);
+    return this.renderWithLayout(view, template, layoutName, locals);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs render — CONVERGEABLE template-render-takes-view-before-locals
+   */
   private async renderWithLayout(
-    context: ViewContext,
+    view: ViewContext,
     template: RenderableTemplate,
     path: RenderOptions["layout"],
     locals: Record<string, unknown>,
@@ -88,13 +91,13 @@ export class TemplateRenderer extends AbstractRenderer {
 
     let body: string;
     if (layout) {
-      const templateBody = await template.render(locals, context);
-      if (context.viewFlow) {
-        context.viewFlow.set("layout", templateBody);
+      const templateBody = await template.render(locals, view);
+      if (view.viewFlow) {
+        view.viewFlow.set("layout", templateBody);
       }
-      body = await layout.render(locals, context);
+      body = await layout.render(locals, view);
     } else {
-      body = await template.render(locals, context);
+      body = await template.render(locals, view);
     }
     return this.buildRenderedTemplate(body, template);
   }

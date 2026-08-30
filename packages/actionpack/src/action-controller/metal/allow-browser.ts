@@ -20,8 +20,8 @@ export class BrowserBlocker {
   private _parsed?: UAParser;
   private _expanded?: Record<string, string | false>;
 
-  constructor(userAgentString: string, versions: BrowserVersions) {
-    this._userAgent = userAgentString;
+  constructor(request: string, versions: BrowserVersions) {
+    this._userAgent = request;
     this._versions = versions;
   }
 

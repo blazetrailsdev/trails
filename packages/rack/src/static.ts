@@ -24,16 +24,16 @@ export class Static {
   private headerRules: [unknown, Record<string, string>][];
   private fileServer: Files;
 
-  constructor(app: any, opts: StaticOptions = {}) {
+  constructor(app: any, options: StaticOptions = {}) {
     this.app = app;
-    this.urls = opts.urls ?? ["/favicon.ico"];
-    this.index = opts.index;
-    this.cascade = opts.cascade ?? false;
-    this.gzip = opts.gzip ?? false;
-    const root = opts.root ? getPath().resolve(opts.root) : cwd();
-    this.headerRules = opts.header_rules ? [...opts.header_rules] : [];
-    if (opts.cache_control) {
-      this.headerRules.unshift(["all", { [CACHE_CONTROL]: opts.cache_control }]);
+    this.urls = options.urls ?? ["/favicon.ico"];
+    this.index = options.index;
+    this.cascade = options.cascade ?? false;
+    this.gzip = options.gzip ?? false;
+    const root = options.root ? getPath().resolve(options.root) : cwd();
+    this.headerRules = options.header_rules ? [...options.header_rules] : [];
+    if (options.cache_control) {
+      this.headerRules.unshift(["all", { [CACHE_CONTROL]: options.cache_control }]);
     }
     this.fileServer = new Files(root, {});
   }

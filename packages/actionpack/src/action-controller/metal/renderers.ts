@@ -67,8 +67,8 @@ export class Renderers {
     return this._renderToBodyWithRenderer(options);
   }
 
-  static useRenderers(...renderers: string[]): void {
-    for (const name of renderers) {
+  static useRenderers(...args: string[]): void {
+    for (const name of args) {
       RENDERERS.add(name);
     }
   }

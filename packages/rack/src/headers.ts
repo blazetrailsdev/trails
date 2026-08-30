@@ -190,8 +190,8 @@ export class Headers {
     throw new Error(`IndexError: key not found: ${key}`);
   }
 
-  fetchValues(...keys: string[]): string[] {
-    return keys.map((k) => {
+  fetchValues(...a: string[]): string[] {
+    return a.map((k) => {
       const lk = this._key(k);
       if (!this._data.has(lk)) throw new Error(`KeyError: key not found: ${k}`);
       return this._data.get(lk)!;
@@ -235,11 +235,11 @@ export class Headers {
   // --- Mutation ---
 
   merge(
-    other: Record<string, string> | Headers,
+    hash: Record<string, string> | Headers,
     fn?: (key: string, oldVal: string, newVal: string) => string,
   ): Headers {
     const result = this.dup();
-    const entries = other instanceof Headers ? other.toArray() : Object.entries(other);
+    const entries = hash instanceof Headers ? hash.toArray() : Object.entries(hash);
     for (const [k, v] of entries) {
       const lk = result._key(k);
       if (fn && result._data.has(lk)) {
@@ -252,10 +252,10 @@ export class Headers {
   }
 
   mergeInPlace(
-    other: Record<string, string> | Headers,
+    hash: Record<string, string> | Headers,
     fn?: (key: string, oldVal: string, newVal: string) => string,
   ): Headers {
-    const entries = other instanceof Headers ? other.toArray() : Object.entries(other);
+    const entries = hash instanceof Headers ? hash.toArray() : Object.entries(hash);
     for (const [k, v] of entries) {
       const lk = this._key(k);
       if (fn && this._data.has(lk)) {
@@ -268,15 +268,15 @@ export class Headers {
   }
 
   update(
-    other: Record<string, string> | Headers,
+    hash: Record<string, string> | Headers,
     fn?: (key: string, oldVal: string, newVal: string) => string,
   ): Headers {
-    return this.mergeInPlace(other, fn);
+    return this.mergeInPlace(hash, fn);
   }
 
-  replace(other: Record<string, string> | Headers): Headers {
+  replace(hash: Record<string, string> | Headers): Headers {
     this._data.clear();
-    const entries = other instanceof Headers ? other.toArray() : Object.entries(other);
+    const entries = hash instanceof Headers ? hash.toArray() : Object.entries(hash);
     for (const [k, v] of entries) {
       this._data.set(this._key(k), v);
     }
@@ -356,17 +356,17 @@ export class Headers {
     return changed ? this : null;
   }
 
-  slice(...keys: string[]): Headers {
+  slice(...a: string[]): Headers {
     const result = new Headers();
-    for (const key of keys) {
+    for (const key of a) {
       const k = this._key(key);
       if (this._data.has(k)) result._data.set(k, this._data.get(k)!);
     }
     return result;
   }
 
-  except(...keys: string[]): Headers {
-    const exclude = new Set(keys.map((k) => this._key(k)));
+  except(...a: string[]): Headers {
+    const exclude = new Set(a.map((k) => this._key(k)));
     const result = new Headers();
     for (const [k, v] of this._data) {
       if (!exclude.has(k)) result._data.set(k, v);
