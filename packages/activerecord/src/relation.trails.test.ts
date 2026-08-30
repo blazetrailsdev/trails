@@ -818,9 +818,9 @@ describe("Relation Enumerable surface (trails)", () => {
   it("groups, indexes and compacts the loaded records the way Enumerable does", async () => {
     const posts = CanonPost.where({ type: "Post" }).order("id");
 
-    const grouped = await posts.groupBy((post: any) => post.authorId);
+    const grouped = await posts.groupBy((post: any) => post.author_id);
     expect([...grouped.keys()].sort()).toEqual(
-      [...new Set((await posts).map((post: any) => post.authorId))].sort(),
+      [...new Set((await posts).map((post: any) => post.author_id))].sort(),
     );
     expect([...grouped.values()].flat().length).toBe(await posts.count());
 

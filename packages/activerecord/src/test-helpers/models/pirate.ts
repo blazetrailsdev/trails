@@ -15,6 +15,8 @@ import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Pirate extends Base {
   declare parrotsLimit: number;
+
+  cancelSaveFromCallback: boolean = false;
   declare catchphrase: string;
 
   declare parrot: Parrot | null;

@@ -763,7 +763,7 @@ describe("RelationTest", () => {
   it("find with readonly option", async () => {
     const devs = await Developer.all();
     for (const d of devs) {
-      expect((d as any).readonly).toBeFalsy();
+      expect((d as any).isReadonly()).toBeFalsy();
     }
     const readonlyDevs = await Developer.all().readonly();
     for (const d of readonlyDevs) {

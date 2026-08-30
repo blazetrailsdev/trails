@@ -111,21 +111,22 @@ export class InstanceMethodsOnActivation extends Module {
   constructor(attribute: string, options: { resetToken: boolean }) {
     super();
     const digestAttr = `${attribute}_digest`;
-    const passwordIvar = new WeakMap<object, string | null>();
-    const confirmationIvar = new WeakMap<object, unknown>();
-    const challengeIvar = new WeakMap<object, unknown>();
+    const passwordIvar = `_${attribute}`;
+    const confirmationIvar = `_${attribute}Confirmation`;
+    const challengeIvar = `_${attribute}Challenge`;
 
     this.moduleEval((mod) => {
       Object.defineProperty(mod, attribute, {
         get(this: Model) {
-          return passwordIvar.get(this) ?? null;
+          return (this as unknown as Record<string, string | null>)[passwordIvar] ?? null;
         },
         set(this: Model, unencryptedPassword: unknown) {
           if (unencryptedPassword == null) {
-            passwordIvar.set(this, null);
+            (this as unknown as Record<string, unknown>)[passwordIvar] = null;
             publicSendWriter(this, digestAttr, null);
           } else if (String(unencryptedPassword) !== "") {
-            passwordIvar.set(this, String(unencryptedPassword));
+            (this as unknown as Record<string, unknown>)[passwordIvar] =
+              String(unencryptedPassword);
             const cost = SecurePassword.minCost ? MIN_COST : DEFAULT_COST;
             publicSendWriter(this, digestAttr, bcrypt.hashSync(String(unencryptedPassword), cost));
           }
@@ -135,20 +136,20 @@ export class InstanceMethodsOnActivation extends Module {
 
       Object.defineProperty(mod, `${attribute}Confirmation`, {
         get(this: Model) {
-          return confirmationIvar.has(this) ? confirmationIvar.get(this) : null;
+          return (this as unknown as Record<string, unknown>)[confirmationIvar] ?? null;
         },
         set(this: Model, value: unknown) {
-          confirmationIvar.set(this, value);
+          (this as unknown as Record<string, unknown>)[confirmationIvar] = value;
         },
         configurable: true,
       });
 
       Object.defineProperty(mod, `${attribute}Challenge`, {
         get(this: Model) {
-          return challengeIvar.has(this) ? challengeIvar.get(this) : null;
+          return (this as unknown as Record<string, unknown>)[challengeIvar] ?? null;
         },
         set(this: Model, value: unknown) {
-          challengeIvar.set(this, value);
+          (this as unknown as Record<string, unknown>)[challengeIvar] = value;
         },
         configurable: true,
       });
