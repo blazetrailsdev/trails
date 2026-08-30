@@ -33,6 +33,7 @@ import {
   quotedBinary as pgQuotedBinary,
   columnNameMatcher as pgColumnNameMatcher,
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
+  lookupCastType as pgLookupCastType,
   lookupCastTypeFromColumn as pgLookupCastTypeFromColumn,
   type CastableColumn,
 } from "./postgresql/quoting.js";
@@ -566,9 +567,9 @@ export class PostgreSQLAdapter
     });
   }
 
-  /** @missingRailsCall verify! — PERMANENT */
+  /** @missingRailsCall verify! — CONVERGEABLE typecaster-connection-drops-datasource-gate-and-with-connection */
   override lookupCastTypeFromColumn(column: CastableColumn): Type {
-    if (!this._typeMapEagerLoaded) {
+    if (this._typeMap == null) {
       throw new ConnectionNotEstablished(
         "PostgreSQL type map is not loaded; the connection has not been configured",
       );
@@ -1870,20 +1871,9 @@ export class PostgreSQLAdapter
     return pgTypeCast.call(this, value);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall query_value — PERMANENT
-   * @missingRailsCall quote — PERMANENT
-   * @missingRailsCall to_i — PERMANENT
-   */
+  /** @internal */
   override lookupCastType(sqlType: string | null): Type {
-    if (typeof sqlType === "string") {
-      sqlType = sqlType
-        .replace(/\([^)]*\)/, "")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-    return super.lookupCastType(sqlType);
+    return pgLookupCastType.call(this, sqlType);
   }
 
   override quoteDefaultExpression(value: unknown, column: unknown): string {

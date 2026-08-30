@@ -7,6 +7,7 @@ import {
 import { ActiveRecord } from "../../ar-config.js";
 import {
   quote as abstractQuote,
+  lookupCastType as abstractLookupCastType,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
   quotedDate as abstractQuotedDate,
   type TemporalDateLike,
@@ -221,6 +222,21 @@ export interface CastableColumn {
   oid?: number | null;
   fmod?: number | null;
   sqlType?: string | null;
+}
+
+/**
+ * @internal
+ * @missingRailsCall query_value — PERMANENT
+ * @missingRailsCall quote — PERMANENT
+ */
+export function lookupCastType(this: { typeMap: LookupableTypeMap }, sqlType: string | null): Type {
+  if (typeof sqlType === "string") {
+    sqlType = sqlType
+      .replace(/\([^)]*\)/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  return abstractLookupCastType.call(this as never, sqlType);
 }
 
 export function lookupCastTypeFromColumn(

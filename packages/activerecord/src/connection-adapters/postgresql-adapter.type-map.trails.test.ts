@@ -78,7 +78,6 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
 
   beforeEach(() => {
     adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
-    (adapter as unknown as { _typeMapEagerLoaded: boolean })._typeMapEagerLoaded = true;
   });
 
   afterEach(async () => {

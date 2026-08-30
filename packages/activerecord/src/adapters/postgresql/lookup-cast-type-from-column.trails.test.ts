@@ -16,15 +16,23 @@ describeIfPg("PostgreSQLAdapter#lookupCastTypeFromColumn", () => {
   });
 
   describe("on a dropped connection", () => {
-    it("verifies the connection and answers the real type", async () => {
+    it("answers the real type from the type map already built", async () => {
       await connection.execute("SELECT 1");
       connection.disconnectBang();
-
-      await connection.verifyBang();
 
       expect(
         connection.lookupCastTypeFromColumn({ oid: UUID_OID, fmod: -1, sqlType: "uuid" }),
       ).toBeInstanceOf(Uuid);
+    });
+  });
+
+  describe("on an adapter that never built a type map", () => {
+    it("raises ConnectionNotEstablished", () => {
+      const fresh = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+
+      expect(() =>
+        fresh.lookupCastTypeFromColumn({ oid: UUID_OID, fmod: -1, sqlType: "uuid" }),
+      ).toThrow(/type map is not loaded/);
     });
   });
 });

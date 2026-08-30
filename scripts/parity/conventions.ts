@@ -683,18 +683,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "PostgreSQL::Quoting#lookup_cast_type resolves a sql_type string with a " +
-      "live `SELECT '<type>'::regtype::oid` query, so trails' port is async and " +
-      "diverges from the sync abstract signature it overrides; it is tracked by " +
-      "the `pg-lookup-cast-type-async-divergence` story rather than counted as " +
-      "a gap. Scoped to postgresql/quoting.rb: the abstract " +
-      "`Quoting#lookup_cast_type` (abstract/quoting.rb:234-236) IS ported, so a " +
-      "flat skip would now hide a real surface.",
-    names: ["lookup_cast_type"],
-    rubyFiles: ["connection_adapters/postgresql/quoting.rb"],
-  },
-  {
-    reason:
       "ActiveSupport::Duration#+@ (`def +@; self; end`, duration.rb:326) is " +
       "Ruby's unary-plus operator returning self. TS has no syntax that " +
       "dispatches to a named method for `+duration` — the unary `+` coerces " +
