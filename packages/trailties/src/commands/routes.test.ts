@@ -13,4 +13,11 @@ describe("RoutesCommand", () => {
     const grepOpt = cmd?.options.find((o) => o.long === "--grep");
     expect(grepOpt).toBeDefined();
   });
+
+  it("has the class options RoutesCommand declares", () => {
+    const program = createProgram();
+    const cmd = program.commands.find((c) => c.name() === "routes");
+    const longs = cmd?.options.map((o) => o.long);
+    expect(longs).toEqual(expect.arrayContaining(["--controller", "--grep", "--expanded"]));
+  });
 });

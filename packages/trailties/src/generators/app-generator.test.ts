@@ -366,9 +366,7 @@ describe("AppGenerator", () => {
     expect(read("app/helpers/application-helper.ts")).toMatchSnapshot("application-helper.ts");
     expect(read("app/jobs/application-job.ts")).toMatchSnapshot("application-job.ts");
     expect(read("app/mailers/application-mailer.ts")).toMatchSnapshot("application-mailer.ts");
-    expect(read("app/channels/application-cable/connection.ts")).toMatchSnapshot(
-      "connection.ts",
-    );
+    expect(read("app/channels/application-cable/connection.ts")).toMatchSnapshot("connection.ts");
     expect(read("app/channels/application-cable/channel.ts")).toMatchSnapshot("channel.ts");
     expect(read("config/application.ts")).toMatchSnapshot("config/application.ts");
     expect(read("config/routes.ts")).toMatchSnapshot("config/routes.ts");
@@ -378,9 +376,7 @@ describe("AppGenerator", () => {
       "environments/development.ts",
     );
     expect(read("config/environments/test.ts")).toMatchSnapshot("environments/test.ts");
-    expect(read("config/environments/production.ts")).toMatchSnapshot(
-      "environments/production.ts",
-    );
+    expect(read("config/environments/production.ts")).toMatchSnapshot("environments/production.ts");
     expect(read("test/test-helper.ts")).toMatchSnapshot("test-helper.ts");
     expect(read("config.ts")).toMatchSnapshot("config.ts");
     expect(read("vite.config.ts")).toMatchSnapshot("vite.config.ts");

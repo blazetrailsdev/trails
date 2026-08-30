@@ -54,18 +54,13 @@ export class AuthenticationGenerator extends GeneratorBase {
       undefined,
       AUTH_CONCERN_METHODS,
     );
-    this.emit(
-      "app/controllers/passwords-controller.ts",
-      "PasswordsController",
-      APP_CONTROLLER,
-      [
-        asyncStub("new_", "// allowUnauthenticatedAccess"),
-        asyncStub("create", "// PasswordsMailer.reset(user).deliverLater"),
-        asyncStub("edit", "// setUserByToken"),
-        asyncStub("update", "// user.update(password, passwordConfirmation)"),
-        asyncStub("setUserByToken", "// User.findByPasswordResetTokenBang", PRIVATE),
-      ],
-    );
+    this.emit("app/controllers/passwords-controller.ts", "PasswordsController", APP_CONTROLLER, [
+      asyncStub("new_", "// allowUnauthenticatedAccess"),
+      asyncStub("create", "// PasswordsMailer.reset(user).deliverLater"),
+      asyncStub("edit", "// setUserByToken"),
+      asyncStub("update", "// user.update(password, passwordConfirmation)"),
+      asyncStub("setUserByToken", "// User.findByPasswordResetTokenBang", PRIVATE),
+    ]);
     // Don't clobber AppGenerator's Connection (or user customizations).
     if (!skipActionCable && !this.fileExists("app/channels/application-cable/connection.ts"))
       this.emit("app/channels/application-cable/connection.ts", "Connection", undefined, [

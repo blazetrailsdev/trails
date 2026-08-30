@@ -8,7 +8,12 @@ export {
   type DispatcherCallback,
 } from "./route-set.js";
 export { escapePath, escapeSegment, escapeFragment, unescapeUri } from "../journey/router/utils.js";
-export { RoutesInspector } from "./inspector.js";
+export {
+  RoutesInspector,
+  ConsoleFormatter,
+  type RoutesFilter,
+  type RoutesFormatter,
+} from "./inspector.js";
 export {
   generateRouteHelpers,
   type RouteHelpersMap,
