@@ -491,7 +491,7 @@ Two boundaries follow from the extra set being a flat set of bare names:
 per package as `totalInterfaceExempt` in the JSON, so the one allowance with no
 tag to count stays measurable.
 
-### Permanence claim: open the reason with `PERMANENT` or `CONVERGEABLE`
+### Permanence claim: the receipt is `PERMANENT` or `CONVERGEABLE <story-id>`
 
 The RFC 0080 tag audit found 42 of 79 `@noRailsEquivalent` tags describing
 **convergeable** surface — unfinished porting, a fixable collision, a
@@ -502,12 +502,17 @@ because each reason was accurate about its mechanism and merely drew
 a **stale** tag (one on a name that no longer flags) fails the run; a tag that
 should never have been written does not.
 
-So the reason states its claim as a leading token:
+So the receipt has exactly two shapes and carries no prose:
 
 ```text
-@noRailsEquivalent PERMANENT. Rails gains these bodies with `include SchemaStatements`…
-@noRailsEquivalent CONVERGEABLE — <mechanism>; story <story-slug>.
+@noRailsEquivalent PERMANENT
+@noRailsEquivalent CONVERGEABLE <story-id>
 ```
+
+`PERMANENT` is the whole receipt — the token stands alone. `CONVERGEABLE`
+points at a registered story, and the story IS the receipt: the mechanism, the
+bar it fails, and the disposition live there, not in the tag.
+`no-freeform-comments` strips anything else.
 
 `classifyReason` (`extra-surface.ts`) reads the first word; anything else is
 **unclassified**, and `parity:api:extra` reports the unclassified count, a
@@ -525,7 +530,7 @@ JSON report shape is unchanged — only the exit code moved.
 
 A `CONVERGEABLE` tag is a documented exception to "not for deferred work"
 above, not a licence for it: it is written only alongside a registered story
-that removes it, and the reason names that story.
+that removes it, and the tag names that story's id.
 
 ### Re-audit cadence
 
