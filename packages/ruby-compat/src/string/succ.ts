@@ -12,14 +12,6 @@
 const isAsciiAlnum = (c: number): boolean =>
   (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
 
-/**
- * `String#succ` (`vendor/ruby/string.c:4868`) — Ruby's successor. Increments the rightmost alphanumeric,
- * carrying within its character class (`9→0`, `z→a`, `Z→A`) and skipping
- * non-alphanumerics during the carry; an overflow past the leftmost member of
- * a class inserts a new leading digit/letter (`"Zz".succ == "AAa"`,
- * `"99".succ == "100"`). Strings with no alphanumeric increment by raw code
- * unit instead (`"<<".succ == "<="`).
- */
 /** Inclusive [min, max] code-point bounds of the UTF-8 width encoding `cp`,
  *  the widths `vendor/ruby/string.c:4631` `enc_succ_char` steps between. */
 function utf8WidthBounds(cp: number): [number, number] {
@@ -29,6 +21,14 @@ function utf8WidthBounds(cp: number): [number, number] {
   return [0x10000, 0x10ffff];
 }
 
+/**
+ * `String#succ` (`vendor/ruby/string.c:4868`) — Ruby's successor. Increments the rightmost alphanumeric,
+ * carrying within its character class (`9→0`, `z→a`, `Z→A`) and skipping
+ * non-alphanumerics during the carry; an overflow past the leftmost member of
+ * a class inserts a new leading digit/letter (`"Zz".succ == "AAa"`,
+ * `"99".succ == "100"`). Strings with no alphanumeric increment by raw code
+ * unit instead (`"<<".succ == "<="`).
+ */
 export function succ(s: string): string {
   if (s.length === 0) return "";
   const codes = Array.from(s, (ch) => ch.codePointAt(0) as number);

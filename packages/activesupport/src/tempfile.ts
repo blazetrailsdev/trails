@@ -78,9 +78,9 @@ function createTmpname(
  *
  * @noRailsEquivalent CONVERGEABLE — `Tempfile` is Ruby stdlib rather than
  *   Rails, so it has no `vendor/rails` anchor and no natural package. It lives
- *   beside activesupport's other unanchored Ruby primitives (`range-ext.ts`,
- *   `include.ts`, `core-ext/string/succ.ts`) until RFC 0089
- *   (`corelib-primitives`) reactivates and re-homes them together.
+ *   beside activesupport's other unanchored Ruby primitives (`include.ts`)
+ *   until it moves to `@blazetrails/ruby-compat` under RFC 0129, as `Range`,
+ *   `String#succ` and `rb_equal` already have.
  */
 export class Tempfile {
   private readonly tmpname: string;
