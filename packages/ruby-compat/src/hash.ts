@@ -1,0 +1,56 @@
+import { KeyError } from "./key-error.js";
+import { isSymbol } from "./symbol.js";
+
+/**
+ * Ruby `Hash#fetch` (`vendor/ruby/hash.c:2176` `rb_hash_fetch_m`), both arms:
+ * with a second argument the stored value or that default, and with one
+ * argument the stored value or a `KeyError`. Ruby's block form is the third
+ * arm and is not ported — no call site yields the missing key through this
+ * export.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch`
+ * (`vendor/ruby/hash.c:2176`), which Rails inherits rather than defines.
+ */
+export function fetch<T>(hash: Record<string, unknown>, key: string): T;
+/**
+ * The two-argument arm: the STORED value whenever the key exists — including a
+ * stored `nil` or `false` — and otherwise `defaultValue`, which is what `??`
+ * gets wrong.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch`
+ * (`vendor/ruby/hash.c:2176`), which Rails inherits rather than defines.
+ */
+export function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T;
+/**
+ * `rb_hash_fetch_m` dispatches on `argc`, so the two arms share one body over a
+ * rest parameter: an absent second argument is the raising arm, and an
+ * explicitly-passed `undefined` is a default, exactly as Ruby's `nil` is.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch`
+ * (`vendor/ruby/hash.c:2176`), which Rails inherits rather than defines.
+ */
+export function fetch(hash: Record<string, unknown>, key: string, ...rest: unknown[]): unknown {
+  if (hasKey(hash, key)) {
+    return hash[key];
+  } else if (rest.length === 0) {
+    throw new KeyError(`key not found: ${inspectKey(key)}`);
+  } else {
+    return rest[0];
+  }
+}
+
+/**
+ * Ruby `Hash#key?` / `#has_key?` (`vendor/ruby/hash.c:3671`
+ * `rb_hash_has_key`) — membership, which for a stored `nil` or `false` is the
+ * question `hash[key] !== undefined` cannot answer.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#key?`
+ * (`vendor/ruby/hash.c:3671`), which Rails inherits rather than defines.
+ */
+export function hasKey(hash: Record<string, unknown>, key: string): boolean {
+  return key in hash;
+}
+
+function inspectKey(key: string): string {
+  return isSymbol(key) ? key : JSON.stringify(key);
+}

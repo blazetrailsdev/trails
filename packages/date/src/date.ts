@@ -21,7 +21,18 @@
  */
 
 import { Temporal } from "@js-temporal/polyfill";
-import { Rational } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  cmp,
+  equals as cmpEquals,
+  greaterThan,
+  greaterThanOrEqual,
+  isBetween,
+  lessThan,
+  lessThanOrEqual,
+  Rational,
+  rubyClass,
+} from "@blazetrails/ruby-compat";
 import { rbWarning } from "./rb-warning.js";
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -781,12 +792,10 @@ export function strftime(
   }
 }
 
-export class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
+/* Ruby core `ArgumentError` lives in `@blazetrails/ruby-compat` (RFC 0129),
+   which is where a Ruby class belongs, and is what `Comparable`'s derived
+   operators raise. Re-exported so this file's public surface is unchanged. */
+export { ArgumentError };
 
 /**
  * @internal Ruby core `FrozenError`, a `RuntimeError` subclass, spelled locally
@@ -832,20 +841,6 @@ class NoMethodError extends Error {
     super(message);
     this.name = "NoMethodError";
   }
-}
-
-/**
- * @internal Ruby `<=>` as `Date::Infinity` uses it, which is three operators:
- * `Float#<=>`, whose NaN arm answers `nil` and is what puts a `nil` in `@d`
- * (`lib/date.rb:19`); `Integer#<=>` for a stored sign; and `NilClass#<=>` —
- * inherited `Object#<=>`, which answers `0` for an identical operand and `nil`
- * otherwise — once that `nil` is stored.
- */
-function spaceship(a: number | null, b: number | null): number | null {
-  if (a === null || b === null) return a === b ? 0 : null;
-  if (a === b) return 0;
-  const c = Math.sign(a - b);
-  return Number.isNaN(c) ? null : c;
 }
 
 /**
@@ -5447,7 +5442,7 @@ export class DateInfinity {
    * the same message.
    */
   constructor(d: number = 1) {
-    this.#d = spaceship(d, 0);
+    this.#d = cmp(d, 0);
   }
 
   /** Ruby `Date::Infinity#d` (ruby/date, `lib/date.rb:21-23`), marked `protected`. */
@@ -5504,83 +5499,66 @@ export class DateInfinity {
 
   /**
    * Ruby `Date::Infinity#<=>` (ruby/date, `lib/date.rb:35-48`). The `Numeric`
-   * arm answers `d` itself — the sign — rather than a spaceship of the two
+   * arm answers `d` itself — the sign — rather than a `<=>` of the two
    * values, and the `coerce` fallback answers `nil` for an `other` that has no
    * `coerce`. Ruby spells that fallback `rescue NoMethodError`; the equivalent
    * here is the presence check rather than a `catch`, because JS reports a
    * missing method as the same `TypeError` a real `coerce` would raise from
    * inside itself, and Ruby lets that one through. The pair it answers goes
    * back through `l <=> r` (`lib/date.rb:43`) — the same nil-producing
-   * {@link spaceship} the arms above use, so an incomparable or NaN-ish pair
+   * {@link cmp} the arms above use, so an incomparable or NaN-ish pair
    * answers `nil` rather than a `NaN` a raw `Math.sign` would let out.
    */
   compareTo(other: unknown): number | null {
-    if (other instanceof DateInfinity) return spaceship(this.d(), other.d());
-    if (other === Number.POSITIVE_INFINITY) return spaceship(this.d(), 1);
-    if (other === Number.NEGATIVE_INFINITY) return spaceship(this.d(), -1);
+    if (other instanceof DateInfinity) return cmp(this.d(), other.d());
+    if (other === Number.POSITIVE_INFINITY) return cmp(this.d(), 1);
+    if (other === Number.NEGATIVE_INFINITY) return cmp(this.d(), -1);
     if (typeof other === "number" || other instanceof Rational) return this.d();
     const coerce = (other as { coerce?: (x: unknown) => [number, number] } | null)?.coerce;
     if (typeof coerce === "function") {
       const [l, r] = coerce.call(other, this);
-      return spaceship(l, r);
+      return cmp(l, r);
     }
     return null;
   }
 
   /**
-   * Ruby `Comparable#cmp_int` over `rb_cmperr` (Ruby core `compar.c`), the one
-   * body every operator below is derived from: a `nil` `<=>` is an
-   * `ArgumentError`, not a `false`. `rb_cmperr` names the operand by `inspect`
-   * when it is a special constant or a Float, and by `rb_obj_class` otherwise.
+   * Ruby `Date::Infinity` includes `Comparable` (ruby/date, `lib/date.rb:16`),
+   * so `<`, `<=`, `>`, `>=`, `==` and `between?` are all derived from
+   * {@link DateInfinity#compareTo} above. They are `@blazetrails/ruby-compat`'s
+   * one copy of `compar.c`, assigned here as the repo's `this`-typed mixin
+   * shape — including `cmp_int`'s `ArgumentError` for a `<=>` that answers
+   * nil, which `equals` alone does not raise.
+   *
+   * `[rubyClass]` is the name `rb_cmperr` puts in that message: Ruby's
+   * `Date::Infinity`, which no JS `constructor.name` can spell.
    */
-  #cmpint(other: unknown): number {
-    const c = this.compareTo(other);
-    if (c === null) {
-      const rhs =
-        other == null || typeof other === "boolean" || kNumericP(other)
-          ? String(other)
-          : ((other as object)?.constructor?.name ?? typeof other);
-      throw new ArgumentError(`comparison of Date::Infinity with ${rhs} failed`);
-    }
-    return c;
-  }
+  readonly [rubyClass] = "Date::Infinity";
 
   /** Ruby `Comparable#<` (Ruby core `compar.c` `cmp_lt`), `cmpint < 0`. */
-  lessThan(other: unknown): boolean {
-    return this.#cmpint(other) < 0;
-  }
+  lessThan = lessThan;
 
   /** Ruby `Comparable#<=` (Ruby core `compar.c` `cmp_le`), `cmpint <= 0`. */
-  lessThanOrEqual(other: unknown): boolean {
-    return this.#cmpint(other) <= 0;
-  }
+  lessThanOrEqual = lessThanOrEqual;
 
   /** Ruby `Comparable#>` (Ruby core `compar.c` `cmp_gt`), `cmpint > 0`. */
-  greaterThan(other: unknown): boolean {
-    return this.#cmpint(other) > 0;
-  }
+  greaterThan = greaterThan;
 
   /** Ruby `Comparable#>=` (Ruby core `compar.c` `cmp_ge`), `cmpint >= 0`. */
-  greaterThanOrEqual(other: unknown): boolean {
-    return this.#cmpint(other) >= 0;
-  }
+  greaterThanOrEqual = greaterThanOrEqual;
 
   /**
    * Ruby `Comparable#==` (Ruby core `compar.c` `cmp_equal`), the one derived
    * operator that does NOT raise: an incomparable operand — a `nil` `<=>` — is
    * `false` here. This is the same shape {@link Date#equals} takes.
    */
-  equals(other: unknown): boolean {
-    return this.compareTo(other) === 0;
-  }
+  equals = cmpEquals;
 
   /**
    * Ruby `Comparable#between?` (Ruby core `compar.c` `cmp_between`), which is
    * `cmpint` on both ends and so raises for an operand `<=>` cannot place.
    */
-  isBetween(min: unknown, max: unknown): boolean {
-    return this.#cmpint(min) >= 0 && this.#cmpint(max) <= 0;
-  }
+  isBetween = isBetween;
 
   /**
    * Ruby `Date::Infinity#coerce` (ruby/date, `lib/date.rb:51-57`). The `else`

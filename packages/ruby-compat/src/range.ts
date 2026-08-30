@@ -4,21 +4,25 @@
  * under `activesupport/src/core-ext/range/`, and reopen this class the way
  * Ruby reopens `Range`.
  *
- * @boundary-file: the comparators here coerce `Date` ↔ epoch number for
- *   ordering since Rails' `Range#cover?` accepts any `<=>`-comparable value.
- *   Temporal-typed ranges live elsewhere.
+ * @boundary-file: ordering goes through `comparable.ts`'s `cmp`, which coerces
+ *   `Date` ↔ epoch number since Rails' `Range#cover?` accepts any
+ *   `<=>`-comparable value. Temporal-typed ranges live elsewhere.
  */
 
+import { cmp } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 
-/** Ruby's `a <=> b`, the comparison `vendor/ruby/range.c:199` `r_less` makes
- *  on every endpoint, over the types trails' ranges carry. */
-function cmp(a: unknown, b: unknown): number {
-  // boundary: Date endpoints are compared as epoch millis.
-  const av = a instanceof Date ? a.getTime() : a;
-  const bv = b instanceof Date ? b.getTime() : b;
-  return (av as number) < (bv as number) ? -1 : (av as number) > (bv as number) ? 1 : 0;
+/**
+ * `vendor/ruby/range.c:199` `r_less` — the comparison every endpoint check
+ * below makes. It is `a <=> b` ({@link cmp}) with one extra arm: an
+ * incomparable pair, whose `<=>` is nil, answers `INT_MAX` and so sorts as
+ * "greater" rather than raising.
+ */
+function rLess(a: unknown, b: unknown): number {
+  const r = cmp(a, b);
+  if (r === null) return Number.MAX_SAFE_INTEGER;
+  return r;
 }
 
 /**
@@ -69,7 +73,7 @@ export class Range<T = unknown> {
     /* `vendor/ruby/range.c:1450` — Ruby answers nil for an empty range, and an
        exclusive end makes `begin == end` empty: `(1...1).min` is nil where
        `(1..1).min` is 1. */
-    if (this.end !== null && cmp(this.begin, this.end) >= (this.excludeEnd ? 0 : 1)) return null;
+    if (this.end !== null && rLess(this.begin, this.end) >= (this.excludeEnd ? 0 : 1)) return null;
     return this.begin;
   }
 
@@ -110,9 +114,9 @@ export class Range<T = unknown> {
    * `clusivity.rb:40-50` selects between. No Rails file declares it.
    */
   cover(value: T): boolean {
-    if (this.begin !== null && cmp(value, this.begin) < 0) return false;
+    if (this.begin !== null && rLess(value, this.begin) < 0) return false;
     if (this.end !== null) {
-      const c = cmp(value, this.end);
+      const c = rLess(value, this.end);
       if (this.excludeEnd ? c >= 0 : c > 0) return false;
     }
     return true;
@@ -149,7 +153,7 @@ export class Range<T = unknown> {
        begin..end via succ, stopping at `end.succ`, when the exclusive end is
        reached, or when the current string grows past `end`'s length (succ is
        non-decreasing in length). */
-    const n = cmp(begin, end);
+    const n = rLess(begin, end);
     if (n > 0 || (excludeEnd && n === 0)) return false;
     const afterEnd = succ(end);
     let current = begin;

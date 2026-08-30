@@ -11,6 +11,7 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
+import { KeyError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 
@@ -503,13 +504,6 @@ export class EncryptedCookieJar {
     } catch {
       return undefined;
     }
-  }
-}
-
-class KeyError extends Error {
-  constructor(msg: string) {
-    super(msg);
-    this.name = "KeyError";
   }
 }
 

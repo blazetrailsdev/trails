@@ -1,4 +1,5 @@
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { KeyError } from "@blazetrails/ruby-compat";
 import { asJson, getEnv } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
@@ -103,9 +104,7 @@ export function withFetch(entries: Record<string, TokenDefinition>): TokenDefini
     value(purpose: string): TokenDefinition {
       const definition = entries[purpose];
       if (definition === undefined) {
-        const error = new Error(`key not found: ${JSON.stringify(purpose)}`);
-        error.name = "KeyError";
-        throw error;
+        throw new KeyError(`key not found: ${JSON.stringify(purpose)}`);
       }
       return definition;
     },

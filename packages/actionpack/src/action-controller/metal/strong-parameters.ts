@@ -1,6 +1,7 @@
 /** ActionController::StrongParameters Provides ActionController::Parameters, a hash-like object that controls which parameters are permitted for mass assignment. @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
+import { KeyError } from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
 
 // --- Error classes ---
@@ -501,9 +502,7 @@ export class Parameters {
     if (args.length > 0) {
       return this._convertValueToParameters(args[0]);
     }
-    const err = new Error(`key not found: "${key}"`);
-    err.name = "KeyError";
-    throw err;
+    throw new KeyError(`key not found: "${key}"`);
   }
 
   dig(...keys: string[]): unknown {

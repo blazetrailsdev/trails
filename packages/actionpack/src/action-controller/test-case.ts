@@ -34,6 +34,7 @@
  */
 
 import { camelize, getCrypto } from "@blazetrails/activesupport";
+import { KeyError } from "@blazetrails/ruby-compat";
 import { buildNestedQuery } from "@blazetrails/rack";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
@@ -818,9 +819,7 @@ export class TestSession {
       // block; mirror by passing the stringified key when the default is callable.
       return typeof args === "function" ? (args as (key: string) => unknown)(k) : args;
     }
-    const err = new Error(`key not found: "${k}"`);
-    err.name = "KeyError";
-    throw err;
+    throw new KeyError(`key not found: "${k}"`);
   }
 
   /** Mirrors Rails `TestSession#enabled?` — always `true`. */

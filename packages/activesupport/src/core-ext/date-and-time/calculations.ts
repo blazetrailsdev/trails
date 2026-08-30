@@ -17,8 +17,7 @@ import * as date from "../date/calculations.js";
 import * as time from "../../time-ext.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { instantFrom } from "../../temporal.js";
-import { Range } from "@blazetrails/ruby-compat";
-import { KeyError } from "../key-error.js";
+import { cmp, fetch, Range } from "@blazetrails/ruby-compat";
 import { Object } from "../object/acts-like.js";
 
 /** A receiver of the mixin: the `Date` arm or the `Time` arm. */
@@ -77,12 +76,15 @@ function classCurrent(dateOrTime: DateOrTime): Temporal.PlainDate | TimeWithZone
   return dateOrTime instanceof Date ? time.current() : date.current();
 }
 
-/** `self < other` / `self > other`, across both arms. */
+/**
+ * `self <=> other`, across both arms — Ruby's `<=>` (`cmp`) over the reading
+ * each receiver orders by. `Temporal.Instant` carries no JS relational
+ * operators, so each side is handed to `cmp` as its epoch nanoseconds; a day
+ * reads as its UTC midnight, which is the ordering `Temporal.PlainDate.compare`
+ * gives. Never nil here: both sides are instants.
+ */
 function compare(dateOrTime: Comparable, other: Comparable): number {
-  if (dateOrTime instanceof Temporal.PlainDate && other instanceof Temporal.PlainDate) {
-    return Temporal.PlainDate.compare(dateOrTime, other);
-  }
-  return Temporal.Instant.compare(toInstant(dateOrTime), toInstant(other));
+  return cmp(toInstant(dateOrTime).epochNanoseconds, toInstant(other).epochNanoseconds)!;
 }
 
 function toInstant(dateOrTime: Comparable): Temporal.Instant {
@@ -195,13 +197,6 @@ function beginningOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant
 function endOfDay(dateOrTime: DateOrTime): TimeWithZone | Temporal.Instant {
   // boundary: a JS `Date` is the `Time` arm's receiver, and this dispatch is keyed on being one.
   return dateOrTime instanceof Date ? time.endOfDay(dateOrTime) : date.endOfDay(dateOrTime);
-}
-
-/** `Hash#fetch` — raises on an unknown key, where `hash[key]` answers `nil`. */
-function fetch(hash: Record<string, number>, key: string): number {
-  const value = hash[key];
-  if (value === undefined) throw new KeyError(`key not found: :${key}`);
-  return value;
 }
 
 /**
@@ -534,7 +529,7 @@ export function daysToWeekStart(
   dateOrTime: DateOrTime | Temporal.Instant,
   startDay: string = date.beginningOfWeek(),
 ): number {
-  const startDayNumber = fetch(DAYS_INTO_WEEK, startDay);
+  const startDayNumber = fetch<number>(DAYS_INTO_WEEK, startDay);
   return (((wday(dateOrTime) - startDayNumber) % 7) + 7) % 7;
 }
 
@@ -643,7 +638,7 @@ export function nextOccurring(
 ): Temporal.PlainDate;
 export function nextOccurring(dateOrTime: Date, dayOfWeek: string): Temporal.Instant;
 export function nextOccurring(dateOrTime: DateOrTime, dayOfWeek: string): DateOrInstant {
-  let fromNow = fetch(DAYS_INTO_WEEK, dayOfWeek) - wday(dateOrTime);
+  let fromNow = fetch<number>(DAYS_INTO_WEEK, dayOfWeek) - wday(dateOrTime);
   if (!(fromNow > 0)) fromNow += 7;
   return advance(dateOrTime, { days: fromNow });
 }
@@ -655,7 +650,7 @@ export function prevOccurring(
 ): Temporal.PlainDate;
 export function prevOccurring(dateOrTime: Date, dayOfWeek: string): Temporal.Instant;
 export function prevOccurring(dateOrTime: DateOrTime, dayOfWeek: string): DateOrInstant {
-  let ago = wday(dateOrTime) - fetch(DAYS_INTO_WEEK, dayOfWeek);
+  let ago = wday(dateOrTime) - fetch<number>(DAYS_INTO_WEEK, dayOfWeek);
   if (!(ago > 0)) ago += 7;
   return advance(dateOrTime, { days: -ago });
 }
@@ -677,7 +672,10 @@ function lastHour(dateOrTime: DateOrInstant): DateOrInstant {
 /** Mirrors: `DateAndTime::Calculations#days_span` (`:366-368`) @internal */
 function daysSpan(day: string): number {
   return (
-    (((fetch(DAYS_INTO_WEEK, day) - fetch(DAYS_INTO_WEEK, date.beginningOfWeek())) % 7) + 7) % 7
+    (((fetch<number>(DAYS_INTO_WEEK, day) - fetch<number>(DAYS_INTO_WEEK, date.beginningOfWeek())) %
+      7) +
+      7) %
+    7
   );
 }
 

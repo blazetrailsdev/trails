@@ -1,4 +1,5 @@
 import { Attribute, Uninitialized } from "./attribute.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 
@@ -27,9 +28,7 @@ export class AttributeSet {
     if (attr !== undefined) return attr;
     if (typeof defaultOrBlock === "function") return (defaultOrBlock as (name: string) => T)(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
-    const err = new Error(`key not found: ${JSON.stringify(name)}`);
-    err.name = "KeyError";
-    throw err;
+    throw new KeyError(`key not found: ${JSON.stringify(name)}`);
   }
 
   except(...names: string[]): Map<string, Attribute> {
