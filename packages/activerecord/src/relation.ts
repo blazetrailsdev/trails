@@ -1625,8 +1625,8 @@ export class Relation<T extends Base> {
             }
             if (value == null || max == null) {
               throw new ArgumentError(
-                `comparison of ${rubyClassName(value)} with ${
-                  max == null ? "nil" : rubyClassName(max)
+                `comparison of ${rubyClassName(max)} with ${
+                  value == null ? "nil" : rubyClassName(value)
                 } failed`,
               );
             }

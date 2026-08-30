@@ -26,14 +26,14 @@ describe("CollectionCacheKeyNilTimestampTest", () => {
       records[0].writeAttribute("updated_at", null);
       await expect(developers.computeCacheVersion()).rejects.toThrow(ArgumentError);
       await expect(developers.computeCacheVersion()).rejects.toThrow(
-        "comparison of Time with nil failed",
+        "comparison of NilClass with Time failed",
       );
 
       const later = await Developer.where({ salary: 100000 }).load();
       const laterRecords = await later.records();
       laterRecords[laterRecords.length - 1].writeAttribute("updated_at", null);
       await expect(later.computeCacheVersion()).rejects.toThrow(
-        "comparison of NilClass with Time failed",
+        "comparison of Time with nil failed",
       );
     });
   });
