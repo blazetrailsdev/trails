@@ -262,7 +262,6 @@ export class Association {
     return this.reflection.klass;
   }
 
-  /** @missingRailsCall order:scopeFor,unscoped — PERMANENT */
   get extensions(): any[] {
     const ctor = this.owner.constructor as typeof Base & {
       _reflectOnAssociation?: (n: string) => AssociationDefinition | null;
