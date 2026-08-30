@@ -83,7 +83,7 @@ describe("Migration", () => {
 
     it.skipIf(adapterType === "mysql")("add column without limit", async () => {
       const connection = await ambientConnection();
-      await connection.addColumn("test_models", "description", "string", { limit: undefined });
+      await connection.addColumn("test_models", "description", "string", { limit: null });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["description"].limit).toBeNull();
