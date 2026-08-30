@@ -1314,7 +1314,8 @@ function excludingWithCallee(callee: "excluding" | "without") {
         continue;
       }
       const primaryKey = relation.model.primaryKey;
-      const primaryKeyArray: string[] = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
+      const primaryKeyArray: string[] =
+        primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
       for (const record of relation._records) {
         flatMappedIds.push(
           primaryKeyArray.length === 1

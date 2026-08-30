@@ -41,3 +41,14 @@ describe("excluding deferred arm (trails)", () => {
     expect(excluded.toSql()).not.toBe(all.toSql());
   });
 });
+
+describe("excluding a loaded relation of a model without a primary key (trails)", () => {
+  fixtures(["edges", "vertices"]);
+
+  it("contributes an empty id per record, matching Array(nil)", async () => {
+    const { Edge } = await import("./test-helpers/models/edge.js");
+    const loaded = await Edge.all().load();
+
+    expect(() => Edge.excluding(loaded).toSql()).toThrow("can't quote Array");
+  });
+});
