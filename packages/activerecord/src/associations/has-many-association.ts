@@ -247,7 +247,7 @@ export class HasManyAssociation extends CollectionAssociation {
       count =
         counterCacheColumn == null ? 0 : toI((this.owner as any).readAttribute(counterCacheColumn));
     } else {
-      count = await (this as unknown as CollectionAssociation).scope().count("all");
+      count = await (this as unknown as CollectionAssociation).scope().count(":all");
     }
 
     if (count === 0) {

@@ -549,7 +549,7 @@ describe("CalculationsTest", () => {
 
   it("should calculate with invalid field", async () => {
     expect(await Account.calculate("count", "*")).toBe(6);
-    expect(await Account.calculate("count", "all")).toBe(6);
+    expect(await Account.calculate("count", ":all")).toBe(6);
   });
 
   it("should calculate grouped with invalid field", async () => {
@@ -716,7 +716,7 @@ describe("CalculationsTest", () => {
     ]);
     const actual = await Account.select("DISTINCT accounts.firm_id")
       .group("accounts.firm_id")
-      .count("all");
+      .count(":all");
     expect(actual).toEqual(expected);
   });
 

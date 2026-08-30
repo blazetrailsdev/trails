@@ -41,7 +41,7 @@ export class Association {
     this.reflection = reflection;
     this.preloadScope = preloadScope ?? null;
     this._reflectionScope = reflectionScope ?? null;
-    this._associate = associateByDefault || preloadScope == null;
+    this._associate = associateByDefault || preloadScope == null || preloadScope.isEmptyScope;
     this._model = owners.length > 0 ? (owners[0].constructor as typeof Base) : null;
     this._run = false;
   }

@@ -505,7 +505,7 @@ describe("InheritanceTest", () => {
   });
 
   it("inheritance with default scope", async () => {
-    expect(await SelectedMembership.count("all")).toBe(1);
+    expect(await SelectedMembership.count(":all")).toBe(1);
   });
 });
 

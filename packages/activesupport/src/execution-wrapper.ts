@@ -11,6 +11,14 @@ import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
 import type { FilterListEntry } from "./callbacks.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value != null &&
+    (typeof value === "object" || typeof value === "function") &&
+    typeof (value as PromiseLike<unknown>).then === "function"
+  );
+}
+
 /**
  * The `run`/`complete` pair `register_hook` threads state between
  * (execution_wrapper.rb:41-48). `complete` is handed whatever `run` returned.
@@ -111,18 +119,40 @@ export class ExecutionWrapper {
    *
    * Ruby takes `source:` as a keyword and the work as a trailing block; TS has
    * no block argument, so the block leads and the keywords follow it.
+   *
+   * A Ruby block returns only when its work is done, so `ensure` is the whole
+   * bracket. A JS block that returns a promise has not finished at `finally`,
+   * and completing there closes the query cache and the async-query session
+   * out from under the still-running body, so the thenable arm re-hangs the
+   * same `rescue`/`ensure` pair onto the promise instead.
    */
   static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
     if (this.active()) return block();
 
     const instance = this.runBang();
+    let deferred = false;
     try {
-      return block();
+      const result = block();
+      if (isThenable(result)) {
+        deferred = true;
+        return Promise.resolve(result).then(
+          (value) => {
+            instance.completeBang();
+            return value;
+          },
+          (error: unknown) => {
+            this.errorReporter().report(error as Error, { handled: false, source });
+            instance.completeBang();
+            throw error;
+          },
+        ) as T;
+      }
+      return result;
     } catch (error) {
       this.errorReporter().report(error as Error, { handled: false, source });
       throw error;
     } finally {
-      instance.completeBang();
+      if (!deferred) instance.completeBang();
     }
   }
 
