@@ -273,6 +273,22 @@ export class BigDecimal {
     return new BigDecimal(`${negative ? "-" : ""}${intPart}.${fracPart}`);
   }
 
+  /**
+   * Ruby `BigDecimal.interpret_loosely` — the lenient parse `String#to_d`
+   * dispatches to (`bigdecimal/util.rb:73-75`). It reads the leading numeric
+   * prefix and discards the rest instead of raising the way
+   * `Kernel#BigDecimal` does, so `"45.67 degrees"` is `0.4567e2` and a string
+   * with no numeric prefix is zero (verified on MRI 3.3).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core (`bigdecimal`), a C method Rails
+   * reaches through `require "bigdecimal/util"` (`xml_mini.rb:5`) without
+   * defining, so there is no `.rb` in the vendored corpus to mirror.
+   */
+  static interpretLoosely(value: string): BigDecimal {
+    const match = INTERPRET_LOOSELY_REGEX.exec(value);
+    return new BigDecimal(match === null ? "0" : match[0].replace(/_/g, "").trim());
+  }
+
   /** Render as `0.<digits>e<exp>` (Ruby's `"E"` form, sans sign prefix). */
   private toScientific(group: number): string {
     const allDigits = this.intDigits + this.fracDigits;
@@ -492,3 +508,23 @@ const NON_DECIMAL_LITERAL_REGEX = /^[+-]?0[bBoO]/;
 
 /** Ruby's `1_000` digit separator, which `Number()` does not read. */
 const DIGIT_SEPARATOR_REGEX = /(?<=\d)_(?=\d)/g;
+
+/**
+ * The leading numeric prefix {@link BigDecimal.interpretLoosely} reads, which
+ * is `String#to_f`'s grammar (see `core-ext/string/conversions.ts`) — Ruby
+ * accepts single underscores between digits and takes an optional fractional
+ * part and exponent only where a digit follows.
+ */
+const INTERPRET_LOOSELY_REGEX =
+  /^\s*[+-]?(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)(?:[eE][+-]?\d(?:_?\d)*)?/;
+
+/**
+ * Ruby `String#to_d` (`bigdecimal/util.rb:73-75`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core (`bigdecimal/util`), which Rails
+ * calls without defining (`xml_mini.rb:75`); the gem is not part of the
+ * vendored Rails corpus the port mirrors.
+ */
+export function toD(str: string): BigDecimal {
+  return BigDecimal.interpretLoosely(str);
+}

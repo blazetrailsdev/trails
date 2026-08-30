@@ -1,12 +1,13 @@
 import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
-import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
+import { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { StringIO } from "./string-io.js";
 import { Temporal, Date as RubyDate, DateTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
 import { ArgumentError } from "./hash-utils.js";
 import { toS } from "./core-ext/object/inspect.js";
+import { toF, toI } from "./core-ext/string/conversions.js";
 import * as XmlMini_REXML from "./xml-mini/rexml.js";
 
 /**
@@ -199,8 +200,8 @@ export const PARSING: Record<
     }
   },
   duration: (duration) => Duration.parse(String(duration)),
-  integer: (integer) => toI(integer),
-  float: (float) => toF(float),
+  integer: (integer) => toI(String(integer)),
+  float: (float) => toF(String(float)),
   decimal: (number) => {
     if (typeof number === "string") {
       return toD(number);
@@ -246,35 +247,6 @@ Object.assign(PARSING, {
   double: PARSING["float"],
   dateTime: PARSING["datetime"],
 });
-
-/**
- * Ruby `String#to_i` / `Numeric#to_i`: a leading integer is taken and the rest
- * of the string discarded, with no match yielding 0; Floats truncate.
- */
-function toI(value: unknown): number {
-  if (typeof value === "number") return Math.trunc(value);
-  const parsed = parseInt(String(value), 10);
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-/**
- * Ruby `String#to_f` / `Numeric#to_f`: a leading float is taken and the rest of
- * the string discarded (so `"123,003"` is `123.0`), with no match yielding 0.0.
- */
-function toF(value: unknown): number {
-  if (typeof value === "number") return value;
-  const parsed = parseFloat(String(value));
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-/**
- * Ruby `String#to_d`: like `to_f`, the leading numeric prefix is taken and the
- * remainder discarded, so this never raises where `BigDecimal(str)` would.
- */
-function toD(value: string): BigDecimal {
-  const match = /^\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/.exec(value);
-  return new BigDecimal(match ? match[0].trim() : "0");
-}
 
 /**
  * The maximum element nesting a backend will descend before raising.
