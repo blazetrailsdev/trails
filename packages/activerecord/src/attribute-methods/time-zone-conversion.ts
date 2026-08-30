@@ -65,7 +65,10 @@ export class TimeZoneConverter extends ValueType<unknown> {
       return setTimeZoneWithoutConversion(this._subtype.cast(value), this._subtypeIsUtc);
     }
     if (value instanceof TimeWithZone) {
-      return this.convertTimeToTimeZone(value);
+      const casted = this._subtype.cast(
+        (this._subtype as TimeValueSubtype).userInputInTimeZone(value),
+      );
+      return casted != null && casted !== false ? casted : this._subtype.cast(value);
     }
     if (value instanceof Temporal.ZonedDateTime) {
       return this.convertTimeToTimeZone(value.toInstant());

@@ -1,11 +1,12 @@
 import { Temporal } from "@blazetrails/date";
+import { TimeWithZone } from "@blazetrails/activesupport";
 import { TimeType as ActiveModelTime } from "@blazetrails/activemodel";
 import { isUtc, type TimezoneOptions } from "./internal/timezone.js";
 
 export class Value {
-  constructor(private readonly obj: Temporal.Instant) {}
+  constructor(private readonly obj: Temporal.Instant | TimeWithZone) {}
 
-  getobj(): Temporal.Instant {
+  getobj(): Temporal.Instant | TimeWithZone {
     return this.obj;
   }
 }
@@ -25,16 +26,21 @@ export class Time extends ActiveModelTime {
   }
 
   override serialize(value: unknown): Value | null {
-    return super.serialize(value) as Value | null;
+    const serialized: unknown = super.serialize(value);
+    return serialized instanceof Temporal.Instant || serialized instanceof TimeWithZone
+      ? new Value(serialized)
+      : (serialized as Value | null);
   }
 
   override serializeCastValue(value: Temporal.Instant | null): Value | null {
-    const serialized = super.serializeCastValue(value);
-    return serialized instanceof Temporal.Instant ? new Value(serialized) : null;
+    const serialized: unknown = super.serializeCastValue(value);
+    return value != null ? new Value(serialized as Temporal.Instant | TimeWithZone) : null;
   }
 
   protected override castValue(value: unknown): Temporal.Instant | null {
     const cast: unknown = super.castValue(value);
-    return cast instanceof Value ? cast.getobj() : (cast as Temporal.Instant | null);
+    return cast instanceof Value
+      ? (cast.getobj() as Temporal.Instant)
+      : (cast as Temporal.Instant | null);
   }
 }

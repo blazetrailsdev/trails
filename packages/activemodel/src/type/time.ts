@@ -45,6 +45,8 @@ export class TimeType extends ValueType<Temporal.Instant> {
         if (!(error instanceof RubyArgumentError)) throw error;
       }
       if (timeHash == null || timeHash.hour == null) return null;
+    } else if (value instanceof TimeWithZone) {
+      value = value.change({ year: 2000, day: 1, month: 1 });
     } else if (value instanceof Temporal.Instant) {
       value = value
         .toZonedDateTimeISO(this.#zoneId())
