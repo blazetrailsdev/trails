@@ -1,0 +1,96 @@
+import { RuleTester } from "eslint";
+import rule from "./no-ruby-compat-reimplementation.mjs";
+
+const tester = new RuleTester({
+  languageOptions: {
+    parser: (await import("typescript-eslint")).parser,
+    ecmaVersion: 2022,
+    sourceType: "module",
+  },
+});
+
+const FLAGGED = "packages/activerecord/src/support/new-helper.ts";
+/** A seeded row in eslint/no-ruby-compat-reimplementation-exclude.json. */
+const ALLOWLISTED = "packages/activerecord/src/support/quote-regex.ts";
+const IN_RUBY_COMPAT = "packages/ruby-compat/src/core-ext/regexp.ts";
+
+tester.run("no-ruby-compat-reimplementation", rule, {
+  valid: [
+    {
+      // The sanctioned home: a declaration there IS the primitive.
+      filename: IN_RUBY_COMPAT,
+      code: `export function regexpEscape(string: string): string { return string; }`,
+    },
+    {
+      // A grandfathered copy, one row in the only-shrink exclude JSON.
+      filename: ALLOWLISTED,
+      code: `export function escapeRegExp(s: string): string { return s; }`,
+    },
+    {
+      // Rails-anchored homonym: `ActiveSupport::Cache::Store#fetch`
+      // (activesupport/lib/active_support/cache.rb:444).
+      filename: FLAGGED,
+      code: `class Store { fetch(name: string): unknown { return name; } }`,
+    },
+    {
+      // Rails-anchored homonym: `ActionDispatch::Request::Session#dig`
+      // (actionpack/lib/action_dispatch/middleware/session/abstract_store.rb).
+      filename: FLAGGED,
+      code: `class Session { dig(...keys: string[]): unknown { return keys; } }`,
+    },
+    {
+      // Rails-anchored homonym: `ActionController::Parameters#dig`
+      // (actionpack/lib/action_controller/metal/strong_parameters.rb).
+      filename: FLAGGED,
+      code: `class Parameters { dig(...keys: string[]): unknown { return keys; } }`,
+    },
+    {
+      // `ActiveRecord::Core#<=>` (activerecord/lib/active_record/core.rb:665)
+      // ports to a function named `compare`; `compare` is deliberately not in
+      // the register, which is what keeps this green.
+      filename: FLAGGED,
+      code: `export function compare(a: unknown, b: unknown): number { return 0; }`,
+    },
+    {
+      // A registered name with the wrong CONTEXT: `fetch` is an alias only over
+      // a `Record`, which is what a `Hash#fetch` copy looks like.
+      filename: FLAGGED,
+      code: `function fetch(url: string): unknown { return url; }`,
+    },
+    {
+      // Tests are out of scope.
+      filename: "packages/activerecord/src/support/new-helper.test.ts",
+      code: `function escapeRegExp(s: string): string { return s; }`,
+    },
+  ],
+
+  invalid: [
+    {
+      filename: FLAGGED,
+      code: `function escapeRegExp(s: string): string { return s; }`,
+      errors: [{ messageId: "reimplementation" }],
+    },
+    {
+      filename: FLAGGED,
+      code: `const isSymbol = (value: unknown): boolean => typeof value === "string";`,
+      errors: [{ messageId: "reimplementation" }],
+    },
+    {
+      filename: FLAGGED,
+      code: `class KeyError extends Error {}`,
+      errors: [{ messageId: "reimplementation" }],
+    },
+    {
+      filename: FLAGGED,
+      code: `function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T { return defaultValue; }`,
+      errors: [{ messageId: "reimplementation" }],
+    },
+    {
+      // The allowlist is keyed by (file, name): the same name in a different
+      // file is new code, and a new row is never the remedy.
+      filename: FLAGGED,
+      code: `function cmp(a: unknown, b: unknown): number { return 0; }`,
+      errors: [{ messageId: "reimplementation" }],
+    },
+  ],
+});

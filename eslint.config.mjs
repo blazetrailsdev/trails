@@ -37,6 +37,12 @@ import {
   testInfraExemptIgnores,
 } from "./eslint/test-infra-scope.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
+import noRubyCompatReimplementation from "./eslint/no-ruby-compat-reimplementation.mjs";
+import {
+  noRubyCompatReimplementationFiles,
+  noRubyCompatReimplementationIgnores,
+} from "./eslint/no-ruby-compat-reimplementation-scope.mjs";
+import rubyCompatNeedsMriCitation from "./eslint/ruby-compat-needs-mri-citation.mjs";
 import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noLoadSchemaWithStubbedDdl from "./eslint/no-load-schema-with-stubbed-ddl.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
@@ -271,6 +277,8 @@ export default defineConfig(
           "require-canonical-rebuild": requireCanonicalRebuild,
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
+          "no-ruby-compat-reimplementation": noRubyCompatReimplementation,
+          "ruby-compat-needs-mri-citation": rubyCompatNeedsMriCitation,
           "no-internal-canonical-loaders": noInternalCanonicalLoaders,
           "no-load-schema-with-stubbed-ddl": noLoadSchemaWithStubbedDdl,
           "no-explicit-any-disable": noExplicitAnyDisable,
@@ -399,6 +407,10 @@ export default defineConfig(
       "packages/rack/src/**/*.ts",
       "packages/did-you-mean/src/**/*.ts",
       "packages/arel/src/**/*.ts",
+      // Every ruby-compat member is absent from the rails-private manifest by
+      // construction, so the receipt pairing is mandatory package-wide there
+      // rather than case-by-case (RFC 0129).
+      "packages/ruby-compat/src/**/*.ts",
     ],
     // test-helpers/ mirrors Rails' test/ code, which the Ruby extractor never
     // reads, so the manifest cannot back an `@internal` there by construction
@@ -657,6 +669,34 @@ export default defineConfig(
     files: ["packages/*/src/**/*.ts"],
     rules: {
       "blazetrails/no-standalone-associations": "error",
+    },
+  },
+
+  // ── no-ruby-compat-reimplementation: a Ruby primitive is declared once, in
+  //    @blazetrails/ruby-compat, and called everywhere else. Today's copies are
+  //    grandfathered one row each in
+  //    eslint/no-ruby-compat-reimplementation-exclude.json, which is
+  //    ONLY-SHRINK — a row is deleted by the move story that converges it, and
+  //    never added for new code. See eslint/no-ruby-compat-reimplementation.mjs
+  //    for what the name-based rule cannot catch. ──
+  {
+    files: noRubyCompatReimplementationFiles,
+    ignores: noRubyCompatReimplementationIgnores,
+    rules: {
+      "blazetrails/no-ruby-compat-reimplementation": "error",
+    },
+  },
+
+  // ── ruby-compat-needs-mri-citation: `parity:api` can never enroll
+  //    ruby-compat (MRI's surface is C), so its anchor is a RESOLVED
+  //    `vendor/ruby/<file>:<line>` citation plus a `@noRailsEquivalent
+  //    PERMANENT` receipt on every export. Skips when vendor/ruby is absent —
+  //    CI fetches it, so CI is the enforcing run. ──
+  {
+    files: ["packages/ruby-compat/src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/ruby-compat-needs-mri-citation": "error",
     },
   },
 

@@ -70,6 +70,25 @@ So a citation without a receipt fails the extra-surface tooling, and a receipt
 without a citation passes the tooling while losing the only record of what the
 code is supposed to do. Write both.
 
+Both are enforced by `blazetrails/ruby-compat-needs-mri-citation`
+(`eslint/ruby-compat-needs-mri-citation.mjs`), which RESOLVES the citation
+rather than pattern-matching it: the file has to exist under `vendor/ruby/` at
+the pinned SHA and the line has to be within it. The vendor tree is fetched
+rather than committed, so the rule skips where it is absent — the
+`rails-comparison` CI job, which fetches it, is the enforcing run. The reverse
+direction is covered too: this package is in the RFC 0121
+`unbacked-internal-needs-receipt` enrollment set, because every member here is
+absent from the rails-private manifest by construction.
+
+And a primitive lives here ONCE.
+`blazetrails/no-ruby-compat-reimplementation` fails a function or class declared
+outside this package whose name is a ruby-compat export, or a registered alias
+of one (`escapeRegExp` for `Regexp.escape`, a local `fetch(hash, key, default)`
+over a `Record` for `Hash#fetch`, ...). Today's copies each hold one row in
+`eslint/no-ruby-compat-reimplementation-exclude.json`, which is only-shrink: a
+row is deleted by the move story that converges it, and a new row is never the
+remedy for new code.
+
 ### 3. `parity:api` never enrolls this package — permanently
 
 `parity:api`'s package list is derived from `vendor/sources.ts` via
