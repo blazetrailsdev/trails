@@ -1084,7 +1084,19 @@ describe("buildReport — novel vs moved classification", () => {
               file: "preloader/association.ts",
               includes: [],
               extends: [],
-              instanceMethods: [method("primaryMethod"), method("nestedHelper")],
+              instanceMethods: [method("primaryMethod")],
+              classMethods: [],
+            },
+            // The sibling TS class that ports the nested Ruby one, the shape
+            // trails actually uses (re-attached as `static readonly
+            // LoaderQuery = LoaderQuery`). `preloader/loader_query.rb` does not
+            // exist, so `loader-query.ts` must not be expected either.
+            LoaderQuery: {
+              name: "LoaderQuery",
+              file: "preloader/association.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("nestedHelper")],
               classMethods: [],
             },
           },
@@ -1822,6 +1834,82 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
       info.fileFunctions?.["inheritance.ts"],
     );
     expect(names.has("stiClassFor")).toBe(true);
+  });
+});
+
+describe("buildReport — nested-class method allowances", () => {
+  // `ActiveModel::Attribute::FromDatabase` declares `type_cast`; the enclosing
+  // `ActiveModel::Attribute` does not (activemodel/lib/active_model/
+  // attribute.rb:154-160).
+  const rubyManifest = (): ApiManifest => ({
+    source: "ruby",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          "ActiveModel::Attribute": rubyClass({
+            name: "Attribute",
+            file: "attribute.rb",
+            instance: [method("value")],
+          }),
+          "ActiveModel::Attribute::FromDatabase": rubyClass({
+            name: "FromDatabase",
+            file: "attribute.rb",
+            instance: [method("type_cast")],
+          }),
+        },
+        modules: {},
+      },
+    },
+  });
+
+  const tsManifest = (owner: string): ApiManifest => ({
+    source: "typescript",
+    generatedAt: "",
+    packages: {
+      activemodel: {
+        classes: {
+          Attribute: {
+            name: "Attribute",
+            file: "attribute.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [
+              method("value"),
+              ...(owner === "Attribute" ? [method("typeCast")] : []),
+            ],
+            classMethods: [],
+          },
+          FromDatabase: {
+            name: "FromDatabase",
+            file: "attribute.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: owner === "FromDatabase" ? [method("typeCast")] : [],
+            classMethods: [],
+          },
+        },
+        modules: {},
+      },
+    },
+  });
+
+  const extrasFor = (owner: string): string[] => {
+    const report = buildReport(rubyManifest(), tsManifest(owner), {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    return (report.packages[0].extraFiles[0]?.extras ?? []).map((n) => n.name);
+  };
+
+  it("allows the nested class's method on the TS declaration that ports it", () => {
+    expect(extrasFor("FromDatabase")).toEqual([]);
+  });
+
+  it("scores it as extra on the enclosing class, where Rails does not declare it", () => {
+    expect(extrasFor("Attribute")).toEqual(["typeCast"]);
   });
 });
 

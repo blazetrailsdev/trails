@@ -100,7 +100,6 @@ import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-closure.js";
 import {
-  hasRubyFileTsOverride,
   isArityOverridden,
   isRubyOnlyClass,
   isScopedSkip,
@@ -2452,17 +2451,27 @@ export function collectRubyEntities(rubyPkg: PackageInfo): RubyEntity[] {
 }
 
 /**
- * Split an entity's methods out of its home-file bucket for every reopening
- * file that carries an explicit TS mapping (RUBY_FILE_TS_OVERRIDES).
+ * Split an entity's methods out of its home-file bucket for every file that
+ * reopens it.
  *
  * Ruby reopens a class/module across many files, but the extractor stamps ONE
  * `file` on the entity — where its first method was defined — so by default
  * every later file's methods are measured against that file's TS counterpart.
  * For `ActiveSupport::Inflector` that means `inflector/methods.rb`'s 20 methods
  * are looked for in `inflector/inflections.ts` and reported missing forever.
- * A mapped file gets its own bucket instead, holding only the methods it
+ * A reopening file gets its own bucket instead, holding only the methods it
  * defines. Splits carry no `includes`/`extends`: the include-flattened methods
  * belong to the home bucket, not to every file the entity is reopened in.
+ *
+ * The Ruby extractor records a per-METHOD `file`, so every reopening is
+ * splittable, and the split is unconditional (RFC 0126). It used to need an
+ * explicit `RUBY_FILE_TS_OVERRIDES` mapping, which made the unmapped
+ * reopenings invisible twice over: `module ARTest` opens in
+ * `test/support/config.rb` and reopens in `connection.rb`, so all seven of its
+ * methods were held against `config.ts` — `connection_name`,
+ * `test_configuration_hashes` and `connect` read as MISSING although
+ * `support/connection.ts` ports and exports each — and `connection.rb` never
+ * appeared as a compared file at all, inflating `files N/N`.
  *
  * A reopening file declared unported (UNPORTED_FILES) is split for the same
  * reason with the opposite outcome: only a file that owns a bucket can be
@@ -2470,18 +2479,11 @@ export function collectRubyEntities(rubyPkg: PackageInfo): RubyEntity[] {
  * the split, `version.rb`'s `.version` would sit in `active_record.rb`'s bucket
  * and read as missing however the exclusion is spelled.
  */
-export function splitOverriddenFileBuckets(entity: RubyEntity, pkg: string): RubyEntity[] {
+export function splitOverriddenFileBuckets(entity: RubyEntity): RubyEntity[] {
   const home = entity.info.file || "unknown.rb";
   const allMethods = [...entity.info.instanceMethods, ...entity.info.classMethods];
   const splitFiles = new Set(
-    allMethods
-      .map((m) => m.file)
-      .filter(
-        (f): f is string =>
-          f !== undefined &&
-          f !== home &&
-          (hasRubyFileTsOverride(f, pkg) || isSourceUnported(f, pkg)),
-      ),
+    allMethods.map((m) => m.file).filter((f): f is string => f !== undefined && f !== home),
   );
   if (splitFiles.size === 0) return [entity];
 
@@ -2778,11 +2780,23 @@ export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, C
  * symbol resolved outside the package's `src` (a dep package, a mixin-factory
  * call), and then we fall back to file-path proximity: most shared leading
  * directory segments with the child, self excluded.
+ *
+ * Proximity only decides when it actually separates the candidates. Several
+ * candidates sharing ZERO leading segments with the child are not ranked at
+ * all, and the old `candidates[0]` fallback bound whichever one the extractor
+ * happened to enumerate first — order-dependent, silent, and wrong: naming the
+ * CSP mixin `Request` (its Rails name) in `http/content-security-policy.ts`
+ * flipped `testing/test-request.ts`'s parent off `http/request.ts` and dropped
+ * `test_request.rb` from 13 matched methods to 9 with no warning (PR #5405).
+ * So an unseparated tie resolves to nothing, the way `includeGraphEntities`
+ * drops an edge name that resolves to more than one entity, and `onAmbiguous`
+ * reports it (RFC 0126).
  */
 export function resolveEntityByDeclaringFile(
   candidates: ClassInfo[],
   childFile: string,
   declFile?: string,
+  onAmbiguous?: (candidates: ClassInfo[]) => void,
 ): ClassInfo | null {
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
@@ -2793,6 +2807,7 @@ export function resolveEntityByDeclaringFile(
   const childParts = (childFile || "").split("/");
   let best: ClassInfo | null = null;
   let bestScore = -1;
+  let bestCount = 0;
   for (const c of candidates) {
     if (c.file === childFile) continue; // skip self
     const parts = (c.file || "").split("/");
@@ -2804,9 +2819,19 @@ export function resolveEntityByDeclaringFile(
     if (shared > bestScore) {
       bestScore = shared;
       best = c;
+      bestCount = 1;
+    } else if (shared === bestScore) {
+      bestCount++;
     }
   }
-  return best ?? candidates[0];
+  // A tie at a POSITIVE score still shares a directory prefix with the child,
+  // which is the signal this heuristic exists to read; only a tie at zero is
+  // pure enumeration order.
+  if (bestScore === 0 && bestCount > 1) {
+    onAmbiguous?.(candidates.filter((c) => c.file !== childFile));
+    return null;
+  }
+  return best;
 }
 
 export function main() {
@@ -3231,8 +3256,17 @@ export function main() {
 
       const entityKey = (e: ClassInfo) => `${e.file}:${e.name}`;
 
+      // Short names whose candidates no proximity score separates, so the walk
+      // followed no parent at all. Reported once per name per package below —
+      // the counterpart of the file-structure manifest's unresolvable
+      // last-segment collisions, so a rename cannot silently move matched
+      // counts (RFC 0126).
+      const ambiguousParents = new Map<string, number>();
+
       const resolveParent = (name: string, childFile: string, declFile?: string) =>
-        resolveEntityByDeclaringFile(entitiesByName.get(name) || [], childFile, declFile);
+        resolveEntityByDeclaringFile(entitiesByName.get(name) || [], childFile, declFile, (cands) =>
+          ambiguousParents.set(name, cands.length),
+        );
 
       const inheritedCache = new Map<string, Set<string>>();
       const getInherited = (entity: ClassInfo, visited: Set<string>): Set<string> => {
@@ -3273,6 +3307,15 @@ export function main() {
           fileMethods.add(m);
         }
         tsMethodsByFile.set(entity.file, fileMethods);
+      }
+
+      if (ambiguousParents.size > 0) {
+        const names = [...ambiguousParents.keys()].sort((a, b) => a.localeCompare(b));
+        console.warn(
+          `[parity:api] ${pkg}: ${names.length} ambiguous parent name(s) — every candidate ` +
+            `shares zero leading path segments with the child, so the inheritance walk ` +
+            `followed none: ${names.join(", ")}`,
+        );
       }
     }
 
@@ -3348,7 +3391,7 @@ export function main() {
     const byFile = new Map<string, typeof allRuby>();
     const excludedFiles = new Set<string>();
     for (const entity of allRuby) {
-      for (const item of splitOverriddenFileBuckets(entity, pkg)) {
+      for (const item of splitOverriddenFileBuckets(entity)) {
         const file = item.info.file || "unknown.rb";
         if (isSourceUnported(file, pkg)) {
           excludedFiles.add(file);

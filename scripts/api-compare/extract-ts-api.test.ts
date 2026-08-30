@@ -3523,6 +3523,36 @@ describe("extract-ts-api — MethodInfo emit-site inventory", () => {
   });
 });
 
+describe("extractFromProgram — a namespace nested inside a namespace", () => {
+  // The `module ClassMethods` inside `module Configurable` shape
+  // (activesupport/lib/active_support/configurable.rb:28), which the settled
+  // trails mixin idiom ports literally.
+  const info = extractFromFiles("/p", {
+    "configurable.ts": `
+      export namespace Configurable {
+        export namespace ClassMethods {
+          export function config(): void {}
+          export function configAccessor(...names: string[]): void {}
+        }
+        export function config(): void {}
+      }
+    `,
+  });
+
+  it("records the nested namespace as a file-level entity of its own", () => {
+    const nested = info.modules["configurable.ts:ClassMethods"];
+    expect(nested).toBeDefined();
+    expect(nested.declaredAsNamespace).toBe(true);
+    expect(nested.instanceMethods.map((m) => m.name).sort()).toEqual(["config", "configAccessor"]);
+  });
+
+  it("leaves the enclosing namespace holding only its own members", () => {
+    expect(info.modules["configurable.ts:Configurable"].instanceMethods.map((m) => m.name)).toEqual(
+      ["config"],
+    );
+  });
+});
+
 describe("extractFromProgram — interface merged with a namespace of the same name", () => {
   const IFACE = `
     /** @noRailsEquivalent duck-typed collaborator shape */

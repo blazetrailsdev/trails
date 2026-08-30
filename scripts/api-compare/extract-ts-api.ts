@@ -665,7 +665,21 @@ export function extractFromProgram(
         if (!isExported(node)) return;
         const name = node.name.text;
         const modKey = `${relPath}:${name}`;
-        const extracted = extractNamespace(node, checker, relPath);
+        const nestedNamespaces: ClassInfo[] = [];
+        const extracted = extractNamespace(node, checker, relPath, nestedNamespaces);
+        for (const ns of nestedNamespaces) {
+          const nsKey = `${relPath}:${ns.name}`;
+          const prior = info.modules[nsKey];
+          if (prior) {
+            const priorNames = new Set(prior.instanceMethods.map((m) => m.name));
+            for (const m of ns.instanceMethods) {
+              if (!priorNames.has(m.name)) prior.instanceMethods.push(m);
+            }
+            prior.declaredAsNamespace = true;
+          } else {
+            info.modules[nsKey] = ns;
+          }
+        }
         if (node.body && ts.isModuleBlock(node.body)) {
           for (const stmt of node.body.statements) {
             if (!ts.isClassDeclaration(stmt) || !stmt.name || !isExported(stmt)) continue;
@@ -2778,10 +2792,23 @@ function extractInterface(
   };
 }
 
+/**
+ * `nested` collects every `export namespace` declared INSIDE this one, so the
+ * caller can register it as a file-level entity of its own.
+ *
+ * Ruby nests a module in a module wherever a Concern spells its class-method
+ * half (`module ClassMethods` inside `module Configurable`,
+ * activesupport/lib/active_support/configurable.rb:28), and the settled trails
+ * mixin idiom ports that shape literally. Without the recursion those members
+ * are surface the walker never reaches: `Configurable::ClassMethods#configure`
+ * and `#config_accessor` read as MISSING against a file that declares both,
+ * penalising the faithful layout and rewarding hoisting them out (RFC 0126).
+ */
 function extractNamespace(
   node: ts.ModuleDeclaration,
   checker: ts.TypeChecker,
   file: string,
+  nested: ClassInfo[] = [],
 ): ClassInfo {
   const name = node.name.text;
   const instanceMethods: MethodInfo[] = [];
@@ -2799,6 +2826,8 @@ function extractNamespace(
           file,
           ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
         });
+      } else if (ts.isModuleDeclaration(stmt) && stmt.name && isExported(stmt)) {
+        nested.push(extractNamespace(stmt, checker, file, nested));
       } else if (ts.isVariableStatement(stmt) && isExported(stmt)) {
         const line = stmt.getSourceFile().getLineAndCharacterOfPosition(stmt.getStart()).line + 1;
         // JSDoc attaches to the statement, not the individual declarator.
