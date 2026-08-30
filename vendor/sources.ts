@@ -251,6 +251,56 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "ruby",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/ruby.git",
+      // The MRI interpreter itself, vendored as the read-anchor for every
+      // ruby-compat port that cites C source by symbol —
+      // `packages/date/src/date.ts` (`rational.c` `nurat_s_canonicalize_internal`,
+      // `nurat_add`, `float_to_r`), `packages/activesupport/src/range-ext.ts`
+      // (`range.c` `range_include_internal`, `str_upto_each`),
+      // `packages/activesupport/src/core-ext/regexp.ts` (`re.c`
+      // `rb_reg_s_quote`), `rb-equal.ts` (`object.c` `rb_equal`). None of it
+      // was checkable in-tree before this entry.
+      //
+      // Pinned to 3.3.11 because that is the build every existing citation was
+      // written against: `.github/workflows/ci.yml:1413,1686,1799` pin
+      // `ruby-version: "3.3"`, the host toolchain is
+      // `ruby 3.3.11 (2026-03-26 revision 1f2d15125a)` — the SHA this ref
+      // resolves to — and `packages/date/src/date.ts:1229-1231` writes its
+      // behavioural claim as "on ruby 3.3.11 `(Rational(1,2) * 12).class` is
+      // `Rational`". Pinning any other ref makes those citations unverifiable.
+      // The `date` gem above keeps its own `v3.4.1` ref: interpreter and gem
+      // refs move independently.
+      ref: "v3_3_11",
+    },
+    packages: [
+      {
+        name: "ruby",
+        // The read-anchor is the C at the repo root (`rational.c`, `range.c`,
+        // `re.c`, `object.c`); `lib` is the Ruby-visible stdlib and is what
+        // verifyPackages checks the clone actually laid down.
+        libPath: "lib",
+        // ruby/ruby mirrors the ruby/spec suite in-tree, so this one source
+        // serves both the C read-anchor and the behavioural suite RFC
+        // 0129-ruby-compat's `ruby-spec-behavioural-enrollment` story needs —
+        // no separate `ruby/spec` clone (which RFC 0089 had planned).
+        testPath: "spec/ruby",
+        // Vendored as a read-anchor only, the way `date` above is. MRI's
+        // surface is C, so `scripts/api-compare/extract-ruby-api.rb` — which
+        // globs `**/*.rb` — extracts nothing from the files every citation
+        // points at, and there is no `packages/ruby/src` workspace dir for the
+        // comparator to key a package to. `compareTests` stays off until the
+        // `ruby-spec-behavioural-enrollment` story wires `spec/ruby` in;
+        // ruby/spec is mspec, not minitest, so the extractor has to learn it
+        // first.
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "i18n",
     origin: {
       type: "git",

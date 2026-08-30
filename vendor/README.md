@@ -11,6 +11,35 @@ schema-parity tooling.
 - `sources.lock.json` (committed, wave 2) records resolved git SHAs for
   reproducibility.
 
+## `vendor/ruby/` — the MRI read-anchor
+
+`vendor/ruby/` is a clone of `ruby/ruby` pinned to **`v3_3_11`**
+(`1f2d15125a2dc701e1822ed2900eb17899500ec7`). It exists so the MRI C symbols
+that the ruby-compat ports cite are readable in-tree — `rational.c`
+(`nurat_s_canonicalize_internal`, `nurat_add`, `float_to_r`), `range.c`
+(`range_include_internal`, `str_upto_each`), `re.c` (`rb_reg_s_quote`),
+`object.c` (`rb_equal`).
+
+The pin is 3.3.11 because that is the build the existing citations were written
+against: `.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`,
+the host toolchain is `ruby 3.3.11 (2026-03-26 revision 1f2d15125a)`, and
+`packages/date/src/date.ts:1229-1231` states its behavioural claim as "on ruby
+3.3.11". The `date` gem keeps its own `v3.4.1` ref; interpreter and gem refs
+move independently.
+
+It is **never enrolled in `parity:api`** (`compareApi: false`) — MRI's surface
+is C and `extract-ruby-api.rb` globs `**/*.rb`, so it would extract nothing
+from the files every citation points at, and there is no `packages/ruby/src`
+workspace dir to key a package onto. `compareTests` is off too, pending the
+RFC 0129-ruby-compat `ruby-spec-behavioural-enrollment` story, which enrolls
+the in-tree `spec/ruby/` mirror of the ruby/spec suite (which is why no
+separate `ruby/spec` clone is needed).
+
+**Clone cost:** a `--depth=1` clone of `v3_3_11` is **130 MiB** on disk (20 MiB
+of it `.git`) and takes ~5-8s — smaller than `vendor/rails` at 225 MiB, and
+each worktree symlinks it rather than re-cloning. No `--filter=blob:none` or
+sparse checkout is needed, so `fetch.ts` is unchanged.
+
 ## Scoping a Rails bump (drift report)
 
 We pin `rails` to one tag in `sources.ts` (today `v8.0.2`) while upstream moves

@@ -78,6 +78,35 @@ describe("vendor/sources.ts", () => {
     expect(resolvePath("date", "test").endsWith("vendor/date/test/date")).toBe(true);
   });
 
+  it("declares the ruby source, vendored as a read-anchor only", () => {
+    // MRI is vendored so the C symbols cited across the ruby-compat ports
+    // (rational.c, range.c, re.c, object.c) are readable in-tree. Both compare
+    // flags stay off: the extractor globs `**/*.rb` and sees none of that C,
+    // and there is no `packages/ruby/src` for a package to key onto.
+    const ruby = SOURCES.find((s) => s.name === "ruby");
+    expect(ruby).toBeDefined();
+    expect(ruby!.origin).toEqual({
+      type: "git",
+      url: "https://github.com/ruby/ruby.git",
+      ref: "v3_3_11",
+    });
+    expect(ruby!.packages).toEqual([
+      {
+        name: "ruby",
+        libPath: "lib",
+        testPath: "spec/ruby",
+        compareApi: false,
+        compareTests: false,
+      },
+    ]);
+    expect(apiComparePackages()).not.toContain("ruby");
+    expect(Object.keys(libPathsManifest())).not.toContain("ruby");
+    expect(Object.keys(testPathsManifest())).not.toContain("ruby");
+    expect(resolvePath("ruby").endsWith("vendor/ruby/lib")).toBe(true);
+    expect(resolvePath("ruby", "test").endsWith("vendor/ruby/spec/ruby")).toBe(true);
+    expect(vendoredRoot("ruby").endsWith("vendor/ruby")).toBe(true);
+  });
+
   it("declares the i18n source, enrolled in both api-compare and test-compare", () => {
     const i18n = SOURCES.find((s) => s.name === "i18n");
     expect(i18n).toBeDefined();
