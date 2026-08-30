@@ -1,3 +1,4 @@
+import { ValueType } from "@blazetrails/activemodel";
 import { quotingHost } from "../../support/quoting-host.js";
 import {
   BinaryData,
@@ -246,15 +247,16 @@ ActiveRecord.raiseIntWiderThan64bit to false.
 
   it("lookupCastTypeFromColumn forwards oid/fmod/sqlType to the type map", () => {
     const calls: Array<[number, number, string]> = [];
+    const sentinel = new ValueType();
     const typeMap = {
       lookup(oid: number, fmod: number, sqlType: string) {
         calls.push([oid, fmod, sqlType]);
-        return { sentinel: true };
+        return sentinel;
       },
     };
     const column = { oid: 23, fmod: -1, sqlType: "integer" };
 
-    expect(lookupCastTypeFromColumn.call({ typeMap }, column)).toEqual({ sentinel: true });
+    expect(lookupCastTypeFromColumn.call({ typeMap }, column)).toBe(sentinel);
     expect(calls).toEqual([[23, -1, "integer"]]);
   });
 

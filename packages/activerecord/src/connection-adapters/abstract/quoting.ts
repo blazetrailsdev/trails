@@ -139,13 +139,13 @@ export function castBoundValue(value: unknown): unknown {
 
 export interface QuotingHost {
   /** @internal */
-  lookupCastType(sqlType: string | null): unknown;
+  lookupCastType(sqlType: string | null): Type;
 }
 
 export function lookupCastTypeFromColumn(
   this: QuotingHost,
   column: { sqlType: string | null },
-): unknown {
+): Type {
   return this.lookupCastType(column.sqlType);
 }
 
@@ -169,7 +169,7 @@ export function quoteDefaultExpression(
   if (typeof value === "function") {
     return (value as () => unknown)() as string;
   }
-  const castType = this.lookupCastType(column.sqlType ?? null) as Type;
+  const castType = this.lookupCastType(column.sqlType ?? null);
   return this.quote(castType.serialize(value));
 }
 

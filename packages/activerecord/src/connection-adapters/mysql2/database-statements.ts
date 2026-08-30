@@ -254,7 +254,7 @@ export async function performQuery(
 
 /** @internal */
 export function castResult(
-  this: { lookupCastType(sqlType: string): Type | Promise<Type> | null },
+  this: { lookupCastType(sqlType: string): Type },
   rawResult: Mysql2RawResult,
 ): Result {
   if (rawResult.rows == null) return Result.empty();
@@ -267,7 +267,7 @@ export function castResult(
       : new Result(
           fields.map((f) => f.name),
           rawResult.rows,
-          buildColumnTypes(fields, (t) => this.lookupCastType(t) as Type),
+          buildColumnTypes(fields, (t) => this.lookupCastType(t)),
         );
 
   freeRawResult(rawResult);

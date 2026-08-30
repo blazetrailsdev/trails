@@ -1,7 +1,13 @@
-import { BinaryData, DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
+import {
+  BinaryData,
+  DateInfinity,
+  DateNegativeInfinity,
+  type Type,
+} from "@blazetrails/activemodel";
 import { ActiveRecord } from "../../ar-config.js";
 import {
   quote as abstractQuote,
+  lookupCastType as abstractLookupCastType,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
   quotedDate as abstractQuotedDate,
   type TemporalDateLike,
@@ -43,7 +49,7 @@ export interface DefaultExpressionColumn {
 
 export interface CastTypeLookupHost {
   lookupCastTypeFromColumn(column: DefaultExpressionColumn): { serialize(value: unknown): unknown };
-  lookupCastType(sqlType: string | null): unknown;
+  lookupCastType(sqlType: string | null): Type;
 }
 
 const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
@@ -209,7 +215,7 @@ export function columnNameWithOrderMatcher(): RegExp {
 }
 
 export interface LookupableTypeMap {
-  lookup(oid: number, fmod: number, sqlType: string): unknown;
+  lookup(oid: number, fmod: number, sqlType: string): Type;
 }
 
 export interface CastableColumn {
@@ -218,10 +224,25 @@ export interface CastableColumn {
   sqlType?: string | null;
 }
 
+/**
+ * @internal
+ * @missingRailsCall query_value — PERMANENT
+ * @missingRailsCall quote — PERMANENT
+ */
+export function lookupCastType(this: { typeMap: LookupableTypeMap }, sqlType: string | null): Type {
+  if (typeof sqlType === "string") {
+    sqlType = sqlType
+      .replace(/\([^)]*\)/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  return abstractLookupCastType.call(this as never, sqlType);
+}
+
 export function lookupCastTypeFromColumn(
   this: { typeMap: LookupableTypeMap },
   column: CastableColumn,
-): unknown {
+): Type {
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 
