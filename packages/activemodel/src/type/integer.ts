@@ -5,7 +5,7 @@ import { applyNumericMixin, isNonNumericString } from "./helpers/numeric.js";
 
 const DEFAULT_LIMIT = 4;
 
-const NumericValueType = applyNumericMixin(ValueType<number>);
+const NumericValueType = applyNumericMixin(ValueType<number | bigint>);
 
 export class IntegerType extends NumericValueType {
   readonly name: string = "integer";
@@ -18,7 +18,7 @@ export class IntegerType extends NumericValueType {
     return this.name;
   }
 
-  deserialize(value: unknown): number | null {
+  deserialize(value: unknown): number | bigint | null {
     if (isBlank(value)) return null;
     return this.castValue(value);
   }
@@ -28,12 +28,12 @@ export class IntegerType extends NumericValueType {
     return this.ensureInRange(this.cast(value));
   }
 
-  serializeCastValue(value: number | null): number | null {
-    return this.ensureInRange(value) as number | null;
+  serializeCastValue(value: number | bigint | null): number | bigint | null {
+    return this.ensureInRange(value);
   }
 
   isSerializable(value: unknown, block?: (castValue: unknown) => void): boolean {
-    const castValue = this.cast(value) as number | bigint | null;
+    const castValue = this.cast(value);
     if (this.isInRange(castValue)) return true;
     block?.(castValue);
     return false;
@@ -61,7 +61,7 @@ export class IntegerType extends NumericValueType {
   }
 
   /** @internal */
-  protected castValue(value: unknown): number | null {
+  protected castValue(value: unknown): number | bigint | null {
     if (typeof value === "number") {
       if (!isFinite(value)) return null;
       return Math.trunc(value);
@@ -105,8 +105,8 @@ export class IntegerType extends NumericValueType {
   }
 
   /** @internal */
-  protected narrowBigInt(value: bigint): number {
+  protected narrowBigInt(value: bigint): number | bigint {
     const num = Number(value);
-    return Number.isSafeInteger(num) ? num : (value as unknown as number);
+    return Number.isSafeInteger(num) ? num : value;
   }
 }

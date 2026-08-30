@@ -1,0 +1,44 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-statements.ts",
+    "rubyName": "column_names_from_column_numbers",
+    "call": "values_at",
+    "reason": "Ruby `Hash#values_at(*column_numbers)` (schema_statements.rb:1153) has no JS builtin; the port indexes a Map by the same column numbers, in the same order."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-statements.ts",
+    "rubyName": "columns_for_distinct",
+    "call": "order:join,map",
+    "reason": "Rails builds `order_columns` with `compact_blank.map{}.compact_blank.map.with_index{}` (schema_statements.rb:869-876); JS has no `compact_blank`, so the port interleaves `filter` between the two `map`s and the call order differs while the produced list does not."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-statements.ts",
+    "rubyName": "exclusion_constraint_name",
+    "call": "first",
+    "reason": "Ruby `String#first(10)` on the SHA256 hexdigest (schema_statements.rb:1082) is `String#slice(0, 10)` in JS."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-statements.ts",
+    "rubyName": "unique_constraint_name",
+    "call": "first",
+    "reason": "Ruby `String#first(10)` on the SHA256 hexdigest (schema_statements.rb:1102) is `String#slice(0, 10)` in JS."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-statements.ts",
+    "rubyName": "unique_constraint_name",
+    "call": "map",
+    "reason": "Ruby `Array(options[:column] || options[:using_index]).map(&:to_s)` (schema_statements.rb:1100); the port has no Symbol arm to stringify, so `Array()`'s JS spelling is the wrapping ternary and the `map` falls away."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-statements.ts",
+    "rubyName": "unique_constraints",
+    "call": "delete",
+    "reason": "Ruby `String#delete(\"{}\")` on the `conkey` array literal (schema_statements.rb:709) is `String#replace(/[{}]/g, \"\")` in JS."
+  }
+]

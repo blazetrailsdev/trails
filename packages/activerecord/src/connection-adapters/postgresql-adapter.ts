@@ -74,7 +74,7 @@ import {
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
-import { SchemaStatements } from "./postgresql/schema-statements-class.js";
+import { SchemaStatements, type CreateDatabaseOptions } from "./postgresql/schema-statements.js";
 import type { SchemaStatements as AbstractSchemaStatements } from "./abstract/schema-statements.js";
 import type {
   CommentOrChanges,
@@ -118,7 +118,6 @@ import {
   performQuery as pgPerformQuery,
   returningColumnValues as pgReturningColumnValues,
 } from "./postgresql/database-statements.js";
-import type { CreateDatabaseOptions } from "./postgresql/schema-statements.js";
 import {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,

@@ -330,6 +330,23 @@ it("fixture pin survives across execution contexts (vitest beforeEach/afterEach)
   }
 });
 
+it("fixture pin holds a leased connection", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    const established = await pool.checkout();
+    pool.checkin(established);
+    expect(established.inUse).toBe(false);
+
+    await withExecutionContext(async () => {
+      await pool.pinConnectionBang({ fixture: true });
+      expect((await pool.checkout()).inUse).toBe(true);
+      await pool.unpinConnectionBang();
+    });
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
 it("context pin takes priority over fixture pin in unpin", async () => {
   const pool = makeAmbientPool({ pool: 5 });
   try {

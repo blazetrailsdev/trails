@@ -1443,9 +1443,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(def!.default).toBe(99);
     });
 
-    it("returns undefined when column does not exist", async () => {
-      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "nonexistent", 42);
-      expect(def).toBeUndefined();
+    it("raises when column does not exist", async () => {
+      await expect(
+        adapter.buildChangeColumnDefaultDefinition("bcd_test", "nonexistent", 42),
+      ).rejects.toThrow("No such column: bcd_test.nonexistent");
     });
   });
 

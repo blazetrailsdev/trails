@@ -478,8 +478,7 @@ export class ConnectionPool implements ReapablePool {
     let pin: { connection: DatabaseAdapter; depth: number } | undefined =
       slot === "fixture" ? (this._fixturePin ?? undefined) : this._pinnedConnections.get(ctxId);
 
-    const fixtureSharedConnection = slot === "fixture" ? (this._connections?.[0] ?? null) : null;
-    const leasedConnection = fixtureSharedConnection ?? this.connectionLease().connection;
+    const leasedConnection = this.connectionLease().connection;
     const connection = pin?.connection ?? leasedConnection ?? (await this.checkout());
     const newlyCheckedOut = !pin && leasedConnection == null;
 
