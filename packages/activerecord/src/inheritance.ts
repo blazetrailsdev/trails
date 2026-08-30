@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { modelRegistry, registerModelConstant } from "./associations.js";
-import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
+import { NameError, SubclassNotFound } from "./errors.js";
 import {
   camelize,
   constantize,
@@ -502,23 +502,12 @@ export function typeCondition(
   modelClass: typeof Base,
   table: any = (modelClass as any).arelTable,
 ): any {
-  const inheritCol = modelClass.inheritanceColumn;
-  if (inheritCol === null) {
-    throw new ActiveRecordError("Cannot build type condition without an inheritance column");
-  }
-  if (!table) throw new ActiveRecordError("Cannot build type condition without arel table");
-
-  const stiColumn = typeof table.get === "function" ? table.get(inheritCol) : table[inheritCol];
+  const stiColumn = table.get(modelClass.inheritanceColumn);
   const stiNames = ([modelClass] as (typeof Base)[])
     .concat(modelClass.descendants)
     .map((klass) => stiName(klass));
 
-  const predicateBuilder = (modelClass as any).predicateBuilder;
-  if (predicateBuilder && predicateBuilder.build) {
-    return predicateBuilder.build(stiColumn, stiNames);
-  }
-
-  return stiColumn.in(stiNames);
+  return (modelClass as any).predicateBuilder.build(stiColumn, stiNames);
 }
 
 /** @internal */

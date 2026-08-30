@@ -1573,11 +1573,7 @@ export class AbstractAdapter implements Quoting {
 
   async renameEnumValue(..._args: unknown[]): Promise<void> {}
 
-  async createVirtualTable(
-    _name: string,
-    _optionsOrModuleName?: unknown,
-    _values?: unknown,
-  ): Promise<void> {}
+  async createVirtualTable(..._args: unknown[]): Promise<void> {}
 
   async dropVirtualTable(_name: string): Promise<void> {}
 

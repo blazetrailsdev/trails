@@ -1012,26 +1012,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override async createVirtualTable(
     tableName: string,
-    moduleName?: unknown,
-    values?: unknown,
+    moduleName: string,
+    values: string[],
   ): Promise<void> {
-    const opts =
-      moduleName !== null && typeof moduleName === "object" && !Array.isArray(moduleName)
-        ? (moduleName as Record<string, unknown>)
-        : undefined;
-
-    const modName = opts?.moduleName ?? (opts ? undefined : moduleName);
-    const virtualValues = opts?.values ?? values;
-
-    const mod = String(modName ?? "");
-    const safeIdent = /^[A-Za-z_][A-Za-z0-9_]*$/;
-    if (!safeIdent.test(mod)) {
-      throw new Error("moduleName must be a valid SQLite identifier");
-    }
-    const args = Array.isArray(virtualValues) ? virtualValues.map(String) : [];
-    const rawArgs = args.join(", ");
     await this.execQuery(
-      `CREATE VIRTUAL TABLE IF NOT EXISTS ${quoteTableName(tableName)} USING ${mod}(${rawArgs})`,
+      `CREATE VIRTUAL TABLE IF NOT EXISTS ${tableName} USING ${moduleName} (${values.join(", ")})`,
     );
   }
 
