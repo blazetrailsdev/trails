@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { Migration as ActiveRecordMigration, Migrator, type MigrationProxy } from "../migration.js";
-import { SchemaMigration } from "../schema-migration.js";
-import { InternalMetadata } from "../internal-metadata.js";
+import type { SchemaMigration } from "../schema-migration.js";
+import type { InternalMetadata } from "../internal-metadata.js";
 
 class MigrationStruct {
   constructor(
@@ -27,11 +27,10 @@ describe("Migration", () => {
     let internalMetadata: InternalMetadata;
 
     beforeEach(async () => {
-      const pool = Base.connectionPool();
-      schemaMigration = new SchemaMigration(pool);
+      schemaMigration = Base.connectionPool().schemaMigration;
       await schemaMigration.createTable();
       await schemaMigration.deleteAllVersions();
-      internalMetadata = new InternalMetadata(pool);
+      internalMetadata = Base.connectionPool().internalMetadata;
     });
 
     afterEach(async () => {
