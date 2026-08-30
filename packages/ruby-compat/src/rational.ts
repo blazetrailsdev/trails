@@ -1,14 +1,26 @@
+/**
+ * Ruby's `Rational` (`vendor/ruby/rational.c:481` `nurat_s_canonicalize_internal`)
+ * and the `Kernel#Rational()` conversion function beside it
+ * (`vendor/ruby/rational.c:2691` `nurat_s_convert`). Ruby has both spellings
+ * and Rails calls the function, so both ship here.
+ */
+
 /** Ruby core `ZeroDivisionError`, what `rb_num_zerodiv`
  * (`vendor/ruby/numeric.c:206`) raises for a denominator of zero.
  *
  * @noRailsEquivalent PERMANENT — Ruby core; Rails defines no such error. */
 export class ZeroDivisionError extends Error {
-  constructor(message = "divided by 0") {
+  constructor(message: string) {
     super(message);
     this.name = "ZeroDivisionError";
   }
 }
 
+/** @internal Ruby core `FloatDomainError`, a `RangeError`
+ * (`vendor/ruby/numeric.c:6155`). `float_decode_internal`
+ * (`vendor/ruby/rational.c:2168`) refuses a non-finite Float with it, with the
+ * Float's own `to_s` as the message: on ruby 3.3.11
+ * `Rational(Float::INFINITY, 1)` is `FloatDomainError: Infinity`. */
 class FloatDomainError extends RangeError {
   constructor(message: string) {
     super(message);
@@ -246,6 +258,6 @@ export class Rational {
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Rational()`, which Rails
  * calls and does not define. */
-export function rational(num: number | bigint, den: number | bigint = 1): Rational {
-  return new Rational(num, den);
+export function rational(numv: number | bigint, denv: number | bigint = 1): Rational {
+  return new Rational(numv, denv);
 }

@@ -225,7 +225,6 @@ export const Extensions = {
   },
 
   writeRational(rational: Rational, packer: Packer): void {
-    // msgpack carries a JS number, where Ruby's Integer needs no narrowing.
     packer.write(Number(rational.numerator));
     if (rational.numerator !== 0n) packer.write(Number(rational.denominator));
   },
