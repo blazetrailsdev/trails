@@ -12,9 +12,9 @@ import {
 } from "@blazetrails/activemodel";
 
 describe("ValueType<T> type parameter flows into concrete subclasses", () => {
-  it("IntegerType#cast narrows to number | null", () => {
+  it("IntegerType#cast narrows to number | bigint | null", () => {
     const t = new IntegerType();
-    expectTypeOf(t.cast(0)).toEqualTypeOf<number | null>();
+    expectTypeOf(t.cast(0)).toEqualTypeOf<number | bigint | null>();
   });
 
   it("BooleanType#cast narrows to boolean | null", () => {
