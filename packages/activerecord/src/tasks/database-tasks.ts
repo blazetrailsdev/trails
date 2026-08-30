@@ -1,4 +1,3 @@
-import { DatabaseConfig } from "../database-configurations/database-config.js";
 import type { DatabaseConfigOptions } from "../database-configurations/database-config.js";
 import {
   DatabaseConfigurations,
@@ -141,7 +140,7 @@ export class DatabaseTasks {
 
   /** @internal */
   private static databaseAdapterFor(
-    dbConfig: DatabaseConfig,
+    dbConfig: HashConfig,
     ...args: unknown[]
   ): DatabaseTaskInstance {
     const klass = this.classForAdapter(dbConfig.adapter);
@@ -151,7 +150,7 @@ export class DatabaseTasks {
 
     const config = converted ? dbConfig : dbConfig.configurationHash;
     const ctor = klass as unknown as new (
-      config: DatabaseConfig | DatabaseConfigOptions,
+      config: HashConfig | DatabaseConfigOptions,
       ...args: unknown[]
     ) => DatabaseTaskInstance;
     return new ctor(config, ...args);
@@ -161,9 +160,7 @@ export class DatabaseTasks {
     this._registeredTasks = [];
   }
 
-  static async create(
-    configuration: DatabaseConfig | string | Record<string, unknown>,
-  ): Promise<void> {
+  static async create(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
     const { DatabaseAlreadyExists } = await import("../errors.js");
     try {
@@ -186,7 +183,7 @@ export class DatabaseTasks {
   }
 
   static async createAll(): Promise<void> {
-    const dbConfig = this.migrationConnection().pool.dbConfig as DatabaseConfig;
+    const dbConfig = this.migrationConnection().pool.dbConfig as HashConfig;
 
     for (const dbConfig of this.eachLocalConfiguration()) {
       await this.create(dbConfig);
@@ -203,9 +200,7 @@ export class DatabaseTasks {
     await this.migrationClass().establishConnection(environment);
   }
 
-  static async drop(
-    configuration: DatabaseConfig | string | Record<string, unknown>,
-  ): Promise<void> {
+  static async drop(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
     const { NoDatabaseError } = await import("../errors.js");
     try {
@@ -291,9 +286,7 @@ export class DatabaseTasks {
     return this.migrationClass().connectionPool().leaseConnection();
   }
 
-  static async purge(
-    configuration: DatabaseConfig | string | Record<string, unknown>,
-  ): Promise<void> {
+  static async purge(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(dbConfig);
     if (handler.purge) {
@@ -328,7 +321,7 @@ export class DatabaseTasks {
   }
 
   static async charset(
-    configuration: DatabaseConfig | string | Record<string, unknown>,
+    configuration: HashConfig | string | Record<string, unknown>,
   ): Promise<string | null> {
     const dbConfig = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(dbConfig);
@@ -350,7 +343,7 @@ export class DatabaseTasks {
   }
 
   static async collation(
-    configuration: DatabaseConfig | string | Record<string, unknown>,
+    configuration: HashConfig | string | Record<string, unknown>,
   ): Promise<string | null> {
     const dbConfig = this.resolveConfiguration(configuration);
     const handler = this.databaseAdapterFor(dbConfig);
@@ -386,7 +379,7 @@ export class DatabaseTasks {
     }
   }
 
-  static dumpSchemaFilename(dbConfig?: DatabaseConfig, format?: SchemaFormat): string {
+  static dumpSchemaFilename(dbConfig?: HashConfig, format?: SchemaFormat): string {
     const envSchema = getEnv("SCHEMA");
     if (envSchema !== undefined) return envSchema;
     const fmt = format ?? this.schemaFormat;
@@ -424,30 +417,30 @@ export class DatabaseTasks {
     envName?: string;
     name: string;
     includeHidden?: boolean;
-  }): DatabaseConfig | undefined;
+  }): HashConfig | undefined;
   /** @internal */
   static configsFor(options?: {
     envName?: string;
     name?: undefined;
     includeHidden?: boolean;
-  }): DatabaseConfig[];
+  }): HashConfig[];
   /** @internal */
   static configsFor(
     options: { envName?: string; name?: string; includeHidden?: boolean } = {},
-  ): DatabaseConfig[] | DatabaseConfig | undefined {
+  ): HashConfig[] | HashConfig | undefined {
     return baseClass()
       .configurations()
       .configsFor(options as { name: string });
   }
 
   /** @internal */
-  private static resolveConfiguration(configuration: unknown): DatabaseConfig {
+  private static resolveConfiguration(configuration: unknown): HashConfig {
     return baseClass().configurations().resolve(configuration);
   }
 
   /** @internal */
-  private static eachCurrentConfiguration(environment: string, name?: string): DatabaseConfig[] {
-    const results: DatabaseConfig[] = [];
+  private static eachCurrentConfiguration(environment: string, name?: string): HashConfig[] {
+    const results: HashConfig[] = [];
     for (const env of eachCurrentEnvironment(environment)) {
       for (const dbConfig of this.configsFor({ envName: env })) {
         if (name != null && name !== dbConfig.name) continue;
@@ -463,8 +456,8 @@ export class DatabaseTasks {
   }
 
   /** @internal */
-  static eachLocalConfiguration(): DatabaseConfig[] {
-    const result: DatabaseConfig[] = [];
+  static eachLocalConfiguration(): HashConfig[] {
+    const result: HashConfig[] = [];
     for (const dbConfig of configurationsStore().configsFor()) {
       if (!dbConfig.database) continue;
       if (this.isLocalDatabase(dbConfig)) {
@@ -479,19 +472,16 @@ export class DatabaseTasks {
   }
 
   /** @internal */
-  private static isLocalDatabase(dbConfig: DatabaseConfig): boolean {
+  private static isLocalDatabase(dbConfig: HashConfig): boolean {
     const host = dbConfig.host;
     return isBlank(host) || this.LOCAL_HOSTS.includes(host as string);
   }
 
-  static cacheDumpFilename(
-    dbConfig: DatabaseConfig,
-    options?: { schemaCachePath?: string },
-  ): string {
+  static cacheDumpFilename(dbConfig: HashConfig, options?: { schemaCachePath?: string }): string {
     return (
       options?.schemaCachePath ||
       dbConfig.schemaCachePath ||
-      (dbConfig as HashConfig).defaultSchemaCachePath(this.dbDir)
+      dbConfig.defaultSchemaCachePath(this.dbDir)
     );
   }
 
@@ -555,7 +545,7 @@ export class DatabaseTasks {
   }
 
   static async structureDump(
-    configuration: DatabaseConfig | string | Record<string, unknown>,
+    configuration: HashConfig | string | Record<string, unknown>,
     ...args: unknown[]
   ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
@@ -569,7 +559,7 @@ export class DatabaseTasks {
   }
 
   static async structureLoad(
-    configuration: DatabaseConfig | string | Record<string, unknown>,
+    configuration: HashConfig | string | Record<string, unknown>,
     ...args: unknown[]
   ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration);
@@ -608,7 +598,7 @@ export class DatabaseTasks {
     return structureLoadFlags;
   }
 
-  static schemaDumpPath(dbConfig?: DatabaseConfig, format?: SchemaFormat): string | null {
+  static schemaDumpPath(dbConfig?: HashConfig, format?: SchemaFormat): string | null {
     const envSchema = getEnv("SCHEMA");
     if (envSchema !== undefined) return envSchema;
 
@@ -643,7 +633,7 @@ export class DatabaseTasks {
   }
 
   static async dumpSchema(
-    dbConfig: DatabaseConfig,
+    dbConfig: HashConfig,
     format: SchemaFormat = DatabaseTasks.schemaFormat,
   ): Promise<void> {
     const rawFilename = this.schemaDumpPath(dbConfig, format);
@@ -672,7 +662,7 @@ export class DatabaseTasks {
 
   /** @missingRailsCall load — PERMANENT */
   static async loadSchema(
-    dbConfig: DatabaseConfig,
+    dbConfig: HashConfig,
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
@@ -716,7 +706,7 @@ export class DatabaseTasks {
     }
   }
 
-  private static async _stampSchemaSha1(dbConfig: DatabaseConfig, filename: string): Promise<void> {
+  private static async _stampSchemaSha1(dbConfig: HashConfig, filename: string): Promise<void> {
     if (!dbConfig.useMetadataTable) return;
     try {
       const adapter = await this._migrationAdapter();
@@ -802,7 +792,7 @@ export class DatabaseTasks {
   static async prepareAll(): Promise<void> {
     const env = this._normalizeEnv();
     let seed = false;
-    const dumpDbConfigs: DatabaseConfig[] = [];
+    const dumpDbConfigs: HashConfig[] = [];
 
     for (const dbConfig of this.eachCurrentConfiguration(env)) {
       const databaseInitialized = await initializeDatabase(dbConfig);
@@ -837,8 +827,8 @@ export class DatabaseTasks {
 
   static async dbConfigsWithVersions(
     environment?: string,
-  ): Promise<Map<string | number, DatabaseConfig[]>> {
-    const dbConfigsWithVersions = new Map<string | number, DatabaseConfig[]>();
+  ): Promise<Map<string | number, HashConfig[]>> {
+    const dbConfigsWithVersions = new Map<string | number, HashConfig[]>();
     environment = this._normalizeEnv(environment);
     await this.withTemporaryPoolForEach({ env: environment }, async (pool) => {
       const dbConfig = pool.dbConfig;
@@ -856,7 +846,7 @@ export class DatabaseTasks {
 
   /** @internal */
   static async withTemporaryPool<T>(
-    dbConfig: DatabaseConfig,
+    dbConfig: HashConfig,
     fn: (pool: ConnectionPool) => Promise<T>,
     { clobber = false }: { clobber?: boolean } = {},
   ): Promise<T> {
@@ -876,7 +866,7 @@ export class DatabaseTasks {
   }
 
   static async withTemporaryConnection<T>(
-    dbConfig: DatabaseConfig,
+    dbConfig: HashConfig,
     fn: (
       adapter: import("../connection-adapters/abstract-adapter.js").AbstractAdapter,
     ) => Promise<T>,
@@ -981,10 +971,7 @@ export class DatabaseTasks {
     return {};
   }
 
-  static forEach(
-    databases: RawConfigurations | DatabaseConfig[],
-    fn: (name: string) => void,
-  ): void {
+  static forEach(databases: RawConfigurations | HashConfig[], fn: (name: string) => void): void {
     const databaseConfigs = new DatabaseConfigurations(databases).configsFor({
       envName: this.env,
     });
@@ -1011,7 +998,7 @@ export class DatabaseTasks {
   }
 
   /** @internal */
-  static async truncateTables(dbConfig: DatabaseConfig): Promise<void> {
+  static async truncateTables(dbConfig: HashConfig): Promise<void> {
     const handler = this.databaseAdapterFor(dbConfig);
     if (handler.truncateAll) {
       await handler.truncateAll();
@@ -1023,7 +1010,7 @@ export class DatabaseTasks {
   }
 
   static async reconstructFromSchema(
-    dbConfig: DatabaseConfig,
+    dbConfig: HashConfig,
     format: SchemaFormat = DatabaseTasks.schemaFormat,
     file?: string,
   ): Promise<void> {
@@ -1104,9 +1091,7 @@ export function eachCurrentEnvironment(environment: string): string[] {
 }
 
 /** @internal */
-export async function checkCurrentProtectedEnvironmentBang(
-  dbConfig: DatabaseConfig,
-): Promise<void> {
+export async function checkCurrentProtectedEnvironmentBang(dbConfig: HashConfig): Promise<void> {
   const { NoDatabaseError } = await import("../errors.js");
   const { EnvironmentMismatchError } = await import("../migration.js");
   await DatabaseTasks.withTemporaryPool(dbConfig, async (pool) => {
@@ -1130,7 +1115,7 @@ export async function checkCurrentProtectedEnvironmentBang(
 }
 
 /** @internal */
-export async function initializeDatabase(dbConfig: DatabaseConfig): Promise<boolean> {
+export async function initializeDatabase(dbConfig: HashConfig): Promise<boolean> {
   const { NoDatabaseError } = await import("../errors.js");
   const { SchemaMigration } = await import("../schema-migration.js");
   return DatabaseTasks.withTemporaryPool(dbConfig, async (pool) => {

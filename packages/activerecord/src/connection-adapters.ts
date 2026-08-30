@@ -13,26 +13,16 @@ const resolvedSyncCache = new Map<string, AdapterClass>();
 const resolveErrors = new Map<string, unknown>();
 
 /**
- * Synchronous companion to `resolve(name)`. Returns the adapter class if it
- * has been resolved at least once (via `resolve()`), or null. Used by
- * `db_config.new_connection`, which is synchronous as Rails' is.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE Ruby's ConnectionAdapters.resolve (connection_adapters.rb:34-39) is synchronous because `require` is; retires with the pool async convergence.
+ * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
  */
 export function resolveSync(adapterName: string): AdapterClass | null {
   return resolvedSyncCache.get(adapterName) ?? null;
 }
 
 /**
- * Returns the rejection from a prior `resolve()` call for this adapter
- * name, or null if no failure was recorded. Lets sync entry points
- * (`ConnectionPool.newConnection` → `dbConfig.newConnection`) surface the
- * original failure cause (AdapterNotFound, import error, etc.) instead of
- * a generic "not pre-resolved" message.
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE surfaces the failure Ruby's synchronous resolve raises in place (connection_adapters.rb:34-39); retires with the same convergence.
+ * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
  */
 export function resolveSyncError(adapterName: string): unknown | null {
   return resolveErrors.get(adapterName) ?? null;
@@ -46,27 +36,10 @@ export function register(name: string, loader: AdapterLoader): void {
 }
 
 /**
- * Synchronous half of `resolve(name)` — Rails does this check inline, but
- * trails' sync callers can't await the dynamic import. Raises the same
- * AdapterNotFound `resolve` raises (connection_adapters.rb:34-39).
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the AdapterNotFound check Ruby writes inline in resolve (connection_adapters.rb:34-39), split out for the sync callers.
+ * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
  */
 export function validateAdapterName(adapterName: string): void {
-  if (adapters.has(adapterName)) return;
-  throw new AdapterNotFound(
-    `Database configuration specifies nonexistent '${adapterName}' adapter. ` +
-      `Available adapters are: ${[...adapters.keys()].sort().join(", ")}. ` +
-      `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
-      `adapter package to your package.json if it's not in the list of available adapters.`,
-  );
-}
-
-export async function resolve(adapterName: string): Promise<AdapterClass> {
-  const cached = resolved.get(adapterName);
-  if (cached) return cached;
-
   const loader = adapters.get(adapterName);
   if (!loader) {
     const err = new AdapterNotFound(
@@ -78,6 +51,14 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
     resolveErrors.set(adapterName, err);
     throw err;
   }
+}
+
+export async function resolve(adapterName: string): Promise<AdapterClass> {
+  const cached = resolved.get(adapterName);
+  if (cached) return cached;
+
+  validateAdapterName(adapterName);
+  const loader = adapters.get(adapterName)!;
   const promise = loader()
     .then((klass) => {
       resolvedSyncCache.set(adapterName, klass);

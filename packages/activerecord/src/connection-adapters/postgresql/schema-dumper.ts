@@ -25,11 +25,11 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (this.supportsVirtualColumns && this._isVirtual(column)) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
-      if (column.isEnum) spec["enum_type"] = JSON.stringify(column.sqlType);
+      if (this._isEnum(column)) spec["enum_type"] = JSON.stringify(column.sqlType);
       return { type: JSON.stringify(this.schemaType(column)), ...spec };
     }
 
-    if (column.isEnum) spec["enum_type"] = JSON.stringify(column.sqlType);
+    if (this._isEnum(column)) spec["enum_type"] = JSON.stringify(column.sqlType);
 
     return spec;
   }
@@ -76,13 +76,13 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected isExplicitPrimaryKeyDefault(column: ColumnInfo): boolean {
-    return column.type === "uuid" || (column.type === "integer" && !column.isSerial);
+    return column.type === "uuid" || (column.type === "integer" && !this._isSerial(column));
   }
 
   /** @internal */
   protected override schemaType(column: ColumnInfo): string {
     const isBigSql = /^bigint\b/i.test(column.sqlType ?? "");
-    if (column.isSerial) return isBigSql ? "bigserial" : "serial";
+    if (this._isSerial(column)) return isBigSql ? "bigserial" : "serial";
     if (isBigSql || column.type === "bigint") return "bigint";
     const semantic = column.type ?? undefined;
     if (semantic === "big_integer") return "bigint";
@@ -96,6 +96,18 @@ export class SchemaDumper extends AbstractSchemaDumper {
     return this.schemaType(column);
   }
 
+  private _isEnum(column: ColumnInfo): boolean {
+    return typeof (column as any).isEnum === "function"
+      ? (column as any).isEnum()
+      : (column as any).isEnum === true;
+  }
+
+  private _isSerial(column: ColumnInfo): boolean {
+    return typeof (column as any).isSerial === "function"
+      ? (column as any).isSerial()
+      : (column as any).isSerial === true;
+  }
+
   private _isVirtual(column: ColumnInfo): boolean {
     return typeof (column as any).isVirtual === "function"
       ? (column as any).isVirtual()
@@ -104,7 +116,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override schemaExpression(column: ColumnInfo): string | undefined {
-    if (column.isSerial) return undefined;
+    if (this._isSerial(column)) return undefined;
     return super.schemaExpression(column as any);
   }
 

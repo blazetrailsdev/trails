@@ -208,7 +208,7 @@ class AdapterSchemaSource implements SchemaSource {
         collation: col.collation ?? undefined,
         array: (col as any).array === true ? true : undefined,
         isEnum: col.type === "enum" ? true : undefined,
-        isSerial: (col as any).isSerial === true ? true : undefined,
+        isSerial: (col as any).isSerial?.() === true ? true : undefined,
         comment: col.comment ?? undefined,
         autoIncrement: (col as any).isAutoIncrement?.() || undefined,
         unsigned:

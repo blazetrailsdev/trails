@@ -7,7 +7,7 @@ import {
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import type { DatabaseConfig } from "../database-configurations/database-config.js";
+import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
 
@@ -23,14 +23,14 @@ const SQL_COMMENT_BEGIN = "--";
 type ConfigHash = Record<string, unknown>;
 
 export class PostgreSQLDatabaseTasks {
-  private readonly dbConfig: DatabaseConfig;
+  private readonly dbConfig: HashConfig;
   private readonly configurationHash: ConfigHash;
 
   static usingDatabaseConfigurations(): boolean {
     return true;
   }
 
-  constructor(dbConfig: DatabaseConfig) {
+  constructor(dbConfig: HashConfig) {
     this.dbConfig = dbConfig;
     this.configurationHash = { ...dbConfig.configuration };
   }

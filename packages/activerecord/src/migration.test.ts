@@ -1013,11 +1013,11 @@ describe("MigrationTest", () => {
     await im.dropTable();
 
     const { HashConfig } = await import("./database-configurations/hash-config.js");
-    type Cfg = import("./database-configurations/database-config.js").DatabaseConfig;
+    type Cfg = import("./database-configurations/hash-config.js").HashConfig;
     const pool = adapter.pool as { dbConfig: Cfg };
     const originalDbConfig = pool.dbConfig;
     pool.dbConfig = new HashConfig(originalDbConfig.envName, originalDbConfig.name, {
-      ...originalDbConfig.configuration,
+      ...originalDbConfig.configurationHash,
       useMetadataTable: false,
     });
 

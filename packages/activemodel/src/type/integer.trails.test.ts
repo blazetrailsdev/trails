@@ -36,6 +36,16 @@ describe("IntegerType", () => {
     expect(type.cast({ toString: () => "15" })).toBeNull();
   });
 
+  it("casts to null when to_i raises", () => {
+    expect(
+      type.cast({
+        toI() {
+          throw new Error("boom");
+        },
+      }),
+    ).toBeNull();
+  });
+
   it("serialize truncates a fractional number toward zero", () => {
     expect(type.serialize(10.5)).toBe(10);
     expect(type.serialize(-10.5)).toBe(-10);

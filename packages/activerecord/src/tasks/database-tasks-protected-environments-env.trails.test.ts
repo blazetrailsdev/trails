@@ -10,7 +10,7 @@ import {
   NoEnvironmentInSchemaError,
   ProtectedEnvironmentError,
 } from "../migration.js";
-import type { DatabaseConfig } from "../database-configurations/database-config.js";
+import type { HashConfig } from "../database-configurations/hash-config.js";
 import { adapterType } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 
@@ -116,7 +116,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   }: {
     versions?: string[];
     storedEnv?: string;
-  }): Promise<DatabaseConfig> {
+  }): Promise<HashConfig> {
     const dir = await mkdtemp(join(tmpdir(), "trails-current-protected-env-"));
     dirs.push(dir);
     const dbFile = join(dir, "primary.sqlite3");

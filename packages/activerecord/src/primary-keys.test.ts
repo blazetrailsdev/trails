@@ -339,24 +339,24 @@ describe("PrimaryKeysTest", () => {
     const cols = (await (Base.connection as any).columns("mixed_case_monkeys")) as {
       name: string;
       defaultFunction?: string;
-      isSerial?: boolean;
+      isSerial?: () => boolean;
     }[];
     const col = cols.find((c) => c.name === "monkeyID");
     expect(col).toBeDefined();
     expect(col!.defaultFunction).toBe("nextval('\"mixed_case_monkeys_monkeyID_seq\"'::regclass)");
-    expect(col!.isSerial).toBeTruthy();
+    expect(col!.isSerial!()).toBeTruthy();
   });
 
   it.skipIf(adapterType !== "postgres")("serial with unquoted sequence name", async () => {
     const cols = (await (Base.connection as any).columns("topics")) as {
       name: string;
       defaultFunction?: string;
-      isSerial?: boolean;
+      isSerial?: () => boolean;
     }[];
     const col = cols.find((c) => c.name === "id");
     expect(col).toBeDefined();
     expect(col!.defaultFunction).toBe("nextval('topics_id_seq'::regclass)");
-    expect(col!.isSerial).toBeTruthy();
+    expect(col!.isSerial!()).toBeTruthy();
   });
 });
 

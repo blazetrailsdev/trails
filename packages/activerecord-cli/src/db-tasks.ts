@@ -4,9 +4,7 @@ import { DatabaseTasks, DatabaseConfigurations } from "@blazetrails/activerecord
 import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
 import { withEnvironmentConnection } from "./environment.js";
 
-async function runCreate(
-  config: import("@blazetrails/activerecord").DatabaseConfig,
-): Promise<boolean> {
+async function runCreate(config: import("@blazetrails/activerecord").HashConfig): Promise<boolean> {
   try {
     await DatabaseTasks.create(config);
     return true;
@@ -15,9 +13,7 @@ async function runCreate(
   }
 }
 
-async function runDrop(
-  config: import("@blazetrails/activerecord").DatabaseConfig,
-): Promise<boolean> {
+async function runDrop(config: import("@blazetrails/activerecord").HashConfig): Promise<boolean> {
   try {
     await DatabaseTasks.drop(config);
     return true;

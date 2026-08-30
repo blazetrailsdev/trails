@@ -25,7 +25,7 @@ type DbConfigHandler = (
   name: string,
   url: string | undefined,
   config: DatabaseConfigOptions,
-) => DatabaseConfig | null | undefined;
+) => HashConfig | null | undefined;
 
 /**
  * @internal
@@ -77,9 +77,9 @@ export class DatabaseConfigurations {
     this._defaultEnv = value;
   }
 
-  private _configurations: DatabaseConfig[];
+  private _configurations: HashConfig[];
 
-  constructor(configurations: RawConfigurations | DatabaseConfig[] = {}) {
+  constructor(configurations: RawConfigurations | HashConfig[] = {}) {
     if (Array.isArray(configurations)) {
       this._configurations = configurations;
     } else {
@@ -99,7 +99,7 @@ export class DatabaseConfigurations {
     return this._configurations.length > 0;
   }
 
-  get configurations(): DatabaseConfig[] {
+  get configurations(): HashConfig[] {
     return [...this._configurations];
   }
 
@@ -108,13 +108,13 @@ export class DatabaseConfigurations {
     name: string;
     configKey?: string;
     includeHidden?: boolean;
-  }): DatabaseConfig | undefined;
+  }): HashConfig | undefined;
   configsFor(options?: {
     envName?: string;
     name?: undefined;
     configKey?: string;
     includeHidden?: boolean;
-  }): DatabaseConfig[];
+  }): HashConfig[];
   configsFor(
     options: {
       envName?: string;
@@ -122,7 +122,7 @@ export class DatabaseConfigurations {
       configKey?: string;
       includeHidden?: boolean;
     } = {},
-  ): DatabaseConfig[] | DatabaseConfig | undefined {
+  ): HashConfig[] | HashConfig | undefined {
     const envName =
       options.envName ?? (options.name ? DatabaseConfigurations.defaultEnv : undefined);
     let configs = this.envWithConfigs(envName);
@@ -146,7 +146,7 @@ export class DatabaseConfigurations {
     return configs;
   }
 
-  findDbConfig(env: string): DatabaseConfig | undefined {
+  findDbConfig(env: string): HashConfig | undefined {
     env = String(env);
     const matching = this._configurations.find(
       (c) => c.forCurrentEnv && (c.envName === env || c.name === env),
@@ -161,8 +161,8 @@ export class DatabaseConfigurations {
     return !!firstConfig && name === firstConfig.name;
   }
 
-  resolve(config: unknown): DatabaseConfig {
-    if (config instanceof DatabaseConfig) return config;
+  resolve(config: unknown): HashConfig {
+    if (config instanceof DatabaseConfig) return config as HashConfig;
     if (typeof config === "string") {
       if (symbolConnectionName(config) != null) {
         return this.resolveSymbolConnection(config);
@@ -181,7 +181,7 @@ export class DatabaseConfigurations {
     );
   }
 
-  private buildConfigs(configs: RawConfigurations | DatabaseConfig[]): DatabaseConfig[] {
+  private buildConfigs(configs: RawConfigurations | HashConfig[]): HashConfig[] {
     if (Array.isArray(configs)) return configs;
     const defaultEnv = DatabaseConfigurations.defaultEnv;
 
@@ -216,7 +216,7 @@ export class DatabaseConfigurations {
   }
 
   /** @internal */
-  private envWithConfigs(env?: string): DatabaseConfig[] {
+  private envWithConfigs(env?: string): HashConfig[] {
     if (env) return this._configurations.filter((c) => c.envName === env);
     return this._configurations;
   }
@@ -225,14 +225,14 @@ export class DatabaseConfigurations {
   private walkConfigs(
     envName: string,
     config: Record<string, DatabaseConfigOptions>,
-  ): DatabaseConfig[] {
+  ): HashConfig[] {
     return Object.entries(config).map(([name, subConfig]) =>
       this.buildDbConfigFromRawConfig(envName, name, subConfig),
     );
   }
 
   /** @internal */
-  private resolveSymbolConnection(name: string): DatabaseConfig {
+  private resolveSymbolConnection(name: string): HashConfig {
     const dbConfig = this.findDbConfig(name);
     if (dbConfig) return dbConfig;
     const defaultEnv = DatabaseConfigurations.defaultEnv;
@@ -260,7 +260,7 @@ export class DatabaseConfigurations {
     envName: string,
     name: string,
     config: string | DatabaseConfigOptions,
-  ): DatabaseConfig {
+  ): HashConfig {
     if (typeof config === "string") return this.buildDbConfigFromString(envName, name, config);
     if (typeof config === "object" && config !== null && !Array.isArray(config))
       return this.buildDbConfigFromHash(
@@ -274,7 +274,7 @@ export class DatabaseConfigurations {
   }
 
   /** @internal */
-  private buildDbConfigFromString(envName: string, name: string, config: string): DatabaseConfig {
+  private buildDbConfigFromString(envName: string, name: string, config: string): HashConfig {
     const url = config;
     if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
       const safe = config.replace(/^([a-zA-Z][a-zA-Z0-9+.-]*:\/\/)[^@/]+@/, "$1***@");
@@ -290,7 +290,7 @@ export class DatabaseConfigurations {
     envName: string,
     name: string,
     config: DatabaseConfigOptions,
-  ): DatabaseConfig {
+  ): HashConfig {
     const url = config.url;
     const configWithoutUrl = { ...config };
     delete configWithoutUrl.url;
@@ -303,10 +303,7 @@ export class DatabaseConfigurations {
   }
 
   /** @internal */
-  private mergeDbEnvironmentVariables(
-    currentEnv: string,
-    configs: DatabaseConfig[],
-  ): DatabaseConfig[] {
+  private mergeDbEnvironmentVariables(currentEnv: string, configs: HashConfig[]): HashConfig[] {
     return configs.map((config) => {
       if (config instanceof UrlConfig || config.envName !== currentEnv) return config;
       return this.environmentUrlConfig(currentEnv, config.name, config.configurationHash) ?? config;
@@ -318,7 +315,7 @@ export class DatabaseConfigurations {
     env: string,
     name: string,
     config: DatabaseConfigOptions,
-  ): DatabaseConfig | null {
+  ): HashConfig | null {
     const url = this.environmentValueFor(name);
     if (!url) return null;
     return new UrlConfig(env, name, url, config);

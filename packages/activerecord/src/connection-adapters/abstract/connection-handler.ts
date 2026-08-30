@@ -4,6 +4,7 @@ import {
   DatabaseConfig,
   _setAdapterClassResolver,
 } from "../../database-configurations/database-config.js";
+import type { HashConfig } from "../../database-configurations/hash-config.js";
 import {
   configurationsStore as configurations,
   symbolConnectionName,
@@ -241,7 +242,7 @@ export class ConnectionHandler {
   removeConnectionPool(
     connectionName: string,
     options?: { role?: string; shard?: string },
-  ): DatabaseConfig | undefined {
+  ): HashConfig | undefined {
     const role = options?.role ?? "writing";
     const shard = options?.shard ?? "default";
     const poolManager = this.getPoolManager(connectionName);
@@ -324,7 +325,7 @@ export class ConnectionHandler {
     poolManager: PoolManager,
     role: string,
     shard: string,
-  ): DatabaseConfig | undefined {
+  ): HashConfig | undefined {
     const poolConfig = poolManager.removePoolConfig(role, shard);
     if (poolConfig) {
       void poolConfig.disconnect();

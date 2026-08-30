@@ -40,14 +40,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       const column = await columnNamed("postgresql_serials", "seq");
       expect(column.type).toBe("integer");
       expect(column.sqlType).toBe("integer");
-      expect(column.isSerial).toBe(true);
+      expect(column.isSerial()).toBe(true);
     });
 
     it("not serial column", async () => {
       const column = await columnNamed("postgresql_serials", "serials_id");
       expect(column.type).toBe("integer");
       expect(column.sqlType).toBe("integer");
-      expect(column.isSerial).toBe(false);
+      expect(column.isSerial()).toBe(false);
     });
 
     it("schema dump with shorthand", async () => {
@@ -81,14 +81,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       const column = await columnNamed("postgresql_big_serials", "seq");
       expect(column.type).toBe("integer");
       expect(column.sqlType).toBe("bigint");
-      expect(column.isSerial).toBe(true);
+      expect(column.isSerial()).toBe(true);
     });
 
     it("not bigserial column", async () => {
       const column = await columnNamed("postgresql_big_serials", "serials_id");
       expect(column.type).toBe("integer");
       expect(column.sqlType).toBe("bigint");
-      expect(column.isSerial).toBe(false);
+      expect(column.isSerial()).toBe(false);
     });
 
     it("schema dump with shorthand", async () => {
@@ -123,7 +123,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const columns = await adapter.columns("foo");
       for (const column of columns) {
         expect(column.type).toBe("integer");
-        expect(column.isSerial).toBe(true);
+        expect(column.isSerial()).toBe(true);
       }
     });
 
@@ -157,7 +157,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const columns = await adapter.columns(tableName);
       for (const column of columns) {
         expect(column.type).toBe("integer");
-        expect(column.isSerial).toBe(true);
+        expect(column.isSerial()).toBe(true);
       }
     });
 

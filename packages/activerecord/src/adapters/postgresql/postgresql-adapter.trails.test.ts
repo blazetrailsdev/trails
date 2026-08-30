@@ -968,7 +968,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       `);
       const cols = await adapter.columns("col_reflection_test");
       const id = cols.find((c) => c.name === "id")!;
-      expect(id.isIdentity).toBe(true);
+      expect(id.isIdentity()).toBe(true);
       expect(id.isAutoIncrementedByDb()).toBe(true);
     });
 
@@ -1013,7 +1013,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.loadAdditionalTypes();
       const cols = await adapter.columns("col_reflection_test");
       const mood = cols.find((c) => c.name === "mood")!;
-      expect(mood.isEnum).toBe(true);
+      expect(mood.isEnum()).toBe(true);
     });
   });
 
