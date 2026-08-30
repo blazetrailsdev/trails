@@ -72,21 +72,19 @@ export class Aes256Gcm {
     if (authTagBuf.length !== AUTH_TAG_LENGTH) throw new EncryptedContentIntegrity();
 
     try {
-      const decipher = getCrypto().createDecipheriv(Aes256Gcm.CIPHER_TYPE, keyBuf, toBytes(iv), {
-        authTagLength: AUTH_TAG_LENGTH,
-      });
-      if (!decipher.setAuthTag) {
-        throw new Configuration("Crypto adapter does not support GCM auth tags (setAuthTag)");
-      }
-      decipher.setAuthTag(authTagBuf);
+      const cipher = new Cipher(Aes256Gcm.CIPHER_TYPE);
+
+      cipher.decrypt();
+      cipher.key = keyBuf;
+      cipher.iv = toBytes(iv);
+
+      cipher.authTag = authTagBuf;
+
       const encryptedData = toBytes(encryptedMessage.payload);
       const decryptedData =
-        encryptedData.length === 0
-          ? Buffer.from(encryptedData)
-          : Buffer.from(decipher.update(encryptedData));
-      return Buffer.concat([decryptedData, Buffer.from(decipher.final())]);
-    } catch (e) {
-      if (e instanceof Configuration) throw e;
+        encryptedData.length === 0 ? Buffer.from(encryptedData) : cipher.update(encryptedData);
+      return Buffer.concat([decryptedData, cipher.final()]);
+    } catch {
       throw new Decryption("The provided key could not decrypt the data");
     }
   }
