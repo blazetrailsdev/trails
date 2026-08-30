@@ -11,6 +11,54 @@ schema-parity tooling.
 - `sources.lock.json` (committed, wave 2) records resolved git SHAs for
   reproducibility.
 
+## `vendor/ruby/` — the MRI read-anchor
+
+`vendor/ruby/` is a clone of `ruby/ruby` pinned to **`v3_3_11`**
+(`1f2d15125a2dc701e1822ed2900eb17899500ec7`). It exists so the MRI C symbols
+that the ruby-compat ports cite are readable in-tree — `rational.c`
+(`nurat_s_canonicalize_internal`, `nurat_add`, `float_to_r`), `range.c`
+(`range_include_internal`, `str_upto_each`), `re.c` (`rb_reg_s_quote`),
+`object.c` (`rb_equal`).
+
+### Why not a newer ref
+
+The pin is deliberately not the newest release. An anchor is only useful if it
+is the build the citations were authored against, and the four cited files
+churn across minors:
+
+| vs the pin                         | `rational.c` `range.c` `re.c` `object.c` |
+| ---------------------------------- | ---------------------------------------- |
+| `v3_3_12` (newest on the 3.3 line) | zero diff — byte-identical               |
+| `v3_4_10` (newest stable)          | +581 / -285                              |
+
+So bumping to current stable would leave a reviewer chasing
+`range_include_internal` through code `range-ext.ts` was never written against.
+The host toolchain is `ruby 3.3.11 (2026-03-26 revision 1f2d15125a)` — the SHA
+this ref resolves to — and `packages/date/src/date.ts:1229-1231` states its
+claim as "on ruby 3.3.11".
+
+`.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`, which
+floats to the newest patch on that line, so it constrains the line rather than
+the patch; since `v3_3_12` is byte-identical here, the two are interchangeable
+for this anchor and `.11` wins only as the revision the host and the date port
+name.
+
+The `date` gem keeps its own `v3.4.1` ref; interpreter and gem refs move
+independently.
+
+It is **never enrolled in `parity:api`** (`compareApi: false`) — MRI's surface
+is C and `extract-ruby-api.rb` globs `**/*.rb`, so it would extract nothing
+from the files every citation points at, and there is no `packages/ruby/src`
+workspace dir to key a package onto. `compareTests` is off too, pending the
+RFC 0129-ruby-compat `ruby-spec-behavioural-enrollment` story, which enrolls
+the in-tree `spec/ruby/` mirror of the ruby/spec suite (which is why no
+separate `ruby/spec` clone is needed).
+
+**Clone cost:** a `--depth=1` clone of `v3_3_11` is **130 MiB** on disk (20 MiB
+of it `.git`) and takes ~5-8s — smaller than `vendor/rails` at 225 MiB, and
+each worktree symlinks it rather than re-cloning. No `--filter=blob:none` or
+sparse checkout is needed, so `fetch.ts` is unchanged.
+
 ## Scoping a Rails bump (drift report)
 
 We pin `rails` to one tag in `sources.ts` (today `v8.0.2`) while upstream moves

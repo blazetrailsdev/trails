@@ -251,6 +251,60 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "ruby",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/ruby.git",
+      // The MRI interpreter, vendored as the read-anchor for the ruby-compat
+      // ports that cite C source by symbol (`rational.c`, `range.c`, `re.c`,
+      // `object.c` — see vendor/README.md for the call sites).
+      //
+      // Deliberately NOT the newest ref. The anchor has to be the build the
+      // existing citations were written against, and moving to the current
+      // stable (v3_4_10) rewrites the very files they point at: measured
+      // `git diff v3_3_11 v3_4_10 -- rational.c range.c re.c object.c` is
+      // +581/-285. The host toolchain is `ruby 3.3.11 (2026-03-26 revision
+      // 1f2d15125a)` — the SHA this ref resolves to — and
+      // `packages/date/src/date.ts:1229-1231` writes its behavioural claim as
+      // "on ruby 3.3.11 `(Rational(1,2) * 12).class` is `Rational`".
+      //
+      // `.github/workflows/ci.yml:1413,1686,1799` pin `ruby-version: "3.3"`,
+      // which floats to the newest patch on that line (v3_3_12 today) rather
+      // than to .11 — so it constrains the LINE, not the patch. That is not a
+      // gap: v3_3_12 is byte-identical to v3_3_11 across all four cited files,
+      // so the two are interchangeable for this anchor and .11 wins only as
+      // the revision the host and the date port name.
+      //
+      // The `date` gem above keeps its own `v3.4.1` ref: interpreter and gem
+      // refs move independently.
+      ref: "v3_3_11",
+    },
+    packages: [
+      {
+        name: "ruby",
+        // The cited C lives at the repo root, which has no `libPath` shape;
+        // `lib` is the Ruby-visible stdlib, and is what verifyPackages checks
+        // the clone actually laid down.
+        libPath: "lib",
+        // ruby/ruby mirrors the ruby/spec suite in-tree, so this one source
+        // serves both the C read-anchor and the behavioural suite RFC
+        // 0129-ruby-compat's `ruby-spec-behavioural-enrollment` story needs —
+        // no separate `ruby/spec` clone (which RFC 0089 had planned).
+        testPath: "spec/ruby",
+        // Vendored as a read-anchor only, the way `date` above is. MRI's
+        // surface is C, so `scripts/api-compare/extract-ruby-api.rb` — which
+        // globs `**/*.rb` — extracts nothing from the files every citation
+        // points at, and there is no `packages/ruby/src` workspace dir for the
+        // comparator to key a package to. `compareTests` stays off until the
+        // `ruby-spec-behavioural-enrollment` story wires `spec/ruby` in;
+        // ruby/spec is mspec, not minitest, so the extractor has to learn it
+        // first.
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "i18n",
     origin: {
       type: "git",
