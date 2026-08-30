@@ -17,12 +17,10 @@ const IN_RUBY_COMPAT = "packages/ruby-compat/src/core-ext/regexp.ts";
 tester.run("no-ruby-compat-reimplementation", rule, {
   valid: [
     {
-      // The sanctioned home: a declaration there IS the primitive.
       filename: IN_RUBY_COMPAT,
       code: `export function regexpEscape(string: string): string { return string; }`,
     },
     {
-      // A grandfathered copy, one row in the only-shrink exclude JSON.
       filename: ALLOWLISTED,
       code: `export function escapeRegExp(s: string): string { return s; }`,
     },
@@ -48,7 +46,6 @@ class Parameters { dig(...keys: string[]): unknown { return keys; } }`,
       code: `function fetch(url: string): unknown { return url; }`,
     },
     {
-      // Tests are out of scope.
       filename: "packages/activerecord/src/support/new-helper.test.ts",
       code: `function escapeRegExp(s: string): string { return s; }`,
     },

@@ -32,7 +32,6 @@ const cite = (line) => `vendor/ruby/rational.c:${line}`;
 
 tester.run("ruby-compat-needs-mri-citation", rule, {
   valid: [
-    // Both halves, and the cited line is within the pinned file.
     `/**
  * Mirrors ${cite(12)} (nurat_add).
  *
@@ -45,7 +44,6 @@ export function add(a: number, b: number): number { return a + b; }`,
  * @noRailsEquivalent PERMANENT
  */
 export class Rational {}`,
-    // A file-level block covers the declarations below it.
     `/**
  * Mirrors ${cite(3)}.
  *
@@ -54,7 +52,6 @@ export class Rational {}`,
 import { x } from "./x.js";
 
 export function add(a: number, b: number): number { return a + b + x; }`,
-    // A default export is held to the same contract as a named one.
     `/**
  * ${cite(4)}
  *

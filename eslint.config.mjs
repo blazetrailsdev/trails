@@ -673,8 +673,7 @@ export default defineConfig(
 
   // ── no-ruby-compat-reimplementation: a Ruby primitive is declared once, in
   //    @blazetrails/ruby-compat, and called everywhere else. Today's copies
-  //    hold one row each in the ONLY-SHRINK
-  //    eslint/no-ruby-compat-reimplementation-exclude.json. ──
+  //    hold one row each in the ONLY-SHRINK exclude JSON. ──
   {
     files: noRubyCompatReimplementationFiles,
     ignores: noRubyCompatReimplementationIgnores,
@@ -686,8 +685,7 @@ export default defineConfig(
   // ── ruby-compat-needs-mri-citation: `parity:api` can never enroll
   //    ruby-compat (MRI's surface is C), so its anchor is a RESOLVED
   //    `vendor/ruby/<file>:<line>` citation plus a `@noRailsEquivalent
-  //    PERMANENT` receipt on every export. Skips where vendor/ruby is absent;
-  //    the rails-comparison job fetches it and is the enforcing run. ──
+  //    PERMANENT` receipt on every export. ──
   {
     files: ["packages/ruby-compat/src/**/*.ts"],
     ignores: ["**/*.test.ts"],
