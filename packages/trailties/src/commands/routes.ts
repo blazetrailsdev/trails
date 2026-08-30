@@ -10,9 +10,12 @@ export function routesCommand(): Command {
     .option("-g, --grep <pattern>", "Filter routes by pattern")
     .action(async (options) => {
       const cwd = getCwd();
-      const routesFile = path.join(cwd, "src", "config", "routes.ts");
+      const routesFile = [
+        path.join(cwd, "config", "routes.ts"),
+        path.join(cwd, "config", "routes.js"),
+      ].find((f) => fs.existsSync(f));
 
-      if (!fs.existsSync(routesFile)) {
+      if (!routesFile) {
         console.log("No routes file found at config/routes.ts");
         return;
       }
