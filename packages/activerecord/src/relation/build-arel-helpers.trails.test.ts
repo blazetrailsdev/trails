@@ -59,6 +59,12 @@ describe("Relation private build-arel helpers", () => {
       expect(args).toEqual(["a", "b"]);
     });
 
+    it("drops a nil select field here, not in process_select_args", () => {
+      const args: unknown[] = [null, "title"];
+      relation().checkIfMethodHasArgumentsBang(":select", args);
+      expect(args).toEqual(["title"]);
+    });
+
     it("flattens arrays only, leaving plain-object args intact (Rails flatten! parity)", () => {
       const args: unknown[] = [[{ a: "x" }]];
       relation().checkIfMethodHasArgumentsBang(":select", args);
