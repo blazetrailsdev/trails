@@ -5,6 +5,12 @@ import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
 import { fixtures } from "../../test-fixtures.js";
+import {
+  ActiveRecordError,
+  StatementInvalid,
+  StatementTimeout,
+  ValueTooLong,
+} from "../../errors.js";
 
 describe("SqliteAdapter", () => {
   let adapter: SQLite3Adapter;
@@ -192,5 +198,39 @@ describe("SQLite3 write-path float binds", () => {
       `SELECT typeof("temperature") AS t FROM "numeric_data" WHERE "id" = ${record.id}`,
     )) as Array<{ t: string }>;
     expect(rows[0].t).toBe("real");
+  });
+});
+
+describe("SQLite3 translateException", () => {
+  let pool: ConnectionPool;
+  let adapter: SQLite3Adapter;
+
+  beforeEach(async () => {
+    pool = newSqlitePool();
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
+  });
+
+  afterEach(async () => {
+    await pool.disconnect();
+  });
+
+  const translate = (exception: unknown) =>
+    adapter.translateException(exception, { message: "msg", sql: "SELECT 1", binds: [] });
+
+  it("classifies a busy database as StatementTimeout", () => {
+    const busy = Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+    expect(translate(busy)).toBeInstanceOf(StatementTimeout);
+  });
+
+  it("passes an ActiveRecordError through unchanged", () => {
+    const error = new ActiveRecordError("boom");
+    expect(translate(error)).toBe(error);
+  });
+
+  it("does not translate an oversized value", () => {
+    const tooLong = new Error("String or BLOB exceeded size limit");
+    const translated = translate(tooLong);
+    expect(translated).toBeInstanceOf(StatementInvalid);
+    expect(translated).not.toBeInstanceOf(ValueTooLong);
   });
 });

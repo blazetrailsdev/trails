@@ -42,11 +42,11 @@ import {
   RecordNotUnique,
   InvalidForeignKey,
   NotNullViolation,
-  ValueTooLong,
   NoDatabaseError,
   ConnectionNotEstablished,
   DatabaseConnectionError,
   TransactionIsolationError,
+  StatementTimeout,
 } from "../errors.js";
 import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
@@ -1763,11 +1763,34 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       const code = (e as any)?.code;
       if (code !== undefined) (exc as any).code = code;
     }
-    const translated = translateException(exc, msg, sql, binds, this.pool);
+    const translated = this.translateException(exc, { message: msg, sql, binds }) as Error;
     if (translated !== exc && (translated as { cause?: unknown }).cause === undefined) {
       (translated as { cause?: unknown }).cause = exc;
     }
     return translated;
+  }
+
+  /** @internal */
+  override translateException(
+    exception: unknown,
+    { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
+  ): unknown {
+    const exceptionMessage = exception instanceof Error ? exception.message : String(exception);
+    if (
+      /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(exceptionMessage)
+    ) {
+      return new RecordNotUnique(message, { sql, binds, connectionPool: this.pool });
+    } else if (/(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(exceptionMessage)) {
+      return new NotNullViolation(message, { sql, binds, connectionPool: this.pool });
+    } else if (/FOREIGN KEY constraint failed/i.test(exceptionMessage)) {
+      return new InvalidForeignKey(message, { sql, binds, connectionPool: this.pool });
+    } else if (/called on a closed database/i.test(exceptionMessage)) {
+      return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
+    } else if ((exception as { code?: string })?.code === "SQLITE_BUSY") {
+      return new StatementTimeout(message, { sql, binds, connectionPool: this.pool });
+    } else {
+      return super.translateException(exception, { message, sql, binds });
+    }
   }
 
   /** @internal */
@@ -2094,40 +2117,6 @@ function isInvalidAlterTableType(type: string, options: Record<string, unknown>)
     (options["null"] === false && options["default"] == null) ||
     (type === "virtual" && Boolean(options["stored"]))
   );
-}
-
-/** @internal */
-function translateException(
-  exception: Error,
-  message: string,
-  sql: string,
-  binds: unknown[],
-  pool?: unknown,
-): Error {
-  const msg = exception.message;
-  const code = (exception as any)?.code as string | undefined;
-  if (
-    code?.includes("CONSTRAINT_UNIQUE") ||
-    /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(msg)
-  ) {
-    return new RecordNotUnique(message, { sql, binds, connectionPool: pool });
-  }
-  if (
-    code?.includes("CONSTRAINT_NOTNULL") ||
-    /(.* may not be NULL|NOT NULL constraint failed: .*)/i.test(msg)
-  ) {
-    return new NotNullViolation(message, { sql, binds, connectionPool: pool });
-  }
-  if (code?.includes("CONSTRAINT_FOREIGNKEY") || /FOREIGN KEY constraint failed/i.test(msg)) {
-    return new InvalidForeignKey(message, { sql, binds, connectionPool: pool });
-  }
-  if (msg.includes("String or BLOB exceeded size limit")) {
-    return new ValueTooLong(message, { sql, binds, connectionPool: pool });
-  }
-  if (/called on a closed database/i.test(msg)) {
-    return new ConnectionNotEstablished(exception, { connectionPool: pool });
-  }
-  return new StatementInvalid(message, { sql, binds, connectionPool: pool });
 }
 
 dirtiesQueryCache(SQLite3Adapter, "rollbackDbTransaction", "rollbackToSavepoint");
