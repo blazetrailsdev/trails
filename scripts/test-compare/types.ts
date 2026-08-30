@@ -85,6 +85,14 @@ export interface TestCaseInfo {
   /** Whether the test is pending/skipped */
   pending?: boolean;
   /**
+   * Whether the recorded `description` was recovered from a template literal
+   * with interpolations (`` it(`${name} raises`) `` → `"<expr> raises"`) rather
+   * than read off a static string. A recovered name is a placeholder, not the
+   * runtime name, so parity:test counts such a test as extra (TS-only) and
+   * never credits a Rails test against it. TS extractor only.
+   */
+  dynamic?: boolean;
+  /**
    * Adapter/feature gating condition, if the test runs conditionally. Absent
    * means unconditional. See {@link TestGate}.
    */

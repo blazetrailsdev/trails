@@ -822,8 +822,12 @@ class TestExtractor
   end
 
   # Intercept `if/unless current_adapter?(...)` (and modifier forms) so every
-  # test in the guarded body inherits the restriction. Walks the else branch
-  # ungated.
+  # test in the guarded body inherits the restriction. The else branch runs on
+  # the INVERTED condition, so it is walked under the gate the same condition
+  # derives at the opposite parity: `foreign_key_test.rb:453-535` defines
+  # `test_add_invalid_foreign_key` on both arms of
+  # `if ... supports_validate_constraints?`, and walking the else arm ungated
+  # made the two indistinguishable to the matcher.
   def process_conditional(node)
     kind = node[0]
     cond = node[1]
@@ -840,7 +844,19 @@ class TestExtractor
     else
       walk(body) if body.is_a?(Array)
     end
-    walk(els) if els.is_a?(Array)
+    return unless els.is_a?(Array)
+
+    # An `:elsif` in the else slot walks back through here with its OWN
+    # condition, so it composes: it runs on this condition being false AND its
+    # own being true.
+    else_gate = gate_from_run_condition(cond, !positive)
+    if else_gate
+      @gate_stack.push(else_gate)
+      walk(els)
+      @gate_stack.pop
+    else
+      walk(els)
+    end
   end
 
   # Attach a :gate to a test_case from its dir gate, the enclosing

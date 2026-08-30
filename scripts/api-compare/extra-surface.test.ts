@@ -2102,6 +2102,66 @@ describe("buildReport — reopened modules", () => {
       ["isValid", "moved"],
     ]);
   });
+
+  it("does not widen the allow-set with a mixin's methods on a reopening file", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {},
+          modules: {
+            "ActiveModel::Validations": {
+              ...rubyClass({ name: "Validations", file: "validations.rb" }),
+              includes: ["ActiveModel::Validations::Helper"],
+              instanceMethods: [
+                { ...method("valid?"), file: "validations.rb" },
+                { ...method("validates_with"), file: "validations/with.rb" },
+              ],
+              classMethods: [],
+            },
+            "ActiveModel::Validations::Helper": {
+              ...rubyClass({ name: "Helper", file: "validations/helper.rb" }),
+              instanceMethods: [{ ...method("helper_method"), file: "validations/helper.rb" }],
+            },
+            "ActiveModel::Validations::WithValidator": rubyClass({
+              name: "WithValidator",
+              file: "validations/with.rb",
+            }),
+          },
+        },
+      },
+    };
+    const tsFor = (file: string): ApiManifest => ({
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            Validations: {
+              name: "Validations",
+              file,
+              includes: [],
+              extends: [],
+              instanceMethods: [method("helperMethod")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    });
+    const opts = { filterPkg: null, excludeGlobs: [], novelOnly: false, topN: 50 };
+    // The primary site legitimately answers everything `Validations` includes.
+    expect(buildReport(ruby, tsFor("validations.ts"), opts).packages[0].extraFiles).toEqual([]);
+    // The reopening file declares `validates_with` and nothing else, so the
+    // mixin's methods are not its to answer.
+    expect(
+      buildReport(ruby, tsFor("validations/with.ts"), opts).packages[0].extraFiles[0].extras.map(
+        (e) => e.name,
+      ),
+    ).toEqual(["helperMethod"]);
+  });
 });
 
 describe("buildReport — declaration names", () => {

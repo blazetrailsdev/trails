@@ -50,6 +50,12 @@
  *                 and literal expected-VALUE divergences (Rails `assert_equal 5`
  *                 vs a trails `toEqual(4)`) via assertion-values.ts. All three
  *                 are report-only (no CI gate, no exclude.json).
+ *   --dynamic     List the TS files carrying dynamically-named tests
+ *                 (`` it(`${x} …`) ``) — recorded under a placeholder name,
+ *                 counted as extra, never matched against a Rails test.
+ *   --sibling-classes
+ *                 List the Rails files whose sibling test classes define
+ *                 same-named tests (those are keyed by (class, name)).
  *   --sort-extra  Sort the per-file table by the "Extra" column (TS tests in
  *                 the convention file that matched no Rails test) descending,
  *                 surfacing files that have ballooned with bespoke/non-Rails
@@ -163,6 +169,34 @@ function normalize(s: string): string {
 // Rails uses ERB; we use TSE — normalize class/test names to match
 function normalizeErb(s: string): string {
   return normalize(s).replace(/erb/g, "tse");
+}
+
+/**
+ * The test CLASS a Rails test case belongs to — the innermost ancestor the Ruby
+ * extractor records, which is the `class …Test < ActiveSupport::TestCase` name
+ * (outer ancestors are the enclosing modules). `undefined` for a case with no
+ * enclosing class.
+ */
+function rubyTestClass(ancestors: string[]): string | undefined {
+  return ancestors.length > 0 ? normalizeErb(ancestors[ancestors.length - 1]) : undefined;
+}
+
+/**
+ * Whether a description-only candidate must be refused because it belongs to a
+ * SIBLING test class. `classCount` is how many classes in the Rails file define
+ * this description; `tsAncestorNames` is every describe name the convention TS
+ * file uses. The key is (class, name) only when the name actually collides
+ * across siblings AND the TS file names the class — a flat port has nothing to
+ * key on, so it keeps matching by name alone.
+ */
+export function rejectsSiblingClassCandidate(
+  rubyClass: string | undefined,
+  classCount: number,
+  tsAncestorNames: Set<string>,
+  tsParts: string[],
+): boolean {
+  if (rubyClass === undefined || classCount <= 1 || !tsAncestorNames.has(rubyClass)) return false;
+  return !tsParts.slice(0, -1).includes(rubyClass);
 }
 
 function normPath(ancestors: string[], description: string): string {
@@ -306,6 +340,7 @@ interface ConventionPackageResult {
 interface TsTestInfo {
   path: string; // normalized full path
   desc: string; // normalized description
+  dynamic: boolean; // name recovered from a template literal — never a match candidate
   pending: boolean;
   gate?: TestGate; // adapter/feature gate emitted by the TS extractor
   assertionCount?: number; // raw assertion-call count from the TS extractor
@@ -416,6 +451,8 @@ export function main(args: string[] = process.argv.slice(2)) {
   const checkGates = args.includes("--check");
   const showAssertions = args.includes("--assertions");
   const sortExtra = args.includes("--sort-extra");
+  const showDynamic = args.includes("--dynamic");
+  const showSiblingClasses = args.includes("--sibling-classes");
   let minExtra = 0;
   try {
     minExtra = parseMinExtra(args);
@@ -449,6 +486,16 @@ export function main(args: string[] = process.argv.slice(2)) {
   const ruby: TestManifest = JSON.parse(fs.readFileSync(rubyPath, "utf-8"));
   const ts: TestManifest = JSON.parse(fs.readFileSync(tsPath, "utf-8"));
 
+  // TS files carrying at least one dynamically-named (`it(`${x} …`)`) test —
+  // the one-line audit for a blind spot that used to be invisible: such tests
+  // were dropped from the manifest entirely, so a TS-only group sitting in a
+  // Rails-named file was neither matched nor reported as extra.
+  const dynamicFiles: { file: string; count: number }[] = [];
+
+  // Ruby files whose sibling test classes define same-named tests — the
+  // inventory behind the (class, name) keying in pass 2 below.
+  const siblingClassFiles: { file: string; collisions: number }[] = [];
+
   // Build TS lookups per package.
   // Per-file, we store an ordered list of test info plus pre-indexed queues
   // (path → indices, desc → indices) for O(1) consume-based matching.
@@ -477,6 +524,7 @@ export function main(args: string[] = process.argv.slice(2)) {
       const relPath = extractRelativeTsPath(file.file, pkg);
       allFiles.add(relPath);
 
+      let dynamicTests = 0;
       const tests: TsTestInfo[] = [];
       const pathIdx = new Map<string, number[]>();
       const descIdx = new Map<string, number[]>();
@@ -488,12 +536,21 @@ export function main(args: string[] = process.argv.slice(2)) {
         tests.push({
           path: np,
           desc: nd,
+          dynamic: !!tc.dynamic,
           pending: !!tc.pending,
           gate: tc.gate,
           assertionCount: tc.assertionCount,
           assertionKinds: tc.assertionKinds,
           assertionValues: tc.assertionValues,
         });
+        // A dynamically-named TS test carries a recovered placeholder name
+        // (`"<expr> raises"`), not the name it runs under, so it is never a
+        // match candidate for a Rails test — it stays in `tests` and so is
+        // counted as extra (TS only), which is the whole point of recording it.
+        if (tc.dynamic) {
+          dynamicTests++;
+          continue;
+        }
         appendIndex(pathIdx, np, i);
         appendIndex(descIdx, nd, i);
 
@@ -507,6 +564,7 @@ export function main(args: string[] = process.argv.slice(2)) {
       fileTests.set(relPath, tests);
       filePathIndex.set(relPath, pathIdx);
       fileDescIndex.set(relPath, descIdx);
+      if (dynamicTests > 0) dynamicFiles.push({ file: relPath, count: dynamicTests });
     }
 
     tsLookup.set(pkg, {
@@ -583,6 +641,33 @@ export function main(args: string[] = process.argv.slice(2)) {
       const excludedCount = file.testCases.filter((tc) =>
         isTestCaseUnported(file.file, tc.description, tc.ancestors[0]),
       ).length;
+
+      // One Ruby file can define several test CLASSES
+      // (`ActiveRecord::Migration::ForeignKeyTest` and
+      // `…::CompositeForeignKeyTest` both live in `migration/foreign_key_test.rb`)
+      // and two siblings can define a test of the same name. Description-only
+      // matching (pass 2) keys on the name alone, so it can credit one class's
+      // Rails test against the other class's TS port. For a colliding name the
+      // class is part of the key: a candidate has to sit under a describe of the
+      // Rails test's own class.
+      const tsAncestorNames = new Set<string>();
+      for (const t of tsTests)
+        for (const part of t.path.split(" > ").slice(0, -1)) {
+          tsAncestorNames.add(part);
+        }
+      const rubyClassesByDesc = new Map<string, Set<string>>();
+      for (const tc of file.testCases) {
+        const klass = rubyTestClass(tc.ancestors);
+        if (klass === undefined) continue;
+        const nd = normalize(tc.description);
+        const seen = rubyClassesByDesc.get(nd);
+        if (seen === undefined) rubyClassesByDesc.set(nd, new Set([klass]));
+        else seen.add(klass);
+      }
+      const siblingCollisions = [...rubyClassesByDesc.values()].filter((s) => s.size > 1).length;
+      if (siblingCollisions > 0) {
+        siblingClassFiles.push({ file: file.file, collisions: siblingCollisions });
+      }
 
       let matched = 0;
       let matchedSkipped = 0;
@@ -751,10 +836,15 @@ export function main(args: string[] = process.argv.slice(2)) {
         if (candidates) {
           let bestScore = -1;
           const rubyParts = np.split(" > ");
+          const rubyClass = rubyTestClass(tc.ancestors);
+          const classCount = rubyClassesByDesc.get(nd)?.size ?? 0;
           for (const idx of candidates) {
             if (consumedTs.has(idx)) continue;
             const tsPath = tsTests[idx].path;
             const tsParts = tsPath.split(" > ");
+            if (rejectsSiblingClassCandidate(rubyClass, classCount, tsAncestorNames, tsParts)) {
+              continue;
+            }
             // Score: suffix match (TS path ends with Ruby path) gets highest priority,
             // then prefix overlap, then path length
             let overlap = 0;
@@ -915,6 +1005,34 @@ export function main(args: string[] = process.argv.slice(2)) {
     console.log(`Written to ${outPath}`);
     if (checkGates) enforceGateZero(results);
     return;
+  }
+
+  if (siblingClassFiles.length > 0) {
+    const total = siblingClassFiles.reduce((n, f) => n + f.collisions, 0);
+    console.log(
+      `\n  ${total} same-named test(s) across sibling classes in ${siblingClassFiles.length} Rails file(s) — keyed by (class, name):`,
+    );
+    if (showSiblingClasses) {
+      for (const f of siblingClassFiles.sort((a, b) => b.collisions - a.collisions)) {
+        console.log(`    ${f.file}  (${f.collisions})`);
+      }
+    } else {
+      console.log("    (run with --sibling-classes for the file list)");
+    }
+  }
+
+  if (dynamicFiles.length > 0) {
+    const total = dynamicFiles.reduce((n, f) => n + f.count, 0);
+    console.log(
+      `\n  ${total} dynamically-named test(s) in ${dynamicFiles.length} file(s) — counted as extra, never matched:`,
+    );
+    if (showDynamic) {
+      for (const f of dynamicFiles.sort((a, b) => b.count - a.count)) {
+        console.log(`    ${f.file}  (${f.count})`);
+      }
+    } else {
+      console.log("    (run with --dynamic for the file list)");
+    }
   }
 
   // Print report

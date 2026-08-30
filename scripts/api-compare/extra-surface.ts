@@ -1464,21 +1464,33 @@ function collectAllowedNames(
   // Ruby-side walk: a duplicated short name is disambiguated by the enclosing
   // namespace inside `resolveModuleName`, so this needs no declaring-file hint
   // the way the TS sites do (compare.ts `resolveEntityByDeclaringFile`).
-  const walkMixin = (incName: string, contextFqn: string, target: Set<string> = allowed): void => {
+  const walkMixin = (
+    incName: string,
+    contextFqn: string,
+    target: Set<string> = allowed,
+    methodFile?: string,
+  ): void => {
     const fqn = resolveModuleName(incName, contextFqn, moduleFqnByShort);
     let visited = visitedByTarget.get(target);
     if (visited === undefined) {
       visited = new Set<string>();
       visitedByTarget.set(target, visited);
     }
-    if (visited.has(fqn)) return;
-    visited.add(fqn);
+    // Keyed by (methodFile, fqn), not by fqn alone: the same target set is
+    // walked once per entity registered for this file, and a reopening
+    // registration's filtered walk contributes a strictly smaller set than the
+    // primary site's unfiltered one. Collapsing them on fqn would let whichever
+    // ran first suppress the other.
+    const visitKey = `${methodFile ?? ""}\u0000${fqn}`;
+    if (visited.has(visitKey)) return;
+    visited.add(visitKey);
     // A Ruby core module (`include Enumerable`) supplies methods no vendored
     // gem `def`s — see CORE_MIXIN_METHODS. Added before the module lookup
     // because the same name can ALSO be a vendored core_ext reopening, which
     // contributes its own `def`s through the walk below.
     for (const name of CORE_MIXIN_METHODS[fqn] ?? []) addRubyName(name, target);
-    for (const inc of HOOK_INJECTED_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn, target);
+    for (const inc of HOOK_INJECTED_MIXINS[fqn]?.includes ?? [])
+      walkMixin(inc, fqn, target, methodFile);
     // Fall back to the cross-package map: a railtie-injected mixin (see
     // AMBIENT_RAILTIE_MIXINS) or a fully-qualified cross-gem include lives
     // in another package's modules, not this package's.
@@ -1498,7 +1510,7 @@ function collectAllowedNames(
     // Only the module's instance methods cross into the host. Class
     // methods on the module itself stay on the module (Ruby `include`
     // semantics; matches compare.flattenIncludedMethodInfos).
-    addMethods(mod.instanceMethods, fqn, undefined, target);
+    addMethods(mod.instanceMethods, fqn, methodFile, target);
     // `include M` where `M extend ActiveSupport::Concern` also runs
     // `base.extend M::ClassMethods` and the `included` block
     // (activesupport/lib/active_support/concern.rb:137-138), so the includer
@@ -1515,10 +1527,11 @@ function collectAllowedNames(
     const isConcern = (ext: string): boolean =>
       ext === CONCERN || (ext === "Concern" && fqn.startsWith("ActiveSupport::"));
     if ((mod.extends ?? []).some(isConcern)) {
-      walkMixin(`${fqn}::ClassMethods`, fqn, target);
-      for (const ext of mod.extends ?? []) if (!isConcern(ext)) walkMixin(ext, fqn, target);
+      walkMixin(`${fqn}::ClassMethods`, fqn, target, methodFile);
+      for (const ext of mod.extends ?? [])
+        if (!isConcern(ext)) walkMixin(ext, fqn, target, methodFile);
     }
-    for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target);
+    for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target, methodFile);
   };
 
   for (const { fqn, info, nameOnly, methodFile, nestedIn } of entities) {
@@ -1539,10 +1552,11 @@ function collectAllowedNames(
     }
     addMethods(info.instanceMethods, fqn, methodFile, target);
     addMethods(info.classMethods, fqn, methodFile, target);
-    for (const inc of info.includes ?? []) walkMixin(inc, fqn, target);
-    for (const ext of info.extends ?? []) walkMixin(ext, fqn, target);
+    for (const inc of info.includes ?? []) walkMixin(inc, fqn, target, methodFile);
+    for (const ext of info.extends ?? []) walkMixin(ext, fqn, target, methodFile);
 
-    for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? []) walkMixin(inc, fqn, target);
+    for (const inc of AMBIENT_RAILTIE_MIXINS[fqn]?.includes ?? [])
+      walkMixin(inc, fqn, target, methodFile);
 
     for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name, target);
   }

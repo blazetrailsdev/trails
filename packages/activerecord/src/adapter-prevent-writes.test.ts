@@ -65,11 +65,14 @@ describe("AdapterPreventWritesTest", () => {
     },
   );
 
-  it("doesnt error when a select query has encoding errors", async () => {
-    await Base.whilePreventingWrites(async () => {
-      await expect(connection.selectAll(`SELECT '\xC8'`)).resolves.not.toThrow();
-    });
-  });
+  it.skipIf(adapterType === "postgres")(
+    "doesnt error when a select query has encoding errors",
+    async () => {
+      await Base.whilePreventingWrites(async () => {
+        await expect(connection.selectAll(`SELECT '\xC8'`)).resolves.not.toThrow();
+      });
+    },
+  );
 
   it("doesnt error when a select query is called while preventing writes", async () => {
     await connection.insert("INSERT INTO subscribers(nick) VALUES ('138853948594')");

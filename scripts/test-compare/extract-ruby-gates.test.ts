@@ -39,6 +39,34 @@ describe("Ruby extractor gate detection", () => {
     }
   }
 
+  /** Every extracted case in file order — `rubyGates` keys by name, which two
+   * same-named arms of one conditional would collapse. */
+  function rubyCases(fixtures: Record<string, string>): { description: string; gate?: TestGate }[] {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gate-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = TestExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = []
+        ex.test_files.each { |f| f[:testCases].each { |tc| out << { description: tc[:description], gate: tc[:gate] } } }
+        puts JSON.generate(out)
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   // Fixtures are minimal — the extractor needs no class wrapper or assertion body.
   it("derives gates from dir, class wrapping, and in-body skips", () => {
     const g = rubyGates({
@@ -500,5 +528,45 @@ describe("Ruby extractor gate detection", () => {
     // The module is never \`include\`d in this file, so it falls back to the gate
     // in force at its definition site (\`supports_views?\`) rather than ungated.
     expect(g["defined under gate"]).toEqual({ features: ["views"], source: ["class"] });
+  });
+
+  it("gates the else branch on the inverted condition", () => {
+    const g = rubyGates({
+      "cases/else_test.rb": `
+        if ActiveRecord::Base.lease_connection.supports_validate_constraints?
+          def test_supported; end
+        else
+          def test_unsupported; end
+        end
+        if current_adapter?(:PostgreSQLAdapter)
+          def test_pg_only; end
+        else
+          def test_not_pg; end
+        end
+      `,
+    });
+    expect(g["supported"]).toEqual({ features: ["validate_constraints"], source: ["class"] });
+    expect(g["unsupported"]).toEqual({
+      guards: ["no_validate_constraints"],
+      source: ["class"],
+    });
+    expect(g["pg only"]).toEqual({ adapters: ["postgresql"], source: ["class"] });
+    expect(g["not pg"]).toEqual({ adapters: ["mysql", "sqlite"], source: ["class"] });
+  });
+
+  it("distinguishes same-named tests defined on both arms of a feature conditional", () => {
+    const cases = rubyCases({
+      "cases/foreign_key_test.rb": `
+        if ActiveRecord::Base.lease_connection.supports_validate_constraints?
+          def test_add_invalid_foreign_key; end
+        else
+          def test_add_invalid_foreign_key; end
+        end
+      `,
+    });
+    expect(cases.map((c) => [c.description, c.gate])).toEqual([
+      ["add invalid foreign key", { features: ["validate_constraints"], source: ["class"] }],
+      ["add invalid foreign key", { guards: ["no_validate_constraints"], source: ["class"] }],
+    ]);
   });
 });
