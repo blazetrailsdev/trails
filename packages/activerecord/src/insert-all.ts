@@ -38,6 +38,7 @@ interface ResolvedConnectionFacts {
   supportsInsertConflictTarget: boolean;
   primaryKeys: string[];
   indexes: (tableName: string) => unknown[];
+  columnsHash: Record<string, unknown>;
 }
 
 /**
@@ -71,6 +72,9 @@ async function resolveConnectionFacts(
     if (pk != null) primaryKeys = Array.isArray(pk) ? pk : [pk];
   }
   const indexes: unknown[] = cache ? await cache.indexes(model.tableName) : [];
+  const columnsHash: Record<string, unknown> = cache
+    ? ((await cache.columnsHash(model.tableName)) ?? {})
+    : {};
   return {
     supportsInsertReturning,
     supportsInsertOnDuplicateSkip,
@@ -78,6 +82,7 @@ async function resolveConnectionFacts(
     supportsInsertConflictTarget,
     primaryKeys,
     indexes: (name: string) => (name === model.tableName ? indexes : []),
+    columnsHash,
   };
 }
 
@@ -189,6 +194,14 @@ export class InsertAll {
   updatableColumns(): string[] {
     const exclude = new Set([...this.readonlyColumns(), ...this.uniqueByColumns()]);
     return (this._updatableColumns ??= [...this.keys].filter((k) => !exclude.has(k)));
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  schemaCacheColumnsHash(tableName: string): Record<string, unknown> {
+    return tableName === this.model.tableName ? this._facts.columnsHash : {};
   }
 
   /** @missingRailsCall table_name — PERMANENT */
@@ -458,19 +471,11 @@ export class Builder implements InsertBuilder {
 
   /** @internal */
   private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, Type> {
-    const columns = (
-      this._connection as unknown as {
-        internalSchemaCache: {
-          getCachedColumnsHash(t: string): Record<string, unknown> | undefined;
-        };
-      }
-    ).internalSchemaCache.getCachedColumnsHash(tableName);
+    const columns = this._insertAll.schemaCacheColumnsHash(tableName);
 
-    if (columns != null) {
-      const unknownColumn = keys.find((key) => !(key in columns));
-      if (unknownColumn !== undefined) {
-        throw new UnknownAttributeError({ constructor: this.model }, unknownColumn);
-      }
+    const unknownColumn = keys.find((key) => !(key in columns));
+    if (unknownColumn !== undefined) {
+      throw new UnknownAttributeError({ constructor: this.model }, unknownColumn);
     }
 
     const types: Record<string, Type> = {};

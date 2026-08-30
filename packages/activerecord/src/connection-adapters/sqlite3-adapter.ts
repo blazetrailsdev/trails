@@ -227,7 +227,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.driver;
   }
 
-  private _inTransaction = false;
   private _readonly: boolean;
   private _strict: boolean;
   /** @internal */
@@ -463,7 +462,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       allowRetry: true,
       materializeTransactions: false,
     });
-    this._inTransaction = true;
     if (isolation) {
       this._previousReadUncommitted = (await this.queryValue("PRAGMA read_uncommitted")) ?? 0;
       await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", [], {
@@ -546,7 +544,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async beginDbTransaction(): Promise<void> {
-    if (this._inTransaction) return;
     return this.internalBeginTransaction("immediate", null);
   }
 
@@ -559,7 +556,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       allowRetry: true,
       materializeTransactions: false,
     });
-    this._inTransaction = false;
   }
 
   async commit(): Promise<void> {
@@ -579,7 +575,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const translated = this._translateException(e, "ROLLBACK TRANSACTION", []);
       if (!(translated instanceof ConnectionNotEstablished)) throw translated;
     }
-    this._inTransaction = false;
   }
 
   async rollback(): Promise<void> {
@@ -855,7 +850,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const closing = this.driver.close();
       if (closing) this._chainClose(closing);
     }
-    this._inTransaction = false;
   }
 
   /** @internal */
@@ -877,7 +871,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         await this.connectAsync();
       }
     }
-    this._inTransaction = false;
   }
 
   nativeDatabaseTypes(): NativeDatabaseTypes {
