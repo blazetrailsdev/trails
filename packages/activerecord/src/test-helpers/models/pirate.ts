@@ -22,6 +22,8 @@ export interface Pirate {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the reader/writer accessor pair for this model's generated attributes lives in the interface merged above. */
 export class Pirate extends Base {
   declare parrotsLimit: number;
+
+  cancelSaveFromCallback: boolean = false;
   declare catchphrase: string;
 
   declare parrot: Parrot | null;

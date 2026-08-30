@@ -111,7 +111,16 @@ export class Model {
 
   declare static modelName: ModelName;
 
-  errors!: Errors<this>;
+  /** @internal */
+  _errors?: Errors<this>;
+
+  get errors(): Errors<this> {
+    return (this._errors ??= new Errors(this));
+  }
+
+  set errors(value: Errors<this>) {
+    this._errors = value;
+  }
 
   /** @internal */
   _initializingAttributes = false;

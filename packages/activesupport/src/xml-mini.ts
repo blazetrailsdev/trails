@@ -525,7 +525,11 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
     else value(merged, singularize(String(key)));
     return;
   }
-  if (value != null && typeof (value as { toXml?: unknown }).toXml === "function") {
+  if (
+    value != null &&
+    "toXml" in Object(value) &&
+    typeof (value as { toXml?: unknown }).toXml === "function"
+  ) {
     (value as { toXml(o: ToTagOptions): void }).toXml(merged);
     return;
   }

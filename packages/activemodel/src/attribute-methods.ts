@@ -9,8 +9,8 @@ import {
   type Extended,
   type Included,
   Module,
-  NameError,
 } from "@blazetrails/activesupport";
+import { NoMethodError } from "./attribute-assignment.js";
 
 export interface AttributeMethods {
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
@@ -106,13 +106,6 @@ interface ReadWriteHost {
   /** @internal */
   _writeAttribute(name: string, value: unknown): void;
   [key: string]: unknown;
-}
-
-class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
 }
 
 export interface AttributeMethodHost {
@@ -446,8 +439,8 @@ export const InstanceMethods = {
   ): unknown {
     const target = (this as Record<string, (...a: unknown[]) => unknown>)[match.proxyTarget];
     if (typeof target !== "function") {
-      throw new MissingAttributeError(
-        `attribute_missing dispatch failed: ${match.proxyTarget} not defined`,
+      throw new NoMethodError(
+        `undefined method '${match.proxyTarget}' for an instance of ${(this as { constructor?: { name?: string } }).constructor?.name ?? "unknown"}`,
       );
     }
     return target.call(this, match.attrName, ...args);

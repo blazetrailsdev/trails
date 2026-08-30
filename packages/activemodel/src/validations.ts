@@ -42,6 +42,8 @@ export const _defineAfterModelCallback = _defineAfterModelCallbackImpl;
 
 export interface ValidationsInternalsHost<TBase extends object = object> {
   errors: Errors<TBase>;
+  /** @internal */
+  _errors?: Errors<TBase>;
   _validationContext: string | string[] | null;
   _contextForValidation?: ValidationContext;
 }
@@ -323,7 +325,6 @@ export function initInternals<TBase extends object>(
   super_: () => void,
 ): void {
   super_();
-  this.errors = new Errors(this as unknown as TBase);
   this._contextForValidation = undefined;
 }
 
@@ -394,7 +395,7 @@ export function initializeDup<TBase extends object>(
   super_: (other: unknown) => void,
   other: unknown,
 ): void {
-  this.errors = new Errors(this as unknown as TBase);
+  this._errors = undefined;
   super_(other);
 }
 

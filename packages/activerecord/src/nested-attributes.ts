@@ -554,7 +554,10 @@ export function assignNestedAttributesForOneToOneAssociation(
     } else {
       if (isPolymorphicBelongsTo(record, associationName)) {
         const buildMethod = `build${camelize(associationName, true)}`;
-        const builder = (record as unknown as Record<string, unknown>)[buildMethod];
+        const builder =
+          buildMethod in (record as object)
+            ? (record as unknown as Record<string, unknown>)[buildMethod]
+            : undefined;
         if (typeof builder === "function") {
           (builder as (attrs: Record<string, unknown>) => unknown).call(record, assignable);
         } else {
@@ -680,7 +683,11 @@ function populateInMemoryExistingRecord(
     }
     const pk = (targetModel as any).primaryKey;
     const pkCol = Array.isArray(pk) ? pk[0] : (pk ?? "id");
-    const row: Record<string, unknown> = { [pkCol]: id, ...stubOwnerForeignKey(record, assocDef) };
+    const row: Record<string, unknown> = {};
+    for (const column of ((targetModel as any).columnNames?.() ?? []) as string[]) {
+      row[column] = null;
+    }
+    Object.assign(row, { [pkCol]: id, ...stubOwnerForeignKey(record, assocDef) });
     existing = (targetModel as any)._instantiate(row);
     isNewStub = true;
   }

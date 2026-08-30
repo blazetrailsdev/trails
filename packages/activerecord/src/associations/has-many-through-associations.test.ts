@@ -1856,7 +1856,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const postAddresses = await (post as any).authorAddresses.toArray();
     expect(postAddresses.map((a: any) => a.id)).toContain(address.id);
     await (post as any).authorAddresses.delete(address);
-    expect((post as any)["author_count"]).toBeUndefined();
+    expect((post as any).get("author_count")).toBeNull();
   });
 
   it("primary key option on source", async () => {

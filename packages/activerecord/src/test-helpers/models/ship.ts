@@ -29,6 +29,8 @@ export class Ship extends Base {
   declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
   declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
 
+  cancelSaveFromCallback: boolean = false;
+
   static {
     this.recordTimestamps = false;
     this.belongsTo("pirate");

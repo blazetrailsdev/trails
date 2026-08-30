@@ -61,7 +61,7 @@ export class Parrot extends Base {
   }
 
   incrementUpdatedCount() {
-    (this as any).updatedCount = ((this as any).updatedCount ?? 0) + 1;
+    this.updated_count = (this.updated_count ?? 0) + 1;
   }
 }
 

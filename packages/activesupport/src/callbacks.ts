@@ -1645,6 +1645,9 @@ export namespace Callbacks {
     ): unknown {
       return Callbacks.runCallbacks(this, name, block, opts, type);
     },
+
+    /** Mirrors: ActiveSupport::Callbacks#halted_callback_hook (callbacks.rb:149-150). */
+    haltedCallbackHook(_filter: unknown, _name: string): void {},
   };
 }
 
