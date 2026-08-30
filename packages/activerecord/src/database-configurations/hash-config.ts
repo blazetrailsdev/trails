@@ -15,7 +15,7 @@ export class HashConfig extends DatabaseConfig {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE alias of configurationHash predating the hash_config.rb split; callers converge onto configurationHash.
+   * @noRailsEquivalent CONVERGEABLE converge-hash-config-configuration-alias
    */
   get configuration(): DatabaseConfigOptions {
     return this.configurationHash;
@@ -97,6 +97,15 @@ export class HashConfig extends DatabaseConfig {
     return this.configurationHash.schemaCachePath;
   }
 
+  defaultSchemaCachePath(dbDir: string = "db"): string {
+    const file = this.isPrimary() ? "schema_cache.json" : `${this.name}_schema_cache.json`;
+    return `${dbDir}/${file}`;
+  }
+
+  lazySchemaCachePath(): string {
+    return this.schemaCachePath ?? this.defaultSchemaCachePath();
+  }
+
   isPrimary(): boolean {
     return configurations().isPrimary(this.name);
   }
@@ -120,15 +129,6 @@ export class HashConfig extends DatabaseConfig {
     const typeFile = this.schemaFileType(format);
     if (!typeFile) return null;
     return this.isPrimary() ? typeFile : `${this.name}_${typeFile}`;
-  }
-
-  defaultSchemaCachePath(dbDir: string = "db"): string {
-    const file = this.isPrimary() ? "schema_cache.json" : `${this.name}_schema_cache.json`;
-    return `${dbDir}/${file}`;
-  }
-
-  lazySchemaCachePath(): string {
-    return this.schemaCachePath ?? this.defaultSchemaCachePath();
   }
 
   /** @missingRailsCall fetch — PERMANENT */

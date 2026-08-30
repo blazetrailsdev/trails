@@ -84,10 +84,8 @@ export class DatabaseConfig {
   }
 
   /**
-   * Synchronous companion to `adapterClass()`, for the sync `newConnection`.
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE Ruby's ConnectionAdapters.resolve is synchronous because `require` is; retires with the pool async convergence.
+   * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
    */
   adapterClassSync(): (new (...args: any[]) => unknown) | null {
     if (!_adapterClassResolverSync || !this.adapter) return null;
@@ -95,11 +93,8 @@ export class DatabaseConfig {
   }
 
   /**
-   * Awaits the dynamic import behind `adapterClass()` so the sync companions
-   * above it can answer.
-   *
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the async half of the same split; retires with the pool async convergence.
+   * @noRailsEquivalent CONVERGEABLE retire-adapter-resolution-sync-companions
    */
   async loadAdapter(): Promise<unknown> {
     return this.adapterClass();
