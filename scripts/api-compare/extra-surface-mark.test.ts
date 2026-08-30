@@ -11,27 +11,34 @@ import {
 } from "./extra-surface-mark.js";
 
 const marks: SurfaceMarks = { arel: { novel: 0, total: 63 } };
+const zeroMarks: SurfaceMarks = { "ruby-compat": { novel: 0, total: 0 } };
 
 describe("extra-surface mark", () => {
   it("measures only the gated packages", () => {
     const measured = measure([
       { package: "arel", totalNovel: 0, totalExtras: 63 },
       { package: "activerecord", totalNovel: 399, totalExtras: 1424 },
+      { package: "ruby-compat", totalNovel: 0, totalExtras: 0 },
       { package: "activemodel", totalNovel: 12, totalExtras: 34 },
     ]);
     expect(measured).toEqual({
       arel: { novel: 0, total: 63 },
       activerecord: { novel: 399, total: 1424 },
+      "ruby-compat": { novel: 0, total: 0 },
     });
   });
 
   it("names a gated package the mark file never seeded", () => {
-    expect(unmarkedPackages({ arel: { novel: 0, total: 63 } })).toEqual(["activerecord"]);
+    expect(unmarkedPackages({ arel: { novel: 0, total: 63 } })).toEqual([
+      "activerecord",
+      "ruby-compat",
+    ]);
     expect(unmarkedPackages({})).toEqual([...GATED_PACKAGES]);
     expect(
       unmarkedPackages({
         arel: { novel: 0, total: 63 },
         activerecord: { novel: 399, total: 1424 },
+        "ruby-compat": { novel: 0, total: 0 },
       }),
     ).toEqual([]);
   });
@@ -80,6 +87,23 @@ describe("extra-surface mark", () => {
     });
     expect(tightened(marks, { arel: { novel: 3, total: 70 } })).toEqual({
       arel: { novel: 0, total: 63 },
+    });
+  });
+
+  it("holds ruby-compat at zero, so any public name at all is an exceedance", () => {
+    expect(exceedances(zeroMarks, { "ruby-compat": { novel: 0, total: 0 } })).toEqual([]);
+    expect(exceedances(zeroMarks, { "ruby-compat": { novel: 1, total: 1 } })).toEqual([
+      { package: "ruby-compat", dimension: "novel", mark: 0, current: 1 },
+      { package: "ruby-compat", dimension: "total", mark: 0, current: 1 },
+    ]);
+  });
+
+  it("cannot tighten ruby-compat below zero, and never widens it", () => {
+    expect(tightened(zeroMarks, { "ruby-compat": { novel: 0, total: 0 } })).toEqual({
+      "ruby-compat": { novel: 0, total: 0 },
+    });
+    expect(tightened(zeroMarks, { "ruby-compat": { novel: 4, total: 4 } })).toEqual({
+      "ruby-compat": { novel: 0, total: 0 },
     });
   });
 

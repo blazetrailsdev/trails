@@ -28,6 +28,16 @@
  * burn down. The mark is seeded at the measured 399 novel / 1424 total: a
  * high-water mark to shrink, NOT a budget to spend.
  *
+ * ruby-compat joined under RFC 0129, at the moment its mark was still 0/0. Its
+ * defining rule — no member exists without a real call site in this repo — has
+ * no `SKIP_GROUPS` discipline behind it, because there is no Ruby-Rails file to
+ * be measured against: every public name in the package lands in the
+ * `rubyFile === null` slice and scores novel, so this counter IS the rule. A
+ * speculative member — an MRI method ported because its siblings are here —
+ * raises `novel` and turns the gate red, and there is no reseed. A later need
+ * is a later story against RFC 0129 carrying its motivating call site, and the
+ * mark moves up only as a reviewed line of that story's diff.
+ *
  * activemodel remains ungated. The same reasoning would apply, but it has no
  * burndown behind it yet, and widening GATED_PACKAGES without one is exactly
  * the not-mechanical step this comment has always warned about.
@@ -47,7 +57,7 @@ export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
  * The packages this gate covers. Everything else is measured by
  * `parity:api:extra` and left ungated — see the module comment.
  */
-export const GATED_PACKAGES = ["arel", "activerecord"] as const;
+export const GATED_PACKAGES = ["arel", "activerecord", "ruby-compat"] as const;
 
 export interface SurfaceMark {
   /**

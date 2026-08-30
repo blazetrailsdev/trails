@@ -31,6 +31,19 @@ this package is extra surface by construction (see rule 2), so the extra-surface
 report lists the entire package; the question a reviewer asks of a new row is
 "where is the call site", and the answer must be a file and a line.
 
+The counter behind that report is a gate. `ruby-compat` is in `GATED_PACKAGES`
+(`scripts/api-compare/extra-surface-mark.ts`) with its mark committed in
+`extra-surface-mark.json`, and `pnpm parity:api:extra:gate` fails on **any**
+increase in either dimension. So a speculative member — an MRI method ported
+because its siblings are here, or "we'll need it soon" — does not reach review
+as a judgement call: it raises `novel`, and CI turns red. The mark is only-shrink
+(`parity:api:extra:tighten` writes it DOWN) and **there is no reseed**.
+
+The way past the gate is therefore never a bigger mark in a PR that is about
+something else. A later need is a **later story filed against RFC 0129**, naming
+the call site that motivates it, and the mark moves in that story's reviewed
+diff — never as a drive-by addition to a move PR.
+
 ### 2. Every export carries BOTH a `vendor/ruby` citation and a receipt
 
 Each exported member needs two things in its JSDoc:
@@ -70,6 +83,12 @@ with a burndown behind it. Do not add `ruby-compat` to `vendor/sources.ts`, to
 `PACKAGES`, or to `PACKAGES_OUTSIDE_MANIFEST` — the last of those subtracts a
 package from the `unbacked-internal-needs-receipt` rule, and this package wants
 that rule at full strength (rule 2 requires the receipt unconditionally).
+
+What it IS in is `TS_ONLY_PACKAGES` (same file) — the packages the TypeScript
+extractor walks and the Rails comparison never scores. That is the whole of the
+enrollment rule 1 relies on: the TS manifest has to carry the package for the
+extra-surface counter to see it, while the Rails-parity population stays a list
+of gems.
 
 ### 4. It is a leaf: no workspace dependencies
 

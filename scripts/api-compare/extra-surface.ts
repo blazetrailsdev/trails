@@ -88,7 +88,7 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "@blazetrails/parity/types";
-import { OUTPUT_DIR, apiComparePackageRoots } from "./config.js";
+import { OUTPUT_DIR, TS_ONLY_PACKAGES, apiComparePackageRoots } from "./config.js";
 import {
   SKIP,
   SKIP_TS_MIRROR_IS_DRIFT,
@@ -1701,6 +1701,20 @@ export function inlinedModuleMembers(
   return out.sort((a, b) => a.tsFile.localeCompare(b.tsFile) || a.tsName.localeCompare(b.tsName));
 }
 
+/**
+ * The Rails side of a `TS_ONLY_PACKAGES` package — one with no gem at all, so
+ * no file of it maps onto any Ruby file, every TS file lands in the
+ * `rubyFile === null` slice and every public name in it scores novel. That is
+ * the measurement `ruby-compat` is gated on (RFC 0129), and it falls out of the
+ * scoring the no-counterpart slice already does rather than needing its own arm.
+ *
+ * A factory rather than a shared constant: `foldClassMethodsModules` mutates
+ * `rubyPkg.modules`.
+ */
+function emptyRubyPackage(): PackageInfo {
+  return { classes: {}, modules: {} };
+}
+
 function buildPackageReport(
   pkg: string,
   ruby: ApiManifest,
@@ -1715,7 +1729,7 @@ function buildPackageReport(
   fileTagRejections: FileTagRejection[],
   concernHooks: Map<string, Set<string>>,
 ): PackageTotals {
-  const rubyPkg = ruby.packages[pkg];
+  const rubyPkg = ruby.packages[pkg] ?? emptyRubyPackage();
   const tsPkg = ts.packages[pkg];
   const result: PackageTotals = {
     package: pkg,
@@ -1731,7 +1745,7 @@ function buildPackageReport(
     extraFiles: [],
     inlinedFrom: [],
   };
-  if (!rubyPkg || !tsPkg) return result;
+  if (!tsPkg) return result;
 
   // Pre-fold ASC's `::ClassMethods` submodules into their parent's
   // classMethods (mirrors compare.ts:759-773). Mutates rubyPkg.modules.
@@ -2272,7 +2286,7 @@ export function buildReport(
   const packages: PackageTotals[] = [];
   const fileTagRejections: FileTagRejection[] = [];
   const scannedPkgs = new Set<string>();
-  for (const pkg of Object.keys(ruby.packages)) {
+  for (const pkg of [...Object.keys(ruby.packages), ...TS_ONLY_PACKAGES]) {
     if (opts.filterPkg && pkg !== opts.filterPkg) continue;
     if (!ts.packages[pkg]) continue;
     scannedPkgs.add(pkg);

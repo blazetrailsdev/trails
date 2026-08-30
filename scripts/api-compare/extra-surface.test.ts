@@ -300,6 +300,41 @@ describe("buildReport — ActiveSupport::Concern allow-set", () => {
   });
 });
 
+describe("a TS-only package", () => {
+  const report = (): ReturnType<typeof buildReport> => {
+    const ruby: ApiManifest = { source: "ruby", generatedAt: "", packages: {} };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        "ruby-compat": {
+          classes: {},
+          modules: {},
+          fileFunctions: { "string.ts": [method("succ"), method("squeeze")] },
+        },
+      },
+    };
+    return buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+  };
+
+  it("is scored even though the Ruby manifest has no package of that name", () => {
+    expect(report().packages.map((p) => p.package)).toEqual(["ruby-compat"]);
+  });
+
+  it("scores every public name novel, on a file with no counterpart", () => {
+    const pkg = report().packages[0];
+    expect(pkg?.totalNovel).toBe(2);
+    expect(pkg?.noCounterpartNovel).toBe(2);
+    expect(pkg?.extraFiles[0]?.rubyFile).toBeNull();
+    expect(pkg?.extraFiles[0]?.extras.map((e) => e.name)).toEqual(["squeeze", "succ"]);
+  });
+});
+
 describe("concernHookNames", () => {
   it("credits [included] for an `included do` block", () => {
     // activemodel/lib/active_model/conversion.rb:27-33 — the block only calls
