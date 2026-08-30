@@ -41,7 +41,7 @@ describe("virtualize — deltas", () => {
       "}\n";
     const { deltas } = virtualize(src, "post.ts");
     expect(deltas).toHaveLength(1);
-    expect(deltas[0].lineCount).toBe(3);
+    expect(deltas[0].lineCount).toBe(7);
   });
 
   test("no deltas when no class matches Base", () => {
@@ -63,11 +63,11 @@ describe("virtualize — deltas", () => {
         posts: { title: "string", body: "text", published_at: "datetime", views: "integer" },
       },
     });
-    expect(text).toMatch(/declare title: string;/);
-    expect(text.match(/declare title: string;/g)?.length).toBe(1);
-    expect(text).toMatch(/declare body: string;/);
-    expect(text).toMatch(/declare published_at:.*Temporal\.Instant.*Temporal\.PlainDateTime/);
-    expect(text).toMatch(/declare views: number;/);
+    expect(text).toMatch(/get title\(\): string;/);
+    expect(text.match(/get title\(\): string;/g)?.length).toBe(1);
+    expect(text).toMatch(/get body\(\): string;/);
+    expect(text).toMatch(/get published_at\(\):.*Temporal\.Instant.*Temporal\.PlainDateTime/);
+    expect(text).toMatch(/get views\(\): number;/);
   });
 
   test("schemaColumnsByTable skips user-authored declares", () => {
@@ -80,6 +80,7 @@ describe("virtualize — deltas", () => {
       schemaColumnsByTable: { posts: { body: "text" } },
     });
     expect(text.match(/declare body:/g)?.length).toBe(1);
+    expect(text).not.toMatch(/get body\(\):/);
   });
 
   test("schemaColumnsByTable skips `id`", () => {
@@ -87,8 +88,8 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "post.ts", {
       schemaColumnsByTable: { posts: { id: "integer", name: "string" } },
     });
-    expect(text).not.toMatch(/declare id:/);
-    expect(text).toMatch(/declare name: string;/);
+    expect(text).not.toMatch(/get id\(\):/);
+    expect(text).toMatch(/get name\(\): string;/);
   });
 
   test("schemaColumnsByTable quotes non-identifier and reserved-word column names", () => {
@@ -106,15 +107,15 @@ describe("virtualize — deltas", () => {
         },
       },
     });
-    expect(text).toMatch(/declare safe: string;/);
-    expect(text).toMatch(/declare "strange-col": string;/);
-    expect(text).toMatch(/declare "2bad": string;/);
-    expect(text).toMatch(/declare "class": string;/);
-    expect(text).toMatch(/declare "static": string;/);
-    expect(text).toMatch(/declare "interface": string;/);
-    expect(text).toMatch(/declare "private": string;/);
-    expect(text).not.toMatch(/declare class: string;/);
-    expect(text).not.toMatch(/declare static: string;/);
+    expect(text).toMatch(/get safe\(\): string;/);
+    expect(text).toMatch(/get "strange-col"\(\): string;/);
+    expect(text).toMatch(/get "2bad"\(\): string;/);
+    expect(text).toMatch(/get "class"\(\): string;/);
+    expect(text).toMatch(/get "static"\(\): string;/);
+    expect(text).toMatch(/get "interface"\(\): string;/);
+    expect(text).toMatch(/get "private"\(\): string;/);
+    expect(text).not.toMatch(/get class\(\): string;/);
+    expect(text).not.toMatch(/get static\(\): string;/);
   });
 
   test("schemaColumnsByTable de-dupes against user-authored quoted members", () => {
@@ -125,7 +126,8 @@ describe("virtualize — deltas", () => {
       },
     });
     expect(text.match(/declare "strange-col":/g)?.length).toBe(1);
-    expect(text).toMatch(/declare safe: string;/);
+    expect(text).not.toMatch(/get "strange-col"\(\):/);
+    expect(text).toMatch(/get safe\(\): string;/);
   });
 
   test("isKnownTarget: unknown plain association target falls back to Base", () => {
@@ -177,9 +179,9 @@ describe("virtualize — deltas", () => {
       "}\n";
     const { text } = virtualize(src, "membership.ts", { attributesNullable: true });
     expect(text).toMatch(
-      /declare club_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+      /get club_id\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
     );
-    expect(text).toMatch(/declare rank: number \| null;/);
+    expect(text).toMatch(/get rank\(\): number \| null;/);
   });
 
   test("isKnownTarget omitted: every target is trusted verbatim", () => {
@@ -208,7 +210,7 @@ describe("virtualize — deltas", () => {
     });
     expect(text.match(/declare comments:/g)?.length).toBe(1);
     expect(text.match(/declare author:/g)?.length).toBe(1);
-    expect(text).toMatch(/declare body: string;/);
+    expect(text).toMatch(/get body\(\): string;/);
   });
 
   test("runtime-macro declares quote reserved / non-identifier names", () => {
@@ -219,8 +221,8 @@ describe("virtualize — deltas", () => {
       "  }\n" +
       "}\n";
     const { text } = virtualize(src, "post.ts");
-    expect(text).toMatch(/declare "class": string;/);
-    expect(text).not.toMatch(/declare class: string;/);
+    expect(text).toMatch(/get "class"\(\): string;/);
+    expect(text).not.toMatch(/get class\(\): string;/);
   });
 
   test("schemaColumnsByTable accepts the rich shape (null: true, arrayElementType)", () => {
@@ -235,10 +237,10 @@ describe("virtualize — deltas", () => {
         },
       },
     });
-    expect(text).toMatch(/declare title: string;/);
-    expect(text).toMatch(/declare bio: string \| null;/);
-    expect(text).toMatch(/declare tags: number\[\] \| null;/);
-    expect(text).toMatch(/declare strict_tags: string\[\];/);
+    expect(text).toMatch(/get title\(\): string;/);
+    expect(text).toMatch(/get bio\(\): string \| null;/);
+    expect(text).toMatch(/get tags\(\): number\[\] \| null;/);
+    expect(text).toMatch(/get strict_tags\(\): string\[\];/);
   });
 
   test("schemaColumnsByTable emits Temporal types for timestamp/timestamptz/date/time columns", () => {
@@ -254,12 +256,12 @@ describe("virtualize — deltas", () => {
         },
       },
     });
-    expect(text).toMatch(/declare created_at:.*Temporal\.Instant;/);
-    expect(text).toMatch(/declare updated_at:.*Temporal\.PlainDateTime;/);
-    expect(text).toMatch(/declare starts_on:.*Temporal\.PlainDate.*\| null/);
-    expect(text).toMatch(/declare duration:.*Temporal\.PlainTime;/);
+    expect(text).toMatch(/get created_at\(\):.*Temporal\.Instant;/);
+    expect(text).toMatch(/get updated_at\(\):.*Temporal\.PlainDateTime;/);
+    expect(text).toMatch(/get starts_on\(\):.*Temporal\.PlainDate.*\| null/);
+    expect(text).toMatch(/get duration\(\):.*Temporal\.PlainTime;/);
     expect(text).toMatch(
-      /declare scheduled_at: \(.*Temporal\.Instant.*Temporal\.PlainDateTime\) \| null/,
+      /get scheduled_at\(\): \(.*Temporal\.Instant.*Temporal\.PlainDateTime\) \| null/,
     );
   });
 
@@ -273,8 +275,8 @@ describe("virtualize — deltas", () => {
         },
       },
     });
-    expect(text).toMatch(/declare score: bigint;/);
-    expect(text).toMatch(/declare score_nullable: bigint \| null;/);
+    expect(text).toMatch(/get score\(\): bigint;/);
+    expect(text).toMatch(/get score_nullable\(\): bigint \| null;/);
   });
 
   test("schemaColumnsByTable widens integer FK columns to PrimaryKeyValue", () => {
@@ -290,15 +292,15 @@ describe("virtualize — deltas", () => {
       },
     });
     expect(text).toMatch(
-      /declare club_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+      /get club_id\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
     );
     expect(text).toMatch(
-      /declare member_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+      /get member_id\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
     );
     expect(text).toMatch(
-      /declare favorite_things_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+      /get favorite_things_id\(\): import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
     );
-    expect(text).toMatch(/declare rank: number \| null;/);
+    expect(text).toMatch(/get rank\(\): number \| null;/);
   });
 
   test("schemaColumnsByTable mixing legacy string and rich shape in same table", () => {
@@ -311,8 +313,8 @@ describe("virtualize — deltas", () => {
         },
       },
     });
-    expect(text).toMatch(/declare legacy: string;/);
-    expect(text).toMatch(/declare modern: number;/);
+    expect(text).toMatch(/get legacy\(\): string;/);
+    expect(text).toMatch(/get modern\(\): number;/);
   });
 
   test("schemaColumnsByTable emits columns in stable (sorted) order", () => {
@@ -322,9 +324,9 @@ describe("virtualize — deltas", () => {
         posts: { zulu: "string", alpha: "string", mike: "string" },
       },
     });
-    const alphaIdx = text.indexOf("declare alpha:");
-    const mikeIdx = text.indexOf("declare mike:");
-    const zuluIdx = text.indexOf("declare zulu:");
+    const alphaIdx = text.indexOf("get alpha():");
+    const mikeIdx = text.indexOf("get mike():");
+    const zuluIdx = text.indexOf("get zulu():");
     expect(alphaIdx).toBeGreaterThan(-1);
     expect(mikeIdx).toBeGreaterThan(alphaIdx);
     expect(zuluIdx).toBeGreaterThan(mikeIdx);
@@ -335,7 +337,7 @@ describe("virtualize — deltas", () => {
     const { text } = virtualize(src, "blog-post.ts", {
       schemaColumnsByTable: { blog_posts: { slug: "string" } },
     });
-    expect(text).toMatch(/declare slug: string;/);
+    expect(text).toMatch(/get slug\(\): string;/);
   });
 
   test("skip marker yields no deltas", () => {
@@ -486,7 +488,7 @@ describe("virtualize — multiple classes", () => {
       "  }\n" +
       "});\n";
     const { text } = virtualize(src, "file.ts");
-    expect(text).toContain("declare title: string;");
+    expect(text).toContain("get title(): string;");
     expect(text).toContain("declare gadgets:");
   });
 
@@ -552,7 +554,7 @@ describe("virtualize — multiple classes", () => {
     const { text } = virtualize(src, "file.ts", {
       isModelClass: (cls) => baseRooted.has(`${cls.pos}:${cls.end}`),
     });
-    expect(text.match(/declare rating: number;/g)?.length).toBe(1);
+    expect(text.match(/get rating\(\): number;/g)?.length).toBe(1);
   });
 });
 
@@ -566,8 +568,8 @@ describe("virtualize — materializing-generator gaps", () => {
       "  }\n" +
       "}\n";
     const { text } = virtualize(src, "file.ts");
-    expect(text).not.toMatch(/declare id:/);
-    expect(text).toContain("declare content: string;");
+    expect(text).not.toMatch(/get id\(\):/);
+    expect(text).toContain("get content(): string;");
   });
 
   test("attributesNullable renders attribute declares as `T | null`", () => {
@@ -575,9 +577,9 @@ describe("virtualize — materializing-generator gaps", () => {
       "class Reply extends Base {\n" +
       '  static { this.attribute("content", "string"); }\n' +
       "}\n";
-    expect(virtualize(src, "file.ts").text).toContain("declare content: string;");
+    expect(virtualize(src, "file.ts").text).toContain("get content(): string;");
     expect(virtualize(src, "file.ts", { attributesNullable: true }).text).toContain(
-      "declare content: string | null;",
+      "get content(): string | null;",
     );
   });
 
@@ -863,6 +865,29 @@ describe("virtualize — include() interface bridge", () => {
     expect(once.match(/__TrailsIncluded/g)?.length).toBeGreaterThan(0);
     expect(twice.match(/import type \{ Included as __TrailsIncluded \}/g)?.length).toBe(1);
     expect(twice.match(/interface Relation extends __TrailsIncluded<typeof QM>/g)?.length).toBe(1);
+  });
+});
+
+describe("virtualize — attribute accessor pairs", () => {
+  test("an attribute member is a get/set pair whose writer takes the raw value", () => {
+    const src =
+      "export class Post extends Base {\n" +
+      '  static { this.attribute("published_at", "datetime"); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts");
+    expect(text).toMatch(/export interface Post \{/);
+    expect(text).toMatch(/get published_at\(\):.*Temporal\.Instant.*Temporal\.PlainDateTime;/);
+    expect(text).toMatch(/set published_at\(value: unknown\);/);
+  });
+
+  test("a default-exported class keeps the plain declare form", () => {
+    const src =
+      "export default class Post extends Base {\n" +
+      '  static { this.attribute("title", "string"); }\n' +
+      "}\n";
+    const { text } = virtualize(src, "post.ts");
+    expect(text).toContain("declare title: string;");
+    expect(text).not.toMatch(/interface Post/);
   });
 });
 

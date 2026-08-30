@@ -1,5 +1,4 @@
 export class Task extends Base {
-  declare status: number;
   declare isTierLow: () => boolean;
   declare tierLowBang: () => Promise<true | undefined>;
   declare static tierLow: () => import("@blazetrails/activerecord").Relation<Task>;
@@ -14,3 +13,8 @@ export class Task extends Base {
     this.enum("status", { low: 0, high: 1 }, { prefix: "tier" });
   }
 }
+export interface Task {
+  get status(): number;
+  set status(value: unknown);
+}
+

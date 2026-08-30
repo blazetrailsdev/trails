@@ -1,7 +1,8 @@
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 
 export class NumericData extends Base {
-  declare virtual_decimal_number: unknown;
+  declare virtual_decimal_number: BigDecimal | null;
   declare world_population: bigint;
   declare my_house_population: bigint;
   declare atoms_in_universe: bigint;

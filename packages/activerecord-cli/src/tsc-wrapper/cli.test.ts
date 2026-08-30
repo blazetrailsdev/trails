@@ -59,7 +59,7 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
     expect(modelFile).toBeDefined();
     // model.ts has no static block with `this.attribute(...)` calls
     // on a class that extends Base — it IS the Base. No declares injected.
-    expect(modelFile!.text).not.toContain("declare title");
+    expect(modelFile!.text).not.toContain("get title()");
   });
 
   it("zero diagnostics across all diagnostic categories", () => {
@@ -182,7 +182,7 @@ describe("trails-tsc transitive extends — Phase 1b.3", () => {
     const { program } = createProgramWithArPlugin(configPath);
     const userFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "user.ts"));
     expect(userFile).toBeDefined();
-    expect(userFile!.text).toContain("declare name: string");
+    expect(userFile!.text).toContain("get name(): string");
   });
 
   it("Admin (transitive via User) gets declares injected", () => {
@@ -190,7 +190,7 @@ describe("trails-tsc transitive extends — Phase 1b.3", () => {
     const { program } = createProgramWithArPlugin(configPath);
     const adminFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "admin.ts"));
     expect(adminFile).toBeDefined();
-    expect(adminFile!.text).toContain("declare role: string");
+    expect(adminFile!.text).toContain("get role(): string");
   });
 });
 

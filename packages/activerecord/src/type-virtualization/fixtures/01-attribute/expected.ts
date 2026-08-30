@@ -1,9 +1,4 @@
 export class Post extends Base {
-  declare title: string;
-  declare view_count: number;
-  declare published: boolean;
-  declare published_at: import("@blazetrails/date").Temporal.Instant | import("@blazetrails/date").Temporal.PlainDateTime;
-
   static {
     this.attribute("title", "string");
     this.attribute("view_count", "integer");
@@ -11,3 +6,14 @@ export class Post extends Base {
     this.attribute("published_at", "datetime");
   }
 }
+export interface Post {
+  get title(): string;
+  set title(value: unknown);
+  get view_count(): number;
+  set view_count(value: unknown);
+  get published(): boolean;
+  set published(value: unknown);
+  get published_at(): import("@blazetrails/date").Temporal.Instant | import("@blazetrails/date").Temporal.PlainDateTime;
+  set published_at(value: unknown);
+}
+

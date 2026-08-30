@@ -33,10 +33,31 @@ export interface SynthesizeOptions {
   superNameOf?: ReadonlyMap<string, string>;
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
   isKnownTarget?: (name: string, host: ClassInfo) => boolean;
+  mergeAttributeInterface?: boolean;
 }
 
-export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
+export interface SynthesizedDeclares {
+  classLines: string[];
+  interfaceLines: string[];
+}
+
+export function synthesizeDeclares(
+  info: ClassInfo,
+  opts: SynthesizeOptions = {},
+): SynthesizedDeclares {
   const out: string[] = [];
+  const interfaceLines: string[] = [];
+  const mergeAttributeInterface = opts.mergeAttributeInterface ?? true;
+  const emit = (l: RenderedLine): void => {
+    if (mergeAttributeInterface && l.attribute) {
+      interfaceLines.push(
+        `${INDENT}get ${l.attribute.memberName}(): ${l.attribute.readerType};`,
+        `${INDENT}set ${l.attribute.memberName}(value: unknown);`,
+      );
+    } else {
+      out.push(l.text);
+    }
+  };
   const aliases = opts.classNameAliases;
   const targets = opts.associationTargets;
   const isKnownTarget = boundKnownTarget(info, opts);
@@ -65,7 +86,7 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
       isKnownTarget,
     )) {
       if (!line.skipIfPresent || !memberPresent(info, line)) {
-        out.push(line.text);
+        emit(line);
         if (!line.isStatic) synthesizedInstanceNames.add(line.declaredName);
       }
     }
@@ -77,9 +98,9 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
     }
   }
   for (const line of renderSchemaColumnDeclares(info, synthesizedInstanceNames, opts)) {
-    out.push(line);
+    emit(line);
   }
-  return out;
+  return { classLines: out, interfaceLines };
 }
 
 function boundKnownTarget(
@@ -95,13 +116,13 @@ function renderSchemaColumnDeclares(
   info: ClassInfo,
   synthesizedInstanceNames: Set<string>,
   opts: SynthesizeOptions,
-): string[] {
+): RenderedLine[] {
   const map = opts.schemaColumnsByTable;
   if (!map) return [];
   const table = info.tableName ?? pluralize(underscore(info.name));
   const cols = map[table];
   if (!cols) return [];
-  const out: string[] = [];
+  const out: RenderedLine[] = [];
   const entries = Object.entries(cols).sort(([a], [b]) => a.localeCompare(b));
   const composedCols = opts.composedOfColumns?.get(info.name);
   for (const [col, value] of entries) {
@@ -113,7 +134,7 @@ function renderSchemaColumnDeclares(
     const tsType = isForeignKeyColumn(col, value)
       ? `${AR_IMPORT}.PrimaryKeyValue`
       : renderSchemaValueType(value);
-    out.push(`${INDENT}declare ${renderDeclaredMemberName(col)}: ${tsType};`);
+    out.push(attributeLine(renderDeclaredMemberName(col), tsType, col));
   }
   return out;
 }
@@ -262,6 +283,7 @@ interface RenderedLine {
   declaredName: string;
   isStatic: boolean;
   skipIfPresent: boolean;
+  attribute?: { memberName: string; readerType: string };
 }
 
 function renderCall(
@@ -294,7 +316,7 @@ function renderAttribute(call: AttributeCall, nullable: boolean): RenderedLine[]
   if (call.name === "id") return [];
   const memberName = renderDeclaredMemberName(call.name);
   if (isForeignKeyColumn(call.name, call.railsType)) {
-    return [line(`declare ${memberName}: ${AR_IMPORT}.PrimaryKeyValue;`, call.name, false)];
+    return [attributeLine(memberName, `${AR_IMPORT}.PrimaryKeyValue`, call.name)];
   }
   const tsType = tsTypeFor(call.railsType);
   const rendered = nullable
@@ -302,7 +324,7 @@ function renderAttribute(call: AttributeCall, nullable: boolean): RenderedLine[]
       ? `(${tsType}) | null`
       : `${tsType} | null`
     : tsType;
-  return [line(`declare ${memberName}: ${rendered};`, call.name, false)];
+  return [attributeLine(memberName, rendered, call.name)];
 }
 
 function renderCollectionAssoc(
@@ -415,6 +437,13 @@ function line(body: string, declaredName: string, isStatic: boolean): RenderedLi
     declaredName,
     isStatic,
     skipIfPresent: true,
+  };
+}
+
+function attributeLine(memberName: string, readerType: string, declaredName: string): RenderedLine {
+  return {
+    ...line(`declare ${memberName}: ${readerType};`, declaredName, false),
+    attribute: { memberName, readerType },
   };
 }
 

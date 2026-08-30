@@ -1,6 +1,4 @@
 export class Post extends Base {
-  declare body: string;
-
   declare title: string | null;
 
   static {
@@ -8,3 +6,8 @@ export class Post extends Base {
     this.attribute("body", "string");
   }
 }
+export interface Post {
+  get body(): string;
+  set body(value: unknown);
+}
+

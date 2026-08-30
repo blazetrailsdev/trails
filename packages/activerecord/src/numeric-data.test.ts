@@ -11,10 +11,10 @@ beforeAll(async () => {
 });
 
 class NumericData extends Base {
-  declare bank_balance: unknown;
-  declare big_bank_balance: unknown;
-  declare my_house_population: unknown;
-  declare world_population: unknown;
+  declare bank_balance: BigDecimal | null;
+  declare big_bank_balance: BigDecimal | null;
+  declare my_house_population: number | null;
+  declare world_population: bigint | null;
   static _tableName = "numeric_data";
   static {
     this.attribute("world_population", "big_integer");
@@ -55,10 +55,10 @@ describe("NumericDataTest", () => {
     expect(m1!.my_house_population).toBe(3);
 
     expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
-    expect((m1!.bank_balance as BigDecimal).toString("F")).toBe("1586.43");
+    expect(m1!.bank_balance!.toString("F")).toBe("1586.43");
 
     expect(m1!.big_bank_balance).toBeInstanceOf(BigDecimal);
-    expect((m1!.big_bank_balance as BigDecimal).toString("F")).toBe("1000234000567.95");
+    expect(m1!.big_bank_balance!.toString("F")).toBe("1000234000567.95");
   });
 
   it("numeric fields with scale", async () => {
@@ -82,10 +82,10 @@ describe("NumericDataTest", () => {
     expect(m1!.my_house_population).toBe(3);
 
     expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
-    expect((m1!.bank_balance as BigDecimal).toString("F")).toBe("1586.43");
+    expect(m1!.bank_balance!.toString("F")).toBe("1586.43");
 
     expect(m1!.big_bank_balance).toBeInstanceOf(BigDecimal);
-    expect((m1!.big_bank_balance as BigDecimal).toString("F")).toBe("234000567.95");
+    expect(m1!.big_bank_balance!.toString("F")).toBe("234000567.95");
   });
 
   it.skipIf(adapterType !== "postgres")("numeric fields with nan", async () => {

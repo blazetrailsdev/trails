@@ -6,17 +6,26 @@ import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 import { Column as PostgreSQLColumn } from "../../connection-adapters/postgresql/column.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute member is an accessor pair (read.rb:35 / write.rb:36 cast asymmetry); the class/interface merge is how it surfaces on the type side.
 class IntervalDataType extends Base {
-  declare all_terms: unknown;
-  declare default_term: unknown;
   declare legacy_term: string;
-  declare maximum_term: unknown;
-  declare minimum_term: unknown;
   static {
     this.tableName = "interval_data_types";
     this.attribute("id", "integer");
     this.attribute("legacy_term", "string");
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute member is an accessor pair (read.rb:35 / write.rb:36 cast asymmetry); the class/interface merge is how it surfaces on the type side.
+interface IntervalDataType {
+  get all_terms(): Duration[] | null;
+  set all_terms(value: unknown);
+  get default_term(): Duration | null;
+  set default_term(value: unknown);
+  get maximum_term(): Duration | null;
+  set maximum_term(value: unknown);
+  get minimum_term(): Duration | null;
+  set minimum_term(value: unknown);
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -71,10 +80,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         legacy_term: "33 years",
       });
       const i = await IntervalDataType.lastBang();
-      expect((i.maximum_term as Duration).iso8601()).toBe("P6Y5M4DT3H2M1S");
-      expect((i.minimum_term as Duration).iso8601()).toBe("P1Y2M3DT4H5M6.235S");
-      expect((i.default_term as Duration).iso8601()).toBe("P3Y");
-      expect((i.all_terms as Duration[]).map((d) => d.iso8601())).toEqual(["P1M", "P1Y", "PT1H"]);
+      expect(i.maximum_term!.iso8601()).toBe("P6Y5M4DT3H2M1S");
+      expect(i.minimum_term!.iso8601()).toBe("P1Y2M3DT4H5M6.235S");
+      expect(i.default_term!.iso8601()).toBe("P3Y");
+      expect(i.all_terms!.map((d) => d.iso8601())).toEqual(["P1M", "P1Y", "PT1H"]);
       expect(i.legacy_term).toBe("P33Y");
     });
 
@@ -87,7 +96,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("interval type cast from numeric", async () => {
       const i = await IntervalDataType.createBang({ minimum_term: 36000 });
       await i.reload();
-      expect((i.minimum_term as Duration).iso8601()).toBe("PT10H");
+      expect(i.minimum_term!.iso8601()).toBe("PT10H");
     });
 
     it("interval type cast string and numeric from user", () => {
@@ -97,8 +106,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       i.legacy_term = "P1DT1H";
       expect(i.maximum_term instanceof Duration).toBeTruthy();
       expect(typeof i.legacy_term === "string").toBeTruthy();
-      expect((i.maximum_term as Duration).iso8601()).toBe("P1YT2M");
-      expect((i.minimum_term as Duration).iso8601()).toBe("PT10H");
+      expect(i.maximum_term!.iso8601()).toBe("P1YT2M");
+      expect(i.minimum_term!.iso8601()).toBe("PT10H");
       expect(i.legacy_term).toBe("P1DT1H");
     });
 

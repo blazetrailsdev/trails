@@ -32,15 +32,13 @@ export class Time extends ActiveModelTime {
       : (serialized as Value | null);
   }
 
-  override serializeCastValue(value: Temporal.Instant | null): Value | null {
+  override serializeCastValue(value: Temporal.Instant | TimeWithZone | null): Value | null {
     const serialized: unknown = super.serializeCastValue(value);
     return value != null ? new Value(serialized as Temporal.Instant | TimeWithZone) : null;
   }
 
-  protected override castValue(value: unknown): Temporal.Instant | null {
-    const cast: unknown = super.castValue(value);
-    return cast instanceof Value
-      ? (cast.getobj() as Temporal.Instant)
-      : (cast as Temporal.Instant | null);
+  protected override castValue(value: unknown): Temporal.Instant | TimeWithZone | null {
+    const cast = super.castValue(value);
+    return cast instanceof Value ? cast.getobj() : cast;
   }
 }

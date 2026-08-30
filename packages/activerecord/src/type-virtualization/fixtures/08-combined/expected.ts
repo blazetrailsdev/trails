@@ -1,6 +1,4 @@
 export class Post extends Base {
-  declare title: string;
-  declare published: boolean;
   declare author: Author | null;
   declare comments: import("@blazetrails/activerecord").AssociationProxy<Comment>;
   declare static published: () => import("@blazetrails/activerecord").Relation<Post>;
@@ -16,3 +14,10 @@ export class Post extends Base {
     });
   }
 }
+export interface Post {
+  get title(): string;
+  set title(value: unknown);
+  get published(): boolean;
+  set published(value: unknown);
+}
+
