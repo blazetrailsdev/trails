@@ -24,9 +24,9 @@ import { inMemoryDb } from "./support/adapter-helper.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 
-function middleware(app: (env?: unknown) => unknown | Promise<unknown>): (
-  env?: unknown,
-) => Promise<unknown> {
+function middleware(
+  app: (env?: unknown) => unknown | Promise<unknown>,
+): (env?: unknown) => Promise<unknown> {
   const executor = class extends Executor {};
   QueryCache.installExecutorHooks(executor);
   return async (env?: unknown) => executor.wrap(() => app(env));
