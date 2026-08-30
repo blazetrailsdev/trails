@@ -27,16 +27,12 @@ tester.run("no-ruby-compat-reimplementation", rule, {
       code: `export function escapeRegExp(s: string): string { return s; }`,
     },
     {
-      // Rails-anchored homonym: `ActiveSupport::Cache::Store#fetch`
-      // (activesupport/lib/active_support/cache.rb:444).
-      filename: FLAGGED,
-      code: `class Store { fetch(name: string): unknown { return name; } }`,
-    },
-    {
-      // Rails-anchored homonyms: `ActionDispatch::Request::Session#dig` and
+      // Rails-anchored homonyms: `ActiveSupport::Cache::Store#fetch`
+      // (activesupport/lib/active_support/cache.rb:444), `Session#dig`,
       // `ActionController::Parameters#dig`.
       filename: FLAGGED,
-      code: `class Session { dig(...keys: string[]): unknown { return keys; } }
+      code: `class Store { fetch(name: string): unknown { return name; } }
+class Session { dig(...keys: string[]): unknown { return keys; } }
 class Parameters { dig(...keys: string[]): unknown { return keys; } }`,
     },
     {

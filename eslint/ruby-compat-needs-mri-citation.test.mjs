@@ -45,8 +45,7 @@ export function add(a: number, b: number): number { return a + b; }`,
  * @noRailsEquivalent PERMANENT
  */
 export class Rational {}`,
-    // A file-level block covers the declarations below it, the way the
-    // extractor reads a file-level `@noRailsEquivalent`.
+    // A file-level block covers the declarations below it.
     `/**
  * Mirrors ${cite(3)}.
  *
