@@ -501,10 +501,22 @@ export class PostgreSQLAdapter
 
   private async _eagerLoadAdditionalTypes(client: pg.Client): Promise<void> {
     this._typeMap = null;
+    this._regtypeOids.clear();
     const initializer = new TypeMapInitializer(this.typeMap);
     for await (const query of this.loadTypesQueries(initializer)) {
       const result = await client.query(query);
-      initializer.run(result.rows as unknown as PgTypeRow[]);
+      const records = result.rows as unknown as PgTypeRow[];
+      this._captureRegtypeOids(records);
+      initializer.run(records);
+    }
+  }
+
+  private _captureRegtypeOids(records: PgTypeRow[]): void {
+    for (const row of records) {
+      const oid = Number(row.oid);
+      for (const name of [row.typname, row.formatType, row.aliasName]) {
+        if (name != null) this._regtypeOids.set(name, oid);
+      }
     }
   }
 
@@ -715,12 +727,7 @@ export class PostgreSQLAdapter
         (result.fields ?? []).map((f) => f.name),
         result.rows ?? [],
       ).toArray() as unknown as PgTypeRow[];
-      for (const row of records) {
-        const oid = Number(row.oid);
-        for (const name of [row.typname, row.formatType, row.aliasName]) {
-          if (name != null) this._regtypeOids.set(name, oid);
-        }
-      }
+      this._captureRegtypeOids(records);
       initializer.run(records);
     }
   }

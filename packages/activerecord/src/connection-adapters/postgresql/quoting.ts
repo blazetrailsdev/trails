@@ -245,11 +245,8 @@ function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | numb
     .replace(/\([^)]*\)/, "")
     .replace(/\s+/g, " ")
     .trim();
-  return (
-    this._regtypeOids?.get(name) ??
-    this._regtypeOids?.get(name.slice(name.lastIndexOf(".") + 1)) ??
-    name
-  );
+  const bare = name.slice(name.lastIndexOf(".") + 1);
+  return this._regtypeOids?.get(name) ?? this._regtypeOids?.get(bare) ?? bare;
 }
 
 export function lookupCastTypeFromColumn(
