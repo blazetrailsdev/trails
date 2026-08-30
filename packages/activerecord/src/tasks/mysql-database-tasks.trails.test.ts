@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { MySQLDatabaseTasks } from "./mysql-database-tasks.js";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
+import { Result } from "../result.js";
 
 function config(overrides: Record<string, unknown> = {}): HashConfig {
   return new HashConfig("development", "primary", {
@@ -38,15 +39,19 @@ describe("MySQLDatabaseTasks", () => {
       tasks as unknown as { connection(): Promise<unknown> },
       "connection",
     ).mockResolvedValue({
-      async execute(sql: string, binds?: unknown[]) {
+      async execQuery(sql: string, _name?: string | null, binds?: unknown[]) {
         executeCalls.push({ sql, binds });
-        return [
+        return Result.fromRowHashes([
           { table_name: "widgets" },
           { table_name: "posts" },
           { table_name: "comments" },
           { table_name: "schema_migrations" },
           { table_name: "ar_internal_metadata" },
-        ];
+        ]);
+      },
+      async execute(sql: string) {
+        executeCalls.push({ sql });
+        return [];
       },
       async executeMutation(sql: string) {
         mutationCalls.push(sql);
