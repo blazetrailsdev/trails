@@ -461,6 +461,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../../packages/ruby-compat
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../../packages/trails-tsc
