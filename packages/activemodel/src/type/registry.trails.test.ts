@@ -33,7 +33,7 @@ describe("TypeRegistry", () => {
   });
 
   it("a class can be registered for a symbol", () => {
-    Types.typeRegistry.register("type_registry_test_custom", () => new Types.StringType());
+    Types.typeRegistry.register("type_registry_test_custom", null, () => new Types.StringType());
     const t = Types.typeRegistry.lookup("type_registry_test_custom");
     expect(t).toBeInstanceOf(Types.StringType);
   });

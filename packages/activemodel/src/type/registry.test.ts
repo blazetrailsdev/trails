@@ -1,40 +1,55 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "../index.js";
 import { ArgumentError } from "../attribute-assignment.js";
-import { TypeRegistry } from "./registry.js";
+import { TypeRegistry, type TypeFactory } from "./registry.js";
+
+class FooClass {
+  readonly args: unknown[];
+  constructor(...args: unknown[]) {
+    this.args = args;
+  }
+}
+
+class BarClass {
+  readonly args: unknown[];
+  constructor(...args: unknown[]) {
+    this.args = args;
+  }
+}
 
 describe("RegistryTest", () => {
   it("a class can be registered for a symbol", () => {
     const registry = new TypeRegistry();
-    registry.register("foo", (_name, options) => new Types.StringType(options));
-    registry.register("bar", (_name, options) => new Types.IntegerType(options));
+    registry.register("foo", FooClass as never);
+    registry.register("bar", BarClass as never);
 
-    expect(registry.lookup("foo")).toEqual(new Types.StringType());
-    expect(registry.lookup("bar")).toEqual(new Types.IntegerType());
+    expect(registry.lookup("foo")).toEqual(new FooClass());
+    expect(registry.lookup("bar")).toEqual(new BarClass());
+    expect(registry.lookup("bar", 2, ":a")).toEqual(new BarClass(2, ":a"));
+    expect(registry.lookup("bar", 2, {})).toEqual(new BarClass(2, {}));
   });
 
   it("a block can be registered", () => {
     const registry = new TypeRegistry();
-    const calls: unknown[] = [];
-    const fooType = new Types.StringType(),
-      barType = new Types.IntegerType();
-    registry.register("foo", (type, ...args) => {
-      calls.push([type, args, "block for foo"]);
-      return fooType;
-    });
-    registry.register("bar", (type, ...args) => {
-      calls.push([type, args, "block for bar"]);
-      return barType;
-    });
+    registry.register("foo", null, ((type: string, ...args: unknown[]) => [
+      type,
+      args,
+      "block for foo",
+    ]) as unknown as TypeFactory);
+    registry.register("bar", null, ((type: string, ...args: unknown[]) => [
+      type,
+      args,
+      "block for bar",
+    ]) as unknown as TypeFactory);
+    registry.register("baz", null, ((type: string, kwargs: Record<string, unknown>) => [
+      type,
+      kwargs,
+      "block for baz",
+    ]) as unknown as TypeFactory);
 
-    expect(registry.lookup("foo", { limit: 1 })).toBe(fooType);
-    expect(registry.lookup("foo", { limit: 2 })).toBe(fooType);
-    expect(registry.lookup("bar", { limit: 3 })).toBe(barType);
-    expect(calls).toEqual([
-      ["foo", [{ limit: 1 }], "block for foo"],
-      ["foo", [{ limit: 2 }], "block for foo"],
-      ["bar", [{ limit: 3 }], "block for bar"],
-    ]);
+    expect(registry.lookup("foo", 1)).toEqual(["foo", [1], "block for foo"]);
+    expect(registry.lookup("foo", 2)).toEqual(["foo", [2], "block for foo"]);
+    expect(registry.lookup("bar", 1, 2, 3)).toEqual(["bar", [1, 2, 3], "block for bar"]);
+    expect(registry.lookup("baz", { kw: 1 })).toEqual(["baz", { kw: 1 }, "block for baz"]);
   });
 
   it("a reasonable error is given when no type is found", () => {

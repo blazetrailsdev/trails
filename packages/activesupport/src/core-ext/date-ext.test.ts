@@ -315,7 +315,7 @@ describe("DateExtCalculationsTest", () => {
 
   it("all week", () => {
     expect(range(allWeek(d(2011, 6, 7)))).toEqual([pd(2011, 6, 6), pd(2011, 6, 12)]);
-    expect(range(allWeek(d(2011, 6, 7), 0))).toEqual([pd(2011, 6, 5), pd(2011, 6, 11)]);
+    expect(range(allWeek(d(2011, 6, 7), "sunday"))).toEqual([pd(2011, 6, 5), pd(2011, 6, 11)]);
   });
 
   it("all month", () => {

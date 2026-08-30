@@ -16,35 +16,43 @@ export type TypeOptions = { precision?: number; scale?: number; limit?: number }
   string,
   unknown
 >;
-export type TypeFactory = (name: string, options?: TypeOptions) => Type;
+export type TypeFactory = (name: string, ...args: unknown[]) => Type;
+export type TypeClass = new (...args: never[]) => Type;
 
 export class TypeRegistry {
   /** @internal */
   protected registrationsMap = new Map<string, TypeFactory>();
 
   constructor() {
-    this.register("string", (_name, options) => new StringType(options));
-    this.register("integer", (_name, options) => new IntegerType(options));
-    this.register("float", (_name, options) => new FloatType(options));
-    this.register("boolean", (_name, options) => new BooleanType(options));
-    this.register("date", (_name, options) => new DateType(options));
-    this.register("datetime", (_name, options) => new DateTimeType(options));
-    this.register("decimal", (_name, options) => new DecimalType(options));
-    this.register("big_integer", (_name, options) => new BigIntegerType(options));
-    this.register("immutable_string", (_name, options) => new ImmutableStringType(options));
-    this.register("value", (_name, options) => new ValueType(options));
-    this.register("binary", (_name, options) => new BinaryType(options));
-    this.register("time", (_name, options) => new TimeType(options));
+    this.register("string", StringType);
+    this.register("integer", IntegerType);
+    this.register("float", FloatType);
+    this.register("boolean", BooleanType);
+    this.register("date", DateType);
+    this.register("datetime", DateTimeType);
+    this.register("decimal", DecimalType);
+    this.register("big_integer", BigIntegerType);
+    this.register("immutable_string", ImmutableStringType);
+    this.register("value", ValueType);
+    this.register("binary", BinaryType);
+    this.register("time", TimeType);
   }
 
-  register(typeName: string, klass: TypeFactory): void {
-    this.registrations.set(typeName, klass);
+  register(typeName: string, klass: TypeClass | null = null, block?: TypeFactory): void {
+    if (block === undefined) {
+      block = (_: string, ...args: unknown[]) => new klass!(...(args as never[]));
+    }
+    this.registrations.set(typeName, block);
   }
 
-  lookup(symbol: string, options?: TypeOptions): Type {
+  lookup(symbol: string, ...args: unknown[]): Type {
     const registration = this.registrations.get(symbol);
-    if (!registration) throw new ArgumentError(`Unknown type :${symbol}`);
-    return registration(symbol, options);
+
+    if (registration) {
+      return registration(symbol, ...args);
+    } else {
+      throw new ArgumentError(`Unknown type :${symbol}`);
+    }
   }
 
   /** @internal */

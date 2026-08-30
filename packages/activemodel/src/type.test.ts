@@ -9,9 +9,9 @@ describe("TypeTest", () => {
         super();
       }
     }
-    register("foo", (_name, args) => new type(args));
+    register("foo", type);
 
-    expect(lookup("foo", { precision: 1 })).toEqual(new type({ precision: 1 }));
+    expect(lookup("foo", ":arg")).toEqual(new type(":arg"));
     expect(lookup("foo", {})).toEqual(new type({}));
   });
 });

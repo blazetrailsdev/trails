@@ -1,5 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
-import { NameError, wrap } from "@blazetrails/activesupport";
+import { inOrderOf, NameError, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
 import {
   ArgumentError,
@@ -792,21 +792,19 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   if ((this as any).selectValues.length > 0) {
     relation = relation.select(this.table.get(this.model.primaryKey as string));
   }
-  const records: any[] = await relation.records();
+  const result: any[] = await relation.records();
 
-  const primaryKey = this.model.primaryKey as string;
-  const primaryKeyType = (this.model as any).typeForAttribute(primaryKey);
-  const castKey = (id: unknown) => String(primaryKeyType.cast(id));
-
-  if (records.length !== ids.length) {
-    this.raiseRecordNotFoundExceptionBang(ids, records.length, ids.length);
+  if (result.length === ids.length) {
+    return inOrderOf(
+      result,
+      (record: any) => record.id,
+      ids.map((id) =>
+        (this.model as any).typeForAttribute(this.model.primaryKey as string).cast(id),
+      ),
+    );
+  } else {
+    this.raiseRecordNotFoundExceptionBang(ids, result.length, ids.length);
   }
-  const idIndex = new Map(ids.map((id, i) => [castKey(id), i]));
-  return records.sort((a: any, b: any) => {
-    const ai = idIndex.get(castKey(a.readAttribute?.(primaryKey) ?? a[primaryKey])) ?? 0;
-    const bi = idIndex.get(castKey(b.readAttribute?.(primaryKey) ?? b[primaryKey])) ?? 0;
-    return ai - bi;
-  });
 }
 
 /**
