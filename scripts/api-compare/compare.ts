@@ -1037,7 +1037,7 @@ interface CallResult {
  * call-mismatches.json and its ratchet read exactly what they read before, and
  * nothing gates on it yet.
  */
-interface CallSkeleton {
+export interface CallSkeleton {
   rubyFile: string;
   rubyName: string;
   tsFile: string;

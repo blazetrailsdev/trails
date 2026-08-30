@@ -15,6 +15,7 @@ import * as path from "path";
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import type { CallSkeleton } from "./compare.js";
 
 import { parseTop, section, tally } from "./lint-call-mismatches.js";
 
@@ -22,16 +23,10 @@ export { parseTop };
 
 const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-skeletons.json");
 
-/** One row of output/call-skeletons.json (compare.ts:CallSkeleton, plus the
- *  package the flattening writer prefixes onto it). */
-export interface SkeletonRow {
+/** One row of output/call-skeletons.json: a {@link CallSkeleton} plus the
+ *  package the flattening writer prefixes onto it (compare.ts:skeletonsFlat). */
+export interface SkeletonRow extends CallSkeleton {
   package: string;
-  rubyFile: string;
-  rubyName: string;
-  tsFile: string;
-  tsName: string;
-  ruby: string[];
-  ts: string[];
 }
 
 export interface SkeletonArtifact {
