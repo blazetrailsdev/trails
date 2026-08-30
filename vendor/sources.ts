@@ -255,14 +255,9 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/ruby/ruby.git",
-      // The MRI interpreter itself, vendored as the read-anchor for every
-      // ruby-compat port that cites C source by symbol —
-      // `packages/date/src/date.ts` (`rational.c` `nurat_s_canonicalize_internal`,
-      // `nurat_add`, `float_to_r`), `packages/activesupport/src/range-ext.ts`
-      // (`range.c` `range_include_internal`, `str_upto_each`),
-      // `packages/activesupport/src/core-ext/regexp.ts` (`re.c`
-      // `rb_reg_s_quote`), `rb-equal.ts` (`object.c` `rb_equal`). None of it
-      // was checkable in-tree before this entry.
+      // The MRI interpreter, vendored as the read-anchor for the ruby-compat
+      // ports that cite C source by symbol (`rational.c`, `range.c`, `re.c`,
+      // `object.c` — see vendor/README.md for the call sites).
       //
       // Pinned to 3.3.11 because that is the build every existing citation was
       // written against: `.github/workflows/ci.yml:1413,1686,1799` pin
@@ -278,9 +273,9 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [
       {
         name: "ruby",
-        // The read-anchor is the C at the repo root (`rational.c`, `range.c`,
-        // `re.c`, `object.c`); `lib` is the Ruby-visible stdlib and is what
-        // verifyPackages checks the clone actually laid down.
+        // The cited C lives at the repo root, which has no `libPath` shape;
+        // `lib` is the Ruby-visible stdlib, and is what verifyPackages checks
+        // the clone actually laid down.
         libPath: "lib",
         // ruby/ruby mirrors the ruby/spec suite in-tree, so this one source
         // serves both the C read-anchor and the behavioural suite RFC
