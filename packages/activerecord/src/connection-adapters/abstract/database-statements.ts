@@ -161,8 +161,6 @@ export interface DatabaseStatementsHost {
   /** @internal */
   rawExecQuery?(...args: unknown[]): Promise<Result>;
   supportsConcurrentConnections?(): boolean;
-  /** @internal */
-  _inQueryTransformers?: boolean;
 }
 
 export class DatabaseStatementsBase {
@@ -1162,16 +1160,10 @@ function affectedRows(rawResult: any): never {
 export function preprocessQuery(this: DatabaseStatementsHost, sql: string): string {
   this.checkIfWriteQuery?.(sql);
   markTransactionWrittenIfWrite.call(this, sql);
-  const host = this as unknown as DatabaseStatementsHost & { _inQueryTransformers?: boolean };
-  if (host._inQueryTransformers) return sql;
-  host._inQueryTransformers = true;
-  try {
-    for (const t of ActiveRecord.queryTransformers) {
-      sql = t.call(sql, this);
-    }
-  } finally {
-    host._inQueryTransformers = false;
+  for (const transformer of ActiveRecord.queryTransformers) {
+    sql = transformer.call(sql, this);
   }
+
   return sql;
 }
 

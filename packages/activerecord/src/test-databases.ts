@@ -11,10 +11,6 @@ export async function eachDatabase(
   }
 }
 
-function isInMemorySqlite(name: string): boolean {
-  return name === ":memory:";
-}
-
 export async function createAndLoadSchema(
   i: number,
   { envName }: { envName: string } = { envName: "test" },
@@ -32,9 +28,7 @@ export async function createAndLoadSchema(
             `neither database nor a parseable URL is available`,
         );
       }
-      if (!isInMemorySqlite(baseName)) {
-        dbConfig._database = `${baseName}-${i}`;
-      }
+      dbConfig._database = `${baseName}-${i}`;
       await DatabaseTasks.reconstructFromSchema(dbConfig, DatabaseTasks.schemaFormat, undefined);
     }
   } finally {

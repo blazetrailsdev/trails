@@ -126,30 +126,6 @@ describe("TestDatabasesTest", () => {
     expect(dbConfig.database).toBe("test/db/primary.sqlite3-5");
   });
 
-  it("does not suffix in-memory SQLite databases", async () => {
-    const mockReconstructFromSchema = vi
-      .spyOn(DatabaseTasks, "reconstructFromSchema")
-      .mockResolvedValue(undefined);
-    vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
-      undefined,
-    );
-
-    const mockConfig: any = { adapter: "sqlite3" };
-    let suffixed: string | undefined;
-    Object.defineProperty(mockConfig, "_database", {
-      set(val: string) {
-        suffixed = val;
-      },
-    });
-    Object.defineProperty(mockConfig, "database", { get: () => ":memory:" });
-
-    Base.configurations(stubConfigurations([mockConfig]));
-
-    await createAndLoadSchema(7, { envName: "arunit" });
-    expect(suffixed).toBeUndefined();
-    expect(mockReconstructFromSchema).toHaveBeenCalled();
-  });
-
   it("reconnects through the ensure even when the registry is empty", async () => {
     const mockReconstructFromSchema = vi
       .spyOn(DatabaseTasks, "reconstructFromSchema")

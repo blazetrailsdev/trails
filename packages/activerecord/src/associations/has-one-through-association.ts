@@ -1,8 +1,5 @@
 import type { Base } from "../base.js";
-import type { AssociationDefinition, AssociationOptions } from "../associations.js";
-import { association, _buildAssociationInstance } from "./instance-methods.js";
-import { camelize, underscore } from "@blazetrails/activesupport";
-import { resolveAssocClass, _hmtNotFound } from "../associations.js";
+import type { AssociationDefinition } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import { RecordInvalid } from "../validations.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
@@ -29,11 +26,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
 
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
-  }
-
-  /** @internal */
-  protected loadHasOneThrough(): Promise<Base | null> {
-    return loadHasOneThrough(this.owner, this.reflection.name, this.reflection.options);
   }
 
   override reset(): void {
@@ -231,56 +223,6 @@ async function createThroughRecord(
     }
   }
   return record;
-}
-
-async function loadHasOneThrough(
-  record: Base,
-  assocName: string,
-  options: AssociationOptions,
-): Promise<Base | null> {
-  const ctor = record.constructor as typeof Base;
-  const throughAssoc = ctor._reflectOnAssociation(
-    options.through!,
-  ) as unknown as AssociationDefinition | null;
-  if (!throughAssoc) {
-    throw _hmtNotFound(ctor, assocName);
-  }
-
-  let throughRecord: Base | null;
-  if (throughAssoc.macro === "hasOne") {
-    throughRecord = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
-  } else if (throughAssoc.macro === "belongsTo") {
-    throughRecord = (await association.call(record, throughAssoc.name).loadTarget()) as Base | null;
-  } else if (throughAssoc.macro === "hasMany") {
-    const throughHolder = _buildAssociationInstance.call(record, throughAssoc) as unknown as {
-      findTarget(): Promise<Base[]>;
-    };
-    const throughRecords = await throughHolder.findTarget();
-    throughRecord = throughRecords[0] ?? null;
-  } else {
-    throughRecord = null;
-  }
-
-  if (!throughRecord) return null;
-
-  const sourceName = options.source ?? assocName;
-  const throughCtor = throughRecord.constructor as typeof Base;
-  const sourceAssoc = throughCtor._reflectOnAssociation(sourceName);
-
-  if (sourceAssoc) {
-    if (sourceAssoc.macro === "belongsTo") {
-      return (await association.call(throughRecord, sourceName).loadTarget()) as Base | null;
-    } else if (sourceAssoc.macro === "hasOne") {
-      return (await association.call(throughRecord, sourceName).loadTarget()) as Base | null;
-    }
-  }
-
-  const className = options.className ?? camelize(sourceName);
-  const targetFk = `${underscore(sourceName)}_id`;
-  const fkValue = throughRecord._readAttribute(targetFk);
-  if (fkValue === null || fkValue === undefined) return null;
-  const targetModel = resolveAssocClass(throughRecord, sourceName, className);
-  return targetModel.findBy({ [targetModel.primaryKey as string]: fkValue });
 }
 
 /** @internal */
