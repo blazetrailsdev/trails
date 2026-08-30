@@ -194,7 +194,10 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
       await expect(
         Invoice.transaction(
           async () => {
-            await connection.setConstraints("deferred", "invoices_date_overlap");
+            await ((await Invoice.leaseConnection()) as PostgreSQLAdapter).setConstraints(
+              "deferred",
+              "invoices_date_overlap",
+            );
             await Invoice.createBang({ start_date: "2020-12-31", end_date: "2021-01-01" });
             await invoice.updateBang({ end_date: "2020-12-31" });
 

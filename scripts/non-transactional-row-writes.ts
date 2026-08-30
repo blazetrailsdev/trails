@@ -327,9 +327,35 @@ export const SHARED_CONNECTION_ACCESSORS = [
   "freshAdapter",
 ];
 
+/**
+ * The model classes this file binds an adapter of its own to. `Model.leaseConnection()`
+ * on one of them hands back that adapter, not the shared per-worker connection,
+ * so it is not a way of reaching the latter.
+ */
+export function adapterBoundModels(stripped: string): Set<string> {
+  const bound = new Set<string>();
+  for (const line of stripped.split("\n")) {
+    if (!EXPLICIT_ADAPTER_BINDING.test(line)) continue;
+    const receiver = /([A-Z][\w$]*)/.exec(line);
+    if (receiver) bound.add(receiver[1]);
+  }
+  return bound;
+}
+
 export function reachesSharedConnection(src: string): boolean {
   const stripped = stripCommentsAndStrings(src);
-  return SHARED_CONNECTION_ACCESSORS.some((accessor) => stripped.includes(accessor));
+  const bound = adapterBoundModels(stripped);
+  return SHARED_CONNECTION_ACCESSORS.some((accessor) => {
+    for (let at = stripped.indexOf(accessor); at !== -1; at = stripped.indexOf(accessor, at + 1)) {
+      if (accessor !== "leaseConnection") return true;
+      const dot = stripped[at - 1] === "." ? at - 1 : -1;
+      if (dot === -1) return true;
+      let start = dot;
+      while (start > 0 && /[\w$]/.test(stripped[start - 1])) start--;
+      if (!bound.has(stripped.slice(start, dot))) return true;
+    }
+    return false;
+  });
 }
 
 /**
