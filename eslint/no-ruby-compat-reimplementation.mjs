@@ -3,10 +3,10 @@
  *
  * `@blazetrails/ruby-compat` only pays for itself if the tree CALLS it.
  * Without a gate the package relocates today's duplicates and grows fresh ones
- * — the exact history that produced them: `activesupport/src/core-ext/regexp.ts:18`
+ * — the history that produced them: `activesupport/src/core-ext/regexp.ts:18`
  * has been the canonical `regexpEscape` for a long time and three
- * byte-identical private copies exist anyway (`activerecord/src/support/quote-regex.ts:27`,
- * `run-token.ts:23`, `trailties/src/generators/trails-actions.ts:191`).
+ * byte-identical private copies exist anyway (`quote-regex.ts:27`,
+ * `run-token.ts:23`, `trails-actions.ts:191`).
  *
  * So a function or class declared OUTSIDE `packages/ruby-compat/` whose name is
  * a ruby-compat export, or a registered alias of one, is an error. The register
@@ -22,9 +22,8 @@
  *
  * `no-ruby-compat-reimplementation-exclude.json` holds today's copies, one row
  * per declaration, and is ONLY-SHRINK: a row is deleted by the move story that
- * converges it, and NEVER added to cover new code — the remedy for a new flag
- * is to call the primitive. Precedent for the scope-module + exclude-JSON
- * shape: `no-raw-sql.mjs` / `no-raw-sql-scope.mjs`.
+ * converges it, NEVER added to cover new code — the remedy for a new flag is to
+ * call the primitive. Precedent for the shape: `no-raw-sql-scope.mjs`.
  */
 import * as fs from "fs";
 import * as path from "path";

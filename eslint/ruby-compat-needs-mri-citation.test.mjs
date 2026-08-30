@@ -6,7 +6,7 @@ import rule from "./ruby-compat-needs-mri-citation.mjs";
 
 // A stand-in for `vendor/ruby/` at the pinned SHA: one file, 20 lines. Reading
 // the real (fetched, uncommitted) tree would make the outcome depend on whether
-// the runner had run `pnpm vendor:fetch`.
+// the runner ran `pnpm vendor:fetch`.
 const vendorRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ruby-compat-citation-"));
 fs.writeFileSync(path.join(vendorRoot, "rational.c"), "x\n".repeat(20));
 

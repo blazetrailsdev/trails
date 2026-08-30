@@ -1,9 +1,9 @@
 /**
  * Single source of truth for the `blazetrails/no-ruby-compat-reimplementation`
  * scope and its alias register. The rule re-checks scope by filename (so it
- * stays testable in isolation) and eslint.config.mjs applies the same globs as
- * `files`/`ignores` — the split `no-raw-sql-scope.mjs` uses, for the same
- * reason: two independently maintained lists disagree after any file move.
+ * stays testable in isolation) and eslint.config.mjs applies the same globs —
+ * the `no-raw-sql-scope.mjs` split, for the same reason: two independently
+ * maintained lists disagree after any file move.
  */
 
 /** Files the rule applies to (repo-relative globs). */
@@ -22,8 +22,8 @@ export const noRubyCompatReimplementationIgnores = [
 
 /**
  * The alias register: names that ARE a ruby-compat primitive under another
- * spelling, seeded from today's tree. It grows by one row whenever a
- * convergence uncovers another spelling.
+ * spelling, seeded from today's tree, growing by one row whenever a convergence
+ * uncovers another spelling.
  *
  * Each entry is a name plus the CONTEXT that makes it unambiguous, because a
  * bare name list would flag Rails ports. `kind: "function"` matches a
@@ -32,14 +32,13 @@ export const noRubyCompatReimplementationIgnores = [
  * (`actionpack/lib/action_dispatch/journey/nodes/node.rb:103`) and one named
  * `fetch` is `ActiveSupport::Cache::Store#fetch`
  * (`activesupport/lib/active_support/cache.rb:444`). `firstParamType` separates
- * a local `fetch(hash, key, default)` over a `Record` from anything else
- * spelled `fetch`.
+ * a local `fetch(hash, key, default)` over a `Record` from anything else.
  *
  * `compare` is deliberately NOT registered: `ActiveRecord::Core#<=>`
  * (`activerecord/lib/active_record/core.rb:665`) and
  * `DateAndTime::Calculations#<=>` port to a function named exactly that, and
- * nothing in the declaration distinguishes those from a hand-rolled
- * comparator. `cmp` and `spaceship` carry no such port and are registered.
+ * nothing distinguishes those from a hand-rolled comparator. `cmp` and
+ * `spaceship` carry no such port and are registered.
  */
 export const rubyCompatAliases = [
   { name: "regexpEscape", kind: "function", primitive: "Regexp.escape" },
