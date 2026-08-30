@@ -112,8 +112,6 @@ export async function loadDatabaseConfigModule(
   const candidates = [
     path.join(resolvedCwd, "config", "database.ts"),
     path.join(resolvedCwd, "config", "database.js"),
-    path.join(resolvedCwd, "src", "config", "database.ts"),
-    path.join(resolvedCwd, "src", "config", "database.js"),
   ];
 
   let configPath: string | undefined;
@@ -238,15 +236,13 @@ export async function databaseConfiguration(root?: string): Promise<DatabaseConf
 
 /**
  * Load the database configuration for the given environment.
- * Looks for config/database.ts or src/config/database.ts in the cwd.
+ * Looks for config/database.ts (or .js) in the cwd.
  */
 export async function loadDatabaseConfig(env?: string, cwd?: string): Promise<DatabaseConfig> {
   const resolvedEnv = env ?? resolveEnv();
   const loaded = await loadDatabaseConfigModule(cwd);
   if (!loaded) {
-    throw new Error(
-      "No database config found. Expected config/database.ts (.js) or src/config/database.ts (.js)",
-    );
+    throw new Error("No database config found. Expected config/database.ts (.js)");
   }
 
   const envs = Object.keys(loaded.module).filter((k) => !TOP_LEVEL_CONFIG_KEYS.has(k));
@@ -373,9 +369,7 @@ export async function loadAllDatabaseConfigs(
   const resolvedEnv = env ?? resolveEnv();
   const loaded = await loadDatabaseConfigModule(cwd);
   if (!loaded) {
-    throw new Error(
-      "No database config found. Expected config/database.ts (.js) or src/config/database.ts (.js)",
-    );
+    throw new Error("No database config found. Expected config/database.ts (.js)");
   }
 
   const envs = Object.keys(loaded.module).filter((k) => !TOP_LEVEL_CONFIG_KEYS.has(k));

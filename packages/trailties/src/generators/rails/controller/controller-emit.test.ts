@@ -25,7 +25,7 @@ function read(rel: string): string {
 describe("ControllerGenerator emit", () => {
   it("matches snapshot for simple controller", () => {
     new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run("Account", ["index", "show"]);
-    const src = read("src/app/controllers/account-controller.ts");
+    const src = read("app/controllers/account-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
     assertNoRubySource(src);
@@ -35,7 +35,7 @@ describe("ControllerGenerator emit", () => {
     new ControllerGenerator({ cwd: tmpDir, output: () => {} }).run("admin/dashboard", ["index"], {
       parent: "admin_controller",
     });
-    const src = read("src/app/controllers/admin/dashboard-controller.ts");
+    const src = read("app/controllers/admin/dashboard-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
     assertNoRubySource(src);

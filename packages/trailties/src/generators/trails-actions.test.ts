@@ -117,40 +117,40 @@ describe("TrailsActions", () => {
   describe("route", () => {
     it("inserts code before the // routes marker", async () => {
       files.set(
-        "/app/src/config/routes.ts",
+        "/app/config/routes.ts",
         `export function drawRoutes(router: any): void {\n  // routes\n}\n`,
       );
       await makeGen().route(`router.resources("posts");`);
-      expect(files.get("/app/src/config/routes.ts")).toBe(
+      expect(files.get("/app/config/routes.ts")).toBe(
         `export function drawRoutes(router: any): void {\n  router.resources("posts");\n  // routes\n}\n`,
       );
     });
 
     it("ignores marker substrings that aren't standalone lines", async () => {
       files.set(
-        "/app/src/config/routes.ts",
+        "/app/config/routes.ts",
         `// inline mention of // routes in a leading comment\nexport function drawRoutes(router: any): void {\n  // routes\n}\n`,
       );
       await makeGen().route(`router.resources("posts");`);
-      expect(files.get("/app/src/config/routes.ts")).toBe(
+      expect(files.get("/app/config/routes.ts")).toBe(
         `// inline mention of // routes in a leading comment\nexport function drawRoutes(router: any): void {\n  router.resources("posts");\n  // routes\n}\n`,
       );
     });
 
     it("targets the original marker even when prior insertions contain the marker string", async () => {
       files.set(
-        "/app/src/config/routes.ts",
+        "/app/config/routes.ts",
         `export function drawRoutes(router: any): void {\n  // routes\n}\n`,
       );
       await makeGen().route(`// routes (user note)\nrouter.resources("posts");`);
       await makeGen().route(`router.resources("comments");`);
-      expect(files.get("/app/src/config/routes.ts")).toBe(
+      expect(files.get("/app/config/routes.ts")).toBe(
         `export function drawRoutes(router: any): void {\n  // routes (user note)\n  router.resources("posts");\n  router.resources("comments");\n  // routes\n}\n`,
       );
     });
 
     it("errors when the marker is missing", async () => {
-      files.set("/app/src/config/routes.ts", "export function drawRoutes() {}\n");
+      files.set("/app/config/routes.ts", "export function drawRoutes() {}\n");
       await expect(makeGen().route("x")).rejects.toThrow(/marker .* not found/);
     });
   });
@@ -158,11 +158,11 @@ describe("TrailsActions", () => {
   describe("environment", () => {
     it("inserts code before the // config marker in application.ts by default", async () => {
       files.set(
-        "/app/src/config/application.ts",
+        "/app/config/application.ts",
         `export const app = {\n  config: {\n    // config\n  },\n};\n`,
       );
       await makeGen().environment(`logLevel: "debug",`);
-      expect(files.get("/app/src/config/application.ts")).toBe(
+      expect(files.get("/app/config/application.ts")).toBe(
         `export const app = {\n  config: {\n    logLevel: "debug",\n    // config\n  },\n};\n`,
       );
     });
@@ -177,29 +177,26 @@ describe("TrailsActions", () => {
     });
 
     it("with env option targets the env-specific config file", async () => {
-      files.set(
-        "/app/src/config/environments/production.ts",
-        `export default {\n  // config\n};\n`,
-      );
+      files.set("/app/config/environments/production.ts", `export default {\n  // config\n};\n`);
       await makeGen().environment(`logLevel: "warn",`, { env: "production" });
-      expect(files.get("/app/src/config/environments/production.ts")).toBe(
+      expect(files.get("/app/config/environments/production.ts")).toBe(
         `export default {\n  logLevel: "warn",\n  // config\n};\n`,
       );
     });
   });
 
   describe("initializer", () => {
-    it("writes the file under src/config/initializers/", async () => {
+    it("writes the file under config/initializers/", async () => {
       await makeGen().initializer("my-config.ts", `export const myConfig = { enabled: true };\n`);
-      expect(files.get("/app/src/config/initializers/my-config.ts")).toBe(
+      expect(files.get("/app/config/initializers/my-config.ts")).toBe(
         `export const myConfig = { enabled: true };\n`,
       );
-      expect(dirs.has("/app/src/config/initializers")).toBe(true);
+      expect(dirs.has("/app/config/initializers")).toBe(true);
     });
 
     it("appends a trailing newline when missing", async () => {
       await makeGen().initializer("x.ts", "export const x = 1;");
-      expect(files.get("/app/src/config/initializers/x.ts")).toBe("export const x = 1;\n");
+      expect(files.get("/app/config/initializers/x.ts")).toBe("export const x = 1;\n");
     });
 
     it("rejects Ruby-shape source via assertNoRubySource", async () => {
@@ -222,11 +219,11 @@ describe("TrailsActions", () => {
 
   it("route and environment reject Ruby-shape source", async () => {
     files.set(
-      "/app/src/config/routes.ts",
+      "/app/config/routes.ts",
       `export function drawRoutes(r: any): void {\n  // routes\n}\n`,
     );
     files.set(
-      "/app/src/config/application.ts",
+      "/app/config/application.ts",
       `export const app = {\n  config: {\n    // config\n  },\n};\n`,
     );
     await expect(makeGen().route("class Foo\nend")).rejects.toThrow(/Ruby-like source/);

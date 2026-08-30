@@ -22,7 +22,7 @@ describe("ScaffoldGenerator emit", () => {
       "title:string",
       "views:integer",
     ]);
-    const src = read("src/app/controllers/posts-controller.ts");
+    const src = read("app/controllers/posts-controller.ts");
     expect(src).toMatchSnapshot();
     expect(parseTs(src).diagnostics).toEqual([]);
     assertNoRubySource(src);

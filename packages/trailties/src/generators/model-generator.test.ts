@@ -22,7 +22,7 @@ function makeGen() {
 }
 
 function readModel(name: string): string {
-  return fs.readFileSync(path.join(tmpDir, `src/app/models/${name}.ts`), "utf-8");
+  return fs.readFileSync(path.join(tmpDir, `app/models/${name}.ts`), "utf-8");
 }
 
 function findMigration(files: string[]): string {
@@ -79,7 +79,7 @@ describe("ModelGeneratorTest", () => {
   it("model with no migration option", () => {
     const gen = makeGen();
     const files = gen.run("Account", ["name:string"], { migration: false });
-    expect(files).toContain("src/app/models/account.ts");
+    expect(files).toContain("app/models/account.ts");
     expect(files.find((f) => f.startsWith("db/migrate/"))).toBeUndefined();
   });
 
@@ -441,7 +441,7 @@ describe("ModelGenerator (JavaScript project)", () => {
   it("generates .js model and test files", () => {
     const gen = makeJsGen();
     const files = gen.run("User", ["name:string"]);
-    expect(files).toContain("src/app/models/user.js");
+    expect(files).toContain("app/models/user.js");
     expect(files).toContain("test/models/user.test.js");
   });
 
@@ -455,7 +455,7 @@ describe("ModelGenerator (JavaScript project)", () => {
   it("uses ESM imports and exports in model", () => {
     const gen = makeJsGen();
     gen.run("User", ["name:string"]);
-    const content = fs.readFileSync(path.join(jsTmpDir, "src/app/models/user.js"), "utf-8");
+    const content = fs.readFileSync(path.join(jsTmpDir, "app/models/user.js"), "utf-8");
     expect(content).toContain('import { Base } from "@blazetrails/activerecord"');
     expect(content).toContain("export class User");
   });

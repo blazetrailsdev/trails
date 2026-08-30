@@ -2,7 +2,7 @@
 // Ruby-shape `gem`, `route`, `environment`, `initializer` actions.
 //
 // Kept separate from `actions.ts` (Rails-shape mirror) so `parity:api`
-// stays clean. These actions mutate `package.json` and `src/config/*.ts`
+// stays clean. These actions mutate `package.json` and `config/*.ts`
 // files in a trails app; they have no Ruby counterpart.
 
 import { getFsAsync, getPathAsync, type FsAdapter } from "@blazetrails/activesupport";
@@ -87,14 +87,14 @@ export async function pkg(
 }
 
 /**
- * Insert TS source at the `// routes` marker in `src/config/routes.ts`.
+ * Insert TS source at the `// routes` marker in `config/routes.ts`.
  * The trails analogue of railties' `route` action — caller supplies valid
  * TS; the marker is left in place so subsequent `route()` calls append
  * below the prior insertion.
  */
 export async function route(this: TrailsActionsHost, tsCode: string): Promise<void> {
   assertNoRubySource(tsCode);
-  await insertAtMarker(this, "src/config/routes.ts", "// routes", tsCode);
+  await insertAtMarker(this, "config/routes.ts", "// routes", tsCode);
   this.output(`       route  ${summarize(tsCode)}`);
 }
 
@@ -103,8 +103,8 @@ export interface EnvironmentOptions {
 }
 
 /**
- * Insert TS source at the `// config` marker in `src/config/application.ts`,
- * or in `src/config/environments/$env.ts` when `env` is passed. The trails
+ * Insert TS source at the `// config` marker in `config/application.ts`,
+ * or in `config/environments/$env.ts` when `env` is passed. The trails
  * analogue of railties' `environment` action.
  */
 export async function environment(
@@ -118,15 +118,13 @@ export async function environment(
       `environment name must match /^[a-z0-9_-]+$/i, got ${JSON.stringify(options.env)}`,
     );
   }
-  const relPath = options.env
-    ? `src/config/environments/${options.env}.ts`
-    : "src/config/application.ts";
+  const relPath = options.env ? `config/environments/${options.env}.ts` : "config/application.ts";
   await insertAtMarker(this, relPath, "// config", tsCode);
   this.output(` environment  ${summarize(tsCode)}`);
 }
 
 /**
- * Write a new file under `src/config/initializers/`. The trails analogue of
+ * Write a new file under `config/initializers/`. The trails analogue of
  * railties' `initializer` action — `content` must be valid TS produced via
  * the `tsModule` builder (the `assertNoRubySource` check rejects raw Ruby
  * source like `class … end`). `filename` is a plain leaf name; path
@@ -149,11 +147,11 @@ export async function initializer(
   assertNoRubySource(content);
   const fs = await requireAsyncFs(["mkdir", "writeFile"]);
   const path = await getPathAsync();
-  const dir = path.join(this.cwd, "src/config/initializers");
+  const dir = path.join(this.cwd, "config/initializers");
   await fs.mkdir(dir, { recursive: true });
   const dest = path.join(dir, filename);
   await fs.writeFile(dest, content.endsWith("\n") ? content : content + "\n");
-  this.output(`      create  src/config/initializers/${filename}`);
+  this.output(`      create  config/initializers/${filename}`);
 }
 
 async function insertAtMarker(

@@ -25,7 +25,7 @@ describe("ScriptGeneratorTest", () => {
     const files = gen.run();
     expect(files).toContain("script/my_script.ts");
     const content = fs.readFileSync(path.join(tmpDir, "script/my_script.ts"), "utf-8");
-    expect(content).toMatch(/"\.\.\/src\/config\/environment\.js"/);
+    expect(content).toMatch(/"\.\.\/config\/environment\.js"/);
   });
 
   it("generate_script_with_folder", () => {
@@ -36,6 +36,6 @@ describe("ScriptGeneratorTest", () => {
     });
     gen.run();
     const content = fs.readFileSync(path.join(tmpDir, "script/my_folder/my_script.ts"), "utf-8");
-    expect(content).toMatch(/"\.\.\/\.\.\/src\/config\/environment\.js"/);
+    expect(content).toMatch(/"\.\.\/\.\.\/config\/environment\.js"/);
   });
 });

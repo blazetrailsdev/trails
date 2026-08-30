@@ -8,8 +8,8 @@ let tmpDir: string;
 let lines: string[];
 
 function setupRoutes() {
-  fs.mkdirSync(path.join(tmpDir, "src/config"), { recursive: true });
-  fs.writeFileSync(path.join(tmpDir, "src/config/routes.ts"), "// routes\n");
+  fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
+  fs.writeFileSync(path.join(tmpDir, "config/routes.ts"), "// routes\n");
 }
 
 beforeEach(() => {
@@ -39,7 +39,7 @@ describe("ControllerGeneratorTest", () => {
   it("controller skeleton is created", () => {
     const gen = makeGen();
     gen.run("Account", ["foo", "bar"]);
-    const content = readFile("src/app/controllers/account-controller.ts");
+    const content = readFile("app/controllers/account-controller.ts");
     expect(content).toContain("class AccountController");
   });
 
@@ -50,13 +50,13 @@ describe("ControllerGeneratorTest", () => {
   it("invokes helper", () => {
     const gen = makeGen();
     gen.run("Account", ["foo", "bar"]);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/helpers/account-helper.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(true);
   });
 
   it("does not invoke helper if required", () => {
     const gen = makeGen();
     gen.run("Account", ["foo"], { skipHelper: true });
-    expect(fs.existsSync(path.join(tmpDir, "src/app/helpers/account-helper.ts"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "app/helpers/account-helper.ts"))).toBe(false);
   });
 
   it("invokes default test framework", () => {
@@ -78,14 +78,14 @@ describe("ControllerGeneratorTest", () => {
   it("invokes default template engine", () => {
     const gen = makeGen();
     gen.run("Account", ["foo", "bar"]);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account/foo.html.tse"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account/bar.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/account/foo.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/account/bar.html.tse"))).toBe(true);
   });
 
   it("add routes", () => {
     const gen = makeGen();
     gen.run("Account", ["foo", "bar"]);
-    const routes = readFile("src/config/routes.ts");
+    const routes = readFile("config/routes.ts");
     expect(routes).toContain('router.get("/account/foo", "account#foo")');
     expect(routes).toContain('router.get("/account/bar", "account#bar")');
   });
@@ -93,7 +93,7 @@ describe("ControllerGeneratorTest", () => {
   it("skip routes", () => {
     const gen = makeGen();
     gen.run("Account", ["foo"], { skipRoutes: true });
-    const routes = readFile("src/config/routes.ts");
+    const routes = readFile("config/routes.ts");
     expect(routes).not.toContain("account/foo");
   });
 
@@ -107,19 +107,19 @@ describe("ControllerGeneratorTest", () => {
   it("invokes default template engine even with no action", () => {
     const gen = makeGen();
     gen.run("Account", []);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/account"))).toBe(true);
   });
 
   it("template engine with class path", () => {
     const gen = makeGen();
     gen.run("admin/account", []);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/admin/account"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/admin/account"))).toBe(true);
   });
 
   it("actions are turned into methods", () => {
     const gen = makeGen();
     gen.run("Account", ["foo", "bar"]);
-    const content = readFile("src/app/controllers/account-controller.ts");
+    const content = readFile("app/controllers/account-controller.ts");
     expect(content).toContain("async foo()");
     expect(content).toContain("async bar()");
   });
@@ -127,7 +127,7 @@ describe("ControllerGeneratorTest", () => {
   it("namespaced routes are created in routes", () => {
     const gen = makeGen();
     gen.run("admin/dashboard", ["index"]);
-    const routes = readFile("src/config/routes.ts");
+    const routes = readFile("config/routes.ts");
     expect(routes).toContain('router.namespace("admin"');
     expect(routes).toContain('router.get("/dashboard/index", "dashboard#index")');
   });
@@ -135,7 +135,7 @@ describe("ControllerGeneratorTest", () => {
   it("namespaced routes with multiple actions are created in routes", () => {
     const gen = makeGen();
     gen.run("admin/dashboard", ["index", "show"]);
-    const routes = readFile("src/config/routes.ts");
+    const routes = readFile("config/routes.ts");
     expect(routes).toContain('router.namespace("admin"');
     expect(routes).toContain('router.get("/dashboard/index", "dashboard#index")');
     expect(routes).toContain('router.get("/dashboard/show", "dashboard#show")');
@@ -144,7 +144,7 @@ describe("ControllerGeneratorTest", () => {
   it("deeply nested namespace routes are created in routes", () => {
     const gen = makeGen();
     gen.run("admin/api/dashboard", ["index"]);
-    const routes = readFile("src/config/routes.ts");
+    const routes = readFile("config/routes.ts");
     expect(routes).toContain('router.namespace("admin"');
     expect(routes).toContain('router.namespace("api"');
     expect(routes).toMatch(/router\.namespace\("admin"[\s\S]*router\.namespace\("api"/);
@@ -154,14 +154,14 @@ describe("ControllerGeneratorTest", () => {
   it("does not add routes when action is not specified", () => {
     const gen = makeGen();
     gen.run("admin/dashboard", []);
-    const routes = readFile("src/config/routes.ts");
+    const routes = readFile("config/routes.ts");
     expect(routes).not.toContain("namespace");
   });
 
   it("controller parent param", () => {
     const gen = makeGen();
     gen.run("admin/dashboard", ["index"], { parent: "admin_controller" });
-    const content = readFile("src/app/controllers/admin/dashboard-controller.ts");
+    const content = readFile("app/controllers/admin/dashboard-controller.ts");
     expect(content).toContain("class AdminDashboardController extends AdminController");
   });
 
@@ -169,13 +169,11 @@ describe("ControllerGeneratorTest", () => {
     const gen = makeGen();
     gen.run("account_controller", ["index"]);
     expect(
-      fs.existsSync(path.join(tmpDir, "src/app/controllers/account-controller-controller.ts")),
+      fs.existsSync(path.join(tmpDir, "app/controllers/account-controller-controller.ts")),
     ).toBe(false);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/controllers/account-controller.ts"))).toBe(
-      true,
-    );
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account-controller"))).toBe(false);
-    expect(fs.existsSync(path.join(tmpDir, "src/app/views/account"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/controllers/account-controller.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/account-controller"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/account"))).toBe(true);
   });
 });
 
@@ -199,7 +197,7 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
   it("generates .js controller and test files", () => {
     const gen = makeJsGen();
     const files = gen.run("Posts", ["index"]);
-    expect(files).toContain("src/app/controllers/posts-controller.js");
+    expect(files).toContain("app/controllers/posts-controller.js");
     expect(files).toContain("test/controllers/posts-controller.test.js");
   });
 
@@ -207,7 +205,7 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
     const gen = makeJsGen();
     gen.run("Posts", ["index"]);
     const content = fs.readFileSync(
-      path.join(jsTmpDir, "src/app/controllers/posts-controller.js"),
+      path.join(jsTmpDir, "app/controllers/posts-controller.js"),
       "utf-8",
     );
     expect(content).not.toContain("Promise<void>");
@@ -218,7 +216,7 @@ describe("ControllerGeneratorTest (JavaScript project)", () => {
     const gen = makeJsGen();
     gen.run("Posts", ["index"]);
     const content = fs.readFileSync(
-      path.join(jsTmpDir, "src/app/controllers/posts-controller.js"),
+      path.join(jsTmpDir, "app/controllers/posts-controller.js"),
       "utf-8",
     );
     expect(content).toContain('import { ActionController } from "@blazetrails/actionpack"');

@@ -29,12 +29,12 @@ describe("exec: new", () => {
   it("creates app scaffold files via trailties AppGenerator", async () => {
     const result = await runtime.exec("new myapp");
     expect(result.success).toBe(true);
-    expect(result.output.join("\n")).toContain("create  src/config/routes.ts");
+    expect(result.output.join("\n")).toContain("create  config/routes.ts");
     expect(runtime.vfs.exists("package.json")).toBe(true);
-    expect(runtime.vfs.exists("src/config/routes.ts")).toBe(true);
-    expect(runtime.vfs.exists("src/config/application.ts")).toBe(true);
-    expect(runtime.vfs.exists("src/app/models/application-record.ts")).toBe(true);
-    expect(runtime.vfs.exists("src/app/controllers/application-controller.ts")).toBe(true);
+    expect(runtime.vfs.exists("config/routes.ts")).toBe(true);
+    expect(runtime.vfs.exists("config/application.ts")).toBe(true);
+    expect(runtime.vfs.exists("app/models/application-record.ts")).toBe(true);
+    expect(runtime.vfs.exists("app/controllers/application-controller.ts")).toBe(true);
     expect(runtime.vfs.exists("db/seeds.ts")).toBe(true);
     expect(runtime.vfs.exists("db/migrate/.gitkeep")).toBe(true);
   });
@@ -51,8 +51,8 @@ describe("exec: generate model", () => {
     const result = await runtime.exec("generate model User name:string email:string");
     expect(result.success).toBe(true);
 
-    // Model uses trailties format (src/app/models/ path, import from @blazetrails)
-    const modelFile = runtime.vfs.read("src/app/models/user.ts");
+    // Model uses trailties format (app/models/ path, import from @blazetrails)
+    const modelFile = runtime.vfs.read("app/models/user.ts");
     expect(modelFile).not.toBeNull();
     expect(modelFile!.content).toContain("class User extends Base");
     expect(modelFile!.content).toContain('this.attribute("name", "string")');
@@ -78,7 +78,7 @@ describe("exec: generate model", () => {
   it("g is an alias for generate", async () => {
     const result = await runtime.exec("g model Post title:string");
     expect(result.success).toBe(true);
-    expect(runtime.vfs.exists("src/app/models/post.ts")).toBe(true);
+    expect(runtime.vfs.exists("app/models/post.ts")).toBe(true);
   });
 });
 

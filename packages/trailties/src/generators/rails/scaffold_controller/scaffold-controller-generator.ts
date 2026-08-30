@@ -46,7 +46,7 @@ export class ScaffoldControllerGenerator extends GeneratorBase {
     const attrNames = parseColumns(attributes).map((c) => c.name);
 
     this.createFile(
-      `src/app/controllers/${controllerFileName}${ext}`,
+      `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,
         methods: api
@@ -62,7 +62,7 @@ export class ScaffoldControllerGenerator extends GeneratorBase {
       this.createFile(
         `test/controllers/${controllerFileName}.test${ext}`,
         `import { describe, it } from "vitest";
-import { ${controllerClassName} } from "${importPrefix}src/app/controllers/${controllerFileName}.js";
+import { ${controllerClassName} } from "${importPrefix}app/controllers/${controllerFileName}.js";
 
 describe("${controllerClassName}", () => {
   it("references controller", () => { void ${controllerClassName}; });
@@ -75,16 +75,16 @@ ${skip("index")}${skip("show")}${skip("new")}${skip("create")}${skip("edit")}${s
       const helperFileName = [...nsDashed, dasherize(resourceName)].join("/") + "-helper";
       const helperConstName = [...nsClass, classify(resourceName)].join("") + "Helper";
       this.createFile(
-        `src/app/helpers/${helperFileName}${ext}`,
+        `app/helpers/${helperFileName}${ext}`,
         `export const ${helperConstName} = {\n};\n`,
       );
     }
 
     if (!skipRoutes) {
-      const routesFile = this.fileExists("src/config/routes.ts")
-        ? "src/config/routes.ts"
-        : this.fileExists("src/config/routes.js")
-          ? "src/config/routes.js"
+      const routesFile = this.fileExists("config/routes.ts")
+        ? "config/routes.ts"
+        : this.fileExists("config/routes.js")
+          ? "config/routes.js"
           : null;
       if (routesFile) {
         this.insertIntoFile(

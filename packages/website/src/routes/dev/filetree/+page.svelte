@@ -17,13 +17,13 @@
     // Seed with a realistic project structure
     v.write("package.json", '{ "name": "docs" }');
     v.write("tsconfig.json", '{ "compilerOptions": {} }');
-    v.write("src/config/application.ts", 'export const app = { name: "docs" };');
-    v.write("src/config/routes.ts", "// routes");
-    v.write("src/config/database.ts", 'export default { adapter: "sqlite3" };');
-    v.write("src/app/models/user.ts", 'import { Base } from "@blazetrails/activerecord";\n\nexport class User extends Base {\n  static {\n    this.attribute("name", "string");\n    this.attribute("email", "string");\n  }\n}');
-    v.write("src/app/models/post.ts", 'import { Base } from "@blazetrails/activerecord";\n\nexport class Post extends Base {\n  static {\n    this.attribute("title", "string");\n    this.attribute("body", "text");\n  }\n}');
-    v.write("src/app/controllers/application-controller.ts", "class ApplicationController {}");
-    v.write("src/app/controllers/posts-controller.ts", "class PostsController {}");
+    v.write("config/application.ts", 'export const app = { name: "docs" };');
+    v.write("config/routes.ts", "// routes");
+    v.write("config/database.ts", 'export default { adapter: "sqlite3" };');
+    v.write("app/models/user.ts", 'import { Base } from "@blazetrails/activerecord";\n\nexport class User extends Base {\n  static {\n    this.attribute("name", "string");\n    this.attribute("email", "string");\n  }\n}');
+    v.write("app/models/post.ts", 'import { Base } from "@blazetrails/activerecord";\n\nexport class Post extends Base {\n  static {\n    this.attribute("title", "string");\n    this.attribute("body", "text");\n  }\n}');
+    v.write("app/controllers/application-controller.ts", "class ApplicationController {}");
+    v.write("app/controllers/posts-controller.ts", "class PostsController {}");
     v.write("db/migrate/20260401120000_create_users.ts", "class CreateUsers extends Migration {}");
     v.write("db/migrate/20260401120001_create_posts.ts", "class CreatePosts extends Migration {}");
     v.write("db/seeds.ts", "// seeds");
@@ -32,7 +32,7 @@
     v.write("test/models/post.test.ts", "// post tests");
 
     vfs = v;
-    selectedPath = "src/app/models/user.ts";
+    selectedPath = "app/models/user.ts";
   });
 </script>
 

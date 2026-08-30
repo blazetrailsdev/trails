@@ -32,7 +32,7 @@ export class ControllerGenerator extends GeneratorBase {
       parent: parent ? parentRefForRelative(parent, depth) : undefined,
       methods: actions.map((a) => actionMethod(a, ts)),
     });
-    this.createFile(`src/app/controllers/${paths.controllerFile}${ext}`, source);
+    this.createFile(`app/controllers/${paths.controllerFile}${ext}`, source);
 
     if (test) {
       const importPrefix = "../".repeat(depth + 2);
@@ -42,7 +42,7 @@ export class ControllerGenerator extends GeneratorBase {
       this.createFile(
         `test/controllers/${paths.controllerFile}.test${ext}`,
         `import { describe, it, expect } from "vitest";
-import { ${paths.className} } from "${importPrefix}src/app/controllers/${paths.controllerFile}.js";
+import { ${paths.className} } from "${importPrefix}app/controllers/${paths.controllerFile}.js";
 
 describe("${paths.displayName}", () => {
 ${cases}
@@ -53,18 +53,18 @@ ${cases}
 
     if (!skipHelper) {
       this.createFile(
-        `src/app/helpers/${paths.helperFile}${ext}`,
+        `app/helpers/${paths.helperFile}${ext}`,
         `export const ${paths.helperName} = {\n};\n`,
       );
     }
 
     for (const action of actions) {
-      this.createFile(`src/app/views/${paths.viewBase}/${action}.html.tse`, "");
+      this.createFile(`app/views/${paths.viewBase}/${action}.html.tse`, "");
     }
     if (actions.length === 0) {
       // Touch the directory by emitting a placeholder .keep so all fs work
       // stays in createFile (no node:fs / sync mkdir paths needed).
-      this.createFile(`src/app/views/${paths.viewBase}/.keep`, "");
+      this.createFile(`app/views/${paths.viewBase}/.keep`, "");
     }
 
     if (!skipRoutes && actions.length > 0) {
@@ -74,10 +74,10 @@ ${cases}
   }
 
   private addRoutes(namespaceParts: string[], actions: string[]): void {
-    const routesFile = this.fileExists("src/config/routes.ts")
-      ? "src/config/routes.ts"
-      : this.fileExists("src/config/routes.js")
-        ? "src/config/routes.js"
+    const routesFile = this.fileExists("config/routes.ts")
+      ? "config/routes.ts"
+      : this.fileExists("config/routes.js")
+        ? "config/routes.js"
         : null;
     if (!routesFile) return;
     const controllerSegment = dasherize(underscore(namespaceParts[namespaceParts.length - 1]));

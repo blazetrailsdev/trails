@@ -65,7 +65,7 @@ think one is wrong.
 | `MailersController` + `generators/erb/mailer/*` + `generators/test_unit/mailer/*`                                                                                                       | Blocked on `actionmailer` package             |
 | `generators/erb/*` (other than mailer)                                                                                                                                                  | Defer to a render-engine PR                   |
 | Ruby `gem` / `gem_group` / `github` / `add_source` template actions                                                                                                                     | trails uses `package.json`, not Gemfile       |
-| Ruby `route` / `environment` / `application` template actions                                                                                                                           | trails uses `src/config/*.ts`                 |
+| Ruby `route` / `environment` / `application` template actions                                                                                                                           | trails uses `config/*.ts`                     |
 | `after_bundle` (renamed `afterInstall`)                                                                                                                                                 | terminology fits package-manager install      |
 
 ### Architectural answers

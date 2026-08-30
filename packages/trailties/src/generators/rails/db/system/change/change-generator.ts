@@ -1,6 +1,6 @@
 // Mirrors railties/lib/rails/generators/rails/db/system/change/change_generator.rb.
 // Trailties substitutions: the Rails generator rewrites `config/database.yml`
-// (ERB/YAML) and `Gemfile`. Trailties emits `src/config/database.ts` and
+// (ERB/YAML) and `Gemfile`. Trailties emits `config/database.ts` and
 // `package.json` instead, so `editDatabaseConfig` rewrites the TS module and
 // `editPackageJson` swaps the database dependency. Dockerfile rewriting
 // mirrors Rails when the Dockerfile carries db-specific apt packages.
@@ -53,14 +53,10 @@ export class ChangeGenerator extends GeneratorBase {
 
   editDatabaseConfig(): void {
     // Candidate order matches the runtime loader in trailties/src/database.ts
-    // so editing prefers the active config; fall back to src/config when none exist.
+    // so editing prefers the active config.
     const target =
-      [
-        "config/database.ts",
-        "config/database.js",
-        "src/config/database.ts",
-        "src/config/database.js",
-      ].find((p) => this.fileExists(p)) ?? `src/config/database${this.ext()}`;
+      ["config/database.ts", "config/database.js"].find((p) => this.fileExists(p)) ??
+      `config/database${this.ext()}`;
     this.writeOrUpdate(target, databaseConfigTs(this.to, this.database, this.appName));
   }
 

@@ -20,7 +20,7 @@ export function destroyCommand(): Command {
       const className = classify(name);
       const tableName = tableize(className);
 
-      removeFile(cwd, `src/app/models/${fileName}.ts`);
+      removeFile(cwd, `app/models/${fileName}.ts`);
       removeFile(cwd, `test/models/${fileName}.test.ts`);
 
       // Find and remove migration
@@ -48,7 +48,7 @@ export function destroyCommand(): Command {
     .action((name: string) => {
       const cwd = getCwd();
       const fileName = dasherize(name.replace(/Controller$/i, "")) + "-controller";
-      removeFile(cwd, `src/app/controllers/${fileName}.ts`);
+      removeFile(cwd, `app/controllers/${fileName}.ts`);
       removeFile(cwd, `test/controllers/${fileName}.test.ts`);
     });
 
@@ -86,11 +86,11 @@ export function destroyCommand(): Command {
       const tableName = tableize(className);
 
       // Model
-      removeFile(cwd, `src/app/models/${fileName}.ts`);
+      removeFile(cwd, `app/models/${fileName}.ts`);
       removeFile(cwd, `test/models/${fileName}.test.ts`);
 
       // Controller
-      removeFile(cwd, `src/app/controllers/${tableName}-controller.ts`);
+      removeFile(cwd, `app/controllers/${tableName}-controller.ts`);
       removeFile(cwd, `test/controllers/${tableName}-controller.test.ts`);
 
       // Migration

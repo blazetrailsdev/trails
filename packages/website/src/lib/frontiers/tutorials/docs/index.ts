@@ -16,8 +16,8 @@ export const steps: TutorialStep[] = [
     diagramLabel: "Tutorial overview: from new app to queries",
     actions: [{ command: "new docs" }],
     checkpoint: [
-      { type: "file_exists", target: "src/config/routes.ts" },
-      { type: "file_exists", target: "src/app/controllers/application-controller.ts" },
+      { type: "file_exists", target: "config/routes.ts" },
+      { type: "file_exists", target: "app/controllers/application-controller.ts" },
     ],
   },
   {
@@ -38,10 +38,10 @@ export const steps: TutorialStep[] = [
     diagramLabel: "Users table schema",
     actions: [{ command: "generate model User name:string email:string" }],
     checkpoint: [
-      { type: "file_exists", target: "src/app/models/user.ts" },
+      { type: "file_exists", target: "app/models/user.ts" },
       {
         type: "file_contains",
-        target: "src/app/models/user.ts",
+        target: "app/models/user.ts",
         value: 'this.attribute("name", "string")',
       },
     ],

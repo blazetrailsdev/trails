@@ -14,7 +14,7 @@ describe("AppCommandTest", () => {
       const tmpl = path.join(tmpDir, "template.mjs");
       fs.writeFileSync(tmpl, 'export default (g) => g.generate("model", "Post");\n');
       await appTemplateCommand().parseAsync(["node", "app:template", tmpl]);
-      expect(fs.existsSync(path.join(tmpDir, "src/app/models/post.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(tmpDir, "app/models/post.ts"))).toBe(true);
     } finally {
       process.chdir(origCwd);
       fs.rmSync(tmpDir, { recursive: true, force: true });

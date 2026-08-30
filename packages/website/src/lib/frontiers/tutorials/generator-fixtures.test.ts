@@ -46,11 +46,11 @@ describe("generator fixtures", () => {
     it("creates expected app structure", () => {
       expect(fileExists("package.json")).toBe(true);
       expect(fileExists("tsconfig.json")).toBe(true);
-      expect(fileExists("src/config/application.ts")).toBe(true);
-      expect(fileExists("src/config/routes.ts")).toBe(true);
-      expect(fileExists("src/config/database.ts")).toBe(true);
-      expect(fileExists("src/app/models/application-record.ts")).toBe(true);
-      expect(fileExists("src/app/controllers/application-controller.ts")).toBe(true);
+      expect(fileExists("config/application.ts")).toBe(true);
+      expect(fileExists("config/routes.ts")).toBe(true);
+      expect(fileExists("config/database.ts")).toBe(true);
+      expect(fileExists("app/models/application-record.ts")).toBe(true);
+      expect(fileExists("app/controllers/application-controller.ts")).toBe(true);
       expect(fileExists("db/migrate/.gitkeep")).toBe(true);
       expect(fileExists("db/seeds.ts")).toBe(true);
     });
@@ -71,8 +71,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates model file", () => {
-      expect(files).toContain("src/app/models/user.ts");
-      const content = readFile("src/app/models/user.ts");
+      expect(files).toContain("app/models/user.ts");
+      const content = readFile("app/models/user.ts");
       expect(content).toContain("class User extends Base");
       expect(content).toContain('this.attribute("name", "string")');
       expect(content).toContain('this.attribute("email", "string")');
@@ -103,8 +103,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates model file", () => {
-      expect(files).toContain("src/app/models/folder.ts");
-      const content = readFile("src/app/models/folder.ts");
+      expect(files).toContain("app/models/folder.ts");
+      const content = readFile("app/models/folder.ts");
       expect(content).toContain("class Folder extends Base");
       expect(content).toContain('this.attribute("name", "string")');
       expect(content).toContain('this.attribute("user_id", "integer")');
@@ -137,8 +137,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates model file", () => {
-      expect(files).toContain("src/app/models/document.ts");
-      const content = readFile("src/app/models/document.ts");
+      expect(files).toContain("app/models/document.ts");
+      const content = readFile("app/models/document.ts");
       expect(content).toContain("class Document extends Base");
       expect(content).toContain('this.attribute("title", "string")');
       expect(content).toContain('this.attribute("body", "text")');
@@ -189,8 +189,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates Artist model and migration", () => {
-      expect(artistFiles).toContain("src/app/models/artist.ts");
-      const content = readFile("src/app/models/artist.ts");
+      expect(artistFiles).toContain("app/models/artist.ts");
+      const content = readFile("app/models/artist.ts");
       expect(content).toContain("class Artist extends Base");
       expect(content).toContain('this.attribute("name", "string")');
       expect(content).toContain('this.attribute("bio", "text")');
@@ -201,8 +201,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates Album model and migration", () => {
-      expect(albumFiles).toContain("src/app/models/album.ts");
-      const content = readFile("src/app/models/album.ts");
+      expect(albumFiles).toContain("app/models/album.ts");
+      const content = readFile("app/models/album.ts");
       expect(content).toContain("class Album extends Base");
       expect(content).toContain('this.attribute("artist_id", "integer")');
       expect(content).toContain('this.attribute("release_date", "date")');
@@ -213,8 +213,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates Track model and migration", () => {
-      expect(trackFiles).toContain("src/app/models/track.ts");
-      const content = readFile("src/app/models/track.ts");
+      expect(trackFiles).toContain("app/models/track.ts");
+      const content = readFile("app/models/track.ts");
       expect(content).toContain("class Track extends Base");
       expect(content).toContain('this.attribute("track_number", "integer")');
       expect(content).toContain('this.attribute("duration", "integer")');
@@ -225,8 +225,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates Genre model and migration", () => {
-      expect(genreFiles).toContain("src/app/models/genre.ts");
-      const content = readFile("src/app/models/genre.ts");
+      expect(genreFiles).toContain("app/models/genre.ts");
+      const content = readFile("app/models/genre.ts");
       expect(content).toContain("class Genre extends Base");
 
       const mig = findMigration(genreFiles, /db\/migrate\/.+_create_genres\.ts$/);
@@ -267,8 +267,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates Account model and migration", () => {
-      expect(accountFiles).toContain("src/app/models/account.ts");
-      const content = readFile("src/app/models/account.ts");
+      expect(accountFiles).toContain("app/models/account.ts");
+      const content = readFile("app/models/account.ts");
       expect(content).toContain("class Account extends Base");
       expect(content).toContain('this.attribute("balance", "decimal")');
 
@@ -277,8 +277,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates Category model with self-referential parent_id", () => {
-      expect(categoryFiles).toContain("src/app/models/category.ts");
-      const content = readFile("src/app/models/category.ts");
+      expect(categoryFiles).toContain("app/models/category.ts");
+      const content = readFile("app/models/category.ts");
       expect(content).toContain("class Category extends Base");
       expect(content).toContain('this.attribute("parent_id", "integer")');
 
@@ -287,8 +287,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates Transaction model and migration", () => {
-      expect(transactionFiles).toContain("src/app/models/transaction.ts");
-      const content = readFile("src/app/models/transaction.ts");
+      expect(transactionFiles).toContain("app/models/transaction.ts");
+      const content = readFile("app/models/transaction.ts");
       expect(content).toContain("class Transaction extends Base");
       expect(content).toContain('this.attribute("amount", "decimal")');
       expect(content).toContain('this.attribute("account_id", "integer")');
@@ -301,8 +301,8 @@ describe("generator fixtures", () => {
     });
 
     it("creates Budget model and migration", () => {
-      expect(budgetFiles).toContain("src/app/models/budget.ts");
-      const content = readFile("src/app/models/budget.ts");
+      expect(budgetFiles).toContain("app/models/budget.ts");
+      const content = readFile("app/models/budget.ts");
       expect(content).toContain("class Budget extends Base");
       expect(content).toContain('this.attribute("period_start", "date")');
       expect(content).toContain('this.attribute("period_end", "date")');

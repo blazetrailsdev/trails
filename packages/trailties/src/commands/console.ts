@@ -96,7 +96,7 @@ export function consoleCommand(): Command {
     }
 
     // Load models from the current project
-    const modelsDir = path.join(cwd(), "src", "app", "models");
+    const modelsDir = path.join(cwd(), "app", "models");
     let loadedCount = 0;
     if (fs.existsSync(modelsDir)) {
       const files = fs
@@ -116,7 +116,7 @@ export function consoleCommand(): Command {
         }
       }
       if (loadedCount > 0) {
-        console.log(`Loaded ${loadedCount} model(s) from src/app/models/`);
+        console.log(`Loaded ${loadedCount} model(s) from app/models/`);
       }
     }
 

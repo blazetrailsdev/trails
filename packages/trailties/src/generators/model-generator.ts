@@ -96,7 +96,7 @@ export class ModelGenerator extends GeneratorBase {
     const ext = this.ext();
 
     this.createFile(
-      `src/app/models/${fileName}${ext}`,
+      `app/models/${fileName}${ext}`,
       `${importPath}
 
 export class ${className} extends ${parentClass} {${staticBlock}}
@@ -107,7 +107,7 @@ export class ${className} extends ${parentClass} {${staticBlock}}
       this.createFile(
         `test/models/${fileName}.test${ext}`,
         `import { describe, it, expect } from "vitest";
-import { ${className} } from "../../src/app/models/${fileName}.js";
+import { ${className} } from "../../app/models/${fileName}.js";
 
 describe("${className}", () => {
   it("exists", () => {

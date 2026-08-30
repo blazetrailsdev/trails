@@ -31,7 +31,7 @@ export class ScaffoldGenerator extends GeneratorBase {
     const ts = this.isTypeScript();
 
     this.createFile(
-      `src/app/controllers/${controllerFileName}${ext}`,
+      `app/controllers/${controllerFileName}${ext}`,
       emitControllerClass({
         className: controllerClassName,
         methods: crudMethods(className, singular, resourceName, ts),
@@ -43,24 +43,21 @@ export class ScaffoldGenerator extends GeneratorBase {
     );
 
     this.createFile(
-      `src/app/views/${resourceName}/index.html.tse`,
+      `app/views/${resourceName}/index.html.tse`,
       indexView(resourceName, singular, columns),
     );
-    this.createFile(`src/app/views/${resourceName}/show.html.tse`, showView(singular, columns));
-    this.createFile(`src/app/views/${resourceName}/new.html.tse`, newView(singular, resourceName));
-    this.createFile(
-      `src/app/views/${resourceName}/edit.html.tse`,
-      editView(singular, resourceName),
-    );
-    this.createFile(`src/app/views/${resourceName}/_form.html.tse`, formPartial(singular, columns));
-    if (!this.fileExists("src/app/views/layouts/application.html.tse")) {
-      this.createFile("src/app/views/layouts/application.html.tse", layoutTemplate());
+    this.createFile(`app/views/${resourceName}/show.html.tse`, showView(singular, columns));
+    this.createFile(`app/views/${resourceName}/new.html.tse`, newView(singular, resourceName));
+    this.createFile(`app/views/${resourceName}/edit.html.tse`, editView(singular, resourceName));
+    this.createFile(`app/views/${resourceName}/_form.html.tse`, formPartial(singular, columns));
+    if (!this.fileExists("app/views/layouts/application.html.tse")) {
+      this.createFile("app/views/layouts/application.html.tse", layoutTemplate());
     }
 
-    const routesFile = this.fileExists("src/config/routes.ts")
-      ? "src/config/routes.ts"
-      : this.fileExists("src/config/routes.js")
-        ? "src/config/routes.js"
+    const routesFile = this.fileExists("config/routes.ts")
+      ? "config/routes.ts"
+      : this.fileExists("config/routes.js")
+        ? "config/routes.js"
         : null;
     if (routesFile) {
       this.insertIntoFile(routesFile, "// routes", `  router.resources("${resourceName}");\n`);
@@ -107,7 +104,7 @@ function crudMethods(model: string, singular: string, plural: string, ts: boolea
 
 function controllerTestSource(className: string, fileName: string): string {
   return `import { describe, it, expect } from "vitest";
-import { ${className} } from "../../src/app/controllers/${fileName}.js";
+import { ${className} } from "../../app/controllers/${fileName}.js";
 
 describe("${className}", () => {
   it("index", () => {

@@ -56,7 +56,7 @@ export class DevcontainerGenerator extends GeneratorBase {
       this.opts.systemTest,
     );
     this.gsubFile(
-      "src/config/database.ts",
+      "config/database.ts",
       /host:\s*"localhost"/g,
       'host: process.env.DB_HOST ?? "localhost"',
       this.opts.database !== "sqlite3",

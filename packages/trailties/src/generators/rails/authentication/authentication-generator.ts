@@ -31,51 +31,46 @@ export class AuthenticationGenerator extends GeneratorBase {
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
     const { api = false, skipMailer = true, skipActionCable = true } = options;
-    this.emit("src/app/models/session.ts", "Session", APP_RECORD, [
+    this.emit("app/models/session.ts", "Session", APP_RECORD, [
       stub("associations", "// belongsTo: User", { static: true }),
     ]);
-    this.emit("src/app/models/user.ts", "User", APP_RECORD, [
+    this.emit("app/models/user.ts", "User", APP_RECORD, [
       stub("associations", "// hasSecurePassword; hasMany sessions, dependent: destroy", {
         static: true,
       }),
       stub("normalizes", "// emailAddress → e.strip().toLowerCase()", { static: true }),
     ]);
-    this.emit("src/app/models/current.ts", "Current", CURRENT_ATTRS, [
+    this.emit("app/models/current.ts", "Current", CURRENT_ATTRS, [
       stub("attributes", "// attribute :session", { static: true }),
     ]);
-    this.emit("src/app/controllers/sessions-controller.ts", "SessionsController", APP_CONTROLLER, [
+    this.emit("app/controllers/sessions-controller.ts", "SessionsController", APP_CONTROLLER, [
       asyncStub("new_", "// allowUnauthenticatedAccess only: [new_, create]"),
       asyncStub("create", "// User.authenticateBy → startNewSessionFor → redirect"),
       asyncStub("destroy", "// terminateSession → redirect to /session/new"),
     ]);
     this.emit(
-      "src/app/controllers/concerns/authentication.ts",
+      "app/controllers/concerns/authentication.ts",
       "Authentication",
       undefined,
       AUTH_CONCERN_METHODS,
     );
-    this.emit(
-      "src/app/controllers/passwords-controller.ts",
-      "PasswordsController",
-      APP_CONTROLLER,
-      [
-        asyncStub("new_", "// allowUnauthenticatedAccess"),
-        asyncStub("create", "// PasswordsMailer.reset(user).deliverLater"),
-        asyncStub("edit", "// setUserByToken"),
-        asyncStub("update", "// user.update(password, passwordConfirmation)"),
-        asyncStub("setUserByToken", "// User.findByPasswordResetTokenBang", PRIVATE),
-      ],
-    );
+    this.emit("app/controllers/passwords-controller.ts", "PasswordsController", APP_CONTROLLER, [
+      asyncStub("new_", "// allowUnauthenticatedAccess"),
+      asyncStub("create", "// PasswordsMailer.reset(user).deliverLater"),
+      asyncStub("edit", "// setUserByToken"),
+      asyncStub("update", "// user.update(password, passwordConfirmation)"),
+      asyncStub("setUserByToken", "// User.findByPasswordResetTokenBang", PRIVATE),
+    ]);
     // Don't clobber AppGenerator's Connection (or user customizations).
-    if (!skipActionCable && !this.fileExists("src/app/channels/application-cable/connection.ts"))
-      this.emit("src/app/channels/application-cable/connection.ts", "Connection", undefined, [
+    if (!skipActionCable && !this.fileExists("app/channels/application-cable/connection.ts"))
+      this.emit("app/channels/application-cable/connection.ts", "Connection", undefined, [
         stub("identifiedBy", "// currentUser", { static: true }),
         asyncStub("connect", "// setCurrentUser || rejectUnauthorizedConnection"),
         asyncStub("setCurrentUser", "// Session.findBy(cookies.signed.sessionId)", PRIVATE),
       ]);
 
     if (!skipMailer) {
-      this.emit("src/app/mailers/passwords-mailer.ts", "PasswordsMailer", APP_MAILER, [
+      this.emit("app/mailers/passwords-mailer.ts", "PasswordsMailer", APP_MAILER, [
         asyncStub("reset", '// mail subject: "Reset your password", to: user.emailAddress', {
           param: "user",
         }),
@@ -87,8 +82,8 @@ export class AuthenticationGenerator extends GeneratorBase {
         [stub("reset", "// TODO: preview PasswordsMailer.reset")],
       );
       if (!api) {
-        this.createFile("src/app/views/passwords-mailer/reset.html.tse", RESET_HTML);
-        this.createFile("src/app/views/passwords-mailer/reset.text.tse", RESET_TEXT);
+        this.createFile("app/views/passwords-mailer/reset.html.tse", RESET_HTML);
+        this.createFile("app/views/passwords-mailer/reset.text.tse", RESET_TEXT);
       }
     }
 
@@ -104,7 +99,7 @@ export class AuthenticationGenerator extends GeneratorBase {
 
   // Anchored on the class declaration; idempotent.
   private configureApplicationController(): void {
-    const file = "src/app/controllers/application-controller.ts";
+    const file = "app/controllers/application-controller.ts";
     if (!this.fileExists(file)) return;
     const full = this.path.join(this.cwd, file);
     let src = this.fs.readFileSync(full, "utf-8");
@@ -122,7 +117,7 @@ export class AuthenticationGenerator extends GeneratorBase {
 
   // Each route checked independently for partial-config convergence.
   private configureAuthenticationRoutes(): void {
-    for (const f of ["src/config/routes.ts", "src/config/routes.js"]) {
+    for (const f of ["config/routes.ts", "config/routes.js"]) {
       if (!this.fileExists(f)) continue;
       const src = this.fs.readFileSync(this.path.join(this.cwd, f), "utf-8");
       const lines: string[] = [];

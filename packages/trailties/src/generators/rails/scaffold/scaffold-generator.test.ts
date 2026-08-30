@@ -8,8 +8,8 @@ let tmpDir: string;
 let lines: string[];
 
 function setupRoutes() {
-  fs.mkdirSync(path.join(tmpDir, "src/config"), { recursive: true });
-  fs.writeFileSync(path.join(tmpDir, "src/config/routes.ts"), "// routes\n");
+  fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
+  fs.writeFileSync(path.join(tmpDir, "config/routes.ts"), "// routes\n");
 }
 
 beforeEach(() => {
@@ -42,7 +42,7 @@ describe("ScaffoldGeneratorTest", () => {
     ]);
 
     // Model
-    const model = readFile("src/app/models/product-line.ts");
+    const model = readFile("app/models/product-line.ts");
     expect(model).toContain("class ProductLine extends Base");
 
     expect(files.some((f) => f.includes("test/models/product-line.test.ts"))).toBe(true);
@@ -54,11 +54,11 @@ describe("ScaffoldGeneratorTest", () => {
     expect(migContent).toContain('t.references("user"');
 
     // Route
-    const routes = readFile("src/config/routes.ts");
+    const routes = readFile("config/routes.ts");
     expect(routes).toContain('resources("product_lines")');
 
     // Controller
-    const controller = readFile("src/app/controllers/product-lines-controller.ts");
+    const controller = readFile("app/controllers/product-lines-controller.ts");
     expect(controller).toContain("class ProductLinesController");
     expect(controller).toContain("async index()");
     expect(controller).toContain("async show()");
@@ -126,7 +126,7 @@ describe("ScaffoldGeneratorTest", () => {
   it("scaffold generator belongs to and references", () => {
     const gen = makeGen();
     const files = gen.run("LineItem", ["product:belongs_to", "cart:references"]);
-    const model = readFile("src/app/models/line-item.ts");
+    const model = readFile("app/models/line-item.ts");
     expect(model).toContain('this.belongsTo("product")');
     expect(model).toContain('this.belongsTo("cart")');
 
@@ -139,14 +139,14 @@ describe("ScaffoldGeneratorTest", () => {
   it("scaffold generator attachments", () => {
     const gen = makeGen();
     gen.run("Message", ["photos:attachments"]);
-    const model = readFile("src/app/models/message.ts");
+    const model = readFile("app/models/message.ts");
     expect(model).toContain('this.hasManyAttached("photos")');
   });
 
   it("scaffold generator rich text", () => {
     const gen = makeGen();
     gen.run("Message", ["content:rich_text"]);
-    const model = readFile("src/app/models/message.ts");
+    const model = readFile("app/models/message.ts");
     expect(model).toContain('this.hasRichText("content")');
   });
 
@@ -207,8 +207,8 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
   it("generates .js controller and model files", () => {
     const gen = new ScaffoldGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
     const files = gen.run("Post", ["title:string"]);
-    expect(files).toContain("src/app/controllers/posts-controller.js");
-    expect(files).toContain("src/app/models/post.js");
+    expect(files).toContain("app/controllers/posts-controller.js");
+    expect(files).toContain("app/models/post.js");
     const migFile = files.find((f) => f.startsWith("db/migrate/"));
     expect(migFile).toMatch(/\.js$/);
   });
@@ -217,7 +217,7 @@ describe("ScaffoldGeneratorTest (JavaScript project)", () => {
     const gen = new ScaffoldGenerator({ cwd: jsTmpDir, output: (m) => jsLines.push(m) });
     gen.run("Post", ["title:string"]);
     const content = fs.readFileSync(
-      path.join(jsTmpDir, "src/app/controllers/posts-controller.js"),
+      path.join(jsTmpDir, "app/controllers/posts-controller.js"),
       "utf-8",
     );
     expect(content).not.toContain("Promise<void>");

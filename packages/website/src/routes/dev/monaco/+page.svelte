@@ -41,7 +41,7 @@ export class User extends Base {
   </div>
   <div class="flex-1">
     <MonacoEditor
-      file={{ path: "src/app/models/user.ts", content: sampleCode }}
+      file={{ path: "app/models/user.ts", content: sampleCode }}
       readonly={false}
       highlights={showHighlights ? highlights : []}
     />
