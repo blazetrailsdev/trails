@@ -24,6 +24,7 @@ import {
   Temporal,
   Time,
 } from "@blazetrails/date";
+import { rational } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";
@@ -270,7 +271,7 @@ export const atMiddleOfDay = middleOfDay;
 
 /** Mirrors: `DateTime#end_of_day` (`date_time/calculations.rb:140-142`) */
 export function endOfDay(datetime: DateTime): DateTime {
-  return change(datetime, { hour: 23, min: 59, sec: 59, usec: new Rational(999999999, 1000) });
+  return change(datetime, { hour: 23, min: 59, sec: 59, usec: rational(999999999, 1000) });
 }
 
 /** Mirrors: `alias :at_end_of_day :end_of_day` (`date_time/calculations.rb:143`) */
@@ -286,7 +287,7 @@ export const atBeginningOfHour = beginningOfHour;
 
 /** Mirrors: `DateTime#end_of_hour` (`date_time/calculations.rb:152-154`) */
 export function endOfHour(datetime: DateTime): DateTime {
-  return change(datetime, { min: 59, sec: 59, usec: new Rational(999999999, 1000) });
+  return change(datetime, { min: 59, sec: 59, usec: rational(999999999, 1000) });
 }
 
 /** Mirrors: `alias :at_end_of_hour :end_of_hour` (`date_time/calculations.rb:155`) */
@@ -302,7 +303,7 @@ export const atBeginningOfMinute = beginningOfMinute;
 
 /** Mirrors: `DateTime#end_of_minute` (`date_time/calculations.rb:164-166`) */
 export function endOfMinute(datetime: DateTime): DateTime {
-  return change(datetime, { sec: 59, usec: new Rational(999999999, 1000) });
+  return change(datetime, { sec: 59, usec: rational(999999999, 1000) });
 }
 
 /** Mirrors: `alias :at_end_of_minute :end_of_minute` (`date_time/calculations.rb:167`) */

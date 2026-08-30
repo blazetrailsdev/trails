@@ -13,7 +13,6 @@ import {
   ArgumentError,
   Date,
   DateTime,
-  Rational,
   SEAT,
   cCivilToJd,
   dfLocalToUtc,
@@ -24,6 +23,7 @@ import {
   strftime,
   timeToDf,
 } from "./date.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 /**
  * MRI reads the process's zone once and caches it (`time.c`

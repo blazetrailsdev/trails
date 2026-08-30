@@ -1,4 +1,5 @@
-import { Rational, Temporal } from "@blazetrails/date";
+import { Temporal } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import {
   TimeWithZone,
   inTimeZone as stringInTimeZone,

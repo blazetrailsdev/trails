@@ -42,8 +42,9 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect } from "vitest";
-import { Date, DateTime, Rational, strftime } from "./date.js";
+import { Date, DateTime, strftime } from "./date.js";
 import type { DateParts } from "./date.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 const STRFTIME_2001_02_03: Record<string, [string, DateParts]> = {
   "%A": ["Saturday", { wday: 6 }],

@@ -18,19 +18,13 @@
  * gem's, line for line.
  */
 
+import { isSymbol } from "@blazetrails/ruby-compat";
+
 import { MissingTranslation, InvalidLocale } from "../exceptions.js";
 import { EMPTY_HASH, translate, type Locale, type TranslationKey } from "../i18n.js";
 import { Fallbacks as LocaleFallbacks } from "../locale/fallbacks.js";
 import { catchException, throwException } from "../throw-catch.js";
 import type { Base, TranslateOptions } from "./base.js";
-
-/**
- * Ruby `Symbol === x`. A Ruby Symbol is a JS string that keeps its leading
- * colon (`":short"`), which is the discriminator Ruby gets from the type.
- */
-function isSymbol(value: unknown): value is string {
-  return typeof value === "string" && value.startsWith(":");
-}
 
 /**
  * Anything that answers the gem's `I18n.fallbacks[locale]` — the gem's own

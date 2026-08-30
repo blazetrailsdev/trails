@@ -1,14 +1,9 @@
 [
   "packages/actionpack/src/action-dispatch/middleware/cookies.ts::KeyError",
-  "packages/activemodel/src/validations/numericality.ts::isSymbol",
   "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.ts::fetch",
   "packages/activerecord/src/connection-adapters/postgresql-adapter.ts::fetch",
   "packages/activesupport/src/core-ext/date-and-time/calculations.ts::fetch",
   "packages/activesupport/src/core-ext/key-error.ts::KeyError",
   "packages/activesupport/src/core-ext/string/conversions.ts::fetch",
-  "packages/date/src/date.ts::spaceship",
-  "packages/i18n/src/backend/base.ts::isSymbol",
-  "packages/i18n/src/backend/fallbacks.ts::isSymbol",
-  "packages/i18n/src/backend/key-value.ts::isSymbol",
-  "packages/i18n/src/backend/simple.ts::isSymbol"
+  "packages/date/src/date.ts::spaceship"
 ]

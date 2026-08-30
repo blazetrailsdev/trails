@@ -161,6 +161,28 @@ export type CallArgResult =
     };
 
 /**
+ * Kernel's conversion FUNCTIONS (`vendor/ruby/object.c` `rb_f_integer`,
+ * `vendor/ruby/rational.c:2691` `nurat_s_convert`, ...). They are methods whose
+ * names are capitalized, so `Rational(999999999, 1000)`
+ * (`core_ext/date_time/calculations.rb:117`) ports as `rational(...)` by the
+ * ordinary method rule, and the `id:`/`call:` collapse below means the const
+ * `Rational` and the method `Rational()` reach here as the same `ref:` either
+ * way. Folding the leading capital on BOTH sides is what makes the ported call
+ * compare equal to Rails' — the set is named rather than "any capitalized
+ * call", so an ordinary constant reference still keeps its spelling.
+ */
+const KERNEL_CONVERSION_METHODS = new Set([
+  "Array",
+  "BigDecimal",
+  "Complex",
+  "Float",
+  "Hash",
+  "Integer",
+  "Rational",
+  "String",
+]);
+
+/**
  * The comparison key for one identifier or nested call name.
  *
  * Ruby `new` is the port's `constructor`, exactly as `calls` / `callSeq`
@@ -182,6 +204,7 @@ function normalizeRef(rawName: string): string {
   if (rawName === "new") return "constructor";
   const name = rawName.replace(/^[@$]+/, "");
   if (name === "self") return "this";
+  if (KERNEL_CONVERSION_METHODS.has(name)) return `${name[0].toLowerCase()}${name.slice(1)}`;
   return /[?!=]$/.test(name) ? name : snakeToCamel(name);
 }
 

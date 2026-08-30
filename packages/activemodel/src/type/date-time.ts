@@ -1,11 +1,11 @@
 import {
   ArgumentError as RubyArgumentError,
   Date as RubyDate,
-  Rational,
   Temporal,
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,

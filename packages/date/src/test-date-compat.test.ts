@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Date, DateTime, Rational } from "./date.js";
+import { Date, DateTime } from "./date.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 describe("TestDateCompat", () => {
   it("compat", () => {

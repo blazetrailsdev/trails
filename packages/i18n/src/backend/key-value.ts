@@ -36,6 +36,8 @@
  * emptiness it reports is load-bearing — see `Base`'s `isNil`.
  */
 
+import { isSymbol } from "@blazetrails/ruby-compat";
+
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, deepSymbolizeKeys, type TranslationData } from "../utils.js";
 import {
@@ -59,10 +61,6 @@ export interface Store {
 
 function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isSymbol(value: unknown): value is string {
-  return typeof value === "string" && value.startsWith(":");
 }
 
 /**

@@ -1,3 +1,5 @@
+import { isSymbol } from "@blazetrails/ruby-compat";
+
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import {
@@ -174,10 +176,6 @@ export function parseAsNumber(
 
 function isNumeric(value: unknown): boolean {
   return typeof value === "number" || typeof value === "bigint" || value instanceof BigDecimal;
-}
-
-function isSymbol(value: unknown): boolean {
-  return typeof value === "string" && value.startsWith(":");
 }
 
 /** @internal */

@@ -49,10 +49,10 @@ import {
   Date as RubyDate,
   DateTime as RubyDateTime,
   ERANGE,
-  Rational,
   dNewByFrags,
   dtNewByFrags,
 } from "./date.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 /* eslint-disable no-control-regex */
 

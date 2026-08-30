@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Rational, Temporal } from "@blazetrails/date";
+import { Temporal } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone, useZone } from "@blazetrails/activesupport";
 import {
   applySecondsPrecision,

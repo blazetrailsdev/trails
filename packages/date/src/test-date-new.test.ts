@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
-import { Date, DateTime, Rational } from "./date.js";
+import { Date, DateTime } from "./date.js";
 import { Time } from "./time.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 /**
  * `vendor/date/test/date/test_date_new.rb`, the `Date.jd` / `Date.ordinal` /

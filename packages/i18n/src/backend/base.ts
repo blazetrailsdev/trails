@@ -38,6 +38,7 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { Temporal, strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import { throwException, catchException } from "../throw-catch.js";
@@ -234,18 +235,10 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * Ruby `Symbol === x`. A Ruby Symbol is a JS string that keeps its leading
- * colon (`":short"`), which is the discriminator Ruby gets from the type.
- */
-function isSymbol(value: unknown): value is string {
-  return typeof value === "string" && value.startsWith(":");
-}
-
 /** Ruby `#to_s` (i18n gem `lib/i18n.rb:447`), for the values a format argument can hold. */
 function toS(subject: unknown): string {
   if (subject == null) return "";
-  return isSymbol(subject) ? subject.slice(1) : String(subject);
+  return isSymbol(subject) ? symbolToS(subject) : String(subject);
 }
 
 /**
@@ -447,7 +440,7 @@ export abstract class Base {
       const key = format;
       const type = respondTo(object, "sec") ? "time" : "date";
       options = { ...options, raise: true, object, locale };
-      format = t(`:${type}.formats.${key.slice(1)}`, options);
+      format = t(`:${type}.formats.${symbolToS(key)}`, options);
     }
 
     format = this.translateLocalizationFormat(locale, object as Localizable, format, options);
