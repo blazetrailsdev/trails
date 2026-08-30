@@ -404,3 +404,40 @@ describe("TS extractor gate detection", () => {
     expect(i.pending).toBe(false);
   });
 });
+
+describe("dynamically-named tests", () => {
+  it("records a template-literal title as a placeholder skeleton", () => {
+    const info = extractTestsFromSource(
+      [
+        'describe("value-class visitors aliased to unsupported", () => {',
+        "  for (const name of aliasNames) {",
+        "    it(`${name} raises UnsupportedVisitError`, () => {});",
+        "  }",
+        '  it("static one", () => {});',
+        "});",
+      ].join("\n"),
+      "packages/arel/src/visitors/to-sql.test.ts",
+    );
+    expect(info.testCases.map((tc) => [tc.description, tc.dynamic])).toEqual([
+      ["<expr> raises UnsupportedVisitError", true],
+      ["static one", undefined],
+    ]);
+  });
+
+  it("recovers the skeleton through the skip/skipIf forms too", () => {
+    const info = extractTestsFromSource(
+      [
+        "it.skip(`raises for ${label}`, () => {});",
+        'it.skipIf(adapterType !== "postgres")(`casts ${type}`, () => {});',
+        "test(`${a} and ${b}`, () => {});",
+      ].join("\n"),
+      "packages/activerecord/src/x.test.ts",
+    );
+    expect(info.testCases.map((tc) => tc.description)).toEqual([
+      "raises for <expr>",
+      "casts <expr>",
+      "<expr> and <expr>",
+    ]);
+    expect(info.testCases.every((tc) => tc.dynamic)).toBe(true);
+  });
+});

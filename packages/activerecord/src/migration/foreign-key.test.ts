@@ -23,8 +23,6 @@ import { SchemaDumper } from "../schema-dumper.js";
 
 const unlessSqlite3Adapter = adapterType !== "sqlite";
 
-const supportsValidateConstraints = adapterSupports("validate_constraints");
-
 function validating(conn: AbstractAdapter): PostgreSQLAdapter {
   return conn as PostgreSQLAdapter;
 }
@@ -588,7 +586,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       });
     });
 
-    it.skipIf(supportsValidateConstraints)("add invalid foreign key", async () => {
+    it.skipIf(adapterSupports("validate_constraints"))("add invalid foreign key", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets", {

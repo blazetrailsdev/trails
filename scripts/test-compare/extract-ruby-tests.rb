@@ -822,8 +822,12 @@ class TestExtractor
   end
 
   # Intercept `if/unless current_adapter?(...)` (and modifier forms) so every
-  # test in the guarded body inherits the restriction. Walks the else branch
-  # ungated.
+  # test in the guarded body inherits the restriction. The else branch runs on
+  # the INVERTED condition, so it is walked under the gate the same condition
+  # derives at the opposite parity: `foreign_key_test.rb:453-535` defines
+  # `test_add_invalid_foreign_key` on both arms of
+  # `if ... supports_validate_constraints?`, and walking the else arm ungated
+  # made the two indistinguishable to the matcher.
   def process_conditional(node)
     kind = node[0]
     cond = node[1]
@@ -840,14 +844,28 @@ class TestExtractor
     else
       walk(body) if body.is_a?(Array)
     end
-    walk(els) if els.is_a?(Array)
+    return unless els.is_a?(Array)
+
+    else_gate = gate_from_run_condition(cond, !positive)
+    if else_gate
+      @gate_stack.push(else_gate)
+      walk(els)
+      @gate_stack.pop
+    else
+      walk(els)
+    end
   end
 
   # Attach a :gate to a test_case from its dir gate, the enclosing
-  # `current_adapter?` stack, and any in-body `skip ... if/unless` guards.
+  # `current_adapter?` stack, and any in-body `skip ... if/unless` guards, plus
+  # the enclosing test CLASS. `ancestors` cannot stand in for the class: it is
+  # `@describe_stack`, which minitest-spec `describe`/`context` blocks push onto
+  # too (arel/attributes_test.rb:6,15 nests two inside one class), so its last
+  # entry is a describe label there rather than the class name.
   # `body_gate` defaults to `:compute` (derive from `body_node`); module tests
   # pass their precomputed in-body skip gate instead, since the sexp is gone.
   def add_gate(test_case, body_node, body_gate: :compute)
+    test_case[:rubyClass] = @class_stack.last unless @class_stack.empty?
     parts = []
     parts << { adapters: @file_adapter_gate } if @file_adapter_gate
     @gate_stack.each { |g| parts << g }

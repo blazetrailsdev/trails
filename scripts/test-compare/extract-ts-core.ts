@@ -359,6 +359,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     style: "it" | "test",
     pending: boolean,
     inlineGate?: TestGate | null,
+    dynamic = false,
   ) {
     let gate = activeGate();
     if (inlineGate) gate = mergeGate(gate, inlineGate);
@@ -380,6 +381,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       assertionKinds,
       assertionValues,
       pending,
+      ...(dynamic ? { dynamic: true } : {}),
       ...(finalGate ? { gate: finalGate } : {}),
     });
   }
@@ -415,13 +417,20 @@ export function extractTestsFromSource(content: string, relativePath: string): T
           }
         } else if (funcName === "itIfSupports") {
           // itIfSupports("feature", "name", fn)
-          const title = getArgString(node, 1);
-          if (title) {
-            addTest(node, title, "it", false, gateFromWrapper(funcName, getArgString(node, 0)));
+          const t = getArgTitle(node, 1);
+          if (t) {
+            addTest(
+              node,
+              t.title,
+              "it",
+              false,
+              gateFromWrapper(funcName, getArgString(node, 0)),
+              t.dynamic,
+            );
           }
         } else if (funcName === "it" || funcName === "test") {
-          const title = getArgString(node, 0);
-          if (title) addTest(node, title, funcName, false);
+          const t = getArgTitle(node, 0);
+          if (t) addTest(node, t.title, funcName, false, null, t.dynamic);
         }
       } else if (
         ts.isCallExpression(expression) &&
@@ -470,20 +479,21 @@ export function extractTestsFromSource(content: string, relativePath: string): T
               return;
             }
           } else if (base.text === "itIfSupports") {
-            const title = getArgString(node, 1);
-            if (title) {
+            const t = getArgTitle(node, 1);
+            if (t) {
               const wrapperGate = gateFromWrapper(base.text, getArgString(node, 0));
               addTest(
                 node,
-                title,
+                t.title,
                 "it",
                 false,
                 wrapperGate ? mergeGate(wrapperGate, inlineGate) : inlineGate,
+                t.dynamic,
               );
             }
           } else if (base.text === "it" || base.text === "test") {
-            const title = getArgString(node, 0);
-            if (title) addTest(node, title, base.text, false, inlineGate);
+            const t = getArgTitle(node, 0);
+            if (t) addTest(node, t.title, base.text, false, inlineGate, t.dynamic);
           }
         }
       } else if (ts.isPropertyAccessExpression(expression)) {
@@ -497,9 +507,16 @@ export function extractTestsFromSource(content: string, relativePath: string): T
           }
         } else if (ts.isIdentifier(base) && (base.text === "it" || base.text === "test")) {
           const modifier = expression.name.text;
-          const title = getArgString(node, 0);
-          if (title) {
-            addTest(node, title, base.text, modifier === "skip" || modifier === "todo");
+          const t = getArgTitle(node, 0);
+          if (t) {
+            addTest(
+              node,
+              t.title,
+              base.text,
+              modifier === "skip" || modifier === "todo",
+              null,
+              t.dynamic,
+            );
           }
         }
       }
@@ -518,6 +535,41 @@ function getArgString(node: ts.CallExpression, index: number): string | null {
     return arg.text;
   }
   return null;
+}
+
+/** Placeholder standing in for one `${...}` of a recovered template title. */
+export const DYNAMIC_TITLE_PLACEHOLDER = "<expr>";
+
+/**
+ * The static skeleton of a template-literal title, with every `${...}`
+ * replaced by {@link DYNAMIC_TITLE_PLACEHOLDER} — `` `${name} raises` `` →
+ * `"<expr> raises"`. Returns null when the argument is not an interpolated
+ * template.
+ *
+ * A loop-generated `it()` has no static name, so before this the case was
+ * dropped from the manifest entirely: neither matched nor counted as extra,
+ * which hid two TS-only groups sitting in a Rails-named arel file from the very
+ * gate meant to find them (`visitors/to-sql.test.ts`). The skeleton is a label
+ * for the audit, not a name to match on — see `TestCaseInfo.dynamic`.
+ */
+function getArgTitle(
+  node: ts.CallExpression,
+  index: number,
+): { title: string; dynamic: boolean } | null {
+  const staticTitle = getArgString(node, index);
+  if (staticTitle !== null) return { title: staticTitle, dynamic: false };
+  const skeleton = getArgTemplateSkeleton(node, index);
+  return skeleton === null ? null : { title: skeleton, dynamic: true };
+}
+
+function getArgTemplateSkeleton(node: ts.CallExpression, index: number): string | null {
+  const arg = node.arguments[index];
+  if (!arg || !ts.isTemplateExpression(arg)) return null;
+  let out = arg.head.text;
+  for (const span of arg.templateSpans) {
+    out += DYNAMIC_TITLE_PLACEHOLDER + span.literal.text;
+  }
+  return out;
 }
 
 export function pkgFromPath(relPath: string): string {

@@ -4,6 +4,7 @@ import {
   compareFileResults,
   isAssertionCountMismatch,
   parseMinExtra,
+  rejectsSiblingClassCandidate,
   rubyToConventionTs,
   type ConventionFileResult,
 } from "./compare.js";
@@ -148,5 +149,49 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("relation/where_test.rb", "activerecord")).toBe(
       "relation/where.test.ts",
     );
+  });
+});
+
+describe("rejectsSiblingClassCandidate", () => {
+  const tsClasses = new Set(["ForeignKeyTest", "CompositeForeignKeyTest"]);
+
+  it("refuses a candidate under a sibling class when the name collides", () => {
+    expect(
+      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, tsClasses, [
+        "migration",
+        "ForeignKeyTest",
+        "foreign key exists",
+      ]),
+    ).toBe(true);
+  });
+
+  it("accepts a candidate under the test's own class", () => {
+    expect(
+      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, tsClasses, [
+        "migration",
+        "CompositeForeignKeyTest",
+        "foreign key exists",
+      ]),
+    ).toBe(false);
+  });
+
+  it("keys on the name alone when the name does not collide", () => {
+    expect(
+      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 1, tsClasses, [
+        "migration",
+        "ForeignKeyTest",
+        "foreign key exists",
+      ]),
+    ).toBe(false);
+  });
+
+  it("keys on the name alone when the TS file names no such describe", () => {
+    expect(
+      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, new Set(["migration"]), [
+        "migration",
+        "foreign key exists",
+      ]),
+    ).toBe(false);
+    expect(rejectsSiblingClassCandidate(undefined, 2, tsClasses, ["x"])).toBe(false);
   });
 });
