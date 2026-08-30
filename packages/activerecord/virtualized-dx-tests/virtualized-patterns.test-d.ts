@@ -156,14 +156,17 @@ describe("virtualized patterns — trails-tsc injects declares + auto-imports", 
     expectTypeOf(await author.loadHasOne("profile")).toEqualTypeOf<Profile | null>();
   });
 
-  it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → PlainTime", () => {
+  it("Temporal attribute types: datetime → Instant | PlainDateTime, date → PlainDate, time → Instant | TimeWithZone", () => {
     const e = new Event({});
     expectTypeOf(e.starts_at).toEqualTypeOf<
       | import("@blazetrails/date").Temporal.Instant
       | import("@blazetrails/date").Temporal.PlainDateTime
     >();
     expectTypeOf(e.starts_on).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainDate>();
-    expectTypeOf(e.duration).toEqualTypeOf<import("@blazetrails/date").Temporal.PlainTime>();
+    expectTypeOf(e.duration).toEqualTypeOf<
+      | import("@blazetrails/date").Temporal.Instant
+      | import("@blazetrails/activesupport").TimeWithZone
+    >();
   });
 });
 

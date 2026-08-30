@@ -305,8 +305,8 @@ function typeCastedBinds(
 }
 
 /** @internal */
-export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | null): Type {
-  return this.typeMap.lookup(sqlType);
+export function lookupCastType(this: { typeMap: TypeMap }, sqlType: string | number | null): Type {
+  return this.typeMap.lookup(sqlType as string | null);
 }
 
 /** @internal */

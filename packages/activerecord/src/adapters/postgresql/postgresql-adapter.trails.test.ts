@@ -343,7 +343,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         other.disconnectBang();
         expect(other._rawConnection).toBeNull();
 
-        other.resetBang();
+        void other.resetBang();
         await other.lock.synchronize(async () => {});
 
         expect(other._rawConnection).not.toBeNull();
@@ -360,7 +360,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((other as unknown as { _client: unknown })._client).toBeNull();
         expect(other.transactionStatus).not.toBe(0);
 
-        other.resetBang();
+        void other.resetBang();
         await other.lock.synchronize(async () => {});
 
         expect(other.transactionStatus).toBe(0);
@@ -375,7 +375,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.beginDbTransaction();
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
-        other.resetBang();
+        void other.resetBang();
         await expect(foreign).resolves.toHaveLength(1);
       } finally {
         await other.close();
@@ -386,7 +386,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await other.execute("SELECT 1 AS n");
-        setTimeout(() => other.resetBang(), 0);
+        setTimeout(() => void other.resetBang(), 0);
         await other.lock.synchronize(async () => {
           await new Promise<void>((r) => setTimeout(r, 50));
           const rows = await other.execute("SELECT 1 AS n");

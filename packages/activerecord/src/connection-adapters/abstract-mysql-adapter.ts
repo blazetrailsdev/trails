@@ -784,10 +784,10 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @internal */
-  declare _maxAllowedPacket?: number;
+  declare _maxAllowedPacket?: number | null;
 
   /** @internal */
-  async maxAllowedPacket(): Promise<number> {
+  async maxAllowedPacket(): Promise<number | null> {
     return mysqlMaxAllowedPacket.call(this);
   }
 

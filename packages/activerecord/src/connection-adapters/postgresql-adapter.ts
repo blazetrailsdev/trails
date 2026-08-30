@@ -330,6 +330,9 @@ export class PostgreSQLAdapter
   private _inTransaction = false;
   private _readyForQueryStatus = "I";
   private _typeMap: HashLookupTypeMap | null = null;
+
+  /** @internal */
+  _regtypeOids: Map<string, number> = new Map();
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
   private _mappedDefaultTimezone: "utc" | "local" | null = null;
@@ -712,6 +715,12 @@ export class PostgreSQLAdapter
         (result.fields ?? []).map((f) => f.name),
         result.rows ?? [],
       ).toArray() as unknown as PgTypeRow[];
+      for (const row of records) {
+        const oid = Number(row.oid);
+        for (const name of [row.typname, row.formatType, row.aliasName]) {
+          if (name != null) this._regtypeOids.set(name, oid);
+        }
+      }
       initializer.run(records);
     }
   }
@@ -765,6 +774,7 @@ export class PostgreSQLAdapter
 
   async reloadTypeMap(): Promise<void> {
     return this.lock.synchronize(async () => {
+      this._regtypeOids.clear();
       if (this._typeMap) {
         this.typeMap.clear();
       } else {
@@ -1534,39 +1544,37 @@ export class PostgreSQLAdapter
     this.verifiedBang();
   }
 
-  override resetBang(): void {
-    void this.lock
-      .synchronize(async () => {
-        const live = this._rawConnection;
-        if (!live) {
-          await this.connectBang();
-          return;
-        }
-        this._connectionConfigured = false;
-        if (this.transactionStatus !== PQTRANS_IDLE) {
-          await live.query("ROLLBACK").catch(() => {});
-        }
-        if (this._client) {
-          this._client = null;
-          this._inTransaction = false;
-        }
-        await live.query("DISCARD ALL");
-        if (this._rawConnection === live && !this._closed) {
-          await this.configureConnection().catch((error: unknown) => {
-            if (this._rawConnection === live) {
-              this._rawConnection = null;
-              this._connectionConfigured = false;
-              this._typeMapEagerLoaded = false;
-              this._statements.reset();
-            }
-            live.end().catch(() => {});
-            throw error;
-          });
-        }
-        this._statements.reset();
-        super.resetBang();
-      })
-      .catch(() => {});
+  override async resetBang(): Promise<void> {
+    await this.lock.synchronize(async () => {
+      const live = this._rawConnection;
+      if (!live) {
+        await this.connectBang();
+        return;
+      }
+      this._connectionConfigured = false;
+      if (this.transactionStatus !== PQTRANS_IDLE) {
+        await live.query("ROLLBACK").catch(() => {});
+      }
+      if (this._client) {
+        this._client = null;
+        this._inTransaction = false;
+      }
+      await live.query("DISCARD ALL");
+      if (this._rawConnection === live && !this._closed) {
+        await this.configureConnection().catch((error: unknown) => {
+          if (this._rawConnection === live) {
+            this._rawConnection = null;
+            this._connectionConfigured = false;
+            this._typeMapEagerLoaded = false;
+            this._statements.reset();
+          }
+          live.end().catch(() => {});
+          throw error;
+        });
+      }
+      this._statements.reset();
+      await super.resetBang();
+    });
   }
 
   /**

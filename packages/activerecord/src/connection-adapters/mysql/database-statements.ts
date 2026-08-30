@@ -1,4 +1,6 @@
 import { sql as arelSql } from "@blazetrails/arel";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
 import { Result } from "../../result.js";
@@ -95,9 +97,9 @@ export async function returningColumnValues(
 
 export interface MaxAllowedPacketHost {
   showVariable(name: string): Promise<string | null>;
-  _maxAllowedPacket?: number;
+  _maxAllowedPacket?: number | null;
   /** @internal */
-  maxAllowedPacket(): Promise<number>;
+  maxAllowedPacket(): Promise<number | null>;
 }
 
 /** @internal */
@@ -125,8 +127,9 @@ export async function isMaxAllowedPacketReached(
 ): Promise<boolean> {
   const maxPacket = await this.maxAllowedPacket();
   const currentSize = Buffer.byteLength(currentPacket, "utf8");
+  if (maxPacket == null) throw new ArgumentError("comparison of Integer with nil failed");
   if (currentSize > maxPacket) {
-    throw new Error(
+    throw new ActiveRecordError(
       `Fixtures set is too large ${currentSize}. Consider increasing the max_allowed_packet variable.`,
     );
   }
@@ -135,8 +138,10 @@ export async function isMaxAllowedPacketReached(
 }
 
 /** @internal */
-export async function maxAllowedPacket(this: MaxAllowedPacketHost): Promise<number> {
-  return (this._maxAllowedPacket ??= Number(await this.showVariable("max_allowed_packet")));
+export async function maxAllowedPacket(this: MaxAllowedPacketHost): Promise<number | null> {
+  if (this._maxAllowedPacket != null) return this._maxAllowedPacket;
+  const value = await this.showVariable("max_allowed_packet");
+  return (this._maxAllowedPacket = value == null ? value : Number(value));
 }
 
 export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {

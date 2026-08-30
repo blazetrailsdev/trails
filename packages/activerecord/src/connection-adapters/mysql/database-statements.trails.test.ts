@@ -32,7 +32,7 @@ describe("MySQL::DatabaseStatements max_allowed_packet", () => {
   it("raises rather than combining when the server does not answer", async () => {
     const host = hostReporting(null);
     await expect(isMaxAllowedPacketReached.call(host, "SELECT 1", undefined)).rejects.toThrow(
-      /Fixtures set is too large 8\./,
+      /comparison of Integer with nil failed/,
     );
   });
 
