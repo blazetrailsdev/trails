@@ -4,14 +4,11 @@ import { fetch, hasKey } from "./hash.js";
 describe("Hash#fetch", () => {
   it("returns a stored null rather than the default", () => {
     expect(fetch({ offset: null }, "offset", 0)).toBeNull();
+    expect(fetch({ offset: undefined }, "offset", 0)).toBeUndefined();
   });
 
   it("returns a stored false rather than the default", () => {
     expect(fetch({ verbose: false }, "verbose", true)).toBe(false);
-  });
-
-  it("returns a stored undefined rather than the default", () => {
-    expect(fetch({ offset: undefined }, "offset", 0)).toBeUndefined();
   });
 
   it("does not read an inherited JavaScript property as a stored key", () => {

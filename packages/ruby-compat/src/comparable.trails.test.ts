@@ -11,23 +11,16 @@ import {
 } from "./comparable.js";
 
 describe("<=>", () => {
-  it("orders numbers", () => {
+  it("orders the Ruby types that define an ordering", () => {
     expect(cmp(1, 2)).toBe(-1);
     expect(cmp(2, 1)).toBe(1);
     expect(cmp(1, 1)).toBe(0);
-  });
-
-  it("orders strings", () => {
     expect(cmp("a", "b")).toBe(-1);
   });
 
   it("orders Dates as epoch millis", () => {
     expect(cmp(new Date(0), new Date(1))).toBe(-1);
     expect(cmp(new Date(1), 1)).toBe(0);
-  });
-
-  it("returns nil for NaN", () => {
-    expect(cmp(Number.NaN, 0)).toBeNull();
   });
 
   it("returns nil for nil against a value and 0 for nil against nil", () => {
@@ -41,6 +34,7 @@ describe("<=>", () => {
   });
 
   it("returns nil rather than ordering what Ruby leaves to Object#<=>", () => {
+    expect(cmp(Number.NaN, 0)).toBeNull();
     expect(cmp(false, true)).toBeNull();
     expect(cmp(true, true)).toBe(0);
     expect(cmp(1, "a")).toBeNull();
@@ -48,13 +42,10 @@ describe("<=>", () => {
   });
 
   it("sends the receiver's own <=> under either trails spelling", () => {
-    expect(cmp({ cmp: () => -1 }, 0)).toBe(-1);
-  });
-
-  it("sends the receiver's own <=> when it has one", () => {
     const receiver = { compareTo: (other: unknown) => (other === "x" ? 0 : null) };
     expect(cmp(receiver, "x")).toBe(0);
     expect(cmp(receiver, "y")).toBeNull();
+    expect(cmp({ cmp: () => -1 }, 0)).toBe(-1);
   });
 });
 
