@@ -1005,9 +1005,7 @@ export class SchemaStatements {
       [key: string]: unknown;
     } = {},
   ): Promise<boolean> {
-    return (await this.indexes(tableName)).some((i) =>
-      i.isDefinedFor(columnName ?? undefined, options),
-    );
+    return (await this.indexes(tableName)).some((i) => i.isDefinedFor(columnName, options));
   }
 
   async foreignKeyExists(

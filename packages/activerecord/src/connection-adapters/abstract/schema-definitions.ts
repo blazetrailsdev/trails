@@ -532,7 +532,7 @@ export class IndexDefinition {
   }
 
   isDefinedFor(
-    columns?: string | string[],
+    columns?: string | string[] | null,
     options: {
       column?: string | string[];
       name?: string;
@@ -540,7 +540,6 @@ export class IndexDefinition {
       valid?: boolean;
       include?: string[];
       nullsNotDistinct?: boolean;
-      [key: string]: unknown;
     } = {},
   ): boolean {
     const isBlank =
