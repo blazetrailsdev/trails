@@ -399,7 +399,7 @@ export interface IdHashOptions {
 export interface ColumnOptions {
   null?: boolean;
   default?: unknown;
-  limit?: number;
+  limit?: number | null;
   precision?: number | null;
   scale?: number;
   index?: boolean;
