@@ -555,6 +555,7 @@ export class ConnectionPool implements ReapablePool {
       }
 
       if (pin.depth === 0) {
+        connection.stealBang();
         connection.setLockThread(null);
         this.checkin(connection);
       }
