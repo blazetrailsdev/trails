@@ -1317,12 +1317,11 @@ function excludingWithCallee(callee: "excluding" | "without") {
       const primaryKeyArray: string[] =
         primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
       for (const record of relation._records) {
-        const id =
+        flatMappedIds.push(
           primaryKeyArray.length === 1
             ? record._readAttribute(primaryKeyArray[0])
-            : primaryKeyArray.map((column: string) => record._readAttribute(column));
-        if (Array.isArray(id)) flatMappedIds.push(...id);
-        else flatMappedIds.push(id);
+            : primaryKeyArray.map((column: string) => record._readAttribute(column)),
+        );
       }
     }
     const combined: unknown[] = [...records, ...flatMappedIds, ...deferredRelations];

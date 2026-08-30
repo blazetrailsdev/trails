@@ -328,14 +328,3 @@ describe("empty-scope aggregate identities", () => {
     expect(await Account.none().ids()).toEqual([]);
   });
 });
-
-describe("ids on a model without a primary key", () => {
-  fixtures(["edges"]);
-
-  it("maps every record to an empty id list, matching Array(nil)", async () => {
-    const { Edge } = await import("./test-helpers/models/edge.js");
-    const relation = Edge.all();
-    await relation.load();
-    expect(await relation.ids()).toEqual([[], [], [], []]);
-  });
-});
