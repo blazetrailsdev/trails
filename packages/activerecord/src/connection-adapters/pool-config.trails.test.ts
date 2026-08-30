@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PoolConfig } from "./pool-config.js";
-import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
+import { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { SchemaReflection } from "./schema-cache.js";
 

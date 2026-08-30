@@ -1038,8 +1038,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
   ): Promise<void> {
     const expr = typeof expression === "string" || expression == null ? expression : null;
     const opts = typeof expression === "object" && expression !== null ? expression : options;
-    const exclNameToDelete = (await this.exclusionConstraintForBang(tableName, expr ?? null, opts))
-      .name!;
+    const exclNameToDelete = (
+      await this.exclusionConstraintForBang(tableName, { ...opts, expression: expr ?? undefined })
+    ).name!;
     await this.removeConstraint(tableName, exclNameToDelete);
   }
 
@@ -1102,16 +1103,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
   /** @internal */
   async exclusionConstraintForBang(
     tableName: string,
-    expression?: string | null,
-    options: Record<string, unknown> = {},
+    { expression, ...options }: Record<string, unknown>,
   ): Promise<ExclusionConstraintDefinition> {
-    const result = await this.exclusionConstraintFor(tableName, {
-      ...options,
-      expression: expression ?? undefined,
-    });
+    const result = await this.exclusionConstraintFor(tableName, { expression, ...options });
     if (!result)
       throw new ArgumentError(
-        `Table '${tableName}' has no exclusion constraint for ${expression ?? rubyInspectHash(options)}`,
+        `Table '${tableName}' has no exclusion constraint for ${(expression as string | undefined) ?? rubyInspectHash(options)}`,
       );
     return result;
   }
@@ -1159,7 +1156,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
       typeof columnName === "object" && columnName !== null && !Array.isArray(columnName)
         ? columnName
         : options;
-    const uniqueNameToDelete = (await this.uniqueConstraintForBang(tableName, column, opts)).name!;
+    const uniqueNameToDelete = (
+      await this.uniqueConstraintForBang(tableName, { ...opts, column: column ?? undefined })
+    ).name!;
     await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
@@ -1229,16 +1228,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
   /** @internal */
   async uniqueConstraintForBang(
     tableName: string,
-    column?: string | string[] | null,
-    options: Record<string, unknown> = {},
+    { column, ...options }: Record<string, unknown>,
   ): Promise<UniqueConstraintDefinition> {
-    const result = await this.uniqueConstraintFor(tableName, {
-      ...options,
-      column: column ?? undefined,
-    });
+    const result = await this.uniqueConstraintFor(tableName, { column, ...options });
     if (!result)
       throw new ArgumentError(
-        `Table '${tableName}' has no unique constraint for ${column != null ? (Array.isArray(column) ? rubyInspectArray(column) : column) : rubyInspectHash(options)}`,
+        `Table '${tableName}' has no unique constraint for ${column != null ? (Array.isArray(column) ? rubyInspectArray(column) : (column as string)) : rubyInspectHash(options)}`,
       );
     return result;
   }

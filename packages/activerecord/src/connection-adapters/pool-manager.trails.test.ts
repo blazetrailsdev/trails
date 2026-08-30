@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { PoolManager } from "./pool-manager.js";
 import { PoolConfig } from "./pool-config.js";
-import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
+import { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 
 function makePoolConfig(name: string, opts: { role?: string; shard?: string } = {}): PoolConfig {

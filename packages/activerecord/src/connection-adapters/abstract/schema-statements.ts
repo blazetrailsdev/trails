@@ -1754,12 +1754,12 @@ export class SchemaStatements {
   /** @internal */
   async foreignKeyForBang(
     fromTable: string,
-    options: ForeignKeyLookupOptions = {},
+    { toTable, ...options }: ForeignKeyLookupOptions,
   ): Promise<ForeignKeyDefinition> {
-    const fk = await this.foreignKeyFor(fromTable, options);
+    const fk = await this.foreignKeyFor(fromTable, { toTable, ...options });
     if (!fk) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${options.toTable ?? rubyInspectHash(options)}`,
+        `Table '${fromTable}' has no foreign key for ${toTable ?? rubyInspectHash(options)}`,
       );
     }
     return fk;
@@ -1827,9 +1827,8 @@ export class SchemaStatements {
   /** @internal */
   async checkConstraintForBang(
     tableName: string,
-    kwargs: { name?: string; expression?: string; validate?: boolean } = {},
+    { expression, ...options }: { name?: string; expression?: string; validate?: boolean },
   ): Promise<CheckConstraintDefinition> {
-    const { expression, ...options } = kwargs;
     const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!chk) {
       throw new ArgumentError(

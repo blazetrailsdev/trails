@@ -4,7 +4,6 @@ import {
   FloatType,
   IntegerType,
   StringType,
-  TimeType,
   Type,
 } from "@blazetrails/activemodel";
 import * as ArType from "../../type.js";
@@ -178,7 +177,7 @@ export function initializeInstanceTypeMap(
   defaultTimezone: "utc" | "local" = "utc",
 ): void {
   initializeTypeMap(m);
-  registerClassWithPrecision(m, "time", TimeType, { timezone: defaultTimezone });
+  registerClassWithPrecision(m, "time", ArType.Time, { timezone: defaultTimezone });
   registerClassWithPrecision(m, "timestamp", Timestamp, { timezone: defaultTimezone });
   registerClassWithPrecision(m, "timestamptz", TimestampWithTimeZone);
 }

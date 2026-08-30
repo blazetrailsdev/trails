@@ -5,7 +5,7 @@ import { adapterNameFromConfig } from "../abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import type { PoolConfig } from "../pool-config.js";
-import type { ConnectionDescriptor } from "./connection-descriptor.js";
+import type { ConnectionDescriptor } from "./connection-handler.js";
 import {
   ConnectionNotEstablished,
   ConnectionTimeoutError,

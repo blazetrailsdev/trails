@@ -65,7 +65,7 @@ const { PoolConfig } = await import("./connection-adapters/pool-config.js");
 const { ConnectionPool: RealConnectionPool } =
   await import("./connection-adapters/abstract/connection-pool.js");
 const { ConnectionDescriptor } =
-  await import("./connection-adapters/abstract/connection-descriptor.js");
+  await import("./connection-adapters/abstract/connection-handler.js");
 
 /**
  * Returns a raw test adapter that came out of `ConnectionPool#checkout` — via
@@ -149,7 +149,7 @@ async function buildInTestPool(): Promise<ConnectionPool> {
   const { PoolConfig } = await import("./connection-adapters/pool-config.js");
   const { ConnectionPool } = await import("./connection-adapters/abstract/connection-pool.js");
   const { ConnectionDescriptor } =
-    await import("./connection-adapters/abstract/connection-descriptor.js");
+    await import("./connection-adapters/abstract/connection-handler.js");
 
   const src = Base.connectionPool().dbConfig;
 

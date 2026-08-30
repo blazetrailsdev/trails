@@ -3,7 +3,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Visitors } from "@blazetrails/arel";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
+import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaCache, SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";

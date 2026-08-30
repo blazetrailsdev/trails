@@ -805,9 +805,6 @@ export async function reload<T extends ReloadRecord>(
   for (const association of this._associationInstances.values()) {
     association.owner = this;
   }
-  for (const proxy of this._collectionProxies.values()) {
-    (proxy as { owner: unknown }).owner = this;
-  }
   return this;
 }
 

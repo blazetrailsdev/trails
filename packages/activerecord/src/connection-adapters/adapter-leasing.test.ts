@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
 import { PoolConfig } from "./pool-config.js";
-import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
+import { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { ActiveRecordError } from "../errors.js";
 

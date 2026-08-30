@@ -5,7 +5,7 @@ import { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js"
 import { ExpoSQLiteAdapter } from "./connection-adapters/expo-sqlite-adapter.js";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
-import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-descriptor.js";
+import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";

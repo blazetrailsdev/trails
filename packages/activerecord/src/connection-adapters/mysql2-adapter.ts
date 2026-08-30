@@ -689,12 +689,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return printer.pp(result, elapsed);
   }
 
-  async exec(sql: string): Promise<void> {
-    this._databaseTimezone = ActiveRecord.defaultTimezone;
-    const conn = await this.getConn();
-    await conn.query(this.mysqlQuote(sql));
-  }
-
   createSchemaDumper(options: Record<string, unknown> = {}): MysqlSchemaDumper {
     const dumper = MysqlSchemaDumper.create(this as unknown as DatabaseAdapter, options);
     dumper.connection = this;

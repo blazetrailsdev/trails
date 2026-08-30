@@ -3,7 +3,7 @@ import mysql from "mysql2/promise";
 import "../sqlite/better-sqlite3.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import { ConnectionDescriptor } from "../connection-adapters/abstract/connection-descriptor.js";
+import { ConnectionDescriptor } from "../connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "../connection-adapters/pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { loadSchema } from "./load-schema-helper.js";

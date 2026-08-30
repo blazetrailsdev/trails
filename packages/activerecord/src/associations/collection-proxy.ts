@@ -89,7 +89,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /** @internal */
   static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
 
-  private _record: Base;
   private _association!: CollectionAssociation;
   private _assocName: string;
   private get _target(): T[] {
@@ -137,50 +136,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return this._target;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  readTargets(): T[] {
-    return this._target;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  targetsByPrimaryKey(): Map<string, T> {
-    const byKey = new Map<string, T>();
-    for (const record of this._target) {
-      const token = primaryKeyToken(record);
-      if (token != null) byKey.set(token, record);
-    }
-    return byKey;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  get owner(): Base {
-    return this._record;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  set owner(record: Base) {
-    this._record = record;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  get reflection(): AssociationDefinition {
-    const ctor = this._record.constructor as typeof Base;
-    return ctor._reflectOnAssociation(this._assocName) as unknown as AssociationDefinition;
+  /** @internal */
+  private get reflection(): AssociationDefinition {
+    return this._association.reflection;
   }
 
   /** @internal */
@@ -191,14 +149,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       callback: assocCallback,
       callbacksFor: assocCallbacksFor,
     };
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  get associationName(): string {
-    return this._assocName;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -241,10 +191,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
+  /** @internal */
+  private get _record(): Base {
+    return this._association.owner;
+  }
+
   constructor(klass: typeof Base, association: CollectionAssociation) {
     super(klass, klass.arelTable);
     this._association = association;
-    this._record = association.owner;
     this._assocName = association.reflection.name;
 
     const extensions = association.extensions;
@@ -351,14 +305,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     return Array.isArray(attributes)
       ? this.build(attributes, block)
       : this.build(attributes, block);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  addExistingRecord(record: T): void {
-    this._association.addToTarget(record, { skipCallbacks: true });
   }
 
   async create(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
@@ -530,10 +476,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /** @internal */
   isFindFromTarget(): boolean {
-    return CollectionAssociation.prototype.isFindFromTarget.call(
-      this as unknown as CollectionAssociation,
-      this._targetLoaded,
-    );
+    return this._association.isFindFromTarget(this._targetLoaded);
   }
 
   // @ts-expect-error async divergence from Relation#inspect — see doc comment.
@@ -716,14 +659,3 @@ _registerRelationFamily(
   "collectionProxy",
   CollectionProxy as unknown as new (...a: never[]) => unknown,
 );
-
-/** @internal */
-function primaryKeyToken(record: Base): string | null {
-  const id = record.id;
-  if (Array.isArray(id)) {
-    if (id.some((part) => part == null)) return null;
-    return id.map((part) => String(part)).join("\u0000");
-  }
-  if (id == null) return null;
-  return String(id);
-}
