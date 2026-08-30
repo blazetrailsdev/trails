@@ -7,18 +7,19 @@
  * `node:child_process` out of the packages that use them.
  */
 
-/** An inbound request, the structural subset of Node's `IncomingMessage`. */
+/** The structural subset of Node's `IncomingMessage` a Rack handler reads. */
 export interface HttpRequest {
   method?: string | undefined;
   url?: string | undefined;
   httpVersion?: string | undefined;
   headers: Record<string, string | string[] | undefined>;
   socket: { remoteAddress?: string | undefined; encrypted?: boolean | undefined };
-  on(event: string, listener: (...args: never[]) => void): unknown;
+  on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
+  on(event: "end" | "error", listener: (error: Error) => void): unknown;
   destroy(): unknown;
 }
 
-/** An outbound response, the structural subset of Node's `ServerResponse`. */
+/** The structural subset of Node's `ServerResponse` a Rack handler writes. */
 export interface HttpResponse {
   writeHead(status: number, headers?: Record<string, string | string[]>): unknown;
   write(chunk: string | Uint8Array): unknown;

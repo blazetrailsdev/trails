@@ -4,8 +4,6 @@ import { bodyFromString } from "../index.js";
 import type { RackApp, RackEnv } from "../index.js";
 import { Node } from "./node.js";
 
-const okApp: RackApp = async () => [200, { "content-type": "text/plain" }, bodyFromString("ok")];
-
 function createMockReq(options: {
   method?: string;
   url?: string;
@@ -157,19 +155,10 @@ describe("Rack::Handler::Node", () => {
     expect(env.REMOTE_ADDR).toBe("127.0.0.1");
   });
 
-  it("writes the response tuple back to the response", async () => {
-    const res = createMockRes();
-    await new Node(okApp).service(createMockReq({}), res);
-
-    expect(res.status).toBe(200);
-    expect(res.headers).toEqual({ "content-type": "text/plain" });
-    expect(res.body).toBe("ok");
-  });
-
   it("streams a multi-chunk body", async () => {
     const app: RackApp = async () => [
       200,
-      {},
+      { "content-type": "text/plain" },
       (async function* () {
         yield "one";
         yield "two";
@@ -178,6 +167,8 @@ describe("Rack::Handler::Node", () => {
     const res = createMockRes();
     await new Node(app).service(createMockReq({}), res);
 
+    expect(res.status).toBe(200);
+    expect(res.headers).toEqual({ "content-type": "text/plain" });
     expect(res.body).toBe("onetwo");
   });
 

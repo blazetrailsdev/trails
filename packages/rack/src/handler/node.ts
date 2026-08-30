@@ -1,20 +1,18 @@
 /**
  * The Node handler — trails' `Rackup::Handler::WEBrick`.
  *
- * WEBrick's handler is a servlet: `self.run` builds the server and mounts the
- * servlet at "/", and `#service(req, res)` turns one WEBrick request into a
- * Rack env, calls the app, and writes the tuple back out. This mirrors that
- * split, over a `node:http` server reached through ActiveSupport's HTTP
- * adapter rather than a direct import.
- *
- * WEBrick hands the servlet a request that already knows its CGI meta
- * variables (`WEBrick::HTTPRequest#meta_vars`); a Node request does not, so
- * {@link Node.metaVars} ports that method too.
+ * WEBrick's handler is a servlet: `self.run` builds the server and mounts it at
+ * "/", and `#service(req, res)` turns one request into a Rack env, calls the
+ * app, and writes the tuple back. This mirrors that split over a `node:http`
+ * server reached through ActiveSupport's HTTP adapter. WEBrick hands the
+ * servlet a request that already knows its CGI meta variables; a Node request
+ * does not, so {@link Node.metaVars} ports `HTTPRequest#meta_vars` too.
  */
 
 import { getHttpAsync, stderr } from "@blazetrails/activesupport";
 import type { HttpRequest, HttpResponse, HttpServer } from "@blazetrails/activesupport";
 import {
+  HTTP_X_FORWARDED_PROTO,
   HTTPS,
   PATH_INFO,
   QUERY_STRING,
@@ -38,11 +36,8 @@ export interface Options {
   Host?: string;
 }
 
-/**
- * The maximum request body the handler will buffer. WEBrick has
- * `:InputBufferSize` and a `RequestEntityTooLarge` response; a Node request is
- * a stream with no such ceiling, so one is imposed here.
- */
+// WEBrick's `:InputBufferSize` plus its `RequestEntityTooLarge` response; a
+// Node request is a stream with no such ceiling, so one is imposed here.
 const MAX_BODY_SIZE = 10 * 1024 * 1024;
 
 export class Node {
@@ -87,10 +82,16 @@ export class Node {
 
     env[RACK_INPUT] = await readBody(req);
     env[RACK_ERRORS] = stderr;
-    env[RACK_URL_SCHEME] = urlScheme(req, env);
+    env[RACK_URL_SCHEME] =
+      ["yes", "on", "1"].includes(env[HTTPS] as string) || tls(req, env) ? "https" : "http";
     env[RACK_IS_HIJACK] = false;
 
     env[QUERY_STRING] ??= "";
+    if (env[PATH_INFO] !== "") {
+      const path = env[PATH_INFO] as string;
+      const n = (env[SCRIPT_NAME] as string).length;
+      env[PATH_INFO] = path.slice(n, path.length);
+    }
     env[REQUEST_PATH] ??= `${env[SCRIPT_NAME] as string}${env[PATH_INFO] as string}`;
 
     const [status, headers, body] = await this.app(env);
@@ -139,19 +140,16 @@ export class Node {
   }
 }
 
-/**
- * WEBrick decides the scheme from `env["HTTPS"]`; behind a Node server the TLS
- * fact lives on the socket, and a reverse proxy states it in
- * `X-Forwarded-Proto`.
- */
-function urlScheme(req: HttpRequest, env: RackEnv): string {
-  if (["yes", "on", "1"].includes(env[HTTPS] as string)) return "https";
-  if (req.socket.encrypted === true) return "https";
-  const forwarded = (env["HTTP_X_FORWARDED_PROTO"] as string | undefined) ?? "";
-  if (forwarded.split(",").some((proto) => proto.trim().toLowerCase() === "https")) return "https";
-  return "http";
+// WEBrick sets `HTTPS` itself from its own SSL config; behind a Node server the
+// TLS fact lives on the socket, and a reverse proxy states it in
+// `X-Forwarded-Proto`.
+function tls(req: HttpRequest, env: RackEnv): boolean {
+  if (req.socket.encrypted === true) return true;
+  const forwarded = (env[HTTP_X_FORWARDED_PROTO] as string | undefined) ?? "";
+  return forwarded.split(",").some((proto) => proto.trim().toLowerCase() === "https");
 }
 
+/** `WEBrick::HTTPRequest#[]` — one header, however Node spelled its value. */
 function header(req: HttpRequest, name: string): string | undefined {
   const value = req.headers[name];
   if (value === undefined) return undefined;
@@ -164,7 +162,7 @@ function readBody(req: HttpRequest): Promise<string> {
     const chunks: string[] = [];
     let totalLength = 0;
     const decoder = new TextDecoder("utf-8");
-    req.on("data", ((chunk: Uint8Array) => {
+    req.on("data", (chunk) => {
       totalLength += chunk.length;
       if (totalLength > MAX_BODY_SIZE) {
         req.destroy();
@@ -172,8 +170,8 @@ function readBody(req: HttpRequest): Promise<string> {
         return;
       }
       chunks.push(decoder.decode(chunk, { stream: true }));
-    }) as (...args: never[]) => void);
-    req.on("end", (() => resolve(chunks.join("") + decoder.decode())) as () => void);
-    req.on("error", reject as (...args: never[]) => void);
+    });
+    req.on("end", () => resolve(chunks.join("") + decoder.decode()));
+    req.on("error", reject);
   });
 }
