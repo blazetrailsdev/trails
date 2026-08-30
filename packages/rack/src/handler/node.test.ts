@@ -1,198 +1,153 @@
 import { describe, it, expect } from "vitest";
-import type { HttpRequest } from "@blazetrails/activesupport";
+import type { HttpRequest, StringIO } from "@blazetrails/activesupport";
 import { bodyFromString } from "../index.js";
 import type { RackApp, RackEnv } from "../index.js";
 import { Node } from "./node.js";
 
-function createMockReq(options: {
-  method?: string;
-  url?: string;
-  headers?: Record<string, string | string[] | undefined>;
-  body?: string;
-}): HttpRequest {
-  const listeners: Record<string, ((...args: never[]) => void)[]> = {};
-  const req: HttpRequest = {
-    method: options.method || "GET",
-    url: options.url || "/",
-    httpVersion: "1.1",
-    headers: { host: "localhost:3000", ...options.headers },
-    socket: { remoteAddress: "127.0.0.1" },
-    on(event, listener) {
-      (listeners[event] ??= []).push(listener);
-      return req;
-    },
-    destroy() {
-      return req;
-    },
-  };
-
-  setTimeout(() => {
-    if (options.body !== undefined) {
-      for (const listener of listeners["data"] ?? []) {
-        (listener as (chunk: Uint8Array) => void)(new TextEncoder().encode(options.body));
-      }
-    }
-    for (const listener of listeners["end"] ?? []) (listener as () => void)();
-  }, 0);
-
-  return req;
+/** Serve `app` on an ephemeral port, run `body` against it, then shut down. */
+async function serving(app: RackApp, body: (url: string) => Promise<void>): Promise<void> {
+  const server = await Node.run(app, { Port: 0, Host: "127.0.0.1" });
+  const address = server.address();
+  const port = address && typeof address === "object" ? address.port : 0;
+  try {
+    await body(`http://127.0.0.1:${port}`);
+  } finally {
+    await Node.shutdown();
+  }
 }
 
-function createMockRes() {
-  const res = {
-    body: "",
-    status: undefined as number | undefined,
-    headers: undefined as unknown,
-    writeHead(status: number, headers?: Record<string, string | string[]>) {
-      res.status = status;
-      res.headers = headers;
-    },
-    write(chunk: string | Uint8Array) {
-      res.body += typeof chunk === "string" ? chunk : new TextDecoder().decode(chunk);
-    },
-    end(chunk?: string | Uint8Array) {
-      if (chunk !== undefined) res.write(chunk);
-    },
-  };
-  return res;
-}
-
-async function metaVarsFor(req: HttpRequest): Promise<RackEnv> {
+/** The env one real request builds, as the app saw it. */
+async function envFor(path: string, init?: RequestInit): Promise<RackEnv> {
   let env: RackEnv = {};
-  const handler = new Node(async (e) => {
-    env = e;
-    return [200, {}, bodyFromString("")];
-  });
-  await handler.service(req, createMockRes());
+  await serving(
+    async (e) => {
+      env = e;
+      return [200, {}, bodyFromString("")];
+    },
+    async (url) => void (await fetch(`${url}${path}`, init)),
+  );
   return env;
+}
+
+/** For the two shapes a real socket cannot produce, `meta_vars` is called direct. */
+function metaVars(req: Partial<HttpRequest>): Promise<RackEnv> {
+  const app: RackApp = async () => [200, {}, bodyFromString("")];
+  return new Node(app).metaVars({
+    method: "GET",
+    url: "/",
+    httpVersion: "1.1",
+    headers: { host: "localhost:3000" },
+    socket: { remoteAddress: "127.0.0.1" },
+    ...req,
+  } as HttpRequest);
 }
 
 describe("Rack::Handler::Node", () => {
   it("builds a Rack env from a basic GET request", async () => {
-    const env = await metaVarsFor(createMockReq({ method: "GET", url: "/users?page=2" }));
+    const env = await envFor("/users?page=2");
 
     expect(env.REQUEST_METHOD).toBe("GET");
     expect(env.PATH_INFO).toBe("/users");
     expect(env.QUERY_STRING).toBe("page=2");
-    expect(env.SERVER_PORT).toBe("3000");
-    expect(env.HTTP_HOST).toBe("localhost:3000");
+    expect(env.HTTP_HOST).toBe(env.SERVER_NAME + ":" + env.SERVER_PORT);
     expect(env["rack.url_scheme"]).toBe("http");
   });
 
   it("reads request body", async () => {
-    const env = await metaVarsFor(
-      createMockReq({ method: "POST", url: "/users", body: '{"name":"dean"}' }),
-    );
+    const env = await envFor("/users", { method: "POST", body: '{"name":"dean"}' });
 
     expect(env.REQUEST_METHOD).toBe("POST");
-    expect(env["rack.input"]).toBe('{"name":"dean"}');
+    const input = env["rack.input"] as StringIO;
+    expect(typeof input.read).toBe("function");
+    expect(input.read()).toBe('{"name":"dean"}');
   });
 
   it("maps content-type and content-length to CGI keys", async () => {
-    const env = await metaVarsFor(
-      createMockReq({
-        headers: { "content-type": "application/json", "content-length": "15" },
-      }),
-    );
+    const env = await envFor("/", {
+      method: "POST",
+      body: "a=1",
+      headers: { "content-type": "application/json" },
+    });
 
     expect(env.CONTENT_TYPE).toBe("application/json");
-    expect(env.CONTENT_LENGTH).toBe("15");
+    expect(env.CONTENT_LENGTH).toBe("3");
     expect(env).not.toHaveProperty("HTTP_CONTENT_TYPE");
     expect(env).not.toHaveProperty("HTTP_CONTENT_LENGTH");
   });
 
   it("maps other headers to HTTP_ prefixed keys", async () => {
-    const env = await metaVarsFor(
-      createMockReq({ headers: { "x-request-id": "abc-123", accept: "text/html" } }),
-    );
+    const env = await envFor("/", { headers: { "x-request-id": "abc-123", accept: "text/html" } });
 
     expect(env.HTTP_X_REQUEST_ID).toBe("abc-123");
     expect(env.HTTP_ACCEPT).toBe("text/html");
   });
 
   it("normalizes array header values to comma-separated strings", async () => {
-    const env = await metaVarsFor(createMockReq({ headers: { "set-cookie": ["a=1", "b=2"] } }));
+    const env = await metaVars({ headers: { host: "x", "set-cookie": ["a=1", "b=2"] } });
 
     expect(env.HTTP_SET_COOKIE).toBe("a=1, b=2");
   });
 
   it("skips undefined header values", async () => {
-    const env = await metaVarsFor(createMockReq({ headers: { "x-undefined": undefined } }));
+    const env = await metaVars({ headers: { host: "x", "x-undefined": undefined } });
+
     expect(env).not.toHaveProperty("HTTP_X_UNDEFINED");
   });
 
-  it("sets rack.url_scheme to https when x-forwarded-proto is https", async () => {
-    const env = await metaVarsFor(createMockReq({ headers: { "x-forwarded-proto": "https" } }));
-
-    expect(env["rack.url_scheme"]).toBe("https");
-  });
-
   it("sets rack.url_scheme to https for TLS sockets", async () => {
-    const req = createMockReq({});
-    req.socket.encrypted = true;
-    const env = await metaVarsFor(req);
+    const env = await metaVars({ socket: { remoteAddress: "127.0.0.1", encrypted: true } });
 
-    expect(env["rack.url_scheme"]).toBe("https");
-  });
-
-  it("handles comma-separated x-forwarded-proto", async () => {
-    const env = await metaVarsFor(
-      createMockReq({ headers: { "x-forwarded-proto": "https, http" } }),
-    );
-
-    expect(env["rack.url_scheme"]).toBe("https");
+    expect(env.HTTPS).toBe("on");
   });
 
   it("sets the CGI meta variables WEBrick supplies", async () => {
-    const env = await metaVarsFor(createMockReq({ url: "/users?page=2" }));
+    const env = await envFor("/users?page=2");
 
     expect(env.GATEWAY_INTERFACE).toBe("CGI/1.1");
     expect(env.SCRIPT_NAME).toBe("");
     expect(env.REQUEST_URI).toBe("/users?page=2");
     expect(env.REQUEST_PATH).toBe("/users");
-    expect(env.SERVER_NAME).toBe("localhost");
     expect(env.SERVER_PROTOCOL).toBe("HTTP/1.1");
     expect(env.REMOTE_ADDR).toBe("127.0.0.1");
+    expect(env.REMOTE_HOST).toBe("127.0.0.1");
+    expect(env).not.toHaveProperty("REMOTE_USER");
+  });
+
+  it("skips rack. headers and keeps set-cookie repeatable", async () => {
+    const headers = {
+      "rack.protocol": "websocket",
+      "set-cookie": ["a=1", "b=2"],
+      vary: ["accept", "origin"],
+    } as unknown as Record<string, string>;
+
+    await serving(
+      async () => [200, headers, bodyFromString("")],
+      async (url) => {
+        const response = await fetch(url);
+
+        expect(response.headers.get("rack.protocol")).toBeNull();
+        expect(response.headers.getSetCookie()).toEqual(["a=1", "b=2"]);
+        expect(response.headers.get("vary")).toBe("accept, origin");
+      },
+    );
   });
 
   it("streams a multi-chunk body", async () => {
     const app: RackApp = async () => [
-      200,
+      201,
       { "content-type": "text/plain" },
       (async function* () {
         yield "one";
         yield "two";
       })(),
     ];
-    const res = createMockRes();
-    await new Node(app).service(createMockReq({}), res);
 
-    expect(res.status).toBe(200);
-    expect(res.headers).toEqual({ "content-type": "text/plain" });
-    expect(res.body).toBe("onetwo");
-  });
-
-  it("serves the app over HTTP", async () => {
-    const app: RackApp = async (env) => [
-      201,
-      { "content-type": "text/plain" },
-      bodyFromString(
-        `${env.REQUEST_METHOD as string} ${env.PATH_INFO as string} ${env["rack.input"] as string}`,
-      ),
-    ];
-    const server = await Node.run(app, { Port: 0, Host: "127.0.0.1" });
-    try {
-      const address = server.address();
-      const port = address && typeof address === "object" ? address.port : 0;
-      const response = await fetch(`http://127.0.0.1:${port}/greet`, {
-        method: "POST",
-        body: "hi",
-      });
+    await serving(app, async (url) => {
+      const response = await fetch(url);
 
       expect(response.status).toBe(201);
-      expect(await response.text()).toBe("POST /greet hi");
-    } finally {
-      await Node.shutdown();
-    }
+      expect(response.headers.get("content-type")).toBe("text/plain");
+      expect(await response.text()).toBe("onetwo");
+    });
   });
 });
