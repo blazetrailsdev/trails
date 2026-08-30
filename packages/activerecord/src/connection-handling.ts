@@ -3,12 +3,11 @@ import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
-import { HashConfig } from "./database-configurations/hash-config.js";
-import { UrlConfig } from "./database-configurations/url-config.js";
+import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
 import { adapterNameFromUrl } from "./connection-adapters/adapter-args.js";
-import { AdapterNotSpecified, NotImplementedError, ActiveRecordError } from "./errors.js";
+import { NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ActiveRecord } from "./ar-config.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
@@ -613,52 +612,7 @@ async function establishWithDbConfig(modelClass: typeof Base, dbConfig: HashConf
   const config = dbConfig.configurationHash as Record<string, unknown>;
   const tz = validateConfigDefaultTimezone(config);
 
-  const { adapterName, connectUrl } = deriveAdapterAndUrl(dbConfig);
-  if (!adapterName) {
-    throw new AdapterNotSpecified(
-      `Database configuration for "${dbConfig.envName}" must include an adapter name or a URL.`,
-    );
-  }
-
-  await establishWithConfig(modelClass, adapterName, connectUrl, config, dbConfig);
-  if (tz) ActiveRecord.defaultTimezone = tz;
-}
-
-function deriveAdapterAndUrl(dbConfig: HashConfig): {
-  adapterName: string | undefined;
-  connectUrl: string;
-} {
-  const originalUrl =
-    (dbConfig instanceof UrlConfig ? dbConfig.url : undefined) ||
-    (dbConfig.configurationHash.url as string) ||
-    "";
-  const adapterName =
-    dbConfig.adapter || (originalUrl ? adapterNameFromUrl(originalUrl) : undefined);
-  const connectUrl = (dbConfig.configurationHash as { database?: string }).database
-    ? ""
-    : originalUrl;
-  return { adapterName, connectUrl };
-}
-
-async function establishWithConfig(
-  modelClass: typeof Base,
-  adapterName: string,
-  url: string,
-  config?: Record<string, unknown>,
-  dbConfigOverride?: HashConfig,
-): Promise<void> {
-  await _loadAdapter(adapterName);
-
-  const env = DatabaseConfigurations.defaultEnv;
-  let dbConfig: HashConfig;
-  if (dbConfigOverride) {
-    dbConfig = dbConfigOverride;
-  } else if (url) {
-    const { url: _droppedUrl, ...configWithoutUrl } = config ?? {};
-    dbConfig = new UrlConfig(env, "primary", url, { adapter: adapterName, ...configWithoutUrl });
-  } else {
-    dbConfig = new HashConfig(env, "primary", { adapter: adapterName, url, ...config });
-  }
+  if (dbConfig.adapter) await _loadAdapter(dbConfig.adapter);
 
   modelClass.connectionClass = true;
 
@@ -670,6 +624,7 @@ async function establishWithConfig(
     role,
     shard,
   });
+  if (tz) ActiveRecord.defaultTimezone = tz;
 }
 
 export {

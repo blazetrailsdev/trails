@@ -5,6 +5,7 @@ import type { SillyUniqueReply } from "./reply.js";
 import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
 import { Temporal } from "@blazetrails/date";
+import type { TimeWithZone } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 
@@ -41,7 +42,7 @@ export class Topic extends Base {
   declare author_email_address: string;
   declare author_name: string;
   declare binary_content: Uint8Array;
-  declare bonus_time: Temporal.PlainTime;
+  declare bonus_time: (Temporal.Instant | TimeWithZone) | null;
   declare created_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
   declare group: string;
   declare important: string;

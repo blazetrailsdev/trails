@@ -218,6 +218,12 @@ export interface LookupableTypeMap {
   lookup(oid: number, fmod: number, sqlType: string): Type;
 }
 
+export interface RegtypeOidHost {
+  typeMap: LookupableTypeMap;
+  /** @internal */
+  _regtypeOids?: Map<string, number>;
+}
+
 export interface CastableColumn {
   oid?: number | null;
   fmod?: number | null;
@@ -229,14 +235,18 @@ export interface CastableColumn {
  * @missingRailsCall query_value — PERMANENT
  * @missingRailsCall quote — PERMANENT
  */
-export function lookupCastType(this: { typeMap: LookupableTypeMap }, sqlType: string | null): Type {
-  if (typeof sqlType === "string") {
-    sqlType = sqlType
-      .replace(/\([^)]*\)/, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  }
-  return abstractLookupCastType.call(this as never, sqlType);
+export function lookupCastType(this: RegtypeOidHost, sqlType: string | null): Type {
+  return abstractLookupCastType.call(this as never, regtypeOid.call(this, sqlType));
+}
+
+function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | number | null {
+  if (typeof sqlType !== "string") return sqlType;
+  const name = sqlType
+    .replace(/\([^)]*\)/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const bare = name.slice(name.lastIndexOf(".") + 1);
+  return this._regtypeOids?.get(name) ?? this._regtypeOids?.get(bare) ?? bare;
 }
 
 export function lookupCastTypeFromColumn(

@@ -15,10 +15,10 @@ import {
   NotImplementedError,
 } from "../errors.js";
 import {
-  ActiveSupport,
   IsolatedExecutionState,
   LoadInterlockAwareMonitor,
   Notifications,
+  NullLock,
   toS,
 } from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
@@ -734,7 +734,11 @@ export class AbstractAdapter implements Quoting {
 
   pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
-  lock: LoadInterlockAwareMonitor = new LoadInterlockAwareMonitor();
+  lock: LoadInterlockAwareMonitor | NullLock = new LoadInterlockAwareMonitor();
+
+  setLockThread(lockThread: unknown): void {
+    this.lock = lockThread != null ? new LoadInterlockAwareMonitor() : new NullLock();
+  }
 
   /** @internal */
   _statements?: StatementPool | null;
@@ -1423,12 +1427,10 @@ export class AbstractAdapter implements Quoting {
 
   discardBang(): void {}
 
-  resetBang(): void {
-    void this.clearCacheBang({ newConnection: true });
+  async resetBang(): Promise<void> {
+    await this.clearCacheBang({ newConnection: true });
     this.resetTransaction();
-    void this.attemptConfigureConnection().catch((error: Error) => {
-      ActiveSupport.errorReporter.report(error, { handled: true });
-    });
+    await this.attemptConfigureConnection();
   }
 
   supportsAdvisoryLocks(): boolean {
@@ -1561,8 +1563,6 @@ export class AbstractAdapter implements Quoting {
       throw error;
     }
   }
-
-  lockThread: boolean = false;
 
   async enableExtension(_name: string): Promise<void> {}
 

@@ -1,5 +1,5 @@
 export class NullLock {
-  synchronize<T>(fn: () => T): T {
-    return fn();
+  async synchronize<T>(block: () => T | Promise<T>): Promise<T> {
+    return block();
   }
 }

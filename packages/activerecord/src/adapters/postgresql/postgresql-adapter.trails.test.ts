@@ -343,8 +343,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         other.disconnectBang();
         expect(other._rawConnection).toBeNull();
 
-        other.resetBang();
+        const resetting = other.resetBang();
         await other.lock.synchronize(async () => {});
+        await resetting;
 
         expect(other._rawConnection).not.toBeNull();
         await expect(other.execute("SELECT 1 AS n")).resolves.toHaveLength(1);
@@ -360,8 +361,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((other as unknown as { _client: unknown })._client).toBeNull();
         expect(other.transactionStatus).not.toBe(0);
 
-        other.resetBang();
+        const resetting = other.resetBang();
         await other.lock.synchronize(async () => {});
+        await resetting;
 
         expect(other.transactionStatus).toBe(0);
       } finally {
@@ -375,8 +377,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         await other.beginDbTransaction();
         const foreign = other.execute("SELECT pg_sleep(0.5) AS slept");
         await new Promise<void>((r) => setTimeout(r, 100));
-        other.resetBang();
+        const resetting = other.resetBang();
         await expect(foreign).resolves.toHaveLength(1);
+        await resetting;
       } finally {
         await other.close();
       }
@@ -384,14 +387,18 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("a query holding the lock does not wait on a reset queued behind it", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
+      let resetting: Promise<void> | undefined;
       try {
         await other.execute("SELECT 1 AS n");
-        setTimeout(() => other.resetBang(), 0);
+        setTimeout(() => {
+          resetting = other.resetBang();
+        }, 0);
         await other.lock.synchronize(async () => {
           await new Promise<void>((r) => setTimeout(r, 50));
           const rows = await other.execute("SELECT 1 AS n");
           expect(rows).toHaveLength(1);
         });
+        await resetting;
       } finally {
         await other.close();
       }

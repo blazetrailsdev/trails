@@ -11,6 +11,7 @@ describe("PostgreSQLAdapter#reloadTypeMap", () => {
     const a = adapter as unknown as Record<string, unknown>;
     a.lock = new LoadInterlockAwareMonitor();
     a._statements = { reset: () => {} };
+    a._regtypeOids = new Map();
     a._transactionManager = new TransactionManager(adapter as never);
     const typeMap = {
       seeded: true,

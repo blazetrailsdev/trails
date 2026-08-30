@@ -1,5 +1,6 @@
 const T = `import("@blazetrails/date").Temporal`;
 const IPADDR = `import("@blazetrails/activerecord").IPAddr`;
+const TWZ = `import("@blazetrails/activesupport").TimeWithZone`;
 
 export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   string: "string",
@@ -18,7 +19,7 @@ export const ATTRIBUTE_TYPE_MAP: Record<string, string> = {
   datetime: `${T}.Instant | ${T}.PlainDateTime`,
   timestamp: `${T}.PlainDateTime`,
   timestamptz: `${T}.Instant`,
-  time: `${T}.PlainTime`,
+  time: `${T}.Instant | ${TWZ}`,
   json: "unknown",
   jsonb: "unknown",
   hstore: "Record<string, string | null>",

@@ -30,7 +30,7 @@ import { MigrationContext, Migrator } from "../../migration.js";
 type TransactionAwareConnection = AbstractAdapter & {
   transactionManager: TransactionManager;
   verifyBang(): void;
-  resetBang(): void;
+  resetBang(): Promise<void>;
 };
 
 interface PoolManagedConnection {
@@ -468,11 +468,9 @@ export class ConnectionPool implements ReapablePool {
     return false;
   }
 
-  async pinConnectionBang(_lockThread: boolean | { fixture?: boolean } = false): Promise<void> {
+  async pinConnectionBang(lockThread: boolean | { fixture?: boolean } = false): Promise<void> {
     const fixture =
-      typeof _lockThread === "object" && _lockThread !== null
-        ? Boolean(_lockThread.fixture)
-        : false;
+      typeof lockThread === "object" && lockThread !== null ? Boolean(lockThread.fixture) : false;
     const slot = fixture ? "fixture" : "ctx";
     const ctxId = executionContextId();
     let pin: { connection: DatabaseAdapter; depth: number } | undefined =
@@ -497,6 +495,8 @@ export class ConnectionPool implements ReapablePool {
       if (this._connections && !this._connections.includes(connection)) {
         this._connections.push(connection);
       }
+
+      if (lockThread) connection.setLockThread(executionContextId());
 
       if (isTransactionAware(connection)) {
         await connection.verifyBang();
@@ -550,11 +550,13 @@ export class ConnectionPool implements ReapablePool {
           await connection.transactionManager.rollbackTransaction();
         } else {
           clean = false;
-          connection.resetBang();
+          await connection.resetBang();
         }
       }
 
       if (pin.depth === 0) {
+        connection.stealBang();
+        connection.setLockThread(null);
         this.checkin(connection);
       }
     };
