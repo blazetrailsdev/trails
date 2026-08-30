@@ -4,13 +4,8 @@
 
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
-import {
-  Date as RubyDate,
-  DateTime as RubyDateTime,
-  Rational,
-  dNewByFrags,
-  dtNewByFrags,
-} from "./date.js";
+import { Date as RubyDate, DateTime as RubyDateTime, dNewByFrags, dtNewByFrags } from "./date.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 /**
  * Ruby's `Float#<=>` (`ruby/numeric.c` `flo_cmp`, not vendored), which is the

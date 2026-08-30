@@ -30,6 +30,7 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/i18n": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
     "bcryptjs": "^3.0.3"
   }
 }

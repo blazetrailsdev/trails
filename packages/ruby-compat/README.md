@@ -14,6 +14,22 @@ Its upstream is [ruby/ruby](https://github.com/ruby/ruby), vendored at
 `vendor/ruby/` (RFC 0129). Read the C or the Ruby there before writing anything
 here, the same way every other package reads `vendor/rails/` first.
 
+## What is here
+
+Every export, with the call site that justifies it (rule 1).
+
+| export              | MRI anchor                                       | call sites                                                                                                                                                                                                                                                                                 |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `regexpEscape`      | `re.c:4144` `rb_reg_s_quote`                     | `activerecord/src/support/quote-regex.ts`, `run-token.ts`, `trailties/src/generators/trails-actions.ts`                                                                                                                                                                                    |
+| `Range`             | `range.c:31` `rb_cRange`                         | `activesupport/src/core-ext/range/*.ts`, `activemodel/src/validations/{clusivity,length,numericality}.ts`                                                                                                                                                                                  |
+| `rbEqual`           | `object.c:147` `rb_equal`                        | `ruby-compat/src/range.ts` (`Range#==`)                                                                                                                                                                                                                                                    |
+| `succ`              | `string.c:4868` `rb_str_succ`                    | `ruby-compat/src/range.ts` (string ranges), `arel`                                                                                                                                                                                                                                         |
+| `Rational`          | `rational.c:481` `nurat_s_canonicalize_internal` | `activemodel/src/type/{decimal,date-time}.ts`, `type/helpers/time-value.ts`, `activesupport/src/{time-with-zone.ts,core-ext/date-time/calculations.ts,message-pack/extensions.ts}`, `activerecord/src/connection-adapters/{mysql/quoting.ts,abstract/sql-datetime.ts}`, `date/src/date.ts` |
+| `rational`          | `rational.c:2691` `nurat_s_convert`              | `activesupport/src/core-ext/date-time/calculations.ts:274,290,306` (`end_of_day` / `end_of_hour` / `end_of_minute`), `message-pack/extensions.ts` (`read_rational`)                                                                                                                        |
+| `ZeroDivisionError` | `numeric.c:206` `rb_num_zerodiv`                 | `activesupport/src/message-pack/extensions.ts` (`readRational` raises it on a zero denominator)                                                                                                                                                                                            |
+| `isSymbol`          | `symbol.c:954` `rb_sym2str`                      | `i18n/src/backend/{base,fallbacks,simple,key-value}.ts`, `activemodel/src/validations/numericality.ts`                                                                                                                                                                                     |
+| `symbolToS`         | `symbol.c:954` `rb_sym2str`                      | `i18n/src/backend/base.ts:242,444`                                                                                                                                                                                                                                                         |
+
 ## The contract
 
 Four rules govern this package. They are not review preferences; three of the

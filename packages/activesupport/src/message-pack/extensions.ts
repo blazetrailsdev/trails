@@ -17,37 +17,15 @@ import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal } from "@blazetrails/date";
+import { Rational, rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
-
-/** Ruby's core `ZeroDivisionError`, raised by `Rational(n, 0)`. */
-export class ZeroDivisionError extends Error {}
-
-export interface Rational {
-  numerator: number;
-  denominator: number;
-}
 
 const JD_UNIX_EPOCH = 2440588;
 
 const UNIX_EPOCH_DATE = Temporal.PlainDate.from("1970-01-01");
 
 const NANOS_PER_SECOND = 1_000_000_000;
-
-function gcd(a: number, b: number): number {
-  return b === 0 ? a : gcd(b, a % b);
-}
-
-function rational(numerator: number, denominator: number): Rational {
-  if (denominator === 0) throw new ZeroDivisionError("divided by 0");
-  const sign = denominator < 0 ? -1 : 1;
-  if (numerator === 0) return { numerator: 0, denominator: 1 };
-  const divisor = gcd(Math.abs(numerator), Math.abs(denominator));
-  return {
-    numerator: (sign * numerator) / divisor,
-    denominator: (sign * denominator) / divisor,
-  };
-}
 
 function julianDay(date: Temporal.PlainDate): number {
   return JD_UNIX_EPOCH + date.since(UNIX_EPOCH_DATE, { largestUnit: "day" }).days;
@@ -247,8 +225,8 @@ export const Extensions = {
   },
 
   writeRational(rational: Rational, packer: Packer): void {
-    packer.write(rational.numerator);
-    if (rational.numerator !== 0) packer.write(rational.denominator);
+    packer.write(Number(rational.numerator));
+    if (rational.numerator !== 0n) packer.write(Number(rational.denominator));
   },
 
   readRational(unpacker: Unpacker): Rational {
@@ -272,7 +250,7 @@ export const Extensions = {
     const second = unpacker.read() as number;
     const secFraction = Extensions.readRational(unpacker);
     Extensions.readRational(unpacker);
-    const nanos = Math.round((secFraction.numerator / secFraction.denominator) * NANOS_PER_SECOND);
+    const nanos = Math.round(secFraction.toF() * NANOS_PER_SECOND);
     return dateFromJulianDay(jd).toPlainDateTime({
       hour,
       minute,

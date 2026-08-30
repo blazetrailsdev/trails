@@ -23,7 +23,8 @@
 /* eslint-disable vitest/no-conditional-expect */
 
 import { describe, it, expect } from "vitest";
-import { Date as RubyDate, DateTime as RubyDateTime, Rational } from "./date.js";
+import { Date as RubyDate, DateTime as RubyDateTime } from "./date.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 describe("TestDateAttr", () => {
   it(" attr", () => {

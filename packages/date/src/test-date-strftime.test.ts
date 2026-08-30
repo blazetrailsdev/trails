@@ -20,15 +20,10 @@
  */
 
 import { describe, it, expect, vi } from "vitest";
-import {
-  Date as RubyDate,
-  DateTime as RubyDateTime,
-  Rational,
-  dNewByFrags,
-  dtNewByFrags,
-} from "./date.js";
+import { Date as RubyDate, DateTime as RubyDateTime, dNewByFrags, dtNewByFrags } from "./date.js";
 import { Time as RubyTime } from "./time.js";
 import { setRubyVerbose } from "./rb-warning.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 /**
  * Ruby's `assert_warning` (`test/lib/core_assertions.rb`): runs the block with

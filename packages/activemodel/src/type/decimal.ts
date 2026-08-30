@@ -1,5 +1,5 @@
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Rational } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
 

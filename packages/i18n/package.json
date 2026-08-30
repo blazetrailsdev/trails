@@ -15,7 +15,8 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@blazetrails/date": "workspace:*"
+    "@blazetrails/date": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
   },
   "optionalDependencies": {
     "yaml": "^2.8.3"

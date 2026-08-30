@@ -7,8 +7,9 @@
 
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError, Rational } from "./date.js";
+import { ArgumentError } from "./date.js";
 import { Time, resetLocalTimeZoneId } from "./time.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 describe("Time", () => {
   afterEach(() => {

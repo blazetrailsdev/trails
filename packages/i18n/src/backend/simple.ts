@@ -33,15 +33,12 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
+import { isSymbol } from "@blazetrails/ruby-compat";
 import { deepMergeBang, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
 function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isSymbol(value: unknown): value is string {
-  return typeof value === "string" && value.startsWith(":");
 }
 
 /**

@@ -21,12 +21,12 @@ import {
   ArgumentError,
   Date,
   DateTime,
-  Rational,
   dNewByFrags,
   dtNewByFrags,
   type DateParts,
 } from "./date.js";
 import { Time } from "./time.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 /** Ruby's `h.values_at(...)` over the frag hash, `nil` for an absent key. */
 function valuesAt(h: DateParts, ...keys: (keyof DateParts)[]): unknown[] {

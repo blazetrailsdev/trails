@@ -10,13 +10,13 @@ import {
   Date as RubyDate,
   DateTime as RubyDateTime,
   ERANGE,
-  Rational,
   dNewByFrags,
   dtNewByFrags,
   strftime,
   type DateParts,
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 /**
  * The gem-shaped `::Date` / `::DateTime` RFC 0088's opt-in answers. The statics
@@ -2445,37 +2445,6 @@ describe("the instance formatters", () => {
     expect(d2.iso8601(3)).toBe("2001-02-03T04:05:06.123+00:00");
     expect(d2.iso8601(9)).toBe("2001-02-03T04:05:06.123456000+00:00");
     expect(d2.xmlschema(3)).toBe("2001-02-03T04:05:06.123+00:00");
-  });
-});
-
-describe("Rational", () => {
-  it("takes a Float on either side, as nurat_s_convert does", () => {
-    // ruby 3.3.11:
-    //   Rational(0.5, 86400)  #=> (1/172800)
-    //   Rational(1.333, 1)    #=> (6003298303284871/4503599627370496)
-    //   Rational(1, 0.5)      #=> (2/1)
-    expect(new Rational(0.5, 86400)).toEqual(new Rational(1, 172800));
-    expect(new Rational(1.333, 1).numerator).toBe(6003298303284871n);
-    expect(new Rational(1.333, 1).denominator).toBe(4503599627370496n);
-    expect(new Rational(1, 0.5)).toEqual(new Rational(2, 1));
-  });
-
-  it("raises FloatDomainError for a non-finite Float, as float_decode_internal does", () => {
-    // ruby 3.3.11: Rational(Float::INFINITY, 1) #=> FloatDomainError: Infinity
-    expect(() => new Rational(Infinity, 1)).toThrow("Infinity");
-    expect(() => new Rational(NaN, 1)).toThrow("NaN");
-  });
-
-  it("canonicalizes the sign onto the numerator, as nurat_s_canonicalize_internal does", () => {
-    // ruby 3.3.11:
-    //   Rational(3, -4)   #=> (-3/4)
-    //   Rational(-3, -4)  #=> (3/4)
-    //   Rational(1, -0.5) #=> (-2/1)
-    expect(new Rational(3, -4).numerator).toBe(-3n);
-    expect(new Rational(3, -4).denominator).toBe(4n);
-    expect(new Rational(3, -4).inspect()).toBe("(-3/4)");
-    expect(new Rational(-3, -4).inspect()).toBe("(3/4)");
-    expect(new Rational(1, -0.5).inspect()).toBe("(-2/1)");
   });
 });
 

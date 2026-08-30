@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { Extensions, ZeroDivisionError } from "./extensions.js";
+import { ZeroDivisionError } from "@blazetrails/ruby-compat";
+
+import { Extensions } from "./extensions.js";
 import { Factory } from "./factory.js";
 
 describe("MessagePackExtensionsTest", () => {
@@ -12,12 +14,12 @@ describe("MessagePackExtensionsTest", () => {
   };
 
   it("normalizes the sign of a decoded Rational onto the numerator", () => {
-    expect(readRational(1, -2)).toEqual({ numerator: -1, denominator: 2 });
-    expect(readRational(-1, -2)).toEqual({ numerator: 1, denominator: 2 });
+    expect(readRational(1, -2)).toEqual({ numerator: -1n, denominator: 2n });
+    expect(readRational(-1, -2)).toEqual({ numerator: 1n, denominator: 2n });
   });
 
   it("reduces a decoded Rational", () => {
-    expect(readRational(2, 4)).toEqual({ numerator: 1, denominator: 2 });
+    expect(readRational(2, 4)).toEqual({ numerator: 1n, denominator: 2n });
   });
 
   it("raises on a zero denominator", () => {
@@ -25,6 +27,6 @@ describe("MessagePackExtensionsTest", () => {
   });
 
   it("reads a zero numerator without a denominator", () => {
-    expect(readRational(0)).toEqual({ numerator: 0, denominator: 1 });
+    expect(readRational(0)).toEqual({ numerator: 0n, denominator: 1n });
   });
 });
