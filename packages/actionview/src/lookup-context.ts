@@ -24,6 +24,7 @@ import { Jaro } from "@blazetrails/did-you-mean";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";
 import { Requested } from "./template-details.js";
+import { Types } from "./template/types.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
 type DetailsMap = Record<string, DetailValue>;
@@ -42,25 +43,6 @@ registerDetail("locale", () => ["en"]);
 registerDetail("formats", () => ["html", "text", "js", "css", "xml", "json"]);
 registerDetail("variants", () => []);
 registerDetail("handlers", () => TemplateHandlers.extensions() as DetailValue);
-
-/** Whitelist of format symbols recognized by `formats=`. */
-const VALID_FORMAT_SYMBOLS: ReadonlySet<string> = new Set([
-  "html",
-  "text",
-  "js",
-  "css",
-  "xml",
-  "json",
-  "rss",
-  "atom",
-  "yaml",
-  "multipart_form",
-  "url_encoded_form",
-  "ics",
-  "csv",
-  "vcf",
-  "tsx",
-]);
 
 export class MissingTemplate extends Error {
   /** Rails-shape accessors — refined in Phase 1d. @internal stub - real impl in Phase 1d */
@@ -150,9 +132,9 @@ export class DetailsKey {
   /** Canonical Requested object for a given detail tuple. */
   static detailsCacheKey(details: DetailsMap): Requested {
     let formats = details.formats;
-    if (formats && !formats.every((f) => typeof f === "string" && VALID_FORMAT_SYMBOLS.has(f))) {
+    if (formats && !Types.isValidSymbols(formats)) {
       formats = formats.filter(
-        (f) => typeof f === "string" && VALID_FORMAT_SYMBOLS.has(f),
+        (f) => typeof f === "string" && Types.symbols().includes(f),
       ) as DetailValue;
     }
     const normalized: DetailsMap = { ...details, formats: formats ?? [] };
@@ -311,9 +293,11 @@ export class LookupContext {
       arr = arr.filter((v) => v !== "*/*").concat(DEFAULT_PROCS.formats());
     }
     arr = Array.from(new Set(arr));
-    const invalid = arr.filter((f) => typeof f !== "string" || !VALID_FORMAT_SYMBOLS.has(f));
-    if (invalid.length > 0) {
-      throw new Error(`Invalid formats: ${invalid.map((v) => String(v)).join(", ")}`);
+    if (!Types.isValidSymbols(arr)) {
+      const invalidValues = arr.filter(
+        (f) => typeof f !== "string" || !Types.symbols().includes(f),
+      );
+      throw new Error(`Invalid formats: ${invalidValues.map((v) => String(v)).join(", ")}`);
     }
     if (arr.length === 1 && arr[0] === "js") {
       arr.push("html");

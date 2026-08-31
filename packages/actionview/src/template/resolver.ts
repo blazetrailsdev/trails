@@ -11,6 +11,7 @@
  */
 
 import { getFs, getPath } from "@blazetrails/activesupport";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
 import { TemplateHandlers } from "../template/handlers.js";
@@ -121,7 +122,13 @@ export abstract class Resolver implements PathSetResolver {
         pattern += "(?:[^/]+/)*";
         continue;
       }
-      pattern += segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*");
+      for (let c = 0; c < segment.length; c++) {
+        const char = segment[c];
+        if (char === "\\" && c + 1 < segment.length) pattern += regexpEscape(segment[++c]);
+        else if (char === "*") pattern += "[^/]*";
+        else if (char === "?") pattern += "[^/]";
+        else pattern += regexpEscape(char);
+      }
       if (i < segments.length - 1) pattern += "/";
     }
     return new RegExp(`^${pattern}$`);
@@ -200,6 +207,18 @@ export class FileSystemResolver extends Resolver {
     return this.toString();
   }
 
+  /**
+   * `resolver.rb:108-111`, and the `alias :== :eql?` beside it — JS has no
+   * operator to overload, so the one method answers both spellings.
+   */
+  isEql(resolver: unknown): boolean {
+    return (
+      resolver instanceof FileSystemResolver &&
+      this.constructor === resolver.constructor &&
+      this.toPath() === resolver.toPath()
+    );
+  }
+
   override builtTemplates(): Template[] {
     return Array.from(this.templatesCache.values()).flatMap((templates) =>
       templates.map((t) => t.template),
@@ -229,7 +248,7 @@ export class FileSystemResolver extends Resolver {
 
     let templates = this.templatesCache.get(path.virtual);
     if (templates === undefined) {
-      templates = this.templatesFromPath(path);
+      templates = this.unboundTemplatesFromPath(path);
       if (key != null) this.templatesCache.set(path.virtual, templates);
     }
 
@@ -253,7 +272,7 @@ export class FileSystemResolver extends Resolver {
    * Rails' `build_unbound_template` (`resolver.rb:145-155`); trails binds the
    * template eagerly because `UnboundTemplate` is unported.
    */
-  protected buildTemplate(template: string): TemplateWithDetails | null {
+  protected buildUnboundTemplate(template: string): TemplateWithDetails | null {
     const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
     const details = parsed.details;
     if (typeof details.handler !== "string") return null;
@@ -278,14 +297,14 @@ export class FileSystemResolver extends Resolver {
    * checking every possible path, scan the directory for files with the right
    * prefix and keep the exact virtual-path matches.
    */
-  protected templatesFromPath(path: TemplatePath): TemplateWithDetails[] {
+  protected unboundTemplatesFromPath(path: TemplatePath): TemplateWithDetails[] {
     if (path.name.includes(".")) return [];
 
-    const paths = this.templateGlob(`${path.virtual}*`);
+    const paths = this.templateGlob(`${this.escapeEntry(path.virtual)}*`);
     const templates: TemplateWithDetails[] = [];
 
     for (const template of paths) {
-      const built = this.buildTemplate(template);
+      const built = this.buildUnboundTemplate(template);
       if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
     }
 
@@ -295,17 +314,27 @@ export class FileSystemResolver extends Resolver {
   /**
    * @internal
    * Safe glob within the resolver root (`resolver.rb:202-207`), yielding
-   * expanded paths. The walk starts at the glob's last literal segment, so it
-   * only descends what the pattern can reach, as `Dir.glob` does.
+   * expanded paths. `Dir.glob` walks the tree itself; here the walk starts at
+   * the glob's last literal segment, so it only descends what the pattern can
+   * reach.
    */
   protected templateGlob(glob: string): string[] {
-    const regex = this.fnmatch(glob);
+    const query = getPath().join(this.escapeEntry(this._path), glob);
+    const regex = this.fnmatch(query);
+    const pathWithSlash = getPath().join(this._path, "");
+
     const segments = glob.split("/").slice(0, -1);
     const wildcard = segments.findIndex((segment) => segment.includes("*"));
     const root = (wildcard === -1 ? segments : segments.slice(0, wildcard)).join("/");
+
     return this.entriesUnder(root)
-      .filter((relative) => regex.test(relative))
-      .map((relative) => getPath().join(this._path, relative));
+      .map((relative) => getPath().join(this._path, relative))
+      .filter((filename) => regex.test(filename) && filename.startsWith(pathWithSlash));
+  }
+
+  /** @internal `resolver.rb:208-209`. */
+  protected escapeEntry(entry: string): string {
+    return entry.replace(/[*?{}[\]]/g, "\\$&");
   }
 
   /** @internal Every file under `prefix`, as a path relative to the root. */

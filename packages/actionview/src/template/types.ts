@@ -49,4 +49,9 @@ export class Types {
   static symbols(): readonly string[] {
     return SYMBOLS;
   }
+
+  /** @internal `types.rb:22-24`. */
+  static isValidSymbols(symbols: ReadonlyArray<string | symbol>): boolean {
+    return symbols.every((s) => typeof s === "string" && SYMBOLS.includes(s));
+  }
 }

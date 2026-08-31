@@ -20,6 +20,7 @@ describe("FileSystemResolver", () => {
     await write("index.html.tse", "<h1>Posts</h1>");
     await write("index.html+phone.tse", "<h1>Phone</h1>");
     await write("_form.html.tse", "<form></form>");
+    await write("i*x.html.tse", "<h1>Star</h1>");
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
   });
 
@@ -55,6 +56,14 @@ describe("FileSystemResolver", () => {
     expect(ctx.find("index", ["posts"], false, [], { variants: ["phone"] })).toMatchObject({
       source: "<h1>Phone</h1>",
     });
+  });
+
+  it("escapes glob metacharacters in the looked-up path", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.findTemplate("i*x", "posts", "html")?.source).toBe("<h1>Star</h1>");
+    expect(ctx.isExists("i*dex", ["posts"])).toBe(false);
   });
 
   it("any? ignores the format and variant constraints", () => {
