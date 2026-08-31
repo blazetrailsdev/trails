@@ -58,6 +58,30 @@ SKIP_PATTERNS = [
   /\/config\.rb$/,
 ]
 
+# ruby-compat's spec selection (see the pkg_name == "ruby-compat" branch in
+# `run`). Types ruby-compat ports whole take their whole directory.
+RUBY_COMPAT_SPEC_DIRS = %w[rational range hash comparable].freeze
+
+# Types ruby-compat ports ONE member of take that member's spec files. A
+# `<type>/<member>_spec.rb` is usually a one-line `it_behaves_like` shell whose
+# body is a shared file under `<type>/shared/`, so the shared body is listed
+# beside it — without it the member contributes zero tests. Aliases share the
+# body and so add only their shell: `String#next` is `String#succ`
+# (next_spec.rb:6 `it_behaves_like :string_succ, :next`), `Regexp.quote` is
+# `Regexp.escape` (quote_spec.rb:6), and `Symbol#to_s` shares
+# `Symbol#id2name`'s body (to_s_spec.rb:5).
+RUBY_COMPAT_SPEC_FILES = %w[
+  string/succ_spec.rb
+  string/next_spec.rb
+  string/shared/succ.rb
+  regexp/escape_spec.rb
+  regexp/quote_spec.rb
+  regexp/shared/quote.rb
+  symbol/to_s_spec.rb
+  symbol/name_spec.rb
+  symbol/shared/id2name.rb
+].freeze
+
 # Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of
 # TS isAssertionCallee (extract-ts-core.ts), so both sides count the full breadth
 # of Rails assertions: the `assert_*`/`refute_*` families incl. custom helpers
@@ -1868,13 +1892,18 @@ def run
       test_files.select! { |f| f.start_with?(controller_dir) }
     end
 
-    # For ruby-compat, include only the value-type primitive directories.
+    # For ruby-compat, include only the specs for surface the package ports.
     # `pkg_dir` is ruby/spec's `spec/ruby/core`; vendor/sources.ts carries why
-    # the list is scoped, how it grows, and why an unported spec is not a gap.
+    # the selection is scoped, how it grows, and why an unported spec is not a
+    # gap. A whole-type port takes its directory; a port of one member of a
+    # type takes that member's spec files, since ruby/spec is one file per
+    # member.
     if pkg_name == "ruby-compat"
-      value_type_dirs = %w[rational range string hash symbol comparable regexp]
-                        .map { |d| File.join(pkg_dir, d) }
-      test_files.select! { |f| value_type_dirs.any? { |d| f.start_with?(d + File::SEPARATOR) } }
+      test_files += Dir.glob(File.join(pkg_dir, "**", "shared", "*.rb"))
+      test_files.uniq!
+      selected = RUBY_COMPAT_SPEC_DIRS.map { |d| File.join(pkg_dir, d) + File::SEPARATOR } +
+                 RUBY_COMPAT_SPEC_FILES.map { |f| File.join(pkg_dir, f) }
+      test_files.select! { |f| selected.any? { |s| f.start_with?(s) } }
     end
 
     # Apply skip patterns

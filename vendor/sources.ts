@@ -295,20 +295,35 @@ export const SOURCES: readonly UpstreamSource[] = [
         // clone (which RFC 0089 had planned).
         //
         // Scoped to `spec/ruby/core`, and narrowed AGAIN inside the extractor
-        // to the value-type primitive directories ruby-compat actually ports
-        // (`rational`, `range`, `string`, `hash`, `symbol`, `comparable`,
-        // `regexp` — see the `ruby-compat` filter in
+        // to the surface ruby-compat actually ports (`RUBY_COMPAT_SPEC_DIRS` /
+        // `RUBY_COMPAT_SPEC_FILES` in
         // scripts/test-compare/extract-ruby-tests.rb). The narrowing is
         // deliberate: all of `spec/ruby` is thousands of test names for
         // language and library surface ruby-compat has no port of, which would
-        // drown the compare output. The directory list grows with the package,
-        // one entry per value type as it lands.
+        // drown the compare output.
+        //
+        // The unit is the TYPE, not the directory, because ruby-compat ports
+        // some types whole and others by a single member. `Rational`, `Range`,
+        // `Hash` and `Comparable` are whole-type ports, so they take their
+        // whole spec directory. `String`, `Regexp` and `Symbol` are not:
+        // ruby-compat's entire String surface is `succ`, its entire Regexp
+        // surface is `escape`, and its entire Symbol surface is `to_s`. Taking
+        // those three directories whole would present 1,969 test names for
+        // members the package deliberately does not have — 74% of the measure,
+        // measuring nothing. ruby/spec is one file per member, so they take
+        // their member's spec files instead.
+        //
+        // Either list grows with the package: a new member of a ported type
+        // needs no change, a newly ported member of String/Regexp/Symbol adds
+        // its spec file, and a type that grows into a whole-type port
+        // graduates from the file list to the directory list.
         //
         // An unported spec here is NOT a reason to port the member it covers.
         // ruby-compat's surface is driven by what the trails packages need
         // from Ruby, and the standing rule wins over suite coverage: a spec
         // for a member ruby-compat deliberately does not have is a spec that
-        // is out of scope, not a gap.
+        // is out of scope, not a gap. Scoping the measure to the ported
+        // surface is what keeps that rule enforceable rather than aspirational.
         //
         // Name mapping: ruby/spec files are mspec, which is RSpec-shaped
         // (`describe "Rational#abs" do` / `it "..." do`) rather than minitest
