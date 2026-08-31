@@ -5,6 +5,10 @@ import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.j
 import { QueryCache } from "./query-cache.js";
 import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
 import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
+import {
+  AutoFilteredParameters,
+  type AutoFilteredParametersApp,
+} from "./encryption/auto-filtered-parameters.js";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import type { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
@@ -173,12 +177,15 @@ export class Trailtie extends BaseRailtie {
       ConnectionPool.installExecutorHooks();
     });
 
-    this.initializer("active_record_encryption.configuration", () => {
+    this.initializer("active_record_encryption.configuration", (app) => {
       const cfg = this.config["activeRecord"] as ActiveRecordConfig;
       const enc = cfg.encryption;
       if (enc && Object.keys(enc).length > 0) {
         EncryptionConfigurable.configure(enc);
       }
+
+      const autoFilteredParameters = new AutoFilteredParameters(app as AutoFilteredParametersApp);
+      if (EncryptionConfigurable.config.addToFilterParameters) autoFilteredParameters.enable();
 
       onLoad("active_record", { runOnce: true }, installEncryptionExtendedQueries);
     });

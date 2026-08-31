@@ -10,6 +10,15 @@
  */
 import type { Deprecation } from "./deprecation.js";
 
+/**
+ * An initializer body. Rails' `Initializable::Initializer#run` is
+ * `@context.instance_exec(*args, &block)` (`railties/lib/rails/initializable.rb:31-33`)
+ * and `run_initializers(group = :default, *args)` passes the application
+ * through (`initializable.rb:60-63`), so the block Rails writes as
+ * `initializer "name" do |app|` receives it.
+ */
+export type InitializerBlock = (...args: unknown[]) => void;
+
 export class Railtie {
   /**
    * All registered subclasses — tracked so the application can enumerate
@@ -57,14 +66,14 @@ export class Railtie {
     return host._config as Record<string, unknown>;
   }
 
-  private static _initializers: Array<{ name: string; block: () => void }> = [];
+  private static _initializers: Array<{ name: string; block: InitializerBlock }> = [];
 
   /**
    * Register a named initializer block.
    *
    * Mirrors: Rails::Railtie.initializer
    */
-  static initializer(name: string, block: () => void): void {
+  static initializer(name: string, block: InitializerBlock): void {
     const host = this as any;
     if (!Object.prototype.hasOwnProperty.call(host, "_initializers")) {
       host._initializers = [];
@@ -77,16 +86,12 @@ export class Railtie {
    *
    * Mirrors: Rails::Railtie#run_initializers
    */
-  static runInitializers(): void {
+  static runInitializers(...args: unknown[]): void {
     const host = this as any;
-    const own: Array<{ name: string; block: () => void }> = Object.prototype.hasOwnProperty.call(
-      host,
-      "_initializers",
-    )
-      ? host._initializers
-      : [];
+    const own: Array<{ name: string; block: InitializerBlock }> =
+      Object.prototype.hasOwnProperty.call(host, "_initializers") ? host._initializers : [];
     for (const { block } of own) {
-      block();
+      block(...args);
     }
   }
 
@@ -95,9 +100,9 @@ export class Railtie {
    *
    * Mirrors: Rails application initialization pipeline.
    */
-  static runAllInitializers(): void {
+  static runAllInitializers(...args: unknown[]): void {
     for (const sub of Railtie.subclasses) {
-      sub.runInitializers();
+      sub.runInitializers(...args);
     }
   }
 }

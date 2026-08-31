@@ -1,7 +1,15 @@
-import { describe, it, expect } from "vitest";
-import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
+import { describe, it, expect, afterEach } from "vitest";
+import {
+  ArgumentError,
+  Railtie as BaseRailtie,
+  resetLoadHooks,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
+import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { GlobalID } from "./global-id.js";
-import "./trailtie.js";
+import { _resetApp } from "./config.js";
+import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
+import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./trailtie.js";
 
 describe("GlobalID::Railtie class body", () => {
   it("pushes GlobalID onto the shared eager-load namespace list", () => {
@@ -10,5 +18,41 @@ describe("GlobalID::Railtie class body", () => {
 
   it("seeds the config.global_id namespace before any initializer runs", () => {
     expect(BaseRailtie.config["globalId"]).toBeDefined();
+  });
+});
+
+describe("GlobalID::Railtie verifier derivation", () => {
+  afterEach(() => {
+    _resetApp();
+    _resetSignedGlobalIDClassConfig();
+    resetLoadHooks();
+  });
+
+  const blogApp = (): TrailtieApp & { config: { globalId: GlobalIdConfig } } => ({
+    railtieName: () => "blog_app_application",
+    config: { globalId: {} },
+    keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
+  });
+
+  const initializeApp = (app: TrailtieApp): void => {
+    Trailtie.initialize(app);
+    runLoadHooks("after_initialize", app);
+  };
+
+  it("leaves the verifier unset when key_generator raises ArgumentError", () => {
+    const app = blogApp();
+    app.keyGenerator = () => {
+      throw new ArgumentError("Missing `secret_key_base`");
+    };
+    initializeApp(app);
+    expect(SignedGlobalID.verifier).toBeUndefined();
+  });
+
+  it("propagates a non-ArgumentError failure out of the derivation", () => {
+    const app = blogApp();
+    app.keyGenerator = () => {
+      throw new TypeError("boom");
+    };
+    expect(() => initializeApp(app)).toThrow(TypeError);
   });
 });

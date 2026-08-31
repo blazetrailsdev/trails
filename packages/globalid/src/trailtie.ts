@@ -1,14 +1,17 @@
 // Port of `GlobalID::Railtie` (`global_id/railtie.rb`). Trails railties are
-// `Railtie` (activesupport) subclasses rather than `Rails::Railtie`, so the
-// initializer bodies read their `app` off `Railtie.config` — the shape
-// activemodel's Trailtie uses.
+// `Railtie` (activesupport) subclasses rather than `Rails::Railtie`; the
+// initializer block is yielded the application, as `initializable.rb:31-33`
+// and `:60-63` do.
 import {
+  ArgumentError,
   Railtie as BaseRailtie,
   dasherize,
+  extend,
   months,
   onLoad,
   registerRailtie,
 } from "@blazetrails/activesupport";
+import { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
@@ -41,8 +44,8 @@ export class Trailtie extends BaseRailtie {
     BaseRailtie.config["globalId"] = {} as GlobalIdConfig;
     ((BaseRailtie.config["eagerLoadNamespaces"] ??= []) as unknown[]).push(GlobalID);
 
-    this.initializer("global_id", () => {
-      Trailtie.initialize(Trailtie.config["app"] as TrailtieApp);
+    this.initializer("global_id", (app) => {
+      Trailtie.initialize(app as TrailtieApp);
     });
 
     this.initializer("web_console.deprecator", () => {
@@ -60,13 +63,8 @@ export class Trailtie extends BaseRailtie {
    * `nil` wins over the default, which is how
    * `config.global_id.expires_in = nil` disables expiration.
    *
-   * The verifier derivation rescues any error where Rails rescues
-   * `ArgumentError` (`railtie.rb:31-32`): `Application#keyGenerator` raises a
-   * plain `Error` for a missing `secret_key_base`, so there is no narrower
-   * class to name until trailties grows one.
-   *
    * The class body's `config.global_id = ActiveSupport::OrderedOptions.new`
-   * and `config.eager_load_namespaces << GlobalID` (`railtie.rb:13-14`) are
+   * and `config.eager_load_namespaces << GlobalID` (`railtie.rb:13-14`)
    * are seeded on activesupport's `Railtie.config`, the analogue of the
    * `@@`-level state `Railtie::Configuration` holds
    * (`railtie/configuration.rb:17-20`): trailties' `Configuration` reads its
@@ -76,8 +74,7 @@ export class Trailtie extends BaseRailtie {
    *
    * `ActiveSupport.on_load(:active_record)` (`railtie.rb:36-39`) needs no arm:
    * `Base` includes `GlobalID::Identification` statically, because base.ts
-   * already imports globalid. `on_load(:active_record_fixture_set)`
-   * (`railtie.rb:41`) awaits a `GlobalID::FixtureSet` port.
+   * already imports globalid.
    */
   static initialize(app: TrailtieApp): void {
     const config = (app.config.globalId ??= BaseRailtie.config["globalId"] as GlobalIdConfig);
@@ -96,11 +93,16 @@ export class Trailtie extends BaseRailtie {
       config.verifier ??= (() => {
         try {
           return new Verifier(app.keyGenerator().generateKey("signed_global_ids"));
-        } catch {
-          return undefined;
+        } catch (error) {
+          if (error instanceof ArgumentError) return undefined;
+          throw error;
         }
       })();
       SignedGlobalID.verifier = config.verifier;
+    });
+
+    onLoad("active_record_fixture_set", (fixtureSet: FixtureSetHost) => {
+      extend(fixtureSet as object, FixtureSet);
     });
   }
 }

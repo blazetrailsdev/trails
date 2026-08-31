@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { months, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import { ArgumentError, months, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./trailtie.js";
@@ -17,7 +17,11 @@ function blogApp(
     railtieName: () => "blog_app_application",
     config: { globalId: {} },
     keyGenerator: () => {
-      if (secretKeyBase === null) throw new Error("Missing secret_key_base.");
+      if (secretKeyBase === null) {
+        throw new ArgumentError(
+          "Missing `secret_key_base` for 'test' environment, set this string with `bin/rails credentials:edit`",
+        );
+      }
       return new KeyGenerator(secretKeyBase, { iterations: 1000 });
     },
   };

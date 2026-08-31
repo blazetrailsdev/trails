@@ -1,3 +1,4 @@
+import { currentTimeInstant } from "@blazetrails/activesupport";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { GID } from "./uri/gid.js";
@@ -165,7 +166,7 @@ export class SignedGlobalID extends GlobalID {
     let expiresAt: Temporal.Instant | undefined;
     if (raw.expires_at) {
       expiresAt = Temporal.Instant.from(raw.expires_at);
-      if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) return null;
+      if (Temporal.Instant.compare(expiresAt, currentTimeInstant()) <= 0) return null;
     }
     return { uri: raw.gid, expiresAt };
   }
@@ -193,7 +194,7 @@ export class SignedGlobalID extends GlobalID {
   static raiseIfExpired(expiresAt: string | null | undefined): void {
     if (!expiresAt) return;
     const instant = Temporal.Instant.from(expiresAt);
-    if (Temporal.Instant.compare(instant, Temporal.Now.instant()) > 0) return;
+    if (Temporal.Instant.compare(instant, currentTimeInstant()) > 0) return;
     throw new ExpiredMessage("This signed global id has expired.");
   }
 
@@ -247,7 +248,7 @@ function pickExpiration(
   const expiresIn = options.expiresIn !== undefined ? options.expiresIn : _classExpiresIn;
   if (expiresIn == null) return undefined;
   const ms = Math.round(expiresIn * 1000);
-  return Temporal.Now.instant().add({ milliseconds: ms });
+  return currentTimeInstant().add({ milliseconds: ms });
 }
 
 /** @internal — test use only: clear class-level config between tests. */

@@ -9,7 +9,15 @@ import { StatementInvalid } from "./errors.js";
 import { findStiClass } from "./inheritance.js";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { currentTimeFromProperTimezone } from "./timestamp.js";
-import { isPresent, singularize, underscore } from "@blazetrails/activesupport";
+import {
+  camelize,
+  isPresent,
+  OID_NAMESPACE,
+  runLoadHooks,
+  singularize,
+  underscore,
+  uuidV5,
+} from "@blazetrails/activesupport";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
@@ -963,6 +971,20 @@ export async function prepareJoinTableFixtures(
 }
 
 export class FixtureSet {
+  static defaultFixtureModelName(fixtureSetName: string, config: typeof Base = Base): string {
+    return config.pluralizeTableNames
+      ? camelize(singularize(fixtureSetName))
+      : camelize(fixtureSetName);
+  }
+
+  static identify(label: string, columnType: string = ":integer"): number | string {
+    if (columnType === ":uuid") {
+      return uuidV5(OID_NAMESPACE, String(label));
+    } else {
+      return crc32(String(label));
+    }
+  }
+
   static async createFixtures<T extends BaseClass, K extends string>(
     adapter: DatabaseAdapter,
     ModelClass: T,
@@ -971,3 +993,5 @@ export class FixtureSet {
     return defineFixtures(adapter, ModelClass, fixtures);
   }
 }
+
+runLoadHooks("active_record_fixture_set", FixtureSet);

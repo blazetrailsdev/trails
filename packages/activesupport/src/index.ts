@@ -347,7 +347,14 @@ export {
 
 export { sliceBang } from "./core-ext/hash/slice.js";
 export { BASE36_ALPHABET, BASE58_ALPHABET, base36, base58 } from "./core-ext/securerandom.js";
-export { nilUuid, uuidFromHash, uuidV3, uuidV4, uuidV5 } from "./core-ext/digest/uuid.js";
+export {
+  nilUuid,
+  OID_NAMESPACE,
+  uuidFromHash,
+  uuidV3,
+  uuidV4,
+  uuidV5,
+} from "./core-ext/digest/uuid.js";
 
 // Note: `Hash#extract!` is intentionally kept off this flat index and reached
 // through the "./core-ext/hash/slice" subpath, which mirrors its Rails require
