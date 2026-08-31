@@ -248,11 +248,13 @@ export async function loadBaseline(): Promise<ExcludeEntry[]> {
   return rowsOfKind(await loadSplitBaseline(BASELINE_DIR), "calls");
 }
 
-/** The other dimension's rows, which a reseed must write back untouched:
+/** The other dimensions' rows, which a reseed must write back untouched:
  *  `--write` rebuilds each shard from this gate's population alone, so without
- *  them the first call-set reseed would delete every call-argument row. */
+ *  them the first call-set reseed would delete every call-argument (RFC 0095)
+ *  and ruby-compat (RFC 0129) row. */
 export async function loadForeignRows(): Promise<ExcludeEntry[]> {
-  return rowsOfKind(await loadSplitBaseline(BASELINE_DIR), "args");
+  const all = await loadSplitBaseline(BASELINE_DIR);
+  return [...rowsOfKind(all, "args"), ...rowsOfKind(all, "rubyCompat")];
 }
 
 // Repartition the reseeded baseline back across the split files under `dir`.

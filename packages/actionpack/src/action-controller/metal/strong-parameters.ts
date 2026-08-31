@@ -1,7 +1,7 @@
 /** ActionController::StrongParameters Provides ActionController::Parameters, a hash-like object that controls which parameters are permitted for mass assignment. @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, eachPair } from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
 
 // --- Error classes ---
@@ -120,14 +120,14 @@ export class Parameters {
 
   /** Sets permitted to true in-place (recursive). Returns self. */
   permitBang(): this {
-    for (const [, value] of Object.entries(this._data)) {
+    this.eachPair((_key, value) => {
       const values = Array.isArray(value) ? value.flat() : [value];
       for (const v of values) {
         if (v instanceof Parameters) {
           v.permitBang();
         }
       }
-    }
+    });
     this._permitted = true;
     return this;
   }
@@ -480,9 +480,9 @@ export class Parameters {
   }
 
   eachValue(fn: (value: unknown) => void): this {
-    for (const [k, v] of Object.entries(this._data)) {
-      fn(this._convertHashesToParameters(k, v));
-    }
+    eachPair(this._data, (key, value) => {
+      fn(this._convertHashesToParameters(key, value));
+    });
     return this;
   }
 
@@ -678,14 +678,13 @@ export class Parameters {
     // — e.g. `zipcode(90210i)` permitted under the bare `zipcode`. The
     // regex matches the suffix and the prefix must equal the bare key.
     const re = /\(\d+[if]?\)$/;
-    for (const k of Object.keys(this._data)) {
-      const m = re.exec(k);
-      if (!m) continue;
-      const prefix = k.slice(0, m.index);
-      if (prefix === permittedKey && isPermittedScalar(this._data[k])) {
-        params._data[k] = this._data[k];
-      }
-    }
+    this.eachKey((key) => {
+      const m = re.exec(key);
+      if (!m) return;
+      const preMatch = key.slice(0, m.index);
+      if (preMatch !== permittedKey) return;
+      if (isPermittedScalar(this._data[key])) params._data[key] = this._data[key];
+    });
   }
 
   private _hashFilter(

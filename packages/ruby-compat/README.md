@@ -105,6 +105,15 @@ over a `Record` for `Hash#fetch`, ...). Today's copies each hold one row in
 row is deleted by the move story that converges it, and a new row is never the
 remedy for new code.
 
+That is enforced, not merely conventional.
+`eslint/no-ruby-compat-reimplementation-mark.mjs` gates the register against the
+committed high-water mark in
+`eslint/no-ruby-compat-reimplementation-mark.json` — the way
+`extra-surface-mark.json` gates extra surface — and fails when the array holds
+more rows than the mark, or is not sorted (an appended row reads correctly to
+the rule, so nothing else says where it belongs). Its `tighten` path writes the
+mark DOWN as the move stories delete rows; there is no reseed.
+
 ### 3. `parity:api` never enrolls this package — permanently
 
 `parity:api`'s package list is derived from `vendor/sources.ts` via

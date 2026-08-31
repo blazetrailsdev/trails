@@ -9,16 +9,18 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-set/builder.ts",
-    "rubyName": "attributes",
-    "call": "each_key",
-    "reason": "builder.rb:62-63 walks `values.each_key`/`types.each_key`; `values` is a plain object and `types` a Map here, neither of which has Ruby's Hash#each_key — `Object.keys(...)`/`Map#keys()` is the only spelling (same gap as the `materialize` -> `each_key` row below)."
+    "rubyName": "deep_dup",
+    "call": "transform_values",
+    "reason": "builder.rb:120 `delegate_hash.transform_values(&:dup)`; the delegate hash is a JS Map, which has no `transform_values`, and `LazyAttributeHash#transformValues` cannot stand in because it materializes first — so the copy loop is spelled inline."
   },
   {
     "package": "activemodel",
     "tsFile": "attribute-set/builder.ts",
     "rubyName": "deep_dup",
     "call": "transform_values",
-    "reason": "builder.rb:120 `delegate_hash.transform_values(&:dup)`; the delegate hash is a JS Map, which has no `transform_values`, and `LazyAttributeHash#transformValues` cannot stand in because it materializes first — so the copy loop is spelled inline."
+    "kind": "rubyCompat",
+    "tsExport": "transformValues",
+    "reason": "Baseline (RFC 0129): `delegate_hash` (builder.rb:114) is ported as a `Map`, and `transformValues` takes a `Record`; converging it means porting the delegate hash to a Record, which is its own change."
   },
   {
     "package": "activemodel",
@@ -33,12 +35,5 @@
     "rubyName": "fetch_value",
     "call": "fetch",
     "reason": "builder.rb:46,51 `@casted_values.fetch(name) { ... }` and `values.fetch(name) { value_present = false }`; JS Map/objects have no block-taking `fetch`, so the key-presence probe is `has`/`hasOwnProperty` and the miss arm is the surrounding branch."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-set/builder.ts",
-    "rubyName": "materialize",
-    "call": "each_key",
-    "reason": "builder.rb:153-154 walks `values.each_key`/`types.each_key`; `values` is a plain object and `types` a Map here, neither of which has Ruby's Hash#each_key — `Object.keys(...)`/`Map#keys()` is the only spelling (same gap as the `attributes` -> `each_key` row above)."
   }
 ]

@@ -25,6 +25,12 @@
  * per declaration, and is ONLY-SHRINK: a row is deleted by the move story that
  * converges it, NEVER added to cover new code — the remedy for a new flag is to
  * call the primitive. Precedent for the shape: `no-raw-sql-scope.mjs`.
+ *
+ * That is a GUARD, not a convention a reader has to take on trust:
+ * `no-ruby-compat-reimplementation-mark.mjs` compares the register against the
+ * committed mark in `no-ruby-compat-reimplementation-mark.json` and reds on a
+ * row over it or an unsorted array, with a `tighten` path that only ever writes
+ * the mark down.
  */
 import * as fs from "fs";
 import * as path from "path";

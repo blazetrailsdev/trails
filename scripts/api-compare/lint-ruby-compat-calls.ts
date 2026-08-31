@@ -62,14 +62,37 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
  * seed a red across nine packages and block every unrelated PR, which is why
  * enrollment is per-package work rather than one flip.
  *
- * `i18n` and `activesupport` go first because they are the smallest and because
- * most of their rows are already gone: `ruby-compat-symbol-conventions` and
- * `move-regexp-escape-to-ruby-compat` landed the shared imports that drained
- * them. i18n enrolls at zero rows, activesupport at the one
- * `inflector/inflections.ts` `to_regex` row this story converges. The rest
- * follow under `enroll-call-mapping-remaining-packages`.
+ * `i18n` and `activesupport` went first because they were the smallest and
+ * because most of their rows were already gone: `ruby-compat-symbol-conventions`
+ * and `move-regexp-escape-to-ruby-compat` landed the shared imports that drained
+ * them. i18n enrolled at zero rows, activesupport at the one
+ * `inflector/inflections.ts` `to_regex` row.
+ *
+ * `enroll-call-mapping-remaining-packages` then took the rest in one step: the
+ * measured population was 13 rows across four packages, not the per-package
+ * burndown the story sized for, so every remaining package joins here. Eight of
+ * the thirteen converged; the five that stayed are baselined, and three of them
+ * are the same shape — the table keys on the Ruby call NAME, so a
+ * `URI_PARSER.escape` or an `Array#delete_if` reads as `Regexp.escape` /
+ * `Hash#delete_if`.
  */
-export const ENROLLED_PACKAGES: readonly string[] = ["activesupport", "i18n"];
+export const ENROLLED_PACKAGES: readonly string[] = [
+  "abstractcontroller",
+  "actioncontroller",
+  "actiondispatch",
+  "actionpackversion",
+  "actionview",
+  "activemodel",
+  "activerecord",
+  "activerecord-test-support",
+  "activesupport",
+  "arel",
+  "did-you-mean",
+  "globalid",
+  "i18n",
+  "rack",
+  "trailties",
+];
 
 /** One row as the gate prints it — the shard key plus the export the body
  *  should have called, which is not part of the identity since one Ruby call

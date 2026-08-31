@@ -78,8 +78,7 @@ export interface CallMismatchKey {
  *  rows; a second parallel tree was the original design and was reversed
  *  because it doubled the conflict surface of every burndown PR (RFC 0095).
  *  `"rubyCompat"` (RFC 0129) joined on the same terms: a Ruby-core call whose
- *  ruby-compat port the TS body did not make. Report-only today — no shard holds
- *  one — and when gated, that gate reads it alone. */
+ *  ruby-compat port the TS body did not make. Its gate reads it alone. */
 export type RowKind = "calls" | "args" | "rubyCompat";
 
 /** The rows of one dimension. `kind` absent reads as `"calls"`. */
@@ -87,11 +86,16 @@ export function rowsOfKind<T extends CallMismatchKey>(entries: T[], kind: RowKin
   return entries.filter((e) => (e.kind ?? "calls") === kind);
 }
 
-/** Ordering key for a row inside a shard, covering BOTH kinds so one comparator
+/** Ordering key for a row inside a shard, covering EVERY kind so one comparator
  *  writes the whole file. A call-set row's key is unchanged, so adding the
- *  argument dimension never reorders an existing shard. */
+ *  argument or ruby-compat dimension never reorders an existing shard — and the
+ *  suffix keeps a rubyCompat row distinct from the call-set row of the same
+ *  `keyOf`, which is the shape `rack utils.ts escape_path escape` already has.
+ */
 export function shardKeyOf(k: CallMismatchKey): string {
-  return k.kind === "args" ? `${keyOf(k)} args ${(k.rubyArgs ?? []).join(",")}` : keyOf(k);
+  if (k.kind === "args") return `${keyOf(k)} args ${(k.rubyArgs ?? []).join(",")}`;
+  if (k.kind === "rubyCompat") return `${keyOf(k)} rubyCompat`;
+  return keyOf(k);
 }
 
 export function compareShardKeys(a: CallMismatchKey, b: CallMismatchKey): number {

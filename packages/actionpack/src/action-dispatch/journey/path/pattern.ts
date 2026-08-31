@@ -1,4 +1,4 @@
-import { transformValues } from "@blazetrails/ruby-compat";
+import { regexpEscape, transformValues } from "@blazetrails/ruby-compat";
 import { Ast } from "../ast.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
@@ -6,16 +6,9 @@ import { FormatBuilder, Format, Visitor } from "../visitors.js";
 
 type Matchers = Record<string, RegExp | RegExp[]>;
 
-function escapeRegex(s: string): string {
-  // Mirrors Ruby `Regexp.escape`: does NOT escape `/` (`/` has no special
-  // meaning in a regex source string; it's only delimiter-significant in
-  // JS regex literals, not in the `RegExp` constructor).
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /**
  * Escape characters that would be significant inside a `[…]` character class.
- * Distinct from `escapeRegex` because the metacharacter set is different
+ * Distinct from `regexpEscape` because the metacharacter set is different
  * (e.g. `.` and `+` are literals inside a class, but `]` and `-` are not).
  */
 function escapeCharClass(s: string): string {
@@ -116,11 +109,11 @@ export class AnchoredRegexp extends Visitor {
   }
 
   protected override visitLITERAL(node: Node): string {
-    return escapeRegex((node as Literal).left as string);
+    return regexpEscape((node as Literal).left as string);
   }
 
   protected override visitDOT(node: Node): string {
-    return escapeRegex((node as Dot).left as string);
+    return regexpEscape((node as Dot).left as string);
   }
 
   protected override visitSLASH(node: Node): string {
