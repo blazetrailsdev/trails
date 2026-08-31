@@ -13,6 +13,7 @@
     { "path": "../date" },
     { "path": "../activemodel" },
     { "path": "../did-you-mean" },
-    { "path": "../globalid" }
+    { "path": "../globalid" },
+    { "path": "../actionview" }
   ]
 }
