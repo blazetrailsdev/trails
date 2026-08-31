@@ -65,7 +65,6 @@ export function acceptsNestedAttributesFor(
       this: Base,
       options?: { validate?: boolean; touch?: boolean },
     ): Promise<boolean> {
-      await awaitPendingNestedReaderLoads(this);
       const result = await originalSave.call(this, options);
       if (!result) return false;
 
@@ -280,7 +279,7 @@ export function assignToOrMarkForDestruction(
   attributes: Record<string, unknown>,
   allowDestroy: boolean,
 ): Promise<void> | void {
-  const pending = record.assignAttributes(except(attributes, ...UNASSIGNABLE_KEYS));
+  const pending = record.setAttributes(except(attributes, ...UNASSIGNABLE_KEYS));
   const markIfRequested = (): void => {
     if (hasDestroyFlag(attributes) && allowDestroy) {
       record.markForDestruction();
@@ -428,36 +427,6 @@ async function detachDisplacedThenSetNewRecord(
   if (built) assoc.setNewRecord(built);
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function parkNestedReaderLoad(record: Base, load: Promise<void>): void {
-  const settled = load.then(
-    () => null,
-    (error: unknown) => error ?? new Error("nested attributes reader load failed"),
-  );
-  const host = record as unknown as NestedReaderLoadHost;
-  (host._pendingNestedReaderLoads ??= []).push(settled);
-}
-
-/** @internal */
-interface NestedReaderLoadHost {
-  _pendingNestedReaderLoads?: Promise<unknown>[];
-}
-
-/** @internal */
-async function awaitPendingNestedReaderLoads(record: Base): Promise<void> {
-  const host = record as unknown as NestedReaderLoadHost;
-  const pending = host._pendingNestedReaderLoads;
-  if (!pending?.length) return;
-  host._pendingNestedReaderLoads = [];
-  for (const settled of pending) {
-    const error = await settled;
-    if (error) throw error;
-  }
-}
-
 /** @internal */
 function hasNestedId(attributes: Record<string, unknown>): boolean {
   const id = (attributes as any).id;
@@ -546,7 +515,7 @@ export function assignNestedAttributesForOneToOneAssociation(
     const targetModel = resolveCollectionTargetModel(record, associationName);
     if (targetModel) assertNestedAttributesAreKnown(targetModel, assignable);
     if (existingRecord && existingRecord.isNewRecord()) {
-      const pending = existingRecord.assignAttributes(assignable);
+      const pending = existingRecord.setAttributes(assignable);
       if (pending) {
         return pending.then(() => assoc.initializeAttributes(existingRecord));
       }

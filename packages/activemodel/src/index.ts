@@ -15,6 +15,7 @@ export {
 } from "./forbidden-attributes-protection.js";
 export {
   assignAttributes,
+  assertAssignedSynchronously,
   attributeWriterMissing,
   isMassAssignmentEmpty,
   ArgumentError,

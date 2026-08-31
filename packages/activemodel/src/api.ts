@@ -18,7 +18,7 @@ import { Translation } from "./translation.js";
 type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
 export function initialize(this: APIHost, attributes: Record<string, unknown> = {}): void {
-  if (attributes != null) void this.assignAttributes(attributes);
+  if (attributes != null) this.assignAttributes(attributes);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
@@ -50,7 +50,7 @@ export class API {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export interface API extends Conversion {
-  assignAttributes(newAttributes: unknown): Promise<void> | void;
+  assignAttributes(newAttributes: unknown): void;
   setAttributes(newAttributes: unknown): Promise<void> | void;
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
@@ -94,5 +94,5 @@ export interface API extends Conversion {
 }
 
 interface APIHost {
-  assignAttributes(newAttributes: unknown): Promise<void> | void;
+  assignAttributes(newAttributes: unknown): void;
 }

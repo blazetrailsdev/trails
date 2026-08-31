@@ -37,10 +37,10 @@ describe("constructor-form association writer", () => {
     expect((author as any).association("posts").target).toEqual([p1]);
   });
 
-  it("routes an association key reached through assignAttributes", async () => {
+  it("routes an association key reached through setAttributes", async () => {
     const author = new Author();
     const post = new Post({ title: "a" });
-    await author.assignAttributes({ posts: [post] });
+    await author.setAttributes({ posts: [post] });
     expect((author as any).association("posts").target).toContain(post);
   });
 

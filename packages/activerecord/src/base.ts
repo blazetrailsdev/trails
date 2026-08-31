@@ -121,6 +121,7 @@ import {
 import {
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
+  assertAssignedSynchronously,
   type DirtyOptions,
   dirtyInitAttributes,
 } from "@blazetrails/activemodel";
@@ -557,8 +558,12 @@ function _applyScopeAttributes(
     }
   }
   if (Object.keys(toApply).length > 0) {
-    const pending = (record as any).assignAttributes(toApply) as Promise<void> | void;
-    if (pending) _NestedAttributes.parkNestedReaderLoad(record as any, pending);
+    const assocPending = _extractAssociationAttrs(ctor, toApply);
+    const rest = assocPending ? assocPending.rest : toApply;
+    if (Object.keys(rest).length > 0) {
+      assertAssignedSynchronously((record as any)._assignAttributes(rest), "Model.new");
+    }
+    if (assocPending) _dispatchAssociationAttrs(record as unknown as Base, assocPending.assocs);
   }
 }
 
@@ -2763,7 +2768,8 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   _updateRecord(attributeNames?: string[], block?: (record: this) => void): Promise<unknown>;
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
   valuesAt(...keys: string[]): unknown[];
-  assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+  assignAttributes(attrs: Record<string, unknown>): void;
+  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;
@@ -3194,8 +3200,7 @@ _setSuperIsValid(Model.prototype.isValid);
       return _attributes.call(this as unknown as ThisParameterType<typeof _attributes>);
     },
     set(this: Base, attrs: Record<string, unknown>) {
-      const pending = this.setAttributes(attrs);
-      if (pending) _NestedAttributes.parkNestedReaderLoad(this, pending);
+      assertAssignedSynchronously(this.setAttributes(attrs), "attributes=");
     },
     configurable: true,
     enumerable: false,

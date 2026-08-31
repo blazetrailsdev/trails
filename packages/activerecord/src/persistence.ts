@@ -391,24 +391,26 @@ interface UpdateRecord extends AttributeIO {
   saveBang(options?: { validate?: boolean }): Promise<true | undefined>;
 }
 
+/** @missingRailsCall assign_attributes — CONVERGEABLE grep-gate-sync-association-writers-to-zero */
 export async function update<T extends UpdateRecord>(
   this: T,
   attributes: Record<string, unknown>,
 ): Promise<boolean | undefined> {
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
-    await self.assignAttributes(attributes);
+    await self.setAttributes(attributes);
     return self.save() as Promise<boolean | undefined>;
   }) as Promise<boolean | undefined>;
 }
 
+/** @missingRailsCall assign_attributes — CONVERGEABLE grep-gate-sync-association-writers-to-zero */
 export async function updateBang<T extends UpdateRecord>(
   this: T,
   attributes: Record<string, unknown>,
 ): Promise<true | undefined> {
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
-    await self.assignAttributes(attributes);
+    await self.setAttributes(attributes);
     return self.saveBang() as Promise<true | undefined>;
   }) as Promise<true | undefined>;
 }

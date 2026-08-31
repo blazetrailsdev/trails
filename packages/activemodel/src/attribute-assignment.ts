@@ -1,18 +1,8 @@
 import type { AttributeMethod } from "./attribute-methods.js";
 import { UnknownAttributeError } from "./errors.js";
 
-export function assignAttributes(
-  this: AttributeAssignment,
-  newAttributes: unknown,
-): Promise<void> | void {
-  if (!respondToEachPair(newAttributes)) {
-    throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${classOf(newAttributes)} passed.`,
-    );
-  }
-  if (isMassAssignmentEmpty(newAttributes)) return;
-
-  return this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
+export function assignAttributes(this: AttributeAssignment, newAttributes: unknown): void {
+  assertAssignedSynchronously(setAttributes.call(this, newAttributes), "assignAttributes");
 }
 
 /** @internal */
@@ -29,7 +19,14 @@ export function setAttributes(
   this: AttributeAssignment,
   newAttributes: unknown,
 ): Promise<void> | void {
-  return assignAttributes.call(this, newAttributes);
+  if (!respondToEachPair(newAttributes)) {
+    throw new ArgumentError(
+      `When assigning attributes, you must pass a hash as an argument, ${classOf(newAttributes)} passed.`,
+    );
+  }
+  if (isMassAssignmentEmpty(newAttributes)) return;
+
+  return this._assignAttributes(this.sanitizeForMassAssignment(newAttributes));
 }
 
 export function attributeWriterMissing(
@@ -182,3 +179,18 @@ class NotImplementedError extends globalThis.Error {
 }
 
 export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError, RuntimeError };
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function assertAssignedSynchronously(
+  pending: Promise<void> | void,
+  methodName: string,
+): void {
+  if (!pending) return;
+  void pending.catch(() => {});
+  throw new RuntimeError(
+    `${methodName} cannot assign this attribute synchronously; use \`await record.setAttributes(...)\` instead.`,
+  );
+}

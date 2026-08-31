@@ -13,7 +13,7 @@ interface HasOneOwner {
   account?: unknown;
   club?: unknown;
   setAccount(value: unknown): void | Promise<void>;
-  assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
   update(attrs: Record<string, unknown>): Promise<boolean>;
 }
 
@@ -71,10 +71,10 @@ describe("HasOnePersistedSetterThrows", () => {
     }
   });
 
-  it("mass-assignment (assignAttributes) awaits the has_one writer", async () => {
+  it("mass-assignment (setAttributes) awaits the has_one writer", async () => {
     const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
     const account = await Account.create({ credit_limit: 1000 });
-    await firm.assignAttributes({ account });
+    await firm.setAttributes({ account });
     expect((account as unknown as { firm_id: number }).firm_id).toBe(
       Number((firm as unknown as { id: unknown }).id),
     );
@@ -102,7 +102,7 @@ describe("HasOnePersistedSetterThrows", () => {
   it("has_one_through mass-assignment awaits the through writer", async () => {
     const member = (await Member.create({ name: "Groucho" })) as unknown as HasOneOwner;
     const club = await Club.create({ name: "Moustache" });
-    await member.assignAttributes({ club });
+    await member.setAttributes({ club });
     expect(await (member as unknown as { club: Promise<unknown> }).club).toBeTruthy();
   });
 
