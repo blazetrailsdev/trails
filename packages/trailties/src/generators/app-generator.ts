@@ -39,10 +39,17 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
  * `tsx` loader, so a command that imports application code can resolve the
  * `.js` specifiers `Node16` resolution requires of a `.ts` source.
  *
+ * The package scripts name the loader bare, because a package manager puts
+ * `node_modules/.bin` on PATH for them. `bin/trails` is run directly, where
+ * nothing does, so it resolves both halves from its own location instead —
+ * the same way `bin/rails` reaches the app through `require_relative`
+ * (`bin/rails.tt:3`) rather than through PATH.
+ *
  * @noRailsEquivalent PERMANENT
  */
-const TRAILS_ARGV = ["tsx", "node_modules/@blazetrails/trailties/bin/trails.js"];
-const TRAILS = TRAILS_ARGV.join(" ");
+const TRAILS_LOADER = "tsx";
+const TRAILS_CLI = "node_modules/@blazetrails/trailties/bin/trails.js";
+const TRAILS = `${TRAILS_LOADER} ${TRAILS_CLI}`;
 
 export class AppGenerator extends AppBase {
   readonly packageManager: PackageManager;
@@ -368,10 +375,13 @@ export default defineConfig({
       "bin/trails",
       `#!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { status } = spawnSync(
-  "${TRAILS_ARGV[0]}",
-  ["${TRAILS_ARGV[1]}", ...process.argv.slice(2)],
+  join(root, "node_modules", ".bin", "${TRAILS_LOADER}"),
+  [join(root, "${TRAILS_CLI}"), ...process.argv.slice(2)],
   { stdio: "inherit" },
 );
 process.exit(status ?? 1);
@@ -412,10 +422,14 @@ console.log("\\n== Done! ==");
       "bin/dev",
       `#!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
-const { status } = spawnSync("bin/trails", ["server", ...process.argv.slice(2)], {
-  stdio: "inherit",
-});
+const { status } = spawnSync(
+  join(dirname(fileURLToPath(import.meta.url)), "trails"),
+  ["server", ...process.argv.slice(2)],
+  { stdio: "inherit" },
+);
 process.exit(status ?? 1);
 `,
       { mode: 0o755 },

@@ -168,14 +168,18 @@ describe("AppGenerator", () => {
     const binstub = (n: string) => fs.readFileSync(appPath("bin", n), "utf-8");
     expect(binstub("trails")).toContain("tsx");
     expect(binstub("setup")).toContain("bin/trails");
-    expect(binstub("dev")).toContain("bin/trails");
+    expect(binstub("dev")).toContain('"trails"');
     // Rails' `exec "./bin/rails", "server", *ARGV` (`bin/dev.tt:1`) hands argv
     // to the process, so an argument with a space or a shell metacharacter
     // survives. A joined command string would not.
     for (const n of ["trails", "dev"]) {
       expect(binstub(n)).toContain("spawnSync");
       expect(binstub(n)).not.toContain('.join(" ")');
+      // `bin/` is run directly, where nothing puts node_modules/.bin on PATH,
+      // so both halves resolve from the binstub's own location.
+      expect(binstub(n)).toContain("fileURLToPath(import.meta.url)");
     }
+    expect(binstub("trails")).toContain('join(root, "node_modules", ".bin", "tsx")');
     const readme = fs.readFileSync(appPath("README.md"), "utf-8");
     expect(readme).not.toMatch(/^\| `trails /m);
   });
