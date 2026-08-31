@@ -136,6 +136,11 @@ export function forwardCredits(api: TsApi): Credit[] {
   return out;
 }
 
+const byPackage = (r: RubyCompatKey): string => r.package;
+const byExport = (r: RubyCompatKey): string => `${r.call} → ${r.tsExport}`;
+const byFile = (r: RubyCompatKey): string => `${r.package}/${r.tsFile}  ${r.rubyName}  ${r.call}`;
+const creditedExport = (c: Credit): string => c.tsExport;
+
 export function renderReport(artifact: Artifact, api: TsApi, top: number): string {
   const rows = reverseRows(artifact);
   const credits = forwardCredits(api);
@@ -143,23 +148,10 @@ export function renderReport(artifact: Artifact, api: TsApi, top: number): strin
   return [
     `ruby-compat call mapping report: ${rows.length} unconverged row(s) across ` +
       `${files} file(s); ${credits.length} call site(s) already credited`,
-    section(
-      "Reverse by package",
-      tally(rows, (r) => r.package),
-    ),
-    section(
-      "Reverse by export",
-      tally(rows, (r) => `${r.call} → ${r.tsExport}`),
-    ),
-    section(
-      "Reverse by file",
-      tally(rows, (r) => `${r.package}/${r.tsFile}  ${r.rubyName}  ${r.call}`),
-      top,
-    ),
-    section(
-      "Forward by export",
-      tally(credits, (c) => c.tsExport),
-    ),
+    section("Reverse by package", tally(rows, byPackage)),
+    section("Reverse by export", tally(rows, byExport)),
+    section("Reverse by file", tally(rows, byFile), top),
+    section("Forward by export", tally(credits, creditedExport)),
   ].join("\n");
 }
 
