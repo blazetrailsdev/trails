@@ -596,10 +596,8 @@ export function change(
   }
 
   // `elsif zone` (time/calculations.rb:172-175) — `::Time.local` in Ruby's
-  // reversed component order. Every receiver still here is a JS `Date`, whose
-  // `zone` is the system's and so never `nil`, and which has no `isdst`; the
-  // trailing `utc_offset` arm (time/calculations.rb:176-177) belongs to the
-  // `::Time` receiver, which this body delegated at its head.
+  // reversed component order, `isdst` picking the occurrence of a wall clock a
+  // DST fall-back repeats. A JS `Date` has no `isdst` and only milliseconds.
   const newTime = RubyTime.local(
     newSec,
     newMin,
