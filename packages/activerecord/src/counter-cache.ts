@@ -35,8 +35,8 @@ export async function updateCounters(
   const unscoped = this.unscoped();
   const primaryKey = this.primaryKey;
   const relation = Array.isArray(primaryKey)
-    ? (unscoped as any).where(primaryKey, id)
-    : (unscoped as any).whereBang({ [primaryKey]: id });
+    ? unscoped.where(primaryKey as never, id as never)
+    : unscoped.whereBang({ [primaryKey]: id });
   return relation.updateCounters(counters);
 }
 
@@ -112,7 +112,7 @@ export async function resetCounters(
     const unscoped = this.unscoped();
     const primaryKey = this.primaryKey;
     const relation = Array.isArray(primaryKey)
-      ? (unscoped as any).where(primaryKey, [object.id])
+      ? unscoped.where(primaryKey as never, [object.id] as never)
       : unscoped.where({ [primaryKey]: [object.id] });
     await relation.updateAll(updates);
   }

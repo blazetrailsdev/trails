@@ -345,10 +345,8 @@ export class Locator {
    * automatically as a BlockLocator).
    */
   static use(app: string, locator?: LocatorLike | LocatorBlock): void {
-    // Ruby takes the block separately (`&locator_block`) and asks
-    // `block_given?`; trails takes it in the `locator` position, so the block's
-    // presence is read off that one parameter and Rails' `locator ||
-    // block_given?` collapses to its absence.
+    // Ruby's block arrives as `&locator_block`; trails takes it in the
+    // `locator` position, so `locator || block_given?` is that parameter alone.
     const locatorBlock = typeof locator === "function" ? locator : undefined;
     if (locator == null) {
       throw new ArgumentError(
