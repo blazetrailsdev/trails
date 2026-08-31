@@ -263,9 +263,6 @@ export class Base extends Metal {
       this._pendingRender = { type: "template", options };
       return; // Will be handled by async processAction wrapper
     } else if ((this.constructor as typeof Base).lookupContext) {
-      // No render key given — render the current action's template through
-      // the view layer, the same path `action:` takes. This is what
-      // `ImplicitRender#default_render`'s bare `render` reaches.
       this._pendingRender = { type: "template", options };
       return;
     } else {

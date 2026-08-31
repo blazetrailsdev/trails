@@ -200,7 +200,7 @@ describe("Engine", () => {
   });
 
   describe("endpoint", () => {
-    it("defaults to the route set", () => {
+    it("it provides routes as default endpoint", () => {
       class DefaultEndpointEngine extends Engine {}
       Trailtie.register(DefaultEndpointEngine);
       const engine = DefaultEndpointEngine.instance();
@@ -215,7 +215,7 @@ describe("Engine", () => {
       expect(MountedEngine.instance().endpoint()).toBe(rack);
     });
 
-    it("terminates the middleware stack", async () => {
+    it("engine is a rack app and can have its own middleware stack", async () => {
       const stack = new MiddlewareStack();
       class Tagger {
         constructor(private app: (env: never) => Promise<[number, object, string[]]>) {}

@@ -136,10 +136,11 @@ export class RespondToMismatchError extends ActionControllerError {
 }
 
 export class MissingExactTemplate extends UnknownFormat {
-  readonly controller: string;
+  /** Rails: `attr_reader :controller` — the controller CLASS, not its name. */
+  readonly controller: { name: string };
   readonly actionName: string;
 
-  constructor(message: string, controller: string, actionName: string) {
+  constructor(message: string, controller: { name: string }, actionName: string) {
     super(message);
     this.name = "MissingExactTemplate";
     this.controller = controller;

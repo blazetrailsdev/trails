@@ -14,6 +14,7 @@ import { Response } from "../../action-dispatch/http/response.js";
 class ImplicitRenderTestController extends Base {
   async emptyAction(): Promise<void> {}
   async helloWorld(): Promise<void> {}
+  async variantWithImplicitTemplateRendering(): Promise<void> {}
 }
 
 function makeRequest(opts: Record<string, unknown> = {}): Request {
@@ -34,6 +35,7 @@ beforeAll(() => {
   ctx.addResolver(
     new FixtureResolver({
       "implicit_render_test/helloWorld.html.html": "Hello world!",
+      "implicit_render_test/variantWithImplicitTemplateRendering.html+mobile.html": "mobile",
     }),
   );
   ctx.setLayout(false);
@@ -56,6 +58,17 @@ describe("ImplicitRenderTest", () => {
       new Response(),
     );
     expect(c.status).toBe(204);
+  });
+});
+
+describe("RespondToControllerTest", () => {
+  it("variant not set regular unknown format", async () => {
+    const c = new ImplicitRenderTestController();
+    await expect(
+      c.dispatch("variantWithImplicitTemplateRendering", makeRequest(), new Response()),
+    ).rejects.toThrow(
+      /is missing a template for this request format and variant\.\n\nrequest\.formats: \[/,
+    );
   });
 });
 
