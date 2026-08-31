@@ -562,6 +562,9 @@ describe("body call capture", () => {
             return true;
           });
         }
+        expressionBodied(stack: { isDirty(): boolean }[]) {
+          return stack.every((t) => !t.isDirty());
+        }
         inverted(stack: { isDirty(): boolean }[]) {
           return stack.every((t) => t.isDirty());
         }
@@ -569,6 +572,8 @@ describe("body call capture", () => {
     );
     const restorable = cls.instanceMethods.find((m) => m.name === "restorable")!;
     expect(restorable.calls).toContain("!every");
+    const expressionBodied = cls.instanceMethods.find((m) => m.name === "expressionBodied")!;
+    expect(expressionBodied.calls).toContain("!every");
     const inverted = cls.instanceMethods.find((m) => m.name === "inverted")!;
     expect(inverted.calls).toContain("every");
     expect(inverted.calls).not.toContain("!every");
