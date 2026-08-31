@@ -828,7 +828,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._filename.slice(qIdx).includes("cache=shared");
   }
 
-  /** @missingRailsCall query_value — PERMANENT */
+  /** @missingRailsCall query_value — CONVERGEABLE sqlite-get-database-version-uses-query-value */
   override getDatabaseVersion(): Version | Promise<Version> {
     const driver = this.driver as SqliteConnection | undefined;
     if (!driver) return new Version("0.0.0");
