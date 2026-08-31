@@ -165,24 +165,9 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
 /**
  * Fold a description to its comparison key.
  *
- * SPACES ARE SIGNIFICANT, and deliberately so: the Ruby extractor derives a
- * `def test_x` case's description by `name.sub(/^test_/, "").tr("_", " ")`
- * (extract-ruby-tests.rb:514), so a leading or doubled underscore becomes a
- * leading or doubled space and is the ONLY thing telling two sibling tests
- * apart. `vendor/date/test/date/test_date_parse.rb` has five such pairs —
- * `test__parse` (:8) / `test_parse` (:214), and the same split on `_parse__2`,
- * `_iso8601`, `_xmlschema`, `_jisx0301`. Collapsing runs and trimming mapped
- * each pair onto one key, so the greedy matcher handed a single ported test to
- * whichever Ruby case came first in file order and charged it the other one's
- * assertion counts (PR #6661). Only whitespace that is not a space — a tab or
- * a newline inside a Ruby heredoc description — is folded to one.
- */
-/**
- * Fold a description to its comparison key.
- *
  * A LEADING space is significant, and deliberately so: the Ruby extractor
  * derives a `def test_x` case's description by
- * `name.sub(/^test_/, "").tr("_", " ")` (extract-ruby-tests.rb:514), so the
+ * `name.sub(/^test_/, "").tr("_", " ")` (extract-ruby-tests.rb:648), so the
  * doubled underscore of `test__parse` becomes a leading space and is the only
  * thing telling it apart from `test_parse` in the same file.
  * `vendor/date/test/date/test_date_parse.rb` has five such pairs — `test__parse`
@@ -689,6 +674,12 @@ export function main(args: string[] = process.argv.slice(2)) {
       const descIndex = lookup.fileDescIndex.get(conventionTs) || new Map();
       const pathAliasIndex = lookup.filePathAliasIndex.get(conventionTs) || new Map();
       const descAliasIndex = lookup.fileDescAliasIndex.get(conventionTs) || new Map();
+      const descCandidates = (nd: string, consumed: Set<number>): number[] | undefined => {
+        const exact = descIndex.get(nd) as number[] | undefined;
+        return exact !== undefined && exact.some((i) => !consumed.has(i))
+          ? exact
+          : (descAliasIndex.get(nd) as number[] | undefined);
+      };
       // Track which TS tests (by index) have been consumed
       const consumedTs = new Set<number>();
       // Track which Ruby tests (by index) have been matched
@@ -837,11 +828,7 @@ export function main(args: string[] = process.argv.slice(2)) {
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
-        const exact = descIndex.get(nd);
-        const candidates =
-          exact !== undefined && exact.some((i: number) => !consumedTs.has(i))
-            ? exact
-            : descAliasIndex.get(nd);
+        const candidates = descCandidates(nd, consumedTs);
         if (!candidates) continue;
 
         for (const idx of candidates) {
@@ -884,7 +871,7 @@ export function main(args: string[] = process.argv.slice(2)) {
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
-        const candidates = descIndex.get(nd);
+        const candidates = descCandidates(nd, consumedTs);
         let descIdx = -1;
         if (candidates) {
           let bestScore = -1;

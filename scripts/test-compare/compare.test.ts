@@ -201,7 +201,7 @@ describe("rejectsSiblingClassCandidate", () => {
 describe("normalize", () => {
   // `def test__parse__2` (vendor/date/test/date/test_date_parse.rb:477) and
   // `def test_parse__2` (:563) reach the comparer as " parse  2" and
-  // "parse  2" — extract-ruby-tests.rb:514 maps each underscore to a space.
+  // "parse  2" — extract-ruby-tests.rb:648 maps each underscore to a space.
   it("keeps a leading space, so a test__x / test_x pair stays two paths", () => {
     expect(normalize(" parse  2")).not.toBe(normalize("parse  2"));
     for (const name of ["parse", "parse  2", "iso8601", "xmlschema", "jisx0301"]) {
