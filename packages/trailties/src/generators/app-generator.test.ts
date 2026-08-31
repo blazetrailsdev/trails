@@ -169,6 +169,13 @@ describe("AppGenerator", () => {
     expect(binstub("trails")).toContain("tsx");
     expect(binstub("setup")).toContain("bin/trails");
     expect(binstub("dev")).toContain("bin/trails");
+    // Rails' `exec "./bin/rails", "server", *ARGV` (`bin/dev.tt:1`) hands argv
+    // to the process, so an argument with a space or a shell metacharacter
+    // survives. A joined command string would not.
+    for (const n of ["trails", "dev"]) {
+      expect(binstub(n)).toContain("spawnSync");
+      expect(binstub(n)).not.toContain('.join(" ")');
+    }
     const readme = fs.readFileSync(appPath("README.md"), "utf-8");
     expect(readme).not.toMatch(/^\| `trails /m);
   });

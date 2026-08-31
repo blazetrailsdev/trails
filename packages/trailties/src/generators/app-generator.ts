@@ -41,7 +41,8 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
  *
  * @noRailsEquivalent PERMANENT
  */
-const TRAILS = "tsx node_modules/@blazetrails/trailties/bin/trails.js";
+const TRAILS_ARGV = ["tsx", "node_modules/@blazetrails/trailties/bin/trails.js"];
+const TRAILS = TRAILS_ARGV.join(" ");
 
 export class AppGenerator extends AppBase {
   readonly packageManager: PackageManager;
@@ -366,9 +367,14 @@ export default defineConfig({
     this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
-execSync(["${TRAILS}", ...process.argv.slice(2)].join(" "), { stdio: "inherit" });
+const { status } = spawnSync(
+  "${TRAILS_ARGV[0]}",
+  ["${TRAILS_ARGV[1]}", ...process.argv.slice(2)],
+  { stdio: "inherit" },
+);
+process.exit(status ?? 1);
 `,
       { mode: 0o755 },
     );
@@ -405,9 +411,12 @@ console.log("\\n== Done! ==");
     this.createFile(
       "bin/dev",
       `#!/usr/bin/env node
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 
-execSync(["bin/trails", "server", ...process.argv.slice(2)].join(" "), { stdio: "inherit" });
+const { status } = spawnSync("bin/trails", ["server", ...process.argv.slice(2)], {
+  stdio: "inherit",
+});
+process.exit(status ?? 1);
 `,
       { mode: 0o755 },
     );
