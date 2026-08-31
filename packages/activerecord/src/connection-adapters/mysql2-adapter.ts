@@ -446,6 +446,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   executeBatch = mysql2ExecuteBatch;
 
   /** @internal */
+  lastInsertedId(result: Result): Promise<unknown> {
+    return mysql2LastInsertedId.call(this as never, result);
+  }
+
+  /** @internal */
   isMultiStatementsEnabled = mysql2IsMultiStatementsEnabled;
 
   /** @internal */
@@ -457,11 +462,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** @internal */
   affectedRows(rawResult: Mysql2RawResult): number {
     return mysql2AffectedRows.call(this as any, rawResult);
-  }
-
-  /** @internal */
-  lastInsertedId(result: Result): Promise<unknown> {
-    return mysql2LastInsertedId.call(this as never, result);
   }
 
   async execute(
