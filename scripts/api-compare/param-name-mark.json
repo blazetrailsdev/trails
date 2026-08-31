@@ -4,30 +4,27 @@
     "byFile": {}
   },
   "actioncontroller": {
-    "total": 11,
+    "total": 9,
     "byFile": {
       "base.rb": 1,
       "metal/allow_browser.rb": 1,
       "metal/flash.rb": 1,
-      "metal/logging.rb": 2,
       "metal/request_forgery_protection.rb": 3,
       "metal/strong_parameters.rb": 1,
       "template_assertions.rb": 2
     }
   },
   "actiondispatch": {
-    "total": 5,
+    "total": 2,
     "byFile": {
       "http/headers.rb": 1,
-      "http/request.rb": 1,
-      "middleware/stack.rb": 3
+      "http/request.rb": 1
     }
   },
   "actionview": {
-    "total": 3,
+    "total": 1,
     "byFile": {
-      "buffers.rb": 1,
-      "renderer/object_renderer.rb": 2
+      "buffers.rb": 1
     }
   },
   "activemodel": {

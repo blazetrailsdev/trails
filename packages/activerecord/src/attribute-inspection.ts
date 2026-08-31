@@ -2,12 +2,9 @@ import { inspect, ParameterFilter, TimeWithZone, toFs } from "@blazetrails/activ
 import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { Temporal } from "@blazetrails/date";
 
+/** @internal */
 export class InspectionMask {
-  private _value: string;
-
-  constructor(value: string = "[FILTERED]") {
-    this._value = value;
-  }
+  private _value: string = ParameterFilter.FILTERED;
 
   toString(): string {
     return this._value;

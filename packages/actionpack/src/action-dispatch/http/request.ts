@@ -8,6 +8,10 @@
 import { toSentence } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { parseNestedQuery, RACK_SESSION, Request as RackRequest } from "@blazetrails/rack";
+import {
+  _setActionDispatchRequest,
+  type ActionDispatchRequestConstructor,
+} from "@blazetrails/activesupport";
 import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import { Session } from "../request/session.js";
 import {
@@ -1225,3 +1229,5 @@ Request.prototype.formatFromPathExtension = function (this: Request) {
 Request.prototype.isParamsReadable = function (this: Request) {
   return _paramsReadable.call(mimeHost(this));
 };
+
+_setActionDispatchRequest(Request as unknown as ActionDispatchRequestConstructor);

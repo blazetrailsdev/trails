@@ -1945,6 +1945,7 @@ export class Base extends Model {
     this._associationCacheStore.clear();
   }
 
+  /** @missingRailsCall init_internals — CONVERGEABLE base-constructor-calls-init-internals-not-activemodel */
   constructor(attrs: Record<string, unknown> = {}, initBlock?: (record: Base) => void) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
     attrs ??= {};
@@ -3033,7 +3034,12 @@ _registerAssociationBuilderExtension(AssociationBuilder.extensions);
     options?: { lock?: boolean | string; unscoped?: boolean },
   ) => Promise<Base>;
   Object.defineProperty(Base.prototype, "reload", {
-    value: _autosaveReload(inheritedReload),
+    value: function (
+      this: Base,
+      options?: { lock?: boolean | string; unscoped?: boolean },
+    ): Promise<Base> {
+      return _autosaveReload.call(this, options, inheritedReload);
+    },
     writable: true,
     configurable: true,
   });

@@ -38,13 +38,15 @@ interface AutosaveAssociationHost {
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
 type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>;
 
-export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T> {
-  return function (this: T, options?: ReloadOptions): Promise<T> {
-    const record = this as unknown as AutosaveAssociationHost;
-    record._markedForDestruction = false;
-    record.destroyedByAssociation = null;
-    return inheritedReload.call(this, options);
-  };
+export function reload<T extends Base>(
+  this: T,
+  options: ReloadOptions | undefined,
+  superFn: ReloadFn<T>,
+): Promise<T> {
+  const record = this as unknown as AutosaveAssociationHost;
+  record._markedForDestruction = false;
+  record.destroyedByAssociation = null;
+  return superFn.call(this, options);
 }
 
 export const AutosaveAssociation = {

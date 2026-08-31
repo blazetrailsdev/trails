@@ -3,6 +3,15 @@ import { Base } from "./base.js";
 import { ShardSelector } from "./middleware/shard-selector.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { ambientPoolConfiguration } from "./test-adapter.js";
+import { _setActionDispatchRequest } from "@blazetrails/activesupport";
+
+class TestRequest {
+  readonly method: string;
+  constructor(env: Record<string, unknown>) {
+    this.method = env["REQUEST_METHOD"] as string;
+  }
+}
+_setActionDispatchRequest(TestRequest);
 
 describe("ShardSelectorTest", () => {
   afterEach(async () => {
@@ -28,7 +37,7 @@ describe("ShardSelectorTest", () => {
       () => "shard_one",
     );
     setupShards();
-    expect(await middleware.call({ method: "GET" })).toEqual([200, {}, ["body"]]);
+    expect(await middleware.call({ REQUEST_METHOD: "GET" })).toEqual([200, {}, ["body"]]);
   });
 
   it("middleware can turn off lock option", async () => {
@@ -41,7 +50,7 @@ describe("ShardSelectorTest", () => {
       { lock: false },
     );
     setupShards();
-    expect(await middleware.call({ method: "GET" })).toEqual([200, {}, ["body"]]);
+    expect(await middleware.call({ REQUEST_METHOD: "GET" })).toEqual([200, {}, ["body"]]);
   });
 
   it("middleware can change shards", async () => {
@@ -53,7 +62,7 @@ describe("ShardSelectorTest", () => {
       },
       () => "shard_one",
     );
-    expect(await middleware.call({ method: "GET" })).toEqual([200, {}, ["body"]]);
+    expect(await middleware.call({ REQUEST_METHOD: "GET" })).toEqual([200, {}, ["body"]]);
   });
 
   it("middleware can handle string shards", async () => {
@@ -65,6 +74,6 @@ describe("ShardSelectorTest", () => {
       },
       () => "shard_one",
     );
-    expect(await middleware.call({ method: "GET" })).toEqual([200, {}, ["body"]]);
+    expect(await middleware.call({ REQUEST_METHOD: "GET" })).toEqual([200, {}, ["body"]]);
   });
 });

@@ -22,6 +22,7 @@ import type { RouteHelpersMap } from "../action-dispatch/routing/route-helpers.j
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
+import { logAt } from "./metal/logging.js";
 import {
   contentSecurityPolicy,
   contentSecurityPolicyNonce,
@@ -558,6 +559,9 @@ export class Base extends Metal {
    * Mirrors Rails `rate_limit` class DSL.
    */
   static rateLimit = rateLimit;
+
+  /** Rails: `include Logging` (base.rb:302) — `log_at` (metal/logging.rb:17). */
+  static logAt = logAt;
 
   /**
    * Per-request enforcement. Private in Rails; exposed as a prototype

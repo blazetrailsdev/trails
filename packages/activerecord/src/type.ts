@@ -107,12 +107,9 @@ export function addModifier(
   registry().addModifier(options, klass, registrationOptions);
 }
 
-export function lookup(
-  symbol: string,
-  options?: { adapter?: string; [key: string]: unknown },
-): Type {
-  const adapter = options?.adapter ?? currentAdapterName();
-  return registry().lookup(symbol, { ...options, adapter });
+export function lookup(args: string, kwargs?: { adapter?: string; [key: string]: unknown }): Type {
+  const adapter = kwargs?.adapter ?? currentAdapterName();
+  return registry().lookup(args, { ...kwargs, adapter });
 }
 
 export function defaultValue(): Type {

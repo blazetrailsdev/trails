@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { currentPreventingWrites } from "./core.js";
 import { DatabaseSelector } from "./middleware/database-selector.js";
+import { _setActionDispatchRequest } from "@blazetrails/activesupport";
 import { Resolver, type ResolverContext } from "./middleware/database-selector/resolver.js";
 import { Session, type SessionStore } from "./middleware/database-selector/resolver/session.js";
 import { Temporal } from "@blazetrails/date";
@@ -17,6 +18,16 @@ function makeStore(data: Record<string, unknown> = {}): SessionStore {
     },
   };
 }
+
+class TestRequest {
+  readonly method: string;
+  readonly session: SessionStore;
+  constructor(env: Record<string, unknown>) {
+    this.method = env["REQUEST_METHOD"] as string;
+    this.session = env["rack.session"] as SessionStore;
+  }
+}
+_setActionDispatchRequest(TestRequest);
 
 function isWriting() {
   return Base.connectedToQ({ role: "writing" });
@@ -223,7 +234,7 @@ describe("DatabaseSelectorTest", () => {
       expect(isWriting()).toBe(true);
       return {};
     });
-    await mw.call({ method: "POST", session: makeStore() });
+    await mw.call({ REQUEST_METHOD: "POST", "rack.session": makeStore() });
   });
 
   it("the middleware chooses reading role with GET request", async () => {
@@ -231,7 +242,7 @@ describe("DatabaseSelectorTest", () => {
       expect(isReading()).toBe(true);
       return {};
     });
-    await mw.call({ method: "GET", session: makeStore() });
+    await mw.call({ REQUEST_METHOD: "GET", "rack.session": makeStore() });
   });
 
   it("the middleware chooses reading role with POST request if resolver tells it to", async () => {
@@ -247,6 +258,6 @@ describe("DatabaseSelectorTest", () => {
       expect(isReading()).toBe(true);
       return {};
     }, ReadonlyResolver);
-    await mw.call({ method: "POST", session: makeStore() });
+    await mw.call({ REQUEST_METHOD: "POST", "rack.session": makeStore() });
   });
 });

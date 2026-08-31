@@ -1,5 +1,5 @@
 import { Base } from "../base.js";
-import { Notifications } from "@blazetrails/activesupport";
+import { Notifications, _ActionDispatchRequest } from "@blazetrails/activesupport";
 
 export interface ShardRequest {
   method: string;
@@ -12,10 +12,10 @@ export class ShardSelector {
   readonly resolver: ShardResolverFn;
   readonly options: { lock?: boolean };
 
-  private readonly app: (request: ShardRequest) => Promise<unknown>;
+  private readonly app: (env: Record<string, unknown>) => Promise<unknown>;
 
   constructor(
-    app: (request: ShardRequest) => Promise<unknown>,
+    app: (env: Record<string, unknown>) => Promise<unknown>,
     resolver: ShardResolverFn,
     options: { lock?: boolean } = {},
   ) {
@@ -24,20 +24,12 @@ export class ShardSelector {
     this.options = options;
   }
 
-  /**
-   * @missingRailsCall new — CONVERGEABLE: `ActionDispatch::Request.new(env)`
-   *   (`shard_selector.rb:41`) wraps the rack env before the resolver sees it.
-   *   `ActionDispatch::Request` lives in `@blazetrails/actionpack`, so `call()` is handed the
-   *   request object itself and constructs nothing. Ruby resolves the constant
-   *   when `call` runs, so activerecord takes no load-time dependency on
-   *   actionpack — `activerecord.gemspec` declares no actionpack dependency. An
-   *   ESM `import` is eager, so naming the constant here would make actionpack a
-   *   hard dependency of activerecord that Rails does not have. Convergeable once
-   *   the constant can be reached at call time (RFC 0106).
-   */
-  async call(request: ShardRequest): Promise<unknown> {
+  async call(env: Record<string, unknown>): Promise<unknown> {
+    const request = new _ActionDispatchRequest!(env) as ShardRequest;
+
     const shard = this.selectedShard(request);
-    return this.setShard(shard, () => this.app(request));
+
+    return this.setShard(shard, () => this.app(env));
   }
 
   /**
