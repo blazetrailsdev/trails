@@ -256,13 +256,14 @@ export class Rational {
  * sites across activesupport and activerecord — and it is NOT an Integer fold:
  * on ruby 3.3.11 `Rational(6, 1)` is `(6/1)` and its class is `Rational`.
  *
+ * A Rational numerator is NOT canonicalized against the denominator:
+ * `nurat_convert` (`vendor/ruby/rational.c:2621`) returns it unchanged for an
+ * exact-one denominator, and otherwise leaves the canonicalizer for `f_div`
+ * (`vendor/ruby/rational.c:2668`), so `Rational(r, 1000000)` is a division.
+ *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Rational()`, which Rails
  * calls and does not define. */
 export function rational(numv: number | bigint | Rational, denv: number | bigint = 1): Rational {
-  /* `nurat_convert` (`vendor/ruby/rational.c:2621`) returns a Rational numerator
-     unchanged when the denominator is an exact one, and otherwise leaves the
-     canonicalizer for `f_div` (`:2668`) — so `Rational(r, 1000000)` is a
-     division, not a numerator/denominator pair. */
   if (numv instanceof Rational) {
     return denv === 1 || denv === 1n ? numv : numv.quo(denv);
   }

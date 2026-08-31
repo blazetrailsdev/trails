@@ -210,7 +210,9 @@ export function except<T>(hash: Record<string, T>, ...keys: string[]): Record<st
  * the same pairs in the same order, carrying the receiver's `default` /
  * `default_proc` over — `hash_dup` passes `RHASH_IFNONE(hash)` and the
  * `RHASH_PROC_DEFAULT` flag through to the allocation, which a plain object
- * spread has nowhere to put.
+ * spread has nowhere to put. The flag is what decides which of the two seats
+ * the value lands in, so the port reads the receiver's seat rather than
+ * testing the value's type.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/object.c:591`).
  */
 export function dup<K, V>(hash: Hash<K, V>): Hash<K, V>;
@@ -229,9 +231,6 @@ export function dup(
   if (!(hash instanceof Hash)) return { ...hash };
   const ret = new Hash<unknown, unknown>();
   const defaultProc = hash.defaultProc();
-  /* `hash_dup` (`vendor/ruby/hash.c:1577`) passes `RHASH_IFNONE(hash)` and the
-     `RHASH_PROC_DEFAULT` flag separately, so which seat the value lands in is
-     the receiver's flag — not a typeof test on the value. */
   if (defaultProc) ret.setDefaultProc(defaultProc);
   else ret.setDefault(hash.default());
   for (const [key, value] of hash) {

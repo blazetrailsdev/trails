@@ -56,9 +56,13 @@ interface CmpSpelling {
  * `nil` for an operand it cannot place, which includes `Float::NAN`, a
  * cross-type operand, and `rb_obj_cmp`'s unequal arm.
  *
- * @boundary: a Temporal value has neither `<=>` spelling nor a JS ordering, so
- * it reaches `rb_obj_cmp`; `calculations.ts`'s `compare` — the one caller that
- * orders Temporal receivers — hands over each side's epoch reading instead.
+ * @boundary: a Temporal value carrying an instant is trails' seat for a Ruby
+ * `Time`, whose `<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by that
+ * instant, so it is ordered on `epochNanoseconds` — read off the value rather
+ * than through `@blazetrails/date`, which this package does not depend on. A
+ * Temporal value carrying no instant still reaches `rb_obj_cmp`;
+ * `calculations.ts`'s `compare` — the one caller that orders those — hands
+ * over each side's epoch reading instead.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — the `<=>` send it is defined over
  * (`vendor/ruby/compar.c:315`), which Rails inherits rather than defines.
@@ -70,10 +74,6 @@ export function cmp(a: unknown, b: unknown): number | null {
   // boundary: Date endpoints are compared as epoch millis.
   if (a instanceof Date) a = a.getTime();
   if (b instanceof Date) b = b.getTime();
-  /* boundary: a Temporal value carrying an instant is trails' seat for a Ruby
-     `Time`, whose `<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by that
-     instant. Read off `epochNanoseconds` rather than importing
-     `@blazetrails/date`, which this package does not depend on. */
   if (hasEpochNanoseconds(a) && hasEpochNanoseconds(b)) {
     const x = a.epochNanoseconds;
     const y = b.epochNanoseconds;

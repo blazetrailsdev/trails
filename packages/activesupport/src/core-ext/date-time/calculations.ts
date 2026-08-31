@@ -319,9 +319,6 @@ export function localtime(datetime: DateTime, utcOffset: number | string | null 
     utc.day,
     utc.hour,
     utc.min,
-    // `utc.sec + utc.sec_fraction` (`date_time/calculations.rb:173`) is a plain
-    // Integer + Rational sum, not a `Rational()` call: the C constructor is
-    // what gives the Integer term an exact seat to be added in.
     new Rational(utc.sec, 1).add(utc.secFraction),
   ).getlocal(utcOffset);
 }
@@ -343,9 +340,6 @@ export function utc(datetime: DateTime): Time {
     utc.day,
     utc.hour,
     utc.min,
-    // `utc.sec + utc.sec_fraction` (`date_time/calculations.rb:189`) is a plain
-    // Integer + Rational sum, not a `Rational()` call: the C constructor is
-    // what gives the Integer term an exact seat to be added in.
     new Rational(utc.sec, 1).add(utc.secFraction),
   );
 }
