@@ -4,13 +4,14 @@ import { Route } from "../routing/route.js";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import type { Request } from "../http/request.js";
+import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 
 // ==========================================================================
 // Journey::Route tests (journey/route_test.rb)
 // ==========================================================================
 /** Echoes the matched `path_parameters` back as JSON. */
-class echoParamsController {
+class EchoParamsController {
   static makeResponseBang(request: Request): Response {
     const res = new Response();
     res.request = request;
@@ -516,7 +517,10 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
     });
-    routes.registerController("posts", echoParamsController as never);
+    routes.registerController(
+      "posts",
+      EchoParamsController as unknown as DispatchableControllerClass,
+    );
     const [status, , body] = await routes.call({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/7",

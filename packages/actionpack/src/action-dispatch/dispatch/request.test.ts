@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Request, PassNotFound, controllerConstants } from "../request.js";
+import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import { MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
@@ -832,7 +833,7 @@ describe("RequestControllerClass", () => {
 
   it("controllerClassFor resolves the registered controller constant", () => {
     class PostsController {}
-    controllerConstants.set("posts", PostsController as never);
+    controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
     try {
       expect(new Request({}).controllerClassFor("posts")).toBe(PostsController);
     } finally {

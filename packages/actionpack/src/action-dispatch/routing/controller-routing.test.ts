@@ -3,6 +3,7 @@ import { RouteSet } from "./route-set.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
 import type { Request } from "../http/request.js";
+import type { DispatchableControllerClass } from "./dispatcher.js";
 
 // ==========================================================================
 // Controller routing integration tests
@@ -10,7 +11,7 @@ import type { Request } from "../http/request.js";
 let capturedEnv: RackEnv = {};
 
 /** Hands the dispatching request's Rack env back to the test. */
-class captureEnvController {
+class CaptureEnvController {
   static makeResponseBang(request: Request): Response {
     const res = new Response();
     res.request = request;
@@ -235,7 +236,10 @@ describe("Controller routing integration", () => {
 
   it("call sets path parameters in env", async () => {
     const routes = new RouteSet();
-    routes.registerController("posts", captureEnvController as never);
+    routes.registerController(
+      "posts",
+      CaptureEnvController as unknown as DispatchableControllerClass,
+    );
     routes.draw((map) => {
       map.get("/posts/:id", { to: "posts#show" });
     });

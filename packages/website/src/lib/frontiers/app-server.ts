@@ -8,6 +8,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { RouteSet, ActionController } from "@blazetrails/actionpack";
+import type { DispatchableControllerClass } from "@blazetrails/actionpack";
 
 export interface AppServerDeps {
   executeCode: (code: string) => Promise<unknown>;
@@ -20,7 +21,8 @@ export interface AppServer {
   drawRoutes: (fn: (r: any) => void) => void;
 }
 
-type ControllerClass = new () => InstanceType<typeof ActionController.Base>;
+type ControllerClass = DispatchableControllerClass &
+  (new () => InstanceType<typeof ActionController.Base>);
 
 export function createAppServer(_deps: AppServerDeps): AppServer {
   const routeSet = new RouteSet();
@@ -41,7 +43,7 @@ export function createAppServer(_deps: AppServerDeps): AppServer {
     },
 
     registerController(name: string, controllerClass: ControllerClass) {
-      routeSet.registerController(name, controllerClass as never);
+      routeSet.registerController(name, controllerClass);
     },
 
     drawRoutes(fn: (r: any) => void) {

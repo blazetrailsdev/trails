@@ -18,7 +18,7 @@ function makeReq(path: string, method = "GET"): RouterRequest {
   return req;
 }
 
-function controllerClass(
+function makeControllerClass(
   body: (action: string, req: RouterRequest) => [number, Record<string, string>, string[]],
 ): DispatchableControllerClass {
   return class {
@@ -45,7 +45,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
     const calls: Array<{ action: string; id: string }> = [];
     routes.registerController(
       "posts",
-      controllerClass((action, req) => {
+      makeControllerClass((action, req) => {
         const params = req.pathParameters as Record<string, string>;
         calls.push({ action, id: params["id"] });
         return [200, { "content-type": "text/plain" }, ["ok"]];
@@ -71,7 +71,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
     routes.draw((r) => r.get("/posts", { to: "posts#index" }));
     routes.registerController(
       "posts",
-      controllerClass(() => [200, {}, []]),
+      makeControllerClass(() => [200, {}, []]),
     );
 
     const res = await routes.serve(makeReq("/nope"));
@@ -88,11 +88,11 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
 
     routes.registerController(
       "first",
-      controllerClass(() => [404, { "x-cascade": "pass" }, []]),
+      makeControllerClass(() => [404, { "x-cascade": "pass" }, []]),
     );
     routes.registerController(
       "second",
-      controllerClass(() => [200, {}, ["second"]]),
+      makeControllerClass(() => [200, {}, ["second"]]),
     );
 
     const res = await routes.serve(makeReq("/x"));
@@ -103,7 +103,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
     const routes = new RouteSet();
     routes.registerController(
       "posts",
-      controllerClass(() => [200, {}, []]),
+      makeControllerClass(() => [200, {}, []]),
     );
     expect(routes.dispatcherRegistry.has("posts")).toBe(true);
     routes.clear();
@@ -127,7 +127,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
   it("StaticDispatcher dispatches its bound handler regardless of params[:controller]", async () => {
     const calls: string[] = [];
     const d = new StaticDispatcher(
-      controllerClass((action) => {
+      makeControllerClass((action) => {
         calls.push(action);
         return [200, {}, []];
       }),
@@ -143,7 +143,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
     routes.draw((r) => r.get("/p", { to: "posts#index" }));
     routes.registerController(
       "posts",
-      controllerClass(() => [200, {}, []]),
+      makeControllerClass(() => [200, {}, []]),
     );
     routes.dispatcherRegistry.unregister("posts");
     const res = await routes.serve(makeReq("/p"));
@@ -168,7 +168,7 @@ describe("Dispatcher over the controller constant table", () => {
   }
 
   beforeEach(() => {
-    controllerConstants.set("posts", PostsController as never);
+    controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
   });
   afterEach(() => {
     controllerConstants.delete("posts");
