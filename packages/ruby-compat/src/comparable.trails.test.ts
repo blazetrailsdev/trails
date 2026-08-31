@@ -23,12 +23,9 @@ describe("<=>", () => {
     expect(cmp(new Date(1), 1)).toBe(0);
   });
 
-  it("returns nil for nil against a value and 0 for nil against nil", () => {
+  it("returns nil for an unrelated object, as Object#<=> does", () => {
     expect(cmp(null, 0)).toBeNull();
     expect(cmp(null, null)).toBe(0);
-  });
-
-  it("returns nil for an unrelated object, as Object#<=> does", () => {
     expect(cmp({ a: 1 }, { a: 2 })).toBeNull();
     expect(cmp({ a: 1 }, { a: 1 })).toBe(0);
   });
@@ -85,15 +82,9 @@ describe("Comparable", () => {
     expect(() => new Sign(1).lessThan(1n << 70n)).toThrow("comparison of Sign with Integer failed");
   });
 
-  it("answers false rather than raising for ==", () => {
+  it("answers false rather than raising for ==, and true for an identical object", () => {
     expect(new Sign(1).equals("x")).toBe(false);
-  });
-
-  it("answers true for an identical object before sending <=>", () => {
-    const incomparable = {
-      compareTo: () => null,
-      equals,
-    };
+    const incomparable = { compareTo: () => null, equals };
     expect(incomparable.equals(incomparable)).toBe(true);
   });
 });

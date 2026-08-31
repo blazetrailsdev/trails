@@ -1,16 +1,15 @@
 /**
  * Ruby's core `Comparable` module (`vendor/ruby/compar.c:313`
- * `Init_Comparable`) and the `<=>` send every one of its members is derived
- * from. JS has no `<=>` and no module to include, so both halves live here:
- * {@link cmp} is the send, and the derived operators are `this`-typed functions
- * a class assigns to itself (CLAUDE.md "Module mixins" — `include()` is
- * ActiveSupport's, and this package takes no workspace dependencies).
+ * `Init_Comparable`) and the `<=>` send its members derive from. JS has no
+ * `<=>` and no module to include, so both halves live here: {@link cmp} is the
+ * send, and the derived operators are `this`-typed functions a class assigns to
+ * itself (CLAUDE.md "Module mixins" — `include()` is ActiveSupport's, and this
+ * package takes no workspace dependencies).
  *
  * The nullable return is the point: Ruby's `<=>` answers **nil** for an operand
- * it cannot place (`Float::NAN <=> 0`, `Object#<=>` on an unrelated object),
- * and a `cmp` typed `number` silently loses that arm. Every derived operator
- * goes through {@link cmpint}, which turns that nil into `rb_cmperr`'s
- * `ArgumentError`; `equals` is the one that does not raise.
+ * it cannot place, and a `cmp` typed `number` silently loses that arm. Every
+ * derived operator goes through {@link cmpint}, which turns that nil into
+ * `rb_cmperr`'s `ArgumentError`; `equals` is the one that does not raise.
  *
  * @boundary-file: a JS `Date` is compared as epoch millis, since Ruby's
  *  `Time#<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by the instant and

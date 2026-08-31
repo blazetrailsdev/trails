@@ -23,15 +23,9 @@ describe("Hash#fetch", () => {
   });
 
   it("raises KeyError with the quoted key when no default is given", () => {
+    expect(() => fetch({}, "expression")).toThrow(KeyError);
     expect(() => fetch({}, "expression")).toThrow('key not found: "expression"');
-  });
-
-  it("raises KeyError keeping a Symbol key's colon", () => {
     expect(() => fetch({}, ":expression")).toThrow("key not found: :expression");
-  });
-
-  it("raises a KeyError, not a plain Error", () => {
-    expect(() => fetch({}, "k")).toThrow(KeyError);
   });
 
   it("ellipsizes a description past 65 characters, as rb_str_ellipsize does", () => {
@@ -40,11 +34,8 @@ describe("Hash#fetch", () => {
 });
 
 describe("Hash#key?", () => {
-  it("is true for a stored null", () => {
+  it("is true for a stored null and false for an absent key", () => {
     expect(hasKey({ offset: null }, "offset")).toBe(true);
-  });
-
-  it("is false for an absent key", () => {
     expect(hasKey({}, "offset")).toBe(false);
   });
 });
