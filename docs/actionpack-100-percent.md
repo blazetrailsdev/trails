@@ -599,7 +599,6 @@ lives in **CLAUDE.md** — start there. actionpack-specific notes only:
   Rails dups env (`env.dup`).
 - **`Static`** rejects `..` escapes upfront; Rails collapses and lets the
   filesystem miss.
-- **`Mapper#draw(string)`** throws — Ruby file-load form not supported.
 - **`mount`** only accepts kwarg form `mount(SomeApp, { at: "/path" })`;
   Rails' hash form deferred to S9.
 - **`asJson` keys `stdparam_states` by `re.source`** for symmetry with
