@@ -79,6 +79,7 @@ export class Aes256Gcm {
       cipher.iv = toBytes(iv);
 
       cipher.authTag = authTagBuf;
+      cipher.authData = "";
 
       const encryptedData = toBytes(encryptedMessage.payload);
       const decryptedData =

@@ -138,6 +138,11 @@ export class Request {
     return key in this.env;
   }
 
+  /** Mirrors: `Rack::Request::Env#get_header` (`rack/request.rb:100-102`). */
+  getHeader(name: string): any {
+    return this.env[name];
+  }
+
   get(key: string, defaultValue?: any): any {
     if (key in this.env) return this.env[key];
     if (typeof defaultValue === "function") return defaultValue();

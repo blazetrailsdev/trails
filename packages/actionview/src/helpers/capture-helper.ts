@@ -26,7 +26,7 @@ export function capture<TArgs extends unknown[]>(
   let value: unknown = null;
   if (!this.outputBuffer) this.outputBuffer = new OutputBuffer();
   const buf = this.outputBuffer;
-  const buffer = buf.capture(() => {
+  const buffer = buf.capture([], () => {
     value = block(...args);
   });
 

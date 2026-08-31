@@ -122,7 +122,7 @@ describe("OutputBuffer", () => {
 
   it("capture swaps the buffer and restores it", () => {
     const buf = new OutputBuffer("before-");
-    const captured = buf.capture(() => {
+    const captured = buf.capture([], () => {
       buf.append("inside");
     });
     expect(captured.toString()).toBe("inside");
@@ -133,7 +133,7 @@ describe("OutputBuffer", () => {
   it("capture restores the buffer when the callback throws", () => {
     const buf = new OutputBuffer("kept");
     expect(() =>
-      buf.capture(() => {
+      buf.capture([], () => {
         buf.append("lost");
         throw new Error("boom");
       }),

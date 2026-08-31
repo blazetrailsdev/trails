@@ -1,11 +1,15 @@
-import {
-  REQUEST_METHOD,
-  RACK_METHODOVERRIDE_ORIGINAL_METHOD,
-  RACK_ERRORS,
-  RACK_INPUT,
-} from "./constants.js";
+import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
-import { parseNestedQuery } from "./utils.js";
+import { Request } from "./request.js";
+
+/** `rack.errors` is a Ruby IO in Rails; trails sees `puts` or `write` sinks. */
+function putsError(errors: any, message: string): void {
+  if (errors && typeof errors.puts === "function") {
+    errors.puts(message);
+  } else if (errors && typeof errors.write === "function") {
+    errors.write(message + "\n");
+  }
+}
 
 const METHOD_OVERRIDE_PARAM_KEY = "_method";
 const HTTP_METHOD_OVERRIDE_HEADER = "HTTP_X_HTTP_METHOD_OVERRIDE";
@@ -36,69 +40,31 @@ export class MethodOverride {
   }
 
   private methodOverride(env: Record<string, any>): string | null {
-    const method = this.methodOverrideParam(env) || env[HTTP_METHOD_OVERRIDE_HEADER] || null;
+    const req = new Request(env);
+    const method = this.methodOverrideParam(req) || env[HTTP_METHOD_OVERRIDE_HEADER] || null;
     if (method) {
       try {
         return method.toString().toUpperCase();
       } catch {
-        const errors = env[RACK_ERRORS];
-        if (errors && typeof errors.puts === "function") {
-          errors.puts("Invalid string for method");
-        } else if (errors && typeof errors.write === "function") {
-          errors.write("Invalid string for method\n");
-        }
+        putsError(env[RACK_ERRORS], "Invalid string for method");
         return null;
       }
     }
     return null;
   }
 
-  private methodOverrideParam(env: Record<string, any>): string | null {
-    const contentType = env["CONTENT_TYPE"] || "";
-    const isFormData = contentType.includes("application/x-www-form-urlencoded");
-    const isMultipart = contentType.includes("multipart/form-data");
-
-    if (!isFormData && !isMultipart) return null;
-
+  private methodOverrideParam(req: Request): string | null {
     try {
-      const input = env[RACK_INPUT];
-      if (!input) return null;
-      const body =
-        typeof input.read === "function" ? input.read() : typeof input === "string" ? input : "";
-      if (typeof body !== "string") return null;
-
-      if (isMultipart) {
-        // For multipart, we don't parse it here — just check for EOFError-like issues
-        // Ruby raises EOFError for truncated multipart, we simulate by checking
-        const boundary = contentType.match(/boundary=([^\s;]+)/)?.[1];
-        if (boundary && !body.includes(`--${boundary}--`)) {
-          const errors = env[RACK_ERRORS];
-          if (errors && typeof errors.puts === "function") {
-            errors.puts("Bad request content body");
-          } else if (errors && typeof errors.write === "function") {
-            errors.write("Bad request content body\n");
-          }
-          return null;
-        }
-        // Try to parse multipart params - simplified, just look for _method
-        return null;
+      if (req.formData || req.isParseableData()) {
+        return req.POST[METHOD_OVERRIDE_PARAM_KEY] ?? null;
       }
-
-      // URL-encoded form data
-      const params = parseNestedQuery(body);
-      return params[METHOD_OVERRIDE_PARAM_KEY] || null;
+      return null;
     } catch (e: any) {
-      const errors = env[RACK_ERRORS];
-      const msg = e.message?.includes("too deep")
-        ? "Invalid or incomplete POST params"
-        : e.message?.includes("Invalid")
+      const message =
+        e instanceof RangeError || /too deep|Invalid/.test(String(e?.message))
           ? "Invalid or incomplete POST params"
           : "Bad request content body";
-      if (errors && typeof errors.puts === "function") {
-        errors.puts(msg);
-      } else if (errors && typeof errors.write === "function") {
-        errors.write(msg + "\n");
-      }
+      putsError(req.getHeader(RACK_ERRORS), message);
       return null;
     }
   }

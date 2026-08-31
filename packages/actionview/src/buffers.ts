@@ -90,9 +90,11 @@ export class OutputBuffer {
 
   /**
    * Capture — swaps the buffer for the duration of `fn`, returns what was
-   * appended as an HTML-safe string. Mirrors Rails `capture(*args, &block)`.
+   * appended as an HTML-safe string. Mirrors Rails `capture(*args, &block)`;
+   * Ruby's splat is an array because TypeScript cannot follow a rest parameter
+   * with the block.
    */
-  capture<TArgs extends unknown[]>(fn: (...args: TArgs) => void, ...args: TArgs): SafeBuffer {
+  capture<TArgs extends unknown[]>(args: TArgs, fn: (...args: TArgs) => void): SafeBuffer {
     const saved = this._raw;
     this._raw = "";
     try {

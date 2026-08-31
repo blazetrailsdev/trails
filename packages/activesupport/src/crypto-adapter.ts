@@ -17,6 +17,7 @@ export interface DecipherAdapter {
   update(data: Uint8Array): Uint8Array;
   final(outputEncoding: string): string;
   final(): Uint8Array;
+  setAAD?(buffer: Uint8Array): this;
   setAuthTag?(tag: Uint8Array): void;
 }
 
@@ -134,6 +135,15 @@ export class Cipher {
       throw new Error("Crypto adapter does not support GCM auth tags (getAuthTag)");
     }
     return Buffer.from(impl.getAuthTag());
+  }
+
+  /** Mirrors: `OpenSSL::Cipher#auth_data=` — Node spells it `setAAD`. */
+  set authData(data: Uint8Array | string) {
+    const impl = this.started();
+    if (!impl.setAAD) {
+      throw new Error("Crypto adapter does not support AEAD auth data (setAAD)");
+    }
+    impl.setAAD(typeof data === "string" ? Buffer.from(data, "utf8") : data);
   }
 
   update(data: Uint8Array): Buffer {
