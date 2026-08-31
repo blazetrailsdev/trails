@@ -91,3 +91,12 @@ export type {
   CycleOptions,
   TextHelperHost,
 } from "./text-helper.js";
+
+export {
+  assignController,
+  logger,
+  installControllerDelegates,
+  installControllerInternals,
+  CONTROLLER_DELEGATES,
+} from "./controller-helper.js";
+export type { ControllerHelperHost } from "./controller-helper.js";

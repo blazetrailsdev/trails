@@ -11,6 +11,9 @@
  *   TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
  */
 
+import type { Base } from "../base.js";
+import type { Template } from "../template.js";
+
 /**
  * The rendering context passed to handlers.
  */
@@ -26,15 +29,24 @@ export interface RenderContext {
   /** The full template path for error reporting */
   templatePath?: string;
   /**
-   * Synchronous nested-partial renderer, supplied by whoever owns the
-   * resolvers. Rails hands the template its view — an `ActionView::Base` that
-   * answers `render` itself — so a nested `render partial:` needs nothing
-   * threaded through. A trails handler is given only source + locals, so the
-   * capability arrives on the context until the view object lands.
+   * The `ActionView::Base` the template is compiled into and rendered
+   * against. Rails' handler protocol has no such field because `Template#render`
+   * receives the view directly (`template.rb:271`) and hands it to `_run`;
+   * trails' handler is called with source + locals, so the view rides along on
+   * the context.
    *
-   * @noRailsEquivalent CONVERGEABLE helper-methods-not-in-tse-scope
+   * @noRailsEquivalent CONVERGEABLE template-render-takes-view-before-locals
    */
-  renderPartial?(name: string, locals: Record<string, unknown>): string;
+  view?: Base;
+  /**
+   * The `Template` being rendered. Rails' `Template#render` (`template.rb:271`)
+   * passes `self` straight to `view._run`, so nothing has to carry it; a trails
+   * handler is called with source + locals, so it rides on the context beside
+   * the view.
+   *
+   * @noRailsEquivalent CONVERGEABLE template-render-takes-view-before-locals
+   */
+  template?: Template;
 }
 
 /**
