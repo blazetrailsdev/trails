@@ -136,19 +136,17 @@ export class Metal extends AbstractController {
    * Returns a Rack endpoint for the given action name — mirrors
    * `ActionController::Metal.action` (`action_controller/metal.rb:315-327`).
    */
-  static action(this: typeof Metal, name: string): any {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const Klass = this;
-    const app = async (env: Record<string, unknown>) => {
+  static action(this: typeof Metal, name: string): RackApp {
+    const app: RackApp = async (env: RackEnv) => {
       const req = new Request(env);
-      const res = Klass.makeResponseBang(req);
-      const controller = new Klass();
+      const res = this.makeResponseBang(req);
+      const controller = new this();
       await controller.dispatch(name, req, res);
       return controller.toRackResponse();
     };
 
-    if (this.middleware().any()) {
-      return this.middleware().build(name, app as unknown as RackApp);
+    if (this.middleware().isAny()) {
+      return this.middleware().build(name, app);
     } else {
       return app;
     }
@@ -165,26 +163,17 @@ export class Metal extends AbstractController {
     req: Request,
     res: Response,
   ): Promise<RackResponse> {
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const Klass = this;
-    if (this.middleware().any()) {
+    if (this.middleware().isAny()) {
       return await this.middleware().build(name, async () => {
-        const controller = new Klass();
+        const controller = new this();
         await controller.dispatch(name, req, res);
         return controller.toRackResponse();
       })(req.env);
     } else {
-      const controller = new Klass();
+      const controller = new this();
       await controller.dispatch(name, req, res);
       return controller.toRackResponse();
     }
-  }
-
-  static build(
-    action: string,
-    app?: (env: Record<string, unknown>) => Promise<Response>,
-  ): (env: Record<string, unknown>) => Promise<Response> {
-    return app ?? this.action(action);
   }
 
   controllerPath(): string {

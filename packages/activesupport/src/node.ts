@@ -13,8 +13,6 @@
  *
  * Rails has no counterpart: `require` is uniform there, so there is no
  * split between a sync and an async load path.
- *
- * @noRailsEquivalent PERMANENT
  */
 import { getChildProcessAsync } from "./child-process-adapter.js";
 import { getCryptoAsync } from "./crypto-adapter.js";

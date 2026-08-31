@@ -27,15 +27,16 @@ const DEFAULT_DISTANCE_IN_WORDS: Record<string, { one: string; other: string } |
   almost_x_years: { one: "almost 1 year", other: "almost %{count} years" },
 };
 
+/**
+ * The `{ epochMilliseconds }` arm is the `Temporal.Instant` ActiveRecord
+ * returns for a datetime column. Rails has no seam here — an AR datetime is
+ * an `ActiveSupport::TimeWithZone`, which `to_time` normalizes.
+ */
 export type DistanceOfTimeInput =
   | Date
   | number
   | { toDate: () => Date }
   | { toTime: () => Date }
-  // ActiveRecord reads a datetime column back as a `Temporal.Instant`, which
-  // answers neither `toDate` nor `toTime`. Rails has no seam here — an AR
-  // datetime is an `ActiveSupport::TimeWithZone` and `to_time` is defined on
-  // it — so the normalizer grows the arm the Ruby `to_time` covers.
   | { epochMilliseconds: number };
 
 export interface DistanceOfTimeOptions {

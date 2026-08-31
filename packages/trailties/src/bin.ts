@@ -5,10 +5,6 @@ import { argv, cwd } from "@blazetrails/activesupport/process-adapter";
 import { setAppPath } from "./app-path.js";
 import { createProgram } from "./cli.js";
 
-// Rails' `bin/rails` line `APP_PATH = File.expand_path("../config/application", __dir__)`.
-// A trails app ships TypeScript sources and a compiled `dist/`, so the entry
-// point picks the spelling — `require_application!` then names one path, the
-// way `Rails::Command::Actions` does.
 const root = cwd();
 const fs = await getFsAsync();
 const p = await getPathAsync();

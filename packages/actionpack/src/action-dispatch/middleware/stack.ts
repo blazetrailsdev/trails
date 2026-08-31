@@ -69,7 +69,7 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
   }
 
   /** `Enumerable#any?` over the stack — `middleware_stack.any?` at `metal.rb:322, :332`. */
-  any(): boolean {
+  isAny(): boolean {
     return this.entries.length > 0;
   }
 

@@ -114,6 +114,12 @@ export class MockRequest {
     }
   }
 
+  /**
+   * Mirrors `Rack::MockRequest.env_for` (`rack/lib/rack/mock_request.rb:98-158`).
+   * Its trailing `opts.each { |field, value| env[field] = value if String === field }`
+   * (line 153) skips Ruby Symbol keys; a Symbol key is a plain string here, so
+   * {@link SYMBOL_OPTS} is the exclusion instead.
+   */
   static envFor(uri = "", opts: Record<string, any> = {}): Record<string, any> {
     let parsedUrl: URL;
     try {
@@ -172,9 +178,6 @@ export class MockRequest {
       }
     }
 
-    // `opts.each { |field, value| env[field] = value if String === field }`
-    // (`rack/lib/rack/mock_request.rb:153-155`). A Ruby Symbol key is a plain
-    // string here, so the option names Rack reads as Symbols are the exclusion.
     for (const [key, value] of Object.entries(opts)) {
       if (SYMBOL_OPTS.has(key)) continue;
       env[key] = value;
