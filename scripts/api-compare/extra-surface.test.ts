@@ -3701,6 +3701,96 @@ describe("buildReport — Ruby operator methods", () => {
   });
 });
 
+describe("buildReport — stdlib Comparable operators", () => {
+  // `include Comparable` derives `<`/`<=`/`>`/`>=`/`between?`/`clamp` from the
+  // single `<=>` the class defines, so there is no `def` for
+  // extract-ruby-api.rb to record and a faithful TS port of one reads as novel
+  // surface. CORE_MIXIN_METHODS supplies the names; the operators among them
+  // get their TS spelling from CORE_MIXIN_OPERATOR_SPELLINGS.
+  function makeManifests(): { ruby: ApiManifest; ts: ApiManifest } {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        arel: {
+          classes: {
+            "Arel::Version": rubyClass({
+              name: "Version",
+              file: "version.rb",
+              includes: ["Comparable"],
+              instance: [method("<=>")],
+            }),
+            "Arel::Plain": rubyClass({
+              name: "Plain",
+              file: "plain.rb",
+              instance: [method("<=>")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        arel: {
+          classes: {
+            Version: {
+              name: "Version",
+              file: "version.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [
+                method("compare"),
+                method("gteq"),
+                method("lt"),
+                method("between"),
+                method("clamp"),
+              ],
+              classMethods: [],
+            },
+            Plain: {
+              name: "Plain",
+              file: "plain.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("compare"), method("gteq")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    return { ruby, ts };
+  }
+
+  it("admits the Comparable operator set into a class that includes it", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const files = report.packages[0].extraFiles.map((f) => f.tsFile);
+    expect(files).not.toContain("version.ts");
+  });
+
+  it("still flags a Comparable operator on a class that does not include it", () => {
+    const { ruby, ts } = makeManifests();
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((f) => f.tsFile === "plain.ts");
+    expect(f?.extras.map((e) => e.name)).toEqual(["gteq"]);
+  });
+});
+
 describe("inlinedModuleMembers", () => {
   // arel/crud.rb:6-47 defines four bodies; select_manager.rb:6 `include Crud`.
   // trails put the bodies on SelectManager (select-manager.ts:295-338) and left
