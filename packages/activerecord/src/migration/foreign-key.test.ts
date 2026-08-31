@@ -653,10 +653,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const connection = await pool.checkout();
 
       try {
+        // eslint-disable-next-line blazetrails/require-table-teardown
         await connection.createTable("rockets", { force: true }, (t) => {
           t.string("name");
         });
 
+        // eslint-disable-next-line blazetrails/require-table-teardown
         await connection.createTable("astronauts", { force: true }, (t) => {
           t.string("name");
           t.references("rocket");

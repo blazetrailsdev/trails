@@ -162,6 +162,29 @@ const rule = {
     // that binding inside its TDZ — a runtime ReferenceError, not just a type
     // error. Such sites are reported as standaloneNoFix and left in place.
     const bindingStarts = new Map(); // name -> number[] (all decl start offsets)
+
+    // Simple `const <alias> = <Identifier>;` bindings, so a macro call whose
+    // receiver is a local alias of a class (`const Person = IndexErrorsPerson;`
+    // — the shape the canonical-shadow renames introduced) still resolves to
+    // the class it aliases instead of silently passing. A name bound more than
+    // once, or bound to a different target, is AMBIGUOUS and resolves to
+    // nothing.
+    const aliasOf = new Map(); // name -> name | "AMBIGUOUS"
+    function recordAlias(name, target) {
+      const prev = aliasOf.get(name);
+      aliasOf.set(name, prev === undefined || prev === target ? target : "AMBIGUOUS");
+    }
+    function resolveReceiver(name) {
+      const seen = new Set();
+      let cur = name;
+      while (!classesByName.has(cur) && aliasOf.has(cur) && !seen.has(cur)) {
+        seen.add(cur);
+        const next = aliasOf.get(cur);
+        if (next === "AMBIGUOUS") return cur;
+        cur = next;
+      }
+      return cur;
+    }
     function recordBinding(name, start) {
       if (typeof name !== "string") return;
       const arr = bindingStarts.get(name);
@@ -307,6 +330,9 @@ const rule = {
 
       VariableDeclarator(node) {
         for (const name of bindingNamesOf(node.id)) recordBinding(name, node.range[0]);
+        if (node.id.type === "Identifier" && node.init && node.init.type === "Identifier") {
+          recordAlias(node.id.name, node.init.name);
+        }
       },
       FunctionDeclaration(node) {
         if (node.id && node.id.type === "Identifier") recordBinding(node.id.name, node.range[0]);
@@ -323,7 +349,9 @@ const rule = {
           const macro = macroOfCall(node.callee);
           const receiverArg = node.arguments[0];
           const receiver =
-            receiverArg && receiverArg.type === "Identifier" ? receiverArg.name : null;
+            receiverArg && receiverArg.type === "Identifier"
+              ? resolveReceiver(receiverArg.name)
+              : null;
 
           if (exclude.has(siteKey(rel, node, macro))) continue;
 

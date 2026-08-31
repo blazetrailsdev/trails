@@ -73,6 +73,41 @@ tester.run("no-standalone-associations", rule, {
         "class C extends Base {\nstatic {\nthis._tableName = 'cs';\nthis.hasMany('xs', {\n  className: 'X',\n});\n}\n}\n",
       errors: [{ messageId: "standalone" }],
     },
+    // A local alias of a class (`const Q = P;`) resolves through to the class
+    // it aliases, and the report names the real class.
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {\n    this._tableName = 'ps';\n  }\n}\n" +
+        "const Q = P;\n" +
+        "Associations.hasMany.call(Q, 'cs', { className: 'C' });\n",
+      output:
+        "class P extends Base {\n  static {\n    this._tableName = 'ps';\n    this.hasMany('cs', { className: 'C' });\n  }\n}\n" +
+        "const Q = P;\n",
+      errors: [{ messageId: "standalone", data: { macro: "hasMany", receiver: "P" } }],
+    },
+    // An alias chain resolves through every hop.
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {}\n}\nconst Q = P;\nconst R = Q;\n" +
+        "Associations.hasOne.call(R, 'c', {});\n",
+      output:
+        "class P extends Base {\n  static {\n    this.hasOne('c', {});\n  }\n}\nconst Q = P;\nconst R = Q;\n",
+      errors: [{ messageId: "standalone", data: { macro: "hasOne", receiver: "P" } }],
+    },
+    // An alias of a name that is NOT a class in this file still reports, and
+    // the reason names the resolved identifier.
+    {
+      filename: FILENAME,
+      code: "const Q = Imported;\nAssociations.hasMany.call(Q, 'cs', {});\n",
+      errors: [
+        {
+          messageId: "standaloneNoFix",
+          data: { macro: "hasMany", reason: "Imported is not declared in this file" },
+        },
+      ],
+    },
     // No fix: receiver class is not declared in this file.
     {
       filename: FILENAME,

@@ -1029,7 +1029,11 @@ const rule = {
     });
     const sqlTextGroups = createSqlTextGroups(resolve);
 
-    // table name → first create node seen (for the report location).
+    // table name → every create node seen for it (each is its own report
+    // location). Reporting per CALL SITE rather than once per name keeps an
+    // `eslint-disable-next-line` on one create from depending on whether an
+    // earlier create of the same name exists: a disable suppresses exactly the
+    // call it precedes, in either order.
     const created = new Map();
     const dropped = new Set();
     // `dropped` split by where the drop sits; unguardedDrops holds the first
@@ -1092,7 +1096,13 @@ const rule = {
     }
 
     function recordCreate(table, node) {
-      if (!created.has(table)) created.set(table, node);
+      const nodes = created.get(table);
+      // Dedupe by NODE, not by name: a raw-SQL create can be recorded twice
+      // through the same node (once for the SQL text, once for the exec call),
+      // and that is one call site, not two.
+      if (nodes) {
+        if (!nodes.includes(node)) nodes.push(node);
+      } else created.set(table, [node]);
       if (checkFailureSafe && inMemoryDatabase(node, sourceCode)) memoryLocal.add(table);
     }
 
@@ -1176,14 +1186,16 @@ const rule = {
       // Deferred so creates and drops in any order across the file are matched.
       "Program:exit"() {
         const prefixes = sawSweepDrop ? sweptPrefixes : [];
-        for (const [name, node] of created) {
+        for (const [name, nodes] of created) {
           if (dropped.has(name)) continue;
           if (prefixes.some((p) => p.test(name))) continue;
-          context.report({
-            node,
-            messageId: "missingTeardown",
-            data: { table: name },
-          });
+          for (const node of nodes) {
+            context.report({
+              node,
+              messageId: "missingTeardown",
+              data: { table: name },
+            });
+          }
         }
         if (!checkFailureSafe) return;
         // A drop of a table this file never created is somebody else's cleanup.

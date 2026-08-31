@@ -5,6 +5,7 @@ import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
 import { Base } from "./index.js";
 import { Result } from "./result.js";
+import { adapterType } from "./test-adapter.js";
 
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;
@@ -264,5 +265,19 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
     await expect(a.verifyBang()).rejects.toBeInstanceOf(ConnectionFailed);
     expect(a.disconnectCalls).toBe(1);
     expect((a as unknown as { _verified: boolean })._verified).toBe(false);
+  });
+});
+
+describe("AbstractAdapter#isValidType spelling (trails-only)", () => {
+  it.runIf(adapterType === "postgres")("rejects a camelCase spelling of a native type", () => {
+    const conn = Base.connection;
+    expect(conn.isValidType("bit_varying")).toBe(true);
+    expect(conn.isValidType("bitVarying")).toBe(false);
+  });
+
+  it("rejects a camelCase spelling of primary_key", () => {
+    const conn = Base.connection;
+    expect(conn.isValidType("primary_key")).toBe(true);
+    expect(conn.isValidType("primaryKey")).toBe(false);
   });
 });

@@ -1095,6 +1095,7 @@ describe("SchemaStatements#createTable statement ordering", () => {
       quote: (v: unknown) => `'${String(v)}'`,
     });
 
+    // eslint-disable-next-line blazetrails/require-table-teardown -- stub adapter, no real database
     await ss.createTable("things", { id: false, ifNotExists: true }, (t) => {
       t.column("name", "string");
       t.index(["name"], { ifNotExists: false });
@@ -1128,6 +1129,7 @@ describe("SchemaStatements#createTable statement ordering", () => {
       AdapterSettingTheCommentOnTheDefinition,
     );
 
+    // eslint-disable-next-line blazetrails/require-table-teardown -- stub adapter, no real database
     await ss.createTable("things", { id: false }, (t) => {
       t.column("name", "string");
     });

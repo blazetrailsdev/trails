@@ -2110,6 +2110,26 @@ describe("extractFromProgram — @internal JSDoc on class members", () => {
     expect(cls.instanceMethods.find((m) => m.name === "quoteTableName")!.internal).toBeUndefined();
   });
 
+  it("tags an @internal-tagged constructor and computed-name member of a plain class", () => {
+    const info = extractFromFiles("/p", {
+      "signed-global-id.ts": `
+        export class SignedGlobalId {
+          /** @internal */
+          constructor() {}
+
+          /** @internal */
+          [Symbol.toPrimitive](): string { return ""; }
+
+          toParam(): string { return ""; }
+        }
+      `,
+    });
+    const cls = info.classes["signed-global-id.ts:SignedGlobalId"];
+    expect(cls.instanceMethods.find((m) => m.name === "constructor")!.internal).toBe(true);
+    expect(cls.instanceMethods.find((m) => m.name === "[Symbol.toPrimitive]")!.internal).toBe(true);
+    expect(cls.instanceMethods.find((m) => m.name === "toParam")!.internal).toBeUndefined();
+  });
+
   it("tags an @internal-tagged member of a synthesized __mixin class", () => {
     const info = extractFromFiles("/p", {
       "attributes.ts": `

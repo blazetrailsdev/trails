@@ -1115,10 +1115,7 @@ export class AbstractAdapter implements Quoting {
 
   isValidType(type: string | null | undefined): boolean {
     if (type == null) return false;
-    const types = this.nativeDatabaseTypes();
-    if (types[type] != null) return true;
-    const camel = type.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
-    return camel !== type && types[camel] != null;
+    return this.nativeDatabaseTypes()[type] != null;
   }
 
   /** @internal */
