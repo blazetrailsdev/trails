@@ -56,9 +56,15 @@ interface CmpSpelling {
  * `nil` for an operand it cannot place, which includes `Float::NAN`, a
  * cross-type operand, and `rb_obj_cmp`'s unequal arm.
  *
- * @boundary: a Temporal value has neither `<=>` spelling nor a JS ordering, so
- * it reaches `rb_obj_cmp`; `calculations.ts`'s `compare` — the one caller that
- * orders Temporal receivers — hands over each side's epoch reading instead.
+ * @boundary: a Temporal value carrying an instant is trails' seat for a Ruby
+ * `Time`, whose `<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by that
+ * instant, so it is ordered on `epochNanoseconds` — read off the value, and
+ * only behind Temporal's own `Symbol.toStringTag` brand, rather than through
+ * `@blazetrails/date`, which this package does not depend on. The receiver's
+ * own `<=>` still wins, as it does in Ruby. A Temporal value carrying no
+ * instant still reaches `rb_obj_cmp`;
+ * `calculations.ts`'s `compare` — the one caller that orders those — hands
+ * over each side's epoch reading instead.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — the `<=>` send it is defined over
  * (`vendor/ruby/compar.c:315`), which Rails inherits rather than defines.
@@ -72,6 +78,11 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (b instanceof Date) b = b.getTime();
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
+  if (hasEpochNanoseconds(a) && hasEpochNanoseconds(b)) {
+    const x = a.epochNanoseconds;
+    const y = b.epochNanoseconds;
+    return x < y ? -1 : x > y ? 1 : 0;
+  }
   if (typeof a === "number" || typeof a === "bigint") {
     /* `rb_int_cmp` (`vendor/ruby/numeric.c:4696`) and `flo_cmp`
        (`vendor/ruby/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
@@ -90,6 +101,14 @@ export function cmp(a: unknown, b: unknown): number | null {
   return rbEqual(a, b) ? 0 : null;
 }
 
+function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
+  return (
+    typeof (value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag] === "string" &&
+    (value as { [Symbol.toStringTag]: string })[Symbol.toStringTag].startsWith("Temporal.") &&
+    typeof (value as { epochNanoseconds?: unknown }).epochNanoseconds === "bigint"
+  );
+}
+
 function isComparable(value: unknown): value is Comparable {
   return typeof (value as { compareTo?: unknown }).compareTo === "function";
 }
@@ -101,13 +120,18 @@ function isCmpSpelling(value: unknown): value is CmpSpelling {
 /**
  * Ruby's `rb_cmperr` (`vendor/ruby/compar.c:28`), which names the operand by
  * `inspect` for a special constant or a Float and by `rb_obj_class` otherwise. */
-function rbCmperr(x: Comparable, y: unknown): never {
-  const classname = specialConstP(y)
-    ? String(y)
-    : typeof y === "bigint"
-      ? "Integer"
-      : ((y as object).constructor?.name ?? typeof y);
+function rbCmperr(x: unknown, y: unknown): never {
+  const classname = specialConstP(y) ? inspect(y) : rbObjClass(y);
   throw new ArgumentError(`comparison of ${rbObjClass(x)} with ${classname} failed`);
+}
+
+/**
+ * The `rb_inspect(y)` arm of `rb_cmperr` (`vendor/ruby/compar.c:32`): `nil`,
+ * not `null`, is what Ruby prints for the one special constant this port
+ * meets.
+ */
+function inspect(y: unknown): string {
+  return y === null || y === undefined ? "nil" : String(y);
 }
 
 /**
@@ -122,8 +146,39 @@ function specialConstP(y: unknown): boolean {
   return y === null || y === undefined || typeof y === "boolean" || typeof y === "number";
 }
 
-function rbObjClass(x: Comparable): string {
-  return x[rubyClass] ?? x.constructor.name;
+/**
+ * `rb_obj_class` (`vendor/ruby/object.c:296`) over the values trails carries:
+ * the immediates Ruby answers a class for without a heap object, the
+ * {@link rubyClass} brand, and otherwise the constructor's own name.
+ *
+ * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
+ *  which one it is is read off the value; a Temporal value carrying an instant
+ *  is a Ruby `Time`, by the same reading {@link cmp} orders it with.
+ */
+function rbObjClass(x: unknown): string {
+  if (x === null || x === undefined) return "NilClass";
+  if (typeof x === "boolean") return x ? "TrueClass" : "FalseClass";
+  if (typeof x === "bigint") return "Integer";
+  if (typeof x === "number") return Number.isInteger(x) ? "Integer" : "Float";
+  if (typeof x === "string") return "String";
+  const branded = (x as Comparable)[rubyClass];
+  if (branded != null) return branded;
+  if (hasEpochNanoseconds(x)) return "Time";
+  return (x as object).constructor?.name ?? typeof x;
+}
+
+/**
+ * Ruby's `rb_cmpint` (`vendor/ruby/bignum.c:2959`), which turns a `<=>` result
+ * into a C int and sends a `nil` one to `rb_cmperr` — the free-function form
+ * `Array#max` reaches through `OPTIMIZED_CMP`, where {@link cmpint} is the
+ * `Comparable` method form.
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_cmpint` (`vendor/ruby/bignum.c:2959`).
+ */
+export function rbCmpint(val: number | null | undefined, a: unknown, b: unknown): number {
+  if (val === null || val === undefined) rbCmperr(a, b);
+  if (val > 0) return 1;
+  if (val < 0) return -1;
+  return 0;
 }
 
 /**
@@ -189,4 +244,37 @@ export function equals(this: Comparable, other: unknown): boolean {
  */
 export function isBetween(this: Comparable, min: unknown, max: unknown): boolean {
   return cmpint.call(this, min) >= 0 && cmpint.call(this, max) <= 0;
+}
+
+/**
+ * Ruby `Array#max` (`vendor/ruby/array.c:5848` `rb_ary_max`), the no-argument,
+ * no-block arm: `nil` for an empty array, and otherwise the first element
+ * carried through `ary_max_generic` (`vendor/ruby/array.c:5719`). MRI's
+ * `CMP_OPTIMIZABLE` fast paths for a Fixnum / String / Float first element are
+ * omitted — each one falls back to `ary_max_generic` the moment an element is
+ * not of that type, so they change speed, not the answer.
+ *
+ * It lives beside {@link rbCmpint} rather than in an `array.ts` because that is
+ * the whole of it: `ary_max_generic` is `rb_cmpint(rb_cmp(vmax, v), vmax, v)`,
+ * so a `nil` reaching the comparison is an `ArgumentError`, not a skipped
+ * element.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#max` (`vendor/ruby/array.c:5848`).
+ */
+export function max<T>(ary: readonly T[]): T | null {
+  const n = ary.length;
+  if (n === 0) return null;
+  const result = ary[0];
+  if (n > 1) return aryMaxGeneric(ary, 1, result);
+  return result;
+}
+
+function aryMaxGeneric<T>(ary: readonly T[], i: number, vmax: T): T {
+  for (; i < ary.length; ++i) {
+    const v = ary[i];
+    if (rbCmpint(cmp(vmax, v), vmax, v) < 0) {
+      vmax = v;
+    }
+  }
+  return vmax;
 }

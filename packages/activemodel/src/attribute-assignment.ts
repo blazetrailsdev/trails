@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import type { AttributeMethod } from "./attribute-methods.js";
 import { UnknownAttributeError } from "./errors.js";
 
@@ -144,13 +145,6 @@ function classOf(value: unknown): string {
   if (ctorName) return ctorName;
   const t = typeof value;
   return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
-class ArgumentError extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
 }
 
 class TypeError extends globalThis.Error {

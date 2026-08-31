@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   Hash,
   deleteIf,
+  dup,
   eachKey,
   eachPair,
   except,
@@ -188,5 +189,29 @@ describe("Hash#default", () => {
     hash.set(1, "integer");
     expect(hash.get("1")).toBe("miss");
     expect(hash.get(1)).toBe("integer");
+  });
+
+  it("carries the default over a dup, as hash_dup does", () => {
+    const hash = new Hash<string, number>(7);
+    hash.set("a", 1);
+    const copy = dup(hash);
+    copy.set("b", 2);
+    expect(copy.get("a")).toBe(1);
+    expect(copy.get("miss")).toBe(7);
+    expect(hash.has("b")).toBe(false);
+  });
+
+  it("carries the default_proc over a dup, as the RHASH_PROC_DEFAULT flag does", () => {
+    const hash = new Hash<string, string>((_h, key) => `made ${String(key)}`);
+    const copy = dup(hash);
+    expect(copy.get("x")).toBe("made x");
+    expect(copy.default()).toBeUndefined();
+  });
+
+  it("dups a plain object into a new object", () => {
+    const hash = { a: 1 };
+    const copy = dup(hash);
+    copy.a = 2;
+    expect(hash.a).toBe(1);
   });
 });

@@ -205,6 +205,41 @@ export function except<T>(hash: Record<string, T>, ...keys: string[]): Record<st
 }
 
 /**
+ * Ruby `Hash#dup` (`vendor/ruby/object.c:591` `rb_obj_dup`), which for a Hash
+ * allocates through `rb_hash_dup` (`vendor/ruby/hash.c:1584`): a NEW hash with
+ * the same pairs in the same order, carrying the receiver's `default` /
+ * `default_proc` over — `hash_dup` passes `RHASH_IFNONE(hash)` and the
+ * `RHASH_PROC_DEFAULT` flag through to the allocation, which a plain object
+ * spread has nowhere to put. The flag is what decides which of the two seats
+ * the value lands in, so the port reads the receiver's seat rather than
+ * testing the value's type.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/object.c:591`).
+ */
+export function dup<K, V>(hash: Hash<K, V>): Hash<K, V>;
+/**
+ * The plain-object arm: a Hash with no `default` seat is an object literal in
+ * trails, and `rb_obj_dup` over it is the spread.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/object.c:591`).
+ */
+export function dup<T>(hash: Record<string, T>): Record<string, T>;
+/**
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/object.c:591`).
+ */
+export function dup(
+  hash: Hash<unknown, unknown> | Record<string, unknown>,
+): Hash<unknown, unknown> | Record<string, unknown> {
+  if (!(hash instanceof Hash)) return { ...hash };
+  const ret = new Hash<unknown, unknown>();
+  const defaultProc = hash.defaultProc();
+  if (defaultProc) ret.setDefaultProc(defaultProc);
+  else ret.setDefault(hash.default());
+  for (const [key, value] of hash) {
+    ret.set(key, value);
+  }
+  return ret;
+}
+
+/**
  * A `Hash#default_proc` (`vendor/ruby/hash.c:2308` `rb_hash_set_default_proc`):
  * yielded the hash itself and the missing key.
  */

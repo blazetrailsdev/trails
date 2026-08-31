@@ -8,12 +8,15 @@ export {
   isBetween,
   lessThan,
   lessThanOrEqual,
+  max,
+  rbCmpint,
   rubyClass,
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
 export {
   Hash,
   deleteIf,
+  dup,
   eachKey,
   eachPair,
   except,

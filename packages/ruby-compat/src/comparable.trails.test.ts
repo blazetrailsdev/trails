@@ -7,6 +7,7 @@ import {
   isBetween,
   lessThan,
   lessThanOrEqual,
+  max,
   rubyClass,
 } from "./comparable.js";
 
@@ -86,5 +87,37 @@ describe("Comparable", () => {
     expect(new Sign(1).equals("x")).toBe(false);
     const incomparable = { compareTo: () => null, equals };
     expect(incomparable.equals(incomparable)).toBe(true);
+  });
+});
+
+function instant(epochNanoseconds: bigint): object {
+  return { epochNanoseconds, [Symbol.toStringTag]: "Temporal.Instant" };
+}
+
+describe("Array#max", () => {
+  it("returns nil for an empty array, as rb_ary_max does", () => {
+    expect(max([])).toBeNull();
+  });
+
+  it("returns the only element of a one-element array", () => {
+    expect(max([5])).toBe(5);
+  });
+
+  it("returns the largest element", () => {
+    expect(max([1, 9, 3])).toBe(9);
+    expect(max(["a", "c", "b"])).toBe("c");
+  });
+
+  it("orders the Time seat by its instant, as time_cmp does", () => {
+    const early = instant(1n);
+    const late = instant(2n);
+    expect(max([early, late])).toBe(late);
+    expect(max([late, early])).toBe(late);
+  });
+
+  it("raises rb_cmperr's ArgumentError when a nil reaches the comparison", () => {
+    const now = instant(1n);
+    expect(() => max([now, null])).toThrow("comparison of Time with nil failed");
+    expect(() => max([null, now])).toThrow("comparison of NilClass with Time failed");
   });
 });
