@@ -9,12 +9,13 @@
  * `require "active_support/core_ext/time/calculations"` is.
  */
 
-import { Date as RubyDate, Rational, Time as RubyTime } from "@blazetrails/date";
+import { Date as RubyDate, Rational, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "../../hash-utils.js";
 import { currentTimeInstant } from "../../time-travel.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { zone as timeZone } from "../../time-zone-config.js";
 import { advance as dateAdvance } from "../date/calculations.js";
+import { toF } from "../date-time/conversions.js";
 
 /** Mirrors: `Time::COMMON_YEAR_DAYS_IN_MONTH` (`time/calculations.rb:13`) */
 export const COMMON_YEAR_DAYS_IN_MONTH = [null, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -60,6 +61,51 @@ export function current(): TimeWithZone | RubyTime {
   return zone
     ? zone.now()
     : RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
+}
+
+/**
+ * Mirrors: `Time.at_without_coercion` (`time/calculations.rb:59`), Rails'
+ * `alias_method :at_without_coercion, :at` — the `::Time.at` that was in place
+ * before this file reopened `Time`.
+ */
+const atWithoutCoercion = RubyTime.at.bind(RubyTime);
+
+/**
+ * Mirrors: `Time.at_with_coercion` (`time/calculations.rb:44-57`), aliased over
+ * `Time.at` at the bottom of this module as `:60` does.
+ *
+ * `is_a?(DateTime)` is spelled against trails' `DateTime` seat,
+ * `Temporal.PlainDateTime | Temporal.ZonedDateTime` (RFC 0088) — the receiver
+ * `core-ext/date-time/conversions.ts` is keyed on, whence its `to_f`.
+ * TypeScript cannot widen an existing class static through declaration
+ * merging, so `Time.at`'s DECLARED parameter stays core Ruby's and a caller
+ * handing it a `TimeWithZone` or a `DateTime` seat casts at the call site.
+ */
+export function atWithCoercion(
+  timeOrNumber:
+    | number
+    | bigint
+    | Rational
+    | RubyTime
+    | TimeWithZone
+    | Temporal.PlainDateTime
+    | Temporal.ZonedDateTime,
+  ...args: (number | bigint | Rational)[]
+): RubyTime {
+  if (args.length === 0) {
+    if (timeOrNumber instanceof TimeWithZone) {
+      return atWithoutCoercion(timeOrNumber.toR()).getlocal();
+    } else if (
+      timeOrNumber instanceof Temporal.PlainDateTime ||
+      timeOrNumber instanceof Temporal.ZonedDateTime
+    ) {
+      return atWithoutCoercion(toF(timeOrNumber)).getlocal();
+    } else {
+      return atWithoutCoercion(timeOrNumber);
+    }
+  } else {
+    return atWithoutCoercion(timeOrNumber as number, ...args);
+  }
 }
 
 /** Mirrors: `Time.days_in_month` (`time/calculations.rb:24-30`) */
@@ -400,6 +446,10 @@ declare module "@blazetrails/date" {
     export function daysInMonth(month: number, year?: number): number;
     export function daysInYear(year?: number): number;
     export function rfc3339(str: string): Time;
+    export function atWithCoercion(
+      timeOrNumber: unknown,
+      ...args: (number | bigint | Rational)[]
+    ): Time;
   }
 }
 
@@ -440,4 +490,6 @@ Object.assign(RubyTime.prototype, {
   nextYear,
 });
 
-Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339 });
+Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
+
+RubyTime.at = atWithCoercion as typeof RubyTime.at;

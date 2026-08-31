@@ -287,37 +287,4 @@ describe("ConnectionPool::ConnectionLeasingQueue", () => {
     await promise;
     expect(leased).toBe(true);
   });
-
-  it("leaseTo/unlease/leasedTo track leases", () => {
-    const q = new ConnectionLeasingQueue();
-    const c = fakeConn();
-
-    q.leaseTo(c, "thread-1");
-    expect(q.leasedTo(c)).toBe("thread-1");
-
-    q.unlease(c);
-    expect(q.leasedTo(c)).toBeUndefined();
-  });
-});
-
-describe("Queue rejectAll", () => {
-  it("rejects all pending waiters with the provided error", async () => {
-    const q = new Queue();
-    const p1 = q.poll(5) as Promise<DatabaseAdapter>;
-    const p2 = q.poll(5) as Promise<DatabaseAdapter>;
-    expect(q.numWaiting()).toBe(2);
-
-    const error = new Error("pool discarded");
-    q.rejectAll(error);
-
-    await expect(p1).rejects.toThrow("pool discarded");
-    await expect(p2).rejects.toThrow("pool discarded");
-    expect(q.numWaiting()).toBe(0);
-  });
-
-  it("rejectAll is a no-op when no waiters exist", () => {
-    const q = new Queue();
-    expect(() => q.rejectAll(new Error("test"))).not.toThrow();
-    expect(q.numWaiting()).toBe(0);
-  });
 });

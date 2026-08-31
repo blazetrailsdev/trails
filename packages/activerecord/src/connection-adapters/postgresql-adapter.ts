@@ -2754,7 +2754,11 @@ export interface PostgreSQLAdapter {
 
   setPkSequenceBang(table: string, value: number): Promise<void>;
 
-  resetPkSequenceBang(table: string, pk?: string | null, sequence?: string | null): Promise<void>;
+  resetPkSequenceBang(
+    table: string,
+    pk?: string | null,
+    sequence?: Name | string | null,
+  ): Promise<void>;
 
   primaryKeys(tableName: string): Promise<string[]>;
 

@@ -5,8 +5,8 @@ export class Name {
   readonly identifier: string;
 
   constructor(schema: string | null, identifier: string) {
-    this.schema = schema ? unquoteIdentifier(schema) : null;
-    this.identifier = unquoteIdentifier(identifier);
+    this.schema = Utils.unquoteIdentifier(schema);
+    this.identifier = Utils.unquoteIdentifier(identifier);
   }
 
   toString(): string {
@@ -38,57 +38,19 @@ export class Name {
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace Utils {
   export function extractSchemaQualifiedName(string: string): Name {
-    const parts = splitQuotedIdentifier(string);
-    let schema: string | null = parts[0] ?? null;
-    let table = parts[1] ?? null;
+    let [schema, table]: (string | undefined)[] = string.match(/[^".]+|"[^"]*"/g) ?? [];
     if (table == null) {
       table = schema;
-      schema = null;
+      schema = undefined;
     }
-    return new Name(schema, table ?? "");
+    return new Name(schema ?? null, table);
   }
-}
 
-export function unquoteIdentifier(identifier: string): string {
-  if (identifier.startsWith('"') && identifier.endsWith('"')) {
-    return identifier.slice(1, -1).replace(/""/g, '"');
-  }
-  return identifier;
-}
-
-export function splitQuotedIdentifier(name: string): string[] {
-  const parts: string[] = [];
-  let i = 0;
-  while (i < name.length) {
-    if (name[i] === '"') {
-      let value = "";
-      i++;
-      while (i < name.length) {
-        if (name[i] === '"') {
-          if (i + 1 < name.length && name[i + 1] === '"') {
-            value += '"';
-            i += 2;
-          } else {
-            i++;
-            break;
-          }
-        } else {
-          value += name[i];
-          i++;
-        }
-      }
-      parts.push(value);
-      if (i < name.length && name[i] === ".") i++;
+  export function unquoteIdentifier<T extends string | null | undefined>(identifier: T): T {
+    if (identifier != null && identifier.startsWith('"')) {
+      return identifier.slice(1, -1) as T;
     } else {
-      const dot = name.indexOf(".", i);
-      if (dot === -1) {
-        parts.push(name.substring(i));
-        break;
-      }
-      const part = name.substring(i, dot);
-      if (part.length > 0) parts.push(part);
-      i = dot + 1;
+      return identifier;
     }
   }
-  return parts;
 }
