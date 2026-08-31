@@ -83,31 +83,7 @@ export function buildAdapterArg(
   if (normalized === "sqlite") {
     const resolvedUrl = url !== undefined && isRemoteLibsqlUrl(url) ? url : undefined;
     const filename = parseSqliteUrl(resolvedUrl || database || url || ":memory:");
-    const {
-      readonly,
-      driver,
-      pragmas,
-      strict,
-      foreignKeys,
-      timeout,
-      retries,
-      statementLimit,
-      preparedStatements,
-      driverOptions,
-      authToken,
-      syncUrl,
-    } = configuration;
-    const options: Record<string, unknown> = {};
-    if (readonly !== undefined) options.readonly = readonly;
-    if (driver !== undefined) options.driver = driver;
-    if (pragmas !== undefined) options.pragmas = pragmas;
-    if (strict !== undefined) options.strict = strict;
-    if (foreignKeys !== undefined) options.foreignKeys = foreignKeys;
-    if (timeout !== undefined) options.timeout = timeout;
-    if (retries !== undefined) options.retries = retries;
-    if (statementLimit !== undefined) options.statementLimit = statementLimit;
-    if (preparedStatements !== undefined) options.preparedStatements = preparedStatements;
-    if (driverOptions !== undefined) options.driverOptions = driverOptions;
+    const { adapter: _sa, url: _su, database: _sd, authToken, syncUrl, ...options } = configuration;
     if (authToken !== undefined || syncUrl !== undefined) {
       const merged = { ...(options.driverOptions as Record<string, unknown> | undefined) };
       if (authToken !== undefined) merged.authToken = authToken;

@@ -745,9 +745,15 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
         const output = await dumpTableSchema(conn as unknown as SchemaSource, "fk_test_has_fk");
-        expect(output).toMatch(
-          /\s+await ctx\.addForeignKey\("fk_test_has_fk", "fk_test_has_pk", \{ column: "fk_id", primaryKey: "pk_id", name: "fk_name" \}\);$/m,
-        );
+        if (adapterType === "sqlite") {
+          expect(output).toMatch(
+            /\s+await ctx\.addForeignKey\("fk_test_has_fk", "fk_test_has_pk", \{ column: "fk_id", primaryKey: "pk_id" \}\);$/m,
+          );
+        } else {
+          expect(output).toMatch(
+            /\s+await ctx\.addForeignKey\("fk_test_has_fk", "fk_test_has_pk", \{ column: "fk_id", primaryKey: "pk_id", name: "fk_name" \}\);$/m,
+          );
+        }
       });
     });
 

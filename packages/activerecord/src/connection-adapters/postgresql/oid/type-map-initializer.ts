@@ -46,10 +46,6 @@ export class TypeMapInitializer {
     records.forEach((row) => this.registerSqlTypeName(row));
   }
 
-  runInitializer(records: PgTypeRow[]): void {
-    this.run(records);
-  }
-
   queryConditionsForKnownTypeNames(): string {
     const knownTypeNames = this.store.keys().map((key) => `'${key}'`);
     return `WHERE\n  t.typname IN (${knownTypeNames.join(", ")})\n`;

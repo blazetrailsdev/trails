@@ -560,7 +560,7 @@ export class PostgreSQLAdapter
     columnName: string,
     sqlType: string = "",
   ): Promise<Type> {
-    if (!this.typeMap.has(oid)) {
+    if (!this.typeMap.isKey(oid)) {
       await this.loadAdditionalTypes([oid]);
     }
     return this.typeMap.fetch(oid, fmod, sqlType, () => {
@@ -692,7 +692,7 @@ export class PostgreSQLAdapter
 
     const missing = new Set<number>();
     for (const f of fields) {
-      if (!this.typeMap.has(f.dataTypeID)) missing.add(f.dataTypeID);
+      if (!this.typeMap.isKey(f.dataTypeID)) missing.add(f.dataTypeID);
     }
     if (missing.size > 0) {
       await this.loadAdditionalTypes([...missing]);

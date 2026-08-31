@@ -16,6 +16,16 @@ describe("Migration", () => {
       await connection.dropTable("trades", { ifExists: true });
     });
 
+    it("reads back a check constraint nested deeper than two parenthesis levels", async () => {
+      const connection = await ambientConnection();
+      const expression = "price > (abs((price - (0 + 1))) - 1)";
+      await connection.addCheckConstraint("trades", expression, { name: "deep_check" });
+
+      const [constraint] = await connection.checkConstraints("trades");
+      expect(constraint.name).toBe("deep_check");
+      expect(constraint.expression).toBe(expression);
+    });
+
     it("removes by expression with the name supplied as trailing options", async () => {
       const connection = await ambientConnection();
       await connection.addCheckConstraint("trades", "price > 0", { name: "price_check" });

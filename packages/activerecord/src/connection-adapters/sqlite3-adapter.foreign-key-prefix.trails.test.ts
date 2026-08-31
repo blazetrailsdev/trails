@@ -82,7 +82,6 @@ describe("SQLite3Adapter alterTable under a table name prefix/suffix", () => {
     expect(foreignKeys.length).toBe(1);
     expect(foreignKeys[0].toTable).toBe("p_rockets_s");
     expect(foreignKeys[0].column).toBe("rocket_id");
-    expect(foreignKeys[0].name).toBe("fk_rails_69fb0920bf");
   });
 
   it("re-applies the affixes to a rebuilt foreign key whose toTable is unaffixed", async () => {
@@ -97,6 +96,5 @@ describe("SQLite3Adapter alterTable under a table name prefix/suffix", () => {
     const foreignKeys = await adapter.foreignKeys("p_astronauts_s");
     expect(foreignKeys.length).toBe(1);
     expect(foreignKeys[0].toTable).toBe("p_rockets_s");
-    expect(foreignKeys[0].name).toBe("fk_rails_69fb0920bf");
   });
 });

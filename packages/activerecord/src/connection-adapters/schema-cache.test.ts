@@ -401,18 +401,20 @@ describe("SchemaCacheTest", () => {
     }
   });
   it("#init_with skips deduplication if told to", () => {
-    const cols = new Map<string, Column[]>([["t", [makeColumn("id", "integer")]]]);
+    const col = makeColumn("id", "integer");
     const cache = new SchemaCache();
-    cache.initWith({ columns: cols, deduplicated: true });
-    expect((cache as unknown as { _columns: Map<string, Column[]> })._columns).toBe(cols);
+    cache.initWith({ columns: { t: [col] }, deduplicated: true });
+    expect((cache as unknown as { _columns: Map<string, Column[]> })._columns.get("t")![0]).toBe(
+      col,
+    );
   });
 
   it("#init_with reads columns_hash from the coder", () => {
     const col = makeColumn("id", "integer");
     const cache = new SchemaCache();
     cache.initWith({
-      columns: new Map<string, Column[]>([["t", [col]]]),
-      columns_hash: new Map<string, Record<string, Column>>([["t", { id: col }]]),
+      columns: { t: [col] },
+      columns_hash: { t: { id: col } },
       deduplicated: true,
     });
     const columnsHash = (cache as unknown as { _columnsHash: Map<string, Record<string, Column>> })

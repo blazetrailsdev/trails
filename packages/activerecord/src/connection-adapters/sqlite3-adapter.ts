@@ -1175,8 +1175,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       group.push(row);
     }
 
-    const namesByColumn = await this._parseForeignKeyNames(tableName);
-
     const results: ForeignKeyDefinition[] = [];
     for (const group of groupedFk) {
       group.sort((a, b) => (a.seq as number) - (b.seq as number));
@@ -1190,8 +1188,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const primaryKey = toCols.length === 1 ? toCols[0] : toCols;
       const columnKey = fromCols.join(",");
       const primaryKeyKey = toCols.join(",");
-      const nameKey = columnKey.replace(/,/g, "_");
-      const name = namesByColumn.get(columnKey) ?? `fk_${tableName}_${nameKey}`;
       const deferrable = fkDefs[`${toTable},${columnKey},${primaryKeyKey}`];
       results.push(
         new ForeignKeyDefinition(
@@ -1199,7 +1195,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           toTable,
           column,
           primaryKey,
-          name,
+          undefined,
           onDelete,
           onUpdate,
           deferrable,
@@ -1261,26 +1257,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         binds: [],
       });
     }
-  }
-
-  private async _parseForeignKeyNames(tableName: string): Promise<Map<string, string>> {
-    const fkStrings = (await this.tableStructureSql(tableName, [])).filter(
-      (columnString) =>
-        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
-    );
-    const names = new Map<string, string>();
-    const regex = /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+FOREIGN\s+KEY\s*\(([^)]+)\)/i;
-    for (const fkString of fkStrings) {
-      const match = regex.exec(fkString);
-      if (!match) continue;
-      const name = match[1] ? match[1].replace(/""/g, '"') : match[2];
-      const colList = match[3]
-        .split(",")
-        .map((c) => c.trim().replace(/^"|"$/g, ""))
-        .join(",");
-      names.set(colList, name);
-    }
-    return names;
   }
 
   private quoteDefault(value: unknown): string {
@@ -1382,13 +1358,23 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       "SCHEMA",
     )) as string | null;
 
-    const regex =
-      /CONSTRAINT\s+(?:"((?:[^"]|"")*)"|(\w+))\s+CHECK\s*\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/gi;
-    return [...String(tableSql ?? "").matchAll(regex)].map((match) => {
-      const name = match[1] ? match[1].replace(/""/g, '"') : match[2];
-      const expression = match[3].trim();
-      return new CheckConstraintDefinition(tableName, expression, { name });
-    });
+    const sql = String(tableSql ?? "");
+    const checkConstraints: CheckConstraintDefinition[] = [];
+    for (const match of sql.matchAll(/CONSTRAINT\s+(\w+)\s+CHECK\s+\(/gi)) {
+      const start = match.index + match[0].length;
+      let depth = 1;
+      let i = start;
+      while (i < sql.length && depth > 0) {
+        if (sql[i] === "(") depth++;
+        else if (sql[i] === ")") depth--;
+        i++;
+      }
+      if (depth !== 0) continue;
+      const [, name] = match;
+      const expression = sql.slice(start, i - 1);
+      checkConstraints.push(new CheckConstraintDefinition(tableName, expression, { name }));
+    }
+    return checkConstraints;
   }
 
   async addForeignKey(
