@@ -217,8 +217,8 @@ describe("Controller routing integration", () => {
   it("call sets path parameters in env", async () => {
     const routes = new RouteSet();
     let capturedEnv: RackEnv = {};
-    routes.setDispatcher(async (_ctrl, _action, _params, env) => {
-      capturedEnv = env;
+    routes.registerController("posts", (_action, req) => {
+      capturedEnv = (req as unknown as { env: RackEnv }).env;
       return [200, {}, []] as any;
     });
     routes.draw((map) => {

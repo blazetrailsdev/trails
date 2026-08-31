@@ -5,10 +5,11 @@
  * mirroring the Rails Request API.
  */
 
-import { toSentence } from "@blazetrails/activesupport";
+import { camelize, toSentence, underscore } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { parseNestedQuery, RACK_SESSION, Request as RackRequest } from "@blazetrails/rack";
-import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
+import { RoutingError, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
+import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import {
   etagMatches as _etagMatches,
@@ -1005,29 +1006,31 @@ export class Request {
    * `action` path-parameter to `"index"` and resolves the controller class
    * via {@link controllerClassFor}.
    */
-  controllerClass(): typeof PassNotFound {
+  controllerClass(): DispatchableControllerClass | typeof PassNotFound {
     const params = this.pathParameters;
     if (params["action"] == null) params["action"] = "index";
     return this.controllerClassFor(params["controller"] as string | undefined);
   }
 
   /**
-   * Rails: `request.controller_class_for(name)` (request.rb:94-110). When
-   * `name` is absent, returns the {@link PassNotFound} sentinel; otherwise
-   * throws — Trails has no global constant table to back Rails'
-   * `"#{name.camelize}Controller".constantize` lookup, so callers must
-   * resolve the class through the router (which knows the registered
-   * controllers for a route) until that bridge lands.
+   * Rails: `request.controller_class_for(name)` (request.rb:94-110).
+   * `"#{controller_param.camelize}Controller"` is looked up in
+   * {@link controllerConstants} rather than `constantize`d, so the miss
+   * Rails surfaces as a `MissingController` `NameError` — which
+   * `Dispatcher#controller` (route_set.rb:60-63) immediately converts —
+   * is raised as the `ActionController::RoutingError` directly.
    */
-  controllerClassFor(name: string | undefined | null): typeof PassNotFound {
+  controllerClassFor(
+    name: string | undefined | null,
+  ): DispatchableControllerClass | typeof PassNotFound {
     // Ruby `if name` is truthy for empty strings; only nil/false fall through
-    // to the PASS_NOT_FOUND branch. Mirror with explicit null-check so `""`
-    // takes the resolution path (and surfaces the not-implemented error).
+    // to the PASS_NOT_FOUND branch.
     if (name != null) {
-      throw new Error(
-        `controllerClassFor(${name}): Trails has no global controller constant table; ` +
-          `resolve the controller class via the router instead.`,
-      );
+      const controllerParam = underscore(name);
+      const constName = `${camelize(controllerParam)}Controller`;
+      const klass = controllerConstants.get(controllerParam);
+      if (!klass) throw new RoutingError(`uninitialized constant ${constName}`);
+      return klass;
     }
     return PassNotFound;
   }
@@ -1196,6 +1199,18 @@ Request.prototype.parameterFilterFor = _parameterFilterFor as (
  * @internal
  */
 export async function* emptyRackBody(): RackBody {}
+
+/**
+ * The constant table `controller_class_for` resolves against, keyed by the
+ * Rails controller path `path_parameters[:controller]` carries (`posts`,
+ * `admin/posts`). Rails looks the `"#{name.camelize}Controller"` constant up
+ * in the global Ruby namespace, which Zeitwerk autoloads on demand; ESM has
+ * no `const_missing` seam, so railties' `setup_main_autoloader` populates
+ * this map eagerly instead.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const controllerConstants = new Map<string, DispatchableControllerClass>();
 
 export class PassNotFound {
   /** @internal */

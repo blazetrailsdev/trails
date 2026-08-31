@@ -23,8 +23,6 @@ export {
   type DrawCallback,
   Dispatcher,
   StaticDispatcher,
-  type DispatcherCallback,
-  controllerDispatcher,
   type DispatchableControllerClass,
   escapePath,
   escapeSegment,
@@ -32,7 +30,7 @@ export {
   unescapeUri,
 } from "./routing/index.js";
 
-export { Request } from "./http/request.js";
+export { Request, controllerConstants } from "./http/request.js";
 export { Response, type CookieOptions } from "./http/response.js";
 export {
   Parameters,

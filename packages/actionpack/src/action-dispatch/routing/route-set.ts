@@ -40,7 +40,12 @@ import {
 } from "./url-for.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
-import { DispatcherRegistry, type DispatchHandler } from "./dispatcher.js";
+import {
+  DispatcherRegistry,
+  type DispatchableControllerClass,
+  type DispatchHandler,
+} from "./dispatcher.js";
+import type { Response as AdResponse } from "../http/response.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
@@ -105,28 +110,21 @@ export class CustomUrlHelper implements PolymorphicMappingEntry {
 
 export type DrawCallback = (mapper: Mapper) => void;
 
-/** Legacy {@link RouteSet.setDispatcher} callback (kept for back-compat). */
-export type DispatcherCallback = (
-  controller: string,
-  action: string,
-  params: Record<string, string>,
-  env: RackEnv,
-) => Promise<RackResponse>;
-
 /**
- * Port of `ActionDispatch::Routing::RouteSet::Dispatcher`. Attached as
- * each Journey route's `app`; on serve, reads `path_parameters[:controller]`
- * and dispatches via {@link DispatcherRegistry}. Rails resolves a
- * controller class through `req.controller_class`; trails has no
- * ActionController port yet, so the registry holds string-keyed handlers.
+ * Port of `ActionDispatch::Routing::RouteSet::Dispatcher` (route_set.rb:38-69).
+ * Attached as each Journey route's `app`; on serve it resolves the controller
+ * class through `req.controller_class` and dispatches the action.
+ *
+ * `dispatch` is async in trails, so `serve` may return a promise —
+ * `RouteSet#call` awaits it. Alongside the Rails resolution path the
+ * dispatcher consults a {@link DispatcherRegistry} of string-keyed handlers,
+ * which is how tests bind an action to a route without a controller constant.
  */
 export class Dispatcher extends Endpoint {
   private readonly _raiseOnNameError: boolean;
   // Optional, mirroring the Rails Dispatcher whose only ivar is
-  // `@raise_on_name_error` — controller resolution flows through
-  // `req.controller_class`. Trails has no AC port, so the general-purpose
-  // resolver consults a {@link DispatcherRegistry}; subclasses that bind
-  // a handler directly (e.g. {@link StaticDispatcher}) leave it undefined.
+  // `@raise_on_name_error`. Subclasses that bind a handler directly
+  // (e.g. {@link StaticDispatcher}) leave it undefined.
   private readonly _registry: DispatcherRegistry | undefined;
 
   constructor(raiseOnNameError: boolean, registry?: DispatcherRegistry) {
@@ -139,35 +137,51 @@ export class Dispatcher extends Endpoint {
     return true;
   }
 
-  serve(req: RouterRequest): RackishResponse {
-    const params = req.pathParameters;
-    const action = typeof params["action"] === "string" ? params["action"] : "";
-    const handler = this._controller(req);
-    if (!handler) {
-      if (this._raiseOnNameError) {
-        const name = typeof params["controller"] === "string" ? params["controller"] : "";
-        throw new Error(`uninitialized constant ${name || "<missing>"}`);
+  serve(req: RouterRequest): RackishResponse | Promise<RackishResponse> {
+    try {
+      const params = req.pathParameters;
+      const controller = this._controller(req);
+      if (!("makeResponseBang" in controller)) {
+        return controller(typeof params["action"] === "string" ? params["action"] : "", req);
       }
-      return [404, { [X_CASCADE]: "pass" }, []] as unknown as RackishResponse;
+      const request = req as unknown as AdRequest;
+      const res = controller.makeResponseBang(request);
+      return this._dispatch(controller, params["action"] as string, request, res);
+    } catch (error) {
+      if (error instanceof RoutingError) {
+        if (this._raiseOnNameError) throw error;
+        return [404, { [X_CASCADE]: "pass" }, []] as unknown as RackishResponse;
+      }
+      throw error;
     }
-    return this._dispatch(handler, action, req);
   }
 
-  /** @internal */
-  protected _controller(req: RouterRequest): DispatchHandler | undefined {
-    if (!this._registry) return undefined;
+  /**
+   * Rails: `Dispatcher#controller` (route_set.rb:60-63) — `req.controller_class`,
+   * with the `NameError` it can raise converted to
+   * `ActionController::RoutingError`. {@link Request.controllerClassFor}
+   * raises the `RoutingError` directly, so there is no rescue to mirror.
+   *
+   * @internal
+   */
+  protected _controller(req: RouterRequest): DispatchHandler | DispatchableControllerClass {
     const params = req.pathParameters;
     const controller = typeof params["controller"] === "string" ? params["controller"] : "";
-    return this._registry.resolve(controller);
+    const handler = this._registry?.resolve(controller);
+    if (handler) return handler;
+    return (req as unknown as AdRequest).controllerClass() as DispatchableControllerClass;
   }
 
-  /** @internal */
-  protected _dispatch(
-    handler: DispatchHandler,
+  /** Rails: `Dispatcher#dispatch` (route_set.rb:65-67). @internal */
+  protected async _dispatch(
+    controller: DispatchableControllerClass,
     action: string,
-    req: RouterRequest,
-  ): RackishResponse {
-    return handler(action, req);
+    req: AdRequest,
+    res: AdResponse,
+  ): Promise<RackishResponse> {
+    const instance = new controller();
+    await instance.dispatch(action, req, res);
+    return instance.toRackResponse() as unknown as RackishResponse;
   }
 }
 
@@ -339,7 +353,6 @@ export class UrlHelpersModule {
 export class RouteSet {
   private routes: Route[] = [];
   private namedRoutes: Map<string, Route> = new Map();
-  private dispatcher: DispatcherCallback | undefined;
   /** @internal Rails: `@config`. */
   private _config: RouteSetConfig;
   /** Rails: `attr_accessor :disable_clear_and_finalize`. */
@@ -864,7 +877,7 @@ export class RouteSet {
   }
 
   /** End-to-end `Router.serve` using registered handlers. */
-  serve(req: RouterRequest): RackishResponse {
+  serve(req: RouterRequest): Promise<RackishResponse> {
     return this.journeyRouter.serve(req);
   }
 
@@ -947,14 +960,6 @@ export class RouteSet {
       extras.push(k);
     }
     return [path, extras];
-  }
-
-  /**
-   * Set a dispatcher that handles matched routes.
-   * Without one, call() returns a simple JSON response.
-   */
-  setDispatcher(dispatcher: DispatcherCallback): void {
-    this.dispatcher = dispatcher;
   }
 
   /**
@@ -1118,16 +1123,8 @@ export class RouteSet {
       ...params,
     };
 
-    if (this.dispatcher) {
-      return this.dispatcher(route.controller, route.action, params, env);
-    }
-
-    // Default: return a simple JSON response showing the match
-    const body = JSON.stringify({
-      controller: route.controller,
-      action: route.action,
-      params,
-    });
-    return [200, { "content-type": "application/json" }, bodyFromString(body)];
+    return (await this._routeDispatcher.serve(
+      new AdRequest(env) as unknown as RouterRequest,
+    )) as unknown as RackResponse;
   }
 }

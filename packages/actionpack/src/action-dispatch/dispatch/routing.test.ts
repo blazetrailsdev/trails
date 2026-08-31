@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
 import { Route } from "../routing/route.js";
-import { bodyToString } from "@blazetrails/rack";
+import { bodyFromString, bodyToString } from "@blazetrails/rack";
+import type { RackishResponse } from "../journey/router.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 
 // ==========================================================================
@@ -496,6 +497,15 @@ describe("TestRoutingMapper", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
+    });
+    routes.registerController("posts", (action, req) => {
+      const params = req.pathParameters as Record<string, string>;
+      const { controller, action: _a, ...rest } = params;
+      return [
+        200,
+        { "content-type": "application/json" },
+        bodyFromString(JSON.stringify({ controller, action, params: rest })),
+      ] as unknown as RackishResponse;
     });
     const [status, , body] = await routes.call({
       REQUEST_METHOD: "GET",

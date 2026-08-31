@@ -38,36 +38,36 @@ function req(opts: Partial<RouterRequest> & { pathInfo: string }): RouterRequest
 }
 
 describe("ActionDispatch::Journey::Router", () => {
-  it("serve() dispatches to the matching route's app", () => {
+  it("serve() dispatches to the matching route's app", async () => {
     const route = new Route({
       name: "p",
       app: okApp("posts"),
       path: pat("/posts"),
     });
     const router = new Router(buildRoutes([route]));
-    const response = router.serve(req({ pathInfo: "/posts" }));
+    const response = await router.serve(req({ pathInfo: "/posts" }));
     expect(response[0]).toBe(200);
     expect(response[2]).toEqual(["posts"]);
   });
 
-  it("serve() returns 404 + X-Cascade=pass when no route matches", () => {
+  it("serve() returns 404 + X-Cascade=pass when no route matches", async () => {
     const router = new Router(buildRoutes([]));
-    const response = router.serve(req({ pathInfo: "/nope" }));
+    const response = await router.serve(req({ pathInfo: "/nope" }));
     expect(response[0]).toBe(404);
     expect(response[1][X_CASCADE]).toBe("pass");
   });
 
-  it("serve() honors X-Cascade=pass and tries the next matching route", () => {
+  it("serve() honors X-Cascade=pass and tries the next matching route", async () => {
     const passing = new Route({ name: "a", app: cascadeApp(), path: pat("/a"), precedence: 1 });
     const winning = new Route({ name: "b", app: okApp("won"), path: pat("/a"), precedence: 2 });
     const router = new Router(buildRoutes([passing, winning]));
     const r = req({ pathInfo: "/a" });
-    const response = router.serve(r);
+    const response = await router.serve(r);
     expect(response[2]).toEqual(["won"]);
     expect(r.pathParameters).toEqual({});
   });
 
-  it("serve() injects path parameters + defaults onto the request", () => {
+  it("serve() injects path parameters + defaults onto the request", async () => {
     let seen: Record<string, unknown> = {};
     const app = {
       serve: (req: RouterRequest): RackishResponse => {
@@ -82,11 +82,11 @@ describe("ActionDispatch::Journey::Router", () => {
       defaults: { controller: "posts" },
     });
     const router = new Router(buildRoutes([route]));
-    router.serve(req({ pathInfo: "/posts/42" }));
+    await router.serve(req({ pathInfo: "/posts/42" }));
     expect(seen).toEqual({ controller: "posts", id: "42" });
   });
 
-  it("serve() sets routeUriPattern from the matched route", () => {
+  it("serve() sets routeUriPattern from the matched route", async () => {
     let pattern: string | null | undefined;
     const app = {
       serve: (req: RouterRequest): RackishResponse => {
@@ -96,7 +96,7 @@ describe("ActionDispatch::Journey::Router", () => {
     };
     const route = new Route({ name: "p", app, path: pat("/posts/:id") });
     const router = new Router(buildRoutes([route]));
-    router.serve(req({ pathInfo: "/posts/1" }));
+    await router.serve(req({ pathInfo: "/posts/1" }));
     expect(pattern).toContain("/posts");
   });
 
@@ -115,7 +115,7 @@ describe("ActionDispatch::Journey::Router", () => {
     expect(found).toEqual([["show", { controller: "posts", id: "7" }]]);
   });
 
-  it("serve() filters by HTTP verb", () => {
+  it("serve() filters by HTTP verb", async () => {
     const getRoute = new Route({
       name: "g",
       app: okApp("get"),
@@ -129,11 +129,13 @@ describe("ActionDispatch::Journey::Router", () => {
       requestMethodMatch: [VerbMatchers.for("POST")],
     });
     const router = new Router(buildRoutes([getRoute, postRoute]));
-    expect(router.serve(req({ pathInfo: "/x", requestMethod: "POST" }))[2]).toEqual(["post"]);
-    expect(router.serve(req({ pathInfo: "/x", requestMethod: "GET" }))[2]).toEqual(["get"]);
+    expect((await router.serve(req({ pathInfo: "/x", requestMethod: "POST" })))[2]).toEqual([
+      "post",
+    ]);
+    expect((await router.serve(req({ pathInfo: "/x", requestMethod: "GET" })))[2]).toEqual(["get"]);
   });
 
-  it("HEAD falls back to GET routes when no HEAD-specific route exists", () => {
+  it("HEAD falls back to GET routes when no HEAD-specific route exists", async () => {
     const getRoute = new Route({
       name: "g",
       app: okApp("get"),
@@ -141,10 +143,10 @@ describe("ActionDispatch::Journey::Router", () => {
       requestMethodMatch: [VerbMatchers.for("GET")],
     });
     const router = new Router(buildRoutes([getRoute]));
-    expect(router.serve(req({ pathInfo: "/x", requestMethod: "HEAD" }))[0]).toBe(200);
+    expect((await router.serve(req({ pathInfo: "/x", requestMethod: "HEAD" })))[0]).toBe(200);
   });
 
-  it("URI-decodes captured parameters", () => {
+  it("URI-decodes captured parameters", async () => {
     let seen: Record<string, unknown> = {};
     const app = {
       serve: (req: RouterRequest): RackishResponse => {
@@ -154,7 +156,7 @@ describe("ActionDispatch::Journey::Router", () => {
     };
     const route = new Route({ name: "show", app, path: pat("/posts/:slug") });
     const router = new Router(buildRoutes([route]));
-    router.serve(req({ pathInfo: "/posts/hello%20world" }));
+    await router.serve(req({ pathInfo: "/posts/hello%20world" }));
     expect(seen["slug"]).toBe("hello world");
   });
 

@@ -5,6 +5,7 @@ import { Response } from "../../action-dispatch/response.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
 import { bodyToString } from "@blazetrails/rack";
+import type { RackishResponse } from "../../action-dispatch/journey/router.js";
 
 describe("Controller JSON rendering integration", () => {
   it("renders JSON from a controller action", async () => {
@@ -109,12 +110,11 @@ describe("Controller JSON rendering integration", () => {
     routes.draw((r) => {
       r.resources("posts");
     });
-    routes.setDispatcher(async (controller, action, params, env) => {
-      const req = new Request(env);
+    routes.registerController("posts", async (action, req) => {
       const res = new Response();
       const c = new PostsController();
-      await c.dispatch(action, req, res);
-      return c.toRackResponse();
+      await c.dispatch(action, req as unknown as Request, res);
+      return c.toRackResponse() as unknown as RackishResponse;
     });
 
     const [status, headers, body] = await routes.call({

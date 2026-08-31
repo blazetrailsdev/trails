@@ -26,38 +26,6 @@ export function createAppServer(_deps: AppServerDeps): AppServer {
   const routeSet = new RouteSet();
   const controllers = new Map<string, ControllerClass>();
 
-  routeSet.setDispatcher(async (controllerName, action, params, env): Promise<RackResponse> => {
-    const Ctrl = controllers.get(controllerName);
-    if (!Ctrl) {
-      return [
-        404,
-        { "content-type": "text/plain" },
-        bodyFromString(`Controller not found: ${controllerName}`),
-      ];
-    }
-
-    const controller = new Ctrl();
-    const request = new Request(env);
-    const response = new Response();
-
-    try {
-      await controller.dispatch(action, request, response);
-
-      const headers: Record<string, string> = {};
-      if (response.headers) {
-        Object.assign(headers, response.headers);
-      }
-
-      return [response.status, headers, bodyFromString(response.body ?? "")];
-    } catch (e: any) {
-      return [
-        500,
-        { "content-type": "text/plain" },
-        bodyFromString(`Error in ${controllerName}#${action}: ${e.message}`),
-      ];
-    }
-  });
-
   return {
     routes: routeSet,
 
@@ -67,6 +35,29 @@ export function createAppServer(_deps: AppServerDeps): AppServer {
 
     registerController(name: string, controllerClass: ControllerClass) {
       controllers.set(name, controllerClass);
+      routeSet.registerController(name, async (action, req): Promise<RackResponse> => {
+        const Ctrl = controllers.get(name)!;
+        const controller = new Ctrl();
+        const request = req as unknown as Request;
+        const response = new Response();
+
+        try {
+          await controller.dispatch(action, request, response);
+
+          const headers: Record<string, string> = {};
+          if (response.headers) {
+            Object.assign(headers, response.headers);
+          }
+
+          return [response.status, headers, bodyFromString(response.body ?? "")];
+        } catch (e: any) {
+          return [
+            500,
+            { "content-type": "text/plain" },
+            bodyFromString(`Error in ${name}#${action}: ${e.message}`),
+          ];
+        }
+      });
     },
 
     drawRoutes(fn: (r: any) => void) {

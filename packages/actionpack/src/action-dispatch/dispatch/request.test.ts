@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Request, PassNotFound } from "../request.js";
+import { Request, PassNotFound, controllerConstants } from "../request.js";
 import { Session } from "../request/session.js";
 import { MimeType } from "../http/mime-type.js";
 import { X_CASCADE } from "../constants.js";
@@ -827,7 +827,17 @@ describe("RequestControllerClass", () => {
 
   it("controllerClassFor throws when a controller name is supplied", () => {
     const req = new Request({});
-    expect(() => req.controllerClassFor("posts")).toThrow(/no global controller constant table/);
+    expect(() => req.controllerClassFor("posts")).toThrow(/uninitialized constant PostsController/);
+  });
+
+  it("controllerClassFor resolves the registered controller constant", () => {
+    class PostsController {}
+    controllerConstants.set("posts", PostsController as never);
+    try {
+      expect(new Request({}).controllerClassFor("posts")).toBe(PostsController);
+    } finally {
+      controllerConstants.delete("posts");
+    }
   });
 
   it("controllerClass defaults action to 'index' and returns PassNotFound without a controller", () => {

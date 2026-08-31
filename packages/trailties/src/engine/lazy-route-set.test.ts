@@ -55,7 +55,7 @@ describe("LazyRouteSet", () => {
   });
 
   it("reloads routes when serve (Rails: call) is invoked", () => {
-    const superServe = vi.spyOn(RouteSet.prototype, "serve").mockReturnValue({
+    const superServe = vi.spyOn(RouteSet.prototype, "serve").mockResolvedValue({
       0: 200,
       1: {},
       2: [],
