@@ -4,6 +4,7 @@ import { CookieStore } from "./cookie-store.js";
 import { CacheStore } from "./cache-store.js";
 import { MemCacheStore } from "./mem-cache-store.js";
 import { AbstractStore } from "./abstract-store.js";
+import { sessionStoreConstants } from "./resolve-store.js";
 
 describe("ActionDispatch::Session.resolve_store", () => {
   it("resolves the autoloaded session store constants", () => {
@@ -11,6 +12,16 @@ describe("ActionDispatch::Session.resolve_store", () => {
     expect(resolveStore(":cache_store")).toBe(CacheStore);
     expect(resolveStore(":mem_cache_store")).toBe(MemCacheStore);
     expect(resolveStore(":abstract_store")).toBe(AbstractStore);
+  });
+
+  it("resolves a custom store registered into the namespace table", () => {
+    class MyCustomStore extends CookieStore {}
+    sessionStoreConstants.set("MyCustomStore", MyCustomStore);
+    try {
+      expect(resolveStore(":my_custom_store")).toBe(MyCustomStore);
+    } finally {
+      sessionStoreConstants.delete("MyCustomStore");
+    }
   });
 
   it("raises a NameError-shaped message for an undefined store", () => {

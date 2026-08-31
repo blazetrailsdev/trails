@@ -399,7 +399,19 @@ describe("Application::Configuration", () => {
     expect(c.sessionStore()).toBeNull();
   });
 
-  it("config.session_store raises on an unresolvable store", () => {
+  it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
+    class MyCustomStore extends Session.CookieStore {}
+    Session.sessionStoreConstants.set("MyCustomStore", MyCustomStore);
+    try {
+      const c = new Configuration();
+      c.sessionStore(":my_custom_store");
+      expect(c.sessionStore()).toBe(MyCustomStore);
+    } finally {
+      Session.sessionStoreConstants.delete("MyCustomStore");
+    }
+  });
+
+  it("config.session_store with unknown store raises helpful error", () => {
     const c = new Configuration();
     c.sessionStore(":nonexistent_store");
     expect(() => c.sessionStore()).toThrow(/Unable to resolve session store :nonexistent_store/);

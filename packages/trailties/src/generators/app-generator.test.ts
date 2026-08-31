@@ -159,6 +159,12 @@ describe("AppGenerator", () => {
     expect(pkg.scripts["db:seed"]).toContain("tsx");
     expect(pkg.scripts.dev).toContain("tsx");
     expect(pkg.scripts.trails).toContain("tsx");
+    // Rails' binstub wrappers go through `bin/rails` (`bin/setup.tt:33`,
+    // `bin/dev.tt:1`); the trails equivalent is the loader-backed command, so
+    // the generated entrypoints do not bypass it.
+    const binstub = (n: string) => fs.readFileSync(appPath("bin", n), "utf-8");
+    expect(binstub("setup")).toContain("tsx");
+    expect(binstub("dev")).toContain("tsx");
   });
 
   it("emits prepare hook that builds .tse views", async () => {

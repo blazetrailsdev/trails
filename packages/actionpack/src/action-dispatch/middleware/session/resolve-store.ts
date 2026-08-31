@@ -6,24 +6,28 @@ import { CacheStore } from "./cache-store.js";
 import { MemCacheStore } from "./mem-cache-store.js";
 
 /**
- * Rails resolves a `:cookie_store` symbol with `const_get` against the
- * `ActionDispatch::Session` namespace, which Zeitwerk autoloads. ESM resolves
- * nothing from a name, so the namespace the constant is looked up in is this
- * table — the same set `action_dispatch.rb:107-111` autoloads.
+ * The constant table `resolve_store` reads, keyed by the camelized store name.
+ * Rails calls `ActionDispatch::Session.const_get`, so it resolves whatever is
+ * defined in that namespace — the five stores `action_dispatch.rb:107-111`
+ * autoloads, and any an app or extension adds. ESM has no namespace to reopen
+ * and no `const_missing` seam, so the namespace is this map, seeded with the
+ * autoloaded five and open for a custom store to register into. Mirrors
+ * {@link controllerConstants}, the same stand-in for the namespace
+ * `Request#controller_class_for` constantizes against.
  *
  * @noRailsEquivalent PERMANENT
  */
-const constants: Record<string, unknown> = {
-  AbstractStore,
-  AbstractSecureStore,
-  CookieStore,
-  MemCacheStore,
-  CacheStore,
-};
+export const sessionStoreConstants = new Map<string, unknown>([
+  ["AbstractStore", AbstractStore],
+  ["AbstractSecureStore", AbstractSecureStore],
+  ["CookieStore", CookieStore],
+  ["MemCacheStore", MemCacheStore],
+  ["CacheStore", CacheStore],
+]);
 
 export function resolveStore(sessionStore: string): unknown {
   const name = camelize(sessionStore.startsWith(":") ? sessionStore.slice(1) : sessionStore);
-  const store = constants[name];
+  const store = sessionStoreConstants.get(name);
   if (store === undefined) {
     // Rails interpolates `session_store.inspect`; a trails Ruby Symbol value
     // already carries its leading colon, so the value renders as-is.

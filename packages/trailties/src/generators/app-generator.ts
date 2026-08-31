@@ -388,7 +388,7 @@ console.log("== Installing dependencies ==");
 system("${this.pmInstall()}");
 
 console.log("\\n== Preparing database ==");
-system("trails db setup");
+system("${TRAILS} db setup");
 
 console.log("\\n== Removing old logs and tempfiles ==");
 for (const dir of ["log", "tmp"]) {
@@ -407,7 +407,7 @@ console.log("\\n== Done! ==");
       `#!/usr/bin/env node
 import { execSync } from "node:child_process";
 
-execSync("trails server", { stdio: "inherit" });
+execSync(["${TRAILS}", "server", ...process.argv.slice(2)].join(" "), { stdio: "inherit" });
 `,
       { mode: 0o755 },
     );
