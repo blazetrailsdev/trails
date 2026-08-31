@@ -36,7 +36,6 @@ function strftimeSubject(v: {
     hour: v.hour,
     min: v.minute,
     sec: v.second,
-    // `RTIME`'s nsec seat, not a Rails `Rational()` call: `vendor/ruby/rational.c:1969` `rb_rational_new`.
     nsec: new Rational(v.millisecond * 1_000_000 + v.microsecond * 1_000 + v.nanosecond, 1),
     zone: "",
     utcOffset: 0,

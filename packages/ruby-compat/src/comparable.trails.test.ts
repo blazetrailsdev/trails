@@ -90,8 +90,8 @@ describe("Comparable", () => {
   });
 });
 
-function instant(epochNanoseconds: bigint): { epochNanoseconds: bigint } {
-  return { epochNanoseconds };
+function instant(epochNanoseconds: bigint): object {
+  return { epochNanoseconds, [Symbol.toStringTag]: "Temporal.Instant" };
 }
 
 describe("Array#max", () => {
