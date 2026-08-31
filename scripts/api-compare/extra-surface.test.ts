@@ -3743,7 +3743,7 @@ describe("buildReport — stdlib Comparable operators", () => {
               extends: [],
               instanceMethods: [
                 method("compare"),
-                method("gte"),
+                method("gteq"),
                 method("lt"),
                 method("between"),
                 method("clamp"),
@@ -3755,7 +3755,7 @@ describe("buildReport — stdlib Comparable operators", () => {
               file: "plain.ts",
               includes: [],
               extends: [],
-              instanceMethods: [method("compare"), method("gte")],
+              instanceMethods: [method("compare"), method("gteq")],
               classMethods: [],
             },
           },
@@ -3787,7 +3787,7 @@ describe("buildReport — stdlib Comparable operators", () => {
       topN: 50,
     });
     const f = report.packages[0].extraFiles.find((f) => f.tsFile === "plain.ts");
-    expect(f?.extras.map((e) => e.name)).toEqual(["gte"]);
+    expect(f?.extras.map((e) => e.name)).toEqual(["gteq"]);
   });
 });
 

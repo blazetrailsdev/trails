@@ -343,19 +343,20 @@ const CORE_MIXIN_METHODS: Record<string, string[]> = {
  * mixin, which keeps the allowance scoped to the files whose Ruby counterpart
  * actually writes the `include`.
  *
- * The names are Rails' own vocabulary for these four comparisons, taken from
- * `Arel::Predications` (`arel/predications.rb:163,175,187,199` — `gteq`, `gt`,
- * `lt`, `lteq`), plus `gte`, which is what the retired
- * `AbstractAdapter::Version` port spelled `>=`. Listing both spellings of a
- * comparison is a no-op: a file is scored on the names it actually declares.
- * `==` is already `equals` through MIRROR_CANDIDATE_OVERRIDES, and
- * `between?` / `clamp` carry ordinary names the base mapper spells.
+ * The names are Rails' own vocabulary for these four comparisons and nothing
+ * else, taken from `Arel::Predications` (`arel/predications.rb:163,175,187,199`
+ * — `gteq`, `gt`, `lt`, `lteq`). A near-miss spelling like `gte` is NOT listed:
+ * this map suppresses a report, so every name on it is a name the gate can no
+ * longer surface, and admitting one Rails does not use would mask a real
+ * divergence rather than credit a port. `==` is already `equals` through
+ * MIRROR_CANDIDATE_OVERRIDES, and `between?` / `clamp` carry ordinary names the
+ * base mapper spells.
  */
 const CORE_MIXIN_OPERATOR_SPELLINGS: Record<string, string[]> = {
   "<": ["lt"],
-  "<=": ["lteq", "lte"],
+  "<=": ["lteq"],
   ">": ["gt"],
-  ">=": ["gteq", "gte"],
+  ">=": ["gteq"],
 };
 
 const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {
