@@ -409,14 +409,22 @@ class TestExtractor
     true
   end
 
-  def materialize_shared_example(args)
+  # `line` is re-stamped to the `it_behaves_like` call site, NOT left at the
+  # shared body's own line: the manifest files this case under the CALLING file
+  # (`process_file` groups by the file being walked, and rails-find/core.ts:131
+  # pairs that path with this line), so the body's line would point past EOF of
+  # an 8-line shell. The call site is a real line in that file and names the
+  # shared body, which is the one hop a reader wants.
+  def materialize_shared_example(args, node)
     name = first_symbol_name(args)
     return unless name
+    line = extract_line(node)
     (@shared_examples[name] || []).each do |t|
       @test_cases << t.merge(
         path: (@describe_stack + [t[:description]]).join(" > "),
         ancestors: @describe_stack.dup,
         file: @current_file,
+        line: line,
       )
     end
   end
@@ -473,7 +481,7 @@ class TestExtractor
     when "describe"
       process_describe(args, node)
     when "it_behaves_like", "it_should_behave_like"
-      materialize_shared_example(args)
+      materialize_shared_example(args, node)
     when "it"
       process_it(args, node)
     when "test"
