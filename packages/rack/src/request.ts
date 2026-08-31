@@ -43,6 +43,7 @@ import {
   HTTP_X_FORWARDED_SCHEME,
 } from "./constants.js";
 import { forwardedValues, getDefaultQueryParser, QueryParser } from "./utils.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 import * as MediaTypeModule from "./media-type.js";
 import { parseMultipart as multipartExtract } from "./multipart.js";
 
@@ -669,9 +670,7 @@ export class Request {
   fetchHeader(name: string, block?: (key: string) => any): any {
     if (Object.hasOwn(this.env, name)) return this.env[name];
     if (block) return block(name);
-    const err = new Error(`key not found: "${name}"`);
-    err.name = "KeyError";
-    throw err;
+    throw new KeyError(`key not found: "${name}"`);
   }
 
   /** Mirrors: `Rack::Request::Env#set_header` (`rack/request.rb:116-118`). */

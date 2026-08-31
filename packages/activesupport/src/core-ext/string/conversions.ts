@@ -9,6 +9,7 @@
  */
 
 import { Date as RubyDate, DateTime, Rational, Temporal, Time } from "@blazetrails/date";
+import { fetch } from "@blazetrails/ruby-compat";
 import { isBlank } from "../object/blank.js";
 import { preserveTimezone } from "../time/compatibility.js";
 
@@ -18,15 +19,13 @@ import { preserveTimezone } from "../time/compatibility.js";
  */
 const USED_KEYS = ["year", "mon", "mday", "hour", "min", "sec", "secFraction", "offset"] as const;
 
-/**
- * Ruby's `Hash#fetch(key, default)` returns the STORED value whenever the key
- * exists — including a stored `nil` — where `??` would substitute the default.
- * `:offset` is exactly that case: `date__parse` sets it from a `nil` return for
- * a zone Ruby does not know (`date_parse.c:2290-2294`).
+/*
+ * `fetch` below is Ruby's `Hash#fetch(key, default)`, which returns the STORED
+ * value whenever the key exists — including a stored `nil` — where `??` would
+ * substitute the default. `:offset` is exactly that case: `date__parse` sets it
+ * from a `nil` return for a zone Ruby does not know
+ * (`date_parse.c:2290-2294`).
  */
-function fetch<T>(parts: Record<string, unknown>, key: string, defaultValue: T): T {
-  return key in parts ? (parts[key] as T) : defaultValue;
-}
 
 /**
  * Converts a string to a Time value.

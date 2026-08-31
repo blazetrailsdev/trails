@@ -3,6 +3,7 @@
  */
 
 import { registerDefaultMimeTypes } from "./mime-types.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 /**
  * Ordered set of registered MIME types. Mirrors `Mime::Mimes` — Rails uses
@@ -471,8 +472,6 @@ export const Mime = {
     const found = MimeType.lookupByExtension(type);
     if (found) return found;
     if (fallback) return fallback(type);
-    const err = new Error(`key not found: "${type}"`);
-    err.name = "KeyError";
-    throw err;
+    throw new KeyError(`key not found: "${type}"`);
   },
 };

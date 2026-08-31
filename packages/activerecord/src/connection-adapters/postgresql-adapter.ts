@@ -1,4 +1,5 @@
 import pg from "pg";
+import { fetch } from "@blazetrails/ruby-compat";
 import {
   type Type,
   ValueType,
@@ -153,10 +154,6 @@ const OID_JSON = 114;
 const OID_JSONB = 3802;
 
 type SessionVariables = Record<string, string | number | boolean | null | ":default">;
-
-function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {
-  return key in hash ? (hash[key] as T) : defaultValue;
-}
 
 interface PgClientLiveness {
   _ending?: boolean;

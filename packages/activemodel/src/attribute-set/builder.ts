@@ -1,4 +1,5 @@
 import { Attribute, Uninitialized } from "../attribute.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 import { Type } from "../type/value.js";
 import { defaultValue } from "../type.js";
 import { AttributeSet } from "../attribute-set.js";
@@ -153,9 +154,7 @@ export class LazyAttributeHash {
     if (attr !== undefined) return attr;
     if (typeof defaultOrBlock === "function") return defaultOrBlock(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
-    const err = new Error(`key not found: ${JSON.stringify(name)}`);
-    err.name = "KeyError";
-    throw err;
+    throw new KeyError(`key not found: ${JSON.stringify(name)}`);
   }
 
   except(...names: string[]): Map<string, Attribute> {

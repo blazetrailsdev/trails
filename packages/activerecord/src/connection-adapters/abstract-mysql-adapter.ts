@@ -5,6 +5,7 @@ import {
   buildExplainClause as mysqlBuildExplainClause,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
+import { fetch } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { KeyError } from "@blazetrails/activesupport";
@@ -123,10 +124,6 @@ import {
   MYSQL_NATIVE_DATABASE_TYPES,
   type NativeDatabaseTypes,
 } from "./abstract/native-database-types.js";
-
-function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {
-  return key in hash ? (hash[key] as T) : defaultValue;
-}
 
 const ER_DUP_ENTRY = 1062;
 const ER_CANNOT_ADD_FOREIGN = 1215;
