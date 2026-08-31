@@ -228,6 +228,9 @@ describe("aliasKey", () => {
 });
 
 describe("arClosureResult", () => {
+  // The closure is passed explicitly: `closureFiles()` walks `vendor/rails`,
+  // which the unit-test job does not populate.
+  const closure = ["active_support/core_ext/object/blank.rb"];
   const files = [
     // core_ext/object/blank.rb is in the AR closure (R1 on the stem).
     file({ rubyFile: "core_ext/object/blank_test.rb", rubyTestCount: 10, matched: 8 }),
@@ -241,7 +244,7 @@ describe("arClosureResult", () => {
   ];
 
   it("partitions the files by the AR-closure manifest", () => {
-    const { inClosure, outOfClosure } = arClosureResult(files);
+    const { inClosure, outOfClosure } = arClosureResult(files, closure);
     expect(inClosure.files).toBe(1);
     expect(inClosure.totalRubyTests).toBe(10);
     expect(inClosure.percent).toBe(80);
@@ -250,13 +253,13 @@ describe("arClosureResult", () => {
   });
 
   it("sums back to the package totals it partitions", () => {
-    const { inClosure, outOfClosure } = arClosureResult(files);
+    const { inClosure, outOfClosure } = arClosureResult(files, closure);
     expect(inClosure.totalRubyTests + outOfClosure.totalRubyTests).toBe(20);
     expect(inClosure.totalMatched + outOfClosure.totalMatched).toBe(14);
     expect(inClosure.totalMatchedSkipped + outOfClosure.totalMatchedSkipped).toBe(1);
   });
 
   it("reports zero percent for an empty side rather than dividing by zero", () => {
-    expect(arClosureResult([]).inClosure.percent).toBe(0);
+    expect(arClosureResult([], closure).inClosure.percent).toBe(0);
   });
 });

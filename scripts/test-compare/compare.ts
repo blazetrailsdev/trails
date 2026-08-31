@@ -396,8 +396,10 @@ interface ConventionPackageResult {
  * remainder sits on ActiveRecord's critical path. Derived from the manifest on
  * every run — there is no second file list.
  */
-export function arClosureResult(files: ConventionFileResult[]): ArClosureResult {
-  const closure = closureFiles();
+export function arClosureResult(
+  files: ConventionFileResult[],
+  closure: readonly string[] = closureFiles(),
+): ArClosureResult {
   const side = (): ClosureSideResult => ({
     files: 0,
     totalRubyTests: 0,
