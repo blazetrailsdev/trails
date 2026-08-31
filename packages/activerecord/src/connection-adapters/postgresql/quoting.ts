@@ -19,7 +19,6 @@ import { Temporal } from "@blazetrails/date";
 import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
-import { rangeBoundLiteral } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
 import { Range, toS } from "@blazetrails/activesupport";
@@ -288,8 +287,8 @@ function yearOf(value: TemporalDateLike): number {
 
 /** @internal */
 export function encodeRange(this: QuotingDispatchHost, range: Range<unknown>): string {
-  const begin = rangeBoundLiteral(typeCastRangeValue.call(this, range.begin));
-  const end = rangeBoundLiteral(typeCastRangeValue.call(this, range.end));
+  const begin = typeCastRangeValue.call(this, range.begin) ?? "";
+  const end = typeCastRangeValue.call(this, range.end) ?? "";
   return `[${begin},${end}${range.excludeEnd ? ")" : "]"}`;
 }
 

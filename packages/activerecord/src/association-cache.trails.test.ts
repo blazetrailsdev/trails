@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createAssociationCache } from "./association-cache.js";
+import { AssociationCache } from "./association-cache.js";
 
 describe("association cache fold", () => {
   it("exposes independent facets over one backing store", () => {
-    const cache = createAssociationCache();
+    const cache = new AssociationCache();
     cache.instances.set("posts", { kind: "instance" });
     cache.proxies.set("posts", { kind: "proxy" });
 
@@ -13,7 +13,7 @@ describe("association cache fold", () => {
   });
 
   it("distinguishes a nil facet value from absent", () => {
-    const cache = createAssociationCache();
+    const cache = new AssociationCache();
     cache.instances.set("author", null);
     expect(cache.instances.has("author")).toBe(true);
     expect(cache.instances.get("author")).toBeNull();
@@ -21,7 +21,7 @@ describe("association cache fold", () => {
   });
 
   it("facet has/get/delete scope to that facet only", () => {
-    const cache = createAssociationCache();
+    const cache = new AssociationCache();
     cache.instances.set("a", 1);
     expect(cache.proxies.has("a")).toBe(false);
     expect(cache.instances.delete("a")).toBe(true);
@@ -31,7 +31,7 @@ describe("association cache fold", () => {
   });
 
   it("clear() resets every facet at once", () => {
-    const cache = createAssociationCache();
+    const cache = new AssociationCache();
     cache.instances.set("a", 1);
     cache.proxies.set("b", 2);
     cache.clear();
@@ -41,7 +41,7 @@ describe("association cache fold", () => {
   });
 
   it("iterates keys/entries/values for its facet", () => {
-    const cache = createAssociationCache();
+    const cache = new AssociationCache();
     cache.instances.set("a", 1);
     cache.instances.set("b", 2);
     cache.proxies.set("c", 3);

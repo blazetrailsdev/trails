@@ -24,13 +24,17 @@ import {
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
 import { ExplainPrettyPrinter } from "./sqlite3/explain-pretty-printer.js";
 import {
-  assertValidDeferrable,
   dataSourceSql as sqliteDataSourceSql,
   extractValueFromDefault as sqliteExtractValueFromDefault,
   indexes as sqliteIndexes,
   newColumnFromField,
   validTableDefinitionOptions as sqliteValidTableDefinitionOptions,
   validateIndexLengthBang as sqliteValidateIndexLengthBang,
+  addForeignKey as sqliteAddForeignKey,
+  removeForeignKey as sqliteRemoveForeignKey,
+  checkConstraints as sqliteCheckConstraints,
+  addCheckConstraint as sqliteAddCheckConstraint,
+  removeCheckConstraint as sqliteRemoveCheckConstraint,
   virtualTableExists as sqliteVirtualTableExists,
 } from "./sqlite3/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
@@ -55,14 +59,7 @@ import { Temporal } from "@blazetrails/date";
 import type { DateTimeCastResult } from "@blazetrails/activemodel";
 import { defaultSqlTimezone } from "./abstract/sql-datetime.js";
 import { IntegerType, FloatType } from "@blazetrails/activemodel";
-import {
-  getFs,
-  getPath,
-  isBlank,
-  pluralize,
-  runLoadHooks,
-  trailsRoot,
-} from "@blazetrails/activesupport";
+import { getFs, getPath, isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -104,10 +101,8 @@ import {
   type ColumnType,
   type ColumnOptions,
   type RemoveForeignKeyOptions,
-  type ForeignKeyLookupOptions,
   type IndexDefinition,
 } from "./abstract/schema-definitions.js";
-import { Base } from "../base.js";
 import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
@@ -1282,30 +1277,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    const tableSql = (await this.queryValue(
-      `SELECT sql FROM sqlite_master WHERE name = ${this.quote(tableName)} AND type = 'table' ` +
-        `UNION ALL ` +
-        `SELECT sql FROM sqlite_temp_master WHERE name = ${this.quote(tableName)} AND type = 'table'`,
-      "SCHEMA",
-    )) as string | null;
-
-    const sql = String(tableSql ?? "");
-    const checkConstraints: CheckConstraintDefinition[] = [];
-    for (const match of sql.matchAll(/CONSTRAINT\s+(\w+)\s+CHECK\s+\(/gi)) {
-      const start = match.index + match[0].length;
-      let depth = 1;
-      let i = start;
-      while (i < sql.length && depth > 0) {
-        if (sql[i] === "(") depth++;
-        else if (sql[i] === ")") depth--;
-        i++;
-      }
-      if (depth !== 0) continue;
-      const [, name] = match;
-      const expression = sql.slice(start, i - 1);
-      checkConstraints.push(new CheckConstraintDefinition(tableName, expression, { name }));
-    }
-    return checkConstraints;
+    return sqliteCheckConstraints.call(this, tableName);
   }
 
   async addForeignKey(
@@ -1313,11 +1285,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    assertValidDeferrable(options.deferrable);
-
-    await this.alterTable(fromTable, undefined, undefined, undefined, (definition) => {
-      definition.foreignKey(this.stripTableNamePrefixAndSuffix(toTable), options);
-    });
+    return sqliteAddForeignKey.call(this, fromTable, toTable, options);
   }
 
   async removeForeignKey(
@@ -1325,39 +1293,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     toTable?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    let to = typeof toTable === "string" ? toTable : undefined;
-    const opts: RemoveForeignKeyOptions =
-      typeof toTable === "object" && toTable !== null ? { ...toTable, ...options } : { ...options };
-    const ifExists = opts.ifExists === true;
-    delete opts.ifExists;
-
-    if (ifExists && !(await this.foreignKeyExists(fromTable, to))) return;
-
-    to ??= opts.toTable;
-    const matchOptions: ForeignKeyLookupOptions = { ...opts };
-    delete matchOptions.name;
-    delete matchOptions.toTable;
-    delete matchOptions.validate;
-
-    const foreignKeys = await this.foreignKeys(fromTable);
-    const fkey = foreignKeys.find((fk) => {
-      const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
-      const table = this.stripTableNamePrefixAndSuffix(
-        to ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
-      );
-      return (
-        this.stripTableNamePrefixAndSuffix(fk.toTable) === table && fk.isDefinedFor(matchOptions)
-      );
-    });
-
-    if (!fkey) {
-      throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${to ?? JSON.stringify(matchOptions)}`,
-      );
-    }
-
-    foreignKeys.splice(foreignKeys.indexOf(fkey), 1);
-    await this.alterTable(fromTable, foreignKeys);
+    return sqliteRemoveForeignKey.call(this, fromTable, toTable, options);
   }
 
   async addCheckConstraint(
@@ -1365,9 +1301,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     expression: string,
     options: { name?: string; validate?: boolean } = {},
   ): Promise<void> {
-    await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
-      definition.checkConstraint(expression, options);
-    });
+    return sqliteAddCheckConstraint.call(this, tableName, expression, options);
   }
 
   async removeCheckConstraint(
@@ -1382,23 +1316,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       ifExists?: boolean;
     } = {},
   ): Promise<void> {
-    const expr = typeof expression === "string" ? expression : undefined;
-    const opts =
-      typeof expression === "object" ? { ...(expression ?? {}), ...options } : { ...options };
-
-    const { ifExists, ...lookupOptions } = opts;
-
-    if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
-
-    let checkConstraints = await this.checkConstraints(tableName);
-    const chkNameToDelete = (
-      await this.checkConstraintForBang(tableName, { expression: expr, ...lookupOptions })
-    ).name;
-    checkConstraints = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
-    await this.alterTable(tableName, await this.foreignKeys(tableName), checkConstraints);
+    return sqliteRemoveCheckConstraint.call(this, tableName, expression, options);
   }
 
-  private async alterTable(
+  /** @internal */
+  async alterTable(
     tableName: string,
     foreignKeys?: ForeignKeyDefinition[],
     checkConstraints?: CheckConstraintDefinition[],
