@@ -10,6 +10,7 @@ import {
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/activesupport";
+import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
 import { RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { EngineConfiguration } from "./engine/configuration.js";
@@ -69,6 +70,7 @@ describe("Engine", () => {
   it("engine_name aliases railtie_name", () => {
     class BlogEngine extends Engine {}
     Trailtie.register(BlogEngine);
+    BlogEngine.calledFrom("/");
     expect(BlogEngine.engineName()).toBe("blog_engine");
     expect(BlogEngine.engineName()).toBe(BlogEngine.railtieName());
   });
@@ -76,6 +78,7 @@ describe("Engine", () => {
   it("isolated? defaults to false", () => {
     class PlainEngine extends Engine {}
     Trailtie.register(PlainEngine);
+    PlainEngine.calledFrom("/");
     expect(PlainEngine.isolated()).toBe(false);
     expect(PlainEngine.instance().isolated()).toBe(false);
   });
@@ -117,7 +120,10 @@ describe("Engine", () => {
   });
 
   it("find() locates the engine whose root matches", async () => {
-    installFs(new Set(["/", "/found", "/found/sub"]), new Set(["/found/lib"]));
+    installFs(
+      new Set(["/", "/found", "/found/sub", "/blog", "/blog/sub"]),
+      new Set(["/lib", "/found/lib", "/blog/sub/lib"]),
+    );
     class FoundEngine extends Engine {}
     Trailtie.register(FoundEngine);
     FoundEngine.calledFrom("/found/sub");
@@ -214,6 +220,7 @@ describe("Engine", () => {
     A.instance().config.eagerLoadNamespaces.push("ANs");
     B.instance().config.eagerLoadNamespaces.push("BNs");
     expect(A.instance().config.eagerLoadNamespaces).toBe(B.instance().config.eagerLoadNamespaces);
+    expect(A.instance().config.eagerLoadNamespaces).toBe(BaseRailtie.config["eagerLoadNamespaces"]);
     expect(A.instance().config.eagerLoadNamespaces.length).toBe(before + 2);
   });
 

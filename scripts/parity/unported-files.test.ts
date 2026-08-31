@@ -166,10 +166,11 @@ describe("UNPORTED_FILES schema", () => {
     expect(isTestCaseUnported("test_switch_hitter.rb", "strftime", "TestSH")).toBe(false);
   });
 
-  it("scopes the globalid railtie_test.rb exclusion so activemodel's is still counted", () => {
+  it("counts every package's railtie_test.rb", () => {
     // Regression: a bare `railtie_test.rb` substring-matched activemodel's and
-    // railties' railtie_test.rb too, silently dropping ported files.
-    expect(isTestFileUnported("railtie_test.rb", "globalid")).toBe(true);
+    // railties' railtie_test.rb too, silently dropping ported files. globalid's
+    // own entry retired once its railtie became a Trailtie.
+    expect(isTestFileUnported("railtie_test.rb", "globalid")).toBe(false);
     expect(isTestFileUnported("railtie_test.rb", "activemodel")).toBe(false);
     expect(isTestFileUnported("railties/railtie_test.rb", "trailties")).toBe(false);
   });

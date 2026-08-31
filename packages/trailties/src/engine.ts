@@ -40,8 +40,8 @@ export class Engine extends Trailtie {
     const expanded = await realpathOr(fs, p.resolve(path));
     for (const klass of this.engineSubclasses()) {
       const engine = klass.instance();
-      const root = await engine.root().catch(() => undefined);
-      if (root && (await realpathOr(fs, p.resolve(root))) === expanded) return engine;
+      const root = await engine.root();
+      if ((await realpathOr(fs, p.resolve(root))) === expanded) return engine;
     }
     return undefined;
   }
@@ -84,13 +84,16 @@ export class Engine extends Trailtie {
     return (this.constructor as typeof Engine).isolated();
   }
 
-  /** Returns the resolved root, or undefined when `calledFrom` is unset.
-   * Diverges from Rails (which raises) so consumers can construct an
-   * Engine before its source location is known — matches PR 2.2a. */
-  async root(): Promise<string | undefined> {
+  /** Rails delegates `root` to `config` (`engine.rb:437`), whose root is
+   * seeded from `find_root(called_from)` when the configuration is built
+   * (`engine.rb:553`). Resolution is async here, so it happens on read — an
+   * unset `calledFrom` reaches `find_root_with_flag` exactly as Ruby's nil
+   * `called_from` does, and raises for an Engine (no default) while
+   * `Application.findRoot`'s `cwd` default answers for an Application
+   * (`application.rb:88-90`). */
+  async root(): Promise<string> {
     const klass = this.constructor as typeof Engine;
-    const from = klass.calledFrom();
-    return from === undefined ? undefined : await klass.findRoot(from);
+    return await klass.findRoot(klass.calledFrom() as string);
   }
 
   /** Mirrors `Engine#config` — overrides `Trailtie#config` to return
@@ -118,10 +121,7 @@ export class Engine extends Trailtie {
    * expanded root for subsequent `expanded`/`existent` calls. */
   async paths(): Promise<Root> {
     const cfg = this.config;
-    if (cfg.root === null) {
-      const resolved = await this.root();
-      if (resolved !== undefined) cfg.setRoot(resolved);
-    }
+    if (cfg.root === null) cfg.setRoot(await this.root());
     return cfg.paths();
   }
 

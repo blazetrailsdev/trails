@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EnvironmentInquirer, NullLogger, setEnv, trailsRoot } from "@blazetrails/activesupport";
+import {
+  EnvironmentInquirer,
+  getFsAsync,
+  NullLogger,
+  setEnv,
+  trailsRoot,
+} from "@blazetrails/activesupport";
 import { Trails, _resetTrailsEnv } from "./rails.js";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
@@ -164,19 +170,17 @@ describe("Trails", () => {
     expect(trailsRoot()).toBe("/srv/override");
   });
 
-  it("Trails.root stays undefined when neither config.root nor discovery resolve (Rails returns nil, not cwd)", async () => {
+  it("Trails.root synthesizes no cwd of its own — the fallback is Application#root's (Rails: find_root's Dir.pwd)", async () => {
     class NoRootApp extends Application {}
     Application.register(NoRootApp);
-    const app = NoRootApp.instance();
-    app.root = async () => undefined;
-    expect(await Trails.root()).toBeUndefined();
+    const fs = await getFsAsync();
+    expect(await Trails.root()).toBe(await fs.realpath!(fs.cwd()));
   });
 
   it("Trails.publicPath honors a config.setRoot override when discovery is unresolved", async () => {
     class OverriddenPubApp extends Application {}
     Application.register(OverriddenPubApp);
     const app = OverriddenPubApp.instance();
-    app.root = async () => undefined;
     app.config.setRoot("/srv/override");
     expect(await Trails.publicPath()).toBe("/srv/override/public");
   });
@@ -199,14 +203,6 @@ describe("Trails", () => {
 
   it("Trails.publicPath returns null when no application is registered", async () => {
     expect(await Trails.publicPath()).toBeNull();
-  });
-
-  it("Trails.publicPath returns null when app.root() is unresolved (no throw)", async () => {
-    class UnrootedApp extends Application {}
-    Application.register(UnrootedApp);
-    const app = UnrootedApp.instance();
-    app.root = async () => undefined;
-    await expect(Trails.publicPath()).resolves.toBeNull();
   });
 
   it('Trails.publicPath returns the first expanded entry of paths["public"]', async () => {

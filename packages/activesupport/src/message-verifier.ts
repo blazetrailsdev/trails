@@ -38,7 +38,11 @@ export class MessageVerifier extends Codec {
 
   declare rotate: (...args: unknown[]) => this;
   declare onRotation: (callback: OnRotation) => this;
-  declare fallBackTo: (fallback: this) => this;
+  /** Ruby's `fall_back_to(fallback)` takes any verifier, not one of the
+   * receiver's own class (`messages/rotator.rb:23-26`); a `this`-typed
+   * parameter would make a subclass — `GlobalID::Verifier` — unassignable to
+   * `MessageVerifier`. */
+  declare fallBackTo: (fallback: MessageVerifier) => this;
 
   private secret: string | Buffer;
   private digest: string;

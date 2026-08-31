@@ -5,13 +5,16 @@ import { GID, validateApp, type GidComponents } from "./uri/gid.js";
 // `class SignedGlobalID extends GlobalID` while `GlobalID` is still in TDZ.
 // `find` therefore reaches Locator through a dynamic import.
 import type { LocateOptions, LocatorLike, LocatorModel } from "./locator.js";
-import { constantize } from "@blazetrails/activesupport";
+import { constantize, Deprecation } from "@blazetrails/activesupport";
 
 /**
  * Mirrors Ruby's `model <= GlobalID` — matches the identity itself OR any
  * subclass. Safe for non-constructor `LocatorModel` values (returns false
  * instead of throwing on missing `.prototype`).
  */
+/** Memoizes `@deprecator ||=` (`global_id.rb:21`). */
+let _deprecator: Deprecation | undefined;
+
 function isOrExtends(klass: LocatorModel, base: { prototype: object }): boolean {
   if ((klass as unknown) === base) return true;
   const proto = (klass as unknown as { prototype?: unknown }).prototype;
@@ -166,6 +169,11 @@ export class GlobalID {
   /** Mirrors: GlobalID#== — `other.is_a?(GlobalID) && uri == other.uri`. */
   equals(other: GlobalID): boolean {
     return other instanceof GlobalID && this.uri.equals(other.uri);
+  }
+
+  /** Mirrors: GlobalID.deprecator (`global_id.rb:20-22`). */
+  static deprecator(): Deprecation {
+    return (_deprecator ??= new Deprecation("2.1", "GlobalID"));
   }
 
   /** Mirrors: GlobalID.app= validation */

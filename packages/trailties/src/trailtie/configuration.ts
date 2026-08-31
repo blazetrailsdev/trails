@@ -7,6 +7,8 @@
  * behavior without coupling to a hook surface that doesn't expose that
  * semantic yet.
  */
+import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
+
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
 
 const LIFECYCLE_HOOKS = [
@@ -19,8 +21,13 @@ const LIFECYCLE_HOOKS = [
 export type LifecycleHook = (typeof LIFECYCLE_HOOKS)[number];
 
 export class Configuration {
-  /** @internal Rails `@@`-style shared state. */
-  static readonly _eagerLoadNamespaces: unknown[] = [];
+  /** @internal Rails `@@eager_load_namespaces` (`railtie/configuration.rb:17-20`).
+   * One array, shared with `Railtie.config` in activesupport: a railtie that
+   * cannot import trailties — globalid, whose package trailties depends on
+   * transitively — still runs `config.eager_load_namespaces << GlobalID`
+   * against this list. */
+  static readonly _eagerLoadNamespaces: unknown[] = (BaseRailtie.config["eagerLoadNamespaces"] ??=
+    []) as unknown[];
   /** @internal */
   static readonly _watchableFiles: string[] = [];
   /** @internal */

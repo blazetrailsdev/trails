@@ -1,4 +1,4 @@
-import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { GID } from "./uri/gid.js";
 import { GlobalID, type GlobalIDModel, type GlobalIDOptions } from "./global-id.js";
@@ -73,11 +73,6 @@ export class SignedGlobalID extends GlobalID {
    * Mirrors: SignedGlobalID.parse
    */
   static parse(sgid: string, options: ParseOptions = {}): SignedGlobalID | null {
-    // Rails' `verify` reaches `pick_verifier`, which raises when no verifier
-    // is available — only InvalidSignature is rescued. Our verify helpers
-    // swallow every error to return null, so assert the verifier here to keep
-    // "no verifier configured" a raise rather than a silent null.
-    SignedGlobalID.pickVerifier(options);
     const verified = SignedGlobalID.verify(sgid, options);
     if (verified === null) return null;
     // The token's own expiry wins over any class-level default: an explicit
@@ -139,29 +134,40 @@ export class SignedGlobalID extends GlobalID {
   }
 
   /**
-   * @internal Mirrors verify_with_verifier_validated_metadata. Verifier
-   * validates purpose + expires_at; we then re-check the embedded URI parses.
+   * @internal Mirrors verify_with_verifier_validated_metadata. Only
+   * `ActiveSupport::MessageVerifier::InvalidSignature` is rescued
+   * (`signed_global_id.rb:34-38`) — a missing verifier's error and any other
+   * failure propagate. The verifier validates purpose + expires_at; the
+   * embedded URI is then re-checked through the same `rescue nil` Rails'
+   * `GlobalID.parse` (`global_id.rb:33`) applies to it.
    */
   static verifyWithVerifierValidatedMetadata(
     sgid: string,
     options: ParseOptions,
   ): { uri: string; expiresAt: Temporal.Instant | undefined } | null {
+    const verifier = SignedGlobalID.pickVerifier(options);
+    let raw: SgidPayload | null;
     try {
-      const verifier = SignedGlobalID.pickVerifier(options);
-      const purpose = SignedGlobalID.pickPurpose(options);
-      const raw = verifier.verified(sgid, { purpose }) as SgidPayload | null;
-      if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
-      if (raw.purpose !== purpose) return null;
+      raw = verifier.verify(sgid, {
+        purpose: SignedGlobalID.pickPurpose(options),
+      }) as SgidPayload | null;
+    } catch (error) {
+      if (error instanceof InvalidSignature) return null;
+      throw error;
+    }
+    if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
+    if (raw.purpose !== SignedGlobalID.pickPurpose(options)) return null;
+    try {
       GID.parse(raw.gid);
-      let expiresAt: Temporal.Instant | undefined;
-      if (raw.expires_at) {
-        expiresAt = Temporal.Instant.from(raw.expires_at);
-        if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) return null;
-      }
-      return { uri: raw.gid, expiresAt };
     } catch {
       return null;
     }
+    let expiresAt: Temporal.Instant | undefined;
+    if (raw.expires_at) {
+      expiresAt = Temporal.Instant.from(raw.expires_at);
+      if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) return null;
+    }
+    return { uri: raw.gid, expiresAt };
   }
 
   /**
