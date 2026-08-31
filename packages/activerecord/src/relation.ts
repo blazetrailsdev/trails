@@ -1,5 +1,6 @@
 import { Temporal } from "@blazetrails/date";
-import { except, hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
+import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";

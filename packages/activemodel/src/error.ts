@@ -1,4 +1,5 @@
-import { humanize, deepDup, except, isPlainObject } from "@blazetrails/activesupport";
+import { humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
 import { MissingTranslation, catchException, type TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 

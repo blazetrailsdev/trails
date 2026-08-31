@@ -19,8 +19,8 @@ import {
   reverseMerge,
   assertValidKeys,
   slice,
-  except,
 } from "../hash-utils.js";
+import { except } from "@blazetrails/ruby-compat";
 
 describe("HashExtTest", () => {
   it("methods", () => {

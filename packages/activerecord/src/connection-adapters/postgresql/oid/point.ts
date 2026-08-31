@@ -1,3 +1,4 @@
+import { kernelFloat } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class PointValue {
@@ -75,22 +76,13 @@ export class Point extends ValueType<PointValue> {
     return super.typeCastForSchema(value);
   }
 
-  private toCoordinate(value: unknown): number | null {
-    if (typeof value === "string" && value.trim() === "") return null;
-    const n = Number(value);
-    return Number.isNaN(n) ? null : n;
-  }
-
   private numberForPoint(number: unknown): string {
     const s = String(number);
     return s.endsWith(".0") ? s.slice(0, -2) : s;
   }
 
-  private buildPoint(x: unknown, y: unknown): PointValue | null {
-    const fx = this.toCoordinate(x);
-    const fy = this.toCoordinate(y);
-    if (fx == null || fy == null) return null;
-    return new PointValue(fx, fy);
+  private buildPoint(x: unknown, y: unknown): PointValue {
+    return new PointValue(kernelFloat(x), kernelFloat(y));
   }
 }
 

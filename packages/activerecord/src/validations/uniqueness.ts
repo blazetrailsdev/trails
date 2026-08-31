@@ -1,5 +1,6 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
-import { isBlank, except } from "@blazetrails/activesupport";
+import { isBlank } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 

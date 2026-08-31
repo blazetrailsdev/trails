@@ -28,6 +28,10 @@ function utf8WidthBounds(cp: number): [number, number] {
  * a class inserts a new leading digit/letter (`"Zz".succ == "AAa"`,
  * `"99".succ == "100"`). Strings with no alphanumeric increment by raw code
  * unit instead (`"<<".succ == "<="`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#succ`
+ * (`vendor/ruby/string.c:4868` `rb_str_succ`), which Rails inherits rather
+ * than defines.
  */
 export function succ(s: string): string {
   if (s.length === 0) return "";

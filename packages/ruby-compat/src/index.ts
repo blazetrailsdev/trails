@@ -27,6 +27,7 @@ export {
   update,
 } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
+export { kernelFloat } from "./kernel-float.js";
 export { KeyError } from "./key-error.js";
 export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";

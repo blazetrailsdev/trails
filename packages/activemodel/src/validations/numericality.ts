@@ -1,15 +1,12 @@
-import { isSymbol } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError as RubyArgumentError,
+  isSymbol,
+  kernelFloat,
+} from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import {
-  underscore,
-  BigDecimal,
-  Range,
-  kernelFloat,
-  mergeBang,
-  slice,
-} from "@blazetrails/activesupport";
+import { underscore, BigDecimal, Range, mergeBang, slice } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
@@ -167,9 +164,7 @@ export function parseAsNumber(
       : int;
   }
   if (!isHexadecimalLiteral(rawValue)) {
-    const float = kernelFloat(rawValue);
-    if (float === undefined) return undefined;
-    return parseFloat(float, precision, scale);
+    return parseFloat(kernelFloat(rawValue), precision, scale);
   }
   return undefined;
 }
@@ -194,7 +189,18 @@ export function isNumber(
 ): boolean {
   if (this.options.onlyNumeric && !isNumeric(rawValue)) return false;
 
-  return parseAsNumber(rawValue, precision, scale) !== undefined;
+  try {
+    return parseAsNumber(rawValue, precision, scale) !== undefined;
+  } catch (error) {
+    if (
+      error instanceof RubyArgumentError ||
+      error instanceof ArgumentError ||
+      error instanceof TypeError
+    ) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /** @internal */

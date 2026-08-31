@@ -6,7 +6,8 @@ import {
   association as collectionProxyFor,
 } from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
-import { singularize, camelize, underscore, isBlank, except } from "@blazetrails/activesupport";
+import { singularize, camelize, underscore, isBlank } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { BooleanType } from "@blazetrails/activemodel";

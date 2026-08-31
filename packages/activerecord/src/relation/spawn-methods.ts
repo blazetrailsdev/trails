@@ -1,4 +1,5 @@
-import { defineModule, except as exceptValues, slice } from "@blazetrails/activesupport";
+import { defineModule, slice } from "@blazetrails/activesupport";
+import { except as exceptValues } from "@blazetrails/ruby-compat";
 import { Merger, HashMerger } from "./merger.js";
 import { argumentError, setValues } from "./query-methods.js";
 import type { ExceptSkip } from "./query-methods.js";

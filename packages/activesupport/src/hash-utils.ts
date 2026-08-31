@@ -109,23 +109,10 @@ export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K
 }
 
 /**
- * Mirrors Ruby's `Hash#include?` — an alias of `Hash#has_key?`, so it is an
- * OWN-key test (`Object.hasOwn`), never the `in` operator, which also answers
- * for keys inherited down the prototype chain.
- *
- * Reaches the package barrel as `isIncludeObj`: `Range#include?`'s port
- * already owns the bare name there and one ESM namespace cannot hold both,
- * the same collision `compactBlank as compactBlankObj` resolves.
- */
-export function isInclude(hash: AnyObject, key: string): boolean {
-  return Object.hasOwn(hash, key);
-}
-
-/**
  * Ruby's `Hash#merge` — a non-destructive copy of the receiver with
  * `otherHash`'s pairs written over it.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link except} is.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link mergeBang} is.
  */
 export function merge<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
   return { ...hash, ...otherHash } as T;
@@ -139,17 +126,6 @@ export function merge<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
  */
 export function mergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
   return Object.assign(hash, otherHash);
-}
-
-/**
- * Return a copy of the object without the specified keys.
- */
-export function except<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Omit<T, K> {
-  const result = { ...obj };
-  for (const key of keys) {
-    delete result[key];
-  }
-  return result as Omit<T, K>;
 }
 
 /**
