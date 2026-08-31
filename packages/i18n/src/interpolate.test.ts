@@ -90,9 +90,8 @@ describe("I18nInterpolateTest", () => {
   });
 
   class RailsSafeBuffer extends String {
-    override replace(searchValue: never, replaceValue: never): string {
-      return this.toString().replace(searchValue, replaceValue);
-    }
+    override replace: typeof String.prototype.replace = (searchValue, replaceValue) =>
+      this.toString().replace(searchValue as string, replaceValue as string);
   }
 
   it("with String subclass that redefined gsub method", () => {
