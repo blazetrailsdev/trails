@@ -1,6 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { MissingTemplate, LookupContext } from "./lookup-context.js";
 import type { TemplateResolver } from "./resolver/resolver.js";
+import { Template } from "./template.js";
+import { TemplateHandlers } from "./template/handlers.js";
+import { Tse } from "./template/handlers/tse.js";
 
 describe("MissingTemplate#corrections", () => {
   it("returns close template path matches ranked by Jaro distance", () => {
@@ -101,5 +104,76 @@ describe("LookupContext allCandidatePaths wiring", () => {
     expect(caught).toBeInstanceOf(MissingTemplate);
     expect(caught!.candidatePaths).toContain("posts/_form");
     expect(caught!.corrections).toContain("posts/form");
+  });
+});
+
+describe("LookupContext#renderPartialSync", () => {
+  const template = (identifier: string, source: string): Template =>
+    new Template({ source, identifier, extension: "tse", format: "html" });
+
+  function contextWith(templates: Record<string, string>): LookupContext {
+    const resolver: TemplateResolver = {
+      find: (name, prefix) => {
+        const key = prefix ? `${prefix}/${name}` : name;
+        const source = templates[key];
+        return source === undefined ? null : template(key, source);
+      },
+      allTemplatePaths: () => Object.keys(templates),
+    };
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(resolver);
+    return ctx;
+  }
+
+  beforeEach(() => {
+    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  });
+
+  afterEach(() => {
+    TemplateHandlers.clear();
+  });
+
+  it("renders a partial by bare name against the given prefix", () => {
+    const ctx = contextWith({ "posts/_form": "<%= title %>" });
+    expect(ctx.renderPartialSync("form", "posts", "html", { title: "New" })).toBe("New");
+  });
+
+  it("takes the prefix from a qualified name", () => {
+    const ctx = contextWith({ "users/_user": "<li><%= user %></li>" });
+    expect(ctx.renderPartialSync("users/user", "posts", "html", { user: "Ada" })).toBe(
+      "<li>Ada</li>",
+    );
+  });
+
+  it("resolves a partial nested inside a partial", () => {
+    const ctx = contextWith({
+      "posts/_post": '<%= render({ partial: "posts/byline", locals: { name: name } }) %>',
+      "posts/_byline": "by <%= name %>",
+    });
+    expect(ctx.renderPartialSync("post", "posts", "html", { name: "Ada" })).toBe("by Ada");
+  });
+
+  it("raises MissingTemplate when the partial does not resolve", () => {
+    const ctx = contextWith({ "posts/_form": "" });
+    expect(() => ctx.renderPartialSync("frm", "posts", "html")).toThrow(MissingTemplate);
+  });
+
+  it("raises rather than emitting [object Promise] for an async handler", () => {
+    TemplateHandlers.registerTemplateHandler("tse", {
+      extensions: ["tse"],
+      render: async () => "later",
+    });
+    const ctx = contextWith({ "posts/_form": "hi" });
+    expect(() => ctx.renderPartialSync("form", "posts", "html")).toThrow(/renders asynchronously/);
+  });
+
+  it("is reachable from a template rendered through renderTemplate", async () => {
+    const ctx = contextWith({ "posts/_form": "form!" });
+    const out = await ctx.renderTemplate(
+      template("posts/index", '<%= render({ partial: "form" }) %>'),
+      {},
+      { controller: "posts", action: "index", format: "html" },
+    );
+    expect(out).toBe("form!");
   });
 });

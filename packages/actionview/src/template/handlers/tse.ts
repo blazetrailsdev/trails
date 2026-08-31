@@ -1,6 +1,8 @@
-import { chomp } from "@blazetrails/activesupport";
+import { chomp, htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { Base } from "../../base.js";
+import { TseRenderContextImpl, type TseRenderContext } from "../../render-context.js";
+import { StrictLocalsMismatch } from "../../strict-locals.js";
 import type { RenderContext, TemplateHandler } from "../handlers.js";
 import {
   translateLocation as translateLocationImpl,
@@ -142,18 +144,164 @@ export class Tse implements TemplateHandler {
   }
 
   /**
-   * Not yet executable. Rails' handler protocol returns compiled code from
-   * `call(...)`; turning that code into an output string requires the
-   * runtime substrate (`OutputBuffer`, view context, compiled-template
-   * module loader) that Phase 2c wires up. Returning the JS source from
-   * `render` would be a footgun — a renderer would write template source
-   * into the response body. Throw until execution lands.
+   * Compile the template and run it, returning its output.
+   *
+   * Rails splits this across `Template#compile!`
+   * (`actionview/lib/action_view/template.rb:418`), which `module_eval`s the
+   * handler's code string into a real method on the view class and memoizes on
+   * `@compiled`, and `Template#render` (`template.rb:271`), which calls that
+   * method and returns `OutputBuffer#to_s`. `new Function` is the JS analogue
+   * of `module_eval` — it is the only way to turn an emitted source string into
+   * a callable — and the compile is memoized on that source the way Rails
+   * memoizes on `@compiled`.
    */
-  render(_source: string, _locals: Record<string, unknown>, _context: RenderContext): string {
-    throw new Error(
-      "Tse#render is not yet implemented — `.tse` execution lands in Phase 2c. " +
-        "Use `Tse#call(template, source)` to get the compiled JS module source.",
+  render(source: string, locals: Record<string, unknown>, context: RenderContext): string {
+    const compiled = this.compiled(source, context);
+    const renderContext = new HandlerRenderContext(context);
+    if (context.yield !== undefined) renderContext.setDefaultYield(htmlSafe(context.yield));
+    compiled(renderContext, locals, scopeFor(renderContext, locals));
+    return renderContext.outputBuffer.toStr();
+  }
+
+  /**
+   * Memoized emitted-source → callable. Mirrors `compile!`'s `@compiled`
+   * guard; keyed on the emitted code so a handler-option change
+   * (`escapeIgnoreList`, annotation) compiles afresh.
+   *
+   * @internal
+   */
+  private compiled(source: string, context: RenderContext): CompiledTemplate {
+    const code = this.call(
+      { type: context.format, format: context.format, shortIdentifier: context.templatePath },
+      source,
     );
+    let fn = compiledCache.get(code);
+    if (!fn) {
+      fn = evaluateTemplate(code, context.templatePath);
+      compiledCache.set(code, fn);
+    }
+    return fn;
+  }
+}
+
+/**
+ * Build the object a compiled template's bare identifiers resolve against.
+ *
+ * Rails compiles a template into a method ON THE VIEW
+ * (`template.rb:458-463`), so `yield`, `render`, `raw`, `concat`, `capture`
+ * and `content_for` are all in scope as ordinary method calls, and
+ * `locals_code` (`template.rb:561-572`) then assigns each local as a real
+ * local variable — which is why a local shadows a same-named helper. The
+ * object environment record below is the JS construct with that resolution
+ * order: helpers first, locals assigned over them.
+ *
+ * `<%= yield %>` compiles to an identifier read rather than a call, so the
+ * default section is a property; a named section is read off the context
+ * (`context.yield("sidebar")`), which the compiler cannot spell as
+ * `yield :sidebar`.
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE helper-methods-not-in-tse-scope
+ */
+function scopeFor(
+  context: HandlerRenderContext,
+  locals: Record<string, unknown>,
+): Record<string, unknown> {
+  const scope: Record<string, unknown> = {
+    render: (options: Parameters<TseRenderContext["render"]>[0]) => context.render(options),
+    raw: (value: unknown) => context.raw(value),
+    concat: (value: unknown) => context.concat(value),
+    capture: (callback: () => void) => context.capture(callback),
+    contentFor: (name: string, callback: () => void) => context.contentFor(name, callback),
+  };
+  Object.defineProperty(scope, "yield", {
+    get: () => context.yield(),
+    enumerable: true,
+  });
+  return Object.assign(scope, locals);
+}
+
+/** The shape `compileJs` emits as its default export, plus the scope record. @internal */
+type CompiledTemplate = (
+  context: TseRenderContext,
+  locals: Record<string, unknown>,
+  scope: Record<string, unknown>,
+) => unknown;
+
+const compiledCache = new Map<string, CompiledTemplate>();
+
+/**
+ * Turn the emitted ES-module source into a callable. The compiler emits
+ * `export default function render(context, locals)`, optionally preceded by an
+ * `import` of `StrictLocalsMismatch`; strip both so the remainder is a
+ * function expression, then create it inside a `with` block over the scope
+ * record so its bare identifiers resolve there. The emitted name `render` is
+ * renamed on the way: as a function *expression* it would bind inside the
+ * function's own scope and shadow the `render` helper the scope record
+ * supplies, so `<%= render({ partial: … }) %>` would recurse into the
+ * template.
+ *
+ * `locals` is passed through unchanged — the strict-locals check the compiler
+ * emits compares `Object.keys(locals)` against the declared signature, so the
+ * scope record must not stand in for it.
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE helper-methods-not-in-tse-scope
+ */
+function evaluateTemplate(code: string, templatePath?: string): CompiledTemplate {
+  const expression = code
+    .replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\n?/u, "")
+    .replace(/^\s*export\s+default\s+/u, "")
+    .replace(/^function\s+render\b/u, "function __tseCompiled");
+  try {
+    const factory = new Function(
+      "StrictLocalsMismatch",
+      "__tseContext",
+      "__tseLocals",
+      "__tseScope",
+      `with (__tseScope) { var __tseTemplate = ${expression}; return __tseTemplate(__tseContext, __tseLocals); }`,
+    ) as (
+      mismatch: typeof StrictLocalsMismatch,
+      context: TseRenderContext,
+      locals: Record<string, unknown>,
+      scope: Record<string, unknown>,
+    ) => unknown;
+    return (context, locals, scope) => factory(StrictLocalsMismatch, context, locals, scope);
+  } catch (error) {
+    const where = templatePath != null ? ` (${templatePath})` : "";
+    throw new SyntaxError(`Failed to compile .tse template${where}: ${(error as Error).message}`, {
+      cause: error,
+    });
+  }
+}
+
+/**
+ * The per-render view object a compiled template is run against. Rails passes
+ * the `ActionView::Base` instance, which answers `render` for a nested
+ * partial; trails threads that capability in through
+ * {@link RenderContext.renderPartial}, so the handler needs no `LookupContext`.
+ *
+ * @internal
+ * @noRailsEquivalent CONVERGEABLE helper-methods-not-in-tse-scope
+ */
+class HandlerRenderContext extends TseRenderContextImpl {
+  constructor(private readonly context: RenderContext) {
+    super();
+  }
+
+  protected override _renderPartial(
+    partial: string,
+    _localName: string,
+    locals: Record<string, unknown>,
+  ): SafeBuffer {
+    const render = this.context.renderPartial;
+    if (!render) {
+      throw new Error(
+        `Cannot render partial ${JSON.stringify(partial)} — this render context has no ` +
+          "partial renderer. Render through LookupContext so nested partials resolve.",
+      );
+    }
+    return htmlSafe(render(partial, locals));
   }
 }
 
