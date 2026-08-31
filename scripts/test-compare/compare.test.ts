@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  aliasKey,
   assertionKindMismatch,
   compareFileResults,
   isAssertionCountMismatch,
+  normalize,
   parseMinExtra,
   rejectsSiblingClassCandidate,
   rubyToConventionTs,
@@ -193,5 +195,33 @@ describe("rejectsSiblingClassCandidate", () => {
       ]),
     ).toBe(false);
     expect(rejectsSiblingClassCandidate(undefined, 2, tsClasses, ["x"])).toBe(false);
+  });
+});
+
+describe("normalize", () => {
+  // `def test__parse__2` (vendor/date/test/date/test_date_parse.rb:477) and
+  // `def test_parse__2` (:563) reach the comparer as " parse  2" and
+  // "parse  2" — extract-ruby-tests.rb:514 maps each underscore to a space.
+  it("keeps a leading space, so a test__x / test_x pair stays two paths", () => {
+    expect(normalize(" parse  2")).not.toBe(normalize("parse  2"));
+    for (const name of ["parse", "parse  2", "iso8601", "xmlschema", "jisx0301"]) {
+      expect(normalize(` ${name}`)).not.toBe(normalize(name));
+    }
+  });
+
+  it("collapses an inner run and drops a trailing one", () => {
+    expect(normalize("PARSE\n\t 2 ")).toBe("parse 2");
+  });
+});
+
+describe("aliasKey", () => {
+  it("space-prefixes the description of a key that has none", () => {
+    expect(aliasKey("plus")).toBe(" plus");
+    expect(aliasKey("testdatearith > plus")).toBe("testdatearith >  plus");
+  });
+
+  it("gives a key whose description is already space-prefixed no alias", () => {
+    expect(aliasKey(" plus")).toBeUndefined();
+    expect(aliasKey("testdatearith >  plus")).toBeUndefined();
   });
 });

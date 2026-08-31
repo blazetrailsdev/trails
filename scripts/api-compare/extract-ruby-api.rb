@@ -2479,9 +2479,24 @@ class ApiExtractor
   # Record a constant keyed file → NAME (unwrapping `.freeze`). A non-literal
   # RHS still gets an entry, as {kind: "expr"} — the name is what extra-surface
   # scoring needs, and "expr" is already the uncomparable marker for literals.
+  # Whether a Ripper node is the receiver `self`.
+  def self_ref?(node)
+    node.is_a?(Array) && node[0] == :var_ref && node[1].is_a?(Array) &&
+      node[1][0] == :@kw && node[1][1] == "self"
+  end
+
+  # `self::OPTION_NAMES = [...]` inside a `Struct.new do ... end` body
+  # (connection_adapters/abstract/schema_definitions.rb:79) is a constant
+  # assignment like any other — it just reaches Ripper as a `const_path_field`
+  # rather than a `var_field`, which used to drop it from the allow-set and
+  # leave its faithful TS port scoring as novel surface.
   def maybe_record_constant(lhs, rhs)
-    return unless lhs.is_a?(Array) && lhs[0] == :var_field
-    const = lhs[1]
+    const =
+      if lhs.is_a?(Array) && lhs[0] == :var_field
+        lhs[1]
+      elsif lhs.is_a?(Array) && lhs[0] == :const_path_field && self_ref?(lhs[1])
+        lhs[2]
+      end
     return unless const.is_a?(Array) && const[0] == :@const
     rhs = unwrap_freeze(rhs)
     maybe_record_collection_constant(const[1], rhs)
