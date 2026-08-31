@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { LookupContext } from "../lookup-context.js";
 import { FileSystemResolver } from "./resolver.js";
+import { FixtureResolver } from "../testing/resolvers.js";
 import { TemplateHandlers } from "./handlers.js";
 import { Tse } from "./handlers/tse.js";
 
@@ -76,6 +77,20 @@ describe("FileSystemResolver", () => {
     expect(ctx.findTemplate("index", "po?sts", "html")?.source).toBe("<h1>Query</h1>");
   });
 
+  it("rescans the filesystem when the details cache is off", async () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+    expect(ctx.isExists("index", ["posts"])).toBe(true);
+
+    const fs = await getFsAsync();
+    const path = await getPathAsync();
+    await fs.writeFile!(path.join(dir, "posts", "index.html+tablet.tse"), "<h1>Tablet</h1>");
+
+    expect(
+      ctx.disableCache(() => ctx.find("index", ["posts"], false, [], { variants: ["tablet"] })),
+    ).toMatchObject({ source: "<h1>Tablet</h1>" });
+  });
+
   it("any? ignores the format and variant constraints", () => {
     const ctx = new LookupContext(null, { formats: ["json"] }, []);
     ctx.addResolver(new FileSystemResolver(dir));
@@ -83,5 +98,16 @@ describe("FileSystemResolver", () => {
     expect(ctx.isExists("index", ["posts"])).toBe(false);
     expect(ctx.isAny("index", ["posts"])).toBe(true);
     expect(ctx.isAny("missing", ["posts"])).toBe(false);
+  });
+});
+
+describe("FixtureResolver", () => {
+  it("globs with File.fnmatch semantics, where ** requires a directory", () => {
+    const resolver = new FixtureResolver({
+      "index.html.tse": "root",
+      "posts/index.html.tse": "nested",
+    });
+
+    expect(resolver.allTemplatePaths().map((path) => path.virtual)).toEqual(["posts/index"]);
   });
 });

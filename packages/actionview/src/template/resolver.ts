@@ -109,11 +109,16 @@ export abstract class Resolver implements PathSetResolver {
 
   /**
    * @internal
-   * Ruby `File.fnmatch` for the two patterns `Resolver` globs with
-   * (`resolver.rb:118,161`), which JS has no equivalent of and no admissible
-   * third-party one: `**` spans directory separators and `*` does not.
+   * Ruby `File.fnmatch`, which JS has no equivalent of and no admissible
+   * third-party one. `pathname` selects the flag Ruby's two call sites use:
+   * `Dir.glob` (`resolver.rb:205`) matches path-wise, so `*` stops at a
+   * separator and `**` spans them, while `FixtureResolver`'s bare
+   * `File.fnmatch` (`testing/resolvers.rb:27`) passes no `FNM_PATHNAME` and
+   * lets `*` match `/` too — verified against MRI.
    */
-  protected fnmatch(glob: string): RegExp {
+  protected fnmatch(glob: string, pathname = true): RegExp {
+    if (!pathname) return new RegExp(`^${fnmatchChars(glob, ".*", ".")}$`);
+
     const segments = glob.split("/");
     let pattern = "";
     for (let i = 0; i < segments.length; i++) {
@@ -122,13 +127,7 @@ export abstract class Resolver implements PathSetResolver {
         pattern += "(?:[^/]+/)*";
         continue;
       }
-      for (let c = 0; c < segment.length; c++) {
-        const char = segment[c];
-        if (char === "\\" && c + 1 < segment.length) pattern += regexpEscape(segment[++c]);
-        else if (char === "*") pattern += "[^/]*";
-        else if (char === "?") pattern += "[^/]";
-        else pattern += regexpEscape(char);
-      }
+      pattern += fnmatchChars(segment, "[^/]*", "[^/]");
       if (i < segments.length - 1) pattern += "/";
     }
     return new RegExp(`^${pattern}$`);
@@ -171,6 +170,23 @@ export abstract class Resolver implements PathSetResolver {
  * backslash quoting undone, since those segments name a real directory rather
  * than a pattern to match.
  */
+/**
+ * One `File.fnmatch` pattern segment as a regular expression: a backslash
+ * quotes the character after it (`escape_entry`'s output), `*` and `?` are the
+ * wildcards, everything else is literal.
+ */
+function fnmatchChars(text: string, star: string, question: string): string {
+  let pattern = "";
+  for (let c = 0; c < text.length; c++) {
+    const char = text[c];
+    if (char === "\\" && c + 1 < text.length) pattern += regexpEscape(text[++c]);
+    else if (char === "*") pattern += star;
+    else if (char === "?") pattern += question;
+    else pattern += regexpEscape(char);
+  }
+  return pattern;
+}
+
 function globWalkRoot(glob: string): string {
   const root: string[] = [];
   for (const segment of glob.split("/").slice(0, -1)) {
@@ -249,7 +265,13 @@ export class FileSystemResolver extends Resolver {
     return Array.from(seen, (filename) => TemplatePath.parse(filename));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * `resolver.rb:127-140`. `cache = key ? @unbound_templates :
+   * Concurrent::Map.new` — with no key the map Rails computes into is fresh,
+   * so the persistent one is neither read nor written and the scan always
+   * runs. That is what `LookupContext#disableCache` relies on.
+   */
   protected override _findAll(
     name: string,
     prefix: string,
@@ -261,10 +283,11 @@ export class FileSystemResolver extends Resolver {
     const requestedDetails = this.requestedDetailsFor(details, key);
     const path = TemplatePath.build(name, prefix, partial);
 
-    let templates = this.templatesCache.get(path.virtual);
+    const cache = key != null ? this.templatesCache : undefined;
+    let templates = cache?.get(path.virtual);
     if (templates === undefined) {
       templates = this.unboundTemplatesFromPath(path);
-      if (key != null) this.templatesCache.set(path.virtual, templates);
+      cache?.set(path.virtual, templates);
     }
 
     return this.filterAndSortByDetails(templates, requestedDetails);
