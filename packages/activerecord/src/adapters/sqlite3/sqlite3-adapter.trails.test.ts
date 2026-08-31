@@ -113,53 +113,59 @@ describe("SQLite3Adapter pragmas option", () => {
     vi.restoreAllMocks();
   });
 
-  it("applies a valid numeric pragma on construction", () => {
+  it("applies a valid numeric pragma on connect", async () => {
     adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { cache_size: 500 } });
+    await adapter.connectBang();
     const result = (adapter.raw as import("better-sqlite3").Database).pragma(
       "cache_size",
     ) as Array<{ cache_size: number }>;
     expect(result[0]?.cache_size).toBe(500);
   });
 
-  it("applies a valid string enum pragma", () => {
+  it("applies a valid string enum pragma", async () => {
     adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { synchronous: "FULL" } });
+    await adapter.connectBang();
     const result = (adapter.raw as import("better-sqlite3").Database).pragma(
       "synchronous",
     ) as Array<{ synchronous: number }>;
     expect(result[0]?.synchronous).toBe(2);
   });
 
-  it("converts boolean true to 1 for pragma", () => {
+  it("converts boolean true to 1 for pragma", async () => {
     adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { foreign_keys: true } });
+    await adapter.connectBang();
     const result = (adapter.raw as import("better-sqlite3").Database).pragma(
       "foreign_keys",
     ) as Array<{ foreign_keys: number }>;
     expect(result[0]?.foreign_keys).toBe(1);
   });
 
-  it("converts boolean false to 0 for pragma", () => {
+  it("converts boolean false to 0 for pragma", async () => {
     adapter = new BetterSQLite3Adapter(":memory:", { pragmas: { foreign_keys: false } });
+    await adapter.connectBang();
     const result = (adapter.raw as import("better-sqlite3").Database).pragma(
       "foreign_keys",
     ) as Array<{ foreign_keys: number }>;
     expect(result[0]?.foreign_keys).toBe(0);
   });
 
-  it("warns and skips an invalid pragma name", () => {
+  it("warns and skips an invalid pragma name", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     adapter = new BetterSQLite3Adapter(":memory:", {
       pragmas: { "bad-name!": 1 } as Record<string, number>,
     });
+    await adapter.connectBang();
     expect(console.warn).toHaveBeenCalledWith(
       expect.stringContaining("invalid SQLite pragma name"),
     );
   });
 
-  it("warns and skips a string value with unsafe characters", () => {
+  it("warns and skips a string value with unsafe characters", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     adapter = new BetterSQLite3Adapter(":memory:", {
       pragmas: { synchronous: "FULL; DROP TABLE users" },
     });
+    await adapter.connectBang();
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unsafe characters"));
   });
 });
@@ -178,6 +184,7 @@ describe("SQLite3 databaseExists", () => {
     const dbPath = path.join(os.tmpdir(), `sqlite-exists-instance-${Date.now()}.db`);
     const a = new BetterSQLite3Adapter(dbPath);
     try {
+      await a.connectBang();
       expect(await a.databaseExists()).toBe(true);
       fs.rmSync(dbPath, { force: true });
       expect(await a.databaseExists()).toBe(false);

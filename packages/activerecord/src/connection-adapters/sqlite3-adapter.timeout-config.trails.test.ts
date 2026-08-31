@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { SQLite3Adapter } from "./sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
-import { ArgumentError } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
 
 describe("SQLite3Adapter timeout config coercion", () => {
@@ -19,16 +18,18 @@ describe("SQLite3Adapter timeout config coercion", () => {
     expect(Number(rows[0].timeout)).toBe(5000);
   });
 
-  it("raises TypeError when the timeout does not cast to an integer", () => {
-    expect(() => new BetterSQLite3Adapter({ database: ":memory:", timeout: "5s" })).toThrow(
-      new TypeError("timeout must be integer, not 5s"),
-    );
+  it("raises TypeError when the timeout does not cast to an integer", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", timeout: "5s" });
+    await expect(adapter.connectBang()).rejects.toThrow("timeout must be integer, not 5s");
+    adapter = undefined;
   });
 
-  it("raises ArgumentError when both timeout and retries are given", () => {
-    expect(
-      () => new BetterSQLite3Adapter({ database: ":memory:", timeout: 5000, retries: 3 }),
-    ).toThrow(new ArgumentError("Cannot specify both timeout and retries arguments"));
+  it("raises ArgumentError when both timeout and retries are given", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", timeout: 5000, retries: 3 });
+    await expect(adapter.connectBang()).rejects.toThrow(
+      "Cannot specify both timeout and retries arguments",
+    );
+    adapter = undefined;
   });
 
   it("treats a false timeout and a false retries as unset", async () => {

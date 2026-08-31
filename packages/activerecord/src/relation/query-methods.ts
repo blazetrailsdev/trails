@@ -793,17 +793,21 @@ function where(
   if (rest.length === 0 && isBlankArgument(conditionsOrSql)) {
     return this;
   }
-  if (
-    Array.isArray(conditionsOrSql) &&
-    rest.length > 0 &&
-    conditionsOrSql.every((c) => typeof c === "string")
-  ) {
+  return whereBang.call(
+    this.spawn(),
+    conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
+    ...rest,
+  );
+}
+
+function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
+  if (Array.isArray(opts) && rest.length > 0 && opts.every((c) => typeof c === "string")) {
     if (rest.length !== 1 || !Array.isArray(rest[0])) {
       throw argumentError(
         "Relation#where(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
       );
     }
-    const cols = conditionsOrSql as string[];
+    const cols = opts;
     const tuples = rest[0] as unknown[][];
     const nodes = this.predicateBuilder.buildComposite(
       cols,
@@ -813,19 +817,10 @@ function where(
           | QueryMethodsHost["_model"]
           | null,
     );
-    if (nodes.length === 0) return noneBang.call(this.spawn());
-    const rel = this.spawn();
-    rel.whereClause = rel.whereClause.plus(new WhereClause([...nodes]));
-    return rel;
+    if (nodes.length === 0) return noneBang.call(this);
+    this.whereClause = this.whereClause.plus(new WhereClause([...nodes]));
+    return this;
   }
-  return whereBang.call(
-    this.spawn(),
-    conditionsOrSql as Record<string, unknown> | string | Nodes.Node | null,
-    ...rest,
-  );
-}
-
-function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
   const clause = buildWhereClause.call(this, opts, rest);
   this.whereClause = this.whereClause.plus(clause);
   return this;

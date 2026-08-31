@@ -94,11 +94,22 @@ describe("StatementPoolTest", () => {
     expect(dealloced).toEqual(["1"]);
   });
 
-  it("LRU: get moves entry to end", async () => {
+  it("evicts in insertion order regardless of reads", async () => {
     const pool = new StatementPool<string>(2);
     await pool.set("a", "1");
     await pool.set("b", "2");
     pool.get("a");
+    await pool.set("c", "3");
+    expect(pool.isKey("a")).toBe(false);
+    expect(pool.isKey("b")).toBe(true);
+    expect(pool.isKey("c")).toBe(true);
+  });
+
+  it("evicts before storing, so a full pool sheds its oldest entry on re-assign", async () => {
+    const pool = new StatementPool<string>(2);
+    await pool.set("a", "1");
+    await pool.set("b", "2");
+    await pool.set("a", "1b");
     await pool.set("c", "3");
     expect(pool.isKey("a")).toBe(true);
     expect(pool.isKey("b")).toBe(false);
@@ -116,6 +127,7 @@ describe("StatementPoolTest", () => {
 describe("SQLite3 StatementPool integration", () => {
   it.skipIf(!isSqliteRun())("caches prepared statements across execute calls", async () => {
     const { adapter, pool: adapterPool } = await checkoutRawTestAdapter();
+    await adapter.connectBang();
     const prepareSpy = vi.spyOn((adapter as any).driver, "prepare");
 
     try {
@@ -146,23 +158,6 @@ describe("SQLite3 StatementPool integration", () => {
       adapterPool.releaseConnection();
       await adapterPool.disconnectBang();
     }
-  });
-
-  it("evicts LRU entries through dealloc once the statement limit is reached", async () => {
-    const dealloced: string[] = [];
-    class TestPool extends StatementPool<string> {
-      protected dealloc(stmt: string): void {
-        dealloced.push(stmt);
-      }
-    }
-    const pool = new TestPool(2);
-    await pool.set("a", "stmt_a");
-    await pool.set("b", "stmt_b");
-    pool.get("a");
-    await pool.set("c", "stmt_c");
-    expect(pool.length).toBe(2);
-    expect(pool.isKey("a")).toBe(true);
-    expect(dealloced).toEqual(["stmt_b"]);
   });
 
   it("a statement limit of 0 raises on the first insert", async () => {

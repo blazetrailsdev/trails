@@ -42,6 +42,16 @@ describe("SQLite adapter driver binding", () => {
     adapter.disconnectBang();
   });
 
+  it("leaves the raw connection unopened until connectBang", async () => {
+    const adapter = new BetterSQLite3Adapter(":memory:");
+    expect(adapter.isConnected()).toBe(false);
+    expect(await adapter.active()).toBe(false);
+
+    await adapter.connectBang();
+    expect(adapter.isConnected()).toBe(true);
+    adapter.disconnectBang();
+  });
+
   it("the abstract base has no bundled driver and cannot open directly", () => {
     expect(() => new SQLite3Adapter(":memory:")).toThrow(/No SQLite driver configured/);
   });

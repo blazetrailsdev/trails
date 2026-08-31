@@ -1,6 +1,5 @@
 import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 import { registerLoadSchemaOverride } from "./load-schema-overrides-slot.js";
 import {
@@ -32,47 +31,16 @@ export async function updateCounters(
   id: unknown | unknown[],
   counters: CounterCacheCounters,
 ): Promise<number> {
-  const relation = this.unscoped().where(buildPkPredicate(this, id));
+  if (this.compositePrimaryKey && Array.isArray(id) && !Array.isArray(id[0])) id = [id];
+  const unscoped = this.unscoped();
+  const primaryKey = this.primaryKey;
+  const relation = Array.isArray(primaryKey)
+    ? unscoped.whereBang(primaryKey, id)
+    : unscoped.whereBang({ [primaryKey]: id });
   return relation.updateCounters(counters);
 }
 
 export type CounterCacheCounters = Record<string, number | CounterCacheTouchOption | undefined>;
-
-function buildPkPredicate(
-  modelClass: typeof Base,
-  id: unknown | unknown[],
-): InstanceType<typeof Nodes.Node> {
-  const table = modelClass.arelTable;
-  const pk = modelClass.primaryKey;
-
-  if (Array.isArray(pk)) {
-    if (!Array.isArray(id)) return arelSql("1=0");
-    const ids = id as unknown[];
-    if (ids.length === 0) return arelSql("1=0");
-    const tuples = Array.isArray(ids[0]) ? (ids as unknown[][]) : [ids];
-    const groupings: InstanceType<typeof Nodes.Node>[] = [];
-    for (const tuple of tuples) {
-      if (!Array.isArray(tuple) || tuple.length !== pk.length) return arelSql("1=0");
-      const conditions = pk.map((col, i) =>
-        tuple[i] === null || tuple[i] === undefined
-          ? table.get(col).eq(null)
-          : table.get(col).eq(tuple[i]),
-      );
-      groupings.push(new Nodes.Grouping(new Nodes.And(conditions)));
-    }
-    if (groupings.length === 1) return groupings[0];
-    return new Nodes.Grouping(groupings.reduce((left, right) => new Nodes.Or([left, right])));
-  }
-
-  const attr = table.get(pk);
-  if (Array.isArray(id)) {
-    if (id.length === 0) return arelSql("1=0");
-    if (id.some((value) => value === null || value === undefined)) return arelSql("1=0");
-    return attr.in(id);
-  }
-  if (id === null || id === undefined) return arelSql("1=0");
-  return attr.eq(id);
-}
 
 type ResetCountersOptions = { touch?: CounterCacheTouchOption };
 
@@ -141,7 +109,12 @@ export async function resetCounters(
   }
 
   if (Object.keys(updates).length > 0) {
-    await this.unscoped().where(buildPkPredicate(this, object.id)).updateAll(updates);
+    const unscoped = this.unscoped();
+    const primaryKey = this.primaryKey;
+    const relation = Array.isArray(primaryKey)
+      ? unscoped.where(primaryKey, [object.id] as unknown[][])
+      : unscoped.where({ [primaryKey]: [object.id] });
+    await relation.updateAll(updates);
   }
 }
 

@@ -34,4 +34,14 @@ describe("SQLite3Adapter#check_all_foreign_keys_valid!", () => {
       "Foreign key violations found: kids",
     );
   });
+
+  it("raises with the connection pool that produced the error", async () => {
+    await adapter.executeMutation("INSERT INTO kids (id, parent_id) VALUES (1, 999)");
+
+    const error = await adapter.checkAllForeignKeysValidBang().then(
+      () => null,
+      (e: StatementInvalid) => e,
+    );
+    expect(error!.connectionPool).toBe(adapter.pool);
+  });
 });

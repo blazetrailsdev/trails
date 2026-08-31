@@ -244,8 +244,8 @@ describe("PostgreSQLAdapter#sqlKey", () => {
     const nameB = await preparedNameFor(fakeClient, "SELECT * FROM widgets");
 
     expect(nameA).not.toBe(nameB);
-    expect(pool.keys).toContain("schema_a, public-SELECT * FROM widgets");
-    expect(pool.keys).toContain("schema_b, public-SELECT * FROM widgets");
+    expect(pool.isKey("schema_a, public-SELECT * FROM widgets")).toBe(true);
+    expect(pool.isKey("schema_b, public-SELECT * FROM widgets")).toBe(true);
     expect(pool.length).toBe(2);
 
     setMemo("schema_a, public");
