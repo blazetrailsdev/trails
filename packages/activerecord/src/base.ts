@@ -1945,7 +1945,7 @@ export class Base extends Model {
     this._associationCacheStore.clear();
   }
 
-  /** @missingRailsCall init_internals — PERMANENT */
+  /** @missingRailsCall init_internals — CONVERGEABLE base-constructor-calls-init-internals-not-activemodel */
   constructor(attrs: Record<string, unknown> = {}, initBlock?: (record: Base) => void) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
     attrs ??= {};
