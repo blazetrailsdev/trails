@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aliasKey,
+  arClosureResult,
   assertionKindMismatch,
   compareFileResults,
   isAssertionCountMismatch,
@@ -223,5 +224,42 @@ describe("aliasKey", () => {
   it("gives a key whose description is already space-prefixed no alias", () => {
     expect(aliasKey(" plus")).toBeUndefined();
     expect(aliasKey("testdatearith >  plus")).toBeUndefined();
+  });
+});
+
+describe("arClosureResult", () => {
+  // The closure is passed explicitly: `closureFiles()` walks `vendor/rails`,
+  // which the unit-test job does not populate.
+  const closure = ["active_support/core_ext/object/blank.rb"];
+  const files = [
+    // core_ext/object/blank.rb is in the AR closure (R1 on the stem).
+    file({ rubyFile: "core_ext/object/blank_test.rb", rubyTestCount: 10, matched: 8 }),
+    // Cache behaviors are the out-of-closure remainder RFC 0105 reconciles.
+    file({
+      rubyFile: "cache/stores/memory_store_test.rb",
+      rubyTestCount: 10,
+      matched: 6,
+      matchedSkipped: 1,
+    }),
+  ];
+
+  it("partitions the files by the AR-closure manifest", () => {
+    const { inClosure, outOfClosure } = arClosureResult(files, closure);
+    expect(inClosure.files).toBe(1);
+    expect(inClosure.totalRubyTests).toBe(10);
+    expect(inClosure.percent).toBe(80);
+    expect(outOfClosure.files).toBe(1);
+    expect(outOfClosure.percent).toBe(50);
+  });
+
+  it("sums back to the package totals it partitions", () => {
+    const { inClosure, outOfClosure } = arClosureResult(files, closure);
+    expect(inClosure.totalRubyTests + outOfClosure.totalRubyTests).toBe(20);
+    expect(inClosure.totalMatched + outOfClosure.totalMatched).toBe(14);
+    expect(inClosure.totalMatchedSkipped + outOfClosure.totalMatchedSkipped).toBe(1);
+  });
+
+  it("reports zero percent for an empty side rather than dividing by zero", () => {
+    expect(arClosureResult([], closure).inClosure.percent).toBe(0);
   });
 });

@@ -74,6 +74,7 @@ import { isTestCaseUnported, isTestFileUnported } from "@blazetrails/parity/unpo
 import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
+import { classifyTestFile, closureFiles } from "./closure-manifest.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -350,6 +351,24 @@ export interface ConventionFileResult {
   valueMismatches?: ValueMismatch[];
 }
 
+/**
+ * One side of the AR-closure partition of a package's `files[]` (RFC 0105).
+ * A partition of the numbers already reported, not a second measurement: the
+ * two sides sum to the package's own totals.
+ */
+export interface ClosureSideResult {
+  files: number;
+  totalRubyTests: number;
+  totalMatched: number;
+  totalMatchedSkipped: number;
+  percent: number;
+}
+
+export interface ArClosureResult {
+  inClosure: ClosureSideResult;
+  outOfClosure: ClosureSideResult;
+}
+
 interface ConventionPackageResult {
   package: string;
   rubyFiles: number;
@@ -366,7 +385,43 @@ interface ConventionPackageResult {
   totalValueMismatch: number;
   totalExtra: number;
   percent: number;
+  /** activesupport only — the AR-closure partition of `files` below. */
+  arClosure?: ArClosureResult;
   files: ConventionFileResult[];
+}
+
+/**
+ * Partition a package's per-file results by the AR-closure test manifest
+ * (`./closure-manifest.js`), so the summary can say how much of the package's
+ * remainder sits on ActiveRecord's critical path. Derived from the manifest on
+ * every run — there is no second file list.
+ */
+export function arClosureResult(
+  files: ConventionFileResult[],
+  closure: readonly string[] = closureFiles(),
+): ArClosureResult {
+  const side = (): ClosureSideResult => ({
+    files: 0,
+    totalRubyTests: 0,
+    totalMatched: 0,
+    totalMatchedSkipped: 0,
+    percent: 0,
+  });
+  const inClosure = side();
+  const outOfClosure = side();
+  for (const file of files) {
+    const target = classifyTestFile(file.rubyFile, closure).inClosure ? inClosure : outOfClosure;
+    target.files++;
+    target.totalRubyTests += file.rubyTestCount;
+    target.totalMatched += file.matched;
+    target.totalMatchedSkipped += file.matchedSkipped;
+  }
+  for (const target of [inClosure, outOfClosure]) {
+    const implemented = target.totalMatched - target.totalMatchedSkipped;
+    target.percent =
+      target.totalRubyTests > 0 ? Math.round((implemented / target.totalRubyTests) * 1000) / 10 : 0;
+  }
+  return { inClosure, outOfClosure };
 }
 
 // ---------------------------------------------------------------------------
@@ -1030,6 +1085,7 @@ export function main(args: string[] = process.argv.slice(2)) {
       totalValueMismatch,
       totalExtra,
       percent,
+      ...(pkg === "activesupport" ? { arClosure: arClosureResult(fileResults) } : {}),
       files: fileResults,
     });
   }
@@ -1131,6 +1187,14 @@ export function main(args: string[] = process.argv.slice(2)) {
     console.log(
       `  ${pkg.package}  —  ${pkgImplemented}/${pkg.totalRubyTests} tests (${pkg.percent}%)${detailStr}  |  ${pkg.tsMapped}/${pkg.rubyFiles} files  |  ${pkg.totalMisplaced} misplaced`,
     );
+    if (pkg.arClosure) {
+      const { inClosure, outOfClosure } = pkg.arClosure;
+      const implemented = (side: ClosureSideResult) => side.totalMatched - side.totalMatchedSkipped;
+      console.log(
+        `    of which, on the AR require closure: ${implemented(inClosure)}/${inClosure.totalRubyTests} tests (${inClosure.percent}%) in ${inClosure.files} files` +
+          `  |  out of closure: ${implemented(outOfClosure)}/${outOfClosure.totalRubyTests} (${outOfClosure.percent}%) in ${outOfClosure.files} files`,
+      );
+    }
     console.log(`${"=".repeat(90)}\n`);
 
     // Show files with misplaced tests first as a moves summary
