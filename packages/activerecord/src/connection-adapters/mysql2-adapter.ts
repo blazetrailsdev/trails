@@ -32,6 +32,8 @@ import { Result } from "../result.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   affectedRows as mysql2AffectedRows,
+  executeBatch as mysql2ExecuteBatch,
+  isMultiStatementsEnabled as mysql2IsMultiStatementsEnabled,
   lastInsertedId as mysql2LastInsertedId,
   castResult as mysql2CastResult,
   performQuery as mysql2PerformQuery,
@@ -441,6 +443,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
+  executeBatch = mysql2ExecuteBatch;
+
+  /** @internal */
+  lastInsertedId(result: Result): Promise<unknown> {
+    return mysql2LastInsertedId.call(this as never, result);
+  }
+
+  /** @internal */
+  isMultiStatementsEnabled = mysql2IsMultiStatementsEnabled;
+
+  /** @internal */
   declare performQuery: typeof mysql2PerformQuery;
 
   /** @internal */
@@ -449,11 +462,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** @internal */
   affectedRows(rawResult: Mysql2RawResult): number {
     return mysql2AffectedRows.call(this as any, rawResult);
-  }
-
-  /** @internal */
-  lastInsertedId(result: Result): Promise<unknown> {
-    return mysql2LastInsertedId.call(this as never, result);
   }
 
   async execute(
@@ -904,6 +912,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       conn = await mysql.createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
+        multipleStatements: true,
         typeCast: composedTypeCast,
       });
     } catch (err) {

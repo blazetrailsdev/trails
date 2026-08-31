@@ -1,7 +1,7 @@
 import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
-import { rubyInspectArray, rubyInspectHash } from "../../relation/ruby-inspect.js";
+import { rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
 import {
@@ -1233,10 +1233,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
     { column, ...options }: Record<string, unknown>,
   ): Promise<UniqueConstraintDefinition> {
     const result = await this.uniqueConstraintFor(tableName, { column, ...options });
-    if (!result)
-      throw new ArgumentError(
-        `Table '${tableName}' has no unique constraint for ${column != null ? (Array.isArray(column) ? rubyInspectArray(column) : (column as string)) : rubyInspectHash(options)}`,
-      );
+    if (!result) {
+      const columnToS =
+        column == null
+          ? rubyInspectHash(options)
+          : Array.isArray(column)
+            ? `[${(column as string[])
+                .map((c) => (String(c).startsWith(":") ? String(c) : `:${String(c)}`))
+                .join(", ")}]`
+            : String(column).replace(/^:/, "");
+      throw new ArgumentError(`Table '${tableName}' has no unique constraint for ${columnToS}`);
+    }
     return result;
   }
 
