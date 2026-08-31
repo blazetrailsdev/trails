@@ -258,6 +258,13 @@ export class Rational {
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Rational()`, which Rails
  * calls and does not define. */
-export function rational(numv: number | bigint, denv: number | bigint = 1): Rational {
+export function rational(numv: number | bigint | Rational, denv: number | bigint = 1): Rational {
+  /* `nurat_convert` (`vendor/ruby/rational.c:2621`) returns a Rational numerator
+     unchanged when the denominator is an exact one, and otherwise leaves the
+     canonicalizer for `f_div` (`:2668`) — so `Rational(r, 1000000)` is a
+     division, not a numerator/denominator pair. */
+  if (numv instanceof Rational) {
+    return denv === 1 || denv === 1n ? numv : numv.quo(denv);
+  }
   return new Rational(numv, denv);
 }

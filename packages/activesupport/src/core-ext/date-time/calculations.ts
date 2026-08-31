@@ -18,8 +18,7 @@
  */
 
 import { Date as RubyDate, DateTime as RubyDateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
-import { rational } from "@blazetrails/ruby-compat";
+import { Rational, rational } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";
@@ -127,16 +126,15 @@ export function change(datetime: DateTime, options: ChangeOptions): DateTime {
         `Can't change both :nsec and :usec at the same time: ${inspect(options)}`,
       );
     }
-    newFraction = new Rational(newNsec, 1000000000);
+    newFraction = rational(newNsec, 1000000000);
   } else {
     const newUsec =
       "usec" in options
         ? options.usec!
         : options.hour != null || options.min != null || options.sec != null
           ? 0
-          : new Rational(nsec(datetime), 1000);
-    newFraction =
-      newUsec instanceof Rational ? newUsec.quo(1000000) : new Rational(newUsec, 1000000);
+          : rational(nsec(datetime), 1000);
+    newFraction = rational(newUsec, 1000000);
   }
 
   if (newFraction.cmp(1) >= 0) throw new ArgumentError("argument out of range");
@@ -220,7 +218,7 @@ export function ago(datetime: DateTime, seconds: number): DateTime {
  * `self + Rational(seconds, 86400)`.
  */
 export function since(datetime: DateTime, seconds: number): DateTime {
-  return new RubyDateTime(datetime).plus(new Rational(seconds, 86400)).toDatetime();
+  return new RubyDateTime(datetime).plus(rational(seconds, 86400)).toDatetime();
 }
 
 /**
@@ -321,6 +319,9 @@ export function localtime(datetime: DateTime, utcOffset: number | string | null 
     utc.day,
     utc.hour,
     utc.min,
+    // `utc.sec + utc.sec_fraction` (`date_time/calculations.rb:173`) is a plain
+    // Integer + Rational sum, not a `Rational()` call: the C constructor is
+    // what gives the Integer term an exact seat to be added in.
     new Rational(utc.sec, 1).add(utc.secFraction),
   ).getlocal(utcOffset);
 }
@@ -342,6 +343,9 @@ export function utc(datetime: DateTime): Time {
     utc.day,
     utc.hour,
     utc.min,
+    // `utc.sec + utc.sec_fraction` (`date_time/calculations.rb:189`) is a plain
+    // Integer + Rational sum, not a `Rational()` call: the C constructor is
+    // what gives the Integer term an exact seat to be added in.
     new Rational(utc.sec, 1).add(utc.secFraction),
   );
 }

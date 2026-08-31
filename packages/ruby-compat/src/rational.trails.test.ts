@@ -39,4 +39,16 @@ describe("Kernel#Rational()", () => {
     expect(() => rational(1, 0)).toThrow(ZeroDivisionError);
     expect(() => rational(1, 0)).toThrow("divided by 0");
   });
+
+  it("divides rather than pairing when the numerator is a Rational, as nurat_convert does", () => {
+    expect(rational(new Rational(999999999, 1000), 1000000).inspect()).toBe(
+      "(999999999/1000000000)",
+    );
+  });
+
+  it("returns a Rational numerator unchanged for an exact-one denominator", () => {
+    const r = new Rational(3, 4);
+    expect(rational(r)).toBe(r);
+    expect(rational(r, 1)).toBe(r);
+  });
 });

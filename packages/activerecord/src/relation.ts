@@ -8,6 +8,7 @@ import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
 import { ActiveRecordError, RecordNotSaved, RecordNotUnique, UnknownPrimaryKey } from "./errors.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
+import { max } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 
@@ -1607,44 +1608,27 @@ export class Relation<T extends Base> {
     return this._cacheVersions.get(timestampColumn)!;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs max — PERMANENT
+   */
   async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
     timestampColumn = String(timestampColumn);
 
     let size: unknown = 0;
     let timestamp: unknown = null;
 
-    const rubyClassName = (value: unknown): string => {
-      if (value == null) return "NilClass";
-      if (value instanceof Temporal.Instant) return "Time";
-      if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
-      if (typeof value === "string") return "String";
-      return "Object";
-    };
-
     if (this.isLoaded) {
       const records = await this.records();
       size = records.length;
       if ((size as number) > 0) {
-        timestamp = records
-          .map((record) =>
+        timestamp = max(
+          records.map((record) =>
             (record as unknown as { readAttribute(name: string): unknown }).readAttribute(
               timestampColumn,
             ),
-          )
-          .reduce((max: unknown, value: unknown) => {
-            if (value instanceof Temporal.Instant && max instanceof Temporal.Instant) {
-              return Temporal.Instant.compare(value, max) > 0 ? value : max;
-            }
-            if (value == null || max == null) {
-              throw new ArgumentError(
-                `comparison of ${rubyClassName(max)} with ${
-                  value == null ? "nil" : rubyClassName(value)
-                } failed`,
-              );
-            }
-            return (value as number) > (max as number) ? value : max;
-          });
+          ),
+        );
       }
     } else {
       let collection: Relation<T> = this;

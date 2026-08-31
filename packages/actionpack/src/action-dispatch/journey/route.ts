@@ -1,4 +1,4 @@
-import { deleteIf, merge } from "@blazetrails/ruby-compat";
+import { deleteIf, dup, merge } from "@blazetrails/ruby-compat";
 import type { Pattern } from "./path/pattern.js";
 import type { Node } from "./nodes/node.js";
 import type { Format } from "./visitors.js";
@@ -202,10 +202,13 @@ export class Route {
     return this._requiredDefaults.includes(key);
   }
 
+  /**
+   * @missingRailsArgs delete_if — PERMANENT
+   */
   get requiredDefaults(): Record<string, unknown> {
     if (this._requiredDefaultsCache) return this._requiredDefaultsCache;
     this._requiredDefaultsCache = deleteIf(
-      { ...this.defaults },
+      dup(this.defaults),
       (k) => this.parts.includes(k) || !this.isRequiredDefault(k),
     );
     return this._requiredDefaultsCache;
