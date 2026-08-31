@@ -19,9 +19,7 @@ export class BinaryType extends ValueType<unknown> {
       return value.bytes;
     } else {
       value = super.cast(value);
-      if (!(value instanceof Uint8Array) && typeof value === "string") {
-        value = textEncoder.encode(value);
-      }
+      if (typeof value === "string") value = textEncoder.encode(value);
       return value;
     }
   }
