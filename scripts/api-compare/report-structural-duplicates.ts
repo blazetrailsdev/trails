@@ -28,10 +28,10 @@ export type Site = { package: string; tsFile: string; name: string; line: number
 /**
  * The comparable shape of a body — the `skeleton` `extract-ts-api.ts` computes
  * (control flow and call sequence, identifiers erased), then the literal
- * arguments it passes, the half the skeleton erases and which for some
- * primitives is the whole signal. `id:` args are identifiers and `?` is a
- * literal the extractor could not represent, so neither is kept. `undefined`
- * for a body with no skeleton (an overload signature), which cannot compare.
+ * arguments it passes, which for some primitives are the whole signal. `id:`
+ * args are identifiers and `?` a literal the extractor could not represent, so
+ * neither is kept. `undefined` for a body with no skeleton (an overload
+ * signature), which cannot compare.
  */
 export function shapeOf(decl: Decl): string | undefined {
   if (decl.skeleton === undefined || decl.skeleton.length === 0) return undefined;

@@ -29,9 +29,9 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
 const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
 
 /** The reverse-direction row, at the grain the shards record. `kind:
- *  "rubyCompat"` so that when it IS baselined it sits in the existing
- *  `call-mismatches-exclude/` shards, and so the two gates, which each filter to
- *  their own kind, never see it. */
+ *  "rubyCompat"` so that when baselined it sits in the existing
+ *  `call-mismatches-exclude/` shards, and so neither gate — each filtering to
+ *  its own kind — ever sees it. */
 export interface RubyCompatKey extends CallMismatchKey {
   kind: "rubyCompat";
   /** The export the body should have called. */
@@ -48,8 +48,8 @@ export interface Decl {
   callArgs?: { name: string; args?: string[] }[];
 }
 
-/** A class or module as the manifest records it: members live under
- *  `instanceMethods`/`classMethods`, never one `methods` (`scripts/parity/types.ts`). */
+/** A class or module: members live under `instanceMethods`/`classMethods`,
+ *  never one `methods` (`scripts/parity/types.ts`). */
 export interface Host {
   file?: string;
   instanceMethods?: Decl[];

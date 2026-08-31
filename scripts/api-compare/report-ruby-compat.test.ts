@@ -31,7 +31,6 @@ const api: TsApi = {
           classMethods: [{ name: "build", calls: ["cmp"] }],
         },
       },
-      // `inflector.ts:Inflector` is the extractor's synthesized file module.
       modules: {
         "core-ext/range.ts:RangeExt": {
           file: "core-ext/range.ts",
@@ -89,8 +88,7 @@ describe("forwardCredits", () => {
   });
 
   it("counts a synthesized file module's re-presentation of a function once", () => {
-    const titleize = forwardCredits(api).filter((c) => c.name === "titleize");
-    expect(titleize).toHaveLength(1);
+    expect(forwardCredits(api).filter((c) => c.name === "titleize")).toHaveLength(1);
   });
 
   it("reads both member lists of a class and of a module", () => {
