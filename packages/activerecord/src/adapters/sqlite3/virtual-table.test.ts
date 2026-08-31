@@ -36,7 +36,10 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
 
   it("schema load", async () => {
     await Schema.define<SQLite3Adapter>(async (schema) => {
-      await schema.createVirtualTable("emails", "fts5", ["content", "meta UNINDEXED"]);
+      await schema.methodMissing("createVirtualTable", "emails", "fts5", [
+        "content",
+        "meta UNINDEXED",
+      ]);
     });
 
     expect(await adapter.virtualTableExists("emails")).toBe(true);
