@@ -10,7 +10,7 @@ import {
   type Format,
   type Serializer,
 } from "./serializer-with-fallback.js";
-import { KeyError } from "../core-ext/key-error.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 const FORMATS = Object.keys(SERIALIZERS) as Format[];
 

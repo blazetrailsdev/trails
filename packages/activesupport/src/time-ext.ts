@@ -9,7 +9,8 @@
  *   `toDate`). Predicates (`isPast`, `isFuture`) accept `Date | Temporal.Instant`.
  */
 
-import { Rational, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { advance as timeAdvance, change as timeChange } from "./core-ext/time/calculations.js";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
@@ -23,7 +24,7 @@ import {
   prevWeek,
 } from "./core-ext/date-and-time/calculations.js";
 import { beginningOfWeek as beginningOfWeekDefault } from "./core-ext/date/calculations.js";
-import { KeyError } from "./core-ext/key-error.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 export { nextWeek, prevWeek, lastWeek };
 

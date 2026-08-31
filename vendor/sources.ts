@@ -281,26 +281,63 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        name: "ruby",
+        // Keyed to the TS package it measures — `packages/ruby-compat/src` —
+        // not to the source name, because the test comparator maps a package
+        // key onto a TS src dir (scripts/test-compare/compare.ts pkgDirs).
+        name: "ruby-compat",
         // The cited C lives at the repo root, which has no `libPath` shape;
         // `lib` is the Ruby-visible stdlib, and is what verifyPackages checks
         // the clone actually laid down.
         libPath: "lib",
         // ruby/ruby mirrors the ruby/spec suite in-tree, so this one source
         // serves both the C read-anchor and the behavioural suite RFC
-        // 0129-ruby-compat's `ruby-spec-behavioural-enrollment` story needs —
-        // no separate `ruby/spec` clone (which RFC 0089 had planned).
-        testPath: "spec/ruby",
+        // 0129-ruby-compat measures ruby-compat with — no separate `ruby/spec`
+        // clone (which RFC 0089 had planned).
+        //
+        // Scoped to `spec/ruby/core`, and narrowed AGAIN inside the extractor
+        // to the surface ruby-compat actually ports (`RUBY_COMPAT_SPEC_DIRS` /
+        // `RUBY_COMPAT_SPEC_FILES` in
+        // scripts/test-compare/extract-ruby-tests.rb). The narrowing is
+        // deliberate: all of `spec/ruby` is thousands of test names for
+        // language and library surface ruby-compat has no port of, which would
+        // drown the compare output.
+        //
+        // The unit is the TYPE, not the directory, because ruby-compat ports
+        // some types whole and others by a single member. `Rational`, `Range`,
+        // `Hash` and `Comparable` are whole-type ports, so they take their
+        // whole spec directory. `String`, `Regexp` and `Symbol` are not:
+        // ruby-compat's entire String surface is `succ`, its entire Regexp
+        // surface is `escape`, and its entire Symbol surface is `to_s`. Taking
+        // those three directories whole would present 1,969 test names for
+        // members the package deliberately does not have — 74% of the measure,
+        // measuring nothing. ruby/spec is one file per member, so they take
+        // their member's spec files instead.
+        //
+        // Either list grows with the package: a new member of a ported type
+        // needs no change, a newly ported member of String/Regexp/Symbol adds
+        // its spec file, and a type that grows into a whole-type port
+        // graduates from the file list to the directory list.
+        //
+        // An unported spec here is NOT a reason to port the member it covers.
+        // ruby-compat's surface is driven by what the trails packages need
+        // from Ruby, and the standing rule wins over suite coverage: a spec
+        // for a member ruby-compat deliberately does not have is a spec that
+        // is out of scope, not a gap. Scoping the measure to the ported
+        // surface is what keeps that rule enforceable rather than aspirational.
+        //
+        // Name mapping: ruby/spec files are mspec, which is RSpec-shaped
+        // (`describe "Rational#abs" do` / `it "..." do`) rather than minitest
+        // `def test_`, so the `def_test` name mapping the gem suites use does
+        // not apply. extract-ruby-tests.rb already handles describe/it as its
+        // Minitest::Spec style, so the description string IS the test name on
+        // both sides and no mapping is needed.
+        testPath: "spec/ruby/core",
         // Vendored as a read-anchor only, the way `date` above is. MRI's
         // surface is C, so `scripts/api-compare/extract-ruby-api.rb` — which
         // globs `**/*.rb` — extracts nothing from the files every citation
-        // points at, and there is no `packages/ruby/src` workspace dir for the
-        // comparator to key a package to. `compareTests` stays off until the
-        // `ruby-spec-behavioural-enrollment` story wires `spec/ruby` in;
-        // ruby/spec is mspec, not minitest, so the extractor has to learn it
-        // first.
+        // points at. `compareApi` stays off permanently; no later story flips
+        // it.
         compareApi: false,
-        compareTests: false,
       },
     ],
   },

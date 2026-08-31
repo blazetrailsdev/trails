@@ -11,7 +11,7 @@
  * cross-format dispatch still works.
  */
 
-import { KeyError } from "../core-ext/key-error.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";

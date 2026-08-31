@@ -1,4 +1,4 @@
-import { Rational } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { BIGDECIMAL_STRING } from "./number-converter.js";
 

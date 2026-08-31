@@ -9,7 +9,8 @@
  * `require "active_support/core_ext/time/calculations"` is.
  */
 
-import { Date as RubyDate, Rational, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import { currentTimeInstant } from "../../time-travel.js";
 import { TimeWithZone } from "../../time-with-zone.js";

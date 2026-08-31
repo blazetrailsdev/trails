@@ -1,8 +1,8 @@
 /**
  * Ruby's core `KeyError` (`vendor/ruby/error.c:3325`) — what `Hash#fetch`
  * raises for an absent key (`vendor/ruby/hash.c:2203` `rb_key_err_raise`).
- * `activesupport/src/core-ext/key-error.ts` is a re-export shim so
- * `@blazetrails/activesupport`'s public surface is unchanged.
+ * `@blazetrails/activesupport`'s index re-exports it, so that package's
+ * public surface is unchanged.
  *
  * Callers pass the whole message, exactly as Ruby composes it: a Symbol key
  * renders `key not found: :expression`, a String key

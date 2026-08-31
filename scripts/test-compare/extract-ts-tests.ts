@@ -23,6 +23,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "did-you-mean",
     "i18n",
     "date",
+    "ruby-compat",
   ];
   const packageAliases: Record<string, string> = {};
   const result: Record<string, string[]> = {};

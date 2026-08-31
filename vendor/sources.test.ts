@@ -78,11 +78,13 @@ describe("vendor/sources.ts", () => {
     expect(resolvePath("date", "test").endsWith("vendor/date/test/date")).toBe(true);
   });
 
-  it("declares the ruby source, vendored as a read-anchor only", () => {
+  it("declares the ruby source, read-anchor for api-compare and enrolled in test-compare", () => {
     // MRI is vendored so the C symbols cited across the ruby-compat ports
-    // (rational.c, range.c, re.c, object.c) are readable in-tree. Both compare
-    // flags stay off: the extractor globs `**/*.rb` and sees none of that C,
-    // and there is no `packages/ruby/src` for a package to key onto.
+    // (rational.c, range.c, re.c, object.c) are readable in-tree. `compareApi`
+    // stays off permanently: the extractor globs `**/*.rb` and sees none of
+    // that C. `compareTests` is on — ruby/ruby mirrors the ruby/spec suite
+    // in-tree, and `spec/ruby/core` (narrowed to the value-type primitives by
+    // extract-ruby-tests.rb) is ruby-compat's behavioural measure.
     const ruby = SOURCES.find((s) => s.name === "ruby");
     expect(ruby).toBeDefined();
     expect(ruby!.origin).toEqual({
@@ -92,18 +94,17 @@ describe("vendor/sources.ts", () => {
     });
     expect(ruby!.packages).toEqual([
       {
-        name: "ruby",
+        name: "ruby-compat",
         libPath: "lib",
-        testPath: "spec/ruby",
+        testPath: "spec/ruby/core",
         compareApi: false,
-        compareTests: false,
       },
     ]);
-    expect(apiComparePackages()).not.toContain("ruby");
-    expect(Object.keys(libPathsManifest())).not.toContain("ruby");
-    expect(Object.keys(testPathsManifest())).not.toContain("ruby");
-    expect(resolvePath("ruby").endsWith("vendor/ruby/lib")).toBe(true);
-    expect(resolvePath("ruby", "test").endsWith("vendor/ruby/spec/ruby")).toBe(true);
+    expect(apiComparePackages()).not.toContain("ruby-compat");
+    expect(Object.keys(libPathsManifest())).not.toContain("ruby-compat");
+    expect(Object.keys(testPathsManifest())).toContain("ruby-compat");
+    expect(resolvePath("ruby-compat").endsWith("vendor/ruby/lib")).toBe(true);
+    expect(resolvePath("ruby-compat", "test").endsWith("vendor/ruby/spec/ruby/core")).toBe(true);
     expect(vendoredRoot("ruby").endsWith("vendor/ruby")).toBe(true);
   });
 
@@ -275,6 +276,7 @@ describe("vendor/sources.ts", () => {
         "globalid",
         "i18n",
         "rack",
+        "ruby-compat",
         "trailties",
       ].sort(),
     );

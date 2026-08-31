@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { Rational, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import "./calculations.js";
 

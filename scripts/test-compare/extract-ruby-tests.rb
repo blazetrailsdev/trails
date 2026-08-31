@@ -3,7 +3,9 @@
 
 # Extracts test metadata from Rails test files using Ripper.
 # Handles three test styles:
-#   1. Minitest::Spec: describe/it blocks (used in Arel tests)
+#   1. Minitest::Spec: describe/it blocks (used in Arel tests, and by the
+#      RSpec-shaped mspec files of ruby/spec — same `describe`/`it` syntax,
+#      so the `def test_` name mapping the gem suites use does not apply)
 #   2. test macro: test "description" do (ActiveModel, ActiveRecord)
 #   3. def test_xxx: older-style test methods
 #
@@ -55,6 +57,31 @@ SKIP_PATTERNS = [
   /\/abstract_unit\.rb$/,
   /\/config\.rb$/,
 ]
+
+# ruby-compat's spec selection (see the pkg_name == "ruby-compat" branch in
+# `run`). Types ruby-compat ports whole take their whole directory.
+RUBY_COMPAT_SPEC_DIRS = %w[rational range hash comparable].freeze
+
+# Types ruby-compat ports ONE member of take that member's spec files. A
+# `<type>/<member>_spec.rb` is usually a one-line `it_behaves_like` shell whose
+# body is a shared file under `<type>/shared/`, so the shared body is listed
+# beside it — it is what carries the tests, which collect_shared_example /
+# materialize_shared_example re-parent under the shell's own describe. Aliases
+# share one body and so add only their shell: `String#next` is `String#succ`
+# (next_spec.rb:6 `it_behaves_like :string_succ, :next`), `Regexp.quote` is
+# `Regexp.escape` (quote_spec.rb:6), and `Symbol#to_s` shares
+# `Symbol#id2name`'s body (to_s_spec.rb:5).
+RUBY_COMPAT_SPEC_FILES = %w[
+  string/succ_spec.rb
+  string/next_spec.rb
+  string/shared/succ.rb
+  regexp/escape_spec.rb
+  regexp/quote_spec.rb
+  regexp/shared/quote.rb
+  symbol/to_s_spec.rb
+  symbol/name_spec.rb
+  symbol/shared/id2name.rb
+].freeze
 
 # Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of
 # TS isAssertionCallee (extract-ts-core.ts), so both sides count the full breadth
@@ -118,6 +145,10 @@ class TestExtractor
 
   def initialize
     @test_files = []
+    # `describe :symbol, shared: true` bodies, keyed by symbol name, for
+    # `it_behaves_like` to re-parent at its call site. Package-wide rather than
+    # per-file: a shared body lives in a different file from its callers.
+    @shared_examples = {}
     # `[...].each { define_method("test_...") }` loops whose cases can't be
     # expanded statically, as "file:line" — reported rather than dropped silently.
     @unexpanded_loops = []
@@ -230,6 +261,7 @@ class TestExtractor
       case cmd_name
       when "describe"
         desc = extract_first_string(inner[2])
+        return if desc.nil? && collect_shared_example(inner[2], node)
         if desc
           @describe_stack.push(desc)
           walk(block) if block.is_a?(Array)
@@ -351,6 +383,80 @@ class TestExtractor
     end
   end
 
+  # ruby/spec writes a reusable body as `describe :symbol, shared: true do ... end`
+  # (`core/string/shared/succ.rb:2`) and a caller mounts it with
+  # `it_behaves_like :symbol, :method` (`core/string/next_spec.rb:6`), which at
+  # runtime re-parents the body's examples under the CALLING file's describe.
+  # The name is a Symbol, not a String, so `extract_first_string` returns nil and
+  # the body would otherwise emit as unparented, effectively-anonymous tests.
+  #
+  # So a shared definition is COLLECTED, never emitted where it is defined, and
+  # `materialize_shared_example` re-parents it at each call site — the cross-file
+  # twin of process_module/flush_collected_modules. The registry is a package-wide
+  # accessor because the definition lives in a different FILE from its callers.
+  def collect_shared_example(args, node)
+    name = shared_example_name(args)
+    return false unless name
+
+    saved_cases = @test_cases
+    saved_stack = @describe_stack
+    @test_cases = []
+    @describe_stack = []
+    walk_block_body(node)
+    @shared_examples[name] = @test_cases
+    @test_cases = saved_cases
+    @describe_stack = saved_stack
+    true
+  end
+
+  # `line` is re-stamped to the `it_behaves_like` call site, NOT left at the
+  # shared body's own line: the manifest files this case under the CALLING file
+  # (`process_file` groups by the file being walked, and rails-find/core.ts:131
+  # pairs that path with this line), so the body's line would point past EOF of
+  # an 8-line shell. The call site is a real line in that file and names the
+  # shared body, which is the one hop a reader wants.
+  def materialize_shared_example(args, node)
+    name = first_symbol_name(args)
+    return unless name
+    line = extract_line(node)
+    (@shared_examples[name] || []).each do |t|
+      @test_cases << t.merge(
+        path: (@describe_stack + [t[:description]]).join(" > "),
+        ancestors: @describe_stack.dup,
+        file: @current_file,
+        line: line,
+      )
+    end
+  end
+
+  # A describe whose first argument is a Symbol and whose args carry a `shared:`
+  # keyword — the shape ruby/spec uses and the only one treated as a definition.
+  def shared_example_name(args)
+    return nil unless args.is_a?(Array)
+    return nil unless has_shared_kwarg?(args)
+    first_symbol_name(args)
+  end
+
+  def has_shared_kwarg?(node)
+    return false unless node.is_a?(Array)
+    return true if node[0] == :@label && node[1] == "shared:"
+    node.any? { |child| child.is_a?(Array) && has_shared_kwarg?(child) }
+  end
+
+  def first_symbol_name(node)
+    return nil unless node.is_a?(Array)
+    if node[0] == :symbol_literal
+      inner = node[1]
+      return ident_name(inner[1]) if inner.is_a?(Array) && inner[0] == :symbol
+    end
+    node.each do |child|
+      next unless child.is_a?(Array)
+      found = first_symbol_name(child)
+      return found if found
+    end
+    nil
+  end
+
   def materialize_module_test(t)
     path = (@describe_stack + [t[:description]]).join(" > ")
     add_gate({
@@ -374,6 +480,8 @@ class TestExtractor
     case cmd_name
     when "describe"
       process_describe(args, node)
+    when "it_behaves_like", "it_should_behave_like"
+      materialize_shared_example(args, node)
     when "it"
       process_it(args, node)
     when "test"
@@ -403,6 +511,7 @@ class TestExtractor
 
   def process_describe(args, node)
     desc = extract_first_string(args)
+    return if desc.nil? && collect_shared_example(args, node)
     return unless desc
 
     line = extract_line(node)
@@ -1844,7 +1953,8 @@ def run
     test_files = Dir.glob(File.join(pkg_dir, "**", "*_test.rb")) +
                  Dir.glob(File.join(pkg_dir, "**", "test_*.rb")) +
                  Dir.glob(File.join(pkg_dir, "**", "spec_*.rb")) +
-                 Dir.glob(File.join(pkg_dir, "**", "behaviors", "*_behavior.rb"))
+                 Dir.glob(File.join(pkg_dir, "**", "behaviors", "*_behavior.rb")) +
+                 Dir.glob(File.join(pkg_dir, "**", "*_spec.rb"))
     test_files.uniq!
 
     # For activerecord, exclude arel test files (handled by arel package)
@@ -1865,6 +1975,21 @@ def run
       test_files.select! { |f| f.start_with?(controller_dir) }
     end
 
+    # For ruby-compat, include only the specs for surface the package ports.
+    # `pkg_dir` is ruby/spec's `spec/ruby/core`; vendor/sources.ts carries why
+    # the selection is scoped, how it grows, and why an unported spec is not a
+    # gap. A whole-type port takes its directory; a port of one member of a
+    # type takes that member's spec files, since ruby/spec is one file per
+    # member.
+    if pkg_name == "ruby-compat"
+      # Shared bodies are not named `*_spec.rb`, so the globs above miss them.
+      test_files += Dir.glob(File.join(pkg_dir, "**", "shared", "*.rb"))
+      test_files.uniq!
+      selected = RUBY_COMPAT_SPEC_DIRS.map { |d| File.join(pkg_dir, d) + File::SEPARATOR } +
+                 RUBY_COMPAT_SPEC_FILES.map { |f| File.join(pkg_dir, f) }
+      test_files.select! { |f| selected.any? { |s| f.start_with?(s) } }
+    end
+
     # Apply skip patterns
     test_files.reject! do |filepath|
       SKIP_PATTERNS.any? { |pattern| filepath =~ pattern }
@@ -1874,7 +1999,10 @@ def run
 
     puts "Processing #{pkg_name}: #{test_files.length} test files..."
 
-    test_files.each do |filepath|
+    # Shared bodies first: `it_behaves_like` resolves against a registry the
+    # definition has to be in already, and the definition is in another file.
+    shared, callers = test_files.partition { |f| f.include?("#{File::SEPARATOR}shared#{File::SEPARATOR}") }
+    (shared + callers).each do |filepath|
       extractor.process_file(filepath, pkg_dir)
     end
 

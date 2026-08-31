@@ -8,7 +8,8 @@
  * Mirrors: `class String` (`core_ext/string/conversions.rb`)
  */
 
-import { Date as RubyDate, DateTime, Rational, Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { fetch } from "@blazetrails/ruby-compat";
 import { isBlank } from "../object/blank.js";
 import { preserveTimezone } from "../time/compatibility.js";

@@ -65,6 +65,11 @@
       "kind": 471,
       "value": 61
     },
+    "ruby-compat": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
     "trailties": {
       "assertionCount": 46,
       "kind": 72,

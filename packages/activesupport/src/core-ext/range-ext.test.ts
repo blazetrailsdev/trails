@@ -3,11 +3,11 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
 
 import { hours } from "../duration.js";
-import { Range } from "../range-ext.js";
+import { Range } from "@blazetrails/ruby-compat/range";
 import { instantFromDate } from "../testing/temporal-helpers.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
-import { succ } from "./string/succ.js";
+import { succ } from "@blazetrails/ruby-compat";
 import "./range/compare-range.js";
 import "./range/conversions.js";
 import "./range/each.js";

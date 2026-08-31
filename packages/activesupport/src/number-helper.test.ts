@@ -8,7 +8,7 @@ import {
   numberToHumanSize,
   numberToHuman,
 } from "./number-helper.js";
-import { Rational } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 
 /** Mirrors: number_helper_test.rb:18-25's `NumberWithToD`. */

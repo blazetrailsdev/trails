@@ -11,7 +11,7 @@ const tester = new RuleTester({
 
 const FLAGGED = "packages/activerecord/src/support/new-helper.ts";
 /** A seeded row in eslint/no-ruby-compat-reimplementation-exclude.json. */
-const ALLOWLISTED = "packages/activesupport/src/core-ext/key-error.ts";
+const ALLOWLISTED = "packages/actionpack/src/action-dispatch/middleware/cookies.ts";
 const IN_RUBY_COMPAT = "packages/ruby-compat/src/core-ext/regexp.ts";
 
 tester.run("no-ruby-compat-reimplementation", rule, {

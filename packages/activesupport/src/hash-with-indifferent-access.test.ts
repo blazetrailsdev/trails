@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { KeyError } from "./core-ext/key-error.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 describe("HashWithIndifferentAccessTest", () => {
   // Basic indifferent access

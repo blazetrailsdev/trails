@@ -16,7 +16,7 @@
  */
 
 import { presence } from "./core-ext/object/blank.js";
-import { KeyError } from "./core-ext/key-error.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
   /**

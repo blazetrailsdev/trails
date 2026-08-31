@@ -1357,6 +1357,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     "did-you-mean": "packages/did-you-mean/src/",
     i18n: "packages/i18n/src/",
     date: "packages/date/src/",
+    "ruby-compat": "packages/ruby-compat/src/",
   };
 
   const prefix = pkgDirs[pkg];

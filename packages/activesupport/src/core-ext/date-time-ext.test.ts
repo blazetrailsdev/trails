@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { DateTime, Rational, Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
+import { DateTime, Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { Object as ObjectExt } from "./object/acts-like.js";
 import {
   advance,

@@ -15,7 +15,7 @@
 
 import { describe, it, expect } from "vitest";
 import { assertRespondTo } from "./testing/assertions.js";
-import { KeyError } from "./core-ext/key-error.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 import { OrderedOptions, InheritableOptions } from "./ordered-options.js";
 
 /** The `method_missing` surface: any name reads and writes the Hash. */

@@ -3,10 +3,11 @@
  *
  * `@blazetrails/ruby-compat` only pays for itself if the tree CALLS it.
  * Without a gate the package relocates today's duplicates and grows fresh ones
- * — the history that produced them: `activesupport/src/core-ext/regexp.ts:18`
- * has been the canonical `regexpEscape` for a long time and three
- * byte-identical private copies exist anyway (`quote-regex.ts:27`,
- * `run-token.ts:23`, `trails-actions.ts:191`).
+ * — the history that produced them: `regexpEscape` has been the canonical
+ * spelling for a long time (in `activesupport/src/core-ext/regexp.ts` before
+ * RFC 0129 moved it to `ruby-compat/src/regexp.ts`) and three byte-identical
+ * private copies exist anyway (`quote-regex.ts:27`, `run-token.ts:23`,
+ * `trails-actions.ts:191`).
  *
  * So a function or class declared OUTSIDE `packages/ruby-compat/` whose name is
  * a ruby-compat export, or a registered alias of one, is an error. The register

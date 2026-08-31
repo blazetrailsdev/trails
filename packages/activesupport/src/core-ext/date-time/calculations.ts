@@ -17,13 +17,8 @@
  * Mirrors: `class DateTime` (`core_ext/date_time/calculations.rb`)
  */
 
-import {
-  Date as RubyDate,
-  DateTime as RubyDateTime,
-  Rational,
-  Temporal,
-  Time,
-} from "@blazetrails/date";
+import { Date as RubyDate, DateTime as RubyDateTime, Temporal, Time } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { rational } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import { instantFrom } from "../../temporal.js";

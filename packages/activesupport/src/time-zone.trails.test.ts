@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { TimeZone, AmbiguousTime, PeriodNotFound } from "./values/time-zone.js";
 import { ArgumentError } from "./hash-utils.js";
-import { Rational, Time } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 
 describe("TimeZoneTest", () => {
   it("clear resets the memos", () => {

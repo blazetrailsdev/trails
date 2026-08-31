@@ -17,7 +17,8 @@ import {
   toBytes,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { Rational, Temporal } from "@blazetrails/date";
+import { Temporal } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Value as TimeValue } from "../../type/time.js";
 import { BinaryData } from "@blazetrails/activemodel";

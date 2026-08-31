@@ -1,4 +1,4 @@
-import { Rational } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
