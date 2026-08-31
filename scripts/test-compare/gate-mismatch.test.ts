@@ -27,11 +27,41 @@ describe("classifyGateMismatch", () => {
   });
 
   it("stays silent when Rails has only an incomparable guard but we gate", () => {
-    // e.g. Rails `skip if supports_transaction_isolation?` → guards:["no_…"],
-    // our TS gates [sqlite]. Real-but-incomparable Rails restriction → not over-gated.
-    const negFeatureGuard: TestGate = { guards: ["no_transaction_isolation"], source: ["class"] };
+    // e.g. Rails `skip if mariadb?` → guards:["mariadb"], our TS gates
+    // [sqlite]. Real-but-incomparable Rails restriction → not over-gated.
+    const runtimeGuard: TestGate = { guards: ["mariadb"], source: ["class"] };
     expect(
-      classifyGateMismatch(negFeatureGuard, { adapters: ["sqlite"], source: ["test"] }, false),
+      classifyGateMismatch(runtimeGuard, { adapters: ["sqlite"], source: ["test"] }, false),
+    ).toBeNull();
+  });
+
+  it("compares an inverted feature restriction as a signed feature", () => {
+    const noRenameIndexRails: TestGate = { guards: ["no_rename_index"], source: ["body-skip"] };
+    const noRenameIndexTs: TestGate = { guards: ["no_rename_index"], source: ["test"] };
+    expect(classifyGateMismatch(noRenameIndexRails, noRenameIndexTs, false)).toBeNull();
+
+    const noJson: TestGate = { guards: ["no_json"], source: ["body-skip"] };
+    expect(classifyGateMismatch(noRenameIndexRails, noJson, false)).toBe("wrong-gate");
+
+    expect(classifyGateMismatch(noJson, jsonTs, false)).toBe("wrong-gate");
+
+    expect(classifyGateMismatch(noRenameIndexRails, undefined, false)).toBe("missing-gate");
+    expect(classifyGateMismatch(undefined, noRenameIndexTs, false)).toBe("over-gated");
+  });
+
+  it("keeps a `no_<feature>` beside a plain feature in the compared key", () => {
+    const railsFk: TestGate = {
+      features: ["foreign_keys"],
+      guards: ["no_rename_index"],
+      source: ["class"],
+    };
+    const tsFk: TestGate = { features: ["foreign_keys"], source: ["wrapper"] };
+    expect(classifyGateMismatch(railsFk, tsFk, false)).toBe("wrong-gate");
+    expect(
+      classifyGateMismatch(railsFk, { ...tsFk, guards: ["no_rename_index"] }, false),
+    ).toBeNull();
+    expect(
+      classifyGateMismatch(railsFk, { ...tsFk, guards: ["no_rename_index", "mariadb"] }, false),
     ).toBeNull();
   });
 

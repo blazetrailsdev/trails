@@ -18,6 +18,7 @@ const mysql =
         supportsSqlStandardDropConstraint: false,
         supportsDefaultExpression: false,
         supportsCheckConstraints: false,
+        supportsRenameIndex: false,
       };
 
 function withMysql(base: readonly Backend[], supported: boolean): readonly Backend[] {
@@ -50,6 +51,7 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   insert_returning: withMysql(["postgres", "sqlite"], mysql.supportsInsertReturning),
   text_column_with_default: withMysql(["postgres", "sqlite"], mysql.supportsTextColumnWithDefault),
   non_unique_constraint_name: withMysql([], mysql.supportsNonUniqueConstraintName),
+  rename_index: withMysql([], mysql.supportsRenameIndex),
   sql_standard_drop_constraint: withMysql(["postgres"], mysql.supportsSqlStandardDropConstraint),
   common_table_expressions: ALL,
   insert_on_duplicate_skip: ALL,
