@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { Mapper } from "./mapper.js";
 
 describe("Mapper.normalizePath", () => {
@@ -110,18 +114,27 @@ describe("Mapper public DSL additions", () => {
     expect(observedInside).toBe("/admin");
   });
 
-  it("draw runs a callback form", () => {
+  it("routes drawing from config/routes", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "trails-draw-"));
+    await writeFile(
+      join(dir, "external.ts"),
+      'export function drawRoutes(mapper) { mapper.get("/external", { to: "external#index" }); }\n',
+    );
     const m = new Mapper();
-    let inner: Mapper | undefined;
-    m.draw((inside) => {
-      inner = inside;
-    });
-    expect(inner).toBe(m);
+    m._drawPaths.push(dir);
+
+    await m.draw("external");
+
+    expect(m.routes.map((r) => r.path)).toContain("/external");
   });
 
-  it("draw throws on the string (file-load) form", () => {
+  it("draw raises when the external file is not found", async () => {
     const m = new Mapper();
-    expect(() => m.draw("admin")).toThrow(/file-based draw is not supported/);
+    m._drawPaths.push("/nonexistent/config/routes");
+
+    await expect(m.draw("external")).rejects.toThrow(
+      /tried to #draw the external file external\.ts/,
+    );
   });
 
   it("defaultUrlOptions getter/setter round-trip", () => {

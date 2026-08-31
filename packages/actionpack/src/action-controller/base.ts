@@ -19,12 +19,13 @@ import { FlashHash } from "../action-dispatch/middleware/flash.js";
 import { RequestForgeryProtection } from "../action-dispatch/request-forgery-protection.js";
 import { Collector } from "./metal/mime-responds.js";
 import { UnknownFormat } from "./metal/exceptions.js";
+import { defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
   AroundCallback,
   CallbackOptions,
 } from "../abstract-controller/callbacks.js";
-import { LookupContext } from "@blazetrails/actionview";
+import { LookupContext, _prefixes } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../action-dispatch/routing/route-helpers.js";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
@@ -268,6 +269,9 @@ export class Base extends Metal {
       // Render action template or collection via LookupContext
       this._pendingRender = { type: "template", options };
       return; // Will be handled by async processAction wrapper
+    } else if ((this.constructor as typeof Base).lookupContext) {
+      this._pendingRender = { type: "template", options };
+      return;
     } else {
       // Implicit render — try template resolver
       this._renderTemplate(this.actionName, options);
@@ -283,6 +287,63 @@ export class Base extends Metal {
 
   /** Pending async render (for template/partial rendering). */
   _pendingRender: { type: string; options: RenderOptions } | null = null;
+
+  /**
+   * Rails `ActionView::ViewPaths#_prefixes` — mixed in from the file that
+   * matches `action_view/view_paths.rb`, per the module-mixin convention.
+   *
+   * @internal
+   */
+  _prefixes = _prefixes;
+
+  /**
+   * Rails `ActionView::ViewPaths#template_exists?` (`view_paths.rb:83-85`).
+   * trails' controllers hold their lookup context on the class rather than
+   * building one per instance, so the delegation target differs; the
+   * signature and the `exists?` call are Rails'.
+   */
+  templateExists(
+    name: string,
+    prefixes: readonly string[] = [],
+    partial = false,
+    keys: readonly string[] = [],
+    options: Record<string, readonly (string | symbol)[]> = {},
+  ): boolean {
+    const ctx = (this.constructor as typeof Base).lookupContext;
+    if (!ctx) return false;
+    return ctx.isExists(name, prefixes, partial, keys, options);
+  }
+
+  /**
+   * Rails `ActionView::ViewPaths#any_templates?` (`view_paths.rb:87-89`).
+   * Same class-level lookup-context note as {@link templateExists}.
+   */
+  isAnyTemplates(name: string, prefixes: readonly string[] = [], partial = false): boolean {
+    const ctx = (this.constructor as typeof Base).lookupContext;
+    if (!ctx) return false;
+    return ctx.isAny(name, prefixes, partial);
+  }
+
+  /**
+   * Rails `ImplicitRender#default_render` — mixed in from
+   * `metal/implicit-render.ts`, the file that matches
+   * `action_controller/metal/implicit_render.rb`.
+   */
+  defaultRender = defaultRender;
+
+  /**
+   * Rails `BasicImplicitRender#send_action`
+   * (`basic_implicit_render.rb:7-11`): `ret = super; default_render unless
+   * performed?; ret`. A `_pendingRender` counts as performed here — the
+   * render was requested by the action, it just resolves asynchronously in
+   * {@link processAction}.
+   *
+   * @internal
+   */
+  override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
+    await super._dispatchAction(action, ...args);
+    if (!this.performed && !this._pendingRender) this.defaultRender();
+  }
 
   /** Async render — resolves pending template/partial renders. */
   async renderAsync(options: RenderOptions): Promise<void> {

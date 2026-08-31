@@ -11,7 +11,7 @@ import {
   type PathAdapter,
 } from "@blazetrails/activesupport";
 import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
-import { RouteSet } from "@blazetrails/actionpack";
+import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import { Trailtie } from "./trailtie.js";
@@ -199,6 +199,68 @@ describe("Engine", () => {
     });
   });
 
+  describe("endpoint", () => {
+    it("it provides routes as default endpoint", () => {
+      class DefaultEndpointEngine extends Engine {}
+      Trailtie.register(DefaultEndpointEngine);
+      const engine = DefaultEndpointEngine.instance();
+      expect(engine.endpoint()).toBe(engine.routes());
+    });
+
+    it("returns the registered endpoint", () => {
+      class MountedEngine extends Engine {}
+      Trailtie.register(MountedEngine);
+      const rack = async () => [200, {}, ["OK"]] as const;
+      MountedEngine.endpoint(rack as never);
+      expect(MountedEngine.instance().endpoint()).toBe(rack);
+    });
+
+    it("engine is a rack app and can have its own middleware stack", async () => {
+      const stack = new MiddlewareStack();
+      class Tagger {
+        constructor(private app: (env: never) => Promise<[number, object, string[]]>) {}
+        async call(env: never): Promise<[number, object, string[]]> {
+          const [status, headers, body] = await this.app(env);
+          return [status, headers, [...body, "!"]];
+        }
+      }
+      stack.use(Tagger as never);
+
+      class StackEngine extends Engine {}
+      Trailtie.register(StackEngine);
+      StackEngine.endpoint((async () => [200, {}, ["OK"]]) as never);
+
+      const app = stack.build(StackEngine.instance().endpoint());
+      expect(await app({} as never)).toEqual([200, {}, ["OK", "!"]]);
+    });
+  });
+
+  describe("load_server", () => {
+    it("invokes the registered server blocks and returns self", () => {
+      class ServerEngine extends Engine {}
+      Trailtie.register(ServerEngine);
+      const seen: unknown[] = [];
+      ServerEngine.server((app: unknown) => {
+        seen.push(app);
+      });
+      const engine = ServerEngine.instance();
+      expect(engine.loadServer()).toBe(engine);
+      expect(seen).toEqual([engine]);
+    });
+
+    it("passes the given app to the server blocks", () => {
+      class ServerAppEngine extends Engine {}
+      Trailtie.register(ServerAppEngine);
+      const seen: unknown[] = [];
+      ServerAppEngine.server((app: unknown) => {
+        seen.push(app);
+      });
+      const other = {};
+      ServerAppEngine.instance().loadServer(other);
+      expect(seen).toEqual([other]);
+    });
+  });
+
   describe("tableNamePrefix", () => {
     it("defaults to null when not isolated and unset", () => {
       class PlainNamespacedEngine extends Engine {}
@@ -270,14 +332,17 @@ describe("Engine", () => {
     const engine = RoutingEngine.instance();
     engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
     const reloader = { paths: [] as string[], routeSets: [] as unknown[], externalRoutes: [] };
+    const appRoutes = new RouteSet();
 
     await engine.initializers
       .find((i) => i.name === "add_routing_paths")!
-      .run({ routesReloader: () => reloader });
+      .run({ routes: () => appRoutes, routesReloader: () => reloader });
 
     expect(reloader.paths).toHaveLength(1);
     expect(reloader.paths[0]).toMatch(/config\/routes\.ts$/);
     expect(reloader.routeSets).toEqual([engine.routes()]);
+    expect(engine.routes().drawPaths).toEqual(appRoutes.drawPaths);
+    expect(appRoutes.drawPaths[0]).toMatch(/config\/routes$/);
   });
 
   it("add_view_paths prepends app/views onto the action_controller load hook", async () => {

@@ -7,6 +7,20 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 export type RackApp = (env: RackEnv) => Promise<RackResponse>;
+
+/**
+ * A Rack application that answers `call` as a method rather than being one.
+ * Ruby has a single shape here — `MiddlewareStack#build` folds over anything
+ * that responds to `call` (`stack.rb:166-175`), which is how
+ * `Engine#endpoint` hands its `RouteSet` straight to the stack
+ * (`engine.rb:521`) — while JS keeps a function and a `call`-bearing object
+ * apart, so both spellings are named.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface RackAppObject {
+  call(env: RackEnv): Promise<RackResponse>;
+}
 type MiddlewareFactory = new (
   app: RackApp,
   ...args: any[]
@@ -161,8 +175,8 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return this.entries[Symbol.iterator]();
   }
 
-  build(app: RackApp): RackApp {
-    let current = app;
+  build(app: RackApp | RackAppObject): RackApp {
+    let current: RackApp = typeof app === "function" ? app : (env: RackEnv) => app.call(env);
     for (let i = this.entries.length - 1; i >= 0; i--) {
       const entry = this.entries[i];
       if (entry.block) {

@@ -56,7 +56,12 @@ export {
   DefaultResponseApp,
   type HostAuthorizationOptions,
 } from "./middleware/host-authorization.js";
-export { MiddlewareStack, type MiddlewareEntry, type RackApp } from "./middleware/stack.js";
+export {
+  MiddlewareStack,
+  type MiddlewareEntry,
+  type RackApp,
+  type RackAppObject,
+} from "./middleware/stack.js";
 export { MimeType } from "./http/mime-type.js";
 export {
   ContentSecurityPolicy,
