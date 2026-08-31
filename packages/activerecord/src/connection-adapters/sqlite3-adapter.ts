@@ -43,6 +43,7 @@ import {
   NotNullViolation,
   NoDatabaseError,
   ConnectionNotEstablished,
+  ConnectionFailed,
   DatabaseConnectionError,
   StatementTimeout,
 } from "../errors.js";
@@ -506,7 +507,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     try {
       await this.execRollbackDbTransaction();
     } catch (e) {
-      if (!(e instanceof ConnectionNotEstablished)) throw e;
+      if (!(e instanceof ConnectionNotEstablished) && !(e instanceof ConnectionFailed)) throw e;
     }
   }
 

@@ -12,16 +12,6 @@ import {
 const READ_QUERY =
   /^(?:[(\s]|\/\*[\s\S]*?\*\/)*(?:begin|commit|explain|release|rollback|savepoint|select|with|pragma)\b/i;
 
-type ExecutableAdapter = {
-  execute(sql: string, binds?: unknown[]): Promise<unknown>;
-  internalExecute(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-    options?: { allowRetry?: boolean; materializeTransactions?: boolean },
-  ): Promise<unknown>;
-};
-
 export interface DatabaseStatements {
   execQuery(sql: string, name?: string | null): Promise<Result>;
   execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;

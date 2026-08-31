@@ -297,7 +297,7 @@ function tryAutoRegisterNode(): boolean {
           try {
             nodeFs.unlinkSync(entry);
           } catch {
-            // FileUtils.rm_f ignores a missing entry.
+            /* rm_f ignores a missing entry */
           }
         }
       },
