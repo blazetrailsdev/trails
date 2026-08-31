@@ -193,7 +193,7 @@ describe("Finisher", () => {
       seen.push("before_eager_load");
     });
     app.config.eagerLoad = true;
-    app.config.eagerLoadNamespaces = [{ eagerLoad: () => seen.push("namespace") }];
+    app.config.eagerLoadNamespaces = [{ eagerLoadBang: () => seen.push("namespace") }];
     await run(app, "eager_load!");
     expect(seen).toEqual(["before_eager_load", "namespace"]);
     resetLoadHooks();
@@ -202,7 +202,7 @@ describe("Finisher", () => {
   it("eager_load! is a no-op when config.eagerLoad is false", async () => {
     const app = new TestApp();
     const seen: string[] = [];
-    app.config.eagerLoadNamespaces = [{ eagerLoad: () => seen.push("namespace") }];
+    app.config.eagerLoadNamespaces = [{ eagerLoadBang: () => seen.push("namespace") }];
     await run(app, "eager_load!");
     expect(seen).toEqual([]);
   });

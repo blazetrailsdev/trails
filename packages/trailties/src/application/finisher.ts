@@ -135,7 +135,7 @@ Finisher.initializer("eager_load!", function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {
     runLoadHooks("before_eager_load", this);
     for (const namespace of this.config.eagerLoadNamespaces) {
-      (namespace as { eagerLoad(): void }).eagerLoad();
+      (namespace as { eagerLoadBang(): void }).eagerLoadBang();
     }
   }
 });
