@@ -1,0 +1,54 @@
+import { describe, expect, it } from "vitest";
+import {
+  AMBIGUOUS_RUBY_CALLS,
+  RUBY_COMPAT_EXPORTS,
+  rubyCallName,
+  rubyCompatAliases,
+  rubyCompatExport,
+} from "./ruby-compat.js";
+import { jsEnumerableAliases } from "../api-compare/enumerable-idioms.js";
+
+describe("RUBY_COMPAT_EXPORTS", () => {
+  it("keys every row by an MRI spelling", () => {
+    for (const mri of RUBY_COMPAT_EXPORTS.keys()) expect(mri).toMatch(/^[A-Z]\w*[#.]\S+$/);
+  });
+
+  it("gives every excluded member the homonym that excludes it", () => {
+    for (const reason of AMBIGUOUS_RUBY_CALLS.values()) expect(reason).toMatch(/`.+`/);
+  });
+
+  it("keeps the folded CORE_LIBRARY_ALIASES entry", () => {
+    expect(RUBY_COMPAT_EXPORTS.get("Regexp.escape")).toBe("regexpEscape");
+    expect(rubyCompatAliases("escape")).toEqual(["regexpEscape"]);
+  });
+
+  it("holds no row whose bare name is recorded ambiguous", () => {
+    const ambiguous = new Set([...AMBIGUOUS_RUBY_CALLS.keys()].map(rubyCallName));
+    for (const mri of RUBY_COMPAT_EXPORTS.keys())
+      expect(ambiguous).not.toContain(rubyCallName(mri));
+  });
+});
+
+describe("rubyCompatExport", () => {
+  it("resolves an unambiguous Ruby core call to its ruby-compat export", () => {
+    expect(rubyCompatExport("key?")).toBe("hasKey");
+    expect(rubyCompatExport("cover?")).toBe("cover");
+  });
+
+  it("resolves nothing for an ambiguous receiver, nor a call the table omits", () => {
+    for (const call of ["fetch", "merge", "to_s", "run_callbacks"]) {
+      expect(rubyCompatExport(call)).toBeUndefined();
+      expect(rubyCompatAliases(call)).toEqual([]);
+    }
+  });
+
+  it("forwards a Ruby core call through jsEnumerableAliases", () => {
+    expect(jsEnumerableAliases("cover?")).toEqual(["cover"]);
+    expect(jsEnumerableAliases("escape")).toEqual(["regexpEscape"]);
+  });
+
+  it("leaves the Enumerable and fs-adapter tables in front of it", () => {
+    expect(jsEnumerableAliases("key?")).toEqual(["has"]);
+    expect(jsEnumerableAliases("exist?")).toEqual(["existsSync", "exists"]);
+  });
+});

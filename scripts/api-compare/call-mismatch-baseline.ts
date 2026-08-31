@@ -73,11 +73,14 @@ export interface CallMismatchKey {
   rubyArgs?: string[];
 }
 
-/** The two dimensions sharing a shard file. Each gate filters to its own kind,
+/** The dimensions sharing a shard file. Each gate filters to its own kind,
  *  which is what keeps RFC 0084's row-count debt metric exactly the call-set
  *  rows; a second parallel tree was the original design and was reversed
- *  because it doubled the conflict surface of every burndown PR (RFC 0095). */
-export type RowKind = "calls" | "args";
+ *  because it doubled the conflict surface of every burndown PR (RFC 0095).
+ *  `"rubyCompat"` (RFC 0129) joined on the same terms: a Ruby-core call whose
+ *  ruby-compat port the TS body did not make. Report-only today — no shard holds
+ *  one — and when gated, that gate reads it alone. */
+export type RowKind = "calls" | "args" | "rubyCompat";
 
 /** The rows of one dimension. `kind` absent reads as `"calls"`. */
 export function rowsOfKind<T extends CallMismatchKey>(entries: T[], kind: RowKind): T[] {
