@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Request } from "./request.js";
+import { EmptyContentError } from "./multipart/parser.js";
 import { MockRequest } from "./mock-request.js";
 import { MultipartPartLimitError, MultipartTotalPartLimitError } from "./multipart.js";
 
@@ -1159,9 +1160,19 @@ describe("RackRequestTest", () => {
       },
     };
     const req = new Request(env);
-    // Should parse without crashing (incomplete data just yields empty results)
-    const post = req.POST;
-    expect(post).toBeDefined();
+    expect(() => req.POST).toThrow(EmptyContentError);
+
+    const input2 = `--${boundary}\r\ncontent-disposition: form-data; name="huge"; filename="huge"\r\n\r\nfoo\r\n`;
+    const env2 = {
+      ...makeEnv(),
+      CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
+      "rack.input": {
+        read() {
+          return Buffer.from(input2, "binary");
+        },
+      },
+    };
+    expect(() => new Request(env2).POST).toThrow(EmptyContentError);
   });
 
   it("consistently raise EOFError on bad multipart form data", () => {
@@ -1177,10 +1188,8 @@ describe("RackRequestTest", () => {
       },
     };
     const req = new Request(env);
-    // Should consistently return the same result (cached)
-    const post1 = req.POST;
-    const post2 = req.POST;
-    expect(post1).toBe(post2);
+    expect(() => req.POST).toThrow(EmptyContentError);
+    expect(() => req.POST).toThrow(EmptyContentError);
   });
 
   it("correctly parse the part name from Content-Id header", () => {

@@ -2,7 +2,7 @@ import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
 import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./query-parser.js";
-import { BoundaryTooLongError } from "./multipart/parser.js";
+import { EmptyContentError } from "./multipart/parser.js";
 
 /**
  * Rails writes to `rack.errors` with `puts`, which the Rack SPEC requires of an
@@ -63,7 +63,8 @@ export class MethodOverride {
    * Mirrors: `Rack::MethodOverride#method_override_param`
    * (`rack/method_override.rb:48-54`). Its second rescue arm is `EOFError`,
    * which `Multipart.parse_multipart` raises on a body whose terminating
-   * boundary never arrives; trails' parser raises `BoundaryTooLongError` there.
+   * boundary never arrives — `Rack::Multipart::EmptyContentError < ::EOFError`
+   * (`rack/multipart/parser.rb:20`).
    */
   private methodOverrideParam(req: Request): string | null {
     try {
@@ -80,7 +81,7 @@ export class MethodOverride {
         putsError(req.getHeader(RACK_ERRORS), "Invalid or incomplete POST params");
         return null;
       }
-      if (e instanceof BoundaryTooLongError) {
+      if (e instanceof EmptyContentError) {
         putsError(req.getHeader(RACK_ERRORS), "Bad request content body");
         return null;
       }
