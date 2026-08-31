@@ -162,8 +162,43 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   return path.join(tsDir, mappedTsFile);
 }
 
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, " ").trim();
+/**
+ * Fold a description to its comparison key.
+ *
+ * A LEADING space is significant, and deliberately so: the Ruby extractor
+ * derives a `def test_x` case's description by
+ * `name.sub(/^test_/, "").tr("_", " ")` (extract-ruby-tests.rb:648), so the
+ * doubled underscore of `test__parse` becomes a leading space and is the only
+ * thing telling it apart from `test_parse` in the same file.
+ * `vendor/date/test/date/test_date_parse.rb` has five such pairs — `test__parse`
+ * (:8) / `test_parse` (:214), and the same split on `_parse__2`, `_iso8601`,
+ * `_xmlschema` and `_jisx0301`. Trimming mapped each pair onto one key, so the
+ * greedy matcher handed a single ported test to whichever Ruby case came first
+ * in file order and charged it the other one's assertion counts (PR #6661).
+ *
+ * A trailing space is NOT significant: it carries no such distinction, and a
+ * Rails `test "#{validation} finds …"` leaves one behind wherever an
+ * interpolation ends the name.
+ */
+export function normalize(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").replace(/\s+$/, "");
+}
+
+/**
+ * The key a TS test ALSO answers to, or `undefined` where it has none.
+ *
+ * A Ruby description whose leading space comes from an interpolation
+ * (`test "#{validation} finds …"`, activemodel i18n_validation_test.rb:374)
+ * rather than from a doubled underscore has no counterpart space in the ported
+ * name, so a space-prefixed key must still be able to reach a TS test spelled
+ * without it. The alias is consulted only after the exact key finds nothing,
+ * which is what keeps a `test__parse` / `test_parse` pair on two TS tests.
+ */
+export function aliasKey(key: string): string | undefined {
+  const at = key.lastIndexOf(" > ");
+  const desc = at === -1 ? key : key.slice(at + 3);
+  if (desc.startsWith(" ")) return undefined;
+  return at === -1 ? ` ${desc}` : `${key.slice(0, at + 3)} ${desc}`;
 }
 
 // Rails uses ERB; we use TSE — normalize class/test names to match
@@ -499,6 +534,8 @@ export function main(args: string[] = process.argv.slice(2)) {
       fileTests: Map<string, TsTestInfo[]>;
       filePathIndex: Map<string, Map<string, number[]>>; // file → path → [indices]
       fileDescIndex: Map<string, Map<string, number[]>>; // file → desc → [indices]
+      filePathAliasIndex: Map<string, Map<string, number[]>>;
+      fileDescAliasIndex: Map<string, Map<string, number[]>>;
       allFiles: Set<string>;
       // Cross-file reverse lookup: key → Map<tsFile, count>
       pathToFileCounts: Map<string, Map<string, number>>;
@@ -510,6 +547,8 @@ export function main(args: string[] = process.argv.slice(2)) {
     const fileTests = new Map<string, TsTestInfo[]>();
     const filePathIndex = new Map<string, Map<string, number[]>>();
     const fileDescIndex = new Map<string, Map<string, number[]>>();
+    const filePathAliasIndex = new Map<string, Map<string, number[]>>();
+    const fileDescAliasIndex = new Map<string, Map<string, number[]>>();
     const allFiles = new Set<string>();
     const pathToFileCounts = new Map<string, Map<string, number>>();
     const descToFileCounts = new Map<string, Map<string, number>>();
@@ -522,6 +561,8 @@ export function main(args: string[] = process.argv.slice(2)) {
       const tests: TsTestInfo[] = [];
       const pathIdx = new Map<string, number[]>();
       const descIdx = new Map<string, number[]>();
+      const pathAliasIdx = new Map<string, number[]>();
+      const descAliasIdx = new Map<string, number[]>();
 
       for (let i = 0; i < file.testCases.length; i++) {
         const tc = file.testCases[i];
@@ -543,6 +584,10 @@ export function main(args: string[] = process.argv.slice(2)) {
         }
         appendIndex(pathIdx, np, i);
         appendIndex(descIdx, nd, i);
+        const npAlias = aliasKey(np);
+        if (npAlias !== undefined) appendIndex(pathAliasIdx, npAlias, i);
+        const ndAlias = aliasKey(nd);
+        if (ndAlias !== undefined) appendIndex(descAliasIdx, ndAlias, i);
 
         // Cross-file reverse lookup
         if (!pathToFileCounts.has(np)) pathToFileCounts.set(np, new Map());
@@ -554,6 +599,8 @@ export function main(args: string[] = process.argv.slice(2)) {
       fileTests.set(relPath, tests);
       filePathIndex.set(relPath, pathIdx);
       fileDescIndex.set(relPath, descIdx);
+      filePathAliasIndex.set(relPath, pathAliasIdx);
+      fileDescAliasIndex.set(relPath, descAliasIdx);
       if (dynamicTests > 0) dynamicFiles.push({ file: relPath, count: dynamicTests });
     }
 
@@ -561,6 +608,8 @@ export function main(args: string[] = process.argv.slice(2)) {
       fileTests,
       filePathIndex,
       fileDescIndex,
+      filePathAliasIndex,
+      fileDescAliasIndex,
       allFiles,
       pathToFileCounts,
       descToFileCounts,
@@ -623,6 +672,14 @@ export function main(args: string[] = process.argv.slice(2)) {
       const tsTests = lookup.fileTests.get(conventionTs) || [];
       const pathIndex = lookup.filePathIndex.get(conventionTs) || new Map();
       const descIndex = lookup.fileDescIndex.get(conventionTs) || new Map();
+      const pathAliasIndex = lookup.filePathAliasIndex.get(conventionTs) || new Map();
+      const descAliasIndex = lookup.fileDescAliasIndex.get(conventionTs) || new Map();
+      const descCandidates = (nd: string, consumed: Set<number>): number[] | undefined => {
+        const exact = descIndex.get(nd) as number[] | undefined;
+        return exact !== undefined && exact.some((i) => !consumed.has(i))
+          ? exact
+          : (descAliasIndex.get(nd) as number[] | undefined);
+      };
       // Track which TS tests (by index) have been consumed
       const consumedTs = new Set<number>();
       // Track which Ruby tests (by index) have been matched
@@ -741,7 +798,8 @@ export function main(args: string[] = process.argv.slice(2)) {
         const tc = file.testCases[ri];
         if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
         const np = normPath(tc.ancestors, tc.description);
-        const tsIdx = consumeIndex(pathIndex.get(np), consumedTs);
+        let tsIdx = consumeIndex(pathIndex.get(np), consumedTs);
+        if (tsIdx < 0) tsIdx = consumeIndex(pathAliasIndex.get(np), consumedTs);
         if (tsIdx >= 0) {
           consumedTs.add(tsIdx);
           matchedRuby.add(ri);
@@ -770,7 +828,7 @@ export function main(args: string[] = process.argv.slice(2)) {
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
-        const candidates = descIndex.get(nd);
+        const candidates = descCandidates(nd, consumedTs);
         if (!candidates) continue;
 
         for (const idx of candidates) {
@@ -813,7 +871,7 @@ export function main(args: string[] = process.argv.slice(2)) {
         const np = normPath(tc.ancestors, tc.description);
         const nd = normalize(tc.description);
 
-        const candidates = descIndex.get(nd);
+        const candidates = descCandidates(nd, consumedTs);
         let descIdx = -1;
         if (candidates) {
           let bestScore = -1;

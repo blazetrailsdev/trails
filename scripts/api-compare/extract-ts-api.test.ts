@@ -15,6 +15,7 @@ import {
   resolveRelModule,
   extractClass,
   extractFileConstants,
+  extractInternalFileConstants,
   extractFileLocalHelpers,
   extractFromProgram,
   harvestObjectLiteralMethods,
@@ -1140,6 +1141,15 @@ describe("extractFileConstants", () => {
       BATCH: { kind: "int", value: "1000" },
       PUBLIC: { kind: "string", value: "x" },
     });
+  });
+});
+
+describe("extractInternalFileConstants", () => {
+  it("names the exported consts an @internal tag holds out of the surface", () => {
+    const src = `/** @internal */ export const HIDDEN = 1;
+      export const SHOWN = 2;
+      /** @internal */ export const NOT_A_LITERAL = compute();`;
+    expect(extractInternalFileConstants(compile(src).sourceFile)).toEqual(["HIDDEN"]);
   });
 });
 

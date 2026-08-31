@@ -1574,6 +1574,17 @@ describe("Ruby extractor file constants", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS 
     expect(c["NATIVE_DATABASE_TYPES"]).toEqual({ kind: "expr" });
     expect(c["VALID_OPTIONS"]).toEqual({ kind: "expr" });
   });
+
+  // connection_adapters/abstract/schema_definitions.rb:79 assigns OPTION_NAMES
+  // this way inside a `Struct.new do ... end` body.
+  it("records a `self::CONST =` assignment", () => {
+    const c = rubyFileConstants(`
+      ColumnDefinition = Struct.new(:name) do
+        self::OPTION_NAMES = [:limit, :precision]
+      end
+    `);
+    expect(c["OPTION_NAMES"]).toEqual({ kind: "expr" });
+  });
 });
 
 describe(

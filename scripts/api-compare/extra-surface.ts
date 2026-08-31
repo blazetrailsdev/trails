@@ -1024,9 +1024,11 @@ export function collectTsFileNames(
   classes: ClassInfo[],
   modules: ClassInfo[],
   fileFunctions: MethodInfo[] | undefined,
+  fileConstants?: string[],
 ): Set<string> {
   const out = new Set<string>();
-  for (const { name } of walkTsFileSurface(file, classes, modules, fileFunctions)) out.add(name);
+  for (const { name } of walkTsFileSurface(file, classes, modules, fileFunctions, fileConstants))
+    out.add(name);
   return out;
 }
 
@@ -1058,6 +1060,7 @@ function walkTsFileSurface(
   classes: ClassInfo[],
   modules: ClassInfo[],
   fileFunctions: MethodInfo[] | undefined,
+  fileConstants?: string[],
 ): SurfaceName[] {
   const out: SurfaceName[] = [];
   const pushMember = (
@@ -1101,6 +1104,10 @@ function walkTsFileSurface(
     }
   }
   for (const fn of fileFunctions ?? []) pushMember(fn, null, null);
+  for (const name of fileConstants ?? []) {
+    if (name.startsWith("_")) continue;
+    out.push({ name, interfaceDeclaration: false, interfaceMemberOf: null, owner: null });
+  }
   return out;
 }
 
@@ -1120,6 +1127,7 @@ export function collectTsNameOwners(
   classes: ClassInfo[],
   modules: ClassInfo[],
   fileFunctions: MethodInfo[] | undefined,
+  fileConstants?: string[],
 ): Map<string, string[] | null> {
   const out = new Map<string, string[] | null>();
   for (const { name, owner, interfaceMemberOf } of walkTsFileSurface(
@@ -1127,6 +1135,7 @@ export function collectTsNameOwners(
     classes,
     modules,
     fileFunctions,
+    fileConstants,
   )) {
     if (interfaceMemberOf !== null) continue;
     if (owner === null) {
@@ -1180,6 +1189,7 @@ export function collectInterfaceOnlyNames(
   classes: ClassInfo[],
   modules: ClassInfo[],
   fileFunctions: MethodInfo[] | undefined,
+  fileConstants?: string[],
 ): Set<string> {
   const interfaces = new Set<string>();
   const others = new Set<string>();
@@ -1188,6 +1198,7 @@ export function collectInterfaceOnlyNames(
     classes,
     modules,
     fileFunctions,
+    fileConstants,
   )) {
     (interfaceDeclaration ? interfaces : others).add(name);
   }
@@ -1239,6 +1250,7 @@ export function collectInterfaceMemberOnlyNames(
   classes: ClassInfo[],
   modules: ClassInfo[],
   fileFunctions: MethodInfo[] | undefined,
+  fileConstants?: string[],
 ): Map<string, string[]> {
   const members = new Map<string, string[]>();
   const others = new Set<string>();
@@ -1247,6 +1259,7 @@ export function collectInterfaceMemberOnlyNames(
     classes,
     modules,
     fileFunctions,
+    fileConstants,
   )) {
     if (interfaceMemberOf === null) {
       others.add(name);
@@ -1777,11 +1790,13 @@ export function uncoveredTsFiles(
   tsClassesByFile: Map<string, ClassInfo[]>,
   tsModulesByFile: Map<string, ClassInfo[]>,
   tsFileFunctions: Record<string, MethodInfo[]>,
+  tsFileConstants: Record<string, Record<string, unknown>> = {},
 ): string[] {
   const files = new Set<string>([
     ...tsClassesByFile.keys(),
     ...tsModulesByFile.keys(),
     ...Object.keys(tsFileFunctions),
+    ...Object.keys(tsFileConstants),
   ]);
   return [...files]
     .filter((f) => !coveredTsFiles.has(f) && !isTestSupportFile(f))
@@ -1954,6 +1969,8 @@ function buildPackageReport(
     pushTo(tsModulesByFile, m.file, m);
   }
   const tsFileFunctions = tsPkg.fileFunctions ?? {};
+  const tsFileConstants = tsPkg.fileConstants ?? {};
+  const tsInternalConstants = tsPkg.fileInternalConstants ?? {};
   const fileTags = tsPkg.fileNoRailsEquivalent ?? {};
 
   // TS file -> names the file declares WITH a body. A bare `interface` signature
@@ -2046,9 +2063,13 @@ function buildPackageReport(
       tsFile: rubyFileToTs(rubyFile, pkg),
       rubyFile,
     })),
-    ...uncoveredTsFiles(coveredTsFiles, tsClassesByFile, tsModulesByFile, tsFileFunctions).map(
-      (tsFile) => ({ tsFile, rubyFile: null }),
-    ),
+    ...uncoveredTsFiles(
+      coveredTsFiles,
+      tsClassesByFile,
+      tsModulesByFile,
+      tsFileFunctions,
+      tsFileConstants,
+    ).map((tsFile) => ({ tsFile, rubyFile: null })),
   ];
 
   for (const { tsFile: expectedTs, rubyFile } of scoreTargets) {
@@ -2057,16 +2078,28 @@ function buildPackageReport(
     const classes = tsClassesByFile.get(expectedTs) ?? [];
     const modules = tsModulesByFile.get(expectedTs) ?? [];
     const fileFns = tsFileFunctions[expectedTs];
-    if (classes.length === 0 && modules.length === 0 && !fileFns) continue;
+    const internalConsts = new Set(tsInternalConstants[expectedTs] ?? []);
+    const fileConsts = Object.keys(tsFileConstants[expectedTs] ?? {}).filter(
+      (n) => !internalConsts.has(n),
+    );
+    if (classes.length === 0 && modules.length === 0 && !fileFns && fileConsts.length === 0)
+      continue;
 
-    const tsNames = collectTsFileNames(expectedTs, classes, modules, fileFns);
+    const tsNames = collectTsFileNames(expectedTs, classes, modules, fileFns, fileConsts);
     if (tsNames.size === 0) continue;
-    const interfaceOnly = collectInterfaceOnlyNames(expectedTs, classes, modules, fileFns);
+    const interfaceOnly = collectInterfaceOnlyNames(
+      expectedTs,
+      classes,
+      modules,
+      fileFns,
+      fileConsts,
+    );
     const interfaceMemberOnly = collectInterfaceMemberOnlyNames(
       expectedTs,
       classes,
       modules,
       fileFns,
+      fileConsts,
     );
 
     const scopedAllowed = new Map<string, Set<string>>();
@@ -2088,7 +2121,7 @@ function buildPackageReport(
     const tsNameOwners =
       scopedAllowed.size === 0
         ? undefined
-        : collectTsNameOwners(expectedTs, classes, modules, fileFns);
+        : collectTsNameOwners(expectedTs, classes, modules, fileFns, fileConsts);
     const scopedAllows = (name: string): boolean => {
       const owners = tsNameOwners?.get(name);
       if (owners === undefined || owners === null || owners.length === 0) return false;

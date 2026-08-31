@@ -589,11 +589,17 @@ export function extractFromProgram(
   // list already skipped them — filter here too or the de-overlap is a no-op.
   const excludePrefixes = excludeDirs.map((dir) => dir.replace(/\\/g, "/") + "/");
   const info: PackageInfo &
-    Required<Pick<PackageInfo, "fileFunctions" | "fileConstants" | "fileNoRailsEquivalent">> = {
+    Required<
+      Pick<
+        PackageInfo,
+        "fileFunctions" | "fileConstants" | "fileInternalConstants" | "fileNoRailsEquivalent"
+      >
+    > = {
     classes: {},
     modules: {},
     fileFunctions: {},
     fileConstants: {},
+    fileInternalConstants: {},
     fileNoRailsEquivalent: {},
   };
   const pendingReExports: PendingReExport[] = [];
@@ -920,19 +926,23 @@ export function extractFromProgram(
       // marked `declaredIn` so `collectTsFileNames` skips it as another file's
       // surface, and only the JSDoc reason is gated
       // on the declaration living in THIS file. An implicit constructor
-      // resolves to no declaration at all, and that entry stays bare.
+      // resolves to no declaration at all, so its home comes off the returned
+      // class instead — the constructor a foreign class never spells is still
+      // that file's surface, not this one's.
       if (constructSigs.length > 0) {
         const sigDecl = constructSigs[0].getDeclaration();
         const ctorDecl =
           sigDecl !== undefined && ts.isConstructorDeclaration(sigDecl) ? sigDecl : undefined;
+        const classDecl = instanceType.getSymbol()?.declarations?.[0];
+        const homeDecl = ctorDecl ?? classDecl;
         const ctorDeclFile =
-          ctorDecl !== undefined
-            ? path.relative(srcDir, ctorDecl.getSourceFile().fileName).replace(/\\/g, "/")
+          homeDecl !== undefined
+            ? path.relative(srcDir, homeDecl.getSourceFile().fileName).replace(/\\/g, "/")
             : undefined;
         const ownCtor = ctorDeclFile === relPath ? ctorDecl : undefined;
         const ctorVisibility = ctorDecl !== undefined ? memberVisibility(ctorDecl) : "public";
         const ctorReason = ownCtor !== undefined ? noRailsEquivalentReason(ownCtor) : undefined;
-        const ctorNode = ctorDecl ?? node;
+        const ctorNode = homeDecl ?? node;
         mixinMethods.push({
           name: "constructor",
           visibility: ctorVisibility,
@@ -1111,6 +1121,8 @@ export function extractFromProgram(
 
     const fileConstants = extractFileConstants(sourceFile);
     if (Object.keys(fileConstants).length > 0) info.fileConstants[relPath] = fileConstants;
+    const internalConstants = extractInternalFileConstants(sourceFile);
+    if (internalConstants.length > 0) info.fileInternalConstants[relPath] = internalConstants;
 
     const fileReason = fileLevelNoRailsEquivalentReason(sourceFile);
     if (fileReason !== undefined) info.fileNoRailsEquivalent[relPath] = fileReason;
@@ -2955,6 +2967,28 @@ export function extractFileConstants(sourceFile: ts.SourceFile): Record<string, 
         if (!hasModifier(member, ts.SyntaxKind.ReadonlyKeyword)) continue;
         if (memberVisibility(member) !== "public") continue; // skip internal constants
         recordDecl(member.name, member.initializer);
+      }
+    }
+  });
+  return out;
+}
+
+/**
+ * The `extractFileConstants` names an `@internal` tag holds out of the scored
+ * surface. The static-member half of that function drops a non-public constant
+ * outright; a module-level `export const` cannot be spelled non-public, so its
+ * tag is read here instead and the constant keeps its `fileConstants` entry for
+ * the literal pass.
+ */
+export function extractInternalFileConstants(sourceFile: ts.SourceFile): string[] {
+  const out: string[] = [];
+  ts.forEachChild(sourceFile, (node) => {
+    if (!ts.isVariableStatement(node) || !isExported(node)) return;
+    if (!(node.declarationList.flags & ts.NodeFlags.Const)) return;
+    if (!internalJsDocTagApplies(node)) return;
+    for (const decl of node.declarationList.declarations) {
+      if (ts.isIdentifier(decl.name) && decl.initializer && tsLiteralValue(decl.initializer)) {
+        out.push(decl.name.text);
       }
     }
   });

@@ -662,6 +662,55 @@ describe("buildReport — novel vs moved classification", () => {
     ]);
   });
 
+  it("scores a module-scope TS constant the same as a ported static member", () => {
+    const { ruby, ts } = makeManifests();
+    ruby.packages["activemodel"].fileConstants = {
+      "foo.rb": { ER_DUP_ENTRY: { kind: "int", value: "1062" } },
+      "baz.rb": { SHARED_MESSAGE: { kind: "string", value: "boom" } },
+    };
+    ts.packages["activemodel"].fileConstants = {
+      "foo.ts": {
+        ER_DUP_ENTRY: { kind: "int", value: "1062" },
+        SHARED_MESSAGE: { kind: "string", value: "boom" },
+        TS_ONLY_CONST: { kind: "string", value: "x" },
+        _PRIVATE_CONST: { kind: "string", value: "x" },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles[0];
+    expect(f.extras.map((e) => [e.name, e.kind])).toEqual([
+      ["TS_ONLY_CONST", "novel"],
+      ["tsOnlyHelper", "novel"],
+      ["quux", "moved"],
+      ["SHARED_MESSAGE", "moved"],
+    ]);
+  });
+
+  it("holds an @internal module-scope constant out of the scored surface", () => {
+    const { ruby, ts } = makeManifests();
+    ts.packages["activemodel"].fileConstants = {
+      "foo.ts": {
+        SCORED_CONST: { kind: "int", value: "1" },
+        HIDDEN_CONST: { kind: "int", value: "2" },
+      },
+    };
+    ts.packages["activemodel"].fileInternalConstants = { "foo.ts": ["HIDDEN_CONST"] };
+    const report = buildReport(ruby, ts, {
+      filterPkg: null,
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const names = report.packages[0].extraFiles[0].extras.map((e) => e.name);
+    expect(names).toContain("SCORED_CONST");
+    expect(names).not.toContain("HIDDEN_CONST");
+  });
+
   it("allows a Hash key declared in the matched Ruby file, in either key spelling", () => {
     const { ruby, ts } = makeManifests();
     // `"base64Binary"` is a String key ported verbatim; `:skip_instruct` is a
@@ -1830,6 +1879,48 @@ describe("collectTsFileNames — `__mixin` pseudo-modules", () => {
       info.fileFunctions?.["inheritance.ts"],
     );
     expect(names.has("stiClassFor")).toBe(true);
+  });
+
+  it("drops the synthetic constructor entry of a class base.ts declares", () => {
+    const info = extract(FILES);
+    const ctor = info.modules["inheritance.ts:stiClassFor__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    );
+    expect(ctor?.declaredIn).toBe("base.ts");
+
+    const names = collectTsFileNames(
+      "inheritance.ts",
+      [],
+      Object.values(info.modules),
+      info.fileFunctions?.["inheritance.ts"],
+    );
+    expect(names.has("constructor")).toBe(false);
+  });
+
+  it("keeps the synthetic constructor entry of a class the mixin file declares", () => {
+    const info = extract({
+      ...FILES,
+      "inheritance.ts": `
+        export function stiClassFor(typeName: string) {
+          class M {
+            constructor(readonly typeName: string) {}
+          }
+          return M;
+        }
+      `,
+    });
+    const ctor = info.modules["inheritance.ts:stiClassFor__mixin"].instanceMethods.find(
+      (m) => m.name === "constructor",
+    );
+    expect(ctor?.declaredIn).toBeUndefined();
+
+    const names = collectTsFileNames(
+      "inheritance.ts",
+      [],
+      Object.values(info.modules),
+      info.fileFunctions?.["inheritance.ts"],
+    );
+    expect(names.has("constructor")).toBe(true);
   });
 });
 

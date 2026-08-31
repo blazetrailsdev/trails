@@ -348,6 +348,15 @@ export interface PackageInfo {
   fileFunctions?: Record<string, MethodInfo[]>;
   fileConstants?: Record<string, Record<string, LiteralValue>>; // file → NAME → literal value
   /**
+   * TS-side only: file → the `fileConstants` names whose declaration carries
+   * `@internal`. The constant stays in `fileConstants` so the literal pass
+   * still compares its value, but extra-surface.ts holds it out of the scored
+   * surface — the same thing `MethodInfo.internal` does for a member, and the
+   * same thing the static-member half of `extractFileConstants` already gets
+   * from its visibility check.
+   */
+  fileInternalConstants?: Record<string, string[]>;
+  /**
    * Ruby-side only: file → the literal Hash KEY names declared in it — the keys
    * of a Hash-constant assignment and the Symbol keys an options hash is read
    * by in a method body. A key is a Ruby name that is not a declaration, so
