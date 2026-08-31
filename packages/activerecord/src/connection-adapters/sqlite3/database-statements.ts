@@ -99,7 +99,7 @@ interface InternalBeginTransactionHost {
     options?: { allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<unknown>;
   queryValue(sql: string, name?: string): Promise<unknown>;
-  isSharedCache?(): boolean;
+  isSharedCache(): boolean;
   _previousReadUncommitted?: unknown;
 }
 
@@ -142,7 +142,7 @@ export async function internalBeginTransaction(
         "SQLite3 only supports the `read_uncommitted` transaction isolation level",
       );
     }
-    if (this.isSharedCache && !this.isSharedCache()) {
+    if (!this.isSharedCache()) {
       // eslint-disable-next-line blazetrails/rails-error-parity
       throw new Error(
         "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",

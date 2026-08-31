@@ -28,29 +28,29 @@ describeIfSqlite("SQLite3CollationTest", () => {
   it("string column with collation", async () => {
     const columns = await adapter.columns("collation_table_sqlite3");
 
-    const stringNocase = columns.find((c) => c.name === "string_nocase")!;
-    expect(stringNocase.sqlType?.toLowerCase()).toMatch(/varchar|char/);
-    expect(stringNocase.collation).toBe("NOCASE");
+    let column = columns.find((c) => c.name === "string_nocase")!;
+    expect(column.type).toBe("string");
+    expect(column.collation).toBe("NOCASE");
 
-    const stringAfterDecimal = columns.find((c) => c.name === "string_after_decimal_nocase")!;
-    expect(stringAfterDecimal.sqlType?.toLowerCase()).toMatch(/varchar|char/);
-    expect(stringAfterDecimal.collation).toBe("NOCASE");
+    column = columns.find((c) => c.name === "string_after_decimal_nocase")!;
+    expect(column.type).toBe("string");
+    expect(column.collation).toBe("NOCASE");
   });
 
   it("text column with collation", async () => {
     const columns = await adapter.columns("collation_table_sqlite3");
-    const textRtrim = columns.find((c) => c.name === "text_rtrim")!;
-    expect(textRtrim.sqlType?.toLowerCase()).toBe("text");
-    expect(textRtrim.collation).toBe("RTRIM");
+    const column = columns.find((c) => c.name === "text_rtrim")!;
+    expect(column.type).toBe("text");
+    expect(column.collation).toBe("RTRIM");
   });
 
   it("add column with collation", async () => {
     await adapter.addColumn("collation_table_sqlite3", "title", "string", { collation: "RTRIM" });
 
     const columns = await adapter.columns("collation_table_sqlite3");
-    const title = columns.find((c) => c.name === "title")!;
-    expect(title.sqlType?.toLowerCase()).toMatch(/varchar|char/);
-    expect(title.collation).toBe("RTRIM");
+    const column = columns.find((c) => c.name === "title")!;
+    expect(column.type).toBe("string");
+    expect(column.collation).toBe("RTRIM");
   });
 
   it("change column with collation", async () => {
@@ -60,9 +60,9 @@ describeIfSqlite("SQLite3CollationTest", () => {
     });
 
     const columns = await adapter.columns("collation_table_sqlite3");
-    const desc = columns.find((c) => c.name === "description")!;
-    expect(desc.sqlType?.toLowerCase()).toBe("text");
-    expect(desc.collation).toBe("RTRIM");
+    const column = columns.find((c) => c.name === "description")!;
+    expect(column.type).toBe("text");
+    expect(column.collation).toBe("RTRIM");
   });
 
   it("schema dump includes collation", async () => {

@@ -100,8 +100,8 @@ import * as Timestamp from "./timestamp.js";
 import * as TouchLater from "./touch-later.js";
 import { Association as AssociationInstance } from "./associations/association.js";
 import {
+  AssociationCache,
   type AssociationCache as _AssociationCache,
-  createAssociationCache,
 } from "./association-cache.js";
 import {
   ConnectionHandler,
@@ -1934,7 +1934,7 @@ export class Base extends Model {
   /** @internal */
   _resetAssociationCaches(): void {
     if (this._associationCacheStore === undefined) {
-      this._associationCacheStore = createAssociationCache();
+      this._associationCacheStore = new AssociationCache();
       this._collectionProxies = this._associationCacheStore.proxies;
       this._associationInstances = this._associationCacheStore.instances as Map<
         string,

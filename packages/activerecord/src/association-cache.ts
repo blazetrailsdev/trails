@@ -125,11 +125,3 @@ export class AssociationCache {
     this.store.clear();
   }
 }
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function createAssociationCache(): AssociationCache {
-  return new AssociationCache();
-}

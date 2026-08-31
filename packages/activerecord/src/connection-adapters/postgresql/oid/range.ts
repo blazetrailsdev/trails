@@ -2,14 +2,6 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Range } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function rangeBoundLiteral(value: unknown): string {
-  return value == null || isInfinity(value) ? "" : String(value);
-}
-
 export interface RangeSubtype {
   cast(value: unknown): unknown;
   serialize(value: unknown): unknown;
