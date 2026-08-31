@@ -1,10 +1,11 @@
 /**
  * Mirrors: i18n/test/i18n/interpolate_test.rb
  *
- * The two `RailsSafeBuffer` cases are not ported: they turn on a Ruby `String`
- * subclass that redefines `gsub`, and on `assert_same` identity for that
- * object. JS strings are primitives with no subclass hook, so there is nothing
- * for the cases to exercise.
+ * `RailsSafeBuffer` is a Ruby `String` subclass redefining `gsub`; the JS
+ * `String` wrapper object is subclassable the same way, and `gsub` is
+ * `replace`. `interpolate` is typed for the primitive because that is what
+ * every trails caller hands it, so the two cases cast at the call site the way
+ * Ruby's duck typing does implicitly.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -86,6 +87,27 @@ describe("I18nInterpolateTest", () => {
 
   it("sprintf mix unformatted and formatted named placeholders", () => {
     expect(I18n.interpolate("%{name} %<num>f", { name: "foo", num: 1.0 })).toBe("foo 1.000000");
+  });
+
+  class RailsSafeBuffer extends String {
+    override replace(searchValue: never, replaceValue: never): string {
+      return this.toString().replace(searchValue, replaceValue);
+    }
+  }
+
+  it("with String subclass that redefined gsub method", () => {
+    expect(
+      I18n.interpolate(new RailsSafeBuffer("Hello %{planet} world") as unknown as string, {
+        planet: "mars",
+      }),
+    ).toBe("Hello mars world");
+  });
+
+  it("with String subclass that redefined gsub method returns same object if no interpolations", () => {
+    const string = new RailsSafeBuffer("Hello world");
+    expect(I18n.interpolate(string as unknown as string, { planet: "mars" })).toBe(
+      string as unknown as string,
+    );
   });
 });
 

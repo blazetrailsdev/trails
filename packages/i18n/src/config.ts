@@ -44,7 +44,7 @@ let availableLocalesSet: Set<Locale> | undefined;
 let defaultSeparator: string | undefined;
 let exceptionHandler: ExceptionHandlerLike | undefined;
 let missingInterpolationArgumentHandler: MissingInterpolationArgumentHandler | undefined;
-let loadPath: string[] | undefined;
+let loadPath: (string | string[])[] | undefined;
 let enforceAvailableLocalesFlag = true;
 let interpolationPatterns: RegExp[] | undefined;
 
@@ -157,7 +157,7 @@ export class Config {
   }
 
   /** Paths providing translation data sources; the backend defines what it accepts. */
-  get loadPath(): string[] {
+  get loadPath(): (string | string[])[] {
     loadPath ??= [];
     return loadPath;
   }
@@ -170,7 +170,7 @@ export class Config {
    * `set` accessor because `backend.reload!` is async here and a TS `set`
    * accessor cannot be awaited.
    */
-  async setLoadPath(value: string[]): Promise<void> {
+  async setLoadPath(value: (string | string[])[]): Promise<void> {
     loadPath = value;
     availableLocalesSet = undefined;
     await this.backend.reloadBang();

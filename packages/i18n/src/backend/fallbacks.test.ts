@@ -1,11 +1,15 @@
 /**
  * Mirrors: i18n/test/backend/fallbacks_test.rb
  *
- * Not ported: the two `Thread.new` cases, which are the gem asserting that its
- * thread-local fallbacks store is visible from another thread. JS has no threads, so
- * `fallbacks()` is a single module-level binding (see `fallbacks.ts`) and both
- * cases assert the single-threaded behaviour the rest of the file already
- * covers.
+ * JS has no threads, so a `Thread.new { ... }.join` runs its body in place —
+ * which is what "falls back to default locale - Issue #546" asks for: a fresh
+ * thread carries no `I18n.config`, so the localization has to build the default
+ * one. "multi-threaded fallbacks" is the case that cannot follow, because it
+ * turns on `I18n.fallbacks=` writing a `Thread.current` slot the outer thread
+ * does not see (fallbacks.rb:19-26); `fallbacks()` here is a single
+ * module-level binding, and giving it per-execution-context storage needs a
+ * facility this package does not have — filed as
+ * `i18n-thread-local-fallbacks`.
  *
  * `RegressionTestFor617` assigns a plain Ruby Hash as the fallbacks object,
  * which quacks like one because it answers `[]`; a `Map` is the JS Hash, and
@@ -208,6 +212,24 @@ describe("I18nBackendFallbacksLocalizeTestWithDefaultLocale", () => {
   });
 
   it("falls back to default locale - Issue #534", () => {
+    expect(l(Time.utc(2010, 1, 3), { format: ":fallback", locale: "un-supported" })).toBe(
+      "en fallback",
+    );
+  });
+});
+
+// See Issue #546
+describe("I18nBackendFallbacksLocalizeTestWithMultipleThreads", () => {
+  let backend: Backend;
+
+  beforeEach(() => {
+    backend = setup();
+    config().enforceAvailableLocales = false;
+    setFallbacks([config().defaultLocale]);
+    backend.storeTranslations("en", { time: { formats: { fallback: "en fallback" } } });
+  });
+
+  it("falls back to default locale - Issue #546", () => {
     expect(l(Time.utc(2010, 1, 3), { format: ":fallback", locale: "un-supported" })).toBe(
       "en fallback",
     );
