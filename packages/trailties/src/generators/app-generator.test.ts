@@ -162,9 +162,15 @@ describe("AppGenerator", () => {
     // Rails' binstub wrappers go through `bin/rails` (`bin/setup.tt:33`,
     // `bin/dev.tt:1`); the trails equivalent is the loader-backed command, so
     // the generated entrypoints do not bypass it.
+    // Rails' wrappers go through the app binstub (`bin/setup.tt:33`,
+    // `bin/dev.tt:1`), and `bin/rails` is what loads the app; the trails
+    // binstub is where the loader lives, so nothing may reach the CLI around it.
     const binstub = (n: string) => fs.readFileSync(appPath("bin", n), "utf-8");
-    expect(binstub("setup")).toContain("tsx");
-    expect(binstub("dev")).toContain("tsx");
+    expect(binstub("trails")).toContain("tsx");
+    expect(binstub("setup")).toContain("bin/trails");
+    expect(binstub("dev")).toContain("bin/trails");
+    const readme = fs.readFileSync(appPath("README.md"), "utf-8");
+    expect(readme).not.toMatch(/^\| `trails /m);
   });
 
   it("emits prepare hook that builds .tse views", async () => {

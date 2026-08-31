@@ -301,24 +301,25 @@ Every command below that executes application code — anything that imports a
 model, \`config/database.ts\`, or \`config/routes.ts\` — must run through the
 \`tsx\` loader, because the app's sources are TypeScript and \`Node16\`
 resolution spells its imports with a \`.js\` extension that has no file behind
-it until the loader transforms them. The generated \`package.json\` scripts
-already do this; the single supported way to invoke the CLI directly is the
-\`trails\` script:
+it until the loader transforms them. The generated \`package.json\` scripts and
+the \`bin/\` binstubs already do this, so every command below is loader-backed.
+To reach a CLI command with no script of its own, use the \`bin/trails\`
+binstub:
 
-    ${this.pmRun()} trails routes
-    ${this.pmRun()} trails console
+    bin/trails routes
+    bin/trails console
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
 | \`${this.pmRun()} dev\` | Start the development server |
-| \`trails generate model NAME\` | Generate a new model |
-| \`trails generate controller NAME\` | Generate a new controller |
-| \`trails generate scaffold NAME\` | Generate a full CRUD resource |
-| \`trails db migrate\` | Run pending database migrations |
-| \`trails db seed\` | Seed the database |
-| \`trails test\` | Run the test suite |
+| \`bin/trails generate model NAME\` | Generate a new model |
+| \`bin/trails generate controller NAME\` | Generate a new controller |
+| \`bin/trails generate scaffold NAME\` | Generate a full CRUD resource |
+| \`${this.pmRun()} db:migrate\` | Run pending database migrations |
+| \`${this.pmRun()} db:seed\` | Seed the database |
+| \`${this.pmRun()} test\` | Run the test suite |
 
 ## Configuration
 
@@ -365,10 +366,9 @@ export default defineConfig({
     this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
-import { createProgram } from "@blazetrails/trailties";
+import { execSync } from "node:child_process";
 
-const program = createProgram();
-program.parse(process.argv);
+execSync(["${TRAILS}", ...process.argv.slice(2)].join(" "), { stdio: "inherit" });
 `,
       { mode: 0o755 },
     );
@@ -388,7 +388,7 @@ console.log("== Installing dependencies ==");
 system("${this.pmInstall()}");
 
 console.log("\\n== Preparing database ==");
-system("${TRAILS} db setup");
+system("bin/trails db setup");
 
 console.log("\\n== Removing old logs and tempfiles ==");
 for (const dir of ["log", "tmp"]) {
@@ -407,7 +407,7 @@ console.log("\\n== Done! ==");
       `#!/usr/bin/env node
 import { execSync } from "node:child_process";
 
-execSync(["${TRAILS}", "server", ...process.argv.slice(2)].join(" "), { stdio: "inherit" });
+execSync(["bin/trails", "server", ...process.argv.slice(2)].join(" "), { stdio: "inherit" });
 `,
       { mode: 0o755 },
     );
