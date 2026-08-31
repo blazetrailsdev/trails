@@ -1025,21 +1025,14 @@ export class IntegrationTest {
 
     await this.controller.dispatch(action, this.request, this.response);
 
-    // `Metal#dispatch` has already run `request.commit_flash` (`metal.rb:253`),
-    // which writes the surviving flash into `rack.session` — or deletes the
-    // key once the flash is swept. Carry the whole session forward the way a
-    // real store's `commit_session` would, deletions included, so the flash
-    // reaches the request after the redirect and no further.
     // Persist session back
     if ("session" in this.controller) {
       Object.assign(this.session, (this.controller as any).session);
     }
-    // `Metal#dispatch` has already run `request.commit_flash` (`metal.rb:253`),
-    // which writes the surviving flash into `rack.session` — or DELETES the key
-    // once the flash is swept. Carry the store's view forward the way a real
-    // `commit_session` would, deletions included, so the flash reaches the
-    // request after the redirect and no further. Only keys this request was
-    // seeded with can be deleted; anything the controller added is new state.
+    // `Metal#dispatch` has run `request.commit_flash` (`metal.rb:253`), which
+    // DELETES `rack.session`'s flash key once the flash is swept — so the
+    // store's view has to carry forward with its deletions, or the flash never
+    // expires. Only seeded keys can be deleted; controller writes are new state.
     const committed = (env["rack.session"] as TestSession).toHash();
     for (const key of Object.keys(sessionSeed)) {
       if (!(key in committed)) delete this.session[key];

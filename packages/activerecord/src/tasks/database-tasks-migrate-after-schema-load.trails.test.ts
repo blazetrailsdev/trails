@@ -56,7 +56,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     } finally {
       SchemaDumper.language = languageWas;
     }
-    expect(dumped).toMatch(/export const version = /);
+    expect(dumped).toMatch(/export const defineParams = \{ version: /);
 
     const schemaFile = join(dir, "schema.js");
     await writeFile(schemaFile, dumped);

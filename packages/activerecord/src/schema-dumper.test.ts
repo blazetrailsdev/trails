@@ -321,7 +321,7 @@ describe("SchemaDumperTest", () => {
     await sm.createTable();
     await sm.createVersion("20240601120000");
     const output = (await TopLevelDumper.dump(adapter)).join("\n");
-    expect(output).toMatch(/export const version = 2024_06_01_120000;/);
+    expect(output).toMatch(/export const defineParams = \{ version: 2024_06_01_120000 \};/);
     expect(output).toContain("defineSchema");
   }, 60000);
 

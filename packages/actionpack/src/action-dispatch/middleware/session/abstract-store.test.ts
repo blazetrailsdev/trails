@@ -111,11 +111,9 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     it("commitSession invokes commitCsrfToken on the request", () => {
       const store = new AbstractStore();
       let called = false;
-      const req: any = {
-        env: {},
-        commitCsrfToken: () => {
-          called = true;
-        },
+      const req: any = new Request({});
+      req.commitCsrfToken = () => {
+        called = true;
       };
       (store as any).prepareSession(req);
       (store as any).commitSession(req, { setCookie: () => {} });

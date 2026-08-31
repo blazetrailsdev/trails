@@ -10,7 +10,11 @@
  */
 
 import type { RackApp } from "@blazetrails/rack";
-import { AbstractSecureStore, SessionId as RackSessionId } from "./abstract-store.js";
+import {
+  AbstractSecureStore,
+  SessionId as RackSessionId,
+  type SessionOptions,
+} from "./abstract-store.js";
 
 /** @internal Minimum shape this store needs out of `ActionDispatch::Request`. */
 export interface CookieStoreRequest {
@@ -61,12 +65,8 @@ export class CookieStore extends AbstractSecureStore {
   }
 
   /** Rails: `delete_session(req, session_id, options)`. */
-  deleteSession(
-    req: any,
-    _sessionId: unknown,
-    options: { drop?: boolean } = {},
-  ): RackSessionId | null {
-    const newSid = options.drop ? null : this.generateSid();
+  deleteSession(req: any, _sessionId: unknown, options: SessionOptions): RackSessionId | null {
+    const newSid = options.get("drop") ? null : this.generateSid();
     req.setHeader(
       "action_dispatch.request.unsigned_session_cookie",
       newSid ? { session_id: newSid.publicId } : {},
@@ -120,7 +120,7 @@ export class CookieStore extends AbstractSecureStore {
     _req: CookieStoreRequest,
     sid: RackSessionId,
     sessionData: Record<string, unknown>,
-    _options: Record<string, unknown> = {},
+    _options?: SessionOptions,
   ): SessionId {
     sessionData["session_id"] = sid.publicId;
     return new SessionId(sid, sessionData);

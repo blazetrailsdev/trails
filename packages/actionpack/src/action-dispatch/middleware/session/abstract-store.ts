@@ -14,6 +14,7 @@
 
 import { include as includeMixin, getCrypto } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import { RACK_SESSION, RACK_SESSION_OPTIONS, Utils } from "@blazetrails/rack";
 import { Request } from "../../request.js";
 import { Session as RequestSession } from "../../request/session.js";
 
@@ -63,7 +64,7 @@ class NotImplementedError extends Error {
 
 /** Rails: `Rack::Session::Abstract::Persisted::DEFAULT_OPTIONS` (`id.rb:240-253`). */
 export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({
-  key: "rack.session",
+  key: RACK_SESSION,
   path: "/",
   domain: null,
   expireAfter: null,
@@ -87,6 +88,13 @@ export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze(
 export interface ResponseRaw {
   setCookie(key: string, value: unknown): void;
 }
+
+/**
+ * Rails: the `ActionDispatch::Request::Session::Options` a prepared session
+ * answers from `#options` — Ruby reads it with `options[:drop]`, which is
+ * `Options#[]`.
+ */
+export type SessionOptions = InstanceType<typeof RequestSession.Options>;
 
 /** Rails: `class Persisted` (`rack-session id.rb:239`). */
 export class Persisted {
@@ -134,7 +142,7 @@ export class Persisted {
     const req = this.makeRequest(env);
     this.prepareSession(req);
     const [status, headers, body] = await app!(req.env);
-    const res = rawResponse(headers);
+    const res: ResponseRaw = { setCookie: (key, value) => setCookieOn(headers, key, value) };
     this.commitSession(req, res);
     return [status, headers, body];
   }
@@ -152,28 +160,28 @@ export class Persisted {
   }
 
   /**
-   * Rails: `generate_sid(secure = @sid_secure)` (`id.rb:296-304`). Ruby's
-   * `Kernel.rand` fallback arm exists for a `SecureRandom` that raises
-   * `NotImplementedError`; `getCrypto()` has no such mode.
+   * Rails: `generate_sid(secure = @sid_secure)` (`id.rb:296-304`).
+   *
+   * Ruby's `else` arm (`Kernel.rand`) and the `rescue NotImplementedError`
+   * that retries into it both exist for a `SecureRandom` that cannot seed;
+   * `getCrypto()` has no such mode, so neither arm has a trigger and only
+   * `secure.hex(@sid_length)` is reachable. `secure` is kept because
+   * `PersistedSecure#generate_sid(*)` forwards it.
    */
   generateSid(secure: unknown = this.sidSecure): unknown {
-    if (secure != null && secure !== false) {
-      return getCrypto()
-        .randomBytes(Math.ceil(this.sidLength / 2))
-        .toString("hex")
-        .slice(0, this.sidLength);
-    }
-    return Math.floor(Math.random() * 2 ** 32)
-      .toString(16)
-      .padStart(this.sidLength, "0");
+    void secure;
+    return getCrypto()
+      .randomBytes(Math.ceil(this.sidLength / 2))
+      .toString("hex")
+      .slice(0, this.sidLength);
   }
 
   /** @internal Rails: `prepare_session(req)` (`id.rb:309-315`). */
   prepareSession(req: any): void {
-    const sessionWas = req.env["rack.session"];
+    const sessionWas = req.getHeader(RACK_SESSION);
     const session = new (this.sessionClass())(this, req);
-    req.env["rack.session"] = session;
-    req.env["rack.session.options"] = { ...this.defaultOptions };
+    req.setHeader(RACK_SESSION, session);
+    req.setHeader(RACK_SESSION_OPTIONS, { ...this.defaultOptions });
     if (sessionWas) session.mergeBang(sessionWas);
   }
 
@@ -193,7 +201,7 @@ export class Persisted {
 
   /** @internal Rails: `current_session_id(req)` (`id.rb:336-338`). */
   currentSessionId(req: any): unknown {
-    return req.env["rack.session"].id();
+    return req.getHeader(RACK_SESSION).id();
   }
 
   /** @internal Rails: `session_exists?(req)` (`id.rb:342-345`). */
@@ -203,8 +211,8 @@ export class Persisted {
   }
 
   /** @internal Rails: `commit_session?(req, session, options)` (`id.rb:350-357`). */
-  isCommitSession(req: any, session: any, options: Record<string, unknown>): boolean {
-    if (options["skip"]) return false;
+  isCommitSession(req: any, session: any, options: SessionOptions): boolean {
+    if (options.get("skip")) return false;
     const hasSession =
       this.isLoadedSession(session) || this.isForcedSessionUpdate(session, options);
     return hasSession && this.isSecurityMatches(req, options);
@@ -216,31 +224,30 @@ export class Persisted {
   }
 
   /** @internal Rails: `forced_session_update?(session, options)` (`id.rb:363-365`). */
-  isForcedSessionUpdate(session: any, options: Record<string, unknown>): boolean {
+  isForcedSessionUpdate(session: any, options: SessionOptions): boolean {
     return this.isForceOptions(options) && session != null && !session.isEmpty();
   }
 
   /** @internal Rails: `force_options?(options)` (`id.rb:367-369`). */
-  isForceOptions(options: Record<string, unknown>): boolean {
-    return ["maxAge", "renew", "drop", "defer", "expireAfter"].some((k) => {
-      const v = options[k];
-      return v != null && v !== false;
-    });
+  isForceOptions(options: SessionOptions): boolean {
+    return options
+      .valuesAt("maxAge", "renew", "drop", "defer", "expireAfter")
+      .some((v) => v != null && v !== false);
   }
 
   /** @internal Rails: `security_matches?(request, options)` (`id.rb:371-374`). */
-  isSecurityMatches(request: any, options: Record<string, unknown>): boolean {
-    if (!options["secure"]) return true;
+  isSecurityMatches(request: any, options: SessionOptions): boolean {
+    if (!options.get("secure")) return true;
     return request.isSsl?.() === true || this.assumeSsl === true;
   }
 
   /** Rails: `commit_session(req, res)` (`id.rb:381-414`). */
   commitSession(req: any, res: ResponseRaw): unknown {
-    const session = req.env["rack.session"];
-    const options = session.options().toHash();
+    const session = req.getHeader(RACK_SESSION);
+    const options: SessionOptions = session.options();
 
     let sessionId: unknown;
-    if (options["drop"] || options["renew"]) {
+    if (options.get("drop") || options.get("renew")) {
       sessionId = this.deleteSession(req, session.id() ?? this.generateSid(), options);
       if (sessionId == null) return;
     }
@@ -259,19 +266,19 @@ export class Persisted {
       // Rails writes onto `rack.errors`; trails' Rack env carries no such
       // stream, so the same warning goes to the console.
       console.warn(`Warning! ${this.constructor.name} failed to save session. Content dropped.`);
-    } else if (options["defer"] && !options["renew"]) {
-      // Rails only reports this under `$VERBOSE`.
+    } else if (options.get("defer") && !options.get("renew")) {
+      // Rails' "Deferring cookie" notice is `$VERBOSE`-only (`id.rb:399`).
     } else {
       const cookie: Record<string, unknown> = {};
       cookie["value"] = this.cookieValue(data);
-      if (options["expireAfter"] != null) cookie["expires"] = options["expireAfter"];
-      if (options["maxAge"] != null) cookie["expires"] = options["maxAge"];
+      if (options.get("expireAfter") != null) cookie["expires"] = options.get("expireAfter");
+      if (options.get("maxAge") != null) cookie["expires"] = options.get("maxAge");
 
       cookie["sameSite"] =
         typeof this.sameSite === "function"
           ? (this.sameSite as (req: unknown, res: unknown) => unknown)(req, res)
           : this.sameSite;
-      this.setCookie(req, res, { ...cookie, ...options });
+      this.setCookie(req, res, { ...cookie, ...options.toHash() });
     }
   }
 
@@ -294,7 +301,7 @@ export class Persisted {
 
   /** Rails: `find_session(env, sid)` (`id.rb:440-442`). */
   findSession(_req: any, _sid: unknown): [unknown, Record<string, unknown> | null] {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
     throw new NotImplementedError("#find_session not implemented.");
   }
 
@@ -303,42 +310,39 @@ export class Persisted {
     _req: any,
     _sid: unknown,
     _session: Record<string, unknown>,
-    _options: Record<string, unknown>,
+    _options: SessionOptions,
   ): unknown {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
     throw new NotImplementedError("#write_session not implemented.");
   }
 
   /** Rails: `delete_session(req, sid, options)` (`id.rb:455-457`). */
-  deleteSession(_req: any, _sid: unknown, _options: Record<string, unknown>): unknown {
-    // @nie disposition=TODO
+  deleteSession(_req: any, _sid: unknown, _options: SessionOptions): unknown {
+    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
     throw new NotImplementedError("#delete_session not implemented");
   }
 }
 
 /**
- * `Rack::Response::Raw.new status, headers` (`id.rb:275`) exists only so
- * `set_cookie` has somewhere to write; trails' Rack response is a plain
- * headers hash, so the same two lines of `Rack::Utils.set_cookie_header`
- * are applied to it directly.
+ * `Rack::Response::Raw#set_cookie` (`id.rb:275, 425`) reaches
+ * `Rack::Utils.set_cookie_header!`, which reads Ruby's symbol names —
+ * `:http_only`, `:same_site`, `:max_age` — and trails' port of it keeps those
+ * spellings. `Persisted`'s option hash camelCases them per the repo's Ruby→TS
+ * rules, so the two meet here.
  *
- * @noRailsEquivalent PERMANENT — see above.
+ * @noRailsEquivalent PERMANENT — trails has no `Rack::Response::Raw`; this is
+ * the `set_cookie` half of it, and the rename is a spelling boundary only.
  */
-function rawResponse(headers: Record<string, string>): ResponseRaw {
-  return {
-    setCookie(key: string, value: unknown): void {
-      const cookie = value as Record<string, unknown>;
-      const parts = [`${key}=${encodeURIComponent(String(cookie["value"]))}`];
-      if (cookie["path"]) parts.push(`path=${cookie["path"]}`);
-      if (cookie["domain"]) parts.push(`domain=${cookie["domain"]}`);
-      if (cookie["expires"]) parts.push(`expires=${cookie["expires"]}`);
-      if (cookie["secure"]) parts.push("secure");
-      if (cookie["httpOnly"]) parts.push("HttpOnly");
-      if (cookie["sameSite"]) parts.push(`SameSite=${cookie["sameSite"]}`);
-      const existing = headers["set-cookie"];
-      headers["set-cookie"] = existing ? `${existing}\n${parts.join("; ")}` : parts.join("; ");
-    },
-  };
+function setCookieOn(headers: Record<string, string>, key: string, value: unknown): void {
+  const cookie = { ...(value as Record<string, unknown>) };
+  for (const [camel, snake] of [
+    ["httpOnly", "httponly"],
+    ["sameSite", "same_site"],
+    ["maxAge", "max_age"],
+  ]) {
+    if (camel in cookie) cookie[snake] = cookie[camel];
+  }
+  Utils.setCookieHeaderBang(headers, key, cookie);
 }
 
 /** Rails: `class PersistedSecure < Persisted` (`id.rb:460-497`). */

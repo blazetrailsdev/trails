@@ -444,7 +444,7 @@ export abstract class SchemaDumper {
     }
     const params = this.defineParams();
     if (params) {
-      stream.push(`export const ${params.replace(": ", " = ")};`);
+      stream.push(`export const defineParams = { ${params} };`);
       stream.push("");
     }
     if (this._language === "ts") {

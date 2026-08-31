@@ -686,7 +686,7 @@ export class DatabaseTasks {
       const href = path.pathToFileURL(absolute).href;
       const mod = (await import(href)) as {
         default?: (ctx: unknown) => Promise<void> | void;
-        version?: string | number;
+        defineParams?: { version?: string | number };
       };
       const defineSchema =
         mod.default ?? (mod as unknown as (ctx: unknown) => Promise<void> | void);
@@ -694,9 +694,7 @@ export class DatabaseTasks {
         throw new Error(`Schema file must export a default function (got ${typeof defineSchema})`);
       }
       const { Schema } = await import("../schema.js");
-      await new Schema().define({ version: mod.version, environment: dbConfig.envName }, (schema) =>
-        defineSchema(schema.connection),
-      );
+      await Schema.define(mod.defineParams ?? {}, (schema) => defineSchema(schema.connection));
       await this._stampSchemaSha1(dbConfig, absolute);
     } finally {
       Migration.verbose = verboseWas;
