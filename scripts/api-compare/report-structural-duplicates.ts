@@ -92,7 +92,7 @@ export function renderReport(api: TsApi, top: number): string {
     `structural duplicate report: ${flat.length} candidate(s) across ` +
       `${found.size} ruby-compat export(s) with a shape match`,
     section(
-      "By ruby-compat export",
+      "By export",
       tally(flat, (h) => h.origin),
     ),
   ];

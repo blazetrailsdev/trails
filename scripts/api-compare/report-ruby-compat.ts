@@ -144,11 +144,11 @@ export function renderReport(artifact: Artifact, api: TsApi, top: number): strin
     `ruby-compat call mapping report: ${rows.length} unconverged row(s) across ` +
       `${files} file(s); ${credits.length} call site(s) already credited`,
     section(
-      "Reverse (hand-rolled) by package",
+      "Reverse by package",
       tally(rows, (r) => r.package),
     ),
     section(
-      "Reverse by ruby-compat export",
+      "Reverse by export",
       tally(rows, (r) => `${r.call} → ${r.tsExport}`),
     ),
     section(
@@ -157,7 +157,7 @@ export function renderReport(artifact: Artifact, api: TsApi, top: number): strin
       top,
     ),
     section(
-      "Forward (credited) by ruby-compat export",
+      "Forward by export",
       tally(credits, (c) => c.tsExport),
     ),
   ].join("\n");
