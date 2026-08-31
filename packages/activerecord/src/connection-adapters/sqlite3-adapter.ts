@@ -294,10 +294,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       this._statements = this.buildStatementPool();
     }
     this.connect();
-    if (!this._asyncConnectPending) {
-      const configured = this.configureConnection();
-      if (configured) void configured.catch(() => {});
-    }
+    if (!this._asyncConnectPending) void this.configureConnection();
   }
 
   /** @internal */
@@ -831,8 +828,19 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._filename.slice(qIdx).includes("cache=shared");
   }
 
-  override async getDatabaseVersion(): Promise<Version> {
-    return new Version((await this.queryValue("SELECT sqlite_version(*)", "SCHEMA")) as string);
+  /** @missingRailsCall query_value — PERMANENT */
+  override getDatabaseVersion(): Version | Promise<Version> {
+    const driver = this.driver as SqliteConnection | undefined;
+    if (!driver) return new Version("0.0.0");
+    const toVersion = (row: unknown) => new Version((row as { v?: string })?.v ?? "0.0.0");
+    // eslint-disable-next-line blazetrails/sqlite-driver-await -- both arms handled below: an in-process driver answers directly, an async-only one with a Promise.
+    const stmt = driver.prepare("SELECT sqlite_version(*) AS v");
+    if (stmt instanceof Promise) {
+      return stmt.then(async (s) => toVersion(await s.get()));
+    }
+    const row = stmt.get();
+    if (row instanceof Promise) return row.then(toVersion);
+    return toVersion(row);
   }
 
   override async checkVersion(): Promise<void> {
@@ -1826,8 +1834,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /** @internal */
   private async _doAsyncConnect(): Promise<void> {
     await this.connectAsync();
-    this._asyncConnectPending = false;
     await this.configureConnection();
+    this._asyncConnectPending = false;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -2052,7 +2060,7 @@ SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurr
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
 export interface SQLite3Adapter {
-  get databaseVersion(): Promise<Version>;
+  get databaseVersion(): Version | Promise<Version>;
   beginDbTransaction: typeof sqliteBeginDbTransaction;
   beginDeferredTransaction: typeof sqliteBeginDeferredTransaction;
   beginIsolatedDbTransaction: typeof sqliteBeginIsolatedDbTransaction;
