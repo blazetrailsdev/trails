@@ -1,7 +1,7 @@
 /** ActionController::StrongParameters Provides ActionController::Parameters, a hash-like object that controls which parameters are permitted for mass assignment. @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { KeyError, eachPair } from "@blazetrails/ruby-compat";
+import { KeyError, eachPair, hasKey } from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
 
 // --- Error classes ---
@@ -177,15 +177,15 @@ export class Parameters {
   }
 
   has(key: string): boolean {
-    return key in this._data;
+    return hasKey(this._data, key);
   }
 
   isKey(key: string): boolean {
-    return key in this._data;
+    return hasKey(this._data, key);
   }
 
   hasKey(key: string): boolean {
-    return key in this._data;
+    return hasKey(this._data, key);
   }
 
   hasValue(value: unknown): boolean {
@@ -671,12 +671,9 @@ export class Parameters {
   }
 
   private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
-    if (permittedKey in this._data && isPermittedScalar(this._data[permittedKey])) {
+    if (this.hasKey(permittedKey) && isPermittedScalar(this._data[permittedKey])) {
       params._data[permittedKey] = this._data[permittedKey];
     }
-    // Rails also walks every existing key to copy multi-parameter keys
-    // — e.g. `zipcode(90210i)` permitted under the bare `zipcode`. The
-    // regex matches the suffix and the prefix must equal the bare key.
     const re = /\(\d+[if]?\)$/;
     this.eachKey((key) => {
       const m = re.exec(key);
