@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
+import {
+  DateTime as RubyDateTime,
+  Rational,
+  Temporal,
+  Time as RubyTime,
+  resetLocalTimeZoneId,
+} from "@blazetrails/date";
+import { TimeWithZone } from "../time-with-zone.js";
+import { TimeZone } from "../values/time-zone.js";
+import "./time/calculations.js";
 import { ArgumentError } from "../hash-utils.js";
 import { Object as ObjectExt } from "./object/acts-like.js";
 import {
@@ -763,30 +772,43 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("at with datetime", () => {
-    const epoch = Date.UTC(2000, 0, 1, 0, 0, 0) / 1000;
-    const t = new Date(epoch * 1000);
-    expect(t.getUTCFullYear()).toBe(2000);
-    expect(t.getUTCMonth()).toBe(0);
-    expect(t.getUTCDate()).toBe(1);
+    expect(
+      RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0) as never)
+        .toR()
+        .toString(),
+    ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
   });
 
   it("at with datetime returns local time", () => {
-    withEnvTz("America/New_York", () => {
-      const utcMs = Date.UTC(2000, 0, 1, 0, 0, 0);
-      const t = new Date(utcMs);
-      expect(t.getFullYear()).toBe(1999);
-      expect(t.getMonth()).toBe(11); // December
-      expect(t.getDate()).toBe(31);
-      expect(t.getHours()).toBe(19);
+    withEnvTz("US/Eastern", () => {
+      let dt = RubyDateTime.civil(2000, 1, 1, 0, 0, 0, 0);
+      expect(
+        RubyTime.at(dt as never)
+          .toR()
+          .toString(),
+      ).toBe(RubyTime.local(1999, 12, 31, 19, 0, 0).toR().toString());
+      expect(RubyTime.at(dt as never).zone).toBe("EST");
+      expect(RubyTime.at(dt as never).utcOffset).toBe(-18000);
+
+      // Daylight savings
+      dt = RubyDateTime.civil(2000, 7, 1, 1, 0, 0, new Rational(1, 24));
+      expect(
+        RubyTime.at(dt as never)
+          .toR()
+          .toString(),
+      ).toBe(RubyTime.local(2000, 6, 30, 20, 0, 0).toR().toString());
+      expect(RubyTime.at(dt as never).zone).toBe("EDT");
+      expect(RubyTime.at(dt as never).utcOffset).toBe(-14400);
     });
   });
 
   it("at with time with zone", () => {
-    const utcMs = Date.UTC(2000, 0, 1, 0, 0, 0);
-    const t = new Date(utcMs);
-    expect(t.getUTCFullYear()).toBe(2000);
-    expect(t.getUTCMonth()).toBe(0);
-    expect(t.getUTCDate()).toBe(1);
+    const twz = new TimeWithZone(RubyTime.utc(2000, 1, 1, 0, 0, 0), TimeZone.find("UTC")!);
+    expect(
+      RubyTime.at(twz as never)
+        .toR()
+        .toString(),
+    ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
   });
 
   it("at with in option", () => {
@@ -797,11 +819,25 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("at with time with zone returns local time", () => {
-    withEnvTz("America/New_York", () => {
-      const utcMs = Date.UTC(2000, 0, 1, 0, 0, 0);
-      const t = new Date(utcMs);
-      expect(t.getHours()).toBe(19);
-      expect(t.getFullYear()).toBe(1999);
+    withEnvTz("US/Eastern", () => {
+      let twz = new TimeWithZone(RubyTime.utc(2000, 1, 1, 0, 0, 0), TimeZone.find("London")!);
+      expect(
+        RubyTime.at(twz as never)
+          .toR()
+          .toString(),
+      ).toBe(RubyTime.local(1999, 12, 31, 19, 0, 0).toR().toString());
+      expect(RubyTime.at(twz as never).zone).toBe("EST");
+      expect(RubyTime.at(twz as never).utcOffset).toBe(-18000);
+
+      // Daylight savings
+      twz = new TimeWithZone(RubyTime.utc(2000, 7, 1, 0, 0, 0), TimeZone.find("London")!);
+      expect(
+        RubyTime.at(twz as never)
+          .toR()
+          .toString(),
+      ).toBe(RubyTime.local(2000, 6, 30, 20, 0, 0).toR().toString());
+      expect(RubyTime.at(twz as never).zone).toBe("EDT");
+      expect(RubyTime.at(twz as never).utcOffset).toBe(-14400);
     });
   });
 

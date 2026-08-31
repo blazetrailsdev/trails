@@ -655,7 +655,7 @@ export interface AbstractAdapter {
   /** @internal */
   createAlterTable?(name: string): AlterTable;
 
-  explain?(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
+  explain(arel: unknown, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
 
   dumpSchemaInformation?(): Promise<string | null>;
 

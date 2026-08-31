@@ -1031,6 +1031,15 @@ export class Time {
   }
 
   /**
+   * Ruby `Time#to_r` (`ruby/time.c` `time_to_r`), the number of seconds since
+   * the epoch as an exact `Rational`. MRI holds the timestamp as a `timew`
+   * whose sub-second is exact, so `to_r` is lossless where `to_f` is not.
+   */
+  toR(): Rational {
+    return new Rational(this.#instant.epochNanoseconds, 1_000_000_000n);
+  }
+
+  /**
    * Ruby `Time#to_time` (ruby/date, `date_core.c` `time_to_time`,
    * `date_core.c:8860-8864`), which answers `self` — MRI's `::Time` value IS
    * the receiver. trails' is `Temporal.ZonedDateTime` (RFC 0088's mapping

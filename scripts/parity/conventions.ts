@@ -606,13 +606,17 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "Rails' alias_method chains around Ruby's Time operators — `+`/`-`/`<=>`/" +
-      "`eql?` (time/calculations.rb:304-355) and `Time.at` (:59-60). Each pair " +
-      "exists only so the redefined operator can fall back to the original " +
-      "core-Ruby one under its `*_without_*` name. JS has no operator " +
-      "overloading and no way to reopen `Date`'s operators, so trails' ported " +
-      "arithmetic is the plain `since`/`ago`/`compare` functions and the chain " +
-      "halves have no receiver to attach to. Scoped to time/calculations.rb.",
+      "Rails' alias_method chains around Ruby's Time OPERATORS — `+`/`-`/`<=>`/" +
+      "`eql?` (time/calculations.rb:304-355). Each pair exists only so the " +
+      "redefined operator can fall back to the original core-Ruby one under " +
+      "its `*_without_*` name. JS has no operator overloading and no way to " +
+      "reopen `Date`'s operators, so trails' ported arithmetic is the plain " +
+      "`since`/`ago`/`compare` functions and the chain halves have no receiver " +
+      "to attach to. `at_without_coercion` (:59) is here for a narrower reason: " +
+      "it aliases core Ruby's `Time.at`, which in trails IS `Time.at` on " +
+      "`@blazetrails/date`'s `Time`, so it has nothing of its own to name. " +
+      "`at`/`at_with_coercion` are NOT skipped — they are ported onto `Time` in " +
+      "core-ext/time/calculations.ts. Scoped to time/calculations.rb.",
     names: [
       "plus_with_duration",
       "plus_without_duration",
@@ -624,9 +628,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "compare_without_coercion",
       "eql_with_coercion",
       "eql_without_coercion",
-      "at_with_coercion",
       "at_without_coercion",
-      "at",
     ],
     rubyFiles: ["core_ext/time/calculations.rb"],
   },

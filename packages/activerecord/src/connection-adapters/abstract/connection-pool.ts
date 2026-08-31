@@ -704,9 +704,6 @@ export class ConnectionPool implements ReapablePool {
         if (drain) draining.push(drain);
       }
       if (this._connections) this._connections.length = 0;
-      this._available?.rejectAll(
-        new ConnectionNotEstablished("Connection pool has been disconnected"),
-      );
       this._available?.clear();
       this._checkedOut.clear();
       this._leases?.clear();
@@ -739,7 +736,6 @@ export class ConnectionPool implements ReapablePool {
       if (drain) draining.push(drain);
     }
     this._connections = null;
-    this._available?.rejectAll(new ConnectionNotEstablished("Connection pool has been discarded"));
     this._available?.clear();
     this._available = null;
     this._leases = null;

@@ -1,8 +1,4 @@
-export {
-  Name as PgName,
-  splitQuotedIdentifier,
-  Utils,
-} from "../../connection-adapters/postgresql/utils.js";
+export { Name as PgName, Utils } from "../../connection-adapters/postgresql/utils.js";
 
 import { Utils } from "../../connection-adapters/postgresql/utils.js";
 

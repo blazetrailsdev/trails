@@ -583,6 +583,14 @@ export class TimeWithZone {
   }
 
   /**
+   * Mirrors: `TimeWithZone#to_r` (`time_with_zone.rb:478-480`). Seconds since
+   * the Epoch as an exact Rational.
+   */
+  toR(): Rational {
+    return this.utc().toR();
+  }
+
+  /**
    * Convert to a different timezone. No-argument form uses Time.zone.
    *
    * `utc.in_time_zone(new_zone)` (time_with_zone.rb:79) lands in

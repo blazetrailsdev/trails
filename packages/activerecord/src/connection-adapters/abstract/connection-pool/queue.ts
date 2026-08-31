@@ -4,7 +4,6 @@ import { include, type Included } from "@blazetrails/activesupport";
 
 interface Waiter {
   resolve: () => void;
-  reject: (err: Error) => void;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -12,7 +11,6 @@ interface Cond {
   wait(timeout: number): Promise<void>;
   signal(): void;
   broadcast(): void;
-  rejectAll(error: Error): void;
 }
 
 /**
@@ -29,8 +27,8 @@ class ConditionVariable implements Cond {
   private _waiters: Waiter[] = [];
 
   wait(timeout: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const waiter: Waiter = { resolve, reject, timer: null };
+    return new Promise((resolve) => {
+      const waiter: Waiter = { resolve, timer: null };
       waiter.timer = setTimeout(() => this._wake(waiter), Math.max(timeout, 0) * 1000);
       this._waiters.push(waiter);
     });
@@ -44,14 +42,6 @@ class ConditionVariable implements Cond {
   broadcast(): void {
     while (this._waiters.length > 0) {
       this._wake(this._waiters.shift()!);
-    }
-  }
-
-  rejectAll(error: Error): void {
-    while (this._waiters.length > 0) {
-      const waiter = this._waiters.shift()!;
-      if (waiter.timer != null) clearTimeout(waiter.timer);
-      waiter.reject(error);
     }
   }
 
@@ -107,11 +97,6 @@ export class BiasedConditionVariable implements Cond {
       cond = this._otherCond;
     }
     return cond.wait(timeout);
-  }
-
-  rejectAll(error: Error): void {
-    this._realCond.rejectAll(error);
-    this._otherCond.rejectAll(error);
   }
 }
 
@@ -206,10 +191,6 @@ export class Queue {
     });
   }
 
-  rejectAll(error: Error): void {
-    this._cond.rejectAll(error);
-  }
-
   protected internalPoll(timeout?: number): Promise<DatabaseAdapter> | DatabaseAdapter | undefined {
     const conn = this.noWaitPoll();
     if (conn) return conn;
@@ -262,40 +243,18 @@ export class Queue {
 export interface ConnectionLeasingQueue extends Included<typeof BiasableQueue> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ConnectionLeasingQueue extends Queue {
-  private _leasedTo = new Map<DatabaseAdapter, string>();
-
   protected override internalPoll(
     timeout?: number,
   ): Promise<DatabaseAdapter> | DatabaseAdapter | undefined {
-    const result = super.internalPoll(timeout);
-    if (result && typeof (result as any).then === "function") {
-      return (result as Promise<DatabaseAdapter>).then((conn) => {
-        this._leaseConn(conn);
+    const conn = super.internalPoll(timeout);
+    if (conn && typeof (conn as { then?: unknown }).then === "function") {
+      return (conn as Promise<DatabaseAdapter>).then((conn) => {
+        conn.lease();
         return conn;
       });
     }
-    if (result) {
-      this._leaseConn(result as DatabaseAdapter);
-    }
-    return result;
-  }
-
-  leaseTo(conn: DatabaseAdapter, key: string): void {
-    this._leasedTo.set(conn, key);
-  }
-
-  unlease(conn: DatabaseAdapter): void {
-    this._leasedTo.delete(conn);
-  }
-
-  leasedTo(conn: DatabaseAdapter): string | undefined {
-    return this._leasedTo.get(conn);
-  }
-
-  private _leaseConn(conn: DatabaseAdapter): void {
-    if (typeof (conn as any).lease === "function") {
-      (conn as any).lease();
-    }
+    if (conn) (conn as DatabaseAdapter).lease();
+    return conn;
   }
 }
 

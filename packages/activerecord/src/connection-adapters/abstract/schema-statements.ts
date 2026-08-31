@@ -236,7 +236,32 @@ interface SchemaMigrationPool {
 }
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
-export interface SchemaStatements extends DatabaseAdapter, SchemaQuoter {}
+/** @internal */
+export interface SchemaStatements
+  extends
+    Pick<
+      DatabaseAdapter,
+      | "columnFor"
+      | "execute"
+      | "indexAlgorithms"
+      | "internalExecQuery"
+      | "lookupCastType"
+      | "pool"
+      | "queryValues"
+      | "quote"
+      | "schemaCache"
+      | "selectRows"
+      | "supportsComments"
+      | "supportsCommentsInCreate"
+      | "supportsDatetimeWithPrecision"
+      | "supportsForeignKeys"
+      | "supportsIndexSortOrder"
+      | "supportsIndexesInCreate"
+      | "tableAliasLength"
+      | "typeRegistryKey"
+      | "visitor"
+    >,
+    SchemaQuoter {}
 
 export class SchemaStatements {
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
@@ -1429,7 +1454,10 @@ export class SchemaStatements {
   }
 
   createSchemaDumper(options: Record<string, unknown> = {}): SchemaDumper {
-    return SchemaDumper.create(this as Parameters<typeof SchemaDumper.create>[0], options);
+    return SchemaDumper.create(
+      this as unknown as Parameters<typeof SchemaDumper.create>[0],
+      options,
+    );
   }
 
   useForeignKeys(): boolean {

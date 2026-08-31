@@ -30,7 +30,7 @@ export async function execExplain(
         msg += rubyInspect(binds.map((attr) => renderBind(c, attr)));
       }
       msg += "\n";
-      msg += await c.explain!(sql, binds, options);
+      msg += await c.explain(sql, binds, options);
       msgs.push(msg);
     }
     return msgs.join("\n");

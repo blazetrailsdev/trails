@@ -14,11 +14,10 @@ import {
   type ColumnOptions,
   type ColumnType,
 } from "../abstract/schema-definitions.js";
-import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import type { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
-import { unquoteIdentifier, splitQuotedIdentifier, Name, Utils } from "./utils.js";
+import { Name, Utils } from "./utils.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
 import {
   type AlterTable as PgAlterTable,
@@ -65,7 +64,9 @@ export interface SchemaStatements
       | "extractDefaultFunction"
       | "extractSchemaQualifiedName"
       | "extractValueFromDefault"
+      | "databaseVersion"
       | "internalExecQuery"
+      | "internalExecute"
       | "loadAdditionalTypes"
       | "maxIdentifierLength"
       | "newColumnFromField"
@@ -78,6 +79,7 @@ export interface SchemaStatements
       | "supportsIdentityColumns"
       | "supportsNativePartitioning"
       | "supportsVirtualColumns"
+      | "typeMap"
       | "visitor"
     > {
   readonly logger: { warn?(message: string): void } | null;
@@ -158,7 +160,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         const orders: Record<string, string> = {};
         const opclasses: Record<string, string> = {};
         const includeColumns = includeStr
-          ? includeStr.split(",").map((c) => unquoteIdentifier(c.trim().replace(/""/g, '"')))
+          ? includeStr.split(",").map((c) => Utils.unquoteIdentifier(c.trim().replace(/""/g, '"')))
           : [];
 
         let columns: string | string[];
@@ -576,7 +578,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       )
     ).toArray();
 
-    const typeMap = this.typeMap as HashLookupTypeMap;
+    const typeMap = this.typeMap;
     const missingOids = [
       ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.has(oid))),
     ];
@@ -946,7 +948,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
     return Promise.all(
       fkInfo.toArray().map(async (row) => {
-        const toTable = unquoteIdentifier(row.to_table as string);
+        const toTable = Utils.unquoteIdentifier(row.to_table as string);
         const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
         const confkey = String(row.confkey).replace(/[{}]/g, "").split(",").map(Number);
         let column: string | string[];
@@ -955,7 +957,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
           column = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
           primaryKey = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
         } else {
-          column = unquoteIdentifier(row.column as string);
+          column = Utils.unquoteIdentifier(row.column as string);
           primaryKey = row.primary_key as string;
         }
         return new ForeignKeyDefinition(
@@ -1382,7 +1384,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
             `(e.g. "float8", "myschema.mytype"). Use the single-word alias instead of "${identifier}".`,
         );
       }
-      const parts = splitQuotedIdentifier(identifier);
+      const parts = identifier.match(/[^".]+|"[^"]*"/g) ?? [];
       if (parts.length === 0 || parts.length > 2) {
         throw new Error(
           `PostgreSQLAdapter#createRange: ${param} must have 1 or 2 dot-separated parts, got ${parts.length}: "${identifier}".`,
@@ -1567,7 +1569,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const [pk, seq] = result ?? [null, null];
     if (!pk) return;
     if (seq) {
-      const quotedSequence = this.quoteTableName(seq.toString());
+      const quotedSequence = this.quoteTableName(seq);
       await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
     } else {
       this.logger?.warn?.(`${table} has primary key ${pk} with no default sequence.`);
@@ -1577,12 +1579,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
   async resetPkSequenceBang(
     table: string,
     pk: string | null = null,
-    sequence: string | null = null,
+    sequence: Name | string | null = null,
   ): Promise<void> {
     if (!pk || !sequence) {
       const [defaultPk, defaultSeq] = (await this.pkAndSequenceFor(table)) ?? [null, null];
       pk = pk ?? defaultPk;
-      sequence = sequence ?? defaultSeq?.toString() ?? null;
+      sequence = sequence ?? defaultSeq ?? null;
     }
 
     if (pk && !sequence) {
@@ -1598,7 +1600,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
     let minvalue: unknown = null;
     if (maxPk == null) {
-      const dbVersion = (await this.databaseVersion) as number;
+      const dbVersion = await this.databaseVersion;
       minvalue =
         dbVersion >= 100000
           ? await this.queryValue(
