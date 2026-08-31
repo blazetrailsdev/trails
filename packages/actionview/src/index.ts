@@ -37,6 +37,8 @@ export {
   _prefixes,
   lookupContext,
   detailsForLookup,
+  templateExists,
+  isAnyTemplates,
 } from "./view-paths.js";
 export type { ViewPaths, ViewPathsClass, ViewPathsInput } from "./view-paths.js";
 

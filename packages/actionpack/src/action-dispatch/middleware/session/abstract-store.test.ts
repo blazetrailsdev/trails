@@ -120,6 +120,32 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       expect(called).toBe(true);
     });
 
+    it("commitSession expires the cookie at Time.now + expire_after", () => {
+      let cookie: any;
+      class WritingStore extends AbstractStore {
+        override findSession(): [unknown, Record<string, unknown>] {
+          return [new SessionId("abc"), {}];
+        }
+        override writeSession(): unknown {
+          return { ok: true };
+        }
+        override setCookie(_req: any, _res: any, c: any): void {
+          cookie = c;
+        }
+      }
+      const store = new WritingStore(undefined, { expireAfter: 60 });
+      const req: any = new Request({});
+      (store as any).prepareSession(req);
+      req.session.set("user", 1);
+
+      (store as any).commitSession(req, { setCookie: () => {} });
+
+      expect(cookie.expires).toBeInstanceOf(Date);
+      const deltaMs = (cookie.expires as Date).getTime() - Date.now();
+      expect(deltaMs).toBeGreaterThan(55_000);
+      expect(deltaMs).toBeLessThanOrEqual(60_000);
+    });
+
     it("prepareSession wraps in ActionDispatch::Request::Session", () => {
       const store = new AbstractStore() as unknown as {
         prepareSession: (req: { env: Record<string, unknown> }) => RequestSession;

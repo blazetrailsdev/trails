@@ -30,7 +30,9 @@ import {
   ViewPathsClassMethods,
   _prefixes,
   detailsForLookup,
+  isAnyTemplates,
   lookupContext,
+  templateExists,
 } from "@blazetrails/actionview";
 import type { PathSet, ViewPathsInput } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../action-dispatch/routing/route-helpers.js";
@@ -337,25 +339,11 @@ export class Base extends Metal {
   /** Rails `ActionView::ViewPaths#details_for_lookup` (`view_paths.rb:67-69`). */
   detailsForLookup = detailsForLookup;
 
-  /**
-   * Rails `ActionView::ViewPaths#template_exists?` (`view_paths.rb:83-85`).
-   */
-  templateExists(
-    name: string,
-    prefixes: readonly string[] = [],
-    partial = false,
-    keys: readonly string[] = [],
-    options: Record<string, readonly (string | symbol)[]> = {},
-  ): boolean {
-    return this.lookupContext.isExists(name, prefixes, partial, keys, options);
-  }
+  /** Rails `ActionView::ViewPaths#template_exists?` (`view_paths.rb:83-85`). */
+  templateExists = templateExists;
 
-  /**
-   * Rails `ActionView::ViewPaths#any_templates?` (`view_paths.rb:87-89`).
-   */
-  isAnyTemplates(name: string, prefixes: readonly string[] = [], partial = false): boolean {
-    return this.lookupContext.isAny(name, prefixes, partial);
-  }
+  /** Rails `ActionView::ViewPaths#any_templates?` (`view_paths.rb:87-89`). */
+  isAnyTemplates = isAnyTemplates;
 
   /**
    * Rails `ImplicitRender#default_render` — mixed in from

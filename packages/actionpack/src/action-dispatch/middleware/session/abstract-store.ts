@@ -257,7 +257,9 @@ export class Persisted {
     let sessionId: unknown;
     if (options.get("drop") || options.get("renew")) {
       sessionId = this.deleteSession(req, session.id() ?? this.generateSid(), options);
-      if (sessionId == null) return;
+      // Ruby's `return unless session_id` (`id.rb:387`) is falsy on `false` too,
+      // which `delete_session` is free to return.
+      if (sessionId == null || sessionId === false) return;
     }
 
     if (!this.isCommitSession(req, session, options)) return;
@@ -279,8 +281,17 @@ export class Persisted {
     } else {
       const cookie: Record<string, unknown> = {};
       cookie["value"] = this.cookieValue(data);
-      if (options.get("expireAfter") != null) cookie["expires"] = options.get("expireAfter");
-      if (options.get("maxAge") != null) cookie["expires"] = options.get("maxAge");
+      const expireAfter = options.get("expireAfter");
+      if (expireAfter != null && expireAfter !== false) {
+        // boundary: `Time.now + options[:expire_after]` is an ABSOLUTE expiry
+        // and `Rack::Utils.set_cookie_header` renders it through `httpDate`.
+        cookie["expires"] = new Date(Date.now() + (expireAfter as number) * 1000);
+      }
+      const maxAge = options.get("maxAge");
+      if (maxAge != null && maxAge !== false) {
+        // boundary: as above (`id.rb:404`).
+        cookie["expires"] = new Date(Date.now() + (maxAge as number) * 1000);
+      }
 
       cookie["sameSite"] =
         typeof this.sameSite === "function"
