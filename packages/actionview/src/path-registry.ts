@@ -10,8 +10,8 @@
 
 import { getPath } from "@blazetrails/activesupport";
 import { PathSet } from "./path-set.js";
-import { FileSystemResolver } from "./resolver/file-system-resolver.js";
-import type { TemplateResolver } from "./resolver/resolver.js";
+import { FileSystemResolver } from "./template/resolver.js";
+import type { PathSetResolver } from "./path-set.js";
 
 type ClassLike = new (...args: unknown[]) => unknown;
 
@@ -43,7 +43,7 @@ export class PathRegistry {
    * FileSystemResolver instance.
    * @internal
    */
-  static castFileSystemResolvers(paths: Array<string | TemplateResolver>): TemplateResolver[] {
+  static castFileSystemResolvers(paths: Array<string | PathSetResolver>): PathSetResolver[] {
     let builtNew = false;
     const result = paths.map((p) => {
       if (typeof p === "string") {
@@ -67,10 +67,10 @@ export class PathRegistry {
     return Array.from(this._fileSystemResolvers.values());
   }
 
-  static allResolvers(): TemplateResolver[] {
-    const seen = new Set<TemplateResolver>();
-    const out: TemplateResolver[] = [];
-    const add = (r: TemplateResolver) => {
+  static allResolvers(): PathSetResolver[] {
+    const seen = new Set<PathSetResolver>();
+    const out: PathSetResolver[] = [];
+    const add = (r: PathSetResolver) => {
       if (!seen.has(r)) {
         seen.add(r);
         out.push(r);
@@ -78,7 +78,7 @@ export class PathRegistry {
     };
     for (const r of this._fileSystemResolvers.values()) add(r);
     for (const paths of this._viewPathsByClass.values()) {
-      for (const r of paths.toArray() as unknown as TemplateResolver[]) add(r);
+      for (const r of paths.toArray() as unknown as PathSetResolver[]) add(r);
     }
     return out;
   }

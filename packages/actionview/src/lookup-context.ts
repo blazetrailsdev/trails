@@ -19,7 +19,6 @@
 import type { RenderContext } from "./template/handlers.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import type { TemplateResolver } from "./resolver/resolver.js";
 import type { Template } from "./template.js";
 import { Jaro } from "@blazetrails/did-you-mean";
 import { PathRegistry } from "./path-registry.js";
@@ -193,8 +192,7 @@ export class DetailsKey {
    */
   static clear(): void {
     for (const resolver of PathRegistry.allResolvers()) {
-      const r = resolver as TemplateResolver & { clearCache?: () => void };
-      r.clearCache?.();
+      resolver.clearCache?.();
     }
     DetailsKey._detailsKeys.clear();
     DetailsKey._digestCache.clear();
@@ -249,7 +247,6 @@ export class LookupContext {
   }
 
   // --- Existing high-level renderer state (kept for AC integration) ---
-  private resolvers: TemplateResolver[] = [];
   private layoutName: string | false | null = "application";
 
   // --- Rails-faithful state ---
@@ -530,9 +527,15 @@ export class LookupContext {
     return [base, pfxs];
   }
 
-  /** Add a resolver to the lookup chain. First added = highest priority. */
-  addResolver(resolver: TemplateResolver): void {
-    this.resolvers.push(resolver);
+  /**
+   * Add a resolver to the lookup chain. First added = highest priority.
+   * An alias for Rails' `append_view_paths` (`view_paths.rb:87-89`), so
+   * every resolver reaches the same `PathSet` the Rails-shape lookups read.
+   *
+   * @noRailsEquivalent CONVERGEABLE actionview-drop-add-resolver-for-append-view-paths
+   */
+  addResolver(resolver: PathSetResolver): void {
+    this.appendViewPaths([resolver]);
   }
 
   /** Set the layout to use. Pass false to disable layout. */
@@ -551,21 +554,14 @@ export class LookupContext {
    * @internal
    */
   findTemplate(name: string, prefix: string, format: string): Template | null {
-    const extensions = TemplateHandlers.extensions();
-    if (extensions.length === 0) return null;
-
-    for (const resolver of this.resolvers) {
-      const template = resolver.find(name, prefix, format, extensions);
-      if (template) return template;
-    }
-    return null;
+    return (this.findAll(name, [prefix], false, [], { formats: [format] })[0] as Template) ?? null;
   }
 
   /**
    * Find a partial template. Partials are prefixed with underscore.
    */
   findPartial(name: string, prefix: string, format: string): Template | null {
-    return this.findTemplate(`_${name}`, prefix, format);
+    return (this.findAll(name, [prefix], true, [], { formats: [format] })[0] as Template) ?? null;
   }
 
   /**
@@ -574,21 +570,10 @@ export class LookupContext {
    * @internal
    */
   findLayout(name: string, format: string): Template | null {
-    const extensions = TemplateHandlers.extensions();
-    if (extensions.length === 0) return null;
-
-    for (const resolver of this.resolvers) {
-      if (resolver.findLayout) {
-        const layout = resolver.findLayout(name, format, extensions);
-        if (layout) return layout;
-      }
-      // Fallback: look in "layouts" prefix
-      const template = resolver.find(name, "layouts", format, extensions);
-      if (template) {
-        return template.asLayout();
-      }
-    }
-    return null;
+    const template = this.findAll(name, ["layouts"], false, [], { formats: [format] })[0] as
+      | Template
+      | undefined;
+    return template ? template.asLayout() : null;
   }
 
   /**
@@ -815,13 +800,13 @@ export class LookupContext {
   private _viewContextClass: typeof Base | null = null;
 
   private resolverNames(): string[] {
-    return this.resolvers.map((r) => r.constructor.name);
+    return this._viewPaths.toArray().map((r) => r.constructor.name);
   }
 
   /** @internal Collect all template paths from resolvers that expose them. */
   private allCandidatePaths(): string[] {
     const seen = new Set<string>();
-    for (const resolver of this.resolvers) {
+    for (const resolver of this._viewPaths) {
       try {
         const paths = resolver.allTemplatePaths?.();
         if (paths) {

@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { getPathAsync } from "@blazetrails/activesupport";
-import { FileSystemResolver } from "./resolver/file-system-resolver.js";
-import { InMemoryResolver } from "./resolver/in-memory-resolver.js";
+import { FileSystemResolver } from "./template/resolver.js";
+import { InMemoryResolver } from "./testing/resolvers.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
 

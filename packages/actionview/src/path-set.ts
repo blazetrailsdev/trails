@@ -34,6 +34,16 @@ export interface PathSetResolver {
     detailsKey: unknown,
     locals: ReadonlyArray<string>,
   ): unknown[];
+
+  /** @internal Resolvers with internal caches implement this. */
+  clearCache?(): void;
+
+  /**
+   * Every template path this resolver knows, used by `MissingTemplate#corrections`
+   * to suggest close matches. Resolvers that cannot enumerate them may omit it.
+   * @internal
+   */
+  allTemplatePaths?(): readonly string[];
 }
 
 export class PathSet implements Iterable<PathSetResolver> {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { PathRegistry } from "./path-registry.js";
-import { InMemoryResolver } from "./resolver/in-memory-resolver.js";
+import { InMemoryResolver } from "./testing/resolvers.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import {
   ClassMethods,

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Digestor } from "./digestor.js";
 import { LookupContext } from "./lookup-context.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { InMemoryResolver } from "./resolver/in-memory-resolver.js";
+import { InMemoryResolver } from "./testing/resolvers.js";
 
 function withFinder(source: string): LookupContext {
   TemplateHandlers.registerTemplateHandler("html", {

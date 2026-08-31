@@ -39,7 +39,13 @@ interface ImplicitRenderHost {
     variant?: unknown;
   };
   _prefixes?: string[];
-  templateExists?(action: string, prefixes?: unknown, opts?: unknown): boolean;
+  templateExists?(
+    action: string,
+    prefixes?: unknown,
+    partial?: boolean,
+    keys?: readonly string[],
+    options?: Record<string, readonly (string | symbol)[]>,
+  ): boolean;
   anyTemplates?(action: string, prefixes?: unknown): boolean;
   head(status: number | string): void;
   render(): void;
@@ -54,8 +60,8 @@ interface ImplicitRenderHost {
  */
 export function defaultRender(this: ImplicitRenderHost): void {
   if (
-    this.templateExists?.(String(this.actionName), this._prefixes, {
-      variants: this.request?.variant,
+    this.templateExists?.(String(this.actionName), this._prefixes, false, [], {
+      variants: variantsFor(this.request?.variant),
     })
   ) {
     this.render();
@@ -79,6 +85,18 @@ export function defaultRender(this: ImplicitRenderHost): void {
     `No template found for ${this.controllerName ?? ""}#${this.actionName}, rendering head :no_content`,
   );
   _defaultRender.call(this);
+}
+
+/**
+ * `request.variant` is an `ActionController::RequestVariant` — an Array
+ * subclass — so Rails' `variants: request.variant` kwarg already carries a
+ * list (`action_controller/metal/implicit_render.rb:37`).
+ *
+ * @internal
+ */
+function variantsFor(variant: unknown): readonly (string | symbol)[] {
+  if (variant == null) return [];
+  return Array.isArray(variant) ? (variant as readonly string[]) : [String(variant)];
 }
 
 /**
