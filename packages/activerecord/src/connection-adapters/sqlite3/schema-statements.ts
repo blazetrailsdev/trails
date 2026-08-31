@@ -1,6 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { pluralize } from "@blazetrails/activesupport";
-import { Base } from "../../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
   AddForeignKeyOptions,
@@ -12,6 +11,7 @@ import { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
 import type { TableDefinition as SQLite3TableDefinition } from "./schema-definitions.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import { globalPluralizeTableNames } from "../abstract/table-name-options.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
 import { SchemaDumper } from "./schema-dumper.js";
@@ -87,7 +87,7 @@ export async function removeForeignKey(
   const fkey = foreignKeys.find((fk) => {
     const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
     const table = this.stripTableNamePrefixAndSuffix(
-      to ?? (Base.pluralizeTableNames ? pluralize(inferred) : inferred),
+      to ?? (globalPluralizeTableNames() ? pluralize(inferred) : inferred),
     );
     return (
       this.stripTableNamePrefixAndSuffix(fk.toTable) === table && fk.isDefinedFor(matchOptions)
@@ -116,7 +116,7 @@ export async function checkConstraints(
   )) as string | null;
 
   const sql = String(tableSql ?? "");
-  const checkConstraints: CheckConstraintDefinition[] = [];
+  const scanned: [name: string, expression: string][] = [];
   for (const match of sql.matchAll(/CONSTRAINT\s+(\w+)\s+CHECK\s+\(/gi)) {
     const start = match.index + match[0].length;
     let depth = 1;
@@ -127,11 +127,11 @@ export async function checkConstraints(
       i++;
     }
     if (depth !== 0) continue;
-    const [, name] = match;
-    const expression = sql.slice(start, i - 1);
-    checkConstraints.push(new CheckConstraintDefinition(tableName, expression, { name }));
+    scanned.push([match[1], sql.slice(start, i - 1)]);
   }
-  return checkConstraints;
+  return scanned.map(
+    ([name, expression]) => new CheckConstraintDefinition(tableName, expression, { name }),
+  );
 }
 
 export async function addCheckConstraint(
