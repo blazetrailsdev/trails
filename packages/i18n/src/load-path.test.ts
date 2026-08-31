@@ -10,7 +10,9 @@
  * `Pathname.new(path)` has no JS counterpart: a path is a String here, so both
  * Pathname cases push the same value `Dir[]` yields above them. The Ruby file
  * fixture is `en.rb`; trails authors it as TypeScript and registers it under
- * its emitted `en.js` name, the way backend/simple.test.ts does.
+ * its emitted `en.js` name, the way backend/simple.test.ts does — so
+ * `Dir[locales_dir + '/*.{rb,yml}']` is the `.js`/`.yml` entries of the
+ * fixture directory, listed the way `Dir[]` sorts them.
  */
 
 import { readFile } from "node:fs/promises";
@@ -40,7 +42,7 @@ describe("I18nLoadPathTest", () => {
     config().enforceAvailableLocales = false;
     registerFileReader((filename) => readFile(filename, "utf8"));
     await preloadTranslationFiles(
-      ["en.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
+      ["en.yml", "fr.yml", "psych.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
         (name) => `${localesDir()}/${name}`,
       ),
     );
@@ -67,7 +69,9 @@ describe("I18nLoadPathTest", () => {
   });
 
   it("adding arrays of filenames to the load path does not break locale loading", () => {
-    config().loadPath.push([`${localesDir()}/en.yml`, `${localesDir()}/en.js`]);
+    config().loadPath.push(
+      ["en.js", "en.yml", "fr.yml", "psych.yml"].map((name) => `${localesDir()}/${name}`),
+    );
     expect(t("foo.bar")).toBe("baz");
   });
 

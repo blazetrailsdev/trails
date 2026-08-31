@@ -1,11 +1,12 @@
 /**
  * Mirrors: i18n/test/api/override_test.rb
  *
- * `I18n.dup` duplicates the module object; an ESM namespace is not
- * duplicable, so the copy below is the object spread of its exports, and
- * `extend` is the assignment of a module's methods onto it. `@I18n.backend =`
- * still reaches the one process-wide config, which is what `I18n.config` is
- * here (i18n.ts:92-93).
+ * `I18n.dup` duplicates the module object; an ESM namespace is not duplicable,
+ * so the copy below is the object spread of its exports, and `extend` is
+ * `Object.assign` of a module's methods onto it. Ruby's `@I18n` cannot keep its
+ * name — `I18n` is the namespace import it copies — so the local reads
+ * `dupI18n`. `@I18n.backend =` still reaches the one process-wide config, which
+ * is what `I18n.config` is here (i18n.ts:92-93).
  *
  * Only "make sure modules can overwrite I18n signature" is ported.
  * "make sure modules can overwrite I18n methods" needs `translate!` to reach
@@ -29,13 +30,14 @@ type I18nModule = Omit<typeof I18n, "translate" | "t"> & {
   t(...args: unknown[]): unknown;
 };
 
-const OverrideSignature = {
-  translate(...args: unknown[]): unknown {
-    return (args[0] as string) + (args[1] as string);
-  },
-} as const;
-
 describe("I18nOverrideTest", () => {
+  const OverrideSignature = {
+    translate(...args: unknown[]): unknown {
+      return (args[0] as string) + (args[1] as string);
+    },
+  } as { translate(...args: unknown[]): unknown; t(...args: unknown[]): unknown };
+  OverrideSignature.t = OverrideSignature.translate;
+
   let dupI18n: I18nModule;
 
   beforeEach(() => {
@@ -52,7 +54,7 @@ describe("I18nOverrideTest", () => {
     ) as MissingTranslation;
     expect(exception.message).toBeTruthy();
 
-    Object.assign(dupI18n, OverrideSignature, { t: OverrideSignature.translate });
+    Object.assign(dupI18n, OverrideSignature);
     // tr8n example
     expect(dupI18n.translate("Hello", "Welcome message on home page", { tokenize: true })).toBe(
       "HelloWelcome message on home page",
