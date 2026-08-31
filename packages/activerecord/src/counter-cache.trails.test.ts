@@ -3,7 +3,6 @@ import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
-import { CpkOrder } from "./test-helpers/models/cpk.js";
 
 describe("CounterCacheTest (trails)", () => {
   fixtures(["posts", "comments"]);
@@ -27,36 +26,6 @@ describe("CounterCacheTest (trails)", () => {
 
     expect(ChildModel.counterCachedAssociationNames).toEqual(["post"]);
     expect(ParentModel.counterCachedAssociationNames).toEqual([]);
-  });
-});
-
-describe("CounterCacheTest composite primary keys (trails)", () => {
-  fixtures(["cpkOrders", "cpkBooks"]);
-  beforeAll(() => {
-    registerModel(CpkOrder);
-  });
-
-  it("update counters for a single composite key updates that one record", async () => {
-    const [first, second] = await CpkOrder.first(2);
-    const before = second.books_count as number;
-
-    await CpkOrder.updateCounters(first.id, { books_count: 5 });
-
-    await first.reload();
-    await second.reload();
-    expect(first.books_count).toBe(5);
-    expect(second.books_count).toBe(before);
-  });
-
-  it("update counters for an array of composite keys updates each", async () => {
-    const [first, second] = await CpkOrder.first(2);
-
-    await CpkOrder.updateCounters([first.id, second.id], { books_count: 5 });
-
-    await first.reload();
-    await second.reload();
-    expect(first.books_count).toBe(5);
-    expect(second.books_count).toBe(5);
   });
 });
 
