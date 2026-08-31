@@ -469,12 +469,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return value == null ? "" : String(value);
   }
 
-  async charset(): Promise<string> {
-    return (await this.showVariable("character_set_database")) as string;
+  async charset(): Promise<string | null> {
+    return (await this.showVariable("character_set_database")) as string | null;
   }
 
-  async collation(): Promise<string> {
-    return (await this.showVariable("collation_database")) as string;
+  async collation(): Promise<string | null> {
+    return (await this.showVariable("collation_database")) as string | null;
   }
 
   /** @internal */

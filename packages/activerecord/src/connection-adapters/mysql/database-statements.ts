@@ -139,9 +139,9 @@ export async function isMaxAllowedPacketReached(
 
 /** @internal */
 export async function maxAllowedPacket(this: MaxAllowedPacketHost): Promise<number | null> {
-  if (this._maxAllowedPacket != null) return this._maxAllowedPacket;
-  const value = await this.showVariable("max_allowed_packet");
-  return (this._maxAllowedPacket = value == null ? value : Number(value));
+  return (this._maxAllowedPacket ??= (await this.showVariable("max_allowed_packet")) as
+    | number
+    | null);
 }
 
 export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
