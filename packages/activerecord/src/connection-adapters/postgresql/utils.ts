@@ -43,7 +43,7 @@ export namespace Utils {
       table = schema;
       schema = undefined;
     }
-    return new Name(schema ?? null, table ?? "");
+    return new Name(schema ?? null, table);
   }
 
   export function unquoteIdentifier<T extends string | null | undefined>(identifier: T): T {

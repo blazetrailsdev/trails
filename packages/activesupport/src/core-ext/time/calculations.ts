@@ -70,7 +70,17 @@ export function current(): TimeWithZone | RubyTime {
  */
 const atWithoutCoercion = RubyTime.at.bind(RubyTime);
 
-/** Mirrors: `Time.at_with_coercion` (`time/calculations.rb:44-57`) */
+/**
+ * Mirrors: `Time.at_with_coercion` (`time/calculations.rb:44-57`), aliased over
+ * `Time.at` at the bottom of this module as `:60` does.
+ *
+ * `is_a?(DateTime)` is spelled against trails' `DateTime` seat,
+ * `Temporal.PlainDateTime | Temporal.ZonedDateTime` (RFC 0088) — the receiver
+ * `core-ext/date-time/conversions.ts` is keyed on, whence its `to_f`.
+ * TypeScript cannot widen an existing class static through declaration
+ * merging, so `Time.at`'s DECLARED parameter stays core Ruby's and a caller
+ * handing it a `TimeWithZone` or a `DateTime` seat casts at the call site.
+ */
 export function atWithCoercion(
   timeOrNumber:
     | number
@@ -86,9 +96,6 @@ export function atWithCoercion(
     if (timeOrNumber instanceof TimeWithZone) {
       return atWithoutCoercion(timeOrNumber.toR()).getlocal();
     } else if (
-      // `is_a?(DateTime)`: trails seats a `DateTime` on
-      // `Temporal.PlainDateTime | Temporal.ZonedDateTime` (RFC 0088), the
-      // receiver `core-ext/date-time/conversions.ts` is keyed on.
       timeOrNumber instanceof Temporal.PlainDateTime ||
       timeOrNumber instanceof Temporal.ZonedDateTime
     ) {
@@ -485,9 +492,4 @@ Object.assign(RubyTime.prototype, {
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 
-// `alias_method :at, :at_with_coercion` (`time/calculations.rb:60`). The
-// assignment is the whole alias at runtime; TypeScript cannot widen an existing
-// class static through declaration merging, so `Time.at`'s DECLARED parameter
-// stays core Ruby's and a caller handing it a `TimeWithZone` or a `DateTime`
-// seat casts at the call site.
 RubyTime.at = atWithCoercion as typeof RubyTime.at;
