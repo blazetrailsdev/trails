@@ -22,7 +22,8 @@ const DIGIT_SEPARATOR_REGEX = /(?<=\d)_(?=\d)/g;
  * true — the arm every Rails call site reaches. A Numeric answers itself, a
  * String is parsed by `rb_str_to_dbl` and raises `ArgumentError` when it does
  * not parse, and anything else is converted through `to_f`, raising
- * `TypeError` when the value does not define one.
+ * `TypeError` when the value does not define one. Leading whitespace is
+ * stripped before the String parse, so `"  0b1"` is rejected too.
  *
  * JS `Number()` and `Kernel#Float` disagree in three places trails has to
  * close by hand: `Number()` reads `0b…` and `0o…` literals, which Ruby
@@ -39,28 +40,24 @@ export function kernelFloat(val: unknown): number {
   if (typeof val === "bigint") return Number(val);
   if (typeof val === "string") {
     if (val.trim() === "" || NON_DECIMAL_LITERAL_REGEX.test(val.trimStart())) {
-      throw invalidValue(val);
+      throw new ArgumentError(`invalid value for Float(): ${JSON.stringify(val)}`);
     }
     const coerced = Number(val.replace(DIGIT_SEPARATOR_REGEX, ""));
-    if (Number.isNaN(coerced)) throw invalidValue(val);
+    if (Number.isNaN(coerced)) {
+      throw new ArgumentError(`invalid value for Float(): ${JSON.stringify(val)}`);
+    }
     return coerced;
   }
   if (val !== null && val !== undefined && typeof val === "object") {
     const toF = (val as { toF?: unknown }).toF;
     if (typeof toF === "function") return (toF as () => number).call(val);
   }
-  /* `vendor/ruby/object.c:3629` `rb_convert_type_with_id`'s failure arm:
-     `can't convert X into Float`, named by the value's class. */
-  throw new TypeError(`can't convert ${rbObjClassName(val)} into Float`);
+  throw new TypeError(`can't convert ${rbObjClass(val)} into Float`);
 }
 
-/** `vendor/ruby/object.c:3629` — the `ArgumentError` `rb_str_to_dbl` raises,
- *  which names the offending string as `String#inspect` renders it. */
-function invalidValue(val: string): ArgumentError {
-  return new ArgumentError(`invalid value for Float(): ${JSON.stringify(val)}`);
-}
-
-function rbObjClassName(val: unknown): string {
+/** `rb_obj_class` (`vendor/ruby/object.c:296`) as `conversion_mismatch`
+ *  spells it: `nil` for nil, the class name otherwise. */
+function rbObjClass(val: unknown): string {
   if (val === null || val === undefined) return "nil";
   if (Array.isArray(val)) return "Array";
   if (typeof val === "boolean") return val ? "TrueClass" : "FalseClass";

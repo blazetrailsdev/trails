@@ -1,8 +1,6 @@
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-/* Ruby aliases `Hash#include?` to `Hash#has_key?` (`vendor/ruby/hash.c:3671`),
-   so the alias keeps `format.rb:22`'s spelling at the call site. */
 import { hasKey as isInclude } from "@blazetrails/ruby-compat";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";

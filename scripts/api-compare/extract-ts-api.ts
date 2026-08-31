@@ -2545,9 +2545,6 @@ export function extractClass(
         if (!ts.isIdentifier(param.name)) continue;
         const paramVisibility = parameterPropertyVisibility(param);
         if (paramVisibility === undefined) continue;
-        /* A parameter property is the declaration site of the field, so a
-           `@noRailsEquivalent` receipt written on the parameter is the only
-           place one can go — the field has no other declaration to carry it. */
         const paramNoRailsEquivalent = noRailsEquivalentReason(param);
         instanceMethods.push({
           name: param.name.text,
