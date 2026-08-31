@@ -1868,13 +1868,9 @@ def run
       test_files.select! { |f| f.start_with?(controller_dir) }
     end
 
-    # ruby-compat measures against ruby/spec (mspec), vendored in-tree at
-    # `spec/ruby` by the MRI clone. `pkg_dir` is `spec/ruby/core`, and this
-    # narrows it again to the value-type primitives ruby-compat ports. All of
-    # `spec/ruby/core` is thousands of test names for surface ruby-compat has
-    # no port of, which would drown the compare output; the list grows with
-    # the package, one entry per value type as it lands. An unported spec is
-    # not a reason to port the member it covers — see vendor/sources.ts.
+    # For ruby-compat, include only the value-type primitive directories.
+    # `pkg_dir` is ruby/spec's `spec/ruby/core`; vendor/sources.ts carries why
+    # the list is scoped, how it grows, and why an unported spec is not a gap.
     if pkg_name == "ruby-compat"
       value_type_dirs = %w[rational range string hash symbol comparable regexp]
                         .map { |d| File.join(pkg_dir, d) }
