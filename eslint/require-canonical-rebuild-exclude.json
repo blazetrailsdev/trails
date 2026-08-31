@@ -14,6 +14,7 @@
     "packages/activerecord/src/database-statements.test.ts",
     "packages/activerecord/src/migration/exclusion-constraint.test.ts",
     "packages/activerecord/src/migration/unique-constraint.test.ts",
+    "packages/activerecord/src/migration/unique-constraint.trails.test.ts",
     "packages/activerecord/src/sqlite/libsql.trails.test.ts",
     "packages/activerecord/src/transactions.trails.test.ts"
   ],

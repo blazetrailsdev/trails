@@ -32,6 +32,8 @@ import { Result } from "../result.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   affectedRows as mysql2AffectedRows,
+  executeBatch as mysql2ExecuteBatch,
+  isMultiStatementsEnabled as mysql2IsMultiStatementsEnabled,
   lastInsertedId as mysql2LastInsertedId,
   castResult as mysql2CastResult,
   performQuery as mysql2PerformQuery,
@@ -439,6 +441,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (translated instanceof AdapterError) translated.setConnectionPool(this.pool);
     return translated;
   }
+
+  /** @internal */
+  executeBatch = mysql2ExecuteBatch;
+
+  /** @internal */
+  isMultiStatementsEnabled = mysql2IsMultiStatementsEnabled;
 
   /** @internal */
   declare performQuery: typeof mysql2PerformQuery;
@@ -903,6 +911,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     try {
       conn = await mysql.createConnection({
         supportBigNumbers: true,
+        multipleStatements: true,
         ...(connOptions as mysql.ConnectionOptions),
         typeCast: composedTypeCast,
       });
