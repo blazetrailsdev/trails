@@ -8,7 +8,7 @@ import { Category } from "../test-helpers/models/category.js";
 import { fixtures } from "../test-fixtures.js";
 
 interface CollectionOwner {
-  assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
 }
 
 interface PostsProxy {
@@ -66,7 +66,7 @@ describe("CollectionAwaitableWriters", () => {
   it("ids= mass-assignment reaches the association writer on either owner arm", async () => {
     const post = await Post.create({ title: "t", body: "b" });
     const assignOn = (owner: Author): Promise<void> | void =>
-      (owner as unknown as CollectionOwner).assignAttributes({ postIds: [post.id] });
+      (owner as unknown as CollectionOwner).setAttributes({ postIds: [post.id] });
     const persisted = await Author.create({ name: "Bill" });
 
     const built = new Author({ name: "Bill" });
@@ -100,7 +100,7 @@ describe("CollectionAwaitableWriters", () => {
   it("mass-assignment reaches the association writer on a persisted owner", async () => {
     const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
     const post = await Post.create({ title: "t", body: "b" });
-    await author.assignAttributes({ posts: [post] });
+    await author.setAttributes({ posts: [post] });
     await (author as unknown as Author).reload();
     expect(await postsOf(author as unknown as Author).count()).toBe(1);
   });
@@ -109,7 +109,7 @@ describe("CollectionAwaitableWriters", () => {
     const author = (await Author.create({ name: "Bill" })) as unknown as CollectionOwner;
     const post = await Post.create({ title: "t", body: "b" });
 
-    await author.assignAttributes({ name: "Bob", posts: [post] });
+    await author.setAttributes({ name: "Bob", posts: [post] });
     expect((author as unknown as { name: string }).name).toBe("Bob");
     await (author as unknown as Author).reload();
     expect(await postsOf(author as unknown as Author).count()).toBe(1);

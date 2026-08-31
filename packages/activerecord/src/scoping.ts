@@ -1,6 +1,5 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
-import type { Base } from "./base.js";
-import { parkNestedReaderLoad } from "./nested-attributes.js";
+import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
@@ -90,16 +89,19 @@ function setValueFor(scopeType: WeakMap<object, any>, model: object, value: any)
 
 interface ScopingHost {
   constructor: { isScopeAttributes(): boolean };
-  assignAttributes?(attrs: Record<string, unknown>): Promise<void> | void;
+  /** @internal */
+  _assignAttributes?(attrs: Record<string, unknown>): Promise<void> | void;
 }
 
 export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
   const klass = this.constructor as any;
   if (!klass.isScopeAttributes()) return;
   const attrs = scopeAttributes.call(klass);
-  if (attrs && Object.keys(attrs).length > 0 && this.assignAttributes) {
-    const pending = this.assignAttributes(attrs);
-    if (pending) parkNestedReaderLoad(this as unknown as Base, pending);
+  if (attrs && Object.keys(attrs).length > 0 && this._assignAttributes) {
+    assertAssignedSynchronously(
+      this._assignAttributes(attrs),
+      "populateWithCurrentScopeAttributes",
+    );
   }
 }
 

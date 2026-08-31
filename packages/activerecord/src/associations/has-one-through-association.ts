@@ -212,7 +212,7 @@ async function createThroughRecord(
 
     if (throughRecord) {
       if (throughRecord.isNewRecord?.()) {
-        await throughRecord.assignAttributes?.(attrs);
+        await throughRecord.setAttributes?.(attrs);
       } else {
         await throughRecord.update?.(attrs);
       }

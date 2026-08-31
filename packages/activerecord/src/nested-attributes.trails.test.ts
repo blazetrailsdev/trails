@@ -201,7 +201,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     expect(observed).toEqual(["Aye"]);
   });
 
-  it("returns nothing from assignAttributes and drains the displacing write on save", async () => {
+  it("completes the displacing write through setAttributes before save", async () => {
     const pirate = (await Pirate.create({ catchphrase: "Aye" })) as unknown as Pirate;
     const displaced = await Ship.create({
       name: "Nights Dirty Lightning",
@@ -210,7 +210,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     await (pirate as unknown as { ship: Promise<Base | null> }).ship;
 
     expect(
-      await pirate.assignAttributes({ shipAttributes: { name: "Davy Jones Gold Dagger" } }),
+      await pirate.setAttributes({ shipAttributes: { name: "Davy Jones Gold Dagger" } }),
     ).toBeUndefined();
     await pirate.save();
 
@@ -236,10 +236,10 @@ describe("nested attributes assignment ordering (trails-only)", () => {
 
     const events: string[] = [];
     const proto = Parrot.prototype as unknown as {
-      assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+      setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
     };
-    const original = proto.assignAttributes;
-    proto.assignAttributes = function (this: Base, attrs: Record<string, unknown>) {
+    const original = proto.setAttributes;
+    proto.setAttributes = function (this: Base, attrs: Record<string, unknown>) {
       const name = String((attrs as { name?: unknown }).name);
       events.push(`start:${name}`);
       const result = original.call(this, attrs);
@@ -254,7 +254,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
         b: { id: readAttr(second, "id"), name: "Renamed Second" },
       });
     } finally {
-      proto.assignAttributes = original;
+      proto.setAttributes = original;
     }
 
     expect(events).toEqual([

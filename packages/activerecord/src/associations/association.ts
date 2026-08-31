@@ -6,9 +6,9 @@ import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { ThroughAssociation } from "./through-association.js";
-import { parkNestedReaderLoad } from "../nested-attributes.js";
 import { camelize, except, safeConstantize, singularize } from "@blazetrails/activesupport";
 import { AssociationTargetReplacedDuringLoad, AssociationTypeMismatch } from "../errors.js";
+import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
 export class Association {
   owner: Base;
@@ -343,10 +343,7 @@ export class Association {
     }
   }
 
-  initializeAttributes(
-    record: Base,
-    exceptFromScopeAttributes?: Record<string, unknown>,
-  ): Promise<void> | void {
+  initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
     exceptFromScopeAttributes ??= {};
     const skipAssign: (string | string[])[] = [
       this.reflection.foreignKey,
@@ -358,14 +355,11 @@ export class Association {
       this.scopeForCreate(),
       ...assignedKeys.filter((key) => !skipAssign.includes(key)),
     );
-    const pending =
-      Object.keys(attributes).length > 0
-        ? (record._assignAttributes(attributes) as Promise<void> | undefined)
-        : undefined;
-    if (pending) {
-      return pending.then(() => {
-        this.setInverseInstance(record);
-      });
+    if (Object.keys(attributes).length > 0) {
+      assertAssignedSynchronously(
+        record._assignAttributes(attributes) as Promise<void> | undefined,
+        "initializeAttributes",
+      );
     }
     this.setInverseInstance(record);
   }
@@ -456,8 +450,7 @@ export class Association {
       }
     )._reflectOnAssociation?.(this.reflection.name);
     const initializeAndYield = (record: Base): void => {
-      const pending = this.initializeAttributes(record, attributes);
-      if (pending) parkNestedReaderLoad(record, pending);
+      this.initializeAttributes(record, attributes);
       if (block) block(record);
     };
     if (reflection?.buildAssociation) {
