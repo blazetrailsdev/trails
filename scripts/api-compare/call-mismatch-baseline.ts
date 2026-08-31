@@ -78,8 +78,8 @@ export interface CallMismatchKey {
  *  rows; a second parallel tree was the original design and was reversed
  *  because it doubled the conflict surface of every burndown PR (RFC 0095).
  *  `"rubyCompat"` (RFC 0129) joined on the same terms: a Ruby-core call whose
- *  ruby-compat port the TS body did not make. It is report-only today — no
- *  shard holds one yet — and when it is gated, that gate reads it alone. */
+ *  ruby-compat port the TS body did not make. Report-only today — no shard holds
+ *  one — and when gated, that gate reads it alone. */
 export type RowKind = "calls" | "args" | "rubyCompat";
 
 /** The rows of one dimension. `kind` absent reads as `"calls"`. */

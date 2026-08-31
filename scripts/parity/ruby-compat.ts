@@ -18,9 +18,9 @@
  * signal beside them, the inert-receiver `weakCalls` subset (RFC 0083), and the
  * TS side has only `FOREIGN_READ_PREFIX`. So: **where the receiver cannot be
  * resolved, the row does not go in the table** — a row admitted anyway would
- * credit a Rails `fetch` for a Ruby one, worse than flagging both. The MRI
- * keying makes each admission legible rather than being a discriminator the
- * comparator can use; {@link AMBIGUOUS_RUBY_CALLS} keeps exclusions reviewable.
+ * credit a Rails `fetch` for a Ruby one, worse than flagging both. The MRI keying
+ * makes each admission legible rather than being a discriminator the comparator
+ * can use; {@link AMBIGUOUS_RUBY_CALLS} keeps exclusions reviewable.
  *
  * Hard rules: no node:* imports, no process.*, async fs only.
  */

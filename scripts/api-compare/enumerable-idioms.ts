@@ -92,12 +92,10 @@ export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
   ["realpath", ["realpathSync"]],
 ]);
 
-/**
- * JS call names that count as making Ruby call `rubyCall`. The Ruby-core tail is
- * `rubyCompatAliases` (scripts/parity/ruby-compat.ts) — the FORWARD half of the
- * RFC 0129 resolution table, which absorbed the `CORE_LIBRARY_ALIASES` that used
- * to sit in this file. Same silence-only contract as the two tables above it.
- */
+/** JS call names that count as making Ruby call `rubyCall`. The Ruby-core tail
+ *  is `rubyCompatAliases` (scripts/parity/ruby-compat.ts), the FORWARD half of
+ *  the RFC 0129 table that absorbed this file's `CORE_LIBRARY_ALIASES`; same
+ *  silence-only contract as the two tables above it. */
 export function jsEnumerableAliases(rubyCall: string): string[] {
   const aliases = JS_ENUMERABLE_ALIASES.get(rubyCall) ?? FS_ADAPTER_ALIASES.get(rubyCall);
   return aliases ?? rubyCompatAliases(rubyCall);
