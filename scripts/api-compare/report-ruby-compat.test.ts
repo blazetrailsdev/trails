@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { type Artifact, rowsOfKind } from "./call-mismatch-baseline.js";
-import { type TsApi, forwardCredits, renderReport, reverseRows } from "./report-ruby-compat.js";
+import {
+  type TsApi,
+  declarations,
+  forwardCredits,
+  renderReport,
+  reverseRows,
+} from "./report-ruby-compat.js";
 
 const row = (pkg: string, tsFile: string, rubyName: string, missing: string) => ({
   package: pkg,
@@ -101,5 +107,66 @@ describe("forwardCredits", () => {
     expect(renderReport(artifact, api, 20)).toContain(
       "1 unconverged row(s) across 1 file(s); 4 call site(s) already credited",
     );
+  });
+});
+
+/** The extractor stamps a barrel clone with the DECLARING entry's file and line
+ *  (`extract-ts-api.ts:1017`), so a re-export used to report as a second
+ *  declaration site at `index.ts` carrying the original line. */
+describe("declarations", () => {
+  const reExporting: TsApi = {
+    packages: {
+      activesupport: {
+        fileFunctions: {
+          "hash-utils.ts": [{ name: "except", file: "hash-utils.ts", line: 147 }],
+          "index.ts": [
+            {
+              name: "except",
+              file: "index.ts",
+              line: 147,
+              reExportedFrom: "hash-utils.ts:except",
+            },
+          ],
+        },
+        classes: {
+          "index.ts:Store": {
+            file: "index.ts",
+            instanceMethods: [{ name: "read", line: 12, reExportedFrom: "cache/store.ts:read" }],
+          },
+        },
+      },
+    },
+  };
+
+  it("yields a re-exported declaration once, at its declaring file", () => {
+    expect(
+      declarations(reExporting).map((d) => `${d.tsFile}:${d.decl.line} ${d.decl.name}`),
+    ).toEqual(["hash-utils.ts:147 except"]);
+  });
+
+  it("credits a re-exported call site once", () => {
+    const credits = forwardCredits({
+      packages: {
+        activesupport: {
+          fileFunctions: {
+            "hash-utils.ts": [
+              { name: "except", file: "hash-utils.ts", line: 4, calls: ["hasKey"] },
+            ],
+            "index.ts": [
+              {
+                name: "except",
+                file: "index.ts",
+                line: 4,
+                calls: ["hasKey"],
+                reExportedFrom: "hash-utils.ts:except",
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(credits).toEqual([
+      { package: "activesupport", tsFile: "hash-utils.ts", name: "except", tsExport: "hasKey" },
+    ]);
   });
 });

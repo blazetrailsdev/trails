@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activesupport",
-    "tsFile": "inflector/inflections.ts",
-    "rubyName": "to_regex",
-    "call": "escape",
-    "reason": "Pre-existing divergence in `Uncountables`, a class nested inside a same-file parent (inflector/inflections.rb). parity:api dropped such classes from the Rails population entirely until compare-drops-nested-class-methods-from-coverage-denominator, so this body was never measured; the row records existing debt, not new code. Converge under converge-nested-class-call-mismatches-surfaced-by-population-fix."
-  }
-]

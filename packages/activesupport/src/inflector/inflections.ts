@@ -3,6 +3,7 @@
  * Mirrors ActiveSupport::Inflector::Inflections from Rails.
  */
 
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { isEmpty } from "../ruby-empty.js";
 
@@ -50,10 +51,7 @@ export class Uncountables extends Array<string> {
   // Ruby's `/\b…\Z/i` boundary is Unicode-aware, so it fires before a
   // non-ASCII word like "猫"; JS `\b` is ASCII-only.
   private toRegex(string: string): RegExp {
-    return new RegExp(
-      `(?<![\\p{L}\\p{N}_])${string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-      "iu",
-    );
+    return new RegExp(`(?<![\\p{L}\\p{N}_])${regexpEscape(string)}$`, "iu");
   }
 }
 
