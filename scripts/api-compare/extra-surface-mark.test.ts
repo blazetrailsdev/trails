@@ -6,7 +6,6 @@ import {
   exceedances,
   measure,
   staleMarks,
-  strandedMarks,
   taggedOnlyViolations,
   tightened,
   unmarkedPackages,
@@ -32,27 +31,29 @@ describe("extra-surface mark", () => {
     });
   });
 
-  it("names a counted package the mark file never seeded", () => {
+  it("names a gated package the mark file never seeded", () => {
     expect(unmarkedPackages({ activerecord: { novel: 399, total: 1424 } })).toEqual([
+      "arel",
       "ruby-compat",
     ]);
-    expect(unmarkedPackages({})).toEqual([...COUNTED_PACKAGES]);
+    expect(unmarkedPackages({})).toEqual([...GATED_PACKAGES]);
     expect(
       unmarkedPackages({
         activerecord: { novel: 399, total: 1424 },
+        arel: { novel: 0, total: 35 },
         "ruby-compat": { novel: 0, total: 0 },
       }),
     ).toEqual([]);
   });
 
-  it("never asks a tagged-only package for a mark it does not carry", () => {
-    expect(unmarkedPackages({})).not.toContain("arel");
-    expect(strandedMarks({})).toEqual([]);
-    expect(strandedMarks({ activerecord: { novel: 1, total: 1 } })).toEqual([]);
-  });
-
-  it("names a tagged-only package that still carries a stranded row", () => {
-    expect(strandedMarks({ arel: { novel: 0, total: 63 } })).toEqual(["arel"]);
+  it("demands a mark from a tagged-only package too, because total stays gated", () => {
+    expect(unmarkedPackages({})).toContain("arel");
+    expect(
+      unmarkedPackages({
+        activerecord: { novel: 399, total: 1424 },
+        "ruby-compat": { novel: 0, total: 0 },
+      }),
+    ).toEqual(["arel"]);
   });
 
   it("holds a tagged-only package at zero novel with no mark to consult", () => {
@@ -62,15 +63,25 @@ describe("extra-surface mark", () => {
     ]);
   });
 
-  it("lets a tagged-only package's moved-not-novel total grow, which the mode trades away", () => {
-    expect(taggedOnlyViolations({ arel: { novel: 0, total: 9999 } })).toEqual([]);
+  it("still gates a tagged-only package's moved-not-novel total against its mark", () => {
+    const arelMark: SurfaceMarks = { arel: { novel: 0, total: 35 } };
+    expect(exceedances(arelMark, { arel: { novel: 0, total: 36 } })).toEqual([
+      { package: "arel", dimension: "total", mark: 35, current: 36 },
+    ]);
+    expect(staleMarks(arelMark, { arel: { novel: 0, total: 34 } })).toEqual([
+      { package: "arel", dimension: "total", mark: 35, current: 34 },
+    ]);
+    expect(tightened(arelMark, { arel: { novel: 0, total: 34 } })).toEqual({
+      arel: { novel: 0, total: 34 },
+    });
   });
 
-  it("ignores a tagged-only package in every mark-keyed comparison", () => {
-    const strayed: SurfaceMarks = { arel: { novel: 0, total: 1 } };
-    expect(exceedances(strayed, { arel: { novel: 99, total: 99 } })).toEqual([]);
-    expect(staleMarks(strayed, { arel: { novel: 0, total: 0 } })).toEqual([]);
-    expect(tightened(strayed, { arel: { novel: 0, total: 0 } })).toEqual(strayed);
+  it("pins a tagged-only package's novel at zero even if its row were widened", () => {
+    const widened: SurfaceMarks = { arel: { novel: 99, total: 35 } };
+    expect(exceedances(widened, { arel: { novel: 7, total: 35 } })).toEqual([]);
+    expect(taggedOnlyViolations({ arel: { novel: 7, total: 35 } })).toEqual([
+      { package: "arel", dimension: "novel", mark: 0, current: 7 },
+    ]);
   });
 
   it("skips a package with no mark rather than gating it, which is why the seed is checked", () => {

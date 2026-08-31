@@ -8,13 +8,10 @@
  * on the same contract as the RFC 0047/0084 call-set mark and its RFC 0095
  * call-argument twin:
  *
- *   - a committed mark per COUNTED package — `novel` and `total`;
+ *   - a committed mark per gated package — `novel` and `total`;
  *   - CI fails on ANY increase in either number;
  *   - converging surface makes the mark stale-HIGH, which `--tighten` narrows
  *     to the current measurement — never a reseed, and never a widening.
- *
- * A package that reaches zero untagged novel surface leaves that contract for
- * TAGGED-ONLY MODE below, and carries no mark at all.
  *
  * The mark is per-PACKAGE, not per-file. The call-set baseline is sharded per
  * source file because its unit of work is one reviewed row per call site; here
@@ -45,30 +42,43 @@
  * burndown behind it yet, and widening GATED_PACKAGES without one is exactly
  * the not-mechanical step this comment has always warned about.
  *
- * TAGGED-ONLY MODE is where a gated package ends up once its untagged novel
+ * TAGGED-ONLY MODE is what a gated package earns once its untagged novel
  * surface is burnt down. `extra-surface.ts` already subtracts a declaration
  * carrying a `@noRailsEquivalent` receipt from both dimensions, so `novel`
  * never counted KNOWN extra surface — only the residue nobody has written a
- * receipt for. A package whose residue is zero therefore needs no number at
- * all: its rule is the constant `novel === 0`, and it carries no row in the
- * JSON.
+ * receipt for. A package with no residue does not need a NUMBER for that
+ * dimension; it needs a RULE, and the rule is the constant `novel === 0`.
  *
- * That is not merely tidier. A single shared integer per package is a
- * merge-conflict generator — every PR anywhere in the package that deletes one
- * novel name rewrites the same line, and two parallel branches collide on a
- * value neither can resolve without a full re-measurement. A receipt lives in
- * the file the PR is already editing, so it conflicts with nothing.
+ * The mode pins that constant independently of the mark file. A counted
+ * package's `novel` is whatever its row says, so a hand-edit or a stray
+ * reseed could widen it; a tagged-only package's is 0 no matter what the row
+ * says, and the only remedies for a red run are a receipt at the declaration
+ * or deleting the name. That is the guarantee the mode adds, and it is why
+ * {@link taggedOnlyViolations} is checked alongside {@link exceedances}
+ * rather than instead of it.
  *
- * The mode drops the `total` dimension, deliberately. A moved-not-novel extra
- * is a name Rails DOES define, just in another `.rb`; that is a file-placement
- * deviation, which `blazetrails/rails-file-structure-method-order` already
- * polices for the packages enrolled here, and it is not what a receipt is for.
- * Trading it away is the price of retiring the package's row, and it is only
- * paid by a package that has already reached zero invented surface.
+ * The mode does NOT drop the `total` dimension, and an earlier revision of
+ * this comment was wrong to claim `blazetrails/rails-file-structure-method-order`
+ * would cover it. That rule orders members WITHIN one file's container and
+ * filters its expected names to the ones already present there, so a name
+ * Rails defines in another `.rb` is simply absent from the bucket and rides
+ * along in the unmapped tail — it cannot see a cross-file relocation at all.
+ * `parity:api:moves` reports the adjacent population and gates nothing. So
+ * `total` is the ONLY thing standing between a tagged-only package and
+ * unbounded moved-not-novel growth (arel carries 35 such extras today), and
+ * it stays gated for every package in either mode.
+ *
+ * Keeping it costs almost nothing, because pinning `novel` at 0 removes what
+ * made the mark churn: the file was rewritten by 48 commits in six weeks, and
+ * that traffic was burndown deletions, each lowering `novel` and `total`
+ * together. A package that can no longer delete a novel name only moves
+ * `total` when a name is genuinely relocated, which is rare. The merge
+ * conflicts this mode exists to stop are stopped by the pin, not by removing
+ * the row.
  *
  * arel enrolls first, being the only package measured at `novel: 0`.
- * activerecord's 342 and ruby-compat's 4 stay on counts until their own
- * burndowns (the `activerecord-extra-surface-receipt-burndown` RFC and RFC
+ * activerecord's 342 and ruby-compat's 4 stay ungated on `novel` until their
+ * own burndowns (the `activerecord-extra-surface-receipt-burndown` RFC and RFC
  * 0129 respectively) retire them, one receipt or one deletion at a time.
  * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
  * reaches zero and is never moved back out to turn a red run green.
@@ -85,15 +95,16 @@ import { serializeBaseline } from "./baseline-json.js";
 export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
 
 /**
- * Gated packages that still carry a committed `novel`/`total` mark, because
- * they still have untagged novel surface to burn down.
+ * Gated packages whose `novel` is still a number to burn down rather than a
+ * rule to hold, so the mark's value governs both dimensions.
  */
 export const COUNTED_PACKAGES = ["activerecord", "ruby-compat"] as const;
 
 /**
- * Gated packages held at `novel === 0` with NO row in the mark file — see
- * TAGGED-ONLY MODE in the module comment. Only-grow: a package joins on
- * reaching zero and never leaves.
+ * Gated packages whose `novel` is pinned at the constant 0 regardless of what
+ * their mark row says — see TAGGED-ONLY MODE in the module comment. They keep
+ * a row, because `total` stays gated in both modes. Only-grow: a package joins
+ * on reaching zero and never leaves.
  */
 export const TAGGED_ONLY_PACKAGES = ["arel"] as const;
 
@@ -152,7 +163,7 @@ export interface MarkViolation {
  */
 export function exceedances(marks: SurfaceMarks, current: SurfaceMarks): MarkViolation[] {
   const violations: MarkViolation[] = [];
-  for (const name of COUNTED_PACKAGES) {
+  for (const name of GATED_PACKAGES) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
@@ -177,7 +188,7 @@ export function exceedances(marks: SurfaceMarks, current: SurfaceMarks): MarkVio
  */
 export function staleMarks(marks: SurfaceMarks, current: SurfaceMarks): MarkViolation[] {
   const stale: MarkViolation[] = [];
-  for (const name of COUNTED_PACKAGES) {
+  for (const name of GATED_PACKAGES) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
@@ -207,15 +218,17 @@ export function unmeasuredPackages(current: SurfaceMarks): string[] {
  * {@link unmeasuredPackages}.
  */
 export function unmarkedPackages(marks: SurfaceMarks): string[] {
-  return COUNTED_PACKAGES.filter((name) => marks[name] === undefined);
+  return GATED_PACKAGES.filter((name) => marks[name] === undefined);
 }
 
 /**
  * Every tagged-only package measured with novel surface left. Non-empty means
  * a public TS name with no Ruby counterpart was added without a
- * `@noRailsEquivalent` receipt — the fix is the receipt or the deletion, and
- * there is no number to raise. The twin of {@link exceedances} for the mode
- * that has no mark.
+ * `@noRailsEquivalent` receipt — the fix is the receipt or the deletion.
+ *
+ * Checked IN ADDITION to {@link exceedances}, not instead of it: that one
+ * compares against whatever the row says, while this one holds the constant 0
+ * even if the row were edited to say otherwise.
  */
 export function taggedOnlyViolations(current: SurfaceMarks): MarkViolation[] {
   const violations: MarkViolation[] = [];
@@ -229,17 +242,6 @@ export function taggedOnlyViolations(current: SurfaceMarks): MarkViolation[] {
   return violations;
 }
 
-/**
- * A tagged-only package that still carries a row in the mark file. The row is
- * dead weight no comparison here reads, and leaving one there invites a later
- * `--tighten` to resurrect a number the package no longer has. This is the
- * single enforcement point: {@link writeMarks} does not filter such a row out,
- * so the gate must refuse before one can ever reach it.
- */
-export function strandedMarks(marks: SurfaceMarks): string[] {
-  return TAGGED_ONLY_PACKAGES.filter((name) => marks[name] !== undefined);
-}
-
 export async function loadMarks(): Promise<SurfaceMarks> {
   return JSON.parse(await fs.readFile(MARK_PATH, "utf-8")) as SurfaceMarks;
 }
@@ -251,7 +253,7 @@ export async function loadMarks(): Promise<SurfaceMarks> {
  */
 export function tightened(marks: SurfaceMarks, current: SurfaceMarks): SurfaceMarks {
   const next: SurfaceMarks = { ...marks };
-  for (const name of COUNTED_PACKAGES) {
+  for (const name of GATED_PACKAGES) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
