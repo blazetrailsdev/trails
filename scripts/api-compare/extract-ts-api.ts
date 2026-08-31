@@ -3068,6 +3068,54 @@ function isNegatedOperand(expr: ts.Node): boolean {
   return !isNegatedOperand(parent);
 }
 
+// Whether an expression IS a logical negation — `!x.foo()`, `(!x.foo())`. The
+// mirror of isNegatedOperand, which asks the same question of an operand
+// looking up. `!!x` is a truthiness cast, not a negation, and is excluded on
+// both sides for the same reason.
+function isNegationExpression(expr: ts.Expression): boolean {
+  let node: ts.Expression = expr;
+  while (ts.isParenthesizedExpression(node)) node = node.expression;
+  if (!ts.isPrefixUnaryExpression(node) || node.operator !== ts.SyntaxKind.ExclamationToken) {
+    return false;
+  }
+  let operand: ts.Expression = node.operand;
+  while (ts.isParenthesizedExpression(operand)) operand = operand.expression;
+  return !(
+    ts.isPrefixUnaryExpression(operand) && operand.operator === ts.SyntaxKind.ExclamationToken
+  );
+}
+
+// Whether a function argument's body is itself a negation — `(t) => !t.isDirty()`,
+// or its single-`return` block form. A Ruby negating idiom has a de-Morgan port
+// that carries the `!` INSIDE the predicate callback rather than on the call:
+// `@stack.none?(&:dirty?)` (abstract/transaction.rb:573) is
+// `stack.every((t) => !t.isDirty())` in transaction.ts `isRestorable`. That is as
+// faithful as `!stack.some(...)`, and the call ratchet must tell it from the
+// de-Morgan OPPOSITE `every((t) => t.isDirty())` — so it earns the same
+// NEGATED_CALL_PREFIX marker.
+function hasNegatedCallbackBody(arg: ts.Expression): boolean {
+  if (!ts.isArrowFunction(arg) && !ts.isFunctionExpression(arg)) return false;
+  const body = arg.body;
+  if (!ts.isBlock(body)) return isNegationExpression(body);
+  // A block body counts when ANY of its own returns is negated — the narrowing
+  // a `&:dirty?` block-pass needs in TS costs the callback a guard arm
+  // (`if (t instanceof Transaction) return !t.isDirty(); return true;`), so the
+  // negation is one return among several. Returns inside a NESTED function
+  // belong to that function, not this callback, and are not walked.
+  let negated = false;
+  const visitStatement = (n: ts.Node): void => {
+    if (negated) return;
+    if (ts.isFunctionLike(n)) return;
+    if (ts.isReturnStatement(n) && n.expression !== undefined) {
+      if (isNegationExpression(n.expression)) negated = true;
+      return;
+    }
+    ts.forEachChild(n, visitStatement);
+  };
+  ts.forEachChild(body, visitStatement);
+  return negated;
+}
+
 /**
  * The same call names in SOURCE ORDER — the sequence the call-order comparison
  * reads (RFC 0084). `extractCalls` sorts, which is the right shape for a
@@ -3472,6 +3520,11 @@ function collectCalls(
     if (!isNegatedOperand(expr)) return;
     for (const c of called) names.add(`${NEGATED_CALL_PREFIX}${c}`);
   };
+  // The callback-negated half of the same marker (see hasNegatedCallbackBody).
+  const addCallbackNegated = (args: readonly ts.Expression[], ...called: string[]): void => {
+    if (!args.some(hasNegatedCallbackBody)) return;
+    for (const c of called) names.add(`${NEGATED_CALL_PREFIX}${c}`);
+  };
   // Marked only when EVERY occurrence that credited the name was a foreign
   // read — the same shape as the Ruby side's `weak` tally.
   const occurrences = new Map<string, number>();
@@ -3551,6 +3604,7 @@ function collectCalls(
       }
       for (const block of blocks) visit(block);
       addNegated(n, ...negated);
+      addCallbackNegated(blocks, ...negated);
       return;
     } else if (skipHoistedClosures && isLocalBoundFunction(n)) {
       return;

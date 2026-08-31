@@ -520,11 +520,12 @@ export function significantMissingCalls(
     const mapped = narrowPredicateCandidates(rc, raw, bodyRubyCalls, mapCall);
     if (!mapped.some(isPortedWithArgs)) continue;
     if (mapped.some((c) => availableTsCalls.has(c))) continue;
-    // A NEGATED alias (`exclude? → includes`) is matched against the negated
-    // call-set: a bare `xs.includes(y)` where Rails wrote `exclude?` is the
-    // inverted condition, and must not silence the ratchet. Direct aliases —
-    // including `none? → every`, whose de-Morgan port negates inside the
-    // callback — keep matching the plain call-set (see NEGATED_ALIASES).
+    // A NEGATED alias (`exclude? → includes`, `none? → every`) is matched
+    // against the negated call-set: a bare `xs.includes(y)` where Rails wrote
+    // `exclude?`, or a bare `xs.every(p)` where it wrote `none?`, is the
+    // inverted condition and must not silence the ratchet. The marker covers a
+    // `!` on the call or inside its callback, so the de-Morgan port
+    // `every((t) => !t.isDirty())` still counts (see NEGATED_ALIASES).
     const aliasMatched = aliasCall(rc).some((c) =>
       requiresNegatedAlias(rc, c) ? availableNegatedTsCalls.has(c) : availableTsCalls.has(c),
     );

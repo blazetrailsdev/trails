@@ -550,6 +550,35 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("marks a call whose predicate callback is negated with the ! prefix", () => {
+    // The de-Morgan port of `@stack.none?(&:dirty?)`
+    // (abstract/transaction.rb:573): the `!` sits inside the callback, and the
+    // call ratchet requires the marker before crediting `none? -> every`.
+    const cls = extractFromSource(
+      `class Foo {
+        restorable(stack: { isDirty(): boolean }[]) {
+          return stack.every((t) => {
+            if (t) return !t.isDirty();
+            return true;
+          });
+        }
+        expressionBodied(stack: { isDirty(): boolean }[]) {
+          return stack.every((t) => !t.isDirty());
+        }
+        inverted(stack: { isDirty(): boolean }[]) {
+          return stack.every((t) => t.isDirty());
+        }
+      }`,
+    );
+    const restorable = cls.instanceMethods.find((m) => m.name === "restorable")!;
+    expect(restorable.calls).toContain("!every");
+    const expressionBodied = cls.instanceMethods.find((m) => m.name === "expressionBodied")!;
+    expect(expressionBodied.calls).toContain("!every");
+    const inverted = cls.instanceMethods.find((m) => m.name === "inverted")!;
+    expect(inverted.calls).toContain("every");
+    expect(inverted.calls).not.toContain("!every");
+  });
+
   it("marks a read off another object with the foreign-read prefix", () => {
     // `details.locale` names a member of `details`, not the same-file method
     // `locale` — the closure must not walk into that one (RFC 0108).
