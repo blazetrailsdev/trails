@@ -177,7 +177,8 @@ describe("SQLite adapter driver binding", () => {
               throw new Error("close failed");
             };
           }
-          return Reflect.get(target, prop, receiver);
+          const value = Reflect.get(target, prop, target);
+          return typeof value === "function" ? value.bind(target) : value;
         },
       });
     });
@@ -363,7 +364,8 @@ describe("SQLite adapter driver binding", () => {
         new Proxy(new SQLite3Adapter(":memory:", { driver }), {
           get(target, prop, receiver) {
             if (prop === "requiresReloading") return () => true;
-            return Reflect.get(target, prop, receiver);
+            const value = Reflect.get(target, prop, target);
+            return typeof value === "function" ? value.bind(target) : value;
           },
         }) as unknown as DatabaseAdapter,
     );
@@ -430,7 +432,8 @@ describe("SQLite adapter driver binding", () => {
                 return () => {
                   if (failCheckout) throw new Error("checkout boom");
                 };
-              return Reflect.get(target, prop, receiver);
+              const value = Reflect.get(target, prop, target);
+              return typeof value === "function" ? value.bind(target) : value;
             },
           }) as unknown as DatabaseAdapter,
       ),
@@ -486,7 +489,8 @@ describe("SQLite adapter driver binding", () => {
           return (source: string, opts?: { simple?: boolean }) =>
             Promise.resolve(target.pragma(source, opts));
         }
-        return Reflect.get(target, prop, receiver);
+        const value = Reflect.get(target, prop, target);
+        return typeof value === "function" ? value.bind(target) : value;
       },
     }) as unknown as SqliteConnection;
   });

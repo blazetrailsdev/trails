@@ -1826,8 +1826,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /** @internal */
   private async _doAsyncConnect(): Promise<void> {
     await this.connectAsync();
-    await this.configureConnection();
     this._asyncConnectPending = false;
+    await this.configureConnection();
   }
 
   /** @noRailsEquivalent PERMANENT */
