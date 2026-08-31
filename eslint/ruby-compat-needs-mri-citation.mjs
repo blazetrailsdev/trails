@@ -103,6 +103,14 @@ function fileLevelBlock(sourceCode) {
   return null;
 }
 
+/**
+ * Report the two halves of the package contract on one exported declaration.
+ *
+ * The receipt is read LINE-LEADING, as `extract-ts-api.ts`'s extractor credits
+ * it: a tag written on a hang-indented continuation line reads fine to a human,
+ * used to be reported by neither reader, and dropped the member from the
+ * measured surface (RFC 0129; `jsdoc-tag-line.mjs`).
+ */
 function check(context, node, name) {
   if (!name) return;
   const root = vendorRoot(context);
@@ -114,9 +122,6 @@ function check(context, node, name) {
   const blocks = [docBlockFor(target, sourceCode), fileLevelBlock(sourceCode)].filter(Boolean);
   const text = blocks.map((c) => c.value).join("\n");
 
-  // Line-leading, as `extract-ts-api.ts`'s extractor credits it: a tag written
-  // on a hang-indented continuation line reads fine to a human, is reported by
-  // neither, and drops the member from the measured surface (RFC 0129).
   if (!lineLeadingTagReasons(text, "noRailsEquivalent").some((r) => /^PERMANENT\b/.test(r))) {
     context.report({ node: target, messageId: "missingReceipt", data: { name } });
     return;

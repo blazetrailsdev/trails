@@ -110,10 +110,10 @@ describe("forwardCredits", () => {
   });
 });
 
+/** The extractor stamps a barrel clone with the DECLARING entry's file and line
+ *  (`extract-ts-api.ts:1017`), so a re-export used to report as a second
+ *  declaration site at `index.ts` carrying the original line. */
 describe("declarations", () => {
-  // The extractor stamps a barrel clone with the DECLARING entry's file and
-  // line (`extract-ts-api.ts:1017`), so a re-export used to report as a second
-  // declaration site at `index.ts` carrying the original line.
   const reExporting: TsApi = {
     packages: {
       activesupport: {

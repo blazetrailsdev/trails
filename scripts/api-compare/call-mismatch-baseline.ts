@@ -186,15 +186,17 @@ export function flattenArtifact(artifact: Artifact): CallMismatchKey[] {
   return keys;
 }
 
-export interface DiffResult {
-  added: CallMismatchKey[]; // flagged now, not in baseline — the ratchet failure
+export interface DiffResult<T extends CallMismatchKey = CallMismatchKey> {
+  added: T[]; // flagged now, not in baseline — the ratchet failure
   stale: ExcludeEntry[]; // in baseline, no longer flags — the only-shrink failure
 }
 
-export function diffAgainstBaseline(
-  current: CallMismatchKey[],
+/** Generic in the row type so a gate over a richer key (RFC 0129's rubyCompat
+ *  rows carry the ruby-compat export beside the key) gets its own rows back. */
+export function diffAgainstBaseline<T extends CallMismatchKey>(
+  current: T[],
   baseline: ExcludeEntry[],
-): DiffResult {
+): DiffResult<T> {
   const currentKeys = new Set(current.map(keyOf));
   const baselineKeys = new Set(baseline.map(keyOf));
   return {

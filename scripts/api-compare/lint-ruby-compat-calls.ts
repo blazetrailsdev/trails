@@ -34,6 +34,8 @@ import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import {
   type Artifact,
   type ExcludeEntry,
+  diffAgainstBaseline,
+  keyOf,
   missingScope,
   rowsOfKind,
 } from "./call-mismatch-baseline.js";
@@ -68,17 +70,9 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
  */
 export const ENROLLED_PACKAGES: readonly string[] = ["activesupport", "i18n"];
 
-/** Keyed like the shared shards, plus the export the body should have called —
- *  which is not part of the identity, since one call resolves to one export. */
-export function keyOf(k: {
-  package: string;
-  tsFile: string;
-  rubyName: string;
-  call: string;
-}): string {
-  return `${k.package} ${k.tsFile} ${k.rubyName} ${k.call}`;
-}
-
+/** One row as the gate prints it — the shard key plus the export the body
+ *  should have called, which is not part of the identity since one Ruby call
+ *  resolves to one export. */
 export function renderKey(k: RubyCompatKey): string {
   return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call} → ${k.tsExport}`;
 }
@@ -96,25 +90,15 @@ export async function loadBaseline(dir: string = BASELINE_DIR): Promise<ExcludeE
   return enrolled(rowsOfKind(merged, "rubyCompat"));
 }
 
-export interface DiffResult {
-  added: RubyCompatKey[];
-  stale: ExcludeEntry[];
-}
-
-export function diff(current: RubyCompatKey[], baseline: ExcludeEntry[]): DiffResult {
-  const currentKeys = new Set(current.map(keyOf));
-  const baselineKeys = new Set(baseline.map(keyOf));
-  return {
-    added: current.filter((k) => !baselineKeys.has(keyOf(k))),
-    stale: baseline.filter((e) => !currentKeys.has(keyOf(e))),
-  };
-}
-
+/**
+ * Gate the enrolled slice of the artifact against the baseline.
+ *
+ * The scope check is the RFC 0044 determinism guard the other two gates carry:
+ * an artifact covering fewer packages than CI must not pass a gate.
+ */
 export async function main(): Promise<number> {
   const artifact = JSON.parse(await fs.readFile(ARTIFACT_PATH, "utf-8")) as Artifact;
 
-  // Determinism guard (RFC 0044), shared with the other two gates: an artifact
-  // covering fewer packages than CI must not pass a gate.
   const absent = missingScope({ packages: artifact.packages, mismatches: [] });
   if (absent.length > 0) {
     console.error(
@@ -127,7 +111,7 @@ export async function main(): Promise<number> {
 
   const current = enrolled(reverseRows(artifact));
   const baseline = await loadBaseline();
-  const { added, stale } = diff(current, baseline);
+  const { added, stale } = diffAgainstBaseline(current, baseline);
 
   if (added.length === 0 && stale.length === 0) {
     console.log(
