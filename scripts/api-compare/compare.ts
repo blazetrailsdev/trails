@@ -2172,6 +2172,24 @@ function nearestNamespaceMatch(
  * lexical scope, then the ancestry chain, then top-level, then `NameError`.
  * The return type is `string` rather than `string[]` to keep that structural.
  *
+ * The ANCESTRY step is deliberately not implemented, on a measurement. Ruby
+ * binds `class Sub < Base; include Foo` to `Base::Foo` when `Sub`'s own
+ * namespaces do not answer `Foo`, and `ClassInfo.superclass` is on the
+ * entities both callers iterate, so the step is buildable. Swept over the real
+ * `output/rails-api.json` — every `includes`/`extends` site on every class and
+ * module of all 15 packages, 784 sites — 280 resolve to a name absent from
+ * `rubyPkg.modules` (the case where a missed binding costs expected surface),
+ * and for ZERO of them does a walk up the `superclass` chain, trying each
+ * ancestor's namespace prefixes, find a module the lexical walk missed. The 11
+ * sites where an ancestor's namespace does answer the name — `Arel::Nodes::In`
+ * including `FetchAttribute`, `PostgreSQL::TableDefinition` including
+ * `ColumnMethods`, `Rails::Command::CredentialsCommand` including
+ * `Helpers::Editor` — are every one of them already bound by the lexical walk,
+ * because the ancestor shares the includer's own enclosing namespace. So the
+ * step would move no method onto any host, and adding it is unexercised
+ * machinery. Same disposition PR #5354 gave the ambiguous-fallback arm below;
+ * re-measure before building it, rather than assuming it is still empty.
+ *
  * Every consumer of `moduleFqnByShort` resolves through here —
  * `flattenIncludedMethodInfos` (expected surface) and `buildModuleIncluderFqns`
  * (where that surface may be implemented). A broader lookup in either one lets

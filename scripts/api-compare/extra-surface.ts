@@ -249,13 +249,23 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  * counterpart actually writes the `include` — a `detect` on a class that does
  * not include Enumerable stays flagged.
  *
- * Values are `Enumerable.instance_methods(false)` (Ruby 3.4). An
- * ActiveSupport core_ext reopening of the same module (`index_by`,
- * `compact_blank` in `core_ext/enumerable.rb`) is a real `def` in a vendored
- * gem and already resolves through the normal module walk — this table adds
- * only what the interpreter supplies.
+ * Values are `Enumerable.instance_methods(false)` / `Comparable
+ * .instance_methods(false)` (Ruby 3.4). An ActiveSupport core_ext reopening of
+ * the same module (`index_by`, `compact_blank` in `core_ext/enumerable.rb`) is
+ * a real `def` in a vendored gem and already resolves through the normal
+ * module walk — this table adds only what the interpreter supplies.
  */
 const CORE_MIXIN_METHODS: Record<string, string[]> = {
+  // `include Comparable` derives the whole comparison set from the single
+  // `<=>` the class defines, so none of these has a `def` either. Five Rails
+  // classes include it: `AbstractAdapter::Version`
+  // (connection_adapters/abstract_adapter.rb:245), `ActiveModel::Name`
+  // (naming.rb:150), `Multibyte::Chars` (multibyte/chars.rb:16),
+  // `TimeWithZone` (time_with_zone.rb:44) and `TimeZone`
+  // (values/time_zone.rb:31). `<=>` itself is NOT listed: it is a real `def`
+  // on each of them and already resolves through the normal walk (spelled
+  // `compare` by MIRROR_CANDIDATE_OVERRIDES).
+  Comparable: ["<", "<=", "==", ">", ">=", "between?", "clamp"],
   Enumerable: [
     "all?",
     "any?",
@@ -319,6 +329,29 @@ const CORE_MIXIN_METHODS: Record<string, string[]> = {
     "uniq",
     "zip",
   ],
+};
+
+/**
+ * TS spellings for the OPERATOR members of a CORE_MIXIN_METHODS entry.
+ *
+ * `rubyMethodToTs` refuses every operator, and MIRROR_CANDIDATE_OVERRIDES —
+ * the table that rescues `==`, `<=>`, `+` — is keyed by Ruby name across the
+ * whole surface, so a `<` entry there would allow `lt` in any file whose Ruby
+ * defines `def <`. A derived operator has no `def` anywhere, so it needs no
+ * such reach: this map is consulted ONLY for names arriving through a core
+ * mixin, which keeps the allowance scoped to the files whose Ruby counterpart
+ * actually writes the `include`.
+ *
+ * These are the spellings trails uses for the comparison operators (`gte` on
+ * `Arel::Predications#gteq`'s siblings, `lt`/`gt` on the same set); `==` is
+ * already `equals` through MIRROR_CANDIDATE_OVERRIDES and `between?`/`clamp`
+ * carry ordinary names the base mapper spells.
+ */
+const CORE_MIXIN_OPERATOR_SPELLINGS: Record<string, string[]> = {
+  "<": ["lt"],
+  "<=": ["lteq"],
+  ">": ["gt"],
+  ">=": ["gte"],
 };
 
 const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {
@@ -1483,7 +1516,10 @@ function collectAllowedNames(
     // gem `def`s — see CORE_MIXIN_METHODS. Added before the module lookup
     // because the same name can ALSO be a vendored core_ext reopening, which
     // contributes its own `def`s through the walk below.
-    for (const name of CORE_MIXIN_METHODS[fqn] ?? []) addRubyName(name, target);
+    for (const name of CORE_MIXIN_METHODS[fqn] ?? []) {
+      for (const c of CORE_MIXIN_OPERATOR_SPELLINGS[name] ?? []) target.add(c);
+      addRubyName(name, target);
+    }
     for (const inc of HOOK_INJECTED_MIXINS[fqn]?.includes ?? [])
       walkMixin(inc, fqn, target, methodFile);
     // Fall back to the cross-package map: a railtie-injected mixin (see
