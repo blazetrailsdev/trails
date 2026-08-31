@@ -219,6 +219,7 @@ export class ForeignKeyDefinition {
   readonly onUpdate?: ReferentialAction;
   readonly deferrable?: "immediate" | "deferred" | false;
   readonly validate: boolean | null;
+  readonly options: Record<string, unknown>;
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
@@ -256,15 +257,11 @@ export class ForeignKeyDefinition {
     this.storedOptionKeys = new Set(
       storedOptionKeys ?? ["column", "name", "primaryKey", "onDelete", "onUpdate", "deferrable"],
     );
-  }
-
-  get options(): Record<string, unknown> {
-    const options: Record<string, unknown> = {};
+    this.options = {};
     for (const key of this.storedOptionKeys) {
-      options[key] = (this as unknown as Record<string, unknown>)[key];
+      this.options[key] = (this as unknown as Record<string, unknown>)[key];
     }
-    if (this.storesValidate) options["validate"] = this.validate;
-    return options;
+    if (this.storesValidate) this.options["validate"] = this.validate;
   }
 
   get isCustomPrimaryKey(): boolean {
