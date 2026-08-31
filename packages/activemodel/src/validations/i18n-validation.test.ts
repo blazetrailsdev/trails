@@ -12,7 +12,7 @@ import { include } from "@blazetrails/activesupport";
 
 describe("I18nValidationTest", () => {
   const originalI18nCustomizeFullMessage = ModelError.i18nCustomizeFullMessage;
-  let oldLoadPath: string[];
+  let oldLoadPath: (string | string[])[];
   beforeEach(() => {
     oldLoadPath = [...I18n.loadPath()];
     resetI18n();

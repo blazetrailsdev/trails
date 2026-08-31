@@ -249,6 +249,25 @@ export interface KindHistogram {
 }
 
 /**
+ * Kinds the histogram diff folds onto a coarser twin, on BOTH sides.
+ *
+ * Identity folds onto equality: `assert_same` is `Object.is`, which vitest
+ * spells `toBe` — the very matcher a port also uses for `assert_equal` on a
+ * primitive — so TRAILS_MAP scores `toBe` as `equal` and the only trails
+ * spelling that scores `same` is the `assertSame` helper
+ * (activesupport/src/testing/assertions.ts:605). A package activesupport
+ * itself depends on — i18n, date, ruby-compat — cannot import that helper, so
+ * without the fold every faithful port of an `assert_same` down there is a
+ * permanent false mismatch. Folding both sides leaves an `assertSame` port
+ * matching too. The value comparer normalizes separately and still tells the
+ * two apart.
+ */
+const HISTOGRAM_FOLD: Partial<Record<CanonicalKind, CanonicalKind>> = {
+  same: "equal",
+  notSame: "notEqual",
+};
+
+/**
  * Fold a list of raw kind tokens into a normalized-kind histogram, collecting
  * the tokens that don't map. `side` selects the normalizer.
  */
@@ -257,7 +276,8 @@ export function buildHistogram(kinds: string[], side: "rails" | "trails"): KindH
   const histogram: Record<string, number> = {};
   const unmapped = new Set<string>();
   for (const raw of kinds) {
-    const canonical = normalize(raw);
+    const normalized = normalize(raw);
+    const canonical = normalized ? (HISTOGRAM_FOLD[normalized] ?? normalized) : normalized;
     if (canonical) histogram[canonical] = (histogram[canonical] ?? 0) + 1;
     else unmapped.add(raw);
   }

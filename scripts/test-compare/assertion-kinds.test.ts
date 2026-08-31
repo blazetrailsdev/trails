@@ -84,6 +84,13 @@ describe("normalizeTrailsKind", () => {
 });
 
 describe("buildHistogram", () => {
+  it("folds identity onto equality on both sides", () => {
+    expect(buildHistogram(["assert_same"], "rails").histogram).toEqual({ equal: 1 });
+    expect(buildHistogram(["assertSame"], "trails").histogram).toEqual({ equal: 1 });
+    expect(buildHistogram(["toBe"], "trails").histogram).toEqual({ equal: 1 });
+    expect(buildHistogram(["refute_same"], "rails").histogram).toEqual({ notEqual: 1 });
+  });
+
   it("counts normalized kinds and collects unmapped tokens", () => {
     const h = buildHistogram(
       ["assert_equal", "assert_equal", "assert_nil", "assert_cycle"],

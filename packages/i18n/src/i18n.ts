@@ -168,11 +168,11 @@ export function setExceptionHandler(value: ExceptionHandlerLike): void {
   config().exceptionHandler = value;
 }
 
-export function loadPath(): string[] {
+export function loadPath(): (string | string[])[] {
   return config().loadPath;
 }
 
-export async function setLoadPath(value: string[]): Promise<void> {
+export async function setLoadPath(value: (string | string[])[]): Promise<void> {
   await config().setLoadPath(value);
 }
 
