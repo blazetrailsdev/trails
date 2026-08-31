@@ -62,10 +62,11 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
  * seed a red across nine packages and block every unrelated PR, which is why
  * enrollment is per-package work rather than one flip.
  *
- * `i18n` and `activesupport` go first because they are the smallest and their
- * populations were already converged by `ruby-compat-symbol-conventions` and
- * `move-regexp-escape-to-ruby-compat` — i18n at zero rows, activesupport at the
- * one `inflector/inflections.ts` `to_regex` row this story converges. The rest
+ * `i18n` and `activesupport` go first because they are the smallest and because
+ * most of their rows are already gone: `ruby-compat-symbol-conventions` and
+ * `move-regexp-escape-to-ruby-compat` landed the shared imports that drained
+ * them. i18n enrolls at zero rows, activesupport at the one
+ * `inflector/inflections.ts` `to_regex` row this story converges. The rest
  * follow under `enroll-call-mapping-remaining-packages`.
  */
 export const ENROLLED_PACKAGES: readonly string[] = ["activesupport", "i18n"];
