@@ -249,6 +249,16 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  * counterpart actually writes the `include` — a `detect` on a class that does
  * not include Enumerable stays flagged.
  *
+ * `Comparable` is the same shape from a smaller module: it derives the whole
+ * comparison set from the single `<=>` the class defines. Five Rails classes
+ * include it — `AbstractAdapter::Version`
+ * (`connection_adapters/abstract_adapter.rb:244`), `ActiveModel::Name`
+ * (`naming.rb:10`), `Multibyte::Chars` (`multibyte/chars.rb:48`),
+ * `TimeWithZone` (`time_with_zone.rb:48`) and `TimeZone`
+ * (`values/time_zone.rb:295`). `<=>` itself is NOT listed here: it is a real
+ * `def` on each of them and already resolves through the normal module walk,
+ * spelled `compare` by MIRROR_CANDIDATE_OVERRIDES.
+ *
  * Values are `Enumerable.instance_methods(false)` / `Comparable
  * .instance_methods(false)` (Ruby 3.4). An ActiveSupport core_ext reopening of
  * the same module (`index_by`, `compact_blank` in `core_ext/enumerable.rb`) is
@@ -256,15 +266,6 @@ const HOOK_INJECTED_MIXINS: Record<string, { includes: string[] }> = {
  * module walk — this table adds only what the interpreter supplies.
  */
 const CORE_MIXIN_METHODS: Record<string, string[]> = {
-  // `include Comparable` derives the whole comparison set from the single
-  // `<=>` the class defines, so none of these has a `def` either. Five Rails
-  // classes include it: `AbstractAdapter::Version`
-  // (connection_adapters/abstract_adapter.rb:245), `ActiveModel::Name`
-  // (naming.rb:150), `Multibyte::Chars` (multibyte/chars.rb:16),
-  // `TimeWithZone` (time_with_zone.rb:44) and `TimeZone`
-  // (values/time_zone.rb:31). `<=>` itself is NOT listed: it is a real `def`
-  // on each of them and already resolves through the normal walk (spelled
-  // `compare` by MIRROR_CANDIDATE_OVERRIDES).
   Comparable: ["<", "<=", "==", ">", ">=", "between?", "clamp"],
   Enumerable: [
     "all?",
@@ -337,21 +338,24 @@ const CORE_MIXIN_METHODS: Record<string, string[]> = {
  * `rubyMethodToTs` refuses every operator, and MIRROR_CANDIDATE_OVERRIDES —
  * the table that rescues `==`, `<=>`, `+` — is keyed by Ruby name across the
  * whole surface, so a `<` entry there would allow `lt` in any file whose Ruby
- * defines `def <`. A derived operator has no `def` anywhere, so it needs no
- * such reach: this map is consulted ONLY for names arriving through a core
+ * writes `def <`. A DERIVED operator has no `def` anywhere, so it needs no
+ * such reach: this map is consulted only for names arriving through a core
  * mixin, which keeps the allowance scoped to the files whose Ruby counterpart
  * actually writes the `include`.
  *
- * These are the spellings trails uses for the comparison operators (`gte` on
- * `Arel::Predications#gteq`'s siblings, `lt`/`gt` on the same set); `==` is
- * already `equals` through MIRROR_CANDIDATE_OVERRIDES and `between?`/`clamp`
- * carry ordinary names the base mapper spells.
+ * The names are Rails' own vocabulary for these four comparisons, taken from
+ * `Arel::Predications` (`arel/predications.rb:163,175,187,199` — `gteq`, `gt`,
+ * `lt`, `lteq`), plus `gte`, which is what the retired
+ * `AbstractAdapter::Version` port spelled `>=`. Listing both spellings of a
+ * comparison is a no-op: a file is scored on the names it actually declares.
+ * `==` is already `equals` through MIRROR_CANDIDATE_OVERRIDES, and
+ * `between?` / `clamp` carry ordinary names the base mapper spells.
  */
 const CORE_MIXIN_OPERATOR_SPELLINGS: Record<string, string[]> = {
   "<": ["lt"],
-  "<=": ["lteq"],
+  "<=": ["lteq", "lte"],
   ">": ["gt"],
-  ">=": ["gte"],
+  ">=": ["gteq", "gte"],
 };
 
 const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {
