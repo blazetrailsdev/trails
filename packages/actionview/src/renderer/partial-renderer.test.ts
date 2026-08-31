@@ -38,7 +38,7 @@ describe("PartialRenderer", () => {
       ctx,
       undefined,
     );
-    expect(fake.render).toHaveBeenCalledWith({ name: "Alice" }, ctx);
+    expect(fake.render).toHaveBeenCalledWith(ctx, { name: "Alice" });
   });
 
   it("looks up partial with underscore prefix", async () => {
@@ -69,7 +69,7 @@ describe("ObjectRenderer", () => {
     vi.spyOn(lc, "findPartial").mockReturnValue(fake as never);
     const user = { name: "Alice" };
     await new ObjectRenderer(lc).renderObjectWithPartial(user, "users/user", ctx, undefined);
-    expect(fake.render).toHaveBeenCalledWith(expect.objectContaining({ user }), ctx);
+    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ user }));
   });
 
   it("binds object under the as: option name", async () => {
@@ -82,7 +82,7 @@ describe("ObjectRenderer", () => {
       ctx,
       undefined,
     );
-    expect(fake.render).toHaveBeenCalledWith(expect.objectContaining({ person: user }), ctx);
+    expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ person: user }));
   });
 
   it("derives partial path from toPartialPath()", async () => {
@@ -141,7 +141,7 @@ describe("CollectionRenderer", () => {
     const fake: RenderableTemplate = {
       identifier: "f",
       format: "html",
-      render: vi.fn().mockImplementation((l: Record<string, unknown>) => {
+      render: vi.fn().mockImplementation((_view: unknown, l: Record<string, unknown>) => {
         calls.push({ ...l });
         return Promise.resolve("x");
       }),
@@ -163,7 +163,7 @@ describe("CollectionRenderer", () => {
     const fake: RenderableTemplate = {
       identifier: "f",
       format: "html",
-      render: vi.fn().mockImplementation((l: Record<string, unknown>) => {
+      render: vi.fn().mockImplementation((_view: unknown, l: Record<string, unknown>) => {
         calls.push({ ...l });
         return Promise.resolve("x");
       }),

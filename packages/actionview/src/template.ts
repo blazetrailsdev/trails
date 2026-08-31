@@ -125,8 +125,8 @@ export class Template {
    * are wrapped in {@link TemplateError} so AP's ExceptionWrapper can
    * unwrap to the original cause. */
   async render(
+    view: Partial<RenderContext> = {},
     locals: Record<string, unknown> = {},
-    context: Partial<RenderContext> = {},
   ): Promise<string> {
     // Touch strict locals so the magic comment is stripped before the
     // handler sees the source — matches Rails' compile order.
@@ -142,12 +142,12 @@ export class Template {
 
     try {
       return await handler.render(this._source, locals, {
-        ...context,
-        controller: context.controller ?? "",
-        action: context.action ?? "",
-        format: context.format ?? this.format ?? "",
-        yield: context.yield,
-        templatePath: context.templatePath ?? this.fullPath ?? this.identifier,
+        ...view,
+        controller: view.controller ?? "",
+        action: view.action ?? "",
+        format: view.format ?? this.format ?? "",
+        yield: view.yield,
+        templatePath: view.templatePath ?? this.fullPath ?? this.identifier,
       });
     } catch (e) {
       if (e instanceof TemplateError) throw e;

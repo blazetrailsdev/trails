@@ -5,7 +5,14 @@
  * flash, CSRF, content negotiation, caching, rescue, and more.
  */
 
-import { getFs, getPath, getCrypto, Notifications, runLoadHooks } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  getFs,
+  getPath,
+  getCrypto,
+  Notifications,
+  runLoadHooks,
+} from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -393,10 +400,16 @@ export class Base extends Metal {
 
   // --- Content Negotiation ---
 
-  /** Content negotiation via respond_to. */
-  respondTo(block: (collector: Collector) => void): void {
-    const collector = new Collector();
-    block(collector);
+  /** Mirrors: `respond_to(*mimes)` (`metal/mime_responds.rb:211-228`). */
+  respondTo(...mimes: Array<string | ((collector: Collector) => void)>): void {
+    const last = mimes[mimes.length - 1];
+    const block = typeof last === "function" ? (mimes.pop() as (c: Collector) => void) : undefined;
+    if (mimes.length > 0 && block) {
+      throw new ArgumentError("respond_to takes either types or a block, never both");
+    }
+
+    const collector = new Collector(mimes as string[], this.request?.variant ?? null);
+    if (block) block(collector);
 
     const format = this.request?.format?.symbol ?? undefined;
     const accept = this.request?.getHeader("accept") ?? undefined;
@@ -487,14 +500,13 @@ export class Base extends Metal {
 
     this.beforeAction(async function (controller): Promise<boolean> {
       const base = controller as Base;
-      const userAgent = base.request?.getHeader("user-agent") ?? "";
-      const blocker = new BrowserBlocker(userAgent, versions);
+      const blocker = new BrowserBlocker(base.request, versions);
       if (!blocker.blocked) return true;
 
       await Notifications.instrumentAsync(
         "browser_block.action_controller",
         {
-          user_agent: userAgent,
+          user_agent: base.request?.userAgent ?? "",
           method: base.request?.method ?? "GET",
           path: base.request?.path ?? "/",
           versions,

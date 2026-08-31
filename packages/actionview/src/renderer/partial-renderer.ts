@@ -23,7 +23,7 @@ export class PartialRenderer extends AbstractRenderer {
   async render(partial: string, context: ViewContext, _block: unknown): Promise<RenderedTemplate> {
     const locals = { ...(this.options.locals ?? {}) };
     const template = this.findTemplate(partial);
-    const body = await template.render(locals, context);
+    const body = await template.render(context, locals);
     return this.buildRenderedTemplate(body, template);
   }
 

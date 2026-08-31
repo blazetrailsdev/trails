@@ -72,6 +72,7 @@ import {
   type ParametersHost,
 } from "./parameters.js";
 import { Headers as HttpHeaders } from "./headers.js";
+import { _setRequestCtor } from "./request-slot.js";
 
 const FLASH_HASH_KEY = "action_dispatch.request.flash_hash";
 const ACTION_DISPATCH_REQUEST_ID = "action_dispatch.request_id";
@@ -163,20 +164,9 @@ export class Request {
    * `Rack::Request::Env#initialize` (`rack/request.rb:62-65`)
    * and keeps `env` by reference — the semantics `set_header` writes through, so a write made on
    * one `Request` is visible to the middleware downstream of it.
-   *
-   * The Rack minimums are filled in here because Rails' request tests get them
-   * from `Rack::MockRequest.env_for` (`request_test.rb:26`), which has no trails
-   * equivalent.
    */
   constructor(env: RackEnv = {}) {
     this.env = env;
-    this.env["REQUEST_METHOD"] ??= "GET";
-    this.env["SERVER_NAME"] ??= "localhost";
-    this.env["SERVER_PORT"] ??= "80";
-    this.env["PATH_INFO"] ??= "/";
-    this.env["QUERY_STRING"] ??= "";
-    this.env["rack.url_scheme"] ??= "http";
-    this.env["rack.input"] ??= "";
   }
 
   // --- HTTP method ---
@@ -279,7 +269,7 @@ export class Request {
     }
     return (
       (this.getHeader("HTTP_HOST") as string) ||
-      `${this.getHeader("SERVER_NAME")}:${this.getHeader("SERVER_PORT")}`
+      `${this.getHeader("SERVER_NAME") ?? ""}:${this.getHeader("SERVER_PORT") ?? ""}`
     );
   }
 
@@ -414,7 +404,13 @@ export class Request {
   get format(): MimeType | NullType {
     return _format.call(mimeHost(this));
   }
-  set format(extension: unknown) {
+  /**
+   * Rails' `format=` (`http/mime_negotiation.rb:115`). Spelled `setFormat` so
+   * the reader stays a 0-arg property mirroring `format(_view_path = nil)`
+   * (`mime_negotiation.rb:63`) — a TS accessor pair cannot carry both Ruby
+   * signatures.
+   */
+  setFormat(extension: unknown): void {
     mimeHost(this).format = extension;
   }
   get formats(): MimeType[] {
@@ -655,6 +651,25 @@ export class Request {
     return value;
   }
 
+  /**
+   * Adds `v` to a multivalued env slot, comma-joining an existing value.
+   * Mirrors `Rack::Request::Env#add_header` (`rack/request.rb:129-137`).
+   */
+  addHeader(key: string, v: unknown): unknown {
+    if (v == null) {
+      return this.getHeader(key);
+    } else if (this.hasHeader(key)) {
+      return this.setHeader(key, `${this.getHeader(key)},${v}`);
+    } else {
+      return this.setHeader(key, v);
+    }
+  }
+
+  /** Mirrors `Rack::Request::Env#each_header` (`rack/request.rb:111-113`). */
+  eachHeader(block: (key: string, value: unknown) => void): void {
+    for (const [key, value] of Object.entries(this.env)) block(key, value);
+  }
+
   /** @internal Rails: `request.controller_instance` (request.rb:190-192). */
   get controllerInstance(): unknown {
     return this.getHeader("action_controller.instance");
@@ -760,7 +775,7 @@ export class Request {
   // --- Headers wrapper ---
 
   get headers(): HttpHeaders {
-    return new HttpHeaders(this.env as Record<string, unknown>);
+    return new HttpHeaders(this);
   }
 
   // --- Method symbol ---
@@ -1265,3 +1280,5 @@ Request.prototype.isParamsReadable = function (this: Request) {
 };
 
 _setActionDispatchRequest(Request as unknown as ActionDispatchRequestConstructor);
+
+_setRequestCtor(Request);

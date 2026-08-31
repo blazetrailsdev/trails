@@ -47,7 +47,7 @@ describe("TemplateRenderer", () => {
         locals: { name: "Alice" },
       });
       expect(result.body).toBe("Hello Alice");
-      expect(fake.render).toHaveBeenCalledWith({ name: "Alice" }, ctx);
+      expect(fake.render).toHaveBeenCalledWith(ctx, { name: "Alice" });
     });
   });
 

@@ -60,7 +60,7 @@ export class CollectionRenderer extends PartialRenderer {
           ? this.options.spacerTemplate
           : `${prefix}/${this.options.spacerTemplate}`;
       const spacerTmpl = this.findTemplate(spacerPath);
-      spacerBody = await spacerTmpl.render({ ...baseLocals }, context);
+      spacerBody = await spacerTmpl.render(context, { ...baseLocals });
     }
 
     const iteration = new PartialIteration(collection.length);
@@ -73,7 +73,7 @@ export class CollectionRenderer extends PartialRenderer {
         [counterKey]: iteration.index,
         [iterationKey]: iteration,
       };
-      parts.push(await template.render(locals, context));
+      parts.push(await template.render(context, locals));
       iteration.iterate();
     }
 
@@ -110,7 +110,7 @@ export class CollectionRenderer extends PartialRenderer {
         [`${itemAs}_counter`]: iteration.index,
         [`${itemAs}_iteration`]: iteration,
       };
-      parts.push(await template.render(locals, context));
+      parts.push(await template.render(context, locals));
       iteration.iterate();
     }
     return this.buildRenderedTemplate(parts.join(""), lastTemplate);

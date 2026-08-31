@@ -122,7 +122,7 @@ describe("RequestPath", () => {
 
 describe("RequestHost", () => {
   it("host without specifying port", () => {
-    const req = new Request({ SERVER_NAME: "example.com" });
+    const req = new Request({ HTTP_HOST: "example.com" });
     expect(req.host).toBe("example.com");
   });
 

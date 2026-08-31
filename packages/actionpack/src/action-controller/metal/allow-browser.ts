@@ -8,6 +8,8 @@
 
 import { UAParser } from "ua-parser-js";
 
+import type { Request } from "../../action-dispatch/http/request.js";
+
 export type BrowserVersions = "modern" | Record<string, string | false>;
 
 const SETS: Record<string, Record<string, string | false>> = {
@@ -15,14 +17,20 @@ const SETS: Record<string, Record<string, string | false>> = {
 };
 
 export class BrowserBlocker {
-  private _userAgent: string;
+  private _request: Request;
   private _versions: BrowserVersions;
   private _parsed?: UAParser;
   private _expanded?: Record<string, string | false>;
 
-  constructor(userAgentString: string, versions: BrowserVersions) {
-    this._userAgent = userAgentString;
+  /** Mirrors: `BrowserBlocker#initialize` (`metal/allow_browser.rb:80-82`). */
+  constructor(request: Request, versions: BrowserVersions) {
+    this._request = request;
     this._versions = versions;
+  }
+
+  /** Mirrors: `attr_reader :request` (`metal/allow_browser.rb:78`). */
+  get request(): Request {
+    return this._request;
   }
 
   get versions(): Record<string, string | false> {
@@ -35,13 +43,13 @@ export class BrowserBlocker {
 
   /** @internal */
   parsedUserAgent(): UAParser {
-    this._parsed ??= new UAParser(this._userAgent);
+    this._parsed ??= new UAParser(this.request.userAgent);
     return this._parsed;
   }
 
   /** @internal */
   isUserAgentVersionReported(): boolean {
-    if (!this._userAgent) return false;
+    if (!this.request.userAgent) return false;
     const version = this.parsedUserAgent().getBrowser().version ?? "";
     return version.length > 0;
   }
@@ -58,7 +66,7 @@ export class BrowserBlocker {
 
   /** @internal */
   isBot(): boolean {
-    return /bot|crawl|spider|slurp/i.test(this._userAgent);
+    return /bot|crawl|spider|slurp/i.test(this.request.userAgent);
   }
 
   /** @internal */

@@ -74,10 +74,7 @@ export class TemplateRenderer extends AbstractRenderer {
     return this.renderWithLayout(view, template, layoutName, locals);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs render — CONVERGEABLE template-render-takes-view-before-locals
-   */
+  /** @internal */
   private async renderWithLayout(
     view: ViewContext,
     template: RenderableTemplate,
@@ -91,13 +88,13 @@ export class TemplateRenderer extends AbstractRenderer {
 
     let body: string;
     if (layout) {
-      const templateBody = await template.render(locals, view);
+      const templateBody = await template.render(view, locals);
       if (view.viewFlow) {
         view.viewFlow.set("layout", templateBody);
       }
-      body = await layout.render(locals, view);
+      body = await layout.render(view, locals);
     } else {
-      body = await template.render(locals, view);
+      body = await template.render(view, locals);
     }
     return this.buildRenderedTemplate(body, template);
   }

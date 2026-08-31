@@ -15,6 +15,16 @@ import { UnknownFormat } from "./exceptions.js";
 export { type FormatHandler };
 
 export class Collector extends DispatchCollector {
+  /**
+   * Mirrors: `Collector#initialize` (`metal/mime_responds.rb:255-260`), which
+   * seeds a response slot for each mime `respond_to` was called with.
+   */
+  constructor(mimes: string[] = [], variant: string | string[] | null = null) {
+    super();
+    if (variant != null) this.variant(variant);
+    for (const mime of mimes) this.custom(mime);
+  }
+
   get format(): string | null {
     return this.resolvedFormat;
   }
