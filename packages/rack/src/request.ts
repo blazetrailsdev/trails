@@ -1,5 +1,6 @@
 import {
   REQUEST_METHOD,
+  RACK_METHODOVERRIDE_ORIGINAL_METHOD,
   SERVER_NAME,
   SERVER_PORT,
   SERVER_PROTOCOL,
@@ -136,6 +137,11 @@ export class Request {
 
   has(key: string): boolean {
     return key in this.env;
+  }
+
+  /** Mirrors: `Rack::Request::Env#get_header` (`rack/request.rb:100-102`). */
+  getHeader(name: string): any {
+    return this.env[name];
   }
 
   get(key: string, defaultValue?: any): any {
@@ -340,14 +346,14 @@ export class Request {
       return {};
     }
 
-    const mt = this.mediaType;
-    if (!mt || (!FORM_DATA_MEDIA_TYPES.includes(mt) && !mt.startsWith("multipart/"))) {
+    if (!this.formData && !this.isParseableData()) {
       this.env[RACK_REQUEST_FORM_HASH] = {};
       return {};
     }
 
+    const mt = this.mediaType;
     // Multipart data (form-data, related, mixed, etc.)
-    if (mt.startsWith("multipart/")) {
+    if (mt !== null && mt.startsWith("multipart/")) {
       const parsed = this.parseMultipart();
       this.env[RACK_REQUEST_FORM_HASH] = parsed;
       this.env[RACK_REQUEST_FORM_INPUT] = input;
@@ -375,8 +381,13 @@ export class Request {
   }
 
   get formData(): boolean {
-    const mt = this.mediaType;
-    return mt !== null && FORM_DATA_MEDIA_TYPES.includes(mt);
+    const type = this.mediaType;
+    const meth =
+      this.getHeader(RACK_METHODOVERRIDE_ORIGINAL_METHOD) ?? this.getHeader(REQUEST_METHOD);
+
+    return (
+      (meth === POST && type === null) || (type !== null && FORM_DATA_MEDIA_TYPES.includes(type))
+    );
   }
 
   get formPairs(): [string, any][] {

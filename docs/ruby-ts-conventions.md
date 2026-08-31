@@ -212,6 +212,8 @@ a genuine gap:
   - `synchronize` (only in: `cache/memory_store.rb`)
 - FileStore#lock_file (file_store.rb:147-159) takes an advisory `File::LOCK_EX` flock around a read-modify-write so concurrent PROCESSES serialize on the entry file. There is no flock in the async fs surface trails is allowed to use (no node:\* imports), and no portable equivalent, so the increment/decrement path runs unguarded. Scoped to cache/file_store.rb.
   - `lock_file` (only in: `cache/file_store.rb`)
+- `Rack::Headers` aliases `key?` to `has_key?` (headers.rb:144-147). Dropping a predicate's `?` maps `key?` onto the TS spelling `key`, but `headers.ts` already spells `Hash#key(value)` — the value-to-key lookup Headers inherits rather than redefines, and which rack's own suite exercises — at that name, so the mapped site is occupied by a DIFFERENT Ruby method. The faithful port of the alias is `hasKey` (headers.ts:77), the port of the `has_key?` it aliases; a second declaration could only be a synonym under a name Rails does not have. Scoped to headers.rb so `key?` stays expected wherever the spelling is free. `include?` and `member?`, the other two aliases, map to free spellings and stay reported.
+  - `key?` (only in: `headers.rb`; ported in TS as `hasKey`)
 
 ## Ruby-only classes
 

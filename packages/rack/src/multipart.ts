@@ -131,7 +131,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
   // Skip any preamble - find first boundary
   const firstBoundaryIdx = findNextBoundary(body, delimiter, pos);
   if (firstBoundaryIdx === -1) {
-    throw new BoundaryTooLongError("multipart boundary not found within limit");
+    throw new EmptyContentError();
   }
 
   // Check for preceding data (invalid)
@@ -198,7 +198,10 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
 
     // Find header/body separator
     const headerEndIdx = bufferIndexOf(body, headerSep, headStart);
-    if (headerEndIdx === -1) break;
+    if (headerEndIdx === -1) {
+      if (headStart >= body.length) break;
+      throw new EmptyContentError();
+    }
 
     const headerBuf = body.subarray(headStart, headerEndIdx);
     const headerStr = headerBuf.toString("binary");
@@ -209,7 +212,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
     const nextBoundaryIdx = findNextBoundary(body, delimiter, bodyStart);
     let bodyEnd: number;
     if (nextBoundaryIdx === -1) {
-      bodyEnd = body.length;
+      throw new EmptyContentError();
     } else {
       // Body ends before the \r\n preceding the boundary
       bodyEnd = nextBoundaryIdx;

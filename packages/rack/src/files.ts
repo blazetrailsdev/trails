@@ -2,6 +2,7 @@ import { getFs, getPath } from "@blazetrails/activesupport";
 import type { FsStatResult } from "@blazetrails/activesupport";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { mimeType as lookupMime } from "./mime.js";
+import { Request } from "./request.js";
 
 const ALLOWED_VERBS = ["GET", "HEAD", "OPTIONS"];
 const ALLOW_HEADER = ALLOWED_VERBS.join(", ");
@@ -119,8 +120,8 @@ export class Files {
   }
 
   get(env: Record<string, any>): [number, Record<string, any>, any] {
-    const method = env["REQUEST_METHOD"];
-    if (!ALLOWED_VERBS.includes(method)) {
+    const request = new Request(env);
+    if (!ALLOWED_VERBS.includes(request.requestMethod)) {
       return this.fail(405, "Method Not Allowed", { allow: ALLOW_HEADER });
     }
 
@@ -147,13 +148,13 @@ export class Files {
       // not found or unreadable
     }
 
-    return isFile ? this.serving(env, resolved) : this.fail(404, `File not found: ${pathInfo}`);
+    return isFile ? this.serving(request, resolved) : this.fail(404, `File not found: ${pathInfo}`);
   }
 
-  serving(env: Record<string, any>, path: string): [number, Record<string, any>, any] {
-    const method = env["REQUEST_METHOD"];
+  serving(request: Request, path: string): [number, Record<string, any>, any] {
+    const method = request.requestMethod;
 
-    if (method === "OPTIONS") {
+    if (request.isOptions()) {
       return [200, { allow: ALLOW_HEADER, [CONTENT_LENGTH]: "0" }, []];
     }
 
@@ -167,7 +168,7 @@ export class Files {
     if (!stat.isFile()) return this.fail(404, "File not found");
 
     const lastModified = stat.mtime.toUTCString();
-    const ifModSince = env["HTTP_IF_MODIFIED_SINCE"];
+    const ifModSince = request.getHeader("HTTP_IF_MODIFIED_SINCE");
     const headers: Record<string, string> = { "last-modified": lastModified };
 
     if (ifModSince && new Date(ifModSince) >= stat.mtime) return [304, headers, []]; // boundary: HTTP-date vs mtime
@@ -176,7 +177,7 @@ export class Files {
     Object.assign(headers, this.headers);
 
     const size = this.filesize(path);
-    const rawRange = env["HTTP_RANGE"] as string | undefined;
+    const rawRange = request.getHeader("HTTP_RANGE") as string | undefined;
 
     if (rawRange && size > 0) {
       const ranges = this.parseByteRanges(rawRange, size);

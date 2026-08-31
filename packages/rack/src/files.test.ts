@@ -1,5 +1,6 @@
 import { it, expect, beforeAll, afterAll } from "vitest";
 import { Files } from "./files.js";
+import { Request } from "./request.js";
 import { MockRequest } from "./mock-request.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -229,7 +230,7 @@ it("return bodies that respond to #to_path", async () => {
   const app = makeApp();
   const env = MockRequest.envFor("/test.txt");
   const fullPath = path.join(tmpDir, "test.txt");
-  const [status, _headers, body] = app.serving(env, fullPath);
+  const [status, _headers, body] = app.serving(new Request(env), fullPath);
   expect(status).toBe(200);
   expect(typeof body.toPath).toBe("function");
   expect(body.toPath()).toBe(fullPath);

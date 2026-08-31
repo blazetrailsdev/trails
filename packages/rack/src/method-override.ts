@@ -1,11 +1,21 @@
-import {
-  REQUEST_METHOD,
-  RACK_METHODOVERRIDE_ORIGINAL_METHOD,
-  RACK_ERRORS,
-  RACK_INPUT,
-} from "./constants.js";
+import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
-import { parseNestedQuery } from "./utils.js";
+import { Request } from "./request.js";
+import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./query-parser.js";
+import { EmptyContentError } from "./multipart/parser.js";
+
+/**
+ * Rails writes to `rack.errors` with `puts`, which the Rack SPEC requires of an
+ * error stream; trails' lint accepts a `write`-only sink too (`lint.ts:171-173`),
+ * so both are fed.
+ */
+function putsError(errors: any, message: string): void {
+  if (errors && typeof errors.puts === "function") {
+    errors.puts(message);
+  } else if (errors && typeof errors.write === "function") {
+    errors.write(message + "\n");
+  }
+}
 
 const METHOD_OVERRIDE_PARAM_KEY = "_method";
 const HTTP_METHOD_OVERRIDE_HEADER = "HTTP_X_HTTP_METHOD_OVERRIDE";
@@ -36,70 +46,46 @@ export class MethodOverride {
   }
 
   private methodOverride(env: Record<string, any>): string | null {
-    const method = this.methodOverrideParam(env) || env[HTTP_METHOD_OVERRIDE_HEADER] || null;
+    const req = new Request(env);
+    const method = this.methodOverrideParam(req) || env[HTTP_METHOD_OVERRIDE_HEADER] || null;
     if (method) {
       try {
         return method.toString().toUpperCase();
       } catch {
-        const errors = env[RACK_ERRORS];
-        if (errors && typeof errors.puts === "function") {
-          errors.puts("Invalid string for method");
-        } else if (errors && typeof errors.write === "function") {
-          errors.write("Invalid string for method\n");
-        }
+        putsError(env[RACK_ERRORS], "Invalid string for method");
         return null;
       }
     }
     return null;
   }
 
-  private methodOverrideParam(env: Record<string, any>): string | null {
-    const contentType = env["CONTENT_TYPE"] || "";
-    const isFormData = contentType.includes("application/x-www-form-urlencoded");
-    const isMultipart = contentType.includes("multipart/form-data");
-
-    if (!isFormData && !isMultipart) return null;
-
+  /**
+   * Mirrors: `Rack::MethodOverride#method_override_param`
+   * (`rack/method_override.rb:48-54`). Its second rescue arm is `EOFError`,
+   * which `Multipart.parse_multipart` raises on a body whose terminating
+   * boundary never arrives — `Rack::Multipart::EmptyContentError < ::EOFError`
+   * (`rack/multipart/parser.rb:20`).
+   */
+  private methodOverrideParam(req: Request): string | null {
     try {
-      const input = env[RACK_INPUT];
-      if (!input) return null;
-      const body =
-        typeof input.read === "function" ? input.read() : typeof input === "string" ? input : "";
-      if (typeof body !== "string") return null;
-
-      if (isMultipart) {
-        // For multipart, we don't parse it here — just check for EOFError-like issues
-        // Ruby raises EOFError for truncated multipart, we simulate by checking
-        const boundary = contentType.match(/boundary=([^\s;]+)/)?.[1];
-        if (boundary && !body.includes(`--${boundary}--`)) {
-          const errors = env[RACK_ERRORS];
-          if (errors && typeof errors.puts === "function") {
-            errors.puts("Bad request content body");
-          } else if (errors && typeof errors.write === "function") {
-            errors.write("Bad request content body\n");
-          }
-          return null;
-        }
-        // Try to parse multipart params - simplified, just look for _method
-        return null;
-      }
-
-      // URL-encoded form data
-      const params = parseNestedQuery(body);
-      return params[METHOD_OVERRIDE_PARAM_KEY] || null;
-    } catch (e: any) {
-      const errors = env[RACK_ERRORS];
-      const msg = e.message?.includes("too deep")
-        ? "Invalid or incomplete POST params"
-        : e.message?.includes("Invalid")
-          ? "Invalid or incomplete POST params"
-          : "Bad request content body";
-      if (errors && typeof errors.puts === "function") {
-        errors.puts(msg);
-      } else if (errors && typeof errors.write === "function") {
-        errors.write(msg + "\n");
+      if (req.formData || req.isParseableData()) {
+        return req.POST[METHOD_OVERRIDE_PARAM_KEY] ?? null;
       }
       return null;
+    } catch (e) {
+      if (
+        e instanceof InvalidParameterError ||
+        e instanceof ParameterTypeError ||
+        e instanceof ParamsTooDeepError
+      ) {
+        putsError(req.getHeader(RACK_ERRORS), "Invalid or incomplete POST params");
+        return null;
+      }
+      if (e instanceof EmptyContentError) {
+        putsError(req.getHeader(RACK_ERRORS), "Bad request content body");
+        return null;
+      }
+      throw e;
     }
   }
 }

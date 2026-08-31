@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import { MethodOverride } from "./method-override.js";
 import { MockRequest } from "./mock-request.js";
+import { StringIO } from "@blazetrails/activesupport";
 
 const echoApp = async (env: Record<string, any>) => {
   return [200, { "content-type": "text/plain" }, [env["REQUEST_METHOD"]]] as [
@@ -64,23 +65,31 @@ it("store the original REQUEST_METHOD prior to overriding", async () => {
   expect(res.bodyString).toBe("POST");
 });
 
+const TRUNCATED_MULTIPART =
+  "--AaB03x\r\n" + 'content-disposition: form-data; name="huge"; filename="huge"\r\n';
+
 it("not modify REQUEST_METHOD when given invalid multipart form data", async () => {
-  const res = await new MockRequest((env) => makeApp().call(env)).post("/", {
-    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
-    input: "invalid multipart",
+  const env = MockRequest.envFor("/", {
+    CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+    CONTENT_LENGTH: String(TRUNCATED_MULTIPART.length),
+    method: "POST",
+    input: TRUNCATED_MULTIPART,
   });
-  expect(res.bodyString).toBe("POST");
+  await makeApp().call(env);
+  expect(env["REQUEST_METHOD"]).toBe("POST");
 });
 
 it("writes error to RACK_ERRORS when given invalid multipart form data", async () => {
-  const app = new MethodOverride(async (env) => {
-    return [200, {}, [env["REQUEST_METHOD"]]];
+  const errors = new StringIO();
+  const env = MockRequest.envFor("/", {
+    CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
+    CONTENT_LENGTH: String(TRUNCATED_MULTIPART.length),
+    "rack.errors": errors,
+    method: "POST",
+    input: TRUNCATED_MULTIPART,
   });
-  const res = await new MockRequest((env) => app.call(env)).post("/", {
-    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
-    input: "invalid",
-  });
-  expect(res.status).toBe(200);
+  await new MethodOverride(async () => [200, { "content-type": "text/plain" }, []]).call(env);
+  expect(errors.string()).toContain("Bad request content body");
 });
 
 it("writes error to RACK_ERRORS when using incompatible multipart encoding", async () => {

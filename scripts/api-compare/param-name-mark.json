@@ -15,10 +15,8 @@
     "byFile": {}
   },
   "actionview": {
-    "total": 1,
-    "byFile": {
-      "buffers.rb": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "activemodel": {
     "total": 0,
@@ -41,12 +39,8 @@
     "byFile": {}
   },
   "rack": {
-    "total": 3,
-    "byFile": {
-      "files.rb": 1,
-      "headers.rb": 1,
-      "method_override.rb": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "trailties": {
     "total": 0,

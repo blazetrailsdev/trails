@@ -1117,6 +1117,23 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
     names: ["lock_file"],
     rubyFiles: ["cache/file_store.rb"],
   },
+  {
+    reason:
+      "`Rack::Headers` aliases `key?` to `has_key?` (headers.rb:144-147). " +
+      "Dropping a predicate's `?` maps `key?` onto the TS spelling `key`, but " +
+      "`headers.ts` already spells `Hash#key(value)` — the value-to-key lookup " +
+      "Headers inherits rather than redefines, and which rack's own suite " +
+      "exercises — at that name, so the mapped site is occupied by a DIFFERENT " +
+      "Ruby method. The faithful port of the alias is `hasKey` (headers.ts:77), " +
+      "the port of the `has_key?` it aliases; a second declaration could only " +
+      "be a synonym under a name Rails does not have. Scoped to headers.rb so " +
+      "`key?` stays expected wherever the spelling is free. `include?` and " +
+      "`member?`, the other two aliases, map to free spellings and stay " +
+      "reported.",
+    names: ["key?"],
+    rubyFiles: ["headers.rb"],
+    tsMirrorName: "hasKey",
+  },
 ];
 
 /** Map of scoped-skip Ruby method name → the set of Ruby files it's skipped in. */

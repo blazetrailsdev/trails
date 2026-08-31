@@ -170,9 +170,6 @@ export class MockRequest {
     }
     if (rackInput) {
       env[RACK_INPUT] = rackInput;
-      if (!env["CONTENT_TYPE"] && method !== GET) {
-        env["CONTENT_TYPE"] = "application/x-www-form-urlencoded";
-      }
       if (rackInput.size !== undefined) {
         env["CONTENT_LENGTH"] = env["CONTENT_LENGTH"] || String(rackInput.size);
       }
