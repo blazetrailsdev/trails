@@ -175,7 +175,7 @@ function resolve(): ChildProcessAdapter {
     return resolved;
   }
   throw new Error(
-    "No child-process adapter configured. Set ActiveSupport.childProcessAdapter or register a custom adapter.",
+    "No child-process adapter configured. Under ESM, import '@blazetrails/activesupport/node' from your entry point; otherwise set ActiveSupport.childProcessAdapter or register a custom adapter.",
   );
 }
 

@@ -330,7 +330,7 @@ function resolve(): CryptoAdapter {
   }
 
   throw new Error(
-    "No crypto adapter configured. Set ActiveSupport.cryptoAdapter or register a custom adapter.",
+    "No crypto adapter configured. Under ESM, import '@blazetrails/activesupport/node' from your entry point; otherwise set ActiveSupport.cryptoAdapter or register a custom adapter.",
   );
 }
 

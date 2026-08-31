@@ -27,12 +27,11 @@ function makeControllerClass(
       res.request = request;
       return res;
     }
-    private _triple: [number, Record<string, string>, string[]] = [200, {}, []];
-    async dispatch(action: string, req: Request): Promise<void> {
-      this._triple = body(action, req as unknown as RouterRequest);
-    }
-    toRackResponse(): [number, Record<string, string>, string[]] {
-      return this._triple;
+    static async dispatch(
+      action: string,
+      req: Request,
+    ): Promise<[number, Record<string, string>, string[]]> {
+      return body(action, req as unknown as RouterRequest);
     }
   } as unknown as DispatchableControllerClass;
 }
@@ -158,12 +157,8 @@ describe("Dispatcher over the controller constant table", () => {
       res.request = request;
       return res;
     }
-    dispatched: string | null = null;
-    async dispatch(action: string): Promise<void> {
-      this.dispatched = action;
-    }
-    toRackResponse(): [number, Record<string, string>, string[]] {
-      return [200, { "content-type": "text/plain" }, [String(this.dispatched)]];
+    static async dispatch(action: string): Promise<[number, Record<string, string>, string[]]> {
+      return [200, { "content-type": "text/plain" }, [String(action)]];
     }
   }
 

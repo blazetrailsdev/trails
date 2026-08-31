@@ -41,6 +41,7 @@ import {
   HTTP_X_FORWARDED_HOST,
   HTTP_X_FORWARDED_PROTO,
   HTTP_X_FORWARDED_SCHEME,
+  HTTP_X_FORWARDED_SSL,
 } from "./constants.js";
 import { forwardedValues, getDefaultQueryParser, QueryParser } from "./utils.js";
 import { KeyError } from "@blazetrails/ruby-compat";
@@ -209,16 +210,21 @@ export class Request {
     return cl ? parseInt(cl) : null;
   }
 
+  /** Mirrors `Rack::Request::Helpers#scheme` (`rack/lib/rack/request.rb:249-258`). */
   get scheme(): string {
-    const scheme = this.env[RACK_URL_SCHEME];
-    if (scheme && scheme !== "http" && scheme !== "https") {
-      return "http"; // prevent scheme abuse
+    if (this.env[HTTPS] === "on") {
+      return "https";
+    } else if (this.env[HTTP_X_FORWARDED_SSL] === "on") {
+      return "https";
+    } else if (this.forwardedScheme) {
+      return this.forwardedScheme;
+    } else {
+      return this.env[RACK_URL_SCHEME];
     }
-    return scheme || "http";
   }
 
   get ssl(): boolean {
-    return this.scheme === "https" || this.env[HTTPS] === "on";
+    return this.scheme === "https" || this.scheme === "wss";
   }
 
   get host(): string {

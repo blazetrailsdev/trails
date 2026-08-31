@@ -172,19 +172,8 @@ export class Dispatcher extends Endpoint {
   }
 
   /**
-   * Rails: `Dispatcher#dispatch` (route_set.rb:65-67) — one call,
-   * `controller.dispatch(action, req, res)`, to the `Metal.dispatch` class
-   * method (`metal.rb:331-337`), which returns `to_a`. That class method is
-   * not ported yet, so its body is inlined here, taking its
-   * `middleware_stack.any?` branch's empty arm.
-   *
-   * That branch is unwired at every trails dispatch entry point, not just
-   * this one: `Metal.action` drops it too (`metal.ts` vs `metal.rb:322-326`),
-   * and `Metal.use` — the only way to fill the stack — has no caller in the
-   * repo, so the arm taken here is the one Rails would take. Story
-   * `port-metal-dispatch-class-method`, this story's declared dependency,
-   * lands the class method and the branch; it blocks any work that wires
-   * `use`.
+   * Rails: `Dispatcher#dispatch` (route_set.rb:65-67) — one call to the
+   * `Metal.dispatch` class method (`metal.rb:331-337`).
    *
    * @internal
    */
@@ -194,9 +183,11 @@ export class Dispatcher extends Endpoint {
     req: RouterRequest,
     res: AdResponse,
   ): Promise<RackishResponse> {
-    const instance = new controller();
-    await instance.dispatch(action, req as unknown as AdRequest, res);
-    return instance.toRackResponse() as unknown as RackishResponse;
+    return (await controller.dispatch(
+      action,
+      req as unknown as AdRequest,
+      res,
+    )) as unknown as RackishResponse;
   }
 }
 

@@ -17,10 +17,11 @@ class CaptureEnvController {
     res.request = request;
     return res;
   }
-  async dispatch(_action: string, req: Request): Promise<void> {
+  static async dispatch(
+    _action: string,
+    req: Request,
+  ): Promise<[number, Record<string, string>, string[]]> {
     capturedEnv = req.env;
-  }
-  toRackResponse(): [number, Record<string, string>, string[]] {
     return [200, {}, []];
   }
 }
