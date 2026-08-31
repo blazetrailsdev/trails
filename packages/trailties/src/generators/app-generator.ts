@@ -44,8 +44,6 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
  * nothing does, so it resolves both halves from its own location instead —
  * the same way `bin/rails` reaches the app through `require_relative`
  * (`bin/rails.tt:3`) rather than through PATH.
- *
- * @noRailsEquivalent PERMANENT
  */
 const TRAILS_LOADER = "tsx";
 const TRAILS_CLI = "node_modules/@blazetrails/trailties/bin/trails.js";
@@ -123,8 +121,6 @@ export class AppGenerator extends AppBase {
    * with. Rails has no analogue: `bin/rails` is executable because Ruby needs
    * no build step, while every trails CLI command that executes application
    * code has to enter through the `tsx` loader the scripts declare.
-   *
-   * @noRailsEquivalent PERMANENT
    */
   private pmRun(): string {
     return this.packageManager === "npm" ? "npm run" : this.packageManager;
