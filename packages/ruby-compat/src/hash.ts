@@ -63,11 +63,13 @@ function strEllipsize(str: string, len: number): string {
   return str.slice(0, len - ELLIPSIS.length) + ELLIPSIS;
 }
 
+/**
+ * A Ruby block yielded a key and a value. `delete_if_i`
+ * (`vendor/ruby/hash.c:2531`) tests its result with `RTEST` — false only for
+ * `nil` and `false` — so `deleteIf` spells that test out rather than coercing
+ * with `Boolean()`.
+ */
 type PairBlock<T> = (key: string, value: T) => unknown;
-
-function rtest(value: unknown): boolean {
-  return value != null && value !== false;
-}
 
 /**
  * Ruby `Hash#merge` (`vendor/ruby/hash.c:4144` `rb_hash_merge`), which is
@@ -116,7 +118,8 @@ export const mergeBang = update;
  */
 export function deleteIf<T>(hash: Record<string, T>, block: PairBlock<T>): Record<string, T> {
   for (const key of Object.keys(hash)) {
-    if (rtest(block(key, hash[key]))) delete hash[key];
+    const rejected = block(key, hash[key]);
+    if (rejected != null && rejected !== false) delete hash[key];
   }
   return hash;
 }
@@ -299,7 +302,9 @@ export class Hash<K, V> extends Map<K, V> {
       return;
     }
     if (typeof proc !== "function") {
-      throw new TypeError(`wrong default_proc type ${typeof proc} (expected Proc)`);
+      throw new TypeError(
+        `wrong default_proc type ${(proc as object).constructor.name} (expected Proc)`,
+      );
     }
     this._default = undefined;
     this._defaultProc = proc;
