@@ -3,7 +3,9 @@
 
 # Extracts test metadata from Rails test files using Ripper.
 # Handles three test styles:
-#   1. Minitest::Spec: describe/it blocks (used in Arel tests)
+#   1. Minitest::Spec: describe/it blocks (used in Arel tests, and by the
+#      RSpec-shaped mspec files of ruby/spec — same `describe`/`it` syntax,
+#      so the `def test_` name mapping the gem suites use does not apply)
 #   2. test macro: test "description" do (ActiveModel, ActiveRecord)
 #   3. def test_xxx: older-style test methods
 #
@@ -1844,7 +1846,8 @@ def run
     test_files = Dir.glob(File.join(pkg_dir, "**", "*_test.rb")) +
                  Dir.glob(File.join(pkg_dir, "**", "test_*.rb")) +
                  Dir.glob(File.join(pkg_dir, "**", "spec_*.rb")) +
-                 Dir.glob(File.join(pkg_dir, "**", "behaviors", "*_behavior.rb"))
+                 Dir.glob(File.join(pkg_dir, "**", "behaviors", "*_behavior.rb")) +
+                 Dir.glob(File.join(pkg_dir, "**", "*_spec.rb"))
     test_files.uniq!
 
     # For activerecord, exclude arel test files (handled by arel package)
@@ -1863,6 +1866,19 @@ def run
     if pkg_name == "actioncontroller"
       controller_dir = File.join(pkg_dir, "controller")
       test_files.select! { |f| f.start_with?(controller_dir) }
+    end
+
+    # ruby-compat measures against ruby/spec (mspec), vendored in-tree at
+    # `spec/ruby` by the MRI clone. `pkg_dir` is `spec/ruby/core`, and this
+    # narrows it again to the value-type primitives ruby-compat ports. All of
+    # `spec/ruby/core` is thousands of test names for surface ruby-compat has
+    # no port of, which would drown the compare output; the list grows with
+    # the package, one entry per value type as it lands. An unported spec is
+    # not a reason to port the member it covers — see vendor/sources.ts.
+    if pkg_name == "ruby-compat"
+      value_type_dirs = %w[rational range string hash symbol comparable regexp]
+                        .map { |d| File.join(pkg_dir, d) }
+      test_files.select! { |f| value_type_dirs.any? { |d| f.start_with?(d + File::SEPARATOR) } }
     end
 
     # Apply skip patterns

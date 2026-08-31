@@ -3,7 +3,8 @@
  * @noRailsEquivalent PERMANENT
  */
 
-import { Rational, Temporal, cCivilToJd, strftime, type StrftimeSubject } from "@blazetrails/date";
+import { Temporal, cCivilToJd, strftime, type StrftimeSubject } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../../ar-config.js";
 
 const TIME_DB_FORMAT = "%Y-%m-%d %H:%M:%S";

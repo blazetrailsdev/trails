@@ -17,7 +17,7 @@ import {
   symbolizeKeysBang,
 } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
-import { KeyError } from "./core-ext/key-error.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
 

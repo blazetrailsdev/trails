@@ -1,6 +1,6 @@
 export { NameError } from "./core-ext/name-error.js";
-export { KeyError } from "./core-ext/key-error.js";
-export { regexpEscape } from "./core-ext/regexp.js";
+export { KeyError } from "@blazetrails/ruby-compat";
+export { regexpEscape } from "@blazetrails/ruby-compat";
 export {
   registerFsAdapter,
   getFs,
@@ -702,7 +702,7 @@ export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
-export { Range } from "./range-ext.js";
+export { Range } from "@blazetrails/ruby-compat/range";
 export { rbEqual } from "./rb-equal.js";
 export { rbHash } from "./rb-hash.js";
 export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";

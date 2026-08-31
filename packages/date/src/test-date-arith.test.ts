@@ -6,7 +6,8 @@
  * `minus`, `cmp`, `lshift`, `rshift`.
  */
 import { describe, it, expect } from "vitest";
-import { ArgumentError, Date, DateTime, Rational, Time } from "./index.js";
+import { ArgumentError, Date, DateTime, Time } from "./index.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 /** `test_date_arith.rb:6-8` — a `Numeric` whose `to_r` answers itself, so the C's
  *  `f_to_r` retry makes no progress and the arm raises. */

@@ -13,7 +13,8 @@ const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
  * as a little-endian `L`, modulo `36**6`, in base 36.
  *
  * @noRailsEquivalent CONVERGEABLE — see {@link Tempfile}; `Dir::Tmpname` is
- *   Ruby stdlib and moves with it when RFC 0089 re-homes these primitives.
+ *   Ruby stdlib and moves with it when RFC 0129 re-homes these primitives
+ *   into `@blazetrails/ruby-compat`.
  */
 function random(): string {
   const MAX = 36 ** 6;
@@ -29,7 +30,8 @@ function random(): string {
  * `process.*`, so it is a second draw from {@link random}.
  *
  * @noRailsEquivalent CONVERGEABLE — see {@link Tempfile}; `Dir::Tmpname` is
- *   Ruby stdlib and moves with it when RFC 0089 re-homes these primitives.
+ *   Ruby stdlib and moves with it when RFC 0129 re-homes these primitives
+ *   into `@blazetrails/ruby-compat`.
  */
 function createTmpname(
   basename: TempfileBasename,
@@ -230,8 +232,8 @@ export class Tempfile {
  *
  * @noRailsEquivalent CONVERGEABLE — `ensure` is Ruby syntax, so a JS body that
  *   must serve both a synchronous and an asynchronous block has to spell it
- *   out. Removable once RFC 0089 gives these primitives a shared home with
- *   somewhere for it to live.
+ *   out. Removable once RFC 0129 gives these primitives a shared home in
+ *   `@blazetrails/ruby-compat` with somewhere for it to live.
  */
 function ensure<T>(body: () => T, cleanup: () => void): T {
   let value: T;

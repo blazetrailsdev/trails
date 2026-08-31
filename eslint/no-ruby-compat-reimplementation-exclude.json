@@ -3,7 +3,6 @@
   "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.ts::fetch",
   "packages/activerecord/src/connection-adapters/postgresql-adapter.ts::fetch",
   "packages/activesupport/src/core-ext/date-and-time/calculations.ts::fetch",
-  "packages/activesupport/src/core-ext/key-error.ts::KeyError",
   "packages/activesupport/src/core-ext/string/conversions.ts::fetch",
   "packages/date/src/date.ts::spaceship"
 ]

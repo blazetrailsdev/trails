@@ -7,7 +7,7 @@ import { TimeZone } from "../values/time-zone.js";
 import { Encoding, type EncodeOptions } from "./encoding.js";
 import { asJson, ToJsonWithActiveSupportEncoder } from "../core-ext/object/json.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
-import { Range } from "../range-ext.js";
+import { Range } from "@blazetrails/ruby-compat/range";
 
 /** Rails' `JSONTest::Hashlike` (encoding_test_cases.rb:16-20). */
 class Hashlike {

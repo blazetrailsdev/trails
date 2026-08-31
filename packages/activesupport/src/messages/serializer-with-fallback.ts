@@ -22,7 +22,7 @@
  * require to rescue.
  */
 
-import { KeyError } from "../core-ext/key-error.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";

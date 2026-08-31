@@ -23,7 +23,8 @@
  * the nanosecond here.
  */
 import { describe, it, expect } from "vitest";
-import { Temporal, Date, DateTime, Rational, Time } from "./index.js";
+import { Temporal, Date, DateTime, Time } from "./index.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
 describe("TestDateConv", () => {
   it("to class", () => {

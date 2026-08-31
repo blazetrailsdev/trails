@@ -32,7 +32,8 @@ churn across minors:
 | `v3_4_10` (newest stable)          | +581 / -285                              |
 
 So bumping to current stable would leave a reviewer chasing
-`range_include_internal` through code `range-ext.ts` was never written against.
+`range_include_internal` through code `ruby-compat/src/range.ts` was never
+written against.
 The host toolchain is `ruby 3.3.11 (2026-03-26 revision 1f2d15125a)` — the SHA
 this ref resolves to — and `packages/date/src/date.ts:1229-1231` states its
 claim as "on ruby 3.3.11".

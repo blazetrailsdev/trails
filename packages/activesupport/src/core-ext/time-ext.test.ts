@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   DateTime as RubyDateTime,
-  Rational,
   Temporal,
   Time as RubyTime,
   resetLocalTimeZoneId,
 } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import "./time/calculations.js";

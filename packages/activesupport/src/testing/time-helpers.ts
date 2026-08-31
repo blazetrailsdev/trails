@@ -1,7 +1,8 @@
 /**
  * Mirrors: active_support/testing/time_helpers.rb
  */
-import { Date, DateTime, Rational, Temporal, Time } from "@blazetrails/date";
+import { Date, DateTime, Temporal, Time } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
