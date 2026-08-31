@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TsApi } from "./report-ruby-compat.js";
-import { literalArgs, matches, renderReport, shapeOf } from "./report-structural-duplicates.js";
+import { matches, renderReport, shapeOf } from "./report-structural-duplicates.js";
 
 const replace = (name: string, line: number, literal: string) => ({
   name,
@@ -37,8 +37,12 @@ describe("shapeOf", () => {
   });
 
   it("drops identifiers and unrepresented literals", () => {
-    const decl = { name: "x", callArgs: [{ name: "f", args: ["id:a", "?", "num:1"] }] };
-    expect(literalArgs(decl)).toEqual(["num:1"]);
+    const decl = {
+      name: "x",
+      skeleton: ["ref:f"],
+      callArgs: [{ name: "f", args: ["id:a", "?", "num:1"] }],
+    };
+    expect(shapeOf(decl)).toBe("ref:f|num:1");
   });
 });
 

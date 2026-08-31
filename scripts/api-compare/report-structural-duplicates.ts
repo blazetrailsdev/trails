@@ -5,23 +5,13 @@
  *
  *   pnpm parity:structural-duplicates:report [--top=N]
  *
- * `no-ruby-compat-reimplementation` matches on NAMES, so it catches every
- * duplicate the RFC inventoried and nothing under a name nobody has thought of.
- * This asks whether a SHAPE match closes that gap, and answers with a
- * measurement — a gate seeded on an unmeasured signal gets disabled.
- *
- * The normalized form is the one `extract-ts-api.ts` already computes for every
- * declaration: `skeleton`, the body's control flow and call sequence with
- * identifiers erased. No second normalizer is written here, deliberately — the
- * question is whether shape matching WORKS, and a bespoke normalizer would
- * measure the normalizer instead. But `skeleton` erases literals, and for some
- * primitives the literal IS the whole signal: `regexpEscape`'s body is a bare
- * `["ref:replace"]`, which every string rewrite in the tree shares. So the
- * shape is skeleton PLUS the literal arguments the body passes, off the same
- * extractor's `callArgs` — `regexpEscape` passes `str:\$&`. Literals the
- * extractor does not represent (a regex literal arrives as `?`) contribute
- * nothing, itself part of what the precision figure measures.
-
+ * `no-ruby-compat-reimplementation` matches on NAMES, so it misses a copy under
+ * a name nobody has thought of. This asks whether a SHAPE match closes that gap
+ * and answers with a measurement; the RFC's Gate 3 section records the
+ * precision and the recommendation that follows. The shape is {@link shapeOf}.
+ * A package barrel re-exports a declaration under `index.ts` keeping the
+ * ORIGINAL line, so a re-exported hit reports at both files — left visible
+ * rather than guessed away, and the classification says which.
  *
  * Hard rules: no node:* imports, no process.*, async fs only.
  */
@@ -41,40 +31,45 @@ export interface Site {
   shape: string;
 }
 
-/** The literal arguments a body passes, in call order — the half `skeleton`
- *  erases. `id:`-prefixed args are identifiers, so they carry no more than the
- *  skeleton already does and are dropped. */
-export function literalArgs(decl: Decl): string[] {
-  const out: string[] = [];
-  for (const call of decl.callArgs ?? []) {
-    for (const arg of call.args ?? []) if (!arg.startsWith("id:") && arg !== "?") out.push(arg);
-  }
-  return out;
-}
-
-/** The comparable shape of a body, or `undefined` for a body the extractor
- *  recorded no skeleton for (an overload signature, an abstract member). */
+/**
+ * The comparable shape of a body — the `skeleton` `extract-ts-api.ts` computes
+ * (control flow and call sequence, identifiers erased), then the literal
+ * arguments it passes, the half the skeleton erases and which for some
+ * primitives is the whole signal. `id:` args are identifiers and `?` is a
+ * literal the extractor could not represent, so neither is kept. `undefined`
+ * for a body with no skeleton (an overload signature), which cannot compare.
+ */
 export function shapeOf(decl: Decl): string | undefined {
   if (decl.skeleton === undefined || decl.skeleton.length === 0) return undefined;
-  return `${decl.skeleton.join(",")}|${literalArgs(decl).join(",")}`;
+  const literals: string[] = [];
+  for (const call of decl.callArgs ?? []) {
+    for (const arg of call.args ?? [])
+      if (!arg.startsWith("id:") && arg !== "?") literals.push(arg);
+  }
+  return `${decl.skeleton.join(",")}|${literals.join(",")}`;
 }
 
-/** Every declaration in the tree, flattened to a comparable site. */
+/** Every declaration flattened to a comparable site, each counted ONCE:
+ *  `declarations` yields a mixin member per host it lands on, and re-counting
+ *  one declaration per host inflates a bucket without adding a candidate. */
 export function sites(api: TsApi): Site[] {
-  const out: Site[] = [];
+  const bySite = new Map<string, Site>();
   for (const { package: pkg, tsFile, decl } of declarations(api)) {
     const shape = shapeOf(decl);
     if (shape === undefined) continue;
-    out.push({ package: pkg, tsFile, name: decl.name, line: decl.line ?? 0, shape });
+    const site = { package: pkg, tsFile, name: decl.name, line: decl.line ?? 0, shape };
+    bySite.set(siteKey(site), site);
   }
-  return out;
+  return [...bySite.values()];
 }
 
 function siteKey(s: Site): string {
   return `${s.package}/${s.tsFile}:${s.line} ${s.name}`;
 }
 
-/** Candidates sharing a ruby-compat export's shape, grouped by that export. */
+/** Candidates sharing a ruby-compat export's shape, grouped by export NAME —
+ *  `index.ts` re-exports every primitive, so a file-keyed origin would report
+ *  each match twice. */
 export function matches(api: TsApi): Map<string, Site[]> {
   const all = sites(api);
   const byShape = new Map<string, Site[]>();
@@ -89,8 +84,6 @@ export function matches(api: TsApi): Map<string, Site[]> {
     if (origin.package !== "ruby-compat") continue;
     const hits = byShape.get(origin.shape);
     if (hits === undefined) continue;
-    // Keyed by EXPORT NAME, not file#name: `index.ts` re-exports every
-    // primitive, so a file-keyed origin reports each match twice.
     const seen = new Set((found.get(origin.name) ?? []).map(siteKey));
     found.set(origin.name, [
       ...(found.get(origin.name) ?? []),

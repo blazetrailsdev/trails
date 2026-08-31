@@ -22,6 +22,19 @@ const api: TsApi = {
   packages: {
     activesupport: {
       fileFunctions: { "inflector.ts": [{ name: "titleize", calls: ["regexpEscape"] }] },
+      classes: {
+        "cache/store.ts:Store": {
+          file: "cache/store.ts",
+          instanceMethods: [{ name: "read", calls: ["hasKey"] }],
+          classMethods: [{ name: "build", calls: ["cmp"] }],
+        },
+      },
+      modules: {
+        "core-ext/range.ts:RangeExt": {
+          file: "core-ext/range.ts",
+          instanceMethods: [{ name: "overlaps", calls: ["cover"] }],
+        },
+      },
     },
     "ruby-compat": {
       fileFunctions: { "regexp.ts": [{ name: "regexpEscape", calls: ["replace"] }] },
@@ -59,19 +72,24 @@ describe("reverseRows", () => {
 
 describe("forwardCredits", () => {
   it("credits a body that calls the export, never ruby-compat's own", () => {
-    expect(forwardCredits(api)).toEqual([
-      {
-        package: "activesupport",
-        tsFile: "inflector.ts",
-        name: "titleize",
-        tsExport: "regexpEscape",
-      },
-    ]);
+    expect(forwardCredits(api)).toContainEqual({
+      package: "activesupport",
+      tsFile: "inflector.ts",
+      name: "titleize",
+      tsExport: "regexpEscape",
+    });
+    expect(forwardCredits(api).map((c) => c.package)).not.toContain("ruby-compat");
+  });
+
+  it("reads both member lists of a class and of a module", () => {
+    expect(forwardCredits(api).map((c) => `${c.name} ${c.tsExport}`)).toEqual(
+      expect.arrayContaining(["read hasKey", "build cmp", "overlaps cover"]),
+    );
   });
 
   it("counts both directions in the report header", () => {
     expect(renderReport(artifact, api, 20)).toContain(
-      "1 unconverged row(s) across 1 file(s); 1 call site(s) already credited",
+      "1 unconverged row(s) across 1 file(s); 4 call site(s) already credited",
     );
   });
 });

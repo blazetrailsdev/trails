@@ -4,16 +4,12 @@
  *
  *   pnpm parity:api:calls:ruby-compat:report [--top=N]
  *
- * It reads both directions of `RUBY_COMPAT_EXPORTS`
- * (scripts/parity/ruby-compat.ts) off the artifacts `compare.ts --calls`
- * already writes:
- *
- *   reverse — every call-mismatch row whose Ruby call resolves to a ruby-compat
- *             export: Rails made the core call and the port did not, so the
- *             body hand-rolled the primitive under a name the table does not
- *             recognise. This is the population an enrollment story burns down.
- *   forward  — every TS declaration that DOES call a ruby-compat export: the
- *             sites the table credits, hence absent from the reverse half.
+ * Both directions of `RUBY_COMPAT_EXPORTS` (scripts/parity/ruby-compat.ts,
+ * which documents them) over the artifacts `compare.ts --calls` writes. REVERSE
+ * is every call-mismatch row whose Ruby call resolves to a ruby-compat export —
+ * the port hand-rolled the primitive under an unrecognised name, the population
+ * an enrollment story burns down. FORWARD is every TS declaration that DOES call
+ * one: the sites the table credits, hence absent from the reverse half.
  *
  * Report-only, and separate from enrollment on purpose: seeding a gate red
  * across nine packages blocks every unrelated PR, so the flip is its own story
@@ -34,23 +30,31 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
 const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
 
 /** The reverse-direction row, at the grain the shards record. `kind:
- *  "rubyCompat"` so that the day it IS baselined it sits in the existing
- *  `call-mismatches-exclude/` shards rather than a second artifact tree — and so
- *  that the two gates, which each filter to their own kind, never see it. */
+ *  "rubyCompat"` so that when it IS baselined it sits in the existing
+ *  `call-mismatches-exclude/` shards, and so the two gates, which each filter to
+ *  their own kind, never see it. */
 export interface RubyCompatKey extends CallMismatchKey {
   kind: "rubyCompat";
   /** The export the body should have called. */
   tsExport: string;
 }
 
-/** One declaration as output/ts-api.json records it — the union of the fields
- *  both readers of {@link declarations} need. */
+/** One declaration as output/ts-api.json records it. */
 export interface Decl {
   name: string;
+  file?: string;
   line?: number;
   calls?: string[];
   skeleton?: string[];
   callArgs?: { name: string; args?: string[] }[];
+}
+
+/** A class or module as the manifest records it: members live under
+ *  `instanceMethods`/`classMethods`, never one `methods` (`scripts/parity/types.ts`). */
+export interface Host {
+  file?: string;
+  instanceMethods?: Decl[];
+  classMethods?: Decl[];
 }
 
 /** The slice of output/ts-api.json the reports read. */
@@ -59,21 +63,28 @@ export interface TsApi {
     string,
     {
       fileFunctions?: Record<string, Decl[]>;
-      classes?: Record<string, { file?: string; methods?: Decl[] }>;
+      classes?: Record<string, Host>;
+      modules?: Record<string, Host>;
     }
   >;
 }
 
-/** Every declaration in the tree, with the package and file it came from. */
+/** Every declaration in the tree — top-level functions AND both member lists of
+ *  every class and module. A declaration's own `file` wins over the map key or
+ *  the host, because a member mixed into a class is declared elsewhere. */
 export function declarations(api: TsApi): { package: string; tsFile: string; decl: Decl }[] {
   const out: { package: string; tsFile: string; decl: Decl }[] = [];
   for (const [pkg, entry] of Object.entries(api.packages)) {
     for (const [tsFile, fns] of Object.entries(entry.fileFunctions ?? {})) {
-      for (const decl of fns) out.push({ package: pkg, tsFile, decl });
+      for (const decl of fns) out.push({ package: pkg, tsFile: decl.file ?? tsFile, decl });
     }
-    for (const klass of Object.values(entry.classes ?? {})) {
-      for (const decl of klass.methods ?? [])
-        out.push({ package: pkg, tsFile: klass.file ?? "", decl });
+    for (const host of [
+      ...Object.values(entry.classes ?? {}),
+      ...Object.values(entry.modules ?? {}),
+    ]) {
+      for (const decl of [...(host.instanceMethods ?? []), ...(host.classMethods ?? [])]) {
+        out.push({ package: pkg, tsFile: decl.file ?? host.file ?? "", decl });
+      }
     }
   }
   return out;
@@ -100,12 +111,7 @@ export function reverseRows(artifact: Artifact): RubyCompatKey[] {
   return rows;
 }
 
-export interface Credit {
-  package: string;
-  tsFile: string;
-  name: string;
-  tsExport: string;
-}
+export type Credit = { package: string; tsFile: string; name: string; tsExport: string };
 
 /** Forward: the call sites the table credits — a declaration outside
  *  `ruby-compat` itself that calls one of its exports. */
@@ -149,10 +155,8 @@ export function renderReport(artifact: Artifact, api: TsApi, top: number): strin
 }
 
 /** The `report-*` CLI shape both RFC 0129 reports share: render, or explain the
- *  missing artifact and exit 2. Neither can fail a build, so there is no gate
- *  arm to keep in sync — one copy, imported, rather than two. `moduleUrl` is the
- *  caller's own `import.meta.url`, which is what makes the imported copy run
- *  only when ITS module is the one node was invoked on. */
+ *  missing artifact and exit 2. `moduleUrl` is the caller's own
+ *  `import.meta.url`, so the imported copy runs only for ITS module. */
 export async function runReport(
   moduleUrl: string,
   label: string,
