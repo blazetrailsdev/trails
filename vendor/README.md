@@ -5,7 +5,8 @@ schema-parity tooling.
 
 - `sources.ts` — declarative registry. Single source of truth for which
   gems we mirror and at what version.
-- Per-source subdirs (`rails/`, `rack/`, `globalid/`, …) are gitignored
+- Per-source subdirs (`rails/`, `rack/`, `rack-session/`, `globalid/`, …) are
+  gitignored
   shallow clones of the upstream repo at the pinned tag. They land here
   via the unified fetcher (wave 2).
 - `sources.lock.json` (committed, wave 2) records resolved git SHAs for
@@ -59,6 +60,29 @@ separate `ruby/spec` clone is needed).
 of it `.git`) and takes ~5-8s — smaller than `vendor/rails` at 225 MiB, and
 each worktree symlinks it rather than re-cloning. No `--filter=blob:none` or
 sparse checkout is needed, so `fetch.ts` is unchanged.
+
+## `vendor/rack-session/` — the Rack::Session anchor
+
+Rack 3 moved `Rack::Session` out of Rack into its own gem, so `vendor/rack`
+(pinned at `v3.1.14`) has no `lib/rack/session/` and `packages/rack` correctly
+mirrors that absence. Rails still depends on the gem — `add_dependency
+"rack-session", ">= 1.0.1"`
+(`vendor/rails/actionpack/actionpack.gemspec:40`), resolved to **2.1.0** by
+`vendor/rails/Gemfile.lock:440` — and
+`vendor/rails/actionpack/lib/action_dispatch/middleware/session/abstract_store.rb`
+opens with `require "rack/session/abstract/id"`. This clone is what those
+citations resolve against: `SessionId` at `abstract/id.rb:21`, `SessionHash`
+`:50`, `Persisted` `:239`, `PersistedSecure` `:460`, `ID` `:499`, `Pool`
+`pool.rb:26`, `Cookie` `cookie.rb:91`.
+
+`compareApi` / `compareTests` are off for now, and unlike `date` (a C surface)
+or `minitest` (no TS package the port could ever key onto) that is temporary:
+both extractors already run over this clone unmodified — `extract-ruby-api.rb`
+reports 19 classes, 3 modules, 78 public methods, and
+`extract-ruby-tests.rb` reports 7 files, 124 tests. They stay off only until
+`packages/rack-session/src` exists, because both compares key a package onto a
+TS workspace dir. RFC 0133's `enroll-rack-session-in-compare-tooling` creates
+the package and flips both on.
 
 ## Scoping a Rails bump (drift report)
 

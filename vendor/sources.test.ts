@@ -48,6 +48,34 @@ describe("vendor/sources.ts", () => {
     expect(rack!.packages).toEqual([{ name: "rack", libPath: "lib/rack", testPath: "test" }]);
   });
 
+  it("declares the rack-session source, a read-anchor pending its TS package", () => {
+    // Rack 3 moved Rack::Session out of rack into its own gem, so vendor/rack
+    // (v3.1.14) has no lib/rack/session/. v2.1.0 is what
+    // vendor/rails/Gemfile.lock:440 resolves.
+    const rackSession = SOURCES.find((s) => s.name === "rack-session");
+    expect(rackSession).toBeDefined();
+    expect(rackSession!.origin).toEqual({
+      type: "git",
+      url: "https://github.com/rack/rack-session.git",
+      ref: "v2.1.0",
+    });
+    expect(rackSession!.packages).toEqual([
+      {
+        name: "rack-session",
+        libPath: "lib/rack/session",
+        testPath: "test",
+        compareApi: false,
+        compareTests: false,
+      },
+    ]);
+    expect(apiComparePackages()).not.toContain("rack-session");
+    expect(Object.keys(libPathsManifest())).not.toContain("rack-session");
+    expect(Object.keys(testPathsManifest())).not.toContain("rack-session");
+    expect(resolvePath("rack-session").endsWith("vendor/rack-session/lib/rack/session")).toBe(true);
+    expect(resolvePath("rack-session", "test").endsWith("vendor/rack-session/test")).toBe(true);
+    expect(vendoredRoot("rack-session").endsWith("vendor/rack-session")).toBe(true);
+  });
+
   it("declares the globalid source (wave 3)", () => {
     const gid = SOURCES.find((s) => s.name === "globalid");
     expect(gid).toBeDefined();

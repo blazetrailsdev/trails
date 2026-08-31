@@ -78,22 +78,22 @@ export class Persisted {
   constructor(_app?: unknown, _options: Record<string, unknown> = {}) {}
 
   generateSid(): unknown {
-    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
+    // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:296 cluster=actionpack-session
     throw new NotImplementedError("generateSid");
   }
 
   loadSession(_env: Record<string, unknown>): [unknown, Record<string, unknown>] {
-    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
+    // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:320 cluster=actionpack-session
     throw new NotImplementedError("loadSession");
   }
 
   extractSessionId(_env: Record<string, unknown>): unknown {
-    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
+    // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:328 cluster=actionpack-session
     throw new NotImplementedError("extractSessionId");
   }
 
   commitSession(_req: any, _res: any): unknown {
-    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
+    // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:381 cluster=actionpack-session
     throw new NotImplementedError("commitSession");
   }
 }
@@ -101,7 +101,7 @@ export class Persisted {
 /** Stand-in for `Rack::Session::Abstract::PersistedSecure`. */
 export class PersistedSecure extends Persisted {
   override generateSid(): unknown {
-    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
+    // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:477 cluster=actionpack-session
     throw new NotImplementedError("generateSid");
   }
 }

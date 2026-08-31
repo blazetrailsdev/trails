@@ -143,6 +143,39 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [{ name: "rack", libPath: "lib/rack", testPath: "test" }],
   },
   {
+    name: "rack-session",
+    origin: {
+      type: "git",
+      url: "https://github.com/rack/rack-session.git",
+      // vendor/rails/Gemfile.lock:440 resolves rack-session (2.1.0), inside
+      // both declared ranges (actionpack `>= 1.0.1`,
+      // vendor/rails/actionpack/actionpack.gemspec:40; railties
+      // `>= 2.0.0, < 3`, vendor/rails/Gemfile.lock:569).
+      ref: "v2.1.0",
+    },
+    // libPath points at `lib/rack/session/` (the Rack::Session module root)
+    // for the same reason `rack` above points at `lib/rack`: bare `lib` would
+    // also scan lib/rack/session.rb (the entrypoint shim).
+    packages: [
+      {
+        name: "rack-session",
+        libPath: "lib/rack/session",
+        testPath: "test",
+        // Vendored as a read-anchor first. Both extractors already run over
+        // this clone unmodified — `extract-ruby-api.rb` reports 19 classes,
+        // 3 modules, 78 public methods; `extract-ruby-tests.rb` reports 7
+        // files, 124 tests — so the flags are off only because
+        // `packages/rack-session/src` does not exist yet, and both compares
+        // key a package onto a TS workspace dir (a missing one is a hard
+        // build-state error in `extract-ts-api.ts`, not an empty measure).
+        // RFC 0133's `enroll-rack-session-in-compare-tooling` creates the
+        // package and flips both on.
+        compareApi: false,
+        compareTests: false,
+      },
+    ],
+  },
+  {
     name: "did_you_mean",
     origin: {
       type: "git",
