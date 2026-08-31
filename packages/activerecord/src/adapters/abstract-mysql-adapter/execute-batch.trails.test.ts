@@ -1,5 +1,10 @@
 import { describe, it, beforeEach, expect, vi } from "vitest";
-import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "./test-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
   let adapter: Mysql2Adapter;
@@ -19,6 +24,19 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
       }
 
       expect(calls.map((call) => call[0])).toEqual(["SELECT 1;\nSELECT 2"]);
+    });
+
+    it("batches even when the connection config disables multiple statements", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        multipleStatements: false,
+      } as never);
+      try {
+        const rows = await testAdapter.execute("SELECT 1 AS v;\nSELECT 2 AS v");
+        expect(rows.length).toBeGreaterThan(0);
+      } finally {
+        await testAdapter.close();
+      }
     });
 
     it("splits the statements against the server reported max_allowed_packet", async () => {
