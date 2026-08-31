@@ -194,8 +194,8 @@ export class Persisted {
 
   /** @internal Rails: `extract_session_id(request)` (`id.rb:328-332`). */
   extractSessionId(request: any): unknown {
-    let sid = request.cookies?.[this.key];
-    if (sid == null && !this.cookieOnly) sid = request.params?.[this.key];
+    let sid = request.cookies[this.key];
+    if (sid == null && !this.cookieOnly) sid = request.params[this.key];
     return sid;
   }
 
@@ -235,7 +235,15 @@ export class Persisted {
       .some((v) => v != null && v !== false);
   }
 
-  /** @internal Rails: `security_matches?(request, options)` (`id.rb:371-374`). */
+  /**
+   * Rails: `security_matches?(request, options)` (`id.rb:371-374`).
+   *
+   * @internal
+   * @missingRailsCall ssl? — CONVERGEABLE cookie-store-runnable-in-a-real-stack:
+   * `Rack::Request#ssl?` is unported, so a `secure:` session cannot be
+   * committed over HTTPS yet. `middleware/cookies.ts:297` guards the same
+   * absent method the same way.
+   */
   isSecurityMatches(request: any, options: SessionOptions): boolean {
     if (!options.get("secure")) return true;
     return request.isSsl?.() === true || this.assumeSsl === true;
