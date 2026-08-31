@@ -149,9 +149,9 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  * Recognizes the adapter idiom in the suite — `adapterType === "mysql"` /
  * `adapterType !== "sqlite"` — anywhere in the expression, the Rails-named
  * `currentAdapter("PostgreSQLAdapter")` predicate (variadic, and negatable with
- * `!`), and feature predicates — `adapterSupports("x")`. How a compound mixing the two resolves
- * depends on the adapter term's polarity, mirroring the Ruby extractor's
- * `mixed` rule:
+ * `!`), and feature predicates — `adapterSupports("x")`. How a compound mixing
+ * the two resolves depends on the adapter term's polarity, mirroring the Ruby
+ * extractor's `mixed` rule:
  *   - EXCLUSION (`adapterType === "sqlite" || !adapterSupports("insert_returning")`,
  *     the De-Morgan'd skip form of Rails' `if supports_insert_returning? &&
  *     !current_adapter?(:SQLite3Adapter)`) → the run condition is the pure
@@ -205,11 +205,11 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   }
 
   // `currentAdapter("PostgreSQLAdapter")` / `!currentAdapter("Mysql2Adapter",
-  // "TrilogyAdapter")` — the port of Rails' own `current_adapter?` predicate,
-  // which the Ruby extractor reads directly. It is variadic, so the literals
-  // UNION (the predicate is true when the lane is any one of them); polarity is
-  // then read exactly as for `adapterType` above. Only consulted when no
-  // `adapterType` term was found, keeping the "first adapter term wins" rule.
+  // "TrilogyAdapter")` — the port of Rails' own `current_adapter?`, which the
+  // Ruby extractor reads directly. It is variadic, so the literals UNION (true
+  // when the lane is any one of them); polarity then reads exactly as for
+  // `adapterType` above. Consulted only when no `adapterType` term was found,
+  // keeping that block's "the first adapter term wins" rule.
   if (!adapters) {
     const currentAdapterMatch = text.match(/(!\s*)?currentAdapter\(([^)]*)\)/);
     if (currentAdapterMatch) {

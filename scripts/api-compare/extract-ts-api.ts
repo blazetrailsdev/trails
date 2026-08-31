@@ -1154,16 +1154,14 @@ export function extractFromProgram(
   // Rails expects it.
   //
   // A barrel may re-export from another barrel (`index.ts` ← `foo.ts` ←
-  // `foo/bar.ts`), so a single pass in file-walk order would resolve the outer
-  // hop only when the intermediate clone happened to exist already. Iterate to
-  // a FIXPOINT instead, so the cloned set does not depend on visit order; the
-  // loop terminates because every round either creates at least one new entry
-  // or stops, and the key space is finite.
+  // `foo/bar.ts`), so a single pass in file-walk order resolves the outer hop
+  // only when the intermediate clone happens to exist already. Iterating to a
+  // FIXPOINT makes the cloned set independent of visit order; it terminates
+  // because each round either adds an entry or stops, over a finite key space.
   //
-  // `reExportedFrom` always names the DECLARING entry, never an intermediate
-  // clone: consumers use it to skip a name they have already scored at its real
-  // home, and a chain of clones pointing at each other would leave the outer
-  // hop looking like a declaration site.
+  // `reExportedFrom` names the DECLARING entry, never an intermediate clone:
+  // consumers skip a name already scored at its real home, and a chain of
+  // clones pointing at each other leaves the outer hop looking declared here.
   const declaringKey = (key: string): string => {
     const seen = new Set<string>([key]);
     let current = key;

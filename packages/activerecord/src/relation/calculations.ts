@@ -1,4 +1,4 @@
-import { Nodes, Table, SelectManager } from "@blazetrails/arel";
+import { Nodes, Table, SelectManager, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
@@ -644,7 +644,7 @@ export function aggregateColumn(
   columnName: string | Nodes.Node | number | null,
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
-  if (columnName === ":all") return new Nodes.SqlLiteral("*");
+  if (columnName === ":all") return star();
   return arelColumn.call(rel as never, columnName);
 }
 
