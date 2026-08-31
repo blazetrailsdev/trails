@@ -11,8 +11,7 @@ import { MemCacheStore } from "./mem-cache-store.js";
  * nothing from a name, so the namespace the constant is looked up in is this
  * table — the same set `action_dispatch.rb:107-111` autoloads.
  *
- * @noRailsEquivalent PERMANENT — the JS stand-in for the `Session` namespace
- * `const_get` reads. See CLAUDE.md, "Call-time constant resolution".
+ * @noRailsEquivalent PERMANENT
  */
 const constants: Record<string, unknown> = {
   AbstractStore,
@@ -23,7 +22,7 @@ const constants: Record<string, unknown> = {
 };
 
 export function resolveStore(sessionStore: string): unknown {
-  const name = camelize(sessionStore.replace(/^:/, ""));
+  const name = camelize(sessionStore.startsWith(":") ? sessionStore.slice(1) : sessionStore);
   const store = constants[name];
   if (store === undefined) {
     // Rails interpolates `session_store.inspect`; a trails Ruby Symbol value

@@ -127,19 +127,15 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
 /**
  * Mirrors `Finisher`'s `eager_load!` initializer (`finisher.rb:75-88`).
  *
- * @missingRailsCall eager_load_all — CONVERGEABLE: Zeitwerk is unported; ESM
- * has no loader to walk (`finisher.rb:78`).
- * @missingRailsCall eager_load! — CONVERGEABLE: `Trails.eagerLoad` is unported
- * (`finisher.rb:79`).
- * @missingRailsCall after_class_unload — CONVERGEABLE: `ActiveSupport::Reloader`
- * has no class-unload hook in trails, and there is no autoloader to re-eager-load
- * (`finisher.rb:82-86`).
+ * @missingRailsCall eager_load_all — CONVERGEABLE port-eager-load-autoloader-arms
+ * @missingRailsCall eager_load! — CONVERGEABLE port-eager-load-autoloader-arms
+ * @missingRailsCall after_class_unload — CONVERGEABLE port-eager-load-autoloader-arms
  */
 Finisher.initializer("eager_load!", function (this: FinisherHost) {
   if (this.config.eagerLoad === true) {
     runLoadHooks("before_eager_load", this);
     for (const namespace of this.config.eagerLoadNamespaces) {
-      (namespace as { eagerLoad?: () => void }).eagerLoad?.();
+      (namespace as { eagerLoad(): void }).eagerLoad();
     }
   }
 });

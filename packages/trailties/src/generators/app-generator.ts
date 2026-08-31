@@ -39,8 +39,7 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
  * `tsx` loader, so a command that imports application code can resolve the
  * `.js` specifiers `Node16` resolution requires of a `.ts` source.
  *
- * @noRailsEquivalent PERMANENT — Ruby has no build step, so `bin/rails` needs
- * no loader.
+ * @noRailsEquivalent PERMANENT
  */
 const TRAILS = "tsx node_modules/@blazetrails/trailties/bin/trails.js";
 

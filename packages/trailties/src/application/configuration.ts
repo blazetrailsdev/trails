@@ -78,8 +78,7 @@ export class Configuration extends EngineConfiguration {
   sessionStore(newSessionStore?: unknown, options?: Record<string, unknown>): unknown {
     if (newSessionStore != null && newSessionStore !== false) {
       this._sessionStore = newSessionStore;
-      this._sessionOptions = options ?? {};
-      return undefined;
+      return (this._sessionOptions = options ?? {});
     }
     if (this._sessionStore === ":disabled") return null;
     if (typeof this._sessionStore === "string" && this._sessionStore.startsWith(":")) {
