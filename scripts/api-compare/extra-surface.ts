@@ -1104,10 +1104,6 @@ function walkTsFileSurface(
     }
   }
   for (const fn of fileFunctions ?? []) pushMember(fn, null, null);
-  // A module-level `export const FOO = …` is a declaration name like a class's,
-  // not a member: the Ruby side already scores a file constant that way
-  // (`collectAllowedNames` unions `fileConstants`), so a port written as a
-  // module const and one written as a `static` member score identically.
   for (const name of fileConstants ?? []) {
     if (name.startsWith("_")) continue;
     out.push({ name, interfaceDeclaration: false, interfaceMemberOf: null, owner: null });

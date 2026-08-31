@@ -549,7 +549,6 @@ export function main(args: string[] = process.argv.slice(2)) {
       fileTests: Map<string, TsTestInfo[]>;
       filePathIndex: Map<string, Map<string, number[]>>; // file → path → [indices]
       fileDescIndex: Map<string, Map<string, number[]>>; // file → desc → [indices]
-      // Same two indexes keyed by `aliasKey` — consulted only as a fallback.
       filePathAliasIndex: Map<string, Map<string, number[]>>;
       fileDescAliasIndex: Map<string, Map<string, number[]>>;
       allFiles: Set<string>;

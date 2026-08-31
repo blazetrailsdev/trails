@@ -668,8 +668,6 @@ describe("buildReport — novel vs moved classification", () => {
       "foo.rb": { ER_DUP_ENTRY: { kind: "int", value: "1062" } },
       "baz.rb": { SHARED_MESSAGE: { kind: "string", value: "boom" } },
     };
-    // Authored at module scope rather than as a `static` member — the two
-    // spellings must score identically.
     ts.packages["activemodel"].fileConstants = {
       "foo.ts": {
         ER_DUP_ENTRY: { kind: "int", value: "1062" },
