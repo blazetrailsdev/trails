@@ -346,14 +346,14 @@ export class Request {
       return {};
     }
 
-    const mt = this.mediaType;
-    if (!mt || (!FORM_DATA_MEDIA_TYPES.includes(mt) && !mt.startsWith("multipart/"))) {
+    if (!this.formData && !this.isParseableData()) {
       this.env[RACK_REQUEST_FORM_HASH] = {};
       return {};
     }
 
+    const mt = this.mediaType;
     // Multipart data (form-data, related, mixed, etc.)
-    if (mt.startsWith("multipart/")) {
+    if (mt !== null && mt.startsWith("multipart/")) {
       const parsed = this.parseMultipart();
       this.env[RACK_REQUEST_FORM_HASH] = parsed;
       this.env[RACK_REQUEST_FORM_INPUT] = input;

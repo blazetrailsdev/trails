@@ -431,9 +431,13 @@ describe("RackRequestTest", () => {
   });
 
   it("parse POST data when method is POST and no content-type given", () => {
-    const req = makeReq("/", { method: "POST", input: "foo=bar" });
-    // MockRequest sets default content-type for POST with input
-    expect(req.POST["foo"]).toBe("bar");
+    const req = makeReq("/?foo=quux", { method: "POST", input: "foo=bar&quux=bla" });
+    expect(req.contentType).toBeNull();
+    expect(req.mediaType).toBeNull();
+    expect(req.queryString).toBe("foo=quux");
+    expect(req.GET).toEqual({ foo: "quux" });
+    expect(req.POST).toEqual({ foo: "bar", quux: "bla" });
+    expect(req.params).toEqual({ foo: "bar", quux: "bla" });
   });
 
   it("parse POST data with explicit content type regardless of method", () => {
