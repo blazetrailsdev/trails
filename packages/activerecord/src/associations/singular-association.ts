@@ -48,12 +48,13 @@ export class SingularAssociation extends Association {
     const setNewRecord = (): Base | null | Promise<Base | null> => {
       const removal = this.detachDisplacedOnBuild(record);
       if (removal) {
-        return removal.then(() => {
-          if (record) this.setNewRecord(record);
+        return removal.then(async () => {
+          if (record) await this.setNewRecord(record);
           return record;
         });
       }
-      if (record) this.setNewRecord(record);
+      const assigned = record ? this.setNewRecord(record) : undefined;
+      if (assigned) return assigned.then(() => record);
       return record;
     };
     const load = this.loadDisplacedForBuild();
@@ -191,7 +192,7 @@ export class SingularAssociation extends Association {
     }
     const removal = this.detachDisplacedOnBuild(record);
     if (removal) await removal;
-    this.setNewRecord(record);
+    await this.setNewRecord(record);
     if (!saved && raiseError) {
       throw new RecordInvalid(record);
     }
@@ -209,8 +210,8 @@ export class SingularAssociation extends Association {
     this.target = record;
   }
 
-  protected setNewRecord(record: Base): void {
-    this.replace(record);
+  protected setNewRecord(record: Base): void | Promise<void> {
+    return this.replace(record);
   }
 }
 

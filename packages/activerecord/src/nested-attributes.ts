@@ -408,7 +408,7 @@ interface OneToOneAssociation {
   target: Base | null;
   build(attrs: Record<string, unknown>): Base | null | Promise<Base | null>;
   buildRecord(attrs: Record<string, unknown>): Base | null;
-  setNewRecord(record: Base): void;
+  setNewRecord(record: Base): void | Promise<void>;
   initializeAttributes(record: Base): Promise<void> | void;
   isLoaded(): boolean;
   readonly reader?: Base | null | Promise<Base | null>;
@@ -424,7 +424,7 @@ async function detachDisplacedThenSetNewRecord(
 ): Promise<void> {
   await assoc.loadDisplacedForBuild?.();
   await assoc.detachDisplacedTarget?.();
-  if (built) assoc.setNewRecord(built);
+  if (built) await assoc.setNewRecord(built);
 }
 
 /** @internal */
@@ -540,7 +540,7 @@ export function assignNestedAttributesForOneToOneAssociation(
         if (assoc.displacementNeedsAwait?.() === true) {
           return detachDisplacedThenSetNewRecord(assoc, built);
         }
-        if (built) assoc.setNewRecord(built);
+        if (built) return assoc.setNewRecord(built);
       }
     }
   }
@@ -659,9 +659,23 @@ export function assignNestedAttributesForCollectionAssociation(
   if (!isAutosave || attributeIds.length === 0 || !collectionTargetModel) return assignRecords([]);
 
   const primaryKey = (collectionTargetModel as any).primaryKey;
-  return association
-    .scope()
-    .where({ [Array.isArray(primaryKey) ? primaryKey[0] : primaryKey]: attributeIds })
+  const scope = association.scope();
+  /** @missingRailsArgs where — PERMANENT */
+  const existingRecordsScope = Array.isArray(primaryKey)
+    ? attributeIds
+        .map((id) =>
+          scope.where(
+            Object.fromEntries(
+              (primaryKey as string[]).map((column, i) => [
+                column,
+                (Array.isArray(id) ? id : [id])[i],
+              ]),
+            ),
+          ),
+        )
+        .reduce((left: any, right: any) => left.or(right))
+    : scope.where({ [primaryKey]: attributeIds });
+  return existingRecordsScope
     .toArray()
     .then((existingRecords: Base[]) => assignRecords(existingRecords));
 }

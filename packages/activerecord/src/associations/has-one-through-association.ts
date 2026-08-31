@@ -65,8 +65,8 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     return record;
   }
 
-  protected override setNewRecord(record: Base): void {
-    this.replace(record, false);
+  protected override setNewRecord(record: Base): void | Promise<void> {
+    return this.replace(record, false);
   }
 
   /** @internal */
@@ -97,7 +97,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /** @missingRailsCall create_through_record — PERMANENT */
-  protected override replace(record: Base | null, save: false): void;
   protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
   protected override replace(record: Base | null, save = true): void | Promise<void> {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
@@ -149,7 +148,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
       }
       return assigned;
     } else {
-      buildThroughProxyRecord(throughProxy, attrs);
+      const built = buildThroughProxyRecord(throughProxy, attrs);
       if (!((this.owner as any).isNewRecord?.() ?? true)) {
         if (this._pendingReplace) {
           this._pendingReplace.record = record;
@@ -164,6 +163,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
           tp._pendingReplace = { record: null, previousTarget: null };
         }
       }
+      return built;
     }
   }
 
@@ -220,7 +220,7 @@ async function createThroughRecord(
         await throughRecord.update?.(attrs);
       }
     } else if ((this.owner as any).isNewRecord?.() || !save) {
-      buildThroughProxyRecord(throughProxy, attrs);
+      await buildThroughProxyRecord(throughProxy, attrs);
     } else {
       await throughProxy.create?.(attrs);
     }
@@ -229,9 +229,12 @@ async function createThroughRecord(
 }
 
 /** @internal */
-function buildThroughProxyRecord(throughProxy: any, attrs: Record<string, unknown>): void {
+function buildThroughProxyRecord(
+  throughProxy: any,
+  attrs: Record<string, unknown>,
+): void | Promise<void> {
   const record = throughProxy.buildRecord?.(attrs);
-  if (record) throughProxy.setNewRecord?.(record);
+  if (record) return throughProxy.setNewRecord?.(record);
 }
 
 Object.assign(HasOneThroughAssociation.prototype, {
