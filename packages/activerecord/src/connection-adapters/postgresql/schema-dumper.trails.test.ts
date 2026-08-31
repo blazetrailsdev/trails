@@ -154,7 +154,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(spec["type"]).toBe('"integer"');
     });
 
-    it("adds enumType even for virtual enum columns (Rails continues after virtual block)", () => {
+    it("adds enum_type even for virtual enum columns (Rails continues after virtual block)", () => {
       const mockAdapter = {
         tables: async () => [],
         columns: async () => [],
@@ -201,7 +201,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(spec["as"]).toBeUndefined();
     });
 
-    it("adds enumType for enum columns", () => {
+    it("adds enum_type for enum columns", () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = new Column(
         "status",
