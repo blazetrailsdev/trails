@@ -175,7 +175,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       );
       const spec = dumper.prepareColumnOptions(col);
       expect(spec["stored"]).toBe(true);
-      expect(spec["enum_type"]).toBe(JSON.stringify("mood"));
+      expect(spec["enumType"]).toBe(JSON.stringify("mood"));
     });
 
     it("skips virtual options when adapter does not support virtual columns", () => {
@@ -211,7 +211,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         {},
       );
       const spec = dumper.prepareColumnOptions(col);
-      expect(spec["enum_type"]).toBe(JSON.stringify("mood"));
+      expect(spec["enumType"]).toBe(JSON.stringify("mood"));
     });
   });
 

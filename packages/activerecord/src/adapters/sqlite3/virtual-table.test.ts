@@ -5,6 +5,7 @@ import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import type { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SchemaDumper } from "../../schema-dumper.js";
+import { Schema } from "../../schema.js";
 
 let adapter: SQLite3Adapter;
 
@@ -21,7 +22,7 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   });
 
   afterEach(async () => {
-    await adapter.dropTable("searchables", { ifExists: true });
+    await adapter.dropTable("searchables", "emails", { ifExists: true });
   });
 
   it("schema dump", async () => {
@@ -34,9 +35,13 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   });
 
   it("schema load", async () => {
-    expect(await adapter.virtualTableExists("searchables")).toBe(true);
+    await Schema.define<SQLite3Adapter>(async (schema) => {
+      await schema.methodMissing("createVirtualTable", "emails", "fts5", [
+        "content",
+        "meta UNINDEXED",
+      ]);
+    });
 
-    await adapter.createVirtualTable("emails", "fts5", ["content", "meta UNINDEXED"]);
     expect(await adapter.virtualTableExists("emails")).toBe(true);
   });
 });

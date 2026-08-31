@@ -147,9 +147,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         "Note that some types may not work with other database engines. Be careful if changing database.",
       );
       expect(output).toContain('await ctx.createEnum("mood", ["sad","ok","happy"]);');
-      expect(output).toContain('t.enum("current_mood", { enum_type: "mood" })');
+      expect(output).toContain('t.enum("current_mood", { enumType: "mood" })');
       expect(output).toContain(
-        't.enum("good_mood", { default: "happy", null: false, enum_type: "mood" })',
+        't.enum("good_mood", { default: "happy", null: false, enumType: "mood" })',
       );
     });
 
@@ -157,14 +157,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.renameEnum("mood", "feeling");
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
-      expect(output).toContain('enum_type: "feeling"');
+      expect(output).toContain('enumType: "feeling"');
     });
 
     it("schema dump renamed enum with to option", async () => {
       await adapter.renameEnum("mood", { to: "feeling" });
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_enums");
       expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
-      expect(output).toContain('enum_type: "feeling"');
+      expect(output).toContain('enumType: "feeling"');
     });
 
     it.skipIf(pgServerVersion < 100000)("schema dump added enum value", async () => {
@@ -190,7 +190,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await schema.createEnum("color", ["blue", "green"]);
         await schema.changeTable("postgresql_enums", async (t) => {
           await t.enum("best_color", {
-            enum_type: "color",
+            enumType: "color",
             default: "blue",
             null: false,
           });
@@ -284,7 +284,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           expect(output).toContain(
             'await ctx.createEnum("mood_in_test_schema", ["sad","ok","happy"]);',
           );
-          expect(output).toContain('t.enum("current_mood", { enum_type: "mood_in_test_schema" })');
+          expect(output).toContain('t.enum("current_mood", { enumType: "mood_in_test_schema" })');
           expect(output).not.toContain("other_schema.mood_in_other_schema");
         });
       } finally {
@@ -305,7 +305,7 @@ describeIfPg("PostgreSQLAdapter", () => {
                 "postgresql_enums_in_test_schema",
                 { force: "cascade" },
                 (t) => {
-                  t.enum("current_mood", { enum_type: "mood_in_test_schema" });
+                  t.enum("current_mood", { enumType: "mood_in_test_schema" });
                 },
               );
             });

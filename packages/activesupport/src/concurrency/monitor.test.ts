@@ -76,6 +76,36 @@ describe("MonitorMixin", () => {
     await expect(host.synchronize(() => "after")).resolves.toBe("after");
   });
 
+  it("serves waiters in arrival order when a late caller enters in the release turn", async () => {
+    const host = new Monitored();
+    const log: string[] = [];
+
+    let releaseHolder!: () => void;
+    const held = new Promise<void>((resolve) => {
+      releaseHolder = resolve;
+    });
+
+    const holder = host.synchronize(async () => {
+      log.push("holder");
+      await held;
+    });
+
+    const queued = host.synchronize(() => {
+      log.push("queued");
+    });
+
+    // The late arrival lands in the release window: the holder has already
+    // dropped the lock, but the parked waiter's continuation has not drained
+    // yet. A check-then-set lock lets it barge through there; the extra `then`
+    // is what places the arrival inside that window.
+    const late = held.then(() => {}).then(() => host.synchronize(() => log.push("late")));
+    releaseHolder();
+
+    await Promise.all([holder, queued, late]);
+
+    expect(log).toEqual(["holder", "queued", "late"]);
+  });
+
   it("locks each host independently", async () => {
     const a = new Monitored();
     const b = new Monitored();

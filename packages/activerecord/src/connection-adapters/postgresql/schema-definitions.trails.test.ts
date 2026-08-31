@@ -208,7 +208,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
 
   it("passes :enum through as the column type with enum_type forwarded", () => {
     const td = new TableDefinition(leased, "t");
-    td.enum("current_mood", { enum_type: "mood" });
+    td.enum("current_mood", { enumType: "mood" });
     const [col] = td.columns;
     expect(col.type).toBe("enum");
     expect((col.options as { enumType?: string }).enumType).toBe("mood");
@@ -217,7 +217,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition#enum", () => {
 
   it("defines one column per name", () => {
     const td = new TableDefinition(leased, "t");
-    td.enum("a", "b", { enum_type: "mood" });
+    td.enum("a", "b", { enumType: "mood" });
     expect(td.columns.map((c) => c.name)).toEqual(["a", "b"]);
   });
 

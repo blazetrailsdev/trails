@@ -82,7 +82,7 @@ export interface ColumnMethods {
   xml(...args: [...names: string[], options: ColumnOptions]): unknown;
   enumType(name: string, enumName: string, options?: ColumnOptions): unknown;
   enum(...names: string[]): unknown;
-  enum(...args: [...names: string[], options: ColumnOptions & { enum_type?: string }]): unknown;
+  enum(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
 
 export interface ExclusionConstraintOptions {
@@ -506,12 +506,11 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   enum(...names: string[]): this;
-  enum(...args: [...names: string[], options: ColumnOptions & { enum_type?: string }]): this;
+  enum(...args: [...names: string[], options: ColumnOptions]): this;
   enum(...args: unknown[]): this {
     const { names, options } = splitColumnNames(args, "enum");
-    const { enum_type: enumType, ...rest } = options as ColumnOptions & { enum_type?: string };
     for (const name of names) {
-      this.column(name, "enum" as ColumnType, { ...rest, enumType } as ColumnOptions);
+      this.column(name, "enum" as ColumnType, options);
     }
     return this;
   }
@@ -763,14 +762,11 @@ export class Table extends AbstractTable {
     return this.definedPgColumn("timestamptz", args);
   }
 
-  enum(
-    ...args: [...names: string[], options: ColumnOptions & { enum_type: string }]
-  ): Promise<void>;
+  enum(...args: [...names: string[], options: ColumnOptions]): Promise<void>;
   async enum(...args: unknown[]): Promise<void> {
     const { names, options } = splitColumnNames(args, "enum");
-    const { enum_type: enumType, ...rest } = options as ColumnOptions & { enum_type?: string };
     for (const name of names) {
-      await this.column(name, "enum" as ColumnType, { ...rest, enumType } as ColumnOptions);
+      await this.column(name, "enum" as ColumnType, options);
     }
   }
 

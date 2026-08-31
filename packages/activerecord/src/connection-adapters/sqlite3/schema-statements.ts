@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { pluralize } from "@blazetrails/activesupport";
+import { pluralize, toS } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
   AddForeignKeyOptions,
@@ -78,25 +78,35 @@ export async function removeForeignKey(
   if (ifExists && !(await this.foreignKeyExists(fromTable, to))) return;
 
   to ??= opts.toTable;
-  const matchOptions: ForeignKeyLookupOptions = { ...opts };
+  let matchOptions: ForeignKeyLookupOptions = { ...opts };
   delete matchOptions.name;
   delete matchOptions.toTable;
   delete matchOptions.validate;
 
   const foreignKeys = await this.foreignKeys(fromTable);
   const fkey = foreignKeys.find((fk) => {
-    const inferred = String(matchOptions.column ?? "").replace(/_id$/, "");
-    const table = this.stripTableNamePrefixAndSuffix(
-      to ?? (globalPluralizeTableNames() ? pluralize(inferred) : inferred),
-    );
+    let table: string;
+    if (to != null) {
+      table = to;
+    } else {
+      table = toS(matchOptions.column).replace(/_id$/, "");
+      table = globalPluralizeTableNames() ? pluralize(table) : table;
+    }
+    table = this.stripTableNamePrefixAndSuffix(table);
+    const fkOptions = fk.options;
+    matchOptions = Object.fromEntries(
+      Object.entries(matchOptions).filter(([k]) => k in fkOptions),
+    ) as ForeignKeyLookupOptions;
+    const fkToTable = this.stripTableNamePrefixAndSuffix(fk.toTable);
     return (
-      this.stripTableNamePrefixAndSuffix(fk.toTable) === table && fk.isDefinedFor(matchOptions)
+      fkToTable === table &&
+      Object.entries(matchOptions).every(([k, v]) => toS(fkOptions[k]) === toS(v))
     );
   });
 
   if (!fkey) {
     throw new ArgumentError(
-      `Table '${fromTable}' has no foreign key for ${to ?? JSON.stringify(matchOptions)}`,
+      `Table '${fromTable}' has no foreign key for ${to ?? toS(matchOptions)}`,
     );
   }
 

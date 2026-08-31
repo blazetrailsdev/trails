@@ -25,11 +25,11 @@ export class SchemaDumper extends AbstractSchemaDumper {
     if (this.supportsVirtualColumns && this._isVirtual(column)) {
       spec["as"] = this.extractExpressionForVirtualColumn(column);
       spec["stored"] = true;
-      if (this._isEnum(column)) spec["enum_type"] = JSON.stringify(column.sqlType);
+      if (this._isEnum(column)) spec["enumType"] = JSON.stringify(column.sqlType);
       return { type: JSON.stringify(this.schemaType(column)), ...spec };
     }
 
-    if (this._isEnum(column)) spec["enum_type"] = JSON.stringify(column.sqlType);
+    if (this._isEnum(column)) spec["enumType"] = JSON.stringify(column.sqlType);
 
     return spec;
   }
