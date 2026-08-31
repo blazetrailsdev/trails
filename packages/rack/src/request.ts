@@ -1,5 +1,6 @@
 import {
   REQUEST_METHOD,
+  RACK_METHODOVERRIDE_ORIGINAL_METHOD,
   SERVER_NAME,
   SERVER_PORT,
   SERVER_PROTOCOL,
@@ -380,8 +381,13 @@ export class Request {
   }
 
   get formData(): boolean {
-    const mt = this.mediaType;
-    return mt !== null && FORM_DATA_MEDIA_TYPES.includes(mt);
+    const type = this.mediaType;
+    const meth =
+      this.getHeader(RACK_METHODOVERRIDE_ORIGINAL_METHOD) ?? this.getHeader(REQUEST_METHOD);
+
+    return (
+      (meth === POST && type === null) || (type !== null && FORM_DATA_MEDIA_TYPES.includes(type))
+    );
   }
 
   get formPairs(): [string, any][] {
