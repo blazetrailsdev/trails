@@ -91,7 +91,7 @@ export class DefaultMiddlewareStack {
       stack.use(Cookies as never);
     }
 
-    if (!config.apiOnly && config.sessionStore) {
+    if (!config.apiOnly && config.sessionStore() != null) {
       if (
         config.forceSsl &&
         (config.sslOptions.secureCookies ?? true) &&
@@ -99,7 +99,7 @@ export class DefaultMiddlewareStack {
       ) {
         config.sessionOptions.secure = true;
       }
-      stack.use(config.sessionStore as never, config.sessionOptions);
+      stack.use(config.sessionStore() as never, config.sessionOptions);
     }
 
     if (!config.apiOnly) {

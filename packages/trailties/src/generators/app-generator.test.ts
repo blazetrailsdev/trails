@@ -96,6 +96,10 @@ describe("AppGenerator", () => {
     expect(exists("test/integration/.gitkeep")).toBe(true);
     expect(exists("test/fixtures/files/.gitkeep")).toBe(true);
 
+    // Rails ships no `public/index.html` — a new app's welcome page is a route
+    // to `Rails::WelcomeController`, and one on disk would shadow the root
+    // route `add_internal_routes` appends (`finisher.rb:148-152`).
+    expect(exists("public/index.html")).toBe(false);
     expect(exists("public/404.html")).toBe(true);
     expect(exists("public/422.html")).toBe(true);
     expect(exists("public/500.html")).toBe(true);
@@ -148,6 +152,13 @@ describe("AppGenerator", () => {
     expect(pkg.scripts["db:seed"]).toBeDefined();
     expect(pkg.scripts["db:setup"]).toBeDefined();
     expect(pkg.devDependencies.vite).toBeDefined();
+    expect(pkg.devDependencies.tsx).toBeDefined();
+    // Every CLI command that executes application code enters through the tsx
+    // loader; a bare `trails db seed` cannot resolve the `.js` specifiers a
+    // Node16 `.ts` source spells.
+    expect(pkg.scripts["db:seed"]).toContain("tsx");
+    expect(pkg.scripts.dev).toContain("tsx");
+    expect(pkg.scripts.trails).toContain("tsx");
   });
 
   it("emits prepare hook that builds .tse views", async () => {
