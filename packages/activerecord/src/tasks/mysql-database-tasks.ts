@@ -40,11 +40,11 @@ export class MySQLDatabaseTasks {
     await this.establishConnection();
   }
 
-  async charset(): Promise<string> {
+  async charset(): Promise<string | null> {
     return (await this.connection()).charset();
   }
 
-  async collation(): Promise<string> {
+  async collation(): Promise<string | null> {
     return (await this.connection()).collation();
   }
 

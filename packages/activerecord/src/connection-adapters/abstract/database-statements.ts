@@ -287,8 +287,9 @@ export function queryValue(
   sql: string,
   name?: string | null,
   binds?: unknown[],
+  options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<unknown> {
-  return query.call(this, sql, name, binds).then((rows) => singleValueFromRows(rows));
+  return query.call(this, sql, name, binds, options).then((rows) => singleValueFromRows(rows));
 }
 
 export function queryValues(
@@ -296,8 +297,9 @@ export function queryValues(
   sql: string,
   name?: string | null,
   binds?: unknown[],
+  options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<unknown[]> {
-  return query.call(this, sql, name, binds).then((rows) => rows.map((row) => row[0]));
+  return query.call(this, sql, name, binds, options).then((rows) => rows.map((row) => row[0]));
 }
 
 export async function query(
@@ -305,9 +307,10 @@ export async function query(
   sql: string,
   name?: string | null,
   binds?: unknown[],
+  options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<unknown[][]> {
   const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
-  const result = await run(sql, name, binds);
+  const result = await run(sql, name, binds, options);
   return result.rows;
 }
 

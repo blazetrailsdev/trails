@@ -37,7 +37,7 @@ export function sqlite3AdapterStrictStringsDisabled(): boolean {
 export async function mysqlEnforcingGtidConsistency(): Promise<boolean> {
   if (!currentAdapter("Mysql2Adapter", "TrilogyAdapter")) return false;
   const connection = (await Base.leaseConnection()) as unknown as {
-    showVariable(name: string): Promise<string | null>;
+    showVariable(name: string): Promise<unknown>;
   };
   return (await connection.showVariable("enforce_gtid_consistency")) === "ON";
 }

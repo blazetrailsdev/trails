@@ -1,13 +1,13 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
-import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
 import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
 } from "./schema-definitions.js";
 import { Column } from "./column.js";
+import type { Type } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { ForeignKeyDefinition, IndexDefinition } from "../abstract/schema-definitions.js";
@@ -255,7 +255,7 @@ export async function defaultRowFormat(this: RowFormatHost): Promise<string | nu
 /** @internal */
 export interface MysqlColumnReflectionHost {
   createTableInfo(tableName: string): Promise<string | null>;
-  lookupCastType?(sqlType: string | null): unknown;
+  lookupCastType(sqlType: string | null): Type;
 }
 
 /** @internal */
@@ -284,19 +284,7 @@ export async function newColumnFromField(
   _definitions: unknown,
 ): Promise<Column> {
   const fieldName = field["Field"] ?? "";
-  const meta = fetchTypeMetadata(
-    field["Type"] ?? "",
-    field["Extra"] ?? "",
-    this.lookupCastType
-      ? (sqlType) =>
-          this.lookupCastType!(sqlType) as {
-            name: string;
-            limit?: number | null;
-            precision?: number | null;
-            scale?: number | null;
-          }
-      : undefined,
-  );
+  const meta = fetchTypeMetadata.call(this, field["Type"] ?? "", field["Extra"] ?? "");
   let def: string | null = field["Default"] ?? null;
   let defFn: string | null = null;
 
@@ -322,38 +310,13 @@ export async function newColumnFromField(
 
 /** @internal */
 export function fetchTypeMetadata(
+  this: MysqlColumnReflectionHost,
   sqlType: string,
   extra: string = "",
-  lookupCastType?: (sqlType: string) => {
-    name: string;
-    limit?: number | null;
-    precision?: number | null;
-    scale?: number | null;
-  },
 ): TypeMetadata {
-  let baseType: string;
-  let limit: number | null = null;
-  let precision: number | null = null;
-  let scale: number | null = null;
-
-  if (lookupCastType) {
-    const castType = lookupCastType(sqlType);
-    const raw = castType.name.toLowerCase();
-    baseType = /^timestamp/.test(raw) ? "datetime" : raw;
-    limit = castType.limit ?? null;
-    precision = castType.precision ?? null;
-    scale = castType.scale ?? null;
-  } else {
-    baseType = sqlType
-      .replace(/\(.*\).*$/, "")
-      .trim()
-      .toLowerCase()
-      .split(/\s+/)[0]!;
-    if (/^timestamp/.test(baseType)) baseType = "datetime";
-  }
-
-  const meta = new SqlTypeMetadata({ sqlType, type: baseType, limit, precision, scale });
-  return new TypeMetadata(meta, { extra });
+  return new TypeMetadata(BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType), {
+    extra,
+  });
 }
 
 /** @internal */
