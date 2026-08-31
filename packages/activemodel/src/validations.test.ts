@@ -40,7 +40,7 @@ class Topic extends Model {
     this.attribute("title", "string");
     this.attribute("author_name", "string");
     this.attribute("content", "string");
-    this.afterValidation((t: Topic) => t.performAfterValidation());
+    this.afterValidation(":performAfterValidation");
   }
 
   declare title: string | null;

@@ -285,6 +285,17 @@ function tryAutoRegisterNode(): boolean {
       return false;
     }
 
+    // Node >= 22.3 exposes builtins synchronously from ESM, where
+    // `require` is undefined and `import()` is a promise. This is the only
+    // sync path a pure-ESM entry has to `node:crypto`.
+    const builtin = globalThis.process.getBuiltinModule?.("node:crypto") as
+      | typeof import("node:crypto")
+      | undefined;
+    if (builtin) {
+      registry.set("node", wrapNodeCrypto(builtin));
+      return true;
+    }
+
     const nodeModule =
       typeof require !== "undefined"
         ? // eslint-disable-next-line @typescript-eslint/no-require-imports
