@@ -1,8 +1,14 @@
 import { REQUEST_METHOD, RACK_METHODOVERRIDE_ORIGINAL_METHOD, RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { Request } from "./request.js";
+import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./query-parser.js";
+import { BoundaryTooLongError } from "./multipart/parser.js";
 
-/** `rack.errors` is a Ruby IO in Rails; trails sees `puts` or `write` sinks. */
+/**
+ * Rails writes to `rack.errors` with `puts`, which the Rack SPEC requires of an
+ * error stream; trails' lint accepts a `write`-only sink too (`lint.ts:171-173`),
+ * so both are fed.
+ */
 function putsError(errors: any, message: string): void {
   if (errors && typeof errors.puts === "function") {
     errors.puts(message);
@@ -53,19 +59,32 @@ export class MethodOverride {
     return null;
   }
 
+  /**
+   * Mirrors: `Rack::MethodOverride#method_override_param`
+   * (`rack/method_override.rb:48-54`). Its second rescue arm is `EOFError`,
+   * which `Multipart.parse_multipart` raises on a body whose terminating
+   * boundary never arrives; trails' parser raises `BoundaryTooLongError` there.
+   */
   private methodOverrideParam(req: Request): string | null {
     try {
       if (req.formData || req.isParseableData()) {
         return req.POST[METHOD_OVERRIDE_PARAM_KEY] ?? null;
       }
       return null;
-    } catch (e: any) {
-      const message =
-        e instanceof RangeError || /too deep|Invalid/.test(String(e?.message))
-          ? "Invalid or incomplete POST params"
-          : "Bad request content body";
-      putsError(req.getHeader(RACK_ERRORS), message);
-      return null;
+    } catch (e) {
+      if (
+        e instanceof InvalidParameterError ||
+        e instanceof ParameterTypeError ||
+        e instanceof ParamsTooDeepError
+      ) {
+        putsError(req.getHeader(RACK_ERRORS), "Invalid or incomplete POST params");
+        return null;
+      }
+      if (e instanceof BoundaryTooLongError) {
+        putsError(req.getHeader(RACK_ERRORS), "Bad request content body");
+        return null;
+      }
+      throw e;
     }
   }
 }
