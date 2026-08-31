@@ -157,6 +157,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
 
   it("does not close the handle out from under a statement holding the lock", async () => {
     const closing = new BetterSQLite3Adapter(":memory:");
+    await closing.databaseVersion;
     // eslint-disable-next-line blazetrails/require-table-teardown
     await closing.exec(`CREATE TABLE "dc" ("id" INTEGER PRIMARY KEY)`);
     const release = await acquireStatementLock(closing);
@@ -178,6 +179,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
 
   it("reports itself inactive once the disconnect a caller awaited has returned", async () => {
     const closing = new BetterSQLite3Adapter(":memory:");
+    await closing.databaseVersion;
     // eslint-disable-next-line blazetrails/require-table-teardown
     await closing.exec(`CREATE TABLE "dc2" ("id" INTEGER PRIMARY KEY)`);
     const release = await acquireStatementLock(closing);

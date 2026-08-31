@@ -490,14 +490,22 @@ describe("ConnectionHandlersShardingDbTest", () => {
 
   it("same shards across clusters", async () => {
     class SecondaryBase extends Base {
-      static override abstractClass = true;
+      static {
+        this.abstractClass = true;
+      }
     }
-    class ShardConnectionTestModel extends SecondaryBase {}
+    class ShardConnectionTestModel extends SecondaryBase {
+      declare shard_key: string;
+    }
 
     class SomeOtherBase extends Base {
-      static override abstractClass = true;
+      static {
+        this.abstractClass = true;
+      }
     }
-    class ShardConnectionTestModelB extends SomeOtherBase {}
+    class ShardConnectionTestModelB extends SomeOtherBase {
+      declare shard_key: string;
+    }
 
     const makePool = (owner: string, shard: string) =>
       Base.connectionHandler.establishConnection(
@@ -518,34 +526,30 @@ describe("ConnectionHandlersShardingDbTest", () => {
       (SomeOtherBase as any)._shardKeys = ["one"];
 
       await Base.connectedTo({ role: "writing", shard: "one" }, async () => {
-        const connA = await ShardConnectionTestModel.leaseConnection();
-        await connA.executeMutation(
-          `CREATE TABLE "shard_connection_test_models" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "shard_key" TEXT)`,
-        );
-        await connA.executeMutation(
-          `INSERT INTO "shard_connection_test_models" ("shard_key") VALUES ('test_model_default')`,
-        );
+        await (
+          await ShardConnectionTestModel.leaseConnection()
+        )
+          // eslint-disable-next-line blazetrails/require-table-teardown
+          .execute(`CREATE TABLE "shard_connection_test_models" (shard_key VARCHAR (255))`);
+        await ShardConnectionTestModel.loadSchema();
+        await ShardConnectionTestModel.createBang({ shard_key: "test_model_default" });
 
-        const connB = await ShardConnectionTestModelB.leaseConnection();
-        await connB.executeMutation(
-          `CREATE TABLE "shard_connection_test_model_bs" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "shard_key" TEXT)`,
-        );
-        await connB.executeMutation(
-          `INSERT INTO "shard_connection_test_model_bs" ("shard_key") VALUES ('test_model_b_default')`,
-        );
+        await (
+          await ShardConnectionTestModelB.leaseConnection()
+        )
+          // eslint-disable-next-line blazetrails/require-table-teardown
+          .execute(`CREATE TABLE "shard_connection_test_model_bs" (shard_key VARCHAR (255))`);
+        await ShardConnectionTestModelB.loadSchema();
+        await ShardConnectionTestModelB.createBang({ shard_key: "test_model_b_default" });
 
-        const rowsA = await connA.execute(
-          `SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'test_model_default'`,
-        );
-        expect(rowsA[0]?.shard_key).toBe("test_model_default");
-
-        const rowsB = await connB.execute(
-          `SELECT shard_key FROM "shard_connection_test_model_bs" WHERE shard_key = 'test_model_b_default'`,
-        );
-        expect(rowsB[0]?.shard_key).toBe("test_model_b_default");
-
-        await connA.executeMutation(`DROP TABLE IF EXISTS "shard_connection_test_models"`);
-        await connB.executeMutation(`DROP TABLE IF EXISTS "shard_connection_test_model_bs"`);
+        expect(
+          (await ShardConnectionTestModel.where({ shard_key: "test_model_default" }).first())
+            ?.shard_key,
+        ).toEqual("test_model_default");
+        expect(
+          (await ShardConnectionTestModelB.where({ shard_key: "test_model_b_default" }).first())
+            ?.shard_key,
+        ).toEqual("test_model_b_default");
       });
     } finally {
       await Base.connectionHandler.clearAllConnectionsBang();
@@ -556,9 +560,13 @@ describe("ConnectionHandlersShardingDbTest", () => {
 
   it("sharding separation", async () => {
     class SecondaryBase extends Base {
-      static override abstractClass = true;
+      static {
+        this.abstractClass = true;
+      }
     }
-    class ShardConnectionTestModel extends SecondaryBase {}
+    class ShardConnectionTestModel extends SecondaryBase {
+      declare shard_key: string;
+    }
 
     const makePool = (shard: string) =>
       Base.connectionHandler.establishConnection(
@@ -581,45 +589,24 @@ describe("ConnectionHandlersShardingDbTest", () => {
         await Base.connectedTo({ role: "writing", shard: shardName }, async () => {
           await (
             await ShardConnectionTestModel.leaseConnection()
-          ).executeMutation(
-            `CREATE TABLE "shard_connection_test_models" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "shard_key" TEXT)`,
-          );
+          ).execute(`CREATE TABLE "shard_connection_test_models" (shard_key VARCHAR (255))`);
         });
       }
 
-      await (
-        await ShardConnectionTestModel.leaseConnection()
-      ).executeMutation(`INSERT INTO "shard_connection_test_models" ("shard_key") VALUES ('foo')`);
+      await ShardConnectionTestModel.loadSchema();
+      await ShardConnectionTestModel.createBang({ shard_key: "foo" });
 
       await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
-        const rows = await (
-          await ShardConnectionTestModel.leaseConnection()
-        ).execute(`SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'foo'`);
-        expect(rows.length).toBe(1);
+        expect(await ShardConnectionTestModel.findBy({ shard_key: "foo" })).toBeTruthy();
       });
 
       await Base.connectedTo({ role: "writing", shard: "one" }, async () => {
-        const rows = await (
-          await ShardConnectionTestModel.leaseConnection()
-        ).execute(`SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'foo'`);
-        expect(rows.length).toBe(0);
-
-        await (
-          await ShardConnectionTestModel.leaseConnection()
-        ).executeMutation(
-          `INSERT INTO "shard_connection_test_models" ("shard_key") VALUES ('bar')`,
-        );
+        expect(await ShardConnectionTestModel.findBy({ shard_key: "foo" })).toBeFalsy();
+        await ShardConnectionTestModel.createBang({ shard_key: "bar" });
       });
 
-      const barRows = await (
-        await ShardConnectionTestModel.leaseConnection()
-      ).execute(`SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'bar'`);
-      expect(barRows.length).toBe(0);
-
-      const fooRows = await (
-        await ShardConnectionTestModel.leaseConnection()
-      ).execute(`SELECT shard_key FROM "shard_connection_test_models" WHERE shard_key = 'foo'`);
-      expect(fooRows.length).toBe(1);
+      expect(await ShardConnectionTestModel.findBy({ shard_key: "bar" })).toBeFalsy();
+      expect(await ShardConnectionTestModel.findBy({ shard_key: "foo" })).toBeTruthy();
     } finally {
       await Base.connectionHandler.clearAllConnectionsBang();
       (SecondaryBase as any).connectionClass = undefined;

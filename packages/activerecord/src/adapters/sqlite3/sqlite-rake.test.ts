@@ -153,7 +153,8 @@ describeIfSqlite("SqliteDBDropTest", () => {
   it("checks db dir is absolute", async () => {
     const pathAdapter = activesupport.getPath() as { isAbsolute(p: string): boolean };
     const isAbsolute = vi.spyOn(pathAdapter, "isAbsolute").mockReturnValue(false);
-    vi.spyOn(activesupport.getFs(), "unlinkSync").mockImplementation(() => undefined);
+    vi.spyOn(activesupport.getFs(), "rm").mockImplementation(() => undefined);
+    vi.spyOn(activesupport.getFs(), "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 
@@ -161,20 +162,19 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("removes file with absolute path", async () => {
-    const unlinkSync = vi
-      .spyOn(activesupport.getFs(), "unlinkSync")
-      .mockImplementation(() => undefined);
+    const rm = vi.spyOn(activesupport.getFs(), "rm").mockImplementation(() => undefined);
+    const rmF = vi.spyOn(activesupport.getFs(), "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configurationRoot);
 
-    expect(unlinkSync).toHaveBeenCalledWith(databaseRoot);
-    expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-shm`);
-    expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-wal`);
+    expect(rm).toHaveBeenCalledWith(databaseRoot);
+    expect(rmF).toHaveBeenCalledWith([`${databaseRoot}-shm`, `${databaseRoot}-wal`]);
   });
 
   it("generates absolute path with given root", async () => {
     const join = vi.spyOn(activesupport.getPath(), "join");
-    vi.spyOn(activesupport.getFs(), "unlinkSync").mockImplementation(() => undefined);
+    vi.spyOn(activesupport.getFs(), "rm").mockImplementation(() => undefined);
+    vi.spyOn(activesupport.getFs(), "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 
@@ -183,19 +183,18 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("removes file with relative path", async () => {
-    const unlinkSync = vi
-      .spyOn(activesupport.getFs(), "unlinkSync")
-      .mockImplementation(() => undefined);
+    const rm = vi.spyOn(activesupport.getFs(), "rm").mockImplementation(() => undefined);
+    const rmF = vi.spyOn(activesupport.getFs(), "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 
-    expect(unlinkSync).toHaveBeenCalledWith(databaseRoot);
-    expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-shm`);
-    expect(unlinkSync).toHaveBeenCalledWith(`${databaseRoot}-wal`);
+    expect(rm).toHaveBeenCalledWith(databaseRoot);
+    expect(rmF).toHaveBeenCalledWith([`${databaseRoot}-shm`, `${databaseRoot}-wal`]);
   });
 
   it("when db dropped successfully outputs info to stdout", async () => {
-    vi.spyOn(activesupport.getFs(), "unlinkSync").mockImplementation(() => undefined);
+    vi.spyOn(activesupport.getFs(), "rm").mockImplementation(() => undefined);
+    vi.spyOn(activesupport.getFs(), "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 

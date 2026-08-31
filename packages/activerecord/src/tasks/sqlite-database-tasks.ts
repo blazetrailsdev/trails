@@ -41,17 +41,13 @@ export class SQLiteDatabaseTasks {
     const file =
       !path.isAbsolute || path.isAbsolute(dbPath) ? dbPath : path.join(this.root, dbPath);
     try {
-      fs.unlinkSync(file);
+      fs.rm(file);
+      fs.rmF([`${file}-shm`, `${file}-wal`]);
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         throw new NoDatabaseError((error as Error).message);
       }
       throw error;
-    }
-    for (const suffix of ["-shm", "-wal"]) {
-      try {
-        fs.unlinkSync(file + suffix);
-      } catch {}
     }
   }
 

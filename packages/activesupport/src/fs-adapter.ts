@@ -35,6 +35,13 @@ export interface FsAdapter {
   mkdirSync(path: string, options?: { recursive?: boolean }): void;
   appendFileSync(path: string, content: string): void;
   unlinkSync(path: string): void;
+  /**
+   * Ruby `FileUtils.rm` — removes each entry in the list, raising the
+   * underlying ENOENT when one is missing.
+   */
+  rm(list: string | string[]): void;
+  /** Ruby `FileUtils.rm_f` — {@link FsAdapter.rm} with missing entries ignored. */
+  rmF(list: string | string[]): void;
   readdirSync(path: string): string[];
   readdirSync(path: string, options: { withFileTypes: true }): FsDirent[];
   rmSync(path: string, options?: { recursive?: boolean; force?: boolean }): void;
@@ -282,6 +289,18 @@ function tryAutoRegisterNode(): boolean {
       mkdir(path: string, opts?: { recursive?: boolean }): Promise<string | undefined>;
     };
     const fs: FsAdapter = Object.assign({}, nodeFs, {
+      rm: (list: string | string[]) => {
+        for (const entry of Array.isArray(list) ? list : [list]) nodeFs.unlinkSync(entry);
+      },
+      rmF: (list: string | string[]) => {
+        for (const entry of Array.isArray(list) ? list : [list]) {
+          try {
+            nodeFs.unlinkSync(entry);
+          } catch {
+            // FileUtils.rm_f ignores a missing entry.
+          }
+        }
+      },
       cwd: () => globalThis.process.cwd(),
       exists: (p: string) =>
         fsPromises.access(p).then(

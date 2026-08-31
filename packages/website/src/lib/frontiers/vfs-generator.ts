@@ -54,6 +54,12 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
     unlinkSync(path: string): void {
       vfs.delete(path);
     },
+    rm(list: string | string[]): void {
+      for (const entry of Array.isArray(list) ? list : [list]) vfs.delete(entry);
+    },
+    rmF(list: string | string[]): void {
+      for (const entry of Array.isArray(list) ? list : [list]) vfs.delete(entry);
+    },
     readdirSync(): string[] {
       return [];
     },
