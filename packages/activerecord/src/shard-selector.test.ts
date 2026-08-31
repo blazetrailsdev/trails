@@ -3,7 +3,7 @@ import { Base } from "./base.js";
 import { ShardSelector } from "./middleware/shard-selector.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { ambientPoolConfiguration } from "./test-adapter.js";
-import { _setActionDispatchRequest } from "./middleware/request-slot.js";
+import { _setActionDispatchRequest } from "@blazetrails/activesupport";
 
 class TestRequest {
   readonly method: string;

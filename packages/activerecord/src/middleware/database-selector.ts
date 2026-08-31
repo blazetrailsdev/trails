@@ -1,5 +1,4 @@
-import { Notifications } from "@blazetrails/activesupport";
-import { _ActionDispatchRequest } from "./request-slot.js";
+import { Notifications, _ActionDispatchRequest } from "@blazetrails/activesupport";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
 import { Session } from "./database-selector/resolver/session.js";

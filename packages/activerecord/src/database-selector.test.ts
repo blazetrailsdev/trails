@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { currentPreventingWrites } from "./core.js";
 import { DatabaseSelector } from "./middleware/database-selector.js";
-import { _setActionDispatchRequest } from "./middleware/request-slot.js";
+import { _setActionDispatchRequest } from "@blazetrails/activesupport";
 import { Resolver, type ResolverContext } from "./middleware/database-selector/resolver.js";
 import { Session, type SessionStore } from "./middleware/database-selector/resolver/session.js";
 import { Temporal } from "@blazetrails/date";

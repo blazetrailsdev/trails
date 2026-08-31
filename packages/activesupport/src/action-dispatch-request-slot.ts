@@ -1,4 +1,4 @@
-/** @internal */
+/** @noRailsEquivalent PERMANENT */
 export type ActionDispatchRequestConstructor = new (env: Record<string, unknown>) => unknown;
 
 /** @internal */

@@ -1,6 +1,5 @@
 import { Base } from "../base.js";
-import { Notifications } from "@blazetrails/activesupport";
-import { _ActionDispatchRequest } from "./request-slot.js";
+import { Notifications, _ActionDispatchRequest } from "@blazetrails/activesupport";
 
 export interface ShardRequest {
   method: string;
