@@ -618,7 +618,7 @@ describe("HABTM fixture reflection walking (trails)", () => {
   });
 });
 
-describe("FixtureSet", () => {
+describe("FixtureSet (trails)", () => {
   it("identify returns the crc32 identifier for a label", () => {
     expect(FixtureSet.identify("dhh")).toBe(fixtureId("dhh"));
   });

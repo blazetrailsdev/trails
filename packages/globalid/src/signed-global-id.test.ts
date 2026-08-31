@@ -148,8 +148,7 @@ describe("SignedGlobalIDExpirationTest", () => {
 
   it("passing expires_in less than a second is not expired", () => {
     // Rails parity: with expires_in: 1.second, the token is not expired at
-    // 0.5 seconds elapsed but is expired at 2 seconds. `travel_to` is what the
-    // Ruby case uses; it moves the one clock these bodies read.
+    // 0.5 seconds elapsed but is expired at 2 seconds.
     try {
       travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();

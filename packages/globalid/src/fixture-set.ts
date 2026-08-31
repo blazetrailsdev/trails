@@ -1,7 +1,3 @@
-// Port of `GlobalID::FixtureSet` (`global_id/fixture_set.rb`). Rails mixes it
-// into `ActiveRecord::FixtureSet` with `send :extend, GlobalID::FixtureSet`
-// (`railtie.rb:42`); trails does the same through activesupport's `extend()`,
-// so the module is a plain object of `this`-typed functions.
 import { getApp } from "./config.js";
 import { GlobalID, type GlobalIDOptions } from "./global-id.js";
 import { SignedGlobalID, type SignedGlobalIDOptions } from "./signed-global-id.js";
@@ -63,11 +59,13 @@ function createGlobalId(
 ): GlobalID {
   const identifier = this.identify(label, columnType);
   const modelName = this.defaultFixtureModelName(fixtureSetName);
-  // Ruby passes `GlobalID.app` straight through; `URI::GID.validate_app`
-  // raises when it is nil, which is what `GID.build` does here too.
   const uri = GID.build({ app: getApp() as string, modelName, modelId: identifier, params: {} });
   return new klass(uri, options);
 }
 
-/** The module Rails `extend`s onto `ActiveRecord::FixtureSet`. */
+/**
+ * Port of `GlobalID::FixtureSet` (`global_id/fixture_set.rb`) — the module
+ * `railtie.rb:42` mixes into `ActiveRecord::FixtureSet` with
+ * `send :extend, GlobalID::FixtureSet`.
+ */
 export const FixtureSet = { globalId, signedGlobalId };

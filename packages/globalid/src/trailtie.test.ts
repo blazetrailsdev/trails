@@ -17,8 +17,6 @@ function blogApp(
     railtieName: () => "blog_app_application",
     config: { globalId: {} },
     keyGenerator: () => {
-      // `Application#keyGenerator` raises `ArgumentError` for a missing
-      // `secret_key_base`, which is the one class `railtie.rb:31-32` rescues.
       if (secretKeyBase === null) {
         throw new ArgumentError(
           "Missing `secret_key_base` for 'test' environment, set this string with `bin/rails credentials:edit`",
