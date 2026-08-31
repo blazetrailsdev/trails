@@ -1,3 +1,5 @@
+import { rubyCompatAliases } from "../parity/ruby-compat.js";
+
 /**
  * Single source of truth for Ruby Enumerable/Comparable idioms whose faithful
  * port is a native JS method spelled DIFFERENTLY. Two api-compare tools consume
@@ -67,29 +69,6 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
 ]);
 
 /**
- * Ruby CORE-library calls — not Enumerable idioms — whose faithful port is a
- * helper spelled differently because JS has no built-in for them. Same
- * silence-only contract as {@link JS_ENUMERABLE_ALIASES}, and consulted through
- * the same {@link jsEnumerableAliases}, but kept a separate table because that
- * one's KEYS are also lint-calls.ts's noise list (Ruby names whose port is a
- * NATIVE JS method, so no ported internal is expected to answer them) and the
- * anchor {@link LOOP_SKELETON_NAMES} is derived through. These names are ported
- * as ordinary functions, so neither derivation applies.
- *
- * `Regexp.escape` (`re.c` `rb_reg_s_quote`) escapes every character `Regexp`
- * gives a meaning to. JS has no `RegExp.escape`, so every port that needs it
- * carries a file-local helper, and each one is named `regexpEscape` — receiver
- * then method, the same spelling the naming conventions give any other
- * `Klass.method` call. One name, not a list of the spellings that happened to
- * be in the tree: an alias list would ratify the divergence this entry exists
- * to make visible, and a body that escapes under some other name should still
- * flag. `regexpEscape` cannot plausibly be the port of a different Ruby
- * `escape` (`CGI.escape`, `Shellwords.escape`), so crediting it cannot silence
- * a dropped call of one.
- */
-export const CORE_LIBRARY_ALIASES = new Map<string, string[]>([["escape", ["regexpEscape"]]]);
-
-/**
  * Ruby `File` class methods whose faithful port goes through trails' fs adapter
  * (`activesupport/src/fs-adapter.ts`), whose members carry NODE's spellings —
  * `File.exist?` is `getFs().existsSync`, `File.stat` is `statSync`, and so on.
@@ -98,7 +77,8 @@ export const CORE_LIBRARY_ALIASES = new Map<string, string[]>([["escape", ["rege
  * have. Same silence-only contract as {@link JS_ENUMERABLE_ALIASES} — an alias
  * only decides whether a TS body already makes a call and can never manufacture
  * a mismatch — and kept a separate table for the same reason
- * {@link CORE_LIBRARY_ALIASES} is: these KEYS are not lint-calls.ts noise.
+ * `RUBY_COMPAT_EXPORTS` (scripts/parity/ruby-compat.ts) is: these KEYS are not
+ * lint-calls.ts noise.
  *
  * Both spellings are listed per name because the adapter exposes the sync
  * member (`existsSync`) while a promise-shaped seam spells it bare (`exists`).
@@ -112,14 +92,15 @@ export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
   ["realpath", ["realpathSync"]],
 ]);
 
-/** JS call names that count as making Ruby call `rubyCall`. */
+/**
+ * JS call names that count as making Ruby call `rubyCall`. The Ruby-core tail is
+ * `rubyCompatAliases` (scripts/parity/ruby-compat.ts) — the FORWARD half of the
+ * RFC 0129 resolution table, which absorbed the `CORE_LIBRARY_ALIASES` that used
+ * to sit in this file. Same silence-only contract as the two tables above it.
+ */
 export function jsEnumerableAliases(rubyCall: string): string[] {
-  return (
-    JS_ENUMERABLE_ALIASES.get(rubyCall) ??
-    CORE_LIBRARY_ALIASES.get(rubyCall) ??
-    FS_ADAPTER_ALIASES.get(rubyCall) ??
-    []
-  );
+  const aliases = JS_ENUMERABLE_ALIASES.get(rubyCall) ?? FS_ADAPTER_ALIASES.get(rubyCall);
+  return aliases ?? rubyCompatAliases(rubyCall);
 }
 
 /**
