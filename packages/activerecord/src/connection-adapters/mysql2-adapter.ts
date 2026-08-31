@@ -1,6 +1,5 @@
 import mysql from "mysql2/promise";
-import { Temporal } from "@blazetrails/date";
-import { BigDecimal, KeyError } from "@blazetrails/activesupport";
+import { KeyError } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
@@ -10,7 +9,7 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
-import { StringType, ImmutableStringType, BinaryData } from "@blazetrails/activemodel";
+import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { TypeMap } from "../type/type-map.js";
@@ -39,7 +38,6 @@ import {
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
-import { Value as TimeValue } from "../type/time.js";
 import { ActiveRecord } from "../ar-config.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
@@ -313,7 +311,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
     const driverSql = this.mysqlQuote(sql);
-    const driverBinds = this.mysqlBinds(binds ?? []);
     const typeCastedBinds = this.typeCastedBinds(binds ?? []) ?? [];
     return this.log(driverSql, name, binds ?? [], typeCastedBinds, false, async (payload) => {
       try {
@@ -321,20 +318,26 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           { allowRetry: options?.allowRetry ?? false },
           async (conn) => {
             const mysqlConn = conn as unknown as mysql.Connection;
-            const raw = await this.performQuery(mysqlConn, driverSql, binds ?? [], driverBinds, {
-              prepare: options?.prepare ?? false,
-              notificationPayload: payload,
-            });
+            const raw = await this.performQuery(
+              mysqlConn,
+              driverSql,
+              binds ?? [],
+              typeCastedBinds,
+              {
+                prepare: options?.prepare ?? false,
+                notificationPayload: payload,
+              },
+            );
             return this.castResult(raw);
           },
         );
       } catch (e: any) {
         const translated =
           e instanceof MismatchedForeignKey
-            ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
+            ? await this._translateAndEnrich(e.cause ?? e, driverSql, typeCastedBinds)
             : e instanceof ActiveRecordError
               ? e
-              : await this._translateAndEnrich(e, driverSql, driverBinds);
+              : await this._translateAndEnrich(e, driverSql, typeCastedBinds);
         throw translated;
       }
     });
@@ -437,28 +440,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return translated;
   }
 
-  private mysqlBinds(binds: unknown[]): unknown[] {
-    return binds.map((v) => {
-      if (v && typeof v === "object" && "valueForDatabase" in v) {
-        v = (v as { valueForDatabase: unknown }).valueForDatabase;
-      }
-      if (v instanceof TimeValue || v instanceof Temporal.PlainTime) {
-        v = this.quotedTime(v);
-      } else if (
-        v instanceof Temporal.Instant ||
-        v instanceof Temporal.PlainDateTime ||
-        v instanceof Temporal.PlainDate ||
-        v instanceof Temporal.ZonedDateTime
-      ) {
-        v = this.quotedDate(v);
-      } else if (v instanceof BigDecimal) {
-        v = v.toString("F");
-      }
-      if (v instanceof BinaryData) v = v.bytes;
-      return v === true ? 1 : v === false ? 0 : v;
-    });
-  }
-
   /** @internal */
   declare performQuery: typeof mysql2PerformQuery;
 
@@ -517,13 +498,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   ): Promise<number> {
     sql = this.preprocessQuery(sql);
     const driverSql = this.mysqlQuote(sql);
-    const driverBinds = this.mysqlBinds(binds);
     const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
     return this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
       try {
         return await this.withRawConnection({}, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          const raw = await this.performQuery(mysqlConn, driverSql, binds, driverBinds, {
+          const raw = await this.performQuery(mysqlConn, driverSql, binds, typeCastedBinds, {
             prepare: false,
             notificationPayload: payload,
           });
@@ -541,10 +521,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       } catch (e: any) {
         const translated =
           e instanceof MismatchedForeignKey
-            ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
+            ? await this._translateAndEnrich(e.cause ?? e, driverSql, typeCastedBinds)
             : e instanceof ActiveRecordError
               ? e
-              : await this._translateAndEnrich(e, driverSql, driverBinds);
+              : await this._translateAndEnrich(e, driverSql, typeCastedBinds);
         throw translated;
       }
     });
@@ -634,7 +614,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         await this.materializeTransactions();
       }
       const driverSql = this.mysqlQuote(sql);
-      const driverBinds = binds.length > 0 ? this.mysqlBinds(binds) : [];
       const typeCastedBinds = this.typeCastedBinds(binds) ?? [];
       return await this.log(driverSql, name, binds, typeCastedBinds, false, async (payload) => {
         try {
@@ -642,7 +621,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             { materializeTransactions: false, allowRetry },
             async (rawConn) => {
               const conn = rawConn as unknown as mysql.Connection;
-              const rawResult = await this.performQuery(conn, driverSql, binds, driverBinds, {
+              const rawResult = await this.performQuery(conn, driverSql, binds, typeCastedBinds, {
                 prepare: prepareOption,
               });
               payload.row_count = rawResult.affectedRows;
@@ -652,10 +631,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         } catch (e: any) {
           const translated =
             e instanceof MismatchedForeignKey
-              ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
+              ? await this._translateAndEnrich(e.cause ?? e, driverSql, typeCastedBinds)
               : e instanceof ActiveRecordError
                 ? e
-                : await this._translateAndEnrich(e, driverSql, driverBinds);
+                : await this._translateAndEnrich(e, driverSql, typeCastedBinds);
           throw translated;
         }
       });
