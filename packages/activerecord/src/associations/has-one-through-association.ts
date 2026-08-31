@@ -85,10 +85,11 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   override writer(record: Base | null): void | Promise<void> {
-    this.replace(record);
+    const assigned = this.replace(record);
     if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.() && this._pendingReplace) {
-      return this.persistReplace();
+      return assigned ? assigned.then(() => this.persistReplace()) : this.persistReplace();
     }
+    return assigned;
   }
 
   sourceReflection(): unknown {
@@ -96,7 +97,9 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /** @missingRailsCall create_through_record — PERMANENT */
-  protected override replace(record: Base | null, save = true): void {
+  protected override replace(record: Base | null, save: false): void;
+  protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
+  protected override replace(record: Base | null, save = true): void | Promise<void> {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const inMemory = record != null && ((this.owner as any).isNewRecord?.() || !save);
     if (!inMemory) {
@@ -121,11 +124,11 @@ export class HasOneThroughAssociation extends HasOneAssociation {
       }
     }
     this.target = record;
-    if (record) this.constructThroughRecordInMemory(record, save);
+    if (record) return this.constructThroughRecordInMemory(record, save);
   }
 
   /** @internal */
-  private constructThroughRecordInMemory(record: Base, save: boolean): void {
+  private constructThroughRecordInMemory(record: Base, save: boolean): void | Promise<void> {
     if (!((this.owner as any).isNewRecord?.() || !save)) return;
 
     this.ensureNotNested();
@@ -134,17 +137,17 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     const attrs = this.constructJoinAttributes(record);
     const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
     if (throughRecord) {
+      const assigned: Promise<void> | void = (throughRecord as any).assignAttributes?.(attrs);
       if ((throughRecord as any).isNewRecord?.()) {
-        void (throughRecord as any).assignAttributes?.(attrs);
         if (this._pendingReplace) this._pendingReplace.record = record;
       } else {
-        void (throughRecord as any).assignAttributes?.(attrs);
         if (this._pendingReplace) {
           this._pendingReplace.record = record;
         } else {
           this._pendingReplace = { record, previousTarget: null };
         }
       }
+      return assigned;
     } else {
       buildThroughProxyRecord(throughProxy, attrs);
       if (!((this.owner as any).isNewRecord?.() ?? true)) {

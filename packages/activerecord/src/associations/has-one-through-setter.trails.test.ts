@@ -74,3 +74,44 @@ describe("HasOneThroughSetterTrails", () => {
     expect(Number(persisted!.readAttribute("club_id"))).toBe(Number(club.id));
   });
 });
+
+describe("HasOneThroughInMemoryJoinAssignmentTrails", () => {
+  const { clubs } = fixtures(["members", "clubs", "memberships"]);
+
+  registerModel(Member);
+  registerModel(Club);
+  Membership.inheritanceColumn = "type";
+  registerModel(Membership);
+  registerModel(CurrentMembership);
+
+  it("awaits the in-memory join record's assignment before the setter answers", async () => {
+    const member = Member.new({ name: "Unsaved" });
+    await (member as unknown as AwaitableClubSetter).setClub(clubs("boring_club"));
+
+    const throughRecord = member.currentMembership as unknown as {
+      assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+      readAttribute(name: string): unknown;
+    };
+    expect(throughRecord).not.toBeNull();
+
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = () => setTimeout(resolve, 0)));
+    let landed = false;
+    const original = throughRecord.assignAttributes.bind(throughRecord);
+    throughRecord.assignAttributes = (attrs: Record<string, unknown>): Promise<void> =>
+      gate.then(() => {
+        void original(attrs);
+        landed = true;
+      });
+
+    const newClub = clubs("moustache_club");
+    const pending = (member as unknown as AwaitableClubSetter).setClub(newClub);
+    expect(landed).toBe(false);
+
+    release();
+    await pending;
+
+    expect(landed).toBe(true);
+    expect(Number(throughRecord.readAttribute("club_id"))).toBe(Number(newClub.id));
+  });
+});

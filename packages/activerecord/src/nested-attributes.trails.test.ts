@@ -366,3 +366,43 @@ describe("nested attributes destroy dispatch (trails-only)", () => {
     expect(await Ship.findBy({ id: ship.id })).toBeNull();
   });
 });
+
+describe("nested attributes existing record lookup (trails-only)", () => {
+  fixtures({
+    pirates: [Pirate, {}],
+    parrots: [Parrot, {}],
+  });
+
+  it("hands a callback the existing record's persisted columns", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "Aye" });
+    const parrot = await Parrot.createBang({ name: "Polly", color: "green" });
+    await (pirate as unknown as { parrots: { push(record: Base): Promise<unknown> } }).parrots.push(
+      parrot,
+    );
+    await (parrot as unknown as { update(attrs: unknown): Promise<boolean> }).update({
+      updated_count: 5,
+    });
+
+    const persistedCount = Number((await Parrot.find(parrot.id)).updated_count);
+
+    const reloaded = await Pirate.find(pirate.id);
+    expect(reloaded.association("parrots").isLoaded()).toBe(false);
+
+    await nested(reloaded).setParrotsAttributes([
+      { id: readAttr(parrot as Base, "id"), name: "Polly Two" },
+    ]);
+
+    const target = (reloaded.association("parrots") as unknown as { target: Base[] }).target;
+    const existing = target.find(
+      (r) => String((r as unknown as { id: unknown }).id) === String(parrot.id),
+    ) as Base;
+    expect(Number(readAttr(existing, "updated_count"))).toBe(persistedCount);
+    expect(readAttr(existing, "color")).toBe("green");
+
+    await reloaded.save();
+
+    const persisted = await Parrot.find(parrot.id);
+    expect(persisted.name).toBe("Polly Two");
+    expect(Number(persisted.updated_count)).toBe(persistedCount + 1);
+  });
+});

@@ -594,94 +594,78 @@ export function assignNestedAttributesForCollectionAssociation(
   const isAutosave = assocDef?.options?.autosave === true;
 
   const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
-  const nestedTarget: (Base | null)[] = [];
-  const deferred: Record<string, unknown>[] = [];
-  let pending: Promise<void> | undefined;
-  for (const a of attrs) {
-    if (!hasNestedId(a)) {
-      if (!isRejectNewRecord.call(record, associationName, a)) {
-        if (collectionTargetModel)
-          assertNestedAttributesAreKnown(collectionTargetModel, except(a, ...UNASSIGNABLE_KEYS));
-        nestedTarget.push(
-          collectionProxyFor(record, associationName).build(except(a, ...UNASSIGNABLE_KEYS)),
-        );
+  const association = record.association(associationName) as CollectionAssociation;
+
+  const assignRecords = (existingRecords: Base[]): Promise<void> | void => {
+    const nestedTarget: (Base | null)[] = [];
+    const deferred: Record<string, unknown>[] = [];
+    let pending: Promise<void> | undefined;
+    for (const a of attrs) {
+      if (!hasNestedId(a)) {
+        if (!isRejectNewRecord.call(record, associationName, a)) {
+          if (collectionTargetModel)
+            assertNestedAttributesAreKnown(collectionTargetModel, except(a, ...UNASSIGNABLE_KEYS));
+          nestedTarget.push(
+            collectionProxyFor(record, associationName).build(except(a, ...UNASSIGNABLE_KEYS)),
+          );
+        } else {
+          nestedTarget.push(null);
+        }
+      } else if (isAutosave) {
+        let existingRecord = collectionTargetModel
+          ? findRecordById(collectionTargetModel, existingRecords, (a as any).id)
+          : undefined;
+        if (existingRecord) {
+          if (!callRejectIf.call(record, associationName, a)) {
+            const targetRecord = findRecordById(
+              collectionTargetModel!,
+              association.target,
+              (a as any).id,
+            );
+            if (targetRecord) {
+              existingRecord = targetRecord;
+            } else {
+              (association as any).addToTarget(existingRecord, { skipCallbacks: true });
+            }
+
+            const settled = existingRecord;
+            const allowDestroy = isAllowDestroy.call(record, associationName);
+            nestedTarget.push(settled);
+            pending = (
+              pending
+                ? pending.then(() => assignToOrMarkForDestruction(settled, a, allowDestroy))
+                : assignToOrMarkForDestruction(settled, a, allowDestroy)
+            ) as Promise<void> | undefined;
+          } else {
+            nestedTarget.push(null);
+          }
+        } else {
+          raiseNestedAttributesRecordNotFoundBang(record, associationName, (a as any).id);
+        }
       } else {
-        nestedTarget.push(null);
+        deferred.push(a);
       }
-    } else if (isAutosave) {
-      const existing = populateInMemoryExistingRecord(record, associationName, a);
-      nestedTarget.push(existing);
-      if (existing) {
-        const allowDestroy = isAllowDestroy.call(record, associationName);
-        pending = (
-          pending
-            ? pending.then(() => assignToOrMarkForDestruction(existing, a, allowDestroy))
-            : assignToOrMarkForDestruction(existing, a, allowDestroy)
-        ) as Promise<void> | undefined;
-      }
-    } else {
-      deferred.push(a);
     }
-  }
-  if (deferred.length > 0) {
-    storePendingNestedAttributes(record, associationName, deferred);
-  }
-  (record.association(associationName) as CollectionAssociation).nestedAttributesTarget =
-    nestedTarget;
-  return pending;
-}
-
-/** @internal */
-function populateInMemoryExistingRecord(
-  record: Base,
-  associationName: string,
-  attrs: Record<string, unknown>,
-): Base | null {
-  const ctor = record.constructor as typeof Base;
-  const assocDef = (ctor as any)._reflectOnAssociation?.(associationName);
-  const targetModel = resolveCollectionTargetModel(record, associationName);
-  if (!targetModel || !assocDef) return null;
-
-  const proxy = collectionProxyFor(record, associationName);
-  const id = (attrs as any).id;
-  let existing = findRecordById(targetModel, proxy.target, id);
-  let isNewStub = false;
-  if (!existing) {
-    if (proxy.loaded) {
-      raiseNestedAttributesRecordNotFoundBang(record, associationName, id);
+    if (deferred.length > 0) {
+      storePendingNestedAttributes(record, associationName, deferred);
     }
-    const pk = (targetModel as any).primaryKey;
-    const pkCol = Array.isArray(pk) ? pk[0] : (pk ?? "id");
-    const row: Record<string, unknown> = {};
-    for (const column of ((targetModel as any).columnNames?.() ?? []) as string[]) {
-      row[column] = null;
-    }
-    Object.assign(row, { [pkCol]: id, ...stubOwnerForeignKey(record, assocDef) });
-    existing = (targetModel as any)._instantiate(row);
-    isNewStub = true;
-  }
-
-  if (callRejectIf.call(record, associationName, attrs)) return null;
-  if (isNewStub)
-    (record.association(associationName) as any).addToTarget(existing, { skipCallbacks: true });
-  return existing ?? null;
-}
-
-/** @internal */
-function stubOwnerForeignKey(record: Base, assocDef: any): Record<string, unknown> {
-  if (assocDef.options?.through || assocDef.type === "hasAndBelongsToMany") return {};
-  const ctor = record.constructor as typeof Base;
-  const asName: string | undefined = assocDef.options?.as;
-  const foreignKey: string =
-    assocDef.options?.foreignKey ??
-    (asName ? `${underscore(asName)}_id` : `${underscore(ctor.name)}_id`);
-  const parentPk = assocDef.options?.primaryKey ?? (ctor as any).primaryKey;
-  const parentPkCol = Array.isArray(parentPk) ? parentPk[0] : parentPk;
-  const out: Record<string, unknown> = {
-    [foreignKey]: (record as any)._readAttribute(parentPkCol),
+    association.nestedAttributesTarget = nestedTarget;
+    return pending;
   };
-  if (asName) out[`${underscore(asName)}_type`] = ctor.name;
-  return out;
+
+  if (!isAutosave || association.isLoaded()) {
+    return assignRecords(association.isLoaded() ? association.target : []);
+  }
+
+  const attributeIds = attrs.filter((a) => hasNestedId(a)).map((a) => (a as any).id);
+  if (attributeIds.length === 0 || !collectionTargetModel) return assignRecords([]);
+
+  const primaryKey = (collectionTargetModel as any).primaryKey;
+  return association
+    .scope()
+    .where({ [Array.isArray(primaryKey) ? primaryKey[0] : primaryKey]: attributeIds })
+    .toArray()
+    .then((existingRecords: Base[]) => assignRecords(existingRecords));
 }
 
 /** @internal */
