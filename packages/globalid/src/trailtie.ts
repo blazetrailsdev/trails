@@ -63,9 +63,8 @@ export class Trailtie extends BaseRailtie {
    * `nil` wins over the default, which is how
    * `config.global_id.expires_in = nil` disables expiration.
    *
-
    * The class body's `config.global_id = ActiveSupport::OrderedOptions.new`
-   * and `config.eager_load_namespaces << GlobalID` (`railtie.rb:13-14`) are
+   * and `config.eager_load_namespaces << GlobalID` (`railtie.rb:13-14`)
    * are seeded on activesupport's `Railtie.config`, the analogue of the
    * `@@`-level state `Railtie::Configuration` holds
    * (`railtie/configuration.rb:17-20`): trailties' `Configuration` reads its
