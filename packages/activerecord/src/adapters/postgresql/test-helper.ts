@@ -3,6 +3,7 @@ import { pgDatetimeConfig } from "../../connection-adapters/postgresql/pg-dateti
 import { Notifications, squish } from "@blazetrails/activesupport";
 import type { NotificationSubscriber, NotificationEvent } from "@blazetrails/activesupport";
 import { pgAvailable, pgHasHintPlan, pgServerVersion } from "../../support/describe-if-pg.js";
+import { Base } from "../../base.js";
 
 export { describeIfPg, pgServerVersion, PG_TEST_URL } from "../../support/describe-if-pg.js";
 
@@ -25,6 +26,10 @@ export async function withNativeDatabaseTypeOverrides<T>(
 }
 
 export { PostgreSQLAdapter };
+
+export async function leasePgAdapter(): Promise<PostgreSQLAdapter> {
+  return (await Base.leaseConnection()) as unknown as PostgreSQLAdapter;
+}
 
 export function suiteTable(name: string, suite: string): string {
   return `${name}_${suite}`;

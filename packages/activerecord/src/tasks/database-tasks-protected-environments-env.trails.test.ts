@@ -135,6 +135,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     const adapter = new BetterSQLite3Adapter(dbFile);
     try {
       await adapter.executeMutation(
+        // eslint-disable-next-line blazetrails/require-table-teardown -- isolated per-test tmp DB, removed in afterEach
         "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
       );
       for (const version of versions) {
@@ -144,6 +145,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
       }
       if (storedEnv !== undefined) {
         await adapter.executeMutation(
+          // eslint-disable-next-line blazetrails/require-table-teardown -- isolated per-test tmp DB, removed in afterEach
           "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
         );
         await adapter.executeMutation(

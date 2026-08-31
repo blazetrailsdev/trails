@@ -1,124 +1,265 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, suiteTable } from "./test-helper.js";
+import { withExecutionContext } from "../../connection-adapters/abstract/connection-pool/execution-context.js";
+import { describeIfPg, leasePgAdapter } from "./test-helper.js";
+import type { PostgreSQLAdapter } from "./test-helper.js";
+import { fixtures } from "../../test-fixtures.js";
+import { registerModel } from "../../associations.js";
+import { Base } from "../../base.js";
 import { SerializationFailure, Deadlocked } from "../../errors.js";
+import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
 
-const SAMPLES = suiteTable("samples", "transaction_nested");
-const BITS = suiteTable("bits", "transaction_nested");
+class Sample extends Base {
+  declare id: number;
+  declare value: number | null;
+  static {
+    this.tableName = "samples";
+  }
+}
+class Bit extends Base {
+  declare id: number;
+  declare value: number | null;
+  static {
+    this.tableName = "bits";
+  }
+}
+registerModel([Sample, Bit]);
+
+function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
+  let count = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  return {
+    wait: () => {
+      if (++count >= parties) release();
+      return gate;
+    },
+  };
+}
+
+function event(): { set: () => void; wait: (seconds?: number) => Promise<void> } {
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  return {
+    set: () => release(),
+    wait: (seconds?: number) =>
+      seconds === undefined
+        ? gate
+        : Promise.race([gate, new Promise<void>((r) => setTimeout(r, seconds * 1000))]),
+  };
+}
+
+async function withWarningSuppression<T>(fn: () => Promise<T>): Promise<T> {
+  const connection = await leasePgAdapter();
+  const logLevel = await connection.clientMinMessages();
+  await connection.setClientMinMessages("error");
+  try {
+    return await fn();
+  } finally {
+    Base.connectionHandler.clearActiveConnectionsBang("all");
+    await (await leasePgAdapter()).setClientMinMessages(logLevel);
+  }
+}
+
+async function makeParentTransactionDirty(): Promise<void> {
+  await Bit.take();
+}
+
+async function assertCurrentTransactionIsSavepointTransaction(): Promise<void> {
+  const currentTransaction = (await Sample.leaseConnection()).currentTransaction();
+  if (!(currentTransaction instanceof SavepointTransaction)) {
+    expect.fail("current transaction is not a savepoint transaction");
+  }
+}
 
 describeIfPg("PostgreSQLAdapter", () => {
-  let adapter: PostgreSQLAdapter;
-  beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.close();
-  });
+  describe("PostgresqlTransactionNestedTest", () => {
+    fixtures([], { useTransactionalTests: false });
 
-  describe("PostgreSQLTransactionNestedTest", () => {
     beforeEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}, ${BITS}`);
-      await adapter.exec(`CREATE TABLE ${SAMPLES} (id int PRIMARY KEY, value integer)`);
-      await adapter.exec(`CREATE TABLE ${BITS} (id int PRIMARY KEY, value integer)`);
-      await adapter.execute(`INSERT INTO ${SAMPLES} VALUES (1, 0), (2, 0)`);
-      await adapter.execute(`INSERT INTO ${BITS} VALUES (1, 0)`);
+      const connection = await leasePgAdapter();
+      await connection.transaction(async () => {
+        await connection.dropTable("samples", "bits", { ifExists: true });
+        await connection.createTable("samples", (t) => {
+          t.integer("value");
+        });
+        await connection.createTable("bits", (t) => {
+          t.integer("value");
+        });
+      });
+
+      Sample.resetColumnInformation();
+      Bit.resetColumnInformation();
     });
+
     afterEach(async () => {
-      await adapter.exec(`DROP TABLE IF EXISTS ${SAMPLES}, ${BITS}`);
+      Base.connectionHandler.clearActiveConnectionsBang("all");
+      const connection = await leasePgAdapter();
+      await connection.dropTable("samples", "bits", { ifExists: true });
     });
-
-    async function makeParentTransactionDirty(conn: PostgreSQLAdapter): Promise<void> {
-      await conn.execute(`SELECT * FROM ${BITS} LIMIT 1`);
-    }
-
-    async function serializationConflict(): Promise<PostgreSQLAdapter> {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
-      await other.beginIsolatedDbTransaction("serializable");
-      await makeParentTransactionDirty(other);
-      await other.execute(`SELECT sum(value) FROM ${SAMPLES}`);
-      await adapter.beginIsolatedDbTransaction("serializable");
-      await makeParentTransactionDirty(adapter);
-      await adapter.execute(`SELECT sum(value) FROM ${SAMPLES}`);
-      await adapter.createSavepoint("sp1");
-      await other.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
-      await other.commitDbTransaction();
-      return other;
-    }
-
-    async function nestedDeadlock(other: PostgreSQLAdapter): Promise<boolean> {
-      await adapter.beginDbTransaction();
-      await other.beginDbTransaction();
-      await makeParentTransactionDirty(adapter);
-      await makeParentTransactionDirty(other);
-      await adapter.createSavepoint("sp1");
-      await other.createSavepoint("sp1");
-      await adapter.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
-      await other.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 2`);
-      const [r1, r2] = await Promise.allSettled([
-        adapter.execute(`UPDATE ${SAMPLES} SET value = 3 WHERE id = 2`),
-        other.execute(`UPDATE ${SAMPLES} SET value = 4 WHERE id = 1`),
-      ]);
-      const errs = [r1, r2].filter((r) => r.status === "rejected");
-      return errs.length === 1 && errs[0].reason instanceof Deadlocked;
-    }
-
-    async function assertConnectionRecovers(): Promise<void> {
-      await adapter.beginDbTransaction();
-      await adapter.execute(`UPDATE ${SAMPLES} SET value = 7 WHERE id = 2`);
-      await adapter.commitDbTransaction();
-      const rows = await adapter.execute(`SELECT value FROM ${SAMPLES} WHERE id = 2`);
-      expect((rows[0] as { value: number }).value).toBe(7);
-    }
 
     it("unserializable transaction raises SerializationFailure inside nested SavepointTransaction", async () => {
-      const other = await serializationConflict();
-      try {
-        await expect(
-          adapter.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 1`),
-        ).rejects.toThrow(SerializationFailure);
-      } finally {
-        await adapter.rollbackDbTransaction().catch(() => {});
-        await other.rollbackDbTransaction().catch(() => {});
-        await other.close();
-      }
+      const before = cyclicBarrier(2);
+      const after = cyclicBarrier(2);
+
+      const side = async (): Promise<void> =>
+        withWarningSuppression(async () =>
+          Sample.transaction(
+            async () => {
+              await makeParentTransactionDirty();
+              await Sample.transaction(
+                async () => {
+                  await assertCurrentTransactionIsSavepointTransaction();
+                  await before.wait();
+                  await Sample.create({ value: await Sample.sum("value") });
+                  await after.wait();
+                },
+                { requiresNew: true },
+              );
+            },
+            { isolation: "serializable", requiresNew: false },
+          ),
+        );
+
+      const thread = withExecutionContext(side);
+      const outcomes = await Promise.allSettled([thread, side()]);
+      const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
+
+      expect(errors.some((e) => e instanceof SerializationFailure)).toBe(true);
     });
 
     it("SerializationFailure inside nested SavepointTransaction is recoverable", async () => {
-      const other = await serializationConflict();
+      const startRight = event();
+      const commitLeft = event();
+      const finishRight = event();
+      await Sample.create({ value: 1 });
+
+      const thread = withExecutionContext(async () =>
+        withWarningSuppression(async () => {
+          await Sample.transaction(
+            async () => {
+              await Sample.updateAll({ value: 2 });
+              startRight.set();
+              await commitLeft.wait(1);
+            },
+            { isolation: "serializable", requiresNew: false },
+          );
+          finishRight.set();
+        }),
+      );
+
       try {
-        await expect(
-          adapter.execute(`UPDATE ${SAMPLES} SET value = 2 WHERE id = 1`),
-        ).rejects.toThrow(SerializationFailure);
+        await withWarningSuppression(async () => {
+          await startRight.wait();
+          await Sample.transaction(
+            async () => {
+              await makeParentTransactionDirty();
+              await expect(
+                Sample.transaction(
+                  async () => {
+                    await assertCurrentTransactionIsSavepointTransaction();
+                    await Sample.create({ value: 3 });
+                    commitLeft.set();
+                    await finishRight.wait(2);
+                    await Sample.updateAll({ value: 4 });
+                  },
+                  { requiresNew: true },
+                ),
+              ).rejects.toThrow(SerializationFailure);
+              await Bit.create({ value: 1 });
+            },
+            { isolation: "serializable", requiresNew: false },
+          );
+        });
       } finally {
-        await adapter.rollbackDbTransaction().catch(() => {});
-        await other.rollbackDbTransaction().catch(() => {});
-        await other.close();
+        await thread;
       }
-      await assertConnectionRecovers();
+
+      expect(await Sample.pluck("value")).toEqual([2]);
+      expect(await Bit.pluck("value")).toEqual([1]);
     });
 
     it("deadlock raises Deadlocked inside nested SavepointTransaction", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
-      try {
-        expect(await nestedDeadlock(other)).toBe(true);
-      } finally {
-        await adapter.rollbackDbTransaction().catch(() => {});
-        await other.rollbackDbTransaction().catch(() => {});
-        await other.close();
-      }
+      await withWarningSuppression(async () => {
+        const connections = new Set<unknown>();
+        const barrier = cyclicBarrier(2);
+
+        const s1 = await Sample.create({ value: 1 });
+        const s2 = await Sample.create({ value: 2 });
+
+        const side = async (locked: Sample, updated: Sample, value: number): Promise<void> => {
+          connections.add(await Sample.leaseConnection());
+          return Sample.transaction(
+            async () => {
+              await makeParentTransactionDirty();
+              await Sample.transaction(
+                async () => {
+                  await assertCurrentTransactionIsSavepointTransaction();
+                  await locked.lockBang();
+                  await barrier.wait();
+                  await updated.update({ value });
+                },
+                { requiresNew: true },
+              );
+            },
+            { requiresNew: false },
+          );
+        };
+
+        const thread = withExecutionContext(async () => side(s1, s2, 1));
+        const outcomes = await Promise.allSettled([thread, side(s2, s1, 2)]);
+        const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
+
+        expect(errors).toHaveLength(1);
+        expect(errors[0]).toBeInstanceOf(Deadlocked);
+
+        for (const connection of connections) {
+          expect(await (connection as PostgreSQLAdapter).active()).toBe(true);
+        }
+      });
     });
 
     it("deadlock inside nested SavepointTransaction is recoverable", async () => {
-      const other = new PostgreSQLAdapter(PG_TEST_URL);
-      let deadlocked = false;
-      try {
-        deadlocked = await nestedDeadlock(other);
-      } finally {
-        await adapter.rollbackDbTransaction().catch(() => {});
-        await other.rollbackDbTransaction().catch(() => {});
-        await other.close();
-      }
-      expect(deadlocked).toBe(true);
-      await assertConnectionRecovers();
+      await withWarningSuppression(async () => {
+        const barrier = cyclicBarrier(2);
+        let deadlocks = 0;
+
+        const s1 = await Sample.create({ value: 1 });
+        const s2 = await Sample.create({ value: 2 });
+
+        const side = async (locked: Sample, updated: Sample, value: number): Promise<void> =>
+          Sample.transaction(
+            async () => {
+              await makeParentTransactionDirty();
+              try {
+                await Sample.transaction(
+                  async () => {
+                    await assertCurrentTransactionIsSavepointTransaction();
+                    await locked.lockBang();
+                    await barrier.wait();
+                    await updated.update({ value });
+                  },
+                  { requiresNew: true },
+                );
+              } catch (e) {
+                if (!(e instanceof Deadlocked)) throw e;
+                deadlocks += 1;
+              }
+              await updated.update({ value: 10 });
+            },
+            { requiresNew: false },
+          );
+
+        const thread = withExecutionContext(async () => side(s1, s2, 4));
+        await side(s2, s1, 3);
+        await thread;
+
+        expect(deadlocks).toBe(1);
+        expect(await Sample.pluck("value")).toEqual([10, 10]);
+      });
     });
   });
 });

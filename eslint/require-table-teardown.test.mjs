@@ -566,6 +566,35 @@ tester.run("require-table-teardown", rule, {
       "}",
   ],
   invalid: [
+    // Two creates of the SAME name, neither torn down, report twice — one per
+    // CALL SITE — so a disable on either suppresses only that one and neither
+    // diagnostic depends on the other's presence.
+    {
+      code:
+        'await ctx.createTable("widgets", () => {});\n' +
+        'await ctx.createTable("widgets", () => {});\n',
+      errors: [
+        { messageId: "missingTeardown", data: { table: "widgets" }, line: 1 },
+        { messageId: "missingTeardown", data: { table: "widgets" }, line: 2 },
+      ],
+    },
+    // Disabling the FIRST leaves the second reported …
+    {
+      code:
+        "// eslint-disable-next-line rule-to-test/require-table-teardown\n" +
+        'await ctx.createTable("widgets", () => {});\n' +
+        'await ctx.createTable("widgets", () => {});\n',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 3 }],
+    },
+    // … and disabling the SECOND leaves the first reported.
+    {
+      code:
+        'await ctx.createTable("widgets", () => {});\n' +
+        "// eslint-disable-next-line rule-to-test/require-table-teardown\n" +
+        'await ctx.createTable("widgets", () => {});\n',
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 1 }],
+    },
+
     // ── failureSafe ──
     // The drop trails the assertions in the test body: a failure above it
     // strands `widgets` in the shared per-worker database.

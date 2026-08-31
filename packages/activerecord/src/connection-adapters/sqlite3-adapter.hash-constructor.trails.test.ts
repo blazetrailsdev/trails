@@ -32,6 +32,7 @@ describe("SQLite3Adapter hash-only constructor", () => {
   it("accepts a :memory: database via the config hash", async () => {
     adapter = new BetterSQLite3Adapter({ database: ":memory:" });
 
+    // eslint-disable-next-line blazetrails/require-table-teardown -- throwaway :memory: database
     await adapter.executeMutation("CREATE TABLE items (id INTEGER PRIMARY KEY)");
     const rows = await adapter.execute("SELECT count(*) AS c FROM items");
     expect(Number(rows[0].c)).toBe(0);

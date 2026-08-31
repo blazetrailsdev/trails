@@ -28,7 +28,8 @@
  *      a faithfully ported class is not extra and a trails-only one is.
  *      Filter out `internal: true` (Ruby private/protected, TS
  *      private/protected, TS `#`-prefixed fields, and `@internal` JSDoc on a
- *      top-level exported function) and
+ *      top-level exported function or on a class member — including a
+ *      constructor and a computed-name member) and
  *      separately filter `_`-prefixed names — the extractor keeps those as
  *      public exports; the Rails-private convention in this repo means they
  *      should not count toward extra surface.

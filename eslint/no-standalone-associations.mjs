@@ -169,6 +169,40 @@ const rule = {
       else bindingStarts.set(name, [start]);
     }
 
+    // Resolve a receiver identifier through simple `const <alias> = <Class>;`
+    // bindings, so an aliased receiver (`const Person = IndexErrorsPerson;`)
+    // still reports the class it aliases. Resolution walks the SCOPE CHAIN from
+    // the call site, so an alias bound in an unrelated block never reaches a
+    // receiver it does not actually shadow.
+    function variableInScopeChain(fromNode, name) {
+      let scope = sourceCode.getScope(fromNode);
+      while (scope) {
+        const variable = scope.set.get(name);
+        if (variable) return variable;
+        scope = scope.upper;
+      }
+      return null;
+    }
+
+    function resolveReceiver(identifierNode) {
+      let node = identifierNode;
+      const seen = new Set();
+      for (;;) {
+        if (seen.has(node.name)) return node.name;
+        seen.add(node.name);
+        const variable = variableInScopeChain(node, node.name);
+        // A class binding is the answer; anything with no single variable
+        // definition, or one that is not a plain `= <Identifier>` alias, ends
+        // the chain where it stands.
+        if (!variable || variable.defs.length !== 1) return node.name;
+        const def = variable.defs[0];
+        if (def.type !== "Variable") return node.name;
+        const init = def.node.init;
+        if (!init || init.type !== "Identifier") return node.name;
+        node = init;
+      }
+    }
+
     function recordClass(node) {
       if (!node.id || node.id.type !== "Identifier") return;
       const name = node.id.name;
@@ -323,7 +357,7 @@ const rule = {
           const macro = macroOfCall(node.callee);
           const receiverArg = node.arguments[0];
           const receiver =
-            receiverArg && receiverArg.type === "Identifier" ? receiverArg.name : null;
+            receiverArg && receiverArg.type === "Identifier" ? resolveReceiver(receiverArg) : null;
 
           if (exclude.has(siteKey(rel, node, macro))) continue;
 
