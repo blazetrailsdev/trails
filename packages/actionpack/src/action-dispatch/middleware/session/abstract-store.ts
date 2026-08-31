@@ -9,7 +9,7 @@
  * of `Rack::Session::Abstract::Persisted` / `PersistedSecure`. Those two
  * Rack base classes live in the `rack-session` gem rather than in Rails,
  * so they are ported here alongside their Rails subclasses, from
- * `rack-session-2.1.0/lib/rack/session/abstract/id.rb:239-497`.
+ * `vendor/rack-session/lib/rack/session/abstract/id.rb:239-497`.
  */
 
 import { include as includeMixin, getCrypto } from "@blazetrails/activesupport";
@@ -323,7 +323,7 @@ export class Persisted {
 
   /** @internal Rails: `set_cookie(request, response, cookie)` (`id.rb:423-427`). */
   setCookie(request: any, response: ResponseRaw, cookie: Record<string, unknown>): void {
-    if (request.cookies?.[this.key] !== cookie["value"] || cookie["expires"]) {
+    if (request.cookies[this.key] !== cookie["value"] || isTruthy(cookie["expires"])) {
       response.setCookie(this.key, cookie);
     }
   }
@@ -335,7 +335,7 @@ export class Persisted {
 
   /** Rails: `find_session(env, sid)` (`id.rb:440-442`). */
   findSession(_req: any, _sid: unknown): [unknown, Record<string, unknown> | null] {
-    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
+    // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:440 cluster=actionpack-session
     throw new NotImplementedError("#find_session not implemented.");
   }
 
@@ -346,13 +346,13 @@ export class Persisted {
     _session: Record<string, unknown>,
     _options: SessionOptions,
   ): unknown {
-    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
+    // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:448 cluster=actionpack-session
     throw new NotImplementedError("#write_session not implemented.");
   }
 
   /** Rails: `delete_session(req, sid, options)` (`id.rb:455-457`). */
   deleteSession(_req: any, _sid: unknown, _options: SessionOptions): unknown {
-    // @nie disposition=keep-as-strategy-hook rails=rack/lib/rack/session/abstract/id.rb cluster=actionpack-session
+    // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:455 cluster=actionpack-session
     throw new NotImplementedError("#delete_session not implemented");
   }
 }
@@ -385,9 +385,12 @@ export class PersistedSecure extends Persisted {
     return new SessionId(String(super.generateSid(secure)));
   }
 
-  override extractSessionId(request: any): SessionId | null {
+  override extractSessionId(request: any): SessionId | null | false {
     const publicId = super.extractSessionId(request);
-    return publicId == null ? null : new SessionId(String(publicId));
+    // Ruby's `public_id && SessionId.new(public_id)` (`id.rb:483-486`) answers
+    // `public_id` ITSELF when falsy — `false` stays `false`, it is not wrapped.
+    if (!isTruthy(publicId)) return (publicId ?? null) as null | false;
+    return new SessionId(String(publicId));
   }
 
   /** @internal Rails: `cookie_value(data)` (`id.rb:494-496`). */
