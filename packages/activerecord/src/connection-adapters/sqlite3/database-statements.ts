@@ -3,20 +3,14 @@ import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlit
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
 import { stripSqlComments } from "../sql-classification.js";
-import { combineMultiStatements } from "../abstract/database-statements.js";
+import {
+  combineMultiStatements,
+  execute as abstractExecute,
+  type DatabaseStatementsHost,
+} from "../abstract/database-statements.js";
 
 const READ_QUERY =
   /^(?:[(\s]|\/\*[\s\S]*?\*\/)*(?:begin|commit|explain|release|rollback|savepoint|select|with|pragma)\b/i;
-
-type ExecutableAdapter = {
-  execute(sql: string, binds?: unknown[]): Promise<unknown>;
-  internalExecute(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-    options?: { allowRetry?: boolean; materializeTransactions?: boolean },
-  ): Promise<unknown>;
-};
 
 export interface DatabaseStatements {
   execQuery(sql: string, name?: string | null): Promise<Result>;
@@ -36,15 +30,11 @@ export function isWriteQuery(sql: string): boolean {
   return !READ_QUERY.test(stripSqlComments(sql));
 }
 
-export async function beginDbTransaction(this: InternalBeginTransactionHost): Promise<void> {
-  await internalBeginTransaction.call(this, "immediate", null);
-}
-
 export async function beginDeferredTransaction(
   this: InternalBeginTransactionHost,
   isolation?: string | null,
 ): Promise<void> {
-  await internalBeginTransaction.call(this, "deferred", isolation);
+  await internalBeginTransaction.call(this, "deferred", isolation ?? null);
 }
 
 export async function beginIsolatedDbTransaction(
@@ -54,15 +44,19 @@ export async function beginIsolatedDbTransaction(
   await internalBeginTransaction.call(this, "deferred", isolation);
 }
 
-export async function commitDbTransaction(adapter: ExecutableAdapter): Promise<void> {
-  await adapter.internalExecute("COMMIT TRANSACTION", "TRANSACTION", [], {
+export async function beginDbTransaction(this: InternalBeginTransactionHost): Promise<void> {
+  await internalBeginTransaction.call(this, "immediate", null);
+}
+
+export async function commitDbTransaction(this: InternalBeginTransactionHost): Promise<void> {
+  await this.internalExecute("COMMIT TRANSACTION", "TRANSACTION", [], {
     allowRetry: true,
     materializeTransactions: false,
   });
 }
 
-export async function execRollbackDbTransaction(adapter: ExecutableAdapter): Promise<void> {
-  await adapter.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", [], {
+export async function execRollbackDbTransaction(this: InternalBeginTransactionHost): Promise<void> {
+  await this.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", [], {
     allowRetry: true,
     materializeTransactions: false,
   });
@@ -72,18 +66,29 @@ export function highPrecisionCurrentTimestamp(): string {
   return "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')";
 }
 
-export async function resetIsolationLevel(
-  adapter: ExecutableAdapter,
-  previousReadUncommitted: number | null,
-): Promise<void> {
-  if (previousReadUncommitted !== null) {
-    await adapter.internalExecute(
-      `PRAGMA read_uncommitted=${previousReadUncommitted}`,
-      "TRANSACTION",
-      [],
-      { allowRetry: true, materializeTransactions: false },
-    );
-  }
+export async function execute(
+  this: object,
+  sql: string,
+  name?: string | null,
+  options?: { allowRetry?: boolean },
+): Promise<Record<string, unknown>[]> {
+  const result = (await abstractExecute.call(
+    this as DatabaseStatementsHost,
+    sql,
+    name,
+    options,
+  )) as { toArray(): Record<string, unknown>[] } | null | undefined;
+  return result?.toArray() ?? [];
+}
+
+export async function resetIsolationLevel(this: InternalBeginTransactionHost): Promise<void> {
+  await this.internalExecute(
+    `PRAGMA read_uncommitted=${this._previousReadUncommitted}`,
+    "TRANSACTION",
+    [],
+    { allowRetry: true, materializeTransactions: false },
+  );
+  this._previousReadUncommitted = null;
 }
 
 interface InternalBeginTransactionHost {
@@ -129,7 +134,7 @@ interface QuoteTableNameHost {
 export async function internalBeginTransaction(
   this: InternalBeginTransactionHost,
   mode: "deferred" | "immediate",
-  isolation?: string | null,
+  isolation: string | null,
 ): Promise<void> {
   if (isolation) {
     if (isolation !== "read_uncommitted") {
@@ -144,7 +149,7 @@ export async function internalBeginTransaction(
       );
     }
   }
-  await this.internalExecute(`BEGIN ${mode.toUpperCase()} TRANSACTION`, "TRANSACTION", [], {
+  await this.internalExecute(`BEGIN ${mode} TRANSACTION`, "TRANSACTION", [], {
     allowRetry: true,
     materializeTransactions: false,
   });

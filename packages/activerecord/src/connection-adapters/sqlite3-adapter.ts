@@ -10,8 +10,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
-import type { ExplainOption, DatabaseStatementsHost } from "./abstract/database-statements.js";
-import { execute as abstractExecute } from "./abstract/database-statements.js";
+import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -44,8 +43,8 @@ import {
   NotNullViolation,
   NoDatabaseError,
   ConnectionNotEstablished,
+  ConnectionFailed,
   DatabaseConnectionError,
-  TransactionIsolationError,
   StatementTimeout,
 } from "../errors.js";
 import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
@@ -72,6 +71,14 @@ import {
   affectedRows as sqliteAffectedRows,
   performQuery as sqlitePerformQuery,
   highPrecisionCurrentTimestamp as sqliteHighPrecisionCurrentTimestamp,
+  beginDbTransaction as sqliteBeginDbTransaction,
+  beginDeferredTransaction as sqliteBeginDeferredTransaction,
+  beginIsolatedDbTransaction as sqliteBeginIsolatedDbTransaction,
+  commitDbTransaction as sqliteCommitDbTransaction,
+  execRollbackDbTransaction as sqliteExecRollbackDbTransaction,
+  resetIsolationLevel as sqliteResetIsolationLevel,
+  execute as sqliteExecute,
+  defaultInsertValue as sqliteDefaultInsertValue,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
@@ -312,22 +319,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return expanded;
   }
 
-  async execute(
-    sql: string,
-    name: string | null = "SQL",
-    { allowRetry = false }: { allowRetry?: boolean } = {},
-  ): Promise<Record<string, unknown>[]> {
-    const result = (await abstractExecute.call(
-      this as unknown as DatabaseStatementsHost,
-      sql,
-      name,
-      {
-        allowRetry,
-      },
-    )) as { toArray(): Record<string, unknown>[] } | null | undefined;
-    return result?.toArray() ?? [];
-  }
-
   /** @internal */
   declare performQuery: typeof sqlitePerformQuery;
 
@@ -435,53 +426,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  private _previousReadUncommitted: unknown = null;
-
-  async beginDeferredTransaction(isolation?: string | null): Promise<void> {
-    return this.internalBeginTransaction("deferred", isolation ?? null);
-  }
-
-  async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    return this.internalBeginTransaction("deferred", isolation);
-  }
-
-  private async internalBeginTransaction(mode: string, isolation: string | null): Promise<void> {
-    if (isolation) {
-      if (isolation !== "read_uncommitted") {
-        throw new TransactionIsolationError(
-          "SQLite3 only supports the `read_uncommitted` transaction isolation level",
-        );
-      }
-      if (!this.isSharedCache()) {
-        throw new Error(
-          "You need to enable the shared-cache mode in SQLite mode before attempting to change the transaction isolation level",
-        );
-      }
-    }
-    await this.internalExecute(`BEGIN ${mode} TRANSACTION`, "TRANSACTION", [], {
-      allowRetry: true,
-      materializeTransactions: false,
-    });
-    if (isolation) {
-      this._previousReadUncommitted = (await this.queryValue("PRAGMA read_uncommitted")) ?? 0;
-      await this.internalExecute("PRAGMA read_uncommitted=ON", "TRANSACTION", [], {
-        allowRetry: true,
-        materializeTransactions: false,
-      });
-    }
-  }
-
-  async resetIsolationLevel(): Promise<void> {
-    if (this._previousReadUncommitted !== null) {
-      await this.internalExecute(
-        `PRAGMA read_uncommitted=${this._previousReadUncommitted}`,
-        "TRANSACTION",
-        [],
-        { allowRetry: true, materializeTransactions: false },
-      );
-      this._previousReadUncommitted = null;
-    }
-  }
+  /** @internal */
+  _previousReadUncommitted: unknown = null;
 
   override async internalExecute(
     sql: string,
@@ -543,19 +489,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
   }
 
-  async beginDbTransaction(): Promise<void> {
-    return this.internalBeginTransaction("immediate", null);
-  }
-
   async beginTransaction(): Promise<void> {
     await this._transactionManager.beginTransaction({ _lazy: false });
-  }
-
-  async commitDbTransaction(): Promise<void> {
-    await this.internalExecute("COMMIT TRANSACTION", "TRANSACTION", [], {
-      allowRetry: true,
-      materializeTransactions: false,
-    });
   }
 
   async commit(): Promise<void> {
@@ -567,13 +502,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async rollbackDbTransaction(): Promise<void> {
     try {
-      await this.internalExecute("ROLLBACK TRANSACTION", "TRANSACTION", [], {
-        allowRetry: true,
-        materializeTransactions: false,
-      });
+      await this.execRollbackDbTransaction();
     } catch (e) {
-      const translated = this._translateException(e, "ROLLBACK TRANSACTION", []);
-      if (!(translated instanceof ConnectionNotEstablished)) throw translated;
+      if (!(e instanceof ConnectionNotEstablished) && !(e instanceof ConnectionFailed)) throw e;
     }
   }
 
@@ -897,7 +828,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._filename.slice(qIdx).includes("cache=shared");
   }
 
-  /** @missingRailsCall query_value — PERMANENT */
+  /** @missingRailsCall query_value — CONVERGEABLE sqlite-get-database-version-uses-query-value */
   override getDatabaseVersion(): Version | Promise<Version> {
     const driver = this.driver as SqliteConnection | undefined;
     if (!driver) return new Version("0.0.0");
@@ -2098,6 +2029,15 @@ function isInvalidAlterTableType(type: string, options: Record<string, unknown>)
 }
 
 dirtiesQueryCache(SQLite3Adapter, "rollbackDbTransaction", "rollbackToSavepoint");
+SQLite3Adapter.prototype.beginDbTransaction = sqliteBeginDbTransaction;
+SQLite3Adapter.prototype.beginDeferredTransaction = sqliteBeginDeferredTransaction;
+SQLite3Adapter.prototype.beginIsolatedDbTransaction = sqliteBeginIsolatedDbTransaction;
+SQLite3Adapter.prototype.commitDbTransaction = sqliteCommitDbTransaction;
+SQLite3Adapter.prototype.execRollbackDbTransaction = sqliteExecRollbackDbTransaction;
+SQLite3Adapter.prototype.resetIsolationLevel = sqliteResetIsolationLevel;
+SQLite3Adapter.prototype.execute = sqliteExecute;
+SQLite3Adapter.prototype.defaultInsertValue = sqliteDefaultInsertValue;
+
 dirtiesQueryCache(SQLite3Adapter, "execute");
 
 SQLite3Adapter.prototype.performQuery = sqlitePerformQuery;
@@ -2107,6 +2047,14 @@ SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurr
 /** @internal */
 export interface SQLite3Adapter {
   get databaseVersion(): Version | Promise<Version>;
+  beginDbTransaction: typeof sqliteBeginDbTransaction;
+  beginDeferredTransaction: typeof sqliteBeginDeferredTransaction;
+  beginIsolatedDbTransaction: typeof sqliteBeginIsolatedDbTransaction;
+  commitDbTransaction: typeof sqliteCommitDbTransaction;
+  execRollbackDbTransaction: typeof sqliteExecRollbackDbTransaction;
+  resetIsolationLevel: typeof sqliteResetIsolationLevel;
+  execute: typeof sqliteExecute;
+  defaultInsertValue: typeof sqliteDefaultInsertValue;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 

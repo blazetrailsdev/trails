@@ -86,10 +86,6 @@ export function probeStatIn(dir: string): FsStatResult | null {
     fileName = null;
     return null;
   } finally {
-    if (fileName) {
-      try {
-        getFs().unlinkSync(fileName);
-      } catch {}
-    }
+    if (fileName) getFs().rmF(fileName);
   }
 }
