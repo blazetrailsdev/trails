@@ -32,9 +32,9 @@ import { rubyCompatAliases } from "../parity/ruby-compat.js";
 export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["any?", ["some"]],
   ["all?", ["every"]],
-  // `none?` is `!any?`: the `some` analogue must be NEGATED (see
-  // NEGATED_ALIASES), while `every` is the de-Morgan form `!xs.every(...)` OR
-  // `xs.every((x) => !p(x))`, so it counts either way.
+  // `none?` is `!any?`: the `some` analogue must be NEGATED, and so must the
+  // de-Morgan `every` — `!xs.every(p)` or `xs.every((x) => !p(x))`, both of
+  // which the extractor marks (see NEGATED_ALIASES).
   ["none?", ["some", "every"]],
   ["one?", ["filter"]],
   // `includes` is omitted here on purpose: it is now a naming-convention
@@ -102,27 +102,33 @@ export function jsEnumerableAliases(rubyCall: string): string[] {
 }
 
 /**
- * Aliases whose faithful port carries a leading `!` — the Ruby call is the
- * NEGATION of that JS analogue, so only a NEGATED TS call counts:
- * `none?` → `!xs.some(p)`, `exclude?` → `!xs.includes(y)` / `!set.has(y)`.
- * Without this, a port that INVERTED the condition (a bare `xs.includes(y)`
- * where Rails wrote `exclude?`) silenced the ratchet just as well as the
- * faithful one.
+ * Aliases whose faithful port carries a `!` — the Ruby call is the NEGATION of
+ * that JS analogue, so only a NEGATED TS call counts: `none?` → `!xs.some(p)`,
+ * `exclude?` → `!xs.includes(y)` / `!set.has(y)`. Without this, a port that
+ * INVERTED the condition (a bare `xs.includes(y)` where Rails wrote
+ * `exclude?`) silenced the ratchet just as well as the faithful one.
  *
- * Keyed per-ALIAS, not per Ruby call, because a negating Ruby call can also
- * have a de-Morgan analogue that is faithful UNnegated: `xs.none?(&:dirty?)`
- * ports to `xs.every((t) => !t.isDirty())` (transaction.ts `isRestorable`),
- * where the `!` sits inside the callback, not on the call. So `none? → every`
- * stays a direct alias while `none? → some` requires the marker.
+ * Keyed per-ALIAS, not per Ruby call, because the marker is only meaningful
+ * where the alias is the negation: `all? → every` is faithful unnegated.
+ *
+ * `none? → every` is the de-Morgan analogue, whose `!` may sit on the call
+ * (`!xs.every(p)`) or INSIDE the predicate callback (`xs.every((t) =>
+ * !t.isDirty())`, transaction.ts `isRestorable`, porting
+ * `@stack.none?(&:dirty?)` at abstract/transaction.rb:573). The extractor marks
+ * both shapes (see NEGATED_CALL_PREFIX), so requiring the marker here rejects
+ * only the de-Morgan OPPOSITE — a bare `xs.every(p)` where Rails wrote
+ * `none?`.
  */
 export const NEGATED_ALIASES = new Map<string, Set<string>>([
-  ["none?", new Set(["some"])],
+  ["none?", new Set(["some", "every"])],
   ["exclude?", new Set(["includes", "has"])],
 ]);
 
 /**
- * Prefix the TS extractor uses to mark a call it saw in a NEGATED position
- * (`!xs.includes(y)` → `!includes`). Marked names are recorded IN ADDITION to
+ * Prefix the TS extractor uses to mark a call it saw in a NEGATED position —
+ * either the call itself (`!xs.includes(y)` → `!includes`) or its predicate
+ * callback (`xs.every((t) => !t.isDirty())` → `!every`), which is where a
+ * de-Morgan port puts the negation. Marked names are recorded IN ADDITION to
  * the plain name, so every consumer that tests membership by plain name is
  * unaffected; only the {@link NEGATED_ALIASES} check reads the marked form.
  * Lives here, not in extract-ts-api.ts, so compare.ts can read it without
