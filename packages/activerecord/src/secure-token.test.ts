@@ -21,6 +21,7 @@ describe("SecureTokenTest", () => {
       static _tableName = "users";
     }
     await TokenUser.loadSchema();
+    TokenUser.defineAttributeMethods();
     TokenUser.hasSecureToken("token", { on: "initialize" });
     return TokenUser;
   }
@@ -105,6 +106,7 @@ describe("SecureTokenTest", () => {
       static _tableName = "users";
     }
     await TokenUser.loadSchema();
+    TokenUser.defineAttributeMethods();
     TokenUser.hasSecureToken("token", { on: "initialize" });
 
     const proto = TokenUser.prototype as any;

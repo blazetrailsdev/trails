@@ -270,6 +270,7 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
       static tableName = "developers";
     }
     expect(Developer.columnNames()).toContain("first_name");
+    Developer.defineAttributeMethods();
 
     Developer.ignoredColumns = ["first_name"];
 
