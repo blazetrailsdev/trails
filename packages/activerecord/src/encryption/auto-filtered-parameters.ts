@@ -1,7 +1,7 @@
 import { underscore } from "@blazetrails/activesupport";
 import { Configurable } from "./configurable.js";
 
-interface AutoFilteredParametersApp {
+export interface AutoFilteredParametersApp {
   config: { filterParameters: Array<string | RegExp> };
 }
 

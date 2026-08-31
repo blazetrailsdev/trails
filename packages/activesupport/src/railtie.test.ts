@@ -80,6 +80,19 @@ describe("Railtie", () => {
     expect(log).toEqual(["A", "B"]);
   });
 
+  it("yields the arguments run_initializers was called with", () => {
+    class C extends Railtie {
+      static {
+        registerRailtie(this);
+      }
+    }
+    const seen: unknown[] = [];
+    C.initializer("c", (app) => seen.push(app));
+    const app = { railtieName: () => "blog_app_application" };
+    C.runInitializers(app);
+    expect(seen).toEqual([app]);
+  });
+
   it("config is isolated per subclass (copy-on-first-access)", () => {
     class Child extends Railtie {}
     Railtie.config["shared"] = "base";

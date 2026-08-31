@@ -2,6 +2,7 @@
 // credentials/encrypted/keyGenerator/messageVerifier. Skipped methods
 // listed in docs/trailties-plan.md.
 import {
+  ArgumentError,
   dasherize,
   EncryptedFile,
   getEnv,
@@ -233,7 +234,15 @@ export class Application extends Engine {
 
   /** 1000 iterations match Rails for cookie compatibility. */
   keyGenerator(secretKeyBase: string | null = this.secretKeyBase()): CachingKeyGenerator {
-    if (secretKeyBase === null) throw new Error("Missing secret_key_base.");
+    if (secretKeyBase === null) {
+      // Rails raises from `Configuration#secret_key_base=`
+      // (`railties/lib/rails/application/configuration.rb:524`); trails'
+      // `Configuration#secretKeyBase` is a plain field, so the raise lands at
+      // the first read that needs a key. Class and message are Rails'.
+      throw new ArgumentError(
+        `Missing \`secret_key_base\` for '${resolveEnv()}' environment, set this string with \`bin/rails credentials:edit\``,
+      );
+    }
     let gen = this._keyGenerators.get(secretKeyBase);
     if (!gen) {
       gen = new CachingKeyGenerator(new KeyGenerator(secretKeyBase, { iterations: 1000 }));

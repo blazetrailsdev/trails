@@ -7,7 +7,9 @@ import {
   effectiveFixtureKey,
   resolveModelForTable,
   FixtureSetPrimaryKeyError,
+  FixtureSet,
 } from "./fixtures.js";
+import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
@@ -613,5 +615,25 @@ describe("HABTM fixture reflection walking (trails)", () => {
     expect(assocs.get("projects")?.isHabtm).toBe(true);
     expect(assocs.get("projects")?.joinTable).toBe("developers_projects");
     expect(assocs.get("ratings")?.isHabtm).toBe(false);
+  });
+});
+
+describe("FixtureSet", () => {
+  it("identify returns the crc32 identifier for a label", () => {
+    expect(FixtureSet.identify("dhh")).toBe(fixtureId("dhh"));
+  });
+
+  it("identify returns a UUID v5 for a uuid column type", () => {
+    expect(FixtureSet.identify("dhh", ":uuid")).toBe(uuidV5(OID_NAMESPACE, "dhh"));
+  });
+
+  it("default_fixture_model_name singularizes and camelizes when table names are pluralized", () => {
+    expect(FixtureSet.defaultFixtureModelName("users")).toBe("User");
+  });
+
+  it("runs the active_record_fixture_set load hook with FixtureSet", () => {
+    const seen: unknown[] = [];
+    onLoad("active_record_fixture_set", (base: unknown) => seen.push(base));
+    expect(seen).toEqual([FixtureSet]);
   });
 });

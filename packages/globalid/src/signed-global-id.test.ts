@@ -1,4 +1,5 @@
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { travelBack, travelTo } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
@@ -147,78 +148,72 @@ describe("SignedGlobalIDExpirationTest", () => {
 
   it("passing expires_in less than a second is not expired", () => {
     // Rails parity: with expires_in: 1.second, the token is not expired at
-    // 0.5 seconds elapsed but is expired at 2 seconds. Use fake timers so
-    // the test is deterministic — Date.now() drives Temporal.Now via the
-    // js-temporal polyfill.
-    vi.useFakeTimers();
+    // 0.5 seconds elapsed but is expired at 2 seconds. `travel_to` is what the
+    // Ruby case uses; it moves the one clock these bodies read.
     try {
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 1 });
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.500Z"));
+      travelTo("2024-01-01T00:00:00.500Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
-      vi.setSystemTime(new Date("2024-01-01T00:00:02.000Z"));
+      travelTo("2024-01-01T00:00:02.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
     } finally {
-      vi.useRealTimers();
+      travelBack();
     }
   });
 
   it("passing expires_in nil turns off expiration checking", () => {
-    vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       SignedGlobalID.expiresIn = 3600;
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: null });
 
-      vi.setSystemTime(new Date("2024-01-01T01:00:00.000Z"));
+      travelTo("2024-01-01T01:00:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
 
-      vi.setSystemTime(new Date("2024-01-01T02:00:00.000Z"));
+      travelTo("2024-01-01T02:00:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
     } finally {
-      vi.useRealTimers();
+      travelBack();
       _resetSignedGlobalIDClassConfig();
     }
   });
 
   it("passing expires_at sets expiration date", () => {
-    vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       const date = Temporal.Instant.from("2024-01-01T23:59:59.999Z");
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: date });
       expect(sgid.expiresAt!.epochMilliseconds).toBe(date.epochMilliseconds);
 
-      vi.setSystemTime(new Date("2024-01-02T00:00:00.000Z"));
+      travelTo("2024-01-02T00:00:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
     } finally {
-      vi.useRealTimers();
+      travelBack();
     }
   });
 
   it("passing nil expires_at turns off expiration checking", () => {
-    vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       SignedGlobalID.expiresIn = 3600;
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: null });
 
-      vi.setSystemTime(new Date("2024-01-01T04:00:00.000Z"));
+      travelTo("2024-01-01T04:00:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
     } finally {
-      vi.useRealTimers();
+      travelBack();
       _resetSignedGlobalIDClassConfig();
     }
   });
 
   it("favor expires_at over expires_in", () => {
-    vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       const sgid = SignedGlobalID.create(person(5), {
         verifier,
@@ -226,10 +221,10 @@ describe("SignedGlobalIDExpirationTest", () => {
         expiresIn: 3600,
       });
 
-      vi.setSystemTime(new Date("2024-01-01T01:00:00.000Z"));
+      travelTo("2024-01-01T01:00:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
     } finally {
-      vi.useRealTimers();
+      travelBack();
     }
   });
 
@@ -277,44 +272,41 @@ describe("SignedGlobalIDExpirationTest", () => {
   });
 
   it("expires_in defaults to class level expiration", () => {
-    vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       SignedGlobalID.expiresIn = 3600; // 1 hour class-level default
       const sgid = SignedGlobalID.create(person(5), { verifier });
-      vi.setSystemTime(new Date("2024-01-01T00:59:00.000Z"));
+      travelTo("2024-01-01T00:59:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
-      vi.setSystemTime(new Date("2024-01-01T01:01:00.000Z"));
+      travelTo("2024-01-01T01:01:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
     } finally {
-      vi.useRealTimers();
+      travelBack();
       _resetSignedGlobalIDClassConfig();
     }
   });
 
   it("passing in expires_in overrides class level expiration", () => {
-    vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       SignedGlobalID.expiresIn = 3600;
       // Per-call expiresIn: 2 hours wins over class-level 1 hour
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 7200 });
-      vi.setSystemTime(new Date("2024-01-01T01:00:00.000Z"));
+      travelTo("2024-01-01T01:00:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
-      vi.setSystemTime(new Date("2024-01-01T02:00:03.000Z"));
+      travelTo("2024-01-01T02:00:03.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
     } finally {
-      vi.useRealTimers();
+      travelBack();
       _resetSignedGlobalIDClassConfig();
     }
   });
 
   it("passing expires_at overrides class level expires_in", () => {
-    vi.useFakeTimers();
     try {
-      vi.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
+      travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       SignedGlobalID.expiresIn = 3600;
       // Per-call expiresAt: tomorrow wins over class-level 1 hour
@@ -322,10 +314,10 @@ describe("SignedGlobalIDExpirationTest", () => {
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: date });
       expect(sgid.expiresAt!.epochMilliseconds).toBe(date.epochMilliseconds);
 
-      vi.setSystemTime(new Date("2024-01-01T02:00:00.000Z"));
+      travelTo("2024-01-01T02:00:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
     } finally {
-      vi.useRealTimers();
+      travelBack();
       _resetSignedGlobalIDClassConfig();
     }
   });

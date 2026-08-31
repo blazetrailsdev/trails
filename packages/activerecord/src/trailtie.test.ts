@@ -16,6 +16,10 @@ import { asynchronousQueriesTracker } from "./core.js";
 
 const { deprecators } = BaseRailtie;
 
+const blogApp = (): { config: { filterParameters: Array<string | RegExp> } } => ({
+  config: { filterParameters: [] },
+});
+
 describe("RailtieTest", () => {
   let savedSubclasses: (typeof BaseRailtie)[];
   let savedConfig: ActiveRecordConfig;
@@ -29,6 +33,7 @@ describe("RailtieTest", () => {
   let savedPartialInserts: boolean;
   let savedRaiseOnAssignToAttrReadonly: boolean;
   let savedExtendQueries: boolean;
+  let savedAddToFilterParameters: boolean;
 
   beforeEach(() => {
     savedSubclasses = [...BaseRailtie.subclasses];
@@ -39,6 +44,7 @@ describe("RailtieTest", () => {
     savedCheckSchemaCacheDumpVersion = SchemaReflection.checkSchemaCacheDumpVersion;
     savedStrictStrings = SQLite3Adapter.strictStringsByDefault;
     savedDecodeDates = PostgreSQLAdapter.decodeDates;
+    savedAddToFilterParameters = EncryptionConfigurable.config.addToFilterParameters;
     savedEncryptionSupportUnencryptedData = EncryptionConfigurable.config.supportUnencryptedData;
     savedPartialInserts = Base.partialInserts;
     savedRaiseOnAssignToAttrReadonly = ActiveRecord.raiseOnAssignToAttrReadonly;
@@ -63,6 +69,7 @@ describe("RailtieTest", () => {
     EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
     Base.partialInserts = savedPartialInserts;
     ActiveRecord.raiseOnAssignToAttrReadonly = savedRaiseOnAssignToAttrReadonly;
+    EncryptionConfigurable.config.addToFilterParameters = savedAddToFilterParameters;
     EncryptionConfigurable.config.extendQueries = savedExtendQueries;
     installExtendedQueriesIfConfigured();
     for (const key of Object.keys(deprecators)) {
@@ -75,7 +82,7 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers registers the ActiveRecord deprecator", () => {
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     expect(deprecators["activeRecord"]).toBe(deprecator());
   });
 
@@ -98,13 +105,13 @@ describe("RailtieTest", () => {
 
   it("runInitializers enables time_zone_aware_attributes on Base", () => {
     Base.timeZoneAwareAttributes = false;
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     expect(Base.timeZoneAwareAttributes).toBe(true);
   });
 
   it("runInitializers adds timestamptz to time_zone_aware_types once the postgresql adapter is loaded", () => {
     Base.timeZoneAwareTypes = ["datetime", "time"];
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     expect(Base.timeZoneAwareTypes).toContain("timestamptz");
   });
 
@@ -112,7 +119,7 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config["activeRecord"] as ActiveRecordConfig;
     cfg.useSchemaCacheDump = false;
     cfg.checkSchemaCacheDumpVersion = false;
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     expect(SchemaReflection.useSchemaCacheDump).toBe(false);
     expect(SchemaReflection.checkSchemaCacheDumpVersion).toBe(false);
   });
@@ -120,7 +127,7 @@ describe("RailtieTest", () => {
   it("runInitializers copies sqlite3 strict strings flag onto SQLite3Adapter", () => {
     const cfg = Trailtie.config["activeRecord"] as ActiveRecordConfig;
     cfg.sqlite3AdapterStrictStringsByDefault = true;
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     expect(SQLite3Adapter.strictStringsByDefault).toBe(true);
   });
 
@@ -128,7 +135,7 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config["activeRecord"] as ActiveRecordConfig;
     cfg.postgresqlAdapterDecodeDates = true;
     PostgreSQLAdapter.decodeDates = false;
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     expect(PostgreSQLAdapter.decodeDates).toBe(true);
   });
 
@@ -136,22 +143,42 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config["activeRecord"] as ActiveRecordConfig;
     delete cfg.postgresqlAdapterDecodeDates;
     PostgreSQLAdapter.decodeDates = false;
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     expect(PostgreSQLAdapter.decodeDates).toBe(false);
   });
 
   it("runInitializers forwards config.encryption to Encryption.Configurable", () => {
     const cfg = Trailtie.config["activeRecord"] as ActiveRecordConfig;
     cfg.encryption = { supportUnencryptedData: true };
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     expect(EncryptionConfigurable.config.supportUnencryptedData).toBe(true);
+  });
+
+  it("runInitializers enables auto filtered parameters when add_to_filter_parameters is set", () => {
+    const app = { config: { filterParameters: [] as Array<string | RegExp> } };
+    EncryptionConfigurable.config.addToFilterParameters = true;
+
+    Trailtie.runInitializers(app);
+    EncryptionConfigurable.encryptedAttributeWasDeclared(class Person {}, "name");
+
+    expect(app.config.filterParameters).toContain("person.name");
+  });
+
+  it("runInitializers does not enable auto filtered parameters when add_to_filter_parameters is unset", () => {
+    const app = { config: { filterParameters: [] as Array<string | RegExp> } };
+    EncryptionConfigurable.config.addToFilterParameters = false;
+
+    Trailtie.runInitializers(app);
+    EncryptionConfigurable.encryptedAttributeWasDeclared(class Person {}, "name");
+
+    expect(app.config.filterParameters).toEqual([]);
   });
 
   it("runInitializers installs extended deterministic query support when extend_queries is set", () => {
     ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
     EncryptionConfigurable.config.extendQueries = true;
 
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     runLoadHooks("active_record", Base);
 
     expect(ExtendedDeterministicUniquenessValidator.installed).toBe(true);
@@ -161,14 +188,14 @@ describe("RailtieTest", () => {
     ExtendedDeterministicUniquenessValidator.resetSupport(UniquenessValidator);
     EncryptionConfigurable.config.extendQueries = false;
 
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
     runLoadHooks("active_record", Base);
 
     expect(ExtendedDeterministicUniquenessValidator.installed).toBe(false);
   });
 
   it("runInitializers installs the executor hooks that open an async query session", () => {
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(blogApp());
 
     expect(() => asynchronousQueriesTracker().currentSession).toThrow(
       "Can't perform asynchronous queries without a query session",
