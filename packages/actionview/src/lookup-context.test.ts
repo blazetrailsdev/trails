@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { MissingTemplate, LookupContext } from "./lookup-context.js";
-import type { TemplateResolver } from "./resolver/resolver.js";
+import { Resolver } from "./template/resolver.js";
+import { FixtureResolver } from "./testing/resolvers.js";
 import { Template } from "./template.js";
+import { TemplatePath } from "./template-path.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 
@@ -65,12 +67,23 @@ describe("MissingTemplate#corrections", () => {
   });
 });
 
+class PathsOnlyResolver extends Resolver {
+  constructor(private readonly paths: readonly string[]) {
+    super();
+  }
+
+  protected override _findAll(): Template[] {
+    return [];
+  }
+
+  override allTemplatePaths(): readonly TemplatePath[] {
+    return this.paths.map((path) => TemplatePath.parse(path));
+  }
+}
+
 describe("LookupContext allCandidatePaths wiring", () => {
   it("passes resolver allTemplatePaths into MissingTemplate when render throws", async () => {
-    const resolver: TemplateResolver = {
-      find: () => null,
-      allTemplatePaths: () => ["posts/index", "posts/show", "posts/indx"],
-    };
+    const resolver = new PathsOnlyResolver(["posts/index", "posts/show", "posts/indx"]);
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(resolver);
 
@@ -87,10 +100,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
   });
 
   it("passes resolver allTemplatePaths into MissingTemplate when renderPartial throws", async () => {
-    const resolver: TemplateResolver = {
-      find: () => null,
-      allTemplatePaths: () => ["posts/_form", "posts/_header"],
-    };
+    const resolver = new PathsOnlyResolver(["posts/_form", "posts/_header"]);
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(resolver);
 
@@ -108,18 +118,12 @@ describe("LookupContext allCandidatePaths wiring", () => {
 });
 
 describe("LookupContext#renderPartialSync", () => {
-  const template = (identifier: string, source: string): Template =>
-    new Template({ source, identifier, extension: "tse", format: "html" });
-
   function contextWith(templates: Record<string, string>): LookupContext {
-    const resolver: TemplateResolver = {
-      find: (name, prefix) => {
-        const key = prefix ? `${prefix}/${name}` : name;
-        const source = templates[key];
-        return source === undefined ? null : template(key, source);
-      },
-      allTemplatePaths: () => Object.keys(templates),
-    };
+    const resolver = new FixtureResolver(
+      Object.fromEntries(
+        Object.entries(templates).map(([key, source]) => [`${key}.html.tse`, source]),
+      ),
+    );
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(resolver);
     return ctx;
@@ -180,7 +184,12 @@ describe("LookupContext#renderPartialSync", () => {
   it("is reachable from a template rendered through renderTemplate", async () => {
     const ctx = contextWith({ "posts/_form": "form!" });
     const out = await ctx.renderTemplate(
-      template("posts/index", '<%= render({ partial: "form" }) %>'),
+      new Template({
+        source: '<%= render({ partial: "form" }) %>',
+        identifier: "posts/index",
+        extension: "tse",
+        format: "html",
+      }),
       {},
       { controller: "posts", action: "index", format: "html" },
     );
@@ -189,22 +198,12 @@ describe("LookupContext#renderPartialSync", () => {
 });
 
 describe("LookupContext#render with a layout", () => {
-  const template = (identifier: string, source: string): Template =>
-    new Template({ source, identifier, extension: "tse", format: "html" });
-
   function contextWith(templates: Record<string, string>): LookupContext {
-    const resolver: TemplateResolver = {
-      find: (name, prefix) => {
-        const key = prefix ? `${prefix}/${name}` : name;
-        const source = templates[key];
-        return source === undefined ? null : template(key, source);
-      },
-      findLayout: (name, _format, _extensions) => {
-        const source = templates[`layouts/${name}`];
-        return source === undefined ? null : template(`layouts/${name}`, source).asLayout();
-      },
-      allTemplatePaths: () => Object.keys(templates),
-    };
+    const resolver = new FixtureResolver(
+      Object.fromEntries(
+        Object.entries(templates).map(([key, source]) => [`${key}.html.tse`, source]),
+      ),
+    );
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(resolver);
     return ctx;

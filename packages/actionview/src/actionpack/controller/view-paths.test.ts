@@ -2,7 +2,7 @@ import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import { getPathAsync } from "@blazetrails/activesupport";
 import { PathRegistry } from "../../path-registry.js";
 import { PathSet } from "../../path-set.js";
-import { FileSystemResolver } from "../../resolver/file-system-resolver.js";
+import { FileSystemResolver } from "../../template/resolver.js";
 import {
   ClassMethods,
   appendViewPath,

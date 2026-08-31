@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
 import { getPathAsync } from "@blazetrails/activesupport";
-import { FileSystemResolver } from "./resolver/file-system-resolver.js";
-import { InMemoryResolver } from "./resolver/in-memory-resolver.js";
+import { FileSystemResolver } from "./template/resolver.js";
+import { FixtureResolver } from "./testing/resolvers.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
 
@@ -31,7 +31,7 @@ describe("PathRegistry", () => {
   });
 
   test("castFileSystemResolvers passes through existing resolver instances unchanged", () => {
-    const existing = new InMemoryResolver();
+    const existing = new FixtureResolver();
     const result = PathRegistry.castFileSystemResolvers([existing]);
     expect(result[0]).toBe(existing);
   });
@@ -45,7 +45,7 @@ describe("PathRegistry", () => {
 
   test("setViewPaths + getViewPaths round-trips per class", () => {
     class MyController {}
-    const paths = new PathSet([new InMemoryResolver()]);
+    const paths = new PathSet([new FixtureResolver()]);
     PathRegistry.setViewPaths(MyController, paths);
     expect(PathRegistry.getViewPaths(MyController)).toBe(paths);
   });
@@ -53,7 +53,7 @@ describe("PathRegistry", () => {
   test("getViewPaths walks the prototype chain", () => {
     class Base {}
     class Child extends Base {}
-    const paths = new PathSet([new InMemoryResolver()]);
+    const paths = new PathSet([new FixtureResolver()]);
     PathRegistry.setViewPaths(Base, paths);
     expect(PathRegistry.getViewPaths(Child)).toBe(paths);
   });

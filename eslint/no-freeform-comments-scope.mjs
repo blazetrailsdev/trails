@@ -142,7 +142,6 @@ export const sweptFilesInsideUnsweptTrees = [
   "packages/actionview/src/renderer/partial-renderer.test.ts",
   "packages/actionview/src/renderer/renderer.test.ts",
   "packages/actionview/src/renderer/template-renderer.test.ts",
-  "packages/actionview/src/resolver/optimized-file-system-resolver.test.ts",
   "packages/actionview/src/strict-locals.test.ts",
   "packages/actionview/src/template-details.test.ts",
   "packages/actionview/src/template.test.ts",

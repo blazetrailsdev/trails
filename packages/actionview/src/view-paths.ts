@@ -1,13 +1,13 @@
 import { LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
-import type { TemplateResolver } from "./resolver/resolver.js";
+import type { PathSetResolver } from "./path-set.js";
 
 export type ViewPathsInput =
   | PathSet
   | string
-  | TemplateResolver
-  | ReadonlyArray<string | TemplateResolver>;
+  | PathSetResolver
+  | ReadonlyArray<string | PathSetResolver>;
 
 type DetailValue = ReadonlyArray<string | symbol>;
 
@@ -53,8 +53,8 @@ export class ClassMethods {
   static _buildViewPaths(this: ViewPathsClass, paths: ViewPathsInput): PathSet {
     if (paths instanceof PathSet) return paths;
     const list = Array.isArray(paths)
-      ? (paths as ReadonlyArray<string | TemplateResolver>)
-      : [paths as string | TemplateResolver];
+      ? (paths as ReadonlyArray<string | PathSetResolver>)
+      : [paths as string | PathSetResolver];
     return new PathSet(PathRegistry.castFileSystemResolvers([...list]));
   }
 

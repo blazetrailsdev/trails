@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { PathRegistry } from "./path-registry.js";
-import { InMemoryResolver } from "./resolver/in-memory-resolver.js";
+import { FixtureResolver } from "./testing/resolvers.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import {
   ClassMethods,
@@ -100,8 +100,7 @@ describe("ViewPaths", () => {
       extensions: ["tse"],
       render: () => "",
     });
-    const resolver = new InMemoryResolver();
-    resolver.add("posts/index", "html", "tse", "hello");
+    const resolver = new FixtureResolver({ "posts/index.html.tse": "hello" });
     PostsController.viewPaths([]);
     const controller = new PostsController();
 

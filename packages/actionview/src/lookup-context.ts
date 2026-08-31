@@ -19,12 +19,12 @@
 import type { RenderContext } from "./template/handlers.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import type { TemplateResolver } from "./resolver/resolver.js";
 import type { Template } from "./template.js";
 import { Jaro } from "@blazetrails/did-you-mean";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet, type PathSetResolver } from "./path-set.js";
 import { Requested } from "./template-details.js";
+import { Types } from "./template/types.js";
 
 type DetailValue = ReadonlyArray<string | symbol>;
 type DetailsMap = Record<string, DetailValue>;
@@ -43,25 +43,6 @@ registerDetail("locale", () => ["en"]);
 registerDetail("formats", () => ["html", "text", "js", "css", "xml", "json"]);
 registerDetail("variants", () => []);
 registerDetail("handlers", () => TemplateHandlers.extensions() as DetailValue);
-
-/** Whitelist of format symbols recognized by `formats=`. */
-const VALID_FORMAT_SYMBOLS: ReadonlySet<string> = new Set([
-  "html",
-  "text",
-  "js",
-  "css",
-  "xml",
-  "json",
-  "rss",
-  "atom",
-  "yaml",
-  "multipart_form",
-  "url_encoded_form",
-  "ics",
-  "csv",
-  "vcf",
-  "tsx",
-]);
 
 export class MissingTemplate extends Error {
   /** Rails-shape accessors — refined in Phase 1d. @internal stub - real impl in Phase 1d */
@@ -151,9 +132,9 @@ export class DetailsKey {
   /** Canonical Requested object for a given detail tuple. */
   static detailsCacheKey(details: DetailsMap): Requested {
     let formats = details.formats;
-    if (formats && !formats.every((f) => typeof f === "string" && VALID_FORMAT_SYMBOLS.has(f))) {
+    if (formats && !Types.isValidSymbols(formats)) {
       formats = formats.filter(
-        (f) => typeof f === "string" && VALID_FORMAT_SYMBOLS.has(f),
+        (f) => typeof f === "string" && Types.symbols().includes(f),
       ) as DetailValue;
     }
     const normalized: DetailsMap = { ...details, formats: formats ?? [] };
@@ -193,8 +174,7 @@ export class DetailsKey {
    */
   static clear(): void {
     for (const resolver of PathRegistry.allResolvers()) {
-      const r = resolver as TemplateResolver & { clearCache?: () => void };
-      r.clearCache?.();
+      resolver.clearCache?.();
     }
     DetailsKey._detailsKeys.clear();
     DetailsKey._digestCache.clear();
@@ -249,7 +229,6 @@ export class LookupContext {
   }
 
   // --- Existing high-level renderer state (kept for AC integration) ---
-  private resolvers: TemplateResolver[] = [];
   private layoutName: string | false | null = "application";
 
   // --- Rails-faithful state ---
@@ -314,9 +293,11 @@ export class LookupContext {
       arr = arr.filter((v) => v !== "*/*").concat(DEFAULT_PROCS.formats());
     }
     arr = Array.from(new Set(arr));
-    const invalid = arr.filter((f) => typeof f !== "string" || !VALID_FORMAT_SYMBOLS.has(f));
-    if (invalid.length > 0) {
-      throw new Error(`Invalid formats: ${invalid.map((v) => String(v)).join(", ")}`);
+    if (!Types.isValidSymbols(arr)) {
+      const invalidValues = arr.filter(
+        (f) => typeof f !== "string" || !Types.symbols().includes(f),
+      );
+      throw new Error(`Invalid formats: ${invalidValues.map((v) => String(v)).join(", ")}`);
     }
     if (arr.length === 1 && arr[0] === "js") {
       arr.push("html");
@@ -530,9 +511,15 @@ export class LookupContext {
     return [base, pfxs];
   }
 
-  /** Add a resolver to the lookup chain. First added = highest priority. */
-  addResolver(resolver: TemplateResolver): void {
-    this.resolvers.push(resolver);
+  /**
+   * Add a resolver to the lookup chain. First added = highest priority.
+   * An alias for Rails' `append_view_paths` (`view_paths.rb:87-89`), so
+   * every resolver reaches the same `PathSet` the Rails-shape lookups read.
+   *
+   * @noRailsEquivalent CONVERGEABLE actionview-drop-add-resolver-for-append-view-paths
+   */
+  addResolver(resolver: PathSetResolver): void {
+    this.appendViewPaths([resolver]);
   }
 
   /** Set the layout to use. Pass false to disable layout. */
@@ -551,21 +538,14 @@ export class LookupContext {
    * @internal
    */
   findTemplate(name: string, prefix: string, format: string): Template | null {
-    const extensions = TemplateHandlers.extensions();
-    if (extensions.length === 0) return null;
-
-    for (const resolver of this.resolvers) {
-      const template = resolver.find(name, prefix, format, extensions);
-      if (template) return template;
-    }
-    return null;
+    return (this.findAll(name, [prefix], false, [], { formats: [format] })[0] as Template) ?? null;
   }
 
   /**
    * Find a partial template. Partials are prefixed with underscore.
    */
   findPartial(name: string, prefix: string, format: string): Template | null {
-    return this.findTemplate(`_${name}`, prefix, format);
+    return (this.findAll(name, [prefix], true, [], { formats: [format] })[0] as Template) ?? null;
   }
 
   /**
@@ -574,21 +554,10 @@ export class LookupContext {
    * @internal
    */
   findLayout(name: string, format: string): Template | null {
-    const extensions = TemplateHandlers.extensions();
-    if (extensions.length === 0) return null;
-
-    for (const resolver of this.resolvers) {
-      if (resolver.findLayout) {
-        const layout = resolver.findLayout(name, format, extensions);
-        if (layout) return layout;
-      }
-      // Fallback: look in "layouts" prefix
-      const template = resolver.find(name, "layouts", format, extensions);
-      if (template) {
-        return template.asLayout();
-      }
-    }
-    return null;
+    const template = this.findAll(name, ["layouts"], false, [], { formats: [format] })[0] as
+      | Template
+      | undefined;
+    return template ? template.asLayout() : null;
   }
 
   /**
@@ -815,17 +784,17 @@ export class LookupContext {
   private _viewContextClass: typeof Base | null = null;
 
   private resolverNames(): string[] {
-    return this.resolvers.map((r) => r.constructor.name);
+    return this._viewPaths.toArray().map((r) => r.constructor.name);
   }
 
   /** @internal Collect all template paths from resolvers that expose them. */
   private allCandidatePaths(): string[] {
     const seen = new Set<string>();
-    for (const resolver of this.resolvers) {
+    for (const resolver of this._viewPaths) {
       try {
         const paths = resolver.allTemplatePaths?.();
         if (paths) {
-          for (const p of paths) seen.add(p);
+          for (const p of paths) seen.add(p.virtual);
         }
       } catch {
         // best-effort — don't let enumeration errors mask the MissingTemplate
