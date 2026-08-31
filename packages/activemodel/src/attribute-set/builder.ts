@@ -1,5 +1,5 @@
 import { Attribute, Uninitialized } from "../attribute.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, eachKey } from "@blazetrails/ruby-compat";
 import { Type } from "../type/value.js";
 import { defaultValue } from "../type.js";
 import { AttributeSet } from "../attribute-set.js";
@@ -92,7 +92,7 @@ export class LazyAttributeSet extends AttributeSet {
 
   protected override attributes(): Map<string, Attribute> {
     if (!this.materialized) {
-      for (const key of Object.keys(this.values)) this.getAttribute(key);
+      eachKey(this.values, (key) => this.getAttribute(key));
       for (const key of this.types.keys()) this.getAttribute(key);
       this.materialized = true;
     }
@@ -239,7 +239,7 @@ export class LazyAttributeHash {
   /** @internal */
   protected materialize(): Map<string, Attribute> {
     if (!this.materialized) {
-      for (const key of Object.keys(this.values)) this.getAttribute(key);
+      eachKey(this.values, (key) => this.getAttribute(key));
       for (const key of this.types.keys()) this.getAttribute(key);
       if (!Object.isFrozen(this)) {
         this.materialized = true;

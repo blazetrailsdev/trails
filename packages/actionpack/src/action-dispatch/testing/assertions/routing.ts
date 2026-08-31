@@ -6,6 +6,7 @@
  * `method_missing` named-route forwarding has no TS equivalent.
  */
 
+import { deleteIf, hasKey } from "@blazetrails/ruby-compat";
 import { RouteSet } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import { TestRequest } from "../test-request.js";
@@ -186,10 +187,7 @@ export function assertRouting(
   ) {
     options = { ...options, controller: `/${controller}` };
   }
-  const generateOptions: Options = {};
-  for (const [k, v] of Object.entries(options)) {
-    if (!Object.hasOwn(defaults, k)) generateOptions[k] = v;
-  }
+  const generateOptions = deleteIf({ ...options }, (k) => hasKey(defaults, k));
   const pathStr = typeof path === "string" ? path : path.path;
   assertGenerates.call(this, pathStr, generateOptions, defaults, extras, message);
 }

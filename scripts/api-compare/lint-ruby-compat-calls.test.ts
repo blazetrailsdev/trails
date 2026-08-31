@@ -3,6 +3,7 @@ import { type Artifact, type ExcludeEntry } from "./call-mismatch-baseline.js";
 import { reverseRows } from "./report-ruby-compat.js";
 import { diffAgainstBaseline, keyOf } from "./call-mismatch-baseline.js";
 import { ENROLLED_PACKAGES, renderKey } from "./lint-ruby-compat-calls.js";
+import { PACKAGES } from "./config.js";
 
 const row = (pkg: string, tsFile: string, rubyName: string, missing: string) => ({
   package: pkg,
@@ -30,8 +31,12 @@ const baselined = (k: ReturnType<typeof reverseRows>[number]): ExcludeEntry => (
 });
 
 describe("ruby-compat call ratchet", () => {
-  it("enrolls i18n and activesupport, and nothing else", () => {
-    expect([...ENROLLED_PACKAGES].sort()).toEqual(["activesupport", "i18n"]);
+  // Enrollment is only-grow and now covers the whole compare population, so the
+  // assertion that used to name the two pilot packages is the one that says no
+  // package was left behind — and that a package added to `vendor/sources.ts`
+  // later joins deliberately rather than by silently sitting outside the gate.
+  it("enrolls every package api-compare measures", () => {
+    expect([...ENROLLED_PACKAGES].sort()).toEqual([...PACKAGES].sort());
   });
 
   it("flags an unbaselined row in an enrolled package", () => {
@@ -40,13 +45,18 @@ describe("ruby-compat call ratchet", () => {
     expect(added.map(renderKey)).toEqual([
       "activesupport  inflector/inflections.ts  to_regex  escape → regexpEscape",
       "i18n  backend/base.ts  translate  each_key → eachKey",
+      "actiondispatch  routing/inspector.ts  normalize_filter  escape → regexpEscape",
     ]);
     expect(stale).toEqual([]);
   });
 
-  it("leaves an unenrolled package's rows to the report", () => {
-    const current = reverseRows(artifact).filter((r) => ENROLLED_PACKAGES.includes(r.package));
-    expect(current.some((r) => r.package === "actiondispatch")).toBe(false);
+  it("leaves a package outside the compare population to the report", () => {
+    const outside = {
+      ...artifact,
+      mismatches: [row("ruby-compat", "hash.ts", "fetch", "escape → escape|_escape")],
+    };
+    const current = reverseRows(outside).filter((r) => ENROLLED_PACKAGES.includes(r.package));
+    expect(current).toEqual([]);
   });
 
   it("passes a row a reviewed baseline entry covers", () => {

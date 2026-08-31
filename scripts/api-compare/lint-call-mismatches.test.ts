@@ -653,10 +653,10 @@ describe("--set-reason categories", () => {
 });
 
 describe("the shared shards", () => {
-  it("partitions into exactly the call-set rows and the RFC 0095 args rows", async () => {
+  it("partitions into exactly the call-set rows and the RFC 0095/0129 foreign rows", async () => {
     const all = await loadSplitBaseline(BASELINE_DIR);
-    const args = await loadForeignRows();
-    expect(args.every((r) => r.kind === "args")).toBe(true);
-    expect((await loadBaseline()).length + args.length).toBe(all.length);
+    const foreign = await loadForeignRows();
+    expect(foreign.every((r) => r.kind === "args" || r.kind === "rubyCompat")).toBe(true);
+    expect((await loadBaseline()).length + foreign.length).toBe(all.length);
   });
 });

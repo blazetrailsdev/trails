@@ -1,4 +1,5 @@
 import { deepDup } from "@blazetrails/activesupport";
+import { Hash, transformValues } from "@blazetrails/ruby-compat";
 import { Error as ActiveModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
 
@@ -119,16 +120,15 @@ export class Errors<TBase extends object = object> {
   }
 
   get details(): Map<string, ReadonlyArray<ErrorDetailHash>> {
-    const grouped = this.groupByAttribute();
-    const map = new Map<string, ReadonlyArray<ErrorDetailHash>>();
-    for (const [attr, errors] of Object.entries(grouped)) {
-      map.set(
-        attr,
+    const hash = new Hash<string, ReadonlyArray<ErrorDetailHash>>(EMPTY_ARRAY);
+    for (const [attr, details] of Object.entries(
+      transformValues(this.groupByAttribute(), (errors) =>
         errors.map((e) => e.details as ErrorDetailHash),
-      );
+      ),
+    )) {
+      hash.set(attr, details);
     }
-    map.get = (attribute: string) => Map.prototype.get.call(map, attribute) ?? EMPTY_ARRAY;
-    return map;
+    return hash;
   }
 
   groupByAttribute(): Record<string, ActiveModelError[]> {
