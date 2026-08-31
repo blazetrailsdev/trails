@@ -287,11 +287,6 @@ describe("Ruby extractor gate detection", () => {
   });
 
   it("spells a skip-if inverted feature exactly as the TS extractor does", () => {
-    // Twin of extract-ts-gates.test.ts, "spells a skip-if inverted feature
-    // exactly as the Ruby extractor does". `comparable()` / `adapterFeatureKey()`
-    // (gates.ts) treat `no_<feature>` as a SIGNED FEATURE and compare it across
-    // sides, so the two extractors must agree on the string for the same
-    // restriction.
     const g = rubyGates({
       "cases/inverted_test.rb": `
         class InvertedTest < ActiveRecord::TestCase

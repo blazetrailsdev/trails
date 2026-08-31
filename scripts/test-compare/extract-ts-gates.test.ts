@@ -175,17 +175,10 @@ describe("gates.ts pure helpers", () => {
   });
 
   it("spells a skip-if inverted feature exactly as the Ruby extractor does", () => {
-    // The signed-feature contract `comparable()`/`adapterFeatureKey()` rely on:
-    // this side's `no_<feature>` string must be byte-identical to the one
-    // `gate_from_run_condition` emits for the same restriction, or the two
-    // sides compare unequal for a restriction they agree on.
-    // Ruby: `skip "x" unless supports_rename_index?` → guards:["no_rename_index"]
-    // (see extract-ruby-gates.test.ts, "reads a send-wrapped feature predicate").
     expect(gateFromGuardExpr('adapterSupports("rename_index")', false)).toEqual({
       guards: ["no_rename_index"],
       source: ["test"],
     });
-    // `runIf` reaches the same restriction from the other form.
     expect(gateFromGuardExpr('!adapterSupports("rename_index")', true)).toEqual({
       guards: ["no_rename_index"],
       source: ["test"],
@@ -285,12 +278,6 @@ describe("gates.ts pure helpers", () => {
       features: ["default_expression"],
       source: ["test"],
     });
-    // The feature half of a disjunctive `skipIf` becomes a `no_<feature>`, not
-    // a plain feature: the collection is polarity-blind, so it states the SOURCE
-    // condition's claim while the test runs on that condition's negation. Twin
-    // of `gate_from_run_condition`'s `if positive || split` arm — Ruby's
-    // `skip if !current_adapter?(:Mysql2Adapter) && !supports_default_expression?`
-    // lands on the same `no_default_expression`.
     expect(
       gateFromGuardExpr('adapterType !== "mysql" && !adapterSupports("default_expression")', false),
     ).toEqual({

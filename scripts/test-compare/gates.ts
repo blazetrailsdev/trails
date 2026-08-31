@@ -168,7 +168,16 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  *     `adapter_syms` set alongside a feature in a pure `&&` condition.
  *   - A feature's own polarity is read the same way: while the run condition is a
  *     pure conjunction, a run-NEGATED predicate becomes a `no_<feature>` guard
- *     instead of an inverted `features` entry (see below).
+ *     instead of an inverted `features` entry (see below). When no such split is
+ *     available AND the run condition is the expression's negation (`skipIf`),
+ *     the whole polarity-blind collection is banked as `no_<feature>` too: it
+ *     states the SOURCE condition's capability claim while the test runs on that
+ *     condition's negation. That is the twin of `gate_from_run_condition`'s
+ *     `if positive || split` arm (extract-ruby-tests.rb:1080-1086); collecting a
+ *     plain feature there made every `skipIf(<adapter> && !adapterSupports("x"))`
+ *     state the opposite of the Rails gate it mirrors. A feature term of EITHER
+ *     polarity makes a positive adapter set unsound, so both buckets count
+ *     towards the `mixed` rule, as Ruby's `any_feature` unions them.
  *   - A `mariadb` GUARD is different: it is a runtime predicate neither side can
  *     evaluate statically, so a positive adapter set mixed with one is dropped
  *     rather than over-claiming a partial restriction (Ruby does the same).
@@ -258,15 +267,6 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   const collectedFeatures = featureTerms
     .filter((t) => !splitFeaturePolarity || !t.negated)
     .map((t) => t.name);
-  // The twin of `gate_from_run_condition`'s `if positive || split` arm
-  // (extract-ruby-tests.rb:1080-1086). On the run-when-FALSE path (`skipIf`)
-  // with no split available, the polarity-blind collection above is the SOURCE
-  // condition's capability claim, and the test runs on that condition's
-  // negation — so Ruby banks it as `no_<feature>` rather than asserting the
-  // capability. TS collected it as a plain feature, which made every
-  // `skipIf(<adapter> && !adapterSupports("x"))` state the opposite of the
-  // Rails gate it mirrors; now that `no_<feature>` is a compared dimension
-  // (see `signedFeatures`) that asymmetry would read as a `wrong-gate`.
   const emitCollectedAsInverted = !runsWhenTrue && !splitFeaturePolarity;
   const featureMatches = emitCollectedAsInverted ? [] : collectedFeatures;
   const invertedFeatures = splitFeaturePolarity
@@ -291,10 +291,6 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   // disjunctive — the test does run on the excluded adapter wherever the other
   // term holds. That is the twin of Ruby's negated-adapter branch, likewise
   // gated on `!acc[:has_or]`.
-  // A feature term makes a positive adapter set unsound regardless of the
-  // polarity it was banked at — `no_<feature>` is a restriction like any other,
-  // so it counts here exactly as a plain feature does (Ruby's `any_feature`
-  // likewise unions `features` and `inverted_features`).
   const anyFeature = featureMatches.length > 0 || invertedFeatures.length > 0;
   const mixed = adapterIsPositive
     ? guards.length > 0 || (anyFeature && runIsDisjunctive)
