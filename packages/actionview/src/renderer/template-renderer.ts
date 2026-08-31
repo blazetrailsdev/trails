@@ -177,7 +177,8 @@ class BodyTemplate implements RenderableTemplate {
 
   constructor(private readonly content: string) {}
 
-  async render(_locals: Record<string, unknown>, _context?: ViewContext): Promise<string> {
+  /** Mirrors: `Template::Text#render(*args)` (`template/text.rb:23-25`). */
+  async render(..._args: unknown[]): Promise<string> {
     return this.content;
   }
 }
@@ -188,7 +189,8 @@ class PlainTemplate implements RenderableTemplate {
 
   constructor(private readonly content: string) {}
 
-  async render(_locals: Record<string, unknown>, _context?: ViewContext): Promise<string> {
+  /** Mirrors: `Template::Text#render(*args)` (`template/text.rb:23-25`). */
+  async render(..._args: unknown[]): Promise<string> {
     return this.content;
   }
 }
@@ -201,7 +203,8 @@ class HtmlTemplate implements RenderableTemplate {
     readonly format: string,
   ) {}
 
-  async render(_locals: Record<string, unknown>, _context?: ViewContext): Promise<string> {
+  /** Mirrors: `Template::HTML#render(*args)` (`template/html.rb:24-26`). */
+  async render(..._args: unknown[]): Promise<string> {
     return this.content;
   }
 }
@@ -214,7 +217,8 @@ class InlineTemplate implements RenderableTemplate {
     readonly format: string | null,
   ) {}
 
-  async render(_locals: Record<string, unknown>, _context?: ViewContext): Promise<string> {
+  /** Mirrors: `Template::Inline#render(*args)`. */
+  async render(..._args: unknown[]): Promise<string> {
     return this.source;
   }
 }
@@ -225,7 +229,8 @@ class RenderableWrapper implements RenderableTemplate {
 
   constructor(private readonly inner: { renderIn(context: ViewContext): string }) {}
 
-  async render(_locals: Record<string, unknown>, context?: ViewContext): Promise<string> {
+  /** Mirrors: `Template::Renderable#render(context, *args)` (`template/renderable.rb:15-16`). */
+  async render(context: ViewContext, ..._args: unknown[]): Promise<string> {
     return this.inner.renderIn(context ?? {});
   }
 }

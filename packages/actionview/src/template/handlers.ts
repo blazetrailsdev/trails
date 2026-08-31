@@ -35,7 +35,7 @@ export interface RenderContext {
    * trails' handler is called with source + locals, so the view rides along on
    * the context.
    *
-   * @noRailsEquivalent CONVERGEABLE template-render-takes-view-before-locals
+   * @noRailsEquivalent CONVERGEABLE template-render-hands-the-view-to-run
    */
   view?: Base;
   /**
@@ -44,7 +44,7 @@ export interface RenderContext {
    * handler is called with source + locals, so it rides on the context beside
    * the view.
    *
-   * @noRailsEquivalent CONVERGEABLE template-render-takes-view-before-locals
+   * @noRailsEquivalent CONVERGEABLE template-render-hands-the-view-to-run
    */
   template?: Template;
 }

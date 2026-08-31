@@ -99,7 +99,7 @@ export class Headers {
         if (typeof fallback === "function") return (fallback as () => unknown)();
         return fallback;
       }
-      throw new KeyError(`key not found: "${key}"`);
+      throw new KeyError(String(key));
     });
   }
 

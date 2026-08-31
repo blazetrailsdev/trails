@@ -15,6 +15,7 @@ import { UnknownFormat } from "./exceptions.js";
 export { type FormatHandler };
 
 export class Collector extends DispatchCollector {
+  /** Rails' `@variant` (`metal/mime_responds.rb:255-257`). */
   private _requestVariant: string | string[] | null;
 
   /**
@@ -25,20 +26,6 @@ export class Collector extends DispatchCollector {
     super();
     this._requestVariant = variant;
     for (const mime of mimes) this.custom(mime);
-  }
-
-  /**
-   * Negotiates against the variant the collector was constructed with
-   * (`@variant`, `metal/mime_responds.rb:255-257`), which Rails' own
-   * `negotiate_format(request)` (`mime_responds.rb:297-299`) consults.
-   */
-  override negotiate(
-    options: { accept?: string; format?: string; variant?: string } = {},
-  ): ReturnType<DispatchCollector["negotiate"]> {
-    const variant = Array.isArray(this._requestVariant)
-      ? this._requestVariant[0]
-      : this._requestVariant;
-    return super.negotiate({ variant: variant ?? undefined, ...options });
   }
 
   get format(): string | null {
@@ -88,8 +75,12 @@ export class Collector extends DispatchCollector {
     return !this.handlerFor(this.format) && this.hasAnyHandler;
   }
 
-  negotiateFormat(request: { accept?: string; format?: string }): string | null {
-    const result = this.negotiate({ accept: request.accept, format: request.format });
+  negotiateFormat(request: { accept?: string; format?: string; variant?: string }): string | null {
+    const variant =
+      request.variant ??
+      (Array.isArray(this._requestVariant) ? this._requestVariant[0] : this._requestVariant) ??
+      undefined;
+    const result = this.negotiate({ accept: request.accept, format: request.format, variant });
     return result?.format ?? null;
   }
 }
