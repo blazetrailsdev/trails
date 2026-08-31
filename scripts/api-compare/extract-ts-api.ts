@@ -2545,6 +2545,7 @@ export function extractClass(
         if (!ts.isIdentifier(param.name)) continue;
         const paramVisibility = parameterPropertyVisibility(param);
         if (paramVisibility === undefined) continue;
+        const paramNoRailsEquivalent = noRailsEquivalentReason(param);
         instanceMethods.push({
           name: param.name.text,
           visibility: paramVisibility,
@@ -2552,6 +2553,9 @@ export function extractClass(
           line: param.getSourceFile().getLineAndCharacterOfPosition(param.getStart()).line + 1,
           file,
           isStatic: false,
+          ...(paramNoRailsEquivalent !== undefined
+            ? { noRailsEquivalent: paramNoRailsEquivalent }
+            : {}),
           ...(paramVisibility !== "public" || internalJsDocTagApplies(param)
             ? { internal: true }
             : {}),

@@ -4,7 +4,6 @@ import {
   deepMerge,
   deepDup,
   slice,
-  except,
   deepTransformKeys,
   deepCamelizeKeys,
   deepUnderscoreKeys,
@@ -31,6 +30,7 @@ import {
   compactBlank,
   HashWithIndifferentAccess,
 } from "./index.js";
+import { except } from "@blazetrails/ruby-compat";
 import { extractBang } from "./core-ext/hash/slice.js";
 
 // ── Hash utilities ──────────────────────────────────────────────────

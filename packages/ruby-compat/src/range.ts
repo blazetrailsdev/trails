@@ -42,8 +42,18 @@ function rLess(a: unknown, b: unknown): number {
  */
 export class Range<T = unknown> {
   constructor(
+    /**
+     * @noRailsEquivalent PERMANENT — core Ruby `Range#begin`
+     * (`vendor/ruby/range.c:1178` `range_begin`). No Rails file declares it, so
+     * `parity:api:extra` has no Ruby name to credit it against.
+     */
     readonly begin: T | null,
     readonly end: T | null,
+    /**
+     * @noRailsEquivalent PERMANENT — core Ruby `Range#exclude_end?`
+     * (`vendor/ruby/range.c:133` `range_exclude_end_p`). No Rails file declares
+     * it, so `parity:api:extra` has no Ruby name to credit it against.
+     */
     readonly excludeEnd: boolean = false,
   ) {}
 

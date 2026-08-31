@@ -6,7 +6,8 @@ import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { ThroughAssociation } from "./through-association.js";
-import { camelize, except, safeConstantize, singularize } from "@blazetrails/activesupport";
+import { camelize, safeConstantize, singularize } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
 import { AssociationTargetReplacedDuringLoad, AssociationTypeMismatch } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 

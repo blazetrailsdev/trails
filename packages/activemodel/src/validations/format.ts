@@ -1,7 +1,7 @@
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { isIncludeObj as isInclude } from "@blazetrails/activesupport";
+import { hasKey as isInclude } from "@blazetrails/ruby-compat";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 

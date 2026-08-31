@@ -12,9 +12,9 @@ import {
   constantize,
   safeConstantize,
   foreignKey as deriveForeignKey,
-  except,
   merge,
 } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";

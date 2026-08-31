@@ -1,7 +1,8 @@
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { camelize, except, Range } from "@blazetrails/activesupport";
+import { camelize, Range } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 

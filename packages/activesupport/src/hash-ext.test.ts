@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { toXml, fromXml, fromTrustedXml } from "./hash-utils.js";
+import { except } from "@blazetrails/ruby-compat";
 import type { ToXmlOptions } from "./xml-mini.js";
 import { DisallowedType } from "./core-ext/hash/conversions.js";
 import { Date as RubyDate } from "@blazetrails/date";
@@ -16,7 +17,6 @@ import {
   assertValidKeys,
   ArgumentError,
   slice,
-  except,
   exceptBang,
   reverseMergeBang,
   reverseUpdate,

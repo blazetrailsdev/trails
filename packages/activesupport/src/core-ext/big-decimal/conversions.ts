@@ -472,44 +472,6 @@ function parse(
 }
 
 /**
- * Ruby's `Kernel.Float` — the strict decimal parse Rails reaches for directly
- * (`activemodel/lib/active_model/validations/numericality.rb:82`). It honors
- * `to_f` on a non-Numeric object and raises `ArgumentError`/`TypeError`
- * otherwise; every Rails call site rescues both, so the unparseable cases
- * answer `undefined` here rather than throwing.
- *
- * JS `Number()` and `Kernel.Float` disagree in three places trails has to
- * close by hand: `Number()` reads `0b…` and `0o…` literals, which Ruby
- * rejects; it coerces `""` and whitespace to `0`, which Ruby rejects; and it
- * rejects the `1_000` digit separators Ruby accepts. `0x…` is read by both
- * (`Float("0x10")` is 16.0 on MRI 3.3).
- *
- * @noRailsEquivalent PERMANENT — Ruby core (Kernel.Float), which Rails calls
- * without defining, so there is no Ruby file in any gem for the port to
- * mirror.
- */
-export function kernelFloat(rawValue: unknown): number | undefined {
-  if (rawValue !== null && typeof rawValue === "object") {
-    const toF = (rawValue as { toF?: unknown }).toF;
-    return typeof toF === "function" ? (toF as () => number).call(rawValue) : undefined;
-  }
-  if (typeof rawValue === "number") return rawValue;
-  if (typeof rawValue !== "string") return undefined;
-  if (rawValue.trim() === "") return undefined;
-  // Kernel.Float strips leading whitespace before parsing, so "  0b1" is
-  // rejected too.
-  if (NON_DECIMAL_LITERAL_REGEX.test(rawValue.trimStart())) return undefined;
-  const coerced = Number(rawValue.replace(DIGIT_SEPARATOR_REGEX, ""));
-  return Number.isNaN(coerced) ? undefined : coerced;
-}
-
-/** The literal prefixes `Number()` reads and `Kernel.Float` rejects. */
-const NON_DECIMAL_LITERAL_REGEX = /^[+-]?0[bBoO]/;
-
-/** Ruby's `1_000` digit separator, which `Number()` does not read. */
-const DIGIT_SEPARATOR_REGEX = /(?<=\d)_(?=\d)/g;
-
-/**
  * The leading numeric prefix {@link BigDecimal.interpretLoosely} reads, which
  * is `String#to_f`'s grammar (see `core-ext/string/conversions.ts`) — Ruby
  * accepts single underscores between digits and takes an optional fractional

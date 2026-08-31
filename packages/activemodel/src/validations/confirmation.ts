@@ -1,6 +1,7 @@
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { except, humanize, mergeBang } from "@blazetrails/activesupport";
+import { humanize, mergeBang } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
 import { inspectAccessor } from "./_accessor.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
 
