@@ -21,6 +21,8 @@ describe("FileSystemResolver", () => {
     await write("index.html+phone.tse", "<h1>Phone</h1>");
     await write("_form.html.tse", "<form></form>");
     await write("i*x.html.tse", "<h1>Star</h1>");
+    await fs.mkdir!(path.join(dir, "po?sts"), { recursive: true });
+    await fs.writeFile!(path.join(dir, "po?sts", "index.html.tse"), "<h1>Query</h1>");
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
   });
 
@@ -64,6 +66,14 @@ describe("FileSystemResolver", () => {
 
     expect(ctx.findTemplate("i*x", "posts", "html")?.source).toBe("<h1>Star</h1>");
     expect(ctx.isExists("i*dex", ["posts"])).toBe(false);
+  });
+
+  it("finds a template under a prefix containing a glob metacharacter", () => {
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(new FileSystemResolver(dir));
+
+    expect(ctx.isExists("index", ["po?sts"])).toBe(true);
+    expect(ctx.findTemplate("index", "po?sts", "html")?.source).toBe("<h1>Query</h1>");
   });
 
   it("any? ignores the format and variant constraints", () => {

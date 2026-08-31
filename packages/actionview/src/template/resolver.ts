@@ -165,6 +165,21 @@ export abstract class Resolver implements PathSetResolver {
  * (`resolver.rb:177-179`); `Array#sort` takes a number, so the tuple
  * comparison is spelled out.
  */
+/**
+ * The directory `Dir.glob` would descend into before the pattern's first
+ * wildcard — the leading run of literal segments, with `escape_entry`'s
+ * backslash quoting undone, since those segments name a real directory rather
+ * than a pattern to match.
+ */
+function globWalkRoot(glob: string): string {
+  const root: string[] = [];
+  for (const segment of glob.split("/").slice(0, -1)) {
+    if (/(?:^|[^\\])(?:\\\\)*[*?[{]/.test(segment)) break;
+    root.push(segment.replace(/\\(.)/g, "$1"));
+  }
+  return root.join("/");
+}
+
 function compareSortKeys(
   a: readonly [number, number, number, number],
   b: readonly [number, number, number, number],
@@ -314,20 +329,15 @@ export class FileSystemResolver extends Resolver {
   /**
    * @internal
    * Safe glob within the resolver root (`resolver.rb:202-207`), yielding
-   * expanded paths. `Dir.glob` walks the tree itself; here the walk starts at
-   * the glob's last literal segment, so it only descends what the pattern can
-   * reach.
+   * expanded paths. `Dir.glob` walks the tree itself; here the walk is
+   * {@link globWalkRoot} and the pattern is matched against what it finds.
    */
   protected templateGlob(glob: string): string[] {
     const query = getPath().join(this.escapeEntry(this._path), glob);
     const regex = this.fnmatch(query);
     const pathWithSlash = getPath().join(this._path, "");
 
-    const segments = glob.split("/").slice(0, -1);
-    const wildcard = segments.findIndex((segment) => segment.includes("*"));
-    const root = (wildcard === -1 ? segments : segments.slice(0, wildcard)).join("/");
-
-    return this.entriesUnder(root)
+    return this.entriesUnder(globWalkRoot(glob))
       .map((relative) => getPath().join(this._path, relative))
       .filter((filename) => regex.test(filename) && filename.startsWith(pathWithSlash));
   }
