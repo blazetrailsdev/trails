@@ -53,7 +53,7 @@ describe("StreamingTemplateRenderer", () => {
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
         format: "html",
-        render: vi.fn().mockImplementation((_locals: unknown, viewCtx: ViewContext) => {
+        render: vi.fn().mockImplementation((viewCtx: ViewContext) => {
           const yieldContent = viewCtx?._layoutFor?.() ?? "";
           return Promise.resolve(`<header>HEAD</header>${yieldContent}<footer>FOOT</footer>`);
         }),
@@ -78,7 +78,7 @@ describe("StreamingTemplateRenderer", () => {
       const layoutFake: RenderableTemplate = {
         identifier: "layout",
         format: "html",
-        render: vi.fn().mockImplementation((_locals: unknown, viewCtx: ViewContext) => {
+        render: vi.fn().mockImplementation((viewCtx: ViewContext) => {
           const yieldContent = viewCtx?._layoutFor?.() ?? "";
           return Promise.resolve(`<header>HEAD</header>${yieldContent}<footer>FOOT</footer>`);
         }),

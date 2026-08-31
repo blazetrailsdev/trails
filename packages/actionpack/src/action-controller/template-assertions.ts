@@ -5,32 +5,18 @@
  * @see https://api.rubyonrails.org/classes/ActionController/TemplateAssertions.html
  */
 
-export function assertTemplate(
-  rendered: string | string[] | null | undefined,
-  expected: string | RegExp | null,
-): void {
-  if (expected === null) {
-    if (rendered && rendered.length > 0) {
-      const name = Array.isArray(rendered) ? rendered.join(", ") : rendered;
-      throw new Error(`Expected no template to be rendered, but ${name} was rendered`);
-    }
-    return;
-  }
+import { NameError } from "@blazetrails/activesupport";
 
-  if (!rendered) {
-    throw new Error(`Expected template ${expected} but no template was rendered`);
+class NoMethodError extends NameError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
   }
+}
 
-  const templates = Array.isArray(rendered) ? rendered : [rendered];
-
-  if (typeof expected === "string") {
-    if (!templates.some((t) => t === expected || t.endsWith(`/${expected}`))) {
-      throw new Error(`Expected template "${expected}" but got "${templates.join(", ")}"`);
-    }
-  } else {
-    const pattern = new RegExp(expected.source, expected.flags.replace(/[gy]/g, ""));
-    if (!templates.some((t) => pattern.test(t))) {
-      throw new Error(`Expected template matching ${expected} but got "${templates.join(", ")}"`);
-    }
-  }
+/** Mirrors: `assert_template` (`action_controller/template_assertions.rb:7-11`). */
+export function assertTemplate(options: Record<string, unknown> = {}, message?: string): never {
+  throw new NoMethodError(
+    'assert_template has been extracted to a gem. To continue using it,\n        add `gem "rails-controller-testing"` to your Gemfile.',
+  );
 }

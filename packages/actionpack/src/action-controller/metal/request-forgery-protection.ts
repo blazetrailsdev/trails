@@ -150,50 +150,42 @@ export class Exception implements ProtectionMethods {
   }
 }
 
-const DEFAULT_TOKEN_KEY = "_csrf_token";
+const CSRF_TOKEN_SESSION_KEY = "_csrf_token";
 
+/** Mirrors: `SessionStore` (`metal/request_forgery_protection.rb:319-331`). */
 export class SessionStore {
-  private _tokenKey: string;
-  constructor(tokenKey: string = DEFAULT_TOKEN_KEY) {
-    this._tokenKey = tokenKey;
-  }
-  read(session: Record<string, unknown>): string | null {
-    const token = session[this._tokenKey];
+  fetch(request: CsrfRequest): string | null {
+    const token = request.session?.[CSRF_TOKEN_SESSION_KEY];
     return typeof token === "string" ? token : null;
   }
-  fetch(session: Record<string, unknown>): string | null {
-    return this.read(session);
+
+  store(request: CsrfRequest, csrfToken: string): void {
+    (request.session ??= {})[CSRF_TOKEN_SESSION_KEY] = csrfToken;
   }
-  write(session: Record<string, unknown>, token: string): void {
-    session[this._tokenKey] = token;
-  }
-  store(session: Record<string, unknown>, csrfToken: string): void {
-    this.write(session, csrfToken);
-  }
-  reset(session: Record<string, unknown>): void {
-    delete session[this._tokenKey];
+
+  reset(request: CsrfRequest): void {
+    delete request.session?.[CSRF_TOKEN_SESSION_KEY];
   }
 }
 
+/** Mirrors: `CookieStore` (`metal/request_forgery_protection.rb:333-364`). */
 export class CookieStore {
   private _cookieName: string;
-  constructor(cookieName = "csrf_token") {
-    this._cookieName = cookieName;
+
+  constructor(cookie = "csrf_token") {
+    this._cookieName = cookie;
   }
-  read(cookies: Record<string, string>): string | null {
-    return cookies[this._cookieName] ?? null;
+
+  fetch(request: CsrfRequest): string | null {
+    return request.cookies?.[this._cookieName] ?? null;
   }
-  fetch(cookies: Record<string, string>): string | null {
-    return this.read(cookies);
+
+  store(request: CsrfRequest, csrfToken: string): void {
+    (request.cookies ??= {})[this._cookieName] = csrfToken;
   }
-  write(cookies: Record<string, string>, token: string): void {
-    cookies[this._cookieName] = token;
-  }
-  store(cookies: Record<string, string>, csrfToken: string): void {
-    this.write(cookies, csrfToken);
-  }
-  reset(cookies: Record<string, string>): void {
-    delete cookies[this._cookieName];
+
+  reset(request: CsrfRequest): void {
+    delete request.cookies?.[this._cookieName];
   }
 }
 
@@ -204,18 +196,20 @@ export function warningMessage(origin?: string | null, baseUrl?: string | null):
   return "Can't verify CSRF token authenticity.";
 }
 
-export interface CsrfTokenStore<TStorage> {
-  fetch(storage: TStorage): string | null;
-  store(storage: TStorage, token: string): void;
-  reset(storage: TStorage): void;
+/** Mirrors: `reset_csrf_token` (`metal/request_forgery_protection.rb:371-374`). */
+export function resetCsrfToken(this: CsrfController, request: CsrfRequest): void {
+  delete (request.env ??= {})[CSRF_TOKEN_ENV_KEY];
+  (this.csrfTokenStorageStrategy ??= storageStrategy("session")).reset(request);
 }
 
-export function resetCsrfToken<T>(csrfStore: CsrfTokenStore<T>, storage: T): void {
-  csrfStore.reset(storage);
-}
-
-export function commitCsrfToken<T>(csrfStore: CsrfTokenStore<T>, storage: T, token: string): void {
-  csrfStore.store(storage, token);
+/** Mirrors: `commit_csrf_token` (`metal/request_forgery_protection.rb:376-379`). */
+export function commitCsrfToken(this: CsrfController, request: CsrfRequest): void {
+  const csrfToken = (request.env ??= {})[CSRF_TOKEN_ENV_KEY];
+  if (csrfToken != null)
+    (this.csrfTokenStorageStrategy ??= storageStrategy("session")).store(
+      request,
+      csrfToken as string,
+    );
 }
 
 export function skipForgeryProtection(
@@ -242,13 +236,17 @@ export interface CsrfRequest {
   xCsrfToken?: string | null;
   /** Per-request token cache (mirrors `request.env[CSRF_TOKEN]`). */
   env?: Record<string, unknown>;
+  /** Mirrors `Request#session`, which `SessionStore` indexes. */
+  session?: Record<string, unknown>;
+  /** Mirrors `Request#cookie_jar`, which `CookieStore` indexes. */
+  cookies?: Record<string, string>;
 }
 
 /** @internal */
 export interface CsrfTokenStorage {
-  fetch(controller: CsrfController): string | null | undefined;
-  store(controller: CsrfController, token: string): void;
-  reset(controller: CsrfController): void;
+  fetch(request: CsrfRequest): string | null | undefined;
+  store(request: CsrfRequest, csrfToken: string): void;
+  reset(request: CsrfRequest): void;
 }
 
 /** @internal */
@@ -434,8 +432,9 @@ export function realCsrfToken(this: CsrfController, _session?: unknown): Buffer 
     // class level (line 100 of request_forgery_protection.rb); mirror that
     // here so a session-backed controller without explicit config still
     // verifies tokens against its session-stored real token.
-    const strategy = (this.csrfTokenStorageStrategy ??= storageStrategy("session"));
-    encoded = strategy.fetch(this) ?? generateCsrfToken();
+    encoded =
+      (this.csrfTokenStorageStrategy ??= storageStrategy("session")).fetch(this.request) ??
+      generateCsrfToken();
     env[CSRF_TOKEN_ENV_KEY] = encoded;
   }
   return decodeCsrfToken(encoded);
@@ -605,22 +604,8 @@ export function isStorageStrategy(object: unknown): object is CsrfTokenStorage {
 
 /** @internal */
 export function storageStrategy(name: "session" | "cookie" | CsrfTokenStorage): CsrfTokenStorage {
-  if (name === "session") {
-    const s = new SessionStore();
-    return {
-      fetch: (c) => s.fetch((c.session as Record<string, unknown>) ?? {}),
-      store: (c, t) => s.write((c.session ??= {}) as Record<string, unknown>, t),
-      reset: (c) => s.reset((c.session as Record<string, unknown>) ?? {}),
-    };
-  }
-  if (name === "cookie") {
-    const k = new CookieStore("csrf_token");
-    return {
-      fetch: (c) => k.fetch(c.cookies ?? {}),
-      store: (c, t) => k.write((c.cookies ??= {}), t),
-      reset: (c) => k.reset(c.cookies ?? {}),
-    };
-  }
+  if (name === "session") return new SessionStore();
+  if (name === "cookie") return new CookieStore("csrf_token");
   if (isStorageStrategy(name)) return name;
   throw new TypeError(
     "Invalid CSRF token storage strategy, use :session, :cookie, or a custom CSRF token storage class.",

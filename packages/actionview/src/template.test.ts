@@ -47,7 +47,7 @@ describe("ActionView::Template (smoke)", () => {
   it("render delegates to the handler and wraps non-TemplateError failures", async () => {
     TemplateHandlers.registerTemplateHandler("txt", echo);
     const t = new Template({ source: "hi", identifier: "x", extension: "txt" });
-    expect(await t.render({ name: "ada" })).toBe(`hi::${JSON.stringify({ name: "ada" })}`);
+    expect(await t.render({}, { name: "ada" })).toBe(`hi::${JSON.stringify({ name: "ada" })}`);
 
     TemplateHandlers.clear();
     TemplateHandlers.registerTemplateHandler("txt", {

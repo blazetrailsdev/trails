@@ -369,7 +369,7 @@ export class Base {
    * `StrictLocalsMismatch` there, so there is no `ArgumentError` to convert and
    * the kwarg is not accepted.
    *
-   * @missingRailsArgs _run — CONVERGEABLE template-render-takes-view-before-locals
+   * @missingRailsArgs _run — CONVERGEABLE template-render-hands-the-view-to-run
    */
   _run(
     method: CompiledMethod,

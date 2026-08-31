@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { Headers } from "../http/headers.js";
+import { Request } from "../http/request.js";
 
 function makeHeaders(hash: Record<string, unknown>): Headers {
-  return new Headers(hash);
+  return new Headers(new Request(hash));
 }
 
 // ==========================================================================

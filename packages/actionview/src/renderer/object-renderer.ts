@@ -23,7 +23,7 @@ export class ObjectRenderer extends PartialRenderer {
     const localName = localVariable(partial, this.options as Record<string, unknown>);
     const locals = { ...(this.options.locals ?? {}), [localName]: object };
     const template = this.findTemplate(partial);
-    const body = await template.render(locals, context);
+    const body = await template.render(context, locals);
     return this.buildRenderedTemplate(body, template);
   }
 

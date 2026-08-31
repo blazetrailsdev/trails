@@ -1,3 +1,7 @@
+import type { Request } from "./request.js";
+import { _RequestCtor } from "./request-slot.js";
+import { KeyError } from "@blazetrails/activesupport";
+
 /**
  * ActionDispatch::Http::Headers
  *
@@ -40,26 +44,31 @@ function envName(key: string): string {
 }
 
 export class Headers {
-  private _env: Record<string, unknown>;
+  private _req: Request;
 
-  constructor(env: Record<string, unknown>) {
-    this._env = env;
+  /** Mirrors: `Headers#initialize` (`http/headers.rb:58-60`). */
+  constructor(request: Request) {
+    this._req = request;
   }
 
+  /** Mirrors: `Headers#env` (`http/headers.rb:117`). */
   get env(): Record<string, unknown> {
-    return this._env;
+    return { ...(this._req.env as Record<string, unknown>) };
   }
 
+  /** Mirrors: `Headers#[]` (`http/headers.rb:62-64`). */
   get(key: string): unknown {
-    return this._env[envName(String(key))];
+    return this._req.getHeader(envName(String(key)));
   }
 
+  /** Mirrors: `Headers#[]=` (`http/headers.rb:66-68`). */
   set(key: string, value: unknown): void {
-    this._env[envName(String(key))] = value;
+    this._req.setHeader(envName(String(key)), value);
   }
 
+  /** Mirrors: `Headers#key?` (`http/headers.rb:75-77`). */
   has(key: string): boolean {
-    return envName(String(key)) in this._env;
+    return this._req.hasHeader(envName(String(key)));
   }
 
   /** Rails alias `key?` for `Hash#key?`. */
@@ -72,55 +81,44 @@ export class Headers {
     return this.mergeInPlace(headersOrEnv);
   }
 
-  /**
-   * Rails `Headers.from_hash(hash)` — wraps the env hash directly so
-   * mutations via the returned `Headers` are reflected in the original
-   * hash, matching Rails' Request-backed wrapper semantics.
-   */
+  /** Mirrors: `Headers.from_hash` (`http/headers.rb:54-56`). */
   static fromHash(hash: Record<string, unknown>): Headers {
-    return new Headers(hash);
+    return new Headers(new _RequestCtor!(hash));
   }
 
+  /** Mirrors: `Headers#add` (`http/headers.rb:71-73`). */
   add(key: string, value: unknown): void {
-    if (value == null) return;
-    const envKey = envName(String(key));
-    const strValue = String(value);
-    const existing = this._env[envKey];
-    if (existing != null) {
-      this._env[envKey] = String(existing) + "," + strValue;
-    } else {
-      this._env[envKey] = strValue;
-    }
+    this._req.addHeader(envName(String(key)), value);
   }
 
+  /** Mirrors: `Headers#fetch` (`http/headers.rb:90-96`). */
   fetch(key: string, ...defaultValue: unknown[]): unknown {
-    const envKey = envName(String(key));
-    if (envKey in this._env) return this._env[envKey];
-    if (defaultValue.length > 0) {
-      const fallback = defaultValue[0];
-      if (typeof fallback === "function") return (fallback as () => unknown)();
-      return fallback;
-    }
-    throw new Error(`key not found: "${key}"`);
+    return this._req.fetchHeader(envName(String(key)), () => {
+      if (defaultValue.length > 0) {
+        const fallback = defaultValue[0];
+        if (typeof fallback === "function") return (fallback as () => unknown)();
+        return fallback;
+      }
+      throw new KeyError(String(key));
+    });
   }
 
+  /** Mirrors: `Headers#each` (`http/headers.rb:98-100`). */
   each(fn: (pair: [string, unknown]) => void): void {
-    for (const [key, value] of Object.entries(this._env)) {
-      fn([key, value]);
-    }
+    this._req.eachHeader((key, value) => fn([key, value]));
   }
 
+  /** Mirrors: `Headers#merge` (`http/headers.rb:104-108`). */
   merge(headersOrEnv: Record<string, unknown>): Headers {
-    const newEnv = { ...this._env };
-    for (const [key, value] of Object.entries(headersOrEnv)) {
-      newEnv[envName(String(key))] = value;
-    }
-    return new Headers(newEnv);
+    const headers = Headers.fromHash(this.env);
+    headers.mergeInPlace(headersOrEnv);
+    return headers;
   }
 
+  /** Mirrors: `Headers#merge!` (`http/headers.rb:112-116`). */
   mergeInPlace(other: Record<string, unknown>): this {
     for (const [key, value] of Object.entries(other)) {
-      this._env[envName(String(key))] = value;
+      this._req.setHeader(envName(String(key)), value);
     }
     return this;
   }

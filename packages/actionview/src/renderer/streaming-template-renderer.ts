@@ -67,7 +67,7 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
 
     try {
       if (!layout) {
-        const body = await template.render(locals, context);
+        const body = await template.render(context, locals);
         yield body;
         return;
       }
@@ -98,12 +98,12 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
       _layoutFor: (name?: string) => (name ? (context._layoutFor?.(name) ?? "") : sentinel),
     };
 
-    const layoutBody = await layout.render(locals, streamingContext);
+    const layoutBody = await layout.render(streamingContext, locals);
     const sentinelIdx = layoutBody.indexOf(sentinel);
 
     if (sentinelIdx === -1) {
       // Layout never yielded — render template normally and append.
-      const templateBody = await template.render(locals, context);
+      const templateBody = await template.render(context, locals);
       const fullBody = layoutBody + templateBody;
       yield fullBody;
       return;
@@ -116,7 +116,7 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     yield layoutPrefix;
 
     // Render the template (this is where the "wait" happens in Rails' Fiber).
-    const templateBody = await template.render(locals, context);
+    const templateBody = await template.render(context, locals);
     yield templateBody;
 
     // Resume: stream layout suffix (e.g. </body></html>).
