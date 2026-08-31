@@ -586,21 +586,6 @@ export class PostgreSQLAdapter
     return pgLookupCastTypeFromColumn.call(this, column);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
-   */
-  override async caseInsensitiveComparison(
-    attribute: Nodes.Attribute,
-    value: unknown,
-  ): Promise<Nodes.Node> {
-    const column = await this.columnForAttribute(attribute);
-    if (column && (await this.canPerformCaseInsensitiveComparisonFor(column))) {
-      return attribute.lower().eq(attribute.relation.lower(value));
-    }
-    return attribute.eq(value);
-  }
-
   /** @internal */
   override async canPerformCaseInsensitiveComparisonFor(column: {
     sqlType?: string | null;
@@ -1519,33 +1504,6 @@ export class PostgreSQLAdapter
   async reconnect(): Promise<void> {
     this._discardRawConnection();
     await this.connect();
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
-   */
-  override async verifyBang(): Promise<void> {
-    if (this._pgClientOptions == null) {
-      throw new Error("PostgreSQLAdapter: connection is closed");
-    }
-    if (this._closed || !this._rawConnection) {
-      await this.reconnectBang({ restoreTransactions: true });
-      this.verifiedBang();
-      return;
-    }
-    const conn = this._rawConnection;
-    if (this._closed || !conn) {
-      await this.reconnectBang({ restoreTransactions: true });
-      this.verifiedBang();
-      return;
-    }
-    try {
-      await this.lock.synchronize(() => conn.query(";"));
-    } catch {
-      await this.reconnectBang({ restoreTransactions: true });
-    }
-    this.verifiedBang();
   }
 
   override async resetBang(): Promise<void> {

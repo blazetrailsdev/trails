@@ -10,6 +10,7 @@ import {
   globalTableNameSuffix,
   globalGetPrimaryKey,
 } from "./table-name-options.js";
+import { wrap } from "@blazetrails/activesupport";
 
 /**
  * @internal
@@ -550,18 +551,16 @@ export class IndexDefinition {
     } = {},
   ): boolean {
     const { name, unique, valid, include, nullsNotDistinct } = options;
-    const array = (value: string | string[] | null | undefined): string[] =>
-      value == null ? [] : Array.isArray(value) ? value : [value];
     const equals = (a: string[], b: string[]): boolean =>
       a.length === b.length && a.every((v, i) => v === b[i]);
 
     if (isBlank(columns)) columns = options.column;
     return (
-      (columns == null || equals(array(this.columns), array(columns).map(String))) &&
+      (columns == null || equals(wrap(this.columns), wrap(columns).map(String))) &&
       (name == null || this.name === String(name)) &&
       (unique == null || this.unique === unique) &&
       (valid == null || this.valid === valid) &&
-      (include == null || equals(array(this.include), array(include).map(String))) &&
+      (include == null || equals(wrap(this.include), wrap(include).map(String))) &&
       (nullsNotDistinct == null || this.nullsNotDistinct === nullsNotDistinct)
     );
   }

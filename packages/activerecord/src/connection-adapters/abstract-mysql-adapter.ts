@@ -816,23 +816,8 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return super.caseSensitiveComparison(attribute, value);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
-   */
-  override async caseInsensitiveComparison(
-    attribute: Nodes.Attribute,
-    value: unknown,
-  ): Promise<Nodes.Node> {
-    const column = (await this.columnForAttribute(attribute)) as MysqlColumn | undefined;
-    if (column && this.canPerformCaseInsensitiveComparisonFor(column)) {
-      return attribute.lower().eq(attribute.relation.lower(value));
-    }
-    return attribute.eq(value);
-  }
-
   /** @internal */
-  canPerformCaseInsensitiveComparisonFor(column: MysqlColumn): boolean {
+  override canPerformCaseInsensitiveComparisonFor(column: MysqlColumn): boolean {
     return column.isCaseSensitive();
   }
 
