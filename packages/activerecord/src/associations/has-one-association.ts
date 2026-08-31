@@ -12,6 +12,7 @@ import {
 import type { AssociationReflection } from "../reflection.js";
 import { SingularAssociation } from "./singular-association.js";
 import { queryConstraintsList } from "../persistence.js";
+import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
 export class HasOneAssociation extends SingularAssociation {
   constructor(owner: Base, definition: AssociationDefinition) {
@@ -27,7 +28,7 @@ export class HasOneAssociation extends SingularAssociation {
     if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       throw new HasOnePersistedAssignmentError(this.reflection.name);
     }
-    this.replace(record, false);
+    assertAssignedSynchronously(this.replace(record, false), `${this.reflection.name}=`);
   }
 
   override writer(record: Base | null): void | Promise<void> {
@@ -155,7 +156,7 @@ export class HasOneAssociation extends SingularAssociation {
     return Promise.resolve(this.loadTarget());
   }
 
-  protected override replace(record: Base | null, save: false): void;
+  protected override replace(record: Base | null, save: false): void | Promise<void>;
   protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
   protected override replace(record: Base | null, save = true): void | Promise<void> {
     if (save) {
@@ -308,8 +309,8 @@ export class HasOneAssociation extends SingularAssociation {
     }
   }
 
-  protected override setNewRecord(record: Base): void {
-    this.replace(record, false);
+  protected override setNewRecord(record: Base): void | Promise<void> {
+    return this.replace(record, false);
   }
 
   private async removeTargetBang(method: string): Promise<void> {

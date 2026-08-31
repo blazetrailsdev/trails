@@ -65,8 +65,8 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     return record;
   }
 
-  protected override setNewRecord(record: Base): void {
-    this.replace(record, false);
+  protected override setNewRecord(record: Base): void | Promise<void> {
+    return this.replace(record, false);
   }
 
   /** @internal */
@@ -85,10 +85,11 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   override writer(record: Base | null): void | Promise<void> {
-    this.replace(record);
+    const assigned = this.replace(record);
     if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.() && this._pendingReplace) {
-      return this.persistReplace();
+      return assigned ? assigned.then(() => this.persistReplace()) : this.persistReplace();
     }
+    return assigned;
   }
 
   sourceReflection(): unknown {
@@ -96,7 +97,8 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /** @missingRailsCall create_through_record — PERMANENT */
-  protected override replace(record: Base | null, save = true): void {
+  protected override replace(record: Base | null, save?: boolean): void | Promise<void>;
+  protected override replace(record: Base | null, save = true): void | Promise<void> {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const inMemory = record != null && ((this.owner as any).isNewRecord?.() || !save);
     if (!inMemory) {
@@ -121,11 +123,11 @@ export class HasOneThroughAssociation extends HasOneAssociation {
       }
     }
     this.target = record;
-    if (record) this.constructThroughRecordInMemory(record, save);
+    if (record) return this.constructThroughRecordInMemory(record, save);
   }
 
   /** @internal */
-  private constructThroughRecordInMemory(record: Base, save: boolean): void {
+  private constructThroughRecordInMemory(record: Base, save: boolean): void | Promise<void> {
     if (!((this.owner as any).isNewRecord?.() || !save)) return;
 
     this.ensureNotNested();
@@ -134,19 +136,19 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     const attrs = this.constructJoinAttributes(record);
     const throughRecord = (throughProxy as { target?: Base | null }).target ?? null;
     if (throughRecord) {
+      const assigned: Promise<void> | void = (throughRecord as any).assignAttributes?.(attrs);
       if ((throughRecord as any).isNewRecord?.()) {
-        void (throughRecord as any).assignAttributes?.(attrs);
         if (this._pendingReplace) this._pendingReplace.record = record;
       } else {
-        void (throughRecord as any).assignAttributes?.(attrs);
         if (this._pendingReplace) {
           this._pendingReplace.record = record;
         } else {
           this._pendingReplace = { record, previousTarget: null };
         }
       }
+      return assigned;
     } else {
-      buildThroughProxyRecord(throughProxy, attrs);
+      const built = buildThroughProxyRecord(throughProxy, attrs);
       if (!((this.owner as any).isNewRecord?.() ?? true)) {
         if (this._pendingReplace) {
           this._pendingReplace.record = record;
@@ -161,6 +163,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
           tp._pendingReplace = { record: null, previousTarget: null };
         }
       }
+      return built;
     }
   }
 
@@ -217,7 +220,7 @@ async function createThroughRecord(
         await throughRecord.update?.(attrs);
       }
     } else if ((this.owner as any).isNewRecord?.() || !save) {
-      buildThroughProxyRecord(throughProxy, attrs);
+      await buildThroughProxyRecord(throughProxy, attrs);
     } else {
       await throughProxy.create?.(attrs);
     }
@@ -226,9 +229,12 @@ async function createThroughRecord(
 }
 
 /** @internal */
-function buildThroughProxyRecord(throughProxy: any, attrs: Record<string, unknown>): void {
+function buildThroughProxyRecord(
+  throughProxy: any,
+  attrs: Record<string, unknown>,
+): void | Promise<void> {
   const record = throughProxy.buildRecord?.(attrs);
-  if (record) throughProxy.setNewRecord?.(record);
+  if (record) return throughProxy.setNewRecord?.(record);
 }
 
 Object.assign(HasOneThroughAssociation.prototype, {
