@@ -1,5 +1,6 @@
 import type { Request } from "./request.js";
 import { _RequestCtor } from "./request-slot.js";
+import { KeyError } from "@blazetrails/activesupport";
 
 /**
  * ActionDispatch::Http::Headers
@@ -92,14 +93,14 @@ export class Headers {
 
   /** Mirrors: `Headers#fetch` (`http/headers.rb:90-96`). */
   fetch(key: string, ...defaultValue: unknown[]): unknown {
-    const envKey = envName(String(key));
-    if (this._req.hasHeader(envKey)) return this._req.getHeader(envKey);
-    if (defaultValue.length > 0) {
-      const fallback = defaultValue[0];
-      if (typeof fallback === "function") return (fallback as () => unknown)();
-      return fallback;
-    }
-    throw new Error(`key not found: "${key}"`);
+    return this._req.fetchHeader(envName(String(key)), () => {
+      if (defaultValue.length > 0) {
+        const fallback = defaultValue[0];
+        if (typeof fallback === "function") return (fallback as () => unknown)();
+        return fallback;
+      }
+      throw new KeyError(`key not found: "${key}"`);
+    });
   }
 
   /** Mirrors: `Headers#each` (`http/headers.rb:98-100`). */

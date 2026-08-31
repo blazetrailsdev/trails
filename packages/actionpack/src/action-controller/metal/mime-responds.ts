@@ -15,14 +15,30 @@ import { UnknownFormat } from "./exceptions.js";
 export { type FormatHandler };
 
 export class Collector extends DispatchCollector {
+  private _requestVariant: string | string[] | null;
+
   /**
    * Mirrors: `Collector#initialize` (`metal/mime_responds.rb:255-260`), which
    * seeds a response slot for each mime `respond_to` was called with.
    */
   constructor(mimes: string[] = [], variant: string | string[] | null = null) {
     super();
-    if (variant != null) this.variant(variant);
+    this._requestVariant = variant;
     for (const mime of mimes) this.custom(mime);
+  }
+
+  /**
+   * Negotiates against the variant the collector was constructed with
+   * (`@variant`, `metal/mime_responds.rb:255-257`), which Rails' own
+   * `negotiate_format(request)` (`mime_responds.rb:297-299`) consults.
+   */
+  override negotiate(
+    options: { accept?: string; format?: string; variant?: string } = {},
+  ): ReturnType<DispatchCollector["negotiate"]> {
+    const variant = Array.isArray(this._requestVariant)
+      ? this._requestVariant[0]
+      : this._requestVariant;
+    return super.negotiate({ variant: variant ?? undefined, ...options });
   }
 
   get format(): string | null {
