@@ -285,7 +285,7 @@ export class TableDefinition extends AbstractTableDefinition {
   ): this {
     const col = new ColumnDefinition(name, type, options);
     col.sqlType = sqlType;
-    this.columns.push(col);
+    this.columnsHash.set(name, col);
     return this;
   }
 }

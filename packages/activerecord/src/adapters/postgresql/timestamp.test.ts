@@ -383,57 +383,45 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampMigrationTest", () => {
+    fixtures(["topics"]);
+
     it("adds column as timestamp", async () => {
-      try {
+      await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
+      const rows = await adapter.execute(
+        `SELECT data_type FROM information_schema.columns
+         WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
+      );
+      expect(rows[0]?.data_type).toBe("timestamp without time zone");
+    });
+
+    it("adds column as timestamptz if datetime type changed", async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
         await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
         const rows = await adapter.execute(
           `SELECT data_type FROM information_schema.columns
            WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
         );
-        expect(rows[0]?.data_type).toBe("timestamp without time zone");
-      } finally {
-        await adapter.removeColumn("postgresql_timestamp_with_zones", "times");
-      }
-    });
-
-    it("adds column as timestamptz if datetime type changed", async () => {
-      await withPostgresqlDatetimeType("timestamptz", async () => {
-        try {
-          await adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime");
-          const rows = await adapter.execute(
-            `SELECT data_type FROM information_schema.columns
-             WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
-          );
-          expect(rows[0]?.data_type).toBe("timestamp with time zone");
-        } finally {
-          await adapter.removeColumn("postgresql_timestamp_with_zones", "times");
-        }
+        expect(rows[0]?.data_type).toBe("timestamp with time zone");
       });
     });
 
     it("adds column as custom type", async () => {
-      await adapter.exec(`DROP TYPE IF EXISTS custom_time_format`);
-      try {
-        await adapter.exec(`CREATE TYPE custom_time_format AS ENUM ('past', 'present', 'future')`);
-        await withNativeDatabaseTypeOverrides(
-          { datetimes_as_enum: { name: "custom_time_format" } },
-          () =>
-            withPostgresqlDatetimeType("datetimes_as_enum", () =>
-              adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime", {
-                precision: null,
-              }),
-            ),
-        );
-        const rows = await adapter.execute(
-          `SELECT data_type, udt_name FROM information_schema.columns
-           WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
-        );
-        expect(rows[0]?.data_type).toBe("USER-DEFINED");
-        expect(rows[0]?.udt_name).toBe("custom_time_format");
-      } finally {
-        await adapter.removeColumn("postgresql_timestamp_with_zones", "times");
-        await adapter.exec(`DROP TYPE IF EXISTS custom_time_format`);
-      }
+      await adapter.exec(`CREATE TYPE custom_time_format AS ENUM ('past', 'present', 'future')`);
+      await withNativeDatabaseTypeOverrides(
+        { datetimes_as_enum: { name: "custom_time_format" } },
+        () =>
+          withPostgresqlDatetimeType("datetimes_as_enum", () =>
+            adapter.addColumn("postgresql_timestamp_with_zones", "times", "datetime", {
+              precision: null,
+            }),
+          ),
+      );
+      const rows = await adapter.execute(
+        `SELECT data_type, udt_name FROM information_schema.columns
+         WHERE table_name = 'postgresql_timestamp_with_zones' AND column_name = 'times'`,
+      );
+      expect(rows[0]?.data_type).toBe("USER-DEFINED");
+      expect(rows[0]?.udt_name).toBe("custom_time_format");
     });
   });
 });

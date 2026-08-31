@@ -258,6 +258,15 @@ export class ForeignKeyDefinition {
     );
   }
 
+  get options(): Record<string, unknown> {
+    const options: Record<string, unknown> = {};
+    for (const key of this.storedOptionKeys) {
+      options[key] = (this as unknown as Record<string, unknown>)[key];
+    }
+    if (this.storesValidate) options["validate"] = this.validate;
+    return options;
+  }
+
   get isCustomPrimaryKey(): boolean {
     return this.primaryKey !== this.defaultPrimaryKey;
   }
@@ -419,6 +428,7 @@ export interface ColumnOptions {
   type?: ColumnType;
   as?: string;
   stored?: boolean;
+  enumType?: string;
   _usesLegacyReferenceIndexName?: boolean;
   _skipValidateOptions?: boolean;
 }
@@ -842,7 +852,7 @@ export type TableOf<A> = A extends {
 
 export class TableDefinition {
   readonly name: string;
-  readonly columns: ColumnDefinition[] = [];
+  protected readonly columnsHash = new Map<string, ColumnDefinition | null>();
   readonly indexes: Array<[string | string[], AddIndexOptions]> = [];
   readonly foreignKeys: ForeignKeyDefinition[] = [];
   readonly checkConstraints: CheckConstraintDefinition[] = [];
@@ -940,7 +950,7 @@ export class TableDefinition {
   ): this {
     const { index, ...colOpts } = options;
     this.raiseOnDuplicateColumn(name);
-    this.columns.push(this.newColumnDefinition(name, type, colOpts as ColumnOptions));
+    this.columnsHash.set(name, this.newColumnDefinition(name, type, colOpts as ColumnOptions));
     if (index) {
       const indexOpts: AddIndexOptions = typeof index === "object" ? index : {};
       this.index([name], indexOpts);
@@ -948,14 +958,16 @@ export class TableDefinition {
     return this;
   }
 
-  get(name: string): ColumnDefinition | undefined {
-    return this.columns.find((c) => c.name === String(name));
+  get columns(): ColumnDefinition[] {
+    return Array.from(this.columnsHash.values()) as ColumnDefinition[];
   }
 
-  /** @missingRailsCall delete — PERMANENT */
+  get(name: string): ColumnDefinition | undefined {
+    return this.columnsHash.get(String(name)) ?? undefined;
+  }
+
   removeColumn(name: string): void {
-    const index = this.columns.findIndex((c) => c.name === String(name));
-    if (index !== -1) this.columns.splice(index, 1);
+    this.columnsHash.delete(String(name));
   }
 
   /** @internal */
@@ -993,7 +1005,7 @@ export class TableDefinition {
 
   /** @internal */
   protected raiseOnDuplicateColumn(name: string): void {
-    const existing = this.columns.find((c) => c.name === name);
+    const existing = this.columnsHash.get(name);
     if (existing) {
       if (existing.options.primaryKey) {
         throw new ArgumentError(

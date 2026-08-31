@@ -5,6 +5,12 @@ import {
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
 
 export class TableDefinition extends AbstractTableDefinition {
+  changeColumn(columnName: string, type: ColumnType, options: ColumnOptions = {}): this {
+    const name = String(columnName);
+    this.columnsHash.set(name, null);
+    return this.column(name, type, options);
+  }
+
   override references(...args: unknown[]): this {
     const rest = [...args];
     const last = rest[rest.length - 1];
@@ -20,16 +26,6 @@ export class TableDefinition extends AbstractTableDefinition {
 
   override belongsTo(...args: unknown[]): this {
     return (this.references as (...a: unknown[]) => this)(...args);
-  }
-
-  changeColumn(columnName: string, type: ColumnType, options: ColumnOptions = {}): void {
-    const col = this.newColumnDefinition(columnName, type, options);
-    const idx = this.columns.findIndex((c) => c.name === columnName);
-    if (idx >= 0) {
-      this.columns.splice(idx, 1, col);
-    } else {
-      this.columns.push(col);
-    }
   }
 
   override newColumnDefinition(

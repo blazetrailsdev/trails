@@ -61,7 +61,7 @@ describe("parseSchemaTs", () => {
     const source = `
       export default async function defineSchema(ctx: MigrationContext) {
         await ctx.createTable("articles", { force: "cascade" }, (t) => {
-          t.enum("status", { enum_type: "article_status", null: false });
+          t.enum("status", { enumType: "article_status", null: false });
         });
       }
     `;

@@ -57,10 +57,12 @@ function monData(self: object): MonData {
  * made from inside the critical section runs straight through rather than
  * deadlocking on the lock it already holds.
  *
- * Waiters park on a `while`, not an `if`: several can be waiting on the same
- * chain promise and all wake when it resolves, but the first to resume claims
- * the lock synchronously — installing a new chain — before any other resumes,
- * so the rest re-test and park again.
+ * Waiters queue rather than re-test: each caller reads the current tail,
+ * publishes its own link as the new tail, and only then awaits the tail it
+ * found — all synchronously, before its first `await`. So arrival order fixes
+ * service order and there is no window in which a caller entering in the same
+ * turn as a release observes a free lock and overtakes a parked waiter. Ruby's
+ * `Monitor` is FIFO-fair per thread, so Rails has no such barge either.
  *
  * No `@mon_count`: Ruby needs one because `mon_exit` can be called explicitly,
  * so the release has to be gated on the nesting depth reaching zero. Here the
@@ -83,24 +85,24 @@ export async function synchronize<T>(this: object, block: () => T | Promise<T>):
     return await block();
   }
 
-  while (data.chain) {
-    await data.chain;
-  }
+  const predecessor = data.chain;
+  let monExit!: () => void;
+  const mine = new Promise<void>((resolve) => {
+    monExit = resolve;
+  });
+  const tail = predecessor ? predecessor.then(() => mine) : mine;
+  data.chain = tail;
+
+  if (predecessor) await predecessor;
 
   const owner = Symbol("monitor");
-  let monExit!: () => void;
-  data.chain = new Promise<void>((resolve) => {
-    monExit = () => {
-      data.chain = null;
-      data.owner = null;
-      resolve();
-    };
-  });
   data.owner = owner;
 
   try {
     return await storage.run(owner, () => block());
   } finally {
+    data.owner = null;
+    if (data.chain === tail) data.chain = null;
     monExit();
   }
 }

@@ -695,6 +695,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
+  async createVirtualTable(tableName: string, moduleName: string, values: string[]): Promise<void> {
+    const connection = this.connection as DatabaseAdapter & {
+      createVirtualTable(tableName: string, moduleName: string, values: string[]): Promise<void>;
+    };
+    await connection.createVirtualTable(this._pt(tableName), moduleName, values);
+  }
+
   async createEnum(
     name: string,
     values: string[],
