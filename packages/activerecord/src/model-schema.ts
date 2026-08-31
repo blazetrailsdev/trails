@@ -16,7 +16,6 @@ import {
 import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
-import { withoutAliasAttributeGeneration } from "./attribute-methods.js";
 import { loadSchemaOverrides } from "./load-schema-overrides-slot.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { NullColumn } from "./connection-adapters/column.js";
@@ -566,48 +565,10 @@ function loadSchemaBangAnchor(this: SchemaHost): void {
   if (reflected) {
     this._schemaLoaded = true;
     this._defaultAttributes();
-    defineAttributeMethodsAfterLoad(this);
     return;
   }
 
   this._columnsHash = {};
-}
-
-/**
- * Rails generates attribute methods on demand: `method_missing` calls
- * `define_attribute_methods` and retries (activemodel/attribute_methods.rb:474-486),
- * while `load_schema!` itself defines nothing (model_schema.rb:587-597). A
- * trails reader is a property, not a method, so there is no miss to hook (see
- * CLAUDE.md, "Generated attribute readers are properties"); the demand point
- * is instead the end of a schema load — the columns just reflected are exactly
- * the ones an instance is about to read. It runs *after* `_schemaLoaded` is
- * set, so `define_attribute_methods`' own `load_schema` (attribute_methods.rb:114)
- * returns immediately instead of re-entering the load. Only the plain readers
- * are generated: the alias half stays lazy, on Rails' own demand point
- * (`Core#init_internals`, core.rb:848), so `alias_attribute_method_definition`
- * (attribute_methods.rb:87-97) is reached when a record is built rather than
- * when a column set is reflected. That is why the `@attribute_methods_generated`
- * guard (attribute_methods.rb:104) is released again afterwards: this hook has
- * generated only half of what `define_attribute_methods` generates, so leaving
- * the guard latched would make `init_internals`' own call early-return and the
- * alias half would never be reached. `_attributeMethodsGeneratedByLoad`
- * records that the plain half is already in place, so the later call skips
- * straight to the alias half instead of regenerating the readers.
- *
- * @noRailsEquivalent Rails needs no such hook: its readers are methods, so
- * `method_missing` is the trigger.
- */
-function defineAttributeMethodsAfterLoad(host: SchemaHost): void {
-  withoutAliasAttributeGeneration(() =>
-    (host as unknown as { defineAttributeMethods?: () => boolean }).defineAttributeMethods?.(),
-  );
-  const methodHost = host as unknown as {
-    _attributeMethodsGenerated?: boolean;
-    _attributeMethodsGeneratedByLoad?: boolean;
-  };
-  methodHost._attributeMethodsGenerated = false;
-  methodHost._attributeMethodsGeneratedByLoad = true;
-  (host as unknown as { _columns?: unknown })._columns = undefined;
 }
 
 function getColumnsHash(host: SchemaHost): Record<string, unknown> {
@@ -644,10 +605,8 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
 
   const methodHost = host as unknown as {
     _attributeMethodsGenerated?: boolean;
-    _attributeMethodsGeneratedByLoad?: boolean;
   };
   methodHost._attributeMethodsGenerated = false;
-  methodHost._attributeMethodsGeneratedByLoad = false;
 
   encryptionHooks.applyPendingEncryptions(host);
 

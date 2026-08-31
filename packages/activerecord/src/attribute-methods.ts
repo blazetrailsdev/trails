@@ -113,7 +113,6 @@ export class GeneratedAttributeMethods extends Module {
 interface AttributeMethodsHost {
   name: string;
   _attributeMethodsGenerated?: boolean;
-  _attributeMethodsGeneratedByLoad?: boolean;
   _aliasAttributesMassGenerated?: boolean;
   _generatedAttributeMethods?: GeneratedAttributeMethods;
   attributeAliases?: Record<string, string>;
@@ -199,7 +198,6 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
   this._generatedAttributeMethods = new GeneratedAttributeMethods();
   this._generatedAttributeMethods.ownerName = this.name;
   this._attributeMethodsGenerated = false;
-  this._attributeMethodsGeneratedByLoad = false;
   this._aliasAttributesMassGenerated = false;
   include(this as unknown as new (...args: unknown[]) => unknown, this._generatedAttributeMethods);
   _coreInitializeGeneratedModules.call(
@@ -228,8 +226,6 @@ export function eagerlyGenerateAliasAttributeMethods(
   _newName: string,
   _oldName: string,
 ): void {}
-
-let aliasAttributeGenerationSuppressed = false;
 
 export function generateAliasAttributeMethods(
   this: AttributeMethodsHost,
@@ -282,39 +278,18 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   }
   if (this.abstractClass !== true) {
     loadSchema.call(this as never);
-    const generatedByNestedLoad =
-      (Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-        this._attributeMethodsGenerated) ||
-      (Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGeneratedByLoad") &&
-        (this._attributeMethodsGeneratedByLoad ?? false));
-    if (!generatedByNestedLoad) {
-      AttributeMethods.ClassMethods.defineAttributeMethods.call(
-        this as never,
-        ...this.attributeNames(),
-      );
-      if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
-    }
+    AttributeMethods.ClassMethods.defineAttributeMethods.call(
+      this as never,
+      ...this.attributeNames(),
+    );
+    if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
   }
   generateAliasAttributes.call(this);
   this._attributeMethodsGenerated = true;
   return true;
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function withoutAliasAttributeGeneration<T>(body: () => T): T {
-  aliasAttributeGenerationSuppressed = true;
-  try {
-    return body();
-  } finally {
-    aliasAttributeGenerationSuppressed = false;
-  }
-}
-
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
-  if (aliasAttributeGenerationSuppressed) return;
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
@@ -346,15 +321,12 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
 
 export function undefineAttributeMethods(this: AttributeMethodsHost): void {
   if (
-    (Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-      this._attributeMethodsGenerated) ||
-    (Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGeneratedByLoad") &&
-      (this._attributeMethodsGeneratedByLoad ?? false))
+    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+    this._attributeMethodsGenerated
   ) {
     AttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
   }
   this._attributeMethodsGenerated = false;
-  this._attributeMethodsGeneratedByLoad = false;
   this._aliasAttributesMassGenerated = false;
 }
 
