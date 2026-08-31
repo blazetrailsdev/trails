@@ -10,6 +10,7 @@ import {
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/activesupport";
+import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
 import { RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { EngineConfiguration } from "./engine/configuration.js";
@@ -219,6 +220,7 @@ describe("Engine", () => {
     A.instance().config.eagerLoadNamespaces.push("ANs");
     B.instance().config.eagerLoadNamespaces.push("BNs");
     expect(A.instance().config.eagerLoadNamespaces).toBe(B.instance().config.eagerLoadNamespaces);
+    expect(A.instance().config.eagerLoadNamespaces).toBe(BaseRailtie.config["eagerLoadNamespaces"]);
     expect(A.instance().config.eagerLoadNamespaces.length).toBe(before + 2);
   });
 

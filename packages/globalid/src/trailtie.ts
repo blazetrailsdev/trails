@@ -38,8 +38,8 @@ export class Trailtie extends BaseRailtie {
   static {
     registerRailtie(this);
 
-    Trailtie.config["globalId"] = {} as GlobalIdConfig;
-    ((Trailtie.config["eagerLoadNamespaces"] ??= []) as unknown[]).push(GlobalID);
+    BaseRailtie.config["globalId"] = {} as GlobalIdConfig;
+    ((BaseRailtie.config["eagerLoadNamespaces"] ??= []) as unknown[]).push(GlobalID);
 
     this.initializer("global_id", () => {
       Trailtie.initialize(Trailtie.config["app"] as TrailtieApp);
@@ -67,10 +67,12 @@ export class Trailtie extends BaseRailtie {
    *
    * The class body's `config.global_id = ActiveSupport::OrderedOptions.new`
    * and `config.eager_load_namespaces << GlobalID` (`railtie.rb:13-14`) are
-   * seeded on `Railtie.config`. `Railtie::Configuration` itself lives in
-   * trailties, which globalid cannot import — trailties depends on
-   * activerecord, which depends on globalid — so an activesupport-level
-   * Railtie's own `config` is the shared bag both lines land in.
+   * are seeded on activesupport's `Railtie.config`, the analogue of the
+   * `@@`-level state `Railtie::Configuration` holds
+   * (`railtie/configuration.rb:17-20`): trailties' `Configuration` reads its
+   * `eagerLoadNamespaces` off that same array, so the namespace reaches the
+   * app-facing list even though globalid cannot import trailties (trailties
+   * depends on activerecord, which depends on globalid).
    *
    * `ActiveSupport.on_load(:active_record)` (`railtie.rb:36-39`) needs no arm:
    * `Base` includes `GlobalID::Identification` statically, because base.ts
@@ -78,7 +80,7 @@ export class Trailtie extends BaseRailtie {
    * (`railtie.rb:41`) awaits a `GlobalID::FixtureSet` port.
    */
   static initialize(app: TrailtieApp): void {
-    const config = (app.config.globalId ??= Trailtie.config["globalId"] as GlobalIdConfig);
+    const config = (app.config.globalId ??= BaseRailtie.config["globalId"] as GlobalIdConfig);
     const defaultExpiresIn = months(1).toI();
     const defaultAppName = dasherize(app.railtieName().replace("_application", ""));
 
