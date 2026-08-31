@@ -42,6 +42,32 @@
  * burndown behind it yet, and widening GATED_PACKAGES without one is exactly
  * the not-mechanical step this comment has always warned about.
  *
+ * TAGGED-ONLY MODE is where a gated package ends up once its
+ * untagged novel surface is burnt down. `extra-surface.ts` already subtracts a
+ * declaration carrying a `@noRailsEquivalent` receipt from both dimensions, so
+ * `novel` never counted KNOWN extra surface — only the residue nobody has
+ * written a receipt for. A package whose residue is zero therefore needs no
+ * number at all: its rule is the constant `novel === 0`, and it carries no row
+ * in the JSON. That is not merely tidier. A single shared integer per package
+ * is a merge-conflict generator — every PR anywhere in the package that
+ * deletes one novel name rewrites the same line, and two parallel branches
+ * collide on a value neither can resolve without re-measuring. A receipt lives
+ * in the file the PR is already editing, so it conflicts with nothing.
+ *
+ * The mode drops the `total` dimension, deliberately. A moved-not-novel extra
+ * is a name Rails DOES define, just in another `.rb`; that is a file-placement
+ * deviation, which `blazetrails/rails-file-structure-method-order` already
+ * polices for the packages enrolled here, and it is not what a receipt is for.
+ * Trading it away is the price of retiring the package's row, and it is only
+ * paid by a package that has already reached zero invented surface.
+ *
+ * arel enrolls first, being the only package measured at `novel: 0`.
+ * activerecord's 342 and ruby-compat's 4 stay on counts until their own
+ * burndowns (the `activerecord-extra-surface-receipt-burndown` RFC and RFC
+ * 0129 respectively) retire them, one receipt or one deletion at a time. Enrollment is only-grow, exactly like RFC 0121's:
+ * a package joins when it reaches zero and is never moved back out to turn a
+ * red run green.
+ *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception), async fs only, no third-party runtime deps.
  */
@@ -54,10 +80,26 @@ import { serializeBaseline } from "./baseline-json.js";
 export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
 
 /**
- * The packages this gate covers. Everything else is measured by
- * `parity:api:extra` and left ungated — see the module comment.
+ * Gated packages that still carry a committed `novel`/`total` mark, because
+ * they still have untagged novel surface to burn down.
  */
-export const GATED_PACKAGES = ["arel", "activerecord", "ruby-compat"] as const;
+export const COUNTED_PACKAGES = ["activerecord", "ruby-compat"] as const;
+
+/**
+ * Gated packages held at `novel === 0` with NO row in the mark file — see
+ * TAGGED-ONLY MODE in the module comment. Only-grow: a package joins on
+ * reaching zero and never leaves.
+ */
+export const TAGGED_ONLY_PACKAGES = ["arel"] as const;
+
+/**
+ * The packages this gate covers, in either mode. Everything else is measured
+ * by `parity:api:extra` and left ungated — see the module comment.
+ */
+export const GATED_PACKAGES = [
+  ...COUNTED_PACKAGES,
+  ...TAGGED_ONLY_PACKAGES,
+].sort() as readonly string[];
 
 export interface SurfaceMark {
   /**
@@ -101,7 +143,7 @@ export interface MarkViolation {
  */
 export function exceedances(marks: SurfaceMarks, current: SurfaceMarks): MarkViolation[] {
   const violations: MarkViolation[] = [];
-  for (const name of GATED_PACKAGES) {
+  for (const name of COUNTED_PACKAGES) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
@@ -126,7 +168,7 @@ export function exceedances(marks: SurfaceMarks, current: SurfaceMarks): MarkVio
  */
 export function staleMarks(marks: SurfaceMarks, current: SurfaceMarks): MarkViolation[] {
   const stale: MarkViolation[] = [];
-  for (const name of GATED_PACKAGES) {
+  for (const name of COUNTED_PACKAGES) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
@@ -156,7 +198,35 @@ export function unmeasuredPackages(current: SurfaceMarks): string[] {
  * {@link unmeasuredPackages}.
  */
 export function unmarkedPackages(marks: SurfaceMarks): string[] {
-  return GATED_PACKAGES.filter((name) => marks[name] === undefined);
+  return COUNTED_PACKAGES.filter((name) => marks[name] === undefined);
+}
+
+/**
+ * Every tagged-only package measured with novel surface left. Non-empty means
+ * a public TS name with no Ruby counterpart was added without a
+ * `@noRailsEquivalent` receipt — the fix is the receipt or the deletion, and
+ * there is no number to raise. The twin of {@link exceedances} for the mode
+ * that has no mark.
+ */
+export function taggedOnlyViolations(current: SurfaceMarks): MarkViolation[] {
+  const violations: MarkViolation[] = [];
+  for (const name of TAGGED_ONLY_PACKAGES) {
+    const now = current[name];
+    if (!now) continue;
+    if (now.novel > 0) {
+      violations.push({ package: name, dimension: "novel", mark: 0, current: now.novel });
+    }
+  }
+  return violations;
+}
+
+/**
+ * A tagged-only package that still carries a row in the mark file. The row is
+ * dead weight the gate never reads, and leaving one there invites a later
+ * `--tighten` to resurrect a number the package no longer has.
+ */
+export function strandedMarks(marks: SurfaceMarks): string[] {
+  return TAGGED_ONLY_PACKAGES.filter((name) => marks[name] !== undefined);
 }
 
 export async function loadMarks(): Promise<SurfaceMarks> {
@@ -170,7 +240,7 @@ export async function loadMarks(): Promise<SurfaceMarks> {
  */
 export function tightened(marks: SurfaceMarks, current: SurfaceMarks): SurfaceMarks {
   const next: SurfaceMarks = { ...marks };
-  for (const name of GATED_PACKAGES) {
+  for (const name of COUNTED_PACKAGES) {
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
@@ -184,6 +254,10 @@ export function tightened(marks: SurfaceMarks, current: SurfaceMarks): SurfaceMa
 
 export async function writeMarks(marks: SurfaceMarks): Promise<void> {
   const sorted: SurfaceMarks = {};
-  for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
+  const taggedOnly = new Set<string>(TAGGED_ONLY_PACKAGES);
+  for (const name of Object.keys(marks).sort()) {
+    if (taggedOnly.has(name)) continue;
+    sorted[name] = marks[name]!;
+  }
   await fs.writeFile(MARK_PATH, serializeBaseline(sorted));
 }

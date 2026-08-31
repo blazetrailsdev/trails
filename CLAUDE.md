@@ -442,21 +442,39 @@ write.
    says "known extra surface, not yet removed", and someone will come back for
    it.
 
-   **`arel` is gated**, by the RFC 0117 extra-surface ratchet:
+   **`arel`, `activerecord` and `ruby-compat` are gated**, by the RFC 0117
+   extra-surface ratchet:
 
    ```bash
-   pnpm parity:api:extra:gate   # fails on ANY increase in arel's novel/total
+   pnpm parity:api:extra:gate
    ```
 
-   It reads the committed marks in `scripts/api-compare/extra-surface-mark.json`
-   and is **only-shrink**, like the two call gates: a new public arel name with
-   no Ruby counterpart turns it red, and the fix is to remove the name — never
-   to raise the mark. **Converged something?** The mark then sits above the
-   measurement; narrow it with `pnpm parity:api:extra:tighten`, which writes each
-   dimension DOWN and never up. There is **no reseed**, for the same reason the
-   call baselines forbid one. Other packages are still measured and ungated;
-   widening `GATED_PACKAGES` is a separate decision with its own burndown, not a
-   mechanical step.
+   It runs in one of two modes per package, and which mode you are in decides
+   what a red run asks of you.
+
+   **Tagged-only** (`arel`) is the endgame: the package is held at
+   **`novel === 0`** and carries **no row** in
+   `scripts/api-compare/extra-surface-mark.json`. Every public name with no Ruby
+   counterpart carries a `@noRailsEquivalent PERMANENT|CONVERGEABLE <story-id>`
+   receipt at its own declaration, so there is no number to raise and — the
+   point of the mode — no shared line for two branches to conflict over. A red
+   run here has exactly two fixes: write the receipt, or delete the name.
+
+   **Counted** (`activerecord`, `ruby-compat`) still carries a committed
+   `novel`/`total` mark, and is **only-shrink** like the two call gates: a new
+   public name with no Ruby counterpart turns it red, and the fix is to remove
+   the name — never to raise the mark. **Converged something?** The mark then
+   sits above the measurement; narrow it with `pnpm parity:api:extra:tighten`,
+   which writes each dimension DOWN and never up. There is **no reseed**, for
+   the same reason the call baselines forbid one.
+
+   A package moves counted → tagged-only when it reaches zero novel, as a
+   reviewed step of its own burndown (the
+   `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 342,
+   RFC 0129 for ruby-compat's 4). That direction is **only-grow**: no package is ever
+   moved back to counted to turn a red run green. Other packages are still
+   measured and ungated; widening `GATED_PACKAGES` is a separate decision with
+   its own burndown, not a mechanical step.
 
 5. **Did you write an `@internal` tag?** `@internal` keeps its TypeDoc meaning —
    it holds a member out of the generated API reference — but it also drops the

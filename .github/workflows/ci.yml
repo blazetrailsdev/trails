@@ -1520,15 +1520,20 @@ jobs:
         # rule this reads it under is documented at report-arms.ts:ArmVerdict.
         run: pnpm exec tsx scripts/api-compare/report-arms.ts --report
       - name: Extra-surface ratchet
-        # RFC 0117. Gates arel's and activerecord's extra-surface counts (public
-        # TS names in a Rails-matched file with no Ruby counterpart) against the
-        # committed marks in scripts/api-compare/extra-surface-mark.json.
-        # Only-shrink: fails on any increase in `novel` or `total`, reports a
-        # mark left above the current measurement, and never raises one.
-        # Converged surface? Narrow the mark with `pnpm parity:api:extra:tighten`
-        # — there is no reseed. activerecord joined under RFC 0119 with the
-        # connection-adapter burndown behind it; activemodel stays ungated until
-        # it has one.
+        # RFC 0117. Gates extra surface — public TS names in a Rails-matched
+        # file with no Ruby counterpart — in one of two modes per package.
+        # COUNTED (activerecord, ruby-compat): only-shrink against the marks in
+        # scripts/api-compare/extra-surface-mark.json. Fails on any increase in
+        # `novel` or `total`, reports a mark left above the current measurement,
+        # and never raises one. Converged surface? Narrow the mark with
+        # `pnpm parity:api:extra:tighten` — there is no reseed. activerecord
+        # joined under RFC 0119 with the connection-adapter burndown behind it.
+        # TAGGED-ONLY (arel): held at `novel === 0` with no mark row
+        # at all — every extra carries a `@noRailsEquivalent` receipt at its
+        # declaration, so there is no shared number to raise and none to
+        # conflict over. Enrollment is only-grow; activerecord joins when the
+        # extra-surface receipt burndown clears its 342. activemodel stays ungated until it has a
+        # burndown of its own.
         run: pnpm exec tsx scripts/api-compare/lint-extra-surface-ratchet.ts
       - name: Parameter-name ratchet
         # RFC 0126. Gates arel's param-name row count (a matched pair whose
