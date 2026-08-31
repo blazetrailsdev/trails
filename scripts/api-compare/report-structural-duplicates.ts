@@ -23,13 +23,7 @@ import { type Decl, type TsApi, declarations, runReport } from "./report-ruby-co
 
 const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
 
-export interface Site {
-  package: string;
-  tsFile: string;
-  name: string;
-  line: number;
-  shape: string;
-}
+export type Site = { package: string; tsFile: string; name: string; line: number; shape: string };
 
 /**
  * The comparable shape of a body — the `skeleton` `extract-ts-api.ts` computes
@@ -49,8 +43,8 @@ export function shapeOf(decl: Decl): string | undefined {
   return `${decl.skeleton.join(",")}|${literals.join(",")}`;
 }
 
-/** Every declaration flattened to a comparable site. `declarations` already
- *  yields each one once, so no dedupe is repeated here. */
+/** Every declaration flattened to a comparable site; `declarations` already
+ *  yields each once. */
 export function sites(api: TsApi): Site[] {
   const out: Site[] = [];
   for (const { package: pkg, tsFile, decl } of declarations(api)) {

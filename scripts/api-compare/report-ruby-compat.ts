@@ -4,17 +4,16 @@
  *
  *   pnpm parity:api:calls:ruby-compat:report [--top=N]
  *
- * Both directions of `RUBY_COMPAT_EXPORTS` (scripts/parity/ruby-compat.ts,
- * which documents them) over the artifacts `compare.ts --calls` writes. REVERSE
- * is every call-mismatch row whose Ruby call resolves to a ruby-compat export —
- * the port hand-rolled the primitive under an unrecognised name, the population
- * an enrollment story burns down. FORWARD is every TS declaration that DOES call
+ * Both directions of `RUBY_COMPAT_EXPORTS` (scripts/parity/ruby-compat.ts, which
+ * documents them) over the artifacts `compare.ts --calls` writes. REVERSE is
+ * every call-mismatch row whose Ruby call resolves to a ruby-compat export — the
+ * port hand-rolled the primitive under an unrecognised name, the population an
+ * enrollment story burns down. FORWARD is every TS declaration that DOES call
  * one: the sites the table credits, hence absent from the reverse half.
  *
  * Report-only, and separate from enrollment on purpose: seeding a gate red
  * across nine packages blocks every unrelated PR, so the flip is its own story
- * (`enroll-call-mapping-in-parity-gate`). Nothing here writes a baseline or
- * moves a mark.
+ * (`enroll-call-mapping-in-parity-gate`).
  *
  * Hard rules: no node:* imports, no process.*, async fs only.
  */
@@ -71,16 +70,13 @@ export interface TsApi {
 
 /**
  * Every declaration in the tree — top-level functions AND both member lists of
- * every class and module — each yielded ONCE. A declaration's own `file` wins
- * over the map key or the host, because a member mixed into a class is declared
- * elsewhere.
+ * every class and module — each yielded ONCE, with its own `file` winning over
+ * the map key or the host (a member mixed into a class is declared elsewhere).
  *
- * Two things present one declaration more than once, and both are collapsed
- * here rather than by each caller: the extractor synthesizes a backward-compat
- * module from a file's own `fileFunctions` (`extract-ts-api.ts:1127`), so every
- * top-level function in such a file arrives twice; and the trails `this`-typed
- * mixin idiom puts one function on several hosts, so it arrives once per host.
- * Counting either twice inflates a measurement without adding a declaration.
+ * Two things present one declaration twice, and both collapse here rather than
+ * in each caller: the extractor synthesizes a backward-compat module from a
+ * file's own `fileFunctions` (`extract-ts-api.ts:1127`), and the `this`-typed
+ * mixin idiom puts one function on several hosts.
  */
 export function declarations(api: TsApi): { package: string; tsFile: string; decl: Decl }[] {
   const seen = new Map<string, { package: string; tsFile: string; decl: Decl }>();

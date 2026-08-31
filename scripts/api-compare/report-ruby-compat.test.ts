@@ -31,6 +31,7 @@ const api: TsApi = {
           classMethods: [{ name: "build", calls: ["cmp"] }],
         },
       },
+      // `inflector.ts:Inflector` is the extractor's synthesized file module.
       modules: {
         "core-ext/range.ts:RangeExt": {
           file: "core-ext/range.ts",

@@ -1,13 +1,11 @@
 /**
  * The Ruby-core → `@blazetrails/ruby-compat` call resolution table (RFC 0129),
  * read in both directions: FORWARD, a TS `regexpEscape` counts as making Ruby's
- * `Regexp.escape`, so a faithful port is not flagged — the silence-only
- * contract `jsEnumerableAliases` already has, where a credit can never
- * manufacture a flag; REVERSE, a body that hand-rolls the escape under another
- * name IS flagged, and converges by importing the export, not by baselining.
- *
- * In `scripts/parity/` because two tools read it — the call ratchet's alias hook
- * and `parity:api:calls:ruby-compat:report` — RFC 0092's shared-home rule.
+ * `Regexp.escape`, so a faithful port is not flagged — the silence-only contract
+ * `jsEnumerableAliases` already has, where a credit can never manufacture a
+ * flag; REVERSE, a body that hand-rolls the escape under another name IS
+ * flagged, and converges by importing the export, not by baselining. It lives in
+ * `scripts/parity/` because two tools read it (RFC 0092's shared-home rule).
  *
  * ── Keyed by the MRI SPELLING, and why that is not enough on its own ────────
  * Rows are keyed `Receiver#method` / `Receiver.method`, because the bare name is
