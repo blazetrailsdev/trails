@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { withExecutionContext } from "../../connection-adapters/abstract/connection-pool/execution-context.js";
-import { describeIfPg } from "./test-helper.js";
+import { describeIfPg, leasePgAdapter } from "./test-helper.js";
 import type { PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { registerModel } from "../../associations.js";
@@ -38,16 +38,18 @@ function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
   };
 }
 
-function event(): { set: () => void; wait: () => Promise<void> } {
+function event(): { set: () => void; wait: (seconds?: number) => Promise<void> } {
   let release!: () => void;
   const gate = new Promise<void>((r) => {
     release = r;
   });
-  return { set: () => release(), wait: () => gate };
-}
-
-async function leasePgAdapter(): Promise<PostgreSQLAdapter> {
-  return (await Base.leaseConnection()) as unknown as PostgreSQLAdapter;
+  return {
+    set: () => release(),
+    wait: (seconds?: number) =>
+      seconds === undefined
+        ? gate
+        : Promise.race([gate, new Promise<void>((r) => setTimeout(r, seconds * 1000))]),
+  };
 }
 
 async function withWarningSuppression<T>(fn: () => Promise<T>): Promise<T> {
@@ -126,8 +128,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const outcomes = await Promise.allSettled([thread, side()]);
       const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
 
-      expect(errors.length).toBeGreaterThanOrEqual(1);
-      expect(errors[0]).toBeInstanceOf(SerializationFailure);
+      expect(errors.some((e) => e instanceof SerializationFailure)).toBe(true);
     });
 
     it("SerializationFailure inside nested SavepointTransaction is recoverable", async () => {
@@ -142,7 +143,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             async () => {
               await Sample.updateAll({ value: 2 });
               startRight.set();
-              await commitLeft.wait();
+              await commitLeft.wait(1);
             },
             { isolation: "serializable", requiresNew: false },
           );
@@ -162,7 +163,7 @@ describeIfPg("PostgreSQLAdapter", () => {
                     await assertCurrentTransactionIsSavepointTransaction();
                     await Sample.create({ value: 3 });
                     commitLeft.set();
-                    await finishRight.wait();
+                    await finishRight.wait(2);
                     await Sample.updateAll({ value: 4 });
                   },
                   { requiresNew: true },

@@ -163,12 +163,10 @@ const rule = {
     // error. Such sites are reported as standaloneNoFix and left in place.
     const bindingStarts = new Map(); // name -> number[] (all decl start offsets)
 
-    // Simple `const <alias> = <Identifier>;` bindings, so a macro call whose
-    // receiver is a local alias of a class (`const Person = IndexErrorsPerson;`
-    // — the shape the canonical-shadow renames introduced) still resolves to
-    // the class it aliases instead of silently passing. A name bound more than
-    // once, or bound to a different target, is AMBIGUOUS and resolves to
-    // nothing.
+    // Simple `const <alias> = <Identifier>;` bindings, so a receiver that is a
+    // local alias of a class (`const Person = IndexErrorsPerson;`) still
+    // resolves to the class it aliases instead of silently passing. A name
+    // bound to more than one target is AMBIGUOUS and resolves no further.
     const aliasOf = new Map(); // name -> name | "AMBIGUOUS"
     function recordAlias(name, target) {
       const prev = aliasOf.get(name);

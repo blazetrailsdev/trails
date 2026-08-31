@@ -1029,11 +1029,10 @@ const rule = {
     });
     const sqlTextGroups = createSqlTextGroups(resolve);
 
-    // table name → every create node seen for it (each is its own report
-    // location). Reporting per CALL SITE rather than once per name keeps an
-    // `eslint-disable-next-line` on one create from depending on whether an
-    // earlier create of the same name exists: a disable suppresses exactly the
-    // call it precedes, in either order.
+    // table name → every create node seen for it, so a report anchors to each
+    // CALL SITE: an `eslint-disable-next-line` then suppresses exactly the call
+    // it precedes rather than depending on whether an earlier create of the
+    // same name exists.
     const created = new Map();
     const dropped = new Set();
     // `dropped` split by where the drop sits; unguardedDrops holds the first
