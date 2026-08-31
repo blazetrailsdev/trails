@@ -242,9 +242,14 @@ function subsecNanoseconds(sec: number | Rational): number {
  * its own exact ratio through `Float#to_r` ({@link fToR}) — which is why
  * `Time.at(946684800.123456789).nsec` is `123456835` rather than `...789`.
  */
-function numExact(v: number | bigint | Rational): Rational {
+function numExact(v: unknown): Rational {
   if (v instanceof Rational) return v;
   if (typeof v === "bigint") return new Rational(v, 1);
+  if (typeof v !== "number") {
+    throw new TypeError(
+      `can't convert ${(v as object)?.constructor?.name ?? String(v)} into an exact number`,
+    );
+  }
   return fToR(v);
 }
 
@@ -670,10 +675,10 @@ export class Time {
    */
   static at(
     seconds: number | bigint | Rational | Time,
-    microsecondsWithFrac: number | bigint | Rational = 0,
+    microsecondsWithFrac?: number | bigint | Rational,
   ): Time {
     if (seconds instanceof Time) {
-      if (microsecondsWithFrac !== 0) {
+      if (microsecondsWithFrac !== undefined) {
         throw new TypeError("can't convert Time into an exact number");
       }
       return Time.#atInstant(
@@ -684,7 +689,7 @@ export class Time {
     }
     const timew = numExact(seconds)
       .mul(1_000_000_000)
-      .add(numExact(microsecondsWithFrac).mul(1_000));
+      .add(numExact(microsecondsWithFrac ?? 0).mul(1_000));
     const nanoseconds =
       timew.numerator / timew.denominator - (timew.numerator % timew.denominator < 0n ? 1n : 0n);
     return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(nanoseconds));

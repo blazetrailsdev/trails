@@ -777,6 +777,12 @@ describe("TimeExtCalculationsTest", () => {
         .toR()
         .toString(),
     ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
+
+    // Only test this if the underlying Time.at raises a TypeError
+    expect(() => RubyTime.at(RubyTime.now() as never, 0)).toThrow(TypeError);
+    expect(() => RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0) as never, 0)).toThrow(
+      TypeError,
+    );
   });
 
   it("at with datetime returns local time", () => {
@@ -809,6 +815,10 @@ describe("TimeExtCalculationsTest", () => {
         .toR()
         .toString(),
     ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
+
+    // Only test this if the underlying Time.at raises a TypeError
+    expect(() => RubyTime.at(RubyTime.now() as never, 0)).toThrow(TypeError);
+    expect(() => RubyTime.at(twz as never, 0)).toThrow(TypeError);
   });
 
   it("at with in option", () => {
