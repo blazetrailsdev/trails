@@ -2054,9 +2054,8 @@ export class Base extends Model {
         if (createOk) saved = true;
         else saved = false;
       } else {
-        const updateOk = await this._updateRecord(undefined, block);
-        if (updateOk) saved = true;
-        else saved = false;
+        const result = await this._updateRecord(undefined, block);
+        saved = result !== false;
       }
 
       if (saved) {
@@ -2761,7 +2760,7 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   _createRecord(attributeNames?: string[], block?: (record: this) => void): Promise<boolean>;
   /** @internal */
-  _updateRecord(attributeNames?: string[], block?: (record: this) => void): Promise<boolean>;
+  _updateRecord(attributeNames?: string[], block?: (record: this) => void): Promise<unknown>;
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
@@ -3172,10 +3171,10 @@ for (const [name, fn] of [
       this: Base,
       attributeNames?: string[],
       block?: (record: Base) => void,
-    ): Promise<boolean> {
+    ): Promise<unknown> {
       return Timestamp._updateRecord.call(this as any, () =>
         callbacksUpdateRecord.call(this, attributeNames, block),
-      ) as Promise<boolean>;
+      );
     },
   ],
 ] as const) {

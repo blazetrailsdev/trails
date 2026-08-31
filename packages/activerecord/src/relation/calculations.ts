@@ -1,4 +1,4 @@
-import { Nodes, Table, SelectManager } from "@blazetrails/arel";
+import { Nodes, Table, SelectManager, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
@@ -644,13 +644,8 @@ export function aggregateColumn(
   columnName: string | Nodes.Node | number | null,
 ): unknown {
   if (columnName instanceof Nodes.Node) return columnName;
-  const table = rel._model.arelTable;
-  if (columnName === ":all") return new Nodes.SqlLiteral("*");
-  const pk = rel._model.primaryKey;
-  const pks = Array.isArray(pk) ? pk : [pk];
-  return arelColumn.call(rel as never, columnName, (field: string) =>
-    pks.includes(field) ? table.get(field) : new Nodes.SqlLiteral(field),
-  );
+  if (columnName === ":all") return star();
+  return arelColumn.call(rel as never, columnName);
 }
 
 /** @internal */

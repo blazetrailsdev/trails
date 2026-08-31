@@ -1054,19 +1054,21 @@ async function instanceUpdateRecord(
   this: PersistenceInstanceChainHost,
   attributeNames?: string[],
   block?: (record: any) => void,
-): Promise<boolean> {
+): Promise<number> {
   attributeNames = attributesForUpdate.call(this as any, attributeNames ?? this.attributeNames());
 
+  let affectedRows: number;
   if (attributeNames.length === 0) {
+    affectedRows = 0;
     (this as any)._triggerUpdateCallback = true;
   } else {
-    const affectedRows: number = await (this as any)._updateRow(attributeNames);
+    affectedRows = await (this as any)._updateRow(attributeNames);
     (this as any)._triggerUpdateCallback = affectedRows === 1;
   }
 
   this._previouslyNewRecord = false;
   block?.(this);
-  return true;
+  return affectedRows;
 }
 
 /** @internal */

@@ -1998,6 +1998,7 @@ export function arelColumn(
     return arelColumnWithTable.call(this, dotMatch.groups!.table, dotMatch.groups!.column);
   }
   if (fallback) return fallback(field);
+  if (Arel.arelNode(field)) return field;
   const quoted = isSymbol ? connectionFor(modelClass).quoteTableName(field) : field;
   return Arel.sql(quoted);
 }

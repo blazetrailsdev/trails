@@ -116,6 +116,35 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
+  it("resolves currentAdapter() the same way it resolves adapterType", () => {
+    // The Rails-named predicate (support/adapter-helper.ts, porting
+    // `current_adapter?`). skipIf(currentAdapter("SQLite3Adapter")) → runs
+    // everywhere except sqlite.
+    expect(gateFromGuardExpr('currentAdapter("SQLite3Adapter")', false)).toEqual({
+      adapters: ["mysql", "postgresql"],
+      source: ["test"],
+    });
+    // skipIf(!currentAdapter("PostgreSQLAdapter")) → runs only on postgresql
+    expect(gateFromGuardExpr('!currentAdapter("PostgreSQLAdapter")', false)).toEqual({
+      adapters: ["postgresql"],
+      source: ["test"],
+    });
+    // runIf(currentAdapter("PostgreSQLAdapter")) → runs only on postgresql
+    expect(gateFromGuardExpr('currentAdapter("PostgreSQLAdapter")', true)).toEqual({
+      adapters: ["postgresql"],
+      source: ["test"],
+    });
+    // Variadic: the literals union, and both mysql drivers are the one lane.
+    expect(gateFromGuardExpr('currentAdapter("Mysql2Adapter", "TrilogyAdapter")', true)).toEqual({
+      adapters: ["mysql"],
+      source: ["test"],
+    });
+    expect(gateFromGuardExpr('currentAdapter("Mysql2Adapter", "TrilogyAdapter")', false)).toEqual({
+      adapters: ["postgresql", "sqlite"],
+      source: ["test"],
+    });
+  });
+
   it("extracts adapterSupports() feature predicates at run-condition polarity", () => {
     // skipIf(!adapterSupports("insert_returning")) → runs where the feature IS
     // supported → feature gate.

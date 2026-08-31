@@ -1152,30 +1152,57 @@ export function extractFromProgram(
   // `fromFile:X` via a local declaration), clone the class entry under
   // the re-exporting file's path so api-compare sees the class where
   // Rails expects it.
-  for (const re of pendingReExports) {
-    const key = `${re.fromFile}:${re.localName}`;
-    if (info.classes[key] || info.modules[key]) continue;
-    const targetRel = resolveRelModule(re.fromFile, re.moduleSpecifier);
-    if (!targetRel) continue;
-    const sourceKey = `${targetRel}:${re.sourceName}`;
-    const sourceClass = info.classes[sourceKey];
-    if (sourceClass) {
-      info.classes[key] = {
-        ...sourceClass,
-        name: re.localName,
-        file: re.fromFile,
-        reExportedFrom: sourceKey,
-      };
-      continue;
+  //
+  // A barrel may re-export from another barrel (`index.ts` ← `foo.ts` ←
+  // `foo/bar.ts`), so a single pass in file-walk order resolves the outer hop
+  // only when the intermediate clone happens to exist already. Iterating to a
+  // FIXPOINT makes the cloned set independent of visit order; it terminates
+  // because each round either adds an entry or stops, over a finite key space.
+  //
+  // `reExportedFrom` names the DECLARING entry, never an intermediate clone:
+  // consumers skip a name already scored at its real home, and a chain of
+  // clones pointing at each other leaves the outer hop looking declared here.
+  const declaringKey = (key: string): string => {
+    const seen = new Set<string>([key]);
+    let current = key;
+    for (;;) {
+      const from = (info.classes[current] ?? info.modules[current])?.reExportedFrom;
+      if (!from || seen.has(from)) return current;
+      seen.add(from);
+      current = from;
     }
-    const sourceModule = info.modules[sourceKey];
-    if (sourceModule) {
-      info.modules[key] = {
-        ...sourceModule,
-        name: re.localName,
-        file: re.fromFile,
-        reExportedFrom: sourceKey,
-      };
+  };
+
+  let clonedThisRound = true;
+  while (clonedThisRound) {
+    clonedThisRound = false;
+    for (const re of pendingReExports) {
+      const key = `${re.fromFile}:${re.localName}`;
+      if (info.classes[key] || info.modules[key]) continue;
+      const targetRel = resolveRelModule(re.fromFile, re.moduleSpecifier);
+      if (!targetRel) continue;
+      const sourceKey = `${targetRel}:${re.sourceName}`;
+      const sourceClass = info.classes[sourceKey];
+      if (sourceClass) {
+        info.classes[key] = {
+          ...sourceClass,
+          name: re.localName,
+          file: re.fromFile,
+          reExportedFrom: declaringKey(sourceKey),
+        };
+        clonedThisRound = true;
+        continue;
+      }
+      const sourceModule = info.modules[sourceKey];
+      if (sourceModule) {
+        info.modules[key] = {
+          ...sourceModule,
+          name: re.localName,
+          file: re.fromFile,
+          reExportedFrom: declaringKey(sourceKey),
+        };
+        clonedThisRound = true;
+      }
     }
   }
 

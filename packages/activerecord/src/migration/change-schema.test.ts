@@ -134,7 +134,7 @@ describe("Migration", () => {
       if (!mysql) expect(five!.default).toBe("hello");
     });
 
-    it.skipIf(adapterType !== "postgres")("add column with array", async () => {
+    it.skipIf(!currentAdapter("PostgreSQLAdapter"))("add column with array", async () => {
       const connection = await ambientConnection();
       await connection.createTable("testings");
       await connection.addColumn("testings", "foo", "string", { array: true });
@@ -145,7 +145,7 @@ describe("Migration", () => {
       expect((arrayColumn as unknown as { isArray(): boolean }).isArray()).toBeTruthy();
     });
 
-    it.skipIf(adapterType !== "postgres")("create table with array column", async () => {
+    it.skipIf(!currentAdapter("PostgreSQLAdapter"))("create table with array column", async () => {
       const connection = await ambientConnection();
       await connection.createTable("testings", (t) => {
         t.string("foo", { array: true });
@@ -286,7 +286,7 @@ describe("Migration", () => {
       expect(await connection.tableExists("testings")).toBeTruthy();
     });
 
-    it.skipIf(adapterType === "sqlite")("add column not null without default", async () => {
+    it.skipIf(currentAdapter("SQLite3Adapter"))("add column not null without default", async () => {
       const connection = await ambientConnection();
       await connection.createTable("testings", (t) => {
         t.column("foo", "string");
@@ -321,7 +321,7 @@ describe("Migration", () => {
       ).rejects.toThrow(NotNullViolation);
     });
 
-    it.skipIf(adapterType !== "postgres")(
+    it.skipIf(!currentAdapter("PostgreSQLAdapter"))(
       "add column with datetime in timestamptz mode",
       async () => {
         await withPostgresqlDatetimeType("timestamptz", async () => {
@@ -601,7 +601,7 @@ describe("Migration", () => {
       }
     });
 
-    it.skipIf(adapterType !== "postgres")(
+    it.skipIf(!currentAdapter("PostgreSQLAdapter"))(
       "create table with force cascade drops dependent objects",
       async () => {
         const connection = await ambientConnection();
