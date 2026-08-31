@@ -96,6 +96,22 @@ tester.run("no-standalone-associations", rule, {
         "class P extends Base {\n  static {\n    this.hasOne('c', {});\n  }\n}\nconst Q = P;\nconst R = Q;\n",
       errors: [{ messageId: "standalone", data: { macro: "hasOne", receiver: "P" } }],
     },
+    // An alias bound in an UNRELATED block does not reach a receiver it never
+    // shadows: resolution walks the scope chain from the call site, so `Q` here
+    // stays unresolved rather than picking up the sibling block's binding.
+    {
+      filename: FILENAME,
+      code:
+        "class P extends Base {\n  static {}\n}\n" +
+        "{\n  const Q = P;\n  void Q;\n}\n" +
+        "Associations.hasMany.call(Q, 'cs', {});\n",
+      errors: [
+        {
+          messageId: "standaloneNoFix",
+          data: { macro: "hasMany", reason: "Q is not declared in this file" },
+        },
+      ],
+    },
     // An alias of a name that is NOT a class in this file still reports, and
     // the reason names the resolved identifier.
     {

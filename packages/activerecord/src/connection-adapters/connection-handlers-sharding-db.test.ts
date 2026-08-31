@@ -606,7 +606,7 @@ describe("ConnectionHandlersShardingDbTest", () => {
           await (
             await ShardConnectionTestModel.leaseConnection()
           )
-            // eslint-disable-next-line blazetrails/require-table-teardown
+            // eslint-disable-next-line blazetrails/require-table-teardown -- per-shard :memory: database, discarded by clearAllConnectionsBang() in the finally
             .execute(`CREATE TABLE "shard_connection_test_models" (shard_key VARCHAR (255))`);
         });
       }

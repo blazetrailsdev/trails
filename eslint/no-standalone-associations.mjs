@@ -162,32 +162,45 @@ const rule = {
     // that binding inside its TDZ — a runtime ReferenceError, not just a type
     // error. Such sites are reported as standaloneNoFix and left in place.
     const bindingStarts = new Map(); // name -> number[] (all decl start offsets)
-
-    // Simple `const <alias> = <Identifier>;` bindings, so a receiver that is a
-    // local alias of a class (`const Person = IndexErrorsPerson;`) still
-    // resolves to the class it aliases instead of silently passing. A name
-    // bound to more than one target is AMBIGUOUS and resolves no further.
-    const aliasOf = new Map(); // name -> name | "AMBIGUOUS"
-    function recordAlias(name, target) {
-      const prev = aliasOf.get(name);
-      aliasOf.set(name, prev === undefined || prev === target ? target : "AMBIGUOUS");
-    }
-    function resolveReceiver(name) {
-      const seen = new Set();
-      let cur = name;
-      while (!classesByName.has(cur) && aliasOf.has(cur) && !seen.has(cur)) {
-        seen.add(cur);
-        const next = aliasOf.get(cur);
-        if (next === "AMBIGUOUS") return cur;
-        cur = next;
-      }
-      return cur;
-    }
     function recordBinding(name, start) {
       if (typeof name !== "string") return;
       const arr = bindingStarts.get(name);
       if (arr) arr.push(start);
       else bindingStarts.set(name, [start]);
+    }
+
+    // Resolve a receiver identifier through simple `const <alias> = <Class>;`
+    // bindings, so an aliased receiver (`const Person = IndexErrorsPerson;`)
+    // still reports the class it aliases. Resolution walks the SCOPE CHAIN from
+    // the call site, so an alias bound in an unrelated block never reaches a
+    // receiver it does not actually shadow.
+    function variableInScopeChain(fromNode, name) {
+      let scope = sourceCode.getScope(fromNode);
+      while (scope) {
+        const variable = scope.set.get(name);
+        if (variable) return variable;
+        scope = scope.upper;
+      }
+      return null;
+    }
+
+    function resolveReceiver(identifierNode) {
+      let node = identifierNode;
+      const seen = new Set();
+      for (;;) {
+        if (seen.has(node.name)) return node.name;
+        seen.add(node.name);
+        const variable = variableInScopeChain(node, node.name);
+        // A class binding is the answer; anything with no single variable
+        // definition, or one that is not a plain `= <Identifier>` alias, ends
+        // the chain where it stands.
+        if (!variable || variable.defs.length !== 1) return node.name;
+        const def = variable.defs[0];
+        if (def.type !== "Variable") return node.name;
+        const init = def.node.init;
+        if (!init || init.type !== "Identifier") return node.name;
+        node = init;
+      }
     }
 
     function recordClass(node) {
@@ -328,9 +341,6 @@ const rule = {
 
       VariableDeclarator(node) {
         for (const name of bindingNamesOf(node.id)) recordBinding(name, node.range[0]);
-        if (node.id.type === "Identifier" && node.init && node.init.type === "Identifier") {
-          recordAlias(node.id.name, node.init.name);
-        }
       },
       FunctionDeclaration(node) {
         if (node.id && node.id.type === "Identifier") recordBinding(node.id.name, node.range[0]);
@@ -347,9 +357,7 @@ const rule = {
           const macro = macroOfCall(node.callee);
           const receiverArg = node.arguments[0];
           const receiver =
-            receiverArg && receiverArg.type === "Identifier"
-              ? resolveReceiver(receiverArg.name)
-              : null;
+            receiverArg && receiverArg.type === "Identifier" ? resolveReceiver(receiverArg) : null;
 
           if (exclude.has(siteKey(rel, node, macro))) continue;
 
