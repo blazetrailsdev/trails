@@ -83,10 +83,10 @@ export class Path {
   private _paths: string[];
   private _current: string;
   private _root: Root;
-  private _loadPath = false;
+  private _autoloadOnce = false;
   private _eagerLoad = false;
   private _autoload = false;
-  private _autoloadOnce = false;
+  private _loadPath = false;
   private _exclude: string[] | undefined;
 
   constructor(root: Root, current: string, paths: string[], options: PathOptions = {}) {
@@ -94,11 +94,11 @@ export class Path {
     this._current = current;
     this._paths = [...paths];
     this.glob = options.glob;
-    this._loadPath = !!options.loadPath;
+    this._exclude = options.exclude;
+    this._autoloadOnce = !!options.autoloadOnce;
     this._eagerLoad = !!options.eagerLoad;
     this._autoload = !!options.autoload;
-    this._autoloadOnce = !!options.autoloadOnce;
-    this._exclude = options.exclude;
+    this._loadPath = !!options.loadPath;
   }
 
   children(): Path[] {
@@ -108,11 +108,11 @@ export class Path {
       .map((k) => this._root._entries.get(k)!);
   }
 
-  loadPathBang(): void {
-    this._loadPath = true;
+  autoloadOnceBang(): void {
+    this._autoloadOnce = true;
   }
-  isLoadPath(): boolean {
-    return this._loadPath;
+  isAutoloadOnce(): boolean {
+    return this._autoloadOnce;
   }
 
   eagerLoadBang(): void {
@@ -129,11 +129,11 @@ export class Path {
     return this._autoload;
   }
 
-  autoloadOnceBang(): void {
-    this._autoloadOnce = true;
+  loadPathBang(): void {
+    this._loadPath = true;
   }
-  isAutoloadOnce(): boolean {
-    return this._autoloadOnce;
+  isLoadPath(): boolean {
+    return this._loadPath;
   }
 
   push(path: string): void {
