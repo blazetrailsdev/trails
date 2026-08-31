@@ -59,9 +59,6 @@ import {
 
 export { assertSchemaAdapter } from "./assert-schema-adapter.js";
 
-type RemoveIndexOptions = { name?: string; column?: string | string[] };
-type IndexInfo = { name: string; columns: string[] };
-
 /** @internal */
 export function canRemoveIndexByName(
   columnName: string | string[] | undefined | null,
@@ -72,90 +69,6 @@ export function canRemoveIndexByName(
     "name" in options &&
     Object.keys(options).filter((k) => k !== "name" && k !== "algorithm").length === 0
   );
-}
-
-/** @internal */
-function isExpressionColumnName(columnName: string | string[] | undefined): columnName is string {
-  return typeof columnName === "string" && /\W/.test(columnName);
-}
-
-type GenerateIndexName = (tableName: string, column: string | string[]) => string;
-
-function removeIndexSpec(
-  generateIndexName: GenerateIndexName,
-  tableName: string,
-  columnName: string | string[] | undefined,
-  options: RemoveIndexOptions,
-): { name?: string; columnNames: string[] } {
-  if (options.name == null && isExpressionColumnName(columnName)) {
-    const joined = (columnName.match(/\w+/g) ?? []).join("_");
-    return { name: generateIndexName(tableName, joined), columnNames: [] };
-  }
-  const raw = columnName ?? options.column;
-  const columnNames = raw == null || raw === "" ? [] : Array.isArray(raw) ? raw : [raw];
-  return { name: options.name, columnNames };
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
- */
-export function indexNameForRemoveFrom(
-  generateIndexName: GenerateIndexName,
-  allIndexes: ReadonlyArray<IndexInfo>,
-  tableName: string,
-  columnName: string | string[] | undefined,
-  options: RemoveIndexOptions,
-): string {
-  if (canRemoveIndexByName(columnName, options)) {
-    return options.name as string;
-  }
-  const { name, columnNames } = removeIndexSpec(generateIndexName, tableName, columnName, options);
-  const checks: Array<(i: IndexInfo) => boolean> = [];
-  if (name != null) {
-    checks.push((i) => i.name === name);
-  }
-  if (columnNames.length > 0) {
-    const target = generateIndexName(tableName, columnNames);
-    checks.push((i) => generateIndexName(tableName, i.columns) === target);
-  }
-  if (checks.length === 0) {
-    throw new ArgumentError("No name or columns specified");
-  }
-  const matching = allIndexes.filter((i) => checks.every((check) => check(i)));
-  if (matching.length > 1) {
-    throw new ArgumentError(
-      `Multiple indexes found on ${tableName} columns ${columnNames}. ` +
-        `Specify an index name from ${matching.map((i) => i.name).join(", ")}`,
-    );
-  }
-  if (matching.length === 0) {
-    throw new ArgumentError(`No indexes found on ${tableName} with the options provided.`);
-  }
-  return matching[0].name;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
- */
-export function indexExistsForRemoveFrom(
-  generateIndexName: GenerateIndexName,
-  allIndexes: ReadonlyArray<IndexInfo>,
-  tableName: string,
-  columnName: string | string[] | undefined,
-  options: RemoveIndexOptions,
-): boolean {
-  const { name, columnNames } = removeIndexSpec(generateIndexName, tableName, columnName, options);
-  return allIndexes.some((i) => {
-    if (name != null && i.name !== name) return false;
-    if (columnNames.length > 0) {
-      return (
-        i.columns.length === columnNames.length && columnNames.every((c, k) => c === i.columns[k])
-      );
-    }
-    return name != null;
-  });
 }
 
 export type JoinTableOptions = {
@@ -830,7 +743,7 @@ export class SchemaStatements {
     if (typeof options !== "string" && !Array.isArray(options)) {
       if (options.column != null) {
         if (options._usesLegacyIndexName) {
-          const cols = Array.isArray(options.column) ? options.column : [options.column];
+          const cols = wrap(options.column);
           return `index_${tableName}_on_${cols.join("_and_")}`;
         }
         return this.generateIndexName(tableName, options.column);
@@ -1474,7 +1387,7 @@ export class SchemaStatements {
 
       if (typeof (this as any)[method] === "function") {
         const result = await (this as any)[method](table, ...arguments_);
-        const values = result == null ? [] : Array.isArray(result) ? result : [result];
+        const values = wrap(result);
         const sqls: string[] = [];
         const procs: Array<() => Promise<void>> = [];
         for (const v of values) {
@@ -1526,7 +1439,7 @@ export class SchemaStatements {
    * @missingRailsCall limit — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
    */
   generateIndexName(tableName: string, column: string | string[]): string {
-    const cols = Array.isArray(column) ? column : [column];
+    const cols = wrap(column);
     const name = `index_${tableName}_on_${cols.join("_and_")}`;
     if (new TextEncoder().encode(name).length <= this.maxIndexNameSize()) return name;
 
@@ -1728,7 +1641,7 @@ export class SchemaStatements {
     if (this.isExpressionColumnName(columnNames as string)) {
       return columnNames as unknown as string[];
     }
-    return Array.isArray(columnNames) ? columnNames : [columnNames];
+    return wrap(columnNames);
   }
 
   /** @internal */
@@ -1768,7 +1681,7 @@ export class SchemaStatements {
     if (options.column === undefined) {
       throw new ArgumentError(`foreign_key_name requires either :name or :column to be specified`);
     }
-    const cols = Array.isArray(options.column) ? options.column : [options.column];
+    const cols = wrap(options.column);
     const identifier = `${tableName}_${cols.join("_and_")}_fk`;
     const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
     return `fk_rails_${hex}`;

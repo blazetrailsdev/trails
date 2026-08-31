@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
-import { CreateIndexDefinition, IndexDefinition, TableDefinition } from "./schema-definitions.js";
+import {
+  CreateIndexDefinition,
+  ForeignKeyDefinition,
+  IndexDefinition,
+  TableDefinition,
+} from "./schema-definitions.js";
 import { Base } from "../../base.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { currentAdapter } from "../../support/adapter-helper.js";
@@ -197,5 +202,21 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
 
   it("emits a bare decimal with no precision when none is given", () => {
     expect(new SchemaCreation(conn).typeToSql("decimal")).toBe("decimal");
+  });
+});
+
+describeIfSqlite("SchemaCreation#visit_ForeignKeyDefinition nil column lists", () => {
+  it("renders empty column lists for a nil column and primary key (Ruby Array())", () => {
+    const sc = new SchemaCreation(conn) as any;
+    const fk = new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      null as unknown as string,
+      null as unknown as string,
+      "fk_rails_abc",
+    );
+    expect(sc.visitForeignKeyDefinition(fk)).toBe(
+      'CONSTRAINT "fk_rails_abc" FOREIGN KEY () REFERENCES "rockets" ()',
+    );
   });
 });

@@ -88,6 +88,7 @@ export class EngineConfiguration extends RailtieConfiguration {
     paths.add("db/seeds.ts");
     paths.add("vendor", { loadPath: true });
     paths.add("vendor/assets", { glob: "*" });
+    paths.add("test/mailers/previews", { autoload: true });
     this._paths = paths;
     return paths;
   }
@@ -99,13 +100,17 @@ export class EngineConfiguration extends RailtieConfiguration {
     return this._generators;
   }
 
-  /** Mirrors: Rails `all_autoload_paths` (engine/configuration.rb:121). */
-  allAutoloadPaths(): string[] {
-    return [...this.autoloadPaths];
+  /** Mirrors Rails `all_autoload_paths` (engine/configuration.rb:121-125):
+   * `autoload_paths + paths.autoload_paths`. Async because trails'
+   * `Paths::Root#autoloadPaths` resolves existent paths via async fs. */
+  async allAutoloadPaths(): Promise<string[]> {
+    return [...this.autoloadPaths, ...(await this.paths().autoloadPaths())];
   }
-  /** Mirrors: Rails `all_autoload_once_paths` (engine/configuration.rb:127). */
-  allAutoloadOncePaths(): string[] {
-    return [...this.autoloadOncePaths];
+  /** Mirrors Rails `all_autoload_once_paths` (engine/configuration.rb:127-131):
+   * `autoload_once_paths + paths.autoload_once`. Async because trails'
+   * `Paths::Root#autoloadOnce` resolves existent paths via async fs. */
+  async allAutoloadOncePaths(): Promise<string[]> {
+    return [...this.autoloadOncePaths, ...(await this.paths().autoloadOnce())];
   }
   /** Mirrors Rails `all_eager_load_paths` (engine/configuration.rb:133-135):
    * `eager_load_paths + paths.eager_load`. Async because trails'

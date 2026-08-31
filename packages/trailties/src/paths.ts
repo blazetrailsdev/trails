@@ -6,12 +6,12 @@ export interface PathOptions {
   glob?: string;
   loadPath?: boolean;
   eagerLoad?: boolean;
+  autoload?: boolean;
+  autoloadOnce?: boolean;
   exclude?: string[];
 }
 
-// Port of railties/lib/rails/paths.rb. Autoload APIs are intentionally
-// omitted (ESM + bundlers cover those concerns); load_path / load_paths and
-// eager_load are kept.
+// Port of railties/lib/rails/paths.rb.
 export class Root {
   path: string | null;
   _entries: Map<string, Path> = new Map();
@@ -40,35 +40,39 @@ export class Root {
     return Array.from(new Set(this._entries.values()));
   }
 
-  /** Mirrors Rails `Paths::Root#eager_load` (`filter_by(&:eager_load?)`,
-   * paths.rb:93-110): existent directories of eager-load entries, minus those
-   * claimed by a non-eager-load child entry. */
-  async eagerLoad(): Promise<string[]> {
-    const out: string[] = [];
-    for (const node of this.allPaths()) {
-      if (!node.isEagerLoad()) continue;
-      const dirs = await node.existentDirectories();
-      const excluded = new Set<string>();
-      for (const child of node.children()) {
-        if (child.isEagerLoad()) continue;
-        for (const d of await child.existentDirectories()) excluded.add(d);
-      }
-      for (const d of dirs) if (!excluded.has(d)) out.push(d);
-    }
-    return Array.from(new Set(out));
+  /** Mirrors Rails `Paths::Root#autoload_once` (paths.rb:89-91). */
+  autoloadOnce(): Promise<string[]> {
+    return this.filterBy((path) => path.isAutoloadOnce());
   }
 
-  async loadPaths(): Promise<string[]> {
+  /** Mirrors Rails `Paths::Root#eager_load` (paths.rb:93-95). */
+  eagerLoad(): Promise<string[]> {
+    return this.filterBy((path) => path.isEagerLoad());
+  }
+
+  /** Mirrors Rails `Paths::Root#autoload_paths` (paths.rb:97-99). */
+  autoloadPaths(): Promise<string[]> {
+    return this.filterBy((path) => path.isAutoload());
+  }
+
+  /** Mirrors Rails `Paths::Root#load_paths` (paths.rb:101-103). */
+  loadPaths(): Promise<string[]> {
+    return this.filterBy((path) => path.isLoadPath());
+  }
+
+  /** Mirrors Rails `Paths::Root#filter_by` (paths.rb:106-110). Async because
+   * trails' `Path#existentDirectories` resolves via async fs. */
+  private async filterBy(block: (path: Path) => boolean): Promise<string[]> {
     const out: string[] = [];
-    for (const node of this.allPaths()) {
-      if (!node.isLoadPath()) continue;
-      const dirs = await node.existentDirectories();
+    for (const path of this.allPaths()) {
+      if (!block(path)) continue;
+      const paths = await path.existentDirectories();
       const excluded = new Set<string>();
-      for (const child of node.children()) {
-        if (child.isLoadPath()) continue;
-        for (const d of await child.existentDirectories()) excluded.add(d);
+      for (const p of path.children()) {
+        if (block(p)) continue;
+        for (const d of await p.existentDirectories()) excluded.add(d);
       }
-      for (const d of dirs) if (!excluded.has(d)) out.push(d);
+      for (const d of paths) if (!excluded.has(d)) out.push(d);
     }
     return Array.from(new Set(out));
   }
@@ -81,6 +85,8 @@ export class Path {
   private _root: Root;
   private _loadPath = false;
   private _eagerLoad = false;
+  private _autoload = false;
+  private _autoloadOnce = false;
   private _exclude: string[] | undefined;
 
   constructor(root: Root, current: string, paths: string[], options: PathOptions = {}) {
@@ -90,6 +96,8 @@ export class Path {
     this.glob = options.glob;
     this._loadPath = !!options.loadPath;
     this._eagerLoad = !!options.eagerLoad;
+    this._autoload = !!options.autoload;
+    this._autoloadOnce = !!options.autoloadOnce;
     this._exclude = options.exclude;
   }
 
@@ -112,6 +120,20 @@ export class Path {
   }
   isEagerLoad(): boolean {
     return this._eagerLoad;
+  }
+
+  autoloadBang(): void {
+    this._autoload = true;
+  }
+  isAutoload(): boolean {
+    return this._autoload;
+  }
+
+  autoloadOnceBang(): void {
+    this._autoloadOnce = true;
+  }
+  isAutoloadOnce(): boolean {
+    return this._autoloadOnce;
   }
 
   push(path: string): void {

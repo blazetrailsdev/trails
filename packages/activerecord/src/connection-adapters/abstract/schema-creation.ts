@@ -17,6 +17,7 @@ import {
 import { type NativeDatabaseType, type NativeDatabaseTypes } from "./native-database-types.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { wrap } from "@blazetrails/activesupport";
 
 type Definition =
   | TableDefinition
@@ -269,10 +270,10 @@ export class SchemaCreation {
   }
 
   protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
-    const quotedColumns = (Array.isArray(o.column) ? o.column : [o.column])
+    const quotedColumns = wrap(o.column)
       .map((c) => this.conn.quoteColumnName(c))
       .join(", ");
-    const quotedPrimaryKeys = (Array.isArray(o.primaryKey) ? o.primaryKey : [o.primaryKey])
+    const quotedPrimaryKeys = wrap(o.primaryKey)
       .map((c) => this.conn.quoteColumnName(c))
       .join(", ");
     let sql = `CONSTRAINT ${this.conn.quoteColumnName(o.name)} `;

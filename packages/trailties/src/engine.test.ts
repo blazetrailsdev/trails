@@ -168,6 +168,16 @@ describe("Engine", () => {
       expect(paths.get("app")!.isEagerLoad()).toBe(true);
       expect(paths.get("app/models")!.isEagerLoad()).toBe(true);
       expect(paths.get("app/views")!.isEagerLoad()).toBe(false);
+      expect(paths.get("test/mailers/previews")!.isAutoload()).toBe(true);
+      expect(paths.get("app")!.isAutoload()).toBe(false);
+    });
+
+    it("all_autoload_paths unions the paths registry contribution", async () => {
+      installFs(new Set(["/blog", "/blog/test/mailers/previews"]), new Set());
+      const cfg = new EngineConfiguration("/blog");
+      cfg.autoloadPaths.push("/x/auto");
+      expect(await cfg.allAutoloadPaths()).toEqual(["/x/auto", "/blog/test/mailers/previews"]);
+      expect(await cfg.allAutoloadOncePaths()).toEqual([]);
     });
 
     it("autoload_paths, autoload_once_paths, eager_load_paths are independently writable", async () => {
@@ -177,8 +187,8 @@ describe("Engine", () => {
       cfg.autoloadPaths.push("/x/auto");
       cfg.autoloadOncePaths.push("/x/once");
       cfg.eagerLoadPaths.push("/x/eager");
-      expect(cfg.allAutoloadPaths()).toEqual(["/x/auto"]);
-      expect(cfg.allAutoloadOncePaths()).toEqual(["/x/once"]);
+      expect(await cfg.allAutoloadPaths()).toEqual(["/x/auto"]);
+      expect(await cfg.allAutoloadOncePaths()).toEqual(["/x/once"]);
       expect(await cfg.allEagerLoadPaths()).toEqual(["/x/eager"]);
     });
   });

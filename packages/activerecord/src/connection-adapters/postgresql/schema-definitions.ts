@@ -11,6 +11,7 @@ import {
 import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
+import { wrap } from "@blazetrails/activesupport";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace PostgreSQL {
@@ -163,8 +164,8 @@ export class UniqueConstraintDefinition {
     const { name, column, ...rest } = opts;
     if (name != null && this.name !== String(name)) return false;
     if (column != null) {
-      const thisCol = Array.isArray(this.column) ? this.column : [this.column];
-      const thatCol = (Array.isArray(column) ? column : [column]).map(String);
+      const thisCol = wrap(this.column);
+      const thatCol = wrap(column).map(String);
       if (thisCol.join(",") !== thatCol.join(",")) return false;
     }
     const toS = (x: unknown): string => (x == null ? "" : String(x));

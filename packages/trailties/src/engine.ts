@@ -156,8 +156,8 @@ export class Engine extends Trailtie {
     const cfg = this.config;
     const out = [...(await paths.loadPaths())];
     if (addAutoloadPathsToLoadPath) {
-      for (const p of cfg.allAutoloadPaths()) out.push(p);
-      for (const p of cfg.allAutoloadOncePaths()) out.push(p);
+      for (const p of await cfg.allAutoloadPaths()) out.push(p);
+      for (const p of await cfg.allAutoloadOncePaths()) out.push(p);
     }
     this._allLoadPathsCache = Array.from(new Set(out));
     return this._allLoadPathsCache;
