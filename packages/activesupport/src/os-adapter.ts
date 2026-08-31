@@ -121,7 +121,7 @@ function resolve(): OsAdapter {
     return resolved;
   }
   throw new Error(
-    "No OS adapter configured. Set ActiveSupport.osAdapter or register a custom adapter.",
+    "No OS adapter configured. Under ESM, import '@blazetrails/activesupport/node' from your entry point; otherwise set ActiveSupport.osAdapter or register a custom adapter.",
   );
 }
 

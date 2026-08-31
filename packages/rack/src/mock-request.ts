@@ -46,6 +46,22 @@ export type RackApp = (
   env: Record<string, any>,
 ) => [number, Record<string, string>, any] | Promise<[number, Record<string, string>, any]>;
 
+/**
+ * The `env_for` options Rack passes as Ruby Symbols, which its
+ * `String === field` copy therefore skips (`rack/lib/rack/mock_request.rb:153`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+const SYMBOL_OPTS = new Set([
+  "method",
+  "params",
+  "script_name",
+  "http_version",
+  "fatal",
+  "input",
+  "lint",
+]);
+
 export class MockRequest {
   private app: RackApp;
 
@@ -156,13 +172,12 @@ export class MockRequest {
       }
     }
 
-    // Copy string keys from opts to env
+    // `opts.each { |field, value| env[field] = value if String === field }`
+    // (`rack/lib/rack/mock_request.rb:153-155`). A Ruby Symbol key is a plain
+    // string here, so the option names Rack reads as Symbols are the exclusion.
     for (const [key, value] of Object.entries(opts)) {
-      if (typeof key === "string" && key === key.toUpperCase() && key.length > 1) {
-        env[key] = value;
-      } else if (typeof key === "string" && key.startsWith("HTTP_")) {
-        env[key] = value;
-      }
+      if (SYMBOL_OPTS.has(key)) continue;
+      env[key] = value;
     }
 
     return env;

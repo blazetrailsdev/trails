@@ -16,13 +16,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/stack.ts",
-    "rubyName": "insert",
-    "call": "build_middleware",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
     "rubyName": "insert_after",
     "call": "assert_index",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -61,41 +54,5 @@
     "rubyName": "swap",
     "call": "insert",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "unshift",
-    "call": "build_middleware",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "unshift",
-    "call": "unshift",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:buildMiddleware"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "use",
-    "call": "build_middleware",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/stack.ts",
-    "rubyName": "use",
-    "call": "push",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:buildMiddleware"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   }
 ]

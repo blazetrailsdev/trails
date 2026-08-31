@@ -1,35 +1,21 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
-import { cwd } from "@blazetrails/activesupport/process-adapter";
+import { getPathAsync } from "@blazetrails/activesupport";
+import { APP_PATH, ENGINE_PATH } from "../app-path.js";
 import { Trails } from "../rails.js";
 
 /**
- * Rails' `require APP_PATH`. `APP_PATH` is the constant `bin/rails` defines
- * from its own location, which is the application root the command was run
- * from — `cwd()` here, the same value `serverCommand` already boots against. Trails apps ship TypeScript sources and a
- * compiled `dist/`, so both spellings of `config/application` are probed —
- * the built one first, mirroring how `bin/rails` prefers the loaded app,
- * then the TypeScript source at the Rails layout's `config/application.ts`.
- *
  * Mirrors `Rails::Command::Actions#require_application!`
- * (`railties/lib/rails/command/actions.rb:13-16`).
+ * (`railties/lib/rails/command/actions.rb:13-16`). Rails names two
+ * constants and requires each at most once; the path is decided by the
+ * entry point (`bin/rails` defines `APP_PATH`), never discovered here.
+ * `defined?(X)` reads as `X != null` over the bindings in `app-path.ts`.
  */
 export async function requireApplicationBang(): Promise<void> {
-  const root = cwd();
-  const fs = await getFsAsync();
   const p = await getPathAsync();
   if (!p.pathToFileURL) {
     throw new Error("PathAdapter.pathToFileURL() is required to boot an application.");
   }
-  for (const candidate of [
-    p.join(root, "dist", "config", "application.js"),
-    p.join(root, "config", "application.ts"),
-  ]) {
-    if (await fs.exists(candidate)) {
-      await import(p.pathToFileURL(candidate).href);
-      return;
-    }
-  }
-  throw new Error(`No config/application.ts found in ${root}.`);
+  if (ENGINE_PATH != null) await import(p.pathToFileURL(ENGINE_PATH).href);
+  if (APP_PATH != null) await import(p.pathToFileURL(APP_PATH).href);
 }
 
 /**
@@ -40,5 +26,5 @@ export async function requireApplicationBang(): Promise<void> {
  */
 export async function bootApplicationBang(): Promise<void> {
   await requireApplicationBang();
-  await Trails.initialize();
+  if (APP_PATH != null) await Trails.initialize();
 }

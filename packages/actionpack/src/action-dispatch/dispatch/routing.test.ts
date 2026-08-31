@@ -17,13 +17,13 @@ class EchoParamsController {
     res.request = request;
     return res;
   }
-  private _body = "";
-  async dispatch(action: string, req: Request): Promise<void> {
+  static async dispatch(
+    action: string,
+    req: Request,
+  ): Promise<[number, Record<string, string>, ReturnType<typeof bodyFromString>]> {
     const { controller, action: _a, ...params } = req.pathParameters as Record<string, string>;
-    this._body = JSON.stringify({ controller, action, params });
-  }
-  toRackResponse(): [number, Record<string, string>, ReturnType<typeof bodyFromString>] {
-    return [200, { "content-type": "application/json" }, bodyFromString(this._body)];
+    const body = JSON.stringify({ controller, action, params });
+    return [200, { "content-type": "application/json" }, bodyFromString(body)];
   }
 }
 

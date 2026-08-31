@@ -27,7 +27,16 @@ const DEFAULT_DISTANCE_IN_WORDS: Record<string, { one: string; other: string } |
   almost_x_years: { one: "almost 1 year", other: "almost %{count} years" },
 };
 
-export type DistanceOfTimeInput = Date | number | { toDate: () => Date } | { toTime: () => Date };
+export type DistanceOfTimeInput =
+  | Date
+  | number
+  | { toDate: () => Date }
+  | { toTime: () => Date }
+  // ActiveRecord reads a datetime column back as a `Temporal.Instant`, which
+  // answers neither `toDate` nor `toTime`. Rails has no seam here — an AR
+  // datetime is an `ActiveSupport::TimeWithZone` and `to_time` is defined on
+  // it — so the normalizer grows the arm the Ruby `to_time` covers.
+  | { epochMilliseconds: number };
 
 export interface DistanceOfTimeOptions {
   includeSeconds?: boolean;
@@ -46,6 +55,10 @@ function normalizeDistanceOfTimeArgumentToTime(value: DistanceOfTimeInput): Date
   }
   if (value && typeof (value as { toDate?: unknown }).toDate === "function") {
     return (value as { toDate: () => Date }).toDate();
+  }
+  if (value && typeof (value as { epochMilliseconds?: unknown }).epochMilliseconds === "number") {
+    // boundary: the helper's whole arithmetic is over JS Date, per the type above.
+    return new Date((value as { epochMilliseconds: number }).epochMilliseconds);
   }
   throw new TypeError(`${String(value)} can't be converted to a Time value`);
 }

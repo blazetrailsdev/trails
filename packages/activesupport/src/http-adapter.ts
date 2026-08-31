@@ -93,7 +93,7 @@ export async function getHttpAsync(): Promise<HttpAdapter> {
   // documents.
   // eslint-disable-next-line blazetrails/rails-error-parity
   throw new Error(
-    "No HTTP adapter configured. Set ActiveSupport.httpAdapter or register a custom adapter.",
+    "No HTTP adapter configured. Under ESM, import '@blazetrails/activesupport/node' from your entry point; otherwise set ActiveSupport.httpAdapter or register a custom adapter.",
   );
 }
 

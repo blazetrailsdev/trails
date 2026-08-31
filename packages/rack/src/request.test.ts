@@ -724,14 +724,79 @@ describe("RackRequestTest", () => {
   });
 
   it("ssl detection", () => {
-    expect(makeReq("https://example.org/").ssl).toBe(true);
-    expect(makeReq("http://example.org/").ssl).toBe(false);
+    let request = makeReq("/");
+    expect(request.scheme).toBe("http");
+    expect(request.ssl).toBe(false);
+
+    request = makeReq("/", { HTTP_X_FORWARDED_SCHEME: "ws" });
+    expect(request.scheme).toBe("ws");
+    expect(request.ssl).toBe(false);
+
+    request = makeReq("/", { HTTP_X_FORWARDED_PROTO: "ws" });
+    expect(request.scheme).toBe("ws");
+
+    request = makeReq("/", { HTTP_FORWARDED: "proto=https" });
+    expect(request.scheme).toBe("https");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { HTTP_FORWARDED: "proto=https, proto=http" });
+    expect(request.scheme).toBe("http");
+    expect(request.ssl).toBe(false);
+
+    request = makeReq("/", { HTTP_FORWARDED: "proto=http, proto=https" });
+    expect(request.scheme).toBe("https");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { HTTPS: "on" });
+    expect(request.scheme).toBe("https");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { "rack.url_scheme": "https" });
+    expect(request.scheme).toBe("https");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { "rack.url_scheme": "wss" });
+    expect(request.scheme).toBe("wss");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { HTTP_HOST: "www.example.org:8080" });
+    expect(request.scheme).toBe("http");
+    expect(request.ssl).toBe(false);
+
+    request = makeReq("/", { HTTP_HOST: "www.example.org:8443", HTTPS: "on" });
+    expect(request.scheme).toBe("https");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { HTTP_HOST: "www.example.org:8443", HTTP_X_FORWARDED_SSL: "on" });
+    expect(request.scheme).toBe("https");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { HTTP_X_FORWARDED_SCHEME: "https" });
+    expect(request.scheme).toBe("https");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { HTTP_X_FORWARDED_SCHEME: "wss" });
+    expect(request.scheme).toBe("wss");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { HTTP_X_FORWARDED_PROTO: "https" });
+    expect(request.scheme).toBe("https");
+    expect(request.ssl).toBe(true);
+
+    request = makeReq("/", { HTTP_X_FORWARDED_PROTO: "https, http, http" });
+    expect(request.scheme).toBe("http");
+    expect(request.ssl).toBe(false);
+
+    request = makeReq("/", { HTTP_X_FORWARDED_PROTO: "wss" });
+    expect(request.scheme).toBe("wss");
+    expect(request.ssl).toBe(true);
   });
 
   it("prevents scheme abuse", () => {
-    const env = makeEnv();
-    env["rack.url_scheme"] = "javascript";
-    expect(new Request(env).scheme).toBe("http");
+    const request = makeReq("/", {
+      HTTP_X_FORWARDED_SCHEME: 'a."><script>alert(1)</script>',
+    });
+    expect(request.scheme).toBe("http");
   });
 
   it("parse cookies", () => {

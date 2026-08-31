@@ -48,15 +48,12 @@ export class DispatcherRegistry {
  * table holds.
  *
  * Rails needs only `make_response!` and the `dispatch` class method
- * (`metal.rb:331-337`); the instance `dispatch` + `to_a` pair stands in until
- * story `port-metal-dispatch-class-method` lands the class method.
+ * (`metal.rb:331-337`).
  *
  * @internal
  */
 export interface DispatchableControllerClass {
-  new (): {
-    dispatch(action: string, req: Request, res: Response): Promise<unknown>;
-    toRackResponse(): RackResponse;
-  };
+  new (): unknown;
+  dispatch(action: string, req: Request, res: Response): Promise<RackResponse>;
   makeResponseBang(request: Request): Response;
 }

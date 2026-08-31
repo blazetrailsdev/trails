@@ -15,7 +15,10 @@ import { underscore } from "@blazetrails/activesupport";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   type MiddlewareEntry,
+  type RackApp,
+  type RackAppObject,
 } from "../action-dispatch/middleware/stack.js";
+import type { RackEnv } from "@blazetrails/rack";
 import { includeContent } from "./metal/head.js";
 import { Renderers } from "./metal/renderers.js";
 import { STATUS_CODES, resolveStatus } from "./metal/status-codes.js";
@@ -30,7 +33,44 @@ import {
   _setVaryHeader as _setVaryHeaderFn,
 } from "./metal/rendering.js";
 
-export class MiddlewareStack extends AbstractMiddlewareStack {}
+export class MiddlewareStack extends AbstractMiddlewareStack {
+  /**
+   * Mirrors `ActionController::MiddlewareStack#build_middleware`
+   * (`action_controller/metal.rb:44-52`) — an ActionController entry
+   * carries the `:only`/`:except` predicate.
+   *
+   * @internal
+   */
+  buildMiddleware(
+    klass: MiddlewareEntry["klass"],
+    args: unknown[],
+    block?: (app: RackApp) => RackApp,
+  ): MiddlewareEntry {
+    const middleware = Metal.buildMiddleware(klass, args);
+    return { klass: middleware.klass, args: middleware.args, block, valid: middleware.valid };
+  }
+
+  /**
+   * Mirrors `ActionController::MiddlewareStack#build`
+   * (`action_controller/metal.rb:31-37`). The non-string arm of `action`
+   * only exists so the override stays assignable to
+   * `ActionDispatch::MiddlewareStack#build(app)` (`stack.rb:166`), which
+   * Ruby does not have to reconcile.
+   */
+  build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
+    if (typeof action !== "string") return super.build(action);
+    let current: RackApp =
+      typeof app === "function" ? app : (env: RackEnv) => (app as RackAppObject).call(env);
+    const middlewares = this.middlewares;
+    for (let i = middlewares.length - 1; i >= 0; i--) {
+      const middleware = middlewares[i];
+      if (middleware.valid && !middleware.valid(action)) continue;
+      const mw = new middleware.klass(current, ...middleware.args);
+      current = (env: RackEnv) => mw.call(env);
+    }
+    return current;
+  }
+}
 
 export class Middleware {
   readonly klass: MiddlewareEntry["klass"];
@@ -69,10 +109,20 @@ export class Metal extends AbstractController {
     return false;
   }
 
+  /**
+   * `class_attribute :middleware_stack` (`metal.rb:288`) plus the
+   * `inherited` hook's `subclass.middleware_stack = middleware_stack.dup`
+   * (`metal.rb:148`). JS has no hook that fires when a subclass is defined,
+   * so the dup happens on first read instead, which is the same value.
+   */
   static middleware(): MiddlewareStack {
     let stack = _middlewareStacks.get(this);
     if (!stack) {
-      stack = new MiddlewareStack();
+      const superclass = Object.getPrototypeOf(this) as typeof Metal | null;
+      stack =
+        superclass && typeof superclass.middleware === "function"
+          ? superclass.middleware().dup()
+          : new MiddlewareStack();
       _middlewareStacks.set(this, stack);
     }
     return stack;
@@ -82,20 +132,52 @@ export class Metal extends AbstractController {
     this.middleware().use(args[0] as MiddlewareEntry["klass"], ...(args.slice(1) as any));
   }
 
-  static action(
-    this: typeof Metal,
-    name: string,
-  ): (env: Record<string, unknown>) => Promise<Response> {
+  /**
+   * Returns a Rack endpoint for the given action name — mirrors
+   * `ActionController::Metal.action` (`action_controller/metal.rb:315-327`).
+   */
+  static action(this: typeof Metal, name: string): any {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const Klass = this;
     const app = async (env: Record<string, unknown>) => {
       const req = new Request(env);
       const res = Klass.makeResponseBang(req);
       const controller = new Klass();
-      return controller.dispatch(name, req, res);
+      await controller.dispatch(name, req, res);
+      return controller.toRackResponse();
     };
 
-    return app;
+    if (this.middleware().any()) {
+      return this.middleware().build(name, app as unknown as RackApp);
+    } else {
+      return app;
+    }
+  }
+
+  /**
+   * Direct dispatch to the controller. Instantiates the controller, then
+   * executes the action named `name` — mirrors
+   * `ActionController::Metal.dispatch` (`action_controller/metal.rb:331-337`).
+   */
+  static async dispatch(
+    this: typeof Metal,
+    name: string,
+    req: Request,
+    res: Response,
+  ): Promise<RackResponse> {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const Klass = this;
+    if (this.middleware().any()) {
+      return await this.middleware().build(name, async () => {
+        const controller = new Klass();
+        await controller.dispatch(name, req, res);
+        return controller.toRackResponse();
+      })(req.env);
+    } else {
+      const controller = new Klass();
+      await controller.dispatch(name, req, res);
+      return controller.toRackResponse();
+    }
   }
 
   static build(

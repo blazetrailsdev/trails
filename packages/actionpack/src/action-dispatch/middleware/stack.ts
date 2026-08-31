@@ -30,6 +30,12 @@ export interface MiddlewareEntry {
   klass: MiddlewareFactory;
   args: unknown[];
   block?: (app: RackApp) => RackApp;
+  /**
+   * `ActionController::MiddlewareStack::Middleware#valid?`
+   * (`action_controller/metal.rb:26-28`) — absent on a plain
+   * `ActionDispatch` entry, which Ruby models as a different class.
+   */
+  valid?(action: string): boolean;
 }
 
 export class MiddlewareStack implements Iterable<MiddlewareEntry> {
@@ -55,6 +61,18 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return this.entries.length;
   }
 
+  /** Ruby `Object#dup` — a shallow copy of the entry list. */
+  dup(): this {
+    const copy = new (this.constructor as new () => this)();
+    copy.middlewares = [...this.entries];
+    return copy;
+  }
+
+  /** `Enumerable#any?` over the stack — `middleware_stack.any?` at `metal.rb:322, :332`. */
+  any(): boolean {
+    return this.entries.length > 0;
+  }
+
   each(callback: (entry: MiddlewareEntry) => void): void {
     for (const entry of this.entries) callback(entry);
   }
@@ -72,8 +90,14 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.splice(idx, 1);
   }
 
+  /**
+   * A Ruby `&block` has no positional spelling next to `*args`; trails names
+   * the block form `useWithBlock`, so this arm has no block to forward.
+   *
+   * @missingRailsArgs build_middleware — PERMANENT
+   */
   use(klass: MiddlewareFactory, ...args: unknown[]): void {
-    this.entries.push({ klass, args });
+    this.entries.push(this.buildMiddleware(klass, args));
   }
 
   useWithBlock(
@@ -81,34 +105,36 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     block: (app: RackApp) => RackApp,
     ...args: unknown[]
   ): void {
-    this.entries.push({ klass, args, block });
+    this.entries.push(this.buildMiddleware(klass, args, block));
   }
 
+  /** @missingRailsArgs build_middleware — PERMANENT */
   unshift(klass: MiddlewareFactory, ...args: unknown[]): void {
-    this.entries.unshift({ klass, args });
+    this.entries.unshift(this.buildMiddleware(klass, args));
   }
 
+  /** @missingRailsArgs build_middleware — PERMANENT */
   insert(index: number, klass: MiddlewareFactory, ...args: unknown[]): void {
     if (index < 0 || index > this.entries.length) {
       throw new Error(`Invalid index ${index} for middleware stack of size ${this.entries.length}`);
     }
-    this.entries.splice(index, 0, { klass, args });
+    this.entries.splice(index, 0, this.buildMiddleware(klass, args));
   }
 
   insertBefore(index: MiddlewareFactory, klass: MiddlewareFactory, ...args: unknown[]): void {
     const idx = this.findIndex(index);
     if (idx === -1) throw new Error("No such middleware to insert before");
-    this.entries.splice(idx, 0, { klass, args });
+    this.entries.splice(idx, 0, this.buildMiddleware(klass, args));
   }
 
   insertAfter(index: MiddlewareFactory | number, ...args: unknown[]): void {
     const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
     if (typeof index === "number") {
-      this.entries.splice(index + 1, 0, { klass, args: rest });
+      this.entries.splice(index + 1, 0, this.buildMiddleware(klass, rest));
     } else {
       const idx = this.findIndex(index);
       if (idx === -1) throw new Error("No such middleware to insert after");
-      this.entries.splice(idx + 1, 0, { klass, args: rest });
+      this.entries.splice(idx + 1, 0, this.buildMiddleware(klass, rest));
     }
   }
 
@@ -116,7 +142,7 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
     const idx = this.findIndex(target);
     if (idx === -1) throw new Error("No such middleware to swap");
-    this.entries[idx] = { klass, args: rest };
+    this.entries[idx] = this.buildMiddleware(klass, rest);
   }
 
   delete(target: MiddlewareFactory): void {
@@ -202,7 +228,13 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return i;
   }
 
-  /** @internal */
+  /**
+   * `MiddlewareStack#build_middleware` (`stack.rb:184-186`) — the one place
+   * an entry is constructed, so `ActionController::MiddlewareStack` can
+   * override it (`action_controller/metal.rb:44-52`).
+   *
+   * @internal
+   */
   buildMiddleware(
     klass: MiddlewareFactory,
     args: unknown[],

@@ -436,7 +436,7 @@ function resolve(): FsRegistration {
   }
 
   throw new Error(
-    "No filesystem adapter configured. Set ActiveSupport.fsAdapter or register a custom adapter.",
+    "No filesystem adapter configured. Under ESM, import '@blazetrails/activesupport/node' from your entry point; otherwise set ActiveSupport.fsAdapter or register a custom adapter.",
   );
 }
 
