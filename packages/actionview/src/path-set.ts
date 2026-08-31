@@ -43,7 +43,7 @@ export interface PathSetResolver {
    * to suggest close matches. Resolvers that cannot enumerate them may omit it.
    * @internal
    */
-  allTemplatePaths?(): readonly string[];
+  allTemplatePaths?(): readonly TemplatePath[];
 }
 
 export class PathSet implements Iterable<PathSetResolver> {

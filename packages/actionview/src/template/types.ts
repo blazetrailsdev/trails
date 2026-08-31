@@ -2,33 +2,27 @@
  * ActionView::Template::Types
  *
  * The set of format symbols a template can carry. Rails delegates to the Mime
- * registry (`actionview/lib/action_view/template/types.rb:7-12` —
+ * registry (`actionview/lib/action_view/template/types.rb:37-42` —
  * `Types.symbols` → `Type.symbols` → `SET.symbols`); until `Mime::Type` is
- * ported the set is the fixed list Rails registers by default.
+ * ported the set is Rails' default registrations, in the order
+ * `actionpack/lib/action_dispatch/http/mime_types.rb:8-56` registers them.
  */
 const SYMBOLS: readonly string[] = [
   "html",
   "text",
   "js",
   "css",
-  "xml",
-  "json",
-  "rss",
-  "atom",
-  "yaml",
-  "multipart_form",
-  "url_encoded_form",
   "ics",
   "csv",
   "vcf",
   "vtt",
-  "tsx",
   "png",
   "jpeg",
   "gif",
   "bmp",
   "tiff",
   "svg",
+  "webp",
   "mpeg",
   "mp3",
   "ogg",
@@ -39,6 +33,13 @@ const SYMBOLS: readonly string[] = [
   "ttf",
   "woff",
   "woff2",
+  "xml",
+  "rss",
+  "atom",
+  "yaml",
+  "multipart_form",
+  "url_encoded_form",
+  "json",
   "pdf",
   "zip",
   "gzip",

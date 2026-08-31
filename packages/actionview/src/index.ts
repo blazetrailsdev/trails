@@ -11,7 +11,7 @@ export {
 export { Template } from "./template.js";
 
 export { FileSystemResolver, Resolver } from "./template/resolver.js";
-export { InMemoryResolver } from "./testing/resolvers.js";
+export { FixtureResolver, NullResolver } from "./testing/resolvers.js";
 
 export { LookupContext, MissingTemplate, DetailsKey } from "./lookup-context.js";
 

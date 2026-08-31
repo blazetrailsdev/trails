@@ -3,16 +3,17 @@ import { describe, expect, it } from "vitest";
 import { Digestor } from "./digestor.js";
 import { LookupContext } from "./lookup-context.js";
 import { TemplateHandlers } from "./template/handlers.js";
-import { InMemoryResolver } from "./testing/resolvers.js";
+import { FixtureResolver } from "./testing/resolvers.js";
 
 function withFinder(source: string): LookupContext {
   TemplateHandlers.registerTemplateHandler("html", {
     extensions: ["html"],
     render: (s) => s,
   });
-  const resolver = new InMemoryResolver();
-  resolver.add("posts/show", "html", "html", source);
-  resolver.add("posts/index", "html", "html", source);
+  const resolver = new FixtureResolver({
+    "posts/show.html.html": source,
+    "posts/index.html.html": source,
+  });
   const finder = new LookupContext();
   finder.addResolver(resolver);
   return finder;

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { MissingTemplate, LookupContext } from "./lookup-context.js";
 import { Resolver } from "./template/resolver.js";
-import { InMemoryResolver } from "./testing/resolvers.js";
+import { FixtureResolver } from "./testing/resolvers.js";
 import { Template } from "./template.js";
+import { TemplatePath } from "./template-path.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 
@@ -75,8 +76,8 @@ class PathsOnlyResolver extends Resolver {
     return [];
   }
 
-  override allTemplatePaths(): readonly string[] {
-    return this.paths;
+  override allTemplatePaths(): readonly TemplatePath[] {
+    return this.paths.map((path) => TemplatePath.parse(path));
   }
 }
 
@@ -118,8 +119,11 @@ describe("LookupContext allCandidatePaths wiring", () => {
 
 describe("LookupContext#renderPartialSync", () => {
   function contextWith(templates: Record<string, string>): LookupContext {
-    const resolver = new InMemoryResolver();
-    for (const [key, source] of Object.entries(templates)) resolver.add(key, "html", "tse", source);
+    const resolver = new FixtureResolver(
+      Object.fromEntries(
+        Object.entries(templates).map(([key, source]) => [`${key}.html.tse`, source]),
+      ),
+    );
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(resolver);
     return ctx;
@@ -195,8 +199,11 @@ describe("LookupContext#renderPartialSync", () => {
 
 describe("LookupContext#render with a layout", () => {
   function contextWith(templates: Record<string, string>): LookupContext {
-    const resolver = new InMemoryResolver();
-    for (const [key, source] of Object.entries(templates)) resolver.add(key, "html", "tse", source);
+    const resolver = new FixtureResolver(
+      Object.fromEntries(
+        Object.entries(templates).map(([key, source]) => [`${key}.html.tse`, source]),
+      ),
+    );
     const ctx = new LookupContext(null, {}, []);
     ctx.addResolver(resolver);
     return ctx;

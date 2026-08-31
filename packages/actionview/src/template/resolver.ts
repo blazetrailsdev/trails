@@ -50,7 +50,13 @@ export abstract class Resolver implements PathSetResolver {
     );
   }
 
-  allTemplatePaths(): readonly string[] {
+  /** Used for error pages (`resolver.rb:63-66`). */
+  builtTemplates(): Template[] {
+    return [];
+  }
+
+  /** Not implemented by default (`resolver.rb:68-71`). */
+  allTemplatePaths(): readonly TemplatePath[] {
     return [];
   }
 
@@ -102,6 +108,27 @@ export abstract class Resolver implements PathSetResolver {
 
   /**
    * @internal
+   * Ruby `File.fnmatch` for the two patterns `Resolver` globs with
+   * (`resolver.rb:118,161`), which JS has no equivalent of and no admissible
+   * third-party one: `**` spans directory separators and `*` does not.
+   */
+  protected fnmatch(glob: string): RegExp {
+    const segments = glob.split("/");
+    let pattern = "";
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      if (segment === "**") {
+        pattern += "(?:[^/]+/)*";
+        continue;
+      }
+      pattern += segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*");
+      if (i < segments.length - 1) pattern += "/";
+    }
+    return new RegExp(`^${pattern}$`);
+  }
+
+  /**
+   * @internal
    * `resolver.rb:172-181`. Rails keeps this private on `FileSystemResolver`,
    * the only resolver upstream that filters candidates itself; trails' second
    * such resolver is `testing/resolvers.ts`, and TypeScript has no way to
@@ -144,13 +171,13 @@ function compareSortKeys(
 export class FileSystemResolver extends Resolver {
   private templatesCache = new Map<string, TemplateWithDetails[]>();
   private pathParser = new PathParser();
-  private _path: string;
+  protected _path: string;
 
   constructor(path: string) {
     super();
     if ((path as unknown) instanceof Resolver)
       throw new TypeError("path already is a Resolver class");
-    this._path = path;
+    this._path = getPath().resolve(path);
   }
 
   /** Rails' `attr_reader :path`. */
@@ -168,17 +195,24 @@ export class FileSystemResolver extends Resolver {
     return this._path;
   }
 
-  /**
-   * `resolver.rb:114-120`. Rails returns `TemplatePath`s; trails' only caller
-   * is `MissingTemplate#corrections`, which scores virtual-path strings.
-   */
-  override allTemplatePaths(): readonly string[] {
+  /** Rails' `alias :to_path :to_s` (`resolver.rb:106`). */
+  toPath(): string {
+    return this.toString();
+  }
+
+  override builtTemplates(): Template[] {
+    return Array.from(this.templatesCache.values()).flatMap((templates) =>
+      templates.map((t) => t.template),
+    );
+  }
+
+  override allTemplatePaths(): readonly TemplatePath[] {
     const paths = this.templateGlob("**/*");
     const seen = new Set<string>();
     for (const filename of paths) {
-      seen.add(filename.replace(/\.[^/]*$/, ""));
+      seen.add(filename.slice(this._path.length + 1).replace(/\.[^/]*$/, ""));
     }
-    return Array.from(seen);
+    return Array.from(seen, (filename) => TemplatePath.parse(filename));
   }
 
   /** @internal */
@@ -204,6 +238,42 @@ export class FileSystemResolver extends Resolver {
 
   /**
    * @internal
+   * `resolver.rb:141-143`. Rails wraps the path in a lazy
+   * `Template::Sources::File`, which is unported; the contents are read
+   * eagerly instead.
+   *
+   * @missingRailsCall new — CONVERGEABLE port-template-sources-file-for-lazy-resolver-sources
+   */
+  protected sourceForTemplate(template: string): string {
+    return getFs().readFileSync(template, "utf-8");
+  }
+
+  /**
+   * @internal
+   * Rails' `build_unbound_template` (`resolver.rb:145-155`); trails binds the
+   * template eagerly because `UnboundTemplate` is unported.
+   */
+  protected buildTemplate(template: string): TemplateWithDetails | null {
+    const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
+    const details = parsed.details;
+    if (typeof details.handler !== "string") return null;
+
+    const built = new Template({
+      source: this.sourceForTemplate(template),
+      extension: details.handler,
+      identifier: template,
+      virtualPath: parsed.path.virtual,
+      format: typeof details.format === "string" ? details.format : null,
+      variant: typeof details.variant === "string" ? details.variant : null,
+      fullPath: template,
+      isPartial: parsed.path.partial,
+    });
+
+    return { template: built, details };
+  }
+
+  /**
+   * @internal
    * Rails' `unbound_templates_from_path` (`resolver.rb:157-171`) — instead of
    * checking every possible path, scan the directory for files with the right
    * prefix and keep the exact virtual-path matches.
@@ -214,60 +284,28 @@ export class FileSystemResolver extends Resolver {
     const paths = this.templateGlob(`${path.virtual}*`);
     const templates: TemplateWithDetails[] = [];
 
-    for (const relative of paths) {
-      const built = this.buildTemplate(relative);
+    for (const template of paths) {
+      const built = this.buildTemplate(template);
       if (built !== null && built.template.virtualPath === path.virtual) templates.push(built);
     }
 
     return templates;
   }
 
-  /** @internal */
-  protected buildTemplate(relative: string): TemplateWithDetails | null {
-    const parsed = this.pathParser.parse(relative);
-    const details = parsed.details;
-    if (typeof details.handler !== "string") return null;
-
-    const fullPath = getPath().join(this._path, relative);
-    const template = new Template({
-      source: getFs().readFileSync(fullPath, "utf-8"),
-      extension: details.handler,
-      identifier: fullPath,
-      virtualPath: parsed.path.virtual,
-      format: typeof details.format === "string" ? details.format : null,
-      variant: typeof details.variant === "string" ? details.variant : null,
-      fullPath,
-      isPartial: parsed.path.partial,
-    });
-
-    return { template, details };
-  }
-
   /**
    * @internal
-   * Safe glob within the resolver root (`resolver.rb:202-207`), yielding root-
-   * relative paths. `Dir.glob` has no JS equivalent and no third-party one is
-   * admissible here, so its two patterns are matched directly: `**` spans
-   * directory separators and `*` does not, and the walk starts at the last
-   * literal segment so the glob only descends what it can reach.
+   * Safe glob within the resolver root (`resolver.rb:202-207`), yielding
+   * expanded paths. The walk starts at the glob's last literal segment, so it
+   * only descends what the pattern can reach, as `Dir.glob` does.
    */
   protected templateGlob(glob: string): string[] {
-    const segments = glob.split("/");
-    let pattern = "";
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i];
-      if (segment === "**") {
-        pattern += "(?:[^/]+/)*";
-        continue;
-      }
-      pattern += segment.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*");
-      if (i < segments.length - 1) pattern += "/";
-    }
-    const regex = new RegExp(`^${pattern}$`);
-    const literal = segments.slice(0, -1);
-    const wildcard = literal.findIndex((segment) => segment.includes("*"));
-    const root = (wildcard === -1 ? literal : literal.slice(0, wildcard)).join("/");
-    return this.entriesUnder(root).filter((relative) => regex.test(relative));
+    const regex = this.fnmatch(glob);
+    const segments = glob.split("/").slice(0, -1);
+    const wildcard = segments.findIndex((segment) => segment.includes("*"));
+    const root = (wildcard === -1 ? segments : segments.slice(0, wildcard)).join("/");
+    return this.entriesUnder(root)
+      .filter((relative) => regex.test(relative))
+      .map((relative) => getPath().join(this._path, relative));
   }
 
   /** @internal Every file under `prefix`, as a path relative to the root. */

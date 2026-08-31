@@ -810,7 +810,7 @@ export class LookupContext {
       try {
         const paths = resolver.allTemplatePaths?.();
         if (paths) {
-          for (const p of paths) seen.add(p);
+          for (const p of paths) seen.add(p.virtual);
         }
       } catch {
         // best-effort — don't let enumeration errors mask the MissingTemplate
