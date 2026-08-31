@@ -1,12 +1,6 @@
 export { Route, type MatchedRoute, type RouteOptions, type RouteConstraints } from "./route.js";
 export { Mapper } from "./mapper.js";
-export {
-  RouteSet,
-  Dispatcher,
-  StaticDispatcher,
-  type DrawCallback,
-  type DispatcherCallback,
-} from "./route-set.js";
+export { RouteSet, Dispatcher, StaticDispatcher, type DrawCallback } from "./route-set.js";
 export { escapePath, escapeSegment, escapeFragment, unescapeUri } from "../journey/router/utils.js";
 export {
   RoutesInspector,
@@ -41,7 +35,7 @@ export {
   type ToModel,
 } from "./polymorphic-routes.js";
 export { Endpoint } from "./endpoint.js";
-export { controllerDispatcher, type DispatchableControllerClass } from "./dispatcher.js";
+export { type DispatchableControllerClass } from "./dispatcher.js";
 export {
   RoutesProxy,
   mergeScriptNames,

@@ -31,9 +31,9 @@ describe("createAppServer", () => {
 
     class PostsController extends ActionController.Base {
       async index() {
-        this.response.body = '{"posts":[]}';
-        this.response.status = 200;
-        this.response.setHeader("content-type", "application/json");
+        this.body = '{"posts":[]}';
+        this.status = 200;
+        this.contentType = "application/json";
       }
     }
 
@@ -55,10 +55,9 @@ describe("createAppServer", () => {
       r.resources("users");
     });
 
-    const [status, _headers, body] = await server.call(makeEnv("GET", "/users"));
+    const [status, headers] = await server.call(makeEnv("GET", "/users"));
     expect(status).toBe(404);
-    const text = await bodyToString(body);
-    expect(text).toContain("Controller not found");
+    expect(headers["x-cascade"]).toBe("pass");
   });
 
   it("returns 500 when controller throws", async () => {

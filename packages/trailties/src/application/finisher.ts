@@ -29,24 +29,13 @@ import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { Root } from "../paths.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
-import type { DispatcherCallback, DrawCallback } from "@blazetrails/actionpack";
-import { controllerDispatcher, type DispatchableControllerClass } from "@blazetrails/actionpack";
+import type { DrawCallback } from "@blazetrails/actionpack";
+import { controllerConstants, type DispatchableControllerClass } from "@blazetrails/actionpack";
 
 export interface FinisherRoutes {
   prepend(block: DrawCallback): void;
   append(block: DrawCallback): void;
   defineMountedHelper(name: string): void;
-  /**
-   * @noRailsEquivalent CONVERGEABLE — story
-   * `converge-routeset-setdispatcher-to-per-route-dispatcher`. Rails builds
-   * an `ActionDispatch::Routing::RouteSet::Dispatcher` per route in the
-   * mapper (`mapper.rb:297`) and resolves the controller constant inside it;
-   * trails' `RouteSet#call` still branches on one whole-set callback
-   * (`route-set.ts:952`, marked legacy in-file) because
-   * `Request#controllerClassFor` has no constant table to resolve against,
-   * so the autoloader hands the table over through that seam.
-   */
-  setDispatcher(dispatcher: DispatcherCallback): void;
 }
 
 export interface FinisherReloader {
@@ -91,20 +80,14 @@ Finisher.initializer("add_generator_templates", function (this: FinisherHost) {
  *
  * ESM has no `const_missing` seam, so a constant cannot be materialised
  * lazily from a name; {@link loadControllers} imports the modules under the
- * autoload paths instead, and the resulting constant table is handed to the
- * routing layer — `ActionDispatch`'s {@link controllerDispatcher} is
- * `Dispatcher#serve`'s body and lives in `action_dispatch`, where Rails
- * keeps it.
- *
- * `raiseOnNameError` is `true`: Rails picks it per route from
- * `defaults.key?(:controller)` (`mapper.rb:301`), and `RouteSet#call` only
- * reaches the dispatcher with a controller the matched route already pinned,
- * so the pinned arm is the one that applies.
+ * autoload paths instead and seeds `ActionDispatch`'s
+ * {@link controllerConstants} table — the stand-in for the Ruby namespace
+ * `Request#controller_class_for` constantizes against.
  */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
-  this.routes().setDispatcher(
-    controllerDispatcher(await loadControllers(await this.paths()), true),
-  );
+  for (const [name, klass] of await loadControllers(await this.paths())) {
+    controllerConstants.set(name, klass);
+  }
 });
 
 Finisher.initializer("add_internal_routes", function (this: FinisherHost) {

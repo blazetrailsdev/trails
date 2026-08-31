@@ -37,7 +37,6 @@ class TestApp extends Finisher {
           ),
       } as unknown as Mapper),
     defineMountedHelper: (name) => this.mountedHelpers.push(name),
-    setDispatcher: () => this.calls.push("dispatcher"),
   };
 
   routesReloaderCalls: string[] = [];
@@ -174,12 +173,7 @@ describe("Finisher", () => {
     Trails.env = "production";
     const app = new TestApp();
     await app.runInitializers();
-    expect(app.calls).toEqual([
-      "generator_templates",
-      "dispatcher",
-      "middleware_stack",
-      "prepare!",
-    ]);
+    expect(app.calls).toEqual(["generator_templates", "middleware_stack", "prepare!"]);
     expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded"]);
   });
 

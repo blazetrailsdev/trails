@@ -26,7 +26,7 @@ export interface RackishResponse {
 }
 
 export interface RoutableApp {
-  serve(req: RouterRequest): RackishResponse;
+  serve(req: RouterRequest): RackishResponse | Promise<RackishResponse>;
 }
 
 /**
@@ -46,7 +46,7 @@ export class Router {
     void this.simulator();
   }
 
-  serve(req: RouterRequest): RackishResponse {
+  async serve(req: RouterRequest): Promise<RackishResponse> {
     for (const { match, parameters, route } of this.findRoutes(req)) {
       const setParams = req.pathParameters;
       const pathInfo = req.pathInfo;
@@ -69,7 +69,7 @@ export class Router {
 
       const app = route.app as RoutableApp | undefined;
       if (!app) continue;
-      const response = app.serve(req);
+      const response = await app.serve(req);
       const headers = response[1] ?? {};
 
       if (headers[X_CASCADE] === "pass") {

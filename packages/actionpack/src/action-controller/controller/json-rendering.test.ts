@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
 import { Base } from "../base.js";
@@ -109,13 +110,7 @@ describe("Controller JSON rendering integration", () => {
     routes.draw((r) => {
       r.resources("posts");
     });
-    routes.setDispatcher(async (controller, action, params, env) => {
-      const req = new Request(env);
-      const res = new Response();
-      const c = new PostsController();
-      await c.dispatch(action, req, res);
-      return c.toRackResponse();
-    });
+    routes.registerController("posts", PostsController as unknown as DispatchableControllerClass);
 
     const [status, headers, body] = await routes.call({
       REQUEST_METHOD: "GET",
