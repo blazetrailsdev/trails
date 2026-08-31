@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "../../base.js";
-import { TemplateHandlers } from "../handlers.js";
+import { StrictLocalsMismatch } from "../../strict-locals.js";
+import { TemplateHandlers, type RenderContext } from "../handlers.js";
 import { Tse, type TseImplementation } from "./tse.js";
 
 describe("Template::Handlers::Tse", () => {
@@ -111,12 +112,6 @@ describe("Template::Handlers::Tse", () => {
   it("normalizes a format-token template.type ('text') to MIME before the escapeIgnoreList check", () => {
     const code = new Tse().call({ type: "text" }, "<%= name %>");
     expect(code).toMatch(/_ob\.safeExprAppend\(name\)/);
-  });
-
-  it("render() throws — execution lands in Phase 2c", () => {
-    expect(() =>
-      new Tse().render("<%= 1 %>", {}, { controller: "c", action: "a", format: "html" }),
-    ).toThrow(/not yet implemented/);
   });
 
   it("Tse.call delegates to a fresh instance", () => {
@@ -230,6 +225,94 @@ describe("Template::Handlers::Tse", () => {
       const fnEnd = code.lastIndexOf("}");
       expect(beginPos).toBeGreaterThan(fnStart);
       expect(endPos).toBeLessThan(fnEnd);
+    });
+  });
+
+  describe("#render", () => {
+    const ctx = (extra: Partial<RenderContext> = {}): RenderContext => ({
+      controller: "posts",
+      action: "index",
+      format: "html",
+      ...extra,
+    });
+
+    it("executes the compiled template and returns its output", () => {
+      expect(new Tse().render("<h1>hi</h1>", {}, ctx())).toBe("<h1>hi</h1>");
+    });
+
+    it("resolves a local as a bare identifier", () => {
+      expect(new Tse().render("<%= name %>", { name: "Ada" }, ctx())).toBe("Ada");
+    });
+
+    it("escapes an unsafe local", () => {
+      expect(new Tse().render("<%= name %>", { name: "<b>" }, ctx())).toBe("&lt;b&gt;");
+    });
+
+    it("does not escape a raw() local", () => {
+      expect(new Tse().render("<%= raw(name) %>", { name: "<b>" }, ctx())).toBe("<b>");
+    });
+
+    it("runs code tags", () => {
+      const out = new Tse().render(
+        "<% for (const n of names) { %><%= n %>,<% } %>",
+        { names: ["a", "b"] },
+        ctx(),
+      );
+      expect(out).toBe("a,b,");
+    });
+
+    it("lets a local shadow a same-named view helper", () => {
+      expect(new Tse().render("<%= raw %>", { raw: "local wins" }, ctx())).toBe("local wins");
+    });
+
+    it("emits the inner template's output for a bare yield in a layout", () => {
+      const out = new Tse().render("<main><%= yield %></main>", {}, ctx({ yield: "<p>body</p>" }));
+      expect(out).toBe("<main><p>body</p></main>");
+    });
+
+    it("round-trips a named contentFor section", () => {
+      const out = new Tse().render(
+        '<% contentFor("side", () => { %>aside<% }) %><%= context.yield("side") %>',
+        {},
+        ctx(),
+      );
+      expect(out).toBe("aside");
+    });
+
+    it("renders a nested partial through the context's renderPartial", () => {
+      const seen: Array<[string, Record<string, unknown>]> = [];
+      const out = new Tse().render(
+        '<%= render({ partial: "users/user", locals: { user: user } }) %>',
+        { user: "Ada" },
+        ctx({
+          renderPartial: (name, locals) => {
+            seen.push([name, locals]);
+            return "<li>Ada</li>";
+          },
+        }),
+      );
+      expect(out).toBe("<li>Ada</li>");
+      expect(seen).toEqual([["users/user", { user: "Ada" }]]);
+    });
+
+    it("does not let the compiled function's own name shadow the render helper", () => {
+      expect(() => new Tse().render('<%= render({ partial: "p" }) %>', {}, ctx())).toThrow(
+        /has no partial renderer/,
+      );
+    });
+
+    it("enforces a strict-locals signature against the passed locals, not the helper scope", () => {
+      const source = "<%# locals: (name:) %>\n<%= name %>";
+      expect(new Tse().render(source, { name: "Ada" }, ctx())).toContain("Ada");
+      expect(() => new Tse().render(source, { name: "Ada", extra: 1 }, ctx())).toThrow(
+        StrictLocalsMismatch,
+      );
+    });
+
+    it("memoizes the compile, so a second render of the same source reuses it", () => {
+      const tse = new Tse();
+      expect(tse.render("<%= n %>", { n: 1 }, ctx())).toBe("1");
+      expect(tse.render("<%= n %>", { n: 2 }, ctx())).toBe("2");
     });
   });
 
