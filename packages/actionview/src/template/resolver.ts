@@ -100,7 +100,13 @@ export abstract class Resolver implements PathSetResolver {
     });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * `resolver.rb:172-181`. Rails keeps this private on `FileSystemResolver`,
+   * the only resolver upstream that filters candidates itself; trails' second
+   * such resolver is `testing/resolvers.ts`, and TypeScript has no way to
+   * share a private method between two classes without a common ancestor.
+   */
   protected filterAndSortByDetails(
     templates: ReadonlyArray<TemplateWithDetails>,
     requestedDetails: Requested,
@@ -120,6 +126,11 @@ export abstract class Resolver implements PathSetResolver {
   }
 }
 
+/**
+ * Ruby `sort_by!` orders by an Array key, comparing element by element
+ * (`resolver.rb:177-179`); `Array#sort` takes a number, so the tuple
+ * comparison is spelled out.
+ */
 function compareSortKeys(
   a: readonly [number, number, number, number],
   b: readonly [number, number, number, number],
@@ -157,6 +168,10 @@ export class FileSystemResolver extends Resolver {
     return this._path;
   }
 
+  /**
+   * `resolver.rb:114-120`. Rails returns `TemplatePath`s; trails' only caller
+   * is `MissingTemplate#corrections`, which scores virtual-path strings.
+   */
   override allTemplatePaths(): readonly string[] {
     const paths = this.templateGlob("**/*");
     const seen = new Set<string>();
@@ -231,8 +246,10 @@ export class FileSystemResolver extends Resolver {
   /**
    * @internal
    * Safe glob within the resolver root (`resolver.rb:202-207`), yielding root-
-   * relative paths. `File.fnmatch` is spelled out here: `**` spans directory
-   * separators, `*` does not.
+   * relative paths. `Dir.glob` has no JS equivalent and no third-party one is
+   * admissible here, so its two patterns are matched directly: `**` spans
+   * directory separators and `*` does not, and the walk starts at the last
+   * literal segment so the glob only descends what it can reach.
    */
   protected templateGlob(glob: string): string[] {
     const segments = glob.split("/");
@@ -247,8 +264,6 @@ export class FileSystemResolver extends Resolver {
       if (i < segments.length - 1) pattern += "/";
     }
     const regex = new RegExp(`^${pattern}$`);
-    // Rails' `Dir.glob` only descends what the pattern can reach; walking from
-    // the last literal directory segment keeps that property.
     const literal = segments.slice(0, -1);
     const wildcard = literal.findIndex((segment) => segment.includes("*"));
     const root = (wildcard === -1 ? literal : literal.slice(0, wildcard)).join("/");
@@ -287,11 +302,13 @@ export class ParsedPath {
 export class PathParser {
   private regex: RegExp | null = null;
 
+  /**
+   * `resolver.rb:16-33`. I18n is unported, so `available_locales` contributes
+   * nothing to the locale union and only Rails' generic shape is left.
+   */
   buildPathRegex(): RegExp {
     const handlers = union(TemplateHandlers.extensions());
     const formats = union(Types.symbols());
-    // I18n is not ported, so `available_locales` contributes nothing and only
-    // Rails' generic locale shape (`resolver.rb:20`) is left.
     const locales = "[a-z]{2}(?:[-_][A-Z]{2})?";
     const variants = "[^.]*";
 
