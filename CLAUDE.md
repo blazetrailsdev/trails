@@ -442,21 +442,42 @@ write.
    says "known extra surface, not yet removed", and someone will come back for
    it.
 
-   **`arel` is gated**, by the RFC 0117 extra-surface ratchet:
+   **`arel`, `activerecord` and `ruby-compat` are gated**, by the RFC 0117
+   extra-surface ratchet:
 
    ```bash
-   pnpm parity:api:extra:gate   # fails on ANY increase in arel's novel/total
+   pnpm parity:api:extra:gate
    ```
 
    It reads the committed marks in `scripts/api-compare/extra-surface-mark.json`
-   and is **only-shrink**, like the two call gates: a new public arel name with
-   no Ruby counterpart turns it red, and the fix is to remove the name — never
-   to raise the mark. **Converged something?** The mark then sits above the
-   measurement; narrow it with `pnpm parity:api:extra:tighten`, which writes each
-   dimension DOWN and never up. There is **no reseed**, for the same reason the
-   call baselines forbid one. Other packages are still measured and ungated;
-   widening `GATED_PACKAGES` is a separate decision with its own burndown, not a
-   mechanical step.
+   and is **only-shrink** for every gated package, like the two call gates: a
+   new public name with no Ruby counterpart raises `novel` or `total` and turns
+   it red, and the fix is to remove the name — never to raise the mark.
+   **Converged something?** The mark then sits above the measurement; narrow it
+   with `pnpm parity:api:extra:tighten`, which writes each dimension DOWN and
+   never up. There is **no reseed**, for the same reason the call baselines
+   forbid one.
+
+   A package that has burnt its untagged novel surface to zero (`arel` today)
+   is additionally **pinned**: its `novel` is the constant 0 regardless of what
+   its row says, so widening the row cannot clear a red run. The only two
+   remedies are a `@noRailsEquivalent PERMANENT|CONVERGEABLE <story-id>`
+   receipt at the declaration, or deleting the name. That is where every gated
+   package is headed — a receipt lives in the file you are already editing, so
+   it never conflicts the way a shared counter does.
+
+   Being pinned does **not** exempt `total`. A moved-not-novel extra is a name
+   Rails does define, just in another `.rb`, and nothing else in the repo
+   catches that: `rails-file-structure-method-order` orders members within one
+   file and cannot see a cross-file relocation, and `parity:api:moves` only
+   reports. So `total` stays gated in both modes.
+
+   A package gets pinned as a reviewed step of its own burndown (the
+   `activerecord-extra-surface-receipt-burndown` RFC for activerecord's 342,
+   RFC 0129 for ruby-compat's 4). That direction is **only-grow**: no package
+   is ever un-pinned to turn a red run green. Other packages are still measured
+   and ungated; widening `GATED_PACKAGES` is a separate decision with its own
+   burndown, not a mechanical step.
 
 5. **Did you write an `@internal` tag?** `@internal` keeps its TypeDoc meaning —
    it holds a member out of the generated API reference — but it also drops the

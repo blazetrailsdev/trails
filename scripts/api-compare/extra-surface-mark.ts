@@ -42,6 +42,47 @@
  * burndown behind it yet, and widening GATED_PACKAGES without one is exactly
  * the not-mechanical step this comment has always warned about.
  *
+ * TAGGED-ONLY MODE is what a gated package earns once its untagged novel
+ * surface is burnt down. `extra-surface.ts` already subtracts a declaration
+ * carrying a `@noRailsEquivalent` receipt from both dimensions, so `novel`
+ * never counted KNOWN extra surface — only the residue nobody has written a
+ * receipt for. A package with no residue does not need a NUMBER for that
+ * dimension; it needs a RULE, and the rule is the constant `novel === 0`.
+ *
+ * The mode pins that constant independently of the mark file. A counted
+ * package's `novel` is whatever its row says, so a hand-edit or a stray
+ * reseed could widen it; a tagged-only package's is 0 no matter what the row
+ * says, and the only remedies for a red run are a receipt at the declaration
+ * or deleting the name. That is the guarantee the mode adds, and it is why
+ * {@link taggedOnlyViolations} is checked alongside {@link exceedances}
+ * rather than instead of it.
+ *
+ * The mode does NOT drop the `total` dimension, and an earlier revision of
+ * this comment was wrong to claim `blazetrails/rails-file-structure-method-order`
+ * would cover it. That rule orders members WITHIN one file's container and
+ * filters its expected names to the ones already present there, so a name
+ * Rails defines in another `.rb` is simply absent from the bucket and rides
+ * along in the unmapped tail — it cannot see a cross-file relocation at all.
+ * `parity:api:moves` reports the adjacent population and gates nothing. So
+ * `total` is the ONLY thing standing between a tagged-only package and
+ * unbounded moved-not-novel growth (arel carries 35 such extras today), and
+ * it stays gated for every package in either mode.
+ *
+ * Keeping it costs almost nothing, because pinning `novel` at 0 removes what
+ * made the mark churn: the file was rewritten by 48 commits in six weeks, and
+ * that traffic was burndown deletions, each lowering `novel` and `total`
+ * together. A package that can no longer delete a novel name only moves
+ * `total` when a name is genuinely relocated, which is rare. The merge
+ * conflicts this mode exists to stop are stopped by the pin, not by removing
+ * the row.
+ *
+ * arel enrolls first, being the only package measured at `novel: 0`.
+ * activerecord's 342 and ruby-compat's 4 stay ungated on `novel` until their
+ * own burndowns (the `activerecord-extra-surface-receipt-burndown` RFC and RFC
+ * 0129 respectively) retire them, one receipt or one deletion at a time.
+ * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
+ * reaches zero and is never moved back out to turn a red run green.
+ *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception), async fs only, no third-party runtime deps.
  */
@@ -54,10 +95,31 @@ import { serializeBaseline } from "./baseline-json.js";
 export const MARK_PATH = path.join(SCRIPT_DIR, "extra-surface-mark.json");
 
 /**
- * The packages this gate covers. Everything else is measured by
- * `parity:api:extra` and left ungated — see the module comment.
+ * Gated packages whose `novel` is still a number to burn down rather than a
+ * rule to hold, so the mark's value governs both dimensions.
  */
-export const GATED_PACKAGES = ["arel", "activerecord", "ruby-compat"] as const;
+export const COUNTED_PACKAGES = ["activerecord", "ruby-compat"] as const;
+
+/**
+ * Gated packages whose `novel` is pinned at the constant 0 regardless of what
+ * their mark row says — see TAGGED-ONLY MODE in the module comment. They keep
+ * a row, because `total` stays gated in both modes. Only-grow: a package joins
+ * on reaching zero and never leaves.
+ */
+export const TAGGED_ONLY_PACKAGES = ["arel"] as const;
+
+/**
+ * The packages this gate covers, in either mode. Everything else is measured
+ * by `parity:api:extra` and left ungated — see the module comment.
+ */
+export type GatedPackage =
+  | (typeof COUNTED_PACKAGES)[number]
+  | (typeof TAGGED_ONLY_PACKAGES)[number];
+
+export const GATED_PACKAGES: readonly GatedPackage[] = [
+  ...COUNTED_PACKAGES,
+  ...TAGGED_ONLY_PACKAGES,
+].sort();
 
 export interface SurfaceMark {
   /**
@@ -157,6 +219,27 @@ export function unmeasuredPackages(current: SurfaceMarks): string[] {
  */
 export function unmarkedPackages(marks: SurfaceMarks): string[] {
   return GATED_PACKAGES.filter((name) => marks[name] === undefined);
+}
+
+/**
+ * Every tagged-only package measured with novel surface left. Non-empty means
+ * a public TS name with no Ruby counterpart was added without a
+ * `@noRailsEquivalent` receipt — the fix is the receipt or the deletion.
+ *
+ * Checked IN ADDITION to {@link exceedances}, not instead of it: that one
+ * compares against whatever the row says, while this one holds the constant 0
+ * even if the row were edited to say otherwise.
+ */
+export function taggedOnlyViolations(current: SurfaceMarks): MarkViolation[] {
+  const violations: MarkViolation[] = [];
+  for (const name of TAGGED_ONLY_PACKAGES) {
+    const now = current[name];
+    if (!now) continue;
+    if (now.novel > 0) {
+      violations.push({ package: name, dimension: "novel", mark: 0, current: now.novel });
+    }
+  }
+  return violations;
 }
 
 export async function loadMarks(): Promise<SurfaceMarks> {

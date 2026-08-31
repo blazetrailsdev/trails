@@ -1520,15 +1520,23 @@ jobs:
         # rule this reads it under is documented at report-arms.ts:ArmVerdict.
         run: pnpm exec tsx scripts/api-compare/report-arms.ts --report
       - name: Extra-surface ratchet
-        # RFC 0117. Gates arel's and activerecord's extra-surface counts (public
-        # TS names in a Rails-matched file with no Ruby counterpart) against the
-        # committed marks in scripts/api-compare/extra-surface-mark.json.
-        # Only-shrink: fails on any increase in `novel` or `total`, reports a
+        # RFC 0117. Gates extra surface — public TS names in a Rails-matched
+        # file with no Ruby counterpart — against the committed marks in
+        # scripts/api-compare/extra-surface-mark.json. Only-shrink for every
+        # gated package: fails on any increase in `novel` or `total`, reports a
         # mark left above the current measurement, and never raises one.
-        # Converged surface? Narrow the mark with `pnpm parity:api:extra:tighten`
-        # — there is no reseed. activerecord joined under RFC 0119 with the
-        # connection-adapter burndown behind it; activemodel stays ungated until
-        # it has one.
+        # Converged surface? Narrow the mark with
+        # `pnpm parity:api:extra:tighten` — there is no reseed. activerecord
+        # joined under RFC 0119 with the connection-adapter burndown behind it.
+        #
+        # A package that reaches zero untagged novel surface additionally has
+        # its `novel` PINNED at 0 independently of its row (arel today), so a
+        # widened row cannot clear a red run — the only remedies are a
+        # `@noRailsEquivalent` receipt at the declaration or deleting the name.
+        # `total` stays gated in both modes: nothing else in the repo catches a
+        # name Rails defines in a different `.rb`. Enrollment is only-grow;
+        # activerecord joins when the extra-surface receipt burndown clears its
+        # 342. activemodel stays ungated until it has a burndown of its own.
         run: pnpm exec tsx scripts/api-compare/lint-extra-surface-ratchet.ts
       - name: Parameter-name ratchet
         # RFC 0126. Gates arel's param-name row count (a matched pair whose
