@@ -103,15 +103,24 @@ function isCmpSpelling(value: unknown): value is CmpSpelling {
  * Ruby's `rb_cmperr` (`vendor/ruby/compar.c:28`), which names the operand by
  * `inspect` for a special constant or a Float and by `rb_obj_class` otherwise. */
 function rbCmperr(x: Comparable, y: unknown): never {
-  const classname =
-    y === null ||
-    y === undefined ||
-    typeof y === "boolean" ||
-    typeof y === "number" ||
-    typeof y === "bigint"
-      ? String(y)
+  const classname = specialConstP(y)
+    ? String(y)
+    : typeof y === "bigint"
+      ? "Integer"
       : ((y as object).constructor?.name ?? typeof y);
   throw new ArgumentError(`comparison of ${rbObjClass(x)} with ${classname} failed`);
+}
+
+/**
+ * `SPECIAL_CONST_P` (`vendor/ruby/include/ruby/internal/special_consts.h`) plus
+ * `rb_cmperr`'s `BUILTIN_TYPE(y) == T_FLOAT` arm: nil, true, false, a Symbol, a
+ * Float, and a Fixnum — an Integer up to `RUBY_FIXNUM_MAX`
+ * (`vendor/ruby/include/ruby/internal/arithmetic/fixnum.h:55`, `LONG_MAX / 2`).
+ * A Bignum is a heap object, so `rb_cmperr` names it by class.
+ */
+function specialConstP(y: unknown): boolean {
+  if (typeof y === "bigint") return y <= 4611686018427387903n && y >= -4611686018427387904n;
+  return y === null || y === undefined || typeof y === "boolean" || typeof y === "number";
 }
 
 function rbObjClass(x: Comparable): string {

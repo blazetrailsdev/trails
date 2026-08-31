@@ -13,6 +13,9 @@ import { cmp } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
 
+/** `INT_MAX`, the value `r_less` answers for a nil `<=>` (`vendor/ruby/range.c:204`). */
+const INT_MAX = 2147483647;
+
 /**
  * `vendor/ruby/range.c:199` `r_less` — the comparison every endpoint check
  * below makes. It is `a <=> b` ({@link cmp}) with one extra arm: an
@@ -21,7 +24,7 @@ import { rbEqual } from "./rb-equal.js";
  */
 function rLess(a: unknown, b: unknown): number {
   const r = cmp(a, b);
-  if (r === null) return Number.MAX_SAFE_INTEGER;
+  if (r === null) return INT_MAX;
   return r;
 }
 

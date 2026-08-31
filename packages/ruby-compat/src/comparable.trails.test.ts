@@ -79,8 +79,10 @@ describe("Comparable", () => {
     expect(() => new Sign(1).lessThan("x")).toThrow("comparison of Sign with String failed");
   });
 
-  it("names a special constant by inspect, as rb_cmperr does", () => {
+  it("names a special constant by inspect and a Bignum by class, as rb_cmperr does", () => {
     expect(() => new Sign(1).lessThan(2)).toThrow("comparison of Sign with 2 failed");
+    expect(() => new Sign(1).lessThan(7n)).toThrow("comparison of Sign with 7 failed");
+    expect(() => new Sign(1).lessThan(1n << 70n)).toThrow("comparison of Sign with Integer failed");
   });
 
   it("answers false rather than raising for ==", () => {

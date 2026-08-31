@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fetch, hasKey } from "./hash.js";
+import { KeyError } from "./key-error.js";
 
 describe("Hash#fetch", () => {
   it("returns a stored null rather than the default", () => {
@@ -30,13 +31,11 @@ describe("Hash#fetch", () => {
   });
 
   it("raises a KeyError, not a plain Error", () => {
-    let name: string | undefined;
-    try {
-      fetch({}, "k");
-    } catch (error) {
-      name = (error as Error).name;
-    }
-    expect(name).toBe("KeyError");
+    expect(() => fetch({}, "k")).toThrow(KeyError);
+  });
+
+  it("ellipsizes a description past 65 characters, as rb_str_ellipsize does", () => {
+    expect(() => fetch({}, "k".repeat(80))).toThrow(`key not found: "${"k".repeat(61)}...`);
   });
 });
 

@@ -27,7 +27,7 @@ export function fetch(hash: Record<string, unknown>, key: string, ...rest: unkno
   if (hasKey(hash, key)) {
     return hash[key];
   } else if (rest.length === 0) {
-    throw new KeyError(`key not found: ${inspectKey(key)}`);
+    throw new KeyError(`key not found: ${strEllipsize(inspectKey(key), 65)}`);
   } else {
     return rest[0];
   }
@@ -48,4 +48,17 @@ export function hasKey(hash: Record<string, unknown>, key: string): boolean {
 
 function inspectKey(key: string): string {
   return isSymbol(key) ? key : JSON.stringify(key);
+}
+
+const ELLIPSIS = "...";
+
+/**
+ * `rb_str_ellipsize` (`vendor/ruby/string.c:11027`), the ASCII-compatible arm
+ * `rb_hash_fetch_m` reaches with `len` 65: a longer description keeps its first
+ * `len - 3` characters and ends in the ellipsis, so the whole is `len` wide.
+ */
+function strEllipsize(str: string, len: number): string {
+  if (len >= str.length) return str;
+  if (len <= ELLIPSIS.length) return ELLIPSIS;
+  return str.slice(0, len - ELLIPSIS.length) + ELLIPSIS;
 }
