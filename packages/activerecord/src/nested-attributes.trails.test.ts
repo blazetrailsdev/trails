@@ -2,7 +2,7 @@ import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
-import { CpkBook, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
+import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
@@ -371,6 +371,8 @@ describe("nested attributes existing record lookup (trails-only)", () => {
   fixtures({
     pirates: [Pirate, {}],
     parrots: [Parrot, {}],
+    cpk_books: [CpkBook, {}],
+    cpk_chapters: [CpkChapter, {}],
   });
 
   it("hands a callback the existing record's persisted columns", async () => {
@@ -404,5 +406,22 @@ describe("nested attributes existing record lookup (trails-only)", () => {
     const persisted = await Parrot.find(parrot.id);
     expect(persisted.name).toBe("Polly Two");
     expect(Number(persisted.updated_count)).toBe(persistedCount + 1);
+  });
+
+  it("finds an unloaded existing record whose model has a composite primary key", async () => {
+    const book = await CpkBook.createBang({ id: [1, 2], shop_id: 3 });
+    const chapters = (book as unknown as { chapters: { createBang(a: unknown): Promise<Base> } })
+      .chapters;
+    await chapters.createBang({ id: [1, 3], title: "Title" });
+    await chapters.createBang({ id: [1, 4], title: "Other" });
+
+    const reloaded = (await CpkBook.find([1, 2])) as CpkBook;
+    expect(reloaded.association("chapters").isLoaded()).toBe(false);
+
+    await nested(reloaded).setChaptersAttributes([{ id: [1, 3], title: "New title" }]);
+    await reloaded.save();
+
+    expect(((await CpkChapter.find([1, 3])) as CpkChapter).title).toBe("New title");
+    expect(((await CpkChapter.find([1, 4])) as CpkChapter).title).toBe("Other");
   });
 });

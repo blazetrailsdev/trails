@@ -660,7 +660,7 @@ export function assignNestedAttributesForCollectionAssociation(
 
   const primaryKey = (collectionTargetModel as any).primaryKey;
   const scope = association.scope();
-  /** @missingRailsArgs where — PERMANENT */
+  /** @missingRailsArgs where — CONVERGEABLE expand-from-hash-drops-the-general-array-key-arm */
   const existingRecordsScope = Array.isArray(primaryKey)
     ? attributeIds
         .map((id) =>
