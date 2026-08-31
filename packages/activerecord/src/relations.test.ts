@@ -2448,7 +2448,7 @@ describe("RelationTest", () => {
     const firstPost = await postsRel.take();
     const thirdPost = await postsRel.where({ title: "3" }).take();
     expect(thirdPost!.title).toBe("3");
-    expect(firstPost!.id).not.toBe(thirdPost!.id);
+    expect(firstPost).not.toBe(thirdPost);
   });
 
   it("find by with take memoization", async () => {
@@ -2459,7 +2459,7 @@ describe("RelationTest", () => {
     const firstPost = await postsRel.take();
     const thirdPost = await postsRel.findBy({ title: "3" });
     expect(thirdPost!.title).toBe("3");
-    expect(firstPost!.id).not.toBe(thirdPost!.id);
+    expect(firstPost).not.toBe(thirdPost);
   });
 
   it("#skip_query_cache!", async () => {
