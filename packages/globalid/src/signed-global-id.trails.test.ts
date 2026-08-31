@@ -36,9 +36,6 @@ describe("SignedGlobalID.parse verifier resolution", () => {
   afterEach(() => _resetApp());
 
   it("parse raises when no verifier is configured", () => {
-    // Rails rescues only InvalidSignature in the verify helpers
-    // (`signed_global_id.rb:37`), so pick_verifier's ArgumentError propagates
-    // out of `parse` rather than reading as an invalid token.
     const sgid = SignedGlobalID.create(person, { verifier });
     expect(() => SignedGlobalID.parse(sgid.toString())).toThrow(
       /Pass a `verifier:` option .* SignedGlobalID\.verifier/,
@@ -46,8 +43,6 @@ describe("SignedGlobalID.parse verifier resolution", () => {
   });
 
   it("parse raises when a signed payload carries an unparseable expires_at", () => {
-    // A non-signature failure inside the verify helper — Rails lets it
-    // propagate; only InvalidSignature becomes a nil parse.
     const sgid = verifier.generate(
       { gid: "gid://bcx/Person/5", purpose: "default", expires_at: "not-a-time" },
       { purpose: "default" },

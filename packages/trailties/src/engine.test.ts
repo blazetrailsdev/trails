@@ -69,9 +69,6 @@ describe("Engine", () => {
   it("engine_name aliases railtie_name", () => {
     class BlogEngine extends Engine {}
     Trailtie.register(BlogEngine);
-    // `Engine#root` raises for an engine whose source location never
-    // resolves, and the registry outlives a single test — so every engine
-    // registered here carries a `calledFrom` the `find()` fs can resolve.
     BlogEngine.calledFrom("/");
     expect(BlogEngine.engineName()).toBe("blog_engine");
     expect(BlogEngine.engineName()).toBe(BlogEngine.railtieName());

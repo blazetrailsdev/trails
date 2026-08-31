@@ -134,8 +134,12 @@ export class SignedGlobalID extends GlobalID {
   }
 
   /**
-   * @internal Mirrors verify_with_verifier_validated_metadata. Verifier
-   * validates purpose + expires_at; we then re-check the embedded URI parses.
+   * @internal Mirrors verify_with_verifier_validated_metadata. Only
+   * `ActiveSupport::MessageVerifier::InvalidSignature` is rescued
+   * (`signed_global_id.rb:34-38`) — a missing verifier's error and any other
+   * failure propagate. The verifier validates purpose + expires_at; the
+   * embedded URI is then re-checked through the same `rescue nil` Rails'
+   * `GlobalID.parse` (`global_id.rb:33`) applies to it.
    */
   static verifyWithVerifierValidatedMetadata(
     sgid: string,
@@ -148,16 +152,11 @@ export class SignedGlobalID extends GlobalID {
         purpose: SignedGlobalID.pickPurpose(options),
       }) as SgidPayload | null;
     } catch (error) {
-      // Rails rescues exactly `ActiveSupport::MessageVerifier::InvalidSignature`
-      // (`signed_global_id.rb:37`); every other error — a missing verifier's
-      // ArgumentError included — propagates.
       if (error instanceof InvalidSignature) return null;
       throw error;
     }
     if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
     if (raw.purpose !== SignedGlobalID.pickPurpose(options)) return null;
-    // Rails reaches `GlobalID.parse`, whose `rescue nil` (`global_id.rb:33`)
-    // turns a malformed GID into a nil parse rather than a raise.
     try {
       GID.parse(raw.gid);
     } catch {

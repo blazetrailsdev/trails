@@ -174,10 +174,6 @@ describe("Trails", () => {
     class NoRootApp extends Application {}
     Application.register(NoRootApp);
     const fs = await getFsAsync();
-    // `Application.findRoot` is `find_root_with_flag "config.ru", from,
-    // Dir.pwd` (`application.rb:88-90`), so an app whose `calledFrom` never
-    // resolves still reports the working directory — Rails' own default, not
-    // a tail bolted onto the accessor.
     expect(await Trails.root()).toBe(await fs.realpath!(fs.cwd()));
   });
 
