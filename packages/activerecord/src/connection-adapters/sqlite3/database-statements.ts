@@ -30,10 +30,6 @@ export function isWriteQuery(sql: string): boolean {
   return !READ_QUERY.test(stripSqlComments(sql));
 }
 
-export async function beginDbTransaction(this: InternalBeginTransactionHost): Promise<void> {
-  await internalBeginTransaction.call(this, "immediate", null);
-}
-
 export async function beginDeferredTransaction(
   this: InternalBeginTransactionHost,
   isolation?: string | null,
@@ -46,6 +42,10 @@ export async function beginIsolatedDbTransaction(
   isolation: string,
 ): Promise<void> {
   await internalBeginTransaction.call(this, "deferred", isolation);
+}
+
+export async function beginDbTransaction(this: InternalBeginTransactionHost): Promise<void> {
+  await internalBeginTransaction.call(this, "immediate", null);
 }
 
 export async function commitDbTransaction(this: InternalBeginTransactionHost): Promise<void> {
@@ -66,6 +66,21 @@ export function highPrecisionCurrentTimestamp(): string {
   return "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')";
 }
 
+export async function execute(
+  this: object,
+  sql: string,
+  name?: string | null,
+  options?: { allowRetry?: boolean },
+): Promise<Record<string, unknown>[]> {
+  const result = (await abstractExecute.call(
+    this as DatabaseStatementsHost,
+    sql,
+    name,
+    options,
+  )) as { toArray(): Record<string, unknown>[] } | null | undefined;
+  return result?.toArray() ?? [];
+}
+
 export async function resetIsolationLevel(this: InternalBeginTransactionHost): Promise<void> {
   await this.internalExecute(
     `PRAGMA read_uncommitted=${this._previousReadUncommitted}`,
@@ -74,18 +89,6 @@ export async function resetIsolationLevel(this: InternalBeginTransactionHost): P
     { allowRetry: true, materializeTransactions: false },
   );
   this._previousReadUncommitted = null;
-}
-
-export async function execute(
-  this: object,
-  sql: string,
-  name: string | null = "SQL",
-  { allowRetry = false }: { allowRetry?: boolean } = {},
-): Promise<Record<string, unknown>[]> {
-  const result = (await abstractExecute.call(this as DatabaseStatementsHost, sql, name, {
-    allowRetry,
-  })) as { toArray(): Record<string, unknown>[] } | null | undefined;
-  return result?.toArray() ?? [];
 }
 
 interface InternalBeginTransactionHost {

@@ -2052,7 +2052,7 @@ SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurr
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
 export interface SQLite3Adapter {
-  get databaseVersion(): Version | Promise<Version>;
+  get databaseVersion(): Promise<Version>;
   beginDbTransaction: typeof sqliteBeginDbTransaction;
   beginDeferredTransaction: typeof sqliteBeginDeferredTransaction;
   beginIsolatedDbTransaction: typeof sqliteBeginIsolatedDbTransaction;
