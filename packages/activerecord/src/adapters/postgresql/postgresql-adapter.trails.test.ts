@@ -1701,7 +1701,7 @@ describeIfPg("PostgreSQLAdapter#active", () => {
     try {
       await adapter.execute("SELECT 1");
       const internals = adapter as unknown as {
-        typeMap: { has(oid: number): boolean };
+        typeMap: { isKey(oid: number): boolean };
       };
       const getOidTypeSpy = vi.spyOn(adapter, "getOidType");
       const rows = await adapter.execute("SELECT 'regprocedure'::regtype::oid AS oid");
@@ -1711,7 +1711,7 @@ describeIfPg("PostgreSQLAdapter#active", () => {
       await adapter.loadAdditionalTypes([oid]);
 
       expect(getOidTypeSpy).not.toHaveBeenCalled();
-      expect(internals.typeMap.has(987654321)).toBe(false);
+      expect(internals.typeMap.isKey(987654321)).toBe(false);
     } finally {
       await adapter.close();
     }

@@ -668,7 +668,7 @@ export class SchemaStatements {
     delete (lookup as RemoveForeignKeyOptions).ifExists;
     const fk = await this.foreignKeyForBang(fromTable, lookup);
     const at = this.createAlterTable(fromTable);
-    at.dropForeignKey(fk.name);
+    at.dropForeignKey(fk.name!);
     await this.execute(await this.schemaCreation.accept(at));
   }
 

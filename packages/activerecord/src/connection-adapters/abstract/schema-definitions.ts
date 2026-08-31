@@ -214,7 +214,7 @@ export class ForeignKeyDefinition {
   readonly toTable: string;
   readonly column: string | string[];
   readonly primaryKey: string | string[];
-  readonly name: string;
+  readonly name: string | undefined;
   readonly onDelete?: ReferentialAction;
   readonly onUpdate?: ReferentialAction;
   readonly deferrable?: "immediate" | "deferred" | false;
@@ -236,7 +236,7 @@ export class ForeignKeyDefinition {
     toTable: string,
     column: string | string[],
     primaryKey: string | string[],
-    name: string,
+    name: string | undefined,
     onDelete?: ReferentialAction,
     onUpdate?: ReferentialAction,
     deferrable?: "immediate" | "deferred" | false,

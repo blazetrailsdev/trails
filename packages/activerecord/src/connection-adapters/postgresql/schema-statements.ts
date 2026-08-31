@@ -580,12 +580,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
     const typeMap = this.typeMap;
     const missingOids = [
-      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.has(oid))),
+      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.isKey(oid))),
     ];
     if (missingOids.length > 0) {
       await this.loadAdditionalTypes(missingOids);
       for (const oid of missingOids) {
-        if (!typeMap.has(oid)) {
+        if (!typeMap.isKey(oid)) {
           console.warn(`unknown OID ${oid}: unrecognized column type, treating as generic value.`);
           typeMap.registerType(oid, new ValueType());
         }
@@ -876,7 +876,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     options: ForeignKeyLookupOptions = {},
   ): Promise<void> {
     const fkNameToValidate = (await this.foreignKeyForBang(fromTable, { ...options, toTable }))
-      .name;
+      .name!;
     await this.validateConstraint(fromTable, fkNameToValidate);
   }
 
@@ -1547,21 +1547,22 @@ export class SchemaStatements extends AbstractSchemaStatements {
   /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
     const maxIdentifierLength = this.maxIdentifierLength();
-    const [, unqualifiedTable] = this.extractSchemaQualifiedName(tableName);
-    let overLength =
-      unqualifiedTable.length + columnName.length + suffix.length + 2 - maxIdentifierLength;
-    let col = columnName;
-    let tbl = unqualifiedTable;
+    let overLength = tableName.length + columnName.length + suffix.length + 2 - maxIdentifierLength;
+
     if (overLength > 0) {
-      const colMaxLen = Math.floor((maxIdentifierLength - suffix.length - 2) / 2);
-      const newColLen = Math.min(colMaxLen, col.length);
-      overLength -= col.length - newColLen;
-      col = col.slice(0, newColLen - Math.min(overLength, 0));
+      const columnNameLength = Math.min(
+        Math.floor((maxIdentifierLength - suffix.length - 2) / 2),
+        columnName.length,
+      );
+      overLength -= columnName.length - columnNameLength;
+      columnName = columnName.slice(0, columnNameLength - Math.min(overLength, 0));
     }
+
     if (overLength > 0) {
-      tbl = tbl.slice(0, tbl.length - overLength);
+      tableName = tableName.slice(0, tableName.length - overLength);
     }
-    return `${tbl}_${col}_${suffix}`;
+
+    return `${tableName}_${columnName}_${suffix}`;
   }
 
   async setPkSequenceBang(table: string, value: number): Promise<void> {

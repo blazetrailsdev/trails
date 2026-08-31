@@ -10,6 +10,7 @@
  */
 
 import { Rational, Temporal, Time as RubyTime } from "@blazetrails/date";
+import { advance as timeAdvance, change as timeChange } from "./core-ext/time/calculations.js";
 import { instantFrom } from "./temporal.js";
 import { ArgumentError } from "./hash-utils.js";
 import { zone as timeZone } from "./time-zone-config.js";
@@ -314,6 +315,8 @@ export function advance(
   date: Date | RubyTime,
   options: AdvanceOptions,
 ): Temporal.Instant | RubyTime {
+  if (date instanceof RubyTime) return timeAdvance.call(date, options);
+
   options = { ...options };
 
   if (options.weeks != null) {
@@ -328,23 +331,18 @@ export function advance(
     options.hours = (options.hours ?? 0) + 24 * partialDays;
   }
 
-  let d = date instanceof RubyTime ? date.toTime().toPlainDate() : toDate(date);
+  let d = toDate(date);
   if (options.years) d = d.add({ months: options.years * 12 });
   if (options.months) d = d.add({ months: options.months });
   if (options.weeks) d = d.add({ days: options.weeks * 7 });
   if (options.days) d = d.add({ days: options.days });
 
-  const timeAdvancedByDate =
-    date instanceof RubyTime
-      ? change(date, { year: d.year, month: d.month, day: d.day })
-      : change(date, { year: d.year, month: d.month, day: d.day });
+  const timeAdvancedByDate = change(date, { year: d.year, month: d.month, day: d.day });
   const secondsToAdvance =
     (options.seconds ?? 0) + (options.minutes ?? 0) * 60 + (options.hours ?? 0) * 3600;
 
   if (secondsToAdvance === 0) {
     return timeAdvancedByDate;
-  } else if (timeAdvancedByDate instanceof RubyTime) {
-    return timeAdvancedByDate.plus(secondsToAdvance);
   } else {
     return since(timeAdvancedByDate, secondsToAdvance);
   }
@@ -471,16 +469,14 @@ export function change(
   date: Date | RubyTime | Temporal.ZonedDateTime,
   options: ChangeOptions,
 ): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
+  if (date instanceof RubyTime) return timeChange.call(date, options);
+
   // Ruby reads the components off the receiver; a JS `Date` spells those readers
   // differently, and reads them in the system's local zone, and a `::Time`
   // spells them on its own zone, so widen both to the one shape the arms below
   // share.
   const self =
-    date instanceof Date
-      ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId())
-      : date instanceof RubyTime
-        ? date.toTime()
-        : date;
+    date instanceof Date ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId()) : date;
   const nsec = self.millisecond * 1_000_000 + self.microsecond * 1_000 + self.nanosecond;
 
   const newYear = options.year ?? self.year;
@@ -541,25 +537,12 @@ export function change(
 
   // `utc?` (time/calculations.rb:147) — a `::Time` carries Ruby's own flag; a
   // JS `Date` carries none and is never `utc?`, even under `TZ=UTC`.
-  const isUtc =
-    date instanceof RubyTime
-      ? date.isUtc()
-      : date instanceof Date
-        ? false
-        : date.timeZoneId === "UTC";
-
-  // `zone` (time/calculations.rb:172) — a `::Time`'s tzdata abbreviation, `nil`
-  // when it was built from an offset; a JS `Date`'s is the system's.
-  const zone =
-    date instanceof RubyTime ? date.zone : date instanceof Date ? Temporal.Now.timeZoneId() : null;
+  const isUtc = date instanceof Date ? false : date.timeZoneId === "UTC";
 
   if (newOffset !== null) {
     // `if new_offset` (time/calculations.rb:145-146). Ruby's `::Time.new` takes
     // the offset as a `"+HH:MM"` String or a seconds Integer; Temporal spells
     // the same fixed-offset zone with the String form only.
-    if (date instanceof RubyTime) {
-      return new RubyTime(newYear, newMonth, newDay, newHour, newMin, newSec, newOffset);
-    }
     const timeZone =
       typeof newOffset === "number"
         ? `${newOffset < 0 ? "-" : "+"}${String(Math.floor(Math.abs(newOffset) / 3600)).padStart(2, "0")}:${String(Math.floor((Math.abs(newOffset) % 3600) / 60)).padStart(2, "0")}`
@@ -570,9 +553,6 @@ export function change(
 
   if (isUtc) {
     // `elsif utc?` (time/calculations.rb:147-148).
-    if (date instanceof RubyTime) {
-      return RubyTime.utc(newYear, newMonth, newDay, newHour, newMin, newSec);
-    }
     return Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
   }
 
@@ -615,38 +595,22 @@ export function change(
     }
   }
 
-  if (zone !== null) {
-    // `elsif zone` (time/calculations.rb:172-175) — `::Time.local` in Ruby's
-    // reversed component order, `isdst` picking the occurrence of a wall clock a
-    // DST fall-back repeats. A JS `Date` has no `isdst` and only milliseconds.
-    const newTime = RubyTime.local(
-      newSec,
-      newMin,
-      newHour,
-      newDay,
-      newMonth,
-      newYear,
-      null,
-      null,
-      date instanceof RubyTime ? date.isdst : null,
-      null,
-    );
-    return date instanceof Date
-      ? Temporal.Instant.fromEpochMilliseconds(newTime.toTime().epochMilliseconds)
-      : newTime;
-  }
-
-  // `else ::Time.new(..., utc_offset)` (time/calculations.rb:176-177) — a
-  // `::Time` built from an offset has no zone to answer.
-  return new RubyTime(
-    newYear,
-    newMonth,
-    newDay,
-    newHour,
-    newMin,
+  // `elsif zone` (time/calculations.rb:172-175) — `::Time.local` in Ruby's
+  // reversed component order, `isdst` picking the occurrence of a wall clock a
+  // DST fall-back repeats. A JS `Date` has no `isdst` and only milliseconds.
+  const newTime = RubyTime.local(
     newSec,
-    (date as RubyTime).utcOffset,
+    newMin,
+    newHour,
+    newDay,
+    newMonth,
+    newYear,
+    null,
+    null,
+    null,
+    null,
   );
+  return Temporal.Instant.fromEpochMilliseconds(newTime.toTime().epochMilliseconds);
 }
 
 // ---------------------------------------------------------------------------

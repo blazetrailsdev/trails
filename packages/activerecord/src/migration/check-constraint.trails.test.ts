@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { describeIfSupports } from "../support/supports.js";
+import { adapterType } from "../test-adapter.js";
 
 describe("Migration", () => {
   describeIfSupports("check_constraints", "CheckConstraintTrailsTest", () => {
@@ -15,6 +16,19 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.dropTable("trades", { ifExists: true });
     });
+
+    it.skipIf(adapterType !== "sqlite")(
+      "reads back a check constraint nested deeper than two parenthesis levels",
+      async () => {
+        const connection = await ambientConnection();
+        const expression = "price > (abs((price - (0 + 1))) - 1)";
+        await connection.addCheckConstraint("trades", expression, { name: "deep_check" });
+
+        const [constraint] = await connection.checkConstraints("trades");
+        expect(constraint.name).toBe("deep_check");
+        expect(constraint.expression).toBe(expression);
+      },
+    );
 
     it("removes by expression with the name supplied as trailing options", async () => {
       const connection = await ambientConnection();

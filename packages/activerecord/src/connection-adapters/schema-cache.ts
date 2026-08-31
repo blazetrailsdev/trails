@@ -140,56 +140,38 @@ export class SchemaCache {
   }
 
   initWith(coder: Record<string, unknown>): void {
-    if (coder["columns"] instanceof Map) {
-      this._columns = coder["columns"] as Map<string, Column[]>;
-    } else if (coder["columns"] && typeof coder["columns"] === "object") {
-      const entries = Object.entries(coder["columns"] as Record<string, unknown[]>);
-      this._columns = new Map(
-        entries.map(([table, cols]) => [table, cols.map((c) => rehydrateColumn(c))]),
-      );
-    }
+    this._columns = new Map(
+      Object.entries((coder["columns"] as Record<string, unknown[]>) ?? {}).map(([table, cols]) => [
+        table,
+        cols.map((c) => rehydrateColumn(c)),
+      ]),
+    );
 
-    if (coder["columns_hash"] instanceof Map) {
-      this._columnsHash = coder["columns_hash"] as Map<string, Record<string, Column>>;
-    } else if (coder["columns_hash"] && typeof coder["columns_hash"] === "object") {
-      this._columnsHash = new Map(
-        Object.entries(coder["columns_hash"] as Record<string, Record<string, unknown>>).map(
-          ([table, hash]) => [
-            table,
-            Object.fromEntries(
-              Object.entries(hash).map(([name, col]) => [name, rehydrateColumn(col)]),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (coder["primary_keys"] instanceof Map) {
-      this._primaryKeys = coder["primary_keys"] as Map<string, string | string[] | null>;
-    } else if (coder["primary_keys"] && typeof coder["primary_keys"] === "object") {
-      this._primaryKeys = new Map(
-        Object.entries(coder["primary_keys"] as Record<string, string | string[] | null>),
-      );
-    }
-
-    if (coder["data_sources"] instanceof Map) {
-      this._dataSourceExists = coder["data_sources"] as Map<string, boolean>;
-    } else if (coder["data_sources"] && typeof coder["data_sources"] === "object") {
-      this._dataSourceExists = new Map(
-        Object.entries(coder["data_sources"] as Record<string, boolean>),
-      );
-    }
-
-    if (coder["indexes"] instanceof Map) {
-      this._indexes = coder["indexes"] as Map<string, IndexDefinition[]>;
-    } else if (coder["indexes"] && typeof coder["indexes"] === "object") {
-      this._indexes = new Map(
-        Object.entries(coder["indexes"] as Record<string, unknown[]>).map(([table, idx]) => [
+    this._columnsHash = new Map(
+      Object.entries((coder["columns_hash"] as Record<string, Record<string, unknown>>) ?? {}).map(
+        ([table, hash]) => [
           table,
-          idx.map((i) => rehydrateIndex(i)),
-        ]),
-      );
-    }
+          Object.fromEntries(
+            Object.entries(hash).map(([name, col]) => [name, rehydrateColumn(col)]),
+          ),
+        ],
+      ),
+    );
+
+    this._primaryKeys = new Map(
+      Object.entries((coder["primary_keys"] as Record<string, string | string[] | null>) ?? {}),
+    );
+
+    this._dataSourceExists = new Map(
+      Object.entries((coder["data_sources"] as Record<string, boolean>) ?? {}),
+    );
+
+    this._indexes = new Map(
+      Object.entries((coder["indexes"] as Record<string, unknown[]>) ?? {}).map(([table, idx]) => [
+        table,
+        idx.map((i) => rehydrateIndex(i)),
+      ]),
+    );
 
     this._version = (coder["version"] as string | number) ?? null;
 

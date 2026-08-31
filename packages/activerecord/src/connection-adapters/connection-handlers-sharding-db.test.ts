@@ -205,64 +205,65 @@ describe("ConnectionHandlersShardingDbTest", () => {
   it("switching connections via handler", async () => {
     const primary = dbPath("primary.sqlite3");
     const primaryShardOne = dbPath("primary_shard_one.sqlite3");
-    const databases: Record<string, string> = {
-      primary,
-      primary_replica: primary,
-      primary_shard_one: primaryShardOne,
-      primary_shard_one_replica: primaryShardOne,
-    };
-    const makePool = (name: string, role: string, shard: string, replica = false) =>
-      Base.connectionHandler.establishConnection(
-        new HashConfig("test", name, {
-          adapter: "sqlite3",
-          database: databases[name],
-          ...(replica ? { replica: true } : {}),
-        }),
-        { ownerName: "ActiveRecord::Base", role, shard },
-      );
+    await withBaseConfigs(
+      {
+        default_env: {
+          primary: { adapter: "sqlite3", database: primary },
+          primary_replica: { adapter: "sqlite3", database: primary, replica: true },
+          primary_shard_one: { adapter: "sqlite3", database: primaryShardOne },
+          primary_shard_one_replica: {
+            adapter: "sqlite3",
+            database: primaryShardOne,
+            replica: true,
+          },
+        },
+      },
+      async () => {
+        Base.connectsTo({
+          shards: {
+            default: { writing: "primary", reading: "primary_replica" },
+            shard_one: { writing: "primary_shard_one", reading: "primary_shard_one_replica" },
+          },
+        });
 
-    try {
-      makePool("primary", "writing", "default");
-      makePool("primary_replica", "reading", "default", true);
-      makePool("primary_shard_one", "writing", "shard_one");
-      makePool("primary_shard_one_replica", "reading", "shard_one", true);
-      (Base as any)._shardKeys = ["default", "shard_one"];
+        await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
+          expect(currentRole.call(Base as any)).toBe("reading");
+          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(true);
+          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
+          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
+          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBe(true);
+        });
 
-      await Base.connectedTo({ role: "reading", shard: "default" }, async () => {
-        expect(currentRole.call(Base as any)).toBe("reading");
-        expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(true);
-        expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
-        expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
-        expect((await Base.leaseConnection()).isPreventingWrites()).toBe(true);
-      });
+        await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
+          expect(currentRole.call(Base as any)).toBe("writing");
+          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(true);
+          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
+          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
+          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
+        });
 
-      await Base.connectedTo({ role: "writing", shard: "default" }, async () => {
-        expect(currentRole.call(Base as any)).toBe("writing");
-        expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(true);
-        expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
-        expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
-      });
+        await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
+          expect(currentRole.call(Base as any)).toBe("reading");
+          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(true);
+          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
+          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
+          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBe(true);
+        });
 
-      await Base.connectedTo({ role: "reading", shard: "shard_one" }, async () => {
-        expect(currentRole.call(Base as any)).toBe("reading");
-        expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(true);
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(false);
-        expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
-        expect((await Base.leaseConnection()).isPreventingWrites()).toBe(true);
-      });
-
-      await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
-        expect(currentRole.call(Base as any)).toBe("writing");
-        expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
-        expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
-        expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
-        expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
-      });
-    } finally {
-      await Base.connectionHandler.clearAllConnectionsBang();
-      (Base as any)._shardKeys = undefined;
-    }
+        await Base.connectedTo({ role: "writing", shard: "shard_one" }, async () => {
+          expect(currentRole.call(Base as any)).toBe("writing");
+          expect(Base.connectedToQ({ role: "writing", shard: "shard_one" })).toBe(true);
+          expect(Base.connectedToQ({ role: "reading", shard: "shard_one" })).toBe(false);
+          expect(Base.connectedToQ({ role: "reading", shard: "default" })).toBe(false);
+          expect(Base.connectedToQ({ role: "writing", shard: "default" })).toBe(false);
+          expect((await Base.leaseConnection()).isPreventingWrites()).toBe(false);
+        });
+      },
+      { defaultEnv: "default_env" },
+    );
   });
 
   it("retrieves proper connection with nested connected to", async () => {
@@ -410,38 +411,53 @@ describe("ConnectionHandlersShardingDbTest", () => {
   });
 
   it("cannot swap shards while prohibited", async () => {
-    const databases: Record<string, string> = {
-      default: dbPath("primary.sqlite3"),
-      shard_one: dbPath("primary_shard_one.sqlite3"),
-    };
-    const makePool = (shard: string) =>
-      Base.connectionHandler.establishConnection(
-        new HashConfig("test", shard, { adapter: "sqlite3", database: databases[shard] }),
-        { ownerName: "ActiveRecord::Base", role: "writing", shard },
-      );
-    try {
-      makePool("default");
-      makePool("shard_one");
-      expect(() => {
-        Base.prohibitShardSwapping(() => {
-          Base.connectedTo({ role: "reading", shard: "default" }, () => {});
+    await withBaseConfigs(
+      {
+        default_env: {
+          primary: { adapter: "sqlite3", database: dbPath("primary.sqlite3") },
+          primary_shard_one: { adapter: "sqlite3", database: dbPath("primary_shard_one.sqlite3") },
+        },
+      },
+      () => {
+        Base.connectsTo({
+          shards: {
+            default: { writing: "primary" },
+            shard_one: { writing: "primary_shard_one" },
+          },
         });
-      }).toThrow(/cannot swap `shard` while shard swapping is prohibited/);
-    } finally {
-      await Base.connectionHandler.clearAllConnectionsBang();
-    }
+
+        expect(() => {
+          Base.prohibitShardSwapping(() => {
+            Base.connectedTo({ role: "reading", shard: "default" }, () => {});
+          });
+        }).toThrow(/cannot swap `shard` while shard swapping is prohibited/);
+      },
+      { defaultEnv: "default_env" },
+    );
   });
 
   it("can swap roles while shard swapping is prohibited", async () => {
-    Base.connectionHandler.establishConnection(
-      new HashConfig("test", "Base", { adapter: "sqlite3", database: dbPath("primary.sqlite3") }),
-      { ownerName: "ActiveRecord::Base", role: "reading", shard: "default" },
+    const primary = dbPath("primary.sqlite3");
+    await withBaseConfigs(
+      {
+        default_env: {
+          primary: { adapter: "sqlite3", database: primary },
+          primary_replica: { adapter: "sqlite3", database: primary, replica: true },
+        },
+      },
+      () => {
+        Base.connectsTo({
+          shards: { default: { writing: "primary", reading: "primary_replica" } },
+        });
+
+        expect(() => {
+          Base.prohibitShardSwapping(() => {
+            Base.connectedTo({ role: "reading" }, () => {});
+          });
+        }).not.toThrow();
+      },
+      { defaultEnv: "default_env" },
     );
-    expect(() => {
-      Base.prohibitShardSwapping(() => {
-        Base.connectedTo({ role: "reading" }, () => {});
-      });
-    }).not.toThrow();
   });
 
   it("default shard is chosen by first key or default", async () => {

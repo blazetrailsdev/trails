@@ -48,15 +48,19 @@ describe("buildAdapterArg", () => {
       expect(args).toEqual(["x.db", { retries: 3 }]);
     });
 
-    it("ignores unrelated database.yml keys (pool, host, etc.)", () => {
+    it("forwards every configuration key to the adapter, as new_connection does", () => {
       const args = buildAdapterArg("sqlite3", {
         adapter: "sqlite3",
         database: "x.db",
         pool: 5,
         host: "ignored",
         strict: true,
+        someKeyTheAdapterLearnsLater: "kept",
       });
-      expect(args).toEqual(["x.db", { strict: true }]);
+      expect(args).toEqual([
+        "x.db",
+        { pool: 5, host: "ignored", strict: true, someKeyTheAdapterLearnsLater: "kept" },
+      ]);
     });
 
     it("parses sqlite3:// URLs", () => {

@@ -803,6 +803,12 @@ describe("SchemaStatements sequenceNameFromParts identifier budget", () => {
     expect(name.length).toBe(31);
   });
 
+  it("uses a schema-qualified table name verbatim, as Rails does", () => {
+    const { adapter } = makeAdapter({ maxIdentifierLength: 63 });
+    const ss = withSchemaStatements(adapter);
+    expect(ss.sequenceNameFromParts("public.things", "id", "seq")).toBe("public.things_id_seq");
+  });
+
   it("leaves names within the limit untouched", () => {
     const { adapter } = makeAdapter({ maxIdentifierLength: 31 });
     const ss = withSchemaStatements(adapter);

@@ -118,10 +118,10 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
   it("the derive step shares structurally identical columns between tables", () => {
     const cache = new SchemaCache();
     cache.initWith({
-      columns: new Map([
-        ["people", [makeColumn("id", "integer")]],
-        ["places", [makeColumn("id", "integer")]],
-      ]),
+      columns: {
+        people: [makeColumn("id", "integer")],
+        places: [makeColumn("id", "integer")],
+      },
     });
 
     const columns = (cache as unknown as { _columns: Map<string, Column[]> })._columns;
@@ -129,12 +129,41 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
     expect(Object.isFrozen(columns.get("people")![0])).toBe(true);
   });
 
+  it("init_with rehydrates plain coder rows into Column and IndexDefinition instances", () => {
+    const cache = new SchemaCache();
+    cache.initWith({
+      columns: {
+        people: [
+          {
+            name: "id",
+            default: null,
+            sql_type_metadata: { sqlType: "integer", type: "integer" },
+            null: true,
+          },
+        ],
+      },
+      indexes: {
+        people: [{ table: "people", name: "index_people_on_id", unique: true, columns: ["id"] }],
+      },
+    });
+
+    const columns = (cache as unknown as { _columns: Map<string, Column[]> })._columns;
+    expect(columns.get("people")![0]).toBeInstanceOf(Column);
+    expect(columns.get("people")![0].name).toBe("id");
+
+    const [index] = (cache as unknown as { _indexes: Map<string, IndexDefinition[]> })._indexes.get(
+      "people",
+    )!;
+    expect(index).toBeInstanceOf(IndexDefinition);
+    expect(index.name).toBe("index_people_on_id");
+  });
+
   it("deduplication leaves indexes as IndexDefinition instances", () => {
     const cache = new SchemaCache();
     cache.initWith({
-      indexes: new Map([
-        ["people", [new IndexDefinition("people", "index_people_on_id", true, ["id"])]],
-      ]),
+      indexes: {
+        people: [new IndexDefinition("people", "index_people_on_id", true, ["id"])],
+      },
     });
 
     const [index] = (cache as unknown as { _indexes: Map<string, IndexDefinition[]> })._indexes.get(
