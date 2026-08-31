@@ -69,25 +69,38 @@ export interface TsApi {
   >;
 }
 
-/** Every declaration in the tree — top-level functions AND both member lists of
- *  every class and module. A declaration's own `file` wins over the map key or
- *  the host, because a member mixed into a class is declared elsewhere. */
+/**
+ * Every declaration in the tree — top-level functions AND both member lists of
+ * every class and module — each yielded ONCE. A declaration's own `file` wins
+ * over the map key or the host, because a member mixed into a class is declared
+ * elsewhere.
+ *
+ * Two things present one declaration more than once, and both are collapsed
+ * here rather than by each caller: the extractor synthesizes a backward-compat
+ * module from a file's own `fileFunctions` (`extract-ts-api.ts:1127`), so every
+ * top-level function in such a file arrives twice; and the trails `this`-typed
+ * mixin idiom puts one function on several hosts, so it arrives once per host.
+ * Counting either twice inflates a measurement without adding a declaration.
+ */
 export function declarations(api: TsApi): { package: string; tsFile: string; decl: Decl }[] {
-  const out: { package: string; tsFile: string; decl: Decl }[] = [];
+  const seen = new Map<string, { package: string; tsFile: string; decl: Decl }>();
+  const add = (pkg: string, tsFile: string, decl: Decl): void => {
+    seen.set(`${pkg}/${tsFile}:${decl.line ?? 0} ${decl.name}`, { package: pkg, tsFile, decl });
+  };
   for (const [pkg, entry] of Object.entries(api.packages)) {
     for (const [tsFile, fns] of Object.entries(entry.fileFunctions ?? {})) {
-      for (const decl of fns) out.push({ package: pkg, tsFile: decl.file ?? tsFile, decl });
+      for (const decl of fns) add(pkg, decl.file ?? tsFile, decl);
     }
     for (const host of [
       ...Object.values(entry.classes ?? {}),
       ...Object.values(entry.modules ?? {}),
     ]) {
       for (const decl of [...(host.instanceMethods ?? []), ...(host.classMethods ?? [])]) {
-        out.push({ package: pkg, tsFile: decl.file ?? host.file ?? "", decl });
+        add(pkg, decl.file ?? host.file ?? "", decl);
       }
     }
   }
-  return out;
+  return [...seen.values()];
 }
 
 /** Reverse: the mismatch rows the table claims. */

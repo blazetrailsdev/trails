@@ -49,18 +49,16 @@ export function shapeOf(decl: Decl): string | undefined {
   return `${decl.skeleton.join(",")}|${literals.join(",")}`;
 }
 
-/** Every declaration flattened to a comparable site, each counted ONCE:
- *  `declarations` yields a mixin member per host it lands on, and re-counting
- *  one declaration per host inflates a bucket without adding a candidate. */
+/** Every declaration flattened to a comparable site. `declarations` already
+ *  yields each one once, so no dedupe is repeated here. */
 export function sites(api: TsApi): Site[] {
-  const bySite = new Map<string, Site>();
+  const out: Site[] = [];
   for (const { package: pkg, tsFile, decl } of declarations(api)) {
     const shape = shapeOf(decl);
     if (shape === undefined) continue;
-    const site = { package: pkg, tsFile, name: decl.name, line: decl.line ?? 0, shape };
-    bySite.set(siteKey(site), site);
+    out.push({ package: pkg, tsFile, name: decl.name, line: decl.line ?? 0, shape });
   }
-  return [...bySite.values()];
+  return out;
 }
 
 function siteKey(s: Site): string {

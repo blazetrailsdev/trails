@@ -21,7 +21,9 @@ const artifact: Artifact = {
 const api: TsApi = {
   packages: {
     activesupport: {
-      fileFunctions: { "inflector.ts": [{ name: "titleize", calls: ["regexpEscape"] }] },
+      fileFunctions: {
+        "inflector.ts": [{ name: "titleize", line: 8, calls: ["regexpEscape"] }],
+      },
       classes: {
         "cache/store.ts:Store": {
           file: "cache/store.ts",
@@ -33,6 +35,10 @@ const api: TsApi = {
         "core-ext/range.ts:RangeExt": {
           file: "core-ext/range.ts",
           instanceMethods: [{ name: "overlaps", calls: ["cover"] }],
+        },
+        "inflector.ts:Inflector": {
+          file: "inflector.ts",
+          classMethods: [{ name: "titleize", line: 8, calls: ["regexpEscape"] }],
         },
       },
     },
@@ -79,6 +85,11 @@ describe("forwardCredits", () => {
       tsExport: "regexpEscape",
     });
     expect(forwardCredits(api).map((c) => c.package)).not.toContain("ruby-compat");
+  });
+
+  it("counts a synthesized file module's re-presentation of a function once", () => {
+    const titleize = forwardCredits(api).filter((c) => c.name === "titleize");
+    expect(titleize).toHaveLength(1);
   });
 
   it("reads both member lists of a class and of a module", () => {
