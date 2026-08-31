@@ -1,4 +1,4 @@
-import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { GID } from "./uri/gid.js";
 import { GlobalID, type GlobalIDModel, type GlobalIDOptions } from "./global-id.js";
@@ -73,11 +73,6 @@ export class SignedGlobalID extends GlobalID {
    * Mirrors: SignedGlobalID.parse
    */
   static parse(sgid: string, options: ParseOptions = {}): SignedGlobalID | null {
-    // Rails' `verify` reaches `pick_verifier`, which raises when no verifier
-    // is available — only InvalidSignature is rescued. Our verify helpers
-    // swallow every error to return null, so assert the verifier here to keep
-    // "no verifier configured" a raise rather than a silent null.
-    SignedGlobalID.pickVerifier(options);
     const verified = SignedGlobalID.verify(sgid, options);
     if (verified === null) return null;
     // The token's own expiry wins over any class-level default: an explicit
@@ -146,22 +141,34 @@ export class SignedGlobalID extends GlobalID {
     sgid: string,
     options: ParseOptions,
   ): { uri: string; expiresAt: Temporal.Instant | undefined } | null {
+    const verifier = SignedGlobalID.pickVerifier(options);
+    let raw: SgidPayload | null;
     try {
-      const verifier = SignedGlobalID.pickVerifier(options);
-      const purpose = SignedGlobalID.pickPurpose(options);
-      const raw = verifier.verified(sgid, { purpose }) as SgidPayload | null;
-      if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
-      if (raw.purpose !== purpose) return null;
+      raw = verifier.verify(sgid, {
+        purpose: SignedGlobalID.pickPurpose(options),
+      }) as SgidPayload | null;
+    } catch (error) {
+      // Rails rescues exactly `ActiveSupport::MessageVerifier::InvalidSignature`
+      // (`signed_global_id.rb:37`); every other error — a missing verifier's
+      // ArgumentError included — propagates.
+      if (error instanceof InvalidSignature) return null;
+      throw error;
+    }
+    if (!raw || typeof raw !== "object" || typeof raw.gid !== "string") return null;
+    if (raw.purpose !== SignedGlobalID.pickPurpose(options)) return null;
+    // Rails reaches `GlobalID.parse`, whose `rescue nil` (`global_id.rb:33`)
+    // turns a malformed GID into a nil parse rather than a raise.
+    try {
       GID.parse(raw.gid);
-      let expiresAt: Temporal.Instant | undefined;
-      if (raw.expires_at) {
-        expiresAt = Temporal.Instant.from(raw.expires_at);
-        if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) return null;
-      }
-      return { uri: raw.gid, expiresAt };
     } catch {
       return null;
     }
+    let expiresAt: Temporal.Instant | undefined;
+    if (raw.expires_at) {
+      expiresAt = Temporal.Instant.from(raw.expires_at);
+      if (Temporal.Instant.compare(expiresAt, Temporal.Now.instant()) <= 0) return null;
+    }
+    return { uri: raw.gid, expiresAt };
   }
 
   /**

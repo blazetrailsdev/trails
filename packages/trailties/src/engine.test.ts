@@ -69,6 +69,10 @@ describe("Engine", () => {
   it("engine_name aliases railtie_name", () => {
     class BlogEngine extends Engine {}
     Trailtie.register(BlogEngine);
+    // `Engine#root` raises for an engine whose source location never
+    // resolves, and the registry outlives a single test — so every engine
+    // registered here carries a `calledFrom` the `find()` fs can resolve.
+    BlogEngine.calledFrom("/");
     expect(BlogEngine.engineName()).toBe("blog_engine");
     expect(BlogEngine.engineName()).toBe(BlogEngine.railtieName());
   });
@@ -76,6 +80,7 @@ describe("Engine", () => {
   it("isolated? defaults to false", () => {
     class PlainEngine extends Engine {}
     Trailtie.register(PlainEngine);
+    PlainEngine.calledFrom("/");
     expect(PlainEngine.isolated()).toBe(false);
     expect(PlainEngine.instance().isolated()).toBe(false);
   });
@@ -117,7 +122,10 @@ describe("Engine", () => {
   });
 
   it("find() locates the engine whose root matches", async () => {
-    installFs(new Set(["/", "/found", "/found/sub"]), new Set(["/found/lib"]));
+    installFs(
+      new Set(["/", "/found", "/found/sub", "/blog", "/blog/sub"]),
+      new Set(["/lib", "/found/lib", "/blog/sub/lib"]),
+    );
     class FoundEngine extends Engine {}
     Trailtie.register(FoundEngine);
     FoundEngine.calledFrom("/found/sub");

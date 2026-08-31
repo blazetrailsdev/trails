@@ -283,13 +283,16 @@ export class Application extends Engine {
   }
 
   /** Boot-time root resolution for callers that need a concrete path
-   * (credentials, `configFor`, the `trailsRoot()` seam): explicit
-   * `config.root=` override, then the discovered source root, then cwd.
-   * The cwd tail is a trails addition with no Rails counterpart — Rails'
-   * `config.root` is a plain reader that stays nil. `Trails.root()` is the
-   * Rails-faithful accessor and deliberately does NOT use this. */
+   * (credentials, `configFor`, the `trailsRoot()` seam): an explicit
+   * `config.root=` override, else the root `Application.findRoot` resolves.
+   * Rails needs no such method — `config.root` is seeded from
+   * `find_root(called_from)` when the configuration is built
+   * (`engine.rb:553`) and so is never nil — but that seeding is async here.
+   * The `cwd` fallback is Rails' own: `find_root_with_flag "config.ru", from,
+   * Dir.pwd` (`application.rb:88-90`), not a tail bolted on afterwards.
+   */
   async resolvedRoot(): Promise<string> {
-    return this.config.root ?? (await this.root()) ?? (await getFsAsync()).cwd();
+    return this.config.root ?? (await this.root());
   }
 }
 

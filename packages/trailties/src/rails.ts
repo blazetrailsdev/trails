@@ -131,15 +131,11 @@ export class Trails {
   }
 
   /** Rails: `application && Pathname.new(application.paths["public"].first)`.
-   * Returns null when no app is registered OR when the app's root is still
-   * unresolved (Engine.calledFrom unset) — `Path#expanded` throws on a null
-   * root, so we short-circuit before reaching it. A `config.setRoot(...)`
-   * override satisfies the guard on its own — the root is known even when
-   * source discovery cannot resolve one. */
+   * Returns null only when no app is registered; `Application#root` always
+   * resolves a root (`application.rb:88-90` defaults it to `Dir.pwd`). */
   static async publicPath(): Promise<string | null> {
     const app = Trails.application;
     if (!app) return null;
-    if (app.config.root === null && (await app.root()) === undefined) return null;
     const paths = await app.paths();
     const expanded = await paths.get("public")?.expanded();
     return expanded?.[0] ?? null;
