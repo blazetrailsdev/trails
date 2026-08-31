@@ -287,6 +287,13 @@ export async function deleteAll<T extends typeof Base>(this: T): Promise<number>
   return this.all().deleteAll();
 }
 
+export function destroy<T extends typeof Base>(
+  this: T,
+  id: unknown,
+): Promise<InstanceType<T> | InstanceType<T>[]> {
+  return this.all().destroy(id);
+}
+
 export function destroyAll<T extends typeof Base>(this: T): Promise<InstanceType<T>[]> {
   return this.all().destroyAll();
 }

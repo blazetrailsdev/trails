@@ -159,7 +159,7 @@ describe("LoggerTest", () => {
   });
 
   it("temporarily logging at a symbolic level", () => {
-    logger.logAt("error", () => {
+    logger.logAt(":error", () => {
       logger.debug("NOT THERE");
       logger.error("THIS IS HERE");
     });
@@ -171,7 +171,7 @@ describe("LoggerTest", () => {
     const logger2 = new Logger(makeBuffer());
     expect(logger2.level).toBe(Logger.DEBUG);
     expect(logger.level).toBe(Logger.DEBUG);
-    logger.logAt("error", () => {
+    logger.logAt(":error", () => {
       expect(logger2.level).toBe(Logger.DEBUG);
       expect(logger.level).toBe(Logger.ERROR);
     });

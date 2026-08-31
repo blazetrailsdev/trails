@@ -1347,10 +1347,22 @@ export class Relation<T extends Base> {
     return this.where({ [primaryKey]: idOrArray }).deleteAll();
   }
 
-  async destroy(id: unknown): Promise<T> {
-    const record = await this.find(id);
-    await record.destroy();
-    return record;
+  async destroy(id: unknown): Promise<T | T[]> {
+    const multipleIds = this.model.compositePrimaryKey
+      ? Array.isArray((id as unknown[])[0])
+      : Array.isArray(id);
+
+    if (multipleIds) {
+      const records = (await this.find(id)) as unknown as T[];
+      for (const record of records) {
+        await record.destroy();
+      }
+      return records;
+    } else {
+      const record = await this.find(id);
+      await record.destroy();
+      return record;
+    }
   }
 
   async destroyBy(args: Record<string, unknown> = {}): Promise<T[]> {

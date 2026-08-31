@@ -30,18 +30,26 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
-export type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
+function coerce(severity: number | string): number {
+  if (typeof severity === "number") return severity;
+  const name = severity.startsWith(":") ? severity.slice(1) : severity;
+  const level = LOG_LEVELS[`:${name.toLowerCase()}` as LogLevel];
+  if (level === undefined) throw new ArgumentError(`invalid log level: ${name}`);
+  return level;
+}
+
+export type LogLevel = ":debug" | ":info" | ":warn" | ":error" | ":fatal" | ":unknown";
 
 export const LOG_LEVELS: Record<LogLevel, number> = {
-  debug: 0,
-  info: 1,
-  warn: 2,
-  error: 3,
-  fatal: 4,
-  unknown: 5,
+  ":debug": 0,
+  ":info": 1,
+  ":warn": 2,
+  ":error": 3,
+  ":fatal": 4,
+  ":unknown": 5,
 };
 
-const LEVEL_NAMES: Record<number, LogLevel> = {
+const LEVEL_NAMES: Record<number, string> = {
   0: "debug",
   1: "info",
   2: "warn",
@@ -148,12 +156,8 @@ export class Logger {
     return this.localLevel ?? this._level;
   }
 
-  set level(value: number | LogLevel) {
-    if (typeof value === "string") {
-      this._level = LOG_LEVELS[value];
-    } else {
-      this._level = value;
-    }
+  set level(severity: number | LogLevel | string) {
+    this._level = coerce(severity);
   }
 
   /**
@@ -171,32 +175,13 @@ export class Logger {
     return IsolatedExecutionState.get<number>(this.localLevelKey) ?? null;
   }
 
-  /**
-   * `logger_thread_safe_level.rb:14-22`. Ruby has three non-raising arms and
-   * one raise: a Symbol goes through `Logger::Severity.const_get`, which raises
-   * NameError for an unknown name; the `else` arm raises ArgumentError with the
-   * inspected value.
-   *
-   * A JS string is the Symbol arm here, and Ruby's String — which reaches the
-   * `else` arm — has no distinct spelling on this parameter. CLAUDE.md keeps a
-   * Symbol's leading colon only where a method's control flow turns on
-   * `Symbol === x` with BOTH arms live; this parameter's String arm is dead in
-   * trails: `LogLevel` is the closed set of level names, it is the same
-   * spelling `level=` takes, and no caller passes a string here meaning
-   * anything but a level (`logAt`, `broadcast-logger.ts:60-66`, and the tests
-   * pass a `LogLevel` name or a `Logger.*` Integer). Spelling it `":debug"`
-   * on this one writer would put a colon in front of a level nowhere else in
-   * the logger surface carries. The `else` arm therefore stays reachable for
-   * every non-string, non-Integer, non-null value, which is what the cover
-   * exercises.
-   */
   set localLevel(level: number | LogLevel | null) {
     let value: number | null;
     if (typeof level === "number") {
       value = level;
-    } else if (typeof level === "string") {
-      const constantName = level.toUpperCase();
-      value = LOG_LEVELS[level.toLowerCase() as LogLevel];
+    } else if (typeof level === "string" && level.startsWith(":")) {
+      const constantName = level.slice(1).toUpperCase();
+      value = LOG_LEVELS[`:${level.slice(1).toLowerCase()}` as LogLevel];
       if (value === undefined) {
         throw new NameError(
           `uninitialized constant Logger::Severity::${constantName}`,
@@ -529,8 +514,8 @@ function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
     },
   };
 
-  (["debug", "info", "warn", "error", "fatal"] as LogLevel[]).forEach((name) => {
-    const level = LOG_LEVELS[name];
+  (["debug", "info", "warn", "error", "fatal"] as const).forEach((name) => {
+    const level = LOG_LEVELS[`:${name}`];
     Object.defineProperty(proxy, `${name}?`, {
       get() {
         return logger.level <= level;

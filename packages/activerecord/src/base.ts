@@ -1564,26 +1564,6 @@ export class Base extends Model {
     >;
   }
 
-  /** @missingRailsCall with_transaction_returning_status — PERMANENT */
-  static async destroy<T extends typeof Base>(
-    this: T,
-    id: unknown | unknown[],
-  ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    const multipleIds = this.compositePrimaryKey
-      ? Array.isArray(id) && Array.isArray((id as unknown[])[0])
-      : Array.isArray(id);
-
-    if (multipleIds) {
-      const found = await this.find(id);
-      const records = Array.isArray(found) ? found : [found];
-      for (const record of records) await record.destroy();
-      return records;
-    }
-    const record = await this.find(id);
-    await record.destroy();
-    return record;
-  }
-
   static updateBang<T extends typeof Base>(
     this: T,
     attrs: Record<string, unknown>,
@@ -1751,6 +1731,7 @@ export class Base extends Model {
   declare static upsertAll: typeof Querying.upsertAll;
   declare static updateAll: typeof Querying.updateAll;
   declare static deleteAll: typeof Querying.deleteAll;
+  declare static destroy: typeof Querying.destroy;
   declare static destroyAll: typeof Querying.destroyAll;
   declare static destroyBy: typeof Querying.destroyBy;
   declare static deleteBy: typeof Querying.deleteBy;

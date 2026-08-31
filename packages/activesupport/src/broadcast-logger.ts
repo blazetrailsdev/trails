@@ -2,7 +2,7 @@
  * ActiveSupport::BroadcastLogger — fans out log messages to multiple loggers.
  */
 
-import { Logger, LOG_LEVELS, type LogLevel } from "./logger.js";
+import { Logger, type LogLevel } from "./logger.js";
 import { _setBroadcastLoggerClass } from "./broadcast-logger-slot.js";
 
 export class BroadcastLogger extends Logger {
@@ -54,22 +54,21 @@ export class BroadcastLogger extends Logger {
   }
 
   /** `broadcast_logger.rb:151-153` — dispatches only; stores nothing. */
-  set level(level: number | LogLevel) {
+  set level(level: number | LogLevel | string) {
     this.dispatch((logger) => {
       logger.level = level;
     });
   }
 
   /** `broadcast_logger.rb:154` — `alias_method :sev_threshold=, :level=`. */
-  set sevThreshold(level: number | LogLevel) {
+  set sevThreshold(level: number | LogLevel | string) {
     this.level = level;
   }
 
   set localLevel(value: number | LogLevel | null) {
-    const lvl = value === null ? null : typeof value === "string" ? LOG_LEVELS[value] : value;
     this.dispatch((logger) => {
       if ("localLevel" in logger) {
-        logger.localLevel = lvl;
+        logger.localLevel = value;
       }
     });
   }

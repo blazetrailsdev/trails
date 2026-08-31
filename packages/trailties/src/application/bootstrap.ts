@@ -28,7 +28,7 @@ import { Initializable } from "../initializable.js";
 
 export interface BootstrapConfig {
   logger?: Logger | null;
-  logLevel?: LogLevel | number;
+  logLevel?: LogLevel | number | string;
   cacheStore?: CacheStore | (() => CacheStore);
 }
 

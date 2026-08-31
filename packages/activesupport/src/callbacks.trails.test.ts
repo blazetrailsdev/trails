@@ -6,6 +6,7 @@ import {
   setCallback,
   skipCallback,
   runCallbacks,
+  ProcCall,
 } from "./callbacks.js";
 
 // trails-only coverage: CallbackChain.compile() memoizes the folded
@@ -136,5 +137,33 @@ describe("runCallbacks type argument (trails)", () => {
     runCallbacks(target, "save", () => ran.push("block"), undefined, "after");
     runCallbacks(target, "save", () => ran.push("block"), undefined, "after");
     expect(ran).toEqual(["block", "after", "block", "after"]);
+  });
+});
+
+// `(@override_target || target)` (callbacks.rb:470, :475, :481) — a `ProcCall`
+// built with no target resolves to the runtime `target`.
+describe("ProcCall", () => {
+  it("falls back to the runtime target when no override target was given", () => {
+    const calls: unknown[] = [];
+    const target = (...args: unknown[]) => {
+      calls.push(args);
+      return true;
+    };
+
+    const template = new ProcCall(null);
+
+    expect(template.expand(target, 1, null)).toEqual([target, null, "call", target, 1]);
+    expect(template.makeLambda()(target, 1)).toBe(true);
+    expect(template.invertedLambda()(target, 1)).toBe(false);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("prefers the override target over the runtime target", () => {
+    const overrideTarget = () => true;
+    const target = () => false;
+    const template = new ProcCall(overrideTarget);
+
+    expect(template.expand(target, 1, null)[0]).toBe(overrideTarget);
+    expect(template.makeLambda()(target, 1)).toBe(true);
   });
 });
