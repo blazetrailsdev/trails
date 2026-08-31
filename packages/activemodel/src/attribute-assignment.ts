@@ -2,7 +2,17 @@ import type { AttributeMethod } from "./attribute-methods.js";
 import { UnknownAttributeError } from "./errors.js";
 
 export function assignAttributes(this: AttributeAssignment, newAttributes: unknown): void {
-  assertAssignedSynchronously(setAttributes.call(this, newAttributes), "assignAttributes");
+  if (!respondToEachPair(newAttributes)) {
+    throw new ArgumentError(
+      `When assigning attributes, you must pass a hash as an argument, ${classOf(newAttributes)} passed.`,
+    );
+  }
+  if (isMassAssignmentEmpty(newAttributes)) return;
+
+  assertAssignedSynchronously(
+    this._assignAttributes(this.sanitizeForMassAssignment(newAttributes)),
+    "assignAttributes",
+  );
 }
 
 /** @internal */
