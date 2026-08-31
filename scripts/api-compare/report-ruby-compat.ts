@@ -148,19 +148,26 @@ export function renderReport(artifact: Artifact, api: TsApi, top: number): strin
   ].join("\n");
 }
 
-/**
- * The `report-*` CLI shape both RFC 0129 reports share: render, or explain the
- * missing artifact and exit 2. Neither can fail a build, so there is no gate
- * arm to keep in sync — one copy, imported, rather than two.
- */
+/** The `report-*` CLI shape both RFC 0129 reports share: render, or explain the
+ *  missing artifact and exit 2. Neither can fail a build, so there is no gate
+ *  arm to keep in sync — one copy, imported, rather than two. `moduleUrl` is the
+ *  caller's own `import.meta.url`, which is what makes the imported copy run
+ *  only when ITS module is the one node was invoked on. */
 export async function runReport(
+  moduleUrl: string,
   label: string,
   render: (top: number) => Promise<string>,
 ): Promise<void> {
-  const self = fileURLToPath(import.meta.url.replace("report-ruby-compat", label));
-  if (path.resolve(self) !== path.resolve(process.argv[1] ?? "")) return;
+  if (path.resolve(fileURLToPath(moduleUrl)) !== path.resolve(process.argv[1] ?? "")) return;
+  let top: number;
   try {
-    console.log(await render(parseTop(process.argv.slice(2), 20)));
+    top = parseTop(process.argv.slice(2), 20);
+  } catch (e) {
+    console.error(`${label}: ${(e as Error).message}`);
+    return process.exit(2);
+  }
+  try {
+    console.log(await render(top));
   } catch (e) {
     if ((e as { code?: string }).code !== "ENOENT") throw e;
     console.error(
@@ -170,7 +177,7 @@ export async function runReport(
   }
 }
 
-void runReport("report-ruby-compat", async (top) =>
+void runReport(import.meta.url, "ruby-compat call mapping report", async (top) =>
   renderReport(
     JSON.parse(await readFile(ARTIFACT_PATH, "utf8")) as Artifact,
     JSON.parse(await readFile(TS_API_PATH, "utf8")) as TsApi,

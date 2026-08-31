@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  type TsApi,
-  literalArgs,
-  matches,
-  renderReport,
-  shapeOf,
-} from "./report-structural-duplicates.js";
+import type { TsApi } from "./report-ruby-compat.js";
+import { literalArgs, matches, renderReport, shapeOf } from "./report-structural-duplicates.js";
 
 const replace = (name: string, line: number, literal: string) => ({
   name,

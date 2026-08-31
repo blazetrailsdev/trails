@@ -10,9 +10,9 @@
  *             other name: a mismatch, converging by importing the export, not
  *             by baselining it.
  *
- * In `scripts/parity/` because two tools read it — the call ratchet's alias
- * hook (through `enumerable-idioms.ts`) and
- * `parity:api:calls:ruby-compat:report` — RFC 0092's shared-home rule.
+ * In `scripts/parity/` because two tools read it — the call ratchet's alias hook
+ * (through `enumerable-idioms.ts`) and `parity:api:calls:ruby-compat:report` —
+ * RFC 0092's shared-home rule.
  *
  * ── Keyed by the MRI SPELLING, and why that is not enough on its own ────────
  * Rows are keyed `Receiver#method` / `Receiver.method`, because the bare name

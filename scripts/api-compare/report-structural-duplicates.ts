@@ -7,9 +7,8 @@
  *
  * `no-ruby-compat-reimplementation` matches on NAMES, so it catches every
  * duplicate the RFC inventoried and nothing under a name nobody has thought of.
- * This asks whether a SHAPE match closes that gap — and answers with a
- * measurement, which is why it ships report-only: a gate seeded on an
- * unmeasured signal is a gate that gets disabled.
+ * This asks whether a SHAPE match closes that gap, and answers with a
+ * measurement — a gate seeded on an unmeasured signal gets disabled.
  *
  * The normalized form is the one `extract-ts-api.ts` already computes for every
  * declaration: `skeleton`, the body's control flow and call sequence with
@@ -31,7 +30,6 @@ import { readFile } from "fs/promises";
 import { OUTPUT_DIR } from "./config.js";
 import { section, tally } from "./lint-call-mismatches.js";
 import { type Decl, type TsApi, declarations, runReport } from "./report-ruby-compat.js";
-export type { Decl, TsApi };
 
 const TS_API_PATH = path.join(OUTPUT_DIR, "ts-api.json");
 
@@ -124,6 +122,6 @@ export function renderReport(api: TsApi, top: number): string {
   return lines.join("\n");
 }
 
-void runReport("report-structural-duplicates", async (top) =>
+void runReport(import.meta.url, "structural duplicate report", async (top) =>
   renderReport(JSON.parse(await readFile(TS_API_PATH, "utf8")) as TsApi, top),
 );
