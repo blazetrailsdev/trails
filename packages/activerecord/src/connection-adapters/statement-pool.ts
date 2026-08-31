@@ -14,16 +14,11 @@ export class StatementPool<T = unknown> {
   }
 
   get(key: string): T | undefined {
-    if (!this.cache.has(key)) return undefined;
-    const stmt = this.cache.get(key) as T;
-    this.cache.delete(key);
-    this.cache.set(key, stmt);
-    return stmt;
+    return this.cache.get(key);
   }
 
   /** @missingRailsCall last — PERMANENT */
   set(key: string, stmt: T): void | Promise<void> {
-    this.cache.delete(key);
     const deallocating: Array<Promise<void>> = [];
     while (this._statementLimit <= this.cache.size) {
       const [firstKey, evicted] = this.cache.entries().next().value!;
@@ -65,10 +60,6 @@ export class StatementPool<T = unknown> {
     for (const [key, stmt] of this.cache) {
       fn(key, stmt);
     }
-  }
-
-  get keys(): string[] {
-    return [...this.cache.keys()];
   }
 
   private get cache(): Map<string, T> {

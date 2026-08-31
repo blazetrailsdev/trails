@@ -286,8 +286,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       this._statementLimit = options.statementLimit;
       this._statements = this.buildStatementPool();
     }
-    this.connect();
-    if (!this._asyncConnectPending) void this.configureConnection();
+    this._asyncConnectPending = this.driverIsAsync();
   }
 
   /** @internal */
@@ -676,7 +675,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       this._closingDriver = null;
       await closing;
     } else {
-      await this.driver.close();
+      await this.driver?.close();
     }
   }
 
@@ -899,6 +898,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @missingRailsCall query_value — PERMANENT */
   override getDatabaseVersion(): Version | Promise<Version> {
+    if (this.driver === undefined && !this._asyncConnectPending) this.connect();
     const driver = this.driver as SqliteConnection | undefined;
     if (!driver) return new Version("0.0.0");
     const toVersion = (row: unknown) => new Version((row as { v?: string })?.v ?? "0.0.0");
@@ -1254,7 +1254,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const tables = result.map((row) => row["table"]);
       throw new StatementInvalid(`Foreign key violations found: ${tables.join(", ")}`, {
         sql,
-        binds: [],
+        connectionPool: this.pool,
       });
     }
   }
@@ -1589,7 +1589,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   private async tableStructure(tableName: string): Promise<Record<string, unknown>[]> {
     const structure = await this.tableInfo(tableName);
     if (!structure.length) {
-      throw new StatementInvalid(`Could not find table '${tableName}'`, { sql: "", binds: [] });
+      throw new StatementInvalid(`Could not find table '${tableName}'`, {
+        connectionPool: this.pool,
+      });
     }
     return await this.tableStructureWithCollation(tableName, structure);
   }
@@ -1900,7 +1902,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     options: SQLite3AdapterOptions = {},
   ): Promise<SQLite3Adapter> {
     const adapter = new this(filename, options);
-    await adapter.completeAsyncConnect();
+    await adapter.connectBang();
     return adapter;
   }
 

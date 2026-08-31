@@ -53,6 +53,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     fs.mkdirSync(nested, { recursive: true });
     const dbPath = path.join(nested, "test.db");
     const a = new BetterSQLite3Adapter(dbPath);
+    await a.connectBang();
     expect(a.isOpen).toBe(true);
     expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
     await a.close();
@@ -70,6 +71,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     const dbPath = path.join(os.tmpdir(), `sqlite-exists-${Date.now()}.db`);
     const a = new BetterSQLite3Adapter(dbPath);
     try {
+      await a.connectBang();
       expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBe(true);
     } finally {
       await a.close();
@@ -83,12 +85,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("connect with url", async () => {
     const a = new BetterSQLite3Adapter(":memory:");
+    await a.connectBang();
     expect(a.isOpen).toBe(true);
     await a.close();
   });
 
   it("connect memory with url", async () => {
     const a = new BetterSQLite3Adapter(":memory:");
+    await a.connectBang();
     expect(a.isOpen).toBe(true);
     await a.close();
   });
@@ -156,12 +160,10 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   it("connection no db", async () => {
     const os = await import("os");
     const path = await import("path");
-    expect(
-      () =>
-        new BetterSQLite3Adapter(path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"), {
-          readonly: true,
-        }),
-    ).toThrow();
+    const a = new BetterSQLite3Adapter(path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"), {
+      readonly: true,
+    });
+    await expect(a.connectBang()).rejects.toThrow();
   });
 
   it("bad timeout", async () => {
@@ -597,6 +599,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("statement closed", async () => {
     const a = new BetterSQLite3Adapter(":memory:");
+    await a.connectBang();
     expect(a.isOpen).toBe(true);
     await a.close();
     expect(a.isOpen).toBe(false);
@@ -604,12 +607,14 @@ describeIfSqlite("SQLite3AdapterTest", () => {
 
   it("db is not readonly when readonly option is false", async () => {
     const a = new BetterSQLite3Adapter(":memory:", { readonly: false });
+    await a.connectBang();
     expect(a.isOpen).toBe(true);
     await a.close();
   });
 
   it("db is not readonly when readonly option is unspecified", async () => {
     const a = new BetterSQLite3Adapter(":memory:");
+    await a.connectBang();
     expect(a.isOpen).toBe(true);
     await a.close();
   });
@@ -758,6 +763,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     try {
       const conn = new BetterSQLite3Adapter(":memory:", { driver: fakeDriver });
       try {
+        await conn.connectBang();
         expect(capture.config?.strict).toBe(true);
         expect(conn._strictStrings).toBe(true);
       } finally {
@@ -773,6 +779,7 @@ describeIfSqlite("SQLite3AdapterTest", () => {
       strict: false,
     });
     try {
+      await explicit.connectBang();
       expect((capture.config as SqliteOpenConfig | null)?.strict).toBe(false);
       expect(explicit._strictStrings).toBe(false);
     } finally {

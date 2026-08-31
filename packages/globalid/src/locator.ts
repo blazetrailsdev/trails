@@ -10,6 +10,13 @@ import { validateApp } from "./uri/gid.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
+
 /**
  * Duck-typed model interface; globalid stays AR-agnostic.
  *
@@ -337,9 +344,20 @@ export class Locator {
    * Accepts any locator-like object or a plain block function (wrapped
    * automatically as a BlockLocator).
    */
-  static use(app: string, locator: LocatorLike | LocatorBlock): void {
-    validateApp(app);
+  static use(app: string, locator?: LocatorLike | LocatorBlock): void {
+    // Ruby takes the block separately (`&locator_block`) and asks
+    // `block_given?`; trails takes it in the `locator` position, so the block's
+    // presence is read off that one parameter and Rails' `locator ||
+    // block_given?` collapses to its absence.
     const locatorBlock = typeof locator === "function" ? locator : undefined;
+    if (locator == null) {
+      throw new ArgumentError(
+        "No locator provided. Pass a block or an object that responds to #locate.",
+      );
+    }
+
+    validateApp(app);
+
     _appLocators.set(
       Locator.normalizeApp(app),
       locatorBlock === undefined ? (locator as LocatorLike) : new BlockLocator(locatorBlock),

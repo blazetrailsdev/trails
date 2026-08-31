@@ -2,6 +2,13 @@ import { describe, it, expect } from "vitest";
 import { Types, BinaryData } from "../index.js";
 
 describe("BinaryTypeTrails", () => {
+  it("cast leaves an already-binary value untouched", () => {
+    const type = new Types.BinaryType();
+    const bytes = new TextEncoder().encode("ƒée");
+
+    expect(type.cast(bytes)).toBe(bytes);
+  });
+
   it("serialize returns null for nil rather than wrapping it", () => {
     const type = new Types.BinaryType();
     expect(type.serialize(null)).toBe(null);

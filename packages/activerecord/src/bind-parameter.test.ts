@@ -67,7 +67,7 @@ describe("BindParameterTest", () => {
   });
 
   function statementCacheKeys(conn: any): string[] {
-    return conn._statements.keys;
+    return [...(conn._statements.cache as Map<string, unknown>).keys()];
   }
   function toSqlKey(conn: any, arel: unknown): string {
     const sql = conn.toSql(arel);
