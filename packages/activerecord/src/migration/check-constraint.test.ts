@@ -15,8 +15,6 @@ import type { SchemaSource } from "../schema-dumper.js";
 
 const supportsJsonSchemaValid = !isMariaDb && (serverVersion?.compare("8.0.17") ?? -1) >= 0;
 
-const supportsCheckConstraints = adapterSupports("check_constraints");
-
 class Trade extends Base {
   static {
     this._tableName = "trades";
@@ -459,7 +457,7 @@ describe("Migration", () => {
     });
   });
 
-  describe.skipIf(supportsCheckConstraints)("NoCheckConstraintSupportTest", () => {
+  describe.skipIf(adapterSupports("check_constraints"))("NoCheckConstraintSupportTest", () => {
     it("add check constraint should be noop", async () => {
       const connection = await ambientConnection();
       await assertNothingRaised(() =>

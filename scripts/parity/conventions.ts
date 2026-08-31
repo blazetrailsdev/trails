@@ -1375,6 +1375,18 @@ const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
   // ActiveSupport's `exclude?` (Enumerable/String core-ext) is the negation;
   // a port spells it `excludes`.
   ["exclude?", "excludes"],
+  // `key?` / `has_key?` are deliberately absent, and stay absent. Their only
+  // JS analogue is `has`, which is too generic to hand out as a method-NAME
+  // candidate — it would match any unrelated `has()` declared in the same
+  // file. Nothing is lost by omitting it: both Rails classes that define the
+  // predicate already port under the names the predicate rules produce
+  // unaided — `HashWithIndifferentAccess#key?`/`has_key?`/`member?`
+  // (hash_with_indifferent_access.rb:150-156) is `key()`/`hasKey()`/
+  // `member()`, and `Parameters#has_key?`/`key?`
+  // (strong_parameters.rb:253-254) likewise. `has` remains a CALL alias in
+  // `JS_ENUMERABLE_ALIASES` (scripts/api-compare/enumerable-idioms.ts), where
+  // the file's symbol set is not at stake. Asked and settled twice; do not
+  // re-derive it a third time.
 ]);
 
 /**

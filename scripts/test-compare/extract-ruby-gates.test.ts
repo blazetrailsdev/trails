@@ -286,6 +286,34 @@ describe("Ruby extractor gate detection", () => {
     expect(g["send only"]).toEqual({ features: ["rename_index"], source: ["body-skip"] });
   });
 
+  it("spells a skip-if inverted feature exactly as the TS extractor does", () => {
+    // Twin of extract-ts-gates.test.ts, "spells a skip-if inverted feature
+    // exactly as the Ruby extractor does". `comparable()` / `adapterFeatureKey()`
+    // (gates.ts) treat `no_<feature>` as a SIGNED FEATURE and compare it across
+    // sides, so the two extractors must agree on the string for the same
+    // restriction.
+    const g = rubyGates({
+      "cases/inverted_test.rb": `
+        class InvertedTest < ActiveRecord::TestCase
+          def test_skip_if_feature
+            skip "x" if supports_rename_index?
+          end
+          def test_skip_unless_feature
+            skip "x" unless supports_rename_index?
+          end
+        end
+      `,
+    });
+    expect(g["skip if feature"]).toEqual({
+      guards: ["no_rename_index"],
+      source: ["body-skip"],
+    });
+    expect(g["skip unless feature"]).toEqual({
+      features: ["rename_index"],
+      source: ["body-skip"],
+    });
+  });
+
   it("reads feature polarity against the run condition on the skip-if path", () => {
     const g = rubyGates({
       // `skip if !supports_x?` runs on `supports_x?`. The run condition is the

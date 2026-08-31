@@ -27,11 +27,55 @@ describe("classifyGateMismatch", () => {
   });
 
   it("stays silent when Rails has only an incomparable guard but we gate", () => {
-    // e.g. Rails `skip if supports_transaction_isolation?` → guards:["no_…"],
-    // our TS gates [sqlite]. Real-but-incomparable Rails restriction → not over-gated.
-    const negFeatureGuard: TestGate = { guards: ["no_transaction_isolation"], source: ["class"] };
+    // e.g. Rails `skip if mariadb?` → guards:["mariadb"], our TS gates
+    // [sqlite]. Real-but-incomparable Rails restriction → not over-gated.
+    // (A `no_<feature>` guard is NOT such a case — see the signed-feature
+    // tests below, where it compares like any other feature.)
+    const runtimeGuard: TestGate = { guards: ["mariadb"], source: ["class"] };
     expect(
-      classifyGateMismatch(negFeatureGuard, { adapters: ["sqlite"], source: ["test"] }, false),
+      classifyGateMismatch(runtimeGuard, { adapters: ["sqlite"], source: ["test"] }, false),
+    ).toBeNull();
+  });
+
+  it("compares an inverted feature restriction as a signed feature", () => {
+    // Rails `skip unless supports_rename_index?` and our
+    // `it.skipIf(adapterSupports("rename_index"))` both emit
+    // guards:["no_rename_index"] — same restriction, so they agree.
+    const noRenameIndexRails: TestGate = { guards: ["no_rename_index"], source: ["body-skip"] };
+    const noRenameIndexTs: TestGate = { guards: ["no_rename_index"], source: ["test"] };
+    expect(classifyGateMismatch(noRenameIndexRails, noRenameIndexTs, false)).toBeNull();
+
+    // OPPOSITE inverted feature sets are now REPORTED rather than compared
+    // equal by both being dropped from the comparable dimensions.
+    const noJson: TestGate = { guards: ["no_json"], source: ["body-skip"] };
+    expect(classifyGateMismatch(noRenameIndexRails, noJson, false)).toBe("wrong-gate");
+
+    // `no_x` and `x` are opposite restrictions, never a match.
+    expect(classifyGateMismatch(noJson, jsonTs, false)).toBe("wrong-gate");
+
+    // An inverted feature is a real restriction on its own: Rails carries one
+    // and we run unconditionally → missing-gate (it used to stay silent).
+    expect(classifyGateMismatch(noRenameIndexRails, undefined, false)).toBe("missing-gate");
+    // …and the reverse is over-gated.
+    expect(classifyGateMismatch(undefined, noRenameIndexTs, false)).toBe("over-gated");
+  });
+
+  it("keeps a `no_<feature>` beside a plain feature in the compared key", () => {
+    // The foreign-key case: Rails features=[foreign_keys] guards=[no_rename_index]
+    // vs a TS side carrying only features=[foreign_keys].
+    const railsFk: TestGate = {
+      features: ["foreign_keys"],
+      guards: ["no_rename_index"],
+      source: ["class"],
+    };
+    const tsFk: TestGate = { features: ["foreign_keys"], source: ["wrapper"] };
+    expect(classifyGateMismatch(railsFk, tsFk, false)).toBe("wrong-gate");
+    expect(
+      classifyGateMismatch(railsFk, { ...tsFk, guards: ["no_rename_index"] }, false),
+    ).toBeNull();
+    // An incomparable guard riding along does not disturb the key.
+    expect(
+      classifyGateMismatch(railsFk, { ...tsFk, guards: ["no_rename_index", "mariadb"] }, false),
     ).toBeNull();
   });
 

@@ -23,7 +23,6 @@ import { Ship } from "./test-helpers/models/ship.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
 
 const supportsInsertReturning = adapterSupports("insert_returning");
-const supportsInsertConflictTarget = adapterSupports("insert_conflict_target");
 const isMysql = adapterType === "mysql";
 
 class ReadonlyNameBook extends Book {
@@ -1106,7 +1105,7 @@ describe("InsertAllTest", () => {
     },
   );
 
-  it.skipIf(supportsInsertConflictTarget)(
+  it.skipIf(adapterSupports("insert_conflict_target"))(
     "upsert all with unique by fails cleanly for adapters not supporting insert conflict target",
     async () => {
       const connection = await Base.leaseConnection();

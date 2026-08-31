@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType, ambientPoolConfiguration } from "./test-adapter.js";
+import { currentAdapter } from "./support/adapter-helper.js";
 import { adapterSupports } from "./support/supports.js";
 import { fixtures } from "./test-fixtures.js";
 import { transactionIsolationLevels } from "./connection-adapters/abstract/database-statements.js";
@@ -8,22 +9,25 @@ import { transactionIsolationLevels } from "./connection-adapters/abstract/datab
 describe("TransactionIsolationUnsupportedTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
-  it.skipIf(adapterType !== "sqlite")("setting the isolation level raises an error", async () => {
-    class Tag extends Base {
-      declare name: unknown;
-      static {
-        this._tableName = "tags";
+  it.skipIf(adapterSupports("transaction_isolation") && !currentAdapter("SQLite3Adapter"))(
+    "setting the isolation level raises an error",
+    async () => {
+      class Tag extends Base {
+        declare name: unknown;
+        static {
+          this._tableName = "tags";
+        }
       }
-    }
-    await expect(
-      Tag.transaction(
-        async () => {
-          await Tag.count();
-        },
-        { isolation: "serializable" },
-      ),
-    ).rejects.toThrow(TransactionIsolationError);
-  });
+      await expect(
+        Tag.transaction(
+          async () => {
+            await Tag.count();
+          },
+          { isolation: "serializable" },
+        ),
+      ).rejects.toThrow(TransactionIsolationError);
+    },
+  );
 });
 
 describe("TransactionIsolationTest", () => {

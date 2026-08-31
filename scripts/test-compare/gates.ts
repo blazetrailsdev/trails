@@ -255,12 +255,25 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
     const negatedInText = Boolean(m[1]);
     return { negated: runsWhenTrue ? negatedInText : !negatedInText, name: m[2] };
   });
-  const featureMatches = featureTerms
+  const collectedFeatures = featureTerms
     .filter((t) => !splitFeaturePolarity || !t.negated)
     .map((t) => t.name);
+  // The twin of `gate_from_run_condition`'s `if positive || split` arm
+  // (extract-ruby-tests.rb:1080-1086). On the run-when-FALSE path (`skipIf`)
+  // with no split available, the polarity-blind collection above is the SOURCE
+  // condition's capability claim, and the test runs on that condition's
+  // negation — so Ruby banks it as `no_<feature>` rather than asserting the
+  // capability. TS collected it as a plain feature, which made every
+  // `skipIf(<adapter> && !adapterSupports("x"))` state the opposite of the
+  // Rails gate it mirrors; now that `no_<feature>` is a compared dimension
+  // (see `signedFeatures`) that asymmetry would read as a `wrong-gate`.
+  const emitCollectedAsInverted = !runsWhenTrue && !splitFeaturePolarity;
+  const featureMatches = emitCollectedAsInverted ? [] : collectedFeatures;
   const invertedFeatures = splitFeaturePolarity
     ? featureTerms.filter((t) => t.negated).map((t) => `no_${t.name}`)
-    : [];
+    : emitCollectedAsInverted
+      ? collectedFeatures.map((name) => `no_${name}`)
+      : [];
 
   // `isMariaDb` (test-helper boolean) / `isMariadb()` (adapter method) — the
   // TS analogs of Rails' `mariadb?` predicate, which the Ruby extractor records
@@ -278,8 +291,13 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   // disjunctive — the test does run on the excluded adapter wherever the other
   // term holds. That is the twin of Ruby's negated-adapter branch, likewise
   // gated on `!acc[:has_or]`.
+  // A feature term makes a positive adapter set unsound regardless of the
+  // polarity it was banked at — `no_<feature>` is a restriction like any other,
+  // so it counts here exactly as a plain feature does (Ruby's `any_feature`
+  // likewise unions `features` and `inverted_features`).
+  const anyFeature = featureMatches.length > 0 || invertedFeatures.length > 0;
   const mixed = adapterIsPositive
-    ? guards.length > 0 || (featureMatches.length > 0 && runIsDisjunctive)
+    ? guards.length > 0 || (anyFeature && runIsDisjunctive)
     : runIsDisjunctive;
   const gate: TestGate = { source: ["test"] };
   if (adapters && !mixed) gate.adapters = adapters;
@@ -323,21 +341,51 @@ function restrictsByAdapter(g: TestGate): boolean {
 }
 
 /**
- * Only the adapter + feature dimensions are compared across sides — `guards`
- * (mariadb / version / in_memory_db / unknown / always_skip) and `source` use
- * different vocabularies in the Ruby vs TS extractors, so a guard-only gate is
- * treated as not-comparable (informational, never a mismatch).
+ * The `no_<feature>` prefix both extractors use for a feature restriction
+ * reached under inverted polarity — a run condition that requires the lane to
+ * NOT support the capability. The Ruby side emits it from
+ * `gate_from_run_condition` (`extract-ruby-tests.rb`, the `inverted_features`
+ * and run-when-false `features` arms) and the TS side from
+ * `gateFromGuardExpr`'s `invertedFeatures` above. Because both spell it
+ * identically it is a SIGNED FEATURE, not an extractor-local guard vocabulary,
+ * and it is compared across sides like any other feature.
+ */
+const INVERTED_FEATURE_PREFIX = "no_";
+
+/**
+ * The signed-feature restriction of a gate: its plain `features` plus the
+ * `no_<feature>` entries parked in `guards`. `no_x` and `x` are deliberately
+ * distinct strings, so a side requiring the capability and a side requiring its
+ * absence produce different keys and surface as a `wrong-gate` rather than
+ * comparing equal.
+ */
+function signedFeatures(g: TestGate): string[] {
+  const inverted = (g.guards ?? []).filter((guard) => guard.startsWith(INVERTED_FEATURE_PREFIX));
+  return [...(g.features ?? []), ...inverted];
+}
+
+/**
+ * Only the adapter + signed-feature dimensions are compared across sides. The
+ * REMAINING `guards` (mariadb / version / in_memory_db / unknown /
+ * always_skip) use different vocabularies in the Ruby vs TS extractors, so a
+ * gate restricted only by those is treated as not-comparable (informational,
+ * never a mismatch). `no_<feature>` guards are the exception and DO compare —
+ * see {@link signedFeatures}: leaving them out meant any pair whose only real
+ * restriction was an inverted feature was invisible to `gate-mismatch`, so the
+ * two sides could restrict to opposite feature sets in silence.
  */
 function comparable(g: TestGate | undefined): boolean {
-  return !!g && (restrictsByAdapter(g) || (g.features?.length ?? 0) > 0);
+  return !!g && (restrictsByAdapter(g) || signedFeatures(g).length > 0);
 }
 
 /**
  * Is the gate effectively "runs everywhere"? True when absent, or when it
- * names all adapters with no feature/guard restriction. A *guard-only* gate
- * (e.g. `skip if supports_transaction_isolation?` → `guards:["no_…"]`) is a
- * real-but-incomparable restriction, so it is NOT unconditional — flagging
- * `over-gated` against it would be a false positive.
+ * names all adapters with no feature/guard restriction. A gate carrying only
+ * INCOMPARABLE guards (`mariadb`, a version predicate, `unknown`) is a
+ * real-but-unreadable restriction, so it is NOT unconditional — flagging
+ * `over-gated` against it would be a false positive. A `no_<feature>` guard is
+ * no longer in that bucket: it is a signed feature and makes the gate
+ * `comparable`, so it never reaches here.
  */
 function effectivelyUnconditional(g: TestGate | undefined): boolean {
   return !g || (!comparable(g) && (g.guards?.length ?? 0) === 0);
@@ -345,9 +393,10 @@ function effectivelyUnconditional(g: TestGate | undefined): boolean {
 
 function adapterFeatureKey(g: TestGate): string {
   // All-adapters or absent → "*" ("runs on all"); an empty set → "" ("runs
-  // nowhere"), kept distinct. Features sorted; guards/source ignored.
+  // nowhere"), kept distinct. Signed features sorted; the remaining
+  // (incomparable) guards and `source` ignored.
   const a = restrictsByAdapter(g) ? [...g.adapters!].sort().join(",") : "*";
-  const f = g.features ? [...g.features].sort().join(",") : "";
+  const f = signedFeatures(g).sort().join(",");
   return `${a}|${f}`;
 }
 
