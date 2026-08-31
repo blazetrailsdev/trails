@@ -182,8 +182,7 @@ class NotImplementedError extends globalThis.Error {
   }
 }
 
-export { TypeError, NameError, NoMethodError, NotImplementedError, RuntimeError };
-export { ArgumentError };
+export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError, RuntimeError };
 
 /**
  * @internal
