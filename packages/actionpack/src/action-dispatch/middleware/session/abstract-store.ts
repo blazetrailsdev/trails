@@ -96,6 +96,18 @@ export interface ResponseRaw {
  */
 export type SessionOptions = InstanceType<typeof RequestSession.Options>;
 
+/**
+ * Ruby truthiness: only `nil` and `false` are falsy, so `0` and `""` are not.
+ * `commit_session` leans on it three times (`id.rb:386`, `:387`, `:393`) and a
+ * JS `??` / `Boolean()` would answer differently for each.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby spells this with bare `||` / `unless`;
+ * TypeScript has no operator with those semantics.
+ */
+function isTruthy(value: unknown): boolean {
+  return value != null && value !== false;
+}
+
 /** Rails: `class Persisted` (`rack-session id.rb:239`). */
 export class Persisted {
   key = "_session_id";
@@ -182,7 +194,7 @@ export class Persisted {
     const session = new (this.sessionClass())(this, req);
     req.setHeader(RACK_SESSION, session);
     req.setHeader(RACK_SESSION_OPTIONS, { ...this.defaultOptions });
-    if (sessionWas) session.mergeBang(sessionWas);
+    if (isTruthy(sessionWas)) session.mergeBang(sessionWas);
   }
 
   /** @internal Rails: `load_session(req)` (`id.rb:320-324`). */
@@ -195,7 +207,7 @@ export class Persisted {
   /** @internal Rails: `extract_session_id(request)` (`id.rb:328-332`). */
   extractSessionId(request: any): unknown {
     let sid = request.cookies[this.key];
-    if (sid == null && !this.cookieOnly) sid = request.params[this.key];
+    if (!isTruthy(sid) && !isTruthy(this.cookieOnly)) sid = request.params[this.key];
     return sid;
   }
 
@@ -207,12 +219,12 @@ export class Persisted {
   /** @internal Rails: `session_exists?(req)` (`id.rb:342-345`). */
   sessionExists(req: any): boolean {
     const value = this.currentSessionId(req);
-    return value != null && value !== false && String(value) !== "";
+    return isTruthy(value) && String(value) !== "";
   }
 
   /** @internal Rails: `commit_session?(req, session, options)` (`id.rb:350-357`). */
   isCommitSession(req: any, session: any, options: SessionOptions): boolean {
-    if (options.get("skip")) return false;
+    if (isTruthy(options.get("skip"))) return false;
     const hasSession =
       this.isLoadedSession(session) || this.isForcedSessionUpdate(session, options);
     return hasSession && this.isSecurityMatches(req, options);
@@ -225,14 +237,12 @@ export class Persisted {
 
   /** @internal Rails: `forced_session_update?(session, options)` (`id.rb:363-365`). */
   isForcedSessionUpdate(session: any, options: SessionOptions): boolean {
-    return this.isForceOptions(options) && session != null && !session.isEmpty();
+    return this.isForceOptions(options) && isTruthy(session) && !session.isEmpty();
   }
 
   /** @internal Rails: `force_options?(options)` (`id.rb:367-369`). */
   isForceOptions(options: SessionOptions): boolean {
-    return options
-      .valuesAt("maxAge", "renew", "drop", "defer", "expireAfter")
-      .some((v) => v != null && v !== false);
+    return options.valuesAt("maxAge", "renew", "drop", "defer", "expireAfter").some(isTruthy);
   }
 
   /**
@@ -245,7 +255,7 @@ export class Persisted {
    * absent method the same way.
    */
   isSecurityMatches(request: any, options: SessionOptions): boolean {
-    if (!options.get("secure")) return true;
+    if (!isTruthy(options.get("secure"))) return true;
     return request.isSsl?.() === true || this.assumeSsl === true;
   }
 
@@ -255,40 +265,45 @@ export class Persisted {
     const options: SessionOptions = session.options();
 
     let sessionId: unknown;
-    if (options.get("drop") || options.get("renew")) {
-      sessionId = this.deleteSession(req, session.id() ?? this.generateSid(), options);
-      // Ruby's `return unless session_id` (`id.rb:387`) is falsy on `false` too,
-      // which `delete_session` is free to return.
-      if (sessionId == null || sessionId === false) return;
+    if (isTruthy(options.get("drop")) || isTruthy(options.get("renew"))) {
+      // Ruby's `||` here and at `:393` falls through on `false` as well as
+      // `nil`; `??` would not (`id.rb:386`).
+      const currentId = session.id();
+      sessionId = this.deleteSession(
+        req,
+        isTruthy(currentId) ? currentId : this.generateSid(),
+        options,
+      );
+      if (!isTruthy(sessionId)) return;
     }
 
     if (!this.isCommitSession(req, session, options)) return;
 
     if (!this.isLoadedSession(session)) session.loadBang();
-    sessionId ??= session.id();
+    if (!isTruthy(sessionId)) sessionId = session.id();
     const sessionData = session.toHash();
     for (const k of Object.keys(sessionData)) {
       if (sessionData[k] == null) delete sessionData[k];
     }
 
     const data = this.writeSession(req, sessionId, sessionData, options);
-    if (!data) {
+    if (!isTruthy(data)) {
       // Rails writes onto `rack.errors`; trails' Rack env carries no such
       // stream, so the same warning goes to the console.
       console.warn(`Warning! ${this.constructor.name} failed to save session. Content dropped.`);
-    } else if (options.get("defer") && !options.get("renew")) {
+    } else if (isTruthy(options.get("defer")) && !isTruthy(options.get("renew"))) {
       // Rails' "Deferring cookie" notice is `$VERBOSE`-only (`id.rb:399`).
     } else {
       const cookie: Record<string, unknown> = {};
       cookie["value"] = this.cookieValue(data);
       const expireAfter = options.get("expireAfter");
-      if (expireAfter != null && expireAfter !== false) {
+      if (isTruthy(expireAfter)) {
         // boundary: `Time.now + options[:expire_after]` is an ABSOLUTE expiry
         // and `Rack::Utils.set_cookie_header` renders it through `httpDate`.
         cookie["expires"] = new Date(Date.now() + (expireAfter as number) * 1000);
       }
       const maxAge = options.get("maxAge");
-      if (maxAge != null && maxAge !== false) {
+      if (isTruthy(maxAge)) {
         // boundary: as above (`id.rb:404`).
         cookie["expires"] = new Date(Date.now() + (maxAge as number) * 1000);
       }
