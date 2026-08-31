@@ -118,33 +118,25 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.splice(idx, 1);
   }
 
-  move(target: MiddlewareFactory, index: number): void {
-    const idx = this.findIndex(target);
-    if (idx === -1) throw new Error("No such middleware to move");
-    const [entry] = this.entries.splice(idx, 1);
-    this.entries.splice(index, 0, entry);
+  move(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
+    const sourceIndex = this.assertIndex(source, "before");
+    const [sourceMiddleware] = this.entries.splice(sourceIndex, 1);
+
+    const targetIndex = this.assertIndex(target, "before");
+    this.entries.splice(targetIndex, 0, sourceMiddleware);
   }
 
-  moveBefore(target: MiddlewareFactory, beforeTarget: MiddlewareFactory): void {
-    const srcIdx = this.findIndex(target);
-    if (srcIdx === -1) throw new Error("No such middleware to move");
-    const [entry] = this.entries.splice(srcIdx, 1);
-    const destIdx = this.findIndex(beforeTarget);
-    if (destIdx === -1) throw new Error("No such middleware to move before");
-    this.entries.splice(destIdx, 0, entry);
+  /** Rails: `alias_method :move_before, :move`. */
+  moveBefore(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
+    this.move(target, source);
   }
 
-  moveAfter(target: MiddlewareFactory, afterTarget: MiddlewareFactory | number): void {
-    const srcIdx = this.findIndex(target);
-    if (srcIdx === -1) throw new Error("No such middleware to move");
-    const [entry] = this.entries.splice(srcIdx, 1);
-    if (typeof afterTarget === "number") {
-      this.entries.splice(afterTarget, 0, entry);
-    } else {
-      const destIdx = this.findIndex(afterTarget);
-      if (destIdx === -1) throw new Error("No such middleware to move after");
-      this.entries.splice(destIdx + 1, 0, entry);
-    }
+  moveAfter(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
+    const sourceIndex = this.assertIndex(source, "after");
+    const [sourceMiddleware] = this.entries.splice(sourceIndex, 1);
+
+    const targetIndex = this.assertIndex(target, "after");
+    this.entries.splice(targetIndex + 1, 0, sourceMiddleware);
   }
 
   includes(klass: MiddlewareFactory): boolean {

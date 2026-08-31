@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Renderer } from "./renderer.js";
 import { TemplateRenderer } from "./template-renderer.js";
-import { PartialRenderer, ObjectRenderer, CollectionRenderer } from "./partial-renderer.js";
+import { PartialRenderer } from "./partial-renderer.js";
+import { ObjectRenderer } from "./object-renderer.js";
+import { CollectionRenderer } from "./collection-renderer.js";
 import { LookupContext } from "../lookup-context.js";
 import type { ViewContext } from "./abstract-renderer.js";
 

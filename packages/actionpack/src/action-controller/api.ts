@@ -9,6 +9,7 @@ import { Metal } from "./metal.js";
 import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
+import { logAt } from "./metal/logging.js";
 
 export class API extends Metal {
   static withoutModules<T extends typeof API>(this: T, ..._modules: unknown[]): T {
@@ -22,6 +23,9 @@ export class API extends Metal {
    * (actionpack/lib/action_controller/api.rb:125).
    */
   static rateLimit = rateLimit;
+
+  /** Rails: `include Logging` (base.rb:302) — `log_at` (metal/logging.rb:17). */
+  static logAt = logAt;
 
   /** @internal Private in Rails; prototype slot enables subclass overrides. */
   async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {

@@ -484,8 +484,8 @@ export class Builder implements InsertBuilder {
   }
 
   /** @internal */
-  private quoteColumn(name: string): string {
-    return this._connection.quoteColumnName(name);
+  private quoteColumn(column: string): string {
+    return this._connection.quoteColumnName(column);
   }
 
   /** @internal */

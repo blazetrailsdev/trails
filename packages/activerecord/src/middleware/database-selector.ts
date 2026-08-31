@@ -1,4 +1,5 @@
 import { Notifications } from "@blazetrails/activesupport";
+import { _ActionDispatchRequest } from "./request-slot.js";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
 import { Session } from "./database-selector/resolver/session.js";
@@ -25,10 +26,10 @@ export class DatabaseSelector {
   readonly contextKlass: ContextClass;
   readonly options: Record<string, unknown>;
 
-  private readonly app: (request: MiddlewareRequest) => Promise<unknown>;
+  private readonly app: (env: Record<string, unknown>) => Promise<unknown>;
 
   constructor(
-    app: (request: MiddlewareRequest) => Promise<unknown>,
+    app: (env: Record<string, unknown>) => Promise<unknown>,
     resolverKlass?: ResolverClass,
     contextKlass?: ContextClass,
     options: Record<string, unknown> = {},
@@ -39,8 +40,10 @@ export class DatabaseSelector {
     this.options = options;
   }
 
-  async call(request: MiddlewareRequest): Promise<unknown> {
-    return this.selectDatabase(request, () => this.app(request));
+  async call(env: Record<string, unknown>): Promise<unknown> {
+    const request = new _ActionDispatchRequest!(env) as MiddlewareRequest;
+
+    return this.selectDatabase(request, () => this.app(env));
   }
 
   /**

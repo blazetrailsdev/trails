@@ -2,7 +2,9 @@ import type { LookupContext } from "../lookup-context.js";
 import type { ViewContext, RenderOptions } from "./abstract-renderer.js";
 import { RenderedTemplate } from "./abstract-renderer.js";
 import { TemplateRenderer } from "./template-renderer.js";
-import { PartialRenderer, ObjectRenderer, CollectionRenderer } from "./partial-renderer.js";
+import { PartialRenderer } from "./partial-renderer.js";
+import { ObjectRenderer } from "./object-renderer.js";
+import { CollectionRenderer } from "./collection-renderer.js";
 import { StreamingBody } from "./streaming-template-renderer.js";
 
 export type { ViewContext, RenderOptions };

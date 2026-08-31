@@ -145,55 +145,74 @@ describe("MiddlewareStackTest", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
     stack.use(BarMiddleware);
-    stack.use(BazMiddleware);
-    stack.move(BazMiddleware, 0);
-    expect(stack.get(0)?.klass).toBe(BazMiddleware);
+    stack.move(0, BarMiddleware);
+    expect(stack.get(0)?.klass).toBe(BarMiddleware);
+    expect(stack.get(1)?.klass).toBe(FooMiddleware);
   });
 
   it("move requires the moved middleware to be in the stack", () => {
     const stack = new MiddlewareStack();
-    expect(() => stack.move(FooMiddleware, 0)).toThrow();
+    stack.use(FooMiddleware);
+    stack.use(BarMiddleware);
+    expect(() => stack.move(0, BazMiddleware)).toThrow();
   });
 
   it("move preserves the arguments of the moved middleware", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
-    stack.use(QuxMiddleware, "test-arg");
-    stack.move(QuxMiddleware, 0);
-    expect(stack.get(0)?.args).toEqual(["test-arg"]);
+    stack.use(BarMiddleware);
+    stack.use(BazMiddleware, true, { foo: "bar" });
+    stack.moveBefore(FooMiddleware, BazMiddleware);
+
+    expect(stack.get(0)?.args).toEqual([true, { foo: "bar" }]);
   });
 
   it("move_before moves middleware before another middleware class", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
     stack.use(BarMiddleware);
-    stack.use(BazMiddleware);
-    stack.moveBefore(BazMiddleware, FooMiddleware);
-    expect(stack.get(0)?.klass).toBe(BazMiddleware);
+    stack.moveBefore(FooMiddleware, BarMiddleware);
+    expect(stack.get(0)?.klass).toBe(BarMiddleware);
     expect(stack.get(1)?.klass).toBe(FooMiddleware);
   });
 
   it("move_after requires the moved middleware to be in the stack", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
-    expect(() => stack.moveAfter(BarMiddleware, FooMiddleware)).toThrow();
+    stack.use(BarMiddleware);
+    expect(() => stack.moveAfter(BarMiddleware, BazMiddleware)).toThrow();
+  });
+
+  it("move_after moves middleware after the integer index", () => {
+    const stack = new MiddlewareStack();
+    stack.use(FooMiddleware);
+    stack.use(BarMiddleware);
+    stack.insertAfter(BarMiddleware, BazMiddleware);
+    stack.moveAfter(0, BazMiddleware);
+    expect(stack.get(0)?.klass).toBe(FooMiddleware);
+    expect(stack.get(1)?.klass).toBe(BazMiddleware);
+    expect(stack.get(2)?.klass).toBe(BarMiddleware);
   });
 
   it("move_after moves middleware after another middleware class", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
     stack.use(BarMiddleware);
-    stack.use(BazMiddleware);
-    stack.moveAfter(FooMiddleware, BazMiddleware);
-    expect(stack.get(2)?.klass).toBe(FooMiddleware);
+    stack.insertAfter(BarMiddleware, BazMiddleware);
+    stack.moveAfter(BarMiddleware, FooMiddleware);
+    expect(stack.get(0)?.klass).toBe(BarMiddleware);
+    expect(stack.get(1)?.klass).toBe(FooMiddleware);
+    expect(stack.get(2)?.klass).toBe(BazMiddleware);
   });
 
   it("move_afters preserves the arguments of the moved middleware", () => {
     const stack = new MiddlewareStack();
-    stack.use(QuxMiddleware, "my-arg");
     stack.use(FooMiddleware);
-    stack.moveAfter(QuxMiddleware, FooMiddleware);
-    expect(stack.get(1)?.args).toEqual(["my-arg"]);
+    stack.use(BarMiddleware);
+    stack.use(BazMiddleware, true, { foo: "bar" });
+    stack.moveAfter(FooMiddleware, BazMiddleware);
+
+    expect(stack.get(1)?.args).toEqual([true, { foo: "bar" }]);
   });
 
   it("unshift adds a new middleware at the beginning of the stack", () => {
