@@ -34,6 +34,7 @@ import {
   ShowExceptions,
   SSL,
   Static,
+  Session,
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { Root } from "./paths.js";
@@ -286,14 +287,16 @@ describe("Application", () => {
       class IApp6 extends Application {}
       Application.register(IApp6);
       const names = IApp6.instance().initializers.map((i) => i.name);
-      expect(names.slice(-8)).toEqual([
+      expect(names.slice(-10)).toEqual([
         "add_generator_templates",
         "setup_main_autoloader",
-        "add_internal_routes",
         "build_middleware_stack",
         "define_main_app_helper",
         "add_to_prepare_blocks",
         "run_prepare_callbacks",
+        "eager_load!",
+        "finisher_hook",
+        "add_internal_routes",
         "set_routes_reloader_hook",
       ]);
     });
@@ -378,6 +381,42 @@ describe("Trails.application integration (boot-app fixture)", () => {
 });
 
 describe("Application::Configuration", () => {
+  it("config.session_store writes the store and reads it back resolved", () => {
+    const c = new Configuration();
+    expect(c.sessionStoreQ()).toBeNull();
+    expect(c.sessionStore()).toBeNull();
+
+    c.sessionStore(":cookie_store", { key: "_myapp_session" });
+    expect(c.sessionStoreQ()).toBe(":cookie_store");
+    expect(c.sessionStore()).toBe(Session.CookieStore);
+    expect(c.sessionOptions).toEqual({ key: "_myapp_session" });
+  });
+
+  it("config.session_store :disabled reads back as nil", () => {
+    const c = new Configuration();
+    c.sessionStore(":disabled");
+    expect(c.sessionStoreQ()).toBe(":disabled");
+    expect(c.sessionStore()).toBeNull();
+  });
+
+  it("config.session_store with custom custom stores search for it inside the ActionDispatch::Session namespace", () => {
+    class MyCustomStore extends Session.CookieStore {}
+    Session.sessionStoreConstants.set("MyCustomStore", MyCustomStore);
+    try {
+      const c = new Configuration();
+      c.sessionStore(":my_custom_store");
+      expect(c.sessionStore()).toBe(MyCustomStore);
+    } finally {
+      Session.sessionStoreConstants.delete("MyCustomStore");
+    }
+  });
+
+  it("config.session_store with unknown store raises helpful error", () => {
+    const c = new Configuration();
+    c.sessionStore(":nonexistent_store");
+    expect(() => c.sessionStore()).toThrow(/Unable to resolve session store :nonexistent_store/);
+  });
+
   it("defaults match Rails::Application::Configuration#initialize", () => {
     const c = new Configuration();
     expect(c.considerAllRequestsLocal).toBe(false);
@@ -509,7 +548,7 @@ describe("Application::DefaultMiddlewareStack", () => {
     const app = buildApp();
     class FakeSessionStore {}
     app.config.forceSsl = true;
-    app.config.sessionStore = FakeSessionStore;
+    app.config.sessionStore(FakeSessionStore);
     new DefaultMiddlewareStack(app, app.config, paths).buildStack();
     expect(app.config.sessionOptions.secure).toBe(true);
   });

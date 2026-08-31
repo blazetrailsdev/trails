@@ -9,13 +9,14 @@ import {
   type FinisherRoutes,
   type FinisherRoutesReloader,
 } from "./finisher.js";
+import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
 import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { Mapper } from "@blazetrails/actionpack";
 
 class TestApp extends Finisher {
-  config: FinisherConfig = { toPrepareBlocks: [], eagerLoad: null };
+  config: FinisherConfig = { toPrepareBlocks: [], eagerLoad: null, eagerLoadNamespaces: [] };
   calls: string[] = [];
   internalRoutes: string[] = [];
   toPrepared: ConfigurationBlock[] = [];
@@ -86,11 +87,13 @@ describe("Finisher", () => {
     expect(names).toEqual([
       "add_generator_templates",
       "setup_main_autoloader",
-      "add_internal_routes",
       "build_middleware_stack",
       "define_main_app_helper",
       "add_to_prepare_blocks",
       "run_prepare_callbacks",
+      "eager_load!",
+      "finisher_hook",
+      "add_internal_routes",
       "set_routes_reloader_hook",
     ]);
   });
@@ -98,9 +101,7 @@ describe("Finisher", () => {
   it("does not register the intentionally skipped initializers", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
     for (const skipped of [
-      "eager_load!",
       "setup_default_session_store",
-      "finisher_hook",
       "configure_executor_for_concurrency",
       "set_clear_dependencies_hook",
       "enable_yjit",
@@ -183,5 +184,37 @@ describe("Finisher", () => {
     await run(app, "set_routes_reloader_hook");
     expect(app.routesReloader().eagerLoad).toBe(true);
     expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded"]);
+  });
+
+  it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {
+    const app = new TestApp();
+    const seen: string[] = [];
+    onLoad("before_eager_load", () => {
+      seen.push("before_eager_load");
+    });
+    app.config.eagerLoad = true;
+    app.config.eagerLoadNamespaces = [{ eagerLoadBang: () => seen.push("namespace") }];
+    await run(app, "eager_load!");
+    expect(seen).toEqual(["before_eager_load", "namespace"]);
+    resetLoadHooks();
+  });
+
+  it("eager_load! is a no-op when config.eagerLoad is false", async () => {
+    const app = new TestApp();
+    const seen: string[] = [];
+    app.config.eagerLoadNamespaces = [{ eagerLoadBang: () => seen.push("namespace") }];
+    await run(app, "eager_load!");
+    expect(seen).toEqual([]);
+  });
+
+  it("finisher_hook runs the after_initialize load hooks", async () => {
+    const app = new TestApp();
+    const seen: unknown[] = [];
+    onLoad("after_initialize", (base: unknown) => {
+      seen.push(base);
+    });
+    await run(app, "finisher_hook");
+    expect(seen).toEqual([app]);
+    resetLoadHooks();
   });
 });

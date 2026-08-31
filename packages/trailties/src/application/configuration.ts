@@ -2,6 +2,7 @@
 // `railties/lib/rails/application/configuration.rb`. PR 2.5b: scalar/state
 // defaults only — `loadDefaults(version)` version-dispatch + credentials +
 // `databaseConfiguration` are 2.5c or later.
+import { Session } from "@blazetrails/actionpack";
 import { EngineConfiguration } from "../engine/configuration.js";
 import type { Root } from "../paths.js";
 
@@ -30,8 +31,6 @@ export class Configuration extends EngineConfiguration {
   assumeSsl = false;
   forceSsl = false;
   sslOptions: SslOptions = {};
-  sessionStore: unknown = null;
-  sessionOptions: Record<string, unknown> = {};
   timeZone = "UTC";
   beginningOfWeek: WeekDay = "monday";
   logger: unknown = null;
@@ -64,6 +63,42 @@ export class Configuration extends EngineConfiguration {
   rakeEagerLoad = false;
   serverTiming = false;
   yjit = false;
+
+  /** @internal `@session_store` (`application/configuration.rb:545`). */
+  private _sessionStore: unknown = null;
+  /** @internal `@session_options` (`application/configuration.rb:546`). */
+  private _sessionOptions: Record<string, unknown> = {};
+
+  /**
+   * Mirrors `Configuration#session_store`
+   * (`application/configuration.rb:543-557`). Ruby's one method both writes
+   * (with an argument) and reads (without); the reader resolves a Symbol
+   * through `ActionDispatch::Session.resolve_store`.
+   */
+  sessionStore(newSessionStore?: unknown, options?: Record<string, unknown>): unknown {
+    if (newSessionStore != null && newSessionStore !== false) {
+      this._sessionStore = newSessionStore;
+      return (this._sessionOptions = options ?? {});
+    }
+    if (this._sessionStore === ":disabled") return null;
+    if (typeof this._sessionStore === "string" && this._sessionStore.startsWith(":")) {
+      return Session.resolveStore(this._sessionStore);
+    }
+    return this._sessionStore;
+  }
+
+  /** Mirrors `Configuration#session_store?` (`application/configuration.rb:559-561`). */
+  sessionStoreQ(): unknown {
+    return this._sessionStore;
+  }
+
+  /** Mirrors the `attr_accessor :session_options` (`application/configuration.rb:32`). */
+  get sessionOptions(): Record<string, unknown> {
+    return this._sessionOptions;
+  }
+  set sessionOptions(value: Record<string, unknown>) {
+    this._sessionOptions = value;
+  }
 
   get enableReloading(): boolean {
     return !this.cacheClasses;

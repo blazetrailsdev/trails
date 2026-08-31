@@ -18,12 +18,27 @@
  * are Proxy-generated (`string-inquirer.ts:12-28`) and so are absent from its
  * static type.
  *
- * The Rails initializers tied to Zeitwerk, eager loading, the
- * reloader/executor concurrency hooks, default session store, dependency
- * clearing, and YJIT are intentionally not ported here — they depend on subsystems we don't have or are out
- * of scope per the trailties plan.
+ * Four of Rails' fourteen finisher initializers have no declaration here,
+ * each because the subsystem it drives is unported:
+ *
+ * - `setup_default_session_store` (`finisher.rb:48-54`) — sets
+ *   `config.session_store :cookie_store` so `build_stack` mounts a store
+ *   (`default_middleware_stack.rb:76-81`). The `Configuration#session_store`
+ *   reader it writes through IS ported (`application/configuration.ts`), but
+ *   `Rack::Session::Abstract::Persisted#call` is not — the ported
+ *   `AbstractStore` has no `call`, so a mounted `CookieStore` cannot serve a
+ *   request. Blocked on porting Rack's session middleware cycle.
+ * - `configure_executor_for_concurrency` (`finisher.rb:118-135`), with its
+ *   `MonitorHook` / `InterlockHook` — `ActiveSupport::Executor#register_hook`
+ *   and `ActiveSupport::Dependencies.interlock` are both unported, so there is
+ *   no hook registry to register against.
+ * - `set_clear_dependencies_hook` (`finisher.rb:182-228`) — clears
+ *   `ActiveSupport::Dependencies` and `DescendantsTracker` around a reload.
+ *   ESM has no constant unloading, so there is nothing to clear.
+ * - `enable_yjit` (`finisher.rb:230-234`) — YJIT is a MRI JIT with no JS
+ *   analogue.
  */
-import { getFsAsync, getPathAsync, underscore } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, runLoadHooks, underscore } from "@blazetrails/activesupport";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
@@ -46,6 +61,7 @@ export interface FinisherReloader {
 export interface FinisherConfig {
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
+  eagerLoadNamespaces: unknown[];
 }
 
 export interface FinisherRoutesReloader {
@@ -90,22 +106,6 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   }
 });
 
-Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
-  if (!(Trails.env as unknown as Record<string, () => boolean>)["development?"]()) return;
-  this.routes().prepend((mapper) => {
-    mapper.get("/rails/info/properties", { to: "rails/info#properties", internal: true });
-    mapper.get("/rails/info/routes", { to: "rails/info#routes", internal: true });
-    mapper.get("/rails/info/notes", { to: "rails/info#notes", internal: true });
-    mapper.get("/rails/info", { to: "rails/info#index", internal: true });
-  });
-
-  this.routesReloader().runAfterLoadPaths = () => {
-    this.routes().append((mapper) => {
-      mapper.get("/", { to: "rails/welcome#index", internal: true });
-    });
-  };
-});
-
 Finisher.initializer("build_middleware_stack", function (this: FinisherHost) {
   this.buildMiddlewareStack();
 });
@@ -122,6 +122,46 @@ Finisher.initializer("add_to_prepare_blocks", function (this: FinisherHost) {
 
 Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
   this.reloader.prepareBang();
+});
+
+/**
+ * Mirrors `Finisher`'s `eager_load!` initializer (`finisher.rb:75-88`).
+ *
+ * @missingRailsCall eager_load_all — CONVERGEABLE port-eager-load-autoloader-arms
+ * @missingRailsCall eager_load! — CONVERGEABLE port-eager-load-autoloader-arms
+ * @missingRailsCall after_class_unload — CONVERGEABLE port-eager-load-autoloader-arms
+ */
+Finisher.initializer("eager_load!", function (this: FinisherHost) {
+  if (this.config.eagerLoad === true) {
+    runLoadHooks("before_eager_load", this);
+    for (const namespace of this.config.eagerLoadNamespaces) {
+      (namespace as { eagerLoadBang(): void }).eagerLoadBang();
+    }
+  }
+});
+
+/**
+ * Mirrors `Finisher`'s `finisher_hook` initializer (`finisher.rb:90-93`) —
+ * "all initialization is done, including eager loading in production".
+ */
+Finisher.initializer("finisher_hook", function (this: FinisherHost) {
+  runLoadHooks("after_initialize", this);
+});
+
+Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
+  if (!(Trails.env as unknown as Record<string, () => boolean>)["development?"]()) return;
+  this.routes().prepend((mapper) => {
+    mapper.get("/rails/info/properties", { to: "rails/info#properties", internal: true });
+    mapper.get("/rails/info/routes", { to: "rails/info#routes", internal: true });
+    mapper.get("/rails/info/notes", { to: "rails/info#notes", internal: true });
+    mapper.get("/rails/info", { to: "rails/info#index", internal: true });
+  });
+
+  this.routesReloader().runAfterLoadPaths = () => {
+    this.routes().append((mapper) => {
+      mapper.get("/", { to: "rails/welcome#index", internal: true });
+    });
+  };
 });
 
 /**

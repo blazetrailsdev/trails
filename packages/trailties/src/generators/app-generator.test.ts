@@ -96,6 +96,10 @@ describe("AppGenerator", () => {
     expect(exists("test/integration/.gitkeep")).toBe(true);
     expect(exists("test/fixtures/files/.gitkeep")).toBe(true);
 
+    // Rails ships no `public/index.html` — a new app's welcome page is a route
+    // to `Rails::WelcomeController`, and one on disk would shadow the root
+    // route `add_internal_routes` appends (`finisher.rb:148-152`).
+    expect(exists("public/index.html")).toBe(false);
     expect(exists("public/404.html")).toBe(true);
     expect(exists("public/422.html")).toBe(true);
     expect(exists("public/500.html")).toBe(true);
@@ -148,6 +152,36 @@ describe("AppGenerator", () => {
     expect(pkg.scripts["db:seed"]).toBeDefined();
     expect(pkg.scripts["db:setup"]).toBeDefined();
     expect(pkg.devDependencies.vite).toBeDefined();
+    expect(pkg.devDependencies.tsx).toBeDefined();
+    // Every CLI command that executes application code enters through the tsx
+    // loader; a bare `trails db seed` cannot resolve the `.js` specifiers a
+    // Node16 `.ts` source spells.
+    expect(pkg.scripts["db:seed"]).toContain("tsx");
+    expect(pkg.scripts.dev).toContain("tsx");
+    expect(pkg.scripts.trails).toContain("tsx");
+    // Rails' binstub wrappers go through `bin/rails` (`bin/setup.tt:33`,
+    // `bin/dev.tt:1`); the trails equivalent is the loader-backed command, so
+    // the generated entrypoints do not bypass it.
+    // Rails' wrappers go through the app binstub (`bin/setup.tt:33`,
+    // `bin/dev.tt:1`), and `bin/rails` is what loads the app; the trails
+    // binstub is where the loader lives, so nothing may reach the CLI around it.
+    const binstub = (n: string) => fs.readFileSync(appPath("bin", n), "utf-8");
+    expect(binstub("trails")).toContain("tsx");
+    expect(binstub("setup")).toContain("bin/trails");
+    expect(binstub("dev")).toContain('"trails"');
+    // Rails' `exec "./bin/rails", "server", *ARGV` (`bin/dev.tt:1`) hands argv
+    // to the process, so an argument with a space or a shell metacharacter
+    // survives. A joined command string would not.
+    for (const n of ["trails", "dev"]) {
+      expect(binstub(n)).toContain("spawnSync");
+      expect(binstub(n)).not.toContain('.join(" ")');
+      // `bin/` is run directly, where nothing puts node_modules/.bin on PATH,
+      // so both halves resolve from the binstub's own location.
+      expect(binstub(n)).toContain("fileURLToPath(import.meta.url)");
+    }
+    expect(binstub("trails")).toContain('join(root, "node_modules", ".bin", "tsx")');
+    const readme = fs.readFileSync(appPath("README.md"), "utf-8");
+    expect(readme).not.toMatch(/^\| `trails /m);
   });
 
   it("emits prepare hook that builds .tse views", async () => {

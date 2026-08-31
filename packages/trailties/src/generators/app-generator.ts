@@ -34,6 +34,21 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
   sqliteDriver?: SqliteDriver;
 }
 
+/**
+ * The one supported way a generated app invokes the trails CLI: through the
+ * `tsx` loader, so a command that imports application code can resolve the
+ * `.js` specifiers `Node16` resolution requires of a `.ts` source.
+ *
+ * The package scripts name the loader bare, because a package manager puts
+ * `node_modules/.bin` on PATH for them. `bin/trails` is run directly, where
+ * nothing does, so it resolves both halves from its own location instead —
+ * the same way `bin/rails` reaches the app through `require_relative`
+ * (`bin/rails.tt:3`) rather than through PATH.
+ */
+const TRAILS_LOADER = "tsx";
+const TRAILS_CLI = "node_modules/@blazetrails/trailties/bin/trails.js";
+const TRAILS = `${TRAILS_LOADER} ${TRAILS_CLI}`;
+
 export class AppGenerator extends AppBase {
   readonly packageManager: PackageManager;
   readonly sqliteDriver: SqliteDriver;
@@ -101,6 +116,16 @@ export class AppGenerator extends AppBase {
     }
   }
 
+  /**
+   * `npm run` / `pnpm` / `yarn` — the prefix a generated script is invoked
+   * with. Rails has no analogue: `bin/rails` is executable because Ruby needs
+   * no build step, while every trails CLI command that executes application
+   * code has to enter through the `tsx` loader the scripts declare.
+   */
+  private pmRun(): string {
+    return this.packageManager === "npm" ? "npm run" : this.packageManager;
+  }
+
   private pmInstall(): string {
     return this.packageManager === "yarn" ? "yarn" : `${this.packageManager} install`;
   }
@@ -126,7 +151,7 @@ export class AppGenerator extends AppBase {
     this.createAppFiles(name);
     this.createDbFiles();
     this.createTestFiles();
-    this.createPublicFiles(name);
+    this.createPublicFiles();
     this.createDirectoryPlaceholders();
 
     if (!this.options.skipDocker) {
@@ -167,12 +192,13 @@ export class AppGenerator extends AppBase {
           scripts: {
             build: "tsc",
             test: "vitest run",
-            dev: "trails server",
-            "db:create": "trails db create",
-            "db:migrate": "trails db migrate",
-            "db:seed": "trails db seed",
-            "db:setup": "trails db create && trails db migrate && trails db seed",
-            "db:reset": "trails db drop && trails db setup",
+            trails: TRAILS,
+            dev: `${TRAILS} server`,
+            "db:create": `${TRAILS} db create`,
+            "db:migrate": `${TRAILS} db migrate`,
+            "db:seed": `${TRAILS} db seed`,
+            "db:setup": `${TRAILS} db create && ${TRAILS} db migrate && ${TRAILS} db seed`,
+            "db:reset": `${TRAILS} db drop && ${TRAILS} db create && ${TRAILS} db migrate && ${TRAILS} db seed`,
             prepare: "trails-tsc-views build --views app/views",
           },
           dependencies: {
@@ -187,6 +213,7 @@ export class AppGenerator extends AppBase {
           },
           devDependencies: {
             "@blazetrails/trails-tsc": "*",
+            tsx: "^4.20.0",
             typescript: "^5.7.0",
             vite: "^7.0.0",
             vitest: "^3.0.0",
@@ -271,20 +298,32 @@ This application was generated with [trails](https://github.com/blazetrailsdev/b
 
     cd ${name}
     ${this.pmInstall()}
-    trails db setup
-    trails server
+    ${this.pmRun()} db:setup
+    ${this.pmRun()} dev
+
+Every command below that executes application code — anything that imports a
+model, \`config/database.ts\`, or \`config/routes.ts\` — must run through the
+\`tsx\` loader, because the app's sources are TypeScript and \`Node16\`
+resolution spells its imports with a \`.js\` extension that has no file behind
+it until the loader transforms them. The generated \`package.json\` scripts and
+the \`bin/\` binstubs already do this, so every command below is loader-backed.
+To reach a CLI command with no script of its own, use the \`bin/trails\`
+binstub:
+
+    bin/trails routes
+    bin/trails console
 
 ## Commands
 
 | Command | Description |
 | --- | --- |
-| \`trails server\` | Start the development server |
-| \`trails generate model NAME\` | Generate a new model |
-| \`trails generate controller NAME\` | Generate a new controller |
-| \`trails generate scaffold NAME\` | Generate a full CRUD resource |
-| \`trails db migrate\` | Run pending database migrations |
-| \`trails db seed\` | Seed the database |
-| \`trails test\` | Run the test suite |
+| \`${this.pmRun()} dev\` | Start the development server |
+| \`bin/trails generate model NAME\` | Generate a new model |
+| \`bin/trails generate controller NAME\` | Generate a new controller |
+| \`bin/trails generate scaffold NAME\` | Generate a full CRUD resource |
+| \`${this.pmRun()} db:migrate\` | Run pending database migrations |
+| \`${this.pmRun()} db:seed\` | Seed the database |
+| \`${this.pmRun()} test\` | Run the test suite |
 
 ## Configuration
 
@@ -331,10 +370,17 @@ export default defineConfig({
     this.createFile(
       "bin/trails",
       `#!/usr/bin/env node
-import { createProgram } from "@blazetrails/trailties";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
-const program = createProgram();
-program.parse(process.argv);
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const { status } = spawnSync(
+  join(root, "node_modules", ".bin", "${TRAILS_LOADER}"),
+  [join(root, "${TRAILS_CLI}"), ...process.argv.slice(2)],
+  { stdio: "inherit" },
+);
+process.exit(status ?? 1);
 `,
       { mode: 0o755 },
     );
@@ -354,7 +400,7 @@ console.log("== Installing dependencies ==");
 system("${this.pmInstall()}");
 
 console.log("\\n== Preparing database ==");
-system("trails db setup");
+system("bin/trails db setup");
 
 console.log("\\n== Removing old logs and tempfiles ==");
 for (const dir of ["log", "tmp"]) {
@@ -371,9 +417,16 @@ console.log("\\n== Done! ==");
     this.createFile(
       "bin/dev",
       `#!/usr/bin/env node
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
-execSync("trails server", { stdio: "inherit" });
+const { status } = spawnSync(
+  join(dirname(fileURLToPath(import.meta.url)), "trails"),
+  ["server", ...process.argv.slice(2)],
+  { stdio: "inherit" },
+);
+process.exit(status ?? 1);
 `,
       { mode: 0o755 },
     );
@@ -751,110 +804,7 @@ export async function setupTestDatabase(): Promise<void> {
     this.createFile("test/fixtures/files/.gitkeep", "");
   }
 
-  private createPublicFiles(name: string): void {
-    this.createFile(
-      "public/index.html",
-      `<!DOCTYPE html>
-<html>
-<head>
-  <title>${name}</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #f5f0eb;
-      color: #3d3229;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 60px 20px;
-    }
-    .container {
-      max-width: 640px;
-      margin: 0 auto;
-    }
-    h1 {
-      font-size: 2.5em;
-      font-weight: 700;
-      margin-bottom: 0.25em;
-    }
-    .subtitle {
-      color: #8b7355;
-      font-size: 1.2em;
-      margin-bottom: 2em;
-    }
-    .version {
-      display: inline-block;
-      background: #d4a574;
-      color: white;
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 0.8em;
-      font-weight: 600;
-      vertical-align: middle;
-    }
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 16px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
-    .card h2 {
-      font-size: 1.1em;
-      margin-bottom: 12px;
-      color: #5c4a32;
-    }
-    code {
-      background: #f0e8df;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 0.9em;
-    }
-    pre {
-      background: #2d2418;
-      color: #e8ddd0;
-      padding: 16px;
-      border-radius: 8px;
-      overflow-x: auto;
-      font-size: 0.85em;
-      line-height: 1.6;
-    }
-    pre span { color: #d4a574; }
-    .footer {
-      margin-top: 2em;
-      color: #8b7355;
-      font-size: 0.85em;
-    }
-    a { color: #8b5e34; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>\u{1f6a4} ${name} <span class="version">Trails</span></h1>
-    <p class="subtitle">You're on Trails! Time to blaze some.</p>
-
-    <div class="card">
-      <h2>Getting started</h2>
-      <pre><span>$</span> trails generate model Post title:string body:text
-<span>$</span> trails db migrate
-<span>$</span> trails generate controller Posts index show</pre>
-    </div>
-
-    <div class="card">
-      <h2>About your application</h2>
-      <p>This page is <code>public/index.html</code>. To replace it, define a root route in <code>config/routes.ts</code>:</p>
-      <pre>router.get("/", "home#index");</pre>
-    </div>
-
-    <p class="footer">
-      <a href="https://github.com/blazetrailsdev/trails">Trails on GitHub</a>
-    </p>
-  </div>
-</body>
-</html>
-`,
-    );
-
+  private createPublicFiles(): void {
     this.createFile(
       "public/404.html",
       `<!DOCTYPE html>

@@ -150,7 +150,6 @@ export class Application extends Engine {
     setTrailsRoot(() => this.config.root ?? bootRoot);
     await this.runInitializers(group, this);
     this._initialized = true;
-    runLoadHooks("after_initialize", this);
     return this;
   }
 

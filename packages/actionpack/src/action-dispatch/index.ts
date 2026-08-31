@@ -70,6 +70,7 @@ export { ContentSecurityPolicyMiddleware } from "./middleware/content-security-p
 export { redirectTo, redirectBack, type RedirectResult } from "./redirect.js";
 export { FlashHash } from "./middleware/flash.js";
 export { Static, type StaticOptions } from "./middleware/static.js";
+export * as Session from "./middleware/session/index.js";
 export {
   RequestForgeryProtection,
   InvalidAuthenticityToken,
