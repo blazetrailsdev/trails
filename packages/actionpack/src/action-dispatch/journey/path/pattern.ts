@@ -1,3 +1,4 @@
+import { transformValues } from "@blazetrails/ruby-compat";
 import { Ast } from "../ast.js";
 import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
@@ -339,15 +340,14 @@ export class Pattern {
 
   get requirementsForMissingKeysCheck(): Record<string, RegExp> {
     if (this._requirementsAnchoredCache) return this._requirementsAnchoredCache;
-    const out: Record<string, RegExp> = {};
-    for (const [k, v] of Object.entries(this.requirements)) {
+    this._requirementsAnchoredCache = transformValues(
+      this.requirements,
       // Wrap the union in `(?:…)` so the anchors bind around the whole
       // alternation: `^a|b$` parses as `(^a)|(b$)`, which isn't what we
       // want for a missing-keys equality check.
-      out[k] = new RegExp(`^(?:${regexUnion(v)})$`, combinedFlagsFor([v]));
-    }
-    this._requirementsAnchoredCache = out;
-    return out;
+      (regex) => new RegExp(`^(?:${regexUnion(regex)})$`, combinedFlagsFor([regex])),
+    );
+    return this._requirementsAnchoredCache;
   }
 
   /** @internal */

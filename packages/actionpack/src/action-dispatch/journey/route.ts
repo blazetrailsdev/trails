@@ -1,3 +1,4 @@
+import { deleteIf, merge } from "@blazetrails/ruby-compat";
 import type { Pattern } from "./path/pattern.js";
 import type { Node } from "./nodes/node.js";
 import type { Format } from "./visitors.js";
@@ -152,15 +153,14 @@ export class Route {
   /**
    * Defaults minus path-known requirements that match the default star regex.
    * Mirrors Rails: `defaults.merge(path.requirements).delete_if { |_,v| /.+?/m == v }`.
+   *
+   * @missingRailsArgs delete_if — PERMANENT
    */
   get requirements(): Record<string, unknown> {
-    const merged: Record<string, unknown> = { ...this.defaults, ...this.path.requirements };
-    for (const [k, v] of Object.entries(merged)) {
-      if (v instanceof RegExp && v.source === ".+?" && v.flags.includes("s")) {
-        delete merged[k];
-      }
-    }
-    return merged;
+    return deleteIf(
+      merge(this.defaults, this.path.requirements),
+      (_, v) => v instanceof RegExp && v.source === ".+?" && v.flags.includes("s"),
+    );
   }
 
   get segments(): readonly string[] {
@@ -204,14 +204,11 @@ export class Route {
 
   get requiredDefaults(): Record<string, unknown> {
     if (this._requiredDefaultsCache) return this._requiredDefaultsCache;
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this.defaults)) {
-      if (this.parts.includes(k)) continue;
-      if (!this.isRequiredDefault(k)) continue;
-      out[k] = v;
-    }
-    this._requiredDefaultsCache = out;
-    return out;
+    this._requiredDefaultsCache = deleteIf(
+      { ...this.defaults },
+      (k) => this.parts.includes(k) || !this.isRequiredDefault(k),
+    );
+    return this._requiredDefaultsCache;
   }
 
   isGlob(): boolean {

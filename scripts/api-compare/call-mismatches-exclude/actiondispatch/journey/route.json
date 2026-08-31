@@ -2,27 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "journey/route.ts",
-    "rubyName": "required_defaults",
-    "call": "delete_if",
-    "reason": "Verified per-site (RFC 0106): `@defaults.dup.delete_if { … }` (route.rb:135-137) is spelled as an `Object.entries` loop that skips the rejected keys while building the copy; `Hash#delete_if` has no JS call form."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "journey/route.ts",
-    "rubyName": "requirements",
-    "call": "delete_if",
-    "reason": "Verified per-site (RFC 0106): `delete_if { |_, v| /.+?/m == v }` (route.rb:96-98) is spelled as an `Object.entries` loop with `delete merged[k]`; `Hash#delete_if` has no JS call form."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "journey/route.ts",
-    "rubyName": "requirements",
-    "call": "merge",
-    "reason": "Verified per-site (RFC 0106): `@defaults.merge(path.requirements)` (route.rb:96) is object spread `{ ...this.defaults, ...this.path.requirements }`; `Hash#merge` has no JS call form."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "journey/route.ts",
     "rubyName": "verb_matcher",
     "call": "fetch",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
