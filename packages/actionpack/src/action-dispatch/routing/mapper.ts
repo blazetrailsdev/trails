@@ -23,7 +23,8 @@ import {
 } from "./route.js";
 import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Scope, type ScopeLevel } from "./scope.js";
-import { underscore } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, underscore } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -528,21 +529,38 @@ export class Mapper {
   }
 
   /**
-   * Rails: `draw(name)`. Loads `config/routes/<name>.rb` and evaluates it
-   * in the current Mapper context. The file-loading form is Ruby-specific
-   * (`instance_eval(File.read…)`); in trails, pass a callback that receives
-   * this Mapper instead. Passing a string throws — file-based draw is not
-   * supported.
+   * Mirrors `Mapper::Resources#draw(name)` (`mapper.rb:1668-1682`) — finds
+   * `<name>.ts` under {@link _drawPaths} and evaluates it against this
+   * mapper. Ruby's `instance_eval(File.read(route_path))` becomes a dynamic
+   * `import()` of the module and a call to its `drawRoutes` export, the same
+   * shape `RoutesReloader` loads a `config/routes.ts` with; an ESM module
+   * body has no equivalent of `instance_eval`'s receiver rebinding, and the
+   * import makes the method async where Ruby's is not.
    */
-  draw(name: string | MapperCallback): void {
-    if (typeof name === "function") {
-      name(this);
-      return;
+  async draw(name: string): Promise<void> {
+    const fs = await getFsAsync();
+    const p = await getPathAsync();
+    let path: string | undefined;
+    for (const _path of this._drawPaths) {
+      if (await fs.exists(`${_path}/${name}.ts`)) {
+        path = _path;
+        break;
+      }
     }
-    throw new Error(
-      `Mapper#draw(${JSON.stringify(name)}): file-based draw is not supported in trails. ` +
-        "Pass a callback (mapper) => void with the route definitions, or import and invoke a routes module directly.",
-    );
+
+    if (!path) {
+      let msg =
+        `Your router tried to #draw the external file ${name}.ts,\n` +
+        "but the file was not found in:\n\n";
+      msg += this._drawPaths.map((_path) => ` * ${_path}`).join("\n");
+      throw new ArgumentError(msg);
+    }
+
+    const routePath = `${path}/${name}.ts`;
+    const mod = (await import(p.pathToFileURL!(routePath).href)) as {
+      drawRoutes?: (mapper: Mapper) => void;
+    };
+    mod.drawRoutes?.(this);
   }
 
   /**

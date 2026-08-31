@@ -1,8 +1,8 @@
 // Port of `Rails::Engine` from `railties/lib/rails/engine.rb`. Shell +
 // EngineConfiguration + railties() collection. `lazy_route_set` + `updater`
-// → 2.2c. `env_config`/`endpoint`/`call`/`helpers` → blocked on PR 2.5.
+// → 2.2c. `env_config`/`call`/`helpers` → blocked on PR 2.5.
 import { getFsAsync, getPathAsync, onLoad } from "@blazetrails/activesupport";
-import type { DrawCallback, RouteSet } from "@blazetrails/actionpack";
+import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { ActionView } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
@@ -20,6 +20,16 @@ export class Engine extends Trailtie {
     if (value !== undefined) writeOwnState(this, "_calledFrom", value);
     return readOwnState<string>(this, "_calledFrom");
   }
+  /**
+   * Mirrors `Engine.endpoint(endpoint = nil)` (`engine.rb:379-383`) — a
+   * plain `@endpoint` ivar on the singleton, so it is own-state per class
+   * and never inherited.
+   */
+  static endpoint(endpoint?: RackApp | RackAppObject): RackApp | RackAppObject | undefined {
+    if (endpoint) writeOwnState(this, "_endpoint", endpoint);
+    return readOwnState<RackApp | RackAppObject>(this, "_endpoint");
+  }
+
   static isolated(value?: boolean): boolean {
     if (value !== undefined) writeOwnState(this, "_isolated", value);
     return readOwnState<boolean>(this, "_isolated") === true;
@@ -146,6 +156,27 @@ export class Engine extends Trailtie {
   }
 
   /**
+   * Invoke the server registered hooks.
+   * Check {@link Trailtie.server} for more info.
+   *
+   * Mirrors `Engine#load_server(app = self)` (`engine.rb:485-488`).
+   */
+  loadServer(app: unknown = this): this {
+    this.runServerBlocks(app);
+    return this;
+  }
+
+  /**
+   * Returns the endpoint for this engine. If none is registered,
+   * defaults to an `ActionDispatch::Routing::RouteSet`.
+   *
+   * Mirrors `Engine#endpoint` (`engine.rb:527-529`).
+   */
+  endpoint(): RackApp | RackAppObject {
+    return (this.constructor as typeof Engine).endpoint() ?? this.routes();
+  }
+
+  /**
    * Mirrors: Rails `_all_load_paths(add_autoload_paths_to_load_path)` (engine.rb:730).
    *
    * @internal
@@ -171,6 +202,7 @@ export class Engine extends Trailtie {
  * `application.ts`, which imports this file.
  */
 export interface EngineInitializerApp {
+  routes(): { drawPaths: string[] };
   routesReloader(): {
     paths: string[];
     routeSets: RouteSetLike[];
@@ -181,11 +213,6 @@ export interface EngineInitializerApp {
 /**
  * Mirrors `Engine`'s `add_routing_paths` initializer (`engine.rb:595-606`).
  *
- * @missingRailsCall draw_paths — CONVERGEABLE: Rails concats `paths["config/routes"].paths`
- * onto `routes.draw_paths` and `app.routes.draw_paths` so `draw` can resolve
- * partial route files relatively. `RouteSet#draw_paths` is not ported, so the
- * external paths are only recorded on the reloader.
- *
  * Rails reads `paths["config/routes.rb"]`; the trails path set declares the
  * same entry under its TypeScript name (`engine/configuration.ts:84`).
  */
@@ -194,6 +221,8 @@ Engine.initializer("add_routing_paths", async function (this: Engine, ...args: u
   const paths = await this.paths();
   const routingPaths = (await paths.get("config/routes.ts")?.existent()) ?? [];
   const externalPaths = paths.get("config/routes")?.toAry() ?? [];
+  this.routes().drawPaths.push(...externalPaths);
+  app.routes().drawPaths.push(...externalPaths);
 
   if (this.hasRoutes() || routingPaths.length > 0) {
     app.routesReloader().paths.unshift(...routingPaths);

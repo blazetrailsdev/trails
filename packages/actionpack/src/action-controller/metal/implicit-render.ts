@@ -26,27 +26,30 @@ export function sendAction(
   return _sendAction.call(this, method);
 }
 
-interface ImplicitRenderHost {
+export interface ImplicitRenderHost {
   performed: boolean;
   actionName: string;
-  controllerName?: string;
+  /** Rails' messages read `self.class.name`, not `controller_name`. */
+  constructor: { name: string };
   request?: {
-    isGet?(): boolean;
-    get?: boolean;
-    format?: { ref?: string; symbol?: string | null };
-    isXhr?(): boolean;
+    /** Rails `request.get?` — a boolean getter on trails' `Request`. */
+    isGet?: boolean;
+    /** Rails compares `request.format == Mime[:html]`; `symbol` is the trails
+     *  spelling, answered by both `MimeType` and `NullType`. */
+    format?: { symbol?: string | null };
+    /** Rails `request.xhr?` — a boolean getter on trails' `Request`. */
     xhr?: boolean;
     variant?: unknown;
   };
-  _prefixes?: string[];
+  _prefixes?(): string[];
   templateExists?(
     action: string,
-    prefixes?: unknown,
+    prefixes?: readonly string[],
     partial?: boolean,
     keys?: readonly string[],
     options?: Record<string, readonly (string | symbol)[]>,
   ): boolean;
-  anyTemplates?(action: string, prefixes?: unknown): boolean;
+  isAnyTemplates?(action: string, prefixes?: readonly string[]): boolean;
   head(status: number | string): void;
   render(): void;
   logger?: { info(msg: string): void };
@@ -59,31 +62,28 @@ interface ImplicitRenderHost {
  * @internal
  */
 export function defaultRender(this: ImplicitRenderHost): void {
+  const name = this.constructor.name;
   if (
-    this.templateExists?.(String(this.actionName), this._prefixes, false, [], {
+    this.templateExists?.(String(this.actionName), this._prefixes?.(), false, [], {
       variants: variantsFor(this.request?.variant),
     })
   ) {
     this.render();
     return;
   }
-  if (this.anyTemplates?.(String(this.actionName), this._prefixes)) {
-    const name = this.controllerName ?? "";
+  if (this.isAnyTemplates?.(String(this.actionName), this._prefixes?.())) {
     throw new UnknownFormat(
       `${name}#${this.actionName} is missing a template for this request format and variant.`,
     );
   }
   if (isInteractiveBrowserRequest.call(this)) {
-    const name = this.controllerName ?? "";
     throw new MissingExactTemplate(
       `${name}#${this.actionName} is missing a template for request formats.`,
       name,
       this.actionName,
     );
   }
-  this.logger?.info(
-    `No template found for ${this.controllerName ?? ""}#${this.actionName}, rendering head :no_content`,
-  );
+  this.logger?.info(`No template found for ${name}#${this.actionName}, rendering head :no_content`);
   _defaultRender.call(this);
 }
 
@@ -96,7 +96,10 @@ export function defaultRender(this: ImplicitRenderHost): void {
  */
 function variantsFor(variant: unknown): readonly (string | symbol)[] {
   if (variant == null) return [];
-  return Array.isArray(variant) ? (variant as readonly string[]) : [String(variant)];
+  // `request.variant` is an `ArrayInquirer` — a Proxy over an array — and the
+  // lookup context's details key walks the value as a plain array, so copy it
+  // out rather than handing the Proxy through.
+  return Array.isArray(variant) ? [...(variant as readonly string[])] : [String(variant)];
 }
 
 /**
@@ -113,7 +116,7 @@ export function methodForAction(
 ): string | undefined {
   const sup = this._superMethodForAction?.(actionName);
   if (sup) return sup;
-  if (this.templateExists?.(String(actionName), this._prefixes)) return "defaultRender";
+  if (this.templateExists?.(String(actionName), this._prefixes?.())) return "defaultRender";
   return undefined;
 }
 
@@ -126,8 +129,5 @@ export function methodForAction(
 export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   const req = this.request;
   if (!req) return false;
-  const isGet = typeof req.isGet === "function" ? req.isGet() : req.get === true;
-  const isHtml = req.format?.ref === "html" || req.format?.symbol === "html";
-  const isXhr = typeof req.isXhr === "function" ? req.isXhr() : req.xhr === true;
-  return Boolean(isGet) && Boolean(isHtml) && !isXhr;
+  return req.isGet === true && req.format?.symbol === "html" && req.xhr !== true;
 }

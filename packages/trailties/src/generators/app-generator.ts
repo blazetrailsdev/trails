@@ -341,6 +341,8 @@ import { Trails } from "@blazetrails/trailties";
 import "./config/environment.js";
 
 export default Trails.application;
+
+Trails.application.loadServer();
 `,
     );
 

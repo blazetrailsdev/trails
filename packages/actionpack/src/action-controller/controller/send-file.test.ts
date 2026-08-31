@@ -350,6 +350,7 @@ describe("SendFileController", () => {
     class C extends Base {
       async action() {
         this.sendFileHeadersBang({ type: "image/png", filename: "x.png" });
+        this.head(200);
       }
     }
     const c = new C();

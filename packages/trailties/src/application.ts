@@ -184,17 +184,6 @@ export class Application extends Engine {
     return this.app();
   }
 
-  /**
-   * Mirrors `Engine#endpoint` (`engine.rb:527-529`) — `self.class.endpoint`
-   * is not ported, so the route set is always the endpoint. Rails hands the
-   * `RouteSet` itself to the stack because it responds to `call`; trails'
-   * `RackApp` is a function type, so the method is wrapped.
-   */
-  endpoint(): RackApp {
-    const routes = this.routes();
-    return (env) => routes.call(env);
-  }
-
   /** Mirrors `Application#default_middleware_stack` (`application.rb:626-629`).
    * Rails passes `paths`; `Engine#paths()` is async in trails (it resolves the
    * root first), so the sync `config.paths()` it delegates to is passed here.
