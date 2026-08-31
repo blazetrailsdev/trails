@@ -28,6 +28,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { lineLeadingTagReasons } from "./jsdoc-tag-line.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -113,7 +114,10 @@ function check(context, node, name) {
   const blocks = [docBlockFor(target, sourceCode), fileLevelBlock(sourceCode)].filter(Boolean);
   const text = blocks.map((c) => c.value).join("\n");
 
-  if (!/@noRailsEquivalent\s+PERMANENT\b/.test(text)) {
+  // Line-leading, as `extract-ts-api.ts`'s extractor credits it: a tag written
+  // on a hang-indented continuation line reads fine to a human, is reported by
+  // neither, and drops the member from the measured surface (RFC 0129).
+  if (!lineLeadingTagReasons(text, "noRailsEquivalent").some((r) => /^PERMANENT\b/.test(r))) {
     context.report({ node: target, messageId: "missingReceipt", data: { name } });
     return;
   }

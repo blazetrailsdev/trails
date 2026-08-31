@@ -1512,6 +1512,13 @@ jobs:
         # `naming` rows are report-only. Reports instead of failing until the
         # seed PR lands — see the UNSEEDED arm in lint-call-args.ts.
         run: pnpm exec tsx scripts/api-compare/lint-call-args.ts
+      - name: Ruby-compat call ratchet
+        # RFC 0129. Gates the `kind: "rubyCompat"` rows of the shared
+        # call-mismatches-exclude/ shards — a ported body that hand-rolls a
+        # Ruby primitive @blazetrails/ruby-compat already exports — for the
+        # packages in ENROLLED_PACKAGES, which is only-grow and joins a package
+        # at zero. Same only-shrink contract; there is no reseed.
+        run: pnpm exec tsx scripts/api-compare/lint-ruby-compat-calls.ts --no-regen
       - name: Arm-parity report
         # RFC 0113 Phase 1. Reports the arm (control-token) mismatches in the
         # RFC 0084 skeleton artifact the `--calls` step above already wrote.

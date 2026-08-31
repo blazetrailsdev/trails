@@ -12,8 +12,9 @@
  * one: the sites the table credits, hence absent from the reverse half.
  *
  * Report-only, and separate from enrollment on purpose: seeding a gate red
- * across nine packages blocks every unrelated PR, so the flip is its own story
- * (`enroll-call-mapping-in-parity-gate`).
+ * across nine packages blocks every unrelated PR, so the flip is its own work —
+ * `enroll-call-mapping-i18n-and-activesupport` for the first two packages and
+ * `enroll-call-mapping-remaining-packages` for the rest.
  *
  * Hard rules: no node:* imports, no process.*, async fs only.
  */
@@ -46,6 +47,9 @@ export interface Decl {
   calls?: string[];
   skeleton?: string[];
   callArgs?: { name: string; args?: string[] }[];
+  /** `<file>:<name>` of the declaring entry when this one is a barrel clone
+   *  (`extract-ts-api.ts:1017`), absent on a real declaration. */
+  reExportedFrom?: string;
 }
 
 /** A class or module: members live under `instanceMethods`/`classMethods`,
@@ -73,10 +77,14 @@ export interface TsApi {
  * every class and module — each yielded ONCE, with its own `file` winning over
  * the map key or the host (a member mixed into a class is declared elsewhere).
  *
- * Two things present one declaration twice, and both collapse here rather than
- * in each caller: the extractor synthesizes a backward-compat module from a
- * file's own `fileFunctions` (`extract-ts-api.ts:1127`), and the `this`-typed
- * mixin idiom puts one function on several hosts.
+ * Three things present one declaration twice, and all three collapse here
+ * rather than in each caller: the extractor synthesizes a backward-compat
+ * module from a file's own `fileFunctions` (`extract-ts-api.ts:1127`), the
+ * `this`-typed mixin idiom puts one function on several hosts, and a package
+ * barrel re-exports a declaration under `index.ts` keeping the ORIGINAL line.
+ * The last is skipped outright: `reExportedFrom` names the declaring entry, so
+ * a barrel clone is identifiable rather than a heuristic, and a re-export is
+ * not a declaration site.
  */
 export function declarations(api: TsApi): { package: string; tsFile: string; decl: Decl }[] {
   const seen = new Map<string, { package: string; tsFile: string; decl: Decl }>();
@@ -85,13 +93,17 @@ export function declarations(api: TsApi): { package: string; tsFile: string; dec
   };
   for (const [pkg, entry] of Object.entries(api.packages)) {
     for (const [tsFile, fns] of Object.entries(entry.fileFunctions ?? {})) {
-      for (const decl of fns) add(pkg, decl.file ?? tsFile, decl);
+      for (const decl of fns) {
+        if (decl.reExportedFrom !== undefined) continue;
+        add(pkg, decl.file ?? tsFile, decl);
+      }
     }
     for (const host of [
       ...Object.values(entry.classes ?? {}),
       ...Object.values(entry.modules ?? {}),
     ]) {
       for (const decl of [...(host.instanceMethods ?? []), ...(host.classMethods ?? [])]) {
+        if (decl.reExportedFrom !== undefined) continue;
         add(pkg, decl.file ?? host.file ?? "", decl);
       }
     }

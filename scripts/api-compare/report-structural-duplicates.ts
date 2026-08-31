@@ -9,9 +9,6 @@
  * a name nobody has thought of. This asks whether a SHAPE match closes that gap
  * and answers with a measurement; the RFC's Gate 3 section records the
  * precision and the recommendation that follows. The shape is {@link shapeOf}.
- * A package barrel re-exports a declaration under `index.ts` keeping the
- * ORIGINAL line, so a re-exported hit reports at both files — left visible
- * rather than guessed away, and the classification says which.
  *
  * Hard rules: no node:* imports, no process.*, async fs only.
  */

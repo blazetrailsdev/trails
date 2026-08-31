@@ -13,6 +13,8 @@
  * Hard rules: no node:* imports, no process.* references, async fs.
  */
 
+import { ANY_TAG_LINE } from "../../eslint/jsdoc-tag-line.mjs";
+
 export const TAG = "@missingRailsCall";
 
 /**
@@ -83,8 +85,9 @@ const tagLineStart = (tag: string): RegExp => new RegExp(`^\\s*\\*?\\s*${tag}\\b
 // reasons can contain Ruby ivar names (`@primary_key`), and the wrapper's
 // hang indent (`*   `) can place one at line start — deeper-indented `@`
 // lines are continuations, not tag boundaries (found by the activerecord-wide
-// run: core.ts initInternals).
-export const ANY_TAG_LINE = /^\s*\*?\s?@\S/;
+// run: core.ts initInternals). Re-exported from the shared module so the
+// `@noRailsEquivalent` readers cannot drift apart (RFC 0129).
+export { ANY_TAG_LINE };
 const ONE_LINE_COMMENT = /^(\s*)\/\*\*(.*)\*\/\s*$/;
 
 /** One line of a comment as the parser sees it, carrying the line of the
