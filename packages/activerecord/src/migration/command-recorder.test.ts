@@ -3,6 +3,7 @@ import { CommandRecorder } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import { adapterSupports, itIfSupports } from "../support/supports.js";
+import { assertRaises, assertRespondTo } from "@blazetrails/activesupport";
 
 const abstractDelegate = {
   updateTableDefinition: (tableName: string, base: unknown) => new Table(tableName, base as never),
@@ -23,10 +24,8 @@ describe("Migration", () => {
     });
 
     it("respond to delegates", () => {
-      const recorder = new CommandRecorder({ america() {} }) as unknown as {
-        america: unknown;
-      };
-      expect(typeof recorder.america).toBe("function");
+      const recorder = new CommandRecorder({ america() {} });
+      assertRespondTo(recorder, "america");
     });
 
     it("send calls super", () => {
@@ -40,6 +39,7 @@ describe("Migration", () => {
 
     it("send delegates to record", () => {
       const recorder = new CommandRecorder({ createTable(_name: string) {} });
+      assertRespondTo(recorder, "createTable");
       // eslint-disable-next-line blazetrails/require-table-teardown
       (recorder as unknown as { createTable(name: string): void }).createTable("horses");
       expect(recorder.commands).toEqual([["createTable", ["horses"], undefined]]);
@@ -201,35 +201,44 @@ describe("Migration", () => {
     });
 
     it("invert drop table without a block nor option", async () => {
-      const inverseOf = () => recorder.inverseOf("dropTable", ["people_reminders"]);
-      await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
-      await expect(inverseOf()).rejects.toThrow(
-        "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
+      await assertRaises(
+        [IrreversibleMigration],
+        {
+          match:
+            "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
+        },
+        () => recorder.inverseOf("dropTable", ["people_reminders"]),
       );
     });
 
     it("invert drop table with multiple tables", async () => {
-      const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists"]);
-      await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
-      await expect(inverseOf()).rejects.toThrow(
-        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      await assertRaises(
+        [IrreversibleMigration],
+        {
+          match: "To avoid mistakes, drop_table is only reversible if given a single table name.",
+        },
+        () => recorder.inverseOf("dropTable", ["musics", "artists"]),
       );
     });
 
     it("invert drop table with multiple tables and options", async () => {
-      const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists", { id: false }]);
-      await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
-      await expect(inverseOf()).rejects.toThrow(
-        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      await assertRaises(
+        [IrreversibleMigration],
+        {
+          match: "To avoid mistakes, drop_table is only reversible if given a single table name.",
+        },
+        () => recorder.inverseOf("dropTable", ["musics", "artists", { id: false }]),
       );
     });
 
     it("invert drop table with multiple tables and block", async () => {
       const block = () => {};
-      const inverseOf = () => recorder.inverseOf("dropTable", ["musics", "artists"], block);
-      await expect(inverseOf()).rejects.toThrow(IrreversibleMigration);
-      await expect(inverseOf()).rejects.toThrow(
-        "To avoid mistakes, drop_table is only reversible if given a single table name.",
+      await assertRaises(
+        [IrreversibleMigration],
+        {
+          match: "To avoid mistakes, drop_table is only reversible if given a single table name.",
+        },
+        () => recorder.inverseOf("dropTable", ["musics", "artists"], block),
       );
     });
 

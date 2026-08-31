@@ -1,4 +1,5 @@
-import { describe, it, expect as vitestExpect } from "vitest";
+import { describe, it, expect, expect as vitestExpect } from "vitest";
+import { assertNot } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../connection-adapters/abstract/schema-statements-like.js";
@@ -330,7 +331,7 @@ describe("Migration", () => {
 
     it("table name set", async () => {
       await withChangeTable((t) => {
-        vitestExpect(t.name).toEqual("delete_me");
+        expect(t.name).toEqual("delete_me");
       });
     });
 
@@ -348,7 +349,7 @@ describe("Migration", () => {
     it("check constraint exists", async () => {
       await withChangeTable(async (t, expect) => {
         expect("checkConstraintExists", null, ["delete_me", { name: "price_check" }]);
-        vitestExpect(await t.checkConstraintExists({ name: "price_check" })).toBeFalsy();
+        assertNot(await t.checkConstraintExists({ name: "price_check" }));
       });
     });
 
@@ -360,7 +361,7 @@ describe("Migration", () => {
     });
 
     it("remove column with if exists raises error", async () => {
-      await vitestExpect(
+      await expect(
         withChangeTable(async (t) => {
           await t.remove("name", { ifExists: true });
         }),
@@ -368,7 +369,7 @@ describe("Migration", () => {
     });
 
     it("add column with if not exists raises error", async () => {
-      await vitestExpect(
+      await expect(
         withChangeTable(async (t) => {
           await t.string("nickname", { ifNotExists: true });
         }),

@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  assertEmpty,
+  assertNoChanges,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "../test-fixtures.js";
@@ -154,7 +160,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         const foreignKeys = await conn.foreignKeys("astronauts");
         expect(foreignKeys.length).toBe(2);
-        expect(foreignKeys.every((fk) => fk.toTable === "rockets")).toBe(true);
+        expect(foreignKeys.every((fk) => fk.toTable === "rockets")).toBeTruthy();
         expect(foreignKeys.map((fk) => fk.column).sort()).toEqual([
           "favorite_rocket_id",
           "rocket_id",
@@ -277,24 +283,20 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("add foreign key with non existent from table raises", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        const e = await conn.addForeignKey("missions", "rockets").then(
-          () => undefined,
-          (err: unknown) => err,
+        const e = await assertRaises([StatementInvalid], {}, () =>
+          conn.addForeignKey("missions", "rockets"),
         );
-        expect(e).toBeInstanceOf(StatementInvalid);
-        expect((e as Error).message).toMatch(/missions/);
+        expect(e.message).toMatch(/missions/);
       });
     });
 
     it("add foreign key with non existent to table raises", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        const e = await conn.addForeignKey("missions", "rockets").then(
-          () => undefined,
-          (err: unknown) => err,
+        const e = await assertRaises([StatementInvalid], {}, () =>
+          conn.addForeignKey("missions", "rockets"),
         );
-        expect(e).toBeInstanceOf(StatementInvalid);
-        expect((e as Error).message).toMatch(/missions/);
+        expect(e.message).toMatch(/missions/);
       });
     });
 
@@ -303,8 +305,8 @@ describeIfSupports("foreign_keys", "Migration", () => {
       await withRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets");
 
-        expect(await conn.foreignKeyExists("astronauts", "rockets")).toBe(true);
-        expect(await conn.foreignKeyExists("astronauts", "stars")).toBe(false);
+        expect(await conn.foreignKeyExists("astronauts", "rockets")).toBeTruthy();
+        expect(await conn.foreignKeyExists("astronauts", "stars")).toBeFalsy();
       });
     });
 
@@ -315,7 +317,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.addColumn("rockets", "user_id", "bigint");
         try {
           await conn.addForeignKey("rockets", "user");
-          expect(await conn.foreignKeyExists("rockets", "user")).toBe(true);
+          expect(await conn.foreignKeyExists("rockets", "user")).toBeTruthy();
         } finally {
           await conn.removeForeignKey("rockets", "user");
           await conn.dropTable("user");
@@ -328,8 +330,8 @@ describeIfSupports("foreign_keys", "Migration", () => {
       await withRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
 
-        expect(await conn.foreignKeyExists("astronauts", { column: "rocket_id" })).toBe(true);
-        expect(await conn.foreignKeyExists("astronauts", { column: "star_id" })).toBe(false);
+        expect(await conn.foreignKeyExists("astronauts", { column: "rocket_id" })).toBeTruthy();
+        expect(await conn.foreignKeyExists("astronauts", { column: "star_id" })).toBeFalsy();
       });
     });
 
@@ -341,10 +343,10 @@ describeIfSupports("foreign_keys", "Migration", () => {
           name: "fancy_named_fk",
         });
 
-        expect(await conn.foreignKeyExists("astronauts", { name: "fancy_named_fk" })).toBe(true);
-        expect(await conn.foreignKeyExists("astronauts", { name: "other_fancy_named_fk" })).toBe(
-          false,
-        );
+        expect(await conn.foreignKeyExists("astronauts", { name: "fancy_named_fk" })).toBeTruthy();
+        expect(
+          await conn.foreignKeyExists("astronauts", { name: "other_fancy_named_fk" }),
+        ).toBeFalsy();
       });
     });
 
@@ -354,12 +356,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.changeTable("astronauts", async (t) => {
           await t.foreignKey("rockets", { column: "rocket_id", name: "fancy_named_fk" });
 
-          expect(await t.foreignKeyExists({ column: "rocket_id" })).toBe(true);
-          expect(await t.foreignKeyExists({ column: "star_id" })).toBe(false);
+          expect(await t.foreignKeyExists({ column: "rocket_id" })).toBeTruthy();
+          expect(await t.foreignKeyExists({ column: "star_id" })).toBeFalsy();
 
           if (unlessSqlite3Adapter) {
-            expect(await t.foreignKeyExists({ name: "fancy_named_fk" })).toBe(true);
-            expect(await t.foreignKeyExists({ name: "other_fancy_named_fk" })).toBe(false);
+            expect(await t.foreignKeyExists({ name: "fancy_named_fk" })).toBeTruthy();
+            expect(await t.foreignKeyExists({ name: "other_fancy_named_fk" })).toBeFalsy();
           }
         });
       });
@@ -429,12 +431,10 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("remove foreign non existing foreign key raises", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        const e = await conn.removeForeignKey("astronauts", "rockets").then(
-          () => undefined,
-          (err: unknown) => err,
+        const e = await assertRaises([ArgumentError], {}, () =>
+          conn.removeForeignKey("astronauts", "rockets"),
         );
-        expect(e).toBeInstanceOf(ArgumentError);
-        expect((e as Error).message).toBe("Table 'astronauts' has no foreign key for rockets");
+        expect(e.message).toBe("Table 'astronauts' has no foreign key for rockets");
       });
     });
 
@@ -463,7 +463,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.addForeignKey("astronauts", "rockets", { onDelete: "restrict" });
         expect((await conn.foreignKeys("astronauts")).length).toBe(1);
         await conn.removeForeignKey("astronauts", "rockets", { onDelete: "restrict" });
-        expect(await conn.foreignKeys("astronauts")).toEqual([]);
+        assertEmpty(await conn.foreignKeys("astronauts"));
       });
     });
 
@@ -479,7 +479,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         expect(foreignKeys.length).toBe(1);
 
         const fk = foreignKeys[0];
-        expect(fk.isValidated).toBe(false);
+        expect(fk.isValidated).toBeFalsy();
       });
     });
 
@@ -487,10 +487,10 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets", { validate: false });
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(false);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeFalsy();
 
         await validating(conn).validateForeignKey("astronauts", "rockets");
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeTruthy();
       });
     });
 
@@ -501,12 +501,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
           column: "rocket_id",
           validate: false,
         });
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(false);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeFalsy();
 
         await validating(conn).validateForeignKey("astronauts", undefined, {
           column: "rocket_id",
         });
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeTruthy();
       });
     });
 
@@ -517,12 +517,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
           column: "rocket_id",
           validate: false,
         });
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(false);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeFalsy();
 
         await validating(conn).validateForeignKey("astronauts", undefined, {
           column: "rocket_id",
         });
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeTruthy();
       });
     });
 
@@ -534,12 +534,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
           name: "fancy_named_fk",
           validate: false,
         });
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(false);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeFalsy();
 
         await validating(conn).validateForeignKey("astronauts", undefined, {
           name: "fancy_named_fk",
         });
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeTruthy();
       });
     });
 
@@ -566,7 +566,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         });
 
         await validating(conn).validateConstraint("astronauts", "fancy_named_fk");
-        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBe(true);
+        expect((await conn.foreignKeys("astronauts"))[0].isValidated).toBeTruthy();
       });
     });
 
@@ -612,7 +612,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         expect(foreignKeys.length).toBe(1);
 
         const fk = foreignKeys[0];
-        expect(fk.isValidated).toBe(true);
+        expect(fk.isValidated).toBeTruthy();
       });
     });
 
@@ -625,11 +625,11 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.removeForeignKey("astronauts", "rockets");
         expect(await conn.foreignKeys("astronauts")).toEqual([]);
 
-        const error = await conn.removeForeignKey("astronauts", "rockets").then(
-          () => undefined,
-          (err: unknown) => err,
+        const error = await assertRaises([Error], {}, () =>
+          conn.removeForeignKey("astronauts", "rockets"),
         );
-        expect((error as Error).message).toBe("Table 'astronauts' has no foreign key for rockets");
+
+        expect(error.message).toBe("Table 'astronauts' has no foreign key for rockets");
       });
     });
 
@@ -642,7 +642,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.removeForeignKey("astronauts", "rockets", { ifExists: true });
         expect(await conn.foreignKeys("astronauts")).toEqual([]);
 
-        await conn.removeForeignKey("astronauts", "rockets", { ifExists: true });
+        await assertNothingRaised(() =>
+          conn.removeForeignKey("astronauts", "rockets", { ifExists: true }),
+        );
       });
     });
 
@@ -676,15 +678,14 @@ describeIfSupports("foreign_keys", "Migration", () => {
         expect((await conn.foreignKeys("astronauts")).length).toBe(1);
 
         if (adapterType === "sqlite") {
-          await conn.addForeignKey("astronauts", "rockets");
+          await assertNothingRaised(() => conn.addForeignKey("astronauts", "rockets"));
           return;
         }
 
-        const error = await conn.addForeignKey("astronauts", "rockets").then(
-          () => undefined,
-          (err: unknown) => err,
+        const error = await assertRaises([Error], {}, () =>
+          conn.addForeignKey("astronauts", "rockets"),
         );
-        const message = (error as Error).message;
+        const message = error.message;
 
         if (adapterType === "mysql") {
           const mysqlConn = conn as unknown as {
@@ -710,7 +711,9 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.addForeignKey("astronauts", "rockets");
         expect((await conn.foreignKeys("astronauts")).length).toBe(1);
 
-        await conn.addForeignKey("astronauts", "rockets", { ifNotExists: true });
+        await assertNothingRaised(() =>
+          conn.addForeignKey("astronauts", "rockets", { ifNotExists: true }),
+        );
       });
     });
 
@@ -720,9 +723,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
         const columnFor = async (tableName: string, columnName: string) =>
           (await conn.columns(tableName)).find((column) => column.name === columnName);
 
-        expect((await columnFor("astronauts", "rocket_id"))?.isBigint()).toBe(true);
-        await conn.addForeignKey("astronauts", "rockets");
-        expect((await columnFor("astronauts", "rocket_id"))?.isBigint()).toBe(true);
+        await assertNoChanges(
+          async () => (await columnFor("astronauts", "rocket_id"))?.isBigint(),
+          null,
+          { from: true },
+          () => conn.addForeignKey("astronauts", "rockets"),
+        );
       });
     });
 
@@ -1109,7 +1115,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         await conn.removeColumn(astronauts, "rocket_id");
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
 
@@ -1119,7 +1125,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         await conn.removeForeignKey(astronauts, { column: "rocket_id" });
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
 
@@ -1131,7 +1137,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           await t.removeForeignKey({ column: "rocket_id" });
         });
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
   });
@@ -1210,7 +1216,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         await conn.removeColumn(astronauts, "rocket_id");
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
 
@@ -1220,7 +1226,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         await conn.removeForeignKey(astronauts, { column: "rocket_id" });
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
 
@@ -1232,7 +1238,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           await t.removeForeignKey({ column: "rocket_id" });
         });
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
   });
@@ -1311,7 +1317,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         await conn.removeColumn(astronauts, "rocket_id");
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
 
@@ -1321,7 +1327,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         await conn.removeForeignKey(astronauts, { column: "rocket_id" });
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
 
@@ -1333,7 +1339,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           await t.removeForeignKey({ column: "rocket_id" });
         });
 
-        expect(await conn.foreignKeys(astronauts)).toEqual([]);
+        assertEmpty(await conn.foreignKeys(astronauts));
       });
     });
   });
@@ -1344,13 +1350,11 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("add composite foreign key raises without options", async () => {
       const conn = await ambientConnection();
       await withCompositeRocketTables(conn, async () => {
-        const error = await conn.addForeignKey("astronauts", "rockets").then(
-          () => undefined,
-          (err: unknown) => err,
+        const error = await assertRaises([StatementInvalid], {}, () =>
+          conn.addForeignKey("astronauts", "rockets"),
         );
 
-        expect(error).toBeInstanceOf(StatementInvalid);
-        const message = (error as Error).message;
+        const message = error.message;
         if (adapterType === "postgres") {
           expect(message).toMatch(
             /there is no unique constraint matching given keys for referenced table "rockets"/,
@@ -1377,19 +1381,14 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("add composite foreign key raises if column and primary key sizes mismatch", async () => {
       const conn = await ambientConnection();
       await withCompositeRocketTables(conn, async () => {
-        const error = await conn
-          .addForeignKey("astronauts", "rockets", {
-            column: "rocket_id",
-            primaryKey: ["tenant_id", "id"],
-          })
-          .then(
-            () => undefined,
-            (err: unknown) => err,
-          );
-
-        expect(error).toBeInstanceOf(ArgumentError);
-        expect((error as Error).message).toMatch(
-          /:column must reference all the :primary_key columns/,
+        await assertRaises(
+          [ArgumentError],
+          { match: ":column must reference all the :primary_key columns" },
+          () =>
+            conn.addForeignKey("astronauts", "rockets", {
+              column: "rocket_id",
+              primaryKey: ["tenant_id", "id"],
+            }),
         );
       });
     });
@@ -1399,8 +1398,8 @@ describeIfSupports("foreign_keys", "Migration", () => {
       await withCompositeRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets", { primaryKey: ["tenant_id", "id"] });
 
-        expect(await conn.foreignKeyExists("astronauts", "rockets")).toBe(true);
-        expect(await conn.foreignKeyExists("astronauts", "stars")).toBe(false);
+        expect(await conn.foreignKeyExists("astronauts", "rockets")).toBeTruthy();
+        expect(await conn.foreignKeyExists("astronauts", "stars")).toBeFalsy();
       });
     });
 
@@ -1413,25 +1412,25 @@ describeIfSupports("foreign_keys", "Migration", () => {
           await conn.foreignKeyExists("astronauts", "rockets", {
             primaryKey: ["tenant_id", "id"],
           }),
-        ).toBe(true);
+        ).toBeTruthy();
         expect(
           await conn.foreignKeyExists("astronauts", "rockets", {
             column: ["rocket_tenant_id", "rocket_id"],
             primaryKey: ["tenant_id", "id"],
           }),
-        ).toBe(true);
+        ).toBeTruthy();
 
         expect(
           await conn.foreignKeyExists("astronauts", "rockets", {
             primaryKey: ["id", "tenant_id"],
           }),
-        ).toBe(false);
-        expect(await conn.foreignKeyExists("astronauts", "rockets", { primaryKey: "id" })).toBe(
-          false,
-        );
-        expect(await conn.foreignKeyExists("astronauts", "rockets", { column: "rocket_id" })).toBe(
-          false,
-        );
+        ).toBeFalsy();
+        expect(
+          await conn.foreignKeyExists("astronauts", "rockets", { primaryKey: "id" }),
+        ).toBeFalsy();
+        expect(
+          await conn.foreignKeyExists("astronauts", "rockets", { column: "rocket_id" }),
+        ).toBeFalsy();
       });
     });
 
@@ -1442,7 +1441,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
         expect((await conn.foreignKeys("astronauts")).length).toBe(1);
 
         await conn.removeForeignKey("astronauts", "rockets");
-        expect(await conn.foreignKeys("astronauts")).toEqual([]);
+        assertEmpty(await conn.foreignKeys("astronauts"));
       });
     });
 

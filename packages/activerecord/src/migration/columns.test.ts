@@ -12,14 +12,21 @@ import {
   supportsDefaultExpression,
 } from "../support/mysql-server-version.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertDifference, assertRaises } from "@blazetrails/activesupport";
+import { rubyInspect } from "../relation/ruby-inspect.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { adapterSupports } from "../support/supports.js";
 
 const mariaDbRejectsUniqueColumnDrop =
   adapterType === "mysql" && isMariaDb && (serverVersion?.compare("10.2.8") ?? -1) >= 0;
 
-const indexesSurvivingColumnDrop =
-  adapterType === "postgres" ? [] : ["index_test_models_on_hat_style_and_hat_size"];
+function indexesSurvivingColumnDrop(actual: string[]): void {
+  if (adapterType === "postgres") {
+    expect(actual).toEqual([]);
+  } else {
+    expect(actual).toEqual(["index_test_models_on_hat_style_and_hat_size"]);
+  }
+}
 
 const expectedAlterQueryCount = adapterType === "sqlite" ? 14 : 1;
 
@@ -197,7 +204,7 @@ describe("Migration", () => {
       expect((await connection.indexes("test_models")).length).toBe(1);
       await connection.removeColumn("test_models", "hat_size");
 
-      expect(await indexNames(connection, "test_models")).toEqual(indexesSurvivingColumnDrop);
+      indexesSurvivingColumnDrop(await indexNames(connection, "test_models"));
     });
 
     it("removing and renaming column preserves custom primary key", async () => {
@@ -232,7 +239,7 @@ describe("Migration", () => {
           await connection.indexExists("my_table", "item_number", {
             name: "index_my_table_on_item_number",
           }),
-        ).toBe(true);
+        ).toBeTruthy();
       } finally {
         await connection.dropTable("my_table", { ifExists: true });
       }
@@ -256,7 +263,7 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.addColumn("test_models", "funny", "boolean");
       await TestModel.loadSchema();
-      expect(TestModel.columnsHash()["funny"]?.null).toBe(true);
+      expect(TestModel.columnsHash()["funny"]?.null).toBeTruthy();
 
       await connection.changeColumn("test_models", "funny", "boolean", {
         null: false,
@@ -265,12 +272,12 @@ describe("Migration", () => {
 
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.columnsHash()["funny"]?.null).toBe(false);
+      expect(TestModel.columnsHash()["funny"]?.null).toBeFalsy();
 
       await connection.changeColumn("test_models", "funny", "boolean", { null: true });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.columnsHash()["funny"]?.null).toBe(true);
+      expect(TestModel.columnsHash()["funny"]?.null).toBeTruthy();
     });
 
     it("change column", async () => {
@@ -289,33 +296,39 @@ describe("Migration", () => {
       expect(newColumns.find((c) => c.name === "age" && c.type === "integer")).toBeFalsy();
       expect(newColumns.find((c) => c.name === "age" && c.type === "string")).toBeTruthy();
 
-      const approvedDefault = async (columns: readonly Column[]): Promise<unknown> => {
-        const column = columns.find((c) => c.name === "approved" && c.type === "boolean");
-        if (!column) return undefined;
-        const castType = await connection.lookupCastTypeFromColumn(column);
-        return castType?.deserialize(column.default);
+      const findApproved = async (
+        columns: readonly Column[],
+        expected: unknown,
+      ): Promise<Column | undefined> => {
+        for (const c of columns) {
+          const castType = await connection.lookupCastTypeFromColumn(c);
+          const defaultValue = castType?.deserialize(c.default);
+          if (c.name === "approved" && c.type === "boolean" && defaultValue === expected) return c;
+        }
+        return undefined;
       };
 
       oldColumns = await connection.columns(TestModel.tableName);
-      expect(await approvedDefault(oldColumns)).toBe(true);
+      expect(await findApproved(oldColumns, true)).toBeTruthy();
 
       await connection.changeColumn("test_models", "approved", "boolean", { default: false });
       newColumns = await connection.columns(TestModel.tableName);
 
-      expect(await approvedDefault(newColumns)).not.toBe(true);
-      expect(await approvedDefault(newColumns)).toBe(false);
+      expect(await findApproved(newColumns, true)).toBeFalsy();
+      expect(await findApproved(newColumns, false)).toBeTruthy();
+      await connection.changeColumn("test_models", "approved", "boolean", { default: true });
     });
 
     it("change column with nil default", async () => {
       const connection = await ambientConnection();
       await connection.addColumn("test_models", "contributor", "boolean", { default: true });
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("contributor")).toBe(true);
+      expect(TestModel.new().queryAttribute("contributor")).toBeTruthy();
 
       await connection.changeColumn("test_models", "contributor", "boolean", { default: null });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("contributor")).toBe(false);
+      expect(TestModel.new().queryAttribute("contributor")).toBeFalsy();
       expect(TestModel.new().contributor).toBeNull();
     });
 
@@ -326,7 +339,7 @@ describe("Migration", () => {
         null: false,
       });
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("contributor")).toBe(true);
+      expect(TestModel.new().queryAttribute("contributor")).toBeTruthy();
 
       await connection.changeColumn("test_models", "contributor", "boolean", {
         default: null,
@@ -334,7 +347,7 @@ describe("Migration", () => {
       });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("contributor")).toBe(false);
+      expect(TestModel.new().queryAttribute("contributor")).toBeFalsy();
       expect(TestModel.new().contributor).toBeNull();
     });
 
@@ -342,12 +355,12 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.addColumn("test_models", "administrator", "boolean", { default: true });
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("administrator")).toBe(true);
+      expect(TestModel.new().queryAttribute("administrator")).toBeTruthy();
 
       await connection.changeColumn("test_models", "administrator", "boolean", { default: false });
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
-      expect(TestModel.new().queryAttribute("administrator")).toBe(false);
+      expect(TestModel.new().queryAttribute("administrator")).toBeFalsy();
     });
 
     it("change column with custom index name", async () => {
@@ -438,7 +451,7 @@ describe("Migration", () => {
         const renamed = (await connection.columns("test_models")).find(
           (c) => c.name === "id_test",
         ) as MysqlColumn | undefined;
-        expect(renamed?.isAutoIncrement()).toBe(true);
+        expect(renamed?.isAutoIncrement()).toBeTruthy();
         void TestModel.resetColumnInformation();
       } finally {
         await connection.renameColumn("test_models", "id_test", "id");
@@ -519,21 +532,26 @@ describe("Migration", () => {
       await connection.changeColumnNull("test_models", "first_name", true);
       void TestModel.resetColumnInformation();
 
-      const before = (await TestModel.count()) as number;
-      await TestModel.create({ first_name: null });
-      expect(await TestModel.count()).toBe(before + 1);
+      await assertDifference(
+        new Map([[async () => (await TestModel.count()) as number, 1]]),
+        null,
+        async () => {
+          await TestModel.create({ first_name: null });
+        },
+      );
     });
 
     it("change column null with non boolean arguments raises", async () => {
       const connection = await ambientConnection();
       await connection.addColumn("test_models", "first_name", "string");
-      await expect(
+      const e = await assertRaises([ArgumentError], {}, () =>
         connection.changeColumnNull("test_models", "first_name", {
           from: true,
           to: false,
         } as unknown as boolean),
-      ).rejects.toThrow(
-        "change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: {from: true, to: false}",
+      );
+      expect(e.message).toBe(
+        `change_column_null expects a boolean value (true for NULL, false for NOT NULL). Got: ${rubyInspect({ from: true, to: false })}`,
       );
     });
 
@@ -547,11 +565,12 @@ describe("Migration", () => {
     it("add column without column name", async () => {
       const connection = await ambientConnection();
       try {
-        await expect(
+        const e = await assertRaises([ArgumentError], {}, () =>
           connection.createTable("my_table", { force: true }, (t) => {
             (t.timestamp as () => unknown)();
           }),
-        ).rejects.toThrow("Missing column name(s) for timestamp");
+        );
+        expect(e.message).toBe("Missing column name(s) for timestamp");
       } finally {
         await connection.dropTable("my_table", { ifExists: true });
       }
