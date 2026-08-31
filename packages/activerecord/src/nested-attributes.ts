@@ -596,6 +596,7 @@ export function assignNestedAttributesForCollectionAssociation(
   const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
   const association = record.association(associationName) as CollectionAssociation;
 
+  /** @noRailsEquivalent PERMANENT */
   const assignRecords = (existingRecords: Base[]): Promise<void> | void => {
     const nestedTarget: (Base | null)[] = [];
     const deferred: Record<string, unknown>[] = [];
@@ -628,13 +629,12 @@ export function assignNestedAttributesForCollectionAssociation(
               (association as any).addToTarget(existingRecord, { skipCallbacks: true });
             }
 
-            const settled = existingRecord;
             const allowDestroy = isAllowDestroy.call(record, associationName);
-            nestedTarget.push(settled);
+            nestedTarget.push(existingRecord);
             pending = (
               pending
-                ? pending.then(() => assignToOrMarkForDestruction(settled, a, allowDestroy))
-                : assignToOrMarkForDestruction(settled, a, allowDestroy)
+                ? pending.then(() => assignToOrMarkForDestruction(existingRecord!, a, allowDestroy))
+                : assignToOrMarkForDestruction(existingRecord, a, allowDestroy)
             ) as Promise<void> | undefined;
           } else {
             nestedTarget.push(null);
@@ -653,12 +653,10 @@ export function assignNestedAttributesForCollectionAssociation(
     return pending;
   };
 
-  if (!isAutosave || association.isLoaded()) {
-    return assignRecords(association.isLoaded() ? association.target : []);
-  }
+  if (association.isLoaded()) return assignRecords(association.target);
 
-  const attributeIds = attrs.filter((a) => hasNestedId(a)).map((a) => (a as any).id);
-  if (attributeIds.length === 0 || !collectionTargetModel) return assignRecords([]);
+  const attributeIds = attrs.map((a) => (a as any).id).filter((id) => id != null && id !== "");
+  if (!isAutosave || attributeIds.length === 0 || !collectionTargetModel) return assignRecords([]);
 
   const primaryKey = (collectionTargetModel as any).primaryKey;
   return association
