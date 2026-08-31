@@ -71,7 +71,7 @@ describe("Flash::RequestMethods", () => {
 
     commitFlash.call(host);
 
-    expect(host.session._store.get("flash")).toEqual({ notice: "hi" });
+    expect(host.session._store.get("flash")).toEqual({ discard: [], flashes: { notice: "hi" } });
     const cached = flashHash.call(host);
     expect(cached).not.toBe(f);
     expect(cached!.get("notice")).toBe("hi");

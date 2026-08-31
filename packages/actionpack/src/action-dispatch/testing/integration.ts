@@ -33,6 +33,7 @@
 
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
+import { TestSession } from "../../action-controller/test-case.js";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import { CookieJar } from "../middleware/cookies.js";
 import { FlashHash } from "../middleware/flash.js";
@@ -933,6 +934,7 @@ export class IntegrationTest {
     }
 
     // Build env
+    const sessionSeed = { ...this.session };
     const [hostname, port] = splitHostPort(this.host);
     const env: Record<string, unknown> = {
       REQUEST_METHOD: method,
@@ -945,7 +947,7 @@ export class IntegrationTest {
       "rack.url_scheme": this._https ? "https" : "http",
       REMOTE_ADDR: this.remoteAddr,
       HTTP_ACCEPT: this.accept,
-      "rack.session": { ...this.session },
+      "rack.session": new TestSession(sessionSeed),
       "action_dispatch.request.path_parameters": {
         controller: controllerName,
         action,
@@ -1023,14 +1025,26 @@ export class IntegrationTest {
 
     await this.controller.dispatch(action, this.request, this.response);
 
+    // `Metal#dispatch` has already run `request.commit_flash` (`metal.rb:253`),
+    // which writes the surviving flash into `rack.session` — or deletes the
+    // key once the flash is swept. Carry the whole session forward the way a
+    // real store's `commit_session` would, deletions included, so the flash
+    // reaches the request after the redirect and no further.
     // Persist session back
     if ("session" in this.controller) {
       Object.assign(this.session, (this.controller as any).session);
     }
-
-    // Surface the controller's flash on the request so `TestProcess#flash`
-    // (and the `flash` getter above) can find it.
-    this.request.flash = (this.controller as any).flash ?? new FlashHash();
+    // `Metal#dispatch` has already run `request.commit_flash` (`metal.rb:253`),
+    // which writes the surviving flash into `rack.session` — or DELETES the key
+    // once the flash is swept. Carry the store's view forward the way a real
+    // `commit_session` would, deletions included, so the flash reaches the
+    // request after the redirect and no further. Only keys this request was
+    // seeded with can be deleted; anything the controller added is new state.
+    const committed = (env["rack.session"] as TestSession).toHash();
+    for (const key of Object.keys(sessionSeed)) {
+      if (!(key in committed)) delete this.session[key];
+    }
+    Object.assign(this.session, committed);
 
     const cookieJar = this._mockSession.cookieJar;
     const setCookies = this.response.getHeader("set-cookie");

@@ -437,12 +437,17 @@ export abstract class SchemaDumper {
   private header(stream: string[]): void {
     stream.push("// This file is auto-generated from the current state of the database.");
     stream.push("// Instead of editing this file, please use the migrations feature.");
-    const params = this.defineParams();
-    if (params) stream.push(`// ${params}`);
     stream.push("");
     if (this._language === "ts") {
       stream.push(`import type { DatabaseAdapter } from "@blazetrails/activerecord";`);
       stream.push("");
+    }
+    const params = this.defineParams();
+    if (params) {
+      stream.push(`export const ${params.replace(": ", " = ")};`);
+      stream.push("");
+    }
+    if (this._language === "ts") {
       stream.push("export default async function defineSchema(ctx: DatabaseAdapter) {");
     } else {
       stream.push("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");

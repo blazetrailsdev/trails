@@ -6,13 +6,13 @@ import { SessionId } from "./abstract-store.js";
 describe("ActionDispatch::Session::MemCacheStore", () => {
   it("aliases :expires to :expire_after", () => {
     const cache = new MemoryStore();
-    const store = new MemCacheStore(() => undefined, { cache, expires: 600 });
+    const store = new MemCacheStore(undefined, { cache, expires: 600 });
     expect(store.options.expireAfter).toBe(600);
   });
 
   it("keeps :expire_after when both are given", () => {
     const cache = new MemoryStore();
-    const store = new MemCacheStore(() => undefined, {
+    const store = new MemCacheStore(undefined, {
       cache,
       expires: 600,
       expireAfter: 900,
@@ -22,14 +22,14 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
 
   it("inherits CacheStore session behavior", () => {
     const cache = new MemoryStore();
-    const store = new MemCacheStore(() => undefined, { cache });
+    const store = new MemCacheStore(undefined, { cache });
     const [sid, session] = store.findSession({}, null);
     expect(sid).toBeInstanceOf(SessionId);
     expect(session).toEqual({});
   });
 
   it("requires a cache option", () => {
-    expect(() => new MemCacheStore(() => undefined, {})).toThrow(/cache/);
+    expect(() => new MemCacheStore(undefined, {})).toThrow(/cache/);
   });
 
   // Rails: `class MemCacheStore < Rack::Session::Dalli; include Compatibility;
@@ -53,7 +53,7 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
 
   it("keeps generateSid returning SessionId after mixin inclusion", () => {
     const cache = new MemoryStore();
-    const store = new MemCacheStore(() => undefined, { cache });
+    const store = new MemCacheStore(undefined, { cache });
     expect(store.generateSid()).toBeInstanceOf(SessionId);
   });
 });

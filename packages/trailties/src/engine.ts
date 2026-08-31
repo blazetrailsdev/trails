@@ -3,7 +3,6 @@
 // → 2.2c. `env_config`/`call`/`helpers` → blocked on PR 2.5.
 import { getFsAsync, getPathAsync, onLoad } from "@blazetrails/activesupport";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
-import { ActionView } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
 import { Trailtie } from "./trailtie.js";
@@ -233,32 +232,19 @@ Engine.initializer("add_routing_paths", async function (this: Engine, ...args: u
 
 /**
  * Mirrors `Engine`'s `add_view_paths` initializer (`engine.rb:614-620`).
- *
- * Rails' `respond_to?(:prepend_view_path)` guard is live in trails:
- * `ActionController::Base` does not include `ActionView::ViewPaths` yet, so
- * the class-level `prependViewPath` is absent and the view paths are seeded
- * onto the `lookupContext` slot the renderer actually reads
- * (`action-controller/base.ts:177`). The `action_mailer` arm is dropped —
- * ActionMailer is not ported.
+ * The `action_mailer` arm is dropped — ActionMailer is not ported.
  */
 Engine.initializer("add_view_paths", async function (this: Engine) {
   const views = (await (await this.paths()).get("app/views")?.existent()) ?? [];
   if (views.length === 0) return;
   onLoad("action_controller", (base: ActionControllerBaseLike) => {
-    if (typeof base.prependViewPath === "function") {
-      base.prependViewPath(views);
-    } else {
-      base.lookupContext = new ActionView.LookupContext(
-        views.map((view) => new ActionView.FileSystemResolver(view)),
-      );
-    }
+    if (typeof base.prependViewPath === "function") base.prependViewPath(views);
   });
 });
 
 /** @internal The `on_load(:action_controller)` receiver — see `add_view_paths`. */
 interface ActionControllerBaseLike {
   prependViewPath?: (views: string[]) => void;
-  lookupContext?: ActionView.LookupContext;
 }
 
 type Fs = Awaited<ReturnType<typeof getFsAsync>>;

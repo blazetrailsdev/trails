@@ -9,6 +9,7 @@
  * `ActionDispatch::Cookies`, not here.
  */
 
+import type { RackApp } from "@blazetrails/rack";
 import { AbstractSecureStore, SessionId as RackSessionId } from "./abstract-store.js";
 
 /** @internal Minimum shape this store needs out of `ActionDispatch::Request`. */
@@ -51,7 +52,7 @@ export interface CookieStoreSessionOptions {
 
 /** Rails: `class CookieStore < AbstractSecureStore`. */
 export class CookieStore extends AbstractSecureStore {
-  constructor(app: unknown, options: CookieStoreSessionOptions = {}) {
+  constructor(app?: RackApp, options: CookieStoreSessionOptions = {}) {
     options.cookieOnly = true;
     if (!Object.prototype.hasOwnProperty.call(options, "sameSite")) {
       options.sameSite = DEFAULT_SAME_SITE;

@@ -196,7 +196,7 @@ export class Metal extends AbstractController {
   protected _headers: Record<string, string> = {};
   protected _contentType: string | null = null;
 
-  /** Dispatch an action in the context of a request/response. */
+  /** Dispatch an action in the context of a request/response (`metal.rb:249-255`). */
   async dispatch(name: string, request: Request, response: Response): Promise<Response> {
     this.setRequestBang(request);
     this.setResponseBang(response);
@@ -204,6 +204,8 @@ export class Metal extends AbstractController {
     this.params = reqParams instanceof Parameters ? reqParams : new Parameters(reqParams);
 
     await this.processAction(name);
+
+    request.commitFlash();
 
     // Commit the response
     this.response.status = this._status;

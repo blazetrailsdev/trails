@@ -40,6 +40,15 @@ class PostsController extends Base {
     this.redirectTo("/posts");
   }
 
+  async createAndRedirect() {
+    this.flash.set("notice", "Post created!");
+    this.redirectTo("/posts/flash");
+  }
+
+  async showFlash() {
+    this.render({ plain: String(this.flash.get("notice") ?? "none") });
+  }
+
   async renderHtml() {
     this.render({ html: "<h1>Posts</h1>" });
   }
@@ -139,6 +148,11 @@ describe("ActionDispatch::IntegrationTest", () => {
       r.get("/posts/redirect", { to: "posts#redirectToIndex", as: "posts_redirect" });
       r.get("/posts/header", { to: "posts#customHeader", as: "posts_header" });
       r.get("/posts/session", { to: "posts#readSession", as: "posts_session" });
+      r.post("/posts/create-and-redirect", {
+        to: "posts#createAndRedirect",
+        as: "posts_create_and_redirect",
+      });
+      r.get("/posts/flash", { to: "posts#showFlash", as: "posts_flash" });
       r.get("/posts/set-cookie", { to: "posts#setCookie", as: "posts_set_cookie" });
       r.get("/posts/read-cookie", { to: "posts#readCookie", as: "posts_read_cookie" });
       r.resources("posts", {}, (posts) => {
@@ -338,6 +352,19 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("flash is accessible after request", async () => {
       await app.post("/posts", { params: { title: "Flash!" } });
       app.assertFlash("notice", "Post created!");
+    });
+
+    it("flash survives a redirect and is swept on the request after", async () => {
+      await app.post("/posts/create-and-redirect");
+      app.assertResponse(302);
+
+      await app.followRedirect();
+      expect(app.responseBody).toBe("Post created!");
+
+      // `commit_flash` sweeps what was only read this request
+      // (`flash.rb:292-305`), so the next one starts clean.
+      await app.get("/posts/flash");
+      expect(app.responseBody).toBe("none");
     });
 
     it("assertFlash throws when not set", async () => {

@@ -15,6 +15,7 @@
  *   automatically expiring. Falls back to `expires` (Rails alias).
  */
 
+import type { RackApp } from "@blazetrails/rack";
 import { include } from "@blazetrails/activesupport";
 import {
   Compatibility,
@@ -31,7 +32,7 @@ export interface MemCacheStoreSessionOptions extends CacheStoreSessionOptions {
 
 /** Rails: `class MemCacheStore < Rack::Session::Dalli`. */
 export class MemCacheStore extends CacheStore {
-  constructor(app: unknown, options: MemCacheStoreSessionOptions = {}) {
+  constructor(app?: RackApp, options: MemCacheStoreSessionOptions = {}) {
     // Rails: `options[:expire_after] ||= options[:expires]`. The caller's
     // options hash is mutated in place to match Rails semantics.
     if (options.expireAfter == null && options.expires != null) {

@@ -37,7 +37,8 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       host.defaultOptions.sidbits = 128;
       host.defaultOptions.secureRandom = 1;
       Compatibility.initializeSid.call(host);
-      expect(host.defaultOptions).toEqual({});
+      expect(host.defaultOptions).not.toHaveProperty("sidbits");
+      expect(host.defaultOptions).not.toHaveProperty("secureRandom");
     });
 
     it("makeRequest builds an ActionDispatch::Request from env", () => {
@@ -110,12 +111,14 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     it("commitSession invokes commitCsrfToken on the request", () => {
       const store = new AbstractStore();
       let called = false;
-      const req = {
+      const req: any = {
+        env: {},
         commitCsrfToken: () => {
           called = true;
         },
       };
-      expect(() => (store as any).commitSession(req, null)).toThrow(/commitSession/);
+      (store as any).prepareSession(req);
+      (store as any).commitSession(req, { setCookie: () => {} });
       expect(called).toBe(true);
     });
 

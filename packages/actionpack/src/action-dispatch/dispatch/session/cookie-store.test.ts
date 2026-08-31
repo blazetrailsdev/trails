@@ -54,7 +54,7 @@ function makeReq(initial: Record<string, unknown> = {}): CookieStoreRequest & {
 }
 
 function makeStore(opts: Record<string, unknown> = {}): CookieStore {
-  return new CookieStore(() => undefined, opts);
+  return new CookieStore(undefined, opts);
 }
 
 describe("CookieStoreTest", () => {

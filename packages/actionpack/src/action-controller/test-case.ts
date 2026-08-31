@@ -373,7 +373,7 @@ export class TestCase {
       HTTP_HOST: "test.host",
       SERVER_NAME: "test.host",
       SERVER_PORT: "80",
-      "rack.session": { ...this.session, ...(session ?? {}) },
+      "rack.session": new TestSession({ ...this.session, ...(session ?? {}) }),
       ...extraEnv,
     };
 
@@ -417,11 +417,8 @@ export class TestCase {
       action,
     };
 
-    if (flash && "flash" in this.controller) {
-      const fh = new FlashHash();
-      for (const [k, v] of Object.entries(flash)) fh.set(k, v);
-      (this.controller as any).flash = fh;
-    }
+    // Rails: `@request.flash.update(flash || {})` (`test_case.rb:613`).
+    this.request.flash!.update(flash ?? {});
 
     await this.processControllerResponse(action, xhr);
   }
@@ -772,9 +769,22 @@ export class TestSession {
     return this.toHash();
   }
 
-  /** Mirrors Rails `TestSession#exists?` — always `true`. */
+  /** Mirrors Rails `TestSession#exists?` (`test_case.rb:208-210`) — always `true`. */
   isExists(): boolean {
     return true;
+  }
+
+  /**
+   * Mirrors `SessionHash#loaded?`. Rails' `TestSession#initialize` sets
+   * `@loaded = true` (`test_case.rb:206`), so it is always loaded.
+   */
+  isLoaded(): boolean {
+    return true;
+  }
+
+  /** Mirrors `SessionHash#has_key?`, inherited from `Rack::Session::Abstract`. */
+  hasKey(key: string): boolean {
+    return this.has(key);
   }
 
   /** Mirrors Rails `TestSession#keys` — stored data keys. */

@@ -8,13 +8,13 @@ function makeStore(opts: { expireAfter?: number } = {}): {
   cache: MemoryStore;
 } {
   const cache = new MemoryStore();
-  const store = new CacheStore(() => undefined, { cache, ...opts });
+  const store = new CacheStore(undefined, { cache, ...opts });
   return { store, cache };
 }
 
 describe("ActionDispatch::Session::CacheStore", () => {
   it("requires a cache option", () => {
-    expect(() => new CacheStore(() => undefined, {})).toThrow(/cache/);
+    expect(() => new CacheStore(undefined, {})).toThrow(/cache/);
   });
 
   describe("findSession", () => {

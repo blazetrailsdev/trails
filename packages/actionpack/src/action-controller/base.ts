@@ -25,7 +25,14 @@ import type {
   AroundCallback,
   CallbackOptions,
 } from "../abstract-controller/callbacks.js";
-import { LookupContext, _prefixes } from "@blazetrails/actionview";
+import {
+  LookupContext,
+  ViewPathsClassMethods,
+  _prefixes,
+  detailsForLookup,
+  lookupContext,
+} from "@blazetrails/actionview";
+import type { PathSet, ViewPathsInput } from "@blazetrails/actionview";
 import type { RouteHelpersMap } from "../action-dispatch/routing/route-helpers.js";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
@@ -173,17 +180,40 @@ export const PROTECTED_IVARS: readonly string[] = [
 ];
 
 export class Base extends Metal {
-  /** Flash messages for the current request. */
-  flash: FlashHash = new FlashHash();
+  /** Rails: `delegate :flash, to: :request` (`action_controller/metal/flash.rb:12`). */
+  get flash(): FlashHash {
+    return this.request.flash!;
+  }
 
-  /** Session store (simple object). */
+  /**
+   * Session store (simple object).
+   *
+   * Rails delegates this to the request (`delegate :session, to: "@_request"`,
+   * `metal.rb:176`); converging it is
+   * `converge-controller-session-delegation`.
+   */
   session: Record<string, unknown> = {};
 
   /** Template resolver (pluggable, legacy). */
   static templateResolver?: (controller: string, action: string, format: string) => string | null;
 
-  /** Pluggable template lookup context (ActionView integration). */
-  static lookupContext?: LookupContext;
+  /**
+   * Rails `ActionView::ViewPaths::ClassMethods` — included into
+   * `AbstractController::Base` through `AbstractController::Rendering`
+   * (`abstract_controller/rendering.rb:20`), which is why
+   * `Engine`'s `add_view_paths` finds `respond_to?(:prepend_view_path)`
+   * true. Assigned per the module-mixin convention.
+   */
+  static _viewPaths: {
+    (): PathSet;
+    (paths: PathSet): void;
+  } = ViewPathsClassMethods._viewPaths;
+  static appendViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.appendViewPath;
+  static prependViewPath: (path: ViewPathsInput) => void = ViewPathsClassMethods.prependViewPath;
+  static viewPaths: {
+    (): PathSet;
+    (paths: ViewPathsInput): void;
+  } = ViewPathsClassMethods.viewPaths;
 
   /** Layout name. Set to false to disable, or a string name. */
   static layout: string | false = "application";
@@ -269,7 +299,7 @@ export class Base extends Metal {
       // Render action template or collection via LookupContext
       this._pendingRender = { type: "template", options };
       return; // Will be handled by async processAction wrapper
-    } else if ((this.constructor as typeof Base).lookupContext) {
+    } else if (this.lookupContext.viewPaths.size > 0) {
       this._pendingRender = { type: "template", options };
       return;
     } else {
@@ -296,11 +326,19 @@ export class Base extends Metal {
    */
   _prefixes = _prefixes;
 
+  /** @internal Rails `ActionView::ViewPaths#_lookup_context` memo. */
+  _lookupContext?: LookupContext;
+
+  /** Rails `ActionView::ViewPaths#lookup_context` (`view_paths.rb:63-65`). */
+  get lookupContext(): LookupContext {
+    return lookupContext.call(this as never);
+  }
+
+  /** Rails `ActionView::ViewPaths#details_for_lookup` (`view_paths.rb:67-69`). */
+  detailsForLookup = detailsForLookup;
+
   /**
    * Rails `ActionView::ViewPaths#template_exists?` (`view_paths.rb:83-85`).
-   * trails' controllers hold their lookup context on the class rather than
-   * building one per instance, so the delegation target differs; the
-   * signature and the `exists?` call are Rails'.
    */
   templateExists(
     name: string,
@@ -309,19 +347,14 @@ export class Base extends Metal {
     keys: readonly string[] = [],
     options: Record<string, readonly (string | symbol)[]> = {},
   ): boolean {
-    const ctx = (this.constructor as typeof Base).lookupContext;
-    if (!ctx) return false;
-    return ctx.isExists(name, prefixes, partial, keys, options);
+    return this.lookupContext.isExists(name, prefixes, partial, keys, options);
   }
 
   /**
    * Rails `ActionView::ViewPaths#any_templates?` (`view_paths.rb:87-89`).
-   * Same class-level lookup-context note as {@link templateExists}.
    */
   isAnyTemplates(name: string, prefixes: readonly string[] = [], partial = false): boolean {
-    const ctx = (this.constructor as typeof Base).lookupContext;
-    if (!ctx) return false;
-    return ctx.isAny(name, prefixes, partial);
+    return this.lookupContext.isAny(name, prefixes, partial);
   }
 
   /**
@@ -357,13 +390,7 @@ export class Base extends Metal {
       this.status = options.status;
     }
 
-    const ctx = (this.constructor as typeof Base).lookupContext;
-    if (!ctx) {
-      throw new Error(
-        "No lookupContext configured. Set YourController.lookupContext = new LookupContext() " +
-          "and register resolvers/handlers.",
-      );
-    }
+    const ctx = this.lookupContext;
 
     const controllerPrefix = this.controllerPath();
     const format = this.request?.format?.symbol ?? "html";

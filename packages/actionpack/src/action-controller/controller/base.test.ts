@@ -261,6 +261,9 @@ describe("ActionController::Base redirecting", () => {
 describe("ActionController::Base flash", () => {
   it("notice sets flash notice", () => {
     const c = new (class extends Base {})();
+    // Rails' `notice=` writes `flash[:notice]`, and `flash` delegates to the
+    // request (`metal/flash.rb:12`), so the controller needs one.
+    c.setRequestBang(new Request({}));
     c.notice = "Success!";
     expect(c.flash.notice).toBe("Success!");
     expect(c.notice).toBe("Success!");
@@ -268,6 +271,7 @@ describe("ActionController::Base flash", () => {
 
   it("alert sets flash alert", () => {
     const c = new (class extends Base {})();
+    c.setRequestBang(new Request({}));
     c.alert = "Danger!";
     expect(c.flash.alert).toBe("Danger!");
     expect(c.alert).toBe("Danger!");

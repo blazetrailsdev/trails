@@ -17,6 +17,7 @@
  *   is dormant until those stores grow an `options` accessor.
  */
 
+import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
 import { AbstractSecureStore, SessionId } from "./abstract-store.js";
 
@@ -33,7 +34,7 @@ export class CacheStore extends AbstractSecureStore {
   /** @internal */
   readonly options: CacheStoreSessionOptions;
 
-  constructor(app: unknown, options: CacheStoreSessionOptions = {}) {
+  constructor(app?: RackApp, options: CacheStoreSessionOptions = {}) {
     super(app, options);
     const cache = options.cache;
     if (!cache) {
