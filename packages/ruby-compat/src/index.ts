@@ -11,7 +11,22 @@ export {
   rubyClass,
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
-export { fetch, hasKey } from "./hash.js";
+export {
+  Hash,
+  deleteIf,
+  eachKey,
+  eachPair,
+  except,
+  fetch,
+  hasKey,
+  merge,
+  mergeBang,
+  reject,
+  slice,
+  transformValues,
+  update,
+} from "./hash.js";
+export type { DefaultProc } from "./hash.js";
 export { KeyError } from "./key-error.js";
 export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";

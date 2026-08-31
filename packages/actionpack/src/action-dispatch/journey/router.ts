@@ -1,3 +1,4 @@
+import { merge } from "@blazetrails/ruby-compat";
 import { X_CASCADE } from "../constants.js";
 import { Builder } from "./gtg/index.js";
 import { unescapeUri } from "./router/utils.js";
@@ -85,6 +86,7 @@ export class Router {
     return [404, { [X_CASCADE]: "pass" }, ["Not Found"]] as unknown as RackishResponse;
   }
 
+  /** @missingRailsArgs merge — PERMANENT */
   recognize(
     railsReq: RouterRequest,
     // Block return is `unknown` so expression-bodied callbacks like
@@ -100,7 +102,7 @@ export class Router {
         if (!post.startsWith("/")) post = "/" + post;
         railsReq.pathInfo = post;
       }
-      const merged: Record<string, unknown> = { ...route.defaults, ...parameters };
+      const merged: Record<string, unknown> = merge(route.defaults, parameters);
       // JS callbacks can't `return` from the caller's frame the way Ruby
       // blocks can; returning `true` from the block signals "stop iterating".
       if (block(route, merged) === true) return;
