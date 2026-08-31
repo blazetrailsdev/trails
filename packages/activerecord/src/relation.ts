@@ -1349,7 +1349,7 @@ export class Relation<T extends Base> {
 
   async destroy(id: unknown): Promise<T | T[]> {
     const multipleIds = this.model.compositePrimaryKey
-      ? Array.isArray((id as unknown[])?.[0])
+      ? Array.isArray((id as unknown[])[0])
       : Array.isArray(id);
 
     if (multipleIds) {
