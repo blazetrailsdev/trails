@@ -1152,30 +1152,59 @@ export function extractFromProgram(
   // `fromFile:X` via a local declaration), clone the class entry under
   // the re-exporting file's path so api-compare sees the class where
   // Rails expects it.
-  for (const re of pendingReExports) {
-    const key = `${re.fromFile}:${re.localName}`;
-    if (info.classes[key] || info.modules[key]) continue;
-    const targetRel = resolveRelModule(re.fromFile, re.moduleSpecifier);
-    if (!targetRel) continue;
-    const sourceKey = `${targetRel}:${re.sourceName}`;
-    const sourceClass = info.classes[sourceKey];
-    if (sourceClass) {
-      info.classes[key] = {
-        ...sourceClass,
-        name: re.localName,
-        file: re.fromFile,
-        reExportedFrom: sourceKey,
-      };
-      continue;
+  //
+  // A barrel may re-export from another barrel (`index.ts` ← `foo.ts` ←
+  // `foo/bar.ts`), so a single pass in file-walk order would resolve the outer
+  // hop only when the intermediate clone happened to exist already. Iterate to
+  // a FIXPOINT instead, so the cloned set does not depend on visit order; the
+  // loop terminates because every round either creates at least one new entry
+  // or stops, and the key space is finite.
+  //
+  // `reExportedFrom` always names the DECLARING entry, never an intermediate
+  // clone: consumers use it to skip a name they have already scored at its real
+  // home, and a chain of clones pointing at each other would leave the outer
+  // hop looking like a declaration site.
+  const declaringKey = (key: string): string => {
+    const seen = new Set<string>([key]);
+    let current = key;
+    for (;;) {
+      const from = (info.classes[current] ?? info.modules[current])?.reExportedFrom;
+      if (!from || seen.has(from)) return current;
+      seen.add(from);
+      current = from;
     }
-    const sourceModule = info.modules[sourceKey];
-    if (sourceModule) {
-      info.modules[key] = {
-        ...sourceModule,
-        name: re.localName,
-        file: re.fromFile,
-        reExportedFrom: sourceKey,
-      };
+  };
+
+  let clonedThisRound = true;
+  while (clonedThisRound) {
+    clonedThisRound = false;
+    for (const re of pendingReExports) {
+      const key = `${re.fromFile}:${re.localName}`;
+      if (info.classes[key] || info.modules[key]) continue;
+      const targetRel = resolveRelModule(re.fromFile, re.moduleSpecifier);
+      if (!targetRel) continue;
+      const sourceKey = `${targetRel}:${re.sourceName}`;
+      const sourceClass = info.classes[sourceKey];
+      if (sourceClass) {
+        info.classes[key] = {
+          ...sourceClass,
+          name: re.localName,
+          file: re.fromFile,
+          reExportedFrom: declaringKey(sourceKey),
+        };
+        clonedThisRound = true;
+        continue;
+      }
+      const sourceModule = info.modules[sourceKey];
+      if (sourceModule) {
+        info.modules[key] = {
+          ...sourceModule,
+          name: re.localName,
+          file: re.fromFile,
+          reExportedFrom: declaringKey(sourceKey),
+        };
+        clonedThisRound = true;
+      }
     }
   }
 

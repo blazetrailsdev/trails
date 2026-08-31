@@ -426,7 +426,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     });
   });
 
-  it.runIf(currentAdapter("Mysql2Adapter", "TrilogyAdapter"))("validate column sizes", async () => {
+  const authorNameLimitPresent = currentAdapter("Mysql2Adapter", "TrilogyAdapter");
+
+  it.skipIf(!authorNameLimitPresent)("validate column sizes", async () => {
     const Author = makeEncryptedAuthor(await freshAdapter());
     new Author();
     await Author.loadSchema();

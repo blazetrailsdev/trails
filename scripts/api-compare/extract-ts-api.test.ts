@@ -2332,6 +2332,35 @@ describe("extractFromProgram — re-export attribution", () => {
     );
     expect(info.classes["adapters.ts:LocalHelper"].reExportedFrom).toBeUndefined();
   });
+
+  it("resolves a two-hop barrel chain to a fixpoint, in either file order", () => {
+    const declaring = {
+      "adapters/abstract-adapter.ts": `export class AbstractAdapter { quoteTableName(): void {} }`,
+    };
+    const mid = {
+      "adapters.ts": `export { AbstractAdapter } from "./adapters/abstract-adapter.js";`,
+    };
+    const outer = { "index.ts": `export { AbstractAdapter } from "./adapters.js";` };
+
+    for (const files of [
+      { ...declaring, ...mid, ...outer },
+      { ...outer, ...mid, ...declaring },
+    ]) {
+      const info = extractFromFiles("/p", files);
+
+      expect(
+        info.classes["adapters/abstract-adapter.ts:AbstractAdapter"].reExportedFrom,
+      ).toBeUndefined();
+      expect(info.classes["adapters.ts:AbstractAdapter"].reExportedFrom).toBe(
+        "adapters/abstract-adapter.ts:AbstractAdapter",
+      );
+      // The outer barrel is cloned regardless of visit order, and points at the
+      // DECLARING file — not at the intermediate clone it was copied from.
+      expect(info.classes["index.ts:AbstractAdapter"].reExportedFrom).toBe(
+        "adapters/abstract-adapter.ts:AbstractAdapter",
+      );
+    }
+  });
 });
 
 function classOf(info: PackageInfo, name: string): ClassInfo {

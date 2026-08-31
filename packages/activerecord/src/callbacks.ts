@@ -80,15 +80,12 @@ export async function _updateRecord(
   this: any,
   attributeNames?: string[],
   block?: (record: any) => void,
-): Promise<boolean> {
-  const ctor = this.constructor;
-  return (
-    (await runCallbacks(this, "update", () =>
-      recordUpdateTimestamps.call(this, () =>
-        dirtyUpdateRecord.call(this, attributeNames, (names: string[]) =>
-          PersistenceInstanceMethods._updateRecord.call(this, names, block),
-        ),
+): Promise<unknown> {
+  return await runCallbacks(this, "update", () =>
+    recordUpdateTimestamps.call(this, () =>
+      dirtyUpdateRecord.call(this, attributeNames, (names: string[]) =>
+        PersistenceInstanceMethods._updateRecord.call(this, names, block),
       ),
-    )) !== false
+    ),
   );
 }

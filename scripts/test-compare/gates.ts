@@ -22,6 +22,20 @@ export function normalizeAdapterType(literal: string): GateAdapter | null {
   return ADAPTER_TYPE_MAP[literal] ?? null;
 }
 
+/**
+ * `AdapterClassName` literal (support/adapter-helper.ts, the port of Rails'
+ * `test/support/adapter_helper.rb`) → normalized {@link GateAdapter}. Rails
+ * spells the same predicate `current_adapter?(:PostgreSQLAdapter)`, so both
+ * `TrilogyAdapter` and `Mysql2Adapter` land on the one `mysql` lane the
+ * comparison knows.
+ */
+const ADAPTER_CLASS_MAP: Record<string, GateAdapter> = {
+  SQLite3Adapter: "sqlite",
+  PostgreSQLAdapter: "postgresql",
+  Mysql2Adapter: "mysql",
+  TrilogyAdapter: "mysql",
+};
+
 function sortedUnique<T>(xs: T[]): T[] {
   return [...new Set(xs)].sort();
 }
@@ -133,8 +147,9 @@ export function gateFromWrapper(name: string, featureArg?: string | null): TestG
  * when the expression is true, so it runs when false) and `true` for `runIf`.
  *
  * Recognizes the adapter idiom in the suite — `adapterType === "mysql"` /
- * `adapterType !== "sqlite"` — anywhere in the expression, and feature
- * predicates — `adapterSupports("x")`. How a compound mixing the two resolves
+ * `adapterType !== "sqlite"` — anywhere in the expression, the Rails-named
+ * `currentAdapter("PostgreSQLAdapter")` predicate (variadic, and negatable with
+ * `!`), and feature predicates — `adapterSupports("x")`. How a compound mixing the two resolves
  * depends on the adapter term's polarity, mirroring the Ruby extractor's
  * `mixed` rule:
  *   - EXCLUSION (`adapterType === "sqlite" || !adapterSupports("insert_returning")`,
@@ -186,6 +201,28 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
       const runWhenEqual = runsWhenTrue ? trueMeansEqual : !trueMeansEqual;
       adapterIsPositive = runWhenEqual;
       adapters = sortedUnique(runWhenEqual ? [adapter] : ALL_ADAPTERS.filter((a) => a !== adapter));
+    }
+  }
+
+  // `currentAdapter("PostgreSQLAdapter")` / `!currentAdapter("Mysql2Adapter",
+  // "TrilogyAdapter")` — the port of Rails' own `current_adapter?` predicate,
+  // which the Ruby extractor reads directly. It is variadic, so the literals
+  // UNION (the predicate is true when the lane is any one of them); polarity is
+  // then read exactly as for `adapterType` above. Only consulted when no
+  // `adapterType` term was found, keeping the "first adapter term wins" rule.
+  if (!adapters) {
+    const currentAdapterMatch = text.match(/(!\s*)?currentAdapter\(([^)]*)\)/);
+    if (currentAdapterMatch) {
+      const [, negatedInText, argsText] = currentAdapterMatch;
+      const named = [...argsText.matchAll(/["']([A-Za-z0-9]+)["']/g)]
+        .map((m) => ADAPTER_CLASS_MAP[m[1]])
+        .filter((a): a is GateAdapter => a !== undefined);
+      if (named.length > 0) {
+        const trueMeansIs = !negatedInText;
+        const runWhenIs = runsWhenTrue ? trueMeansIs : !trueMeansIs;
+        adapterIsPositive = runWhenIs;
+        adapters = sortedUnique(runWhenIs ? named : ALL_ADAPTERS.filter((a) => !named.includes(a)));
+      }
     }
   }
 
