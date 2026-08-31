@@ -113,8 +113,12 @@ async function main(tighten: boolean): Promise<number> {
   if (tighten) {
     if (grew.length > 0 || unreceipted.length > 0) {
       console.error(
-        "\nextra-surface gate: refusing to tighten while the mark is EXCEEDED — " +
-          "`--tighten` only narrows.\nRemove the added surface first, then re-run.\n",
+        grew.length > 0
+          ? "\nextra-surface gate: refusing to tighten while a mark is EXCEEDED — " +
+              "`--tighten` only narrows.\nRemove the added surface first, then re-run.\n"
+          : "\nextra-surface gate: refusing to tighten while a tagged-only package " +
+              "carries novel surface.\nThose packages have no mark to narrow — receipt " +
+              "the names or delete them, then re-run.\n",
       );
       return 1;
     }

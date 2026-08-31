@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   COUNTED_PACKAGES,
   GATED_PACKAGES,
+  TAGGED_ONLY_PACKAGES,
   exceedances,
   measure,
   staleMarks,
@@ -138,5 +139,16 @@ describe("extra-surface mark", () => {
 
   it("names a gated package the run never measured", () => {
     expect(unmeasuredPackages({})).toEqual([...GATED_PACKAGES]);
+  });
+
+  it("still demands a measurement for a tagged-only package, which has no mark to miss", () => {
+    expect(unmeasuredPackages({ activerecord: { novel: 1, total: 1 } })).toContain("arel");
+  });
+
+  it("gates every package in exactly one mode", () => {
+    const counted = new Set<string>(COUNTED_PACKAGES);
+    const taggedOnly = new Set<string>(TAGGED_ONLY_PACKAGES);
+    expect([...counted].filter((p) => taggedOnly.has(p))).toEqual([]);
+    expect([...GATED_PACKAGES].sort()).toEqual([...counted, ...taggedOnly].sort());
   });
 });

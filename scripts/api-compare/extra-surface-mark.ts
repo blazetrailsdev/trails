@@ -8,10 +8,13 @@
  * on the same contract as the RFC 0047/0084 call-set mark and its RFC 0095
  * call-argument twin:
  *
- *   - a committed mark per gated package — `novel` and `total`;
+ *   - a committed mark per COUNTED package — `novel` and `total`;
  *   - CI fails on ANY increase in either number;
  *   - converging surface makes the mark stale-HIGH, which `--tighten` narrows
  *     to the current measurement — never a reseed, and never a widening.
+ *
+ * A package that reaches zero untagged novel surface leaves that contract for
+ * TAGGED-ONLY MODE below, and carries no mark at all.
  *
  * The mark is per-PACKAGE, not per-file. The call-set baseline is sharded per
  * source file because its unit of work is one reviewed row per call site; here
@@ -42,17 +45,19 @@
  * burndown behind it yet, and widening GATED_PACKAGES without one is exactly
  * the not-mechanical step this comment has always warned about.
  *
- * TAGGED-ONLY MODE is where a gated package ends up once its
- * untagged novel surface is burnt down. `extra-surface.ts` already subtracts a
- * declaration carrying a `@noRailsEquivalent` receipt from both dimensions, so
- * `novel` never counted KNOWN extra surface — only the residue nobody has
- * written a receipt for. A package whose residue is zero therefore needs no
- * number at all: its rule is the constant `novel === 0`, and it carries no row
- * in the JSON. That is not merely tidier. A single shared integer per package
- * is a merge-conflict generator — every PR anywhere in the package that
- * deletes one novel name rewrites the same line, and two parallel branches
- * collide on a value neither can resolve without re-measuring. A receipt lives
- * in the file the PR is already editing, so it conflicts with nothing.
+ * TAGGED-ONLY MODE is where a gated package ends up once its untagged novel
+ * surface is burnt down. `extra-surface.ts` already subtracts a declaration
+ * carrying a `@noRailsEquivalent` receipt from both dimensions, so `novel`
+ * never counted KNOWN extra surface — only the residue nobody has written a
+ * receipt for. A package whose residue is zero therefore needs no number at
+ * all: its rule is the constant `novel === 0`, and it carries no row in the
+ * JSON.
+ *
+ * That is not merely tidier. A single shared integer per package is a
+ * merge-conflict generator — every PR anywhere in the package that deletes one
+ * novel name rewrites the same line, and two parallel branches collide on a
+ * value neither can resolve without a full re-measurement. A receipt lives in
+ * the file the PR is already editing, so it conflicts with nothing.
  *
  * The mode drops the `total` dimension, deliberately. A moved-not-novel extra
  * is a name Rails DOES define, just in another `.rb`; that is a file-placement
@@ -64,9 +69,9 @@
  * arel enrolls first, being the only package measured at `novel: 0`.
  * activerecord's 342 and ruby-compat's 4 stay on counts until their own
  * burndowns (the `activerecord-extra-surface-receipt-burndown` RFC and RFC
- * 0129 respectively) retire them, one receipt or one deletion at a time. Enrollment is only-grow, exactly like RFC 0121's:
- * a package joins when it reaches zero and is never moved back out to turn a
- * red run green.
+ * 0129 respectively) retire them, one receipt or one deletion at a time.
+ * Enrollment is only-grow, exactly like RFC 0121's: a package joins when it
+ * reaches zero and is never moved back out to turn a red run green.
  *
  * Hard rules: no node:* imports, no process.* in the library surface (the CLI
  * entry guard is the sole exception), async fs only, no third-party runtime deps.
@@ -96,10 +101,14 @@ export const TAGGED_ONLY_PACKAGES = ["arel"] as const;
  * The packages this gate covers, in either mode. Everything else is measured
  * by `parity:api:extra` and left ungated — see the module comment.
  */
-export const GATED_PACKAGES = [
+export type GatedPackage =
+  | (typeof COUNTED_PACKAGES)[number]
+  | (typeof TAGGED_ONLY_PACKAGES)[number];
+
+export const GATED_PACKAGES: readonly GatedPackage[] = [
   ...COUNTED_PACKAGES,
   ...TAGGED_ONLY_PACKAGES,
-].sort() as readonly string[];
+].sort();
 
 export interface SurfaceMark {
   /**
@@ -222,8 +231,10 @@ export function taggedOnlyViolations(current: SurfaceMarks): MarkViolation[] {
 
 /**
  * A tagged-only package that still carries a row in the mark file. The row is
- * dead weight the gate never reads, and leaving one there invites a later
- * `--tighten` to resurrect a number the package no longer has.
+ * dead weight no comparison here reads, and leaving one there invites a later
+ * `--tighten` to resurrect a number the package no longer has. This is the
+ * single enforcement point: {@link writeMarks} does not filter such a row out,
+ * so the gate must refuse before one can ever reach it.
  */
 export function strandedMarks(marks: SurfaceMarks): string[] {
   return TAGGED_ONLY_PACKAGES.filter((name) => marks[name] !== undefined);
@@ -254,10 +265,6 @@ export function tightened(marks: SurfaceMarks, current: SurfaceMarks): SurfaceMa
 
 export async function writeMarks(marks: SurfaceMarks): Promise<void> {
   const sorted: SurfaceMarks = {};
-  const taggedOnly = new Set<string>(TAGGED_ONLY_PACKAGES);
-  for (const name of Object.keys(marks).sort()) {
-    if (taggedOnly.has(name)) continue;
-    sorted[name] = marks[name]!;
-  }
+  for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
   await fs.writeFile(MARK_PATH, serializeBaseline(sorted));
 }
