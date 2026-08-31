@@ -30,7 +30,7 @@ export {
   unescapeUri,
 } from "./routing/index.js";
 
-export { Request, controllerConstants } from "./http/request.js";
+export { Request, MissingController, controllerConstants } from "./http/request.js";
 export { Response, type CookieOptions } from "./http/response.js";
 export {
   Parameters,

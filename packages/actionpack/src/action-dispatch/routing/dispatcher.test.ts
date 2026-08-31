@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
-import { DispatcherRegistry } from "./dispatcher.js";
+import { DispatcherRegistry, type DispatchableControllerClass } from "./dispatcher.js";
 import { X_CASCADE } from "../constants.js";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
-import type { RackishResponse, RouterRequest } from "../journey/router.js";
+import type { RouterRequest } from "../journey/router.js";
 
 function makeReq(path: string, method = "GET"): RouterRequest {
   const req = new Request({
@@ -18,17 +18,39 @@ function makeReq(path: string, method = "GET"): RouterRequest {
   return req;
 }
 
+function controllerClass(
+  body: (action: string, req: RouterRequest) => [number, Record<string, string>, string[]],
+): DispatchableControllerClass {
+  return class {
+    static makeResponseBang(request: Request): Response {
+      const res = new Response();
+      res.request = request;
+      return res;
+    }
+    private _triple: [number, Record<string, string>, string[]] = [200, {}, []];
+    async dispatch(action: string, req: Request): Promise<void> {
+      this._triple = body(action, req as unknown as RouterRequest);
+    }
+    toRackResponse(): [number, Record<string, string>, string[]] {
+      return this._triple;
+    }
+  } as unknown as DispatchableControllerClass;
+}
+
 describe("RouteDispatcher / DispatcherRegistry", () => {
   it("dispatches to a registered handler via RouteSet.serve", async () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/posts/:id", { to: "posts#show" }));
 
     const calls: Array<{ action: string; id: string }> = [];
-    routes.registerController("posts", (action, req) => {
-      const params = req.pathParameters as Record<string, string>;
-      calls.push({ action, id: params["id"] });
-      return [200, { "content-type": "text/plain" }, ["ok"]] as unknown as RackishResponse;
-    });
+    routes.registerController(
+      "posts",
+      controllerClass((action, req) => {
+        const params = req.pathParameters as Record<string, string>;
+        calls.push({ action, id: params["id"] });
+        return [200, { "content-type": "text/plain" }, ["ok"]];
+      }),
+    );
 
     const res = await routes.serve(makeReq("/posts/42"));
     expect(res[0]).toBe(200);
@@ -47,7 +69,10 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
   it("returns 404 X-Cascade when no route matches", async () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/posts", { to: "posts#index" }));
-    routes.registerController("posts", () => [200, {}, []] as unknown as RackishResponse);
+    routes.registerController(
+      "posts",
+      controllerClass(() => [200, {}, []]),
+    );
 
     const res = await routes.serve(makeReq("/nope"));
     expect(res[0]).toBe(404);
@@ -63,9 +88,12 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
 
     routes.registerController(
       "first",
-      () => [404, { "x-cascade": "pass" }, []] as unknown as RackishResponse,
+      controllerClass(() => [404, { "x-cascade": "pass" }, []]),
     );
-    routes.registerController("second", () => [200, {}, ["second"]] as unknown as RackishResponse);
+    routes.registerController(
+      "second",
+      controllerClass(() => [200, {}, ["second"]]),
+    );
 
     const res = await routes.serve(makeReq("/x"));
     expect(res[0]).toBe(200);
@@ -73,7 +101,10 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
 
   it("clear() empties the dispatcher registry", () => {
     const routes = new RouteSet();
-    routes.registerController("posts", () => [200, {}, []] as unknown as RackishResponse);
+    routes.registerController(
+      "posts",
+      controllerClass(() => [200, {}, []]),
+    );
     expect(routes.dispatcherRegistry.has("posts")).toBe(true);
     routes.clear();
     expect(routes.dispatcherRegistry.has("posts")).toBe(false);
@@ -85,20 +116,22 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
     expect(d.dispatcher()).toBe(true);
   });
 
-  it("Dispatcher with raiseOnNameError=true throws for unregistered controllers", () => {
+  it("Dispatcher with raiseOnNameError=true throws for unregistered controllers", async () => {
     const reg = new DispatcherRegistry();
     const d = new Dispatcher(true, reg);
     const req = makeReq("/x");
     req.pathParameters = { controller: "missing", action: "show" };
-    expect(() => d.serve(req)).toThrow(/uninitialized constant MissingController/);
+    await expect(d.serve(req)).rejects.toThrow(/uninitialized constant MissingController/);
   });
 
   it("StaticDispatcher dispatches its bound handler regardless of params[:controller]", async () => {
     const calls: string[] = [];
-    const d = new StaticDispatcher((action) => {
-      calls.push(action);
-      return [200, {}, []] as unknown as RackishResponse;
-    });
+    const d = new StaticDispatcher(
+      controllerClass((action) => {
+        calls.push(action);
+        return [200, {}, []];
+      }),
+    );
     const req = makeReq("/x");
     req.pathParameters = { controller: "anything", action: "index" };
     expect((await d.serve(req))[0]).toBe(200);
@@ -108,7 +141,10 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
   it("unregister removes a handler so subsequent serves return 404 pass", async () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/p", { to: "posts#index" }));
-    routes.registerController("posts", () => [200, {}, []] as unknown as RackishResponse);
+    routes.registerController(
+      "posts",
+      controllerClass(() => [200, {}, []]),
+    );
     routes.dispatcherRegistry.unregister("posts");
     const res = await routes.serve(makeReq("/p"));
     expect(res[0]).toBe(404);
@@ -153,14 +189,16 @@ describe("Dispatcher over the controller constant table", () => {
     expect(res[2]).toEqual(["index"]);
   });
 
-  it("raises on PASS_NOT_FOUND, which has no make_response!, when there is no controller", () => {
-    expect(() => new Dispatcher(true).serve(reqFor({ action: "index" }))).toThrow(TypeError);
+  it("raises on PASS_NOT_FOUND, which has no make_response!, when there is no controller", async () => {
+    await expect(new Dispatcher(true).serve(reqFor({ action: "index" }))).rejects.toThrow(
+      TypeError,
+    );
   });
 
-  it("raises the routing error when raise_on_name_error is true", () => {
-    expect(() =>
+  it("raises the routing error when raise_on_name_error is true", async () => {
+    await expect(
       new Dispatcher(true).serve(reqFor({ controller: "nope", action: "index" })),
-    ).toThrow(/uninitialized constant NopeController/);
+    ).rejects.toThrow(/uninitialized constant NopeController/);
   });
 
   it("cascades with a 404 pass when raise_on_name_error is false", async () => {

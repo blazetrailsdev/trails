@@ -5,10 +5,10 @@
  * mirroring the Rails Request API.
  */
 
-import { camelize, toSentence, underscore } from "@blazetrails/activesupport";
+import { camelize, NameError, toSentence, underscore } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { parseNestedQuery, RACK_SESSION, Request as RackRequest } from "@blazetrails/rack";
-import { RoutingError, UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
+import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import {
@@ -1016,20 +1016,23 @@ export class Request {
    * Rails: `request.controller_class_for(name)` (request.rb:94-110).
    * `"#{controller_param.camelize}Controller"` is looked up in
    * {@link controllerConstants} rather than `constantize`d, so the miss
-   * Rails surfaces as a `MissingController` `NameError` — which
-   * `Dispatcher#controller` (route_set.rb:60-63) immediately converts —
-   * is raised as the `ActionController::RoutingError` directly.
+   * arrives as the absence of a map entry rather than as the `NameError`
+   * `constantize` raises; the `missing_name` guard that distinguishes that
+   * `NameError` from one thrown by the controller file itself has nothing
+   * left to discriminate and collapses into raising {@link MissingController}
+   * (`request.rb:102`) directly.
    */
   controllerClassFor(
     name: string | undefined | null,
   ): DispatchableControllerClass | typeof PassNotFound {
     // Ruby `if name` is truthy for empty strings; only nil/false fall through
-    // to the PASS_NOT_FOUND branch.
+    // to the PASS_NOT_FOUND branch. Mirror with explicit null-check so `""`
+    // takes the resolution path.
     if (name != null) {
       const controllerParam = underscore(name);
       const constName = `${camelize(controllerParam)}Controller`;
       const klass = controllerConstants.get(controllerParam);
-      if (!klass) throw new RoutingError(`uninitialized constant ${constName}`);
+      if (!klass) throw new MissingController(`uninitialized constant ${constName}`, constName);
       return klass;
     }
     return PassNotFound;
@@ -1199,6 +1202,22 @@ Request.prototype.parameterFilterFor = _parameterFilterFor as (
  * @internal
  */
 export async function* emptyRackBody(): RackBody {}
+
+/**
+ * Rails: `ActionDispatch::MissingController < NameError`
+ * (`action_dispatch.rb:50`).
+ *
+ * @noRailsEquivalent PERMANENT — declared beside its only raise site rather
+ * than in the `action_dispatch` module file, whose TS counterpart is the
+ * package barrel: importing the barrel from here closes an ESM cycle
+ * (barrel → http/request → barrel) that a Ruby autoload never has.
+ */
+export class MissingController extends NameError {
+  constructor(message: string, constantName?: string) {
+    super(message, constantName);
+    this.name = "MissingController";
+  }
+}
 
 /**
  * The constant table `controller_class_for` resolves against, keyed by the

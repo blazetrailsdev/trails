@@ -1,10 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { RackEnv } from "@blazetrails/rack";
+import { Response } from "../http/response.js";
+import type { Request } from "../http/request.js";
 
 // ==========================================================================
 // Controller routing integration tests
 // ==========================================================================
+let capturedEnv: RackEnv = {};
+
+/** Hands the dispatching request's Rack env back to the test. */
+class captureEnvController {
+  static makeResponseBang(request: Request): Response {
+    const res = new Response();
+    res.request = request;
+    return res;
+  }
+  async dispatch(_action: string, req: Request): Promise<void> {
+    capturedEnv = req.env;
+  }
+  toRackResponse(): [number, Record<string, string>, string[]] {
+    return [200, {}, []];
+  }
+}
+
 describe("Controller routing integration", () => {
   it("dispatches GET / to root route", () => {
     const routes = new RouteSet();
@@ -216,11 +235,7 @@ describe("Controller routing integration", () => {
 
   it("call sets path parameters in env", async () => {
     const routes = new RouteSet();
-    let capturedEnv: RackEnv = {};
-    routes.registerController("posts", (_action, req) => {
-      capturedEnv = (req as unknown as { env: RackEnv }).env;
-      return [200, {}, []] as any;
-    });
+    routes.registerController("posts", captureEnvController as never);
     routes.draw((map) => {
       map.get("/posts/:id", { to: "posts#show" });
     });

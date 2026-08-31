@@ -2,12 +2,30 @@ import { describe, it, expect } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
 import { Route } from "../routing/route.js";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
-import type { RackishResponse } from "../journey/router.js";
+import { Response } from "../http/response.js";
+import type { Request } from "../http/request.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
 
 // ==========================================================================
 // Journey::Route tests (journey/route_test.rb)
 // ==========================================================================
+/** Echoes the matched `path_parameters` back as JSON. */
+class echoParamsController {
+  static makeResponseBang(request: Request): Response {
+    const res = new Response();
+    res.request = request;
+    return res;
+  }
+  private _body = "";
+  async dispatch(action: string, req: Request): Promise<void> {
+    const { controller, action: _a, ...params } = req.pathParameters as Record<string, string>;
+    this._body = JSON.stringify({ controller, action, params });
+  }
+  toRackResponse(): [number, Record<string, string>, ReturnType<typeof bodyFromString>] {
+    return [200, { "content-type": "application/json" }, bodyFromString(this._body)];
+  }
+}
+
 describe("TestRoute", () => {
   it("initialize", () => {
     const route = new Route("GET", "/:controller/:action/:id", "pages", "show", {
@@ -498,15 +516,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
     });
-    routes.registerController("posts", (action, req) => {
-      const params = req.pathParameters as Record<string, string>;
-      const { controller, action: _a, ...rest } = params;
-      return [
-        200,
-        { "content-type": "application/json" },
-        bodyFromString(JSON.stringify({ controller, action, params: rest })),
-      ] as unknown as RackishResponse;
-    });
+    routes.registerController("posts", echoParamsController as never);
     const [status, , body] = await routes.call({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/7",
