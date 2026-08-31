@@ -57,6 +57,13 @@ export function contentFor(
   options?: { flush?: boolean },
   block?: () => unknown,
 ): SafeBuffer | null {
+  // Ruby spells the block with `&`, so `content_for(:name) { ... }` arrives in
+  // `&block` no matter how many optional positionals precede it. JS has no
+  // sigil: a lone trailing callback lands in `content`, so recognize it here.
+  if (typeof content === "function" && block === undefined) {
+    block = content as () => unknown;
+    content = undefined;
+  }
   if (content != null || block) {
     let opts = options;
     let body: unknown = content;

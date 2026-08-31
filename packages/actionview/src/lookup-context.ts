@@ -17,6 +17,7 @@
  */
 
 import type { RenderContext } from "./template/handlers.js";
+import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import type { TemplateResolver } from "./resolver/resolver.js";
 import type { Template } from "./template.js";
@@ -624,19 +625,19 @@ export class LookupContext {
       format,
     };
 
-    // Render the template
-    let output = await this.renderTemplate(template, locals, context);
+    // Rails renders the content template and its layout against the SAME view
+    // (`TemplateRenderer#render_with_layout`, `template_renderer.rb:71-78`:
+    // `view.view_flow.set(:layout, yield(layout)); layout.render(view, locals)`),
+    // which is what carries a `content_for` section from one to the other.
+    const view = this.buildViewContext();
+    let output = await this.renderTemplate(template, locals, { ...context, view });
 
-    // Apply layout
     const layoutName = options.layout !== undefined ? options.layout : this.layoutName;
     if (layoutName !== false && layoutName) {
       const layoutTemplate = this.findLayout(layoutName, format);
       if (layoutTemplate) {
-        const layoutContext: RenderContext = {
-          ...context,
-          yield: output,
-        };
-        output = await this.renderTemplate(layoutTemplate, locals, layoutContext);
+        view.viewFlow.set("layout", output);
+        output = await this.renderTemplate(layoutTemplate, locals, { ...context, view });
       }
     }
 
@@ -726,11 +727,12 @@ export class LookupContext {
       );
     }
 
+    const view = context.view ?? this.buildViewContext();
     return handler.render(template.source, locals, {
       ...context,
       templatePath: template.fullPath ?? template.identifier,
-      renderPartial: (name, partialLocals) =>
-        this.renderPartialSync(name, context.controller, context.format, partialLocals),
+      view,
+      template,
     });
   }
 
@@ -745,13 +747,14 @@ export class LookupContext {
    * segments, mirroring `PartialRenderer#partial_path`
    * (`actionview/lib/action_view/renderer/partial_renderer.rb`).
    *
-   * @noRailsEquivalent CONVERGEABLE helper-methods-not-in-tse-scope
+   * @noRailsEquivalent CONVERGEABLE actionview-render-path-is-async-where-rails-is-sync
    */
   renderPartialSync(
     name: string,
     prefix: string,
     format: string,
     locals: Record<string, unknown> = {},
+    view?: Base,
   ): string {
     const slash = name.lastIndexOf("/");
     const partialPrefix = slash === -1 ? prefix : name.slice(0, slash);
@@ -776,13 +779,15 @@ export class LookupContext {
       );
     }
 
+    const partialView = view ?? this.buildViewContext();
+
     const output = handler.render(template.source, locals, {
       controller: partialPrefix,
       action: `_${partialName}`,
       format,
       templatePath: template.fullPath ?? template.identifier,
-      renderPartial: (nested, nestedLocals) =>
-        this.renderPartialSync(nested, partialPrefix, format, nestedLocals),
+      view: partialView,
+      template,
     });
 
     if (typeof output !== "string") {
@@ -793,6 +798,21 @@ export class LookupContext {
     }
     return output;
   }
+
+  /**
+   * The view a template renders against. Rails caches the view class on
+   * `LookupContext::DetailsKey` (`lookup_context.rb`,
+   * `DetailsKey.view_context_class`), which is a `with_empty_template_cache`
+   * subclass, so compiled methods are shared across renders but never across
+   * caches. Rails builds it on the controller instead; see
+   * `port-view-context-class-on-controller`.
+   */
+  private buildViewContext(): Base {
+    this._viewContextClass ??= Base.withEmptyTemplateCache();
+    return new this._viewContextClass(this, {}, null);
+  }
+
+  private _viewContextClass: typeof Base | null = null;
 
   private resolverNames(): string[] {
     return this.resolvers.map((r) => r.constructor.name);

@@ -1,7 +1,7 @@
-import { chomp, htmlSafe, type SafeBuffer } from "@blazetrails/activesupport";
+import { chomp } from "@blazetrails/activesupport";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
-import { Base } from "../../base.js";
-import { TseRenderContextImpl, type TseRenderContext } from "../../render-context.js";
+import { Base, type CompiledMethod } from "../../base.js";
+import { OutputBuffer } from "../../buffers.js";
 import { StrictLocalsMismatch } from "../../strict-locals.js";
 import type { RenderContext, TemplateHandler } from "../handlers.js";
 import {
@@ -144,111 +144,92 @@ export class Tse implements TemplateHandler {
   }
 
   /**
-   * Compile the template and run it, returning its output.
+   * Compile the template and run it against the view, returning its output.
    *
    * Rails splits this across `Template#compile!`
-   * (`actionview/lib/action_view/template.rb:418`), which `module_eval`s the
-   * handler's code string into a real method on the view class and memoizes on
-   * `@compiled`, and `Template#render` (`template.rb:271`), which calls that
-   * method and returns `OutputBuffer#to_s`. `new Function` is the JS analogue
-   * of `module_eval` — it is the only way to turn an emitted source string into
-   * a callable — and the compile is memoized on that source the way Rails
-   * memoizes on `@compiled`.
+   * (`actionview/lib/action_view/template.rb:418-438`), which `module_eval`s
+   * the handler's code into a real method on `view.compiled_method_container`
+   * and memoizes on `@compiled`, and `Template#render` (`:271-287`), which
+   * calls `view._run(method_name, self, locals, OutputBuffer.new)`.
+   *
+   * The method is defined ON THE VIEW, so inside a template `self` is the
+   * `ActionView::Base` and every helper is an ordinary method call on it;
+   * `locals_code` (`:561-572`) then assigns each local as a real local
+   * variable, which is why a local shadows a same-named helper. `with (this)`
+   * nested inside `with (localAssigns)` is the JS construct with that
+   * resolution order — Ruby's implicit `self` receiver has no other analogue.
    */
   render(source: string, locals: Record<string, unknown>, context: RenderContext): string {
-    const compiled = this.compiled(source, context);
-    const renderContext = new HandlerRenderContext(context);
-    if (context.yield !== undefined) renderContext.setDefaultYield(htmlSafe(context.yield));
-    compiled(renderContext, locals, scopeFor(renderContext, locals));
-    return renderContext.outputBuffer.toStr();
+    const view = context.view ?? new (Base.withEmptyTemplateCache())(null, {}, null);
+    // Rails' `TemplateRenderer#render_with_layout` puts the inner template's
+    // output in the view flow (`view.view_flow.set(:layout, content)`), which
+    // is where `_layout_for` — and so `<%= yield %>` — reads it from.
+    if (context.yield !== undefined) view.viewFlow.set("layout", context.yield);
+    const method = this.compiled(source, context, view);
+    const buffer = new OutputBuffer();
+    view._run(method, context.template ?? null, locals, buffer);
+    return buffer.toStr();
   }
 
   /**
-   * Memoized emitted-source → callable. Mirrors `compile!`'s `@compiled`
-   * guard; keyed on the emitted code so a handler-option change
-   * (`escapeIgnoreList`, annotation) compiles afresh.
+   * Mirrors `Template#compile!` (`template.rb:418-438`): compile once per
+   * `compiled_method_container`, keyed on the emitted code so a handler-option
+   * change (`escapeIgnoreList`, annotation) defines a fresh method. The memo
+   * lives on the container, as Rails' does, rather than in a process-global
+   * cache.
    *
    * @internal
    */
-  private compiled(source: string, context: RenderContext): CompiledTemplate {
+  private compiled(source: string, context: RenderContext, view: Base): CompiledMethod {
     const code = this.call(
       { type: context.format, format: context.format, shortIdentifier: context.templatePath },
       source,
     );
-    let fn = compiledCache.get(code);
-    if (!fn) {
-      fn = evaluateTemplate(code, context.templatePath);
-      compiledCache.set(code, fn);
+    const container = view.compiledMethodContainer();
+    // Rails keys on `method_name`, which folds in the identifier
+    // (`template.rb:396-402`); the virtual path is baked into the method body,
+    // so it belongs in the key alongside the emitted code.
+    // Rails emits `@virtual_path` verbatim; trails resolvers do not all
+    // populate it, so the identifier stands in when they don't.
+    const virtualPath = context.template?.virtualPath ?? context.template?.identifier ?? null;
+    const key = `${virtualPath ?? ""}\u0000${code}`;
+    let method = container._compiledMethods.get(key);
+    if (!method) {
+      method = evaluateTemplate(code, virtualPath, context.templatePath);
+      container._compiledMethods.set(key, method);
     }
-    return fn;
+    return method;
   }
 }
 
 /**
- * Build the object a compiled template's bare identifiers resolve against.
- *
- * Rails compiles a template into a method ON THE VIEW
- * (`template.rb:458-463`), so `yield`, `render`, `raw`, `concat`, `capture`
- * and `content_for` are all in scope as ordinary method calls, and
- * `locals_code` (`template.rb:561-572`) then assigns each local as a real
- * local variable — which is why a local shadows a same-named helper. The
- * object environment record below is the JS construct with that resolution
- * order: helpers first, locals assigned over them.
- *
- * `<%= yield %>` compiles to an identifier read rather than a call, so the
- * default section is a property; a named section is read off the context
- * (`context.yield("sidebar")`), which the compiler cannot spell as
- * `yield :sidebar`.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE helper-methods-not-in-tse-scope
- */
-function scopeFor(
-  context: HandlerRenderContext,
-  locals: Record<string, unknown>,
-): Record<string, unknown> {
-  const scope: Record<string, unknown> = {
-    render: (options: Parameters<TseRenderContext["render"]>[0]) => context.render(options),
-    raw: (value: unknown) => context.raw(value),
-    concat: (value: unknown) => context.concat(value),
-    capture: (callback: () => void) => context.capture(callback),
-    contentFor: (name: string, callback: () => void) => context.contentFor(name, callback),
-  };
-  Object.defineProperty(scope, "yield", {
-    get: () => context.yield(),
-    enumerable: true,
-  });
-  return Object.assign(scope, locals);
-}
-
-/** The shape `compileJs` emits as its default export, plus the scope record. @internal */
-type CompiledTemplate = (
-  context: TseRenderContext,
-  locals: Record<string, unknown>,
-  scope: Record<string, unknown>,
-) => unknown;
-
-const compiledCache = new Map<string, CompiledTemplate>();
-
-/**
- * Turn the emitted ES-module source into a callable. The compiler emits
+ * Turn the emitted ES-module source into the function `compile!` would have
+ * defined on the view. The compiler emits
  * `export default function render(context, locals)`, optionally preceded by an
  * `import` of `StrictLocalsMismatch`; strip both so the remainder is a
- * function expression, then create it inside a `with` block over the scope
- * record so its bare identifiers resolve there. The emitted name `render` is
- * renamed on the way: as a function *expression* it would bind inside the
- * function's own scope and shadow the `render` helper the scope record
- * supplies, so `<%= render({ partial: … }) %>` would recurse into the
- * template.
+ * function expression.
  *
- * `locals` is passed through unchanged — the strict-locals check the compiler
- * emits compares `Object.keys(locals)` against the declared signature, so the
- * scope record must not stand in for it.
+ * The emitted name `render` is renamed on the way: as a function *expression*
+ * it would bind inside the function's own scope and shadow the view's `render`
+ * helper, so `<%= render({ partial: … }) %>` would recurse into the template.
+ *
+ * `@virtual_path = …` is emitted as the method's first statement, exactly where
+ * `compiled_source` puts it (`template.rb:461`). It has to be set by the method
+ * rather than by the caller, because `_run` captures the previous value before
+ * invoking it — that ordering is what restores the parent's path when a nested
+ * partial returns.
+ *
+ * `localAssigns` is passed through unchanged — the strict-locals check the
+ * compiler emits compares `Object.keys(localAssigns)` against the declared
+ * signature, so the view must not stand in for it.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE helper-methods-not-in-tse-scope
  */
-function evaluateTemplate(code: string, templatePath?: string): CompiledTemplate {
+function evaluateTemplate(
+  code: string,
+  virtualPath: string | null,
+  templatePath?: string,
+): CompiledMethod {
   const expression = code
     .replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\n?/u, "")
     .replace(/^\s*export\s+default\s+/u, "")
@@ -256,52 +237,20 @@ function evaluateTemplate(code: string, templatePath?: string): CompiledTemplate
   try {
     const factory = new Function(
       "StrictLocalsMismatch",
-      "__tseContext",
-      "__tseLocals",
-      "__tseScope",
-      `with (__tseScope) { var __tseTemplate = ${expression}; return __tseTemplate(__tseContext, __tseLocals); }`,
-    ) as (
-      mismatch: typeof StrictLocalsMismatch,
-      context: TseRenderContext,
-      locals: Record<string, unknown>,
-      scope: Record<string, unknown>,
-    ) => unknown;
-    return (context, locals, scope) => factory(StrictLocalsMismatch, context, locals, scope);
+      `return function (localAssigns, outputBuffer) {
+         this.virtualPath = ${JSON.stringify(virtualPath)};
+         with (this) { with (localAssigns) {
+           var __tseTemplate = ${expression};
+           return __tseTemplate(this, localAssigns);
+         } }
+       };`,
+    ) as (mismatch: typeof StrictLocalsMismatch) => CompiledMethod;
+    return factory(StrictLocalsMismatch);
   } catch (error) {
     const where = templatePath != null ? ` (${templatePath})` : "";
     throw new SyntaxError(`Failed to compile .tse template${where}: ${(error as Error).message}`, {
       cause: error,
     });
-  }
-}
-
-/**
- * The per-render view object a compiled template is run against. Rails passes
- * the `ActionView::Base` instance, which answers `render` for a nested
- * partial; trails threads that capability in through
- * {@link RenderContext.renderPartial}, so the handler needs no `LookupContext`.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE helper-methods-not-in-tse-scope
- */
-class HandlerRenderContext extends TseRenderContextImpl {
-  constructor(private readonly context: RenderContext) {
-    super();
-  }
-
-  protected override _renderPartial(
-    partial: string,
-    _localName: string,
-    locals: Record<string, unknown>,
-  ): SafeBuffer {
-    const render = this.context.renderPartial;
-    if (!render) {
-      throw new Error(
-        `Cannot render partial ${JSON.stringify(partial)} — this render context has no ` +
-          "partial renderer. Render through LookupContext so nested partials resolve.",
-      );
-    }
-    return htmlSafe(render(partial, locals));
   }
 }
 

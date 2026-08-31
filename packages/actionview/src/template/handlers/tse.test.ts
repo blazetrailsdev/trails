@@ -1,3 +1,4 @@
+import { htmlSafe } from "@blazetrails/activesupport";
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "../../base.js";
 import { StrictLocalsMismatch } from "../../strict-locals.js";
@@ -272,32 +273,66 @@ describe("Template::Handlers::Tse", () => {
 
     it("round-trips a named contentFor section", () => {
       const out = new Tse().render(
-        '<% contentFor("side", () => { %>aside<% }) %><%= context.yield("side") %>',
+        '<% contentFor("side", () => { %>aside<% }) %><%= _layoutFor("side") %>',
         {},
         ctx(),
       );
       expect(out).toBe("aside");
     });
 
-    it("renders a nested partial through the context's renderPartial", () => {
+    it("renders a nested partial through the view's render helper", () => {
       const seen: Array<[string, Record<string, unknown>]> = [];
+      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+      view.render = (options) => {
+        seen.push([options.partial, options.locals ?? {}]);
+        return htmlSafe("<li>Ada</li>");
+      };
       const out = new Tse().render(
         '<%= render({ partial: "users/user", locals: { user: user } }) %>',
         { user: "Ada" },
-        ctx({
-          renderPartial: (name, locals) => {
-            seen.push([name, locals]);
-            return "<li>Ada</li>";
-          },
-        }),
+        ctx({ view }),
       );
       expect(out).toBe("<li>Ada</li>");
       expect(seen).toEqual([["users/user", { user: "Ada" }]]);
     });
 
+    it("resolves an ActionView helper mixed onto the view as a bare identifier", () => {
+      expect(new Tse().render("<%= raw(value) %>", { value: "<b>" }, ctx())).toBe("<b>");
+    });
+
+    it("runs the compiled method with the view as `this`", () => {
+      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+      let seen: unknown;
+      (view as unknown as Record<string, unknown>).whoAmI = function (this: Base) {
+        seen = this as unknown;
+        return "ok";
+      };
+      expect(new Tse().render("<%= whoAmI() %>", {}, ctx({ view }))).toBe("ok");
+      expect(seen).toBe(view);
+    });
+
+    it("memoizes the compiled method on the view's compiledMethodContainer", () => {
+      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+      const container = view.compiledMethodContainer();
+      const before = container._compiledMethods.size;
+      new Tse().render("<%= n %>", { n: 1 }, ctx({ view }));
+      const after = container._compiledMethods.size;
+      new Tse().render("<%= n %>", { n: 2 }, ctx({ view }));
+      expect(after).toBe(before + 1);
+      expect(container._compiledMethods.size).toBe(after);
+    });
+
+    it("gives two withEmptyTemplateCache containers separate compiled methods", () => {
+      const a = new (Base.withEmptyTemplateCache())(null, {}, null);
+      const b = new (Base.withEmptyTemplateCache())(null, {}, null);
+      new Tse().render("<%= n %>", { n: 1 }, ctx({ view: a }));
+      expect(a.compiledMethodContainer()._compiledMethods.size).toBe(1);
+      expect(b.compiledMethodContainer()._compiledMethods.size).toBe(0);
+    });
+
     it("does not let the compiled function's own name shadow the render helper", () => {
       expect(() => new Tse().render('<%= render({ partial: "p" }) %>', {}, ctx())).toThrow(
-        /has no partial renderer/,
+        /has no lookup context/,
       );
     });
 

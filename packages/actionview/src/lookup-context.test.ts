@@ -133,6 +133,16 @@ describe("LookupContext#renderPartialSync", () => {
     TemplateHandlers.clear();
   });
 
+  it("restores the parent's virtual path after a nested partial returns", () => {
+    const ctx = contextWith({
+      "posts/_post":
+        '<%= render({ partial: "shared/spacer" }) %>|<%= render({ partial: "byline" }) %>',
+      "shared/_spacer": "spacer",
+      "posts/_byline": "byline",
+    });
+    expect(ctx.renderPartialSync("post", "posts", "html")).toBe("spacer|byline");
+  });
+
   it("renders a partial by bare name against the given prefix", () => {
     const ctx = contextWith({ "posts/_form": "<%= title %>" });
     expect(ctx.renderPartialSync("form", "posts", "html", { title: "New" })).toBe("New");
@@ -175,5 +185,56 @@ describe("LookupContext#renderPartialSync", () => {
       { controller: "posts", action: "index", format: "html" },
     );
     expect(out).toBe("form!");
+  });
+});
+
+describe("LookupContext#render with a layout", () => {
+  const template = (identifier: string, source: string): Template =>
+    new Template({ source, identifier, extension: "tse", format: "html" });
+
+  function contextWith(templates: Record<string, string>): LookupContext {
+    const resolver: TemplateResolver = {
+      find: (name, prefix) => {
+        const key = prefix ? `${prefix}/${name}` : name;
+        const source = templates[key];
+        return source === undefined ? null : template(key, source);
+      },
+      findLayout: (name, _format, _extensions) => {
+        const source = templates[`layouts/${name}`];
+        return source === undefined ? null : template(`layouts/${name}`, source).asLayout();
+      },
+      allTemplatePaths: () => Object.keys(templates),
+    };
+    const ctx = new LookupContext(null, {}, []);
+    ctx.addResolver(resolver);
+    return ctx;
+  }
+
+  beforeEach(() => {
+    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  });
+
+  afterEach(() => {
+    TemplateHandlers.clear();
+  });
+
+  it("renders the content template inside the layout", async () => {
+    const ctx = contextWith({
+      "posts/index": "<p>body</p>",
+      "layouts/application": "<main><%= yield %></main>",
+    });
+    expect(await ctx.render("posts", "index", "html", {}, { layout: "application" })).toBe(
+      "<main><p>body</p></main>",
+    );
+  });
+
+  it("carries a named contentFor section from the content template to the layout", async () => {
+    const ctx = contextWith({
+      "posts/index": '<% contentFor("title", () => { %>Home<% }) %><p>body</p>',
+      "layouts/application": '<title><%= _layoutFor("title") %></title><%= yield %>',
+    });
+    expect(await ctx.render("posts", "index", "html", {}, { layout: "application" })).toBe(
+      "<title>Home</title><p>body</p>",
+    );
   });
 });
