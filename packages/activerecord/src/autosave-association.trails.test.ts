@@ -304,7 +304,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   it("valid nested attributes create children", async () => {
     const { Pirate, Bird } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
+    await assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
     const birds = await Bird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
