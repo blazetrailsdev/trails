@@ -48,6 +48,9 @@ export class DisabledSessionError extends Error {
  * Mirrors: ActionDispatch::Request::Session::Options (`request/session.rb:47`).
  */
 export class Options {
+  // The Hash-shaped reads the constructor's Proxy answers, on the type side.
+  [key: string]: unknown;
+
   private by: SessionStore | null;
   private delegate: Record<string, unknown>;
 
@@ -71,6 +74,22 @@ export class Options {
   constructor(by: SessionStore | null, defaultOptions: Record<string, unknown>) {
     this.by = by;
     this.delegate = { ...defaultOptions };
+    // `Rack::Session::Abstract::Persisted` reads its options as a Hash —
+    // `options[:skip]` (`rack-session/lib/rack/session/abstract/id.rb:351`),
+    // `values_at` (`:368`), `cookie.merge!(options)` (`:411`) — and Ruby's
+    // duck typing lets an Options answer all three through `[]`/`to_hash`.
+    // TS has no operator overloading, so the delegate is surfaced as ordinary
+    // property reads instead, keeping `[]` ported as `get` beside them.
+    return new Proxy(this, {
+      get: (target, key, receiver) =>
+        Reflect.has(target, key)
+          ? Reflect.get(target, key, receiver)
+          : target.delegate[key as string],
+      has: (target, key) => Reflect.has(target, key) || key in target.delegate,
+      ownKeys: (target) => Reflect.ownKeys(target.delegate),
+      getOwnPropertyDescriptor: (target, key) =>
+        Object.getOwnPropertyDescriptor(target.delegate, key),
+    });
   }
 
   /** Mirrors: `Options#[]` (`request/session.rb:61-63`). */

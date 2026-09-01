@@ -26,7 +26,6 @@ export {
   type PersistedRequest,
   type PersistedSession,
   type SessionClass,
-  type SessionOptions,
 } from "@blazetrails/rack-session";
 
 /** Raised when a session payload references a class that isn't loaded. */

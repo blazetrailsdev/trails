@@ -1,6 +1,8 @@
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { bodyFromString } from "@blazetrails/rack";
 import { describe, expect, it } from "vitest";
 
-import type { PersistedRequest, PersistedSession, SessionOptions } from "../index.js";
+import type { PersistedRequest, PersistedSession } from "../index.js";
 import {
   DEFAULT_OPTIONS,
   Persisted,
@@ -17,7 +19,7 @@ function stubRequest(): PersistedRequest {
     params: {},
     getHeader: () => undefined as unknown as PersistedSession,
     setHeader: () => {},
-    sessionOptions: {} as unknown as SessionOptions,
+    sessionOptions: {},
   };
 }
 
@@ -99,7 +101,9 @@ describe("Rack::Session::Abstract::SessionHash", () => {
 
   it("inspect renders the not-yet-loaded form until the store is read", () => {
     const hash = sessionHash();
-    expect(hash.inspect()).toMatch(/^#<SessionHash:0x[0-9a-f]+ not yet loaded>$/);
+    expect(hash.inspect()).toMatch(
+      /^#<Rack::Session::Abstract::SessionHash:0x[0-9a-f]+ not yet loaded>$/,
+    );
     hash.loadBang();
     expect(hash.inspect()).toBe('{"foo"=>:bar}');
   });
@@ -124,5 +128,57 @@ describe("Rack::Session::Abstract::Persisted", () => {
     expect(new Persisted().sessionClass()).toBe(SessionHash);
     expect(new PersistedSecure().sessionClass()).toBe(SecureSessionHash);
     expect(PersistedSecure.SecureSessionHash).toBe(SecureSessionHash);
+  });
+});
+
+describe("Rack::Session::Abstract::PersistedSecure::SecureSessionHash", () => {
+  it("inspect names the subclass's own full constant path", () => {
+    const hash = new SecureSessionHash(stubStore(), null as unknown as PersistedRequest);
+    expect(hash.inspect()).toMatch(
+      /^#<Rack::Session::Abstract::PersistedSecure::SecureSessionHash:0x[0-9a-f]+ not yet loaded>$/,
+    );
+  });
+});
+
+describe("Rack::Session::Abstract::Persisted#call", () => {
+  class TestStore extends Persisted {
+    written: Array<[unknown, Record<string, unknown>]> = [];
+
+    override findSession(): [unknown, Record<string, unknown>] {
+      return ["sid", { counter: 1 }];
+    }
+
+    override writeSession(
+      _req: PersistedRequest,
+      sid: unknown,
+      session: Record<string, unknown>,
+    ): unknown {
+      this.written.push([sid, session]);
+      return sid;
+    }
+
+    override deleteSession(): unknown {
+      return this.generateSid();
+    }
+  }
+
+  const app = async (env: RackEnv): Promise<RackResponse> => {
+    (env["rack.session"] as SessionHash).set("counter", 2);
+    return [200, {}, bodyFromString("")];
+  };
+
+  it("commits the session through the plain options hash the request seats", async () => {
+    const store = new TestStore(app, { expireAfter: 60 });
+    const [status, headers] = await store.call({ HTTP_COOKIE: "rack.session=sid" });
+
+    expect(status).toBe(200);
+    expect(store.written).toEqual([["sid", { counter: 2 }]]);
+    expect(String(headers["set-cookie"])).toMatch(/rack\.session=sid/);
+  });
+
+  it("skips the commit when the session options carry skip", async () => {
+    const store = new TestStore(app, { skip: true });
+    await store.call({ HTTP_COOKIE: "rack.session=sid" });
+    expect(store.written).toEqual([]);
   });
 });

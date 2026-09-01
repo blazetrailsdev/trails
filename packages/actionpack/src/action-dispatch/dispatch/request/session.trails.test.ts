@@ -11,6 +11,23 @@ function makeReq(): { env: Record<string, unknown> } {
 // (request/session.rb:97-108, :257-263) and `Session.delete` (:43-45) have no
 // Rails test of their own.
 // ==========================================================================
+describe("Session::Options", () => {
+  it("answers the Hash-shaped reads Rack::Session::Abstract::Persisted makes", () => {
+    const options = new Options(null, { skip: true, expireAfter: 60 });
+
+    expect(options["skip"]).toBe(true);
+    expect(["maxAge", "renew", "drop", "defer", "expireAfter"].map((k) => options[k])).toEqual([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      60,
+    ]);
+    expect({ ...options }).toEqual({ skip: true, expireAfter: 60 });
+    expect(options.get("skip")).toBe(true);
+  });
+});
+
 describe("Session", () => {
   it("destroy on a disabled session touches no store", () => {
     const req = makeReq();

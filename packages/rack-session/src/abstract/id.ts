@@ -49,6 +49,17 @@ function objectIdHex(object: object): string {
   return id.toString(16);
 }
 
+function rubyClassPath(klass: unknown): string {
+  switch (klass) {
+    case SessionHash:
+      return "Rack::Session::Abstract::SessionHash";
+    case SecureSessionHash:
+      return "Rack::Session::Abstract::PersistedSecure::SecureSessionHash";
+    default:
+      return (klass as { name: string }).name;
+  }
+}
+
 export class SessionHash implements PersistedSession {
   setId(id: unknown): void {
     this._id = id;
@@ -90,8 +101,8 @@ export class SessionHash implements PersistedSession {
     return this._id;
   }
 
-  options(): SessionOptions {
-    return this.req.sessionOptions as SessionOptions;
+  options(): Record<string, unknown> {
+    return this.req.sessionOptions;
   }
 
   each(block: (key: string, value: unknown) => void): Record<string, unknown> {
@@ -208,7 +219,7 @@ export class SessionHash implements PersistedSession {
     if (this.isLoaded()) {
       return inspect(this.data);
     } else {
-      return `#<${this.constructor.name}:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<${rubyClassPath(this.constructor)}:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 
@@ -287,17 +298,10 @@ export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze(
   secureRandom: true,
 });
 
-/** @noRailsEquivalent CONVERGEABLE converge-rack-session-options-onto-hash-reads */
-export interface SessionOptions {
-  get(key: string): unknown;
-  valuesAt(...keys: string[]): unknown[];
-  toHash(): Record<string, unknown>;
-}
-
 /** @noRailsEquivalent PERMANENT */
 export interface PersistedSession {
   id(): unknown;
-  options(): SessionOptions;
+  options(): Record<string, unknown>;
   isLoaded(): boolean;
   isEmpty(): boolean;
   loadBang(): void;
@@ -317,7 +321,7 @@ export interface PersistedRequest {
   params: Record<string, unknown>;
   getHeader(key: string): PersistedSession;
   setHeader(key: string, value: unknown): void;
-  sessionOptions: SessionOptions | Record<string, unknown>;
+  sessionOptions: Record<string, unknown>;
   ssl?: unknown;
 }
 
@@ -431,9 +435,9 @@ export class Persisted {
   isCommitSession(
     req: PersistedRequest,
     session: PersistedSession,
-    options: SessionOptions,
+    options: Record<string, unknown>,
   ): boolean {
-    if (isTruthy(options.get("skip"))) return false;
+    if (isTruthy(options["skip"])) return false;
     const hasSession =
       this.isLoadedSession(session) || this.isForcedSessionUpdate(session, options);
     return hasSession && this.isSecurityMatches(req, options);
@@ -445,27 +449,29 @@ export class Persisted {
   }
 
   /** @internal */
-  isForcedSessionUpdate(session: PersistedSession, options: SessionOptions): boolean {
+  isForcedSessionUpdate(session: PersistedSession, options: Record<string, unknown>): boolean {
     return this.isForceOptions(options) && isTruthy(session) && !session.isEmpty();
   }
 
   /** @internal */
-  isForceOptions(options: SessionOptions): boolean {
-    return options.valuesAt("maxAge", "renew", "drop", "defer", "expireAfter").some(isTruthy);
+  isForceOptions(options: Record<string, unknown>): boolean {
+    return ["maxAge", "renew", "drop", "defer", "expireAfter"]
+      .map((key) => options[key])
+      .some(isTruthy);
   }
 
   /** @internal */
-  isSecurityMatches(request: PersistedRequest, options: SessionOptions): boolean {
-    if (!isTruthy(options.get("secure"))) return true;
+  isSecurityMatches(request: PersistedRequest, options: Record<string, unknown>): boolean {
+    if (!isTruthy(options["secure"])) return true;
     return isTruthy(request.ssl) || this.assumeSsl === true;
   }
 
   commitSession(req: PersistedRequest, res: ResponseRaw): unknown {
     const session = req.getHeader(RACK_SESSION);
-    const options: SessionOptions = session.options();
+    const options: Record<string, unknown> = session.options();
 
     let sessionId: unknown;
-    if (isTruthy(options.get("drop")) || isTruthy(options.get("renew"))) {
+    if (isTruthy(options["drop"]) || isTruthy(options["renew"])) {
       const currentId = session.id();
       sessionId = this.deleteSession(
         req,
@@ -488,16 +494,16 @@ export class Persisted {
     if (!isTruthy(data)) {
       console.warn(`Warning! ${this.constructor.name} failed to save session. Content dropped.`);
       // eslint-disable-next-line no-empty -- Ruby puts a $VERBOSE-only notice on rack.errors (abstract/id.rb:399); trails' Rack env carries no such stream
-    } else if (isTruthy(options.get("defer")) && !isTruthy(options.get("renew"))) {
+    } else if (isTruthy(options["defer"]) && !isTruthy(options["renew"])) {
     } else {
       const cookie: Record<string, unknown> = {};
       cookie["value"] = this.cookieValue(data);
-      const expireAfter = options.get("expireAfter");
+      const expireAfter = options["expireAfter"];
       if (isTruthy(expireAfter)) {
         // boundary: `Time.now + options[:expire_after]` is an ABSOLUTE expiry
         cookie["expires"] = new Date(Date.now() + (expireAfter as number) * 1000);
       }
-      const maxAge = options.get("maxAge");
+      const maxAge = options["maxAge"];
       if (isTruthy(maxAge)) {
         // boundary: as above (`abstract/id.rb:404`).
         cookie["expires"] = new Date(Date.now() + (maxAge as number) * 1000);
@@ -507,7 +513,7 @@ export class Persisted {
         typeof this.sameSite === "function"
           ? (this.sameSite as (req: unknown, res: unknown) => unknown)(req, res)
           : this.sameSite;
-      this.setCookie(req, res, { ...cookie, ...options.toHash() });
+      this.setCookie(req, res, { ...cookie, ...options });
     }
   }
 
@@ -543,14 +549,14 @@ export class Persisted {
     _req: PersistedRequest,
     _sid: unknown,
     _session: Record<string, unknown>,
-    _options: SessionOptions,
+    _options: Record<string, unknown>,
   ): unknown {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:448 cluster=rack-session
     throw new Error("#write_session not implemented.");
   }
 
   /** @missingRailsCall delete — CONVERGEABLE port-rack-session-pool */
-  deleteSession(_req: PersistedRequest, _sid: unknown, _options: SessionOptions): unknown {
+  deleteSession(_req: PersistedRequest, _sid: unknown, _options: Record<string, unknown>): unknown {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:455 cluster=rack-session
     throw new Error("#delete_session not implemented");
   }

@@ -8,5 +8,4 @@ export {
   type PersistedRequest,
   type PersistedSession,
   type SessionClass,
-  type SessionOptions,
 } from "./abstract/id.js";
