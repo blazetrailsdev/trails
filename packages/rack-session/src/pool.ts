@@ -80,9 +80,10 @@ export class Pool extends PersistedSecure {
 
   /** @internal */
   getSessionWithFallback(sid: SessionId): Record<string, unknown> | undefined {
-    return (
-      this.pool[sid.privateId] ??
-      (isTruthy(this.allowFallback) ? this.pool[sid.publicId] : undefined)
-    );
+    return isTruthy(this.pool[sid.privateId])
+      ? this.pool[sid.privateId]
+      : isTruthy(this.allowFallback)
+        ? this.pool[sid.publicId]
+        : undefined;
   }
 }
