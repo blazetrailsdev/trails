@@ -673,11 +673,14 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   /**
-   * Return a plain object with all string keys (Rails' stringify_keys).
-   * Returns a new HashWithIndifferentAccess since all keys are already strings.
+   * `hash_with_indifferent_access.rb` leaves `stringify_keys` to `Hash`
+   * (core_ext/hash/keys.rb:10-12), whose `transform_keys` reaches the override
+   * at :339-342 — so the answer is another `HashWithIndifferentAccess`. Its
+   * `Symbol === k` arm cannot fire: `convert_key` (:388-390) has already made
+   * every stored key a String.
    */
   stringifyKeys(): HashWithIndifferentAccess<V> {
-    return new HashWithIndifferentAccess<V>(this);
+    return this.transformKeys((key) => String(key));
   }
 
   /**
@@ -685,7 +688,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * In TS all keys are already strings; returns a plain object.
    */
   symbolizeKeys(): AnyObject {
-    return symbolizeKeysBang(Object.fromEntries(this.toHash()));
+    return symbolizeKeysBang(this.toHash());
   }
 
   /**
@@ -700,7 +703,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * Mirrors `deep_symbolize_keys` (hash_with_indifferent_access.rb:320).
    */
   deepSymbolizeKeys(): AnyObject {
-    return deepSymbolizeKeysBang(Object.fromEntries(this.toHash()));
+    return deepSymbolizeKeysBang(this.toHash());
   }
 
   /**

@@ -115,6 +115,12 @@ function classOf(value: object): ObjectClass {
 }
 
 export const Extensions = {
+  /**
+   * Mirrors `install` (message_pack/extensions.rb:20-105). Type 17's packer,
+   * `write_hash_with_indifferent_access` (:236-238), hands `packer.write` a
+   * Ruby Hash; the packer here writes a plain object, so `deep_stringify_keys`
+   * (core_ext/hash/keys.rb:82-84) spells the tree `toHash` answers the same way.
+   */
   install(registry: Factory): void {
     registry.registerType({
       type: 0,

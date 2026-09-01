@@ -58,7 +58,14 @@ export class DebugView {
     return "None";
   }
 
-  debugHash(object: { toHash?: () => Record<string, unknown> } | Record<string, unknown>): string {
+  /**
+   * `debug_hash` (debug_view.rb:44-46) sorts `object.to_hash` and inspects each
+   * value. `HashWithIndifferentAccess#toHash` answers
+   * `@blazetrails/ruby-compat`'s `Hash`, so `deep_stringify_keys`
+   * (core_ext/hash/keys.rb:82-84) spells the tree the way `inspect` renders a
+   * Ruby Hash.
+   */
+  debugHash(object: { toHash?: () => unknown } | Record<string, unknown>): string {
     const converted =
       typeof (object as { toHash?: () => unknown }).toHash === "function"
         ? (object as { toHash: () => unknown }).toHash()
