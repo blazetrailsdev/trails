@@ -106,7 +106,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
 
     it("setCookie writes to the request cookie jar at @key", () => {
       const store = new AbstractStore();
-      const req = { cookieJar: {} as Record<string, unknown> };
+      const req = Object.assign(new Request({}), { cookieJar: {} as Record<string, unknown> });
       store.setCookie(req, null, "abc");
       expect(req.cookieJar._session_id).toBe("abc");
     });
@@ -253,7 +253,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     it("writes the session cookie onto the response headers", () => {
       const headers: Record<string, string> = {};
       const res = new ResponseRaw(200, headers);
-      Persisted.prototype.setCookie.call(new Persisted(), { cookies: {} }, res, {
+      Persisted.prototype.setCookie.call(new Persisted(), new Request({}), res, {
         value: "abc",
         path: "/",
         httponly: true,

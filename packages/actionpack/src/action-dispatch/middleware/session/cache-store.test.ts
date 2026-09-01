@@ -26,7 +26,7 @@ describe("ActionDispatch::Session::CacheStore", () => {
       const [sid, session] = store.findSession({}, null);
       expect(sid).toBeInstanceOf(SessionId);
       expect(sid.publicId).toMatch(/^[0-9a-f]{32}$/);
-      expect(sid.privateId).toMatch(/^[0-9a-f]{64}$/);
+      expect(sid.privateId).toMatch(/^2::[0-9a-f]{64}$/);
       expect(session).toEqual({});
     });
 

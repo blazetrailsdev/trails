@@ -1,0 +1,30 @@
+[
+  {
+    "package": "rack-session",
+    "tsFile": "abstract/id.ts",
+    "rubyName": "commit_session",
+    "call": "call",
+    "reason": "Ruby dispatches the `:same_site` option through `@same_site.respond_to? :call` / `@same_site.call(req, res)` (abstract/id.rb:406-407); a JS function is invoked directly, and spelling it `fn.call(req, res)` would rebind `this` to `req`, so the `call` dispatch has no TS counterpart."
+  },
+  {
+    "package": "rack-session",
+    "tsFile": "abstract/id.ts",
+    "rubyName": "commit_session",
+    "call": "order:cookieValue,constructor",
+    "reason": "Ruby builds the cookie hash with `Hash.new` (abstract/id.rb:401) before `cookie_value(data)`; TypeScript spells that as an object literal, so the only `new` left in the body is the `new Date` for `:expire_after` / `:max_age`, which sorts after `cookieValue` instead of before it."
+  },
+  {
+    "package": "rack-session",
+    "tsFile": "abstract/id.ts",
+    "rubyName": "delete_session",
+    "call": "generate_sid",
+    "reason": "Cross-file match: `Rack::Session::Pool` (pool.rb:60-70) is not ported, so the comparer pairs its concrete `delete_session` with `Persisted#delete_session`, whose Ruby body is the `raise '#delete_session not implemented'` hook (abstract/id.rb:455-457) and calls nothing."
+  },
+  {
+    "package": "rack-session",
+    "tsFile": "abstract/id.ts",
+    "rubyName": "find_session",
+    "call": "generate_sid",
+    "reason": "Cross-file match: `Rack::Session::Pool` (pool.rb:37-44) is not ported, so the comparer pairs its concrete `find_session` with `Persisted#find_session`, whose Ruby body is the `raise '#find_session not implemented.'` hook (abstract/id.rb:440-442) and calls nothing."
+  }
+]
