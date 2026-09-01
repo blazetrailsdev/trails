@@ -118,6 +118,15 @@ export class Tse implements TemplateHandler {
    * before passing source to Erubi. `.tse` source is JavaScript/TypeScript,
    * which has no encoding pragma (files are always UTF-8 by spec), so this
    * step is a documented no-op — there is nothing to strip.
+   *
+   * `@blazetrails/tse-compiler` emits an ES module — `export default function
+   * render(...)`, optionally preceded by an `import` of
+   * `StrictLocalsMismatch`. Rails' `Handlers::ERB#call` returns code evaluated
+   * inside the compiled method's body (`template.rb:461`), so the module
+   * framing is stripped down to the equivalent: an expression that runs the
+   * template and evaluates to its output. The emitted name `render` is renamed
+   * on the way, because as a function *expression* it binds inside its own
+   * scope and would shadow the view's `render` helper.
    */
   call(template: TseTemplate, source: string): string {
     const ctor = this.constructor as typeof Tse;
@@ -138,16 +147,6 @@ export class Tse implements TemplateHandler {
       options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;
     }
     const result = ctor.implementation(prepared, options);
-    // The compiler emits an ES module — `export default function render(...)`,
-    // optionally preceded by an `import` of `StrictLocalsMismatch`. Rails'
-    // `Handlers::ERB#call` returns code that is evaluated inside the compiled
-    // method's body, so strip the module framing down to the equivalent: an
-    // expression that runs the template and evaluates to its output.
-    //
-    // The emitted name `render` is renamed on the way. As a function
-    // *expression* it binds inside its own scope and would shadow the view's
-    // `render` helper, so `<%= render({ partial: … }) %>` would recurse into
-    // the template.
     return (
       "(" +
       result.code

@@ -302,7 +302,9 @@ export class Template {
    * the method's parameter list; a JS function has no keyword parameters, so
    * the tse compiler emits the strict-locals check into the body and raises
    * `StrictLocalsMismatch` there — the same reason `Base#_run` does not accept
-   * Rails' `has_strict_locals:`.
+   * Rails' `has_strict_locals:`. That is also why the handler is handed the
+   * source BEFORE `strict_locals!` strips the magic comment, inverting
+   * `template.rb:444-446`: the compiler is what reads the signature.
    *
    * The nested `with` is the JS construct with Ruby's name resolution order:
    * the method is defined ON THE VIEW, so an unqualified name is a helper call
@@ -313,11 +315,6 @@ export class Template {
    * @internal
    */
   private compiledSource(): string {
-    // Rails calls `strict_locals!` first, because it moves the signature into
-    // the method's parameter list and the handler never needs it. A JS
-    // function has no keyword parameters, so the tse compiler emits the check
-    // from the magic comment instead — which means the handler has to see the
-    // source before the comment is stripped.
     const source = this.source;
     this.strictLocalsBang();
     const handler = this.resolveHandler();
