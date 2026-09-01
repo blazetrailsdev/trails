@@ -473,51 +473,37 @@ function filterCoversDir(filter: string, dir: string): boolean {
 
 /**
  * Gate names an `if:` expression reads out of the `changes` job, as one OR
- * group. `docs_only` is dropped: it is a negative condition, and a package's
+ * group. A non-string `if:` (a bare `false`) names none. `docs_only` is dropped: it is a negative condition, and a package's
  * own test file is never docs-only.
  */
-function gateNames(ifText: string): string[] {
+function gateNames(ifText: unknown): string[] {
+  if (typeof ifText !== "string") return [];
   const names = [...ifText.matchAll(/needs\.changes\.outputs\.(\w+)/g)].map((m) => m[1]);
   return names.filter((n) => n !== "docs_only");
-}
-
-/** The `if:` value of a block, with a folded (`>-`) scalar joined onto one line. */
-function ifText(block: string[]): string {
-  const i = block.findIndex((l) => /^\s*if:/.test(l));
-  if (i === -1) return "";
-  const indent = block[i].length - block[i].trimStart().length;
-  const parts = [block[i].replace(/^\s*if:\s*/, "").replace(/^>-?$/, "")];
-  for (let j = i + 1; j < block.length; j++) {
-    const line = block[j];
-    if (line.trim() === "") break;
-    if (line.length - line.trimStart().length <= indent) break;
-    parts.push(line.trim());
-  }
-  return parts.join(" ");
 }
 
 /**
  * Every `pnpm vitest run` filter in ci.yml paired with the gate groups that
  * have to fire for the step holding it to execute: the enclosing job's `if:`
- * and the step's own. Each group is an OR set; all groups must be satisfied.
+ * and the step's own. Each group is an OR set; all groups must be satisfied,
+ * which is how Actions evaluates a step's reachability.
+ *
+ * Jobs and steps come out of `parseYaml`, not an indentation scan — the file
+ * already parses the workflow that way for the `if:`-linearity check below,
+ * and a second hand-rolled block parser would silently mis-read a reformatted
+ * ci.yml with no test needing to change to notice.
  */
 function ciFiltersWithGates(yml: string): { filter: string; gates: string[][] }[] {
-  const lines = yml.split("\n");
-  const jobStarts = lines.flatMap((l, i) => (/^ {2}[\w-]+:\s*$/.test(l) ? [i] : []));
+  const wf = parseYaml(yml) as {
+    jobs: Record<string, { if?: string; steps?: { if?: string; run?: string }[] }>;
+  };
   const out: { filter: string; gates: string[][] }[] = [];
-  for (let k = 0; k < jobStarts.length; k++) {
-    const job = lines.slice(jobStarts[k], jobStarts[k + 1] ?? lines.length);
-    const stepsAt = job.findIndex((l) => /^ {4}steps:\s*$/.test(l));
-    if (stepsAt === -1) continue;
-    const jobGates = gateNames(ifText(job.slice(0, stepsAt)));
-    const body = job.slice(stepsAt + 1);
-    const stepStarts = body.flatMap((l, i) => (/^ {6}- /.test(l) ? [i] : []));
-    for (let s = 0; s < stepStarts.length; s++) {
-      const step = body.slice(stepStarts[s], stepStarts[s + 1] ?? body.length);
-      const stepGates = gateNames(ifText(step));
-      const gates = [jobGates, stepGates].filter((g) => g.length > 0);
-      const text = step.join("\n");
-      for (const filter of [...ciVitestFilters(text), ...ciPackageFilterDirs(text)]) {
+  for (const job of Object.values(wf.jobs)) {
+    const jobGates = gateNames(job.if);
+    for (const step of job.steps ?? []) {
+      if (typeof step.run !== "string") continue;
+      const gates = [jobGates, gateNames(step.if)].filter((g) => g.length > 0);
+      for (const filter of [...ciVitestFilters(step.run), ...ciPackageFilterDirs(step.run)]) {
         out.push({ filter, gates });
       }
     }
