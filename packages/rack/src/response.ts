@@ -11,7 +11,245 @@ import {
 import { STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import * as MediaTypeModule from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
+import { include } from "@blazetrails/activesupport";
 
+/**
+ * Mirrors `Rack::Response::Helpers` (`rack/lib/rack/response.rb:180-370`), the
+ * module both `Rack::Response` (`response.rb:373`) and `Rack::Response::Raw`
+ * (`response.rb:376`) include. Modelled as a class module so `include()`
+ * carries its accessor pairs (Ruby's `content_type` / `content_type=`).
+ */
+export abstract class Helpers {
+  declare status: number;
+  declare headers: Record<string, any>;
+  declare body: any;
+  declare length: number | null;
+  declare _buffered: boolean | null;
+  declare _writer: (chunk: string) => string;
+
+  abstract hasHeader(key: any): boolean;
+  abstract getHeader(key: any): any;
+  abstract setHeader(key: any, value: any): any;
+  abstract deleteHeader(key: any): any;
+
+  get isInvalid(): boolean {
+    return this.status < 100 || this.status >= 600;
+  }
+
+  get isInformational(): boolean {
+    return this.status >= 100 && this.status < 200;
+  }
+  get isSuccessful(): boolean {
+    return this.status >= 200 && this.status < 300;
+  }
+  get isRedirection(): boolean {
+    return this.status >= 300 && this.status < 400;
+  }
+  get isClientError(): boolean {
+    return this.status >= 400 && this.status < 500;
+  }
+  get isServerError(): boolean {
+    return this.status >= 500 && this.status < 600;
+  }
+
+  get isOk(): boolean {
+    return this.status === 200;
+  }
+  get isCreated(): boolean {
+    return this.status === 201;
+  }
+  get isAccepted(): boolean {
+    return this.status === 202;
+  }
+  get isNoContent(): boolean {
+    return this.status === 204;
+  }
+  get isMovedPermanently(): boolean {
+    return this.status === 301;
+  }
+  get isBadRequest(): boolean {
+    return this.status === 400;
+  }
+  get isUnauthorized(): boolean {
+    return this.status === 401;
+  }
+  get isForbidden(): boolean {
+    return this.status === 403;
+  }
+  get isNotFound(): boolean {
+    return this.status === 404;
+  }
+  get isMethodNotAllowed(): boolean {
+    return this.status === 405;
+  }
+  get isNotAcceptable(): boolean {
+    return this.status === 406;
+  }
+  get isRequestTimeout(): boolean {
+    return this.status === 408;
+  }
+  get isPreconditionFailed(): boolean {
+    return this.status === 412;
+  }
+  get isUnprocessable(): boolean {
+    return this.status === 422;
+  }
+
+  get isRedirect(): boolean {
+    return [301, 302, 303, 307, 308].includes(this.status);
+  }
+
+  isInclude(header: string): boolean {
+    return this.hasHeader(header);
+  }
+
+  /**
+   * Add a header that may have multiple values.
+   *
+   * Mirrors `Rack::Response::Helpers#add_header` (`response.rb:219-238`).
+   */
+  addHeader(key: string | null, value: string | null): any {
+    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (value === null || value === undefined) return this.getHeader(key) ?? null;
+    const existing = this.getHeader(key);
+    if (existing != null) {
+      if (Array.isArray(existing)) {
+        existing.push(String(value));
+        return existing;
+      } else {
+        const arr = [existing, String(value)];
+        this.setHeader(key, arr);
+        return arr;
+      }
+    } else {
+      this.setHeader(key, String(value));
+      return String(value);
+    }
+  }
+
+  /** Get the content type of the response. */
+  get contentType(): string | undefined {
+    return this.getHeader(CONTENT_TYPE);
+  }
+
+  /** Set the content type of the response. */
+  set contentType(contentType: string) {
+    this.setHeader(CONTENT_TYPE, contentType);
+  }
+
+  get mediaType(): string | null {
+    return MediaTypeModule.type(this.contentType ?? null);
+  }
+
+  get mediaTypeParams(): Record<string, string> {
+    return MediaTypeModule.params(this.contentType ?? null);
+  }
+
+  get contentLength(): number | null {
+    const cl = this.getHeader(CONTENT_LENGTH);
+    return cl ? parseInt(cl) : null;
+  }
+
+  get location(): string | undefined {
+    return this.getHeader("location");
+  }
+
+  set location(location: string) {
+    this.setHeader("location", location);
+  }
+
+  setCookie(key: string, value: any): void {
+    this.addHeader(SET_COOKIE, setCookieHeader(key, value));
+  }
+
+  deleteCookie(key: string, value: Record<string, any> = {}): void {
+    this.setHeader(SET_COOKIE, deleteSetCookieHeaderBang(this.getHeader(SET_COOKIE), key, value));
+  }
+
+  get setCookieHeader(): any {
+    return this.getHeader(SET_COOKIE);
+  }
+
+  set setCookieHeader(value: any) {
+    this.setHeader(SET_COOKIE, value);
+  }
+
+  get cacheControl(): string | undefined {
+    return this.getHeader(CACHE_CONTROL);
+  }
+
+  set cacheControl(value: string) {
+    this.setHeader(CACHE_CONTROL, value);
+  }
+
+  /** Specifies that the content shouldn't be cached. Overrides `cacheBang` if already called. */
+  doNotCacheBang(): void {
+    this.setHeader(CACHE_CONTROL, "no-cache, must-revalidate");
+    this.setHeader(EXPIRES, new Date().toUTCString()); // boundary: HTTP-date header
+  }
+
+  /** Specify that the content should be cached. */
+  cacheBang(duration: number = 3600, { directive = "public" }: { directive?: string } = {}): void {
+    if (!/no-cache/.test(this.getHeader(CACHE_CONTROL) ?? "")) {
+      this.setHeader(CACHE_CONTROL, `${directive}, max-age=${duration}`);
+      this.setHeader(EXPIRES, new Date(Date.now() + duration * 1000).toUTCString()); // boundary: HTTP-date header
+    }
+  }
+
+  get etag(): string | undefined {
+    return this.getHeader(ETAG);
+  }
+
+  set etag(value: string) {
+    this.setHeader(ETAG, value);
+  }
+
+  /**
+   * Convert the body of this response into an internally buffered Array if possible.
+   *
+   * @internal — `protected` in Ruby (`response.rb:322-355`).
+   */
+  bufferedBodyBang(): boolean {
+    if (this._buffered === null) {
+      if (Array.isArray(this.body)) {
+        this.body = this.body.filter((p: any) => p !== null && p !== undefined);
+        this.length = this.body.reduce(
+          (s: number, p: string) => s + Buffer.byteLength(String(p)),
+          0,
+        );
+        this._buffered = true;
+      } else if (this.body && typeof this.body.each === "function") {
+        const oldBody = this.body;
+        this.body = [];
+        this._buffered = true;
+        this.length = 0;
+        oldBody.each((part: string) => this.append(String(part)));
+      } else if (this.body && typeof this.body[Symbol.iterator] === "function") {
+        const oldBody = this.body;
+        this.body = [];
+        this._buffered = true;
+        this.length = 0;
+        for (const part of oldBody) this.append(String(part));
+      } else {
+        this._buffered = false;
+      }
+    }
+    return this._buffered;
+  }
+
+  /** @internal — `protected` in Ruby (`response.rb:357-368`). */
+  append(chunk: string): string {
+    this.body.push(chunk);
+    if (this.length !== null) {
+      this.length += Buffer.byteLength(chunk);
+    } else if (this._buffered) {
+      this.length = Buffer.byteLength(chunk);
+    }
+    return chunk;
+  }
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:373`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
   status: number;
   headers: Record<string, string | string[]>;
@@ -122,7 +360,7 @@ export class Response {
   }
 
   write(chunk: string): void {
-    this.bufferedBody();
+    this.bufferedBodyBang();
     // Clone array body on first write to avoid mutating original
     if (this._buffered && Array.isArray(this.body) && !this._bodyCloned) {
       this.body = [...this.body];
@@ -159,219 +397,10 @@ export class Response {
     delete this.headers[key];
     return val ?? null;
   }
-
-  // Status helpers
-  get isInvalid(): boolean {
-    return this.status < 100 || this.status >= 600;
-  }
-  get isInformational(): boolean {
-    return this.status >= 100 && this.status < 200;
-  }
-  get isSuccessful(): boolean {
-    return this.status >= 200 && this.status < 300;
-  }
-  get isRedirection(): boolean {
-    return this.status >= 300 && this.status < 400;
-  }
-  get isClientError(): boolean {
-    return this.status >= 400 && this.status < 500;
-  }
-  get isServerError(): boolean {
-    return this.status >= 500 && this.status < 600;
-  }
-  get isOk(): boolean {
-    return this.status === 200;
-  }
-  get isCreated(): boolean {
-    return this.status === 201;
-  }
-  get isAccepted(): boolean {
-    return this.status === 202;
-  }
-  get isNoContent(): boolean {
-    return this.status === 204;
-  }
-  get isMovedPermanently(): boolean {
-    return this.status === 301;
-  }
-  get isNotFound(): boolean {
-    return this.status === 404;
-  }
-  get isBadRequest(): boolean {
-    return this.status === 400;
-  }
-  get isUnauthorized(): boolean {
-    return this.status === 401;
-  }
-  get isMethodNotAllowed(): boolean {
-    return this.status === 405;
-  }
-  get isNotAcceptable(): boolean {
-    return this.status === 406;
-  }
-  get isRequestTimeout(): boolean {
-    return this.status === 408;
-  }
-  get isPreconditionFailed(): boolean {
-    return this.status === 412;
-  }
-  get isRedirect(): boolean {
-    return [301, 302, 303, 307, 308].includes(this.status);
-  }
-  get isUnprocessable(): boolean {
-    return this.status === 422;
-  }
-  get isForbidden(): boolean {
-    return this.status === 403;
-  }
-
-  isInclude(header: string): boolean {
-    return this.hasHeader(header);
-  }
-
-  get contentType(): string | undefined {
-    return this.getHeader(CONTENT_TYPE);
-  }
-  set contentType(v: string) {
-    this.setHeader(CONTENT_TYPE, v);
-  }
-  get contentLength(): number | null {
-    const cl = this.getHeader(CONTENT_LENGTH);
-    return cl ? parseInt(cl) : null;
-  }
-  get location(): string | undefined {
-    return this.getHeader("location");
-  }
-  set location(v: string) {
-    this.setHeader("location", v);
-  }
-
-  get mediaType(): string | null {
-    return MediaTypeModule.type(this.contentType ?? null);
-  }
-  get mediaTypeParams(): Record<string, string> {
-    return MediaTypeModule.params(this.contentType ?? null);
-  }
-
-  get setCookieHeader(): any {
-    return this.getHeader(SET_COOKIE);
-  }
-  set setCookieHeader(v: any) {
-    this.setHeader(SET_COOKIE, v);
-  }
-
-  get cacheControl(): string | undefined {
-    return this.getHeader(CACHE_CONTROL);
-  }
-  set cacheControl(v: string) {
-    this.setHeader(CACHE_CONTROL, v);
-  }
-
-  get etag(): string | undefined {
-    return this.getHeader(ETAG);
-  }
-  set etag(v: string) {
-    this.setHeader(ETAG, v);
-  }
-
-  addHeader(key: string | null, value: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    if (value === null || value === undefined) return this.getHeader(key) ?? null;
-    const existing = this.getHeader(key);
-    if (existing != null) {
-      if (Array.isArray(existing)) {
-        existing.push(String(value));
-        return existing;
-      } else {
-        const arr = [existing, String(value)];
-        this.setHeader(key, arr);
-        return arr;
-      }
-    } else {
-      this.setHeader(key, String(value));
-      return String(value);
-    }
-  }
-
-  setCookie(key: string, value: any): void {
-    this.addHeader(SET_COOKIE, setCookieHeader(key, value));
-  }
-
-  deleteCookie(key: string, value: Record<string, any> = {}): void {
-    this.setHeader(SET_COOKIE, deleteSetCookieHeaderBang(this.getHeader(SET_COOKIE), key, value));
-  }
-
-  cacheBang(duration: number = 3600, directive: string = "public"): void {
-    if (!/no-cache/.test(this.getHeader(CACHE_CONTROL) ?? "")) {
-      this.setHeader(CACHE_CONTROL, `${directive}, max-age=${duration}`);
-      this.setHeader(EXPIRES, new Date(Date.now() + duration * 1000).toUTCString()); // boundary: HTTP-date header
-    }
-  }
-
-  doNotCacheBang(): void {
-    this.setHeader(CACHE_CONTROL, "no-cache, must-revalidate");
-    this.setHeader(EXPIRES, new Date().toUTCString()); // boundary: HTTP-date header
-  }
-
-  cache(duration: number): void {
-    if (this.getHeader(CACHE_CONTROL) === "no-cache, must-revalidate") return;
-    this.setHeader(CACHE_CONTROL, `public, max-age=${duration}`);
-    // boundary: HTTP Expires header is RFC 7231 HTTP-date, produced by Date#toUTCString.
-    this.setHeader(EXPIRES, new Date(Date.now() + duration * 1000).toUTCString());
-  }
-
-  doNotCache(): void {
-    this.setHeader(CACHE_CONTROL, "no-cache, must-revalidate");
-    // boundary: epoch-zero Date is the canonical "already expired" sentinel.
-    this.setHeader(EXPIRES, new Date(0).toUTCString());
-  }
-
-  /** @internal */
-  bufferedBodyBang(): boolean {
-    return this.bufferedBody();
-  }
-
-  bufferedBody(): boolean {
-    if (this._buffered === null) {
-      if (Array.isArray(this.body)) {
-        this.body = this.body.filter((p: any) => p !== null && p !== undefined);
-        this.length = this.body.reduce(
-          (s: number, p: string) => s + Buffer.byteLength(String(p)),
-          0,
-        );
-        this._buffered = true;
-      } else if (this.body && typeof this.body.each === "function") {
-        const oldBody = this.body;
-        this.body = [];
-        this._buffered = true;
-        this.length = 0;
-        oldBody.each((part: string) => this.append(String(part)));
-      } else if (this.body && typeof this.body[Symbol.iterator] === "function") {
-        const oldBody = this.body;
-        this.body = [];
-        this._buffered = true;
-        this.length = 0;
-        for (const part of oldBody) this.append(String(part));
-      } else {
-        this._buffered = false;
-      }
-    }
-    return this._buffered;
-  }
-
-  /** @internal */
-  append(chunk: string): string {
-    this.body.push(chunk);
-    if (this.length !== null) {
-      this.length += Buffer.byteLength(chunk);
-    } else if (this._buffered) {
-      this.length = Buffer.byteLength(chunk);
-    }
-    return chunk;
-  }
 }
 
 /** Mirrors `Rack::Response::Raw` (`rack/lib/rack/response.rb:375-401`). */
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
 export class ResponseRaw {
   status: number;
   headers: Record<string, any>;
@@ -397,58 +426,36 @@ export class ResponseRaw {
     delete this.headers[k];
     return val ?? null;
   }
-
-  get isInvalid(): boolean {
-    return this.status < 100 || this.status >= 600;
-  }
-  get isSuccessful(): boolean {
-    return this.status >= 200 && this.status < 300;
-  }
-  get isOk(): boolean {
-    return this.status === 200;
-  }
-  get isNotFound(): boolean {
-    return this.status === 404;
-  }
-  get isRedirect(): boolean {
-    return [301, 302, 303, 307, 308].includes(this.status);
-  }
-
-  /** Mirrors `Rack::Response::Helpers#add_header` (`response.rb:219-238`). */
-  addHeader(key: string | null, value: string | null): any {
-    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    if (value === null || value === undefined) return this.getHeader(key) ?? null;
-    const existing = this.getHeader(key);
-    if (existing != null) {
-      if (Array.isArray(existing)) {
-        existing.push(String(value));
-        return existing;
-      } else {
-        const arr = [existing, String(value)];
-        this.setHeader(key, arr);
-        return arr;
-      }
-    } else {
-      this.setHeader(key, String(value));
-      return String(value);
-    }
-  }
-
-  /** Mirrors `Rack::Response::Helpers#set_cookie` (`response.rb:270-272`). */
-  setCookie(key: string, value: any): void {
-    this.addHeader(SET_COOKIE, setCookieHeader(key, value));
-  }
-
-  /** Mirrors `Rack::Response::Helpers#delete_cookie` (`response.rb:274-280`). */
-  deleteCookie(key: string, value: Record<string, any> = {}): void {
-    this.setHeader(SET_COOKIE, deleteSetCookieHeaderBang(this.getHeader(SET_COOKIE), key, value));
-  }
-
-  /** Mirrors `Rack::Response::Helpers#set_cookie_header` (`response.rb:282-288`). */
-  get setCookieHeader(): any {
-    return this.getHeader(SET_COOKIE);
-  }
-  set setCookieHeader(v: any) {
-    this.setHeader(SET_COOKIE, v);
-  }
 }
+
+include(Response, Helpers);
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:373`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Response extends Omit<
+  Helpers,
+  | "status"
+  | "headers"
+  | "body"
+  | "length"
+  | "_buffered"
+  | "_writer"
+  | "hasHeader"
+  | "getHeader"
+  | "setHeader"
+  | "deleteHeader"
+> {}
+
+include(ResponseRaw, Helpers);
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface ResponseRaw extends Omit<
+  Helpers,
+  | "status"
+  | "headers"
+  | "body"
+  | "length"
+  | "_buffered"
+  | "_writer"
+  | "hasHeader"
+  | "getHeader"
+  | "setHeader"
+  | "deleteHeader"
+> {}

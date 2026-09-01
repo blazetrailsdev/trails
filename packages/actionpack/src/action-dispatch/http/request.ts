@@ -7,7 +7,12 @@
 
 import { camelize, NameError, toSentence, underscore } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
-import { parseNestedQuery, RACK_SESSION, Request as RackRequest } from "@blazetrails/rack";
+import {
+  parseNestedQuery,
+  RACK_SESSION,
+  Request as RackRequest,
+  RequestHelpers,
+} from "@blazetrails/rack";
 import {
   _setActionDispatchRequest,
   type ActionDispatchRequestConstructor,
@@ -239,10 +244,6 @@ export class Request {
       return (this.env["HTTP_X_FORWARDED_PROTO"] as string).split(",")[0].trim();
     }
     return (this.env["rack.url_scheme"] as string) || "http";
-  }
-
-  get ssl(): boolean {
-    return this.scheme === "https";
   }
 
   /**
@@ -1154,6 +1155,10 @@ Object.defineProperty(Request.prototype, "ifNoneMatchEtags", {
 Request.prototype.notModified = _notModified;
 Request.prototype.etagMatches = _etagMatches;
 Request.prototype.fresh = _fresh;
+
+include(Request, RequestHelpers);
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Request extends Omit<RequestHelpers, "scheme"> {}
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request extends CspRequest {}
