@@ -194,10 +194,16 @@ export class Engine extends Trailtie {
   }
 
   /**
-   * Mirrors `Engine#load_config_initializer(initializer)` (`engine.rb:691-695`),
-   * which sits in Engine's `private` section. Ruby's `load` is `import()` here,
-   * so the body is async and the instrumentation goes through
-   * `Notifications.instrumentAsync`.
+   * Mirrors `Engine#load_config_initializer(initializer)` (`engine.rb:691-695`).
+   * Ruby's `load` is `import()` here, so the body is async and the
+   * instrumentation goes through `Notifications.instrumentAsync`.
+   *
+   * Deliberately carries no internal-visibility tag: the method sits in Engine's
+   * `private` section but has Rails' `# :doc:` directive (`engine.rb:691`),
+   * which republishes it as public API. `extract-ruby-api.rb:402-412` honours
+   * that directive and keeps the name out of the privates manifest, so
+   * `rails-private-jsdoc` does not ask for the tag and
+   * `unbacked-internal-needs-receipt` rejects it.
    */
   async loadConfigInitializer(initializer: string): Promise<void> {
     const { pathToFileURL } = await getPathAsync();
