@@ -223,7 +223,7 @@ describe("Rack::Session::Pool", () => {
   });
 
   it.skip("should merge sessions when multithreaded", () => {
-    // PERMANENT-SKIP: the body runs only under Ruby's $DEBUG and drives Thread.stop/Thread#run; JS has no threads
+    // PERMANENT-SKIP: porting the trivial non-$DEBUG arm alone reds parity:test:assertions — the Ruby body counts 6 assertions statically, and the other 5 are Thread.new/Thread.stop/join
   });
 
   it("does not return a cookie if cookie was not read/written", async () => {
