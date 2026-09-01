@@ -1428,20 +1428,27 @@ describe("resolveEntityByDeclaringFile", () => {
     expect(resolveEntityByDeclaringFile([http, csp], "testing/test-request.ts")).toBeNull();
   });
 
-  it("does not rank a dep package's identically-pathed candidate by proximity", () => {
-    const dep = entity("attribute-methods.ts", "ClassMethods");
-    const own = entity("attribute-methods/read.ts", "ClassMethods");
+  it("does not rank a dep package's same-pathed candidate against a local one", () => {
+    const dep = entity("attribute-methods/dirty.ts", "ClassMethods");
+    const own = entity("attribute-methods/write.ts", "ClassMethods");
     expect(
-      resolveEntityByDeclaringFile([dep, own], "attribute-methods.ts", undefined, undefined, (c) =>
-        Object.is(c, dep),
+      resolveEntityByDeclaringFile(
+        [dep, own],
+        "attribute-methods/read.ts",
+        undefined,
+        undefined,
+        (c) => Object.is(c, dep),
       ),
     ).toBe(own);
   });
 
   it("still resolves a dep candidate that is the only one in the running", () => {
+    const self = entity("type/text.ts", "StringType");
     const dep = entity("type/string.ts", "StringType");
     expect(
-      resolveEntityByDeclaringFile([dep], "type/text.ts", undefined, undefined, () => true),
+      resolveEntityByDeclaringFile([self, dep], "type/text.ts", undefined, undefined, (c) =>
+        Object.is(c, dep),
+      ),
     ).toBe(dep);
   });
 
