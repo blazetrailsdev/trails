@@ -682,13 +682,9 @@ class ApiExtractor
     @namespace_stack.pop
   end
 
-  # The `Struct.new(...)` call node of a `CONST = Struct.new(…)` RHS, in either
-  # the bare form (`AddColumnDefinition = Struct.new(:column)`,
-  # schema_definitions.rb:113) or the block form
-  # (`ForeignKeyDefinition = Struct.new(:from_table, :to_table, :options) do`,
-  # schema_definitions.rb:123). nil when the RHS is not a `Struct.new`.
-  # A dynamic member list is not matched — struct_member_names resolves only
-  # inline symbols and a `*CONST` symbol-array splat.
+  # The `Struct.new(...)` call node of a `CONST = Struct.new(…)` RHS, bare or
+  # block-suffixed; nil otherwise. A dynamic member list is not matched —
+  # struct_member_names resolves only inline symbols and a `*CONST` splat.
   def struct_new_call(rhs)
     return nil unless rhs.is_a?(Array)
     call = rhs[0] == :method_add_block ? rhs[1] : rhs
@@ -1872,8 +1868,9 @@ class ApiExtractor
 
   # The body-derived half of a method entry, shared by the literal-`def` path
   # and the metaprogrammed one so a generated method is indistinguishable from
-  # a `def`-written one in the manifest. Without it every `define_method` body
-  # reads as a zero-call method to `parity:api:calls` (RFC 0126).
+  # a `def`-written one. Without it every `define_method` body reads as a
+  # zero-call method to `parity:api:calls` — indistinguishable from a body that
+  # genuinely calls nothing (RFC 0126).
   def record_body_facts(entry, body, params_node)
     calls, weak_calls, call_receivers = collect_method_calls(body, params_node)
     entry[:calls] = calls unless calls.empty?
@@ -2015,10 +2012,8 @@ class ApiExtractor
     params.is_a?(Array) && params[0] == :params ? params : nil
   end
 
-  # The statement list of a `do`/`{}` block — the generated method's body, for a
-  # `define_method(name) { … }`. Handing it to the same collectors process_def
-  # uses is what makes a metaprogrammed entry carry the calls a literal `def`
-  # written the same way would (RFC 0126).
+  # The statement list of a `do`/`{}` block — the generated method's body, for
+  # a `define_method(name) { … }`. See record_body_facts.
   def block_body_node(block)
     return nil unless block.is_a?(Array) &&
                       [:do_block, :brace_block].include?(block[0])
