@@ -161,17 +161,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "rack-session",
         libPath: "lib/rack/session",
         testPath: "test",
-        // Vendored as a read-anchor first. Both extractors already run over
-        // this clone unmodified — `extract-ruby-api.rb` reports 19 classes,
-        // 3 modules, 78 public methods; `extract-ruby-tests.rb` reports 7
-        // files, 124 tests — so the flags are off only because
-        // `packages/rack-session/src` does not exist yet, and both compares
-        // key a package onto a TS workspace dir (a missing one is a hard
-        // build-state error in `extract-ts-api.ts`, not an empty measure).
-        // RFC 0133's `enroll-rack-session-in-compare-tooling` creates the
-        // package and flips both on.
-        compareApi: false,
-        compareTests: false,
       },
     ],
   },

@@ -124,9 +124,15 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
  * `-behavior.test.ts`.
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
-  if (pkg === "rack") {
+  if (pkg === "rack" || pkg === "rack-session") {
     const dir = path.dirname(rubyFile);
-    const base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
+    // rack-session's lib root is `lib/rack/session` while its test root is
+    // `test`, so every spec repeats that root as a leading `session_` segment
+    // (`spec_session_pool.rb` mirrors `lib/rack/session/pool.rb`). Drop it, the
+    // same redundant-leading-segment case as the i18n branch below, so both
+    // sides land on `packages/rack-session/src/pool`.
+    let base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
+    if (pkg === "rack-session") base = base.replace(/^session_/, "");
     const kebab = base.replace(/_/g, "-");
     const tsFile = kebab + ".test.ts";
     return dir === "." ? tsFile : path.join(dir, tsFile);
@@ -1470,6 +1476,7 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
     activerecord: "packages/activerecord/src/",
     activesupport: "packages/activesupport/src/",
     rack: "packages/rack/src/",
+    "rack-session": "packages/rack-session/src/",
     actiondispatch: "packages/actionpack/src/action-dispatch/",
     actioncontroller: "packages/actionpack/src/action-controller/",
     abstractcontroller: "packages/actionpack/src/abstract-controller/",

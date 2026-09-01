@@ -91,6 +91,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "globalid",
   "i18n",
   "rack",
+  "rack-session",
   "trailties",
 ];
 

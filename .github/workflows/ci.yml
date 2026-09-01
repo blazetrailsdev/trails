@@ -113,7 +113,7 @@ jobs:
           TRAILTIES_PKGS_RE='^packages/(trailties|actionpack|actionview|activerecord|arel|activemodel|activesupport|globalid|rack|date|did-you-mean|trails-tsc)/'
           TRAILS_TSC_PKGS_RE='^packages/trails-tsc/'
           TSE_COMPILER_PKGS_RE='^packages/tse-compiler/'
-          RACK_PKGS_RE='^packages/(rack|activesupport|date)/'
+          RACK_PKGS_RE='^packages/(rack|rack-session|activesupport|date)/'
           # `packages/`, `scripts/` and `eslint/` are listed whole rather than
           # enumerated, because several tests in this lane report on the WHOLE
           # tree rather than on their own package: stale-story-references
@@ -697,7 +697,7 @@ jobs:
       # them one re-run at a time. The job still fails if any step fails.
       - name: Rack tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.rack_affected == 'true' }}
-        run: pnpm vitest run packages/rack
+        run: pnpm vitest run packages/rack packages/rack-session
       - name: Action View tests
         if: ${{ !cancelled() && steps.install.outcome == 'success' && needs.changes.outputs.actionview_affected == 'true' }}
         run: pnpm vitest run packages/actionview
@@ -778,6 +778,7 @@ jobs:
           packages/nokogiri
           packages/html-sanitizer
           packages/rack
+          packages/rack-session
           packages/actionpack
           packages/actionview
           packages/trailties

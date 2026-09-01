@@ -48,7 +48,7 @@ describe("vendor/sources.ts", () => {
     expect(rack!.packages).toEqual([{ name: "rack", libPath: "lib/rack", testPath: "test" }]);
   });
 
-  it("declares the rack-session source, a read-anchor pending its TS package", () => {
+  it("declares the rack-session source, enrolled in both compares", () => {
     // Rack 3 moved Rack::Session out of rack into its own gem, so vendor/rack
     // (v3.1.14) has no lib/rack/session/. v2.1.0 is what
     // vendor/rails/Gemfile.lock:440 resolves.
@@ -64,13 +64,11 @@ describe("vendor/sources.ts", () => {
         name: "rack-session",
         libPath: "lib/rack/session",
         testPath: "test",
-        compareApi: false,
-        compareTests: false,
       },
     ]);
-    expect(apiComparePackages()).not.toContain("rack-session");
-    expect(Object.keys(libPathsManifest())).not.toContain("rack-session");
-    expect(Object.keys(testPathsManifest())).not.toContain("rack-session");
+    expect(apiComparePackages()).toContain("rack-session");
+    expect(Object.keys(libPathsManifest())).toContain("rack-session");
+    expect(Object.keys(testPathsManifest())).toContain("rack-session");
     expect(resolvePath("rack-session").endsWith("vendor/rack-session/lib/rack/session")).toBe(true);
     expect(resolvePath("rack-session", "test").endsWith("vendor/rack-session/test")).toBe(true);
     expect(vendoredRoot("rack-session").endsWith("vendor/rack-session")).toBe(true);
@@ -271,6 +269,7 @@ describe("vendor/sources.ts", () => {
         "globalid",
         "i18n",
         "rack",
+        "rack-session",
         "trailties",
       ].sort(),
     );
@@ -304,6 +303,7 @@ describe("vendor/sources.ts", () => {
         "globalid",
         "i18n",
         "rack",
+        "rack-session",
         "ruby-compat",
         "trailties",
       ].sort(),
