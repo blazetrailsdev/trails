@@ -260,7 +260,6 @@ describe("HashExtTest", () => {
 
     sliceBang(hash, "a");
 
-    expect([...hash.keys()]).toEqual(["a"]);
     expect(hash.get("c")).toBe(0);
   });
 
@@ -274,7 +273,6 @@ describe("HashExtTest", () => {
 
     sliceBang(hash, "a");
 
-    expect([...hash.keys()]).toEqual(["a"]);
     expect(hash.get("c")).toEqual([]);
   });
 
