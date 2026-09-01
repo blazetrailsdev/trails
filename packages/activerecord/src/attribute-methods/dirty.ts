@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { classAttribute, included, isModuleIncluded } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import type {
@@ -6,13 +7,6 @@ import type {
   NullMutationTracker,
 } from "@blazetrails/activemodel";
 import * as Timestamp from "../timestamp.js";
-
-class RuntimeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RuntimeError";
-  }
-}
 
 interface DirtyRecord {
   mutationsFromDatabase: AttributeMutationTracker;

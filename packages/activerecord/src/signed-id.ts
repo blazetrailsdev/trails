@@ -3,13 +3,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { JSON, underscore } from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/date";
 import { UnknownPrimaryKey } from "./errors.js";
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 let _signedIdVerifierSecret: string | (() => string | null | undefined) | null = null;
 

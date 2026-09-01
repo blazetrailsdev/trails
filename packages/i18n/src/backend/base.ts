@@ -38,7 +38,7 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { NotImplementedError, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { Temporal, strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import { throwException, catchException } from "../throw-catch.js";
@@ -203,14 +203,6 @@ function extname(filename: string): string {
 /** Mirrors: Ruby's `Exception#inspect`, which the rescues in load_yml/load_json use. */
 function inspectError(e: unknown): string {
   return e instanceof Error ? `#<${e.name}: ${e.message}>` : String(e);
-}
-
-/** Mirrors: Ruby's core `NotImplementedError`, which base.rb raises. */
-class NotImplementedError extends Error {
-  constructor() {
-    super("NotImplementedError");
-    this.name = "NotImplementedError";
-  }
 }
 
 /**

@@ -1,19 +1,6 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
 import { ExecutionContext } from "./execution-context.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
-
-/**
- * Mirror of Ruby's `RuntimeError` — the class `raise "msg"` and
- * `RuntimeError.new(string)` build, which is what `unexpected` wraps a String
- * argument in (`error_reporter.rb:146`).
- */
-class RuntimeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RuntimeError";
-  }
-}
-
 export type ErrorSeverity = "error" | "warning" | "info";
 
 export interface ErrorContext {

@@ -7,6 +7,9 @@ import {
   QueryLimitError,
   ParamsTooDeepError,
 } from "./query-parser.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
+
+export { ArgumentError };
 
 export { STATUS_WITH_NO_ENTITY_BODY };
 export { ParameterTypeError, InvalidParameterError, QueryLimitError, ParamsTooDeepError };
@@ -127,13 +130,6 @@ export function buildNestedQuery(value: any, prefix?: string): string {
   } else {
     if (prefix === undefined) throw new ArgumentError("value must be a Hash");
     return `${escape(prefix)}=${escape(String(value))}`;
-  }
-}
-
-export class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
   }
 }
 

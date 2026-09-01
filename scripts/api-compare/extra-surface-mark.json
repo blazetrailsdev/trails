@@ -1,7 +1,7 @@
 {
   "activerecord": {
-    "novel": 339,
-    "total": 870
+    "novel": 338,
+    "total": 869
   },
   "arel": {
     "novel": 0,
@@ -9,6 +9,6 @@
   },
   "ruby-compat": {
     "novel": 0,
-    "total": 13
+    "total": 17
   }
 }

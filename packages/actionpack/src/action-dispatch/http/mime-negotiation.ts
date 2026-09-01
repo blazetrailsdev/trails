@@ -16,6 +16,7 @@ import { ArrayInquirer } from "@blazetrails/activesupport";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 /**
  * Rails: `RESCUABLE_MIME_FORMAT_ERRORS = [ActionController::BadRequest,
@@ -24,13 +25,6 @@ import { ParseError } from "./parameters.js";
  * @internal
  */
 const RESCUABLE_MIME_FORMAT_ERRORS = [BadRequest, ParseError] as const;
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
 
 /**
  * Raised when a `Content-Type` or `Accept` header cannot be parsed as a

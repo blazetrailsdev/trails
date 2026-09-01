@@ -9,13 +9,7 @@ import { SignedGlobalID } from "./signed-global-id.js";
 import { validateApp } from "./uri/gid.js";
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 /**
  * Duck-typed model interface; globalid stays AR-agnostic.

@@ -1,14 +1,8 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 export class ParameterTypeError extends TypeError {
   constructor(message: string) {
     super(message);
     this.name = "ParameterTypeError";
-  }
-}
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
   }
 }
 

@@ -20,6 +20,7 @@
  * both.
  */
 
+import { FrozenError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   ArgumentError,
@@ -796,20 +797,6 @@ export function strftime(
    which is where a Ruby class belongs, and is what `Comparable`'s derived
    operators raise. Re-exported so this file's public surface is unchanged. */
 export { ArgumentError };
-
-/**
- * @internal Ruby core `FrozenError`, a `RuntimeError` subclass, spelled locally
- * for the reason {@link NoMethodError} below is. It is what `rb_check_frozen`
- * raises — `d_lite_initialize_copy`'s first statement (`date_core.c:5142`) —
- * with `rb_check_frozen`'s own `"can't modify frozen %s: %s"` message over the
- * receiver's class and its `inspect`.
- */
-class FrozenError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "FrozenError";
-  }
-}
 
 /**
  * @internal Ruby core `FloatDomainError`, a `RangeError` subclass, spelled

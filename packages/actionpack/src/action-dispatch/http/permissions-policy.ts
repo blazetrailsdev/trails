@@ -10,6 +10,8 @@
  * that decision so `build()` output is byte-for-byte identical to Rails.
  */
 
+import { ArgumentError } from "@blazetrails/ruby-compat";
+
 /** @internal */
 const MAPPINGS: Record<string, string> = {
   self: "'self'",
@@ -161,12 +163,5 @@ export class PermissionsPolicy {
       return source(context);
     }
     throw new Error(`Unexpected permissions policy source: ${JSON.stringify(source)}`);
-  }
-}
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
   }
 }

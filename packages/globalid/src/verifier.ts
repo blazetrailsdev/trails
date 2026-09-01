@@ -1,11 +1,5 @@
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 export class Verifier extends MessageVerifier {
   protected override encode(data: string | Buffer): string {

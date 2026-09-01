@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { extractOptionsBang, toParam } from "./hash-utils.js";
 import { env } from "./process-adapter.js";
 import { MemoryStore } from "./cache/memory-store.js";
@@ -12,17 +13,6 @@ import { getFormatVersion } from "./cache/format-version-slot.js";
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
 export type { CacheLogger, StoreOptions } from "./cache/store.js";
 export { DeserializationError } from "./cache/deserialization-error.js";
-
-/**
- * Mirror of Ruby's `RuntimeError` — what `retrieve_store_class`'s bare
- * `raise "Could not find cache store adapter for ..."` produces. @internal
- */
-class RuntimeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RuntimeError";
-  }
-}
 
 /** Mirrors Rails `ActiveSupport::Cache.format_version` (cache.rb:58). */
 export function formatVersion(): number {
