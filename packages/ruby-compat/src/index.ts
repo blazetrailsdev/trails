@@ -31,10 +31,24 @@ export {
 } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
 export { FrozenError } from "./frozen-error.js";
+export {
+  Module,
+  defineModule,
+  extend,
+  extended,
+  include,
+  included,
+  isModuleIncluded,
+  moduleVisibility,
+  publicInstanceMethods,
+} from "./include.js";
+export type { Extended, Included, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
 export { kernelFloat } from "./kernel-float.js";
 export { KeyError } from "./key-error.js";
 export { NotImplementedError } from "./not-implemented-error.js";
+export { prepend } from "./prepend.js";
+export type { PrependMethod, PrependModule } from "./prepend.js";
 export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";

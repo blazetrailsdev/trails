@@ -41,9 +41,6 @@ describe("include", () => {
   });
 
   it("later include wins over an earlier mixin, but class body beats both", () => {
-    // Ruby's `include A; include B` puts B higher in the ancestry, so a method
-    // both define resolves to B (last-included wins). Neither replaces a method
-    // defined directly in the class body.
     class User {
       classBody() {
         return "class-body";
@@ -68,9 +65,7 @@ describe("include", () => {
     include(User, A);
     include(User, B);
 
-    // Later mixin (B) wins over the earlier one (A).
     expect((new User() as any).shared()).toBe("B");
-    // A method defined in the class body beats every included mixin.
     expect(new User().classBody()).toBe("class-body");
   });
 
@@ -201,7 +196,6 @@ describe("include", () => {
     it("fills in the missing half of an accessor pair", () => {
       class Host {
         data: Record<string, unknown> = {};
-        // Only a getter — no setter. include() should install the mixin's setter.
         get key(): unknown {
           return this.data.key;
         }
@@ -218,7 +212,6 @@ describe("include", () => {
       const h = new Host();
       (h as any).key = 7;
       expect(h.data.key).toBe(7);
-      // Host's getter wins; mod's getter never runs.
       expect((h as any).key).toBe(7);
     });
 
@@ -246,9 +239,7 @@ describe("include", () => {
       }
       include(Host, A);
       include(Host, B);
-      // Later class module (B) wins over the earlier one (A).
       expect((new Host() as any).shared()).toBe("B");
-      // The class body still beats every included module.
       expect(new Host().classBody()).toBe("class-body");
     });
 
@@ -265,8 +256,6 @@ describe("include", () => {
         }
       }
       class B {
-        // B only redefines the getter; Ruby keeps A's setter (higher for `key=`
-        // is A, since B doesn't define it), while B's getter wins for `key`.
         get key(): unknown {
           return "B-getter";
         }
@@ -274,9 +263,7 @@ describe("include", () => {
       include(Host, A);
       include(Host, B);
       const h = new Host();
-      // Later mixin (B) supplies the getter.
       expect((h as any).key).toBe("B-getter");
-      // A's setter survives because B never redefined it.
       (h as any).key = 1;
       expect(h.data.key).toBe("A:1");
     });
@@ -490,21 +477,14 @@ describe("isModuleIncluded", () => {
 });
 
 describe("Included<>", () => {
-  // Regression for https://github.com/blazetrailsdev/trails/pull/967 —
-  // when Included<> was constrained over `Record<string, Function>`, the
-  // resulting mapped type carried a string index signature that propagated
-  // into the merging class and forced every subclass field to be
-  // function-typed. Mixing into a class with non-method fields broke.
   it("does not introduce a string index signature into the merged type", () => {
-    const Mod = {
+    const _Mod = {
       hello(this: unknown, name: string): string {
         return `hi ${name}`;
       },
     };
-    type T = Included<typeof Mod>;
+    type T = Included<typeof _Mod>;
     expectTypeOf<T>().toEqualTypeOf<{ hello: (name: string) => string }>();
-    // A class with non-function fields can extend the Included<> interface
-    // without TS demanding those fields conform to the function signature.
     /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging,
                       @typescript-eslint/no-empty-object-type */
     interface Host extends T {}
@@ -520,37 +500,34 @@ describe("Included<>", () => {
   });
 
   it("strips the this parameter and skips non-method properties", () => {
-    const Mod = {
+    const _Mod = {
       greet(this: { name: string }): string {
         return this.name;
       },
       version: 1 as const,
     };
-    type T = Included<typeof Mod>;
+    type T = Included<typeof _Mod>;
     expectTypeOf<T>().toEqualTypeOf<{ greet: () => string }>();
   });
 });
 
 describe("Extended<>", () => {
-  // Extended<> shares its implementation with Included<> via the internal
-  // CallableMethods<> helper. Mirror the Included<> regression assertions
-  // so a future divergence in either type's behavior fails its own test.
   it("does not introduce a string index signature into the merged type", () => {
-    const Mod = {
+    const _Mod = {
       connectedTo(this: unknown, role: string): number {
         return role.length;
       },
     };
-    type T = Extended<typeof Mod>;
+    type T = Extended<typeof _Mod>;
     expectTypeOf<T>().toEqualTypeOf<{ connectedTo: (role: string) => number }>();
   });
 
   it("strips the this parameter and skips non-method properties", () => {
-    const Mod = {
+    const _Mod = {
       establish(this: { tag: string }): void {},
       pool: 5 as const,
     };
-    type T = Extended<typeof Mod>;
+    type T = Extended<typeof _Mod>;
     expectTypeOf<T>().toEqualTypeOf<{ establish: () => void }>();
   });
 });

@@ -3,8 +3,8 @@
  * `Init_Comparable`) and the `<=>` send its members derive from. JS has no
  * `<=>` and no module to include, so both halves live here: {@link cmp} is the
  * send, and the derived operators are `this`-typed functions a class assigns to
- * itself (CLAUDE.md "Module mixins" — `include()` is ActiveSupport's, and this
- * package takes no workspace dependencies).
+ * itself (CLAUDE.md "Module mixins"), which is the settled idiom for a module
+ * whose members need a Ruby-shaped receiver rather than a bulk splice.
  *
  * The nullable return is the point: Ruby's `<=>` answers **nil** for an operand
  * it cannot place, and a `cmp` typed `number` silently loses that arm. Every
