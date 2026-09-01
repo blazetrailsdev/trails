@@ -29,7 +29,7 @@ function makeRequest(opts: Record<string, unknown> = {}): Request {
 beforeAll(() => {
   TemplateHandlers.registerTemplateHandler("html", {
     extensions: ["html"],
-    render: (source: string) => source,
+    call: (_template: unknown, source: string) => JSON.stringify(source),
   });
   ImplicitRenderTestController.prependViewPath(
     new FixtureResolver({

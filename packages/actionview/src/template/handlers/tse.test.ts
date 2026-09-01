@@ -1,8 +1,6 @@
-import { htmlSafe } from "@blazetrails/activesupport";
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "../../base.js";
-import { StrictLocalsMismatch } from "../../strict-locals.js";
-import { TemplateHandlers, type RenderContext } from "../handlers.js";
+import { TemplateHandlers } from "../handlers.js";
 import { Tse, type TseImplementation } from "./tse.js";
 
 describe("Template::Handlers::Tse", () => {
@@ -43,7 +41,7 @@ describe("Template::Handlers::Tse", () => {
 
   it("compiles a static template to a JS render module", () => {
     const code = new Tse().call({ type: "text/html" }, "<h1>hi</h1>");
-    expect(code).toContain("export default function render");
+    expect(code).toContain("function __tseCompiled");
     expect(code).toContain("safeAppend");
     expect(code).toContain("<h1>hi</h1>");
   });
@@ -106,7 +104,7 @@ describe("Template::Handlers::Tse", () => {
     }) as TseImplementation;
 
     const out = new Tse().call({ type: "text/plain" }, "src");
-    expect(out).toBe("STUB");
+    expect(out).toBe("(STUB)(this, localAssigns)");
     expect(calls).toEqual([{ source: "src", escapeIgnore: true }]);
   });
 
@@ -226,128 +224,6 @@ describe("Template::Handlers::Tse", () => {
       const fnEnd = code.lastIndexOf("}");
       expect(beginPos).toBeGreaterThan(fnStart);
       expect(endPos).toBeLessThan(fnEnd);
-    });
-  });
-
-  describe("#render", () => {
-    const ctx = (extra: Partial<RenderContext> = {}): RenderContext => ({
-      controller: "posts",
-      action: "index",
-      format: "html",
-      ...extra,
-    });
-
-    it("executes the compiled template and returns its output", () => {
-      expect(new Tse().render("<h1>hi</h1>", {}, ctx())).toBe("<h1>hi</h1>");
-    });
-
-    it("resolves a local as a bare identifier", () => {
-      expect(new Tse().render("<%= name %>", { name: "Ada" }, ctx())).toBe("Ada");
-    });
-
-    it("escapes an unsafe local", () => {
-      expect(new Tse().render("<%= name %>", { name: "<b>" }, ctx())).toBe("&lt;b&gt;");
-    });
-
-    it("does not escape a raw() local", () => {
-      expect(new Tse().render("<%= raw(name) %>", { name: "<b>" }, ctx())).toBe("<b>");
-    });
-
-    it("runs code tags", () => {
-      const out = new Tse().render(
-        "<% for (const n of names) { %><%= n %>,<% } %>",
-        { names: ["a", "b"] },
-        ctx(),
-      );
-      expect(out).toBe("a,b,");
-    });
-
-    it("lets a local shadow a same-named view helper", () => {
-      expect(new Tse().render("<%= raw %>", { raw: "local wins" }, ctx())).toBe("local wins");
-    });
-
-    it("emits the inner template's output for a bare yield in a layout", () => {
-      const out = new Tse().render("<main><%= yield %></main>", {}, ctx({ yield: "<p>body</p>" }));
-      expect(out).toBe("<main><p>body</p></main>");
-    });
-
-    it("round-trips a named contentFor section", () => {
-      const out = new Tse().render(
-        '<% contentFor("side", () => { %>aside<% }) %><%= _layoutFor("side") %>',
-        {},
-        ctx(),
-      );
-      expect(out).toBe("aside");
-    });
-
-    it("renders a nested partial through the view's render helper", () => {
-      const seen: Array<[string, Record<string, unknown>]> = [];
-      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-      view.render = (options) => {
-        seen.push([options.partial, options.locals ?? {}]);
-        return htmlSafe("<li>Ada</li>");
-      };
-      const out = new Tse().render(
-        '<%= render({ partial: "users/user", locals: { user: user } }) %>',
-        { user: "Ada" },
-        ctx({ view }),
-      );
-      expect(out).toBe("<li>Ada</li>");
-      expect(seen).toEqual([["users/user", { user: "Ada" }]]);
-    });
-
-    it("resolves an ActionView helper mixed onto the view as a bare identifier", () => {
-      expect(new Tse().render("<%= raw(value) %>", { value: "<b>" }, ctx())).toBe("<b>");
-    });
-
-    it("runs the compiled method with the view as `this`", () => {
-      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-      let seen: unknown;
-      (view as unknown as Record<string, unknown>).whoAmI = function (this: Base) {
-        seen = this as unknown;
-        return "ok";
-      };
-      expect(new Tse().render("<%= whoAmI() %>", {}, ctx({ view }))).toBe("ok");
-      expect(seen).toBe(view);
-    });
-
-    it("memoizes the compiled method on the view's compiledMethodContainer", () => {
-      const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-      const container = view.compiledMethodContainer();
-      const before = container._compiledMethods.size;
-      new Tse().render("<%= n %>", { n: 1 }, ctx({ view }));
-      const after = container._compiledMethods.size;
-      new Tse().render("<%= n %>", { n: 2 }, ctx({ view }));
-      expect(after).toBe(before + 1);
-      expect(container._compiledMethods.size).toBe(after);
-    });
-
-    it("gives two withEmptyTemplateCache containers separate compiled methods", () => {
-      const a = new (Base.withEmptyTemplateCache())(null, {}, null);
-      const b = new (Base.withEmptyTemplateCache())(null, {}, null);
-      new Tse().render("<%= n %>", { n: 1 }, ctx({ view: a }));
-      expect(a.compiledMethodContainer()._compiledMethods.size).toBe(1);
-      expect(b.compiledMethodContainer()._compiledMethods.size).toBe(0);
-    });
-
-    it("does not let the compiled function's own name shadow the render helper", () => {
-      expect(() => new Tse().render('<%= render({ partial: "p" }) %>', {}, ctx())).toThrow(
-        /has no lookup context/,
-      );
-    });
-
-    it("enforces a strict-locals signature against the passed locals, not the helper scope", () => {
-      const source = "<%# locals: (name:) %>\n<%= name %>";
-      expect(new Tse().render(source, { name: "Ada" }, ctx())).toContain("Ada");
-      expect(() => new Tse().render(source, { name: "Ada", extra: 1 }, ctx())).toThrow(
-        StrictLocalsMismatch,
-      );
-    });
-
-    it("memoizes the compile, so a second render of the same source reuses it", () => {
-      const tse = new Tse();
-      expect(tse.render("<%= n %>", { n: 1 }, ctx())).toBe("1");
-      expect(tse.render("<%= n %>", { n: 2 }, ctx())).toBe("2");
     });
   });
 

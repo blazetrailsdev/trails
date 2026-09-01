@@ -1,9 +1,7 @@
 import { chomp } from "@blazetrails/activesupport";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
-import { Base, type CompiledMethod } from "../../base.js";
-import { OutputBuffer } from "../../buffers.js";
-import { StrictLocalsMismatch } from "../../strict-locals.js";
-import type { RenderContext, TemplateHandler } from "../handlers.js";
+import { Base } from "../../base.js";
+import type { TemplateHandler } from "../handlers.js";
 import {
   translateLocation as translateLocationImpl,
   type BacktraceLocation,
@@ -120,6 +118,15 @@ export class Tse implements TemplateHandler {
    * before passing source to Erubi. `.tse` source is JavaScript/TypeScript,
    * which has no encoding pragma (files are always UTF-8 by spec), so this
    * step is a documented no-op — there is nothing to strip.
+   *
+   * `@blazetrails/tse-compiler` emits an ES module — `export default function
+   * render(...)`, optionally preceded by an `import` of
+   * `StrictLocalsMismatch`. Rails' `Handlers::ERB#call` returns code evaluated
+   * inside the compiled method's body (`template.rb:461`), so the module
+   * framing is stripped down to the equivalent: an expression that runs the
+   * template and evaluates to its output. The emitted name `render` is renamed
+   * on the way, because as a function *expression* it binds inside its own
+   * scope and would shadow the view's `render` helper.
    */
   call(template: TseTemplate, source: string): string {
     const ctor = this.constructor as typeof Tse;
@@ -140,120 +147,16 @@ export class Tse implements TemplateHandler {
       options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;
     }
     const result = ctor.implementation(prepared, options);
-    return result.code;
-  }
-
-  /**
-   * Compile the template and run it against the view, returning its output.
-   *
-   * Rails splits this across `Template#compile!`
-   * (`actionview/lib/action_view/template.rb:418-438`), which `module_eval`s
-   * the handler's code into a real method on `view.compiled_method_container`
-   * and memoizes on `@compiled`, and `Template#render` (`:271-287`), which
-   * calls `view._run(method_name, self, locals, OutputBuffer.new)`.
-   *
-   * The method is defined ON THE VIEW, so inside a template `self` is the
-   * `ActionView::Base` and every helper is an ordinary method call on it;
-   * `locals_code` (`:561-572`) then assigns each local as a real local
-   * variable, which is why a local shadows a same-named helper. `with (this)`
-   * nested inside `with (localAssigns)` is the JS construct with that
-   * resolution order — Ruby's implicit `self` receiver has no other analogue.
-   */
-  render(source: string, locals: Record<string, unknown>, context: RenderContext): string {
-    const view = context.view ?? new (Base.withEmptyTemplateCache())(null, {}, null);
-    // Rails' `TemplateRenderer#render_with_layout` puts the inner template's
-    // output in the view flow (`view.view_flow.set(:layout, content)`), which
-    // is where `_layout_for` — and so `<%= yield %>` — reads it from.
-    if (context.yield !== undefined) view.viewFlow.set("layout", context.yield);
-    const method = this.compiled(source, context, view);
-    const buffer = new OutputBuffer();
-    view._run(method, context.template ?? null, locals, buffer);
-    return buffer.toStr();
-  }
-
-  /**
-   * Mirrors `Template#compile!` (`template.rb:418-438`): compile once per
-   * `compiled_method_container`, keyed on the emitted code so a handler-option
-   * change (`escapeIgnoreList`, annotation) defines a fresh method. The memo
-   * lives on the container, as Rails' does, rather than in a process-global
-   * cache.
-   *
-   * @internal
-   */
-  private compiled(source: string, context: RenderContext, view: Base): CompiledMethod {
-    const code = this.call(
-      { type: context.format, format: context.format, shortIdentifier: context.templatePath },
-      source,
+    return (
+      "(" +
+      result.code
+        .replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\n?/u, "")
+        .replace(/^\s*export\s+default\s+/u, "")
+        .replace(/^function\s+render\b/u, "function __tseCompiled") +
+      ")(this, localAssigns)"
     );
-    const container = view.compiledMethodContainer();
-    // Rails keys on `method_name`, which folds in the identifier
-    // (`template.rb:396-402`); the virtual path is baked into the method body,
-    // so it belongs in the key alongside the emitted code.
-    // Rails emits `@virtual_path` verbatim; trails resolvers do not all
-    // populate it, so the identifier stands in when they don't.
-    const virtualPath = context.template?.virtualPath ?? context.template?.identifier ?? null;
-    const key = `${virtualPath ?? ""}\u0000${code}`;
-    let method = container._compiledMethods.get(key);
-    if (!method) {
-      method = evaluateTemplate(code, virtualPath, context.templatePath);
-      container._compiledMethods.set(key, method);
-    }
-    return method;
   }
 }
-
-/**
- * Turn the emitted ES-module source into the function `compile!` would have
- * defined on the view. The compiler emits
- * `export default function render(context, locals)`, optionally preceded by an
- * `import` of `StrictLocalsMismatch`; strip both so the remainder is a
- * function expression.
- *
- * The emitted name `render` is renamed on the way: as a function *expression*
- * it would bind inside the function's own scope and shadow the view's `render`
- * helper, so `<%= render({ partial: … }) %>` would recurse into the template.
- *
- * `@virtual_path = …` is emitted as the method's first statement, exactly where
- * `compiled_source` puts it (`template.rb:461`). It has to be set by the method
- * rather than by the caller, because `_run` captures the previous value before
- * invoking it — that ordering is what restores the parent's path when a nested
- * partial returns.
- *
- * `localAssigns` is passed through unchanged — the strict-locals check the
- * compiler emits compares `Object.keys(localAssigns)` against the declared
- * signature, so the view must not stand in for it.
- *
- * @internal
- */
-function evaluateTemplate(
-  code: string,
-  virtualPath: string | null,
-  templatePath?: string,
-): CompiledMethod {
-  const expression = code
-    .replace(/^import\s+\{[^}]*\}\s+from\s+"[^"]*";\n?/u, "")
-    .replace(/^\s*export\s+default\s+/u, "")
-    .replace(/^function\s+render\b/u, "function __tseCompiled");
-  try {
-    const factory = new Function(
-      "StrictLocalsMismatch",
-      `return function (localAssigns, outputBuffer) {
-         this.virtualPath = ${JSON.stringify(virtualPath)};
-         with (this) { with (localAssigns) {
-           var __tseTemplate = ${expression};
-           return __tseTemplate(this, localAssigns);
-         } }
-       };`,
-    ) as (mismatch: typeof StrictLocalsMismatch) => CompiledMethod;
-    return factory(StrictLocalsMismatch);
-  } catch (error) {
-    const where = templatePath != null ? ` (${templatePath})` : "";
-    throw new SyntaxError(`Failed to compile .tse template${where}: ${(error as Error).message}`, {
-      cause: error,
-    });
-  }
-}
-
 /**
  * Normalize a `template.type` input into a MIME string. Rails compares the
  * `escape_ignore_list` (default `["text/plain"]`) against `Template#type`,
