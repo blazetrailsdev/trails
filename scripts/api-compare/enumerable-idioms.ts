@@ -99,10 +99,16 @@ export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
  *
  *  The two halves are UNIONED, not short-circuited: a name can be claimed by
  *  both — `key?` is `Map#has` on a Map receiver AND ruby-compat's `hasKey` on
- *  an object one — and either spelling is the whole call. */
-export function jsEnumerableAliases(rubyCall: string): string[] {
+ *  an object one — and either spelling is the whole call.
+ *
+ *  `receiverKinds` is the Ruby body's `callReceivers` entry for the name
+ *  (extract-ruby-api.rb#receiver_kind), which the ruby-compat half needs to
+ *  admit a row whose bare name is ambiguous across receivers — `Hash#merge` vs
+ *  `Relation#merge`. Absent, only the rows that resolve from the name alone
+ *  are consulted; the two tables above never look at a receiver. */
+export function jsEnumerableAliases(rubyCall: string, receiverKinds?: readonly string[]): string[] {
   const aliases = JS_ENUMERABLE_ALIASES.get(rubyCall) ?? FS_ADAPTER_ALIASES.get(rubyCall);
-  return [...new Set([...(aliases ?? []), ...rubyCompatAliases(rubyCall)])];
+  return [...new Set([...(aliases ?? []), ...rubyCompatAliases(rubyCall, receiverKinds)])];
 }
 
 /**

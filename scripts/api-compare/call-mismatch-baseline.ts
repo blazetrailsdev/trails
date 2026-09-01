@@ -113,6 +113,10 @@ interface ArtifactMismatch {
   tsFile: string;
   rubyName: string;
   missing: string[];
+  /** The Ruby body's receiver kinds for the flagged calls (RFC 0129), which
+   *  the ruby-compat report keys its rows on. Optional so an artifact
+   *  predating the field still loads; no gate reads it. */
+  receivers?: Record<string, string[]>;
 }
 
 export interface Artifact {

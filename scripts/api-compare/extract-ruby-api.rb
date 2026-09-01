@@ -340,6 +340,10 @@ class ApiExtractor
     # rel_path → Set of constant names whose RHS is an Array or Hash LITERAL,
     # whatever its elements are (see collection_constant_receiver?).
     @file_collection_constants = {}
+    # rel_path → Set of constant names whose RHS is a Hash LITERAL — the Hash
+    # half of @file_collection_constants, which conflates the two (see
+    # receiver_kind: `MIME_TYPES.fetch` is provably `Hash#fetch`).
+    @file_hash_constants = {}
     # rel_path → Set of Ruby Hash KEY names declared in that file: the literal
     # keys of a Hash-constant assignment (`PARSING`, xml_mini.rb:67-88) and the
     # Symbol keys an options hash is read by in a method body (`@options.fetch(
@@ -355,6 +359,11 @@ class ApiExtractor
     # The named-capture locals bound by the method body currently being walked
     # (see named_capture_locals).
     @capture_locals = Set.new
+    # call name => Set of receiver kinds seen at its sites in the method body
+    # currently being walked (see receiver_kind).
+    @call_receivers = {}
+    # The locals of that body that are provably a Hash (see hash_typed_locals).
+    @hash_locals = Set.new
     @namespace_stack = []
     @visibility_stack = [:public]
     # Tracks whether the current module-scope is under a bare `module_function`
@@ -767,7 +776,7 @@ class ApiExtractor
     body = node[3]
     mark_symbol_discriminated(params, body)
     dep_info = detect_deps(body)
-    calls, weak_calls = collect_method_calls(body)
+    calls, weak_calls, call_receivers = collect_method_calls(body, find_params(node))
 
     method_info = {
       name: name,
@@ -780,6 +789,7 @@ class ApiExtractor
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
     method_info[:weakCalls] = weak_calls unless weak_calls.empty?
+    method_info[:callReceivers] = call_receivers unless call_receivers.empty?
     call_args = collect_call_args(body)
     method_info[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
@@ -827,7 +837,7 @@ class ApiExtractor
     body = node[5]
     mark_symbol_discriminated(params, body)
     dep_info = detect_deps(body)
-    calls, weak_calls = collect_method_calls(body)
+    calls, weak_calls, call_receivers = collect_method_calls(body, find_params_defs(node))
 
     method_info = {
       name: name,
@@ -840,6 +850,7 @@ class ApiExtractor
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     method_info[:calls] = calls unless calls.empty?
     method_info[:weakCalls] = weak_calls unless weak_calls.empty?
+    method_info[:callReceivers] = call_receivers unless call_receivers.empty?
     call_args = collect_call_args(body)
     method_info[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
@@ -2330,16 +2341,162 @@ class ApiExtractor
     @capture_locals.include?(name)
   end
 
-  # Returns [calls, weak_calls]: the de-duplicated call names, and the subset
-  # whose EVERY occurrence had an inert receiver (see walk_for_calls).
-  def collect_method_calls(body_node)
+  # Returns [calls, weak_calls, call_receivers]: the de-duplicated call names,
+  # the subset whose EVERY occurrence had an inert receiver (see
+  # walk_for_calls), and the receiver kinds each name's sites had (RFC 0129,
+  # see receiver_kind).
+  def collect_method_calls(body_node, params_node = nil)
     calls = []
     weak = []
-    with_capture_locals { walk_for_calls(body_node, calls, weak) }
-    calls = drop_raised_new(calls)
+    receivers = {}
+    with_capture_locals do
+      with_call_receivers(body_node, params_node) do
+        walk_for_calls(body_node, calls, weak)
+        calls = drop_raised_new(calls)
+        receivers = call_receiver_kinds(calls.uniq)
+      end
+    end
     total = calls.tally
     weak_calls = weak.tally.select { |name, n| total[name] == n }.keys
-    [calls.uniq, weak_calls]
+    [calls.uniq, weak_calls, receivers]
+  end
+
+  def with_call_receivers(body_node, params_node)
+    outer_receivers = @call_receivers
+    outer_hash_locals = @hash_locals
+    @call_receivers = {}
+    @hash_locals = hash_typed_locals(body_node, params_node)
+    yield
+  ensure
+    @call_receivers = outer_receivers
+    @hash_locals = outer_hash_locals
+  end
+
+  # call name => its sites' receiver kinds, SORTED. A name whose every
+  # occurrence was an unqualified (implicit-self) call is omitted — that is most
+  # of them, and the field exists to say what a QUALIFIED receiver was — but a
+  # name called both ways still records `self` beside the other kinds, so a
+  # consumer keying on the kind set sees every occurrence or none, the same
+  # all-sites discipline `weak_calls` has.
+  def call_receiver_kinds(names)
+    kinds = {}
+    names.each do |name|
+      seen = @call_receivers[name]
+      next if seen.nil? || seen == Set["self"]
+
+      kinds[name] = seen.to_a.sort
+    end
+    kinds
+  end
+
+  # The coarse receiver kind of one call SITE (RFC 0129). `calls` records names
+  # alone, so `options.fetch` (a Hash) and `cache.fetch`
+  # (`ActiveSupport::Cache::Store`) are one call to every consumer; the kind is
+  # what lets the ruby-compat table admit a row keyed `Hash#fetch` without
+  # crediting the Rails one. Only shapes Ripper PROVES are named for their
+  # class — a literal, or a local hash_typed_locals proved — and everything
+  # else is recorded by shape (`local`, `ivar`, `const`, `expr`), never guessed
+  # at, so a row keyed `hash` can only ever match a Hash.
+  def receiver_kind(recv)
+    return "self" if recv.nil?
+    return "expr" unless recv.is_a?(Array)
+
+    case recv[0]
+    when :hash, :bare_assoc_hash then "hash"
+    when :array then "array"
+    when :string_literal then "string"
+    when :symbol_literal, :dyna_symbol then "symbol"
+    when :regexp_literal then "regexp"
+    when :@int, :@float then "numeric"
+    when :var_ref then var_ref_receiver_kind(recv[1])
+    when :const_path_ref, :top_const_ref then "const"
+    else "expr"
+    end
+  end
+
+  # The `:var_ref` half of receiver_kind. Ripper emits `:@ident` under a
+  # `:var_ref` only for an in-scope LOCAL — a bare method call on self is a
+  # `:vcall`, which receiver_kind leaves an `expr` — so the name spaces below
+  # cannot collide. Same discriminator inert_receiver? reads.
+  def var_ref_receiver_kind(inner)
+    return "expr" unless inner.is_a?(Array)
+
+    case inner[0]
+    when :@ident then @hash_locals.include?(inner[1]) ? "hash" : "local"
+    when :@ivar then "ivar"
+    when :@const then hash_constant?(inner[1]) ? "hash" : "const"
+    when :@kw then inner[1] == "self" ? "self" : "expr"
+    else "expr"
+    end
+  end
+
+  # A constant THIS FILE assigns a hash literal — `MIME_TYPES` (rack/mime.rb:8),
+  # `STATUS_CODES` (rack/utils.rb) — so `MIME_TYPES.fetch(ext)` is provably
+  # `Hash#fetch`. A constant declared elsewhere is not proven and stays `const`.
+  def hash_constant?(name)
+    (@file_hash_constants[@current_file] || Set.new).include?(name)
+  end
+
+  # The body's locals that are provably a Hash: a `**opts` parameter, an
+  # optional parameter defaulting to a hash literal (`def initialize(options =
+  # {})`), and a local whose EVERY assignment in the body is a hash literal.
+  # One assignment of anything else disqualifies the name, which is what keeps
+  # `hash` a proof rather than a guess — an `options = other_thing` reassignment
+  # leaves the local a plain `local`.
+  def hash_typed_locals(body_node, params_node)
+    assigned = {}
+    hash_param_names(params_node).each { |name| assigned[name] = true }
+    note_hash_assignments(body_node, assigned)
+    assigned.select { |_name, hashy| hashy }.keys.to_set
+  end
+
+  # `**opts` and `options = {}` — the parameter shapes whose value IS a Hash on
+  # entry. A `*args` rest is an Array and a required parameter is anything.
+  def hash_param_names(params_node)
+    return [] unless params_node.is_a?(Array) && params_node[0] == :params
+
+    _, _required, optional, _rest, _post, _keywords, keyword_rest, _block = params_node
+    names = (optional || []).filter_map do |p|
+      ident_name(p[0]) if p.is_a?(Array) && p[1].is_a?(Array) && p[1][0] == :hash
+    end
+    names << ident_name(keyword_rest) if keyword_rest && keyword_rest != 0
+    names.compact
+  end
+
+  # Every `x = …` / `x ||= …` in the body, recording whether the value is a hash
+  # literal. A `:massign` target is recorded UNKNOWN rather than skipped: its
+  # value is one element of an unwalked right-hand side.
+  def note_hash_assignments(node, assigned)
+    return unless node.is_a?(Array)
+
+    case node[0]
+    when :assign, :opassign
+      name = assign_target_local(node[1])
+      value = node[2]
+      hashy = value.is_a?(Array) && %i[hash bare_assoc_hash].include?(value[0])
+      assigned[name] = (assigned.fetch(name, true) && hashy) if name
+    when :massign
+      each_massign_target(node[1]) { |name| assigned[name] = false }
+    end
+    node.each { |child| note_hash_assignments(child, assigned) if child.is_a?(Array) }
+  end
+
+  # The local a `:var_field` assignment target names, or nil for an ivar,
+  # constant, index or attribute target — none of which is a local at all.
+  def assign_target_local(target)
+    return nil unless target.is_a?(Array) && target[0] == :var_field
+
+    inner = target[1]
+    inner[1] if inner.is_a?(Array) && inner[0] == :@ident
+  end
+
+  def each_massign_target(targets, &block)
+    return unless targets.is_a?(Array)
+
+    name = assign_target_local(targets)
+    return block.call(name) if name
+
+    targets.each { |child| each_massign_target(child, &block) if child.is_a?(Array) }
   end
 
   # Every syntactic call site in the body, in source order, with its argument
@@ -2580,6 +2737,7 @@ class ApiExtractor
   def maybe_record_collection_constant(name, rhs)
     return unless rhs.is_a?(Array) && COLLECTION_LITERAL_NODES.include?(rhs[0])
     (@file_collection_constants[@current_file] ||= Set.new) << name
+    (@file_hash_constants[@current_file] ||= Set.new) << name if rhs[0] == :hash
   end
 
   def unwrap_freeze(node) # `[...].freeze` → receiver node; otherwise unchanged
@@ -2909,6 +3067,7 @@ class ApiExtractor
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
        !(name == "new" && recv && proc_new_receiver?(recv))
       calls << name
+      (@call_receivers[name] ||= Set.new) << receiver_kind(recv)
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
     end
 

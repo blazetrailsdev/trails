@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AMBIGUOUS_RUBY_CALLS,
+  RECEIVER_KEYED_RUBY_COMPAT_EXPORTS,
   RUBY_COMPAT_EXPORTS,
   rubyCallName,
   rubyCompatAliases,
@@ -14,7 +15,9 @@ describe("RUBY_COMPAT_EXPORTS", () => {
   });
 
   it("gives every excluded member the homonym that excludes it", () => {
-    for (const reason of AMBIGUOUS_RUBY_CALLS.values()) expect(reason).toMatch(/`.+`/);
+    // A burndown that has reached zero, so the loop is vacuous today; the
+    // invariant is asserted whole so a row that comes back is still held to it.
+    expect([...AMBIGUOUS_RUBY_CALLS.values()].every((reason) => /`.+`/.test(reason))).toBe(true);
   });
 
   it("keeps the folded CORE_LIBRARY_ALIASES entry", () => {
@@ -29,6 +32,24 @@ describe("RUBY_COMPAT_EXPORTS", () => {
   });
 });
 
+describe("RECEIVER_KEYED_RUBY_COMPAT_EXPORTS", () => {
+  it("keys every row by an MRI spelling", () => {
+    for (const mri of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS.keys())
+      expect(mri).toMatch(/^[A-Z]\w*[#.]\S+$/);
+  });
+
+  it("gives every row a receiver its own MRI key names", () => {
+    for (const [mri, row] of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS)
+      expect(mri.toLowerCase().startsWith(row.receiver)).toBe(true);
+  });
+
+  it("takes no row the unconditional table already claims by bare name", () => {
+    const unconditional = new Set([...RUBY_COMPAT_EXPORTS.keys()].map(rubyCallName));
+    for (const mri of RECEIVER_KEYED_RUBY_COMPAT_EXPORTS.keys())
+      expect(unconditional).not.toContain(rubyCallName(mri));
+  });
+});
+
 describe("rubyCompatExport", () => {
   it("resolves an unambiguous Ruby core call to its ruby-compat export", () => {
     expect(rubyCompatExport("key?")).toBe("hasKey");
@@ -40,6 +61,29 @@ describe("rubyCompatExport", () => {
       expect(rubyCompatExport(call)).toBeUndefined();
       expect(rubyCompatAliases(call)).toEqual([]);
     }
+  });
+
+  it("resolves a receiver-keyed row only where every site proves the receiver", () => {
+    expect(rubyCompatExport("fetch", ["hash"])).toBe("fetch");
+    expect(rubyCompatExport("merge!", ["hash"])).toBe("mergeBang");
+    expect(rubyCompatExport("to_s", ["symbol"])).toBe("symbolToS");
+    expect(rubyCompatExport("succ", ["string"])).toBe("succ");
+    // `cache.fetch` records `local`, and a body mixing the two proves neither.
+    expect(rubyCompatExport("fetch", ["local"])).toBeUndefined();
+    expect(rubyCompatExport("fetch", ["hash", "local"])).toBeUndefined();
+    expect(rubyCompatExport("to_s", ["ivar"])).toBeUndefined();
+    expect(rubyCompatExport("succ", ["numeric"])).toBeUndefined();
+  });
+
+  it("ignores a receiver on a row that resolves from the bare name alone", () => {
+    expect(rubyCompatExport("key?", ["local"])).toBe("hasKey");
+    expect(rubyCompatExport("escape", ["const"])).toBe("regexpEscape");
+  });
+
+  it("forwards the receiver through jsEnumerableAliases", () => {
+    expect(jsEnumerableAliases("merge", ["hash"])).toEqual(["merge"]);
+    expect(jsEnumerableAliases("merge")).toEqual([]);
+    expect(jsEnumerableAliases("reject", ["hash"])).toEqual(["filter", "reject"]);
   });
 
   it("forwards a Ruby core call through jsEnumerableAliases", () => {
