@@ -14,8 +14,6 @@ const createBuilderWithArPlugin = createArSolutionBuilder;
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
-// The published `trails-tsc` bin, NOT dist/tsc-wrapper/cli.js — every
-// consumer goes through the bin, and it is the bin that once ran nothing.
 const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../bin/trails-tsc.js");
 const CLI_DIST_PATH = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
 // CLI-binary tests skip when dist isn't built (CI jobs that skip
@@ -90,10 +88,6 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
     30_000,
   );
 
-  // Regression: the bin was `import "../dist/tsc-wrapper/cli.js"`, whose
-  // entry guard compares `import.meta.url` to argv[1] — the bin, a different
-  // file — so `main()` never ran and every `trails-tsc` invocation exited 0
-  // without type-checking anything.
   itIfCliBin(
     "CLI binary exits non-zero on a fixture with a type error",
     async () => {
