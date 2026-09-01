@@ -281,13 +281,24 @@ export function deepSymbolizeKeysBang(hash: AnyObject): AnyObject {
 /**
  * Support method for deep transforming nested hashes and arrays — Ruby's
  * private `Hash#_deep_transform_keys_in_object` (core_ext/hash/keys.rb:116-125).
+ *
+ * Ruby's `when Hash` arm covers both trails spellings of a Ruby Hash — a plain
+ * object and `@blazetrails/ruby-compat`'s `Hash`, which is what
+ * `HashWithIndifferentAccess#toHash` now answers — so the `Map` arm builds the
+ * plain-object spelling of the same value.
  * @internal
  */
 export function _deepTransformKeysInObject(
   object: unknown,
   block: (key: string) => string,
 ): unknown {
-  if (isPlainObject(object)) {
+  if (object instanceof Map) {
+    const result: AnyObject = {};
+    for (const [key, value] of object) {
+      result[block(String(key))] = _deepTransformKeysInObject(value, block);
+    }
+    return result;
+  } else if (isPlainObject(object)) {
     const result: AnyObject = {};
     for (const key of Object.keys(object)) {
       result[block(key)] = _deepTransformKeysInObject(object[key], block);
@@ -303,14 +314,18 @@ export function _deepTransformKeysInObject(
 /**
  * Ruby's private `Hash#_deep_transform_keys_in_object!`
  * (core_ext/hash/keys.rb:127-138). Ruby's `Array#map!` mutates in place; so
- * does this, so array identity survives the transform as it does in Ruby.
+ * does this, so array identity survives the transform as it does in Ruby. A
+ * `Map` receiver has no key-preserving in-place spelling of a rename, so it
+ * goes through the non-bang arm.
  * @internal
  */
 export function _deepTransformKeysInObjectBang(
   object: unknown,
   block: (key: string) => string,
 ): unknown {
-  if (isPlainObject(object)) {
+  if (object instanceof Map) {
+    return _deepTransformKeysInObject(object, block);
+  } else if (isPlainObject(object)) {
     for (const key of Object.keys(object)) {
       const value = object[key];
       delete object[key];

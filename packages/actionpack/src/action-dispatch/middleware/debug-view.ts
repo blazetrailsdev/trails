@@ -14,6 +14,7 @@
  */
 
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
+import { deepStringifyKeys } from "@blazetrails/activesupport";
 
 const TEMPLATES_URL = new URL("./templates", import.meta.url).href;
 
@@ -58,10 +59,14 @@ export class DebugView {
   }
 
   debugHash(object: { toHash?: () => Record<string, unknown> } | Record<string, unknown>): string {
-    const hash =
-      typeof (object as { toHash?: () => Record<string, unknown> }).toHash === "function"
-        ? (object as { toHash: () => Record<string, unknown> }).toHash()
-        : (object as Record<string, unknown>);
+    const converted =
+      typeof (object as { toHash?: () => unknown }).toHash === "function"
+        ? (object as { toHash: () => unknown }).toHash()
+        : object;
+    const hash = (converted instanceof Map ? deepStringifyKeys(converted) : converted) as Record<
+      string,
+      unknown
+    >;
     const keys = Object.keys(hash).sort();
     return keys
       .map((k) => {

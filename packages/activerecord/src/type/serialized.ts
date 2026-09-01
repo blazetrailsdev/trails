@@ -1,5 +1,5 @@
 import { Type, ValueType, BinaryData } from "@blazetrails/activemodel";
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, deepStringifyKeys } from "@blazetrails/activesupport";
 import { IndifferentHashAccessor } from "../store.js";
 
 /** @internal */
@@ -39,6 +39,7 @@ function unwrapHash(value: unknown): unknown {
     typeof (value as { toHash?: unknown }).toHash === "function"
   ) {
     value = (value as { toHash(): unknown }).toHash();
+    if (value instanceof Map) value = deepStringifyKeys(value);
   }
   return value;
 }

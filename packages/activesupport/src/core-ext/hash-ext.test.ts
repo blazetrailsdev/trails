@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { extractBang } from "./hash/slice.js";
+import { extractBang, sliceBang } from "./hash/slice.js";
 import { RuntimeError } from "../rexml/document.js";
 import * as XmlMini from "../xml-mini.js";
 import * as XmlMini_REXML from "../xml-mini/rexml.js";
@@ -20,7 +20,7 @@ import {
   assertValidKeys,
   slice,
 } from "../hash-utils.js";
-import { except } from "@blazetrails/ruby-compat";
+import { Hash, except } from "@blazetrails/ruby-compat";
 
 describe("HashExtTest", () => {
   it("methods", () => {
@@ -251,15 +251,28 @@ describe("HashExtTest", () => {
   });
 
   it("slice bang does not override default", () => {
-    const h = { a: 1, b: 2 };
-    const result = slice(h, "a");
-    expect(result).toEqual({ a: 1 });
+    const hash = new Hash<string, number>(0);
+    hash.set("a", 1);
+    hash.set("b", 2);
+
+    sliceBang(hash, "a");
+
+    expect([...hash.keys()]).toEqual(["a"]);
+    expect(hash.get("c")).toBe(0);
   });
 
   it("slice bang does not override default proc", () => {
-    const h = { a: 1, b: 2, c: 3 };
-    const result = slice(h, "a", "c");
-    expect(result).toEqual({ a: 1, c: 3 });
+    const hash = new Hash<string, unknown>((h: Hash<string, unknown>, k: string) => {
+      h.set(k, []);
+      return h.get(k);
+    });
+    hash.set("a", 1);
+    hash.set("b", 2);
+
+    sliceBang(hash, "a");
+
+    expect([...hash.keys()]).toEqual(["a"]);
+    expect(hash.get("c")).toEqual([]);
   });
 
   it("extract", () => {
