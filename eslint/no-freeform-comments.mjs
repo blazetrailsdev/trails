@@ -107,17 +107,17 @@ const DIRECTIVE_RE =
 const KEPT_TAG_NAMES =
   "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|empty|deprecated";
 
+const KEPT_TAG_NAME_SET = new Set(KEPT_TAG_NAMES.split("|"));
+
 /**
  * A kept tag, which must LEAD its line — read through `jsdoc-tag-line.mjs`, the
  * one parse `scripts/api-compare/extract-ts-api.ts` and the receipt lints share
- * (RFC 0129). A tag
- * matched mid-sentence reads a quoted mention inside a reason as a second tag:
- * `which is itself \`@noRailsEquivalent PERMANENT\` for ...` then mints a
- * duplicate, and TypeScript truncates the real reason at it.
+ * (RFC 0129), so a shape this rule keeps is a shape the extractor mints a tag
+ * from. A tag matched mid-sentence reads a quoted mention inside a reason as a
+ * second tag: `which is itself \`@noRailsEquivalent PERMANENT\` for ...` then
+ * mints a duplicate, and TypeScript truncates the real reason at it. A
+ * hang-indented `@` line is a CONTINUATION, not a tag, for the same reason.
  */
-const KEPT_TAG_NAME_SET = new Set(KEPT_TAG_NAMES.split("|"));
-
-/** A kept tag OPENING its line, read through the one shared parse. */
 function keptLineLeadingTag(line) {
   const opened = lineLeadingTag(line);
   return opened !== null && KEPT_TAG_NAME_SET.has(opened.name) ? opened : null;

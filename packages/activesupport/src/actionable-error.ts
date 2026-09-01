@@ -66,8 +66,8 @@ export class ActionableError extends Error {
    * @missingRailsCall call — PERMANENT: Ruby's `Proc#call` on the fetched action
    *   is JS function invocation, which has no named call form.
    * @missingRailsArgs fetch — PERMANENT: `@blazetrails/ruby-compat`'s `fetch` takes
-   *   the Hash Ruby calls it ON as its first argument, so every call site of it
-   *   carries one argument more than the Ruby.
+   *   the Hash Ruby calls it ON as its first argument, so this site passes
+   *   `(actions, name)` where `actions(error).fetch(name)` passes `name` alone.
    */
   static dispatch(error: any, name: string): void {
     try {

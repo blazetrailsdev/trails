@@ -27,7 +27,6 @@ export class JSONGemEncoder {
    * Rails escapes more than the JSON gem natively does: U+2028 and U+2029, and
    * optionally `>`, `<`, `&`, to work around certain browser problems
    * (encoding.rb:60-70).
-   *
    */
   encode(value: unknown): string {
     if (!isEmpty(this.options)) {

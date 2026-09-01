@@ -1,5 +1,3 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
-
 /**
  * Ruby-style `include` for mixing module methods into a class.
  *
@@ -20,6 +18,8 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
  *   // Include it into a class
  *   include(Relation, QueryMethods);
  */
+
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 type AnyClass = new (...args: any[]) => any;
 type ModuleObject = Record<string, any>;
