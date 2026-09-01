@@ -14,6 +14,14 @@
       "types": "./dist/include.d.ts",
       "default": "./dist/include.js"
     },
+    "./method-missing-proxy": {
+      "types": "./dist/method-missing-proxy.d.ts",
+      "default": "./dist/method-missing-proxy.js"
+    },
+    "./name-error": {
+      "types": "./dist/name-error.d.ts",
+      "default": "./dist/name-error.js"
+    },
     "./range": {
       "types": "./dist/range.d.ts",
       "default": "./dist/range.js"
