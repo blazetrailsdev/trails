@@ -19,7 +19,7 @@
 
 import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
-import { AbstractSecureStore, SessionId, type SessionOptions } from "./abstract-store.js";
+import { AbstractSecureStore, SessionId } from "./abstract-store.js";
 
 export interface CacheStoreSessionOptions {
   cache?: CacheStoreLike;
@@ -74,13 +74,13 @@ export class CacheStore extends AbstractSecureStore {
     _env: unknown,
     sid: SessionId,
     session: Record<string, unknown> | null,
-    options?: SessionOptions,
+    options?: Record<string, unknown>,
   ): SessionId {
     const key = this.cacheKey(sid.privateId);
     if (session) {
       // Rails: `expires_in: options[:expire_after]` (seconds). The activesupport
       // CacheStore takes milliseconds, so convert at the boundary.
-      const expireAfter = options?.get("expireAfter") as number | undefined;
+      const expireAfter = options?.["expireAfter"] as number | undefined;
       const expiresIn = expireAfter != null ? expireAfter * 1000 : undefined;
       this.cache.write(key, session, { expiresIn });
     } else {
@@ -90,7 +90,7 @@ export class CacheStore extends AbstractSecureStore {
   }
 
   /** Remove a session from the cache. */
-  deleteSession(_env: unknown, sid: SessionId, _options?: SessionOptions): SessionId {
+  deleteSession(_env: unknown, sid: SessionId, _options?: Record<string, unknown>): SessionId {
     this.cache.delete(this.cacheKey(sid.privateId));
     this.cache.delete(this.cacheKey(sid.publicId));
     return this.generateSid();

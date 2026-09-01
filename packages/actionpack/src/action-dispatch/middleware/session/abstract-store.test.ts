@@ -15,7 +15,6 @@ import {
   SessionRestoreError,
   StaleSessionCheck,
 } from "./abstract-store.js";
-import type { SessionOptions } from "./abstract-store.js";
 
 describe("ActionDispatch::Session::AbstractStore", () => {
   describe("Compatibility", () => {
@@ -188,8 +187,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
   });
 
   describe("#security_matches?", () => {
-    const options = (hash: Record<string, unknown>): SessionOptions =>
-      ({ get: (key: string) => hash[key] }) as unknown as SessionOptions;
+    const options = (hash: Record<string, unknown>): Record<string, unknown> => hash;
 
     it("#security_matches? returns true if secure cookie is off", () => {
       const pers = new Persisted();
