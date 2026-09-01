@@ -83,7 +83,7 @@ export class Deflater {
       const mediaType = (headers[CONTENT_TYPE] || "").split(";")[0].trim();
       if (!this.include.includes(mediaType)) return false;
     }
-    if (this.condition && !this.condition.call(this, env, status, headers, body)) return false;
+    if (this.condition && !this.condition.call(undefined, env, status, headers, body)) return false;
     if (headers[CONTENT_LENGTH] === "0") return false;
     return true;
   }

@@ -518,13 +518,12 @@ export class Response {
   /**
    * Mirrors: `has_header?` (response.rb:192), `@headers.key? key`. Rails'
    * `@headers` is a `Rack::Headers`, which downcases every key on write, so its
-   * `key?` is case-insensitive; this file normalizes at the read site instead,
-   * which is where the same fold has to happen.
+   * `key?` is case-insensitive over one lookup; this file normalizes at the
+   * READ site instead, so the second arm delegates that fold to
+   * {@link Response#getHeader} rather than repeating its scan.
    */
   hasHeader(key: string): boolean {
-    if (hasKey(this._headers, key)) return true;
-    const lower = key.toLowerCase();
-    return Object.keys(this._headers).some((k) => k.toLowerCase() === lower);
+    return hasKey(this._headers, key) || this.getHeader(key) !== undefined;
   }
   get responseCode(): number {
     return this._status;
