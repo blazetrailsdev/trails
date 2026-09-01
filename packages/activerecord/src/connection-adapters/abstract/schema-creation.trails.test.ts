@@ -21,23 +21,21 @@ beforeAll(async () => {
 
 describe("SchemaCreation#typeToSql blank type guard", () => {
   it("throws a descriptive error for an empty custom type", () => {
-    expect(() => new SchemaCreation(conn).typeToSql("" as any)).toThrow(/empty or blank type/);
+    expect(() => conn.typeToSql("" as any)).toThrow(/empty or blank type/);
   });
 
   it("throws a descriptive error for a whitespace-only custom type", () => {
-    expect(() => new SchemaCreation(conn).typeToSql("   " as any)).toThrow(/empty or blank type/);
+    expect(() => conn.typeToSql("   " as any)).toThrow(/empty or blank type/);
   });
 });
 
 describe("SchemaCreation#typeToSql virtual / nil pass-through", () => {
   it("returns '' for a nil type (Rails type_to_sql: type.to_s of nil)", () => {
-    expect(new SchemaCreation(conn).typeToSql(undefined as any)).toBe("");
+    expect(conn.typeToSql(undefined as any)).toBe("");
   });
 
   it("passes 'virtual' through verbatim, with no options.type/string fallback", () => {
-    expect(new SchemaCreation(conn).typeToSql("virtual" as any, { type: "integer" } as any)).toBe(
-      "virtual",
-    );
+    expect(conn.typeToSql("virtual" as any, { type: "integer" } as any)).toBe("virtual");
   });
 });
 
@@ -186,14 +184,14 @@ describe("SchemaCreation#quotedColumns delegates to the connection", () => {
 
 describe("SchemaCreation#typeToSql decimal precision/scale", () => {
   it("raises when a decimal scale is given without a precision", () => {
-    expect(() => new SchemaCreation(conn).typeToSql("decimal", { scale: 2 })).toThrow(
+    expect(() => conn.typeToSql("decimal", { scale: 2 })).toThrow(
       "Error adding decimal column: precision cannot be empty if scale is specified",
     );
   });
 
   it("honors precision and scale when both are given", () => {
     expect(
-      new SchemaCreation(conn).typeToSql("decimal", {
+      conn.typeToSql("decimal", {
         precision: 8,
         scale: 2,
       }),
@@ -201,7 +199,7 @@ describe("SchemaCreation#typeToSql decimal precision/scale", () => {
   });
 
   it("emits a bare decimal with no precision when none is given", () => {
-    expect(new SchemaCreation(conn).typeToSql("decimal")).toBe("decimal");
+    expect(conn.typeToSql("decimal")).toBe("decimal");
   });
 });
 

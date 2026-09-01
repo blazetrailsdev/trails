@@ -4,7 +4,6 @@ import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
-import { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
 import {
   ActiveRecord,
@@ -445,7 +444,7 @@ describe("AdapterTest", () => {
 
   it("type_to_sql returns a String for unmapped types", async () => {
     const conn = await Base.leaseConnection();
-    expect(new SchemaCreation(conn as never).typeToSql("special_db_type" as any)).toBe(
+    expect((conn as never as { typeToSql(t: string): string }).typeToSql("special_db_type")).toBe(
       "special_db_type",
     );
   });

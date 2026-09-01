@@ -1,7 +1,6 @@
 import {
   type ColumnType,
   type ColumnOptions,
-  type AddColumnOptions,
   type ReferentialAction,
   ColumnDefinition,
   AddColumnDefinition,
@@ -14,7 +13,6 @@ import {
   PrimaryKeyDefinition,
   TableDefinition,
 } from "./schema-definitions.js";
-import { type NativeDatabaseType, type NativeDatabaseTypes } from "./native-database-types.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
@@ -31,7 +29,7 @@ type Definition =
   | PrimaryKeyDefinition;
 
 export interface SchemaCreationConn extends SchemaQuoter {
-  nativeDatabaseTypes(): NativeDatabaseTypes;
+  typeToSql(type: ColumnType, options?: ColumnOptions): string;
   supportsCheckConstraints(): Promise<boolean>;
   supportsExclusionConstraints(): boolean;
   supportsIndexInclude(): Promise<boolean>;
@@ -52,6 +50,8 @@ interface IndexVisitor {
 }
 
 export class SchemaCreation {
+  private cache = new Map<abstract new (...args: never[]) => object, string>();
+
   constructor(protected conn: SchemaCreationConn) {}
 
   protected supportsPartialIndex(): boolean {
@@ -110,18 +110,14 @@ export class SchemaCreation {
    * @missingRailsCall last — PERMANENT
    * @missingRailsCall split — PERMANENT
    */
-  async accept(o: Definition): Promise<string> {
-    if (o instanceof TableDefinition) return this.visitTableDefinition(o);
-    if (o instanceof AlterTable) return this.visitAlterTable(o);
-    if (o instanceof AddColumnDefinition) return this.visitAddColumnDefinition(o);
-    if (o instanceof ColumnDefinition) return this.visitColumnDefinition(o);
-    if (o instanceof CreateIndexDefinition) return this.visitCreateIndexDefinition(o);
-    if (o instanceof IndexDefinition)
-      return (this as unknown as IndexVisitor).visitIndexDefinition(o);
-    if (o instanceof ForeignKeyDefinition) return this.visitForeignKeyDefinition(o);
-    if (o instanceof CheckConstraintDefinition) return this.visitCheckConstraintDefinition(o);
-    if (o instanceof PrimaryKeyDefinition) return this.visitPrimaryKeyDefinition(o);
-    throw new Error(`Unknown definition type: ${(o as any).constructor.name}`);
+  async accept(o: object): Promise<string> {
+    const klass = o.constructor as abstract new (...args: never[]) => object;
+    let m = this.cache.get(klass);
+    if (m === undefined) {
+      m = `visit${o.constructor.name}`;
+      this.cache.set(klass, m);
+    }
+    return (this as unknown as Record<string, (o: object) => Promise<string> | string>)[m](o);
   }
 
   protected async visitTableDefinition(o: TableDefinition): Promise<string> {
@@ -288,7 +284,8 @@ export class SchemaCreation {
     return `CONSTRAINT ${o.name} CHECK (${o.expression})`;
   }
 
-  async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
+  /** @internal */
+  protected async addColumnOptionsBang(sql: string, options: ColumnOptions): Promise<string> {
     if (this.optionsIncludeDefault(options)) {
       sql += ` DEFAULT ${await this.conn.quoteDefaultExpression(
         options.default,
@@ -312,59 +309,9 @@ export class SchemaCreation {
     return !(options.null === false && options.default === null);
   }
 
-  protected validateDecimalPrecision(options: ColumnOptions): void {
-    if (options.precision == null && options.scale != null)
-      throw new ArgumentError(
-        "Error adding decimal column: precision cannot be empty if scale is specified",
-      );
-  }
-
   /** @internal */
-  protected nativeDatabaseTypes(): NativeDatabaseTypes {
-    return this.conn.nativeDatabaseTypes();
-  }
-
-  typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
-    let sql: string;
-    const native = type == null ? undefined : this.nativeDatabaseTypes()[type];
-    if (native === undefined) {
-      if (type == null) sql = "";
-      else if (!String(type).trim())
-        throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
-      else sql = String(type);
-    } else {
-      const spec: NativeDatabaseType = typeof native === "string" ? { name: native } : native;
-      sql = spec.name ?? String(type);
-      let { precision, scale, limit } = options;
-      if (type === "decimal") {
-        scale ??= spec.scale;
-        precision ??= spec.precision;
-        if (precision != null) {
-          sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
-        } else if (scale != null) {
-          this.validateDecimalPrecision(options);
-        }
-      } else if (
-        (type === "datetime" || type === "timestamp" || type === "time" || type === "interval") &&
-        (precision ??= spec.precision) != null
-      ) {
-        if (precision >= 0 && precision <= 6) {
-          sql += `(${precision})`;
-        } else {
-          throw new ArgumentError(
-            `No ${spec.name} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
-          );
-        }
-      } else if (type !== "primary_key" && (limit ??= spec.limit) != null) {
-        sql += `(${limit})`;
-      }
-    }
-
-    if (options.array && type !== "primary_key") {
-      throw new Error("Array columns are only supported on PostgreSQL");
-    }
-
-    return sql;
+  protected typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
+    return this.conn.typeToSql(type, options);
   }
 
   /** @internal */
@@ -411,11 +358,6 @@ export class SchemaCreation {
    */
   protected columnOptions(o: ColumnDefinition): Record<string, unknown> {
     return { ...o.options, column: o };
-  }
-
-  /** @internal */
-  protected addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
-    return this.addColumnOptions(sql, options);
   }
 
   /** @internal */

@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
-import { pgDatetimeConfig } from "./pg-datetime-config.js";
 import { quoteDefaultExpression } from "./quoting.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
 import { Column } from "./column.js";
@@ -16,7 +15,6 @@ import {
 
 const s = () =>
   new SchemaCreation({
-    nativeDatabaseTypes: () => ({}),
     supportsCheckConstraints: async () => true,
     supportsExclusionConstraints: () => true,
     supportsIndexInclude: async () => true,
@@ -212,23 +210,5 @@ describe("PostgreSQL SchemaCreation", () => {
       quotedIncludeColumnsForIndex: () => "<<delegated>>",
     } as any) as any;
     expect(await sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
-  });
-
-  it("resolves datetime through datetimeType with no adapter threaded", () => {
-    const hostless = new SchemaCreation({
-      quoteColumnName: (n: string) => `"${n}"`,
-      quoteTableName: (n: string) => `"${n}"`,
-      quoteDefaultExpression: (v: unknown) => ` DEFAULT ${v}`,
-    } as any);
-    expect(hostless.typeToSql("datetime", { precision: 6 })).toBe("timestamp(6)");
-    expect(hostless.typeToSql("primary_key")).toBe("bigserial primary key");
-
-    const original = pgDatetimeConfig.datetimeType;
-    try {
-      pgDatetimeConfig.datetimeType = "nonesuch";
-      expect(hostless.typeToSql("datetime", { precision: 6 })).toBe("datetime");
-    } finally {
-      pgDatetimeConfig.datetimeType = original;
-    }
   });
 });
