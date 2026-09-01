@@ -1,3 +1,4 @@
+import { TypeError } from "@blazetrails/ruby-compat";
 import { Nodes, Table, SelectManager, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
@@ -170,13 +171,6 @@ interface CalculationRelation {
 type AggFn = "count" | "sum" | "average" | "minimum" | "maximum";
 
 export type SumBlock = (record: any) => number | bigint;
-
-class TypeError extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TypeError";
-  }
-}
 
 function isCoerceNumericTypeName(name: string | undefined): boolean {
   if (!name) return true;

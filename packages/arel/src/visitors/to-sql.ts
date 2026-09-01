@@ -1,3 +1,4 @@
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { arelNode } from "../arel.js";
 import { Node } from "../nodes/node.js";
 import { SQLString } from "../collectors/sql-string.js";
@@ -10,13 +11,6 @@ export class UnsupportedVisitError extends Error {
   constructor(object: unknown) {
     super(`Unsupported argument type: ${constructorName(object)}. Construct an Arel node instead.`);
     this.name = "UnsupportedVisitError";
-  }
-}
-
-class NotImplementedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NotImplementedError";
   }
 }
 

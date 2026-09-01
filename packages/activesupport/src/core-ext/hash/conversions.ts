@@ -4,6 +4,7 @@
  * live at the trails seat for Hash core extensions, `hash-utils.ts`.
  */
 
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import * as XmlMini from "../../xml-mini.js";
 import { StringIO } from "../../string-io.js";
 import { isBlank, isPresent } from "../object/blank.js";
@@ -11,11 +12,6 @@ import { isEmpty } from "../../ruby-empty.js";
 import { wrap } from "../../array-utils.js";
 import { isPlainObject } from "../../hash-utils.js";
 import { inspect } from "../object/inspect.js";
-
-/** Mirrors Ruby's `RuntimeError` — what a bare `raise "message"` raises. */
-class RuntimeError extends Error {
-  override name = "RuntimeError";
-}
 
 /**
  * Raised if the XML contains attributes with type="yaml" or

@@ -298,6 +298,9 @@ importers:
       '@blazetrails/date':
         specifier: workspace:*
         version: link:../date
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/date:
     dependencies:
@@ -315,6 +318,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/html-sanitizer:
     dependencies:

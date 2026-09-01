@@ -9,6 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/date": "workspace:*"

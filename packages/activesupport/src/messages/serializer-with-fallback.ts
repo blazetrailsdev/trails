@@ -22,7 +22,7 @@
  * require to rescue.
  */
 
-import { ArgumentError, KeyError } from "@blazetrails/ruby-compat";
+import { ArgumentError, KeyError, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";
@@ -37,18 +37,7 @@ export type Format =
   | "message_pack"
   | "message_pack_allow_marshal";
 
-/**
- * Mirror of Ruby's `RuntimeError` — what Rails' bare
- * `raise "Unsupported serialization format"` produces. @internal
- */
-export class RuntimeError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RuntimeError";
-  }
-}
-
-export { ArgumentError };
+export { ArgumentError, RuntimeError };
 
 /** @internal */
 export class Thrown extends Error {

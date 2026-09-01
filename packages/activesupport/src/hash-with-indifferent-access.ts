@@ -17,7 +17,7 @@ import {
   symbolizeKeysBang,
 } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, TypeError } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
 
@@ -27,20 +27,6 @@ type AnyObject = Record<string, unknown>;
  * `nil` is told apart from an omitted argument.
  */
 const NOT_GIVEN: AnyObject = {};
-
-/**
- * Mirror of Ruby's `TypeError` — what `Hash#transform_keys!` raises for a `nil`
- * hash. Its throw site carries an eslint-disable because `rails-error-parity`
- * matches on the native name.
- * @internal
- */
-class TypeError extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TypeError";
-  }
-}
-
 /**
  * The `update`/`merge!` duplicate-key block (hash_with_indifferent_access.rb:127-131):
  * called with the key, the receiver's value and the other hash's value.

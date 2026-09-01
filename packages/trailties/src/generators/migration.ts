@@ -1,3 +1,5 @@
+import { NotImplementedError } from "@blazetrails/ruby-compat";
+export { NotImplementedError };
 import { camelize, getPath } from "@blazetrails/activesupport";
 import {
   CreateMigration,
@@ -28,8 +30,6 @@ export async function currentMigrationNumber(dirname: string): Promise<number> {
   }
   return max;
 }
-
-export class NotImplementedError extends Error {}
 export function nextMigrationNumber(): never {
   throw new NotImplementedError("nextMigrationNumber must be implemented");
 }

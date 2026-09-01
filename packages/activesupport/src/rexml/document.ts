@@ -11,6 +11,8 @@
  * bodies read as the Ruby ones.
  */
 
+import { RuntimeError } from "@blazetrails/ruby-compat";
+
 /**
  * Mirrors: REXML::ParseException.
  *
@@ -151,18 +153,7 @@ function escapeXml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/**
- * Mirrors: RuntimeError — what REXML raises when an entity expands past
- * `REXML::Security.entity_expansion_text_limit` / `entity_expansion_limit`, and
- * what `XMLMiniEngineTest#test_exception_thrown_on_expansion_attack` asserts
- * through `REXMLEngineTest#expansion_attack_error`
- * (activesupport/test/xml_mini/rexml_engine_test.rb:24-25).
- *
- * @noRailsEquivalent PERMANENT — Ruby core `RuntimeError`, not Rails.
- */
-export class RuntimeError extends Error {
-  override name = "RuntimeError";
-}
+export { RuntimeError };
 
 /** REXML::Security.entity_expansion_limit. */
 const ENTITY_EXPANSION_LIMIT = 10000;

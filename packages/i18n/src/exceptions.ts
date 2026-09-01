@@ -12,6 +12,7 @@
 
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
+import { ArgumentError as RubyArgumentError } from "@blazetrails/ruby-compat";
 
 /**
  * Ruby `Object#inspect`, as far as the values reaching this file go.
@@ -105,13 +106,14 @@ function inspectSymbolOrString(value: string): string {
 }
 
 /**
- * Mirrors: I18n::ArgumentError, the root of every error in this file.
+ * Mirrors: I18n::ArgumentError, the root of every error in this file —
+ * `class ArgumentError < ::ArgumentError` (i18n/lib/i18n/exceptions.rb:14).
  *
  * `message` is passed straight through rather than defaulting to `""`, so
  * `Error` installs no own `message` property when it is undefined — an own
  * property would shadow `MissingTranslation`'s computed getter.
  */
-export class ArgumentError extends Error {
+export class ArgumentError extends RubyArgumentError {
   constructor(message?: string) {
     super(message);
     this.name = "ArgumentError";

@@ -2,7 +2,7 @@
  * Mirrors: active_support/testing/time_helpers.rb
  */
 import { Date, DateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
@@ -10,11 +10,6 @@ import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
 import { change } from "../time-ext.js";
 import { isEmpty } from "../ruby-empty.js";
-
-/** Mirrors Ruby's `RuntimeError` — what a bare `raise "message"` raises. */
-class RuntimeError extends Error {
-  override name = "RuntimeError";
-}
 
 /** Mirrors the `Stub` Struct (time_helpers.rb:10). */
 class Stub {

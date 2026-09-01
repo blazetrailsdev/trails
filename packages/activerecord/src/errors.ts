@@ -1,3 +1,5 @@
+export { NotImplementedError } from "@blazetrails/ruby-compat";
+
 export class ActiveRecordError extends Error {
   constructor(message?: string, options?: ErrorOptions) {
     super(message, options);
@@ -143,13 +145,6 @@ export class DatabaseConnectionError extends ConnectionNotEstablished {
     return new DatabaseConnectionError(
       `There is an issue connecting to your database with your username/password, username: ${username}.\n\nPlease check your database configuration to ensure the username/password are valid.`,
     );
-  }
-}
-
-export class NotImplementedError extends ActiveRecordError {
-  constructor(message?: string, options?: ErrorOptions) {
-    super(message, options);
-    this.name = "NotImplementedError";
   }
 }
 

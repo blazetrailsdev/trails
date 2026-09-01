@@ -11,6 +11,7 @@ import {
   toSentence as _toSentence,
   type ToSentenceOptions,
 } from "./output-safety-helper.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 /**
  * ActionView::Helpers::TagHelper
@@ -114,13 +115,6 @@ const METHOD_TO_TAG_NAME: Record<string, string> = {
 function ensureValidHtml5TagName(name: string): void {
   if (!/^[a-zA-Z][a-zA-Z0-9\-:.]*$/.test(name)) {
     throw new ArgumentError(`Invalid HTML5 tag name: ${JSON.stringify(name)}`);
-  }
-}
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
   }
 }
 

@@ -1,5 +1,10 @@
 import { Entry } from "./entry.js";
-import { ArgumentError, regexpEscape } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NotImplementedError,
+  TypeError,
+  regexpEscape,
+} from "@blazetrails/ruby-compat";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
 import { getFormatVersion } from "./format-version-slot.js";
@@ -115,21 +120,6 @@ function Float(value: unknown): number {
 
 /** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
 const Zlib: CoderCompressor = { deflate, inflate };
-
-/**
- * Mirror of Ruby's `TypeError` — what `retrieve_pool_options` raises for a
- * non-Hash `:pool` (cache.rb:217), and what `Integer()`/`Float()` raise for a
- * value they cannot convert (cache.rb:213-214). Its throw sites carry an
- * eslint-disable because `rails-error-parity` matches on the native name.
- * @internal
- */
-class TypeError extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "TypeError";
-  }
-}
-
 /** Mirror of Ruby's `FloatDomainError` — `Integer(Float::INFINITY)`. @internal */
 class FloatDomainError extends globalThis.Error {
   constructor(message: string) {
@@ -140,10 +130,7 @@ class FloatDomainError extends globalThis.Error {
 
 export { ArgumentError };
 
-/** Mirrors Ruby NotImplementedError. @internal */
-export class NotImplementedError extends Error {
-  override name = "NotImplementedError";
-}
+export { NotImplementedError };
 
 /** @internal */
 export interface CacheLogger {
