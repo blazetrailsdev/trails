@@ -612,8 +612,6 @@ describe("CI runs every tooling test suite", () => {
     const yml = await readFile(CI_YML, "utf8");
     const dirs = ["packages/rack", "packages/rack-session"];
 
-    // The state this story was filed from, reconstructed from the repaired
-    // workflow: rack-session named by no filter and by no gate.
     const brokenYml = yml
       .replace(
         "run: pnpm vitest run packages/rack packages/rack-session\n",
