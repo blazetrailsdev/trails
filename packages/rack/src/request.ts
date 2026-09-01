@@ -99,6 +99,11 @@ export interface Helpers {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export abstract class Helpers {
+  /** Mirrors `Rack::Request::Helpers#body` (`rack/request.rb:190`). */
+  get body(): any {
+    return this.getHeader(RACK_INPUT);
+  }
+
   /** Mirrors `Rack::Request::Helpers#script_name` (`rack/request.rb:191`). */
   get scriptName(): string {
     return this.getHeader(SCRIPT_NAME) || "";

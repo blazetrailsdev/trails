@@ -1178,6 +1178,7 @@ export interface Request extends Omit<
   | "getHeader"
   | "setHeader"
   | "fetchHeader"
+  | "body"
   | "requestMethod"
   | "isGet"
   | "isHead"
