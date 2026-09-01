@@ -126,10 +126,6 @@ describe("AppGenerator", () => {
     expect(exists("app/views/layouts/mailer.text.tse")).toBe(false);
   });
 
-  // `skip_storage?` is `skip_active_storage? && !sqlite3?`
-  // (`railties/lib/rails/generators/app_base.rb:364-366`): a sqlite3 app keeps
-  // `storage/` even with Active Storage skipped, because the database file
-  // lives there (`sqlite3.yml.tt:14,21`).
   it("keeps storage/ for a sqlite3 app with Active Storage skipped", async () => {
     await makeGen("sqlite").run();
 

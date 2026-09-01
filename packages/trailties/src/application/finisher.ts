@@ -103,16 +103,6 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
   }
 });
 
-/**
- * Mirrors `Finisher`'s `setup_default_session_store` initializer
- * (`finisher.rb:47-54`) — "Setup default session store if not already set in
- * config/application.rb". It runs `before: :build_middleware_stack` because
- * `DefaultMiddlewareStack#build_stack` only mounts a session store when
- * `config.session_store` answers one (`default_middleware_stack.rb:76-81`).
- *
- * `app.class.name` is `nil` for an anonymous Rails application class; the JS
- * analogue is a constructor with an empty `name`.
- */
 Finisher.initializer(
   "setup_default_session_store",
   { before: "build_middleware_stack" },
