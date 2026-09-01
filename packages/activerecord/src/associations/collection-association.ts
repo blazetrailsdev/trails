@@ -55,9 +55,8 @@ export class CollectionAssociation extends Association {
   /** @internal */
   _wasLoaded: boolean | null = null;
 
-  writer(records: Base[]): Promise<void> | void {
-    const replaced = this.replace(records);
-    if (isThenable(replaced)) return replaced.then(() => undefined);
+  writer(records: Base[]): Promise<Base[] | undefined> | Base[] {
+    return this.replace(records);
   }
 
   syncWrite(records: Base[]): void {
