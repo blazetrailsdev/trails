@@ -68,6 +68,7 @@ import {
   _wrapperEnabled,
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
+import { processAction as _processAction } from "./metal/rendering.js";
 import { Parameters as StrongParameters } from "./metal/strong-parameters.js";
 import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
@@ -85,6 +86,8 @@ export type RenderOptions = {
   text?: string;
   /** Render a specific action's template */
   action?: string;
+  /** Render a specific template, optionally prefixed ("posts/show") */
+  template?: string;
   /** Render a partial */
   partial?: string;
   /** Locals to pass to template */
@@ -297,7 +300,11 @@ export class Base extends Metal {
       // Render partial via LookupContext (synchronous wrapper, actual render is async)
       this._pendingRender = { type: "partial", options };
       return; // Will be handled by async processAction wrapper
-    } else if (options.action !== undefined || options.collection !== undefined) {
+    } else if (
+      options.template !== undefined ||
+      options.action !== undefined ||
+      options.collection !== undefined
+    ) {
       // Render action template or collection via LookupContext
       this._pendingRender = { type: "template", options };
       return; // Will be handled by async processAction wrapper
@@ -338,6 +345,25 @@ export class Base extends Metal {
 
   /** Rails `ActionView::ViewPaths#details_for_lookup` (`view_paths.rb:67-69`). */
   detailsForLookup = detailsForLookup;
+
+  /**
+   * `delegate :formats, :formats=, to: :lookup_context`
+   * (`action_view/view_paths.rb:12-13`).
+   */
+  get formats(): ReadonlyArray<string | symbol> {
+    return this.lookupContext.formats;
+  }
+  set formats(values: ReadonlyArray<string | symbol> | null) {
+    this.lookupContext.formats = values;
+  }
+
+  /** `delegate :locale, :locale=, to: :lookup_context` (`view_paths.rb:12-13`). */
+  get locale(): string | symbol | null {
+    return this.lookupContext.locale;
+  }
+  set locale(value: string | symbol | null) {
+    this.lookupContext.locale = value;
+  }
 
   /** Rails `ActionView::ViewPaths#template_exists?` (`view_paths.rb:83-85`). */
   templateExists = templateExists;
@@ -381,7 +407,11 @@ export class Base extends Metal {
     const ctx = this.lookupContext;
 
     const controllerPrefix = this.controllerPath();
-    const format = this.request?.format?.symbol ?? "html";
+    // `lookup_context.formats` — negotiated in `process_action` and already
+    // expanded past `"*/*"` by `LookupContext#formats=`
+    // (`lookup_context.rb:263-280`). Rails passes the whole details hash down
+    // to the resolver; trails' `LookupContext#render` takes one format.
+    const format = String(this.formats[0] ?? "html");
     const routeHelpers = (this.constructor as typeof Base).routeHelpers ?? {};
     const locals = { ...routeHelpers, ...options.locals };
     const layout =
@@ -405,8 +435,17 @@ export class Base extends Metal {
         this.body = await ctx.renderPartial(options.partial, controllerPrefix, format, locals);
       }
     } else {
-      const action = options.action ?? this.actionName;
-      this.body = await ctx.render(controllerPrefix, action, format, locals, {
+      // `options[:template] ||= (options[:action] || action_name).to_s`
+      // (`action_view/rendering.rb:_normalize_options`). A `:template` may name
+      // its own prefix ("posts/show"), which Rails resolves by leaving
+      // `:prefixes` unset; trails' `LookupContext#render` takes the prefix
+      // separately, so the qualified path is split here the way
+      // `renderPartialSync` splits a qualified partial name.
+      const template = String(options.template ?? options.action ?? this.actionName);
+      const slash = template.lastIndexOf("/");
+      const prefix = slash === -1 ? controllerPrefix : template.slice(0, slash);
+      const action = slash === -1 ? template : template.slice(slash + 1);
+      this.body = await ctx.render(prefix, action, format, locals, {
         layout: layout === false ? false : layout || undefined,
       });
     }
@@ -816,6 +855,11 @@ export class Base extends Metal {
    */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
     try {
+      // `ActionController::Rendering#process_action` (`rendering.rb:190-194`)
+      // — `self.formats = request.formats.filter_map(&:ref)` before the
+      // action runs, so the lookup context negotiates `"*/*"` down to the
+      // default formats rather than searching for a `*/*` template.
+      _processAction.call(this as never, action, ...args);
       if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
         _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
         // Rails' controller `params` is `request.parameters` by reference, so

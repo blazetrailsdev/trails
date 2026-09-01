@@ -43,7 +43,7 @@ describe("PARAMETERS_KEY", () => {
 });
 
 describe("DEFAULT_PARSERS json", () => {
-  const parser = DEFAULT_PARSERS[MimeType.JSON.symbol];
+  const parser = DEFAULT_PARSERS[MimeType.JSON.symbol!];
 
   it("returns hash payloads unchanged", () => {
     expect(parser('{"a":1}')).toEqual({ a: 1 });
@@ -261,7 +261,7 @@ describe("parseFormattedParameters", () => {
     });
     for (const Err of [ParameterTypeError, InvalidParameterError, ParamsTooDeepError]) {
       const parsers = {
-        [MimeType.JSON.symbol]: () => {
+        [MimeType.JSON.symbol!]: () => {
           throw new Err("boom");
         },
       };
@@ -284,7 +284,7 @@ describe("parseFormattedParameters", () => {
       rawPost: "{}",
     });
     const parsers = {
-      [MimeType.JSON.symbol]: () => {
+      [MimeType.JSON.symbol!]: () => {
         throw new AdParameterTypeError("nope");
       },
     };

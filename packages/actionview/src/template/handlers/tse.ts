@@ -1,6 +1,6 @@
 import { chomp } from "@blazetrails/activesupport";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
-import { Base } from "../../base.js";
+import { _Base } from "../../base-slot.js";
 import type { TemplateHandler } from "../handlers.js";
 import {
   translateLocation as translateLocationImpl,
@@ -141,7 +141,7 @@ export class Tse implements TemplateHandler {
     // Rails erb.rb lines 86–89: annotate HTML output with BEGIN/END comments
     // when ActionView::Base.annotate_rendered_view_with_filenames is on.
     const format = template.format ?? (mime === "text/html" ? "html" : null);
-    if (Base.annotateRenderedViewWithFilenames && format === "html" && template.shortIdentifier) {
+    if (_Base!.annotateRenderedViewWithFilenames && format === "html" && template.shortIdentifier) {
       const id = template.shortIdentifier;
       options.preamble = `_ob.safeAppend(${JSON.stringify(`<!-- BEGIN ${id} -->`)});`;
       options.postamble = `_ob.safeAppend(${JSON.stringify(`<!-- END ${id} -->`)});`;

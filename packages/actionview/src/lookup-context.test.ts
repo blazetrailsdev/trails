@@ -7,6 +7,14 @@ import { TemplatePath } from "./template-path.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 
+describe("LookupContext", () => {
+  it("handles */* formats", () => {
+    const lookupContext = new LookupContext([]);
+    lookupContext.formats = ["*/*"];
+    expect(lookupContext.formats).toEqual(["html", "text", "js", "css", "xml", "json"]);
+  });
+});
+
 describe("MissingTemplate#corrections", () => {
   it("returns close template path matches ranked by Jaro distance", () => {
     const err = new MissingTemplate(

@@ -35,7 +35,7 @@ export type ParameterParsers = Record<string, ParameterParser>;
  * parser wraps non-Hash payloads in `{ _json: data }`.
  */
 export const DEFAULT_PARSERS: ParameterParsers = {
-  [MimeType.JSON.symbol]: (rawPost: string) => {
+  [MimeType.JSON.symbol!]: (rawPost: string) => {
     const data = JSON.parse(rawPost);
     if (data !== null && typeof data === "object" && !Array.isArray(data)) {
       return data as Record<string, unknown>;
@@ -186,7 +186,15 @@ export function parseFormattedParameters(
   if (this.contentLength === 0 || this.contentMimeType === null || !this.rawPost) {
     return fallback();
   }
-  const strategy = parsers[this.contentMimeType.symbol];
+  // Ruby indexes with a possibly-nil symbol and gets nil back
+  // (`parameters.rb:80`); a JS index signature cannot take `null`. The
+  // `toString()` arm is not Rails': it keeps `TestRequest#assignParameters`'
+  // custom parser for an unregistered content type reachable, where Rails
+  // raises `"Unknown Content-Type"` before ever registering one
+  // (`action_controller/test_case.rb:119-131`).
+  // @missingRailsArgs content_mime_type.symbol — CONVERGEABLE actionpack-assign-parameters-raises-on-unknown-content-type
+  const symbol = this.contentMimeType.symbol ?? this.contentMimeType.toString();
+  const strategy = parsers[symbol];
   if (!strategy) return fallback();
 
   try {

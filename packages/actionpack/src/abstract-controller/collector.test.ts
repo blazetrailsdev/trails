@@ -86,7 +86,7 @@ describe("TestCollector", () => {
 class TestCollector extends Collector {
   readonly calls: [string, unknown[]][] = [];
   custom(mime: MimeType, ...args: unknown[]): unknown {
-    this.calls.push([mime.symbol, args]);
+    this.calls.push([mime.symbol!, args]);
     return `dispatched:${mime.symbol}`;
   }
 }

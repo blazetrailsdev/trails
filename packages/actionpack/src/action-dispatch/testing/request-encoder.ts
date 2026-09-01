@@ -68,7 +68,7 @@ export class RequestEncoder {
   static parser(contentType: string | undefined): ResponseParser {
     const type =
       contentType && MimeType.isRegistered(contentType)
-        ? MimeType.lookup(contentType).symbol
+        ? (MimeType.lookup(contentType).symbol ?? undefined)
         : undefined;
     return RequestEncoder.encoder(type).responseParser;
   }

@@ -142,7 +142,7 @@ export class Collector {
         // Look up by MIME type string → symbol (e.g., "text/html" → "html")
         if (MimeType.isRegistered(type)) {
           const mimeType = MimeType.lookup(type);
-          const result = this.resolveFormat(mimeType.symbol);
+          const result = this.resolveFormat(mimeType.symbol!);
           if (result) return result;
         }
 
