@@ -99,7 +99,7 @@ describe("Bootstrap", () => {
 
   describe("initializer order", () => {
     const expected = [
-      "load_environment_config",
+      "load_environment_hook",
       "initialize_logger",
       "initialize_cache",
       "bootstrap_hook",

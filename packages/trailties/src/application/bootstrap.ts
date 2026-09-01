@@ -3,7 +3,8 @@
  * `railties/lib/rails/application/bootstrap.rb`.
  *
  * Rails-mirrored initializers kept here:
- *   - `:load_environment_config` — placeholder hook, run before user config.
+ *   - `:load_environment_hook`   — empty anchor; `Engine#load_environment_config`
+ *                                  runs before it.
  *   - `:initialize_logger`       — wire `host.logger` from `config.logger` or
  *                                  fall back to a `NullLogger`.
  *   - `:initialize_cache`        — wire `host.cache` from `config.cacheStore`
@@ -12,9 +13,8 @@
  *
  * Intentionally skipped (see docs/trailties-plan.md):
  *   - `:set_load_path`, `:set_autoload_paths`,
- *     `:initialize_dependency_mechanism`, `:set_eager_load_paths`,
- *     `:load_environment_hook` — autoload / eager-load only;
- *     ESM + bundlers cover this in trailties.
+ *     `:initialize_dependency_mechanism`, `:set_eager_load_paths` —
+ *     autoload / eager-load only; ESM + bundlers cover this in trailties.
  */
 import {
   type CacheStore,
@@ -44,9 +44,10 @@ export abstract class Bootstrap extends Initializable implements BootstrapHost {
   abstract config: BootstrapConfig;
 }
 
-Bootstrap.initializer("load_environment_config", { group: "all" }, function () {
-  // Empty placeholder. Rails loads `config/environments/*.rb` here; trailties
-  // applications load environment modules through `config_for` (PR 2.5).
+Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {
+  // Rails: `initializer :load_environment_hook, group: :all do end`
+  // (`application/bootstrap.rb:13`) — an empty anchor that `Engine`'s
+  // `load_environment_config` orders itself before.
 });
 
 Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, function () {

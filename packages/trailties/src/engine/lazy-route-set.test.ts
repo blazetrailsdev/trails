@@ -78,4 +78,9 @@ describe("LazyRouteSet", () => {
     resetReloadRoutesHook();
     expect(() => routes.draw(() => {})).not.toThrow();
   });
+
+  it("new_with_config builds an instance of the receiving subclass", () => {
+    expect(LazyRouteSet.newWithConfig({})).toBeInstanceOf(LazyRouteSet);
+    expect(RouteSet.newWithConfig({})).not.toBeInstanceOf(LazyRouteSet);
+  });
 });

@@ -12,6 +12,7 @@ import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { getFs, getPath } from "@blazetrails/activesupport";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
+import { resolveEnv } from "../database.js";
 
 /** Mirrors `config.route_set_class` (`engine/configuration.rb:47`) — the
  * class is used through its `new_with_config` factory. */
@@ -79,6 +80,12 @@ export class EngineConfiguration extends RailtieConfiguration {
     paths.add("lib/assets", { glob: "*" });
     paths.add("lib/tasks", { glob: "**/*.{ts,js}" });
     paths.add("config");
+    // Rails spells the glob `-"#{Rails.env}.rb"` (engine/configuration.rb:96).
+    // `Trails.env` is unreachable from here: `rails.ts` imports `application.ts`,
+    // which imports `engine.ts`, which imports this file — closing a cycle over
+    // `class Application extends Engine`. `resolveEnv()` is the same env source
+    // `Trails.env` itself delegates to (`rails.ts:88`).
+    paths.add("config/environments", { glob: `${resolveEnv()}.{ts,js}` });
     paths.add("config/initializers", { glob: "**/*.{ts,js}" });
     paths.add("config/locales", { glob: "**/*.{ts,js,json}" });
     paths.add("config/routes.ts");
