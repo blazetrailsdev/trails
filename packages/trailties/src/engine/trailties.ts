@@ -1,9 +1,21 @@
 // Port of railties/lib/rails/engine/railties.rb. Iterable collection of
 // instantiated Trailtie + Engine subclasses (excluding the abstract bases).
 import { Trailtie } from "../trailtie.js";
+import { Engine } from "../engine.js";
 
 export class Trailties implements Iterable<Trailtie> {
-  readonly all: Trailtie[] = Trailtie.subclasses().map((k) => k.instance());
+  /**
+   * Mirrors `Railties#initialize` (`engine/railties.rb:9-12`):
+   * `::Rails::Railtie.subclasses + ::Rails::Engine.subclasses`. Ruby's
+   * `Class#subclasses` is DIRECT children, which is what keeps an
+   * `Application` subclass out of the collection — trails' registry-backed
+   * `Trailtie.subclasses()` is transitive, so the two Ruby sets are recovered
+   * by matching each class's immediate superclass.
+   */
+  readonly all: Trailtie[] = [
+    ...Trailtie.subclasses().filter((k) => Object.getPrototypeOf(k) === Trailtie),
+    ...Trailtie.subclasses().filter((k) => Object.getPrototypeOf(k) === Engine),
+  ].map((k) => k.instance());
 
   /**
    * @noRailsEquivalent PERMANENT (`use-site:vendor/rails/railties/lib/rails/engine/railties.rb:6, :14` —

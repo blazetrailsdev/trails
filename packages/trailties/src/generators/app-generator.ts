@@ -431,12 +431,28 @@ process.exit(status ?? 1);
     );
   }
 
+  /**
+   * Mirrors `AppGenerator#config_target_version`
+   * (`generators/rails/app/app_generator.rb:261-263`). Rails answers
+   * `Rails::VERSION::STRING.to_f`; trails' own `VERSION` is not a
+   * `loadDefaults` branch, so the generated app targets the Rails release
+   * this port tracks.
+   */
+  private configTargetVersion(): string {
+    return "8.0";
+  }
+
   private createConfigFiles(name: string): void {
     this.createFile(
       "config/application.ts",
       `import { Application } from "@blazetrails/trailties";
 
 export class ${this.appConstBase()} extends Application {
+  static {
+    // Initialize configuration defaults for originally generated trails version.
+    this.config.loadDefaults("${this.configTargetVersion()}");
+  }
+
   // Configuration for the application, engines, and trailties goes here.
   //
   // These settings can be overridden in specific environments using the files

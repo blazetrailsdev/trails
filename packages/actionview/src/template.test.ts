@@ -113,6 +113,49 @@ describe("ActionView::Template (smoke)", () => {
     expect(Template.Error).toBe(TemplateError);
   });
 
+  describe("#translate_location", () => {
+    const spot = () => ({
+      snippet: "",
+      firstLineno: 1,
+      lastLineno: 1,
+      firstColumn: 0,
+      lastColumn: 0,
+    });
+
+    it("returns the spot unchanged when the handler has no translate_location", () => {
+      const t = new Template({ source: "hi", identifier: "x", extension: "txt", handler: echo });
+      const s = spot();
+      expect(t.translateLocation({ lineno: 1 }, s)).toBe(s);
+    });
+
+    it("falls back to the spot when the handler returns nil", () => {
+      const handler: TemplateHandler = {
+        ...echo,
+        translateLocation: () => null,
+      } as TemplateHandler;
+      const t = new Template({ source: "hi", identifier: "x", extension: "txt", handler });
+      const s = spot();
+      expect(t.translateLocation({ lineno: 1 }, s)).toBe(s);
+    });
+
+    it("reaches the handler's translate_location", () => {
+      const translated = spot();
+      const handler: TemplateHandler = {
+        ...echo,
+        translateLocation: () => translated,
+      } as TemplateHandler;
+      const t = new Template({ source: "hi", identifier: "x", extension: "txt", handler });
+      expect(t.translateLocation({ lineno: 1 }, spot())).toBe(translated);
+    });
+
+    it("reaches the Tse handler's translate_location", () => {
+      const source = "<%= 1 %>\n<%= boom %>\n";
+      const t = new Template({ source, identifier: "t", extension: "tse", handler: new Tse() });
+      const s = spot();
+      expect(t.translateLocation({ lineno: 2 }, s)).toBeDefined();
+    });
+  });
+
   describe("#render", () => {
     const ctx = (extra: { view?: Base; yield?: string } = {}): { view?: Base; yield?: string } =>
       extra;

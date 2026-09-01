@@ -12,6 +12,7 @@ import { OutputBuffer } from "./buffers.js";
 import { StrictLocalsMismatch } from "./strict-locals.js";
 import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
+import type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-location.js";
 
 const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
 const VARIABLE_FROM_BASENAME = /^_?(.*?)(?:\.\w+)*$/;
@@ -171,6 +172,32 @@ export class Template {
     return Boolean(
       h && (h as { supportsStreaming?: () => boolean }).supportsStreaming?.() === true,
     );
+  }
+
+  /**
+   * Translate an error location returned by ErrorHighlight to the correct
+   * source location inside the template. Mirrors
+   * `Template#translate_location` (`template.rb:250-256`).
+   *
+   * `encode!` (`template.rb:253`) has no analogue — a JS string is Unicode by
+   * specification, so `source` is handed to the handler as-is, the same
+   * reason `compiledSource` drops the call.
+   */
+  translateLocation(backtraceLocation: BacktraceLocation, spot: Spot): Spot {
+    const handler = this.resolveHandler() as
+      | (TemplateHandler & {
+          translateLocation?: (
+            spot: Spot,
+            backtraceLocation: BacktraceLocation,
+            source: string,
+          ) => Spot | null;
+        })
+      | undefined;
+    if (typeof handler?.translateLocation === "function") {
+      return handler.translateLocation(spot, backtraceLocation, this.source) ?? spot;
+    } else {
+      return spot;
+    }
   }
 
   /**
