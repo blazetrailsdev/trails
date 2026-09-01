@@ -29,9 +29,8 @@ export class Mimes {
   /** @internal Mirrors Ruby `<<`. */
   push(type: MimeType): void {
     this._mimes.push(type);
-    // Only registered types reach `SET`, and `Mime::Type.register` always
-    // supplies a symbol — `to_sym` is nil only for the unregistered types
-    // `lookup` fabricates (`mime_type.rb:172`).
+    // `to_sym` is nil only for the throwaway types `lookup` fabricates
+    // (`mime_type.rb:172`), which never reach `SET`.
     const sym = type.toSym()!;
     this._symbols.push(sym);
     this._symbolsSet.add(sym);
