@@ -224,7 +224,6 @@ export class Persisted {
     return isTruthy(request.ssl) || this.assumeSsl === true;
   }
 
-  /** @missingRailsCall call — PERMANENT */
   commitSession(req: PersistedRequest, res: ResponseRaw): unknown {
     const session = req.getHeader(RACK_SESSION);
     const options: SessionOptions = session.options();

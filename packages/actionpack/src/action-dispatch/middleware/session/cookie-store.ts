@@ -10,6 +10,7 @@
  */
 
 import type { RackApp } from "@blazetrails/rack";
+import type { PersistedRequest } from "@blazetrails/rack-session";
 import {
   AbstractSecureStore,
   SessionId as RackSessionId,
@@ -129,7 +130,7 @@ export class CookieStore extends AbstractSecureStore {
 
   /** @internal Rails: `write_session(req, sid, session_data, options)` (private). */
   writeSession(
-    _req: any,
+    _req: CookieStoreRequest | PersistedRequest,
     sid: RackSessionId,
     sessionData: Record<string, unknown>,
     _options?: SessionOptions,
