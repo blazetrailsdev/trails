@@ -29,6 +29,7 @@
     "@blazetrails/i18n": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rack-session": "workspace:*",
     "ua-parser-js": "^2.0.9"
   }
 }

@@ -6,6 +6,7 @@
     "baseUrl": ".",
     "paths": {
       "@blazetrails/activerecord": ["../src/index.ts"],
+      "@blazetrails/rack-session": ["../../rack-session/src/index.ts"],
       "@blazetrails/activemodel": ["../../activemodel/src/index.ts"],
       "@blazetrails/arel": ["../../arel/src/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
