@@ -410,6 +410,22 @@ describe("AppGenerator", () => {
     expect(read("config/application.ts")).toMatch(/^export class Things43 /m);
   });
 
+  it("name option", async () => {
+    const gen = new AppGenerator({
+      cwd: tmpDir,
+      output: (m) => lines.push(m),
+      appPath: "app-dir",
+      name: "my-app",
+      database: "sqlite",
+    });
+    await gen.run();
+    const applicationTs = fs.readFileSync(
+      path.join(tmpDir, "app-dir", "config", "application.ts"),
+      "utf-8",
+    );
+    expect(applicationTs).toMatch(/^export class MyApp /m);
+  });
+
   it("types drawRoutes against Mapper", async () => {
     await makeGen().run();
 

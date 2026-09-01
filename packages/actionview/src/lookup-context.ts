@@ -705,7 +705,9 @@ export class LookupContext {
    * segments, mirroring `PartialRenderer#partial_path`
    * (`actionview/lib/action_view/renderer/partial_renderer.rb`).
    *
-   * @noRailsEquivalent CONVERGEABLE actionview-render-path-is-async-where-rails-is-sync
+   * @noRailsEquivalent PERMANENT — trails' render path is asynchronous by
+   * design where Rails' is synchronous, so the synchronous entry point a
+   * compiled template needs has no Rails counterpart and will not converge.
    */
   renderPartialSync(
     name: string,

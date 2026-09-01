@@ -1,3 +1,4 @@
+import { forceEncoding } from "@blazetrails/ruby-compat";
 import { QueryParser } from "../query-parser.js";
 import { getMultipartFileLimit, getMultipartTotalPartLimit, unescapePath } from "../utils.js";
 
@@ -66,7 +67,7 @@ export class BoundedIO {
 
     const str = left < size ? this.io.read(left, outbuf) : this.io.read(size, outbuf);
     if (str) {
-      this.cursor += new TextEncoder().encode(str).length;
+      this.cursor += str.length;
     } else {
       throw new EmptyContentError("bad content body");
     }
@@ -354,8 +355,13 @@ export class Parser {
   result(): MultipartInfo {
     this.collector.each((part) =>
       part.getData((data) => {
-        this.tagMultipartEncoding(part.filename, part.contentType, part.name, data);
-        this.queryParser.normalizeParams(this.params, part.name, data);
+        const [name, body] = this.tagMultipartEncoding(
+          part.filename,
+          part.contentType,
+          part.name,
+          data,
+        );
+        this.queryParser.normalizeParams(this.params, name, body);
       }),
     );
     return {
@@ -457,12 +463,43 @@ export class Parser {
     }
     return filename.split(/[/\\]/).at(-1) ?? "";
   }
+  /**
+   * Mirrors `Rack::Multipart::Parser#tag_multipart_encoding`
+   * (`rack/multipart/parser.rb:456-483`). Ruby re-tags `name` and `body` in
+   * place; a JS string is immutable, so the re-encoded pair is returned and the
+   * caller passes it on.
+   */
   /** @internal */ private tagMultipartEncoding(
-    _filename: string | null | undefined,
-    _contentType: string | null | undefined,
-    _name: string,
-    _body: any,
-  ) {}
+    filename: string | null | undefined,
+    contentType: string | null | undefined,
+    name: string,
+    body: any,
+  ): [string, any] {
+    name = String(name);
+    let encoding = "UTF-8";
+
+    name = forceEncoding(name, encoding);
+
+    if (filename) return [name, body];
+
+    if (contentType) {
+      const list = contentType.split(";");
+      const typeSubtype = list[0].trim();
+      if (Parser.TEXT_PLAIN === typeSubtype) {
+        const rest = list.slice(1);
+        for (const param of rest) {
+          const [rawK, rawV] = param.split(/=(.*)/s, 2);
+          const k = rawK.trim();
+          let v = (rawV ?? "").trim();
+          if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+          if (k === "charset") encoding = this.findEncoding(v);
+        }
+      }
+    }
+
+    name = forceEncoding(name, encoding);
+    return [name, typeof body === "string" ? forceEncoding(body, encoding) : body];
+  }
   /** @internal */ private findEncoding(enc: string | null | undefined): string {
     return enc ?? "UTF-8";
   }

@@ -30,6 +30,8 @@ type Skip =
 
 export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
+  /** `class_option :name, type: :string, aliases: "-n"` (`app_base.rb:33`). */
+  name?: string;
   database?: DatabaseName;
   api?: boolean;
   devcontainer?: boolean;

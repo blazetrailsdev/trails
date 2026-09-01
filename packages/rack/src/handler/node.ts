@@ -210,11 +210,10 @@ function header(req: HttpRequest, name: string): string | undefined {
  * so the body is drained up front into the `StringIO` `service` hands over.
  *
  * Ruby reads the socket as `ASCII-8BIT` and passes those bytes through, so a
- * binary upload round-trips; a `StringIO` holds a JS string, so a decoding is
- * forced, and UTF-8 is what every consumer of `rack.input` here already expects
- * (`request.ts:400`, `method-override.ts:64`, `multipart/parser.ts:67`, and
- * `mock-request.ts:147`, which wraps a JS string too). Making that seam
- * byte-faithful is story `rack-input-binary-safe`.
+ * binary upload round-trips. The bytes go into the `StringIO` one byte per
+ * character, which is the buffer contract `StringIO` documents, so `size` and
+ * `read`'s length count bytes as Ruby's do and an upload round-trips
+ * byte-identical; the text consumers below decode where Rack decodes.
  *
  * @noRailsEquivalent PERMANENT — `MAX_BODY_SIZE` follows from that buffering,
  * not from Rails: `:InputBufferSize` (`webrick/config.rb:59`) is a per-chunk
@@ -228,7 +227,6 @@ function readBody(req: HttpRequest): Promise<string> {
   return new Promise((resolve, reject) => {
     const chunks: string[] = [];
     let totalLength = 0;
-    const decoder = new TextDecoder("utf-8");
     req.on("data", (chunk) => {
       totalLength += chunk.length;
       if (totalLength > MAX_BODY_SIZE) {
@@ -236,9 +234,26 @@ function readBody(req: HttpRequest): Promise<string> {
         reject(new Error("Request body too large"));
         return;
       }
-      chunks.push(decoder.decode(chunk, { stream: true }));
+      chunks.push(binaryString(chunk));
     });
-    req.on("end", () => resolve(chunks.join("") + decoder.decode()));
+    req.on("end", () => resolve(chunks.join("")));
     req.on("error", reject);
   });
+}
+
+/**
+ * `String#force_encoding(Encoding::BINARY)` — one character per byte, the
+ * encoding Ruby reads a request body off the socket in
+ * (`rackup/handler/webrick.rb:60-89`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby tags a String with an encoding and
+ * leaves its bytes alone; JS has only UTF-16 code units, so the byte-per-code-unit
+ * buffer Ruby gets for free has to be built.
+ */
+function binaryString(bytes: Uint8Array): string {
+  let out = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    out += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return out;
 }

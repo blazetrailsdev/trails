@@ -151,11 +151,11 @@ describe("Rack::Multipart::Parser", () => {
     const io = {
       read: (_size: number) => {
         calls++;
-        return "\u00e9";
+        return "\u00c3\u00a9";
       },
     };
     const bounded = new BoundedIO(io, 2);
-    expect(bounded.read(10)).toBe("\u00e9");
+    expect(bounded.read(10)).toBe("\u00c3\u00a9");
     expect(bounded.read(10)).toBeNull();
     expect(calls).toBe(1);
   });
