@@ -4,7 +4,6 @@ import {
   DEFAULT_OPTIONS as ID_DEFAULT_OPTIONS,
   PersistedSecure,
   type PersistedRequest,
-  type SessionOptions,
   SessionId,
 } from "./abstract/id.js";
 
@@ -62,7 +61,7 @@ export class Pool extends PersistedSecure {
     _req: PersistedRequest,
     sessionId: SessionId,
     newSession: Record<string, unknown>,
-    _options: SessionOptions,
+    _options: Record<string, unknown>,
   ): SessionId {
     this.pool[sessionId.privateId] = newSession;
     return sessionId;
@@ -72,11 +71,11 @@ export class Pool extends PersistedSecure {
   override deleteSession(
     _req: PersistedRequest,
     sessionId: SessionId,
-    options: SessionOptions,
+    options: Record<string, unknown>,
   ): SessionId | null {
     delete this.pool[sessionId.publicId];
     delete this.pool[sessionId.privateId];
-    if (!isTruthy(options.get("drop"))) return this.generateSid({ useMutex: false });
+    if (!isTruthy(options["drop"])) return this.generateSid({ useMutex: false });
     return null;
   }
 

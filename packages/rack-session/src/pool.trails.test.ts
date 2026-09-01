@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { PersistedRequest, PersistedSession, SessionOptions } from "./index.js";
+import type { PersistedRequest, PersistedSession } from "./index.js";
 import { Pool, SessionId } from "./index.js";
 
 function stubRequest(): PersistedRequest {
@@ -10,15 +10,7 @@ function stubRequest(): PersistedRequest {
     params: {},
     getHeader: () => undefined as unknown as PersistedSession,
     setHeader: () => {},
-    sessionOptions: {} as unknown as SessionOptions,
-  };
-}
-
-function stubOptions(hash: Record<string, unknown>): SessionOptions {
-  return {
-    get: (key: string) => hash[key],
-    valuesAt: (...keys: string[]) => keys.map((key) => hash[key]),
-    toHash: () => ({ ...hash }),
+    sessionOptions: {},
   };
 }
 
@@ -59,7 +51,7 @@ describe("Rack::Session::Pool", () => {
   it("write_session stores the session and answers the session id", () => {
     const pool = new Pool();
     const sid = new SessionId("abcd");
-    expect(pool.writeSession(stubRequest(), sid, { counter: 2 }, stubOptions({}))).toBe(sid);
+    expect(pool.writeSession(stubRequest(), sid, { counter: 2 }, {})).toBe(sid);
     expect(pool.pool[sid.privateId]).toEqual({ counter: 2 });
   });
 
@@ -68,7 +60,7 @@ describe("Rack::Session::Pool", () => {
     const sid = new SessionId("abcd");
     pool.pool[sid.privateId] = { counter: 1 };
     pool.pool[sid.publicId] = { counter: 1 };
-    const newSid = pool.deleteSession(stubRequest(), sid, stubOptions({}));
+    const newSid = pool.deleteSession(stubRequest(), sid, {});
     expect(newSid).toBeInstanceOf(SessionId);
     expect(pool.pool).toEqual({});
   });
@@ -77,7 +69,7 @@ describe("Rack::Session::Pool", () => {
     const pool = new Pool();
     const sid = new SessionId("abcd");
     pool.pool[sid.privateId] = { counter: 1 };
-    expect(pool.deleteSession(stubRequest(), sid, stubOptions({ drop: true }))).toBeNull();
+    expect(pool.deleteSession(stubRequest(), sid, { drop: true })).toBeNull();
     expect(pool.pool).toEqual({});
   });
 
