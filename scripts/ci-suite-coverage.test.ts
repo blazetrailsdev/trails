@@ -458,6 +458,118 @@ async function gateRunner(yml: string): Promise<(file: string) => Promise<Record
   };
 }
 
+/**
+ * Does `filter` name `dir` itself, or an ancestor directory of it?
+ *
+ * A bare `dir.startsWith(filter)` is a STRING prefix, not a path prefix, so it
+ * reads the `packages/rack` filter as covering `packages/rack-session` — a
+ * package whose name extends another's gets its coverage for free from a job
+ * that never runs one of its tests. Match on the path boundary instead.
+ */
+function filterCoversDir(filter: string, dir: string): boolean {
+  const f = filter.replace(/\/+$/, "");
+  return f === dir || dir.startsWith(`${f}/`);
+}
+
+/**
+ * Gate names an `if:` expression reads out of the `changes` job, as one OR
+ * group. `docs_only` is dropped: it is a negative condition, and a package's
+ * own test file is never docs-only.
+ */
+function gateNames(ifText: string): string[] {
+  const names = [...ifText.matchAll(/needs\.changes\.outputs\.(\w+)/g)].map((m) => m[1]);
+  return names.filter((n) => n !== "docs_only");
+}
+
+/** The `if:` value of a block, with a folded (`>-`) scalar joined onto one line. */
+function ifText(block: string[]): string {
+  const i = block.findIndex((l) => /^\s*if:/.test(l));
+  if (i === -1) return "";
+  const indent = block[i].length - block[i].trimStart().length;
+  const parts = [block[i].replace(/^\s*if:\s*/, "").replace(/^>-?$/, "")];
+  for (let j = i + 1; j < block.length; j++) {
+    const line = block[j];
+    if (line.trim() === "") break;
+    if (line.length - line.trimStart().length <= indent) break;
+    parts.push(line.trim());
+  }
+  return parts.join(" ");
+}
+
+/**
+ * Every `pnpm vitest run` filter in ci.yml paired with the gate groups that
+ * have to fire for the step holding it to execute: the enclosing job's `if:`
+ * and the step's own. Each group is an OR set; all groups must be satisfied.
+ */
+function ciFiltersWithGates(yml: string): { filter: string; gates: string[][] }[] {
+  const lines = yml.split("\n");
+  const jobStarts = lines.flatMap((l, i) => (/^ {2}[\w-]+:\s*$/.test(l) ? [i] : []));
+  const out: { filter: string; gates: string[][] }[] = [];
+  for (let k = 0; k < jobStarts.length; k++) {
+    const job = lines.slice(jobStarts[k], jobStarts[k + 1] ?? lines.length);
+    const stepsAt = job.findIndex((l) => /^ {4}steps:\s*$/.test(l));
+    if (stepsAt === -1) continue;
+    const jobGates = gateNames(ifText(job.slice(0, stepsAt)));
+    const body = job.slice(stepsAt + 1);
+    const stepStarts = body.flatMap((l, i) => (/^ {6}- /.test(l) ? [i] : []));
+    for (let s = 0; s < stepStarts.length; s++) {
+      const step = body.slice(stepStarts[s], stepStarts[s + 1] ?? body.length);
+      const stepGates = gateNames(ifText(step));
+      const gates = [jobGates, stepGates].filter((g) => g.length > 0);
+      const text = step.join("\n");
+      for (const filter of [...ciVitestFilters(text), ...ciPackageFilterDirs(text)]) {
+        out.push({ filter, gates });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The package half of the coverage guard, as a function of a ci.yml and a
+ * package-directory list so the regression test can drive it over a synthetic
+ * workflow instead of only over the real one.
+ */
+async function packageCoverage(
+  yml: string,
+  dirs: string[],
+): Promise<{ uncovered: string[]; ungated: string[] }> {
+  const filters = ciFiltersWithGates(yml);
+  const runGate = await gateRunner(yml);
+  const uncovered: string[] = [];
+  const ungated: string[] = [];
+  for (const dir of dirs) {
+    const covering = filters.filter((f) => filterCoversDir(f.filter, dir));
+    if (covering.length === 0) {
+      uncovered.push(dir);
+      continue;
+    }
+    // A filter inside a gated job is dead for a PR confined to the package it
+    // names: the job the filter lives in is skipped exactly when the package it
+    // points at is the thing that changed.
+    const fired = await runGate(`${dir}/src/probe.test.ts`);
+    const live = covering.some((f) =>
+      f.gates.every((group) => group.some((name) => fired[name] === "true")),
+    );
+    if (!live) ungated.push(dir);
+  }
+  return { uncovered, ungated };
+}
+
+/** Package directories that hold at least one test file. */
+async function testedPackageDirs(): Promise<string[]> {
+  const packagesDir = path.join(REPO_ROOT, "packages");
+  const entries = await readdir(packagesDir, { withFileTypes: true });
+  const dirs: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || SKIP_DIRS.has(entry.name)) continue;
+    const files = await collectTestFiles(path.join(packagesDir, entry.name), []);
+    if (files.length === 0) continue;
+    dirs.push(`packages/${entry.name}`);
+  }
+  return dirs;
+}
+
 describe("CI runs every tooling test suite", () => {
   it("covers each scripts/eslint/vendor test file with a ci.yml vitest filter", async () => {
     const yml = await readFile(CI_YML, "utf8");
@@ -483,21 +595,49 @@ describe("CI runs every tooling test suite", () => {
   // date change woke the Unit Tests job, which then ran no date test.
   it("covers each package test suite with a ci.yml vitest filter", async () => {
     const yml = await readFile(CI_YML, "utf8");
-    const filters = [...ciVitestFilters(yml), ...ciPackageFilterDirs(yml)];
-
-    const packagesDir = path.join(REPO_ROOT, "packages");
-    const entries = await readdir(packagesDir, { withFileTypes: true });
-    const uncovered: string[] = [];
-    for (const entry of entries) {
-      if (!entry.isDirectory() || SKIP_DIRS.has(entry.name)) continue;
-      const files = await collectTestFiles(path.join(packagesDir, entry.name), []);
-      if (files.length === 0) continue;
-      const dir = `packages/${entry.name}`;
-      if (!filters.some((filter) => dir.startsWith(filter.replace(/\/$/, "")))) {
-        uncovered.push(dir);
-      }
-    }
+    const { uncovered } = await packageCoverage(yml, await testedPackageDirs());
     expect(uncovered).toEqual([]);
+  });
+
+  // The companion the package half was missing, mirroring the unit-tests one
+  // below: a filter only runs when the gate of the job holding it fires, so a
+  // package filtered by a job its own paths cannot wake is not covered at all.
+  // packages/rack-session was exactly that — RACK_PKGS_RE never matched it, so
+  // leaf-tests was skipped on a rack-session-only PR.
+  it("matches each package filter against the gate of the job that runs it", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const { ungated } = await packageCoverage(yml, await testedPackageDirs());
+    expect(ungated).toEqual([]);
+  });
+
+  // Regression proof for both halves at once, over a synthetic ci.yml: with
+  // packages/rack-session unregistered (the state this story was filed from),
+  // the guard must report it. The string-prefix bug hid the gate bug — the
+  // packages/rack filter "covered" packages/rack-session for free — so assert
+  // the uncovered arm here and the gated arm against the repaired workflow.
+  it("reports a package a prefix-named sibling's filter appears to cover", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const dirs = ["packages/rack", "packages/rack-session"];
+
+    const broken = await packageCoverage(yml, dirs);
+    expect(broken.uncovered).toEqual(["packages/rack-session"]);
+
+    // Registered in the leaf-tests filter but NOT in the gate: covered, dead.
+    const filterOnly = yml.replace(
+      "run: pnpm vitest run packages/rack\n",
+      "run: pnpm vitest run packages/rack packages/rack-session\n",
+    );
+    expect(filterOnly).not.toEqual(yml);
+    const halfFixed = await packageCoverage(filterOnly, dirs);
+    expect(halfFixed.uncovered).toEqual([]);
+    expect(halfFixed.ungated).toEqual(["packages/rack-session"]);
+
+    const fixed = filterOnly.replace(
+      "RACK_PKGS_RE='^packages/(rack|",
+      "RACK_PKGS_RE='^packages/(rack|rack-session|",
+    );
+    expect(fixed).not.toEqual(filterOnly);
+    expect(await packageCoverage(fixed, dirs)).toEqual({ uncovered: [], ungated: [] });
   });
 
   // A path filter in a gated job only runs when the gate fires. unit-tests is
