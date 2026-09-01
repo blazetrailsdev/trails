@@ -687,11 +687,15 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * dig — nested access using multiple keys.
-   * Each intermediate value must be a HashWithIndifferentAccess or support get().
+   * Mirrors `dig` (hash_with_indifferent_access.rb:208-211) — the first key is
+   * converted, then `super` is `rb_hash_dig` (`vendor/ruby/hash.c:4627`),
+   * whose `rb_hash_aref` yields to the default_proc on a miss the way `[]`
+   * does. Its remaining keys go to `rb_obj_dig`, whose Array arm and
+   * `"%s does not have #dig method"` TypeError (`vendor/ruby/object.c:3899`)
+   * are `hwia-dig-variadic-arm-and-rb-obj-dig-typeerror`.
    */
   dig(key: string, ...rest: string[]): unknown {
-    const val = this.data.get(this.convertKey(key));
+    const val = this.get(key);
     if (rest.length === 0) return val;
     if (val === null || val === undefined) return undefined;
     if (val instanceof HashWithIndifferentAccess) {
