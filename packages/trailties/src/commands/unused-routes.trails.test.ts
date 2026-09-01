@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { controllerConstants, type Route } from "@blazetrails/actionpack";
+import { ActionView, controllerConstants, type Route } from "@blazetrails/actionpack";
 import { RouteInfo } from "./unused-routes.js";
 
 function route(requirements: Record<string, string>): Route {
@@ -34,8 +34,12 @@ describe("UnusedRoutesCommand", () => {
 
   it("RouteInfo is not unused when a template covers the missing action", async () => {
     class PostsController {
-      static viewPaths(): { path: string }[] {
-        return [{ path: new URL("./__fixtures__/views", import.meta.url).pathname }];
+      static viewPaths(): ActionView.PathSet {
+        return new ActionView.PathSet([
+          new ActionView.FileSystemResolver(
+            new URL("./__fixtures__/views", import.meta.url).pathname,
+          ),
+        ]);
       }
     }
     controllerConstants.set("posts", PostsController as never);

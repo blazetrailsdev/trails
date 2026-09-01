@@ -14,7 +14,7 @@ import { bootApplicationBang } from "../command/actions.js";
 import { Trails } from "../rails.js";
 
 interface ViewPathRoot {
-  path: string;
+  path(): string;
 }
 
 interface ControllerClass {
@@ -64,7 +64,7 @@ export class RouteInfo {
   /** @internal */
   private async viewPath(root: ViewPathRoot): Promise<string> {
     const path = await getPathAsync();
-    return path.join(root.path, String(this.controllerName), String(this.actionName));
+    return path.join(root.path(), String(this.controllerName), String(this.actionName));
   }
 
   /** @internal */
