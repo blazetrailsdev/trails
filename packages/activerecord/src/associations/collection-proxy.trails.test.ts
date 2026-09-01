@@ -45,6 +45,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     await proxy.load();
 
     expect(() => proxy.length > 0).toThrow(/`length` is a method on a collection/);
+    expect(() => `${proxy.length}`).toThrow(/`length` is a method on a collection/);
     expect(await proxy.length()).toBe(3);
   });
 

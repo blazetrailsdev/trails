@@ -610,8 +610,7 @@ class ImplicitCountError extends globalThis.TypeError {}
 /** @noRailsEquivalent PERMANENT */
 function refuseImplicitCount<F extends (...args: any[]) => unknown>(fn: F): F {
   Object.defineProperty(fn, Symbol.toPrimitive, {
-    value: (hint: string): string => {
-      if (hint === "string") return Function.prototype.toString.call(fn);
+    value: (): never => {
       throw new ImplicitCountError(
         "`length` is a method on a collection, not a property: it reads as a function, " +
           "not a count. Call `await collection.length()`, or `await collection.size()` " +

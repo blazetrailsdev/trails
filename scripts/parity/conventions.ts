@@ -1731,8 +1731,9 @@ keeps its Rails name and stays a method — \`CollectionProxy#length\`
 in trails and a property cannot await. Ruby has no property/method ambiguity,
 so \`person.pets.length\` counts there while \`collection.length\` here reads the
 METHOD. The delegated \`length\` therefore refuses primitive coercion
-(\`relation/delegation.ts\`): \`collection.length > 0\` throws rather than
-silently being \`NaN > 0\`. Write \`await collection.length()\`, or
+(\`relation/delegation.ts\`): \`collection.length > 0\` and
+\`\${collection.length}\` throw rather than silently reading \`NaN\` or the
+function source. Write \`await collection.length()\`, or
 \`await collection.size()\` for Rails' \`size\`.
 
 ## Operators
