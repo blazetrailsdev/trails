@@ -529,6 +529,10 @@ function ciFiltersWithGates(yml: string): { filter: string; gates: string[][] }[
  * The package half of the coverage guard, as a function of a ci.yml and a
  * package-directory list so the regression test can drive it over a synthetic
  * workflow instead of only over the real one.
+ *
+ * `ungated` holds a package whose every covering filter sits in a job the
+ * package's own paths cannot wake — the filter is dead exactly when the
+ * package it points at is the thing that changed.
  */
 async function packageCoverage(
   yml: string,
@@ -544,9 +548,6 @@ async function packageCoverage(
       uncovered.push(dir);
       continue;
     }
-    // A filter inside a gated job is dead for a PR confined to the package it
-    // names: the job the filter lives in is skipped exactly when the package it
-    // points at is the thing that changed.
     const fired = await runGate(`${dir}/src/probe.test.ts`);
     const live = covering.some((f) =>
       f.gates.every((group) => group.some((name) => fired[name] === "true")),
@@ -622,7 +623,6 @@ describe("CI runs every tooling test suite", () => {
     const broken = await packageCoverage(yml, dirs);
     expect(broken.uncovered).toEqual(["packages/rack-session"]);
 
-    // Registered in the leaf-tests filter but NOT in the gate: covered, dead.
     const filterOnly = yml.replace(
       "run: pnpm vitest run packages/rack\n",
       "run: pnpm vitest run packages/rack packages/rack-session\n",
