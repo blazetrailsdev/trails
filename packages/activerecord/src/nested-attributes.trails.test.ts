@@ -1,11 +1,12 @@
 import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "./index.js";
+import { assignNestedAttributes, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
+import { Bird } from "./test-helpers/models/bird.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
@@ -25,6 +26,8 @@ describe("nested attributes (trails-only)", () => {
     cpk_car_reviews: [CpkCarReview, {}],
     categories: [Category, {}],
     categorizations: [Categorization, {}],
+    birds: [Bird, {}],
+    pirates: [Pirate, {}],
   });
 
   it("builds a new belongs_to record with a composite foreign key", async () => {
@@ -42,6 +45,16 @@ describe("nested attributes (trails-only)", () => {
     const reloaded = (await CpkBook.find([1, 1])) as CpkBook;
     expect(cols(reloaded).shop_id).toBe(7);
     expect(Number(cols(reloaded).order_id)).toBe(Number(orderId));
+  });
+
+  it("assigns the owner's foreign key when a belongs_to nested attribute creates the target", async () => {
+    const bird = await Bird.createBang({ name: "Polly" });
+    assignNestedAttributes(bird, "pirate", [{ catchphrase: "Arr" }]);
+    await bird.save();
+
+    const pirate = await Pirate.where({ catchphrase: "Arr" }).first();
+    expect(pirate).not.toBeNull();
+    expect(Number(cols(bird).pirate_id)).toBe(Number(readAttr(pirate as Base, "id")));
   });
 
   it("find with duplicate composite ids uniqs to a single wrapped record", async () => {

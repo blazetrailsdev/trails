@@ -130,7 +130,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
     const reflection = (ctor as any).reflectOnAssociation?.(assocName);
     const reflectionFk = reflection?.foreignKey;
     const optionFk = assocDef.options.foreignKey;
-    const isCollectionLike = assocDef.type !== "belongsTo";
+    const isCollectionLike = assocDef.macro !== "belongsTo";
     const compositeFkColumns: string[] | null = isCollectionLike
       ? Array.isArray(reflectionFk)
         ? (reflectionFk as unknown[]).map(String)
@@ -142,7 +142,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
       (typeof optionFk === "string" ? optionFk : undefined) ??
       (typeof reflectionFk === "string"
         ? reflectionFk
-        : assocDef.type === "belongsTo"
+        : assocDef.macro === "belongsTo"
           ? `${underscore(assocName)}_id`
           : `${underscore(ctor.name)}_id`);
 
@@ -182,7 +182,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
       if (pkValue) {
         const existing = await (targetModel as any).find(pkValue);
         await existing.update(childAttrs);
-      } else if (assocDef.type === "belongsTo") {
+      } else if (assocDef.macro === "belongsTo") {
         const created = await (targetModel as any).create(childAttrs);
         if (created != null && created.isPersisted()) {
           const belongsToFkColumns = Array.isArray(reflectionFk)

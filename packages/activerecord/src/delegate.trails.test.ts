@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
+import { AssociationNotFoundError } from "./associations/errors.js";
 import { fixtures } from "./test-fixtures.js";
 
 describe("Delegate (Rails-guided)", () => {
@@ -83,5 +84,21 @@ describe("Delegate (Rails-guided)", () => {
 
     const post = await Post.create({ author_id: null });
     expect(await (post as any).name()).toBeNull();
+  });
+
+  it("raises AssociationNotFoundError when the delegated association has no reflection", async () => {
+    class Post extends Base {
+      static {
+        this._tableName = "posts";
+        this.attribute("id", "integer");
+      }
+    }
+    registerModel(Post);
+    delegate(Post, ["name"], { to: "author" });
+
+    await expect((new Post() as any).name()).rejects.toThrow(AssociationNotFoundError);
+    await expect((new Post() as any).name()).rejects.toThrow(
+      "Association named 'author' was not found on Post; perhaps you misspelled it?",
+    );
   });
 });
