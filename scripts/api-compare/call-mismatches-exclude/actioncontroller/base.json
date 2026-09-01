@@ -37,7 +37,7 @@
     "tsFile": "base.ts",
     "rubyName": "expires_in",
     "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "conditional_get.rb:292 `response.cache_control.merge!(...)` — the receiver is the response's cache-control Hash, which trails does not model: `expiresIn` composes the `cache-control` header string directly (base.ts:893-898)."
   },
   {
     "package": "actioncontroller",
@@ -76,7 +76,7 @@
     "tsFile": "base.ts",
     "rubyName": "fresh_when",
     "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "conditional_get.rb:152 `response.cache_control.merge!(cache_control)` — same cache-control Hash receiver; trails' `freshWhen` sets `etag`/`last-modified`/`cache-control` headers directly (base.ts:853-880) and takes no `cache_control:` option."
   },
   {
     "package": "actioncontroller",

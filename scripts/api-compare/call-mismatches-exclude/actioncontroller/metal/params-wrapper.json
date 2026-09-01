@@ -2,20 +2,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/params-wrapper.ts",
-    "rubyName": "_perform_parameter_wrapping",
-    "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/params-wrapper.ts",
-    "rubyName": "_perform_parameter_wrapping",
-    "call": "slice",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/params-wrapper.ts",
     "rubyName": "wrap_parameters",
     "call": "from_hash",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -25,13 +11,13 @@
     "tsFile": "metal/params-wrapper.ts",
     "rubyName": "wrap_parameters",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "params_wrapper.rb:228,230,235 merge onto the `options` Hash inside the `wrap_parameters` class macro; trails' `wrapParameters` is the wrapping helper `(params, name, include, exclude)` (params-wrapper.ts:69-83), not the macro, so the options hash it merges does not exist here."
   },
   {
     "package": "actioncontroller",
     "tsFile": "metal/params-wrapper.ts",
     "rubyName": "wrap_parameters",
     "call": "slice",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "params_wrapper.rb:235 `_wrapper_options.to_h.slice(:format)` — a Hash receiver inside the unported `wrap_parameters` class macro; see the `merge` row on the same method."
   }
 ]

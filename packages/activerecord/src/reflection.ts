@@ -14,7 +14,7 @@ import {
   foreignKey as deriveForeignKey,
   merge,
 } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
+import { except, mergeBang } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
@@ -1808,19 +1808,17 @@ export function create(
     : (reflection as AssociationReflection | AggregateReflection);
 }
 
-/** @missingRailsCall merge! — PERMANENT */
+/** @missingRailsArgs merge! — PERMANENT */
 export function addReflection(
   ar: typeof Base,
   name: string,
   reflection: AssociationReflection | ThroughReflection,
 ): void {
   clearReflectionsCache(ar);
-  const reflections: Record<string, unknown> = except(
-    (ar as any)._reflections as Record<string, unknown>,
-    name,
+  (ar as any)._reflections = mergeBang(
+    except((ar as any)._reflections as Record<string, unknown>, name),
+    { [name]: reflection },
   );
-  reflections[name] = reflection;
-  (ar as any)._reflections = reflections;
 }
 
 export function addAggregateReflection(

@@ -4,7 +4,7 @@
     "tsFile": "utils.ts",
     "rubyName": "build_nested_query",
     "call": "delete_if",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "The receiver is the Array `value.map { … }` returns (rack utils.rb:129), so this is `Array#delete_if`, not `Hash#delete_if`; the port spells it `.filter((s) => s.length > 0)` over the same array."
   },
   {
     "package": "rack",

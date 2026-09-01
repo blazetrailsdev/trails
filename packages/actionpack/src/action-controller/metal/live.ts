@@ -9,6 +9,7 @@ import { ContentDisposition } from "../../action-dispatch/http/content-dispositi
 import { MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { Response as DispatchResponse } from "../../action-dispatch/http/response.js";
+import { merge } from "@blazetrails/ruby-compat";
 
 export class ClientDisconnected extends Error {
   constructor(message?: string) {
@@ -209,17 +210,16 @@ export class SSE {
     json: string,
     options: { retry?: number | string; event?: string; id?: string },
   ): void {
-    const current: Record<string, string | number | undefined> = {
-      ...this._options,
-      ...options,
-    };
+    const currentOptions: Record<string, string | number | undefined> = merge<
+      string | number | undefined
+    >(this._options, options);
 
     for (const name of SSE.PERMITTED_OPTIONS) {
-      const value = current[name];
+      const optionValue = currentOptions[name];
       // Match Ruby truthiness: `if option_value` is true for "" — an empty
       // `id:` line resets the browser's Last-Event-ID, which is valid SSE.
-      if (value !== undefined && value !== null) {
-        this._stream.write(`${name}: ${value}\n`);
+      if (optionValue !== undefined && optionValue !== null) {
+        this._stream.write(`${name}: ${optionValue}\n`);
       }
     }
 

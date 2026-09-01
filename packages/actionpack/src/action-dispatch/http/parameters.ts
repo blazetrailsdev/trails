@@ -19,6 +19,7 @@ import {
   InvalidParameterError as RackInvalidParameterError,
   ParamsTooDeepError as RackParamsTooDeepError,
 } from "@blazetrails/rack";
+import { merge, mergeBang } from "@blazetrails/ruby-compat";
 import { MimeType } from "./mime-type.js";
 
 export const PARAMETERS_KEY = "action_dispatch.request.path_parameters";
@@ -146,8 +147,8 @@ export function parameters(this: ParametersHost): Record<string, unknown> {
   // instead of being silently dropped. TS has no EOFError equivalent and the
   // trails `requestParameters` getter returns `{}` for empty bodies, so no
   // try/catch is needed.
-  let params: Record<string, unknown> = { ...this.requestParameters, ...this.queryParameters };
-  params = { ...params, ...pathParameters.call(this) };
+  const params: Record<string, unknown> = merge(this.requestParameters, this.queryParameters);
+  mergeBang(params, pathParameters.call(this));
   this.setHeader("action_dispatch.request.parameters", params);
   return params;
 }

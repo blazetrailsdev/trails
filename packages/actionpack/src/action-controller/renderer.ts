@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { dup, hasKey, merge, mergeBang } from "@blazetrails/ruby-compat";
 /**
  * ActionController::Renderer
  *
@@ -26,7 +26,7 @@ export class Renderer {
     this._controller = controller;
     this._defaults = defaults;
     this._env = Renderer.normalizeEnv(defaults);
-    if (env) Object.assign(this._env, Renderer.normalizeEnv(env));
+    if (env) mergeBang(this._env, Renderer.normalizeEnv(env));
   }
 
   static for(
@@ -92,7 +92,7 @@ export class Renderer {
   }
 
   withDefaults(defaults: Record<string, unknown>): Renderer {
-    return new Renderer(this._controller, this._env, { ...this._defaults, ...defaults });
+    return new Renderer(this._controller, this._env, merge(this._defaults, defaults));
   }
 
   renderToString(options: Record<string, unknown> = {}): string {
@@ -112,9 +112,9 @@ export class Renderer {
     type EnvSlice = Pick<RouteSetLike, "defaultEnv">;
     const routes = (this._controller as { _routes?: EnvSlice | null } | null | undefined)?._routes;
     if (hasKey(this._env, "HTTP_HOST") || !routes) {
-      return { ...this._env };
+      return dup(this._env);
     }
-    return { ...(routes.defaultEnv ?? {}), ...this._env };
+    return merge(routes.defaultEnv ?? {}, this._env);
   }
 
   private static RACK_KEY_TRANSLATION: Record<string, string> = {
