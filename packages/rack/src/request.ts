@@ -52,7 +52,7 @@ import {
 import { fetch, hasKey } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/activesupport";
 import * as MediaTypeModule from "./media-type.js";
-import { parseMultipart as multipartExtract, ParamList } from "./multipart.js";
+import * as Multipart from "./multipart.js";
 
 // ipv6 extracted from resolv stdlib, simplified
 // to remove numbered match group creation.
@@ -505,7 +505,7 @@ export abstract class Helpers {
   get POST(): Record<string, any> {
     const error = this.getHeader(RACK_REQUEST_FORM_ERROR);
     if (error) {
-      throw error;
+      throw new (error.constructor as ErrorConstructor)(error.message, { cause: error.cause });
     }
 
     try {
@@ -530,7 +530,7 @@ export abstract class Helpers {
         this.setHeader(RACK_REQUEST_FORM_INPUT, null);
         this.setHeader(RACK_REQUEST_FORM_HASH, {});
       } else if (this.formData || this.isParseableData()) {
-        const pairs = multipartExtract(this.env, ParamList);
+        const pairs = Multipart.parseMultipart(this.env, Multipart.ParamList);
         if (pairs) {
           this.setHeader(RACK_REQUEST_FORM_PAIRS, pairs);
           this.setHeader(RACK_REQUEST_FORM_HASH, this.expandParamPairs(pairs));
@@ -545,7 +545,6 @@ export abstract class Helpers {
         }
 
         this.setHeader(RACK_REQUEST_FORM_INPUT, this.getHeader(RACK_INPUT));
-        return this.getHeader(RACK_REQUEST_FORM_HASH);
       } else {
         this.setHeader(RACK_REQUEST_FORM_INPUT, this.getHeader(RACK_INPUT));
         this.setHeader(RACK_REQUEST_FORM_HASH, {});
@@ -706,8 +705,8 @@ export abstract class Helpers {
    * Mirrors `Rack::Request::Helpers#parse_multipart` (`rack/request.rb:680-682`).
    * @internal
    */
-  parseMultipart(): Record<string, any> {
-    return multipartExtract(this.env) || {};
+  parseMultipart(): Record<string, any> | null {
+    return Multipart.extractMultipart(this, this.queryParser());
   }
 
   /**

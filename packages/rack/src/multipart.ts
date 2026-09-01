@@ -635,8 +635,8 @@ export class ParamList {
  */
 export function extractMultipart(
   request: { env: Record<string, any> },
-  _params?: unknown,
-): Record<string, any> | null {
+  _params: QueryParserLike = getDefaultQueryParser() as unknown as QueryParserLike,
+): any | null {
   return parseMultipart(request.env);
 }
 
