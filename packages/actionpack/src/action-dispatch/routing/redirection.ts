@@ -120,7 +120,7 @@ export class Redirect extends Endpoint {
       const request = new Request(env);
       const response = this.buildResponse(request);
       payload.status = this.status;
-      payload.location = response.headers["Location"];
+      payload.location = response.headers.get("Location");
       payload.request = request;
       return response.toRack();
     });

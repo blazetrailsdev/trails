@@ -92,7 +92,7 @@ describe("ResponseTest", () => {
   it("cookies", () => {
     const res = new Response();
     res.setCookie("user_name", { value: "david", path: "/" });
-    expect(res.headers["set-cookie"]).toBe("user_name=david; path=/");
+    expect(res.headers.get("set-cookie")).toBe("user_name=david; path=/");
     expect(res.cookies).toEqual({ user_name: "david" });
   });
 
@@ -104,7 +104,7 @@ describe("ResponseTest", () => {
       path: "/",
       expires: new Date(Date.UTC(2005, 9, 10, 5)),
     });
-    expect(res.headers["set-cookie"]).toBe(
+    expect(res.headers.get("set-cookie")).toBe(
       "user_name=david; path=/\nlogin=foo%26bar; path=/; expires=Mon, 10 Oct 2005 05:00:00 GMT",
     );
     expect(res.cookies).toEqual({ login: "foo&bar", user_name: "david" });
@@ -159,7 +159,7 @@ describe("ResponseTest", () => {
 
   it("does not include Status header", () => {
     const res = new Response(200);
-    expect(res.headers["Status"]).toBeUndefined();
+    expect(res.headers.get("Status")).toBeUndefined();
   });
 
   // --- Stream / commit ---
@@ -409,7 +409,7 @@ describe("ResponseTest", () => {
       Response.defaultCharset = "iso-8859-1";
       const res = new Response();
       res.contentType = "text/plain";
-      expect(res.headers["content-type"]).toBe("text/plain; charset=iso-8859-1");
+      expect(res.headers.get("content-type")).toBe("text/plain; charset=iso-8859-1");
     } finally {
       Response.defaultCharset = prior;
     }
@@ -464,11 +464,11 @@ describe("ResponseTest", () => {
       const resp = Response.create();
       resp.body = "Hello";
       resp.toRack();
-      expect(resp.headers["X-Frame-Options"]).toBe("DENY");
-      expect(resp.headers["X-Content-Type-Options"]).toBe("nosniff");
-      expect(resp.headers["X-XSS-Protection"]).toBe("0");
-      expect(resp.headers["X-Permitted-Cross-Domain-Policies"]).toBe("none");
-      expect(resp.headers["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+      expect(resp.headers.get("X-Frame-Options")).toBe("DENY");
+      expect(resp.headers.get("X-Content-Type-Options")).toBe("nosniff");
+      expect(resp.headers.get("X-XSS-Protection")).toBe("0");
+      expect(resp.headers.get("X-Permitted-Cross-Domain-Policies")).toBe("none");
+      expect(resp.headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
     } finally {
       Response.defaultHeaders = original;
     }
@@ -483,7 +483,7 @@ describe("ResponseTest", () => {
       const resp = Response.create();
       resp.body = "Hello";
       resp.toRack();
-      expect(resp.headers["X-XX-XXXX"]).toBe("Here is my phone number");
+      expect(resp.headers.get("X-XX-XXXX")).toBe("Here is my phone number");
     } finally {
       Response.defaultHeaders = original;
     }
@@ -517,7 +517,7 @@ describe("ResponseFilterRedirect", () => {
     const res = new Response();
     res.location = "https://example.com/foo";
     expect(res.location).toBe("https://example.com/foo");
-    expect(res.headers["location"]).toBe("https://example.com/foo");
+    expect(res.headers.get("location")).toBe("https://example.com/foo");
   });
 
   it("filteredLocation strips sensitive query params using the request filter", () => {

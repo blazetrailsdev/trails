@@ -96,45 +96,12 @@ export class ResponseBuffer {
   }
 }
 
-/**
- * `Response`'s header seat is a `Rack::Headers` (response.rb:174), whose `[]`,
- * `[]=` and `delete` downcase the key (vendor/rack/lib/rack/headers.rb:110-129)
- * — so case-insensitivity is a property of the SEAT and every reader on top of
- * it is a plain delegation (response.rb:192-195).
- *
- * Rails reads that seat by index, both through `headers` and through
- * `delegate :[], :[]=, to: :@headers` (response.rb:75). Ruby gets index access
- * from `Hash`; the ported {@link Headers} is a `Map`, and a JS object's index
- * operators are interceptable only through a `Proxy`, so this is the
- * index-access face of the same seat.
- */
-function headersIndexView(headers: Headers): Record<string, string> {
-  return new Proxy(Object.create(null) as Record<string, string>, {
-    get: (_t, key) => (typeof key === "string" ? headers.get(key) : undefined),
-    set: (_t, key, value) => {
-      headers.set(String(key), value);
-      return true;
-    },
-    has: (_t, key) => typeof key === "string" && headers.hasKey(key),
-    deleteProperty: (_t, key) => {
-      headers.delete(String(key));
-      return true;
-    },
-    ownKeys: () => [...headers.keys()],
-    getOwnPropertyDescriptor: (_t, key) =>
-      typeof key === "string" && headers.hasKey(key)
-        ? { value: headers.get(key), enumerable: true, configurable: true, writable: true }
-        : undefined,
-  });
-}
-
 export class Response {
   /** Rails: `cattr_accessor :default_charset, default: "utf-8"`. */
   static defaultCharset = "utf-8";
 
   private _status: number;
   private _headers: Headers;
-  private _headersView: Record<string, string>;
   private _body: string[];
   private _committed = false;
   private _charset: string | undefined;
@@ -153,7 +120,6 @@ export class Response {
     for (const [key, value] of Object.entries(headers)) {
       this._headers.set(key, value);
     }
-    this._headersView = headersIndexView(this._headers);
     this._body = [...body];
   }
 
@@ -202,8 +168,9 @@ export class Response {
 
   // --- Headers ---
 
-  get headers(): Record<string, string> {
-    return this._headersView;
+  /** Mirrors: `attr_reader :headers` (response.rb:174) — a `Rack::Headers`. */
+  get headers(): Headers {
+    return this._headers;
   }
 
   /** Mirrors: `get_header` (response.rb:193). */
@@ -530,8 +497,8 @@ export class Response {
   // --- Header / mime helpers ---
 
   /** Rails: `alias_method :header, :headers`. */
-  get header(): Record<string, string> {
-    return this._headersView;
+  get header(): Headers {
+    return this._headers;
   }
   /** Mirrors: `has_header?` (response.rb:192), `@headers.key? key`. */
   hasHeader(key: string): boolean {

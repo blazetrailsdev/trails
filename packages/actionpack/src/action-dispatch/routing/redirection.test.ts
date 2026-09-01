@@ -51,7 +51,7 @@ describe("PathRedirect", () => {
         "action_dispatch.request.path_parameters": { article: "hello world" },
       }),
     );
-    expect(res.headers["Location"]).toBe("http://example.com/wiki/hello%20world");
+    expect(res.headers.get("Location")).toBe("http://example.com/wiki/hello%20world");
   });
 
   it("preserves query and fragment, interpolating each part separately", () => {
@@ -64,7 +64,7 @@ describe("PathRedirect", () => {
       "action_dispatch.request.path_parameters": { id: "42" },
     });
     const res = r.buildResponse(req);
-    expect(res.headers["Location"]).toBe("http://example.com/baz?id=42&foo=?&bar=1#id-42");
+    expect(res.headers.get("Location")).toBe("http://example.com/baz?id=42&foo=?&bar=1#id-42");
   });
 
   it("inspects with status and template", () => {
@@ -83,7 +83,7 @@ describe("Redirect", () => {
       "rack.url_scheme": "http",
     });
     const res = r.buildResponse(req);
-    expect(res.headers["Location"]).toBe("http://example.com/mount/relative");
+    expect(res.headers.get("Location")).toBe("http://example.com/mount/relative");
   });
 
   it("call() returns a rack triple", () => {
@@ -108,7 +108,7 @@ describe("OptionRedirect", () => {
     const r = new OptionRedirect(301, { path: "/documentation/new" });
     const req = makeRequest({ PATH_INFO: "/new_documentation" });
     const res = r.buildResponse(req);
-    expect(res.headers["Location"]).toContain("/documentation/new");
+    expect(res.headers.get("Location")).toContain("/documentation/new");
   });
 
   it("inspect renders option pairs", () => {
