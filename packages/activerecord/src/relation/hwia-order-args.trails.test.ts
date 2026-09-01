@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { columnReferences, flattenedArgs, validateOrderArgs } from "./query-methods.js";
+import { Topic } from "../test-helpers/models/topic.js";
 
 describe("HashWithIndifferentAccess order arguments", () => {
   it("walks to the same result as the plain hash it stands for", () => {
@@ -18,5 +19,10 @@ describe("HashWithIndifferentAccess order arguments", () => {
     expect(() =>
       validateOrderArgs.call(host, [new HashWithIndifferentAccess({ id: "sideways" })]),
     ).toThrow(/Direction "sideways" is invalid/);
+  });
+
+  it("orders by the same SQL as the plain hash", () => {
+    const hash: Map<string, "desc"> = new HashWithIndifferentAccess<"desc">({ id: "desc" });
+    expect(Topic.order(hash).toSql()).toEqual(Topic.order({ id: "desc" }).toSql());
   });
 });

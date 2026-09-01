@@ -156,9 +156,11 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   /**
    * Mirrors `delete` (hash_with_indifferent_access.rb:303-305) — `Hash#delete`
    * through `convert_key`, so the removed value comes back (`undefined` when
-   * the key was absent), not `Map#delete`'s boolean.
+   * the key was absent), not `Map#delete`'s boolean. It keeps the inherited
+   * declaration's return type so this class stays assignable to the `Map`
+   * spelling a Ruby `Hash` parameter takes.
    */
-  override delete(key: string): V | undefined {
+  override delete(key: string): ReturnType<Hash<string, V>["delete"]> {
     const convertedKey = this.convertKey(key);
     const value = super.get(convertedKey);
     super.delete(convertedKey);
@@ -474,13 +476,13 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError("no implicit conversion of nil into Hash");
     } else if (NOT_GIVEN === hash) {
-      for (const key of [...this.keys()]) this.set(block!(key), this.delete(key)!);
+      for (const key of [...this.keys()]) this.set(block!(key), this.delete(key));
     } else if (block) {
       for (const key of [...this.keys()]) {
-        this.set((hash[key] as string) || block(key), this.delete(key)!);
+        this.set((hash[key] as string) || block(key), this.delete(key));
       }
     } else {
-      for (const key of [...this.keys()]) this.set((hash[key] as string) || key, this.delete(key)!);
+      for (const key of [...this.keys()]) this.set((hash[key] as string) || key, this.delete(key));
     }
 
     return this;
