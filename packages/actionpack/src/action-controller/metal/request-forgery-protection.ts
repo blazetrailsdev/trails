@@ -6,6 +6,7 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
+import { chomp } from "@blazetrails/ruby-compat";
 import {
   CookieJar,
   cookieJar,
@@ -536,8 +537,7 @@ export function isValidPerFormCsrfToken(
   session?: unknown,
 ): boolean {
   if (!this.perFormCsrfTokens) return false;
-  // Rails: request.path.chomp("/") — strips a single trailing slash, so "/" → "".
-  const path = (this.request.path ?? "").replace(/\/$/, "");
+  const path = chomp(this.request.path ?? "", "/");
   const method = this.request.requestMethod ?? this.request.method;
   return compareBuffers(token, perFormCsrfToken.call(this, session, path, method));
 }
@@ -612,15 +612,24 @@ export function storageStrategy(name: "session" | "cookie" | CsrfTokenStorage): 
   );
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsArgs chomp — PERMANENT. `uri.path.chomp("/")` — trails ports
+ *   Ruby's String methods as free functions rather than String.prototype
+ *   patches, so the receiver is argument 1.
+ */
 export function normalizeRelativeActionPath(this: CsrfController, relActionPath: string): string {
   let path = (this.request.path ?? "/") + "/" + relActionPath;
   path = path.replace(/\/\.\//g, "/");
-  // Rails: uri.path.chomp("/") — single trailing slash, so "/" → "".
-  return path.endsWith("/") ? path.slice(0, -1) : path;
+  return chomp(path, "/");
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsArgs chomp — PERMANENT. `uri.path.chomp("/")` — trails ports
+ *   Ruby's String methods as free functions rather than String.prototype
+ *   patches, so the receiver is argument 1.
+ */
 export function normalizeActionPath(this: CsrfController, actionPath: string): string {
   // Mirrors Ruby's URI.parse: relative inputs without a leading "/" pass
   // through unparsed; absolute paths, protocol-relative ("//host/x"), and
@@ -638,6 +647,5 @@ export function normalizeActionPath(this: CsrfController, actionPath: string): s
   } catch {
     parsedPath = actionPath;
   }
-  // Rails: uri.path.chomp("/") — single trailing slash, so "/" → "".
-  return parsedPath.endsWith("/") ? parsedPath.slice(0, -1) : parsedPath;
+  return chomp(parsedPath, "/");
 }

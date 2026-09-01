@@ -7,7 +7,7 @@ import {
   truncate as stringTruncate,
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { chomp, regexpEscape } from "@blazetrails/ruby-compat";
 import { contentTag } from "./tag-helper.js";
 import { sanitize } from "./sanitize-helper.js";
 import { raw } from "./output-safety-helper.js";
@@ -250,10 +250,7 @@ export function wordWrap(text: string | SafeBuffer, options: WordWrapOptions = {
   const replaced = textStr.replace(pattern, (_match, group1: string | undefined) =>
     group1 === undefined ? breakSequence : group1 + breakSequence,
   );
-  // Rails: .chomp!(break_sequence). Ruby's chomp("") is paragraph mode and
-  // strips trailing newlines; otherwise strip one trailing copy of the arg.
-  if (breakSequence === "") return replaced.replace(/\n+$/, "");
-  return replaced.endsWith(breakSequence) ? replaced.slice(0, -breakSequence.length) : replaced;
+  return chomp(replaced, breakSequence);
 }
 
 export interface SimpleFormatOptions {

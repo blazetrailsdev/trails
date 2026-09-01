@@ -46,6 +46,7 @@ import { RoutingError, UrlGenerationError } from "../../action-controller/metal/
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
 import { NameError } from "@blazetrails/activesupport";
+import { chomp } from "@blazetrails/ruby-compat";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
 import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
 
@@ -1116,9 +1117,7 @@ export class RouteSet {
       const forwarded: RackEnv = { ...env };
       if (matched.matchedPrefix !== undefined) {
         const scriptName = (env["SCRIPT_NAME"] as string) ?? "";
-        // Rails: `(script_name.to_s + match.to_s).chomp("/")` — chomp the
-        // combined value so a trailing slash on either side doesn't leak.
-        forwarded["SCRIPT_NAME"] = (scriptName + matched.matchedPrefix).replace(/\/$/, "");
+        forwarded["SCRIPT_NAME"] = chomp(scriptName + matched.matchedPrefix, "/");
         forwarded["PATH_INFO"] = matched.postMatch ?? "/";
       }
       // Rails (journey/router.rb:45-50): `tmp_params = set_params.merge route.defaults`

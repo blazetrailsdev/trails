@@ -7,6 +7,8 @@
 // file's long-standing importers keep reaching them.
 export { isBlank, isPresent } from "./core-ext/object/blank.js";
 
+export { chomp } from "@blazetrails/ruby-compat";
+
 export function squish(str: string): string {
   return str.trim().replace(/\s+/g, " ");
 }
@@ -98,11 +100,6 @@ export function remove(str: string, ...patterns: (string | RegExp)[]): string {
   return result;
 }
 
-export function ord(str: string): number {
-  if (str.length === 0) throw new Error("empty string");
-  return str.codePointAt(0)!;
-}
-
 /**
  * Strips indentation by removing the amount of leading whitespace of the least
  * indented non-empty line from every line.
@@ -139,20 +136,6 @@ export function at(str: string, pos: number | [number, number] | RegExp): string
 /** Rails String#exclude? — returns true if the string does not include the substring */
 export function exclude(str: string, search: string): boolean {
   return !str.includes(search);
-}
-
-/**
- * Ruby `String#chomp`. With no separator (or `undefined`), removes a single
- * trailing `\n`, `\r\n`, or `\r`. With a separator string, removes that
- * suffix if present. Empty-string separator (Ruby paragraph mode) strips
- * all trailing newline characters.
- */
-export function chomp(str: string, separator?: string): string {
-  if (separator === undefined) return str.replace(/(\r\n|\r|\n)$/, "");
-  if (separator === "") return str.replace(/[\r\n]+$/, "");
-  // Ruby quirk: chomp("\n") also eats a preceding CR — "x\r\n".chomp("\n") == "x".
-  if (separator === "\n") return str.replace(/\r?\n$/, "");
-  return str.endsWith(separator) ? str.slice(0, str.length - separator.length) : str;
 }
 
 /**
