@@ -111,3 +111,40 @@ describe("statically expanded loop-generated it() titles", () => {
     ).toEqual([["rejects an adapter whose <expr> a proxy intercepts on <expr>", true]]);
   });
 });
+
+/** The extracted tests' full paths, in order. */
+function paths(source: string) {
+  const info = extractTestsFromSource(source, "packages/activerecord/src/x.test.ts");
+  return info.testCases.map((tc) => tc.path);
+}
+
+describe("dynamically-named describe titles", () => {
+  it("enters a template-titled describe and keeps it in its children's ancestors", () => {
+    expect(
+      paths(`
+        describe(\`\${adapter} quoting\`, () => {
+          it("quotes a string", () => {});
+        });
+      `),
+    ).toEqual(["<expr> quoting > quotes a string"]);
+  });
+
+  // `migration/foreign-key.test.ts` generated three suites from a
+  // `foreignKeyChangeColumnTest(name, …)` helper: the bare-identifier title read
+  // as null, the describe fell through, and all six contained `it`s were
+  // attributed to the enclosing `Migration` suite (PR #7252).
+  it("enters an identifier-titled describe rather than reparenting its children", () => {
+    expect(
+      paths(`
+        describe("Migration", () => {
+          function makeSuite(name) {
+            describe(name, () => {
+              it("adds a foreign key", () => {});
+            });
+          }
+          makeSuite("ForeignKeyChangeColumnTest");
+        });
+      `),
+    ).toEqual(["Migration > <expr> > adds a foreign key"]);
+  });
+});

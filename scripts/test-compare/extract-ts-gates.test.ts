@@ -481,3 +481,76 @@ describe("dynamically-named tests", () => {
     expect(info.testCases.every((tc) => tc.dynamic)).toBe(true);
   });
 });
+
+describe("gate stack across a same-file shared-cases helper", () => {
+  // `postgresqlJsonSharedTestCases(columnType)` mirrors Rails'
+  // `module PostgresqlJSONSharedTestCases` (json_test.rb:6-39), included by two
+  // PostgreSQLTestCase classes (test_case.rb:303-305). The helper is declared at
+  // top level, so its `it()`s used to be walked with an empty gate stack and
+  // emitted ungated — three hard `[missing-gate]` rows (PR #7141).
+  it("gates a top-level helper's tests with the gate its call sites agree on", () => {
+    expect(
+      tsGates(`
+        function sharedCases(columnType) {
+          it("default", () => {});
+        }
+        describeIfPostgresqlAdapter("PostgresqlJSONTest", () => {
+          sharedCases("json");
+        });
+        describeIfPostgresqlAdapter("PostgresqlJSONBTest", () => {
+          sharedCases("jsonb");
+        });
+      `),
+    ).toEqual({ default: { adapters: ["postgresql"], source: ["wrapper"] } });
+  });
+
+  it("leaves the helper ungated when its call sites disagree", () => {
+    expect(
+      tsGates(`
+        function sharedCases() {
+          it("default", () => {});
+        }
+        describeIfPostgresqlAdapter("A", () => {
+          sharedCases();
+        });
+        describeIfMysqlAdapter("B", () => {
+          sharedCases();
+        });
+      `),
+    ).toEqual({ default: undefined });
+  });
+
+  it("emits a shared-cases helper's tests once, at the declaration's own path", () => {
+    const info = extractTestsFromSource(
+      `
+        function sharedCases() {
+          it("default", () => {});
+        }
+        describeIfPg("A", () => {
+          sharedCases();
+        });
+        describeIfPg("B", () => {
+          sharedCases();
+        });
+      `,
+      "packages/activerecord/src/x.test.ts",
+    );
+    expect(info.testCases.map((tc) => tc.path)).toEqual(["default"]);
+  });
+
+  it("keeps a helper declared INSIDE a suite under that suite's ancestors and gate", () => {
+    const info = extractTestsFromSource(
+      `
+        describeIfPg("Outer", () => {
+          function sharedCases() {
+            it("default", () => {});
+          }
+          sharedCases();
+        });
+      `,
+      "packages/activerecord/src/x.test.ts",
+    );
+    expect(info.testCases.map((tc) => tc.path)).toEqual(["Outer > default"]);
+    expect(info.testCases[0].gate).toEqual({ adapters: ["postgresql"], source: ["wrapper"] });
+  });
+});

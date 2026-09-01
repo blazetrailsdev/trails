@@ -2,7 +2,6 @@ import { it, expect, beforeEach } from "vitest";
 import "../../index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
-import { adapterType } from "../../test-adapter.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import { jsonSharedTestCases, JsonDataType as klass } from "../../cases/json-shared-test-cases.js";
@@ -32,7 +31,7 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
 
   jsonSharedTestCases({ columnType, insertStatementPerDatabase });
 
-  it.skipIf(adapterType !== "postgres")("default", async () => {
+  it("default", async () => {
     await connection.addColumn("json_data_type", "permissions", columnType, {
       default: { users: "read", posts: ["read", "write"] },
     });
@@ -46,7 +45,7 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
     expect((new klass() as any).permissions).toEqual({ users: "read", posts: ["read", "write"] });
   });
 
-  it.skipIf(adapterType !== "postgres")("deserialize with array", async () => {
+  it("deserialize with array", async () => {
     const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
     expect(x.objects).toEqual([{ foo: "bar" }]);
     await x.saveBang();
@@ -55,7 +54,7 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
     expect(x.objects).toEqual([{ foo: "bar" }]);
   });
 
-  it.skipIf(adapterType !== "postgres")("noname columns of different types", async () => {
+  it("noname columns of different types", async () => {
     await connection.execute(insertStatementPerDatabase('{"a":{},"b":"b"}'));
     expect(await klass.pluck(arelSql("payload->'a', payload->>'b'"))).toEqual([[{}, "b"]]);
   });

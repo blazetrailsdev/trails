@@ -2888,3 +2888,65 @@ describe("Ruby extractor gem entry file", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS 
     }
   });
 });
+
+describe("Ruby extractor Hash constant updates", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns the file's pooled Hash key names for the given source.
+  function fileHashKeys(src: string): string[] {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hashkeys-rb-"));
+    try {
+      fs.writeFileSync(path.join(dir, "foo.rb"), src);
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "foo.rb"), ${JSON.stringify(dir)})
+        puts JSON.generate(ex.file_hash_keys.values.flat_map(&:to_a).sort)
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // `PARSING.update("double" => PARSING["float"], …)` (xml_mini.rb:90-93) gives
+  // the constant two keys its assignment never mentions, so a faithful TS port
+  // of `double` had no Ruby key to credit it against.
+  it("records the keys a Hash constant gains through CONST.update", () => {
+    const keys = fileHashKeys(`
+      module XmlMini
+        PARSING = { "float" => 1, "datetime" => 2 }
+        PARSING.update(
+          "double" => PARSING["float"],
+          "dateTime" => PARSING["datetime"]
+        )
+      end
+    `);
+    expect(keys).toContain("double");
+    expect(keys).toContain("dateTime");
+  });
+
+  it("records nothing for an update on a constant this file does not assign a Hash", () => {
+    const keys = fileHashKeys(`
+      module XmlMini
+        NAMES = ["float"]
+        NAMES.update("double" => 1)
+        Elsewhere::PARSING.update("triple" => 1)
+      end
+    `);
+    expect(keys).not.toContain("double");
+    expect(keys).not.toContain("triple");
+  });
+
+  it("skips a computed key inside an update hash and keeps its literal siblings", () => {
+    const keys = fileHashKeys(`
+      module XmlMini
+        PARSING = { "float" => 1 }
+        PARSING.update(other_name => 1, "double" => 2)
+      end
+    `);
+    expect(keys).toContain("double");
+    expect(keys).not.toContain("other_name");
+  });
+});

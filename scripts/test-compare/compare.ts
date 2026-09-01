@@ -67,6 +67,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { TestManifest, TestGate } from "./types.js";
+import { DYNAMIC_TITLE_PLACEHOLDER } from "./extract-ts-core.js";
 import { classifyGateMismatch, type GateMismatchKind } from "./gates.js";
 import { buildHistogram, diffHistograms, type KindDelta } from "./assertion-kinds.js";
 import { assertionValueMismatch, type ValueDelta } from "./assertion-values.js";
@@ -643,18 +644,25 @@ export function main(args: string[] = process.argv.slice(2)) {
           dynamicTests++;
           continue;
         }
-        appendIndex(pathIdx, np, i);
         appendIndex(descIdx, nd, i);
-        const npAlias = aliasKey(np);
-        if (npAlias !== undefined) appendIndex(pathAliasIdx, npAlias, i);
         const ndAlias = aliasKey(nd);
         if (ndAlias !== undefined) appendIndex(descAliasIdx, ndAlias, i);
+        if (!descToFileCounts.has(nd)) descToFileCounts.set(nd, new Map());
+        increment(descToFileCounts.get(nd)!, relPath);
+
+        // A path carrying a recovered SUITE skeleton (`<expr> quoting`, from a
+        // template- or identifier-titled describe) is a label, not a name: no
+        // Rails describe can equal it, so it stays out of every path index and
+        // the case is left to match on its description alone. Its own
+        // description is static and indexed above like any other.
+        if (np.includes(DYNAMIC_TITLE_PLACEHOLDER)) continue;
+        appendIndex(pathIdx, np, i);
+        const npAlias = aliasKey(np);
+        if (npAlias !== undefined) appendIndex(pathAliasIdx, npAlias, i);
 
         // Cross-file reverse lookup
         if (!pathToFileCounts.has(np)) pathToFileCounts.set(np, new Map());
         increment(pathToFileCounts.get(np)!, relPath);
-        if (!descToFileCounts.has(nd)) descToFileCounts.set(nd, new Map());
-        increment(descToFileCounts.get(nd)!, relPath);
       }
 
       fileTests.set(relPath, tests);

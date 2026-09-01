@@ -576,6 +576,7 @@ class ApiExtractor
     when :vcall
       process_vcall(node)
     when :method_add_arg
+      maybe_record_hash_const_update(node)
       process_method_add_arg(node)
     when :method_add_block
       # `CONST.each do |x| … class_eval "def #{x}…" end` enumerable codegen
@@ -2726,13 +2727,45 @@ class ApiExtractor
     (@file_hash_keys[@current_file] ||= Set.new).merge(keys)
   end
 
+  # Hash mutators that ADD keys to their receiver, so the keys of their literal
+  # argument are keys of the receiver: `PARSING.update("double" => …,
+  # "dateTime" => …)` (active_support/xml_mini.rb:90-93) gives PARSING two names
+  # its `PARSING = {...}` assignment (xml_mini.rb:62) never mentions.
+  HASH_CONST_UPDATE_METHODS = %w[update merge!].freeze
+
+  # Keys a Hash constant gains AFTER its assignment. Kept lexical, like every
+  # other collection-constant read here: the receiver must be a constant THIS
+  # file assigns a hash literal to (`hash_constant?`), and a computed key is
+  # skipped while its literal siblings still count. An `update` on anything else
+  # records nothing, so an unresolvable port stays novel.
+  def maybe_record_hash_const_update(node)
+    call = node[1]
+    return unless call.is_a?(Array) && call[0] == :call
+    recv = call[1]
+    return unless recv.is_a?(Array) && recv[0] == :var_ref &&
+                  recv[1].is_a?(Array) && recv[1][0] == :@const
+    return unless hash_constant?(recv[1][1])
+    return unless HASH_CONST_UPDATE_METHODS.include?(ident_name(call[3]))
+    paren = node[2]
+    return unless paren.is_a?(Array) && paren[0] == :arg_paren
+    args = paren[1]
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    return unless args.is_a?(Array)
+    args.each { |arg| record_file_hash_keys(literal_hash_keys(arg)) }
+  end
+
+  # A Hash literal, in either of the two shapes Ripper produces: braced
+  # (`{ a: 1 }`) and bare (`update(a: 1)`, an argument-position hash). Both hold
+  # their `assoc_new` list at node[1], so one reader covers them.
+  LITERAL_HASH_NODES = %i[hash bare_assoc_hash].freeze
+
   # Every literal key of a Hash literal, in EITHER Ruby spelling — a Symbol
   # (`:date =>` / `date:`) or a String (`"base64Binary" =>`, xml_mini.rb:83).
   # Unlike maybe_record_symbol_hash_keys, which needs the whole hash to be
   # symbol-keyed before it can stand in for a constant's member list, this is
   # per-KEY: a computed key is skipped and its literal siblings still count.
   def literal_hash_keys(node)
-    return [] unless node.is_a?(Array) && node[0] == :hash
+    return [] unless node.is_a?(Array) && LITERAL_HASH_NODES.include?(node[0])
     assocs = node[1]
     assocs = assocs[1] if assocs.is_a?(Array) && assocs[0] == :assoclist_from_args
     return [] unless assocs.is_a?(Array)
