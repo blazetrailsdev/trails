@@ -766,8 +766,8 @@ export interface CookieOptions {
 
 /**
  * Rails hands `Rack::Utils.set_cookie_header` the cookie option hash
- * untouched; our options are camelCased, so translate the keys back to the
- * Rack spellings at the boundary.
+ * untouched; the keys pass through unchanged, and only `expires` is narrowed
+ * to the JS `Date` that header formatter reads.
  */
 function rackCookieValue(value: string | Partial<CookieOptions>): Record<string, unknown> {
   const opts = typeof value === "string" ? { value } : value;
