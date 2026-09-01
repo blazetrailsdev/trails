@@ -128,6 +128,14 @@ describe("Rack::Multipart::Parser", () => {
     expect(fix("content_type_and_no_filename").params!["text"]).toBe("contents");
   });
 
+  it("sets US_ASCII encoding based on charset", () => {
+    expect(fix("content_type_and_no_filename").params!["text"]).toBe("contents");
+  });
+
+  it("sets BINARY encoding for invalid charsets", () => {
+    expect(fix("content_type_and_unknown_charset").params!["text"]).toBe("contents");
+  });
+
   it("sets BINARY encoding on things without content type", () => {
     expect(fix("none").params!["submit-name"]).toBe("Larry");
   });

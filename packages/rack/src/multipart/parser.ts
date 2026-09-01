@@ -467,9 +467,12 @@ export class Parser {
    * Mirrors `Rack::Multipart::Parser#tag_multipart_encoding`
    * (`rack/multipart/parser.rb:456-483`). Ruby re-tags `name` and `body` in
    * place; a JS string is immutable, so the re-encoded pair is returned and the
-   * caller passes it on.
+   * caller passes it on. `filename` and `content_type` are a String or nil, so
+   * Ruby's `if` on them is `!= null` — `""` is a filename Ruby returns early on.
+   *
+   * @internal
    */
-  /** @internal */ private tagMultipartEncoding(
+  private tagMultipartEncoding(
     filename: string | null | undefined,
     contentType: string | null | undefined,
     name: string,
@@ -480,17 +483,17 @@ export class Parser {
 
     name = forceEncoding(name, encoding);
 
-    if (filename) return [name, body];
+    if (filename != null) return [name, body];
 
-    if (contentType) {
+    if (contentType != null) {
       const list = contentType.split(";");
       const typeSubtype = list[0].trim();
       if (Parser.TEXT_PLAIN === typeSubtype) {
         const rest = list.slice(1);
         for (const param of rest) {
-          const [rawK, rawV] = param.split(/=(.*)/s, 2);
-          const k = rawK.trim();
-          let v = (rawV ?? "").trim();
+          const eq = param.indexOf("=");
+          const k = (eq === -1 ? param : param.slice(0, eq)).trim();
+          let v = (eq === -1 ? "" : param.slice(eq + 1)).trim();
           if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
           if (k === "charset") encoding = this.findEncoding(v);
         }
@@ -500,8 +503,19 @@ export class Parser {
     name = forceEncoding(name, encoding);
     return [name, typeof body === "string" ? forceEncoding(body, encoding) : body];
   }
-  /** @internal */ private findEncoding(enc: string | null | undefined): string {
-    return enc ?? "UTF-8";
+  /**
+   * Mirrors `find_encoding` (`rack/multipart/parser.rb:489-493`): the charset
+   * is submitted by the user, so an unknown one is binary rather than an error.
+   *
+   * @internal
+   */
+  private findEncoding(enc: string | null | undefined): string {
+    try {
+      new TextDecoder(enc ?? "");
+      return enc!;
+    } catch {
+      return "BINARY";
+    }
   }
   /** @internal */ private handleEmptyContentBang(content: string | null | undefined) {
     if (!content) throw new EmptyContentError();
