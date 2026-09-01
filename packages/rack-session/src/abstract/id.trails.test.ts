@@ -93,6 +93,10 @@ describe("Rack::Session::Abstract::SessionHash", () => {
     expect(sessionHash({ foo: null }).fetch("foo", ":default")).toBeNull();
   });
 
+  it("fetch reads an explicitly passed undefined default as a default, not an omission", () => {
+    expect(sessionHash().fetch("unknown", undefined)).toBeUndefined();
+  });
+
   it("inspect renders the not-yet-loaded form until the store is read", () => {
     const hash = sessionHash();
     expect(hash.inspect()).toMatch(/^#<SessionHash:0x[0-9a-f]+ not yet loaded>$/);

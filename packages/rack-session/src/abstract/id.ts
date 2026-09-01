@@ -50,6 +50,11 @@ function objectIdHex(object: object): string {
 }
 
 export class SessionHash implements PersistedSession {
+  setId(id: unknown): void {
+    this._id = id;
+    this.idDefined = true;
+  }
+
   static Unspecified: unknown = {};
 
   private _store: Persisted;
@@ -77,11 +82,6 @@ export class SessionHash implements PersistedSession {
     this._store = store;
     this.req = req;
     this.loaded = false;
-  }
-
-  setId(id: unknown): void {
-    this._id = id;
-    this.idDefined = true;
   }
 
   id(): unknown {
@@ -123,11 +123,8 @@ export class SessionHash implements PersistedSession {
     return value;
   }
 
-  fetch(
-    key: unknown,
-    defaultValue: unknown = SessionHash.Unspecified,
-    block?: (key: string) => unknown,
-  ): unknown {
+  fetch(key: unknown, defaultValue?: unknown, block?: (key: string) => unknown): unknown {
+    if (arguments.length < 2) defaultValue = SessionHash.Unspecified;
     this.loadForReadBang();
     const k = String(key);
     if (defaultValue === SessionHash.Unspecified) {
@@ -290,7 +287,7 @@ export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze(
   secureRandom: true,
 });
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE converge-rack-session-options-onto-hash-reads */
 export interface SessionOptions {
   get(key: string): unknown;
   valuesAt(...keys: string[]): unknown[];
