@@ -20,6 +20,7 @@ export class ShowExceptions {
       const exceptionString = this.dumpException(e);
 
       env[RACK_ERRORS].puts(exceptionString);
+      env[RACK_ERRORS].flush();
 
       let contentType: string;
       let body: string;

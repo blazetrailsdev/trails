@@ -83,7 +83,7 @@ function uriPort(uri: URL): number | null {
 
 /**
  * The `env_for` options Rack passes as Ruby Symbols, which its
- * `String === field` copy therefore skips (`rack/lib/rack/mock_request.rb:153`).
+ * `String === field` copy therefore skips (`rack/lib/rack/mock_request.rb:154`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -132,7 +132,7 @@ export class MockRequest {
     let app: RackApp;
     if (opts.lint) {
       const lint = new Lint(this.app);
-      app = (env) => lint.call(env);
+      app = lint.call.bind(lint);
     } else {
       app = this.app;
     }
@@ -158,17 +158,16 @@ export class MockRequest {
   }
 
   /**
-   * Mirrors `Rack::MockRequest.env_for` (`rack/lib/rack/mock_request.rb:98-158`).
+   * Mirrors `Rack::MockRequest.env_for` (`rack/lib/rack/mock_request.rb:98-159`).
    * Its trailing `opts.each { |field, value| env[field] = value if String === field }`
-   * (line 153) skips Ruby Symbol keys; a Symbol key is a plain string here, so
+   * (line 154) skips Ruby Symbol keys; a Symbol key is a plain string here, so
    * {@link SYMBOL_OPTS} is the exclusion instead.
    */
-  static envFor(uri: string | URL = "", opts: Record<string, any> = {}): Record<string, any> {
-    const parsedUri = MockRequest.parseUriRfc2396(String(uri));
+  static envFor(uri = "", opts: Record<string, any> = {}): Record<string, any> {
+    const parsedUri = MockRequest.parseUriRfc2396(uri);
     if (parsedUri.pathname[0] !== "/") parsedUri.pathname = `/${parsedUri.pathname}`;
 
     const env: Record<string, any> = {};
-
     const port = uriPort(parsedUri);
 
     env[REQUEST_METHOD] = opts.method ? String(opts.method).toUpperCase() : GET;

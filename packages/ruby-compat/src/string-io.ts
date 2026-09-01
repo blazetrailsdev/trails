@@ -61,6 +61,15 @@ export class StringIO {
     return null;
   }
 
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `strio_flush`
+   * (`vendor/ruby/ext/stringio/stringio.c:1891`) returns the StringIO itself,
+   * which is how `Rack::ShowExceptions#call` flushes `rack.errors`.
+   */
+  flush(): this {
+    return this;
+  }
+
   rewind(): number {
     this._pos = 0;
     return 0;
