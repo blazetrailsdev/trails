@@ -797,6 +797,7 @@ export function strftime(
    which is where a Ruby class belongs, and is what `Comparable`'s derived
    operators raise. Re-exported so this file's public surface is unchanged. */
 export { ArgumentError };
+
 /**
  * @internal Ruby core `FloatDomainError`, a `RangeError` subclass, spelled
  * locally for the reason {@link NoMethodError} below is. `rb_num2int` — what

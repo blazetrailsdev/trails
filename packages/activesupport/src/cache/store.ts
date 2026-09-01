@@ -120,6 +120,7 @@ function Float(value: unknown): number {
 
 /** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
 const Zlib: CoderCompressor = { deflate, inflate };
+
 /** Mirror of Ruby's `FloatDomainError` — `Integer(Float::INFINITY)`. @internal */
 class FloatDomainError extends globalThis.Error {
   constructor(message: string) {
