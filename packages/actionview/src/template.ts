@@ -107,7 +107,15 @@ export class Template {
   private _source: string;
   private readonly _locals: readonly string[];
   private _strictLocals: string | null | typeof NONE = NONE;
-  /** @internal */
+  /**
+   * Mirrors `@strict_local_keys` (`template.rb:534-537`), which Rails derives
+   * from the compiled method's kwarg parameters. A JS function has no keyword
+   * parameters to read back, so this stays null and `render`'s
+   * implicit-locals branch never fires — the same language shortcoming
+   * {@link compiledSource} documents.
+   *
+   * @internal
+   */
   _strictLocalKeys: readonly string[] | null = null;
   private _shortIdentifier?: string;
   private _methodName?: string;
@@ -190,23 +198,39 @@ export class Template {
   }
 
   /**
-   * Mirrors `Template#render(view, locals, buffer)` (`template.rb:271-287`):
-   * compile the template if it has not been compiled yet, then run the
-   * compiled method against the view.
+   * Mirrors `Template#render(view, locals, buffer, implicit_locals:, add_to_stack:)`
+   * (`template.rb:271-287`): compile the template if it has not been compiled
+   * yet, then run the compiled method against the view.
+   *
+   * The non-buffer arm coerces a non-`OutputBuffer` result where Rails returns
+   * it as-is; the tse-compiled method always returns its buffer, so the two
+   * differ only on a path no compiled method takes, and `null` there would
+   * cascade through every renderer's `Promise<string>`.
    */
   render(
     view: Base,
     locals: Record<string, unknown> = {},
     buffer: OutputBuffer | null = null,
+    {
+      implicitLocals = [],
+      addToStack = true,
+    }: { implicitLocals?: readonly string[]; addToStack?: boolean } = {},
   ): string {
     try {
       this.compileBang(view);
 
+      if (this.strictLocalsQ() && this._strictLocalKeys && implicitLocals.length > 0) {
+        const localsToIgnore = implicitLocals.filter((l) => !this._strictLocalKeys!.includes(l));
+        for (const key of localsToIgnore) delete locals[key];
+      }
+
       if (buffer) {
-        view._run(this.methodName(), this, locals, buffer);
+        view._run(this.methodName(), this, locals, buffer, { addToStack });
         return "";
       } else {
-        const result = view._run(this.methodName(), this, locals, new OutputBuffer());
+        const result = view._run(this.methodName(), this, locals, new OutputBuffer(), {
+          addToStack,
+        });
         return result instanceof OutputBuffer ? result.toStr() : String(result ?? "");
       }
     } catch (e) {
@@ -363,7 +387,7 @@ export class Template {
     locals = locals.filter((l) => VALID_LOCAL_NAME.test(l));
 
     return locals.reduce(
-      (code, key) => `${code} ${key} = localAssigns[${JSON.stringify(key)}]; ${key} = ${key};`,
+      (code, key) => `${code}${key} = localAssigns[${JSON.stringify(key)}]; ${key} = ${key};`,
       "",
     );
   }
@@ -380,8 +404,10 @@ export class Template {
 }
 
 /**
- * The `String#hash` of `template.rb:398` — a value stable for equal strings
- * within a process. JS has no built-in, so this is the standard FNV-1a.
+ * Stands in for the `String#hash` of `template.rb:398`. MRI's is seeded
+ * randomly per process, so there is no algorithm to mirror — only the property
+ * `method_name` relies on: equal identifiers hash equally within one process.
+ * FNV-1a is a deterministic stand-in with that property.
  */
 function stringHash(value: string): number {
   let hash = 0x811c9dc5;
