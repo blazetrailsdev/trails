@@ -14,10 +14,11 @@ const createBuilderWithArPlugin = createArSolutionBuilder;
 
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
-const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
+const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../bin/trails-tsc.js");
+const CLI_DIST_PATH = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
 // CLI-binary tests skip when dist isn't built (CI jobs that skip
 // `pnpm build`). Probed at module load so test bodies stay conditional-free.
-const itIfCliBin = fs.existsSync(CLI_BIN_PATH) ? it : it.skip;
+const itIfCliBin = fs.existsSync(CLI_DIST_PATH) ? it : it.skip;
 
 describe("trails-tsc CLI — Phase 1b.1", () => {
   it("virtualizes a single-file model: post.title types as string with no declares", () => {
@@ -83,6 +84,30 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
       );
       // Clean exit — no output expected on success.
       expect(result).toBe("");
+    },
+    30_000,
+  );
+
+  itIfCliBin(
+    "CLI binary exits non-zero on a fixture with a type error",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      let status: number | undefined;
+      let stderr = "";
+      try {
+        execFileSync(
+          "node",
+          [CLI_BIN_PATH, "-p", path.join(FIXTURES_DIR, "tsconfig-with-error.json"), "--noEmit"],
+          { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+        );
+        status = 0;
+      } catch (err) {
+        const e = err as { status?: number; stderr?: string };
+        status = e.status;
+        stderr = e.stderr ?? "";
+      }
+      expect(status).not.toBe(0);
+      expect(stderr).toContain("error TS");
     },
     30_000,
   );

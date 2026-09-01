@@ -9,6 +9,6 @@ export class Follow extends Base {
     this.validates("follower_id", { presence: true });
     this.validates("followee_id", { presence: true });
     // Can't follow the same person twice.
-    this.validatesUniqueness("followee_id", { scope: "follower_id" });
+    this.validatesUniquenessOf("followee_id", { scope: "follower_id" });
   }
 }

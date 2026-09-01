@@ -3,7 +3,6 @@
 import ts from "typescript";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { fileURLToPath } from "node:url";
 import { remapDiagnostics } from "@blazetrails/trails-tsc";
 import { virtualize } from "@blazetrails/activerecord/type-virtualization/virtualize.js";
 import { createArTrailsProgram, createArSolutionBuilder } from "./ar-program.js";
@@ -301,7 +300,13 @@ function handleBuildMode(args: string[]): void {
   process.exit(status);
 }
 
-function main(): void {
+/**
+ * Entry point. Invoked by `bin/trails-tsc.js`; not run on import, so tests
+ * can exercise `loadSchemaColumns` directly. The bin is a different file
+ * from this module, so an `import.meta.url === argv[1]` self-execution
+ * guard here would never fire through it and the CLI would be a no-op.
+ */
+export function main(): void {
   const args = process.argv.slice(2);
 
   handleHelp(args);
@@ -370,40 +375,4 @@ function main(): void {
   }
 
   process.exit(0);
-}
-
-// Run main() only when this module is invoked as a binary, not when
-// imported (e.g. by tests that exercise `loadSchemaColumns` directly).
-// Compare decoded filesystem paths to sidestep URL-encoding pitfalls
-// (spaces, Windows drive letters + backslashes) that would trip up a
-// naive `import.meta.url === "file://" + path.resolve(entry)` check.
-const invokedDirectly = (() => {
-  try {
-    const entry = process.argv[1];
-    if (!entry) return false;
-    // Resolve both sides through symlinks so package-manager bin
-    // shims (e.g. `node_modules/.bin/trails-tsc` → the real cli.js)
-    // still match. Without realpath, a shim invocation would leave
-    // `main()` unrun and the CLI becomes a no-op.
-    const resolveReal = (p: string): string => {
-      try {
-        return fs.realpathSync(p);
-      } catch {
-        return path.resolve(p);
-      }
-    };
-    return resolveReal(fileURLToPath(import.meta.url)) === resolveReal(entry);
-  } catch {
-    return false;
-  }
-})();
-
-if (invokedDirectly) {
-  try {
-    main();
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`trails-tsc: ${msg}\n`);
-    process.exit(1);
-  }
 }
