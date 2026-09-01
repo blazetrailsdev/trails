@@ -107,7 +107,7 @@ describe("ChangeGeneratorTest", () => {
   it("change to sqlite3", () => {
     write("package.json", JSON.stringify({ dependencies: { pg: "^8.19.0" } }) + "\n");
     run("sqlite3");
-    expect(read("config/database.ts")).toContain("db/development.sqlite3");
+    expect(read("config/database.ts")).toContain("storage/development.sqlite3");
     const pkg = JSON.parse(read("package.json"));
     expect(pkg.dependencies["better-sqlite3"]).toBe("^12.6.2");
     expect(pkg.dependencies.pg).toBeUndefined();
