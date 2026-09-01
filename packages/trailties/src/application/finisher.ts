@@ -18,16 +18,9 @@
  * are Proxy-generated (`string-inquirer.ts:12-28`) and so are absent from its
  * static type.
  *
- * Four of Rails' fourteen finisher initializers have no declaration here,
+ * Three of Rails' fourteen finisher initializers have no declaration here,
  * each because the subsystem it drives is unported:
  *
- * - `setup_default_session_store` (`finisher.rb:48-54`) — sets
- *   `config.session_store :cookie_store` so `build_stack` mounts a store
- *   (`default_middleware_stack.rb:76-81`). The `Configuration#session_store`
- *   reader it writes through IS ported (`application/configuration.ts`), but
- *   `Rack::Session::Abstract::Persisted#call` is not — the ported
- *   `AbstractStore` has no `call`, so a mounted `CookieStore` cannot serve a
- *   request. Blocked on porting Rack's session middleware cycle.
  * - `configure_executor_for_concurrency` (`finisher.rb:118-135`), with its
  *   `MonitorHook` / `InterlockHook` — `ActiveSupport::Executor#register_hook`
  *   and `ActiveSupport::Dependencies.interlock` are both unported, so there is
@@ -62,6 +55,8 @@ export interface FinisherConfig {
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
   eagerLoadNamespaces: unknown[];
+  sessionStoreQ(): unknown;
+  sessionStore(newSessionStore?: unknown, options?: Record<string, unknown>): unknown;
 }
 
 export interface FinisherRoutesReloader {
@@ -72,6 +67,8 @@ export interface FinisherRoutesReloader {
 
 export interface FinisherHost {
   config: FinisherConfig;
+  readonly constructor: { name: string };
+  readonly railtieName: string;
   routes(): FinisherRoutes;
   reloader: FinisherReloader;
   routesReloader(): FinisherRoutesReloader;
@@ -105,6 +102,27 @@ Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost
     controllerConstants.set(name, klass);
   }
 });
+
+/**
+ * Mirrors `Finisher`'s `setup_default_session_store` initializer
+ * (`finisher.rb:47-54`) — "Setup default session store if not already set in
+ * config/application.rb". It runs `before: :build_middleware_stack` because
+ * `DefaultMiddlewareStack#build_stack` only mounts a session store when
+ * `config.session_store` answers one (`default_middleware_stack.rb:76-81`).
+ *
+ * `app.class.name` is `nil` for an anonymous Rails application class; the JS
+ * analogue is a constructor with an empty `name`.
+ */
+Finisher.initializer(
+  "setup_default_session_store",
+  { before: "build_middleware_stack" },
+  function (this: FinisherHost) {
+    if (this.config.sessionStoreQ() == null) {
+      const appName = this.constructor.name ? this.railtieName.replace(/_application$/, "") : "";
+      this.config.sessionStore(":cookie_store", { key: `_${appName}_session` });
+    }
+  },
+);
 
 Finisher.initializer("build_middleware_stack", function (this: FinisherHost) {
   this.buildMiddlewareStack();

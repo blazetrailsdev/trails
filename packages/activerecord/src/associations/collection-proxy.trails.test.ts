@@ -39,6 +39,15 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(await proxy.count()).toBe(3);
   });
 
+  it("refuses to coerce `length` to a number", async () => {
+    const author = await authorWithPosts();
+    const proxy = association<Post>(author, "posts") as any;
+    await proxy.load();
+
+    expect(() => proxy.length > 0).toThrow(/`length` is a method on a collection/);
+    expect(await proxy.length()).toBe(3);
+  });
+
   it("is iterable via `for ... of`", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");

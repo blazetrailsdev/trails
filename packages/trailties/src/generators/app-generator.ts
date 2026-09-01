@@ -256,9 +256,6 @@ export class AppGenerator extends AppBase {
 /.env*
 !/.env.example
 
-/db/*.sqlite3
-/db/*.sqlite3-*
-
 /log/*
 !/log/.gitkeep
 
@@ -926,7 +923,7 @@ export async function setupTestDatabase(): Promise<void> {
   private createDirectoryPlaceholders(): void {
     this.createFile("lib/tasks/.gitkeep", "");
     this.createFile("log/.gitkeep", "");
-    if (!this.skip("ActiveStorage")) {
+    if (!this.skipStorage()) {
       this.createFile("storage/.gitkeep", "");
     }
     this.createFile("tmp/.gitkeep", "");
@@ -1031,15 +1028,15 @@ dist
         return `export default {
   development: {
     adapter: "${adapter}",
-    database: "db/development.sqlite3",
+    database: "storage/development.sqlite3",
   },
   test: {
     adapter: "${adapter}",
-    database: "db/test.sqlite3",
+    database: "storage/test.sqlite3",
   },
   production: {
     adapter: "${adapter}",
-    database: "db/production.sqlite3",
+    database: "storage/production.sqlite3",
   },
 };
 `;

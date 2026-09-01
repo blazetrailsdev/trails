@@ -16,7 +16,16 @@ import type { ConfigurationBlock } from "../trailtie/configuration.js";
 import type { Mapper } from "@blazetrails/actionpack";
 
 class TestApp extends Finisher {
-  config: FinisherConfig = { toPrepareBlocks: [], eagerLoad: null, eagerLoadNamespaces: [] };
+  sessionStoreArgs: unknown[] | null = null;
+  config: FinisherConfig = {
+    toPrepareBlocks: [],
+    eagerLoad: null,
+    eagerLoadNamespaces: [],
+    sessionStoreQ: () => (this.sessionStoreArgs === null ? null : this.sessionStoreArgs[0]),
+    sessionStore: (newSessionStore?: unknown, options?: Record<string, unknown>) =>
+      (this.sessionStoreArgs = [newSessionStore, options]),
+  };
+  railtieName = "test_app_application";
   calls: string[] = [];
   internalRoutes: string[] = [];
   toPrepared: ConfigurationBlock[] = [];
@@ -87,6 +96,7 @@ describe("Finisher", () => {
     expect(names).toEqual([
       "add_generator_templates",
       "setup_main_autoloader",
+      "setup_default_session_store",
       "build_middleware_stack",
       "define_main_app_helper",
       "add_to_prepare_blocks",
@@ -101,7 +111,6 @@ describe("Finisher", () => {
   it("does not register the intentionally skipped initializers", () => {
     const names = Finisher._ownInitializers().map((i) => i.name);
     for (const skipped of [
-      "setup_default_session_store",
       "configure_executor_for_concurrency",
       "set_clear_dependencies_hook",
       "enable_yjit",
@@ -114,6 +123,19 @@ describe("Finisher", () => {
     const app = new TestApp();
     await run(app, "add_generator_templates");
     expect(app.calls).toEqual(["generator_templates"]);
+  });
+
+  it("setup_default_session_store sets a cookie store keyed on the app name", async () => {
+    const app = new TestApp();
+    await run(app, "setup_default_session_store");
+    expect(app.sessionStoreArgs).toEqual([":cookie_store", { key: "_test_app_session" }]);
+  });
+
+  it("setup_default_session_store leaves a configured session store alone", async () => {
+    const app = new TestApp();
+    app.sessionStoreArgs = [":disabled", {}];
+    await run(app, "setup_default_session_store");
+    expect(app.sessionStoreArgs).toEqual([":disabled", {}]);
   });
 
   it("build_middleware_stack calls buildMiddlewareStack", async () => {

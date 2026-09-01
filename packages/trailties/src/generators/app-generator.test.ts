@@ -124,7 +124,39 @@ describe("AppGenerator", () => {
     expect(exists("app/channels")).toBe(false);
     expect(exists("app/views/layouts/mailer.html.tse")).toBe(false);
     expect(exists("app/views/layouts/mailer.text.tse")).toBe(false);
+  });
+
+  // `skip_storage?` is `skip_active_storage? && !sqlite3?`
+  // (`railties/lib/rails/generators/app_base.rb:364-366`): a sqlite3 app keeps
+  // `storage/` even with Active Storage skipped, because the database file
+  // lives there (`sqlite3.yml.tt:14,21`).
+  it("keeps storage/ for a sqlite3 app with Active Storage skipped", async () => {
+    await makeGen("sqlite").run();
+
+    expect(exists("storage/.gitkeep")).toBe(true);
+  });
+
+  it("skips storage/ for a non-sqlite3 app with Active Storage skipped", async () => {
+    await makeGen("postgres").run();
+
     expect(exists("storage")).toBe(false);
+  });
+
+  it("writes the sqlite3 database under storage/", async () => {
+    await makeGen("sqlite").run();
+
+    const config = fs.readFileSync(appPath("config/database.ts"), "utf-8");
+    expect(config).toContain('database: "storage/development.sqlite3"');
+    expect(config).toContain('database: "storage/test.sqlite3"');
+    expect(config).toContain('database: "storage/production.sqlite3"');
+  });
+
+  it("does not ignore db/*.sqlite3 in the generated .gitignore", async () => {
+    await makeGen("sqlite").run();
+
+    const gitignore = fs.readFileSync(appPath(".gitignore"), "utf-8");
+    expect(gitignore).not.toContain("sqlite3");
+    expect(gitignore).toContain("/storage/*");
   });
 
   it("emits each subsystem's scaffolding once its skip flag is off", async () => {

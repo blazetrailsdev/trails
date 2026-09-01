@@ -287,9 +287,10 @@ describe("Application", () => {
       class IApp6 extends Application {}
       Application.register(IApp6);
       const names = IApp6.instance().initializers.map((i) => i.name);
-      expect(names.slice(-10)).toEqual([
+      expect(names.slice(-11)).toEqual([
         "add_generator_templates",
         "setup_main_autoloader",
+        "setup_default_session_store",
         "build_middleware_stack",
         "define_main_app_helper",
         "add_to_prepare_blocks",
