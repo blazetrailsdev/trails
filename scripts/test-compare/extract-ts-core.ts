@@ -349,22 +349,6 @@ export function extractTestsFromSource(content: string, relativePath: string): T
   const currentAncestors: string[] = [];
   const gateStack: TestGate[] = [];
 
-  // Same-file helpers that REGISTER tests — the TS analogue of Rails' shared
-  // test-case MODULE. Rails records `module PostgresqlJSONSharedTestCases`'s
-  // three `def test_*` once, at module scope
-  // (`test/cases/adapters/postgresql/json_test.rb:6-39`), and the classes that
-  // `include` it supply the gate they run under (`PostgreSQLTestCase`,
-  // `test/cases/test_case.rb:303-305`). `enterSuite` builds its gate stack
-  // LEXICALLY, so a helper declared at top level had its `it()`s walked with an
-  // empty stack and emitted ungated — three hard `[missing-gate]` rows with no
-  // baseline, red in CI while every local vitest run stayed green (PR #7141).
-  //
-  // So the declaration body is DEFERRED out of the lexical walk and replayed
-  // once afterwards, under the gate its call sites agree on. Once, not once per
-  // call: Ruby emits the module's cases once too, and replaying per call site
-  // would invent a second copy of each with an ancestor Rails does not record.
-  // Call sites that DISAGREE record nothing — the helper is not provably gated
-  // then, and a guessed gate is worse than the absent one.
   const registrars = testRegisteringHelpers(sourceFile, helpers);
   const deferredBodies = new Map<string, ts.Node>();
   const callSiteGates = new Map<string, (TestGate | undefined)[]>();
@@ -467,11 +451,8 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     if (ts.isForOfStatement(node)) {
       if (expandForOf(node)) return;
     }
-    // Only a TOP-LEVEL declaration is deferred. A helper declared INSIDE a
-    // describe is already walked with that suite's gate and ancestors on the
-    // stack, and hoisting it out would strip the ancestors Rails does record.
-    const declared =
-      currentAncestors.length === 0 && gateStack.length === 0 ? declaredHelperName(node) : null;
+    const atFileScope = currentAncestors.length === 0 && gateStack.length === 0;
+    const declared = deferrableHelperName(node, atFileScope);
     if (declared !== null && registrars.has(declared)) {
       deferredBodies.set(declared, resolveHelper(helpers, declared, node.pos)!);
       return;
@@ -480,13 +461,13 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       const expression = node.expression;
       const root = calleeRootName(expression);
       if (root) assertRegisteredGateWrapper(root, relativePath);
-      if (ts.isIdentifier(expression) && registrars.has(expression.text)) {
-        const gates = callSiteGates.get(expression.text) ?? [];
-        gates.push(activeGate());
-        callSiteGates.set(expression.text, gates);
-      }
       if (ts.isIdentifier(expression)) {
         const funcName = expression.text;
+        if (registrars.has(funcName)) {
+          const gates = callSiteGates.get(funcName) ?? [];
+          gates.push(activeGate());
+          callSiteGates.set(funcName, gates);
+        }
 
         if (ADAPTER_SUITE_WRAPPERS.has(funcName)) {
           const title = getSuiteTitle(node, 0, bindings);
@@ -621,9 +602,17 @@ export function extractTestsFromSource(content: string, relativePath: string): T
   return fileInfo;
 }
 
-/** The name a node DECLARES a same-file helper under, or null when it declares
- *  none — the two shapes {@link collectHelpers} records. */
-function declaredHelperName(node: ts.Node): string | null {
+/**
+ * The name a node declares a same-file helper under — the two shapes
+ * {@link collectHelpers} records — or null where it declares none or is not at
+ * file scope.
+ *
+ * Only a TOP-LEVEL declaration is deferrable. A helper declared INSIDE a
+ * describe is already walked with that suite's gate and ancestors on the stack,
+ * and hoisting it out would strip the ancestors Rails does record.
+ */
+function deferrableHelperName(node: ts.Node, atFileScope: boolean): string | null {
+  if (!atFileScope) return null;
   if (ts.isFunctionDeclaration(node) && node.name && node.body) return node.name.text;
   if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
     const init = node.initializer;
@@ -636,10 +625,25 @@ function declaredHelperName(node: ts.Node): string | null {
 
 /**
  * Same-file helpers whose body registers a test — an `it` / `test` /
- * `itIfSupports` call, in any of its modifier forms. Restricted to those, and
- * to helpers actually CALLED in the file, so the deferral touches only the
- * shared-cases shape: an assertion helper (`testCopyTable`) keeps being folded
- * in lexically by `countAssertions`, which is a different reader entirely.
+ * `itIfSupports` call, in any of its modifier forms. These are the TS analogue
+ * of Rails' shared test-case MODULE: Rails records
+ * `module PostgresqlJSONSharedTestCases`'s three `def test_*` once, at module
+ * scope (`test/cases/adapters/postgresql/json_test.rb:6-39`), and the classes
+ * that `include` it supply the gate they run under (`PostgreSQLTestCase`,
+ * `test/cases/test_case.rb:303-305`).
+ *
+ * `enterSuite` builds its gate stack LEXICALLY, so such a helper declared at
+ * top level had its `it()`s walked with an empty stack and emitted ungated —
+ * three hard `[missing-gate]` rows with no baseline, red in CI while every
+ * local vitest run stayed green (PR #7141). So its body is DEFERRED out of the
+ * lexical walk and replayed once afterwards, under {@link agreedGate}. Once,
+ * not once per call site: Ruby emits the module's cases once too, and replaying
+ * per call would invent a second copy of each under an ancestor Rails does not
+ * record.
+ *
+ * Restricted to helpers actually CALLED in the file, so the deferral touches
+ * only that shape: an assertion helper (`testCopyTable`) keeps being folded in
+ * lexically by `countAssertions`, which is a different reader entirely.
  */
 function testRegisteringHelpers(sourceFile: ts.SourceFile, helpers: HelperMap): Set<string> {
   const registers = (body: ts.Node): boolean => {
@@ -670,7 +674,9 @@ function testRegisteringHelpers(sourceFile: ts.SourceFile, helpers: HelperMap): 
 }
 
 /** The one gate every call site of a deferred helper carries, or undefined when
- *  they disagree, one of them is ungated, or the helper is never called. */
+ *  they disagree, one of them is ungated, or the helper is never called — a
+ *  helper its call sites do not agree on is not provably gated, and a guessed
+ *  gate is worse than the absent one. */
 function agreedGate(gates: (TestGate | undefined)[] | undefined): TestGate | undefined {
   if (!gates || gates.length === 0) return undefined;
   const first = gates[0];
@@ -719,7 +725,15 @@ function getArgString(node: ts.CallExpression, index: number): string | null {
   return null;
 }
 
-/** Placeholder standing in for one `${...}` of a recovered template title. */
+/**
+ * Placeholder standing in for one `${...}` of a recovered template title, and
+ * for a suite title that is a bare identifier ({@link getSuiteTitle}).
+ *
+ * It is a label for the audit, never a name to match on, so `compare.ts` keeps
+ * a test whose PATH carries it out of the path indexes: no Rails describe can
+ * equal a recovered skeleton, and the case is left to match on its own static
+ * description instead.
+ */
 export const DYNAMIC_TITLE_PLACEHOLDER = "<expr>";
 
 /**

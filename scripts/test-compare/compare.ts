@@ -650,11 +650,6 @@ export function main(args: string[] = process.argv.slice(2)) {
         if (!descToFileCounts.has(nd)) descToFileCounts.set(nd, new Map());
         increment(descToFileCounts.get(nd)!, relPath);
 
-        // A path carrying a recovered SUITE skeleton (`<expr> quoting`, from a
-        // template- or identifier-titled describe) is a label, not a name: no
-        // Rails describe can equal it, so it stays out of every path index and
-        // the case is left to match on its description alone. Its own
-        // description is static and indexed above like any other.
         if (np.includes(DYNAMIC_TITLE_PLACEHOLDER)) continue;
         appendIndex(pathIdx, np, i);
         const npAlias = aliasKey(np);

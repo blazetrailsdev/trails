@@ -624,7 +624,6 @@ export function extractFromProgram(
     const localImports = new Map<string, { sourceName: string; moduleSpecifier: string }>();
     // Renamed-import aliases for this file, consumed by extractCalls below.
     currentImportAliases = collectImportAliases(sourceFile);
-    // Ruby module-body visibility, read off the file's `defineModule(...)`.
     const sectionVisibility = collectModuleSectionVisibility(sourceFile);
 
     ts.forEachChild(sourceFile, (node) => {
@@ -1931,6 +1930,16 @@ export function internalJsDocTagApplies(node: ts.Node): boolean {
  * `@internal` JSDoc tag `blazetrails/rails-private-jsdoc` requires is
  * documentary; a comment is not something the extractor reads for visibility.
  *
+ * A section is read as its object literal — written inline, or, as both live
+ * call sites spell it, a same-file `const QueryMethodsPrivateInstanceMethods =
+ * {...}`; `defineModule(pub, undefined, priv)` (`spawn-methods.ts:78`) declines
+ * a section rather than passing an empty one. An entry may be shorthand, a
+ * renamed `key: fn`, or an ALIAS such as
+ * `buildHavingClause: buildWhereClause` (`query_methods.rb:1654`) — an alias
+ * stamps the function it REFERENCES, which is the entry the manifest carries.
+ * A member written inline (`{ priv() {} }`) declares no top-level function and
+ * so has nothing to stamp.
+ *
  * Same-file only, matching the section objects' own contract: they can only
  * name what the file declares.
  */
@@ -1954,8 +1963,6 @@ function collectModuleSectionVisibility(
       ? unwrap(e.expression)
       : e;
 
-  // The section's object literal: written inline, or — as both live call sites
-  // spell it — a same-file `const QueryMethodsPrivateInstanceMethods = {...}`.
   const sectionObject = (arg: ts.Expression | undefined): ts.ObjectLiteralExpression | null => {
     if (!arg) return null;
     const e = unwrap(arg);
@@ -1976,22 +1983,14 @@ function collectModuleSectionVisibility(
   const record = (arg: ts.Expression | undefined, visibility: "protected" | "private"): void => {
     if (!arg) return;
     const e = unwrap(arg);
-    // `defineModule(pub, undefined, priv)` (spawn-methods.ts:78) declines the
-    // protected section rather than passing an empty one.
     if (ts.isIdentifier(e) && e.text === "undefined") return;
     const object = sectionObject(arg);
     if (object === null) throw new Error(unresolvedSectionMessage(arg, visibility));
     for (const prop of object.properties) {
-      // A member written INLINE (`{ priv() {} }`) declares no top-level
-      // function, so there is no extracted entry to stamp — only a REFERENCE
-      // to one is this stamp's business.
       let name: string;
       if (ts.isShorthandPropertyAssignment(prop)) {
         name = prop.name.text;
       } else if (ts.isPropertyAssignment(prop)) {
-        // `buildHavingClause: buildWhereClause` (query_methods.rb:1654) is an
-        // ALIAS: the entry the manifest carries is the referenced function, so
-        // that is what the section stamps.
         const init = unwrap(prop.initializer);
         if (!ts.isIdentifier(init)) continue;
         name = init.text;
