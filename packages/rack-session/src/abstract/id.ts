@@ -1,6 +1,7 @@
 import { ArgumentError, getCrypto, inspect, KeyError, valuesAt } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS, Request, ResponseRaw } from "@blazetrails/rack";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 
 export class SessionId {
   static ID_VERSION = 2;
@@ -326,7 +327,7 @@ export interface PersistedRequest {
 }
 
 /** @noRailsEquivalent PERMANENT */
-function isTruthy(value: unknown): boolean {
+export function isTruthy(value: unknown): boolean {
   return value != null && value !== false;
 }
 
@@ -390,15 +391,20 @@ export class Persisted {
   }
 
   generateSid(secure: unknown = this.sidSecure): unknown {
-    if (isTruthy(secure)) {
-      return getCrypto().randomBytes(this.sidLength).toString("hex");
-    } else {
-      const limit = (1n << BigInt(this.sidbits)) - 1n;
-      let value = 0n;
-      for (let i = 0; i < this.sidbits; i += 32) {
-        value = (value << 32n) | BigInt(Math.floor(Math.random() * 0x1_0000_0000));
+    try {
+      if (isTruthy(secure)) {
+        return getCrypto().randomBytes(this.sidLength).toString("hex");
+      } else {
+        const limit = (1n << BigInt(this.sidbits)) - 1n;
+        let value = 0n;
+        for (let i = 0; i < this.sidbits; i += 32) {
+          value = (value << 32n) | BigInt(Math.floor(Math.random() * 0x1_0000_0000));
+        }
+        return (value % limit).toString(16).padStart(this.sidLength, "0");
       }
-      return (value % limit).toString(16).padStart(this.sidLength, "0");
+    } catch (error) {
+      if (error instanceof NotImplementedError) return this.generateSid(false);
+      throw error;
     }
   }
 

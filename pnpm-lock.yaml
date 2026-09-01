@@ -368,6 +368,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/ruby-compat: {}
 

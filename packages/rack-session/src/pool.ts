@@ -2,15 +2,11 @@ import type { RackApp } from "@blazetrails/rack";
 
 import {
   DEFAULT_OPTIONS as ID_DEFAULT_OPTIONS,
+  isTruthy,
   PersistedSecure,
   type PersistedRequest,
   SessionId,
 } from "./abstract/id.js";
-
-/** @noRailsEquivalent PERMANENT */
-function isTruthy(value: unknown): boolean {
-  return value != null && value !== false;
-}
 
 export class Pool extends PersistedSecure {
   pool!: Record<string, Record<string, unknown> | undefined>;
@@ -34,7 +30,10 @@ export class Pool extends PersistedSecure {
     delete this.defaultOptions["allowFallback"];
   }
 
-  /** @missingRailsCall key? — PERMANENT */
+  /**
+   * @missingRailsCall key? — PERMANENT
+   * @missingRailsArgs super(*args) — PERMANENT
+   */
   override generateSid({ useMutex: _useMutex = true }: { useMutex?: boolean } = {}): SessionId {
     for (;;) {
       const sid = super.generateSid();

@@ -76,6 +76,11 @@ describe("Rack::Session::Abstract::PersistedSecure", () => {
     expect(sid.publicId).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("generate_sid takes the rand arm when :secure_random is false", () => {
+    const store = new PersistedSecure(undefined, { secureRandom: false });
+    expect(store.generateSid().publicId).toMatch(/^[0-9a-f]{32}$/);
+  });
+
   it("extract_session_id answers the falsy public id itself", () => {
     const store = new PersistedSecure(undefined, { cookieOnly: true });
     expect(store.extractSessionId(stubRequest())).toBeNull();
