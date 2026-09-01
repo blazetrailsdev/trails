@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type { PersistedRequest, PersistedSession } from "../index.js";
-import { DEFAULT_OPTIONS, Persisted, PersistedSecure, SessionId } from "../index.js";
+import type { PersistedRequest, PersistedSession, SessionOptions } from "../index.js";
+import {
+  DEFAULT_OPTIONS,
+  Persisted,
+  PersistedSecure,
+  SecureSessionHash,
+  SessionHash,
+  SessionId,
+} from "../index.js";
 
 function stubRequest(): PersistedRequest {
   return {
@@ -10,7 +17,18 @@ function stubRequest(): PersistedRequest {
     params: {},
     getHeader: () => undefined as unknown as PersistedSession,
     setHeader: () => {},
+    sessionOptions: {} as unknown as SessionOptions,
   };
+}
+
+function stubStore(
+  id: unknown = "id",
+  session: Record<string, unknown> = { foo: ":bar", baz: ":qux", x: { y: 1 } },
+): Persisted {
+  return {
+    loadSession: () => [id, session],
+    sessionExists: () => true,
+  } as unknown as Persisted;
 }
 
 describe("Rack::Session::SessionId", () => {
@@ -63,5 +81,48 @@ describe("Rack::Session::Abstract::PersistedSecure", () => {
   it("cookie_value reads cookie_value off the written data", () => {
     const sid = new SessionId("xyz");
     expect(new PersistedSecure().cookieValue(sid)).toBe("xyz");
+  });
+});
+
+describe("Rack::Session::Abstract::SessionHash", () => {
+  function sessionHash(session: Record<string, unknown> = { foo: ":bar" }): SessionHash {
+    return new SessionHash(stubStore("id", session), null as unknown as PersistedRequest);
+  }
+
+  it("fetch answers a stored null rather than the default", () => {
+    expect(sessionHash({ foo: null }).fetch("foo", ":default")).toBeNull();
+  });
+
+  it("fetch reads an explicitly passed undefined default as a default, not an omission", () => {
+    expect(sessionHash().fetch("unknown", undefined)).toBeUndefined();
+  });
+
+  it("inspect renders the not-yet-loaded form until the store is read", () => {
+    const hash = sessionHash();
+    expect(hash.inspect()).toMatch(/^#<SessionHash:0x[0-9a-f]+ not yet loaded>$/);
+    hash.loadBang();
+    expect(hash.inspect()).toBe('{"foo"=>:bar}');
+  });
+
+  it("id memoizes the seat, so a null extracted id is asked for once", () => {
+    let calls = 0;
+    const store = {
+      extractSessionId: () => {
+        calls += 1;
+        return null;
+      },
+    } as unknown as Persisted;
+    const hash = new SessionHash(store, null as unknown as PersistedRequest);
+    expect(hash.id()).toBeNull();
+    expect(hash.id()).toBeNull();
+    expect(calls).toBe(1);
+  });
+});
+
+describe("Rack::Session::Abstract::Persisted", () => {
+  it("session_class answers SessionHash, and SecureSessionHash on PersistedSecure", () => {
+    expect(new Persisted().sessionClass()).toBe(SessionHash);
+    expect(new PersistedSecure().sessionClass()).toBe(SecureSessionHash);
+    expect(PersistedSecure.SecureSessionHash).toBe(SecureSessionHash);
   });
 });

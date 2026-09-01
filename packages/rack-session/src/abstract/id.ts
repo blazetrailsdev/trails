@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/activesupport";
+import { ArgumentError, getCrypto, inspect, KeyError } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS, Request, ResponseRaw } from "@blazetrails/rack";
 
@@ -37,6 +37,241 @@ export class SessionId {
   }
 }
 
+const objectIds = new WeakMap<object, number>();
+let nextObjectId = 1;
+
+function objectIdHex(object: object): string {
+  let id = objectIds.get(object);
+  if (id == null) {
+    id = nextObjectId++;
+    objectIds.set(object, id);
+  }
+  return id.toString(16);
+}
+
+export class SessionHash implements PersistedSession {
+  setId(id: unknown): void {
+    this._id = id;
+    this.idDefined = true;
+  }
+
+  static Unspecified: unknown = {};
+
+  private _store: Persisted;
+  private req: PersistedRequest;
+  private loaded: boolean;
+  private _id: unknown;
+  private idDefined = false;
+  private _exists!: boolean;
+  private existsDefined = false;
+  private data!: Record<string, unknown>;
+
+  static find(req: PersistedRequest): unknown {
+    return req.getHeader(RACK_SESSION);
+  }
+
+  static set(req: PersistedRequest, session: unknown): void {
+    req.setHeader(RACK_SESSION, session);
+  }
+
+  static setOptions(req: PersistedRequest, options: Record<string, unknown>): void {
+    req.setHeader(RACK_SESSION_OPTIONS, { ...options });
+  }
+
+  constructor(store: Persisted, req: PersistedRequest) {
+    this._store = store;
+    this.req = req;
+    this.loaded = false;
+  }
+
+  id(): unknown {
+    if (this.loaded || this.idDefined) return this._id;
+    this.setId(this._store.extractSessionId(this.req));
+    return this._id;
+  }
+
+  options(): SessionOptions {
+    return this.req.sessionOptions as SessionOptions;
+  }
+
+  each(block: (key: string, value: unknown) => void): Record<string, unknown> {
+    this.loadForReadBang();
+    for (const key of Object.keys(this.data)) {
+      block(key, this.data[key]);
+    }
+    return this.data;
+  }
+
+  get(key: unknown): unknown {
+    this.loadForReadBang();
+    return this.data[String(key)];
+  }
+
+  dig(key: unknown, ...keys: unknown[]): unknown {
+    if (arguments.length === 0) {
+      throw new ArgumentError("wrong number of arguments (given 0, expected 1+)");
+    }
+    this.loadForReadBang();
+    let value: unknown = this.data[String(key)];
+    for (const k of keys) {
+      if (value == null) return undefined;
+      if (typeof value !== "object") {
+        throw new TypeError(`${(value as object).constructor.name} does not have #dig method`);
+      }
+      value = (value as Record<string, unknown>)[k as string];
+    }
+    return value;
+  }
+
+  fetch(key: unknown, defaultValue?: unknown, block?: (key: string) => unknown): unknown {
+    if (arguments.length < 2) defaultValue = SessionHash.Unspecified;
+    this.loadForReadBang();
+    const k = String(key);
+    if (defaultValue === SessionHash.Unspecified) {
+      if (Object.hasOwn(this.data, k)) return this.data[k];
+      if (block) return block(k);
+      throw new KeyError(`key not found: "${k}"`);
+    } else {
+      if (Object.hasOwn(this.data, k)) return this.data[k];
+      if (block) return block(k);
+      return defaultValue;
+    }
+  }
+
+  hasKey(key: unknown): boolean {
+    this.loadForReadBang();
+    return Object.hasOwn(this.data, String(key));
+  }
+
+  isKey(key: unknown): boolean {
+    return this.hasKey(key);
+  }
+
+  isInclude(key: unknown): boolean {
+    return this.hasKey(key);
+  }
+
+  set(key: unknown, value: unknown): void {
+    this.loadForWriteBang();
+    this.data[String(key)] = value;
+  }
+
+  store(key: unknown, value: unknown): void {
+    this.set(key, value);
+  }
+
+  clear(): Record<string, unknown> {
+    this.loadForWriteBang();
+    for (const key of Object.keys(this.data)) {
+      delete this.data[key];
+    }
+    return this.data;
+  }
+
+  destroy(): void {
+    this.clear();
+    this.setId(this._store.deleteSession(this.req, this.id(), this.options()));
+  }
+
+  toHash(): Record<string, unknown> {
+    this.loadForReadBang();
+    return { ...this.data };
+  }
+
+  update(hash: unknown): Record<string, unknown> {
+    this.loadForWriteBang();
+    return Object.assign(this.data, this.stringifyKeys(hash));
+  }
+
+  mergeBang(hash: unknown): Record<string, unknown> {
+    return this.update(hash);
+  }
+
+  replace(hash: unknown): Record<string, unknown> {
+    this.loadForWriteBang();
+    const other = this.stringifyKeys(hash);
+    for (const key of Object.keys(this.data)) {
+      delete this.data[key];
+    }
+    return Object.assign(this.data, other);
+  }
+
+  delete(key: unknown): unknown {
+    this.loadForWriteBang();
+    const k = String(key);
+    const value = this.data[k];
+    delete this.data[k];
+    return value;
+  }
+
+  inspect(): string {
+    if (this.isLoaded()) {
+      return inspect(this.data);
+    } else {
+      return `#<${this.constructor.name}:0x${objectIdHex(this)} not yet loaded>`;
+    }
+  }
+
+  isExists(): boolean {
+    if (this.existsDefined) return this._exists;
+    this.data = {};
+    this._exists = this._store.sessionExists(this.req);
+    this.existsDefined = true;
+    return this._exists;
+  }
+
+  isLoaded(): boolean {
+    return this.loaded;
+  }
+
+  isEmpty(): boolean {
+    this.loadForReadBang();
+    return Object.keys(this.data).length === 0;
+  }
+
+  keys(): string[] {
+    this.loadForReadBang();
+    return Object.keys(this.data);
+  }
+
+  values(): unknown[] {
+    this.loadForReadBang();
+    return Object.values(this.data);
+  }
+
+  /** @internal */
+  loadForReadBang(): void {
+    if (!this.isLoaded() && this.isExists()) this.loadBang();
+  }
+
+  /** @internal */
+  loadForWriteBang(): void {
+    if (!this.isLoaded()) this.loadBang();
+  }
+
+  /** @internal */
+  loadBang(): void {
+    const [id, session] = this._store.loadSession(this.req);
+    this.setId(id);
+    this.data = this.stringifyKeys(session);
+    this.loaded = true;
+  }
+
+  /** @internal */
+  stringifyKeys(other: unknown): Record<string, unknown> {
+    const hash: Record<string, unknown> = {};
+    const candidate = other as { toHash?: () => Record<string, unknown> } | null | undefined;
+    const source =
+      typeof candidate?.toHash === "function"
+        ? candidate.toHash()
+        : (other as Record<string, unknown>);
+    for (const key of Object.keys(source)) {
+      hash[String(key)] = source[key];
+    }
+    return hash;
+  }
+}
+
 export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({
   key: RACK_SESSION,
   path: "/",
@@ -52,7 +287,7 @@ export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze(
   secureRandom: true,
 });
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE converge-rack-session-options-onto-hash-reads */
 export interface SessionOptions {
   get(key: string): unknown;
   valuesAt(...keys: string[]): unknown[];
@@ -82,6 +317,7 @@ export interface PersistedRequest {
   params: Record<string, unknown>;
   getHeader(key: string): PersistedSession;
   setHeader(key: string, value: unknown): void;
+  sessionOptions: SessionOptions | Record<string, unknown>;
   ssl?: unknown;
 }
 
@@ -293,15 +529,16 @@ export class Persisted {
 
   /** @internal */
   sessionClass(): SessionClass {
-    // @nie disposition=blocked-on-session-hash-port rails=rack-session/lib/rack/session/abstract/id.rb:431 cluster=rack-session
-    throw new Error("Rack::Session::Abstract::SessionHash is not ported.");
+    return SessionHash;
   }
 
+  /** @missingRailsCall store — CONVERGEABLE port-rack-session-pool */
   findSession(_req: PersistedRequest, _sid: unknown): [unknown, Record<string, unknown> | null] {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:440 cluster=rack-session
     throw new Error("#find_session not implemented.");
   }
 
+  /** @missingRailsCall store — CONVERGEABLE port-rack-session-pool */
   writeSession(
     _req: PersistedRequest,
     _sid: unknown,
@@ -312,13 +549,32 @@ export class Persisted {
     throw new Error("#write_session not implemented.");
   }
 
+  /** @missingRailsCall delete — CONVERGEABLE port-rack-session-pool */
   deleteSession(_req: PersistedRequest, _sid: unknown, _options: SessionOptions): unknown {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:455 cluster=rack-session
     throw new Error("#delete_session not implemented");
   }
 }
 
+export class SecureSessionHash extends SessionHash {
+  override get(key: unknown): unknown {
+    if (key === "session_id") {
+      this.loadForReadBang();
+      const id = this.id();
+      if (id instanceof SessionId) {
+        return id.publicId;
+      } else {
+        return id;
+      }
+    } else {
+      return super.get(key);
+    }
+  }
+}
+
 export class PersistedSecure extends Persisted {
+  static SecureSessionHash = SecureSessionHash;
+
   override generateSid(secure?: unknown): SessionId {
     return new SessionId(String(super.generateSid(secure)));
   }
@@ -327,6 +583,11 @@ export class PersistedSecure extends Persisted {
     const publicId = super.extractSessionId(request);
     if (!isTruthy(publicId)) return (publicId ?? null) as null | false;
     return new SessionId(String(publicId));
+  }
+
+  /** @internal */
+  override sessionClass(): SessionClass {
+    return SecureSessionHash;
   }
 
   /** @internal */
