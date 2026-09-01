@@ -47,8 +47,11 @@ describe("rubyCompatExport", () => {
     expect(jsEnumerableAliases("escape")).toEqual(["regexpEscape"]);
   });
 
-  it("leaves the Enumerable and fs-adapter tables in front of it", () => {
-    expect(jsEnumerableAliases("key?")).toEqual(["has"]);
+  it("unions with the Enumerable table, and leaves the fs-adapter one alone", () => {
+    // `key?` is `Map#has` on a Map receiver AND ruby-compat's `hasKey` on an
+    // object one; both spellings are the whole call, so neither shadows the
+    // other. `exist?` is claimed by the fs table alone.
+    expect(jsEnumerableAliases("key?")).toEqual(["has", "hasKey"]);
     expect(jsEnumerableAliases("exist?")).toEqual(["existsSync", "exists"]);
   });
 });

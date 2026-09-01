@@ -2437,8 +2437,7 @@ export class PostgreSQLAdapter
   async prepareStatement(sql: string, _binds: unknown[], _conn: pg.Client): Promise<string> {
     const pool = this._statements;
     const key = this.sqlKey(sql);
-    const existing = pool.get(key);
-    if (existing) return existing.name;
+    if (pool.isKey(key)) return pool.get(key)!.name;
     const name = pool.nextKey();
     await pool.set(key, { name });
     return name;

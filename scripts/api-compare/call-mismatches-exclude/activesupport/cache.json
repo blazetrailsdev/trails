@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "cache.ts",
+    "rubyName": "initialize",
+    "call": "key?",
+    "reason": "Mispairing, not an omission: cache.ts holds only the module functions plus a private `RuntimeError`, whose constructor is what `Cache::Store#initialize` (cache.rb:191) pairs with; the `options.key?(:pool)` / `key?(:compress)` reads live in the ported Store, which trails keeps in cache/store.ts."
+  }
+]

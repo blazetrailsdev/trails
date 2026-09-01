@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import type {
   SqliteBinds,
   SqliteConnection,
@@ -274,7 +275,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     this._config = { ...options };
     this._filename = filename;
     this._readonly = options.readonly ?? false;
-    this._strict = options.strict ?? SQLite3Adapter.strictStringsByDefault;
+    this._strict = hasKey(options, "strict")
+      ? options.strict!
+      : SQLite3Adapter.strictStringsByDefault;
     (this._config as SQLite3AdapterOptions).strict = this._strict;
     this.preparedStatements =
       !ActiveRecord.disablePreparedStatements &&
@@ -1524,7 +1527,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     await this.copyTableIndexes(from, to, rename);
 
     const columnsToCopy = definition.columns
-      .filter((col) => (col.options as Record<string, unknown>)["as"] === undefined)
+      .filter((col) => !hasKey(col.options as Record<string, unknown>, "as"))
       .map((col) => col.name);
     await this.copyTableContents(from, to, columnsToCopy, rename);
   }

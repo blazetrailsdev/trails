@@ -199,15 +199,21 @@ import {
 // therefore suppressed from the significant set (RFC 0025). Each name is
 // justified by the non-call construct it becomes.
 //
-// A name qualifies either because NO JS call form exists (`to_s`, `each`), or
-// because the only JS call form belongs to a receiver shape the ports don't use:
-// `key?`/`has_key?` alias to `Map#has`, but Rails' options/params hashes port to
-// object literals, whose membership tests are the `in` operator, `x.k !== undefined`,
-// or destructuring with a default. The gate cannot tell a faithful `"k" in opts`
-// from a dropped guard either way, so keeping them would baseline every
-// options-hash port forever with no way to ever discharge it. Names in this second
-// group keep their JS_ENUMERABLE_ALIASES entry: the alias is unreachable from here,
-// but lint-calls.ts still consumes the table's KEYS as its noise list.
+// A name qualifies ONLY because no JS call form exists at all. There is no
+// second group any more: `key?` / `has_key?` sat here because the only JS call
+// form was `Map#has` and a ported options hash is an object literal, whose
+// membership test was the `in` operator or `x.k !== undefined` — a shape the
+// gate cannot tell from a dropped guard. `@blazetrails/ruby-compat`'s `hasKey`
+// (the port of `rb_hash_has_key`, `vendor/ruby/hash.c:3671`) is that missing
+// call form, so RFC 0129 discharged both entries and the ports call it.
+//
+// The seven that remain are NOT candidates, and ruby-compat cannot make them
+// so: each becomes a language CONSTRUCT with no callee, not a call some package
+// could supply. `to_s` / `to_str` are a template literal and implicit String
+// coercion; `each` is a `for…of`; `present?` / `blank?` are truthiness tests;
+// `catch` is a clause, never a callee (see below); and `synchronize` is a mutex
+// acquisition JS has nothing to acquire (see below) — a Ruby `Mutex` is
+// deferred by RFC 0129 and is the only thing that could ever revisit it.
 //
 // DELIBERATELY NOT suppressed — `size`, `empty?`, `first`, `last`: these read as
 // plain Array/property idioms (`xs.length`, `xs.length === 0`, `xs[0]`, `xs.at(-1)`)
@@ -252,8 +258,6 @@ export const NO_JS_CALL_FORM = new Set([
   "present?", // truthiness (`x != null && x !== ""`)
   "blank?", // truthiness (`!x`)
   "to_str", // implicit String coercion — same family as `to_s`
-  "key?", // `"k" in opts` / `opts.k !== undefined` on a ported options object
-  "has_key?", // ditto
   "synchronize", // the block runs bare — JS has no mutex to acquire
   "catch", // `try { … } catch (e) { … }` — a clause, never a callee
 ]);

@@ -98,7 +98,10 @@ export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
  *  silence-only contract as the two tables above it. */
 export function jsEnumerableAliases(rubyCall: string): string[] {
   const aliases = JS_ENUMERABLE_ALIASES.get(rubyCall) ?? FS_ADAPTER_ALIASES.get(rubyCall);
-  return aliases ?? rubyCompatAliases(rubyCall);
+  /* A name can be claimed by both halves — `key?` is `Map#has` on a Map receiver
+     AND `@blazetrails/ruby-compat`'s `hasKey` on an object one — so the two are
+     UNIONED rather than short-circuited: either spelling is the whole call. */
+  return [...new Set([...(aliases ?? []), ...rubyCompatAliases(rubyCall)])];
 }
 
 /**

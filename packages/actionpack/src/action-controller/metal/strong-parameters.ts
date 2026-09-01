@@ -697,7 +697,7 @@ export class Parameters {
       return;
     }
     for (const [k, v] of Object.entries(filter)) {
-      if (!(k in this._data)) continue;
+      if (!this.hasKey(k)) continue;
       const val = this._data[k];
 
       if (val instanceof Parameters) {

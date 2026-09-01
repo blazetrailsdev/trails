@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 /**
  * ActionController::Renderer
  *
@@ -110,7 +111,7 @@ export class Renderer {
     // `defaultEnv` and skip `namedRoutes`).
     type EnvSlice = Pick<RouteSetLike, "defaultEnv">;
     const routes = (this._controller as { _routes?: EnvSlice | null } | null | undefined)?._routes;
-    if ("HTTP_HOST" in this._env || !routes) {
+    if (hasKey(this._env, "HTTP_HOST") || !routes) {
       return { ...this._env };
     }
     return { ...(routes.defaultEnv ?? {}), ...this._env };

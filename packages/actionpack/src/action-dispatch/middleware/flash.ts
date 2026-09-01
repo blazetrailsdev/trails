@@ -28,7 +28,7 @@ export interface FlashRequestHost {
   session: {
     isEnabled?(): boolean;
     isLoaded(): boolean;
-    hasKey(key: string): boolean;
+    isKey(key: string): boolean;
     get(key: string): unknown;
     set(key: string, value: unknown): void;
     delete(key: string): void;
@@ -77,7 +77,7 @@ export function commitFlash(this: FlashRequestHost): void {
   if (session.isEnabled && !session.isEnabled()) return;
 
   const hash = flashHash.call(this);
-  if (hash && (!hash.empty || session.hasKey("flash"))) {
+  if (hash && (!hash.empty || session.isKey("flash"))) {
     // Rails: `session["flash"] = flash_hash.to_session_value` (`flash.rb:76`),
     // whose shape is `{ "discard" => [], "flashes" => ... }` (`flash.rb:143-147`)
     // — the discriminator `from_session_value` reads to mark every carried key
@@ -98,7 +98,7 @@ export function commitFlash(this: FlashRequestHost): void {
   // Rails guards this with `session.loaded?` to avoid forcing a session
   // load just to clean up a nil flash entry.
   if (session.isLoaded()) {
-    if (session.hasKey("flash") && session.get("flash") == null) {
+    if (session.isKey("flash") && session.get("flash") == null) {
       session.delete("flash");
     }
   }

@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 export interface AssocTableMeta {
   joinForeignKey: string | string[];
   joinPrimaryKey(klass?: unknown): string | string[] | null;
@@ -105,7 +106,7 @@ export class AssociationQueryValue {
     if (!type) return false;
     const hash = typeof value.whereValuesHash === "function" ? value.whereValuesHash() : undefined;
     if (!hash) return true;
-    return !(type in hash);
+    return !hasKey(hash, type);
   }
 
   /** @missingRailsCall empty? — PERMANENT */

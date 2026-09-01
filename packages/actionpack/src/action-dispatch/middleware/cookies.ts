@@ -191,6 +191,7 @@ export class CookieJar implements Iterable<[string, string]> {
   }
 
   delete(name: string, options?: { path?: string; domain?: string }): string | undefined {
+    if (!this._cookies.has(name)) return undefined;
     if (this._committed) return undefined;
     const val = this._cookies.get(name);
     this._cookies.delete(name);

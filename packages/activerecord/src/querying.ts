@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { threadedConnectionFor } from "./connection-handling.js";
@@ -103,7 +104,7 @@ export function _loadFromSql<T extends typeof Base>(
   if (Object.keys(columnTypes).length !== 0) {
     const attributeTypes = this.attributeTypes();
     columnTypes = Object.fromEntries(
-      Object.entries(columnTypes).filter(([k]) => !Object.hasOwn(attributeTypes, k)),
+      Object.entries(columnTypes).filter(([k]) => !hasKey(attributeTypes, k)),
     );
   }
 

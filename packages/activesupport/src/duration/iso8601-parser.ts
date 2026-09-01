@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import type { DurationParts } from "../duration.js";
 import { inspect } from "../core-ext/object/inspect.js";
 import { isEmpty } from "../ruby-empty.js";
@@ -199,7 +200,10 @@ export class ISO8601Parser {
     if (isEmpty(this.parts)) this.raiseParsingError("is empty duration");
 
     // Mixing any of Y, M, D with W is invalid.
-    if ("weeks" in this.parts && DATE_COMPONENTS.some((component) => component in this.parts)) {
+    if (
+      hasKey(this.parts, "weeks") &&
+      DATE_COMPONENTS.some((component) => component in this.parts)
+    ) {
       this.raiseParsingError("mixing weeks with other date parts not allowed");
     }
 

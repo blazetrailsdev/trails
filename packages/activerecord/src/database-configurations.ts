@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { getEnv, symbolizeKeys } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {
@@ -135,9 +136,7 @@ export class DatabaseConfigurations {
       });
     }
     if (options.configKey) {
-      configs = configs.filter((c) =>
-        Object.prototype.hasOwnProperty.call(c.configuration, options.configKey!),
-      );
+      configs = configs.filter((c) => hasKey(c.configuration, options.configKey!));
     }
     if (options.name) {
       const nameStr = String(options.name);

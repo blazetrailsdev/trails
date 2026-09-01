@@ -6,7 +6,7 @@ describe("Scalar", () => {
     expect(new Scalar(2).compareTo(new Scalar(3))).toBe(-1);
     expect(new Scalar(2).compareTo(days(1))).toBe(-1);
     expect(new Scalar(3).compareTo(3)).toBe(0);
-    expect(new Scalar(3).compareTo("foo")).toBeNaN();
+    expect(new Scalar(3).compareTo("foo")).toBeNull();
   });
 
   it("== answers a Numeric, and Duration#== answers a Scalar", () => {

@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 /**
  * ActionDispatch::Response
  *
@@ -515,7 +516,12 @@ export class Response {
     return this._headers;
   }
   hasHeader(key: string): boolean {
-    return this.getHeader(key) !== undefined;
+    if (hasKey(this._headers, key)) return true;
+    // Rails' `@headers` is a `Rack::Headers`, which downcases every key on
+    // write, so its `key?` is case-insensitive; this file normalizes at the
+    // read site instead, which is where the same fold has to happen.
+    const lower = key.toLowerCase();
+    return Object.keys(this._headers).some((k) => k.toLowerCase() === lower);
   }
   get responseCode(): number {
     return this._status;

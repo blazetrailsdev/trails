@@ -35,6 +35,7 @@ describe("Cookies middleware", () => {
     const cookies = new Cookies(async (env) => {
       const jar = new CookieJar();
       jar.set("session", "abc");
+      jar.set("stale", "old");
       jar.delete("stale");
       env[COOKIES_KEY] = jar;
       return emptyResponse();

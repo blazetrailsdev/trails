@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { kernelFloat } from "@blazetrails/ruby-compat";
 import { NumberConverter } from "./number-converter.js";
 import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
@@ -17,7 +18,7 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
 
     // For backwards compatibility with those that didn't add stripInsignificantZeros to their locale files.
     const options = this.options;
-    if (!("stripInsignificantZeros" in options)) {
+    if (!hasKey(options, "stripInsignificantZeros")) {
       options.stripInsignificantZeros = true;
     }
 

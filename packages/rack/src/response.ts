@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -141,7 +142,7 @@ export class Response {
 
   hasHeader(key: string | null): boolean {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    return key in this.headers;
+    return hasKey(this.headers, key);
   }
   getHeader(key: string | null): any {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
@@ -380,7 +381,7 @@ export class ResponseRaw {
   }
 
   hasHeader(key: any): boolean {
-    return String(key) in this.headers;
+    return hasKey(this.headers, String(key));
   }
   getHeader(key: any): any {
     return this.headers[String(key)];

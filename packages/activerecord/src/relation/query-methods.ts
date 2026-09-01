@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, SelectManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -1989,7 +1990,10 @@ export function arelColumn(
   const fromClause = (this as any).fromClause;
   const from = fromClause?.name || fromClause?.value;
 
-  if (modelClass?.columnsHash?.()[field] && (!from || isTableNameMatches.call(this, from))) {
+  if (
+    hasKey(modelClass?.columnsHash?.() ?? {}, field) &&
+    (!from || isTableNameMatches.call(this, from))
+  ) {
     const table: any = this.table;
     return table.get(field);
   }

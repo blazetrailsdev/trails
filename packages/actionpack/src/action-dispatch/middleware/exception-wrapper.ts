@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 /**
  * ActionDispatch::ExceptionWrapper
  *
@@ -273,7 +274,7 @@ export class ExceptionWrapper {
   }
 
   static rescueResponse(exceptionName: string): boolean {
-    return Object.hasOwn(STATUS_MAP, exceptionName) && STATUS_MAP[exceptionName] !== 500;
+    return hasKey(STATUS_MAP, exceptionName) && STATUS_MAP[exceptionName] !== 500;
   }
 
   show(request: ShowExceptionsRequest): boolean {

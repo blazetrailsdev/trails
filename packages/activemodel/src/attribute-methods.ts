@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import {
   camelize,
   classAttribute,
@@ -219,7 +220,7 @@ export const ClassMethods = {
   },
 
   isAttributeAlias(this: ClassMethodsHost, newName: string): boolean {
-    return Object.prototype.hasOwnProperty.call(this.attributeAliases, newName);
+    return hasKey(this.attributeAliases, newName);
   },
 
   attributeAlias(this: ClassMethodsHost, name: string): string | undefined {

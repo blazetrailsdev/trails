@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { configurationsStore as configurations } from "../database-configurations.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 
@@ -119,7 +120,7 @@ export class HashConfig extends DatabaseConfig {
 
   schemaDump(format: "ruby" | "sql" | "ts" = "ts"): string | null {
     if (
-      Object.hasOwn(this.configurationHash, "schemaDump") &&
+      hasKey(this.configurationHash, "schemaDump") &&
       this.configurationHash.schemaDump !== undefined
     ) {
       const val = this.configurationHash.schemaDump;
