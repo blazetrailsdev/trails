@@ -73,7 +73,7 @@ describe("Rack::Session::Abstract::PersistedSecure", () => {
   it("generate_sid wraps the hex sid in a SessionId", () => {
     const sid = new PersistedSecure().generateSid();
     expect(sid).toBeInstanceOf(SessionId);
-    expect(sid.publicId).toMatch(/^[0-9a-f]{32}$/);
+    expect(sid.publicId).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("extract_session_id answers the falsy public id itself", () => {
