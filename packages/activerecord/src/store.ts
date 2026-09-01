@@ -234,11 +234,20 @@ interface StoreDirtyHost {
   savedChanges: Record<string, [unknown, unknown]>;
 }
 
+/**
+ * `prev_store&.dig(key)` (`vendor/rails/activerecord/lib/active_record/store.rb:149`),
+ * which every store-accessor dirty method spells. With a single key
+ * `rb_hash_dig` (`vendor/ruby/hash.c:4627`) is `rb_hash_aref(self, *argv)` and
+ * returns before `--argc` ever reaches `rb_obj_dig`, so this is exactly
+ * `Hash#[]`: the STORED value, a nested hash still indifferent, rather than
+ * the deep plain-object copy `to_hash` makes. The variadic arms and
+ * `rb_obj_dig`'s `"%s does not have #dig method"` TypeError
+ * (`vendor/ruby/object.c:3899`) have no call site in trails, so no variadic
+ * `dig` is ported.
+ */
 function dig(obj: unknown, key: string): unknown {
   if (obj == null) return undefined;
-  if (obj instanceof HashWithIndifferentAccess) {
-    return (obj.toHash() as Record<string, unknown>)[key];
-  }
+  if (obj instanceof HashWithIndifferentAccess) return obj.get(key);
   if (typeof obj === "object") return (obj as Record<string, unknown>)[key];
   return undefined;
 }

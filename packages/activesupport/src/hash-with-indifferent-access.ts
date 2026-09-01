@@ -773,8 +773,12 @@ export class HashWithIndifferentAccess<V = unknown> {
   }
 
   /**
-   * Mirrors `to_hash` (hash_with_indifferent_access.rb:376-381) — the values
-   * are converted back out of indifferent access too.
+   * Mirrors `to_hash` (hash_with_indifferent_access.rb:375-381) — a regular
+   * Hash with string keys, each value deep-converted by `convert_value_to_hash`.
+   * Rails' `set_defaults(copy)` (:379) then copies `default` / `default_proc`
+   * onto it; a plain JS object has no seat to copy them into, and giving this
+   * reader `@blazetrails/ruby-compat`'s `Hash` instead reaches every caller —
+   * `hwia-to-hash-returns-ruby-compat-hash`.
    */
   toHash(): AnyObject {
     const copy: AnyObject = {};

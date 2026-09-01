@@ -6,8 +6,9 @@ type AnyObject = Record<string, unknown>;
  * Replaces the hash with only the given keys, returning the removed
  * key/value pairs — Ruby's `Hash#slice!` (core_ext/hash/slice.rb:10-17).
  *
- * `hash.default` / `hash.default_proc` have no JS analogue: a plain object has
- * no default-value seat, so slice.rb:13-14 has nothing to copy over.
+ * `hash.default` / `hash.default_proc` (slice.rb:13-14) have nowhere to land on
+ * a plain object; `@blazetrails/ruby-compat`'s `Hash` is the seat, and moving
+ * this receiver onto it is `hwia-to-hash-returns-ruby-compat-hash`.
  * `replace(hash)` (slice.rb:15) is the own-key clear plus `Object.assign` —
  * JS objects carry no `replace`.
  */
