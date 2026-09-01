@@ -1,7 +1,7 @@
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { throwAbort } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, assignNestedAttributes } from "./index.js";
+import { Base, registerModel } from "./index.js";
 import { Associations } from "./associations.js";
 import { Company as CanonicalCompany, Firm, Client } from "./test-helpers/models/company.js";
 import { Pirate as CanonicalPirate } from "./test-helpers/models/pirate.js";
@@ -304,7 +304,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   it("valid nested attributes create children", async () => {
     const { Pirate, Bird } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    await assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
+    await (pirate as any).setBirdsAttributes([{ name: "Polly" }]);
     await pirate.save();
     const birds = await Bird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
