@@ -31,6 +31,7 @@ export {
 } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
 export { FrozenError } from "./frozen-error.js";
+export { JSON } from "./json.js";
 export { kernelFloat } from "./kernel-float.js";
 export { KeyError } from "./key-error.js";
 export { NotImplementedError } from "./not-implemented-error.js";
@@ -39,6 +40,8 @@ export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
 export { rbEqual } from "./rb-equal.js";
 export { RuntimeError } from "./runtime-error.js";
+export { StringIO } from "./string-io.js";
+export { chomp } from "./string/chomp.js";
 export { succ } from "./string/succ.js";
 export { isSymbol, symbolToS } from "./symbol.js";
 export { TypeError } from "./type-error.js";

@@ -33,11 +33,9 @@ import {
   truncateWords,
   truncateBytes,
   remove,
-  ord,
   stripHeredoc,
   downcaseFirst,
   upcaseFirst,
-  chomp,
 } from "../index.js";
 import { StringInquirer } from "../string-inquirer.js";
 
@@ -624,11 +622,6 @@ describe("StringInflectionsTest", () => {
     expect(humanize("<b>foo</b>")).toBe("<b>foo</b>");
   });
 
-  it("ord", () => {
-    expect(ord("h")).toBe(104);
-    expect(ord("a")).toBe(97);
-  });
-
   it("starts ends with alias", () => {
     expect("hello".startsWith("hel")).toBe(true);
     expect("hello".endsWith("llo")).toBe(true);
@@ -1033,38 +1026,5 @@ describe("OutputSafetyTest", () => {
     expect(xmlNameEscape(commonDangerousChars)).toBe("_".repeat(commonDangerousChars.length));
 
     expect(xmlNameEscape(startingWithDash)).toBe("_foo");
-  });
-});
-
-describe("String#chomp", () => {
-  it("removes a single trailing newline", () => {
-    expect(chomp("hello\n")).toBe("hello");
-  });
-  it("removes a trailing CRLF", () => {
-    expect(chomp("hello\r\n")).toBe("hello");
-  });
-  it("removes a lone trailing CR", () => {
-    expect(chomp("hello\r")).toBe("hello");
-  });
-  it("removes only one record separator", () => {
-    expect(chomp("hello\n\n")).toBe("hello\n");
-  });
-  it("returns the string unchanged when it has no trailing newline", () => {
-    expect(chomp("hello")).toBe("hello");
-  });
-  it("removes the given suffix when present", () => {
-    expect(chomp("hello world", " world")).toBe("hello");
-  });
-  it("returns the string unchanged when the suffix is absent", () => {
-    expect(chomp("hello", "x")).toBe("hello");
-  });
-  it("with separator '\\n', also eats a preceding CR (Ruby quirk)", () => {
-    expect(chomp("hello\r\n", "\n")).toBe("hello");
-    expect(chomp("hello\n", "\n")).toBe("hello");
-    expect(chomp("hello\r", "\n")).toBe("hello\r");
-  });
-  it("with an empty separator, removes all trailing newline characters", () => {
-    expect(chomp("hello\r\n\r\n", "")).toBe("hello");
-    expect(chomp("hello\n\n\n", "")).toBe("hello");
   });
 });

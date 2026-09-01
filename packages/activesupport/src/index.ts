@@ -230,7 +230,6 @@ export {
   truncateWords,
   truncateBytes,
   remove,
-  ord,
   stripHeredoc,
   at,
   first,

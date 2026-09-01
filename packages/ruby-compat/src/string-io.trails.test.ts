@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { StringIO } from "./string-io.js";
 
-// Ruby stdlib shim, so there is no Rails test to mirror; the expectations below
-// are MRI's (`ruby -rstringio`).
 describe("StringIO", () => {
   it("reads the buffer forward and reports eof", () => {
     const io = new StringIO("abc");
@@ -28,7 +26,6 @@ describe("StringIO", () => {
   });
 
   it("counts bytes, not code points, in a binary string", () => {
-    // MRI: StringIO.new("\xFF".b).size == 1
     const io = new StringIO("\xff");
     expect(io.size).toBe(1);
     expect(io.read()).toBe("\xff");
