@@ -635,6 +635,14 @@ export class Parameters {
     return p;
   }
 
+  /**
+   * Ruby's `-1` limit is what makes `String#split` keep trailing empty fields
+   * (strong_parameters.rb:1111); JS `String#split` keeps them with no limit at
+   * all, and a numeric limit there TRUNCATES instead. Passing Rails' argument
+   * would change the result, not match it.
+   *
+   * @missingRailsArgs split — PERMANENT
+   */
   extractValue(key: string, delimiter = "_"): string[] | null {
     const val = this._data[key];
     if (val === null || val === undefined) return null;

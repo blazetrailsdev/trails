@@ -3369,10 +3369,26 @@ class ApiExtractor
     when :hash then describe_hash(node[1], flags)
     when :bare_assoc_hash then describe_kwargs(node[1], flags) || "hash"
     when :binary then "binop:#{node[2]}"
-    when :unary then "unary#{describe_arg(node[2], flags)}"
+    when :unary then describe_unary(node, flags)
     when :ifop then "ternary"
     when :paren then describe_args(node[1], flags).first || "?"
     else "?"
+    end
+  end
+
+  # Ripper splits a negative numeric literal `-1` into
+  # `[:unary, :-@, [:@int, "1"]]`. Fold the negation back into the value, the
+  # same fold `literal_value` already applies on the DEFAULT path
+  # (extract-ruby-api.rb:282-291), so `foo(-1)` compares as `num:-1` instead of
+  # taking the whole call site out of the argument gate. Any other unary — a
+  # `!`, a negated constant or expression — stays the opaque `unary…`
+  # descriptor.
+  def describe_unary(node, flags)
+    inner = node[2]
+    if node[1] == :-@ && inner.is_a?(Array) && [:@int, :@float].include?(inner[0])
+      "num:-#{inner[1]}"
+    else
+      "unary#{describe_arg(inner, flags)}"
     end
   end
 

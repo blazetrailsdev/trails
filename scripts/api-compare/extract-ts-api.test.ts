@@ -3977,6 +3977,25 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("folds a negated numeric argument into its value", () => {
+    const sites = site(
+      `class Foo {
+        create(a: number) {
+          this.visit(-1);
+          this.visit(-2.5);
+          this.visit(-Infinity);
+          this.visit(-a);
+        }
+      }`,
+    );
+    expect(sites.map((s) => s.args)).toEqual([
+      ["num:-1"],
+      ["num:-2.5"],
+      ["unaryconst:Infinity"],
+      ["unaryid:a"],
+    ]);
+  });
+
   it("flags a spread argument and a callback, and drops the callback from the list", () => {
     expect(
       site(

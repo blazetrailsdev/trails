@@ -175,3 +175,33 @@ describe("UNPORTED_FILES schema", () => {
     expect(isTestFileUnported("railties/railtie_test.rb", "trailties")).toBe(false);
   });
 });
+
+/**
+ * A `tests:` entry claims a Rails test is NOT ported, and the comparison stage
+ * takes it at its word: `compare.ts:749` subtracts it from `rubyTestCount`
+ * before pairing, so its TS counterpart is never consumed and is scored
+ * `extra (TS only)` instead. A file in that state reports ✓ with
+ * `missing: 0` while the aggregate silently understates the ported population.
+ *
+ * `adapters/postgresql/transaction_nested_test.rb` was in exactly that state:
+ * the manifest carries four `test` declarations, the register excluded the two
+ * deadlock ones, and `convention-comparison.json` reported
+ * `rubyTestCount: 2 / matched: 2 / extra: 2` over four live, faithfully ported
+ * `it`s. Retiring the entry — never renaming a test — is the fix.
+ */
+describe("every Rails test of transaction_nested_test.rb is counted", () => {
+  const FILE = "adapters/postgresql/transaction_nested_test.rb";
+  const TESTS = [
+    "unserializable transaction raises SerializationFailure inside nested SavepointTransaction",
+    "SerializationFailure inside nested SavepointTransaction is recoverable",
+    "deadlock raises Deadlocked inside nested SavepointTransaction",
+    "deadlock inside nested SavepointTransaction is recoverable",
+  ];
+
+  it("excludes none of its four test cases", () => {
+    expect(isTestFileUnported(FILE, "activerecord")).toBe(false);
+    expect(
+      TESTS.filter((test) => isTestCaseUnported(FILE, test, "PostgresqlTransactionNestedTest")),
+    ).toEqual([]);
+  });
+});
