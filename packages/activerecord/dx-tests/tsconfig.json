@@ -38,6 +38,10 @@
         "../../activesupport/src/testing/temporal-helpers.ts"
       ],
       "@blazetrails/ruby-compat/include": ["../../ruby-compat/src/include.ts"],
+      "@blazetrails/ruby-compat/method-missing-proxy": [
+        "../../ruby-compat/src/method-missing-proxy.ts"
+      ],
+      "@blazetrails/ruby-compat/name-error": ["../../ruby-compat/src/name-error.ts"],
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/src/range.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],

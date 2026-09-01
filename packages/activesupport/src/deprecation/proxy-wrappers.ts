@@ -1,6 +1,7 @@
 import { callerLocations, type CallerLocation, type Deprecation } from "../deprecation.js";
 import { extend, include, Module, prepend } from "../include.js";
 import { constantize } from "../inflector.js";
+import { PROTOCOL_PROBES } from "../method-missing-proxy.js";
 
 /**
  * Mirrors: active_support/deprecation/proxy_wrappers.rb
@@ -19,9 +20,6 @@ function inspect(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(inspect).join(", ")}]`;
   return String(value);
 }
-
-/** Names JS probes on any object; forwarding them would warn for an `await`. */
-const PROTOCOL_PROBES = new Set(["then", "catch", "finally", "toJSON", "$$typeof", "nodeType"]);
 
 /** The `instance_methods.each { |m| undef_method m }` lookup. */
 function undefMethodProxy<T extends object>(instance: T, methodMissing: MethodMissing): T {
