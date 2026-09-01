@@ -8,8 +8,13 @@ import {
   SessionId,
 } from "./abstract/id.js";
 
+/** @noRailsEquivalent PERMANENT */
+function isTruthy(value: unknown): boolean {
+  return value != null && value !== false;
+}
+
 export class Pool extends PersistedSecure {
-  pool: Record<string, Record<string, unknown>> = {};
+  pool!: Record<string, Record<string, unknown> | undefined>;
 
   static override DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({
     ...ID_DEFAULT_OPTIONS,
@@ -31,8 +36,7 @@ export class Pool extends PersistedSecure {
   }
 
   /** @missingRailsCall key? — PERMANENT */
-  override generateSid({ useMutex = true }: { useMutex?: boolean } = {}): SessionId {
-    void useMutex;
+  override generateSid({ useMutex: _useMutex = true }: { useMutex?: boolean } = {}): SessionId {
     for (;;) {
       const sid = super.generateSid();
       if (!Object.hasOwn(this.pool, sid.privateId)) return sid;
@@ -41,54 +45,46 @@ export class Pool extends PersistedSecure {
 
   /** @missingRailsCall store — PERMANENT */
   override findSession(
-    req: PersistedRequest,
+    _req: PersistedRequest,
     sid: SessionId | null,
   ): [SessionId, Record<string, unknown>] {
-    void req;
-    let session = sid != null ? this.getSessionWithFallback(sid) : undefined;
-    if (sid == null || session == null) {
+    let session = isTruthy(sid) ? this.getSessionWithFallback(sid as SessionId) : undefined;
+    if (!isTruthy(sid) || !isTruthy(session)) {
       sid = this.generateSid({ useMutex: false });
       session = {};
       this.pool[sid.privateId] = session;
     }
-    return [sid, session];
+    return [sid as SessionId, session as Record<string, unknown>];
   }
 
   /** @missingRailsCall store — PERMANENT */
   override writeSession(
-    req: PersistedRequest,
+    _req: PersistedRequest,
     sessionId: SessionId,
     newSession: Record<string, unknown>,
-    options: SessionOptions,
+    _options: SessionOptions,
   ): SessionId {
-    void req;
-    void options;
     this.pool[sessionId.privateId] = newSession;
     return sessionId;
   }
 
   /** @missingRailsCall delete — PERMANENT */
   override deleteSession(
-    req: PersistedRequest,
+    _req: PersistedRequest,
     sessionId: SessionId,
     options: SessionOptions,
-  ): SessionId | undefined {
-    void req;
+  ): SessionId | null {
     delete this.pool[sessionId.publicId];
     delete this.pool[sessionId.privateId];
-    if (!(options.get("drop") != null && options.get("drop") !== false)) {
-      return this.generateSid({ useMutex: false });
-    }
-    return undefined;
+    if (!isTruthy(options.get("drop"))) return this.generateSid({ useMutex: false });
+    return null;
   }
 
   /** @internal */
   getSessionWithFallback(sid: SessionId): Record<string, unknown> | undefined {
     return (
       this.pool[sid.privateId] ??
-      (this.allowFallback != null && this.allowFallback !== false
-        ? this.pool[sid.publicId]
-        : undefined)
+      (isTruthy(this.allowFallback) ? this.pool[sid.publicId] : undefined)
     );
   }
 }

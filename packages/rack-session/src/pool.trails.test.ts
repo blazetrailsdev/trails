@@ -77,7 +77,7 @@ describe("Rack::Session::Pool", () => {
     const pool = new Pool();
     const sid = new SessionId("abcd");
     pool.pool[sid.privateId] = { counter: 1 };
-    expect(pool.deleteSession(stubRequest(), sid, stubOptions({ drop: true }))).toBeUndefined();
+    expect(pool.deleteSession(stubRequest(), sid, stubOptions({ drop: true }))).toBeNull();
     expect(pool.pool).toEqual({});
   });
 
