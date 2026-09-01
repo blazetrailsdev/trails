@@ -78,11 +78,17 @@ export function commitFlash(this: FlashRequestHost): void {
 
   const hash = flashHash.call(this);
   if (hash && (!hash.empty || session.hasKey("flash"))) {
-    const value = hash.flashesForSession();
-    if (Object.keys(value).length === 0) {
+    // Rails: `session["flash"] = flash_hash.to_session_value` (`flash.rb:76`),
+    // whose shape is `{ "discard" => [], "flashes" => ... }` (`flash.rb:143-147`)
+    // — the discriminator `from_session_value` reads to mark every carried key
+    // for the next sweep. A bare flashes hash reads as Rails-3 and never
+    // sweeps. `to_session_value` answers nil when nothing survives, which
+    // `flash.rb:80-82` then deletes; the delete happens directly here.
+    const flashesToKeep = hash.flashesForSession();
+    if (Object.keys(flashesToKeep).length === 0) {
       session.delete("flash");
     } else {
-      session.set("flash", value);
+      session.set("flash", { discard: [], flashes: flashesToKeep });
     }
     // Rails: `self.flash = flash_hash.dup` so further mutations don't
     // bleed into the just-stored session value.

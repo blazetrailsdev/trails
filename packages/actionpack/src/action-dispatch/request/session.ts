@@ -453,8 +453,11 @@ export class Session {
    * empties the Hash and refills it in place; a plain JS object has no in-place
    * replace, and `@delegate` is never aliased out of this class, so rebinding it
    * is the same observable state.
+   *
+   * @internal Ruby-private; `Rack::Session::Abstract::Persisted#commit_session`
+   * reaches it with `session.send(:load!)` (`rack-session id.rb:392`).
    */
-  private loadBang(): void {
+  loadBang(): void {
     if (this.isEnabled()) {
       if (!this.isExists()) this.idWasInitialized = true;
       const [id, session] = this.by!.loadSession(this.req);

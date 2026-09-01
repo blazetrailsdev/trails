@@ -4,7 +4,7 @@
 // (`actionpack/test/controller/new_base/render_implicit_action_test.rb:16-43`).
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { FixtureResolver, LookupContext, TemplateHandlers } from "@blazetrails/actionview";
+import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
 
 import { Base } from "../base.js";
 import { MissingExactTemplate } from "./exceptions.js";
@@ -31,15 +31,13 @@ beforeAll(() => {
     extensions: ["html"],
     render: (source: string) => source,
   });
-  const ctx = new LookupContext();
-  ctx.addResolver(
+  ImplicitRenderTestController.prependViewPath(
     new FixtureResolver({
       "implicit_render_test/helloWorld.html.html": "Hello world!",
       "implicit_render_test/variantWithImplicitTemplateRendering.html+mobile.html": "mobile",
     }),
   );
-  ctx.setLayout(false);
-  ImplicitRenderTestController.lookupContext = ctx;
+  ImplicitRenderTestController.layout = false;
 });
 
 describe("ImplicitRenderTest", () => {

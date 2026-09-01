@@ -2,19 +2,22 @@ import { describe, expect, it } from "vitest";
 import { MemoryStore } from "@blazetrails/activesupport";
 import { CacheStore } from "./cache-store.js";
 import { SessionId } from "./abstract-store.js";
+import { Session } from "../../request/session.js";
+
+const opts = (o: Record<string, unknown> = {}) => new Session.Options(null, o);
 
 function makeStore(opts: { expireAfter?: number } = {}): {
   store: CacheStore;
   cache: MemoryStore;
 } {
   const cache = new MemoryStore();
-  const store = new CacheStore(() => undefined, { cache, ...opts });
+  const store = new CacheStore(undefined, { cache, ...opts });
   return { store, cache };
 }
 
 describe("ActionDispatch::Session::CacheStore", () => {
   it("requires a cache option", () => {
-    expect(() => new CacheStore(() => undefined, {})).toThrow(/cache/);
+    expect(() => new CacheStore(undefined, {})).toThrow(/cache/);
   });
 
   describe("findSession", () => {
@@ -57,7 +60,7 @@ describe("ActionDispatch::Session::CacheStore", () => {
     it("writes session under the privateId key", () => {
       const { store, cache } = makeStore();
       const sid = new SessionId("d".repeat(32));
-      store.writeSession({}, sid, { user: 3 }, { expireAfter: 60 });
+      store.writeSession({}, sid, { user: 3 }, opts({ expireAfter: 60 }));
       expect(cache.read(`_session_id:${sid.privateId}`)).toEqual({ user: 3 });
     });
 
@@ -65,7 +68,7 @@ describe("ActionDispatch::Session::CacheStore", () => {
       const { store, cache } = makeStore();
       const sid = new SessionId("e".repeat(32));
       cache.write(`_session_id:${sid.privateId}`, { user: 4 });
-      store.writeSession({}, sid, null, {});
+      store.writeSession({}, sid, null, opts());
       expect(cache.read(`_session_id:${sid.privateId}`)).toBeNull();
     });
   });
@@ -76,7 +79,7 @@ describe("ActionDispatch::Session::CacheStore", () => {
       const sid = new SessionId("f".repeat(32));
       cache.write(`_session_id:${sid.privateId}`, { user: 5 });
       cache.write(`_session_id:${sid.publicId}`, { user: 5 });
-      const fresh = store.deleteSession({}, sid, {});
+      const fresh = store.deleteSession({}, sid, opts());
       expect(cache.read(`_session_id:${sid.privateId}`)).toBeNull();
       expect(cache.read(`_session_id:${sid.publicId}`)).toBeNull();
       expect(fresh.publicId).not.toBe(sid.publicId);

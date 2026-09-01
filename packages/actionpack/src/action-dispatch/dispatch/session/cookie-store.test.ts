@@ -7,6 +7,9 @@ import {
   type CookieJarLike,
 } from "../../middleware/session/cookie-store.js";
 import { SessionId as RackSessionId } from "../../middleware/session/abstract-store.js";
+import { Session } from "../../request/session.js";
+
+const opts = (o: Record<string, unknown> = {}) => new Session.Options(null, o);
 
 // ==========================================================================
 // dispatch/session/cookie_store_test.rb
@@ -54,7 +57,7 @@ function makeReq(initial: Record<string, unknown> = {}): CookieStoreRequest & {
 }
 
 function makeStore(opts: Record<string, unknown> = {}): CookieStore {
-  return new CookieStore(() => undefined, opts);
+  return new CookieStore(undefined, opts);
 }
 
 describe("CookieStoreTest", () => {
@@ -168,7 +171,7 @@ describe("CookieStoreTest", () => {
   it("setting session value after session reset", () => {
     const store = makeStore();
     const req = makeReq();
-    const fresh = store.deleteSession(req, null, {})!;
+    const fresh = store.deleteSession(req, null, opts())!;
     const result = store.writeSession(req, fresh, { foo: "bar" });
     expect(result.cookieValue["foo"]).toBe("bar");
     expect(result.publicId).toBe(fresh.publicId);
@@ -177,7 +180,7 @@ describe("CookieStoreTest", () => {
   it("class type after session reset", () => {
     const store = makeStore();
     const req = makeReq();
-    const fresh = store.deleteSession(req, null, {});
+    const fresh = store.deleteSession(req, null, opts());
     expect(fresh).toBeInstanceOf(RackSessionId);
   });
 
@@ -192,7 +195,7 @@ describe("CookieStoreTest", () => {
   it("setting session value after session clear", () => {
     const store = makeStore();
     const req = makeReq();
-    const fresh = store.deleteSession(req, null, {})!;
+    const fresh = store.deleteSession(req, null, opts())!;
     const result = store.writeSession(req, fresh, { user: "new" });
     expect(result.cookieValue["user"]).toBe("new");
   });
@@ -323,7 +326,7 @@ describe("CookieStore unit", () => {
       const req = makeReq();
       const sid = new RackSessionId("a".repeat(32));
       const data: Record<string, unknown> = { user: 1 };
-      const result = store.writeSession(req, sid, data, {});
+      const result = store.writeSession(req, sid, data, opts());
       expect(result).toBeInstanceOf(CookieSessionId);
       expect(result.cookieValue).toBe(data);
     });
@@ -333,7 +336,7 @@ describe("CookieStore unit", () => {
     it("returns null and clears the header when options.drop is true", () => {
       const store = makeStore();
       const req = makeReq();
-      const result = store.deleteSession(req, null, { drop: true });
+      const result = store.deleteSession(req, null, opts({ drop: true }));
       expect(result).toBeNull();
       expect(req.headers["action_dispatch.request.unsigned_session_cookie"]).toEqual({});
     });

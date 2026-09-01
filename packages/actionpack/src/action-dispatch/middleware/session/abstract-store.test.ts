@@ -37,7 +37,8 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       host.defaultOptions.sidbits = 128;
       host.defaultOptions.secureRandom = 1;
       Compatibility.initializeSid.call(host);
-      expect(host.defaultOptions).toEqual({});
+      expect(host.defaultOptions).not.toHaveProperty("sidbits");
+      expect(host.defaultOptions).not.toHaveProperty("secureRandom");
     });
 
     it("makeRequest builds an ActionDispatch::Request from env", () => {
@@ -110,13 +111,39 @@ describe("ActionDispatch::Session::AbstractStore", () => {
     it("commitSession invokes commitCsrfToken on the request", () => {
       const store = new AbstractStore();
       let called = false;
-      const req = {
-        commitCsrfToken: () => {
-          called = true;
-        },
+      const req: any = new Request({});
+      req.commitCsrfToken = () => {
+        called = true;
       };
-      expect(() => (store as any).commitSession(req, null)).toThrow(/commitSession/);
+      (store as any).prepareSession(req);
+      (store as any).commitSession(req, { setCookie: () => {} });
       expect(called).toBe(true);
+    });
+
+    it("commitSession expires the cookie at Time.now + expire_after", () => {
+      let cookie: any;
+      class WritingStore extends AbstractStore {
+        override findSession(): [unknown, Record<string, unknown>] {
+          return [new SessionId("abc"), {}];
+        }
+        override writeSession(): unknown {
+          return { ok: true };
+        }
+        override setCookie(_req: any, _res: any, c: any): void {
+          cookie = c;
+        }
+      }
+      const store = new WritingStore(undefined, { expireAfter: 60 });
+      const req: any = new Request({});
+      (store as any).prepareSession(req);
+      req.session.set("user", 1);
+
+      (store as any).commitSession(req, { setCookie: () => {} });
+
+      expect(cookie.expires).toBeInstanceOf(Date);
+      const deltaMs = (cookie.expires as Date).getTime() - Date.now();
+      expect(deltaMs).toBeGreaterThan(55_000);
+      expect(deltaMs).toBeLessThanOrEqual(60_000);
     });
 
     it("prepareSession wraps in ActionDispatch::Request::Session", () => {

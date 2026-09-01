@@ -362,4 +362,25 @@ describe("Engine", () => {
     expect(prepended[0][0]).toMatch(/app\/views$/);
     resetLoadHooks();
   });
+
+  it("add_view_paths renders through the prepended path", async () => {
+    resetLoadHooks();
+    const { ActionController, ActionView } = await import("@blazetrails/actionpack");
+    ActionView.TemplateHandlers.registerTemplateHandler("raw", new ActionView.RawHandler());
+
+    class RenderEngine extends Engine {}
+    Trailtie.register(RenderEngine);
+    const engine = RenderEngine.instance();
+    engine.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+    await engine.initializers.find((i) => i.name === "add_view_paths")!.run();
+
+    class PostsController extends ActionController.Base {}
+    PostsController.layout = false;
+    runLoadHooks("action_controller", PostsController);
+
+    const controller = new PostsController();
+    await controller.renderAsync({ action: "index" });
+    expect(controller.body).toBe("posts#index\n");
+    resetLoadHooks();
+  });
 });

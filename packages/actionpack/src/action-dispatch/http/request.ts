@@ -16,6 +16,13 @@ import { UnknownHttpMethod } from "../../action-controller/metal/exceptions.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { Session } from "../request/session.js";
 import {
+  commitFlash,
+  flash,
+  flashHash,
+  resetSession as resetFlashSession,
+  type FlashHash,
+} from "../middleware/flash.js";
+import {
   etagMatches as _etagMatches,
   fresh as _fresh,
   ifModifiedSince as _ifModifiedSince,
@@ -74,7 +81,6 @@ import {
 import { Headers as HttpHeaders } from "./headers.js";
 import { _setRequestCtor } from "./request-slot.js";
 
-const FLASH_HASH_KEY = "action_dispatch.request.flash_hash";
 const ACTION_DISPATCH_REQUEST_ID = "action_dispatch.request_id";
 const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"] as const;
 const LOCALHOST_RE = /^(?:127(?:\.\d{1,3}){3}|::1|0:0:0:0:0:0:0:1(?:%.*)?)$/;
@@ -720,15 +726,22 @@ export class Request {
 
   // --- Flash ---
   //
-  // Backed by an env header so the value survives the request lifecycle the
-  // same way Rails' flash middleware stores it (`action_dispatch.request.flash_hash`).
+  // Rails prepends `ActionDispatch::Flash::RequestMethods` onto Request
+  // (`middleware/flash.rb:14`); `ActionDispatch::Flash` itself is a pure
+  // passthrough (`flash.rb:312`), so the middleware stack is not where the
+  // flash lives. These read the ported functions in `middleware/flash.ts`.
 
-  get flash(): unknown {
-    return this.env[FLASH_HASH_KEY];
+  get flash(): FlashHash | null {
+    return flash.call(this as never);
   }
 
-  set flash(value: unknown) {
-    this.env[FLASH_HASH_KEY] = value;
+  set flash(value: FlashHash | null) {
+    flash.call(this as never, value);
+  }
+
+  /** @internal Rails: `Flash::RequestMethods#flash_hash` (`flash.rb:288-290`). */
+  flashHash(): FlashHash | null {
+    return flashHash.call(this as never);
   }
 
   // --- Cookies ---
@@ -921,10 +934,16 @@ export class Request {
 
   // --- Session ---
 
-  /** Rails: `reset_session` (request.rb:381-384) — `session.destroy; reset_csrf_token`. */
+  /**
+   * Rails: `reset_session` (request.rb:381-384) — `session.destroy;
+   * reset_csrf_token` — with `Flash::RequestMethods#reset_session`
+   * (`flash.rb:307-310`) prepended on top, which clears the flash after
+   * `super`.
+   */
   resetSession(): void {
     this.session.destroy();
     this.resetCsrfToken();
+    resetFlashSession.call(this as never);
   }
 
   /** Rails: `session=` (request.rb:385-387) — `Session.set self, session`. */
@@ -961,8 +980,10 @@ export class Request {
 
   // --- Flash / cookie-jar lifecycle hooks (no-ops; Rails uses these as mixin overrides) ---
 
-  /** Rails: `commit_flash` — no-op on the bare Request; the Flash middleware overrides. */
-  commitFlash(): void {}
+  /** Rails: `Flash::RequestMethods#commit_flash` (`flash.rb:292-305`). */
+  commitFlash(): void {
+    commitFlash.call(this as never);
+  }
 
   /** @internal Rails: `commit_cookie_jar!` — no-op on the bare Request. */
   commitCookieJarBang(): void {}
