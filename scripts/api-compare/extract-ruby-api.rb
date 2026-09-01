@@ -2408,15 +2408,16 @@ class ApiExtractor
     when :symbol_literal, :dyna_symbol then "symbol"
     when :regexp_literal then "regexp"
     when :@int, :@float then "numeric"
-    when :var_ref, :vcall then var_ref_receiver_kind(recv[1])
+    when :var_ref then var_ref_receiver_kind(recv[1])
     when :const_path_ref, :top_const_ref then "const"
     else "expr"
     end
   end
 
-  # The `:var_ref` half of receiver_kind. Ripper emits `:@ident` only for an
-  # in-scope LOCAL (a bare method call on self is `:vcall`), so the three name
-  # spaces below cannot collide.
+  # The `:var_ref` half of receiver_kind. Ripper emits `:@ident` under a
+  # `:var_ref` only for an in-scope LOCAL — a bare method call on self is a
+  # `:vcall`, which receiver_kind leaves an `expr` — so the name spaces below
+  # cannot collide. Same discriminator inert_receiver? reads.
   def var_ref_receiver_kind(inner)
     return "expr" unless inner.is_a?(Array)
 

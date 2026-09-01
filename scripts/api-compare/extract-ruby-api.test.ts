@@ -2661,7 +2661,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(c["Core#call"]).toEqual({
       merge: ["hash"],
-      to_s: ["local", "symbol"],
+      to_s: ["expr", "symbol"],
       succ: ["string"],
       first: ["array"],
     });
@@ -2730,6 +2730,19 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(c["Mime#mime_type"]).toEqual({ fetch: ["hash"] });
     expect(c["Mime#name_at"]).toEqual({ fetch: ["const"] });
+  });
+
+  it("leaves a bare method call receiver an expression, not a local", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/vcall.rb": `
+        class Vcall
+          def call
+            response.fetch(:x)
+          end
+        end
+      `,
+    });
+    expect(c["Vcall#call"]).toEqual({ fetch: ["expr"] });
   });
 
   it("records nothing for a body whose every call is unqualified", () => {

@@ -137,7 +137,8 @@ export type Credit = { package: string; tsFile: string; name: string; tsExport: 
 /** Forward: the call sites the table credits — a declaration outside
  *  `ruby-compat` itself that calls one of its exports.
  *
- *  {@link RECEIVER_KEYED_RUBY_COMPAT_EXPORTS} is deliberately NOT unioned in:
+ *  `RECEIVER_KEYED_RUBY_COMPAT_EXPORTS` (scripts/parity/ruby-compat.ts) is
+ *  deliberately NOT unioned in:
  *  its exports are spelled `merge` / `fetch` / `slice`, names a TS body calls
  *  for a hundred unrelated reasons, and a credit here is a per-SITE claim with
  *  no Ruby receiver beside it to check. Counting them would report the tree's

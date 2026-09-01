@@ -3792,9 +3792,6 @@ export function main() {
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           rubyMethodToTs,
           callsSignificant,
-          // The receiver kinds this body recorded for the call, so the
-          // ruby-compat table can admit a row whose bare name is ambiguous
-          // across receivers (RFC 0129 `callReceivers`).
           (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
@@ -3841,8 +3838,9 @@ export function main() {
         if (flagged.length === 0) return;
         const flaggedReceivers: Record<string, string[]> = {};
         for (const f of flagged) {
-          const kinds = rubyOwned?.receivers?.[callOf(f)];
-          if (kinds) flaggedReceivers[callOf(f)] = kinds;
+          const call = callOf(f);
+          const kinds = rubyOwned?.receivers?.[call];
+          if (kinds) flaggedReceivers[call] = kinds;
         }
         callMismatches.push({
           rubyFile,
