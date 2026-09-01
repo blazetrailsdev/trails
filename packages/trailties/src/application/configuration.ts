@@ -87,11 +87,14 @@ export class Configuration extends EngineConfiguration {
    * bag is skipped exactly as it is in Ruby.
    *
    * Four assignments inside otherwise line-for-line arms have no trails
-   * receiver yet and are omitted: `ActiveSupport.utc_to_local_returns_utc_offset_times`
-   * (`:220`), `Rails::HTML::Sanitizer.best_supported_vendor` for
-   * `action_view`/`action_text` (`:313-320`), the `Nokogiri::HTML5` probe
-   * behind `dom_testing_default_html_version` (`:276`), and
-   * `Regexp.timeout ||= 1` (`:344`).
+   * receiver yet and are omitted, each in place so the arm keeps Rails' shape:
+   * `ActiveSupport.utc_to_local_returns_utc_offset_times` (`:220`), the
+   * `Nokogiri::HTML5` probe behind `dom_testing_default_html_version`
+   * (`:276`), `Regexp.timeout ||= 1` (`:344`), and
+   * `Rails::HTML::Sanitizer.best_supported_vendor` (`:313-323`) — the last
+   * emptying the `action_view` and `action_text` guards of 7.1, since
+   * `Rails::HTML::Sanitizer` has no trails counterpart and
+   * `sanitizer_vendor` has no other value to take.
    */
   loadDefaults(targetVersion: string | number): void {
     switch (String(targetVersion)) {
@@ -303,7 +306,7 @@ export class Configuration extends EngineConfiguration {
         this.precompileFilterParameters = true;
         this.domTestingDefaultHtmlVersion = ":html4";
 
-        if (Trails.env["local?"]()) {
+        if (Trails.env.isLocal()) {
           this.logFileSize = 100 * 1024 * 1024;
         }
 
@@ -343,6 +346,14 @@ export class Configuration extends EngineConfiguration {
           activeSupport.messageSerializer = ":json_allow_marshal";
           activeSupport.useMessageSerializerForMetadata = true;
           activeSupport.raiseOnInvalidCacheExpirationTime = true;
+        }
+
+        if (this.respondTo("actionView")) {
+          /** @empty */
+        }
+
+        if (this.respondTo("actionText")) {
+          /** @empty */
         }
         break;
       }
