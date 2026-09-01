@@ -12,6 +12,7 @@
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rack-session": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
