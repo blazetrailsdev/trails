@@ -1,6 +1,7 @@
 import { ArgumentError, getCrypto, inspect, KeyError, valuesAt } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS, Request, ResponseRaw } from "@blazetrails/rack";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 
 export class SessionId {
   static ID_VERSION = 2;
@@ -326,7 +327,7 @@ export interface PersistedRequest {
 }
 
 /** @noRailsEquivalent PERMANENT */
-function isTruthy(value: unknown): boolean {
+export function isTruthy(value: unknown): boolean {
   return value != null && value !== false;
 }
 
@@ -390,11 +391,21 @@ export class Persisted {
   }
 
   generateSid(secure: unknown = this.sidSecure): unknown {
-    void secure;
-    return getCrypto()
-      .randomBytes(Math.ceil(this.sidLength / 2))
-      .toString("hex")
-      .slice(0, this.sidLength);
+    try {
+      if (isTruthy(secure)) {
+        return getCrypto().randomBytes(this.sidLength).toString("hex");
+      } else {
+        const limit = (1n << BigInt(this.sidbits)) - 1n;
+        let value = 0n;
+        for (let i = 0; i < this.sidbits; i += 32) {
+          value = (value << 32n) | BigInt(Math.floor(Math.random() * 0x1_0000_0000));
+        }
+        return (value % limit).toString(16).padStart(this.sidLength, "0");
+      }
+    } catch (error) {
+      if (error instanceof NotImplementedError) return this.generateSid(false);
+      throw error;
+    }
   }
 
   /** @internal */
@@ -540,13 +551,11 @@ export class Persisted {
     return SessionHash;
   }
 
-  /** @missingRailsCall store — CONVERGEABLE port-rack-session-pool */
   findSession(_req: PersistedRequest, _sid: unknown): [unknown, Record<string, unknown> | null] {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:440 cluster=rack-session
     throw new Error("#find_session not implemented.");
   }
 
-  /** @missingRailsCall store — CONVERGEABLE port-rack-session-pool */
   writeSession(
     _req: PersistedRequest,
     _sid: unknown,
@@ -557,7 +566,6 @@ export class Persisted {
     throw new Error("#write_session not implemented.");
   }
 
-  /** @missingRailsCall delete — CONVERGEABLE port-rack-session-pool */
   deleteSession(_req: PersistedRequest, _sid: unknown, _options: Record<string, unknown>): unknown {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:455 cluster=rack-session
     throw new Error("#delete_session not implemented");
