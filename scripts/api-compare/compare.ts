@@ -2883,6 +2883,18 @@ export function buildEntitiesByName(
  * directory segments with the child, self excluded.
  *
  * Proximity only decides when it actually separates the candidates. Several
+ * candidates sharing ZERO leading segments with the child are not ranked at
+ * all, and the old `candidates[0]` fallback bound whichever one the extractor
+ * happened to enumerate first — order-dependent, silent, and wrong: naming the
+ * CSP mixin `Request` (its Rails name) in `http/content-security-policy.ts`
+ * flipped `testing/test-request.ts`'s parent off `http/request.ts` and dropped
+ * `test_request.rb` from 13 matched methods to 9 with no warning (PR #5405).
+ * So an unseparated tie resolves to nothing, the way `includeGraphEntities`
+ * drops an edge name that resolves to more than one entity, and `onAmbiguous`
+ * reports it (RFC 0126). A tie at a POSITIVE score keeps its winner: those
+ * candidates do share a directory prefix with the child, which is the signal
+ * this heuristic exists to read; only a tie at zero is pure enumeration order.
+ *
  * `isForeign` marks a candidate a DEP package contributed. A dep's path is
  * relative to ITS OWN src dir, so a shared prefix with the child is a
  * coincidence: activemodel and activerecord both port `attribute_methods.rb`
@@ -2896,19 +2908,6 @@ export function buildEntitiesByName(
  * and wins only when nothing else is in the running, which is the arm the
  * cross-package walk exists for (`AR::Base extends AM::Model`, AR
  * `type/text.ts` extends AM `type/string.ts`).
- *
- * Proximity only decides when it actually separates the candidates. Several
- * candidates sharing ZERO leading segments with the child are not ranked at
- * all, and the old `candidates[0]` fallback bound whichever one the extractor
- * happened to enumerate first — order-dependent, silent, and wrong: naming the
- * CSP mixin `Request` (its Rails name) in `http/content-security-policy.ts`
- * flipped `testing/test-request.ts`'s parent off `http/request.ts` and dropped
- * `test_request.rb` from 13 matched methods to 9 with no warning (PR #5405).
- * So an unseparated tie resolves to nothing, the way `includeGraphEntities`
- * drops an edge name that resolves to more than one entity, and `onAmbiguous`
- * reports it (RFC 0126). A tie at a POSITIVE score keeps its winner: those
- * candidates do share a directory prefix with the child, which is the signal
- * this heuristic exists to read; only a tie at zero is pure enumeration order.
  */
 export function resolveEntityByDeclaringFile(
   candidates: ClassInfo[],
