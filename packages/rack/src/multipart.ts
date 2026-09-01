@@ -1,5 +1,6 @@
 import { UploadedFile } from "./multipart/uploaded-file.js";
 import { Generator } from "./multipart/generator.js";
+import { getDefaultQueryParser } from "./utils.js";
 
 export { UploadedFile } from "./multipart/uploaded-file.js";
 import {
@@ -44,6 +45,16 @@ export interface UploadedFileInfo {
   head: string;
 }
 
+interface ParamsCollector {
+  toParamsHash(): any;
+}
+
+/** The `QueryParser`-shaped accumulator `parse_multipart` takes as `params`. */
+interface QueryParserLike {
+  makeParams(): ParamsCollector;
+  normalizeParams(params: any, key: string, value: any): void;
+}
+
 /**
  * Parse a multipart/form-data body.
  *
@@ -55,7 +66,10 @@ export interface UploadedFileInfo {
  * Returns a params hash (possibly nested via query-string normalization),
  * or null if the content type is not multipart.
  */
-export function parseMultipart(env: Record<string, any>): Record<string, any> | null {
+export function parseMultipart(
+  env: Record<string, any>,
+  params: QueryParserLike = getDefaultQueryParser() as unknown as QueryParserLike,
+): any | null {
   const contentType = env["CONTENT_TYPE"];
   if (!contentType || !contentType.match(/multipart/i)) return null;
 
@@ -97,7 +111,7 @@ export function parseMultipart(env: Record<string, any>): Record<string, any> | 
     throw new EmptyContentError();
   }
 
-  return parseBody(body, boundary, env);
+  return parseBody(body, boundary, env, params);
 }
 
 function parseBoundary(contentType: string): string | null {
@@ -106,12 +120,17 @@ function parseBoundary(contentType: string): string | null {
   return m[1] || m[2];
 }
 
-function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Record<string, any> {
+function parseBody(
+  body: Buffer,
+  boundary: string,
+  env: Record<string, any>,
+  queryParser: QueryParserLike,
+): any {
   const delimiter = Buffer.from("--" + boundary);
   const endDelimiter = Buffer.from("--" + boundary + "--");
   const headerSep = Buffer.from("\r\n\r\n");
 
-  const params: Record<string, any> = {};
+  const params = queryParser.makeParams();
   const fileLimit = env._multipart_file_limit || 0;
   const totalLimit = env._multipart_total_limit || 0;
   const textLimit = env._multipart_text_limit ?? MULTIPART_TEXT_LIMIT;
@@ -152,7 +171,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
         );
         if (nextBoundary === -1) {
           // Only had end boundary
-          return params;
+          return params.toParamsHash();
         }
         pos = nextBoundary;
       } else {
@@ -172,7 +191,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
       // End boundary first - look for opening boundary after
       const nextBoundary = findNextBoundary(body, delimiter, pos + endDelimiter.length);
       if (nextBoundary === -1) {
-        return params;
+        return params.toParamsHash();
       }
       pos = nextBoundary;
     }
@@ -290,7 +309,7 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
           head: headerStr + "\r\n",
         };
 
-        normalizeAndSet(params, name, fileInfo);
+        queryParser.normalizeParams(params, name, fileInfo);
       }
     } else {
       // Text field
@@ -312,47 +331,13 @@ function parseBody(body: Buffer, boundary: string, env: Record<string, any>): Re
         }
       }
 
-      normalizeAndSet(params, name, textValue);
+      queryParser.normalizeParams(params, name, textValue);
     }
 
     pos = nextBoundaryIdx === -1 ? body.length : nextBoundaryIdx;
   }
 
-  return params;
-}
-
-function normalizeAndSet(params: Record<string, any>, name: string, value: any): void {
-  // Use nested query normalization for bracket notation
-  if (name.includes("[")) {
-    // Simple nested assignment
-    const match = name.match(/^([^[]+)((?:\[[^\]]*\])*)$/);
-    if (match) {
-      const prefix = match[1];
-      const brackets = match[2];
-      if (!brackets) {
-        params[prefix] = value;
-      } else {
-        const keys = brackets.match(/\[([^\]]*)\]/g)!.map((b) => b.slice(1, -1));
-        let current = params;
-        if (!(prefix in current) || typeof current[prefix] !== "object") {
-          current[prefix] = {};
-        }
-        current = current[prefix];
-        for (let i = 0; i < keys.length - 1; i++) {
-          const k = keys[i];
-          if (!(k in current) || typeof current[k] !== "object") {
-            current[k] = {};
-          }
-          current = current[k];
-        }
-        current[keys[keys.length - 1]] = value;
-      }
-    } else {
-      params[name] = value;
-    }
-  } else {
-    params[name] = value;
-  }
+  return params.toParamsHash();
 }
 
 function makeTempfile(buf: Buffer): { read(): string; rewind(): void } {
@@ -554,7 +539,7 @@ export class MultipartParser {
       _multipart_total_limit: opts.multipart_total_limit || 0,
     };
 
-    return parseBody(body, boundary, env);
+    return parseBody(body, boundary, env, getDefaultQueryParser() as unknown as QueryParserLike);
   }
 
   static buildMultipartBody(params: Record<string, any>): { body: string; boundary: string } {

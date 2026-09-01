@@ -31,6 +31,7 @@ import {
   RACK_REQUEST_FORM_INPUT,
   RACK_REQUEST_FORM_VARS,
   RACK_REQUEST_FORM_PAIRS,
+  RACK_REQUEST_FORM_ERROR,
   RACK_REQUEST_COOKIE_HASH,
   RACK_REQUEST_COOKIE_STRING,
   HTTP_FORWARDED,
@@ -46,11 +47,44 @@ import {
   getDefaultQueryParser,
   parseCookiesHeader,
   QueryParser,
+  unescape,
 } from "./utils.js";
 import { fetch, hasKey } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/activesupport";
 import * as MediaTypeModule from "./media-type.js";
-import { parseMultipart as multipartExtract } from "./multipart.js";
+import { parseMultipart as multipartExtract, ParamList } from "./multipart.js";
+
+// ipv6 extracted from resolv stdlib, simplified
+// to remove numbered match group creation.
+// Mirrors the `ipv6` union at `rack/request.rb:700-720`.
+const ipv6 = [
+  /(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}/,
+  /(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?/,
+  /(?:[0-9A-Fa-f]{1,4}:){6,6}\d+\.\d+\.\d+\.\d+/,
+  /(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?::(?:[0-9A-Fa-f]{1,4}:)*\d+\.\d+\.\d+\.\d+/,
+  /[Ff][Ee]80(?::[0-9A-Fa-f]{1,4}){7}%[-0-9A-Za-z._~]+/,
+  /[Ff][Ee]80:(?:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?|:(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?)?:[0-9A-Fa-f]{1,4}%[-0-9A-Za-z._~]+/,
+]
+  .map((r) => r.source)
+  .join("|");
+
+/**
+ * Mirrors the private `AUTHORITY` constant (`rack/request.rb:722-735`). Ruby's
+ * `[[:graph:]&&[^\[\]]]` is a printable non-space character that is not a
+ * square bracket.
+ */
+const AUTHORITY = new RegExp(
+  "^(?<host>" +
+    // Match IPv6 as a string of hex digits and colons in square brackets
+    "\\[(?<address>" +
+    ipv6 +
+    ")\\]" +
+    "|" +
+    // Match any other printable string (except square brackets) as a hostname
+    "(?<address>[^\\[\\]\\s\\x00-\\x20\\x7f]*?)" +
+    ")" +
+    "(:(?<port>\\d+))?$",
+);
 
 const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"];
 const PARSEABLE_DATA_MEDIA_TYPES = ["multipart/related", "multipart/mixed"];
@@ -120,7 +154,7 @@ export abstract class Helpers {
 
   /** Mirrors `Rack::Request::Helpers#path_info` (`rack/request.rb:194`). */
   get pathInfo(): string {
-    return this.getHeader(PATH_INFO) || "/";
+    return this.getHeader(PATH_INFO) ?? "";
   }
   /** Mirrors `Rack::Request::Helpers#path_info=` (`rack/request.rb:195`). */
   set pathInfo(v: string) {
@@ -134,7 +168,7 @@ export abstract class Helpers {
 
   /** Mirrors `Rack::Request::Helpers#query_string` (`rack/request.rb:198`). */
   get queryString(): string {
-    return this.getHeader(QUERY_STRING) || "";
+    return this.getHeader(QUERY_STRING) ?? "";
   }
 
   /** Mirrors `Rack::Request::Helpers#content_length` (`rack/request.rb:199`). */
@@ -303,7 +337,7 @@ export abstract class Helpers {
     const [host, , port] = this.splitAuthority(authority);
 
     if (port === (DEFAULT_PORTS[this.scheme] ?? null)) {
-      return host;
+      return host ?? null;
     } else {
       return authority;
     }
@@ -311,17 +345,17 @@ export abstract class Helpers {
 
   /** Mirrors `Rack::Request::Helpers#host` (`rack/request.rb:333-335`). */
   get host(): string | null {
-    return this.splitAuthority(this.authority)[0];
+    return this.splitAuthority(this.authority)[0] ?? null;
   }
 
   /** Mirrors `Rack::Request::Helpers#hostname` (`rack/request.rb:341-343`). */
   get hostname(): string | null {
-    return this.splitAuthority(this.authority)[1];
+    return this.splitAuthority(this.authority)[1] ?? null;
   }
 
   /** Mirrors `Rack::Request::Helpers#port` (`rack/request.rb:345-351`). */
   get port(): number | string | null {
-    let port: number | null = null;
+    let port: number | null | undefined = null;
     const authority = this.authority;
     if (authority != null) {
       [, , port] = this.splitAuthority(authority);
@@ -437,65 +471,91 @@ export abstract class Helpers {
     return mt !== null && PARSEABLE_DATA_MEDIA_TYPES.includes(mt);
   }
 
-  /** Mirrors `Rack::Request::Helpers#GET` (`rack/request.rb:484-497`). */
+  /**
+   * Returns the data received in the query string.
+   *
+   * Mirrors `Rack::Request::Helpers#GET` (`rack/request.rb:484-497`).
+   */
   get GET(): Record<string, any> {
-    const qs = this.queryString;
-    if (
-      this.getHeader(RACK_REQUEST_QUERY_STRING) === qs &&
-      this.getHeader(RACK_REQUEST_QUERY_HASH)
-    ) {
+    const rrQueryString = this.getHeader(RACK_REQUEST_QUERY_STRING);
+    const queryString = this.queryString;
+    if (rrQueryString === queryString) {
       return this.getHeader(RACK_REQUEST_QUERY_HASH);
+    } else {
+      if (rrQueryString != null) {
+        console.warn(
+          "query string used for GET parsing different from current query string. Starting in Rack 3.2, Rack will used the cached GET value instead of parsing the current query string.",
+        );
+      }
+      const queryHash = this.parseQuery(queryString, "&");
+      this.setHeader(RACK_REQUEST_QUERY_STRING, queryString);
+      this.setHeader(RACK_REQUEST_QUERY_HASH, queryHash);
+      return queryHash;
     }
-    const parsed = this.parseQuery(qs, "&");
-    this.setHeader(RACK_REQUEST_QUERY_STRING, qs);
-    this.setHeader(RACK_REQUEST_QUERY_HASH, parsed);
-    return parsed;
   }
 
-  /** Mirrors `Rack::Request::Helpers#POST` (`rack/request.rb:503-551`). */
+  /**
+   * Returns the data received in the request body.
+   *
+   * This method support both application/x-www-form-urlencoded and
+   * multipart/form-data.
+   *
+   * Mirrors `Rack::Request::Helpers#POST` (`rack/request.rb:503-551`).
+   */
   get POST(): Record<string, any> {
-    if (this.getHeader(RACK_REQUEST_FORM_HASH)) {
+    const error = this.getHeader(RACK_REQUEST_FORM_ERROR);
+    if (error) {
+      throw error;
+    }
+
+    try {
+      const rackInput = this.getHeader(RACK_INPUT);
+
+      // If the form hash was already memoized:
+      const formHash = this.getHeader(RACK_REQUEST_FORM_HASH);
+      if (formHash) {
+        const formInput = this.getHeader(RACK_REQUEST_FORM_INPUT);
+        // And it was memoized from the same input:
+        if (formInput === rackInput) {
+          return formHash;
+        } else if (formInput) {
+          console.warn(
+            "input stream used for POST parsing different from current input stream. Starting in Rack 3.2, Rack will used the cached POST value instead of parsing the current input stream.",
+          );
+        }
+      }
+
+      // Otherwise, figure out how to parse the input:
+      if (rackInput == null) {
+        this.setHeader(RACK_REQUEST_FORM_INPUT, null);
+        this.setHeader(RACK_REQUEST_FORM_HASH, {});
+      } else if (this.formData || this.isParseableData()) {
+        const pairs = multipartExtract(this.env, ParamList);
+        if (pairs) {
+          this.setHeader(RACK_REQUEST_FORM_PAIRS, pairs);
+          this.setHeader(RACK_REQUEST_FORM_HASH, this.expandParamPairs(pairs));
+        } else {
+          let formVars: string = this.getHeader(RACK_INPUT).read();
+
+          // Fix for Safari Ajax postings that always append \0
+          if (formVars.endsWith("\0")) formVars = formVars.slice(0, -1);
+
+          this.setHeader(RACK_REQUEST_FORM_VARS, formVars);
+          this.setHeader(RACK_REQUEST_FORM_HASH, this.parseQuery(formVars, "&"));
+        }
+
+        this.setHeader(RACK_REQUEST_FORM_INPUT, this.getHeader(RACK_INPUT));
+        return this.getHeader(RACK_REQUEST_FORM_HASH);
+      } else {
+        this.setHeader(RACK_REQUEST_FORM_INPUT, this.getHeader(RACK_INPUT));
+        this.setHeader(RACK_REQUEST_FORM_HASH, {});
+      }
+
       return this.getHeader(RACK_REQUEST_FORM_HASH);
+    } catch (error) {
+      this.setHeader(RACK_REQUEST_FORM_ERROR, error);
+      throw error;
     }
-
-    const input = this.getHeader(RACK_INPUT);
-    if (!input) {
-      this.setHeader(RACK_REQUEST_FORM_HASH, {});
-      return {};
-    }
-
-    if (!this.formData && !this.isParseableData()) {
-      this.setHeader(RACK_REQUEST_FORM_HASH, {});
-      return {};
-    }
-
-    const mt = this.mediaType;
-    // Multipart data (form-data, related, mixed, etc.)
-    if (mt !== null && mt.startsWith("multipart/")) {
-      const parsed = this.parseMultipart();
-      this.setHeader(RACK_REQUEST_FORM_HASH, parsed);
-      this.setHeader(RACK_REQUEST_FORM_INPUT, input);
-      return parsed;
-    }
-
-    // URL-encoded form data
-    let body: string;
-    if (typeof input.read === "function") {
-      body = input.read() || "";
-    } else if (typeof input === "string") {
-      body = input;
-    } else {
-      body = "";
-    }
-
-    // Safari sends \0 for empty forms
-    if (body === "\0") body = "";
-
-    const parsed = this.parseQuery(body);
-    this.setHeader(RACK_REQUEST_FORM_HASH, parsed);
-    this.setHeader(RACK_REQUEST_FORM_VARS, body);
-    this.setHeader(RACK_REQUEST_FORM_INPUT, input);
-    return parsed;
   }
 
   /** Mirrors `Rack::Request::Helpers#params` (`rack/request.rb:556-558`). */
@@ -669,11 +729,7 @@ export abstract class Helpers {
    * @internal
    */
   splitHeader(value: string | null | undefined): string[] {
-    if (!value) return [];
-    return value
-      .trim()
-      .split(/[,\s]+/)
-      .filter(Boolean);
+    return value ? value.trim().split(/[,\s]+/) : [];
   }
 
   /**
@@ -681,24 +737,12 @@ export abstract class Helpers {
    * over the `AUTHORITY` pattern (`rack/request.rb:722-733`).
    * @internal
    */
-  splitAuthority(
-    authority: string | null | undefined,
-  ): [string | null, string | null, number | null] {
-    if (authority == null) return [null, null, null];
-    const ipv6Match = authority.match(/^\[([^\]]+)\](?::(\d+))?$/);
-    if (ipv6Match) {
-      const address = ipv6Match[1];
-      const port = ipv6Match[2] ? parseInt(ipv6Match[2]) : null;
-      return [`[${address}]`, address, port];
-    }
-    const idx = authority.lastIndexOf(":");
-    if (idx !== -1) {
-      const portStr = authority.substring(idx + 1);
-      if (/^\d+$/.test(portStr)) {
-        return [authority.substring(0, idx), authority.substring(0, idx), parseInt(portStr)];
-      }
-    }
-    return [authority, authority, null];
+  splitAuthority(authority: string | null | undefined): [string?, string?, (number | null)?] {
+    if (authority == null) return [];
+    const match = AUTHORITY.exec(authority);
+    if (!match) return [];
+    const port = match.groups!.port;
+    return [match.groups!.host, match.groups!.address, port != null ? parseInt(port, 10) : null];
   }
 
   /**
@@ -860,60 +904,30 @@ export class Request {
     return purpose === "prefetch" || secPurpose === "prefetch" || purpose2 === "prefetch";
   }
 
+  /**
+   * The flat `[key, value]` pair list `POST` seats under
+   * `rack.request.form_pairs` (`rack/request.rb:528`), or the pairs of the
+   * urlencoded body it seated under `rack.request.form_vars` (`:537`).
+   * @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs
+   */
   get formPairs(): [string, any][] {
-    const mt = this.mediaType;
-    if (!mt || !FORM_DATA_MEDIA_TYPES.includes(mt)) return [];
+    void this.POST;
 
-    // Multipart: return pairs from parsed POST
-    if (mt === "multipart/form-data") {
-      if (this.env[RACK_REQUEST_FORM_PAIRS]) {
-        return this.env[RACK_REQUEST_FORM_PAIRS];
-      }
-      const post = this.POST;
-      const pairs: [string, any][] = [];
-      for (const [key, value] of Object.entries(post)) {
-        pairs.push([key, value]);
-      }
-      this.env[RACK_REQUEST_FORM_PAIRS] = pairs;
-      return pairs;
-    }
+    const pairs = this.getHeader(RACK_REQUEST_FORM_PAIRS);
+    if (pairs) return pairs;
 
-    // URL-encoded
-    if (this.env[RACK_REQUEST_FORM_VARS] !== undefined) {
-      const body = this.env[RACK_REQUEST_FORM_VARS];
-      if (!body) return [];
-      return this._parseFormPairs(body);
-    }
+    const formVars = this.getHeader(RACK_REQUEST_FORM_VARS);
+    if (formVars == null) return [];
 
-    const input = this.env[RACK_INPUT];
-    if (!input) return [];
-
-    let body: string;
-    if (typeof input.read === "function") {
-      body = input.read() || "";
-    } else {
-      body = "";
-    }
-
-    if (!body) return [];
-    return this._parseFormPairs(body);
-  }
-
-  private _parseFormPairs(body: string): [string, string][] {
-    const pairs: [string, string][] = [];
-    for (const part of body.split("&")) {
-      if (!part) continue;
-      const eqIdx = part.indexOf("=");
-      if (eqIdx === -1) {
-        pairs.push([decodeURIComponent(part), ""]);
-      } else {
-        pairs.push([
-          decodeURIComponent(part.substring(0, eqIdx)),
-          decodeURIComponent(part.substring(eqIdx + 1)),
-        ]);
-      }
-    }
-    return pairs;
+    return formVars
+      .split("&")
+      .filter((part: string) => part !== "")
+      .map((part: string): [string, string] => {
+        const eq = part.indexOf("=");
+        return eq === -1
+          ? [unescape(part), ""]
+          : [unescape(part.slice(0, eq)), unescape(part.slice(eq + 1))];
+      });
   }
 }
 

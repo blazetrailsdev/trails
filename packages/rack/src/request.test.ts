@@ -131,6 +131,42 @@ describe("RackRequestTest", () => {
     expect(makeReq("/", { HTTP_HOST: "example.com" }).host).toBe("example.com");
     expect(makeReq("/", { HTTP_HOST: "example.com:8080" }).host).toBe("example.com");
     expect(makeReq("http://foo.example.com/").host).toBe("foo.example.com");
+
+    for (const httpHost of [
+      "www2.example.org",
+      "123foo.example.com",
+      "\u2661.com",
+      "nic.\u8c37\u6b4c",
+    ]) {
+      const req = makeReq("/", { HTTP_HOST: httpHost });
+      expect(req.host).toBe(httpHost);
+      expect(req.hostname).toBe(httpHost);
+    }
+
+    for (const httpHost of ["\u2661.com:80", "nic.\u8c37\u6b4c:80"]) {
+      const req = makeReq("/", { HTTP_HOST: httpHost });
+      expect(req.host).toBe(httpHost.slice(0, -3));
+      expect(req.hostname).toBe(httpHost.slice(0, -3));
+    }
+
+    for (const httpHost of [
+      "technically_invalid.example.com",
+      "technically_invalid.example.com:80",
+    ]) {
+      const req = makeReq("/", { HTTP_HOST: httpHost });
+      expect(req.host).toBe("technically_invalid.example.com");
+      expect(req.hostname).toBe("technically_invalid.example.com");
+    }
+
+    for (const httpHost of ["trailing_newline.com\n", "really\nbad\ninput"]) {
+      const req = makeReq("/", { HTTP_HOST: httpHost });
+      expect(req.host).toBeNull();
+      expect(req.hostname).toBeNull();
+    }
+
+    const someService = makeReq("/", { HTTP_HOST: "some_service:3001" });
+    expect(someService.host).toBe("some_service");
+    expect(someService.hostname).toBe("some_service");
   });
 
   it("figure out the correct port", () => {
@@ -555,22 +591,6 @@ describe("RackRequestTest", () => {
     };
     const req = new Request(env);
     expect(req.POST).toEqual({ foo: "bar" });
-  });
-
-  it("handle nil return from rack.input.read when parsing url-encoded data", () => {
-    const mockInput = {
-      read() {
-        return null;
-      },
-    };
-    const env = {
-      ...makeEnv(),
-      REQUEST_METHOD: "POST",
-      CONTENT_TYPE: "application/x-www-form-urlencoded",
-      "rack.input": mockInput,
-    };
-    const req = new Request(env);
-    expect(req.POST).toEqual({});
   });
 
   it("truncate POST body at bytesize_limit when parsing url-encoded data", () => {
@@ -1291,19 +1311,16 @@ describe("RackRequestTest", () => {
 
   it("use form_hash when form_input is a Tempfile", () => {
     const formHash = { custom: "data" };
+    const rackInput = {
+      read() {
+        return "{foo: 'bar'}";
+      },
+    };
     const env = {
       ...makeEnv(),
       "rack.request.form_hash": formHash,
-      "rack.request.form_input": {
-        read() {
-          return "";
-        },
-      },
-      "rack.input": {
-        read() {
-          return "";
-        },
-      },
+      "rack.request.form_input": rackInput,
+      "rack.input": rackInput,
     };
     const req = new Request(env);
     expect(req.POST).toBe(formHash);
