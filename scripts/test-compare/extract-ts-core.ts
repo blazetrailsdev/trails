@@ -349,6 +349,10 @@ export function extractTestsFromSource(content: string, relativePath: string): T
   const currentAncestors: string[] = [];
   const gateStack: TestGate[] = [];
 
+  const registrars = testRegisteringHelpers(sourceFile, helpers);
+  const deferredBodies = new Map<string, ts.Node>();
+  const callSiteGates = new Map<string, (TestGate | undefined)[]>();
+
   function activeGate(): TestGate | undefined {
     let g: TestGate | undefined;
     for (const s of gateStack) g = mergeGate(g, s);
@@ -447,22 +451,33 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     if (ts.isForOfStatement(node)) {
       if (expandForOf(node)) return;
     }
+    const atFileScope = currentAncestors.length === 0 && gateStack.length === 0;
+    const declared = deferrableHelperName(node, atFileScope);
+    if (declared !== null && registrars.has(declared)) {
+      deferredBodies.set(declared, resolveHelper(helpers, declared, node.pos)!);
+      return;
+    }
     if (ts.isCallExpression(node)) {
       const expression = node.expression;
       const root = calleeRootName(expression);
       if (root) assertRegisteredGateWrapper(root, relativePath);
       if (ts.isIdentifier(expression)) {
         const funcName = expression.text;
+        if (registrars.has(funcName)) {
+          const gates = callSiteGates.get(funcName) ?? [];
+          gates.push(activeGate());
+          callSiteGates.set(funcName, gates);
+        }
 
         if (ADAPTER_SUITE_WRAPPERS.has(funcName)) {
-          const title = getArgString(node, 0);
+          const title = getSuiteTitle(node, 0, bindings);
           if (title) {
             enterSuite(node, title, gateFromWrapper(funcName));
             return;
           }
         } else if (funcName === "describeIfSupports") {
           // describeIfSupports("feature", "title", fn)
-          const title = getArgString(node, 1);
+          const title = getSuiteTitle(node, 1, bindings);
           if (title) {
             enterSuite(node, title, gateFromWrapper(funcName, getArgString(node, 0)));
             return;
@@ -506,7 +521,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
             // describe.skipIf(…) and the adapter wrappers' .skipIf form, e.g.
             // describeIfPg.skipIf(…) — compose the wrapper's adapter gate with
             // the inline guard.
-            const title = getArgString(node, 0);
+            const title = getSuiteTitle(node, 0, bindings);
             if (title) {
               const wrapperGate = gateFromWrapper(base.text);
               enterSuite(
@@ -520,7 +535,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
             // describeIfSupports.skipIf(expr)("feature", "title", fn) — title is
             // arg 1. Handle explicitly so we don't fall through and re-register
             // the nested tests with no suite title/gate.
-            const title = getArgString(node, 1);
+            const title = getSuiteTitle(node, 1, bindings);
             if (title) {
               const wrapperGate = gateFromWrapper(base.text, getArgString(node, 0));
               enterSuite(
@@ -552,7 +567,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
         // Handle describe.skip, it.skip, it.todo, it.only, etc.
         const base = expression.expression;
         if (ts.isIdentifier(base) && base.text === "describe") {
-          const title = getArgString(node, 0);
+          const title = getSuiteTitle(node, 0, bindings);
           if (title) {
             enterSuite(node, title, null);
             return;
@@ -577,8 +592,129 @@ export function extractTestsFromSource(content: string, relativePath: string): T
   }
 
   visit(sourceFile);
+  for (const [name, body] of deferredBodies) {
+    const gate = agreedGate(callSiteGates.get(name));
+    if (gate) gateStack.push(gate);
+    visit(body);
+    if (gate) gateStack.pop();
+  }
   fileInfo.testCount = fileInfo.testCases.length;
   return fileInfo;
+}
+
+/**
+ * The name a node declares a same-file helper under — the two shapes
+ * {@link collectHelpers} records — or null where it declares none or is not at
+ * file scope.
+ *
+ * Only a TOP-LEVEL declaration is deferrable. A helper declared INSIDE a
+ * describe is already walked with that suite's gate and ancestors on the stack,
+ * and hoisting it out would strip the ancestors Rails does record.
+ */
+function deferrableHelperName(node: ts.Node, atFileScope: boolean): string | null {
+  if (!atFileScope) return null;
+  if (ts.isFunctionDeclaration(node) && node.name && node.body) return node.name.text;
+  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+    const init = node.initializer;
+    if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && init.body) {
+      return node.name.text;
+    }
+  }
+  return null;
+}
+
+/**
+ * Same-file helpers whose body registers a test — an `it` / `test` /
+ * `itIfSupports` call, in any of its modifier forms. These are the TS analogue
+ * of Rails' shared test-case MODULE: Rails records
+ * `module PostgresqlJSONSharedTestCases`'s three `def test_*` once, at module
+ * scope (`test/cases/adapters/postgresql/json_test.rb:6-39`), and the classes
+ * that `include` it supply the gate they run under (`PostgreSQLTestCase`,
+ * `test/cases/test_case.rb:303-305`).
+ *
+ * `enterSuite` builds its gate stack LEXICALLY, so such a helper declared at
+ * top level had its `it()`s walked with an empty stack and emitted ungated —
+ * three hard `[missing-gate]` rows with no baseline, red in CI while every
+ * local vitest run stayed green (PR #7141). So its body is DEFERRED out of the
+ * lexical walk and replayed once afterwards, under {@link agreedGate}. Once,
+ * not once per call site: Ruby emits the module's cases once too, and replaying
+ * per call would invent a second copy of each under an ancestor Rails does not
+ * record.
+ *
+ * Restricted to helpers actually CALLED in the file, so the deferral touches
+ * only that shape: an assertion helper (`testCopyTable`) keeps being folded in
+ * lexically by `countAssertions`, which is a different reader entirely.
+ */
+function testRegisteringHelpers(sourceFile: ts.SourceFile, helpers: HelperMap): Set<string> {
+  const registers = (body: ts.Node): boolean => {
+    let found = false;
+    const walk = (n: ts.Node) => {
+      if (found) return;
+      if (ts.isCallExpression(n)) {
+        const root = calleeRootName(n.expression);
+        if (root === "it" || root === "test" || root === "itIfSupports") found = true;
+      }
+      ts.forEachChild(n, walk);
+    };
+    walk(body);
+    return found;
+  };
+  const called = new Set<string>();
+  const walk = (n: ts.Node) => {
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) called.add(n.expression.text);
+    ts.forEachChild(n, walk);
+  };
+  walk(sourceFile);
+  const out = new Set<string>();
+  for (const [name, defs] of helpers) {
+    if (!called.has(name)) continue;
+    if (defs.length === 1 && registers(defs[0].body)) out.add(name);
+  }
+  return out;
+}
+
+/** The one gate every call site of a deferred helper carries, or undefined when
+ *  they disagree, one of them is ungated, or the helper is never called — a
+ *  helper its call sites do not agree on is not provably gated, and a guessed
+ *  gate is worse than the absent one. */
+function agreedGate(gates: (TestGate | undefined)[] | undefined): TestGate | undefined {
+  if (!gates || gates.length === 0) return undefined;
+  const first = gates[0];
+  if (!first) return undefined;
+  const key = JSON.stringify(finalizeGate(first));
+  return gates.every((g) => g && JSON.stringify(finalizeGate(g)) === key) ? first : undefined;
+}
+
+/**
+ * The title a SUITE argument yields, in the same three readings a test title
+ * gets ({@link getArgTitle}) plus one more: a bare identifier
+ * (`describe(name, …)` inside a `makeSuite(name, …)` helper) has no static text
+ * at all, and stands in as the placeholder alone.
+ *
+ * Reading a suite title with {@link getArgString} only meant a
+ * `` describe(`${adapter} quoting`, …) `` returned null, `enterSuite` never
+ * ran, and every test inside lost that describe from its `ancestors` — silently
+ * REPARENTED onto the enclosing suite, which is not inert: pass 1 keys on the
+ * full path, so a wrong path mis-pairs rather than simply missing.
+ * `migration/foreign-key.test.ts` generated three suites from a
+ * `foreignKeyChangeColumnTest(name, …)` helper and sat on six wrong-describe
+ * rows until PR #7252 inlined them by hand.
+ *
+ * A recovered skeleton is a label for the audit, never a name to match on — a
+ * dynamic suite name cannot equal a Rails describe — so `compare.ts` keeps a
+ * path carrying the placeholder out of its path indexes the way it keeps a
+ * `dynamic` case out of every index.
+ */
+function getSuiteTitle(
+  node: ts.CallExpression,
+  index: number,
+  bindings: ReadonlyMap<string, string>,
+): string | null {
+  const t = getArgTitle(node, index, bindings);
+  if (t) return t.title;
+  const arg = node.arguments[index];
+  if (!arg || ts.isArrowFunction(arg) || ts.isFunctionExpression(arg)) return null;
+  return DYNAMIC_TITLE_PLACEHOLDER;
 }
 
 function getArgString(node: ts.CallExpression, index: number): string | null {
@@ -589,7 +725,15 @@ function getArgString(node: ts.CallExpression, index: number): string | null {
   return null;
 }
 
-/** Placeholder standing in for one `${...}` of a recovered template title. */
+/**
+ * Placeholder standing in for one `${...}` of a recovered template title, and
+ * for a suite title that is a bare identifier ({@link getSuiteTitle}).
+ *
+ * It is a label for the audit, never a name to match on, so `compare.ts` keeps
+ * a test whose PATH carries it out of the path indexes: no Rails describe can
+ * equal a recovered skeleton, and the case is left to match on its own static
+ * description instead.
+ */
 export const DYNAMIC_TITLE_PLACEHOLDER = "<expr>";
 
 /**

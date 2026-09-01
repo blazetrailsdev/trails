@@ -624,6 +624,7 @@ export function extractFromProgram(
     const localImports = new Map<string, { sourceName: string; moduleSpecifier: string }>();
     // Renamed-import aliases for this file, consumed by extractCalls below.
     currentImportAliases = collectImportAliases(sourceFile);
+    const sectionVisibility = collectModuleSectionVisibility(sourceFile);
 
     ts.forEachChild(sourceFile, (node) => {
       if (ts.isClassDeclaration(node) && node.name) {
@@ -801,7 +802,8 @@ export function extractFromProgram(
         const fnCallSeq = extractCallSeq(node.body);
         const fnCallArgs = extractCallArgs(node.body);
         const fnSkeleton = extractSkeleton(node.body);
-        const internal = internalJsDocTagApplies(node);
+        const sectioned = sectionVisibility.get(node.name.text);
+        const internal = internalJsDocTagApplies(node) || sectioned !== undefined;
         const noRailsEquivalent = noRailsEquivalentReason(node);
         const fnMissingRailsCalls = missingRailsCallTags(node);
         const fnMissingRailsArgs = missingRailsArgsTags(node);
@@ -809,7 +811,7 @@ export function extractFromProgram(
         const fnMissingRailsArgsReasons = missingRailsArgsTagReasons(node);
         fileFunctions.push({
           name: node.name.text,
-          visibility: "public",
+          visibility: sectioned ?? "public",
           params: extractParameters(node.parameters),
           isStatic: false,
           line,
@@ -1068,7 +1070,8 @@ export function extractFromProgram(
             const callSeq = extractCallSeq(body);
             const callArgs = extractCallArgs(body);
             const skeleton = extractSkeleton(body);
-            const internal = internalJsDocTagApplies(decl);
+            const exportSectioned = sectionVisibility.get(sym.name);
+            const internal = internalJsDocTagApplies(decl) || exportSectioned !== undefined;
             // A renamed export (`export { withRoutesHelpers as with }`) is its
             // own surface entry: the declaration's tag justifies the DECLARED
             // spelling, and inheriting it would manufacture a stale tag on the
@@ -1092,7 +1095,7 @@ export function extractFromProgram(
                   missingRailsCallTags(renamedSpecifier.parent.parent));
             fileFunctions.push({
               name: sym.name,
-              visibility: "public",
+              visibility: exportSectioned ?? "public",
               params,
               isStatic: false,
               line,
@@ -1914,6 +1917,119 @@ export function internalJsDocTagApplies(node: ts.Node): boolean {
  * The family's empty-reason contract (shared with `@missingRailsCall`) is
  * stated in docs/infrastructure/api-build-stub-generation-plan.md.
  */
+/**
+ * Ruby module-body visibility, read off `defineModule(pub, prot, priv)`
+ * (`packages/activesupport/src/include.ts`) — the single declaration site for a
+ * mixin member's visibility, and the one syntactic shape this can key on.
+ *
+ * A member of `QueryMethodsPrivateInstanceMethods` is `private` in Rails
+ * (`relation/query_methods.rb:1677`), but the TS port has to export it as an
+ * ordinary top-level function so the section object can reference it — so it
+ * extracted as `visibility: "public"` and `internal: false`, and every reader
+ * of the manifest counted a Rails-private helper as public surface. The
+ * `@internal` JSDoc tag `blazetrails/rails-private-jsdoc` requires is
+ * documentary; a comment is not something the extractor reads for visibility.
+ *
+ * A section is read as its object literal — written inline, or, as both live
+ * call sites spell it, a same-file `const QueryMethodsPrivateInstanceMethods =
+ * {...}`; `defineModule(pub, undefined, priv)` (`spawn-methods.ts:78`) declines
+ * a section rather than passing an empty one. An entry may be shorthand, a
+ * renamed `key: fn`, or an ALIAS such as
+ * `buildHavingClause: buildWhereClause` (`query_methods.rb:1654`) — an alias
+ * stamps the function it REFERENCES, which is the entry the manifest carries.
+ * A member written inline (`{ priv() {} }`) declares no top-level function and
+ * so has nothing to stamp.
+ *
+ * Same-file only, matching the section objects' own contract: they can only
+ * name what the file declares.
+ */
+function collectModuleSectionVisibility(
+  sourceFile: ts.SourceFile,
+): Map<string, "protected" | "private"> {
+  const out = new Map<string, "protected" | "private">();
+
+  const topLevelFunctions = new Set<string>();
+  ts.forEachChild(sourceFile, (node) => {
+    if (ts.isFunctionDeclaration(node) && node.name) topLevelFunctions.add(node.name.text);
+    if (ts.isVariableStatement(node)) {
+      for (const d of node.declarationList.declarations) {
+        if (ts.isIdentifier(d.name)) topLevelFunctions.add(d.name.text);
+      }
+    }
+  });
+
+  const unwrap = (e: ts.Expression): ts.Expression =>
+    ts.isAsExpression(e) || ts.isParenthesizedExpression(e) || ts.isSatisfiesExpression(e)
+      ? unwrap(e.expression)
+      : e;
+
+  const sectionObject = (arg: ts.Expression | undefined): ts.ObjectLiteralExpression | null => {
+    if (!arg) return null;
+    const e = unwrap(arg);
+    if (ts.isObjectLiteralExpression(e)) return e;
+    if (!ts.isIdentifier(e)) return null;
+    let found: ts.ObjectLiteralExpression | null = null;
+    ts.forEachChild(sourceFile, (node) => {
+      if (!ts.isVariableStatement(node)) return;
+      for (const d of node.declarationList.declarations) {
+        if (!ts.isIdentifier(d.name) || d.name.text !== e.text || !d.initializer) continue;
+        const init = unwrap(d.initializer);
+        if (ts.isObjectLiteralExpression(init)) found = init;
+      }
+    });
+    return found;
+  };
+
+  const record = (arg: ts.Expression | undefined, visibility: "protected" | "private"): void => {
+    if (!arg) return;
+    const e = unwrap(arg);
+    if (ts.isIdentifier(e) && e.text === "undefined") return;
+    const object = sectionObject(arg);
+    if (object === null) throw new Error(unresolvedSectionMessage(arg, visibility));
+    for (const prop of object.properties) {
+      let name: string;
+      if (ts.isShorthandPropertyAssignment(prop)) {
+        name = prop.name.text;
+      } else if (ts.isPropertyAssignment(prop)) {
+        const init = unwrap(prop.initializer);
+        if (!ts.isIdentifier(init)) continue;
+        name = init.text;
+      } else {
+        continue;
+      }
+      if (!topLevelFunctions.has(name)) {
+        throw new Error(unresolvedSectionMessage(prop, visibility));
+      }
+      out.set(name, visibility);
+    }
+  };
+
+  ts.forEachChild(sourceFile, function visit(node: ts.Node): void {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "defineModule"
+    ) {
+      record(node.arguments[1], "protected");
+      record(node.arguments[2], "private");
+    }
+    ts.forEachChild(node, visit);
+  });
+
+  return out;
+}
+
+/** A `defineModule` section entry that names nothing this file declares — a
+ *  hole in the stamp, so it is reported rather than silently left public. */
+function unresolvedSectionMessage(node: ts.Node, visibility: string): string {
+  const sf = node.getSourceFile();
+  const line = sf.getLineAndCharacterOfPosition(node.getStart()).line + 1;
+  return (
+    `defineModule ${visibility} section entry does not resolve to a same-file ` +
+    `top-level function: ${sf.fileName}:${line}`
+  );
+}
+
 export function noRailsEquivalentReason(node: ts.Node): string | undefined {
   for (const tag of ts.getJSDocTags(node)) {
     if (tag.tagName.text !== "noRailsEquivalent" || !isLineLeadingJsDocTag(tag)) continue;

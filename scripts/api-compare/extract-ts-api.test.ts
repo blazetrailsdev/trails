@@ -4305,3 +4305,74 @@ describe("bodyless declarations (RFC 0126)", () => {
     ]);
   });
 });
+
+describe("extractFromProgram — defineModule section visibility", () => {
+  // Rails declares mixin-member visibility with statement-position `private` /
+  // `protected` inside the module body (`relation/query_methods.rb:1604`, `:1663`,
+  // `:1677`; `relation/spawn_methods.rb:71`). The TS port has to export those
+  // helpers as ordinary top-level functions so the section object can reference
+  // them, so they extracted as public and every reader of the manifest counted a
+  // Rails-private helper as public surface.
+  function visibilities(source: string): Record<string, [string, boolean]> {
+    const info = extractFromFiles("/p", { "query-methods.ts": source });
+    const out: Record<string, [string, boolean]> = {};
+    for (const f of fileFunctionsOf(info, "query-methods.ts")) {
+      out[f.name] = [f.visibility, !!f.internal];
+    }
+    return out;
+  }
+
+  it("stamps protected and private sections onto their top-level functions", () => {
+    expect(
+      visibilities(`
+        export function where() {}
+        export function buildSubquery() {}
+        export function buildArel() {}
+        export const QueryMethodsPublicInstanceMethods = { where } as const;
+        export const QueryMethodsProtectedInstanceMethods = { buildSubquery } as const;
+        export const QueryMethodsPrivateInstanceMethods = { buildArel } as const;
+        export const QueryMethods = defineModule(
+          QueryMethodsPublicInstanceMethods,
+          QueryMethodsProtectedInstanceMethods,
+          QueryMethodsPrivateInstanceMethods,
+        );
+      `),
+    ).toMatchObject({
+      where: ["public", false],
+      buildSubquery: ["protected", true],
+      buildArel: ["private", true],
+    });
+  });
+
+  it("stamps an ALIAS entry onto the function it references", () => {
+    // `buildHavingClause: buildWhereClause` (query_methods.rb:1654).
+    expect(
+      visibilities(`
+        export function buildWhereClause() {}
+        export const QueryMethodsProtectedInstanceMethods = {
+          buildWhereClause,
+          buildHavingClause: buildWhereClause,
+        } as const;
+        export const QueryMethods = defineModule({}, QueryMethodsProtectedInstanceMethods);
+      `),
+    ).toMatchObject({ buildWhereClause: ["protected", true] });
+  });
+
+  it("reads an INLINE section object literal", () => {
+    expect(
+      visibilities(`
+        export function relationWith() {}
+        export const SpawnMethods = defineModule({}, undefined, { relationWith });
+      `),
+    ).toMatchObject({ relationWith: ["private", true] });
+  });
+
+  it("reports a section entry that resolves to no same-file top-level function", () => {
+    expect(() =>
+      visibilities(`
+        import { elsewhere } from "./other.js";
+        export const QueryMethods = defineModule({}, undefined, { elsewhere });
+      `),
+    ).toThrow(/defineModule private section entry does not resolve/);
+  });
+});
