@@ -104,6 +104,8 @@ jobs:
             head="${{ github.sha }}"
           fi
           # Gate rationale: scripts/ci-suite-coverage.test.ts ("Gate reference").
+          # Additive-registration narrowing: see the gate reference.
+          ADDITIVE_CANDIDATE_RE='^(pnpm-lock\.yaml|tsconfig[^/]*\.json|vitest[^/]*\.config\.ts)$'
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
           INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|rails-file-structure-collisions|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|closing-story-references)(\.test)?\.ts$)'
           AR_PKGS_RE='^packages/(activerecord|activerecord-cli|arel|activemodel|activesupport|globalid|date|did-you-mean|trails-tsc)/'
@@ -148,6 +150,22 @@ jobs:
           LINT_ALL_RE='^(eslint\.config\.mjs$|eslint/|package\.json$|pnpm-lock\.yaml$|tsconfig[^/]*\.json$|vendor/|packages/activerecord/src/support/stubbed-ddl-methods\.ts$)'
           LINTABLE_RE='\.(m|c)?(t|j)sx?$'
           COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|rails-file-structure-collisions|deprecated-manifest-diff)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$|eslint/rails-deprecated-methods\.json$)'
+          is_additive_registration() {
+            local f="$1" body
+            body=$(git diff --unified=0 "$base"..."$head" -- "$f" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---)' || true)
+            if grep -qE '^-' <<<"$body"; then return 1; fi
+            case "$f" in
+              pnpm-lock.yaml) return 0 ;;
+              tsconfig*.json)
+                if grep -qvE '^\+[[:space:]]*([]{}[,]*|\{[[:space:]]*"path"[[:space:]]*:[[:space:]]*"packages/[a-z0-9-]+"[[:space:]]*\},?)$' <<<"$body"; then return 1; fi
+                ;;
+              vitest*.config.ts)
+                if grep -qvE '^\+[[:space:]]*([]{}[,]*|"@blazetrails/[a-z0-9-]+/?"[[:space:]]*:.*)$' <<<"$body"; then return 1; fi
+                ;;
+              *) return 1 ;;
+            esac
+            return 0
+          }
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "db_adapter_affected=true"   >> "$GITHUB_OUTPUT"
@@ -240,6 +258,16 @@ jobs:
                   echo "comparison_affected=false"   >> "$GITHUB_OUTPUT"
                 else
                   infra_files=$(echo "$files" | grep -vE "$INFRA_CARVEOUT_RE" || true)
+                  kept=""
+                  while IFS= read -r f; do
+                    [ -n "$f" ] || continue
+                    if grep -qE "$ADDITIVE_CANDIDATE_RE" <<<"$f" && is_additive_registration "$f"; then
+                      echo "additive registration: $f"
+                      continue
+                    fi
+                    kept="${kept}${f}"$'\n'
+                  done <<<"$infra_files"
+                  infra_files="$kept"
                   # Herestrings, not `echo … | grep -q`: `grep -q` exits on its
                   # first match, so on a large diff `echo` is still writing when
                   # the reader vanishes and takes EPIPE. Under `pipefail` that
@@ -635,7 +663,11 @@ jobs:
           packages/activemodel
           packages/activesupport
           packages/date
+          packages/did-you-mean
+          packages/globalid
+          packages/html-sanitizer
           packages/i18n
+          packages/nokogiri
           packages/ruby-compat
           scripts/guides-typecheck
           scripts/tasks

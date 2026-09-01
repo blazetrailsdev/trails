@@ -782,8 +782,8 @@ function rackCookieValue(value: string | Partial<CookieOptions>): Record<string,
         ? opts.expires
         : new Date(opts.expires.epochMilliseconds),
     secure: opts.secure,
-    httponly: opts.httpOnly,
-    same_site: opts.sameSite,
+    httpOnly: opts.httpOnly,
+    sameSite: opts.sameSite,
   };
 }
 

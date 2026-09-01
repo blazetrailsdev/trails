@@ -290,12 +290,12 @@ export function setCookieHeader(
     const opts = value;
     if (opts.domain) domain = `; domain=${opts.domain}`;
     if (opts.path) path = `; path=${opts.path}`;
-    if (opts.max_age !== undefined) maxAge = `; max-age=${opts.max_age}`;
+    if (opts.maxAge !== undefined) maxAge = `; max-age=${opts.maxAge}`;
     if (opts.expires) expires = `; expires=${httpDate(opts.expires)}`;
     if (opts.secure) secure = "; secure";
-    if ("httponly" in opts ? opts.httponly : opts.http_only) httponly = "; httponly";
-    if (opts.same_site !== undefined && opts.same_site !== false && opts.same_site !== null) {
-      const ss = opts.same_site;
+    if ("httponly" in opts ? opts.httponly : opts.httpOnly) httponly = "; httponly";
+    if (opts.sameSite !== undefined && opts.sameSite !== false && opts.sameSite !== null) {
+      const ss = opts.sameSite;
       if (ss === "none" || ss === "None") sameSite = "; samesite=none";
       else if (ss === "lax" || ss === "Lax") sameSite = "; samesite=lax";
       else if (ss === true || ss === "strict" || ss === "Strict") sameSite = "; samesite=strict";
@@ -333,7 +333,7 @@ function httpDate(date: Date): string {
 export function deleteSetCookieHeader(key: string, value: Record<string, any> = {}): string {
   // boundary: epoch-zero Date is the standard delete-cookie sentinel for the
   // Set-Cookie `Expires` attribute (RFC 6265 / 6265bis).
-  return setCookieHeader(key, { ...value, max_age: "0", expires: new Date(0), value: "" });
+  return setCookieHeader(key, { ...value, maxAge: "0", expires: new Date(0), value: "" });
 }
 
 export function deleteSetCookieHeaderBang(

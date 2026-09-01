@@ -139,91 +139,91 @@ it("can set http only cookies", () => {
 
 it("can set http only cookies with :http_only", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", http_only: true });
+  response.setCookie("foo", { value: "bar", httpOnly: true });
   expect(response.headers["set-cookie"]).toBe("foo=bar; httponly");
 });
 
 it("can set prefers :httponly for http only cookie setting when :httponly and :http_only provided", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", httponly: false, http_only: true });
+  response.setCookie("foo", { value: "bar", httponly: false, httpOnly: true });
   expect(response.headers["set-cookie"]).toBe("foo=bar");
 });
 
 it("can set same site cookies with symbol value :none", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "none" });
+  response.setCookie("foo", { value: "bar", sameSite: "none" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=none");
 });
 
 it("can set same site cookies with symbol value :None", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "None" });
+  response.setCookie("foo", { value: "bar", sameSite: "None" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=none");
 });
 
 it("can set same site cookies with string value 'None'", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "None" });
+  response.setCookie("foo", { value: "bar", sameSite: "None" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=none");
 });
 
 it("can set same site cookies with symbol value :lax", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "lax" });
+  response.setCookie("foo", { value: "bar", sameSite: "lax" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=lax");
 });
 
 it("can set same site cookies with symbol value :Lax", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "lax" });
+  response.setCookie("foo", { value: "bar", sameSite: "lax" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=lax");
 });
 
 it("can set same site cookies with string value 'Lax'", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "Lax" });
+  response.setCookie("foo", { value: "bar", sameSite: "Lax" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=lax");
 });
 
 it("can set same site cookies with boolean value true", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: true });
+  response.setCookie("foo", { value: "bar", sameSite: true });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=strict");
 });
 
 it("can set same site cookies with symbol value :strict", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "strict" });
+  response.setCookie("foo", { value: "bar", sameSite: "strict" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=strict");
 });
 
 it("can set same site cookies with symbol value :Strict", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "Strict" });
+  response.setCookie("foo", { value: "bar", sameSite: "Strict" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=strict");
 });
 
 it("can set same site cookies with string value 'Strict'", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "Strict" });
+  response.setCookie("foo", { value: "bar", sameSite: "Strict" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=strict");
 });
 
 it("validates the same site option value", () => {
   const response = new Response();
-  expect(() => response.setCookie("foo", { value: "bar", same_site: "Foo" })).toThrow(/Invalid/);
+  expect(() => response.setCookie("foo", { value: "bar", sameSite: "Foo" })).toThrow(/Invalid/);
 });
 
 it("can set same site cookies with symbol value", () => {
   const response = new Response();
-  response.setCookie("foo", { value: "bar", same_site: "Strict" });
+  response.setCookie("foo", { value: "bar", sameSite: "Strict" });
   expect(response.headers["set-cookie"]).toBe("foo=bar; samesite=strict");
 });
 
 it("omits same site attribute given a  value", () => {
   for (const val of [null, false]) {
     const response = new Response();
-    response.setCookie("foo", { value: "bar", same_site: val });
+    response.setCookie("foo", { value: "bar", sameSite: val });
     expect(response.headers["set-cookie"]).toBe("foo=bar");
   }
 });

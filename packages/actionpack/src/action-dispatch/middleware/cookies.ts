@@ -294,9 +294,9 @@ export class CookieJar implements Iterable<[string, string]> {
 
   /** Mirrors `CookieJar#write_cookie?` (cookies.rb:448-450). @internal */
   private isWriteCookie(cookie: SetCookieOptions): boolean {
-    const request = this._request as unknown as { isSsl?(): boolean; host?: string } | undefined;
+    const request = this._request as unknown as { ssl?: boolean; host?: string } | undefined;
     return (
-      request?.isSsl?.() === true ||
+      request?.ssl === true ||
       !cookie.secure ||
       CookieJar.alwaysWriteCookie ||
       (request?.host ?? "").endsWith(".onion")

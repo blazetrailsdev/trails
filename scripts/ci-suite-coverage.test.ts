@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { readFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
@@ -408,6 +409,26 @@ function gateRegex(yml: string, name: string): RegExp {
  *  package gate true. Downstream jobs still honor docs_only, so a
  *  docs-only push to main still short-circuits the matrix.
  *
+ *  ADDITIVE_CANDIDATE_RE / is_additive_registration
+ *  Registering a workspace package is ADDITIVE by construction: a new
+ *  `packages/<pkg>` reference appended to tsconfig.json, a new alias in a
+ *  vitest config, and the lockfile entries for a package nothing imports
+ *  yet. That necessarily edits three paths INFRA_RE matches, yet reaches
+ *  no existing package's build or test — #7319 and #7322 each ran the
+ *  whole AR adapter matrix for a diff that could not affect it. A REAL
+ *  config change to those SAME paths — an edited compilerOptions, a
+ *  retargeted alias, a bumped shared dependency — does reach everything,
+ *  which is exactly what INFRA_RE is for. So the discriminator cannot be
+ *  the path: a path-only narrowing that let a real tsconfig.json edit
+ *  through would be strictly worse than over-firing. It is the SHAPE of
+ *  the hunk. A removed line is never additive (a registration only
+ *  appends), and for tsconfig/vitest every ADDED line has to be a
+ *  registration entry rather than a setting. pnpm-lock.yaml has no
+ *  comparable shape to match on, so its rule is the removal rule alone:
+ *  entries only ever added cannot change how an existing package
+ *  resolves. Matching files are dropped from infra_files ONLY; they stay
+ *  in $files, so any gate whose own regex names them still fires.
+ *
  *  infra_files
  *  Drop the single-consumer scripts/ subtrees (see
  *  INFRA_CARVEOUT_RE above) from the infra sweep so a change
@@ -439,22 +460,37 @@ function gateRegex(yml: string, name: string): RegExp {
  * the regexes in JS instead would miss shell-level faults (an unbound `$3`
  * under `set -u` took the whole job down once).
  */
-async function gateRunner(yml: string): Promise<(file: string) => Promise<Record<string, string>>> {
+type GateOpts = { cwd?: string; base?: string; head?: string };
+
+async function gateRunner(
+  yml: string,
+): Promise<(file: string, opts?: GateOpts) => Promise<Record<string, string>>> {
   const lines = yml.split("\n").map((l) => l.trim());
   const defs = lines.filter((l) => /^[A-Z_]+_RE='/.test(l));
   const start = lines.findIndex((l) => l.startsWith("infra_files=$("));
+  // `infra_files` calls this helper, which is defined outside the sliced
+  // region; lift it in on its own rather than widening the slice over the
+  // half-open if/elif chain that sits between them.
+  const fnStart = lines.findIndex((l) => l.startsWith("is_additive_registration()"));
+  const fnEnd = lines.indexOf("}", fnStart);
+  if (fnStart === -1 || fnEnd === -1) throw new Error("no is_additive_registration in ci.yml");
   const end = lines.findIndex((l) => l.startsWith("set_gate comparison_affected"));
   if (start === -1 || end === -1) throw new Error("no gate block in ci.yml");
   const script = [
     "set -euo pipefail",
     ...defs,
-    'GITHUB_OUTPUT=$(mktemp)\nfiles="$1"',
+    'GITHUB_OUTPUT=$(mktemp)\nfiles="$1"\nbase="${2:-}"\nhead="${3:-}"',
+    ...lines.slice(fnStart, fnEnd + 1),
     ...lines.slice(start, end + 1),
     'cat "$GITHUB_OUTPUT"; rm -f "$GITHUB_OUTPUT"',
   ].join("\n");
 
-  return async (file) => {
-    const { stdout } = await execFileAsync("bash", ["-c", script, "gate", file]);
+  return async (file, opts = {}) => {
+    const { stdout } = await execFileAsync(
+      "bash",
+      ["-c", script, "gate", file, opts.base ?? "", opts.head ?? ""],
+      opts.cwd ? { cwd: opts.cwd } : {},
+    );
     return Object.fromEntries(
       stdout
         .split("\n")
@@ -479,8 +515,9 @@ function filterCoversDir(filter: string, dir: string): boolean {
 
 /**
  * Gate names an `if:` expression reads out of the `changes` job, as one OR
- * group. A non-string `if:` (a bare `false`) names none. `docs_only` is dropped: it is a negative condition, and a package's
- * own test file is never docs-only.
+ * group. A non-string `if:` names none — a bare `false` is handled by
+ * `isDeadIf` instead, which drops the job outright. `docs_only` is dropped: it
+ * is a negative condition, and a package's own test file is never docs-only.
  */
 function gateNames(ifText: unknown): string[] {
   if (typeof ifText !== "string") return [];
@@ -499,15 +536,26 @@ function gateNames(ifText: unknown): string[] {
  * and a second hand-rolled block parser would silently mis-read a reformatted
  * ci.yml with no test needing to change to notice.
  */
+/**
+ * Is this `if:` the literal `false` — a job or step parked as permanently
+ * disabled? `gateNames` answers `[]` for it, which the coverage check would
+ * otherwise read as "unconditioned, so it always runs" and credit its filters
+ * to every package they name. A dead job covers nothing.
+ */
+function isDeadIf(ifText: unknown): boolean {
+  return ifText === false || (typeof ifText === "string" && ifText.trim() === "false");
+}
+
 function ciFiltersWithGates(yml: string): { filter: string; gates: string[][] }[] {
   const wf = parseYaml(yml) as {
     jobs: Record<string, { if?: string; steps?: { if?: string; run?: string }[] }>;
   };
   const out: { filter: string; gates: string[][] }[] = [];
   for (const job of Object.values(wf.jobs)) {
+    if (isDeadIf(job.if)) continue;
     const jobGates = gateNames(job.if);
     for (const step of job.steps ?? []) {
-      if (typeof step.run !== "string") continue;
+      if (typeof step.run !== "string" || isDeadIf(step.if)) continue;
       const gates = [jobGates, gateNames(step.if)].filter((g) => g.length > 0);
       for (const filter of [...ciVitestFilters(step.run), ...ciPackageFilterDirs(step.run)]) {
         out.push({ filter, gates });
@@ -612,14 +660,20 @@ describe("CI runs every tooling test suite", () => {
     const yml = await readFile(CI_YML, "utf8");
     const dirs = ["packages/rack", "packages/rack-session"];
 
-    const broken = await packageCoverage(yml, dirs);
-    expect(broken.uncovered).toEqual(["packages/rack-session"]);
+    const broken = yml
+      .replace(
+        "run: pnpm vitest run packages/rack packages/rack-session\n",
+        "run: pnpm vitest run packages/rack\n",
+      )
+      .replace("RACK_PKGS_RE='^packages/(rack|rack-session|", "RACK_PKGS_RE='^packages/(rack|");
+    expect(broken).not.toEqual(yml);
+    expect((await packageCoverage(broken, dirs)).uncovered).toEqual(["packages/rack-session"]);
 
-    const filterOnly = yml.replace(
+    const filterOnly = broken.replace(
       "run: pnpm vitest run packages/rack\n",
       "run: pnpm vitest run packages/rack packages/rack-session\n",
     );
-    expect(filterOnly).not.toEqual(yml);
+    expect(filterOnly).not.toEqual(broken);
     const halfFixed = await packageCoverage(filterOnly, dirs);
     expect(halfFixed.uncovered).toEqual([]);
     expect(halfFixed.ungated).toEqual(["packages/rack-session"]);
@@ -630,6 +684,107 @@ describe("CI runs every tooling test suite", () => {
     );
     expect(fixed).not.toEqual(filterOnly);
     expect(await packageCoverage(fixed, dirs)).toEqual({ uncovered: [], ungated: [] });
+  });
+
+  // The infra sweep fires on `pnpm-lock.yaml`, the root `tsconfig.json` and
+  // `vitest*.config.ts` because a change to any of them CAN affect everything.
+  // Registering a workspace package edits all three and affects nothing, so the
+  // narrowing keys on the SHAPE of the hunk. Both directions are pinned over
+  // synthetic diffs in a throwaway repo — the second is the one that matters:
+  // without it, a real `compilerOptions` edit would slip through silently.
+  const TSCONFIG_BEFORE = [
+    "{",
+    '  "compilerOptions": { "strict": true },',
+    '  "references": [',
+    '    { "path": "packages/rack" },',
+    '    { "path": "packages/actionpack" }',
+    "  ]",
+    "}",
+    "",
+  ].join("\n");
+  const VITEST_BEFORE = [
+    "const alias = {",
+    '  "@blazetrails/rack": "packages/rack/src/index.ts",',
+    "};",
+    "",
+  ].join("\n");
+  const INFRA_FILES = ["pnpm-lock.yaml", "tsconfig.json", "vitest.config.ts"];
+
+  /** A two-commit repo whose diff is exactly `after`, ready for the gate. */
+  async function diffRepo(after: Record<string, string>): Promise<GateOpts> {
+    const cwd = await mkdtemp(path.join(tmpdir(), "ci-gate-"));
+    const before: Record<string, string> = {
+      "pnpm-lock.yaml": "packages:\n  packages/rack: {}\n",
+      "tsconfig.json": TSCONFIG_BEFORE,
+      "vitest.config.ts": VITEST_BEFORE,
+    };
+    const git = (...args: string[]) => execFileAsync("git", args, { cwd });
+    await git("init", "-q", "-b", "main");
+    await git("config", "user.email", "gate@example.com");
+    await git("config", "user.name", "gate");
+    for (const [name, body] of Object.entries(before)) await writeFile(path.join(cwd, name), body);
+    await git("add", "-A");
+    await git("commit", "-qm", "before");
+    const { stdout: base } = await git("rev-parse", "HEAD");
+    for (const [name, body] of Object.entries(after)) await writeFile(path.join(cwd, name), body);
+    await git("add", "-A");
+    await git("commit", "-qm", "after");
+    const { stdout: head } = await git("rev-parse", "HEAD");
+    return { cwd, base: base.trim(), head: head.trim() };
+  }
+
+  it("does not sweep an additive workspace-package registration into the infra gate", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const runGate = await gateRunner(yml);
+    const fired = await runGate(
+      INFRA_FILES.join("\n"),
+      await diffRepo({
+        "pnpm-lock.yaml": "packages:\n  packages/rack: {}\n  packages/rack-session: {}\n",
+        "tsconfig.json": TSCONFIG_BEFORE.replace(
+          '    { "path": "packages/rack" },',
+          '    { "path": "packages/rack" },\n    { "path": "packages/rack-session" },',
+        ),
+        "vitest.config.ts": VITEST_BEFORE.replace(
+          '  "@blazetrails/rack": ',
+          '  "@blazetrails/rack-session/": "packages/rack-session/src/",\n  "@blazetrails/rack": ',
+        ),
+      }),
+    );
+    expect(fired.activerecord_affected).toBe("false");
+    expect(fired.db_adapter_affected).toBe("false");
+    expect(fired.actionpack_affected).toBe("false");
+  });
+
+  it("sweeps a real config edit to the same files into the infra gate", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const runGate = await gateRunner(yml);
+    const fired = await runGate(
+      INFRA_FILES.join("\n"),
+      await diffRepo({
+        "tsconfig.json": TSCONFIG_BEFORE.replace('"strict": true', '"strict": false'),
+      }),
+    );
+    expect(fired.activerecord_affected).toBe("true");
+  });
+
+  // A job parked at `if: false` runs nothing, so its filters cover nothing.
+  // `gateNames` reads a bare `false` as "names no gate", which the coverage
+  // check would otherwise credit as unconditioned — the reporting-only
+  // `coverage:` job was the sole "cover" for did-you-mean, nokogiri,
+  // html-sanitizer and globalid that way.
+  it("credits no coverage to a job parked at if: false", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const live = ciFiltersWithGates(yml).map((f) => f.filter);
+    const wf = parseYaml(yml) as { jobs: Record<string, { if?: unknown }> };
+    expect(isDeadIf(wf.jobs.coverage.if)).toBe(true);
+    expect(live).not.toContain("--coverage");
+
+    const revived = yml.replace(
+      "  coverage:\n    name: Coverage (reporting-only)\n    needs: changes\n    if: false\n",
+      "  coverage:\n    name: Coverage (reporting-only)\n    needs: changes\n",
+    );
+    expect(revived).not.toEqual(yml);
+    expect(ciFiltersWithGates(revived).map((f) => f.filter)).toContain("packages/i18n");
   });
 
   // A path filter in a gated job only runs when the gate fires. unit-tests is
@@ -680,7 +835,7 @@ describe("CI runs every tooling test suite", () => {
       "packages/activerecord/src/test-fixtures.ts",
       "packages/activerecord/src/test-fixtures/fixture-connection.ts",
     ];
-    const fired = await Promise.all([...runs, ...skips].map(runGate));
+    const fired = await Promise.all([...runs, ...skips].map((f) => runGate(f)));
     const outcome = Object.fromEntries(
       [...runs, ...skips].map((f, i) => [f, fired[i].guides_affected]),
     );
@@ -720,7 +875,7 @@ describe("CI runs every tooling test suite", () => {
       "packages/activerecord/src/adapters/sqlite3/test-helper.ts",
       "packages/arel/src/visitors/to-sql.ts",
     ];
-    const fired = await Promise.all([...runs, ...skips].map(runGate));
+    const fired = await Promise.all([...runs, ...skips].map((f) => runGate(f)));
     const outcome = Object.fromEntries(
       [...runs, ...skips].map((f, i) => [f, fired[i].db_adapter_affected]),
     );
@@ -777,7 +932,7 @@ describe("CI runs every tooling test suite", () => {
       "guides_affected",
     ];
 
-    const fired = await Promise.all(paths.map(runGate));
+    const fired = await Promise.all(paths.map((f) => runGate(f)));
     const ungated = paths.filter((_f, i) => fired[i].unit_tests_affected !== "true");
     expect(ungated).toEqual([]);
 

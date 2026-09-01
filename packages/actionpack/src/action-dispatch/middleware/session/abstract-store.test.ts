@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { ResponseRaw } from "@blazetrails/rack";
+
 import { Request } from "../../request.js";
 import { Session as RequestSession } from "../../request/session.js";
 import {
@@ -181,6 +183,53 @@ describe("ActionDispatch::Session::AbstractStore", () => {
 
     it("extends PersistedSecure", () => {
       expect(new AbstractSecureStore()).toBeInstanceOf(PersistedSecure);
+    });
+  });
+
+  describe("security_matches?", () => {
+    const calls: Array<[unknown, unknown]> = [];
+
+    class SecureWritingStore extends AbstractStore {
+      override findSession(): [unknown, Record<string, unknown>] {
+        return [new SessionId("abc"), {}];
+      }
+      override writeSession(): unknown {
+        return "written";
+      }
+      override setCookie(_request: any, response: unknown, cookie: unknown): void {
+        calls.push([response, cookie]);
+      }
+    }
+
+    async function runOver(urlScheme: string): Promise<void> {
+      calls.length = 0;
+      const store = new SecureWritingStore(undefined, { secure: true });
+      await (store as any).context({ "rack.url_scheme": urlScheme }, async (env: any) => {
+        env["rack.session"].set("user", 1);
+        return [200, {}, []];
+      });
+    }
+
+    it("commits the session over https", async () => {
+      await runOver("https");
+      expect(calls.length).toBe(1);
+      expect(calls[0][0]).toBeInstanceOf(ResponseRaw);
+    });
+
+    it("does not commit the session over http", async () => {
+      await runOver("http");
+      expect(calls.length).toBe(0);
+    });
+
+    it("set_cookie writes the session cookie onto the response headers", () => {
+      const headers: Record<string, string> = {};
+      const res = new ResponseRaw(200, headers);
+      Persisted.prototype.setCookie.call(new Persisted(), { cookies: {} }, res, {
+        value: "abc",
+        path: "/",
+        httponly: true,
+      });
+      expect(headers["set-cookie"]).toBe("rack.session=abc; path=/; httponly");
     });
   });
 
