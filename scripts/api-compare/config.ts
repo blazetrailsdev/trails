@@ -167,7 +167,8 @@ export function packageSrcDir(pkg: string): string {
  * The api-compare packages `scripts/build-rails-privates-manifest.ts` projects
  * Rails visibility onto — every api-compared package of a Rails framework,
  * actionpack's four included, plus the four gem ports whose gem source is
- * vendored and extracted (`rack`, `globalid`, `i18n`, `did-you-mean`).
+ * vendored and extracted (`rack`, `rack-session`, `globalid`, `i18n`,
+ * `did-you-mean`).
  *
  * This is `PACKAGES` in full: a package is projectable exactly when the Ruby
  * extractor runs over its vendored source, which is what `compareApi !== false`
@@ -186,6 +187,7 @@ export const MANIFEST_PACKAGES = [
   "actionview",
   "trailties",
   "rack",
+  "rack-session",
   "globalid",
   "i18n",
   "did-you-mean",

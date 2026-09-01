@@ -269,7 +269,13 @@ function gateRegex(yml: string, name: string): RegExp {
  *  rack_affected gates the rack step of leaf-tests (split out of
  *  unit-tests so a rack-only PR doesn't drag in
  *  arel/activemodel/activesupport tests). Rack's only workspace
- *  dependency is activesupport.
+ *  dependency is activesupport. `rack-session` rides the same flag
+ *  rather than getting its own: it is a leaf of the same size that
+ *  depends on rack, so a rack-session change correctly runs the rack
+ *  suite too, and one shared step keeps the billed-minute win the
+ *  consolidated leaf job exists for. Note the alternation is spelled
+ *  out — `^packages/(rack|...)/ ` does NOT match `packages/rack-session/`,
+ *  because after `rack` it demands a `/`.
  *
  *  UNIT_TESTS_PKGS_RE
  *  unit_tests_affected gates the bundled vitest run for the small

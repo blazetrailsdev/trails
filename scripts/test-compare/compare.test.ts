@@ -148,6 +148,21 @@ describe("rubyToConventionTs", () => {
     );
   });
 
+  it("strips the spec_ prefix rack-style gem suites carry", () => {
+    expect(rubyToConventionTs("spec_auth_basic.rb", "rack")).toBe("auth-basic.test.ts");
+    expect(rubyToConventionTs("spec_body_proxy.rb", "rack")).toBe("body-proxy.test.ts");
+  });
+
+  it("strips rack-session's leading session_ segment, which mirrors its lib/rack/session root", () => {
+    expect(rubyToConventionTs("spec_session_pool.rb", "rack-session")).toBe("pool.test.ts");
+    expect(rubyToConventionTs("spec_session_cookie.rb", "rack-session")).toBe("cookie.test.ts");
+    expect(rubyToConventionTs("spec_session_abstract_id.rb", "rack-session")).toBe(
+      "abstract-id.test.ts",
+    );
+    // Only scoped to rack-session — rack itself keeps a `session` segment.
+    expect(rubyToConventionTs("spec_session.rb", "rack")).toBe("session.test.ts");
+  });
+
   it("leaves unaliased paths unchanged apart from kebab-casing", () => {
     expect(rubyToConventionTs("relation/where_test.rb", "activerecord")).toBe(
       "relation/where.test.ts",
