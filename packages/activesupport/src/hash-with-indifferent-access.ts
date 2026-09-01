@@ -39,6 +39,22 @@ type BlockFn<V> = (key: string, oldValue: V, newValue: V) => V;
  */
 type DefaultBlock<V> = (key: string) => V;
 
+/**
+ * `CLASS_OF` (`vendor/ruby/object.c:3899`) over the values trails carries: one
+ * JS `Number` seats both `Integer` and `Float`, so which it is is read off the
+ * value, the way `rubyClassName` reads it in `array-utils.ts` and `cache/store.ts`.
+ * The six copies converge onto one exported ruby-compat function in
+ * `converge-rb-obj-class-copies-onto-ruby-compat`.
+ */
+function rubyClassName(value: unknown): string {
+  if (value === null || value === undefined) return "NilClass";
+  if (typeof value === "boolean") return value ? "TrueClass" : "FalseClass";
+  if (typeof value === "bigint") return "Integer";
+  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
+  if (typeof value === "string") return "String";
+  return (value as object).constructor?.name ?? "Object";
+}
+
 export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   /**
    * Mirrors `initialize` (hash_with_indifferent_access.rb:70-83). The
@@ -620,7 +636,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
         return (dig as (...args: (string | number)[]) => unknown).apply(obj, identifiers.slice(i));
       }
       // eslint-disable-next-line blazetrails/rails-error-parity
-      throw new TypeError(`${(obj as object).constructor?.name} does not have #dig method`);
+      throw new TypeError(`${rubyClassName(obj)} does not have #dig method`);
     }
     return obj;
   }

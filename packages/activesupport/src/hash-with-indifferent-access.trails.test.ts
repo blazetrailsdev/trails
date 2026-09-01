@@ -19,7 +19,7 @@ describe("HashWithIndifferentAccess", () => {
 
   it("dig raises TypeError for non-diggable intermediate", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(() => h.dig("a", "b")).toThrow("Number does not have #dig method");
+    expect(() => h.dig("a", "b")).toThrow("Integer does not have #dig method");
   });
 
   it("default proc is yielded the hash itself", () => {
