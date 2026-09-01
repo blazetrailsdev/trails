@@ -1,8 +1,7 @@
 /**
- * Ruby's `StringIO` (stdlib, `vendor/ruby/ext/stringio/stringio.c`), the
- * readable/writable in-memory IO that `XmlMini._parse_file`
- * (`activesupport/lib/active_support/xml_mini.rb:180-186`) and
- * `Rack::MockRequest` hand to their callers. Only the members Ruby code in
+ * Ruby's `StringIO` (stdlib), the readable/writable in-memory IO that
+ * `XmlMini._parse_file` (`activesupport/lib/active_support/xml_mini.rb:180-186`)
+ * and `Rack::MockRequest` hand to their callers. Only the members Ruby code in
  * this repo sends are ported.
  *
  * The buffer is a Ruby binary String — one character per byte — which is what
@@ -12,9 +11,9 @@
  * Ruby does.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO`
- * (`vendor/ruby/ext/stringio/stringio.c:1432` `strio_write`) ships with the
- * interpreter, so no Rails file defines it and no port can remove the need
- * for it while `_parse_file` and `Rack::MockRequest` hand callers an IO.
+ * (`vendor/ruby/ext/stringio/stringio.c:1432`) ships with the interpreter, so
+ * no Rails file defines it and no port can remove the need for it while
+ * `_parse_file` and `Rack::MockRequest` hand callers an IO.
  */
 export class StringIO {
   private _string: string;
@@ -25,22 +24,14 @@ export class StringIO {
     this._string = string;
   }
 
-  /** Ruby: `StringIO#string` (`vendor/ruby/ext/stringio/stringio.c:451`) — the
-   *  whole buffer, regardless of position. */
   string(): string {
     return this._string;
   }
 
-  /** Ruby: `StringIO#size` (`vendor/ruby/ext/stringio/stringio.c:1728`, aliased
-   *  `length`) — the buffer's bytesize. */
   get size(): number {
     return this._string.length;
   }
 
-  /**
-   * Ruby: `StringIO#read` (`vendor/ruby/ext/stringio/stringio.c:1539`) — with no length, the rest of the buffer (`""` at
-   * eof); with a length, at most that many characters, or `nil` at eof.
-   */
   read(length?: number): string | null {
     if (length == null) {
       const rest = this._string.slice(this._pos);
@@ -53,10 +44,6 @@ export class StringIO {
     return chunk;
   }
 
-  /**
-   * Ruby: `StringIO#write` (`vendor/ruby/ext/stringio/stringio.c:1432`) — overwrites from the current position, advances it
-   * past what was written, and returns the number of characters written.
-   */
   write(string: string): number {
     this._string =
       this._string.slice(0, this._pos) + string + this._string.slice(this._pos + string.length);
@@ -64,24 +51,19 @@ export class StringIO {
     return string.length;
   }
 
-  /** Ruby: `StringIO#rewind` (`vendor/ruby/ext/stringio/stringio.c:770`). */
   rewind(): number {
     this._pos = 0;
     return 0;
   }
 
-  /** Ruby: `StringIO#eof?` (`vendor/ruby/ext/stringio/stringio.c:612`, aliased
-   *  `eof`). */
   isEof(): boolean {
     return this._pos >= this._string.length;
   }
 
-  /** Ruby: `StringIO#close` (`vendor/ruby/ext/stringio/stringio.c:502`). */
   close(): void {
     this._closed = true;
   }
 
-  /** Ruby: `StringIO#closed?` (`vendor/ruby/ext/stringio/stringio.c:559`). */
   get closed(): boolean {
     return this._closed;
   }

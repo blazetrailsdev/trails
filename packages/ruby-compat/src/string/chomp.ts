@@ -3,8 +3,8 @@
  * `core_ext/string/*.rb` counterpart. It lives beside `succ.ts`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#chomp`
- * (`vendor/ruby/string.c:9786` `rb_str_chomp`, bound at `:12228`), which Rails
- * inherits rather than defines.
+ * (`vendor/ruby/string.c:9786` `rb_str_chomp`), which Rails inherits rather
+ * than defines.
  */
 
 /**
@@ -12,8 +12,7 @@
  * or `\r`. With a separator string, removes that suffix if present. An
  * empty-string separator (Ruby paragraph mode) strips all trailing newline
  * characters. A `"\n"` separator also eats a preceding CR —
- * `"x\r\n".chomp("\n") == "x"` — which is `chompped_length`'s `\r\n` arm
- * (`vendor/ruby/string.c:9651`).
+ * `"x\r\n".chomp("\n") == "x"`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `String#chomp`
  * (`vendor/ruby/string.c:9786`), which Rails inherits rather than defines.
