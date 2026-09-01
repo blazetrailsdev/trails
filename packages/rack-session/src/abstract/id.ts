@@ -1,4 +1,4 @@
-import { getCrypto, inspect, KeyError } from "@blazetrails/activesupport";
+import { ArgumentError, getCrypto, inspect, KeyError } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS, Request, ResponseRaw } from "@blazetrails/rack";
 
@@ -49,11 +49,6 @@ function objectIdHex(object: object): string {
   return id.toString(16);
 }
 
-function classNameOf(value: unknown): string {
-  if (value === null || value === undefined) return "NilClass";
-  return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
-}
-
 export class SessionHash implements PersistedSession {
   static Unspecified: unknown = {};
 
@@ -64,7 +59,7 @@ export class SessionHash implements PersistedSession {
   private idDefined = false;
   private _exists!: boolean;
   private existsDefined = false;
-  protected data!: Record<string, unknown>;
+  private data!: Record<string, unknown>;
 
   static find(req: PersistedRequest): unknown {
     return req.getHeader(RACK_SESSION);
@@ -99,11 +94,12 @@ export class SessionHash implements PersistedSession {
     return this.req.sessionOptions as SessionOptions;
   }
 
-  each(block: (key: string, value: unknown) => void): void {
+  each(block: (key: string, value: unknown) => void): Record<string, unknown> {
     this.loadForReadBang();
     for (const key of Object.keys(this.data)) {
       block(key, this.data[key]);
     }
+    return this.data;
   }
 
   get(key: unknown): unknown {
@@ -112,12 +108,15 @@ export class SessionHash implements PersistedSession {
   }
 
   dig(key: unknown, ...keys: unknown[]): unknown {
+    if (arguments.length === 0) {
+      throw new ArgumentError("wrong number of arguments (given 0, expected 1+)");
+    }
     this.loadForReadBang();
     let value: unknown = this.data[String(key)];
     for (const k of keys) {
       if (value == null) return undefined;
       if (typeof value !== "object") {
-        throw new TypeError(`${classNameOf(value)} does not have #dig method`);
+        throw new TypeError(`${(value as object).constructor.name} does not have #dig method`);
       }
       value = (value as Record<string, unknown>)[k as string];
     }
@@ -164,11 +163,12 @@ export class SessionHash implements PersistedSession {
     this.set(key, value);
   }
 
-  clear(): void {
+  clear(): Record<string, unknown> {
     this.loadForWriteBang();
     for (const key of Object.keys(this.data)) {
       delete this.data[key];
     }
+    return this.data;
   }
 
   destroy(): void {
@@ -218,8 +218,9 @@ export class SessionHash implements PersistedSession {
   isExists(): boolean {
     if (this.existsDefined) return this._exists;
     this.data = {};
+    this._exists = this._store.sessionExists(this.req);
     this.existsDefined = true;
-    return (this._exists = this._store.sessionExists(this.req));
+    return this._exists;
   }
 
   isLoaded(): boolean {
@@ -262,18 +263,16 @@ export class SessionHash implements PersistedSession {
   /** @internal */
   stringifyKeys(other: unknown): Record<string, unknown> {
     const hash: Record<string, unknown> = {};
-    const source = toHashOf(other);
+    const candidate = other as { toHash?: () => Record<string, unknown> } | null | undefined;
+    const source =
+      typeof candidate?.toHash === "function"
+        ? candidate.toHash()
+        : (other as Record<string, unknown>);
     for (const key of Object.keys(source)) {
       hash[String(key)] = source[key];
     }
     return hash;
   }
-}
-
-function toHashOf(other: unknown): Record<string, unknown> {
-  const candidate = other as { toHash?: () => Record<string, unknown> } | null | undefined;
-  if (typeof candidate?.toHash === "function") return candidate.toHash();
-  return other as Record<string, unknown>;
 }
 
 export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({
