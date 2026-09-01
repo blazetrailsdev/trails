@@ -65,6 +65,11 @@
       "kind": 471,
       "value": 61
     },
+    "rack-session": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
     "ruby-compat": {
       "assertionCount": 0,
       "kind": 0,
