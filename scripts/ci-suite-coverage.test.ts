@@ -612,14 +612,25 @@ describe("CI runs every tooling test suite", () => {
     const yml = await readFile(CI_YML, "utf8");
     const dirs = ["packages/rack", "packages/rack-session"];
 
-    const broken = await packageCoverage(yml, dirs);
+    // The state this story was filed from, reconstructed from the repaired
+    // workflow: rack-session named by no filter and by no gate.
+    const brokenYml = yml
+      .replace(
+        "run: pnpm vitest run packages/rack packages/rack-session\n",
+        "run: pnpm vitest run packages/rack\n",
+      )
+      .replace("          packages/rack-session\n", "")
+      .replace("RACK_PKGS_RE='^packages/(rack|rack-session|", "RACK_PKGS_RE='^packages/(rack|");
+    expect(brokenYml).not.toEqual(yml);
+
+    const broken = await packageCoverage(brokenYml, dirs);
     expect(broken.uncovered).toEqual(["packages/rack-session"]);
 
-    const filterOnly = yml.replace(
+    const filterOnly = brokenYml.replace(
       "run: pnpm vitest run packages/rack\n",
       "run: pnpm vitest run packages/rack packages/rack-session\n",
     );
-    expect(filterOnly).not.toEqual(yml);
+    expect(filterOnly).not.toEqual(brokenYml);
     const halfFixed = await packageCoverage(filterOnly, dirs);
     expect(halfFixed.uncovered).toEqual([]);
     expect(halfFixed.ungated).toEqual(["packages/rack-session"]);
