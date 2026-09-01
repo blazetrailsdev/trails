@@ -2607,3 +2607,142 @@ describe("Ruby extractor Hash-key name pool", { timeout: RUBY_SUBPROCESS_TIMEOUT
     expect(keys["plain.rb"]).toBeUndefined();
   });
 });
+
+describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns a map of "<fqn>#<method>" -> callReceivers.
+  function rubyCallReceivers(
+    fixtures: Record<string, string>,
+  ): Record<string, Record<string, string[]> | undefined> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "recv-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.classes.each do |fqn, info|
+          (info[:instanceMethods] + info[:classMethods]).each do |m|
+            out["#{fqn}##{m[:name]}"] = m[:callReceivers]
+          end
+        end
+        puts JSON.generate(out)
+      `;
+      const stdout = execFileSync("ruby", ["-e", driver], { encoding: "utf-8" });
+      return JSON.parse(stdout);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("names a literal receiver for its class", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/core.rb": `
+        class Core
+          def call
+            { a: 1 }.merge(b: 2)
+            :sym.to_s
+            "ab".succ
+            [1].first
+            other.to_s
+          end
+        end
+      `,
+    });
+    expect(c["Core#call"]).toEqual({
+      merge: ["hash"],
+      to_s: ["local", "symbol"],
+      succ: ["string"],
+      first: ["array"],
+    });
+  });
+
+  it("proves a Hash local from a hash-literal default, a `**` param and an assignment", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/options.rb": `
+        class Options
+          def call(options = {}, **opts)
+            attrs = { a: 1 }
+            options.fetch(:x)
+            opts.fetch(:y)
+            attrs.fetch(:z)
+          end
+        end
+      `,
+    });
+    expect(c["Options#call"]).toEqual({ fetch: ["hash"] });
+  });
+
+  it("leaves a reassigned local unproven, so it reads as a plain local", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/reassigned.rb": `
+        class Reassigned
+          def call(options = {})
+            options = compute
+            options.fetch(:x)
+          end
+        end
+      `,
+    });
+    expect(c["Reassigned#call"]).toEqual({ fetch: ["local"] });
+  });
+
+  it("records self beside the other kinds when a name is called both ways", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/both.rb": `
+        class Both
+          def call(options = {})
+            options.fetch(:x)
+            fetch(:y)
+          end
+        end
+      `,
+    });
+    expect(c["Both#call"]).toEqual({ fetch: ["hash", "self"] });
+  });
+
+  it("proves a Hash constant this file assigns a hash literal", () => {
+    const c = rubyCallReceivers({
+      "lib/rack/mime.rb": `
+        class Mime
+          MIME_TYPES = { "a" => "b" }
+          NAMES = ["x"].freeze
+          def mime_type(ext)
+            MIME_TYPES.fetch(ext)
+          end
+
+          def name_at(i)
+            NAMES.fetch(i)
+            ELSEWHERE.fetch(i)
+          end
+        end
+      `,
+    });
+    expect(c["Mime#mime_type"]).toEqual({ fetch: ["hash"] });
+    expect(c["Mime#name_at"]).toEqual({ fetch: ["const"] });
+  });
+
+  it("records nothing for a body whose every call is unqualified", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/plain.rb": `
+        class Plain
+          def call
+            helper
+            self.helper
+          end
+        end
+      `,
+    });
+    expect(c["Plain#call"]).toBeNull();
+  });
+});

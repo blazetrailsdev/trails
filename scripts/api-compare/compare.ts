@@ -1799,6 +1799,10 @@ interface CallMismatch {
    *  declaration is in `tsFile` itself. See `declFileFor`. */
   tsDeclFile?: string;
   missing: string[];
+  /** The Ruby body's `callReceivers` (RFC 0129) for the flagged calls alone —
+   *  what the ruby-compat report (report-ruby-compat.ts) reads to tell which
+   *  row a flagged `fetch` belongs to. */
+  receivers?: Record<string, string[]>;
 }
 
 /**
@@ -3525,6 +3529,10 @@ export function main() {
       // Same first-sighting keying: the inert-receiver subset of that call-set
       // (RFC 0083), subtracted in calls runs only.
       const rubyWeakCallsByName = new Map<string, string[]>();
+      // Same first-sighting keying: the receiver kinds each call name's sites
+      // had (RFC 0129), which the ruby-compat half of `jsEnumerableAliases`
+      // needs to tell `options.fetch` from `cache.fetch`.
+      const rubyCallReceiversByName = new Map<string, Record<string, string[]>>();
       // First-sighting Ruby body digest per name (source-hash pinning, RFC 0025).
       const rubyBodyDigestByName = new Map<string, string>();
       const rubySkeletonByName = new Map<string, string[]>();
@@ -3533,7 +3541,10 @@ export function main() {
       // can declare a name twice, and first-sighting keying then hands the first
       // one's body to BOTH matched pairs.
       const rubyOwnersByName = new Map<string, Set<string>>();
-      const rubyCallsByOwnerName = new Map<string, { calls: string[]; weak: string[] }>();
+      const rubyCallsByOwnerName = new Map<
+        string,
+        { calls: string[]; weak: string[]; receivers: Record<string, string[]> }
+      >();
       const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
       const rubyReaderNames = new Set<string>();
       // (owner, name) pairs the extractor bucketed as CLASS methods — the
@@ -3567,11 +3578,13 @@ export function main() {
           if (rm.calls && !rubyCallsByName.has(rm.name)) {
             rubyCallsByName.set(rm.name, rm.calls);
             rubyWeakCallsByName.set(rm.name, rm.weakCalls ?? []);
+            rubyCallReceiversByName.set(rm.name, rm.callReceivers ?? {});
           }
           if (rm.calls && !rubyCallsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
             rubyCallsByOwnerName.set(ownerKey(item.fqn, rm.name), {
               calls: rm.calls,
               weak: rm.weakCalls ?? [],
+              receivers: rm.callReceivers ?? {},
             });
           }
           if (rm.callArgs && !rubyCallArgsByOwnerName.has(ownerKey(item.fqn, rm.name))) {
@@ -3710,6 +3723,7 @@ export function main() {
             : {
                 calls: rubyCallsByName.get(rubyName) ?? [],
                 weak: rubyWeakCallsByName.get(rubyName) ?? [],
+                receivers: rubyCallReceiversByName.get(rubyName) ?? {},
               };
         // A body whose every Ruby call is weak still gets compared:
         // significantMissingCalls returns empty for an empty `rubyCalls`, so the
@@ -3778,7 +3792,10 @@ export function main() {
           (c) => portedWithArgsSigs(tsFile, c).some((sig) => stripThis(sig).length > 0),
           rubyMethodToTs,
           callsSignificant,
-          jsEnumerableAliases,
+          // The receiver kinds this body recorded for the call, so the
+          // ruby-compat table can admit a row whose bare name is ambiguous
+          // across receivers (RFC 0129 `callReceivers`).
+          (rc) => jsEnumerableAliases(rc, rubyOwned?.receivers?.[rc]),
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
         );
@@ -3822,6 +3839,11 @@ export function main() {
           }
         }
         if (flagged.length === 0) return;
+        const flaggedReceivers: Record<string, string[]> = {};
+        for (const f of flagged) {
+          const kinds = rubyOwned?.receivers?.[callOf(f)];
+          if (kinds) flaggedReceivers[callOf(f)] = kinds;
+        }
         callMismatches.push({
           rubyFile,
           tsFile,
@@ -3830,6 +3852,7 @@ export function main() {
           tsClass,
           tsDeclFile,
           missing: flagged,
+          ...(Object.keys(flaggedReceivers).length > 0 ? { receivers: flaggedReceivers } : {}),
         });
       };
 

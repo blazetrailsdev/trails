@@ -94,6 +94,18 @@ export interface MethodInfo {
    */
   weakCalls?: string[];
   /**
+   * Ruby-side only (RFC 0129): call name → the coarse receiver KINDS its sites
+   * in the body had, sorted — `hash` (a hash literal, or a local the extractor
+   * proved is one), `string` / `symbol` / `array` / `numeric` / `regexp`, and
+   * the shapes whose class is unknown (`self`, `local`, `ivar`, `const`,
+   * `expr`). `calls` records names alone, so `options.fetch` and `cache.fetch`
+   * are one call to every consumer; this is what lets the ruby-compat table
+   * (scripts/parity/ruby-compat.ts) credit `Hash#fetch` without crediting
+   * `ActiveSupport::Cache::Store#fetch`. A name whose every occurrence was an
+   * unqualified call is omitted. See extract-ruby-api.rb#receiver_kind.
+   */
+  callReceivers?: Record<string, string[]>;
+  /**
    * Both extractors (RFC 0025 `## Call-argument fidelity`): every syntactic
    * call site in the body, in source order, with its argument descriptors.
    * `calls` / `callSeq` carry names only, so a port that calls `where` with a
