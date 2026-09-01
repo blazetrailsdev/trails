@@ -20,7 +20,7 @@ declare module "@blazetrails/ruby-compat/name-error" {
 /**
  * Extract the name of the missing constant from the exception message.
  *
- * Ruby's receiver-aware branches have no JS analogue (an Error carries no
+ * Mirrors: NameError#missing_name. Ruby's receiver-aware branches have no JS analogue (an Error carries no
  * receiver), so this always takes Ruby's final branch — the message regex —
  * which yields the same qualified path Ruby's receiver branch builds.
  * Deliberately not `constantName`, which is the unqualified `name`.
@@ -34,7 +34,7 @@ export function missingName(this: NameError): string | undefined {
 /**
  * Was this exception raised because the given name was missing?
  *
- * Ruby branches on the argument's type — a Symbol compares against `name`,
+ * Mirrors: NameError#missing_name?. Ruby branches on the argument's type — a Symbol compares against `name`,
  * anything else against `missing_name` — so this branches the same way,
  * treating a JS symbol as Ruby's Symbol and its `description` as the symbol's
  * text.
