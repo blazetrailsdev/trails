@@ -241,7 +241,7 @@ export class Persisted {
    */
   isSecurityMatches(request: any, options: SessionOptions): boolean {
     if (!isTruthy(options.get("secure"))) return true;
-    return request.ssl === true || this.assumeSsl === true;
+    return isTruthy(request.ssl) || this.assumeSsl === true;
   }
 
   /** Rails: `commit_session(req, res)` (`id.rb:381-414`). */
