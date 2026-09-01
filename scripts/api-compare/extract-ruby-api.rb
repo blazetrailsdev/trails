@@ -803,11 +803,6 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    body = node[3]
-    mark_symbol_discriminated(params, body)
-    dep_info = detect_deps(body)
-    calls, weak_calls, call_receivers = collect_method_calls(body, find_params(node))
-
     method_info = {
       name: name,
       visibility: vis.to_s,
@@ -815,21 +810,7 @@ class ApiExtractor
       file: @current_file,
       line: @current_line,
     }
-    method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
-    method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
-    method_info[:calls] = calls unless calls.empty?
-    method_info[:weakCalls] = weak_calls unless weak_calls.empty?
-    method_info[:callReceivers] = call_receivers unless call_receivers.empty?
-    call_args = collect_call_args(body)
-    method_info[:callArgs] = call_args unless call_args.empty?
-    skeleton = collect_method_skeleton(body)
-    method_info[:skeleton] = skeleton unless skeleton.empty?
-    opt_keys = collect_option_keys(body, params, fqn)
-    method_info[:option_keys] = opt_keys unless opt_keys.empty?
-    record_file_hash_keys(opt_keys)
-    record_file_hash_keys(collect_ivar_option_keys(body))
-    digest = body_digest(body)
-    method_info[:bodyDigest] = digest if digest
+    record_body_facts(method_info, node[3], find_params(node), fqn)
 
     if @in_sclass
       target[:classMethods] << method_info
@@ -864,11 +845,6 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    body = node[5]
-    mark_symbol_discriminated(params, body)
-    dep_info = detect_deps(body)
-    calls, weak_calls, call_receivers = collect_method_calls(body, find_params_defs(node))
-
     method_info = {
       name: name,
       visibility: vis.to_s,
@@ -876,21 +852,7 @@ class ApiExtractor
       file: @current_file,
       line: @current_line,
     }
-    method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
-    method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
-    method_info[:calls] = calls unless calls.empty?
-    method_info[:weakCalls] = weak_calls unless weak_calls.empty?
-    method_info[:callReceivers] = call_receivers unless call_receivers.empty?
-    call_args = collect_call_args(body)
-    method_info[:callArgs] = call_args unless call_args.empty?
-    skeleton = collect_method_skeleton(body)
-    method_info[:skeleton] = skeleton unless skeleton.empty?
-    opt_keys = collect_option_keys(body, params, fqn)
-    method_info[:option_keys] = opt_keys unless opt_keys.empty?
-    record_file_hash_keys(opt_keys)
-    record_file_hash_keys(collect_ivar_option_keys(body))
-    digest = body_digest(body)
-    method_info[:bodyDigest] = digest if digest
+    record_body_facts(method_info, node[5], find_params_defs(node), fqn)
 
     target[:classMethods] << method_info
 
@@ -1856,7 +1818,7 @@ class ApiExtractor
       line: @current_line,
       notes: notes,
     }
-    record_body_facts(entry, body, params_node) if body
+    record_body_facts(entry, body, params_node, fqn) if body
     # Same as process_alias_method: the alias inherits the target's arity, so
     # record the target for resolve_aliases! to copy params from.
     entry[:alias_target] = alias_target if alias_target
@@ -1866,13 +1828,18 @@ class ApiExtractor
     target[on_class ? :classMethods : :instanceMethods] << entry
   end
 
-  # The body-derived half of a method entry, shared by the literal-`def` path
-  # and the metaprogrammed one so a generated method is indistinguishable from
-  # a `def`-written one. Without it every `define_method` body reads as a
-  # zero-call method to `parity:api:calls` — indistinguishable from a body that
-  # genuinely calls nothing (RFC 0126).
-  def record_body_facts(entry, body, params_node)
+  # The body-derived half of a method entry: every fact the manifest carries
+  # about a method body, so a `define_method`-generated entry is
+  # indistinguishable from a `def`-written one rather than reading as a
+  # zero-call, dep-less, option-key-less method (RFC 0126). Both the literal
+  # `def` paths and the metaprogrammed one go through here, so the two cannot
+  # drift back apart.
+  def record_body_facts(entry, body, params_node, fqn)
+    mark_symbol_discriminated(entry[:params], body)
+    dep_info = detect_deps(body)
     calls, weak_calls, call_receivers = collect_method_calls(body, params_node)
+    entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
+    entry[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
     entry[:calls] = calls unless calls.empty?
     entry[:weakCalls] = weak_calls unless weak_calls.empty?
     entry[:callReceivers] = call_receivers unless call_receivers.empty?
@@ -1880,6 +1847,10 @@ class ApiExtractor
     entry[:callArgs] = call_args unless call_args.empty?
     skeleton = collect_method_skeleton(body)
     entry[:skeleton] = skeleton unless skeleton.empty?
+    opt_keys = collect_option_keys(body, entry[:params], fqn)
+    entry[:option_keys] = opt_keys unless opt_keys.empty?
+    record_file_hash_keys(opt_keys)
+    record_file_hash_keys(collect_ivar_option_keys(body))
     digest = body_digest(body)
     entry[:bodyDigest] = digest if digest
   end

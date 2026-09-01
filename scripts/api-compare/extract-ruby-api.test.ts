@@ -123,6 +123,33 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(rubySkeletons(fixtures)["Foo#language"]).toEqual(rubySkeletons(fixtures)["Foo#literal"]);
   });
 
+  // record_body_facts is the WHOLE body-fact pipeline, not just calls: the
+  // literal-`def` paths go through it too, so the generated and `def`-written
+  // halves cannot drift back apart.
+  it("records the option keys and deps of a define_method block body", () => {
+    const fixtures = {
+      "foo.rb": `
+        class Foo
+          define_method(:generated) do |options = {}|
+            ActiveSupport::Notifications.instrument(options[:name], options.fetch(:scope))
+          end
+
+          def literal(options = {})
+            ActiveSupport::Notifications.instrument(options[:name], options.fetch(:scope))
+          end
+        end
+      `,
+    };
+    for (const field of ["option_keys", "deps", "depRefs", "skeleton", "callArgs"]) {
+      const out = rubyField(fixtures, field);
+      expect({ field, value: out["Foo#generated"] }).toEqual({
+        field,
+        value: out["Foo#literal"],
+      });
+    }
+    expect(rubyField(fixtures, "option_keys")["Foo#generated"]).toEqual(["name", "scope"]);
+  });
+
   // rfc4646.rb:34 — `RFC4646_FORMATS.each do |name, format| define_method(name)
   // { self[name].send(format) … } end` generates four accessors whose dispatch
   // is format-dependent. Each unrolled member records the same block body.
