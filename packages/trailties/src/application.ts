@@ -164,7 +164,7 @@ export class Application extends Engine {
   railtiesInitializers(current: Collection): Collection {
     let initializers = new Collection();
     for (const r of [...this.orderedRailties()].reverse().flat()) {
-      if (r === (this as unknown)) {
+      if (r === this) {
         initializers = initializers.plus(current);
       } else {
         initializers = initializers.plus((r as Trailtie).initializers);

@@ -3,6 +3,7 @@
 // defaults only — credentials + `databaseConfiguration` are 2.5c or later.
 import { Session } from "@blazetrails/actionpack";
 import { getPath } from "@blazetrails/activesupport";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Trails } from "../rails.js";
 import type { Root } from "../paths.js";
@@ -48,7 +49,7 @@ export class Configuration extends EngineConfiguration {
   fileWatcher: unknown = null;
   exceptionsApp: unknown = null;
   debugExceptionResponseFormat: "default" | "api" | null = null;
-  railtiesOrder: Array<string | symbol | { instance(): unknown }> = [":all"];
+  railtiesOrder: Array<string | { instance(): unknown }> = [":all"];
   relativeUrlRoot: string | null = null;
   requireMasterKey = false;
   secretKeyBase: string | null = null;
@@ -68,10 +69,10 @@ export class Configuration extends EngineConfiguration {
   yjit = false;
 
   /** @internal `@loaded_config_version` (`application/configuration.rb:76`). */
-  private _loadedConfigVersion: string | null = null;
+  private _loadedConfigVersion: string | number | null = null;
 
   /** Mirrors the `attr_reader :loaded_config_version` (`application/configuration.rb:28`). */
-  get loadedConfigVersion(): string | null {
+  get loadedConfigVersion(): string | number | null {
     return this._loadedConfigVersion;
   }
 
@@ -382,10 +383,10 @@ export class Configuration extends EngineConfiguration {
         break;
       }
       default:
-        throw new Error(`Unknown version "${String(targetVersion)}"`);
+        throw new RuntimeError(`Unknown version "${String(targetVersion)}"`);
     }
 
-    this._loadedConfigVersion = String(targetVersion);
+    this._loadedConfigVersion = targetVersion;
   }
 
   /**
@@ -399,8 +400,6 @@ export class Configuration extends EngineConfiguration {
   autoloadLib({ ignore }: { ignore: string | string[] }): void {
     const lib = getPath().join(this.root as string, "lib");
 
-    // Set as a string to have the same type as default autoload paths, for
-    // consistency.
     this.autoloadPaths.push(lib);
     this.eagerLoadPaths.push(lib);
   }

@@ -1,5 +1,5 @@
 import { htmlSafe } from "@blazetrails/activesupport";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base } from "./base.js";
 import { StrictLocalsMismatch } from "./strict-locals.js";
 import { Template } from "./template.js";
@@ -150,9 +150,13 @@ describe("ActionView::Template (smoke)", () => {
 
     it("reaches the Tse handler's translate_location", () => {
       const source = "<%= 1 %>\n<%= boom %>\n";
-      const t = new Template({ source, identifier: "t", extension: "tse", handler: new Tse() });
+      const handler = new Tse();
+      const hook = vi.spyOn(handler, "translateLocation");
+      const t = new Template({ source, identifier: "t", extension: "tse", handler });
       const s = spot();
-      expect(t.translateLocation({ lineno: 2 }, s)).toBeDefined();
+
+      expect(t.translateLocation({ lineno: 2 }, s)).toBeTruthy();
+      expect(hook).toHaveBeenCalledWith(s, { lineno: 2 }, source);
     });
   });
 

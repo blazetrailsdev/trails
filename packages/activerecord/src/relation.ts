@@ -1833,10 +1833,7 @@ _registerRelationFamily("relation", Relation);
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface RelationScopes<T extends Base> {}
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface Relation<T extends Base> extends RelationScopes<T> {}
-
-export interface Relation<T extends Base> {
+export interface Relation<T extends Base> extends RelationScopes<T> {
   isNullRelation(): boolean;
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,

@@ -14,6 +14,14 @@ import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-location.js";
 
+type LocationTranslatingHandler = TemplateHandler & {
+  translateLocation?: (
+    spot: Spot,
+    backtraceLocation: BacktraceLocation,
+    source: string,
+  ) => Spot | null;
+};
+
 const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
 const VARIABLE_FROM_BASENAME = /^_?(.*?)(?:\.\w+)*$/;
 const NONE = Symbol("Template::NONE");
@@ -184,15 +192,7 @@ export class Template {
    * reason `compiledSource` drops the call.
    */
   translateLocation(backtraceLocation: BacktraceLocation, spot: Spot): Spot {
-    const handler = this.resolveHandler() as
-      | (TemplateHandler & {
-          translateLocation?: (
-            spot: Spot,
-            backtraceLocation: BacktraceLocation,
-            source: string,
-          ) => Spot | null;
-        })
-      | undefined;
+    const handler = this.resolveHandler() as LocationTranslatingHandler | undefined;
     if (typeof handler?.translateLocation === "function") {
       return handler.translateLocation(spot, backtraceLocation, this.source) ?? spot;
     } else {

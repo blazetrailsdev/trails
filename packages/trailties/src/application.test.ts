@@ -473,7 +473,6 @@ describe("Application::Configuration", () => {
     expect(c.addAutoloadPathsToLoadPath).toBe(false);
     expect(c.precompileFilterParameters).toBe(true);
     expect(c.domTestingDefaultHtmlVersion).toBe(":html4");
-    // 5.0's assignment, reached through the recursive chain.
     expect(c.sslOptions).toEqual({ hsts: { subdomains: true } });
     expect((c.get("activeRecord") as Record<string, unknown>).belongsToRequiredByDefault).toBe(
       true,
