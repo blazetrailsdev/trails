@@ -40,4 +40,22 @@ describe("Request", () => {
     expect(new Request({ "rack.url_scheme": "https" }).ssl).toBe(true);
     expect(new Request({ "rack.url_scheme": "http" }).ssl).toBe(false);
   });
+
+  it("scheme is https when HTTPS is on, the first arm of Rack::Request::Helpers#scheme", () => {
+    expect(new Request({ HTTPS: "on", "rack.url_scheme": "http" }).scheme).toBe("https");
+  });
+
+  it("scheme is https when X-Forwarded-Ssl is on, the second arm of Rack::Request::Helpers#scheme", () => {
+    expect(new Request({ HTTP_X_FORWARDED_SSL: "on", "rack.url_scheme": "http" }).scheme).toBe(
+      "https",
+    );
+  });
+
+  it("scheme reads forwarded_scheme before rack.url_scheme", () => {
+    expect(new Request({ HTTP_X_FORWARDED_PROTO: "https", "rack.url_scheme": "http" }).scheme).toBe(
+      "https",
+    );
+    expect(new Request({ "rack.url_scheme": "http" }).scheme).toBe("http");
+    expect(new Request({ HTTPS: "on" }).ssl).toBe(true);
+  });
 });

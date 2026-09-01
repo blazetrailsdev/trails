@@ -239,13 +239,6 @@ export class Request {
 
   // --- URL components ---
 
-  get scheme(): string {
-    if (this.env["HTTP_X_FORWARDED_PROTO"]) {
-      return (this.env["HTTP_X_FORWARDED_PROTO"] as string).split(",")[0].trim();
-    }
-    return (this.env["rack.url_scheme"] as string) || "http";
-  }
-
   /**
    * Returns the host for this request, such as "example.com".
    *
@@ -1158,7 +1151,7 @@ Request.prototype.fresh = _fresh;
 
 include(Request, RequestHelpers);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface Request extends Omit<RequestHelpers, "scheme"> {}
+export interface Request extends RequestHelpers {}
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request extends CspRequest {}

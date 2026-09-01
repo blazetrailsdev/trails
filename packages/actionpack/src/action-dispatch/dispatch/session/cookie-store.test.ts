@@ -330,6 +330,19 @@ describe("CookieStore unit", () => {
       expect(result).toBeInstanceOf(CookieSessionId);
       expect(result.cookieValue).toBe(data);
     });
+
+    it("delegates the wrapped session id's surface without being one", () => {
+      const store = makeStore();
+      const req = makeReq();
+      const sid = new RackSessionId("a".repeat(32));
+      const result = store.writeSession(req, sid, {}, opts());
+      expect(result).not.toBeInstanceOf(RackSessionId);
+      expect(result.publicId).toBe(sid.publicId);
+      expect(result.privateId).toBe(sid.privateId);
+      expect(String(result)).toBe(sid.publicId);
+      expect(result.isEmpty()).toBe(false);
+      expect(result.inspect()).toBe(sid.inspect());
+    });
   });
 
   describe("deleteSession", () => {
