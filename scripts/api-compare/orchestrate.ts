@@ -53,8 +53,8 @@ import {
   sharedCacheDir,
   hashParts,
   fileHash,
-  readShared,
-  writeShared,
+  readSharedFor,
+  publishShared,
   pruneSharedCache,
 } from "@blazetrails/parity/shared-cache";
 
@@ -131,7 +131,7 @@ async function runRubyExtractShared(): Promise<void> {
   const key = sharedDir ? await railsCacheKey() : null;
 
   if (sharedDir && key) {
-    const cached = await readShared(sharedDir, "rails-api", key);
+    const cached = await readSharedFor(sharedDir, "rails-api", key, ROOT);
     if (cached !== null) {
       await writeFile(railsOut, cached);
       process.stdout.write("Rails manifest served from shared cross-worktree cache\n");
@@ -143,7 +143,8 @@ async function runRubyExtractShared(): Promise<void> {
 
   if (sharedDir && key) {
     const produced = await readFile(railsOut, "utf-8").catch(() => null);
-    if (produced !== null) await writeShared(sharedDir, "rails-api", key, produced, basename(ROOT));
+    if (produced !== null)
+      await publishShared(sharedDir, "rails-api", key, produced, basename(ROOT));
   }
 }
 

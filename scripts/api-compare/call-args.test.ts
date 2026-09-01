@@ -623,6 +623,15 @@ describe("compareCallArgs", () => {
     expect(compareCallArgs(site("where", ["hash"]), site("where", ["hash"])).verdict).toBe("skip");
   });
 
+  it("flags a sign divergence now that a negated numeric folds", () => {
+    const result = compareCallArgs(site("limit", ["num:-1"]), site("limit", ["num:1"]));
+    expect(result.verdict).toBe("mismatch");
+    expect(result.reason).toBeUndefined();
+    expect(compareCallArgs(site("limit", ["num:-1"]), site("limit", ["num:-1"])).verdict).toBe(
+      "match",
+    );
+  });
+
   it("reports the skip reason for an excluded call name", () => {
     expect(compareCallArgs(site("super", ["id:x"]), site("super", ["id:y"])).reason).toBe(
       "excludedCallName",

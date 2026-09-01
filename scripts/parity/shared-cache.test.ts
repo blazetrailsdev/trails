@@ -563,3 +563,67 @@ describe("a cache entry cannot supply another worktree's paths", () => {
     expect(message).toContain(foreign);
   });
 });
+
+/**
+ * The same gate over the two RUBY manifests. `rails-api` / `rails-tests` are
+ * anchored at the same git common dir as the `ts-*` entries, so an entry
+ * carrying one worktree's absolute paths was reachable from every sibling
+ * exactly as the TS ones were — the two orchestrators now read and write them
+ * through `readSharedFor` / `publishShared`.
+ */
+describe("the ruby manifests are gated across worktrees too", () => {
+  const KEY = "vendored-rails-contentkey";
+
+  function linkedWorktrees(): { a: string; b: string } {
+    const repo = mkTmp();
+    const [a, b] = ["a", "b"].map((name) => {
+      const gitdir = path.join(repo, ".git", "worktrees", name);
+      fs.mkdirSync(gitdir, { recursive: true });
+      const root = mkTmp();
+      fs.writeFileSync(path.join(root, ".git"), `gitdir: ${gitdir}\n`);
+      return root;
+    });
+    return { a, b };
+  }
+
+  /** What `runRubyExtractShared` does: serve a servable entry, else extract,
+   *  publish, and use that. */
+  async function runIn(root: string, name: string, extract: () => string) {
+    const dir = (await sharedCacheDir(root))!;
+    const served = await readSharedFor(dir, name, KEY, root);
+    if (served !== null) return { manifest: served, extracted: false };
+    const own = extract();
+    await publishShared(dir, name, KEY, own, path.basename(root));
+    return { manifest: own, extracted: true };
+  }
+
+  for (const name of ["rails-api", "rails-tests"]) {
+    it(`does not serve a ${name} entry carrying another worktree's path`, async () => {
+      const { a, b } = linkedWorktrees();
+      const poisoned = JSON.stringify({
+        files: [{ path: `${a}/packages/activerecord/src/base.ts` }],
+      });
+      // Written past the publish gate, as a pre-fix entry would be.
+      await writeShared((await sharedCacheDir(a))!, name, KEY, poisoned, path.basename(a));
+
+      const own = JSON.stringify({ files: [{ path: "activerecord/lib/active_record/base.rb" }] });
+      expect(await runIn(b, name, () => own)).toEqual({ manifest: own, extracted: true });
+    });
+
+    it(`still serves a vendored-source-relative ${name} entry`, async () => {
+      const { a, b } = linkedWorktrees();
+      // The only absolute-looking tokens in a real rails-api.json are route
+      // strings, and neither is checkout-shaped.
+      const clean = JSON.stringify({
+        files: [{ path: "activerecord/lib/active_record/base.rb" }],
+        routes: ["/", "/rails/locks"],
+      });
+      expect((await runIn(a, name, () => clean)).extracted).toBe(true);
+      expect(
+        await runIn(b, name, () => {
+          throw new Error("B must not re-extract a servable entry");
+        }),
+      ).toEqual({ manifest: clean, extracted: false });
+    });
+  }
+});

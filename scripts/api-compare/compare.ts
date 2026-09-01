@@ -2978,6 +2978,12 @@ export function main() {
     // still let a dep signature open the gate. Feeds the ported-with-args gate
     // and the literal-default check.
     const tsParamsByFileNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
+    // The same signatures keyed by DECLARING CLASS too (`<owner>#<name>`), for
+    // the parameter-NAME check alone: a file-scoped pool lets two sibling
+    // classes lend each other a signature (`OutputBuffer#capture(*args)`,
+    // buffers.rb:72, scored against `StreamingBuffer#capture`, buffers.rb:126).
+    // Arity keeps the wider pool (see tsParamsByName).
+    const tsParamsByFileOwnerNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
     // Signature objects (by identity) belonging to a `set` accessor. A Ruby
     // writer is its own method (`where_clause=`) but conventions.ts maps it onto
     // the bare camel name, so a get/set pair pools two signatures under one
@@ -3147,6 +3153,11 @@ export function main() {
         const pkgByName = tsParamsByFileNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
         pkgByName.set(m.name, [...(pkgByName.get(m.name) ?? []), m.params]);
         tsParamsByFileNameInPkg.set(file, pkgByName);
+        const pkgByOwnerName =
+          tsParamsByFileOwnerNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
+        const ownerKey = `${owner}#${m.name}`;
+        pkgByOwnerName.set(ownerKey, [...(pkgByOwnerName.get(ownerKey) ?? []), m.params]);
+        tsParamsByFileOwnerNameInPkg.set(file, pkgByOwnerName);
         if (m.writer) tsWriterSigs.add(m.params);
         if (m.optionKeys !== undefined) {
           const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
@@ -3993,6 +4004,12 @@ export function main() {
         // read a body, so only they are skipped; arity, option keys, literals
         // and the body pin all still compare the pair by signature.
         skipCalls = false,
+        // The TS file was reached by the misplaced-cluster GUESS rather than the
+        // conventional path, so the pairing is not evidence of a rename and no
+        // rename can close a row it produces (`renderer/object_renderer.rb`
+        // guessed onto `abstract-renderer.ts` reported two). Parameter NAMES are
+        // skipped for it; every other check still compares the pair.
+        guessedFile = false,
       ) => {
         checkOptionKeys(rubyName, tsName, tsFile);
         checkLiterals(rubyName, tsName, tsFile);
@@ -4016,14 +4033,29 @@ export function main() {
         // and renames every arg is 100% on arity and 0% here. Only pairs that
         // line up positionally are compared, so a length disagreement stays
         // arity's row rather than being charged twice.
-        if (!rubyForwardingNames.has(rubyName)) {
+        if (!rubyForwardingNames.has(rubyName) && !guessedFile) {
           // Scoped per-FILE, unlike arity's global pool: a name is only weak
           // evidence of identity for parameter SPELLINGS. `initialize` pools
           // every constructor in the package, so `Table#initialize(name, as:,
           // klass:, type_caster:)` would align against an unrelated 4-arg
           // constructor and report three renames that exist nowhere.
           const fileCandidates = tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [];
-          const verdict = matchParamNamesAgainst(rubyParams, fileCandidates);
+          // A clean candidate anywhere in the file settles the pair: which
+          // declaration carries Rails' identifiers (the `this`-typed function,
+          // the interface re-declaring it, the class assigning it) is the mixin
+          // idiom's business. Only when nothing aligns cleanly does the owner
+          // decide, so the nearest-fitting SIBLING CLASS cannot stand in —
+          // `OutputBuffer#capture(*args)` reported `args → fn` off
+          // `StreamingBuffer#capture(fn)` (buffers.rb:72,126).
+          let verdict = matchParamNamesAgainst(rubyParams, fileCandidates);
+          if (verdict.rows.length > 0) {
+            const rubyOwner = rubyModule.split("::").at(-1) ?? rubyModule;
+            const byOwnerName = tsParamsByFileOwnerNameInPkg.get(tsFile);
+            verdict = matchParamNamesAgainst(
+              rubyParams,
+              byOwnerName?.get(`${rubyOwner}#${tsName}`) ?? [],
+            );
+          }
           if (verdict.aligned) {
             paramNamesCompared++;
             for (const row of verdict.rows) {
@@ -4265,7 +4297,7 @@ export function main() {
           const misplacedMatch = verdict.kind === "match" ? verdict.tsName : undefined;
           if (misplacedMatch) {
             fileMatched++;
-            checkArity(rubyName, misplacedMatch, misplacedActualFile!, rubyModule);
+            checkArity(rubyName, misplacedMatch, misplacedActualFile!, rubyModule, false, true);
             moves.push({
               tsName: misplacedMatch,
               rubyName,

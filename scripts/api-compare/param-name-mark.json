@@ -4,9 +4,8 @@
     "byFile": {}
   },
   "actioncontroller": {
-    "total": 2,
+    "total": 1,
     "byFile": {
-      "metal/flash.rb": 1,
       "metal/strong_parameters.rb": 1
     }
   },

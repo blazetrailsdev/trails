@@ -2142,6 +2142,24 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
     ]);
   });
 
+  it("folds a negated numeric argument into its value", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def m(a)
+            visit(-1, -2.5, -Float::INFINITY, -a)
+          end
+        end
+      `,
+    });
+    expect(argsOf(c["Foo#m"], "visit")).toEqual([
+      "num:-1",
+      "num:-2.5",
+      "unaryconst:INFINITY",
+      "unaryid:a",
+    ]);
+  });
+
   it("emits opaque descriptors the comparator has to skip", () => {
     const c = rubyCallArgs({
       "foo.rb": `

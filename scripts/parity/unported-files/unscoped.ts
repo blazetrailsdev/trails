@@ -974,17 +974,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "concurrency test with no single-threaded JS equivalent.",
   },
   {
-    testFile: "adapters/postgresql/transaction_nested_test.rb",
-    tests: [
-      "deadlock inside nested SavepointTransaction is recoverable",
-      "deadlock raises Deadlocked inside nested SavepointTransaction",
-    ],
-    reason:
-      "Provokes a PostgreSQL deadlock across two Ruby Threads inside nested " +
-      "savepoints. A deadlock requires genuine concurrency; single-threaded JS " +
-      "cannot reproduce it.",
-  },
-  {
     testFile: "adapters/abstract_mysql_adapter/transaction_test.rb",
     tests: ["raises Deadlocked when a deadlock is encountered"],
     reason:
