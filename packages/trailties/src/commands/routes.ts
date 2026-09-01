@@ -6,7 +6,7 @@ import {
 } from "@blazetrails/actionpack";
 import { Command } from "commander";
 import { bootApplicationBang } from "../command/actions.js";
-import { unusedRoutesCommand } from "./unused-routes.js";
+import { UnusedRoutesCommand } from "./unused-routes.js";
 import { Trails } from "../rails.js";
 
 export function routesCommand(): Command {
@@ -22,7 +22,7 @@ export function routesCommand(): Command {
     .option("-u, --unused", "Print unused routes.")
     .action(async (options) => {
       if (options.unused) {
-        await unusedRoutesCommand().parseAsync(unusedArgv(options), { from: "user" });
+        await new UnusedRoutesCommand(options).perform();
         return;
       }
       await bootApplicationBang();
@@ -37,13 +37,6 @@ interface RoutesOptions {
   grep?: string;
   expanded?: boolean;
   unused?: boolean;
-}
-
-function unusedArgv(options: RoutesOptions): string[] {
-  const argv: string[] = [];
-  if (options.controller !== undefined) argv.push("--controller", options.controller);
-  if (options.grep !== undefined) argv.push("--grep", options.grep);
-  return argv;
 }
 
 function inspector(): RoutesInspector {

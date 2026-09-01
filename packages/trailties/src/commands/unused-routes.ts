@@ -6,7 +6,7 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { underscore } from "@blazetrails/activesupport";
+import { getPathAsync, underscore } from "@blazetrails/activesupport";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
@@ -22,15 +22,21 @@ interface ControllerClass {
   viewPaths?: () => Iterable<unknown>;
 }
 
+interface UnusedRoutesOptions {
+  controller?: string;
+  grep?: string;
+}
+
 /**
  * Mirrors `Rails::Command::UnusedRoutesCommand::RouteInfo`
  * (`railties/lib/rails/commands/unused_routes/unused_routes_command.rb:12-39`).
  *
  * Rails resolves the controller with
- * `(@controller_name.to_s.camelize + "Controller").safe_constantize`; ESM has
+ * `(@controller_name.to_s.camelize + "Controller").safe_constantize`. ESM has
  * no constant table, so the lookup goes through `controllerConstants` — the
  * same map `Request#controller_class_for` (`http/request.rb:94-110`) uses —
- * and a miss is the absent map entry rather than `safe_constantize`'s nil.
+ * and a miss arrives as the absent map entry rather than `safe_constantize`'s
+ * nil.
  */
 export class RouteInfo {
   /** @internal */
@@ -56,8 +62,9 @@ export class RouteInfo {
   }
 
   /** @internal */
-  private viewPath(root: ViewPathRoot): string {
-    return [root.path, this.controllerName, this.actionName].join("/");
+  private async viewPath(root: ViewPathRoot): Promise<string> {
+    const path = await getPathAsync();
+    return path.join(root.path, String(this.controllerName), String(this.actionName));
   }
 
   /** @internal */
@@ -65,14 +72,17 @@ export class RouteInfo {
     return this.controllerName != null && this.controllerClass == null;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * Rails globs `Dir["#{view_path(path)}.*"]`, whose pattern is absolute;
+   * trails' glob seam always resolves against a cwd, so the filesystem root is
+   * spelled out.
+   */
   private async templateMissing(): Promise<boolean> {
     if (this.controllerClass == null) return false;
     const paths = this.controllerClass.viewPaths?.() ?? [];
     for (const path of paths) {
-      // Rails' `Dir[...]` takes the absolute view path directly; trails' glob
-      // seam always resolves against a cwd, so the root is spelled out.
-      const found = await glob(`${this.viewPath(path as ViewPathRoot)}.*`, { cwd: "/" });
+      const found = await glob(`${await this.viewPath(path as ViewPathRoot)}.*`, { cwd: "/" });
       if (found.length > 0) return false;
     }
     return true;
@@ -82,6 +92,59 @@ export class RouteInfo {
   private actionMissing(): boolean {
     if (this.controllerClass == null) return false;
     return !(String(this.actionName) in this.controllerClass.prototype);
+  }
+}
+
+/**
+ * Mirrors `Rails::Command::UnusedRoutesCommand`
+ * (`railties/lib/rails/commands/unused_routes/unused_routes_command.rb:7-72`).
+ */
+export class UnusedRoutesCommand {
+  /** @internal */
+  private options: UnusedRoutesOptions;
+  /** @internal */
+  private _routes: Route[] | null = null;
+
+  constructor(options: UnusedRoutesOptions) {
+    this.options = options;
+  }
+
+  async perform(): Promise<void> {
+    await bootApplicationBang();
+
+    console.log((await this.inspector()).format(this.formatter(), this.routesFilter()));
+
+    if ((await this.routes()).length > 0) exit(1);
+  }
+
+  /** @internal */
+  private async inspector(): Promise<RoutesInspector> {
+    return new RoutesInspector(await this.routes());
+  }
+
+  /** @internal */
+  private async routes(): Promise<Route[]> {
+    if (this._routes === null) {
+      const routes: Route[] = [];
+      for (const route of Trails.application!.routes().getRoutes()) {
+        if (await new RouteInfo(route).unused()) routes.push(route);
+      }
+      this._routes = routes;
+    }
+    return this._routes;
+  }
+
+  /** @internal */
+  private formatter(): RoutesFormatter {
+    return new ConsoleFormatter.Unused();
+  }
+
+  /** @internal */
+  private routesFilter(): RoutesFilter {
+    const filter: RoutesFilter = {};
+    if (this.options.controller !== undefined) filter.controller = this.options.controller;
+    if (this.options.grep !== undefined) filter.grep = this.options.grep;
+    return filter;
   }
 }
 
@@ -95,40 +158,8 @@ export function unusedRoutesCommand(): Command {
     )
     .option("-g, --grep <pattern>", "Grep routes by a specific pattern.")
     .action(async (options) => {
-      await bootApplicationBang();
-      const unused = await routes();
-      console.log(inspector(unused).format(formatter(), routesFilter(options)));
-
-      if (unused.length > 0) exit(1);
+      await new UnusedRoutesCommand(options).perform();
     });
 
   return cmd;
-}
-
-interface UnusedRoutesOptions {
-  controller?: string;
-  grep?: string;
-}
-
-async function routes(): Promise<Route[]> {
-  const selected: Route[] = [];
-  for (const route of Trails.application!.routes().getRoutes()) {
-    if (await new RouteInfo(route).unused()) selected.push(route);
-  }
-  return selected;
-}
-
-function inspector(routes: Route[]): RoutesInspector {
-  return new RoutesInspector(routes);
-}
-
-function formatter(): RoutesFormatter {
-  return new ConsoleFormatter.Unused();
-}
-
-function routesFilter(options: UnusedRoutesOptions): RoutesFilter {
-  const filter: RoutesFilter = {};
-  if (options.controller !== undefined) filter.controller = options.controller;
-  if (options.grep !== undefined) filter.grep = options.grep;
-  return filter;
 }

@@ -44,12 +44,12 @@ describe("UnusedRoutesCommand", () => {
   });
 
   describe("RouteInfo", () => {
-    it("is unused when the controller class is missing", async () => {
+    it("no controller", async () => {
       const info = new RouteInfo(route({ controller: "posts", action: "index" }));
       expect(await info.unused()).toBe(true);
     });
 
-    it("is not unused when the controller defines the action", async () => {
+    it("action present", async () => {
       class PostsController {
         index(): void {}
       }
@@ -58,14 +58,14 @@ describe("UnusedRoutesCommand", () => {
       expect(await info.unused()).toBe(false);
     });
 
-    it("is unused when the action and its template are both missing", async () => {
+    it("no action", async () => {
       class PostsController {}
       controllerConstants.set("posts", PostsController as never);
       const info = new RouteInfo(route({ controller: "posts", action: "index" }));
       expect(await info.unused()).toBe(true);
     });
 
-    it("is not unused when a template covers the missing action", async () => {
+    it("implicit render", async () => {
       class PostsController {
         static viewPaths(): { path: string }[] {
           return [{ path: new URL("./__fixtures__/views", import.meta.url).pathname }];
