@@ -1,5 +1,4 @@
 import { NotImplementedError } from "@blazetrails/ruby-compat";
-export { NotImplementedError };
 import { camelize, getPath } from "@blazetrails/activesupport";
 import {
   CreateMigration,
@@ -9,6 +8,7 @@ import {
 } from "./actions/create-migration.js";
 import { migrationLookupAt } from "./migration-lookup.js";
 
+export { NotImplementedError };
 export { migrationLookupAt, migrationExists } from "./migration-lookup.js";
 
 // Mirrors railties/lib/rails/generators/migration.rb. ERB template rendering
