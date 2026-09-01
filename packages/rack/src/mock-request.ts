@@ -133,7 +133,7 @@ export class MockRequest {
 
     env[REQUEST_METHOD] = method;
     env[SERVER_NAME] = parsedUrl.hostname || "example.org";
-    env[SERVER_PORT] = parsedUrl.port || "80";
+    env[SERVER_PORT] = parsedUrl.port || (parsedUrl.protocol === "https:" ? "443" : "80");
     env[SERVER_PROTOCOL] = opts.http_version || "HTTP/1.1";
     env[QUERY_STRING] = parsedUrl.search ? parsedUrl.search.substring(1) : "";
     env[PATH_INFO] = parsedUrl.pathname || "/";

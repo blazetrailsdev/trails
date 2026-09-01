@@ -12,6 +12,13 @@ function makeReq(uri = "/", overrides: Record<string, any> = {}): Request {
   return new Request(MockRequest.envFor(uri, overrides));
 }
 
+const IPV6 = "2620:0:1c00:0:812c:9583:754b:ca11";
+const PRIVATE_IPV6 = "fd5b:982e:9130:247f:0000:0000:0000:0000";
+
+function ip(overrides: Record<string, any>): string | null {
+  return makeReq("/", overrides).ip;
+}
+
 describe("RackRequestTest", () => {
   it("copies the env when duping", () => {
     const req = makeReq();
@@ -32,28 +39,32 @@ describe("RackRequestTest", () => {
   });
 
   it("can calculate the authority", () => {
-    const req = makeReq("http://example.org:8080/");
-    expect(req.authority).toBe("example.org:8080");
+    const req = makeReq("http://example.com:8080/");
+    expect(req.authority).toBe("example.com:8080");
   });
 
   it("can calculate the authority without a port", () => {
-    const req = makeReq("http://example.org/");
-    expect(req.authority).toBe("example.org");
+    const req = makeReq("http://example.com/");
+    expect(req.authority).toBe("example.com:80");
   });
 
   it("can calculate the authority without a port on ssl", () => {
-    const req = makeReq("https://example.org/");
-    expect(req.authority).toBe("example.org");
+    const req = makeReq("https://example.com/");
+    expect(req.authority).toBe("example.com:443");
   });
 
   it("can calculate the server authority", () => {
-    const req = makeReq("http://example.org:8080/");
-    expect(req.serverAuthority).toContain("example.org");
+    let req = new Request({ SERVER_NAME: "example.com" });
+    expect(req.serverAuthority).toBe("example.com");
+    req = new Request({ SERVER_NAME: "example.com", SERVER_PORT: 8080 });
+    expect(req.serverAuthority).toBe("example.com:8080");
   });
 
   it("can calculate the port without an authority", () => {
-    const req = makeReq();
-    expect(req.port).toBe(80);
+    let req = new Request({ SERVER_PORT: 8080 });
+    expect(req.port).toBe(8080);
+    req = new Request({ HTTPS: "on" });
+    expect(req.port).toBe(443);
   });
 
   it("yields to the block if no value has been set", () => {
@@ -123,9 +134,38 @@ describe("RackRequestTest", () => {
   });
 
   it("figure out the correct port", () => {
-    expect(makeReq("http://example.org:8080/").port).toBe(8080);
-    expect(makeReq("http://example.org/").port).toBe(80);
-    expect(makeReq("https://example.org/").port).toBe(443);
+    const port = (env: Record<string, any>): unknown => makeReq("/", env).port;
+    const host = { HTTP_HOST: "localhost:81" };
+    const fwd = (o: Record<string, any> = {}): Record<string, any> => ({
+      ...host,
+      HTTP_X_FORWARDED_HOST: "example.org",
+      ...o,
+    });
+
+    expect(port({ HTTP_HOST: "www2.example.org" })).toBe(80);
+    expect(port({ HTTP_HOST: "www2.example.org:81" })).toBe(81);
+    expect(port({ HTTP_HOST: "some_service:3001" })).toBe(3001);
+    expect(port({ SERVER_NAME: "example.org", SERVER_PORT: "9292" })).toBe(9292);
+    expect(port(fwd({ HTTP_X_FORWARDED_HOST: "example.org:9292" }))).toBe(9292);
+    expect(port(fwd({ HTTP_X_FORWARDED_HOST: "[2001:db8:cafe::17]:47011" }))).toBe(47011);
+    expect(port(fwd({ HTTP_X_FORWARDED_HOST: "2001:db8:cafe::17" }))).toBe(80);
+    expect(port(fwd())).toBe(80);
+    expect(port(fwd({ HTTP_X_FORWARDED_SSL: "on" }))).toBe(443);
+    expect(port(fwd({ HTTP_X_FORWARDED_PROTO: "https" }))).toBe(443);
+    expect(port(fwd({ HTTP_X_FORWARDED_PORT: "9393" }))).toBe(9393);
+    expect(port(fwd({ HTTP_X_FORWARDED_HOST: "example.org:9393", SERVER_PORT: "80" }))).toBe(9393);
+    expect(port(fwd({ SERVER_PORT: "9393" }))).toBe(80);
+    const local = { HTTP_HOST: "localhost", SERVER_PORT: "80" };
+    expect(port({ ...local, HTTP_X_FORWARDED_PROTO: "https" })).toBe(443);
+    expect(port({ ...local, HTTP_X_FORWARDED_PROTO: "https,https" })).toBe(443);
+    expect(
+      port({
+        HTTP_HOST: "localhost",
+        HTTP_FORWARDED: "proto=https",
+        HTTP_X_FORWARDED_PROTO: "http",
+        SERVER_PORT: "9393",
+      }),
+    ).toBe(443);
   });
 
   it("have forwarded_* methods respect forwarded_priority", () => {
@@ -336,8 +376,22 @@ describe("RackRequestTest", () => {
   });
 
   it("figure out the correct host with port", () => {
-    expect(makeReq("http://example.org:8080/").hostWithPort).toBe("example.org:8080");
-    expect(makeReq("http://example.org/").hostWithPort).toBe("example.org");
+    const hwp = (env: Record<string, any>): unknown => makeReq("/", env).hostWithPort();
+    const host = { HTTP_HOST: "localhost:81" };
+
+    expect(hwp({ HTTP_HOST: "www2.example.org" })).toBe("www2.example.org");
+    expect(hwp(host)).toBe("localhost:81");
+    expect(hwp({ SERVER_NAME: "example.org", SERVER_PORT: "9292" })).toBe("example.org:9292");
+    expect(hwp({ SERVER_NAME: "example.org" })).toBe("example.org");
+    expect(hwp({ ...host, HTTP_X_FORWARDED_HOST: "example.org:9292" })).toBe("example.org:9292");
+    const ipv6 = "[2001:db8:cafe::17]";
+    expect(hwp({ ...host, HTTP_X_FORWARDED_HOST: `${ipv6}:47011` })).toBe(`${ipv6}:47011`);
+    expect(hwp({ ...host, HTTP_X_FORWARDED_HOST: "2001:db8:cafe::17" })).toBe(ipv6);
+    const org = { ...host, HTTP_X_FORWARDED_HOST: "example.org" };
+    expect(hwp({ ...org, SERVER_PORT: "9393" })).toBe("example.org");
+    expect(hwp({ ...org, HTTP_FORWARDED: "host=example.com:9292", SERVER_PORT: "9393" })).toBe(
+      "example.com:9292",
+    );
   });
 
   it("parse the query string", () => {
@@ -893,8 +947,8 @@ describe("RackRequestTest", () => {
   });
 
   it("pass through non-uri escaped cookies as-is", () => {
-    const req = makeReq("/", { HTTP_COOKIE: "foo=bar%20baz" });
-    expect(req.cookies["foo"]).toBe("bar%20baz");
+    const req = makeReq("", { HTTP_COOKIE: "foo=%" });
+    expect(req.cookies["foo"]).toBe("%");
   });
 
   it("parse cookies according to RFC 2109", () => {
@@ -1294,125 +1348,126 @@ describe("RackRequestTest", () => {
   });
 
   it("provide ip information", () => {
-    const req = makeReq("/", { REMOTE_ADDR: "1.2.3.4" });
-    expect(req.ip).toBe("1.2.3.4");
+    expect(ip({ REMOTE_ADDR: "1.2.3.4" })).toBe("1.2.3.4");
+    expect(ip({ REMOTE_ADDR: "fe80::202:b3ff:fe1e:8329" })).toBe("fe80::202:b3ff:fe1e:8329");
+    expect(ip({ REMOTE_ADDR: "1.2.3.4,3.4.5.6" })).toBe("3.4.5.6");
+    expect(ip({ REMOTE_ADDR: "127.0.0.1" })).toBe("127.0.0.1");
+    expect(ip({ REMOTE_ADDR: "127.0.0.1,127.0.0.1" })).toBe("127.0.0.1");
   });
 
   it("deals with proxies", () => {
-    const req = makeReq("/", { REMOTE_ADDR: "127.0.0.1", HTTP_X_FORWARDED_FOR: "1.2.3.4" });
-    expect(req.ip).toBe("1.2.3.4");
+    expect(ip({ REMOTE_ADDR: "1.2.3.4", HTTP_FORWARDED: "for=3.4.5.6" })).toBe("1.2.3.4");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "3.4.5.6", HTTP_FORWARDED: "for=5.6.7.8" })).toBe("5.6.7.8");
+    expect(
+      ip({ HTTP_X_FORWARDED_FOR: "3.4.5.6", HTTP_FORWARDED: "for=5.6.7.8, for=7.8.9.0" }),
+    ).toBe("7.8.9.0");
+    expect(ip({ REMOTE_ADDR: "1.2.3.4", HTTP_X_FORWARDED_FOR: "3.4.5.6" })).toBe("1.2.3.4");
+    expect(ip({ REMOTE_ADDR: "1.2.3.4", HTTP_X_FORWARDED_FOR: "unknown" })).toBe("1.2.3.4");
+    expect(ip({ REMOTE_ADDR: "127.0.0.1", HTTP_X_FORWARDED_FOR: "3.4.5.6" })).toBe("3.4.5.6");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "unknown,3.4.5.6" })).toBe("3.4.5.6");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "192.168.0.1,3.4.5.6" })).toBe("3.4.5.6");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "10.0.0.1,3.4.5.6" })).toBe("3.4.5.6");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "10.0.0.1, 10.0.0.1, 3.4.5.6" })).toBe("3.4.5.6");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "127.0.0.1, 3.4.5.6" })).toBe("3.4.5.6");
+
+    // IPv6 format with optional port: "[2001:db8:cafe::17]:47011"
+    expect(ip({ HTTP_X_FORWARDED_FOR: "[2001:db8:cafe::17]:47011" })).toBe("2001:db8:cafe::17");
+    expect(ip({ HTTP_FORWARDED: 'for="[2001:db8:cafe::17]:47011"' })).toBe("2001:db8:cafe::17");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "1.2.3.4, [2001:db8:cafe::17]:47011" })).toBe(
+      "2001:db8:cafe::17",
+    );
+
+    // IPv4 format with optional port: "192.0.2.43:47011"
+    expect(ip({ HTTP_X_FORWARDED_FOR: "192.0.2.43:47011" })).toBe("192.0.2.43");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "1.2.3.4, 192.0.2.43:47011" })).toBe("192.0.2.43");
+
+    expect(ip({ HTTP_X_FORWARDED_FOR: "unknown,192.168.0.1" })).toBe("unknown");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "other,unknown,192.168.0.1" })).toBe("unknown");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "unknown,localhost,192.168.0.1" })).toBe("unknown");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "9.9.9.9, 3.4.5.6, 10.0.0.1, 172.31.4.4" })).toBe("3.4.5.6");
+    expect(ip({ HTTP_X_FORWARDED_FOR: `::1,${IPV6}` })).toBe(IPV6);
+    expect(ip({ HTTP_X_FORWARDED_FOR: `${IPV6},::1` })).toBe(IPV6);
+    expect(ip({ HTTP_X_FORWARDED_FOR: `${PRIVATE_IPV6},${IPV6}` })).toBe(IPV6);
+    expect(ip({ HTTP_X_FORWARDED_FOR: `${IPV6},${PRIVATE_IPV6}` })).toBe(IPV6);
+    expect(ip({ HTTP_X_FORWARDED_FOR: "1.1.1.1, 127.0.0.1", HTTP_CLIENT_IP: "1.1.1.1" })).toBe(
+      "1.1.1.1",
+    );
+    expect(ip({ HTTP_X_FORWARDED_FOR: "8.8.8.8, 9.9.9.9" })).toBe("9.9.9.9");
+    expect(ip({ HTTP_X_FORWARDED_FOR: "8.8.8.8, fe80::202:b3ff:fe1e:8329" })).toBe(
+      "fe80::202:b3ff:fe1e:8329",
+    );
+
+    // Unix Sockets
+    expect(ip({ REMOTE_ADDR: "unix", HTTP_X_FORWARDED_FOR: "3.4.5.6" })).toBe("3.4.5.6");
+    expect(ip({ REMOTE_ADDR: "unix:/tmp/foo", HTTP_X_FORWARDED_FOR: "3.4.5.6" })).toBe("3.4.5.6");
   });
 
   it("not allow IP spoofing via Client-IP and X-Forwarded-For headers", () => {
-    const req = makeReq("/", {
-      REMOTE_ADDR: "127.0.0.1",
-      HTTP_X_FORWARDED_FOR: "1.2.3.4, 127.0.0.1",
-      HTTP_CLIENT_IP: "2.3.4.5",
-    });
-    // Client-IP not in forwarded chain and not trusted => return it
-    expect(req.ip).toBe("2.3.4.5");
+    // IP Spoofing attempt:
+    // Client sends          X-Forwarded-For: 6.6.6.6
+    //                       Client-IP: 6.6.6.6
+    // Load balancer adds    X-Forwarded-For: 2.2.2.3, 192.168.0.7
+    expect(
+      ip({ HTTP_X_FORWARDED_FOR: "6.6.6.6, 2.2.2.3, 192.168.0.7", HTTP_CLIENT_IP: "6.6.6.6" }),
+    ).toBe("2.2.2.3");
   });
 
   it("preserves ip for trusted proxy chain", () => {
-    const req = makeReq("/", {
-      REMOTE_ADDR: "127.0.0.1",
-      HTTP_X_FORWARDED_FOR: "1.2.3.4, 10.0.0.1",
-    });
-    expect(req.ip).toBe("1.2.3.4");
+    expect(
+      ip({ HTTP_X_FORWARDED_FOR: "192.168.0.11, 192.168.0.7", HTTP_CLIENT_IP: "127.0.0.1" }),
+    ).toBe("192.168.0.11");
   });
 
   it("uses a custom trusted proxy filter", () => {
-    const env = MockRequest.envFor("/");
-    env["rack.request.trusted_proxy"] = (ip: string) => ip === "foo";
-    const req = new Request(env);
-    expect(req.trustedProxy("foo")).toBe(true);
-    expect(req.trustedProxy("bar")).toBe(false);
+    const oldIp = Request.ipFilter;
+    Request.ipFilter = (ip: string) => ip === "foo";
+    try {
+      const req = makeReq("/");
+      expect(req.trustedProxy("foo")).toBe(true);
+    } finally {
+      Request.ipFilter = oldIp;
+    }
   });
 
   it("regards local addresses as proxies", () => {
-    const req = makeReq("/", {
-      REMOTE_ADDR: "127.0.0.1",
-      HTTP_X_FORWARDED_FOR: "1.2.3.4, 192.168.1.1, 10.0.0.1",
-    });
-    expect(req.ip).toBe("1.2.3.4");
-  });
-
-  it("uses rack.request.trusted_proxy env key when set to nil (default behavior)", () => {
-    const req = makeReq("/", { REMOTE_ADDR: "127.0.0.1", HTTP_X_FORWARDED_FOR: "1.2.3.4" });
-    expect(req.ip).toBe("1.2.3.4");
-  });
-
-  it("trusts all proxies when rack.request.trusted_proxy is true", () => {
-    const env = MockRequest.envFor("/", {
-      REMOTE_ADDR: "1.2.3.4",
-      HTTP_X_FORWARDED_FOR: "5.6.7.8, 9.10.11.12",
-    });
-    env["rack.request.trusted_proxy"] = true;
-    const req = new Request(env);
-    // All trusted, fall through to REMOTE_ADDR
-    expect(req.ip).toBe("1.2.3.4");
-  });
-
-  it("trusts no proxies when rack.request.trusted_proxy is false", () => {
-    const env = MockRequest.envFor("/", {
-      REMOTE_ADDR: "1.2.3.4",
-      HTTP_X_FORWARDED_FOR: "5.6.7.8",
-    });
-    env["rack.request.trusted_proxy"] = false;
-    const req = new Request(env);
-    expect(req.ip).toBe("1.2.3.4");
-  });
-
-  it("trusts only specified IPs when rack.request.trusted_proxy is a callable", () => {
-    const env = MockRequest.envFor("/", {
-      REMOTE_ADDR: "127.0.0.1",
-      HTTP_X_FORWARDED_FOR: "1.2.3.4, 10.0.0.1",
-    });
-    env["rack.request.trusted_proxy"] = (ip: string) => ip === "10.0.0.1";
-    const req = new Request(env);
-    expect(req.ip).toBe("1.2.3.4");
-  });
-
-  it("supports CIDR ranges in rack.request.trusted_proxy callable", () => {
-    const env = MockRequest.envFor("/");
-    // Simple CIDR check: 10.0.0.0/24
-    env["rack.request.trusted_proxy"] = (ip: string) => {
-      return ip.startsWith("10.0.0.");
-    };
-    const req = new Request(env);
+    const req = makeReq("/");
+    expect(req.trustedProxy("127.0.0.1")).toBe(true);
+    expect(req.trustedProxy("127.000.000.001")).toBe(true);
+    expect(req.trustedProxy("127.0.0.6")).toBe(true);
+    expect(req.trustedProxy("127.0.0.30")).toBe(true);
     expect(req.trustedProxy("10.0.0.1")).toBe(true);
-    expect(req.trustedProxy("10.0.0.100")).toBe(true);
-    expect(req.trustedProxy("10.0.1.1")).toBe(false);
-  });
+    expect(req.trustedProxy("10.000.000.001")).toBe(true);
+    expect(req.trustedProxy("172.16.0.1")).toBe(true);
+    expect(req.trustedProxy("172.20.0.1")).toBe(true);
+    expect(req.trustedProxy("172.30.0.1")).toBe(true);
+    expect(req.trustedProxy("172.31.0.1")).toBe(true);
+    expect(req.trustedProxy("172.31.000.001")).toBe(true);
+    expect(req.trustedProxy("192.168.0.1")).toBe(true);
+    expect(req.trustedProxy("192.168.000.001")).toBe(true);
+    expect(req.trustedProxy("::1")).toBe(true);
+    expect(req.trustedProxy("fd00::")).toBe(true);
+    expect(req.trustedProxy("FD00::")).toBe(true);
+    expect(req.trustedProxy("localhost")).toBe(true);
+    expect(req.trustedProxy("unix")).toBe(true);
+    expect(req.trustedProxy("unix:/tmp/sock")).toBe(true);
 
-  it("supports IPv6 addresses in rack.request.trusted_proxy callable", () => {
-    const env = MockRequest.envFor("/");
-    env["rack.request.trusted_proxy"] = (ip: string) => {
-      return ip === "2001:db8::1" || ip.startsWith("fd00:");
-    };
-    const req = new Request(env);
-    expect(req.trustedProxy("2001:db8::1")).toBe(true);
-    expect(req.trustedProxy("2001:db8::2")).toBe(false);
-    expect(req.trustedProxy("fd00::1")).toBe(true);
-  });
-
-  it("handles custom logic in rack.request.trusted_proxy callable", () => {
-    const env = MockRequest.envFor("/");
-    env["rack.request.trusted_proxy"] = (ip: string) => {
-      return ip === "10.0.0.1" || ip === "invalid-ip";
-    };
-    const req = new Request(env);
-    expect(req.trustedProxy("10.0.0.1")).toBe(true);
-    expect(req.trustedProxy("invalid-ip")).toBe(true);
-    expect(req.trustedProxy("192.168.1.1")).toBe(false);
-  });
-
-  it("can use Rack::Config to set rack.request.trusted_proxy", () => {
-    const env = MockRequest.envFor("/");
-    // Simulate Rack::Config setting the trusted proxy
-    env["rack.request.trusted_proxy"] = true;
-    const req = new Request(env);
-    expect(req.trustedProxy("8.8.8.8")).toBe(true);
+    expect(req.trustedProxy("unix.example.org")).toBe(false);
+    expect(req.trustedProxy("example.org\n127.0.0.1")).toBe(false);
+    expect(req.trustedProxy("127.0.0.1\nexample.org")).toBe(false);
+    expect(req.trustedProxy("127.256.0.1")).toBe(false);
+    expect(req.trustedProxy("127.0.256.1")).toBe(false);
+    expect(req.trustedProxy("127.0.0.256")).toBe(false);
+    expect(req.trustedProxy("127.0.0.300")).toBe(false);
+    expect(req.trustedProxy("10.256.0.1")).toBe(false);
+    expect(req.trustedProxy("10.0.256.1")).toBe(false);
+    expect(req.trustedProxy("10.0.0.256")).toBe(false);
+    expect(req.trustedProxy("11.0.0.1")).toBe(false);
+    expect(req.trustedProxy("11.000.000.001")).toBe(false);
+    expect(req.trustedProxy("172.15.0.1")).toBe(false);
+    expect(req.trustedProxy("172.32.0.1")).toBe(false);
+    expect(req.trustedProxy("172.16.256.1")).toBe(false);
+    expect(req.trustedProxy("172.16.0.256")).toBe(false);
+    expect(req.trustedProxy("2001:470:1f0b:18f8::1")).toBe(false);
   });
 
   it("sets the default session to an empty hash", () => {

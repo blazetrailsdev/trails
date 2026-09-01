@@ -13,11 +13,8 @@ import {
   RACK_SESSION_OPTIONS,
   RACK_LOGGER,
   HTTP_HOST,
-  HTTP_PORT,
   HTTPS,
   HTTP_COOKIE,
-  CONTENT_TYPE,
-  CONTENT_LENGTH,
   GET,
   POST,
   PUT,
@@ -44,7 +41,12 @@ import {
   HTTP_X_FORWARDED_SCHEME,
   HTTP_X_FORWARDED_SSL,
 } from "./constants.js";
-import { forwardedValues, getDefaultQueryParser, QueryParser } from "./utils.js";
+import {
+  forwardedValues,
+  getDefaultQueryParser,
+  parseCookiesHeader,
+  QueryParser,
+} from "./utils.js";
 import { fetch, hasKey } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/activesupport";
 import * as MediaTypeModule from "./media-type.js";
@@ -53,20 +55,12 @@ import { parseMultipart as multipartExtract } from "./multipart.js";
 const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"];
 const PARSEABLE_DATA_MEDIA_TYPES = ["multipart/related", "multipart/mixed"];
 
-function parseCookies(cookieStr: string): Record<string, string> {
-  const cookies: Record<string, string> = {};
-  if (!cookieStr) return cookies;
-  for (const pair of cookieStr.split(/;\s*/)) {
-    const eqIdx = pair.indexOf("=");
-    if (eqIdx === -1) continue;
-    const key = pair.substring(0, eqIdx).trim();
-    const val = pair.substring(eqIdx + 1).trim();
-    if (key && !(key in cookies)) {
-      cookies[key] = val;
-    }
-  }
-  return cookies;
-}
+/**
+ * Default ports depending on scheme. Used to decide whether or not to include
+ * the port in a generated URI. Mirrors
+ * `Rack::Request::Helpers::DEFAULT_PORTS` (`rack/request.rb:168`).
+ */
+const DEFAULT_PORTS: Record<string, number | undefined> = { http: 80, https: 443, coffee: 80 };
 
 const ALLOWED_SCHEMES = ["https", "http", "wss", "ws"] as const;
 const FORWARDED_SCHEME_HEADERS: Record<string, string> = {
@@ -74,10 +68,21 @@ const FORWARDED_SCHEME_HEADERS: Record<string, string> = {
   scheme: HTTP_X_FORWARDED_SCHEME,
 };
 
-function isTrustedProxy(ip: string): boolean {
-  if (!ip) return false;
-  return /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|::1|fd|fc)/i.test(ip.trim());
-}
+const validIpv4Octet = "\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])";
+
+/** Mirrors the `trusted_proxies` union at `rack/request.rb:48-57`. */
+const trustedProxies = new RegExp(
+  [
+    `^127(?:${validIpv4Octet}){3}$`,
+    "^::1$",
+    "^f[cd][0-9a-f]{2}(?::[0-9a-f]{0,4}){0,7}$",
+    `^10(?:${validIpv4Octet}){3}$`,
+    `^172\\.(1[6-9]|2[0-9]|3[01])(?:${validIpv4Octet}){2}$`,
+    `^192\\.168(?:${validIpv4Octet}){2}$`,
+    "^localhost$|^unix($|:)",
+  ].join("|"),
+  "i",
+);
 
 /**
  * Mirrors `Rack::Request::Helpers` (`rack/lib/rack/request.rb:149-787`), the
@@ -133,9 +138,8 @@ export abstract class Helpers {
   }
 
   /** Mirrors `Rack::Request::Helpers#content_length` (`rack/request.rb:199`). */
-  get contentLength(): number | null {
-    const cl = this.getHeader(CONTENT_LENGTH) || this.getHeader("CONTENT_LENGTH");
-    return cl ? parseInt(cl) : null;
+  get contentLength(): string | null {
+    return this.getHeader("CONTENT_LENGTH") ?? null;
   }
 
   /** Mirrors `Rack::Request::Helpers#logger` (`rack/request.rb:200`). */
@@ -232,18 +236,23 @@ export abstract class Helpers {
   }
 
   /** Mirrors `Rack::Request::Helpers#authority` (`rack/request.rb:266-268`). */
-  get authority(): string {
-    const p = this.port;
-    if ((this.ssl && p === 443) || (!this.ssl && p === 80)) {
-      return this.host;
-    }
-    return `${this.host}:${p}`;
+  get authority(): string | null {
+    return this.forwardedAuthority ?? this.hostAuthority ?? this.serverAuthority;
   }
 
   /** Mirrors `Rack::Request::Helpers#server_authority` (`rack/request.rb:272-283`). */
-  get serverAuthority(): string {
-    const p = this.serverPort;
-    return `${this.getHeader(SERVER_NAME)}:${p}`;
+  get serverAuthority(): string | null {
+    const host = this.serverName;
+    const port = this.serverPort;
+
+    if (host != null) {
+      if (port != null) {
+        return `${host}:${port}`;
+      } else {
+        return host;
+      }
+    }
+    return null;
   }
 
   /** Mirrors `Rack::Request::Helpers#server_name` (`rack/request.rb:285-287`). */
@@ -252,30 +261,31 @@ export abstract class Helpers {
   }
 
   /** Mirrors `Rack::Request::Helpers#server_port` (`rack/request.rb:289-291`). */
-  get serverPort(): number {
-    return parseInt(this.getHeader(SERVER_PORT) || "80");
+  get serverPort(): string | null {
+    return this.getHeader(SERVER_PORT) ?? null;
   }
 
   /** Mirrors `Rack::Request::Helpers#cookies` (`rack/request.rb:293-306`). */
   get cookies(): Record<string, string> {
-    const cookieStr = this.getHeader(HTTP_COOKIE) || "";
-    if (
-      this.getHeader(RACK_REQUEST_COOKIE_STRING) === cookieStr &&
-      this.getHeader(RACK_REQUEST_COOKIE_HASH)
-    ) {
-      return this.getHeader(RACK_REQUEST_COOKIE_HASH);
+    const hash: Record<string, string> = this.fetchHeader(RACK_REQUEST_COOKIE_HASH, (key) =>
+      this.setHeader(key, {}),
+    );
+
+    const string = this.getHeader(HTTP_COOKIE);
+
+    if (string !== this.getHeader(RACK_REQUEST_COOKIE_STRING)) {
+      for (const key of Object.keys(hash)) delete hash[key];
+      Object.assign(hash, parseCookiesHeader(string));
+      this.setHeader(RACK_REQUEST_COOKIE_STRING, string);
     }
-    const parsed = parseCookies(cookieStr);
-    this.setHeader(RACK_REQUEST_COOKIE_STRING, cookieStr);
-    this.setHeader(RACK_REQUEST_COOKIE_HASH, parsed);
-    return parsed;
+
+    return hash;
   }
 
   /** Mirrors `Rack::Request::Helpers#content_type` (`rack/request.rb:308-311`). */
   get contentType(): string | null {
-    const ct = this.getHeader(CONTENT_TYPE) || this.getHeader("CONTENT_TYPE");
-    if (!ct || ct === "") return null;
-    return ct;
+    const contentType = this.getHeader("CONTENT_TYPE");
+    return contentType == null || contentType === "" ? null : contentType;
   }
 
   /** Mirrors `Rack::Request::Helpers#xhr?` (`rack/request.rb:313-315`). */
@@ -289,18 +299,19 @@ export abstract class Helpers {
   }
 
   /** Mirrors `Rack::Request::Helpers#host_with_port` (`rack/request.rb:322-330`). */
-  get hostWithPort(): string {
-    return this.authority;
+  hostWithPort(authority: string | null = this.authority): string | null {
+    const [host, , port] = this.splitAuthority(authority);
+
+    if (port === (DEFAULT_PORTS[this.scheme] ?? null)) {
+      return host;
+    } else {
+      return authority;
+    }
   }
 
   /** Mirrors `Rack::Request::Helpers#host` (`rack/request.rb:333-335`). */
-  get host(): string {
-    const httpHost = this.getHeader(HTTP_HOST);
-    if (httpHost) {
-      const [, h] = this.splitAuthority(httpHost);
-      return h ?? httpHost;
-    }
-    return this.getHeader(SERVER_NAME) || "localhost";
+  get host(): string | null {
+    return this.splitAuthority(this.authority)[0];
   }
 
   /** Mirrors `Rack::Request::Helpers#hostname` (`rack/request.rb:341-343`). */
@@ -309,17 +320,14 @@ export abstract class Helpers {
   }
 
   /** Mirrors `Rack::Request::Helpers#port` (`rack/request.rb:345-351`). */
-  get port(): number {
-    const httpHost = this.getHeader(HTTP_HOST);
-    if (httpHost) {
-      const [, , p] = this.splitAuthority(httpHost);
-      if (p !== null) return p;
+  get port(): number | string | null {
+    let port: number | null = null;
+    const authority = this.authority;
+    if (authority != null) {
+      [, , port] = this.splitAuthority(authority);
     }
-    const httpPort = this.getHeader(HTTP_PORT);
-    if (httpPort) return parseInt(httpPort);
-    const serverPort = this.getHeader(SERVER_PORT);
-    if (serverPort && serverPort !== "80" && serverPort !== "443") return parseInt(serverPort);
-    return this.ssl ? 443 : 80;
+
+    return port ?? this.forwardedPort?.at(-1) ?? DEFAULT_PORTS[this.scheme] ?? this.serverPort;
   }
 
   /** Mirrors `Rack::Request::Helpers#forwarded_for` (`rack/request.rb:353-372`). */
@@ -380,52 +388,21 @@ export abstract class Helpers {
   }
 
   /** Mirrors `Rack::Request::Helpers#ip` (`rack/request.rb:414-433`). */
-  get ip(): string {
-    const trustedProxyFn = this.getHeader("rack.request.trusted_proxy");
-    const remoteAddr = this.getHeader("REMOTE_ADDR") || "127.0.0.1";
+  get ip(): string | null {
+    const remoteAddresses = this.splitHeader(this.getHeader("REMOTE_ADDR"));
+    const externalAddresses = this.rejectTrustedIpAddresses(remoteAddresses);
 
-    // false means trust nothing - just use REMOTE_ADDR
-    if (trustedProxyFn === false) {
-      return remoteAddr;
+    if (externalAddresses.length !== 0) {
+      return externalAddresses[externalAddresses.length - 1];
     }
 
-    const trustFn: (ip: string) => boolean =
-      trustedProxyFn === true
-        ? () => true
-        : typeof trustedProxyFn === "function"
-          ? trustedProxyFn
-          : isTrustedProxy;
-
-    const forwarded = this.getHeader("HTTP_X_FORWARDED_FOR");
-    const clientIp = this.getHeader("HTTP_CLIENT_IP");
-
-    if (forwarded) {
-      const ips = forwarded
-        .split(",")
-        .map((s: string) => s.trim())
-        .filter(Boolean);
-
-      // Check for spoofing: if client-ip not in forwarded chain and not trusted
-      if (clientIp) {
-        const clientInForwarded = ips.includes(clientIp);
-        if (!clientInForwarded && !trustFn(clientIp)) {
-          return clientIp;
-        }
-      }
-
-      // Find the first untrusted IP from the right
-      for (let i = ips.length - 1; i >= 0; i--) {
-        if (!trustFn(ips[i])) {
-          return ips[i];
-        }
-      }
+    const forwardedFor = this.forwardedFor;
+    if (forwardedFor && forwardedFor.length !== 0) {
+      const external = this.rejectTrustedIpAddresses(forwardedFor);
+      return external[external.length - 1] ?? forwardedFor[0];
     }
 
-    if (clientIp && !trustFn(clientIp)) {
-      return clientIp;
-    }
-
-    return remoteAddr;
+    return remoteAddresses[0] ?? null;
   }
 
   /** Mirrors `Rack::Request::Helpers#media_type` (`rack/request.rb:441-443`). */
@@ -556,13 +533,12 @@ export abstract class Helpers {
 
   /** Mirrors `Rack::Request::Helpers#base_url` (`rack/request.rb:590-592`). */
   get baseUrl(): string {
-    return `${this.scheme}://${this.authority}${this.scriptName}`;
+    return `${this.scheme}://${this.hostWithPort()}`;
   }
 
   /** Mirrors `Rack::Request::Helpers#url` (`rack/request.rb:595-597`). */
   get url(): string {
-    const qs = this.queryString;
-    return `${this.baseUrl}${this.pathInfo}${qs ? "?" + qs : ""}`;
+    return this.baseUrl + this.fullpath;
   }
 
   /** Mirrors `Rack::Request::Helpers#path` (`rack/request.rb:599-601`). */
@@ -572,8 +548,7 @@ export abstract class Helpers {
 
   /** Mirrors `Rack::Request::Helpers#fullpath` (`rack/request.rb:603-605`). */
   get fullpath(): string {
-    const qs = this.queryString;
-    return `${this.scriptName}${this.pathInfo}${qs ? "?" + qs : ""}`;
+    return this.queryString === "" ? this.path : `${this.path}?${this.queryString}`;
   }
 
   /** Mirrors `Rack::Request::Helpers#accept_encoding` (`rack/request.rb:607-609`). */
@@ -588,17 +563,16 @@ export abstract class Helpers {
 
   /** Mirrors `Rack::Request::Helpers#trusted_proxy?` (`rack/request.rb:615-617`). */
   trustedProxy(ip: string): boolean {
-    const trustedProxyFn = this.getHeader("rack.request.trusted_proxy");
-    if (trustedProxyFn === true) return true;
-    if (trustedProxyFn === false) return false;
-    if (typeof trustedProxyFn === "function") return trustedProxyFn(ip);
-    return isTrustedProxy(ip);
+    return Request.ipFilter(ip);
   }
 
   /** Mirrors `Rack::Request::Helpers#values_at` (`rack/request.rb:620-624`). */
   valuesAt(...keys: string[]): any[] {
-    const p = this.params;
-    return keys.map((k) => p[k]);
+    console.warn(
+      "Request#values_at is deprecated and will be removed in a future version of Rack. Please use request.params.values_at instead",
+    );
+
+    return keys.map((key) => this.params[key]);
   }
 
   /**
@@ -710,7 +684,7 @@ export abstract class Helpers {
   splitAuthority(
     authority: string | null | undefined,
   ): [string | null, string | null, number | null] {
-    if (!authority) return [null, null, null];
+    if (authority == null) return [null, null, null];
     const ipv6Match = authority.match(/^\[([^\]]+)\](?::(\d+))?$/);
     if (ipv6Match) {
       const address = ipv6Match[1];
@@ -797,7 +771,7 @@ export abstract class Helpers {
 export class Request {
   env: Record<string, any>;
 
-  static ipFilter: ((ip: string) => boolean) | null = null;
+  static ipFilter: (ip: string) => boolean = (ip: string) => trustedProxies.test(ip);
   static forwardedPriority: Array<"forwarded" | "x_forwarded" | null> = [
     "forwarded",
     "x_forwarded",
