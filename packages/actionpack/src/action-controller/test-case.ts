@@ -787,6 +787,16 @@ export class TestSession {
     return this.has(key);
   }
 
+  /** Mirrors `alias :key? :has_key?` (rack-session, `abstract/id.rb:111`). */
+  isKey(key: string): boolean {
+    return this.hasKey(key);
+  }
+
+  /** Mirrors `alias :include? :has_key?` (rack-session, `abstract/id.rb:112`). */
+  isInclude(key: string): boolean {
+    return this.hasKey(key);
+  }
+
   /** Mirrors Rails `TestSession#keys` — stored data keys. */
   keys(): string[] {
     return [...this._data.keys()];
