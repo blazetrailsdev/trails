@@ -264,8 +264,8 @@ export function _queryConstraintsHash(
 ): Record<string, unknown> {
   const ctor = this.constructor;
   if (!ctor.lockingEnabled) return base;
-  const col = ctor.lockingColumn;
-  return merge(base, { [col]: _lockValueForDatabase.call(this, col) });
+  const lockingColumn = ctor.lockingColumn;
+  return merge(base, { [lockingColumn]: _lockValueForDatabase.call(this, lockingColumn) });
 }
 
 /** @internal */
