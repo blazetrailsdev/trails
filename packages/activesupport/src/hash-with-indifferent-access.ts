@@ -17,7 +17,7 @@ import {
   symbolizeKeysBang,
 } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
-import { KeyError, TypeError } from "@blazetrails/ruby-compat";
+import { type DefaultProc, Hash, KeyError, TypeError } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
 
@@ -40,18 +40,22 @@ type BlockFn<V> = (key: string, oldValue: V, newValue: V) => V;
 type DefaultBlock<V> = (key: string) => V;
 
 /**
- * A `Hash#default_proc` (hash_with_indifferent_access.rb:77): yielded the hash
- * itself and the missing key.
+ * `CLASS_OF` (`vendor/ruby/object.c:3899`) over the values trails carries: one
+ * JS `Number` seats both `Integer` and `Float`, so which it is is read off the
+ * value, the way `rubyClassName` reads it in `array-utils.ts` and `cache/store.ts`.
+ * The six copies converge onto one exported ruby-compat function in
+ * `converge-rb-obj-class-copies-onto-ruby-compat`.
  */
-type DefaultProc<V> = (hash: HashWithIndifferentAccess<V>, key: string) => V;
+function rubyClassName(value: unknown): string {
+  if (value === null || value === undefined) return "NilClass";
+  if (typeof value === "boolean") return value ? "TrueClass" : "FalseClass";
+  if (typeof value === "bigint") return "Integer";
+  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
+  if (typeof value === "string") return "String";
+  return (value as object).constructor?.name ?? "Object";
+}
 
-export class HashWithIndifferentAccess<V = unknown> {
-  private data: Map<string, V>;
-
-  /** `Hash#default` / `Hash#default_proc` storage — Rails inherits both. */
-  private _default?: V;
-  private _defaultProc?: DefaultProc<V>;
-
+export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   /**
    * Mirrors `initialize` (hash_with_indifferent_access.rb:70-83). The
    * `respond_to?(:to_hash)` arm goes through `update`, so every key gets
@@ -65,9 +69,9 @@ export class HashWithIndifferentAccess<V = unknown> {
    * uses (:195).
    */
   constructor(
-    constructor?: AnyObject | HashWithIndifferentAccess<V> | DefaultProc<V> | NoInfer<V>,
+    constructor?: AnyObject | HashWithIndifferentAccess<V> | DefaultProc<string, V> | NoInfer<V>,
   ) {
-    this.data = new Map();
+    super();
     if (constructor instanceof HashWithIndifferentAccess || isPlainObject(constructor)) {
       this.update(constructor);
 
@@ -81,7 +85,7 @@ export class HashWithIndifferentAccess<V = unknown> {
     } else if (constructor == null) {
       // super()
     } else if (typeof constructor === "function") {
-      this.setDefaultProc(constructor as DefaultProc<V>);
+      this.setDefaultProc(constructor as DefaultProc<string, V>);
     } else {
       this.setDefault(constructor as V);
     }
@@ -100,10 +104,8 @@ export class HashWithIndifferentAccess<V = unknown> {
    * takes either spelling of the key. On a miss `Hash#[]` yields to the
    * default_proc, else returns the default.
    */
-  get(key: string): V | undefined {
-    const convertedKey = this.convertKey(key);
-    if (this.data.has(convertedKey)) return this.data.get(convertedKey);
-    return this.default(convertedKey);
+  override get(key: string): V | undefined {
+    return super.get(this.convertKey(key));
   }
 
   /**
@@ -111,69 +113,18 @@ export class HashWithIndifferentAccess<V = unknown> {
    * argument it is `Hash#default`, the plain default value; with one it is
    * `Hash#default(key)` over the converted key, which runs the default_proc.
    */
-  default(...key: [] | [string]): V | undefined {
+  override default(...key: [] | [string]): V | undefined {
     if (key.length === 0) {
-      return this._default;
+      return super.default();
     } else {
-      const convertedKey = this.convertKey(key[0]);
-      return this._defaultProc ? this._defaultProc(this, convertedKey) : this._default;
+      return super.default(this.convertKey(key[0]));
     }
-  }
-
-  /**
-   * `Hash#default=`, which `initialize` (:76) and `set_defaults` (:420) write
-   * through. A TS `set` accessor cannot share a name with the `default()`
-   * reader, so it takes the conventions' `setX()` spelling. MRI clears
-   * default_proc on this write, and `test_dup_with_default_proc_sets_proc`
-   * (hash_with_indifferent_access_test.rb:837-838) depends on it.
-   */
-  setDefault(value: V | undefined): void {
-    this._default = value;
-    this._defaultProc = undefined;
-  }
-
-  /**
-   * `Hash#default_proc`, read by `set_defaults` (:417-418).
-   *
-   * @noRailsEquivalent PERMANENT — inherited from Ruby's `Hash`, which this class
-   * subclasses. The copy of `@blazetrails/ruby-compat`'s `Hash` seat
-   * (`rb_hash_default_proc`, `vendor/ruby/hash.c:2285`, with its paired
-   * `default=` / `default_proc=` mutual clearing) is a genuine TS shortcoming
-   * and NOT convergeable by delegation: `rb_hash_default_value`
-   * (`vendor/ruby/hash.c:2068`) yields the RECEIVER to the proc, so a held
-   * `Hash` would hand the block the inner seat where Ruby hands it this object,
-   * and inheriting the seat means inheriting `Hash`'s `Map` storage that this
-   * class already replaces with its own key-converting one. Recorded at BOTH
-   * hosts that carry the copy — see `rack/src/headers.ts`.
-   */
-  defaultProc(): DefaultProc<V> | undefined {
-    return this._defaultProc;
-  }
-
-  /**
-   * `Hash#default_proc=`, which `initialize` (:77) and `set_defaults` (:418)
-   * write through. MRI clears the default value on this write.
-   *
-   * @noRailsEquivalent PERMANENT — inherited from Ruby's `Hash`, which this class
-   * subclasses. The copy of `@blazetrails/ruby-compat`'s `Hash` seat
-   * (`rb_hash_default_proc`, `vendor/ruby/hash.c:2285`, with its paired
-   * `default=` / `default_proc=` mutual clearing) is a genuine TS shortcoming
-   * and NOT convergeable by delegation: `rb_hash_default_value`
-   * (`vendor/ruby/hash.c:2068`) yields the RECEIVER to the proc, so a held
-   * `Hash` would hand the block the inner seat where Ruby hands it this object,
-   * and inheriting the seat means inheriting `Hash`'s `Map` storage that this
-   * class already replaces with its own key-converting one. Recorded at BOTH
-   * hosts that carry the copy — see `rack/src/headers.ts`.
-   */
-  setDefaultProc(proc: DefaultProc<V> | undefined): void {
-    this._defaultProc = proc;
-    this._default = undefined;
   }
 
   /**
    * Mirrors `[]=` (hash_with_indifferent_access.rb:98-100).
    */
-  set(key: string, value: V): this {
+  override set(key: string, value: V): this {
     return this.regularWriter(this.convertKey(key), this.convertValue(value, "assignment"));
   }
 
@@ -187,7 +138,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * — the un-converting `Hash#[]=` the converting writer delegates to.
    */
   regularWriter(key: string, value: V): this {
-    this.data.set(key, value);
+    super.set(key, value);
     return this;
   }
 
@@ -197,7 +148,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   regularUpdate(otherHashes: HashWithIndifferentAccess<V>, block?: BlockFn<V>): this {
     for (const [k, v] of otherHashes.entries()) {
-      this.data.set(k, block && this.data.has(k) ? block(k, this.data.get(k)!, v) : v);
+      super.set(k, block && super.has(k) ? block(k, super.get(k)!, v) : v);
     }
     return this;
   }
@@ -205,12 +156,14 @@ export class HashWithIndifferentAccess<V = unknown> {
   /**
    * Mirrors `delete` (hash_with_indifferent_access.rb:303-305) — `Hash#delete`
    * through `convert_key`, so the removed value comes back (`undefined` when
-   * the key was absent), not `Map#delete`'s boolean.
+   * the key was absent), not `Map#delete`'s boolean. It keeps the inherited
+   * declaration's return type so this class stays assignable to the `Map`
+   * spelling a Ruby `Hash` parameter takes.
    */
-  delete(key: string): V | undefined {
+  override delete(key: string): ReturnType<Hash<string, V>["delete"]> {
     const convertedKey = this.convertKey(key);
-    const value = this.data.get(convertedKey);
-    this.data.delete(convertedKey);
+    const value = super.get(convertedKey);
+    super.delete(convertedKey);
     return value;
   }
 
@@ -219,7 +172,16 @@ export class HashWithIndifferentAccess<V = unknown> {
    * for a key in either spelling.
    */
   key(key: string): boolean {
-    return this.data.has(this.convertKey(key));
+    return this.has(key);
+  }
+
+  /**
+   * `key?` again under the operator spelling `Map#has` gives this class — the
+   * inherited `Hash` storage answers it, so it has to convert the key the way
+   * `key?` (hash_with_indifferent_access.rb:150-152) does.
+   */
+  override has(key: string): boolean {
+    return super.has(this.convertKey(key));
   }
 
   /** `alias_method :include?, :key?` (hash_with_indifferent_access.rb:154). */
@@ -250,7 +212,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   fetch(key: string, ...extras: (V | DefaultBlock<V>)[]): V {
     key = this.convertKey(key);
-    if (this.data.has(key)) return this.data.get(key)!;
+    if (super.has(key)) return super.get(key)!;
     if (extras.length > 0) {
       const extra = extras[0];
       return typeof extra === "function" ? (extra as DefaultBlock<V>)(key) : extra;
@@ -262,7 +224,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Mirrors `values_at` (hash_with_indifferent_access.rb:239-242).
    */
   valuesAt(...keys: string[]): (V | undefined)[] {
-    return keys.map((key) => this.data.get(this.convertKey(key)));
+    return keys.map((key) => super.get(this.convertKey(key)));
   }
 
   /**
@@ -276,26 +238,6 @@ export class HashWithIndifferentAccess<V = unknown> {
         ? (indices.pop() as DefaultBlock<V>)
         : undefined;
     return (indices as string[]).map((key) => (block ? this.fetch(key, block) : this.fetch(key)));
-  }
-
-  get size(): number {
-    return this.data.size;
-  }
-
-  keys(): IterableIterator<string> {
-    return this.data.keys();
-  }
-
-  values(): IterableIterator<V> {
-    return this.data.values();
-  }
-
-  entries(): IterableIterator<[string, V]> {
-    return this.data.entries();
-  }
-
-  forEach(fn: (value: V, key: string) => void): void {
-    this.data.forEach(fn);
   }
 
   /**
@@ -397,7 +339,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * contents of this hash with `otherHash`, under indifferent access.
    */
   replace(otherHash: AnyObject | HashWithIndifferentAccess<V>): this {
-    this.data.clear();
+    super.clear();
     return this.update(new HashWithIndifferentAccess<V>(otherHash));
   }
 
@@ -418,8 +360,8 @@ export class HashWithIndifferentAccess<V = unknown> {
     keys = keys.map((key) => this.convertKey(key));
     const result = new HashWithIndifferentAccess<V>();
     for (const key of keys) {
-      if (this.data.has(key)) {
-        result.set(key, this.data.get(key)!);
+      if (super.has(key)) {
+        result.set(key, super.get(key)!);
       }
     }
     return result;
@@ -470,7 +412,7 @@ export class HashWithIndifferentAccess<V = unknown> {
   select(...args: [(key: string, value: V) => boolean]): HashWithIndifferentAccess<V> {
     const block = args[args.length - 1];
     const result = new HashWithIndifferentAccess<V>();
-    for (const [k, v] of this.data) {
+    for (const [k, v] of this) {
       if (block(k, v)) {
         result.set(k, v);
       }
@@ -534,13 +476,13 @@ export class HashWithIndifferentAccess<V = unknown> {
       // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError("no implicit conversion of nil into Hash");
     } else if (NOT_GIVEN === hash) {
-      for (const key of [...this.keys()]) this.set(block!(key), this.delete(key)!);
+      for (const key of [...this.keys()]) this.set(block!(key), this.delete(key));
     } else if (block) {
       for (const key of [...this.keys()]) {
-        this.set((hash[key] as string) || block(key), this.delete(key)!);
+        this.set((hash[key] as string) || block(key), this.delete(key));
       }
     } else {
-      for (const key of [...this.keys()]) this.set((hash[key] as string) || key, this.delete(key)!);
+      for (const key of [...this.keys()]) this.set((hash[key] as string) || key, this.delete(key));
     }
 
     return this;
@@ -551,7 +493,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   transformValues<W = V>(fn: (value: V) => W): HashWithIndifferentAccess<W> {
     const result = new HashWithIndifferentAccess<W>();
-    for (const [k, v] of this.data) {
+    for (const [k, v] of this) {
       result.set(k, fn(v));
     }
     return result;
@@ -562,7 +504,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   compact(): HashWithIndifferentAccess<NonNullable<V>> {
     const result = new HashWithIndifferentAccess<NonNullable<V>>();
-    for (const [k, v] of this.data) {
+    for (const [k, v] of this) {
       if (v !== null && v !== undefined) {
         result.set(k, v as NonNullable<V>);
       }
@@ -575,8 +517,8 @@ export class HashWithIndifferentAccess<V = unknown> {
    * true when it matches at least one `[key, value]` pair.
    */
   any(fn?: (pair: [string, V]) => boolean): boolean {
-    if (!fn) return this.data.size > 0;
-    for (const pair of this.data) {
+    if (!fn) return this.size > 0;
+    for (const pair of this) {
       if (fn(pair)) return true;
     }
     return false;
@@ -588,7 +530,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   all(fn?: (pair: [string, V]) => boolean): boolean {
     if (!fn) return true;
-    for (const pair of this.data) {
+    for (const pair of this) {
       if (!fn(pair)) return false;
     }
     return true;
@@ -599,7 +541,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * true when it matches no `[key, value]` pair.
    */
   none(fn?: (pair: [string, V]) => boolean): boolean {
-    if (!fn) return this.data.size === 0;
+    if (!fn) return this.size === 0;
     return !this.any(fn);
   }
 
@@ -608,9 +550,9 @@ export class HashWithIndifferentAccess<V = unknown> {
    * pair, not two arguments.
    */
   count(fn?: (pair: [string, V]) => boolean): number {
-    if (!fn) return this.data.size;
+    if (!fn) return this.size;
     let n = 0;
-    for (const pair of this.data) {
+    for (const pair of this) {
       if (fn(pair)) n++;
     }
     return n;
@@ -621,7 +563,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * pair, and the matching pair is returned.
    */
   find(fn: (pair: [string, V]) => boolean): [string, V] | undefined {
-    for (const pair of this.data) {
+    for (const pair of this) {
       if (fn(pair)) return pair;
     }
     return undefined;
@@ -632,7 +574,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    * pair.
    */
   each(fn: (pair: [string, V]) => void): this {
-    for (const pair of this.data) {
+    for (const pair of this) {
       fn(pair);
     }
     return this;
@@ -644,7 +586,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   map<T>(fn: (pair: [string, V]) => T): T[] {
     const result: T[] = [];
-    for (const pair of this.data) {
+    for (const pair of this) {
       result.push(fn(pair));
     }
     return result;
@@ -655,8 +597,8 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   assoc(key: string): [string, V] | undefined {
     key = this.convertKey(key);
-    if (this.data.has(key)) {
-      return [key, this.data.get(key)!];
+    if (super.has(key)) {
+      return [key, super.get(key)!];
     }
     return undefined;
   }
@@ -666,7 +608,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   invert(): HashWithIndifferentAccess<string> {
     const result = new HashWithIndifferentAccess<string>();
-    for (const [k, v] of this.data) {
+    for (const [k, v] of this) {
       result.set(String(v), k);
     }
     return result;
@@ -676,19 +618,29 @@ export class HashWithIndifferentAccess<V = unknown> {
    * Mirrors `dig` (hash_with_indifferent_access.rb:208-211) — the first key is
    * converted, then `super` is `rb_hash_dig` (`vendor/ruby/hash.c:4627`),
    * whose `rb_hash_aref` yields to the default_proc on a miss the way `[]`
-   * does. Its remaining keys go to `rb_obj_dig`, whose Array arm and
-   * `"%s does not have #dig method"` TypeError (`vendor/ruby/object.c:3899`)
-   * are `hwia-dig-variadic-arm-and-rb-obj-dig-typeerror`.
+   * does, and whose remaining keys go to `rb_obj_dig`
+   * (`vendor/ruby/object.c:3906`): `nil` ends the walk, an Array is indexed
+   * through `rb_ary_at`, an object that answers `dig` is handed the rest, and
+   * anything else is `no_dig_method`'s TypeError (`object.c:3897-3900`).
    */
-  dig(key: string, ...rest: string[]): unknown {
-    const val = this.get(key);
-    if (rest.length === 0) return val;
-    if (val === null || val === undefined) return undefined;
-    if (val instanceof HashWithIndifferentAccess) {
-      return val.dig(rest[0], ...rest.slice(1));
+  dig(key: string, ...identifiers: (string | number)[]): unknown {
+    let obj: unknown = this.get(key);
+    for (let i = 0; i < identifiers.length; i++) {
+      const identifier = identifiers[i];
+      if (obj == null) return undefined;
+      if (Array.isArray(obj)) {
+        const index = Number(identifier);
+        obj = obj[index < 0 ? obj.length + index : index];
+        continue;
+      }
+      const dig = (obj as { dig?: unknown }).dig;
+      if (typeof dig === "function") {
+        return (dig as (...args: (string | number)[]) => unknown).apply(obj, identifiers.slice(i));
+      }
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new TypeError(`${rubyClassName(obj)} does not have #dig method`);
     }
-    // For plain objects, fall through
-    return undefined;
+    return obj;
   }
 
   /**
@@ -696,7 +648,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   toParam(): string {
     const parts: string[] = [];
-    const sorted = [...this.data.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const sorted = [...this.entries()].sort(([a], [b]) => a.localeCompare(b));
     for (const [k, v] of sorted) {
       parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`);
     }
@@ -772,7 +724,7 @@ export class HashWithIndifferentAccess<V = unknown> {
    */
   toHash(): AnyObject {
     const copy: AnyObject = {};
-    for (const [k, v] of this.data) {
+    for (const [k, v] of this) {
       copy[k] = this.convertValueToHash(v);
     }
     return copy;

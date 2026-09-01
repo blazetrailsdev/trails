@@ -114,8 +114,8 @@ export class Errors<TBase extends object = object> {
   }
 
   get messages(): Map<string, readonly string[]> {
-    const hash = this.toHash();
-    hash.get = (attribute: string) => Map.prototype.get.call(hash, attribute) ?? EMPTY_ARRAY;
+    const hash: Hash<string, readonly string[]> = this.toHash();
+    hash.setDefault(EMPTY_ARRAY);
     return hash;
   }
 
@@ -241,18 +241,17 @@ export class Errors<TBase extends object = object> {
     return this._errors.length > 0;
   }
 
-  toHash(fullMessages = false): Map<string, string[]> {
-    const map = new Map<string, string[]>();
-    for (const error of this._errors) {
-      const msg = fullMessages ? error.fullMessage : error.message;
-      const existing = map.get(error.attribute);
-      if (existing) {
-        existing.push(msg);
-      } else {
-        map.set(error.attribute, [msg]);
-      }
+  toHash(fullMessages = false): Hash<string, string[]> {
+    const messageMethod = fullMessages ? "fullMessage" : "message";
+    const hash = new Hash<string, string[]>();
+    for (const [attribute, errors] of Object.entries(
+      transformValues(this.groupByAttribute(), (errors) =>
+        errors.map((error) => error[messageMethod]),
+      ),
+    )) {
+      hash.set(attribute, errors);
     }
-    return map;
+    return hash;
   }
 
   toArray(): string[] {

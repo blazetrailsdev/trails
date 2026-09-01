@@ -6,17 +6,11 @@
  * replacement in Rack middleware.
  */
 
-export class Headers {
-  private _data: Map<string, string> = new Map();
-  private _default: string | undefined;
-  private _defaultProc: ((h: Headers, key: string) => string | null) | undefined;
+import { type DefaultProc, Hash } from "@blazetrails/ruby-compat";
 
-  constructor(defaultValue?: string | ((h: Headers, key: string) => string | null)) {
-    if (typeof defaultValue === "function") {
-      this._defaultProc = defaultValue;
-    } else {
-      this._default = defaultValue;
-    }
+export class Headers extends Hash<string, string> {
+  constructor(defaultValue?: string | DefaultProc<string, string>) {
+    super(defaultValue);
   }
 
   /**
@@ -53,121 +47,60 @@ export class Headers {
 
   // --- Core accessors ---
 
-  get(key: string): string | undefined | null {
-    const k = this._key(key);
-    if (this._data.has(k)) return this._data.get(k)!;
-    if (this._defaultProc) return this._defaultProc(this, k);
-    if (this._default !== undefined) return this._default;
-    return undefined;
+  override get(key: string): string | undefined {
+    return super.get(this._key(key));
   }
 
-  set(key: string, value: string): string {
-    this._data.set(this._key(key), value);
-    return value;
+  override set(key: string, value: string): this {
+    super.set(this._key(key), value);
+    return this;
   }
 
-  store(key: string, value: string): string {
+  store(key: string, value: string): this {
     return this.set(key, value);
   }
 
-  has(key: string): boolean {
-    return this._data.has(this._key(key));
+  override has(key: string): boolean {
+    return super.has(this._key(key));
   }
 
   hasKey(key: string): boolean {
     return this.has(key);
   }
 
-  delete(key: string): string | undefined {
-    const k = this._key(key);
-    const val = this._data.get(k);
-    this._data.delete(k);
-    return val;
-  }
-
-  clear(): void {
-    this._data.clear();
-  }
-
-  get size(): number {
-    return this._data.size;
+  override delete(key: string): string | undefined {
+    return super.delete(this._key(key));
   }
 
   get length(): number {
-    return this._data.size;
+    return this.size;
   }
 
   get empty(): boolean {
-    return this._data.size === 0;
-  }
-
-  // --- Default ---
-
-  get default(): string | undefined {
-    return this._default ?? undefined;
-  }
-
-  set default(val: string | undefined) {
-    this._default = val;
-    this._defaultProc = undefined;
-  }
-
-  /**
-   * `Hash#default_proc` (`rb_hash_default_proc`, `vendor/ruby/hash.c:2285`) and
-   * its paired `default=` / `default_proc=` mutual clearing above.
-   *
-   * @noRailsEquivalent PERMANENT — inherited from Ruby's `Hash`, which
-   * `Rack::Headers` subclasses. The copy of `@blazetrails/ruby-compat`'s `Hash`
-   * seat is a genuine TS shortcoming and NOT convergeable by delegation:
-   * `rb_hash_default_value` (`vendor/ruby/hash.c:2068`) yields the RECEIVER to
-   * the proc, so a held `Hash` would hand the block the inner seat where Ruby
-   * hands it this object, and inheriting the seat means inheriting `Hash`'s
-   * `Map` storage that this class already replaces with its own
-   * case-normalizing one. Recorded at BOTH hosts that carry the copy — see
-   * `activesupport/src/hash-with-indifferent-access.ts`.
-   */
-  get defaultProc(): ((h: Headers, key: string) => string | null) | undefined {
-    return this._defaultProc;
-  }
-
-  set defaultProc(fn: ((h: Headers, key: string) => string | null) | undefined) {
-    this._defaultProc = fn;
-    this._default = undefined;
+    return this.size === 0;
   }
 
   // --- Iteration ---
 
-  forEach(fn: (key: string, value: string) => void): void {
-    for (const [k, v] of this._data) {
+  each(fn: (key: string, value: string) => void): void {
+    for (const [k, v] of this) {
       fn(k, v);
     }
   }
 
-  each(fn: (key: string, value: string) => void): void {
-    this.forEach(fn);
-  }
-
   eachKey(fn: (key: string) => void): void {
-    for (const k of this._data.keys()) {
+    for (const k of this.keys()) {
       fn(k);
     }
   }
 
   eachValue(fn: (value: string) => void): void {
-    for (const v of this._data.values()) {
+    for (const v of this.values()) {
       fn(v);
     }
   }
 
   // --- Keys/Values ---
-
-  keys(): string[] {
-    return [...this._data.keys()];
-  }
-
-  values(): string[] {
-    return [...this._data.values()];
-  }
 
   valuesAt(...keys: string[]): (string | undefined | null)[] {
     return keys.map((k) => this.get(k));
@@ -176,12 +109,12 @@ export class Headers {
   // --- Conversion ---
 
   toArray(): [string, string][] {
-    return [...this._data.entries()];
+    return [...this.entries()];
   }
 
   toHash(): Record<string, string> {
     const obj: Record<string, string> = {};
-    for (const [k, v] of this._data) {
+    for (const [k, v] of this) {
       obj[k] = v;
     }
     return obj;
@@ -196,7 +129,7 @@ export class Headers {
   fetch(key: string, ...args: any[]): string {
     if (args.length > 1) throw new Error("ArgumentError: wrong number of arguments");
     const k = this._key(key);
-    if (this._data.has(k)) return this._data.get(k)!;
+    if (this.has(k)) return this.get(k)!;
     if (args.length === 1) {
       if (typeof args[0] === "function") return args[0](k);
       return args[0];
@@ -207,8 +140,8 @@ export class Headers {
   fetchValues(...a: string[]): string[] {
     return a.map((k) => {
       const lk = this._key(k);
-      if (!this._data.has(lk)) throw new Error(`KeyError: key not found: ${k}`);
-      return this._data.get(lk)!;
+      if (!this.has(lk)) throw new Error(`KeyError: key not found: ${k}`);
+      return this.get(lk)!;
     });
   }
 
@@ -221,26 +154,26 @@ export class Headers {
 
   assoc(key: string): [string, string] | undefined {
     const k = this._key(key);
-    if (this._data.has(k)) return [k, this._data.get(k)!];
+    if (this.has(k)) return [k, this.get(k)!];
     return undefined;
   }
 
   rassoc(value: string): [string, string] | undefined {
-    for (const [k, v] of this._data) {
+    for (const [k, v] of this) {
       if (v === value) return [k, v];
     }
     return undefined;
   }
 
   key(value: string): string | undefined {
-    for (const [k, v] of this._data) {
+    for (const [k, v] of this) {
       if (v === value) return k;
     }
     return undefined;
   }
 
   hasValue(value: string): boolean {
-    for (const v of this._data.values()) {
+    for (const v of this.values()) {
       if (v === value) return true;
     }
     return false;
@@ -256,10 +189,10 @@ export class Headers {
     const entries = hash instanceof Headers ? hash.toArray() : Object.entries(hash);
     for (const [k, v] of entries) {
       const lk = result._key(k);
-      if (fn && result._data.has(lk)) {
-        result._data.set(lk, fn(lk, result._data.get(lk)!, v));
+      if (fn && result.has(lk)) {
+        result.set(lk, fn(lk, result.get(lk)!, v));
       } else {
-        result._data.set(lk, v);
+        result.set(lk, v);
       }
     }
     return result;
@@ -272,10 +205,10 @@ export class Headers {
     const entries = hash instanceof Headers ? hash.toArray() : Object.entries(hash);
     for (const [k, v] of entries) {
       const lk = this._key(k);
-      if (fn && this._data.has(lk)) {
-        this._data.set(lk, fn(lk, this._data.get(lk)!, v));
+      if (fn && this.has(lk)) {
+        this.set(lk, fn(lk, this.get(lk)!, v));
       } else {
-        this._data.set(lk, v);
+        this.set(lk, v);
       }
     }
     return this;
@@ -297,17 +230,17 @@ export class Headers {
 
   select(fn: (key: string, value: string) => boolean): Headers {
     const result = new Headers();
-    for (const [k, v] of this._data) {
-      if (fn(k, v)) result._data.set(k, v);
+    for (const [k, v] of this) {
+      if (fn(k, v)) result.set(k, v);
     }
     return result;
   }
 
   selectInPlace(fn: (key: string, value: string) => boolean): Headers | null {
     let changed = false;
-    for (const [k, v] of [...this._data]) {
+    for (const [k, v] of [...this]) {
       if (!fn(k, v)) {
-        this._data.delete(k);
+        this.delete(k);
         changed = true;
       }
     }
@@ -316,17 +249,17 @@ export class Headers {
 
   reject(fn: (key: string, value: string) => boolean): Headers {
     const result = new Headers();
-    for (const [k, v] of this._data) {
-      if (!fn(k, v)) result._data.set(k, v);
+    for (const [k, v] of this) {
+      if (!fn(k, v)) result.set(k, v);
     }
     return result;
   }
 
   rejectInPlace(fn: (key: string, value: string) => boolean): Headers | null {
     let changed = false;
-    for (const [k, v] of [...this._data]) {
+    for (const [k, v] of [...this]) {
       if (fn(k, v)) {
-        this._data.delete(k);
+        this.delete(k);
         changed = true;
       }
     }
@@ -334,32 +267,32 @@ export class Headers {
   }
 
   deleteIf(fn: (key: string, value: string) => boolean): Headers {
-    for (const [k, v] of [...this._data]) {
-      if (fn(k, v)) this._data.delete(k);
+    for (const [k, v] of [...this]) {
+      if (fn(k, v)) this.delete(k);
     }
     return this;
   }
 
   keepIf(fn: (key: string, value: string) => boolean): Headers {
-    for (const [k, v] of [...this._data]) {
-      if (!fn(k, v)) this._data.delete(k);
+    for (const [k, v] of [...this]) {
+      if (!fn(k, v)) this.delete(k);
     }
     return this;
   }
 
   compact(): Headers {
     const result = new Headers();
-    for (const [k, v] of this._data) {
-      if (v != null) result._data.set(k, v);
+    for (const [k, v] of this) {
+      if (v != null) result.set(k, v);
     }
     return result;
   }
 
   compactInPlace(): Headers | null {
     let changed = false;
-    for (const [k, v] of [...this._data]) {
+    for (const [k, v] of [...this]) {
       if (v == null) {
-        this._data.delete(k);
+        this.delete(k);
         changed = true;
       }
     }
@@ -370,7 +303,7 @@ export class Headers {
     const result = new Headers();
     for (const key of a) {
       const k = this._key(key);
-      if (this._data.has(k)) result._data.set(k, this._data.get(k)!);
+      if (this.has(k)) result.set(k, this.get(k)!);
     }
     return result;
   }
@@ -378,8 +311,8 @@ export class Headers {
   except(...a: string[]): Headers {
     const exclude = new Set(a.map((k) => this._key(k)));
     const result = new Headers();
-    for (const [k, v] of this._data) {
-      if (!exclude.has(k)) result._data.set(k, v);
+    for (const [k, v] of this) {
+      if (!exclude.has(k)) result.set(k, v);
     }
     return result;
   }
@@ -388,32 +321,32 @@ export class Headers {
 
   transformValues(fn: (value: string) => string): Headers {
     const result = new Headers();
-    for (const [k, v] of this._data) {
-      result._data.set(k, fn(v));
+    for (const [k, v] of this) {
+      result.set(k, fn(v));
     }
     return result;
   }
 
   transformValuesInPlace(fn: (value: string) => string): Headers {
-    for (const [k, v] of this._data) {
-      this._data.set(k, fn(v));
+    for (const [k, v] of this) {
+      this.set(k, fn(v));
     }
     return this;
   }
 
   transformKeys(fn: (key: string) => string): Headers {
     const result = new Headers();
-    for (const [k, v] of this._data) {
-      result._data.set(result._key(fn(k)), v);
+    for (const [k, v] of this) {
+      result.set(result._key(fn(k)), v);
     }
     return result;
   }
 
   transformKeysInPlace(fn: (key: string) => string): Headers {
-    const entries = [...this._data];
-    this._data.clear();
+    const entries = [...this];
+    this.clear();
     for (const [k, v] of entries) {
-      this._data.set(this._key(fn(k)), v);
+      this.set(this._key(fn(k)), v);
     }
     return this;
   }
@@ -424,8 +357,8 @@ export class Headers {
 
   invert(): Headers {
     const result = new Headers();
-    for (const [k, v] of this._data) {
-      result._data.set(result._key(v), k);
+    for (const [k, v] of this) {
+      result.set(result._key(v), k);
     }
     return result;
   }
@@ -434,7 +367,7 @@ export class Headers {
 
   flatten(_depth = 1): string[] {
     const result: string[] = [];
-    for (const [k, v] of this._data) {
+    for (const [k, v] of this) {
       result.push(k, v);
     }
     return result;
@@ -446,18 +379,18 @@ export class Headers {
   }
 
   shift(): [string, string] | undefined {
-    const first = this._data.entries().next();
+    const first = this.entries().next();
     if (first.done) return undefined;
-    this._data.delete(first.value[0]);
+    this.delete(first.value[0]);
     return first.value;
   }
 
   dup(): Headers {
     const h = new Headers();
-    h._default = this._default;
-    h._defaultProc = this._defaultProc;
-    for (const [k, v] of this._data) {
-      h._data.set(k, v);
+    if (this.defaultProc()) h.setDefaultProc(this.defaultProc());
+    else h.setDefault(this.default());
+    for (const [k, v] of this) {
+      h.set(k, v);
     }
     return h;
   }
@@ -475,8 +408,8 @@ export class Headers {
   }
 
   inspect(): string {
-    if (this._data.size === 0) return "{}";
-    const pairs = [...this._data].map(([k, v]) => `"${k}"=>"${v}"`);
+    if (this.size === 0) return "{}";
+    const pairs = [...this].map(([k, v]) => `"${k}"=>"${v}"`);
     return `{${pairs.join(", ")}}`;
   }
 

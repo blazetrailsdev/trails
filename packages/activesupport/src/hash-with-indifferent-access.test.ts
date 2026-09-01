@@ -159,8 +159,8 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("dig returns undefined for missing keys", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.dig("a", "b")).toBeUndefined();
     expect(h.dig("z")).toBeUndefined();
+    expect(h.dig("z", "y")).toBeUndefined();
   });
 
   // slice
