@@ -53,4 +53,17 @@ describe("StringIO", () => {
     io.close();
     expect(io.closed).toBe(true);
   });
+  it("round-trips an arbitrary byte sequence through read", () => {
+    const bytes = Array.from({ length: 256 }, (_, i) => i);
+    const buffer = String.fromCharCode(...bytes);
+    const io = new StringIO(buffer);
+
+    expect(io.size).toBe(256);
+    const read = io.read() as string;
+    expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(bytes);
+  });
+
+  it("counts size in bytes, not UTF-16 code units", () => {
+    expect(new StringIO("\u00c3\u00a9").size).toBe(2);
+  });
 });

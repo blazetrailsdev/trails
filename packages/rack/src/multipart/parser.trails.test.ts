@@ -5,10 +5,14 @@ import { QueryParser } from "../query-parser.js";
 const qp = QueryParser.makeDefault(100);
 
 /**
- * Ruby tags a part's body with the charset and leaves its bytes alone, so a
- * Rack spec asserts `.encoding`. A JS string carries no encoding, so what
- * `tag_multipart_encoding` (`rack/multipart/parser.rb:456-483`) is observably
- * doing here is the decode itself.
+ * Ruby tags a part's body with the charset and leaves its bytes alone, so
+ * Rack's specs assert `.encoding` (`spec_multipart.rb:93` "sets US_ASCII
+ * encoding based on charset", `:105` "sets BINARY encoding for invalid
+ * charsets"). A JS string carries no encoding tag, and both of those specs'
+ * fixtures hold the ASCII body "contents", which every candidate encoding
+ * decodes identically — so ported literally they would pass against a
+ * `tag_multipart_encoding` that did nothing at all. What the charset
+ * observably selects in TS is the decode, so that is what these assert.
  */
 function parseBody(body: string) {
   let done = false;

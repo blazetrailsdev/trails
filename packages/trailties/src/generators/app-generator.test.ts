@@ -44,6 +44,24 @@ function exists(...segments: string[]) {
   return fs.existsSync(appPath(...segments));
 }
 
+/**
+ * Mirrors `Rails::Generators::Testing::Assertions#assert_file`
+ * (`railties/lib/rails/generators/testing/assertions.rb:25-39`): asserts the
+ * file exists, then compares each extra argument against its content — a
+ * RegExp matches, a string equals.
+ */
+function assertFile(root: string, relative: string, ...contents: (RegExp | string)[]) {
+  const absolute = path.join(tmpDir, root, relative);
+  expect(fs.existsSync(absolute), `Expected file ${JSON.stringify(relative)} to exist`).toBe(true);
+
+  if (contents.length === 0) return;
+  const read = fs.readFileSync(absolute, "utf-8");
+  for (const content of contents) {
+    if (typeof content === "string") expect(read).toBe(content);
+    else expect(read).toMatch(content);
+  }
+}
+
 describe("AppGenerator", () => {
   it("creates application directory structure", async () => {
     await makeGen().run();
@@ -419,11 +437,7 @@ describe("AppGenerator", () => {
       database: "sqlite",
     });
     await gen.run();
-    const applicationTs = fs.readFileSync(
-      path.join(tmpDir, "app-dir", "config", "application.ts"),
-      "utf-8",
-    );
-    expect(applicationTs).toMatch(/^export class MyApp /m);
+    assertFile("app-dir", "config/application.ts", /^export class MyApp /m);
   });
 
   it("types drawRoutes against Mapper", async () => {
