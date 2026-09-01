@@ -61,6 +61,7 @@ export {
   deleteSetCookieHeaderBang,
   unescape,
 } from "./utils.js";
+export { Headers } from "./headers.js";
 export { BodyProxy } from "./body-proxy.js";
 export { Request, Helpers as RequestHelpers } from "./request.js";
 export { Response, ResponseRaw } from "./response.js";

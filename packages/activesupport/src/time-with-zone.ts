@@ -20,10 +20,10 @@ import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
 import { zone as timeZone, findZoneBang } from "./time-zone-config.js";
-import { Temporal } from "@blazetrails/date";
+import { DateTime, Temporal } from "@blazetrails/date";
 import { instantFrom } from "./temporal.js";
 import { Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rational } from "@blazetrails/ruby-compat";
 import { Encoding } from "./json/encoding.js";
 import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
 import { advance as timeAdvance } from "./time-ext.js";
@@ -116,7 +116,12 @@ function nsDiffToSeconds(diffNs: bigint): number {
 const SECONDS_PER_DAY = 86400;
 
 /** Ruby's `Time`, whichever shape carries it. */
-type TimeLike = Time | Temporal.Instant | Temporal.PlainDateTime | Temporal.PlainDate;
+type TimeLike =
+  | Time
+  | Temporal.Instant
+  | Temporal.PlainDateTime
+  | Temporal.PlainDate
+  | Temporal.ZonedDateTime;
 
 /**
  * The dispatch Ruby gets for free: an undefined method on a `TimeWithZone`
@@ -241,16 +246,15 @@ export class TimeWithZone {
 
   /**
    * Mirrors: `ActiveSupport::TimeWithZone#incorporate_utc_offset`
-   * (time_with_zone.rb:562-568). Ruby's `Date` advances in DAYS, so its arm
-   * spells the offset as the day fraction `Rational(offset, SECONDS_PER_DAY)`;
-   * a wall clock carrying that date advances by the seconds that fraction
-   * names. The `else` arm is Ruby's `time + offset` (:567) directly, over
-   * `Time#plus`.
+   * (time_with_zone.rb:562-568). The `Date` arm's receiver is already a
+   * `::Date` in Ruby; here the wall clock is a `Temporal.PlainDate`, so it is
+   * carried onto the gem-shaped `DateTime` — `Date#+`'s host — for the
+   * `Rational(offset, SECONDS_PER_DAY)` day fraction of :564, and back.
    */
   private _incorporateUtcOffset(time: Time | Temporal.PlainDate, offset: number): Time {
     if (time instanceof Temporal.PlainDate) {
       return this._transferTimeValuesToUtcConstructor(
-        time.toPlainDateTime().add({ seconds: offset }),
+        new DateTime(time.toPlainDateTime()).plus(rational(offset, SECONDS_PER_DAY)).toDatetime(),
       );
     }
     return time.plus(offset);
@@ -292,7 +296,9 @@ export class TimeWithZone {
           ? time.toZonedDateTimeISO("UTC").toPlainDateTime()
           : time instanceof Temporal.PlainDate
             ? time.toPlainDateTime()
-            : time;
+            : time instanceof Temporal.ZonedDateTime
+              ? time.toPlainDateTime()
+              : time;
     return Time.utc(
       values.year,
       values.month,

@@ -498,7 +498,7 @@ describe("ResponseTest", () => {
     const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
     const [status, headers, body] = res.toRack() as [number, Record<string, string>, string[]];
     expect(status).toBe(404);
-    expect(headers["Content-Type"]).toBe("text/plain");
+    expect(headers["content-type"]).toBe("text/plain");
     expect(body).toEqual(["Not Found"]);
   });
 

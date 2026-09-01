@@ -95,7 +95,7 @@ describe("Redirect", () => {
       "rack.url_scheme": "http",
     });
     expect(status).toBe(302);
-    expect(headers["Location"]).toBe("http://example.com/x");
+    expect(headers["location"]).toBe("http://example.com/x");
   });
 
   it("redirect?() is true", () => {

@@ -5,7 +5,7 @@
  */
 
 import { getFs } from "@blazetrails/activesupport";
-import { deleteSetCookieHeaderBang, setCookieHeader, unescape } from "@blazetrails/rack";
+import { deleteSetCookieHeaderBang, Headers, setCookieHeader, unescape } from "@blazetrails/rack";
 import type { CookieExpires } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
 import {
@@ -34,11 +34,9 @@ import {
   parameterFilteredLocation as _parameterFilteredLocation,
 } from "./filter-redirect.js";
 
-// Lowercase to match the rest of this file's header conventions; setHeader
-// is case-insensitive but call sites read `headers["content-type"]` directly.
-const CONTENT_TYPE = "content-type";
-// Rails spells this `SET_COOKIE = "Set-Cookie"` (response.rb:85); lowercase
-// here for the same reason as CONTENT_TYPE above.
+/** Rails: `CONTENT_TYPE = "Content-Type"` (response.rb:84). */
+const CONTENT_TYPE = "Content-Type";
+/** Rack: `SET_COOKIE = 'set-cookie'` (rack/lib/rack/constants.rb:24). */
 const SET_COOKIE = "set-cookie";
 const NO_CONTENT_CODES = [100, 101, 102, 103, 204, 205, 304] as const;
 const CONTENT_TYPE_PARSER =
@@ -98,12 +96,42 @@ export class ResponseBuffer {
   }
 }
 
+/**
+ * `Response#headers` is a `Rack::Headers` (response.rb:174), whose `[]`, `[]=`
+ * and `delete` downcase the key (vendor/rack/lib/rack/headers.rb:110-129) — so
+ * case-insensitivity is a property of the SEAT and every reader on top of it is
+ * a plain delegation. Ruby gets index access from `Hash`; the ported
+ * {@link Headers} is a `Map`, and a JS object's index operators are only
+ * interceptable through a `Proxy`, so this is the index-access face of the seat
+ * that consumers of {@link Response#headers} read as a plain header hash.
+ */
+function headersIndexView(headers: Headers): Record<string, string> {
+  return new Proxy(Object.create(null) as Record<string, string>, {
+    get: (_t, key) => (typeof key === "string" ? headers.get(key) : undefined),
+    set: (_t, key, value) => {
+      headers.set(String(key), value);
+      return true;
+    },
+    has: (_t, key) => typeof key === "string" && headers.hasKey(key),
+    deleteProperty: (_t, key) => {
+      headers.delete(String(key));
+      return true;
+    },
+    ownKeys: () => [...headers.keys()],
+    getOwnPropertyDescriptor: (_t, key) =>
+      typeof key === "string" && headers.hasKey(key)
+        ? { value: headers.get(key), enumerable: true, configurable: true, writable: true }
+        : undefined,
+  });
+}
+
 export class Response {
   /** Rails: `cattr_accessor :default_charset, default: "utf-8"`. */
   static defaultCharset = "utf-8";
 
   private _status: number;
-  private _headers: Record<string, string>;
+  private _headers: Headers;
+  private _headersView: Record<string, string>;
   private _body: string[];
   private _committed = false;
   private _charset: string | undefined;
@@ -118,7 +146,11 @@ export class Response {
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
     this._status = status;
-    this._headers = { ...headers };
+    this._headers = new Headers();
+    for (const [key, value] of Object.entries(headers)) {
+      this._headers.set(key, value);
+    }
+    this._headersView = headersIndexView(this._headers);
     this._body = [...body];
   }
 
@@ -168,42 +200,28 @@ export class Response {
   // --- Headers ---
 
   get headers(): Record<string, string> {
-    return this._headers;
+    return this._headersView;
   }
 
+  /** Mirrors: `get_header` (response.rb:193). */
   getHeader(key: string): string | undefined {
-    const direct = this._headers[key] ?? this._headers[key.toLowerCase()];
-    if (direct !== undefined) return direct;
-    const lower = key.toLowerCase();
-    for (const k of Object.keys(this._headers)) {
-      if (k.toLowerCase() === lower) return this._headers[k];
-    }
-    return undefined;
+    return this._headers.get(key);
   }
 
+  /** Mirrors: `set_header` (response.rb:194). */
   setHeader(key: string, v: string): void {
-    // Headers are logically case-insensitive (Rack response semantics).
-    // Clear any other-case entry so reads through `getHeader` / accessors
-    // can't return a stale value written under a different case.
-    const lower = key.toLowerCase();
-    if (lower !== key && lower in this._headers) delete this._headers[lower];
-    for (const k of Object.keys(this._headers)) {
-      if (k !== key && k.toLowerCase() === lower) delete this._headers[k];
-    }
-    this._headers[key] = v;
+    this._headers.set(key, v);
   }
 
+  /** Mirrors: `delete_header` (response.rb:195). */
   deleteHeader(key: string): void {
-    const lower = key.toLowerCase();
-    for (const k of Object.keys(this._headers)) {
-      if (k === key || k.toLowerCase() === lower) delete this._headers[k];
-    }
+    this._headers.delete(key);
   }
 
   // --- Content type ---
 
   get contentType(): string | undefined {
-    const ct = this._headers["content-type"] ?? this._headers["Content-Type"];
+    const ct = this._headers.get(CONTENT_TYPE);
     if (!ct) return undefined;
     return ct.split(";")[0].trim() || undefined;
   }
@@ -224,7 +242,7 @@ export class Response {
   }
 
   get charset(): string | undefined {
-    const ct = this._headers["content-type"] ?? this._headers["Content-Type"];
+    const ct = this._headers.get(CONTENT_TYPE);
     if (!ct) return this._charset ?? (this.constructor as typeof Response).defaultCharset;
     const match = ct.match(/charset=([^\s;]+)/i);
     return match
@@ -244,11 +262,11 @@ export class Response {
 
   set body(value: string) {
     this._body = [value];
-    this._headers["content-length"] = String(Buffer.byteLength(value, "utf-8"));
+    this._headers.set("content-length", String(Buffer.byteLength(value, "utf-8")));
   }
 
   get contentLength(): number | undefined {
-    const cl = this._headers["content-length"] ?? this._headers["Content-Length"];
+    const cl = this._headers.get("content-length");
     if (!cl) return undefined;
     return parseInt(cl, 10);
   }
@@ -274,12 +292,11 @@ export class Response {
 
   /** The value of the `Location` header. Mirrors `Response#location`. */
   get location(): string {
-    return this._headers["location"] ?? this._headers["Location"] ?? "";
+    return this._headers.get("location") ?? "";
   }
 
   set location(url: string) {
-    delete this._headers["Location"];
-    this._headers["location"] = url;
+    this._headers.set("location", url);
   }
 
   /**
@@ -358,15 +375,14 @@ export class Response {
    * @internal
    */
   get _cacheControl(): string | undefined {
-    return this._headers["cache-control"] ?? this._headers["Cache-Control"];
+    return this._headers.get("cache-control");
   }
 
   set _cacheControl(value: string | undefined) {
     if (value) {
-      this._headers["cache-control"] = value;
+      this._headers.set("cache-control", value);
     } else {
-      delete this._headers["cache-control"];
-      delete this._headers["Cache-Control"];
+      this._headers.delete("cache-control");
     }
   }
 
@@ -409,8 +425,8 @@ export class Response {
     // If a stream is installed, surface it directly so Rack::Sendfile /
     // BodyProxy can intercept via toPath()/close() rather than draining
     // the file into memory.
-    if (this.stream) return [this._status, { ...this._headers }, this.stream];
-    return [this._status, { ...this._headers }, [...this._body]];
+    if (this.stream) return [this._status, this._headers.toHash(), this.stream];
+    return [this._status, this._headers.toHash(), [...this._body]];
   }
 
   // --- Stream / body parts ---
@@ -512,20 +528,11 @@ export class Response {
 
   /** Rails: `alias_method :header, :headers`. */
   get header(): Record<string, string> {
-    return this._headers;
+    return this._headersView;
   }
-  /**
-   * Mirrors: `has_header?` (response.rb:192), `@headers.key? key` — a plain
-   * delegation, because Rails' `@headers` is a `Rack::Headers` that downcases
-   * every key on write. This file's seat preserves the caller's casing and
-   * folds at the READ site instead, so an exact-key `key?` would answer `false`
-   * for a header stored under another casing; the membership question is the
-   * one {@link Response#getHeader} already answers.
-   *
-   * @missingRailsCall key? — CONVERGEABLE converge-actiondispatch-response-header-seat
-   */
+  /** Mirrors: `has_header?` (response.rb:192), `@headers.key? key`. */
   hasHeader(key: string): boolean {
-    return this.getHeader(key) !== undefined;
+    return this._headers.hasKey(key);
   }
   get responseCode(): number {
     return this._status;
