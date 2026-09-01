@@ -25,27 +25,27 @@ describe("RackHeadersTest", () => {
   });
 
   it("default values", () => {
-    expect(fh.default).toBeUndefined();
-    expect(fh.defaultProc).toBeUndefined();
+    expect(fh.default()).toBeUndefined();
+    expect(fh.defaultProc()).toBeUndefined();
     expect(fh.get("55")).toBeUndefined();
 
     const h3 = new Headers("3");
-    expect(h3.default).toBe("3");
-    expect(h3.defaultProc).toBeUndefined();
+    expect(h3.default()).toBe("3");
+    expect(h3.defaultProc()).toBeUndefined();
     expect(h3.get("1")).toBe("3");
 
-    fh.default = "4";
-    expect(fh.default).toBe("4");
-    expect(fh.defaultProc).toBeUndefined();
+    fh.setDefault("4");
+    expect(fh.default()).toBe("4");
+    expect(fh.defaultProc()).toBeUndefined();
     expect(fh.get("55")).toBe("4");
 
     const h5 = new Headers("5");
-    expect(h5.default).toBe("5");
+    expect(h5.default()).toBe("5");
     expect(h5.get("55")).toBe("5");
 
     const hProc = new Headers((_h, _k) => "1234");
-    expect(hProc.default).toBeUndefined();
-    expect(hProc.defaultProc).toBeDefined();
+    expect(hProc.default()).toBeUndefined();
+    expect(hProc.defaultProc()).toBeDefined();
     expect(hProc.get("55")).toBe("1234");
   });
 
@@ -154,7 +154,7 @@ describe("RackHeadersTest", () => {
 
   it("fetch", () => {
     expect(() => h.fetch("1")).toThrow(/IndexError/);
-    h.default = "33";
+    h.setDefault("33");
     expect(() => h.fetch("1")).toThrow(/IndexError/); // default doesn't affect fetch
     h.set("1", "8");
     expect(h.fetch("1")).toBe("8");
@@ -320,8 +320,16 @@ describe("RackHeadersTest", () => {
     expect(fh.assoc("3")).toEqual(["3", "4"]);
   });
 
+  it("default proc is yielded the headers themselves", () => {
+    h.setDefaultProc((hash, k) => {
+      expect(hash).toBe(h);
+      return k;
+    });
+    expect(h.get("A")).toBe("a");
+  });
+
   it("default proc=", () => {
-    h.defaultProc = (_h, k) => k.repeat(2);
+    h.setDefaultProc((_h, k) => k.repeat(2));
     expect(h.get("A")).toBe("aa");
     h.set("Ab", "2");
     expect(h.get("aB")).toBe("2");

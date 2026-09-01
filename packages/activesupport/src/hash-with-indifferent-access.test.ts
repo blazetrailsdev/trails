@@ -159,8 +159,21 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("dig returns undefined for missing keys", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.dig("a", "b")).toBeUndefined();
     expect(h.dig("z")).toBeUndefined();
+    expect(h.dig("z", "y")).toBeUndefined();
+  });
+
+  it("dig with array", () => {
+    const h = new HashWithIndifferentAccess<unknown>({ a: [1, { b: 2 }] });
+    expect(h.dig("a", 0)).toBe(1);
+    expect(h.dig("a", 1, "b")).toBe(2);
+    expect(h.dig("a", -1, ":b")).toBe(2);
+    expect(h.dig("a", 5)).toBeUndefined();
+  });
+
+  it("dig raises TypeError for non-diggable intermediate", () => {
+    const h = new HashWithIndifferentAccess({ a: 1 });
+    expect(() => h.dig("a", "b")).toThrow("Number does not have #dig method");
   });
 
   // slice
@@ -864,6 +877,15 @@ describe("HashWithIndifferentAccessTest", () => {
 
     newHash.setDefault(2);
     expect(newHash.get(":non_existent")).toBe(2);
+  });
+
+  it("default proc is yielded the hash itself", () => {
+    const hash = new HashWithIndifferentAccess<unknown>();
+    hash.setDefaultProc((h, k) => {
+      expect(h).toBe(hash);
+      return k;
+    });
+    expect(hash.get(":missing")).toBe("missing");
   });
 
   it("to hash with raising default proc", () => {
