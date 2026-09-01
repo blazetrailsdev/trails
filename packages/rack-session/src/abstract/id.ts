@@ -1,4 +1,4 @@
-import { ArgumentError, getCrypto, inspect, KeyError } from "@blazetrails/activesupport";
+import { ArgumentError, getCrypto, inspect, KeyError, valuesAt } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS, Request, ResponseRaw } from "@blazetrails/rack";
 
@@ -455,9 +455,7 @@ export class Persisted {
 
   /** @internal */
   isForceOptions(options: Record<string, unknown>): boolean {
-    return ["maxAge", "renew", "drop", "defer", "expireAfter"]
-      .map((key) => options[key])
-      .some(isTruthy);
+    return valuesAt(options, "maxAge", "renew", "drop", "defer", "expireAfter").some(isTruthy);
   }
 
   /** @internal */
