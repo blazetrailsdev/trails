@@ -4049,7 +4049,7 @@ export function main() {
           // `StreamingBuffer#capture(fn)` (buffers.rb:72,126).
           let verdict = matchParamNamesAgainst(rubyParams, fileCandidates);
           if (verdict.rows.length > 0) {
-            const rubyOwner = rubyModule.split("::").pop() ?? "";
+            const rubyOwner = rubyModule.split("::").at(-1) ?? rubyModule;
             const byOwnerName = tsParamsByFileOwnerNameInPkg.get(tsFile);
             verdict = matchParamNamesAgainst(
               rubyParams,
