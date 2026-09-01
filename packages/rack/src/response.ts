@@ -371,6 +371,7 @@ export class Response {
   }
 }
 
+/** Mirrors `Rack::Response::Raw` (`rack/lib/rack/response.rb:375-401`). */
 export class ResponseRaw {
   status: number;
   headers: Record<string, any>;
@@ -411,5 +412,43 @@ export class ResponseRaw {
   }
   get isRedirect(): boolean {
     return [301, 302, 303, 307, 308].includes(this.status);
+  }
+
+  /** Mirrors `Rack::Response::Helpers#add_header` (`response.rb:219-238`). */
+  addHeader(key: string | null, value: string | null): any {
+    if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
+    if (value === null || value === undefined) return this.getHeader(key) ?? null;
+    const existing = this.getHeader(key);
+    if (existing != null) {
+      if (Array.isArray(existing)) {
+        existing.push(String(value));
+        return existing;
+      } else {
+        const arr = [existing, String(value)];
+        this.setHeader(key, arr);
+        return arr;
+      }
+    } else {
+      this.setHeader(key, String(value));
+      return String(value);
+    }
+  }
+
+  /** Mirrors `Rack::Response::Helpers#set_cookie` (`response.rb:270-272`). */
+  setCookie(key: string, value: any): void {
+    this.addHeader(SET_COOKIE, setCookieHeader(key, value));
+  }
+
+  /** Mirrors `Rack::Response::Helpers#delete_cookie` (`response.rb:274-280`). */
+  deleteCookie(key: string, value: Record<string, any> = {}): void {
+    this.setHeader(SET_COOKIE, deleteSetCookieHeaderBang(this.getHeader(SET_COOKIE), key, value));
+  }
+
+  /** Mirrors `Rack::Response::Helpers#set_cookie_header` (`response.rb:282-288`). */
+  get setCookieHeader(): any {
+    return this.getHeader(SET_COOKIE);
+  }
+  set setCookieHeader(v: any) {
+    this.setHeader(SET_COOKIE, v);
   }
 }

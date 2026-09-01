@@ -14,7 +14,7 @@
 
 import { include as includeMixin, getCrypto } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { RACK_SESSION, RACK_SESSION_OPTIONS, Utils } from "@blazetrails/rack";
+import { RACK_SESSION, RACK_SESSION_OPTIONS, ResponseRaw } from "@blazetrails/rack";
 import { Request } from "../../request.js";
 import { Session as RequestSession } from "../../request/session.js";
 
@@ -69,7 +69,7 @@ export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze(
   domain: null,
   expireAfter: null,
   secure: false,
-  httpOnly: true,
+  httponly: true,
   partitioned: false,
   defer: false,
   renew: false,
@@ -77,17 +77,6 @@ export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze(
   cookieOnly: true,
   secureRandom: true,
 });
-
-/**
- * The `Rack::Response::Raw` shape `commit_session` writes the session cookie
- * onto (`id.rb:275`).
- *
- * @noRailsEquivalent PERMANENT — structural stand-in for `Rack::Response::Raw`,
- * whose only role here is to carry `set_cookie` over the response headers.
- */
-export interface ResponseRaw {
-  setCookie(key: string, value: unknown): void;
-}
 
 /**
  * Rails: the `ActionDispatch::Request::Session::Options` a prepared session
@@ -154,7 +143,7 @@ export class Persisted {
     const req = this.makeRequest(env);
     this.prepareSession(req);
     const [status, headers, body] = await app!(req.env);
-    const res: ResponseRaw = { setCookie: (key, value) => setCookieOn(headers, key, value) };
+    const res = new ResponseRaw(status, headers);
     this.commitSession(req, res);
     return [status, headers, body];
   }
@@ -249,14 +238,10 @@ export class Persisted {
    * Rails: `security_matches?(request, options)` (`id.rb:371-374`).
    *
    * @internal
-   * @missingRailsCall ssl? — CONVERGEABLE cookie-store-runnable-in-a-real-stack:
-   * `Rack::Request#ssl?` is unported, so a `secure:` session cannot be
-   * committed over HTTPS yet. `middleware/cookies.ts:297` guards the same
-   * absent method the same way.
    */
   isSecurityMatches(request: any, options: SessionOptions): boolean {
     if (!isTruthy(options.get("secure"))) return true;
-    return request.isSsl?.() === true || this.assumeSsl === true;
+    return isTruthy(request.ssl) || this.assumeSsl === true;
   }
 
   /** Rails: `commit_session(req, res)` (`id.rb:381-414`). */
@@ -355,28 +340,6 @@ export class Persisted {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:455 cluster=actionpack-session
     throw new NotImplementedError("#delete_session not implemented");
   }
-}
-
-/**
- * `Rack::Response::Raw#set_cookie` (`id.rb:275, 425`) reaches
- * `Rack::Utils.set_cookie_header!`, which reads Ruby's symbol names —
- * `:http_only`, `:same_site`, `:max_age` — and trails' port of it keeps those
- * spellings. `Persisted`'s option hash camelCases them per the repo's Ruby→TS
- * rules, so the two meet here.
- *
- * @noRailsEquivalent PERMANENT — trails has no `Rack::Response::Raw`; this is
- * the `set_cookie` half of it, and the rename is a spelling boundary only.
- */
-function setCookieOn(headers: Record<string, string>, key: string, value: unknown): void {
-  const cookie = { ...(value as Record<string, unknown>) };
-  for (const [camel, snake] of [
-    ["httpOnly", "httponly"],
-    ["sameSite", "same_site"],
-    ["maxAge", "max_age"],
-  ]) {
-    if (camel in cookie) cookie[snake] = cookie[camel];
-  }
-  Utils.setCookieHeaderBang(headers, key, cookie);
 }
 
 /** Rails: `class PersistedSecure < Persisted` (`id.rb:460-497`). */

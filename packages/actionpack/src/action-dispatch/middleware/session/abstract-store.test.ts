@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { Request as RackRequest, ResponseRaw } from "@blazetrails/rack";
+
 import { Request } from "../../request.js";
 import { Session as RequestSession } from "../../request/session.js";
 import {
@@ -13,6 +15,7 @@ import {
   SessionRestoreError,
   StaleSessionCheck,
 } from "./abstract-store.js";
+import type { SessionOptions } from "./abstract-store.js";
 
 describe("ActionDispatch::Session::AbstractStore", () => {
   describe("Compatibility", () => {
@@ -181,6 +184,81 @@ describe("ActionDispatch::Session::AbstractStore", () => {
 
     it("extends PersistedSecure", () => {
       expect(new AbstractSecureStore()).toBeInstanceOf(PersistedSecure);
+    });
+  });
+
+  describe("#security_matches?", () => {
+    const options = (hash: Record<string, unknown>): SessionOptions =>
+      ({ get: (key: string) => hash[key] }) as unknown as SessionOptions;
+
+    it("#security_matches? returns true if secure cookie is off", () => {
+      const pers = new Persisted();
+      expect((pers as any).isSecurityMatches(new RackRequest({}), options({}))).toBe(true);
+    });
+
+    it("#security_matches? returns true if ssl is on", () => {
+      const pers = new Persisted();
+      const req = new RackRequest({});
+      req.setHeader("HTTPS", "on");
+      expect((pers as any).isSecurityMatches(req, options({ secure: true }))).toBe(true);
+    });
+
+    it("#security_matches? returns true if assume_ssl option is set", () => {
+      const req = new RackRequest({});
+      const persWithPersist = new Persisted(undefined, { assumeSsl: true });
+      expect((persWithPersist as any).isSecurityMatches(req, options({ secure: true }))).toBe(true);
+    });
+
+    it("#security_matches? returns false if secure cookie is on, but not ssl or assume_ssl", () => {
+      const pers = new Persisted();
+      expect((pers as any).isSecurityMatches(new RackRequest({}), options({ secure: true }))).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("#context", () => {
+    class SecureWritingStore extends AbstractStore {
+      readonly committed: unknown[] = [];
+      override findSession(): [unknown, Record<string, unknown>] {
+        return [new SessionId("abc"), {}];
+      }
+      override writeSession(): unknown {
+        return "written";
+      }
+      override setCookie(_request: any, response: unknown, _cookie: unknown): void {
+        this.committed.push(response);
+      }
+    }
+
+    async function runOver(urlScheme: string): Promise<SecureWritingStore> {
+      const store = new SecureWritingStore(undefined, { secure: true });
+      await (store as any).context({ "rack.url_scheme": urlScheme }, async (env: any) => {
+        env["rack.session"].set("user", 1);
+        return [200, {}, []];
+      });
+      return store;
+    }
+
+    it("commits the session through a Rack::Response::Raw over https", async () => {
+      const store = await runOver("https");
+      expect(store.committed.length).toBe(1);
+      expect(store.committed[0]).toBeInstanceOf(ResponseRaw);
+    });
+
+    it("does not commit a secure session over http", async () => {
+      expect((await runOver("http")).committed.length).toBe(0);
+    });
+
+    it("writes the session cookie onto the response headers", () => {
+      const headers: Record<string, string> = {};
+      const res = new ResponseRaw(200, headers);
+      Persisted.prototype.setCookie.call(new Persisted(), { cookies: {} }, res, {
+        value: "abc",
+        path: "/",
+        httponly: true,
+      });
+      expect(headers["set-cookie"]).toBe("rack.session=abc; path=/; httponly");
     });
   });
 
