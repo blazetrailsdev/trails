@@ -245,6 +245,9 @@ export function dup(
  */
 export type DefaultProc<K, V> = (hash: Hash<K, V>, key: K) => V;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type MapBoundaryReturn = any;
+
 /**
  * A Ruby `Hash` carrying the `default` / `default_proc` seat a plain JS object
  * has nowhere to put: `Hash.new(obj)` stores a value returned for every miss,
@@ -284,50 +287,6 @@ export class Hash<K, V> extends Map<K, V> {
   override get(key: K): V | undefined {
     if (super.has(key)) return super.get(key);
     return this.default(key);
-  }
-
-  /**
-   * `Hash#delete` (`vendor/ruby/hash.c:2441` `rb_hash_delete_m`): returns the
-   * deleted value, the block's result for a key that was not there, `nil`
-   * otherwise. `Map#delete` returns a boolean instead, and a TS override may
-   * not narrow a `boolean` return, so the declared return is `any` — the
-   * dynamic return Ruby has here.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/hash.c:2441`).
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override delete(key: K, block?: (key: K) => V): any {
-    if (super.has(key)) {
-      const val = super.get(key);
-      super.delete(key);
-      return val;
-    }
-    if (block) return block(key);
-    return undefined;
-  }
-
-  /**
-   * `Hash#keys` (`vendor/ruby/hash.c:3584` `rb_hash_keys`): an Array of the
-   * keys, where `Map#keys` is an iterator. A TS override may not narrow that
-   * return, so the declared return is `any`, the same Map boundary `delete`
-   * meets.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#keys` (`vendor/ruby/hash.c:3584`).
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override keys(): any {
-    return [...super.keys()];
-  }
-
-  /**
-   * `Hash#values` (`vendor/ruby/hash.c:3628` `rb_hash_values`): an Array of the
-   * values, where `Map#values` is an iterator.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#values` (`vendor/ruby/hash.c:3628`).
-   */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  override values(): any {
-    return [...super.values()];
   }
 
   /**
@@ -387,5 +346,46 @@ export class Hash<K, V> extends Map<K, V> {
     }
     this._default = undefined;
     this._defaultProc = proc;
+  }
+
+  /**
+   * `Hash#delete` (`vendor/ruby/hash.c:2441` `rb_hash_delete_m`): returns the
+   * deleted value, the block's result for a key that was not there, `nil`
+   * otherwise. `Map#delete` returns a boolean instead, and a TS override may
+   * not narrow a `boolean` return, so the declared return is
+   * `MapBoundaryReturn` — the dynamic return Ruby has here.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/hash.c:2441`).
+   */
+  override delete(key: K, block?: (key: K) => V): MapBoundaryReturn {
+    if (super.has(key)) {
+      const val = super.get(key);
+      super.delete(key);
+      return val;
+    }
+    if (block) return block(key);
+    return undefined;
+  }
+
+  /**
+   * `Hash#keys` (`vendor/ruby/hash.c:3584` `rb_hash_keys`): an Array of the
+   * keys, where `Map#keys` is an iterator. A TS override may not narrow that
+   * return, so it declares `MapBoundaryReturn`, the same Map boundary `delete`
+   * meets.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#keys` (`vendor/ruby/hash.c:3584`).
+   */
+  override keys(): MapBoundaryReturn {
+    return [...super.keys()];
+  }
+
+  /**
+   * `Hash#values` (`vendor/ruby/hash.c:3628` `rb_hash_values`): an Array of the
+   * values, where `Map#values` is an iterator.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#values` (`vendor/ruby/hash.c:3628`).
+   */
+  override values(): MapBoundaryReturn {
+    return [...super.values()];
   }
 }

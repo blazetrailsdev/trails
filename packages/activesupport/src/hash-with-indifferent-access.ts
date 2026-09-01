@@ -154,6 +154,15 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * for a key in either spelling.
    */
   key(key: string): boolean {
+    return this.has(key);
+  }
+
+  /**
+   * `key?` again under the operator spelling `Map#has` gives this class — the
+   * inherited `Hash` storage answers it, so it has to convert the key the way
+   * `key?` (hash_with_indifferent_access.rb:150-152) does.
+   */
+  override has(key: string): boolean {
     return super.has(this.convertKey(key));
   }
 

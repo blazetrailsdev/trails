@@ -30,4 +30,11 @@ describe("HashWithIndifferentAccess", () => {
     });
     expect(hash.get(":missing")).toBe("missing");
   });
+
+  it("has converts the key like key?", () => {
+    const h = new HashWithIndifferentAccess({ a: 1 });
+    expect(h.has(":a")).toBe(true);
+    expect(h.has("a")).toBe(true);
+    expect(h.has(":b")).toBe(false);
+  });
 });
