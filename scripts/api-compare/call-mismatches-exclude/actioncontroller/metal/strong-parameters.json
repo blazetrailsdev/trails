@@ -23,13 +23,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "compact_blank",
-    "call": "reject",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
     "rubyName": "compact_blank!",
     "call": "reject!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -127,13 +120,6 @@
     "package": "actioncontroller",
     "tsFile": "metal/strong-parameters.ts",
     "rubyName": "reverse_merge",
-    "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "reverse_merge",
     "call": "new_instance_with_inherited_permitted_status",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -142,7 +128,7 @@
     "tsFile": "metal/strong-parameters.ts",
     "rubyName": "reverse_merge!",
     "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "strong_parameters.rb:1043 `@parameters.merge!(other_hash.to_h) { |key, left, right| left }` — a Hash receiver, but with the conflict block, and `@blazetrails/ruby-compat`'s `update`/`mergeBang` ports only `rb_hash_update`'s blockless arm (hash.c:4028), which would let the argument win instead of the receiver."
   },
   {
     "package": "actioncontroller",

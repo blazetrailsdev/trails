@@ -69,7 +69,7 @@
     "tsFile": "system-testing/driver.ts",
     "rubyName": "register_cuprite",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "driver.rb:62 `@options.merge(window_size: @screen_size)` — a Hash receiver, but trails has no Cuprite driver: `registerCuprite` raises `\"Cuprite is not supported. Use playwright.\"` (driver.ts:98-100), so no options hash is built."
   },
   {
     "package": "actiondispatch",

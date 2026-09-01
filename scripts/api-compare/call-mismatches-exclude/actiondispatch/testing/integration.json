@@ -32,6 +32,6 @@
     "tsFile": "testing/integration.ts",
     "rubyName": "process",
     "call": "merge!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "integration.rb:268 `wrapped_headers.merge!(headers)`; the receiver is an `ActionDispatch::Http::Headers` (built by `Http::Headers.from_hash({})` on the line above), not a Hash, so the ruby-compat Hash export is the wrong port for it."
   }
 ]

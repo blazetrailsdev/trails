@@ -36,7 +36,7 @@
     "tsFile": "application.ts",
     "rubyName": "config_for",
     "call": "update",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "application.rb:180 `ActiveSupport::OrderedOptions.new.update(config)` — the receiver is an `OrderedOptions`, and trails' `configFor` supports only `\"database\"`, loading it through `loadDatabaseConfig` rather than parsing a YAML file into an options object (application.ts:278-283)."
   },
   {
     "package": "trailties",

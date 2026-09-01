@@ -9,6 +9,7 @@
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
+import { merge } from "@blazetrails/ruby-compat";
 
 export interface RedirectOptions {
   status?: number;
@@ -73,15 +74,21 @@ export class SSL {
     this.hsts = this.normalizeHstsOptions(options.hsts);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs merge — PERMANENT
+   */
   private normalizeHstsOptions(options: SSLOptions["hsts"]): Required<HSTSOptions> {
     if (options === false) {
-      return { ...SSL.defaultHstsOptions(), expires: 0 };
+      return merge<unknown>(SSL.defaultHstsOptions(), { expires: 0 }) as Required<HSTSOptions>;
     }
     if (options == null || options === true) {
       return SSL.defaultHstsOptions();
     }
-    return { ...SSL.defaultHstsOptions(), ...options };
+    return merge<unknown>(
+      SSL.defaultHstsOptions(),
+      options as Record<string, unknown>,
+    ) as Required<HSTSOptions>;
   }
 
   async call(env: RackEnv): Promise<RackResponse> {

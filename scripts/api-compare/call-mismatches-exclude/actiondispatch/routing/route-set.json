@@ -137,6 +137,6 @@
     "tsFile": "routing/route-set.ts",
     "rubyName": "url_for",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "route_set.rb:250 `default_url_options.merge options` — a Hash receiver, but trails' `urlFor` is the positional `(routeName, params, options)` shape (route-set.ts:1003-1018) and never builds Rails' merged options hash, so there is nothing here to merge onto."
   }
 ]

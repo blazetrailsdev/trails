@@ -1,7 +1,7 @@
 /** ActionController::StrongParameters Provides ActionController::Parameters, a hash-like object that controls which parameters are permitted for mass assignment. @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { KeyError, eachPair, hasKey } from "@blazetrails/ruby-compat";
+import { KeyError, eachPair, hasKey, merge } from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
 
 // --- Error classes ---
@@ -304,9 +304,10 @@ export class Parameters {
     return this;
   }
 
+  /** @missingRailsArgs merge — PERMANENT */
   reverseMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
     const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
-    return this._newWithInheritedPermitted({ ...otherData, ...this._data });
+    return this._newWithInheritedPermitted(merge(otherData, this._data));
   }
 
   /** Alias for reverseMerge */
@@ -452,7 +453,7 @@ export class Parameters {
   }
 
   compactBlank(): Parameters {
-    return this.select((_k, v) => !isBlank(v));
+    return this.reject((_k, v) => isBlank(v));
   }
 
   compactBlankBang(): this {

@@ -289,12 +289,8 @@ export class Headers {
   }
 
   replace(hash: Record<string, string> | Headers): Headers {
-    this._data.clear();
-    const entries = hash instanceof Headers ? hash.toArray() : Object.entries(hash);
-    for (const [k, v] of entries) {
-      this._data.set(this._key(k), v);
-    }
-    return this;
+    this.clear();
+    return this.update(hash);
   }
 
   // --- Filtering ---

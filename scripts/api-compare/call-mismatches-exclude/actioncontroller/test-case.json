@@ -21,15 +21,14 @@
     "package": "actioncontroller",
     "tsFile": "test-case.ts",
     "rubyName": "create",
-    "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "test-case.ts",
-    "rubyName": "params_parsers",
-    "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:merge",
+      "ref:newSession",
+      "ref:controllerClass"
+    ],
+    "reason": "test_case.rb:61 `new(default_env.merge(env), new_session, controller_class)`; trails' `TestRequest` constructor takes the env alone (test-case.ts:496-503) and the session and controller class are assigned after construction, so only the merged env is passed."
   },
   {
     "package": "actioncontroller",

@@ -34,7 +34,7 @@
  */
 
 import { camelize, getCrypto } from "@blazetrails/activesupport";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, merge } from "@blazetrails/ruby-compat";
 import { buildNestedQuery } from "@blazetrails/rack";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
@@ -498,7 +498,7 @@ export class TestRequest extends AbstractTestRequest {
     env["rack.request.cookie_hash"] = {};
     const session = TestRequest.newSession();
     env["rack.session"] = session;
-    const req = new TestRequest({ ...TestRequest.defaultEnv(), ...env });
+    const req = new TestRequest(merge(TestRequest.defaultEnv(), env));
     req._testControllerClass = controllerClass ?? null;
     return req;
   }
@@ -617,10 +617,13 @@ export class TestRequest extends AbstractTestRequest {
     this.pathParameters = pathParameters;
   }
 
-  /** @internal Mirrors Rails `TestRequest#params_parsers` (private). */
+  /**
+   * @internal Mirrors Rails `TestRequest#params_parsers` (private).
+   * @missingRailsArgs merge — PERMANENT
+   */
   override paramsParsers(): ParameterParsers {
     const base = super.paramsParsers();
-    return { ...base, ...this._customParamParsers } as ParameterParsers;
+    return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
   }
 
   /**

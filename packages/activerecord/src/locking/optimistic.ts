@@ -1,3 +1,4 @@
+import { merge } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { Type, ValueType } from "@blazetrails/activemodel";
@@ -253,7 +254,10 @@ export function initializeDup(
   if (this.constructor.lockingEnabled) _clearLockingColumn.call(this);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsArgs merge — PERMANENT
+ */
 export function _queryConstraintsHash(
   this: InstanceLockingHost,
   base: Record<string, unknown>,
@@ -261,7 +265,7 @@ export function _queryConstraintsHash(
   const ctor = this.constructor;
   if (!ctor.lockingEnabled) return base;
   const col = ctor.lockingColumn;
-  return { ...base, [col]: _lockValueForDatabase.call(this, col) };
+  return merge(base, { [col]: _lockValueForDatabase.call(this, col) });
 }
 
 /** @internal */

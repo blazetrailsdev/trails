@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { hasKey, mergeBang, slice } from "@blazetrails/ruby-compat";
 /**
  * ActionController::ParamsWrapper::Options + private mixin methods
  *
@@ -189,20 +189,18 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
  * Performs the wrap: merges wrapped hash into `request.parameters`,
  * `request.requestParameters`, and `request.filteredParameters()`.
  * @internal
+ * @missingRailsArgs merge! — PERMANENT
  */
 export function _performParameterWrapping(this: ParamsWrapperHost): void {
-  const reqParams = this.request.requestParameters;
-  const wrappedHash = _wrapParameters.call(this, reqParams);
-  const wrappedKeys = Object.keys(reqParams);
-  const filtered = this.request.filteredParameters();
-  const slice: Record<string, unknown> = {};
-  for (const k of wrappedKeys) {
-    if (Object.hasOwn(filtered, k)) slice[k] = filtered[k];
-  }
-  const wrappedFiltered = _wrapParameters.call(this, slice);
-  Object.assign(this.request.params, wrappedHash);
-  Object.assign(this.request.requestParameters, wrappedHash);
-  Object.assign(filtered, wrappedFiltered);
+  const wrappedHash = _wrapParameters.call(this, this.request.requestParameters);
+  const wrappedKeys = Object.keys(this.request.requestParameters);
+  const filteredParameters = this.request.filteredParameters();
+  const wrappedFilteredHash = _wrapParameters.call(this, slice(filteredParameters, ...wrappedKeys));
+
+  mergeBang(this.request.params, wrappedHash);
+  mergeBang(this.request.requestParameters, wrappedHash);
+
+  mergeBang(filteredParameters, wrappedFilteredHash);
 }
 
 /**

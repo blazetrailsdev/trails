@@ -1,5 +1,6 @@
 import type { RackEnv } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
+import { merge } from "@blazetrails/ruby-compat";
 
 /** @internal */
 const DEFAULT_ENV: RackEnv = {
@@ -26,9 +27,8 @@ export class TestRequest extends Request {
   }
 
   static create(env: RackEnv = {}): TestRequest {
-    const merged: RackEnv = { ...TestRequest.defaultEnv(), ...env };
-    merged["rack.request.cookie_hash"] ??= {};
-    return new TestRequest(merged);
+    env["rack.request.cookie_hash"] ??= {};
+    return new TestRequest(merge<unknown>(TestRequest.defaultEnv(), env));
   }
 
   get host(): string {

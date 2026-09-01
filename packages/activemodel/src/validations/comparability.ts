@@ -1,3 +1,5 @@
+import { except, mergeBang } from "@blazetrails/ruby-compat";
+
 export const COMPARE_CHECKS = {
   greaterThan: ":>",
   greaterThanOrEqualTo: ":>=",
@@ -12,16 +14,10 @@ export function errorOptions(
   value: unknown,
   optionValue: unknown,
 ): Record<string, unknown> {
-  const rest: Record<string, unknown> = {};
-  const compareKeys = Object.keys(COMPARE_CHECKS);
-  for (const key of Object.keys(this.options)) {
-    if (!compareKeys.includes(key)) {
-      rest[key] = this.options[key];
-    }
-  }
-  rest.count = optionValue;
-  rest.value = value;
-  return rest;
+  return mergeBang(except(this.options, ...Object.keys(COMPARE_CHECKS)), {
+    count: optionValue,
+    value: value,
+  });
 }
 
 export type CompareKey = keyof typeof COMPARE_CHECKS;
