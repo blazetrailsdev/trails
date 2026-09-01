@@ -1039,7 +1039,7 @@ export class TimeWithZone {
    * Comparable's `cmp_between` (Ruby core `compar.c`) — `cmpint` on both ends,
    * so it raises for an operand `<=>` cannot place.
    */
-  between = isBetween;
+  isBetween = isBetween;
 
   // ---------------------------------------------------------------------------
   // Temporal queries

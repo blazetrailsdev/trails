@@ -515,11 +515,14 @@ export class Response {
   get header(): Record<string, string> {
     return this._headers;
   }
+  /**
+   * Mirrors: `has_header?` (response.rb:192), `@headers.key? key`. Rails'
+   * `@headers` is a `Rack::Headers`, which downcases every key on write, so its
+   * `key?` is case-insensitive; this file normalizes at the read site instead,
+   * which is where the same fold has to happen.
+   */
   hasHeader(key: string): boolean {
     if (hasKey(this._headers, key)) return true;
-    // Rails' `@headers` is a `Rack::Headers`, which downcases every key on
-    // write, so its `key?` is case-insensitive; this file normalizes at the
-    // read site instead, which is where the same fold has to happen.
     const lower = key.toLowerCase();
     return Object.keys(this._headers).some((k) => k.toLowerCase() === lower);
   }

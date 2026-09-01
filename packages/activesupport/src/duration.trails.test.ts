@@ -17,3 +17,15 @@ describe("Scalar", () => {
     expect(days(2).equals(new Scalar(1))).toBe(false);
   });
 });
+
+describe("Scalar Comparable", () => {
+  it("<=> answers nil for an incomparable receiver", () => {
+    expect(new Scalar(3).compareTo("foo")).toBeNull();
+  });
+
+  it("== is cmp_equal, so an identical object is true before <=> is sent", () => {
+    const scalar = new Scalar(3);
+    expect(scalar.equals(scalar)).toBe(true);
+    expect(scalar.equals("foo")).toBe(false);
+  });
+});

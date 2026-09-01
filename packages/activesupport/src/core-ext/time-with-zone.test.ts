@@ -273,13 +273,16 @@ describe("TimeWithZoneTest", () => {
   it("between?", () => {
     const twz = maketwz();
     expect(
-      twz.between(
+      twz.isBetween(
         new Date(Date.UTC(1999, 11, 31, 23, 59, 59)),
         new Date(Date.UTC(2000, 0, 1, 0, 0, 1)),
       ),
     ).toBe(true);
     expect(
-      twz.between(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)), new Date(Date.UTC(2000, 0, 1, 0, 0, 2))),
+      twz.isBetween(
+        new Date(Date.UTC(2000, 0, 1, 0, 0, 1)),
+        new Date(Date.UTC(2000, 0, 1, 0, 0, 2)),
+      ),
     ).toBe(false);
   });
 

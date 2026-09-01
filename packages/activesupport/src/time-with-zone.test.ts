@@ -583,9 +583,9 @@ describe("TimeWithZoneTest", () => {
     const a = eastern.local(2024, 1, 10, 0, 0, 0);
     const b = eastern.local(2024, 1, 15, 0, 0, 0);
     const c = eastern.local(2024, 1, 20, 0, 0, 0);
-    expect(b.between(a, c)).toBe(true);
-    expect(a.between(b, c)).toBe(false);
-    expect(a.between(a, c)).toBe(true); // inclusive
+    expect(b.isBetween(a, c)).toBe(true);
+    expect(a.isBetween(b, c)).toBe(false);
+    expect(a.isBetween(a, c)).toBe(true); // inclusive
   });
 
   it("valueOf() enables comparison operators", () => {
