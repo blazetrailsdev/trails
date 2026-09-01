@@ -84,6 +84,24 @@ describe("Rack::Handler::Node", () => {
     expect(input.read()).toBe('{"name":"dean"}');
   });
 
+  it("reads a binary request body byte-identically", async () => {
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44,
+      0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f,
+      0x15, 0xc4, 0x89,
+    ]);
+    const env = await envFor("/upload", {
+      method: "POST",
+      body: png,
+      headers: { "content-type": "application/octet-stream" },
+    });
+
+    const input = env["rack.input"] as StringIO;
+    expect(input.size).toBe(png.length);
+    const read = input.read() as string;
+    expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(Array.from(png));
+  });
+
   it("maps content-type and content-length to CGI keys", async () => {
     const env = await envFor("/", {
       method: "POST",

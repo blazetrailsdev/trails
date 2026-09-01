@@ -400,11 +400,11 @@ export class Base {
    * (`actionview/lib/action_view/helpers/rendering_helper.rb:31`), which
    * hands the view itself to the renderer: `view_renderer.render(self, options)`.
    *
-   * trails' `Renderer#render` is async where Rails' is synchronous, and a
-   * compiled template method is synchronous, so this reaches the lookup
+   * trails' `Renderer#render` is async by design where Rails' is synchronous,
+   * and a compiled template method is synchronous, so this reaches the lookup
    * context's synchronous partial path instead.
    *
-   * @missingRailsCall view_renderer.render — CONVERGEABLE actionview-render-path-is-async-where-rails-is-sync
+   * @missingRailsCall view_renderer.render — PERMANENT
    */
   render(
     options: { partial: string; locals?: Record<string, unknown> },

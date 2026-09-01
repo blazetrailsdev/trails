@@ -72,10 +72,10 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /** Rails' `AppName#original_app_name` (`app_name.rb:12`). Trails has no
-   * `--name` option, so the `options[:name]` arm has nothing to read. */
+  /** Rails' `AppName#original_app_name` (`app_name.rb:12`):
+   * `options[:name] || File.basename(destination_root)`. */
   private originalAppName(): string {
-    return this.path.basename(this.destinationRoot);
+    return this.options.name ?? this.path.basename(this.destinationRoot);
   }
 
   /** Rails' `AppName#app_name` (`app_name.rb:9`):

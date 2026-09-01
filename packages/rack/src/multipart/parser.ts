@@ -1,3 +1,4 @@
+import { forceEncoding } from "@blazetrails/ruby-compat";
 import { QueryParser } from "../query-parser.js";
 import { getMultipartFileLimit, getMultipartTotalPartLimit, unescapePath } from "../utils.js";
 
@@ -66,7 +67,7 @@ export class BoundedIO {
 
     const str = left < size ? this.io.read(left, outbuf) : this.io.read(size, outbuf);
     if (str) {
-      this.cursor += new TextEncoder().encode(str).length;
+      this.cursor += str.length;
     } else {
       throw new EmptyContentError("bad content body");
     }
@@ -354,8 +355,13 @@ export class Parser {
   result(): MultipartInfo {
     this.collector.each((part) =>
       part.getData((data) => {
-        this.tagMultipartEncoding(part.filename, part.contentType, part.name, data);
-        this.queryParser.normalizeParams(this.params, part.name, data);
+        const [name, body] = this.tagMultipartEncoding(
+          part.filename,
+          part.contentType,
+          part.name,
+          data,
+        );
+        this.queryParser.normalizeParams(this.params, name, body);
       }),
     );
     return {
@@ -457,14 +463,65 @@ export class Parser {
     }
     return filename.split(/[/\\]/).at(-1) ?? "";
   }
-  /** @internal */ private tagMultipartEncoding(
-    _filename: string | null | undefined,
-    _contentType: string | null | undefined,
-    _name: string,
-    _body: any,
-  ) {}
-  /** @internal */ private findEncoding(enc: string | null | undefined): string {
-    return enc ?? "UTF-8";
+  /**
+   * Mirrors `Rack::Multipart::Parser#tag_multipart_encoding`
+   * (`rack/multipart/parser.rb:456-483`). Ruby re-tags `name` and `body` in
+   * place; a JS string is immutable, so the re-encoded pair is returned and the
+   * caller passes it on. `filename` and `content_type` are a String or nil, so
+   * Ruby's `if` on them is `!= null` — `""` is a filename Ruby returns early on.
+   *
+   * @internal
+   */
+  private tagMultipartEncoding(
+    filename: string | null | undefined,
+    contentType: string | null | undefined,
+    name: string,
+    body: any,
+  ): [string, any] {
+    name = String(name);
+    let encoding = "UTF-8";
+
+    name = forceEncoding(name, encoding);
+
+    if (filename != null) return [name, body];
+
+    if (contentType != null) {
+      const list = contentType.split(";");
+      const typeSubtype = list[0].trim();
+      if (Parser.TEXT_PLAIN === typeSubtype) {
+        const rest = list.slice(1);
+        for (const param of rest) {
+          const eq = param.indexOf("=");
+          const k = (eq === -1 ? param : param.slice(0, eq)).trim();
+          let v = (eq === -1 ? "" : param.slice(eq + 1)).trim();
+          if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+          if (k === "charset") encoding = this.findEncoding(v);
+        }
+      }
+    }
+
+    name = forceEncoding(name, encoding);
+    return [name, typeof body === "string" ? forceEncoding(body, encoding) : body];
+  }
+  /**
+   * Mirrors `find_encoding` (`rack/multipart/parser.rb:489-493`): the charset
+   * is submitted by the user, so an unknown one is binary rather than an error.
+   *
+   * The validity criterion differs. Ruby asks `Encoding.find`, whose registry
+   * carries Ruby-specific names and aliases (`Shift_JIS`, `EUC-JP`); this asks
+   * `TextDecoder`, which takes WHATWG labels. The two sets overlap but are not
+   * equal, so a charset one accepts the other can reject, in both directions.
+   * There is no Ruby encoding registry to consult from TS.
+   *
+   * @internal
+   */
+  private findEncoding(enc: string | null | undefined): string {
+    try {
+      new TextDecoder(enc ?? "");
+      return enc!;
+    } catch {
+      return "BINARY";
+    }
   }
   /** @internal */ private handleEmptyContentBang(content: string | null | undefined) {
     if (!content) throw new EmptyContentError();

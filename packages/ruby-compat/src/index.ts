@@ -58,6 +58,7 @@ export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { StringIO } from "./string-io.js";
 export { chomp } from "./string/chomp.js";
+export { forceEncoding } from "./string/force-encoding.js";
 export { succ } from "./string/succ.js";
 export { isSymbol, symbolToS } from "./symbol.js";
 export { TypeError } from "./type-error.js";
