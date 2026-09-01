@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   apiComparePackages,
+  libEntryFilesManifest,
   libPathsManifest,
   resolvePath,
   SOURCES,
@@ -148,9 +149,11 @@ describe("vendor/sources.ts", () => {
       {
         name: "i18n",
         libPath: "lib/i18n",
+        libEntryFile: "lib/i18n.rb",
         testPath: "test",
       },
     ]);
+    expect(Object.keys(libEntryFilesManifest())).toEqual(["arel", "i18n"]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
     expect(Object.keys(testPathsManifest())).toContain("i18n");

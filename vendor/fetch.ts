@@ -14,6 +14,7 @@
 //                         compareTests !== false. Used by extract-ruby-tests.rb
 //                         via the TEST_PATHS_JSON env var.
 //   --print-lib-paths:    no fetch; print JSON map {package: absolute_lib_dir}
+//   --print-lib-entry-files: no fetch; print JSON map {package: absolute_entry_file}
 //                         for every package with compareApi !== false. Used by
 //                         extract-ruby-api.rb via the LIB_PATHS_JSON env var.
 
@@ -25,7 +26,13 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-import { libPathsManifest, SOURCES, testPathsManifest, type UpstreamSource } from "./sources.js";
+import {
+  libEntryFilesManifest,
+  libPathsManifest,
+  SOURCES,
+  testPathsManifest,
+  type UpstreamSource,
+} from "./sources.js";
 import { SpellChecker } from "../packages/did-you-mean/src/spell-checker.js";
 
 const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
@@ -179,12 +186,17 @@ function printLibPaths(): void {
   process.stdout.write(JSON.stringify(libPathsManifest()) + "\n");
 }
 
+function printLibEntryFiles(): void {
+  process.stdout.write(JSON.stringify(libEntryFilesManifest()) + "\n");
+}
+
 export interface ParsedArgs {
   sourceFilter?: string;
   refresh: boolean;
   printPaths: { active: boolean; name?: string };
   printTestPaths: boolean;
   printLibPaths: boolean;
+  printLibEntryFiles: boolean;
 }
 
 export function parseArgs(argv: string[]): ParsedArgs {
@@ -193,6 +205,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     printPaths: { active: false },
     printTestPaths: false,
     printLibPaths: false,
+    printLibEntryFiles: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -200,6 +213,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     else if (a === "--refresh") out.refresh = true;
     else if (a === "--print-test-paths") out.printTestPaths = true;
     else if (a === "--print-lib-paths") out.printLibPaths = true;
+    else if (a === "--print-lib-entry-files") out.printLibEntryFiles = true;
     else if (a === "--print-paths") {
       const next = argv[i + 1];
       out.printPaths = {
@@ -261,6 +275,10 @@ async function main(argv: string[]): Promise<void> {
   }
   if (args.printTestPaths) {
     printTestPaths();
+    return;
+  }
+  if (args.printLibEntryFiles) {
+    printLibEntryFiles();
     return;
   }
   if (args.printLibPaths) {

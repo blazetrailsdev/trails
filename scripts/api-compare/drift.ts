@@ -87,6 +87,17 @@ function libPathsFor(cloneRoot: string): Record<string, string> {
   }
   return out;
 }
+
+/** Map of `rails` package → absolute top-level entry file inside the clone. */
+function libEntryFilesFor(cloneRoot: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const pkg of RAILS!.packages) {
+    if (pkg.compareApi === false) continue;
+    if (!pkg.libEntryFile) continue;
+    out[pkg.name] = join(cloneRoot, pkg.libEntryFile);
+  }
+  return out;
+}
 async function extractTargetApi(cloneRoot: string, ref: string): Promise<string> {
   const outPath = join(OUTPUT_DIR, `rails-api@${ref}.json`);
   console.log(`[drift] extracting Ruby API @ ${ref}...`);
@@ -94,6 +105,7 @@ async function extractTargetApi(cloneRoot: string, ref: string): Promise<string>
     env: {
       ...process.env,
       LIB_PATHS_JSON: JSON.stringify(libPathsFor(cloneRoot)),
+      LIB_ENTRY_FILES_JSON: JSON.stringify(libEntryFilesFor(cloneRoot)),
       LOCKFILE_PATH: join(ROOT, "vendor/sources.lock.json"),
       RUBY_API_OUTPUT_PATH: outPath,
     },
@@ -157,11 +169,17 @@ async function rebuildBaseManifest(): Promise<void> {
     ["-s", "vendor:fetch", "--print-lib-paths"],
     { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 },
   );
+  const { stdout: libEntryFilesJson } = await execFileAsync(
+    "pnpm",
+    ["-s", "vendor:fetch", "--print-lib-entry-files"],
+    { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 },
+  );
   await execFileAsync("ruby", [join(DIR, "extract-ruby-api.rb")], {
     cwd: ROOT,
     env: {
       ...process.env,
       LIB_PATHS_JSON: libPathsJson.trim(),
+      LIB_ENTRY_FILES_JSON: libEntryFilesJson.trim(),
       LOCKFILE_PATH: join(ROOT, "vendor/sources.lock.json"),
       API_COMPARE_FORCE: "1",
     },

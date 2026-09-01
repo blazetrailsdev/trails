@@ -50,6 +50,24 @@ if __FILE__ == $PROGRAM_NAME
             "If you set it manually, re-run via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
     end
 
+  # A package's top-level entry file (`activerecord/lib/arel.rb`), declared by
+  # `libEntryFile` in vendor/sources.ts and fed here the same way PACKAGE_DIRS
+  # is. `libPath` names a DIRECTORY, so the gem's own entry file sits outside
+  # the `**/*.rb` glob and is invisible without this (RFC 0126). Optional: a
+  # package that declares none simply has no entry.
+  PACKAGE_ENTRY_FILES =
+    begin
+      parsed = JSON.parse(ENV.fetch("LIB_ENTRY_FILES_JSON", "{}"))
+      unless parsed.is_a?(Hash) && parsed.values.all? { |v| v.is_a?(String) }
+        abort "extract-ruby-api.rb: LIB_ENTRY_FILES_JSON must be a JSON object of " \
+              "{string: string}; got #{parsed.class}. Re-run vendor:fetch --print-lib-entry-files."
+      end
+      parsed
+    rescue JSON::ParserError => e
+      abort "extract-ruby-api.rb: LIB_ENTRY_FILES_JSON is not valid JSON (#{e.message}). " \
+            "If you set it manually, re-run via `LIB_ENTRY_FILES_JSON=$(pnpm -s vendor:fetch --print-lib-entry-files)`."
+    end
+
   # Cache gate: invalidate on (a) a re-fetch (lockfile mtime bumped), (b) a
   # registry edit (sources.ts mtime bumped — covers compareApi flips, libPath
   # edits, source add/remove), or (c) an extractor edit (this script's mtime
@@ -322,7 +340,12 @@ DEPENDENCY_PATTERNS = {
 # `Arel.star`, `Arel.arel_node?` and `Arel.fetch_attribute` are defined there
 # and ported in `packages/arel/src/arel.ts`, so the config-only scan leaves
 # arel.ts scored as having no Rails counterpart at all.
-UMBRELLA_FULL_SCAN_PACKAGES = %w[i18n arel].to_set
+#
+# Both are now declared as `libEntryFile` in vendor/sources.ts and walked as
+# ordinary package files instead — which is also what gives them a sane
+# `file:` (`arel.rb`, not the umbrella scan's `../arel.rb`, which maps to no TS
+# file at all). The umbrella path keeps handling the config-only Rails
+# framework entry files.
 
 # ---- AST walker ----
 
@@ -441,10 +464,11 @@ class ApiExtractor
   # entity-file bucket (the junk-drawer `deprecator.rb`). Must run AFTER the
   # package's own files so the `<Module>::Base` class already exists in `@classes`.
   #
-  # `full:` walks the umbrella exactly as any other file instead, for the
-  # packages in UMBRELLA_FULL_SCAN_PACKAGES whose umbrella defines real methods.
-  def scan_umbrella_file(filepath, package_root, full: false)
-    @scanning_umbrella = !full
+  # A gem whose entry file defines real methods declares it as `libEntryFile`
+  # in vendor/sources.ts instead, and is walked by process_file like any other
+  # package file.
+  def scan_umbrella_file(filepath, package_root)
+    @scanning_umbrella = true
     process_file(filepath, package_root)
   ensure
     @scanning_umbrella = false
@@ -582,29 +606,25 @@ class ApiExtractor
       #   lhs = [:var_field, [:@const, "Name", ...]]
       #   rhs = [:method_add_block, [:method_add_arg, [:call, Struct, ., :new], ...], block]
       #         where the receiver constant resolves to "Struct"
-      struct_call = rhs.is_a?(Array) && rhs[0] == :method_add_block && rhs[1]
-      struct_receiver = struct_call && struct_call.is_a?(Array) &&
-                        struct_call[0] == :method_add_arg && const_name(struct_call[1])
-      is_struct_new = struct_receiver == "Struct"
+      # `CONST = Struct.new(...)` carries the same generated members whether or
+      # not a `do … end` body follows it (schema_definitions.rb:113-121 has five
+      # blockless ones), so both forms enter the struct-class path.
+      struct_call = struct_new_call(rhs)
       if lhs.is_a?(Array) && lhs[0] == :var_field &&
          lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
-         is_struct_new
+         struct_call
         const_name_str = lhs[1][1]
-        block = rhs[2]
+        block = rhs[0] == :method_add_block ? rhs[2] : nil
         body = block.is_a?(Array) && (block[0] == :do_block || block[0] == :brace_block) ? block[2] : nil
-        if body
-          @namespace_stack.push(const_name_str)
-          @visibility_stack.push(:public)
-          fqn = current_fqn
-          @classes[fqn] ||= new_class_info(const_name_str, fqn)
-          @classes[fqn][:superclass] = "Struct"
-          synthesize_struct_members(fqn, struct_call)
-          walk_body(body)
-          @visibility_stack.pop
-          @namespace_stack.pop
-        else
-          node.each { |child| walk(child) if child.is_a?(Array) }
-        end
+        @namespace_stack.push(const_name_str)
+        @visibility_stack.push(:public)
+        fqn = current_fqn
+        @classes[fqn] ||= new_class_info(const_name_str, fqn)
+        @classes[fqn][:superclass] = "Struct"
+        synthesize_struct_members(fqn, struct_call)
+        walk_body(body) if body
+        @visibility_stack.pop
+        @namespace_stack.pop
       else
         node.each { |child| walk(child) if child.is_a?(Array) }
       end
@@ -660,6 +680,16 @@ class ApiExtractor
     @module_function_stack.pop
     @visibility_stack.pop
     @namespace_stack.pop
+  end
+
+  # The `Struct.new(...)` call node of a `CONST = Struct.new(…)` RHS, bare or
+  # block-suffixed; nil otherwise. A dynamic member list is not matched —
+  # struct_member_names resolves only inline symbols and a `*CONST` splat.
+  def struct_new_call(rhs)
+    return nil unless rhs.is_a?(Array)
+    call = rhs[0] == :method_add_block ? rhs[1] : rhs
+    return nil unless call.is_a?(Array) && call[0] == :method_add_arg
+    const_name(call[1]) == "Struct" ? call : nil
   end
 
   # `class Attribute < Struct.new :relation, :name` (arel/attributes/attribute.rb:5)
@@ -773,11 +803,6 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    body = node[3]
-    mark_symbol_discriminated(params, body)
-    dep_info = detect_deps(body)
-    calls, weak_calls, call_receivers = collect_method_calls(body, find_params(node))
-
     method_info = {
       name: name,
       visibility: vis.to_s,
@@ -785,21 +810,7 @@ class ApiExtractor
       file: @current_file,
       line: @current_line,
     }
-    method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
-    method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
-    method_info[:calls] = calls unless calls.empty?
-    method_info[:weakCalls] = weak_calls unless weak_calls.empty?
-    method_info[:callReceivers] = call_receivers unless call_receivers.empty?
-    call_args = collect_call_args(body)
-    method_info[:callArgs] = call_args unless call_args.empty?
-    skeleton = collect_method_skeleton(body)
-    method_info[:skeleton] = skeleton unless skeleton.empty?
-    opt_keys = collect_option_keys(body, params, fqn)
-    method_info[:option_keys] = opt_keys unless opt_keys.empty?
-    record_file_hash_keys(opt_keys)
-    record_file_hash_keys(collect_ivar_option_keys(body))
-    digest = body_digest(body)
-    method_info[:bodyDigest] = digest if digest
+    record_body_facts(method_info, node[3], find_params(node), fqn)
 
     if @in_sclass
       target[:classMethods] << method_info
@@ -834,11 +845,6 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    body = node[5]
-    mark_symbol_discriminated(params, body)
-    dep_info = detect_deps(body)
-    calls, weak_calls, call_receivers = collect_method_calls(body, find_params_defs(node))
-
     method_info = {
       name: name,
       visibility: vis.to_s,
@@ -846,21 +852,7 @@ class ApiExtractor
       file: @current_file,
       line: @current_line,
     }
-    method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
-    method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
-    method_info[:calls] = calls unless calls.empty?
-    method_info[:weakCalls] = weak_calls unless weak_calls.empty?
-    method_info[:callReceivers] = call_receivers unless call_receivers.empty?
-    call_args = collect_call_args(body)
-    method_info[:callArgs] = call_args unless call_args.empty?
-    skeleton = collect_method_skeleton(body)
-    method_info[:skeleton] = skeleton unless skeleton.empty?
-    opt_keys = collect_option_keys(body, params, fqn)
-    method_info[:option_keys] = opt_keys unless opt_keys.empty?
-    record_file_hash_keys(opt_keys)
-    record_file_hash_keys(collect_ivar_option_keys(body))
-    digest = body_digest(body)
-    method_info[:bodyDigest] = digest if digest
+    record_body_facts(method_info, node[5], find_params_defs(node), fqn)
 
     target[:classMethods] << method_info
 
@@ -1740,10 +1732,10 @@ class ApiExtractor
   def process_define_method_block(node)
     name, args = meta_call_parts(node[1])
     return false unless name == "define_method"
-    process_define_method(args, block_params_node(node[2]))
+    process_define_method(args, block_params_node(node[2]), block_body_node(node[2]))
   end
 
-  def process_define_method(args, params_node)
+  def process_define_method(args, params_node, body = nil)
     # Umbrella scans harvest only module-level singleton config (see
     # process_def); anything else recorded there surfaces as false-missing.
     return false if @scanning_umbrella
@@ -1757,7 +1749,8 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return false unless target
 
-    record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method")
+    record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method",
+                                 body: body, params_node: params_node)
     maybe_update_module_file(fqn, target)
     true
   end
@@ -1796,14 +1789,15 @@ class ApiExtractor
     return false unless target
 
     emitted = false
-    each_metaprogramming_call(block[2]) do |kind, args, params_node|
+    each_metaprogramming_call(block[2]) do |kind, args, params_node, body|
       list = positional_arg_list(args)
       next unless list.is_a?(Array)
       members.each do |member|
         name = unrolled_name(list[0], loop_var, member)
         next unless name
         if kind == "define_method"
-          record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method")
+          record_metaprogrammed_method(fqn, target, name, extract_params(params_node), "define_method",
+                                       body: body, params_node: params_node)
         else
           old = list[1] && unrolled_name(list[1], loop_var, member)
           record_metaprogrammed_method(fqn, target, name, [], "alias", alias_target: old)
@@ -1815,7 +1809,7 @@ class ApiExtractor
     emitted
   end
 
-  def record_metaprogrammed_method(fqn, target, name, params, notes, alias_target: nil)
+  def record_metaprogrammed_method(fqn, target, name, params, notes, alias_target: nil, body: nil, params_node: nil)
     entry = {
       name: name,
       visibility: current_visibility.to_s,
@@ -1824,6 +1818,7 @@ class ApiExtractor
       line: @current_line,
       notes: notes,
     }
+    record_body_facts(entry, body, params_node, fqn) if body
     # Same as process_alias_method: the alias inherits the target's arity, so
     # record the target for resolve_aliases! to copy params from.
     entry[:alias_target] = alias_target if alias_target
@@ -1831,6 +1826,33 @@ class ApiExtractor
     # both make the generated method a class method.
     on_class = @in_sclass || (@module_function_stack.last && @modules[fqn])
     target[on_class ? :classMethods : :instanceMethods] << entry
+  end
+
+  # The body-derived half of a method entry: every fact the manifest carries
+  # about a method body, so a `define_method`-generated entry is
+  # indistinguishable from a `def`-written one rather than reading as a
+  # zero-call, dep-less, option-key-less method (RFC 0126). Both the literal
+  # `def` paths and the metaprogrammed one go through here, so the two cannot
+  # drift back apart.
+  def record_body_facts(entry, body, params_node, fqn)
+    mark_symbol_discriminated(entry[:params], body)
+    dep_info = detect_deps(body)
+    calls, weak_calls, call_receivers = collect_method_calls(body, params_node)
+    entry[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
+    entry[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
+    entry[:calls] = calls unless calls.empty?
+    entry[:weakCalls] = weak_calls unless weak_calls.empty?
+    entry[:callReceivers] = call_receivers unless call_receivers.empty?
+    call_args = collect_call_args(body)
+    entry[:callArgs] = call_args unless call_args.empty?
+    skeleton = collect_method_skeleton(body)
+    entry[:skeleton] = skeleton unless skeleton.empty?
+    opt_keys = collect_option_keys(body, entry[:params], fqn)
+    entry[:option_keys] = opt_keys unless opt_keys.empty?
+    record_file_hash_keys(opt_keys)
+    record_file_hash_keys(collect_ivar_option_keys(body))
+    digest = body_digest(body)
+    entry[:bodyDigest] = digest if digest
   end
 
   # Members of an `.each` receiver, whichever way it is spelled: a literal
@@ -1919,13 +1941,13 @@ class ApiExtractor
     if node[0] == :method_add_block
       name, args = meta_call_parts(node[1])
       if name
-        yield name, args, block_params_node(node[2])
+        yield name, args, block_params_node(node[2]), block_body_node(node[2])
         return
       end
     else
       name, args = meta_call_parts(node)
       if name
-        yield name, args, nil
+        yield name, args, nil, nil
         return
       end
     end
@@ -1959,6 +1981,14 @@ class ApiExtractor
     return nil unless block_var.is_a?(Array) && block_var[0] == :block_var
     params = block_var[1]
     params.is_a?(Array) && params[0] == :params ? params : nil
+  end
+
+  # The statement list of a `do`/`{}` block — the generated method's body, for
+  # a `define_method(name) { … }`. See record_body_facts.
+  def block_body_node(block)
+    return nil unless block.is_a?(Array) &&
+                      [:do_block, :brace_block].include?(block[0])
+    block[2]
   end
 
   # Models the enumerable `class_eval`/`define_method` codegen loop
@@ -3691,11 +3721,16 @@ def run
     # package's libPath and outside the glob above) for module-level singleton
     # config and attribute it to `<Module>::Base`. Done last so that Base class
     # already exists. See ApiExtractor#scan_umbrella_file.
-    umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
-    if File.file?(umbrella_file)
-      extractor.scan_umbrella_file(
-        umbrella_file, pkg_dir, full: UMBRELLA_FULL_SCAN_PACKAGES.include?(pkg_name)
-      )
+    entry_file = PACKAGE_ENTRY_FILES[pkg_name]
+    if entry_file
+      # Walked relative to its own directory, so it records as `arel.rb` — the
+      # path `packages/arel/src/arel.ts` maps onto — rather than the umbrella
+      # scan's `../arel.rb`, which matches no TS file.
+      abort "Entry file for #{pkg_name} not found at #{entry_file}." unless File.file?(entry_file)
+      extractor.process_file(entry_file, File.dirname(entry_file))
+    else
+      umbrella_file = "#{pkg_dir.sub(%r{/\z}, '')}.rb"
+      extractor.scan_umbrella_file(umbrella_file, pkg_dir) if File.file?(umbrella_file)
     end
 
     # Drop define_method entries a literal `def` in the same bucket supersedes.

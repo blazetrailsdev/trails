@@ -23,6 +23,16 @@ export interface PackageEntry {
   name: string;
   /** Path relative to the source's vendored root. */
   libPath: string;
+  /**
+   * The gem's top-level entry file (`activerecord/lib/arel.rb`), relative to
+   * the source's vendored root. `libPath` names a DIRECTORY, so the entry file
+   * that sits beside it — and defines the gem's own module functions — is
+   * outside the extractor's recursive .rb glob and invisible without this. Set it
+   * only where that file defines real methods a trails file ports; the Rails
+   * framework entry files (`active_record.rb`, …) are autoload manifests whose
+   * `def self.` boot helpers nothing ports.
+   */
+  libEntryFile?: string;
   /** Path relative to the source's vendored root; omitted = test-compare ignores. */
   testPath?: string;
   /**
@@ -68,6 +78,9 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "arel",
         libPath: "activerecord/lib/arel",
+        // `Arel.sql`, `Arel.star`, `Arel.arel_node?` and `Arel.fetch_attribute`
+        // are defined here and ported in `packages/arel/src/arel.ts`.
+        libEntryFile: "activerecord/lib/arel.rb",
         testPath: "activerecord/test/cases/arel",
       },
       {
@@ -371,6 +384,9 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "i18n",
         libPath: "lib/i18n",
+        // `I18n::Base` — the gem's whole public facade, 19 `def`s plus 3
+        // aliases — is defined here, not under `lib/i18n/`.
+        libEntryFile: "lib/i18n.rb",
         testPath: "test",
       },
     ],
@@ -453,6 +469,23 @@ export function vendoredRoot(sourceName: string): string {
   const found = SOURCES.find((s) => s.name === sourceName);
   if (!found) throw new Error(`vendor/sources.ts: no source named "${sourceName}"`);
   return join(VENDOR_DIR, sourceName);
+}
+
+/**
+ * Map of package name → absolute top-level entry file, for every package that
+ * declares `libEntryFile`. Feeds extract-ruby-api.rb via the
+ * `LIB_ENTRY_FILES_JSON` env var, alongside `LIB_PATHS_JSON`.
+ */
+export function libEntryFilesManifest(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const source of SOURCES) {
+    for (const pkg of source.packages) {
+      if (pkg.compareApi === false) continue;
+      if (!pkg.libEntryFile) continue;
+      out[pkg.name] = resolve(VENDOR_DIR, source.name, pkg.libEntryFile);
+    }
+  }
+  return out;
 }
 
 /**
