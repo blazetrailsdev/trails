@@ -3495,11 +3495,10 @@ function describeArg(node: ts.Expression, flags: string[]): string {
     return `binop:${ts.tokenToString(expr.operatorToken.kind) ?? "?"}`;
   }
   if (ts.isPrefixUnaryExpression(expr) || ts.isPostfixUnaryExpression(expr)) {
-    // `-1` is one negative numeric literal, not a unary operator applied to a
-    // value — the twin of the fold extract-ruby-api.rb#describe_unary applies
-    // to Ripper's `[:unary, :-@, [:@int, "1"]]`. Without it a port passing a
-    // negative number stays opaque on this side and takes the whole call site
-    // out of the argument gate even though Ruby now describes it.
+    // `-1` is one negative numeric literal, not an operator applied to a value
+    // — the twin of extract-ruby-api.rb#describe_unary's fold. Without it the
+    // Ruby side's `num:-1` meets an opaque descriptor here and the whole call
+    // site drops out of the argument gate.
     if (
       ts.isPrefixUnaryExpression(expr) &&
       expr.operator === ts.SyntaxKind.MinusToken &&

@@ -3376,13 +3376,10 @@ class ApiExtractor
     end
   end
 
-  # Ripper splits a negative numeric literal `-1` into
-  # `[:unary, :-@, [:@int, "1"]]`. Fold the negation back into the value, the
-  # same fold `literal_value` already applies on the DEFAULT path
-  # (extract-ruby-api.rb:282-291), so `foo(-1)` compares as `num:-1` instead of
-  # taking the whole call site out of the argument gate. Any other unary — a
-  # `!`, a negated constant or expression — stays the opaque `unary…`
-  # descriptor.
+  # Ripper splits `-1` into `[:unary, :-@, [:@int, "1"]]`. Fold the negation
+  # back into the value — the fold `literal_value` already applies on the
+  # DEFAULT path — so `foo(-1)` compares as `num:-1` rather than taking the
+  # whole call site out of the argument gate. Any other unary stays opaque.
   def describe_unary(node, flags)
     inner = node[2]
     if node[1] == :-@ && inner.is_a?(Array) && [:@int, :@float].include?(inner[0])

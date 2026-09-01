@@ -2978,15 +2978,11 @@ export function main() {
     // still let a dep signature open the gate. Feeds the ported-with-args gate
     // and the literal-default check.
     const tsParamsByFileNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
-    // The same signatures narrowed one step further, by the DECLARING CLASS
-    // (`<owner>#<name>`), for the parameter-NAME check alone. A file-scoped
-    // pool still lets two sibling classes lend each other a signature:
-    // `OutputBuffer#capture(*args)` (actionview/buffers.rb:72) and
-    // `StreamingBuffer#capture` (buffers.rb:126) share one TS file, and the
-    // one-parameter StreamingBuffer form is the only candidate that lines up
-    // positionally with Ruby's one-slot `[*args]` — so the Ruby method was
-    // scored against a DIFFERENT class's method and reported a rename that
-    // exists nowhere. Arity keeps the wider pool (see tsParamsByName).
+    // The same signatures keyed by DECLARING CLASS too (`<owner>#<name>`), for
+    // the parameter-NAME check alone: a file-scoped pool lets two sibling
+    // classes lend each other a signature (`OutputBuffer#capture(*args)`,
+    // buffers.rb:72, scored against `StreamingBuffer#capture`, buffers.rb:126).
+    // Arity keeps the wider pool (see tsParamsByName).
     const tsParamsByFileOwnerNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
     // Signature objects (by identity) belonging to a `set` accessor. A Ruby
     // writer is its own method (`where_clause=`) but conventions.ts maps it onto
@@ -4008,14 +4004,11 @@ export function main() {
         // read a body, so only they are skipped; arity, option keys, literals
         // and the body pin all still compare the pair by signature.
         skipCalls = false,
-        // The TS file was reached by the misplaced-cluster GUESS, not by the
-        // conventional path. `renderer/object_renderer.rb` has no
-        // `renderer/object-renderer.ts` (trails declares `ObjectRenderer` in
-        // `partial-renderer.ts`), so the guess lands on
-        // `renderer/abstract-renderer.ts` and `ObjectRenderer#initialize` is
-        // scored against `RenderedTemplate#initialize`. A guessed pairing is not
-        // evidence of a rename — no rename can close a row it produces — so the
-        // parameter-NAME check is skipped for it (RFC 0126).
+        // The TS file was reached by the misplaced-cluster GUESS rather than the
+        // conventional path, so the pairing is not evidence of a rename and no
+        // rename can close a row it produces (`renderer/object_renderer.rb`
+        // guessed onto `abstract-renderer.ts` reported two). Parameter NAMES are
+        // skipped for it; every other check still compares the pair.
         guessedFile = false,
       ) => {
         checkOptionKeys(rubyName, tsName, tsFile);
@@ -4047,19 +4040,13 @@ export function main() {
           // klass:, type_caster:)` would align against an unrelated 4-arg
           // constructor and report three renames that exist nowhere.
           const fileCandidates = tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [];
-          // A clean candidate anywhere in the file settles the pair: the port
-          // spells Rails' identifiers somewhere under this name, and which
-          // declaration carries them (the `this`-typed function, the interface
-          // that re-declares it, the class that assigns it) is the mixin
-          // idiom's business, not a rename.
-          //
-          // Only when NOTHING in the file aligns cleanly does the owner matter,
-          // and then it decides alone: a file-wide pool otherwise reports the
-          // nearest-fitting SIBLING CLASS's signature as this method's.
-          // `OutputBuffer#capture(*args)` (actionview/buffers.rb:72) was scored
-          // against `StreamingBuffer#capture(fn)` (buffers.rb:126) — whose one
-          // slot is the only one that lines up with Ruby's `[*args]` — and
-          // reported `args → fn`, a rename of the ported block (RFC 0126).
+          // A clean candidate anywhere in the file settles the pair: which
+          // declaration carries Rails' identifiers (the `this`-typed function,
+          // the interface re-declaring it, the class assigning it) is the mixin
+          // idiom's business. Only when nothing aligns cleanly does the owner
+          // decide, so the nearest-fitting SIBLING CLASS cannot stand in —
+          // `OutputBuffer#capture(*args)` reported `args → fn` off
+          // `StreamingBuffer#capture(fn)` (buffers.rb:72,126).
           let verdict = matchParamNamesAgainst(rubyParams, fileCandidates);
           if (verdict.rows.length > 0) {
             const rubyOwner = rubyModule.split("::").pop() ?? "";

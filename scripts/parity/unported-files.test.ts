@@ -177,17 +177,11 @@ describe("UNPORTED_FILES schema", () => {
 });
 
 /**
- * A `tests:` entry claims a Rails test is NOT ported, and the comparison stage
- * takes it at its word: `compare.ts:749` subtracts it from `rubyTestCount`
- * before pairing, so its TS counterpart is never consumed and is scored
- * `extra (TS only)` instead. A file in that state reports ✓ with
- * `missing: 0` while the aggregate silently understates the ported population.
- *
- * `adapters/postgresql/transaction_nested_test.rb` was in exactly that state:
- * the manifest carries four `test` declarations, the register excluded the two
- * deadlock ones, and `convention-comparison.json` reported
- * `rubyTestCount: 2 / matched: 2 / extra: 2` over four live, faithfully ported
- * `it`s. Retiring the entry — never renaming a test — is the fix.
+ * A `tests:` entry claims a Rails test is NOT ported, and `compare.ts`
+ * subtracts it from `rubyTestCount` before pairing — so its TS counterpart is
+ * never consumed and is scored `extra (TS only)`, while the file reports
+ * `missing: 0`. This file's four tests are all live and ported; the register
+ * excluded the two deadlock ones and it reported 2/2 with 2 extra.
  */
 describe("every Rails test of transaction_nested_test.rb is counted", () => {
   const FILE = "adapters/postgresql/transaction_nested_test.rb";
