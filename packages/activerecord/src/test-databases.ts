@@ -21,14 +21,7 @@ export async function createAndLoadSchema(
   try {
     const configs = Base.configurations().configsFor({ envName });
     for (const dbConfig of configs) {
-      const baseName = dbConfig.database;
-      if (!baseName) {
-        throw new Error(
-          `Cannot suffix database name for ${envName}/${dbConfig.name ?? "(unnamed)"}: ` +
-            `neither database nor a parseable URL is available`,
-        );
-      }
-      dbConfig._database = `${baseName}-${i}`;
+      dbConfig._database = `${dbConfig.database}-${i}`;
       await DatabaseTasks.reconstructFromSchema(dbConfig, DatabaseTasks.schemaFormat, undefined);
     }
   } finally {

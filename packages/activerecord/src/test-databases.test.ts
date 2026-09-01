@@ -142,23 +142,6 @@ describe("TestDatabasesTest", () => {
     expect(mockEstablishConnection).toHaveBeenCalledWith(Base, undefined);
   });
 
-  it("throws a clear error when neither database nor URL yields a name", async () => {
-    vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockResolvedValue(undefined);
-    vi.spyOn(await import("./connection-handling.js"), "establishConnection").mockResolvedValue(
-      undefined,
-    );
-
-    const mockConfig: any = { adapter: "sqlite3", configuration: {}, name: "primary" };
-    Object.defineProperty(mockConfig, "_database", { set() {} });
-    Object.defineProperty(mockConfig, "database", { get: () => undefined });
-
-    Base.configurations(stubConfigurations([mockConfig]));
-
-    await expect(createAndLoadSchema(1, { envName: "arunit" })).rejects.toThrow(
-      /Cannot suffix database name/,
-    );
-  });
-
   it("restores VERBOSE and re-establishes connection after schema load failure", async () => {
     const error = new Error("schema load failed");
     vi.spyOn(DatabaseTasks, "reconstructFromSchema").mockRejectedValue(error);
