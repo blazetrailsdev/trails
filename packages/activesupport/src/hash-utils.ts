@@ -230,8 +230,10 @@ export function symbolizeKeys<T extends AnyObject>(obj: T): Record<string, unkno
  * `stringify_keys!`'s transform, exactly as `symbolize_keys` is
  * `stringify_keys`'s here.
  */
-export function symbolizeKeysBang<T extends AnyObject>(hash: T): T {
-  return transformKeysBang(hash, (key) => key);
+export function symbolizeKeysBang<T extends AnyObject>(hash: T): T;
+export function symbolizeKeysBang(hash: Map<string, unknown>): AnyObject;
+export function symbolizeKeysBang(hash: AnyObject | Map<string, unknown>): AnyObject {
+  return transformKeysBang(hash as Map<string, unknown>, (key) => key);
 }
 
 /**
@@ -260,7 +262,10 @@ export function deepSymbolizeKeys(obj: unknown): unknown {
  * hash and every nested hash and array — Ruby's `Hash#deep_transform_keys!`
  * (core_ext/hash/keys.rb:74-76).
  */
-export function deepTransformKeysBang(hash: AnyObject, block: (key: string) => string): AnyObject {
+export function deepTransformKeysBang(
+  hash: AnyObject | Map<string, unknown>,
+  block: (key: string) => string,
+): AnyObject {
   return _deepTransformKeysInObjectBang(hash, block) as AnyObject;
 }
 
@@ -274,20 +279,31 @@ export function deepStringifyKeysBang(hash: AnyObject): AnyObject {
 /**
  * Ruby's `Hash#deep_symbolize_keys!` (core_ext/hash/keys.rb:110-112).
  */
-export function deepSymbolizeKeysBang(hash: AnyObject): AnyObject {
+export function deepSymbolizeKeysBang(hash: AnyObject | Map<string, unknown>): AnyObject {
   return deepTransformKeysBang(hash, (key) => key);
 }
 
 /**
  * Support method for deep transforming nested hashes and arrays — Ruby's
  * private `Hash#_deep_transform_keys_in_object` (core_ext/hash/keys.rb:116-125).
+ *
+ * Ruby's `when Hash` arm covers both trails spellings of a Ruby Hash — a plain
+ * object and `@blazetrails/ruby-compat`'s `Hash`, which is what
+ * `HashWithIndifferentAccess#toHash` now answers — so the `Map` arm builds the
+ * plain-object spelling of the same value.
  * @internal
  */
 export function _deepTransformKeysInObject(
   object: unknown,
   block: (key: string) => string,
 ): unknown {
-  if (isPlainObject(object)) {
+  if (object instanceof Map) {
+    const result: AnyObject = {};
+    for (const [key, value] of object) {
+      result[block(String(key))] = _deepTransformKeysInObject(value, block);
+    }
+    return result;
+  } else if (isPlainObject(object)) {
     const result: AnyObject = {};
     for (const key of Object.keys(object)) {
       result[block(key)] = _deepTransformKeysInObject(object[key], block);
@@ -303,14 +319,18 @@ export function _deepTransformKeysInObject(
 /**
  * Ruby's private `Hash#_deep_transform_keys_in_object!`
  * (core_ext/hash/keys.rb:127-138). Ruby's `Array#map!` mutates in place; so
- * does this, so array identity survives the transform as it does in Ruby.
+ * does this, so array identity survives the transform as it does in Ruby. A
+ * `Map` receiver has no key-preserving in-place spelling of a rename, so it
+ * goes through the non-bang arm.
  * @internal
  */
 export function _deepTransformKeysInObjectBang(
   object: unknown,
   block: (key: string) => string,
 ): unknown {
-  if (isPlainObject(object)) {
+  if (object instanceof Map) {
+    return _deepTransformKeysInObject(object, block);
+  } else if (isPlainObject(object)) {
     for (const key of Object.keys(object)) {
       const value = object[key];
       delete object[key];
@@ -365,15 +385,30 @@ export function transformKeys(
 
 /**
  * Ruby's `Hash#transform_keys!`, the in-place primitive the `keys.rb` bang
- * forms are written on top of.
+ * forms are written on top of. A `Map` receiver — the trails spelling of a Ruby
+ * Hash that `HashWithIndifferentAccess#toHash` answers — has no key-preserving
+ * in-place rename, so that arm answers the plain-object spelling instead.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link transformKeys} is.
  */
-export function transformKeysBang<T extends AnyObject>(hash: T, block: (key: string) => string): T {
+export function transformKeysBang<T extends AnyObject>(hash: T, block: (key: string) => string): T;
+export function transformKeysBang(
+  hash: Map<string, unknown>,
+  block: (key: string) => string,
+): AnyObject;
+export function transformKeysBang(
+  hash: AnyObject | Map<string, unknown>,
+  block: (key: string) => string,
+): AnyObject {
+  if (hash instanceof Map) {
+    const result: AnyObject = {};
+    for (const [key, value] of hash) result[block(key)] = value;
+    return result;
+  }
   for (const key of Object.keys(hash)) {
     const value = hash[key];
     delete hash[key];
-    (hash as AnyObject)[block(key)] = value;
+    hash[block(key)] = value;
   }
   return hash;
 }

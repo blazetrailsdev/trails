@@ -10,12 +10,7 @@
  * Rails' own name.
  */
 
-import {
-  deepMerge as deepMergeObj,
-  deepSymbolizeKeysBang,
-  isPlainObject,
-  symbolizeKeysBang,
-} from "./hash-utils.js";
+import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 import { type DefaultProc, Hash, KeyError, TypeError } from "@blazetrails/ruby-compat";
 
@@ -344,13 +339,24 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   /**
-   * Deep merge, recursively merging nested objects.
+   * Deep merge, recursively merging nested objects — `Hash#deep_merge`
+   * (core_ext/hash/deep_merge.rb:5-6) comes from
+   * `ActiveSupport::DeepMergeable#deep_merge` (deep_mergeable.rb:29-31), a
+   * `dup.deep_merge!`, and `deep_merge!` (:34-44) is `merge!` with the block
+   * that recurses whenever `deep_merge?` (deep_merge.rb:40-42) holds. `update`
+   * converts every value, so the receiver's side is a
+   * `HashWithIndifferentAccess` wherever Ruby's is a Hash.
    */
   deepMerge(other: AnyObject | HashWithIndifferentAccess<V>): HashWithIndifferentAccess<V> {
-    const selfObj = this.toHash();
-    const otherObj = other instanceof HashWithIndifferentAccess ? other.toHash() : other;
-    const merged = deepMergeObj(selfObj, otherObj);
-    return new HashWithIndifferentAccess<V>(merged);
+    return this.dup().update(other, (_key, thisVal, otherVal) => {
+      if (
+        thisVal instanceof HashWithIndifferentAccess &&
+        (isPlainObject(otherVal) || otherVal instanceof HashWithIndifferentAccess)
+      ) {
+        return thisVal.deepMerge(otherVal as AnyObject) as V;
+      }
+      return otherVal;
+    });
   }
 
   /**
@@ -386,7 +392,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * Return a new HashWithIndifferentAccess without the specified keys.
    */
   except(...keys: string[]): HashWithIndifferentAccess<V> {
-    return new HashWithIndifferentAccess<V>(this.toHash()).exceptBang(...keys);
+    return this.dup().exceptBang(...keys);
   }
 
   /**
@@ -667,11 +673,14 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   /**
-   * Return a plain object with all string keys (Rails' stringify_keys).
-   * Returns a new HashWithIndifferentAccess since all keys are already strings.
+   * `hash_with_indifferent_access.rb` leaves `stringify_keys` to `Hash`
+   * (core_ext/hash/keys.rb:10-12), whose `transform_keys` reaches the override
+   * at :339-342 — so the answer is another `HashWithIndifferentAccess`. Its
+   * `Symbol === k` arm cannot fire: `convert_key` (:388-390) has already made
+   * every stored key a String.
    */
   stringifyKeys(): HashWithIndifferentAccess<V> {
-    return new HashWithIndifferentAccess<V>(this.toHash());
+    return this.transformKeys((key) => String(key));
   }
 
   /**
@@ -717,16 +726,19 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   /**
    * Mirrors `to_hash` (hash_with_indifferent_access.rb:375-381) — a regular
    * Hash with string keys, each value deep-converted by `convert_value_to_hash`.
-   * Rails' `set_defaults(copy)` (:379) then copies `default` / `default_proc`
-   * onto it; a plain JS object has no seat to copy them into, and giving this
-   * reader `@blazetrails/ruby-compat`'s `Hash` instead reaches every caller —
-   * `hwia-to-hash-returns-ruby-compat-hash`.
+   * `Hash[self]` (:377) is `@blazetrails/ruby-compat`'s `Hash`, the trails
+   * spelling of a Ruby Hash that carries `default` / `default_proc`, so
+   * `set_defaults(copy)` (:379) has the seat Rails writes to.
    */
-  toHash(): AnyObject {
-    const copy: AnyObject = {};
-    for (const [k, v] of this) {
-      copy[k] = this.convertValueToHash(v);
+  toHash(): Hash<string, unknown> {
+    const copy = new Hash<string, unknown>();
+    for (const [key, value] of this) {
+      copy.set(key, value);
     }
+    for (const [key, value] of copy) {
+      copy.set(key, this.convertValueToHash(value as V));
+    }
+    this.setDefaults(copy);
     return copy;
   }
 
@@ -780,15 +792,17 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * Mirrors `set_defaults` (hash_with_indifferent_access.rb:416-422) — copies
    * the receiver's default_proc, else its default value, onto `target`.
    *
-   * Rails' other caller is `to_hash`, whose target is a plain `Hash`; a TS
-   * object has nowhere to keep a default, so only the hash-valued targets
-   * (`dup`) reach it.
+   * Both targets are a `@blazetrails/ruby-compat` `Hash` — `dup`'s a
+   * `HashWithIndifferentAccess`, `to_hash`'s the bare one — and differ only in
+   * the value type their `default_proc` is yielded, which the proc Rails hands
+   * straight over never reads.
    */
-  private setDefaults(target: HashWithIndifferentAccess<V>): void {
+  private setDefaults(target: Hash<string, V> | Hash<string, unknown>): void {
+    const seat = target as Hash<string, V>;
     if (this.defaultProc()) {
-      target.setDefaultProc(this.defaultProc());
+      seat.setDefaultProc(this.defaultProc());
     } else {
-      target.setDefault(this.default());
+      seat.setDefault(this.default());
     }
   }
 

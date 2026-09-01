@@ -1,6 +1,10 @@
 import { ConfigurationError } from "./errors.js";
 import type { Base } from "./base.js";
-import { HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
+import {
+  HashWithIndifferentAccess,
+  deepStringifyKeys,
+  withIndifferentAccess,
+} from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
 import { YAMLColumn, type YamlColumnOptions } from "./coders/yaml-column.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
@@ -292,7 +296,8 @@ export function writeStoreAttribute(
 /** @internal */
 function asRegularHash(obj: unknown): Record<string, unknown> {
   if (obj == null) return {};
-  if (obj instanceof HashWithIndifferentAccess) return obj.toHash();
+  if (obj instanceof HashWithIndifferentAccess)
+    return deepStringifyKeys(obj.toHash()) as Record<string, unknown>;
   if (typeof obj !== "object" || Array.isArray(obj)) return {};
   const proto = Object.getPrototypeOf(obj);
   return proto === Object.prototype || proto === null

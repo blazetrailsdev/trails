@@ -80,7 +80,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const selected = h.select((_k, v) => v === 1);
     expect(selected).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(selected.toHash()).toEqual({ a: 1 });
+    expect(Object.fromEntries(selected.toHash())).toEqual({ a: 1 });
   });
 
   it("indifferent select returns all when predicate always true", () => {
@@ -94,7 +94,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const rejected = h.reject((_k, v) => v !== 1);
     expect(rejected).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(rejected.toHash()).toEqual({ a: 1 });
+    expect(Object.fromEntries(rejected.toHash())).toEqual({ a: 1 });
   });
 
   // transform_keys / transform_values
@@ -102,7 +102,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const transformed = h.transformKeys((k) => k.repeat(2));
     expect(transformed).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(transformed.toHash()).toEqual({ aa: 1, bb: 2 });
+    expect(Object.fromEntries(transformed.toHash())).toEqual({ aa: 1, bb: 2 });
 
     let hash = new HashWithIndifferentAccess({ a: 1, b: 2 }).transformKeys({ a: "x", y: "z" });
     expect(hash.get("a")).toBeUndefined();
@@ -125,7 +125,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const transformed = h.transformValues((v) => (v as number) * 2);
     expect(transformed).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(transformed.toHash()).toEqual({ a: 2, b: 4 });
+    expect(Object.fromEntries(transformed.toHash())).toEqual({ a: 2, b: 4 });
   });
 
   // compact
@@ -133,7 +133,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: null, c: undefined, d: 2 });
     const compacted = h.compact();
     expect(compacted).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(compacted.toHash()).toEqual({ a: 1, d: 2 });
+    expect(Object.fromEntries(compacted.toHash())).toEqual({ a: 1, d: 2 });
     // original unchanged
     expect(h.hasKey("b")).toBe(true);
   });
@@ -141,7 +141,7 @@ describe("HashWithIndifferentAccessTest", () => {
   it("compact on hash with no nil values returns equivalent hash", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const compacted = h.compact();
-    expect(compacted.toHash()).toEqual({ a: 1, b: 2 });
+    expect(Object.fromEntries(compacted.toHash())).toEqual({ a: 1, b: 2 });
   });
 
   // assoc
@@ -168,7 +168,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
     const sliced = original.slice("a", "b");
     expect(sliced).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(sliced.toHash()).toEqual({ a: "x", b: "y" });
+    expect(Object.fromEntries(sliced.toHash())).toEqual({ a: "x", b: "y" });
     expect(original.size).toBe(3);
   });
 
@@ -187,20 +187,20 @@ describe("HashWithIndifferentAccessTest", () => {
     const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
     const result = original.except("a", "b");
     expect(result).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(result.toHash()).toEqual({ c: 10 });
+    expect(Object.fromEntries(result.toHash())).toEqual({ c: 10 });
     expect(original.size).toBe(3);
   });
 
   it("without — alias for except", () => {
     const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
     const result = original.without("a", "b");
-    expect(result.toHash()).toEqual({ c: 10 });
+    expect(Object.fromEntries(result.toHash())).toEqual({ c: 10 });
   });
 
   // toHash
   it("indifferent to_hash — converts to plain object with string keys", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: 2 });
-    const plain = h.toHash();
+    const plain = Object.fromEntries(h.toHash());
     expect(plain).toEqual({ a: 1, b: 2 });
     expect(plain).not.toBeInstanceOf(HashWithIndifferentAccess);
   });
@@ -412,7 +412,7 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("deep stringify keys bang for hash with indifferent access", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    const plain = h.toHash();
+    const plain = Object.fromEntries(h.toHash());
     expect(Object.keys(plain).every((k) => typeof k === "string")).toBe(true);
   });
 
@@ -560,7 +560,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const selected = h.select((_k, v) => v === 1);
     expect(selected).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(selected.toHash()).toEqual({ a: 1 });
+    expect(Object.fromEntries(selected.toHash())).toEqual({ a: 1 });
   });
 
   it("indifferent select returns enumerator", () => {
@@ -588,7 +588,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const rejected = h.reject((_k, v) => v !== 1);
     expect(rejected).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(rejected.toHash()).toEqual({ a: 1 });
+    expect(Object.fromEntries(rejected.toHash())).toEqual({ a: 1 });
   });
 
   it("indifferent reject returns enumerator", () => {
@@ -608,7 +608,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const transformed = h.transformKeys((k) => k.repeat(2));
     expect(transformed).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(transformed.toHash()).toEqual({ aa: 1, bb: 2 });
+    expect(Object.fromEntries(transformed.toHash())).toEqual({ aa: 1, bb: 2 });
   });
 
   it("indifferent deep transform keys", () => {
@@ -636,7 +636,7 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const transformed = h.transformValues((v) => (v as number) * 2);
     expect(transformed).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(transformed.toHash()).toEqual({ a: 2, b: 4 });
+    expect(Object.fromEntries(transformed.toHash())).toEqual({ a: 2, b: 4 });
   });
 
   it("indifferent transform values bang", () => {
@@ -660,13 +660,13 @@ describe("HashWithIndifferentAccessTest", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: null, c: undefined, d: 2 });
     const compacted = h.compact();
     expect(compacted).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(compacted.toHash()).toEqual({ a: 1, d: 2 });
+    expect(Object.fromEntries(compacted.toHash())).toEqual({ a: 1, d: 2 });
     expect(h.hasKey("b")).toBe(true);
   });
 
   it("indifferent to hash", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: 2 });
-    const plain = h.toHash();
+    const plain = Object.fromEntries(h.toHash());
     expect(plain).toEqual({ a: 1, b: 2 });
     expect(plain).not.toBeInstanceOf(HashWithIndifferentAccess);
   });
@@ -711,7 +711,7 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("to options on indifferent preserves hash", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.toHash()).toEqual({ a: 1 });
+    expect(Object.fromEntries(h.toHash())).toEqual({ a: 1 });
   });
 
   it("to options on indifferent preserves works as hash with dup", () => {
@@ -832,14 +832,14 @@ describe("HashWithIndifferentAccessTest", () => {
     const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
     const result = original.without("a", "b");
     expect(result).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(result.toHash()).toEqual({ c: 10 });
+    expect(Object.fromEntries(result.toHash())).toEqual({ c: 10 });
   });
 
   it("indifferent extract", () => {
     // except removes keys; verify
     const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
     const result = h.except("b", "c");
-    expect(result.toHash()).toEqual({ a: 1 });
+    expect(Object.fromEntries(result.toHash())).toEqual({ a: 1 });
   });
 
   it("new with to hash conversion", () => {
@@ -896,7 +896,7 @@ describe("HashWithIndifferentAccessTest", () => {
   it("inheriting from hash with indifferent access properly dumps ivars", () => {
     class MyHWIA<V> extends HashWithIndifferentAccess<V> {}
     const h = new MyHWIA({ x: 42 });
-    expect(h.toHash()).toEqual({ x: 42 });
+    expect(Object.fromEntries(h.toHash())).toEqual({ x: 42 });
   });
 
   it("should use default proc for unknown key", () => {
@@ -940,14 +940,19 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("should copy the default value when converting to hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    expect(h.toHash()).toEqual({ a: 1 });
+    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
+    h.setDefault("1234");
+    const roundtrip = h.toHash();
+    expect(Object.fromEntries(roundtrip)).toEqual({ a: 1 });
+    expect(roundtrip.default()).toBe("1234");
   });
 
   it("should copy the default proc when converting to hash with indifferent access", () => {
-    const h = new HashWithIndifferentAccess({ a: 1 });
-    const plain = h.toHash();
-    expect(plain["a"]).toBe(1);
+    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
+    h.setDefaultProc((_hash, key) => `${key}!`);
+    const roundtrip = h.toHash();
+    expect(roundtrip.get("a")).toBe(1);
+    expect(roundtrip.get("b")).toBe("b!");
   });
 
   it("should copy the default when converting non hash to hash with indifferent access", () => {
@@ -974,7 +979,7 @@ describe("HashWithIndifferentAccessTest", () => {
 
     let indifferentStrings = new HashWithIndifferentAccess<number>(strings);
     indifferentStrings.transformKeysBang((k) => k.repeat(2));
-    expect(indifferentStrings.toHash()).toEqual({ aa: 1, bb: 2 });
+    expect(Object.fromEntries(indifferentStrings.toHash())).toEqual({ aa: 1, bb: 2 });
     expect(indifferentStrings).toBeInstanceOf(HashWithIndifferentAccess);
 
     indifferentStrings = new HashWithIndifferentAccess<number>(strings);
@@ -1009,7 +1014,7 @@ describe("HashWithIndifferentAccessTest", () => {
     ]) {
       const copy = new HashWithIndifferentAccess(original);
       expect(copy.sliceBang(...keys).toHash()).toEqual(expected.toHash());
-      expect(copy.toHash()).toEqual({ a: "x", b: "y" });
+      expect(Object.fromEntries(copy.toHash())).toEqual({ a: "x", b: "y" });
     }
   });
 
