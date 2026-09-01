@@ -22,10 +22,12 @@
   },
   "dependencies": {
     "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "better-sqlite3": "^12.6.2",
     "express": "^4.21.2"
   },
   "devDependencies": {
+    "@blazetrails/activerecord-cli": "workspace:*",
     "@types/express": "^4.17.21",
     "tsx": "^4.21.0"
   }

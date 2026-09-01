@@ -42,6 +42,6 @@ export class User extends Base {
     this.validates("handle", { presence: true });
     this.validates("display_name", { presence: true });
     // Uniqueness is DB-aware, so it has its own (AR-only) macro.
-    this.validatesUniqueness("handle");
+    this.validatesUniquenessOf("handle");
   }
 }

@@ -10,7 +10,6 @@
  * follow-up; not in scope for Phase 2c.
  */
 
-import { pathToFileURL } from "node:url";
 import { buildViews, type BuildViewsOptions } from "./build-views.js";
 import { watchViews, type WatchHandle } from "./watch-views.js";
 
@@ -95,12 +94,13 @@ export function runCli(argv: readonly string[]): number {
   return 0;
 }
 
-// Skip auto-exec when imported (e.g. from tests). `import.meta.url` is the
-// invoked module only when run as the program entrypoint.
-// Compare module URL to argv[1] via `pathToFileURL` so Windows paths and
-// URL-encoded chars don't trip a naive `file://` string compare.
-const entry = process.argv[1];
-if (entry !== undefined && import.meta.url === pathToFileURL(entry).href) {
+/**
+ * Entry point. Invoked by `bin/trails-tsc-views.js`; not run on import, so
+ * tests can exercise `runCli` directly. The bin is a different file from
+ * this module, so an `import.meta.url === argv[1]` self-execution guard here
+ * would never fire through it and the CLI would be a no-op.
+ */
+export function main(): void {
   const argv = process.argv.slice(2);
   const rc = runCli(argv);
   // `dev` registers SIGINT/SIGTERM handlers and returns 0; calling

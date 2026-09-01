@@ -11,6 +11,6 @@ export class Like extends Base {
     this.validates("user_id", { presence: true });
     this.validates("tweet_id", { presence: true });
     // A user can like a given tweet at most once.
-    this.validatesUniqueness("user_id", { scope: "tweet_id" });
+    this.validatesUniquenessOf("user_id", { scope: "tweet_id" });
   }
 }

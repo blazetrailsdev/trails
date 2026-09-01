@@ -108,6 +108,9 @@ importers:
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../../packages/activerecord
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../../packages/date
       better-sqlite3:
         specifier: ^12.6.2
         version: 12.6.2
@@ -115,6 +118,9 @@ importers:
         specifier: ^4.21.2
         version: 4.22.2
     devDependencies:
+      '@blazetrails/activerecord-cli':
+        specifier: workspace:*
+        version: link:../../packages/activerecord-cli
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25
