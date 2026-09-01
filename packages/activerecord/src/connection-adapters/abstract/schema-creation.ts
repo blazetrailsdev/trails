@@ -17,17 +17,6 @@ import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
 
-type Definition =
-  | TableDefinition
-  | AlterTable
-  | ColumnDefinition
-  | AddColumnDefinition
-  | CreateIndexDefinition
-  | IndexDefinition
-  | ForeignKeyDefinition
-  | CheckConstraintDefinition
-  | PrimaryKeyDefinition;
-
 export interface SchemaCreationConn extends SchemaQuoter {
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
   supportsCheckConstraints(): Promise<boolean>;
@@ -41,7 +30,6 @@ export interface SchemaCreationConn extends SchemaQuoter {
 }
 
 interface IndexVisitor {
-  visitIndexDefinition(o: IndexDefinition, create?: boolean): Promise<string>;
   indexInCreate(
     tableName: string,
     columnName: string | string[],
@@ -114,7 +102,7 @@ export class SchemaCreation {
     const klass = o.constructor as abstract new (...args: never[]) => object;
     let m = this.cache.get(klass);
     if (m === undefined) {
-      m = `visit${o.constructor.name}`;
+      m = `visit${klass.name}`;
       this.cache.set(klass, m);
     }
     return (this as unknown as Record<string, (o: object) => Promise<string> | string>)[m](o);
