@@ -25,8 +25,8 @@ export function sliceBang(
       if (!keys.includes(key)) omit.set(key, value);
     }
     const result = new Hash<unknown, unknown>();
-    for (const [key, value] of hash) {
-      if (keys.includes(key)) result.set(key, value);
+    for (const key of keys) {
+      if (hash.has(key)) result.set(key, hash.get(key));
     }
     result.setDefault(hash.default());
     if (hash.defaultProc()) result.setDefaultProc(hash.defaultProc());

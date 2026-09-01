@@ -238,10 +238,13 @@ describe("HashExtTest", () => {
   });
 
   it("slice inplace", () => {
-    const h = { a: 1, b: 2, c: 3 };
-    const result = slice(h, "a", "c");
-    expect(result).toEqual({ a: 1, c: 3 });
-    expect(result).not.toHaveProperty("b");
+    const original: Record<string, unknown> = { a: "x", b: "y", c: 10 };
+    const expectedReturn = { c: 10 };
+    const expectedOriginal = { a: "x", b: "y" };
+
+    expect(sliceBang(original, "a", "b")).toEqual(expectedReturn);
+
+    expect(original).toEqual(expectedOriginal);
   });
 
   it("slice inplace with an array key", () => {
