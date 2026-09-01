@@ -34,10 +34,22 @@ export interface CookieJarLike {
  * can hand the whole payload to the cookie jar.
  */
 export class SessionId extends RackSessionId {
-  readonly cookieValue: Record<string, unknown>;
+  readonly #cookieValue: Record<string, unknown>;
   constructor(sessionId: RackSessionId, cookieValue: Record<string, unknown> = {}) {
     super(sessionId.publicId);
-    this.cookieValue = cookieValue;
+    this.#cookieValue = cookieValue;
+  }
+
+  /**
+   * Rails: `attr_reader :cookie_value` (`cookie_store.rb:54`). `DelegateClass`
+   * makes this a wrapper rather than a subclass, so the reader freely replaces
+   * the delegate's `alias :cookie_value :public_id`
+   * (`rack-session abstract/id.rb:34`) with a hash. TypeScript's `extends`
+   * demands an override be assignable to the base member, which a `String`
+   * reader and a `Hash` reader are not; the widened return type is that gap.
+   */
+  override get cookieValue(): any {
+    return this.#cookieValue;
   }
 }
 
@@ -117,7 +129,7 @@ export class CookieStore extends AbstractSecureStore {
 
   /** @internal Rails: `write_session(req, sid, session_data, options)` (private). */
   writeSession(
-    _req: CookieStoreRequest,
+    _req: any,
     sid: RackSessionId,
     sessionData: Record<string, unknown>,
     _options?: SessionOptions,
