@@ -673,22 +673,20 @@ describe("RequestVariant", () => {
 
 describe("RequestFormData", () => {
   it("media_type is from the FORM_DATA_MEDIA_TYPES array", () => {
-    expect(new Request({ CONTENT_TYPE: "application/x-www-form-urlencoded" }).isFormData).toBe(
-      true,
-    );
-    expect(new Request({ CONTENT_TYPE: "multipart/form-data" }).isFormData).toBe(true);
+    expect(new Request({ CONTENT_TYPE: "application/x-www-form-urlencoded" }).formData).toBe(true);
+    expect(new Request({ CONTENT_TYPE: "multipart/form-data" }).formData).toBe(true);
   });
 
   it("media_type is not from the FORM_DATA_MEDIA_TYPES array", () => {
-    expect(new Request({ CONTENT_TYPE: "application/xml" }).isFormData).toBe(false);
-    expect(new Request({ CONTENT_TYPE: "multipart/related" }).isFormData).toBe(false);
+    expect(new Request({ CONTENT_TYPE: "application/xml" }).formData).toBe(false);
+    expect(new Request({ CONTENT_TYPE: "multipart/related" }).formData).toBe(false);
   });
 
   it("no Content-Type header is provided and the request_method is POST", () => {
     const req = new Request({ REQUEST_METHOD: "POST" });
     expect(req.mediaType).toBeUndefined();
     expect(req.requestMethod).toBe("POST");
-    expect(req.isFormData).toBe(false);
+    expect(req.formData).toBe(false);
   });
 });
 

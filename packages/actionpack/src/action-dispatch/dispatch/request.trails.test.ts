@@ -5,7 +5,10 @@
  * (request.rb:292-295), the `fetch_header` memoization of `GET`
  * (request.rb:395-404), and the by-reference env `Rack::Request::Env#initialize`
  * gives every `set_header` — the semantics
- * `HostAuthorization#mark_as_authorized` (host_authorization.rb:167) relies on.
+ * `HostAuthorization#mark_as_authorized` (host_authorization.rb:167) relies on;
+ * and the two halves of `include Rack::Request::Helpers` (request.rb:21): the
+ * members the class body does not declare, which arrive through the mixin, and
+ * the ones it does, which outrank it as they do in Ruby.
  */
 import { describe, it, expect } from "vitest";
 import type { RackEnv } from "@blazetrails/rack";
@@ -57,5 +60,31 @@ describe("Request", () => {
     );
     expect(new Request({ "rack.url_scheme": "http" }).scheme).toBe("http");
     expect(new Request({ HTTPS: "on" }).ssl).toBe(true);
+  });
+
+  it("answers the Rack::Request::Helpers members it does not declare itself", () => {
+    const req = new Request({
+      HTTP_REFERER: "http://example.com/referred",
+      HTTP_HOST: "example.com",
+      REQUEST_METHOD: "OPTIONS",
+      SCRIPT_NAME: "/app",
+    });
+    expect(req.referer).toBe("http://example.com/referred");
+    expect(req.referrer).toBe("http://example.com/referred");
+    expect(req.hostAuthority).toBe("example.com");
+    expect(req.scriptName).toBe("/app");
+    expect(req.isOptions()).toBe(true);
+    expect(req.isTrace()).toBe(false);
+  });
+
+  it("its own request_method and form_data? outrank the included ones", () => {
+    const req = new Request({ REQUEST_METHOD: "POST" });
+    req.requestMethod = "PATCH";
+    expect(req.requestMethod).toBe("PATCH");
+    expect(req.getHeader("REQUEST_METHOD")).toBe("PATCH");
+    // Rack's form_data? treats a POST with no Content-Type as form data
+    // (rack/request.rb:470-475); ActionDispatch's override does not
+    // (action_dispatch/http/request.rb:371-373).
+    expect(new Request({ REQUEST_METHOD: "POST" }).formData).toBe(false);
   });
 });

@@ -10,6 +10,7 @@ import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
   RACK_SESSION,
+  RACK_SESSION_OPTIONS,
   Request as RackRequest,
   RequestHelpers,
 } from "@blazetrails/rack";
@@ -871,8 +872,13 @@ export class Request {
     return this.hasHeader(key);
   }
 
-  /** Rails: `form_data?` — content-type is form-data. */
-  get isFormData(): boolean {
+  /**
+   * Rails: `form_data?` (request.rb:373-375) — content-type is form-data.
+   * Spelled as `Rack::Request::Helpers#form_data?` is
+   * (`packages/rack/src/request.ts`), so that this override outranks the
+   * mixin's, which also treats a POST with no Content-Type as form data.
+   */
+  get formData(): boolean {
     const mt = this.mediaType;
     return mt != null && (FORM_DATA_MEDIA_TYPES as readonly string[]).includes(mt);
   }
@@ -946,7 +952,22 @@ export class Request {
   }
 
   /**
-   * Rails: `session_options=` (request.rb:389-391) —
+   * Mirrors `Rack::Request::Helpers#session_options` (`rack/request.rb:213-217`),
+   * which `ActionDispatch::Request` inherits through the mixin
+   * (`request.rb:21`) while overriding only the writer below. A JS property
+   * takes both halves from one descriptor, so the reader cannot fall through
+   * the mixin while the writer overrides it, and the inherited half is
+   * restated here.
+   */
+  get sessionOptions(): Record<string, unknown> {
+    return this.fetchHeader(RACK_SESSION_OPTIONS, (k: string) => this.setHeader(k, {})) as Record<
+      string,
+      unknown
+    >;
+  }
+
+  /**
+   * Rails: `session_options=` (request.rb:390-392) —
    * `Session::Options.set self, options`.
    */
   set sessionOptions(options: Record<string, unknown>) {
@@ -1151,7 +1172,44 @@ Request.prototype.fresh = _fresh;
 
 include(Request, RequestHelpers);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface Request extends RequestHelpers {}
+export interface Request extends Omit<
+  RequestHelpers,
+  | "env"
+  | "getHeader"
+  | "setHeader"
+  | "fetchHeader"
+  | "body"
+  | "requestMethod"
+  | "isGet"
+  | "isHead"
+  | "isPost"
+  | "isPut"
+  | "isPatch"
+  | "isDelete"
+  | "host"
+  | "port"
+  | "hostWithPort"
+  | "serverPort"
+  | "path"
+  | "queryString"
+  | "fullpath"
+  | "url"
+  | "contentType"
+  | "mediaType"
+  | "contentLength"
+  | "userAgent"
+  | "xhr"
+  | "ip"
+  | "params"
+  | "session"
+  | "sessionOptions"
+  | "cookies"
+  | "logger"
+  | "GET"
+  | "POST"
+  | "formData"
+  | "defaultSession"
+> {}
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request extends CspRequest {}
