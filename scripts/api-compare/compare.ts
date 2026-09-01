@@ -1546,6 +1546,68 @@ export function writerPairedWithReader(
   return (rubyMethodToTs(base) ?? []).includes(tsName);
 }
 
+/**
+ * True when a Ruby PREDICATE resolved to the TS declaration that ports its
+ * NON-predicate twin.
+ *
+ * `docs/ruby-ts-conventions.md` drops a predicate's trailing `?`, so `foo?` and
+ * `foo` produce the same TS spelling. When Ruby has both, the bare camel name
+ * is the TWIN's — `ActionController::Parameters#deep_merge?`
+ * (`strong_parameters.rb:1027`) is the DeepMergeable hook asking whether a
+ * value merges recursively, while `strong-parameters.ts:295`'s `deepMerge` is
+ * the port of `ActiveSupport::DeepMergeable#deep_merge`
+ * (`deep_mergeable.rb:29`). Scoring the predicate's signature against that
+ * declaration reports its parameter as a rename (`otherHash` → `other`) with
+ * nothing to converge: the predicate is simply unported, and renaming the
+ * parameter would adopt the identifier of a method the body does not
+ * implement. So the pair is not compared for parameter NAMES, the same way
+ * {@link writerPairedWithReader} withholds a reader's body from a writer.
+ */
+export function predicatePairedWithBareTwin(
+  rubyName: string,
+  tsName: string,
+  twinRubyNames: ReadonlySet<string>,
+): boolean {
+  if (!rubyName.endsWith("?")) return false;
+  const base = rubyName.slice(0, -1);
+  if (!twinRubyNames.has(base)) return false;
+  return (rubyMethodToTs(base) ?? []).includes(tsName);
+}
+
+/**
+ * Method names a Ruby file's entities inherit from `include`d modules that live
+ * in ANOTHER gem.
+ *
+ * `flattenIncludedMethodInfos` resolves an `include` against `rubyPkg` alone,
+ * so `Parameters`'s `include ActiveSupport::DeepMergeable`
+ * (`strong_parameters.rb:161`) contributes nothing to actioncontroller's
+ * expected surface — correctly, since that mixin is activesupport's to port.
+ * But the names it contributes are still what decides whether a predicate's
+ * bare camel spelling is free, so {@link predicatePairedWithBareTwin} needs
+ * them. Names only, one level, fully-qualified include sites only: this answers
+ * "is that spelling already some other Ruby method's" and nothing else, so it
+ * never moves a matched/missing figure.
+ */
+export function crossPackageIncludedMethodNames(
+  entities: readonly ClassInfo[],
+  pkg: string,
+  ruby: ApiManifest,
+): Set<string> {
+  const names = new Set<string>();
+  for (const entity of entities) {
+    for (const inc of [...(entity.includes ?? []), ...(entity.extends ?? [])]) {
+      if (!inc.includes("::")) continue;
+      for (const [otherPkg, otherRubyPkg] of Object.entries(ruby.packages)) {
+        if (otherPkg === pkg) continue;
+        const mod = otherRubyPkg.modules[inc] as unknown as ClassInfo | undefined;
+        if (!mod) continue;
+        for (const m of [...mod.instanceMethods, ...mod.classMethods]) names.add(m.name);
+      }
+    }
+  }
+  return names;
+}
+
 /** The tags that justify deviations for `owner`'s copy of a method. A resolved
  *  owner reads ONLY its own class's tags, so a tag on a sibling class cannot
  *  silence a flag raised against this one. With no owner resolved the tags of
@@ -2770,7 +2832,18 @@ export function blazetrailsDepKeys(pkg: string): string[] {
   }
 }
 
-export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, ClassInfo[]> {
+/**
+ * Index the package's TS entities by short name, then its blazetrails deps',
+ * so a superclass / include-edge walk can cross a package boundary.
+ *
+ * `foreign` is filled with every entity a DEP package contributed — the
+ * candidates {@link resolveEntityByDeclaringFile} must not rank by path.
+ */
+export function buildEntitiesByName(
+  pkg: string,
+  ts: ApiManifest,
+  foreign?: Set<ClassInfo>,
+): Map<string, ClassInfo[]> {
   const map = new Map<string, ClassInfo[]>();
 
   const isFixture = (e: ClassInfo) =>
@@ -2781,6 +2854,7 @@ export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, C
     if (!p) return;
     for (const entity of [...Object.values(p.classes), ...Object.values(p.modules)]) {
       if (isFixture(entity)) continue;
+      if (pkgKey !== pkg) foreign?.add(entity);
       const list = map.get(entity.name) ?? [];
       list.push(entity);
       map.set(entity.name, list);
@@ -2820,12 +2894,27 @@ export function buildEntitiesByName(pkg: string, ts: ApiManifest): Map<string, C
  * reports it (RFC 0126). A tie at a POSITIVE score keeps its winner: those
  * candidates do share a directory prefix with the child, which is the signal
  * this heuristic exists to read; only a tie at zero is pure enumeration order.
+ *
+ * `isForeign` marks a candidate a DEP package contributed. A dep's path is
+ * relative to ITS OWN src dir, so a shared prefix with the child is a
+ * coincidence: activemodel and activerecord both port `attribute_methods.rb`
+ * to `attribute-methods.ts`, and so with `validations.ts`, `callbacks.ts`,
+ * `serialization.ts`, `attributes.ts` and every other file the two gems both
+ * carry. Ranking that coincidence lets a dep's same-named entity take the
+ * child's parent slot, and the inheritance walk then pools the DEP's method
+ * names under the package's identically-named key — where `directMatch` reads
+ * them, so a Ruby method this gem does not port reads as matched because the
+ * other gem ports a same-named one. A foreign candidate therefore scores zero
+ * and wins only when nothing else is in the running, which is the arm the
+ * cross-package walk exists for (`AR::Base extends AM::Model`, AR
+ * `type/text.ts` extends AM `type/string.ts`).
  */
 export function resolveEntityByDeclaringFile(
   candidates: ClassInfo[],
   childFile: string,
   declFile?: string,
   onAmbiguous?: (candidates: ClassInfo[]) => void,
+  isForeign?: (candidate: ClassInfo) => boolean,
 ): ClassInfo | null {
   if (candidates.length === 0) return null;
   if (candidates.length === 1) return candidates[0];
@@ -2841,9 +2930,11 @@ export function resolveEntityByDeclaringFile(
     if (c.file === childFile) continue; // skip self
     const parts = (c.file || "").split("/");
     let shared = 0;
-    for (let i = 0; i < Math.min(childParts.length, parts.length); i++) {
-      if (childParts[i] === parts[i]) shared++;
-      else break;
+    if (isForeign?.(c) !== true) {
+      for (let i = 0; i < Math.min(childParts.length, parts.length); i++) {
+        if (childParts[i] === parts[i]) shared++;
+        else break;
+      }
     }
     if (shared > bestScore) {
       bestScore = shared;
@@ -3289,15 +3380,20 @@ export function main() {
       // Key by short name → entity for superclass/extends resolution.
       // Includes dep-package entities so walks can cross package boundaries
       // (e.g. AR Base extends AM Model).
-      const entitiesByName = buildEntitiesByName(pkg, ts);
+      const foreignEntities = new Set<ClassInfo>();
+      const entitiesByName = buildEntitiesByName(pkg, ts, foreignEntities);
 
       const entityKey = (e: ClassInfo) => `${e.file}:${e.name}`;
 
       const ambiguousParents = new Map<string, number>();
 
       const resolveParent = (name: string, childFile: string, declFile?: string) =>
-        resolveEntityByDeclaringFile(entitiesByName.get(name) || [], childFile, declFile, (cands) =>
-          ambiguousParents.set(name, cands.length),
+        resolveEntityByDeclaringFile(
+          entitiesByName.get(name) || [],
+          childFile,
+          declFile,
+          (cands) => ambiguousParents.set(name, cands.length),
+          (c) => foreignEntities.has(c),
         );
 
       const inheritedCache = new Map<string, Set<string>>();
@@ -4033,7 +4129,11 @@ export function main() {
         // and renames every arg is 100% on arity and 0% here. Only pairs that
         // line up positionally are compared, so a length disagreement stays
         // arity's row rather than being charged twice.
-        if (!rubyForwardingNames.has(rubyName) && !guessedFile) {
+        if (
+          !rubyForwardingNames.has(rubyName) &&
+          !guessedFile &&
+          !predicatePairedWithBareTwin(rubyName, tsName, twinRubyNames)
+        ) {
           // Scoped per-FILE, unlike arity's global pool: a name is only weak
           // evidence of identity for parameter SPELLINGS. `initialize` pools
           // every constructor in the package, so `Table#initialize(name, as:,
@@ -4136,6 +4236,14 @@ export function main() {
       // resolves to `set#{Name}` instead of stealing the reader's TS body
       // (see the `name.endsWith("=")` arm of `rubyMethodToTsIgnoringSkip`).
       const siblingRubyNames = new Set([...seen.values()].map((m) => m.rubyName));
+      const twinRubyNames = new Set([
+        ...siblingRubyNames,
+        ...crossPackageIncludedMethodNames(
+          items.map((item) => item.info),
+          pkg,
+          ruby,
+        ),
+      ]);
 
       for (const [
         _dedupeKey,
