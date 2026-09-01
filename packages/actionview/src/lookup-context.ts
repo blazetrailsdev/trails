@@ -681,28 +681,17 @@ export class LookupContext {
   }
 
   /**
-   * Render a Template with its handler.
+   * Render a Template against a view, as `Template#render` (`template.rb:271`)
+   * does.
    */
   async renderTemplate(
     template: Template,
     locals: Record<string, unknown>,
-    context: RenderContext,
+    context: RenderContext & { view?: Base },
   ): Promise<string> {
-    const handler = TemplateHandlers.handlerForExtension(template.extension);
-    if (!handler) {
-      throw new Error(
-        `No template handler registered for ".${template.extension}". ` +
-          `Register one with TemplateHandlers.registerTemplateHandler(extension, handler).`,
-      );
-    }
-
     const view = context.view ?? this.buildViewContext();
-    return handler.render(template.source, locals, {
-      ...context,
-      templatePath: template.fullPath ?? template.identifier,
-      view,
-      template,
-    });
+    if (context.yield !== undefined) view.viewFlow.set("layout", context.yield);
+    return template.render(view, locals);
   }
 
   /**
@@ -740,32 +729,9 @@ export class LookupContext {
       );
     }
 
-    const handler = TemplateHandlers.handlerForExtension(template.extension);
-    if (!handler) {
-      throw new Error(
-        `No template handler registered for ".${template.extension}". ` +
-          `Register one with TemplateHandlers.registerTemplateHandler(extension, handler).`,
-      );
-    }
-
     const partialView = view ?? this.buildViewContext();
 
-    const output = handler.render(template.source, locals, {
-      controller: partialPrefix,
-      action: `_${partialName}`,
-      format,
-      templatePath: template.fullPath ?? template.identifier,
-      view: partialView,
-      template,
-    });
-
-    if (typeof output !== "string") {
-      throw new Error(
-        `Handler for ".${template.extension}" renders asynchronously and cannot be nested ` +
-          `inside a template. Render ${JSON.stringify(name)} from the controller instead.`,
-      );
-    }
-    return output;
+    return template.render(partialView, locals);
   }
 
   /**

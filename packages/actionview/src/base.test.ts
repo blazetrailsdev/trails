@@ -5,6 +5,14 @@ import { LookupContext } from "./lookup-context.js";
 import { OutputBuffer } from "./buffers.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
+import { Template } from "./template.js";
+
+/** Compile and run a `.tse` source through `Template#render`, as Rails does. */
+const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
+  new Template({ source, identifier: "t", extension: "tse", handler: new Tse() }).render(
+    view,
+    locals,
+  );
 
 describe("ActionView::Base", () => {
   it("prepares the context with an output buffer, a view flow and no virtual path", () => {
@@ -36,31 +44,21 @@ describe("ActionView::Base", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
     const original = view.outputBuffer;
     const buffer = new OutputBuffer();
-    view._run(
-      function (this: Base) {
-        expect(this.outputBuffer).toBe(buffer);
-        return null;
-      },
-      null,
-      {},
-      buffer,
-    );
+    view.compiledMethodContainer()._compiledMethods.set("_m", function (this: Base) {
+      expect(this.outputBuffer).toBe(buffer);
+      return null;
+    });
+    view._run("_m", null, {}, buffer);
     expect(view.outputBuffer).toBe(original);
   });
 
   it("_run restores the buffer even when the method throws", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
     const original = view.outputBuffer;
-    expect(() =>
-      view._run(
-        () => {
-          throw new Error("boom");
-        },
-        null,
-        {},
-        new OutputBuffer(),
-      ),
-    ).toThrow("boom");
+    view.compiledMethodContainer()._compiledMethods.set("_m", () => {
+      throw new Error("boom");
+    });
+    expect(() => view._run("_m", null, {}, new OutputBuffer())).toThrow("boom");
     expect(view.outputBuffer).toBe(original);
   });
 
@@ -122,16 +120,7 @@ describe("ActionView::Base", () => {
         },
       };
       const view = new (Base.withHelpers(helpers))(null, {}, { user: "Ada" });
-      const out = new Tse().render(
-        "<%= currentUser() %>",
-        {},
-        {
-          controller: "posts",
-          action: "index",
-          format: "html",
-          view,
-        },
-      );
+      const out = renderTse("<%= currentUser() %>", {}, view);
       expect(out).toBe("Ada");
     } finally {
       TemplateHandlers.clear();
@@ -140,18 +129,7 @@ describe("ActionView::Base", () => {
 
   it("lets a local shadow a helper of the same name, as locals_code does", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-    expect(
-      new Tse().render(
-        "<%= raw %>",
-        { raw: "local wins" },
-        {
-          controller: "c",
-          action: "a",
-          format: "html",
-          view,
-        },
-      ),
-    ).toBe("local wins");
+    expect(renderTse("<%= raw %>", { raw: "local wins" }, view)).toBe("local wins");
   });
 });
 
@@ -215,16 +193,7 @@ describe("ActionView::Base include Helpers", () => {
   it("resolves a helper as a bare identifier in a template", () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
-      const out = new Tse().render(
-        '<%= contentTag("p", name) %>',
-        { name: "Ada" },
-        {
-          controller: "posts",
-          action: "index",
-          format: "html",
-          view: view(),
-        },
-      );
+      const out = renderTse('<%= contentTag("p", name) %>', { name: "Ada" }, view());
       expect(out).toBe("<p>Ada</p>");
     } finally {
       TemplateHandlers.clear();
@@ -234,16 +203,7 @@ describe("ActionView::Base include Helpers", () => {
   it("resolves a number helper as a bare identifier in a template", () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
-      const out = new Tse().render(
-        "<%= numberToCurrency(amount) %>",
-        { amount: 12.5 },
-        {
-          controller: "posts",
-          action: "index",
-          format: "html",
-          view: view(),
-        },
-      );
+      const out = renderTse("<%= numberToCurrency(amount) %>", { amount: 12.5 }, view());
       expect(out).toContain("12.50");
     } finally {
       TemplateHandlers.clear();
@@ -318,16 +278,7 @@ describe("ActionView::Base include ControllerHelper", () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
       const view = new (Base.withEmptyTemplateCache())(null, {}, controller);
-      const out = new Tse().render(
-        "<%= params.id %>",
-        {},
-        {
-          controller: "posts",
-          action: "index",
-          format: "html",
-          view,
-        },
-      );
+      const out = renderTse("<%= params.id %>", {}, view);
       expect(out).toBe("1");
     } finally {
       TemplateHandlers.clear();
@@ -339,15 +290,10 @@ describe("ActionView::Base include TSE::Util", () => {
   it("resolves h() as a bare identifier in a template", () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
-      const out = new Tse().render(
+      const out = renderTse(
         "<%= h(name) %>",
         { name: "<b>" },
-        {
-          controller: "posts",
-          action: "index",
-          format: "html",
-          view: new (Base.withEmptyTemplateCache())(null, {}, null),
-        },
+        new (Base.withEmptyTemplateCache())(null, {}, null),
       );
       expect(out).toBe("&lt;b&gt;");
     } finally {
@@ -427,15 +373,10 @@ describe("ActionView::Base attr_internal readers", () => {
   it("resolves request as a bare identifier in a template", () => {
     TemplateHandlers.registerTemplateHandler("tse", new Tse());
     try {
-      const out = new Tse().render(
+      const out = renderTse(
         "<%= request.host %>",
         {},
-        {
-          controller: "posts",
-          action: "index",
-          format: "html",
-          view: new (Base.withEmptyTemplateCache())(null, {}, controller),
-        },
+        new (Base.withEmptyTemplateCache())(null, {}, controller),
       );
       expect(out).toBe("example.com");
     } finally {

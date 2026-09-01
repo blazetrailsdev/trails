@@ -5,7 +5,7 @@ import { Raw } from "./handlers/raw.js";
 function makeHandler(extensions: string[]): TemplateHandler {
   return {
     extensions,
-    render: (source) => source,
+    call: (_template, source) => JSON.stringify(source),
   };
 }
 
@@ -84,10 +84,8 @@ describe("Template::Handlers", () => {
 });
 
 describe("Template::Handlers::Raw", () => {
-  it("returns the source verbatim", async () => {
-    const raw = new Raw();
-    const out = await raw.render("hello", {}, { controller: "x", action: "y", format: "html" });
-    expect(out).toBe("hello");
+  it("returns the source verbatim", () => {
+    expect(new Raw().call(null, "hello")).toBe('htmlSafe("hello");');
   });
 
   it("declares passthrough extensions", () => {

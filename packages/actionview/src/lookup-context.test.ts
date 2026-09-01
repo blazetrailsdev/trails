@@ -172,21 +172,13 @@ describe("LookupContext#renderPartialSync", () => {
     expect(() => ctx.renderPartialSync("frm", "posts", "html")).toThrow(MissingTemplate);
   });
 
-  it("raises rather than emitting [object Promise] for an async handler", () => {
-    TemplateHandlers.registerTemplateHandler("tse", {
-      extensions: ["tse"],
-      render: async () => "later",
-    });
-    const ctx = contextWith({ "posts/_form": "hi" });
-    expect(() => ctx.renderPartialSync("form", "posts", "html")).toThrow(/renders asynchronously/);
-  });
-
   it("is reachable from a template rendered through renderTemplate", async () => {
     const ctx = contextWith({ "posts/_form": "form!" });
     const out = await ctx.renderTemplate(
       new Template({
         source: '<%= render({ partial: "form" }) %>',
         identifier: "posts/index",
+        virtualPath: "posts/index",
         extension: "tse",
         format: "html",
       }),

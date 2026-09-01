@@ -22,6 +22,8 @@ export class TemplateError extends Error {
   readonly template: Template;
   /** @internal stub - real impl in Phase 1b */
   readonly sourceExtract: string;
+  /** Mirrors `@sub_templates` (`template/error.rb:219`). */
+  private subTemplates?: Template[];
 
   constructor(opts: TemplateErrorOptions) {
     super(opts.original.message, { cause: opts.original });
@@ -29,5 +31,11 @@ export class TemplateError extends Error {
     this.original = opts.original;
     this.template = opts.template;
     this.sourceExtract = opts.sourceExtract ?? "";
+  }
+
+  /** Mirrors `Template::Error#sub_template_of(template_path)` (`template/error.rb:218-221`). */
+  subTemplateOf(templatePath: Template): void {
+    this.subTemplates ??= [];
+    this.subTemplates.push(templatePath);
   }
 }

@@ -2,17 +2,75 @@
  * ActionView::Template — Rails mirror: `action_view/template.rb`.
  *
  * A single template file: source, handler, and metadata (identifier,
- * format, variant, locals). The TS port collapses Rails' compile-then-
- * `module_eval` step into a direct `handler.render(source, locals, ctx)`
- * call — our handler interface already does the compile-and-execute in
- * one shot (see `template/handlers.ts`).
+ * format, variant, locals). `compile!` turns the handler's code string into
+ * a method on `view.compiled_method_container` and `render` runs it through
+ * `view._run`, exactly as `template.rb:271-287,418-438` does.
  */
+import { htmlSafe } from "@blazetrails/activesupport";
+import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
+import { OutputBuffer } from "./buffers.js";
+import { StrictLocalsMismatch } from "./strict-locals.js";
 import { TemplateError } from "./template/error.js";
-import { TemplateHandlers, type RenderContext, type TemplateHandler } from "./template/handlers.js";
+import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 
 const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
 const VARIABLE_FROM_BASENAME = /^_?(.*?)(?:\.\w+)*$/;
 const NONE = Symbol("Template::NONE");
+
+/**
+ * The JS spelling of `RUBY_RESERVED_KEYWORDS` (`template.rb:558`): names
+ * `locals_code` must not emit an assignment for, because the assignment would
+ * be a syntax error.
+ */
+const JS_RESERVED_KEYWORDS = [
+  "await",
+  "break",
+  "case",
+  "catch",
+  "class",
+  "const",
+  "continue",
+  "debugger",
+  "default",
+  "delete",
+  "do",
+  "else",
+  "enum",
+  "export",
+  "extends",
+  "false",
+  "finally",
+  "for",
+  "function",
+  "if",
+  "import",
+  "in",
+  "instanceof",
+  "new",
+  "null",
+  "return",
+  "super",
+  "switch",
+  "this",
+  "throw",
+  "true",
+  "try",
+  "typeof",
+  "var",
+  "void",
+  "while",
+  "with",
+  "yield",
+];
+
+/** `template.rb:568` — only locals with valid variable names get set directly. */
+const VALID_LOCAL_NAME = /^(?![A-Z0-9])[\p{L}\p{N}_]+$/u;
+
+/**
+ * Stands in for Ruby's `__id__` in `method_name` (`template.rb:398`): a value
+ * unique to this object for the life of the process.
+ */
+let nextObjectId = 0;
 
 export interface TemplateOptions {
   source: string;
@@ -52,6 +110,16 @@ export class Template {
   /** @internal */
   _strictLocalKeys: readonly string[] | null = null;
   private _shortIdentifier?: string;
+  private _methodName?: string;
+  private readonly _objectId = ++nextObjectId;
+  /**
+   * Rails' `@compiled` (`template.rb:420`) is a boolean, because a template
+   * object belongs to exactly one `compiled_method_container`. In trails a
+   * resolver's template cache outlives the view-context class, so the memo
+   * records WHICH container the method was defined on and recompiles for a
+   * second one instead of handing `_run` an undefined method.
+   */
+  private _compiled: CompiledMethodContainer | null = null;
 
   constructor(opts: TemplateOptions) {
     this._source = opts.source;
@@ -121,39 +189,36 @@ export class Template {
     return this.strictLocalsBang() != null;
   }
 
-  /** Render this template. Non-TemplateError failures from the handler
-   * are wrapped in {@link TemplateError} so AP's ExceptionWrapper can
-   * unwrap to the original cause. */
-  async render(
-    view: Partial<RenderContext> = {},
+  /**
+   * Mirrors `Template#render(view, locals, buffer)` (`template.rb:271-287`):
+   * compile the template if it has not been compiled yet, then run the
+   * compiled method against the view.
+   */
+  render(
+    view: Base,
     locals: Record<string, unknown> = {},
-  ): Promise<string> {
-    // Touch strict locals so the magic comment is stripped before the
-    // handler sees the source — matches Rails' compile order.
-    this.strictLocalsBang();
-
-    const handler = this.resolveHandler();
-    if (!handler) {
-      throw new Error(
-        `No template handler registered for ".${this.extension}". ` +
-          `Register one with TemplateHandlers.registerTemplateHandler(ext, handler).`,
-      );
-    }
-
+    buffer: OutputBuffer | null = null,
+  ): string {
     try {
-      return await handler.render(this._source, locals, {
-        ...view,
-        controller: view.controller ?? "",
-        action: view.action ?? "",
-        format: view.format ?? this.format ?? "",
-        yield: view.yield,
-        templatePath: view.templatePath ?? this.fullPath ?? this.identifier,
-      });
+      this.compileBang(view);
+
+      if (buffer) {
+        view._run(this.methodName(), this, locals, buffer);
+        return "";
+      } else {
+        const result = view._run(this.methodName(), this, locals, new OutputBuffer());
+        return result instanceof OutputBuffer ? result.toStr() : String(result ?? "");
+      }
     } catch (e) {
-      if (e instanceof TemplateError) throw e;
-      const original = e instanceof Error ? e : new Error(String(e));
-      throw new TemplateError({ original, template: this });
+      return this.handleRenderError(view, e);
     }
+  }
+
+  /** Mirrors `Template#method_name` (`template.rb:396-402`). */
+  methodName(): string {
+    return (this._methodName ??= `_${this.identifierMethodName()}__${stringHash(
+      this.identifier,
+    )}_${this._objectId}`.replace(/-/g, "_"));
   }
 
   inspect(): string {
@@ -183,10 +248,151 @@ export class Template {
     });
   }
 
+  /**
+   * Mirrors `Template#compile!(view)` (`template.rb:418-438`). Rails takes
+   * `@compile_mutex` around the body so two threads never compile the same
+   * template; JS has no concurrent execution to guard against, so the lock and
+   * its second `@compiled` re-check have no analogue.
+   *
+   * @internal
+   */
+  private compileBang(view: Base): void {
+    const mod = view.compiledMethodContainer();
+    if (this._compiled === mod) return;
+
+    this.compile(mod);
+
+    this._compiled = mod;
+  }
+
+  /**
+   * Mirrors `Template#compile(mod)` (`template.rb:499-521`) — Rails
+   * `module_eval`s `compiled_source` onto the container, which defines a real
+   * method named `method_name`; the JS analogue evaluates the same source to a
+   * function and stores it under that name. Rails' strict-locals parameter
+   * audit has no analogue: the tse compiler emits the check into the template
+   * body (see {@link compiledSource}), so there are no method parameters to
+   * inspect — and so no `to_sentence`d list of offending parameter names to
+   * put in a `StrictLocalsError`.
+   *
+   * @internal
+   * @missingRailsCall to_sentence — PERMANENT
+   */
+  private compile(mod: CompiledMethodContainer): void {
+    try {
+      const factory = new Function(
+        "StrictLocalsMismatch",
+        "htmlSafe",
+        `return ${this.compiledSource()};`,
+      ) as (mismatch: typeof StrictLocalsMismatch, safe: typeof htmlSafe) => CompiledMethod;
+      mod._compiledMethods.set(this.methodName(), factory(StrictLocalsMismatch, htmlSafe));
+    } catch (error) {
+      throw new SyntaxError(`Failed to compile ${this.identifier}: ${(error as Error).message}`, {
+        cause: error,
+      });
+    }
+  }
+
+  /**
+   * Mirrors `Template#compiled_source` (`template.rb:443-485`): wrap the
+   * handler's code string in the method `compile` defines, with
+   * `@virtual_path =` and `locals_code` prepended.
+   *
+   * Rails' `method_arguments` branch splats the strict-locals signature into
+   * the method's parameter list; a JS function has no keyword parameters, so
+   * the tse compiler emits the strict-locals check into the body and raises
+   * `StrictLocalsMismatch` there — the same reason `Base#_run` does not accept
+   * Rails' `has_strict_locals:`.
+   *
+   * The nested `with` is the JS construct with Ruby's name resolution order:
+   * the method is defined ON THE VIEW, so an unqualified name is a helper call
+   * on `self`, and `locals_code`'s assignments shadow a same-named helper.
+   * `encode!` (`template.rb:445`) has no analogue — a JS string is Unicode by
+   * specification, so there is no encoding to force.
+   *
+   * @internal
+   */
+  private compiledSource(): string {
+    // Rails calls `strict_locals!` first, because it moves the signature into
+    // the method's parameter list and the handler never needs it. A JS
+    // function has no keyword parameters, so the tse compiler emits the check
+    // from the magic comment instead — which means the handler has to see the
+    // source before the comment is stripped.
+    const source = this.source;
+    this.strictLocalsBang();
+    const handler = this.resolveHandler();
+    if (!handler) {
+      throw new Error(
+        `No template handler registered for ".${this.extension}". ` +
+          `Register one with TemplateHandlers.registerTemplateHandler(ext, handler).`,
+      );
+    }
+    const code = handler.call(this, source);
+
+    return `function ${this.methodName()}(localAssigns, outputBuffer) {
+  this.virtualPath = ${JSON.stringify(this.virtualPath)};
+  with (this) { with (localAssigns) {${this.localsCode()}
+    return ${code};
+  } }
+}`;
+  }
+
+  /**
+   * Mirrors `Template#locals_code` (`template.rb:561-572`). The assignments
+   * run inside `with (localAssigns)`, so a declared local the caller omitted
+   * resolves to `undefined` — Ruby's `nil` — rather than falling through to a
+   * same-named view helper.
+   *
+   * @internal
+   */
+  private localsCode(): string {
+    if (this.strictLocalsQ()) return "";
+
+    let locals = this._locals.filter((l) => !JS_RESERVED_KEYWORDS.includes(l));
+
+    locals = locals.filter((l) => VALID_LOCAL_NAME.test(l));
+
+    return locals.reduce(
+      (code, key) => `${code} ${key} = localAssigns[${JSON.stringify(key)}]; ${key} = ${key};`,
+      "",
+    );
+  }
+
+  /** Mirrors `Template#identifier_method_name` (`template.rb:574-576`). */
+  private identifierMethodName(): string {
+    return this.shortIdentifier.replace(/[^a-z_]/g, "_");
+  }
+
+  /** Mirrors `Template#handle_render_error(view, e)` (`template.rb:549-556`). */
+  private handleRenderError(view: Base, e: unknown): never {
+    if (e instanceof TemplateError) {
+      e.subTemplateOf(this);
+      throw e;
+    } else {
+      throw new TemplateError({
+        original: e instanceof Error ? e : new Error(String(e)),
+        template: this,
+      });
+    }
+  }
+
   /** @internal */
   private resolveHandler(): TemplateHandler | undefined {
     return this.handler ?? TemplateHandlers.handlerForExtension(this.extension);
   }
+}
+
+/**
+ * The `String#hash` of `template.rb:398` — a value stable for equal strings
+ * within a process. JS has no built-in, so this is the standard FNV-1a.
+ */
+function stringHash(value: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash;
 }
 
 function deriveVariable(virtualPath: string | null): string | null {

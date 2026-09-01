@@ -372,12 +372,14 @@ export class Base {
    * @missingRailsArgs _run — CONVERGEABLE template-render-hands-the-view-to-run
    */
   _run(
-    method: CompiledMethod,
+    method: string,
     template: Template | null,
     locals: Record<string, unknown>,
     buffer: OutputBuffer,
     options: { addToStack?: boolean } = {},
   ): unknown {
+    const compiled = this.compiledMethodContainer()._compiledMethods.get(method);
+    if (!compiled) throw new Error(`undefined method '${method}'`);
     const addToStack = options.addToStack ?? true;
     const oldOutputBuffer = this.outputBuffer;
     const oldVirtualPath = this.virtualPath;
@@ -385,7 +387,7 @@ export class Base {
     if (addToStack) this.currentTemplate = template;
     this.outputBuffer = buffer;
     try {
-      return method.call(this, locals, buffer);
+      return compiled.call(this, locals, buffer);
     } finally {
       this.outputBuffer = oldOutputBuffer;
       this.virtualPath = oldVirtualPath;

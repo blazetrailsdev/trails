@@ -8,7 +8,7 @@ import { FixtureResolver } from "./testing/resolvers.js";
 function withFinder(source: string): LookupContext {
   TemplateHandlers.registerTemplateHandler("html", {
     extensions: ["html"],
-    render: (s) => s,
+    call: (_template, source) => JSON.stringify(source),
   });
   const resolver = new FixtureResolver({
     "posts/show.html.html": source,

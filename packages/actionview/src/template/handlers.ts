@@ -11,9 +11,6 @@
  *   TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
  */
 
-import type { Base } from "../base.js";
-import type { Template } from "../template.js";
-
 /**
  * The rendering context passed to handlers.
  */
@@ -28,50 +25,22 @@ export interface RenderContext {
   yield?: string;
   /** The full template path for error reporting */
   templatePath?: string;
-  /**
-   * The `ActionView::Base` the template is compiled into and rendered
-   * against. Rails' handler protocol has no such field because `Template#render`
-   * receives the view directly (`template.rb:271`) and hands it to `_run`;
-   * trails' handler is called with source + locals, so the view rides along on
-   * the context.
-   *
-   * @noRailsEquivalent CONVERGEABLE template-render-hands-the-view-to-run
-   */
-  view?: Base;
-  /**
-   * The `Template` being rendered. Rails' `Template#render` (`template.rb:271`)
-   * passes `self` straight to `view._run`, so nothing has to carry it; a trails
-   * handler is called with source + locals, so it rides on the context beside
-   * the view.
-   *
-   * @noRailsEquivalent CONVERGEABLE template-render-hands-the-view-to-run
-   */
-  template?: Template;
 }
 
 /**
- * A template handler knows how to render templates of a specific type.
- *
- * Implementations should be stateless — all per-render state comes
- * through the `render` method's arguments.
+ * A template handler compiles a template source string to a code string, which
+ * `Template#compile!` (`template.rb:418-438`) turns into a method on the view.
+ * Rails' handlers answer `call(template, source)` and nothing else.
  */
 export interface TemplateHandler {
   /** File extensions this handler supports (e.g., ["tse"], ["tsx", "jsx"]) */
   readonly extensions: string[];
 
   /**
-   * Render a template source string to output.
-   *
-   * @param source  The raw template source code
-   * @param locals  Variables available to the template
-   * @param context Rendering context (controller, action, format, yield)
-   * @returns The rendered output string (may be async)
+   * Mirrors `Handlers::ERB#call(template, source)` — compile `source` into a
+   * code string evaluated inside the compiled method's body.
    */
-  render(
-    source: string,
-    locals: Record<string, unknown>,
-    context: RenderContext,
-  ): string | Promise<string>;
+  call(template: unknown, source: string): string;
 }
 
 const handlers = new Map<string, TemplateHandler>();
