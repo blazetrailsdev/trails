@@ -1156,6 +1156,10 @@ Request.prototype.notModified = _notModified;
 Request.prototype.etagMatches = _etagMatches;
 Request.prototype.fresh = _fresh;
 
+include(Request, RequestHelpers);
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Request extends Omit<RequestHelpers, "scheme"> {}
+
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging */
 export interface Request extends CspRequest {}
 include(Request, CspRequest);
@@ -1304,7 +1308,3 @@ Request.prototype.isParamsReadable = function (this: Request) {
 _setActionDispatchRequest(Request as unknown as ActionDispatchRequestConstructor);
 
 _setRequestCtor(Request);
-
-include(Request, RequestHelpers);
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface Request extends Omit<RequestHelpers, "scheme"> {}
