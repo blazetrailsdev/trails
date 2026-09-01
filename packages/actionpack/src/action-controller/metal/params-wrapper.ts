@@ -194,13 +194,15 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
 export function _performParameterWrapping(this: ParamsWrapperHost): void {
   const wrappedHash = _wrapParameters.call(this, this.request.requestParameters);
   const wrappedKeys = Object.keys(this.request.requestParameters);
-  const filteredParameters = this.request.filteredParameters();
-  const wrappedFilteredHash = _wrapParameters.call(this, slice(filteredParameters, ...wrappedKeys));
+  const wrappedFilteredHash = _wrapParameters.call(
+    this,
+    slice(this.request.filteredParameters(), ...wrappedKeys),
+  );
 
   mergeBang(this.request.params, wrappedHash);
   mergeBang(this.request.requestParameters, wrappedHash);
 
-  mergeBang(filteredParameters, wrappedFilteredHash);
+  mergeBang(this.request.filteredParameters(), wrappedFilteredHash);
 }
 
 /**
