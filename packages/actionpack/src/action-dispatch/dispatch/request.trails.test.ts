@@ -34,4 +34,10 @@ describe("Request", () => {
     req.setHeader("action_dispatch.authorized_host", req.host);
     expect(env["action_dispatch.authorized_host"]).toBe("example.com");
   });
+
+  it("ssl? is true for a wss request, the second arm of Rack::Request::Helpers#ssl?", () => {
+    expect(new Request({ "rack.url_scheme": "wss" }).ssl).toBe(true);
+    expect(new Request({ "rack.url_scheme": "https" }).ssl).toBe(true);
+    expect(new Request({ "rack.url_scheme": "http" }).ssl).toBe(false);
+  });
 });

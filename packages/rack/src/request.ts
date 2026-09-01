@@ -46,6 +46,7 @@ import {
 } from "./constants.js";
 import { forwardedValues, getDefaultQueryParser, QueryParser } from "./utils.js";
 import { KeyError } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/activesupport";
 import * as MediaTypeModule from "./media-type.js";
 import { parseMultipart as multipartExtract } from "./multipart.js";
 
@@ -124,6 +125,28 @@ function isTrustedProxy(ip: string): boolean {
   return /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.|::1|fd|fc)/i.test(ip.trim());
 }
 
+/**
+ * Mirrors `Rack::Request::Helpers` (`rack/lib/rack/request.rb:139-664`), the
+ * module `Rack::Request` and `ActionDispatch::Request` both `include`
+ * (`actionpack/lib/action_dispatch/http/request.rb:21`). Modelled as a class
+ * module so `include()` carries its accessors; only the members ported out of
+ * the class body so far live here.
+ */
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers`; the class/interface merge is how the module's host state surfaces on the type side. */
+export interface Helpers {
+  /** Supplied by the including class (`Rack::Request#scheme`). */
+  readonly scheme: string;
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
+export abstract class Helpers {
+  /** Mirrors `Rack::Request::Helpers#ssl?` (`rack/lib/rack/request.rb:410-412`). */
+  get ssl(): boolean {
+    return this.scheme === "https" || this.scheme === "wss";
+  }
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/request.rb:37`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Request {
   env: Record<string, any>;
 
@@ -218,19 +241,15 @@ export class Request {
 
   /** Mirrors `Rack::Request::Helpers#scheme` (`rack/lib/rack/request.rb:249-258`). */
   get scheme(): string {
-    if (this.env[HTTPS] === "on") {
+    if (this.getHeader(HTTPS) === "on") {
       return "https";
-    } else if (this.env[HTTP_X_FORWARDED_SSL] === "on") {
+    } else if (this.getHeader(HTTP_X_FORWARDED_SSL) === "on") {
       return "https";
     } else if (this.forwardedScheme) {
       return this.forwardedScheme;
     } else {
-      return this.env[RACK_URL_SCHEME];
+      return this.getHeader(RACK_URL_SCHEME);
     }
-  }
-
-  get ssl(): boolean {
-    return this.scheme === "https" || this.scheme === "wss";
   }
 
   get host(): string {
@@ -771,3 +790,7 @@ export class Request {
     return ipAddresses.filter((ip) => !this.trustedProxy(ip));
   }
 }
+
+include(Request, Helpers);
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/request.rb:37`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Request extends Omit<Helpers, "scheme"> {}

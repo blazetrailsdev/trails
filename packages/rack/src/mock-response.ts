@@ -45,7 +45,7 @@ export class MockResponse extends Response {
       else if (typeof errors === "string") this.errors = errors;
     }
     this.cookies = this.parseCookiesFromHeader();
-    this.bufferedBody();
+    this.bufferedBodyBang();
   }
 
   get bodyString(): string {
