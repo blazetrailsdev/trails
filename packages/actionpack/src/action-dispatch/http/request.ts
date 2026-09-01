@@ -1305,8 +1305,6 @@ _setActionDispatchRequest(Request as unknown as ActionDispatchRequestConstructor
 
 _setRequestCtor(Request);
 
-// `ActionDispatch::Request` does not define `ssl?` — it answers from
-// `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`).
 include(Request, RequestHelpers);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request extends Omit<RequestHelpers, "scheme"> {}

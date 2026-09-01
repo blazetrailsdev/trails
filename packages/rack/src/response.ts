@@ -189,7 +189,7 @@ export abstract class Helpers {
   }
 
   /** Specify that the content should be cached. */
-  cacheBang(duration: number = 3600, directive: string = "public"): void {
+  cacheBang(duration: number = 3600, { directive = "public" }: { directive?: string } = {}): void {
     if (!/no-cache/.test(this.getHeader(CACHE_CONTROL) ?? "")) {
       this.setHeader(CACHE_CONTROL, `${directive}, max-age=${duration}`);
       this.setHeader(EXPIRES, new Date(Date.now() + duration * 1000).toUTCString()); // boundary: HTTP-date header
