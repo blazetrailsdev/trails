@@ -238,7 +238,7 @@ function databaseConfigTs(to: DatabaseName, database: Database, appName: string)
     return [
       `export default {`,
       ...["development", "test", "production"].map(
-        (env) => `  ${env}: { adapter: "sqlite3", database: "db/${env}.sqlite3" },`,
+        (env) => `  ${env}: { adapter: "sqlite3", database: "storage/${env}.sqlite3" },`,
       ),
       `};`,
       ``,

@@ -1724,6 +1724,18 @@ surface defines the matching *reader* too (\`beginning_of_week\` alongside
 is offered \`set#{Name}\` first — unless Ruby also defines \`set_#{base}\`, whose
 own port already owns that spelling.
 
+Name-collision details: a Ruby method whose name is also a JS **property**
+keeps its Rails name and stays a method — \`CollectionProxy#length\`
+(\`activerecord/lib/active_record/associations/collection_proxy.rb:786-795\`) is
+\`length()\`, not a \`length\` getter, because loading the target is asynchronous
+in trails and a property cannot await. Ruby has no property/method ambiguity,
+so \`person.pets.length\` counts there while \`collection.length\` here reads the
+METHOD. The delegated \`length\` therefore refuses primitive coercion
+(\`relation/delegation.ts\`): \`collection.length > 0\` and
+\`\${collection.length}\` throw rather than silently reading \`NaN\` or the
+function source. Write \`await collection.length()\`, or
+\`await collection.size()\` for Rails' \`size\`.
+
 ## Operators
 
 These Ruby operator methods have no parity:api counterpart (map them to named

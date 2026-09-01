@@ -601,7 +601,25 @@ export function delegateRecordMethodSync(
 ): ((...args: any[]) => unknown) | undefined {
   const fn = RECORD_DELEGATES[prop];
   if (!fn) return undefined;
-  return (...args: any[]) => fn(records(), ...args);
+  const delegate = (...args: any[]): unknown => fn(records(), ...args);
+  return prop === "length" ? refuseImplicitCount(delegate) : delegate;
+}
+
+class ImplicitCountError extends globalThis.TypeError {}
+
+/** @noRailsEquivalent PERMANENT */
+function refuseImplicitCount<F extends (...args: any[]) => unknown>(fn: F): F {
+  Object.defineProperty(fn, Symbol.toPrimitive, {
+    value: (): never => {
+      throw new ImplicitCountError(
+        "`length` is a method on a collection, not a property: it reads as a function, " +
+          "not a count. Call `await collection.length()`, or `await collection.size()` " +
+          "for the count Rails' `size` gives.",
+      );
+    },
+    configurable: true,
+  });
+  return fn;
 }
 
 export class DelegationMethods {
@@ -745,6 +763,8 @@ export class DelegationMethods {
     return this.model.sanitizeSqlLike(value, escapeChar);
   }
 }
+
+refuseImplicitCount(DelegationMethods.prototype.length);
 
 function shuffleInPlace<T>(array: T[]): T[] {
   for (let i = array.length - 1; i > 0; i--) {
