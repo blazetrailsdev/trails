@@ -1,16 +1,6 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { ExecutionContext } from "./execution-context.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
-
-/**
- * Mirror of Ruby's `ArgumentError`, raised by `subscribe` and by `report`'s
- * severity check (`error_reporter.rb:163,221`).
- */
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
 
 /**
  * Mirror of Ruby's `RuntimeError` — the class `raise "msg"` and

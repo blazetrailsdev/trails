@@ -109,8 +109,10 @@ describe("vendor/sources.ts", () => {
     // (rational.c, range.c, re.c, object.c) are readable in-tree. `compareApi`
     // stays off permanently: the extractor globs `**/*.rb` and sees none of
     // that C. `compareTests` is on — ruby/ruby mirrors the ruby/spec suite
-    // in-tree, and `spec/ruby/core` (narrowed to the value-type primitives by
-    // extract-ruby-tests.rb) is ruby-compat's behavioural measure.
+    // in-tree, and `spec/ruby` (narrowed per ported MEMBER by
+    // extract-ruby-tests.rb, which needs the suite root to reach the
+    // suite-level `shared/<type>/` bodies) is ruby-compat's behavioural
+    // measure.
     const ruby = SOURCES.find((s) => s.name === "ruby");
     expect(ruby).toBeDefined();
     expect(ruby!.origin).toEqual({
@@ -122,7 +124,7 @@ describe("vendor/sources.ts", () => {
       {
         name: "ruby-compat",
         libPath: "lib",
-        testPath: "spec/ruby/core",
+        testPath: "spec/ruby",
         compareApi: false,
       },
     ]);
@@ -130,7 +132,7 @@ describe("vendor/sources.ts", () => {
     expect(Object.keys(libPathsManifest())).not.toContain("ruby-compat");
     expect(Object.keys(testPathsManifest())).toContain("ruby-compat");
     expect(resolvePath("ruby-compat").endsWith("vendor/ruby/lib")).toBe(true);
-    expect(resolvePath("ruby-compat", "test").endsWith("vendor/ruby/spec/ruby/core")).toBe(true);
+    expect(resolvePath("ruby-compat", "test").endsWith("vendor/ruby/spec/ruby")).toBe(true);
     expect(vendoredRoot("ruby").endsWith("vendor/ruby")).toBe(true);
   });
 

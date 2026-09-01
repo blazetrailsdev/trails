@@ -29,23 +29,27 @@ const TAG_NAME = /^\s*\*?\s?@(\S+)\s*/;
 
 /**
  * The prose following each line-leading `@<tag>` in `text` — a comment body as
- * ESLint's `comment.value` gives it, or the raw block. The `/**` opener of a
- * one-line comment is rewritten to the `*` frame `ANY_TAG_LINE` expects,
- * exactly as `isLineLeading` normalizes it.
+ * ESLint's `comment.value` gives it, or the raw block.
  */
 export function lineLeadingTagReasons(text, tag) {
   const out = [];
   for (const raw of text.split("\n")) {
-    const line = raw.replace(/^(\s*)\/\*\*/, "$1*");
-    if (!ANY_TAG_LINE.test(line)) continue;
-    const m = TAG_NAME.exec(line);
-    if (m === null || m[1] !== tag) continue;
-    out.push(
-      line
-        .slice(m[0].length)
-        .replace(/\*\/\s*$/, "")
-        .trim(),
-    );
+    const opened = lineLeadingTag(raw);
+    if (opened === null || opened.name !== tag) continue;
+    out.push(opened.text.replace(/\*\/\s*$/, "").trim());
   }
   return out;
+}
+
+/**
+ * The tag a single line OPENS and the text following it, or `null` when the
+ * line opens none — the one parse every reader of a JSDoc tag shares. The
+ * `/**` opener of a one-line comment is rewritten to the `*` frame
+ * {@link ANY_TAG_LINE} expects, exactly as `isLineLeading` normalizes it.
+ */
+export function lineLeadingTag(rawLine) {
+  const line = rawLine.replace(/^(\s*)\/\*\*/, "$1*");
+  if (!ANY_TAG_LINE.test(line)) return null;
+  const m = TAG_NAME.exec(line);
+  return m === null ? null : { name: m[1], text: line.slice(m[0].length) };
 }

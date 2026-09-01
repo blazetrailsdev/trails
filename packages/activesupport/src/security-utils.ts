@@ -1,11 +1,5 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { getCrypto } from "./crypto-adapter.js";
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
 
 export class SecurityUtils {
   static fixedLengthSecureCompare(a: string, b: string): boolean {

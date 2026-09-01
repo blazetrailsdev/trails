@@ -35,6 +35,18 @@ import {
   manifestAvailable,
   relFromRepoRoot,
 } from "./rails-private-jsdoc.mjs";
+import { lineLeadingTagReasons } from "./jsdoc-tag-line.mjs";
+
+/**
+ * The receipt, read through `jsdoc-tag-line.mjs` — the one parse
+ * `scripts/api-compare/extract-ts-api.ts` applies when it decides the measured
+ * surface (RFC 0129). A bare `includes` credited the string anywhere, including
+ * quoted inside another tag's prose, so this rule could pass a receipt the
+ * extractor drops.
+ */
+function hasReceipt(commentValue) {
+  return lineLeadingTagReasons(commentValue, "noRailsEquivalent").length > 0;
+}
 
 /**
  * A whole file with no Rails counterpart carries ONE `@noRailsEquivalent` in a
@@ -53,14 +65,14 @@ function hasFileLevelReceipt(sourceCode) {
     .filter((c) => c.type === "Block" && c.value.startsWith("*"));
   if (comments.length === 0) return false;
   if (first.type === "ImportDeclaration") {
-    return comments.some((c) => c.value.includes("@noRailsEquivalent"));
+    return comments.some((c) => hasReceipt(c.value));
   }
   const followedBy = [...comments.slice(1), first];
   for (let i = comments.length - 1; i >= 0; i--) {
     // A blank line between the block and what follows means TypeScript binds it
     // to nothing, so reading it as file-level widens no declaration's doc.
     if (followedBy[i].loc.start.line - comments[i].loc.end.line < 2) continue;
-    return comments[i].value.includes("@noRailsEquivalent");
+    return hasReceipt(comments[i].value);
   }
   return false;
 }
@@ -87,7 +99,7 @@ function check(context, node, name) {
   const sourceCode = context.sourceCode ?? context.getSourceCode();
   const comment = attachedJsDoc(target, sourceCode);
   if (comment === null || !comment.value.includes("@internal")) return;
-  if (comment.value.includes("@noRailsEquivalent")) return;
+  if (hasReceipt(comment.value)) return;
   if (hasFileLevelReceipt(sourceCode)) return;
 
   // Backed either file-wide or on the instance half alone: a name private on the
@@ -146,3 +158,4 @@ const rule = {
 };
 
 export default rule;
+export { hasReceipt };

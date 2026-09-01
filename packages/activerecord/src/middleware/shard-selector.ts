@@ -1,3 +1,4 @@
+import { fetch } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Notifications, _ActionDispatchRequest } from "@blazetrails/activesupport";
 
@@ -61,10 +62,12 @@ export class ShardSelector {
     return this.resolver(request);
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   private async setShard<T>(shard: string, block: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ shard }, () =>
-      Base.prohibitShardSwapping(() => block(), "lock" in this.options ? this.options.lock : true),
+      Base.prohibitShardSwapping(
+        () => block(),
+        fetch<boolean>(this.options as Record<string, unknown>, "lock", true),
+      ),
     ) as Promise<T>;
   }
 }

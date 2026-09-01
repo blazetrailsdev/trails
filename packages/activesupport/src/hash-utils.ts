@@ -2,6 +2,7 @@
  * Hash/object utilities mirroring Rails ActiveSupport hash extensions.
  */
 
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
@@ -9,15 +10,7 @@ import type { StringIO } from "./string-io.js";
 
 type AnyObject = Record<string, unknown>;
 
-/**
- * Mirrors Ruby's `ArgumentError`. Raised by {@link assertValidKeys} so callers
- * can `catch`/narrow on the Rails-faithful error type (`err.name ===
- * "ArgumentError"`) the way they would in Ruby.
- * @internal
- */
-export class ArgumentError extends Error {
-  override name = "ArgumentError";
-}
+export { ArgumentError };
 
 /**
  * Mirrors Ruby's `Hash#values_at` — the values stored under each of the given

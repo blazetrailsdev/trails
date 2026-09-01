@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { fetch, hasKey } from "@blazetrails/ruby-compat";
 import { configurationsStore as configurations } from "../database-configurations.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 
@@ -74,19 +74,19 @@ export class HashConfig extends DatabaseConfig {
     return toFloat(this.configurationHash.checkoutTimeout ?? 5);
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   override get reapingFrequency(): number | null {
-    const raw = this.configurationHash.reapingFrequency;
-    if (raw === null) return null;
-    if (raw === undefined) return 60.0;
-    return toFloat(raw);
+    const raw = fetch<unknown>(
+      this.configurationHash as Record<string, unknown>,
+      "reapingFrequency",
+      60,
+    );
+    return raw == null ? null : toFloat(raw);
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   override get idleTimeout(): number | null {
-    const raw = this.configurationHash.idleTimeout;
-    if (raw === null) return null;
-    const timeout = raw === undefined ? 300 : toFloat(raw);
+    const timeout = toFloat(
+      fetch<unknown>(this.configurationHash as Record<string, unknown>, "idleTimeout", 300),
+    );
     return timeout > 0 ? timeout : null;
   }
 
@@ -111,11 +111,12 @@ export class HashConfig extends DatabaseConfig {
     return configurations().isPrimary(this.name);
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   override get seeds(): boolean | null {
-    return "seeds" in this.configurationHash
-      ? (this.configurationHash.seeds as boolean | null)
-      : this.isPrimary();
+    return fetch<boolean | null>(
+      this.configurationHash as Record<string, unknown>,
+      "seeds",
+      this.isPrimary(),
+    );
   }
 
   schemaDump(format: "ruby" | "sql" | "ts" = "ts"): string | null {
@@ -132,17 +133,19 @@ export class HashConfig extends DatabaseConfig {
     return this.isPrimary() ? typeFile : `${this.name}_${typeFile}`;
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   databaseTasks(): boolean {
-    if (this.replica) return false;
-    const val = this.configurationHash.databaseTasks;
-    return val === undefined ? true : !!val;
+    return (
+      !this.replica &&
+      !!fetch<unknown>(this.configurationHash as Record<string, unknown>, "databaseTasks", true)
+    );
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
   override get useMetadataTable(): boolean {
-    const val = this.configurationHash.useMetadataTable;
-    return val === undefined ? true : !!val;
+    return fetch<boolean>(
+      this.configurationHash as Record<string, unknown>,
+      "useMetadataTable",
+      true,
+    );
   }
 
   private schemaFileType(format: string): string | null {

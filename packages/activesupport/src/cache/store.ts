@@ -1,5 +1,5 @@
 import { Entry } from "./entry.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { ArgumentError, regexpEscape } from "@blazetrails/ruby-compat";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
 import { getFormatVersion } from "./format-version-slot.js";
@@ -138,10 +138,8 @@ class FloatDomainError extends globalThis.Error {
   }
 }
 
-/** Mirrors Ruby ArgumentError. @internal */
-export class ArgumentError extends Error {
-  override name = "ArgumentError";
-}
+export { ArgumentError };
+
 /** Mirrors Ruby NotImplementedError. @internal */
 export class NotImplementedError extends Error {
   override name = "NotImplementedError";

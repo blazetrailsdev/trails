@@ -1,14 +1,7 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { getCrypto } from "../crypto-adapter.js";
 
 export type EventPayload = Record<string, unknown>;
-
-// Rails' Fanout::Handle#ensure_state! raises ArgumentError (fanout.rb:263-267).
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
 
 /**
  * Mirrors ActiveSupport::Notifications::Event (instrumenter.rb:104-228).

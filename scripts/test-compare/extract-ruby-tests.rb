@@ -59,29 +59,45 @@ SKIP_PATTERNS = [
 ]
 
 # ruby-compat's spec selection (see the pkg_name == "ruby-compat" branch in
-# `run`). Types ruby-compat ports whole take their whole directory.
-RUBY_COMPAT_SPEC_DIRS = %w[rational range hash comparable].freeze
-
-# Types ruby-compat ports ONE member of take that member's spec files. A
-# `<type>/<member>_spec.rb` is usually a one-line `it_behaves_like` shell whose
-# body is a shared file under `<type>/shared/`, so the shared body is listed
-# beside it — it is what carries the tests, which collect_shared_example /
-# materialize_shared_example re-parent under the shell's own describe. Aliases
-# share one body and so add only their shell: `String#next` is `String#succ`
-# (next_spec.rb:6 `it_behaves_like :string_succ, :next`), `Regexp.quote` is
-# `Regexp.escape` (quote_spec.rb:6), and `Symbol#to_s` shares
-# `Symbol#id2name`'s body (to_s_spec.rb:5).
-RUBY_COMPAT_SPEC_FILES = %w[
-  string/succ_spec.rb
-  string/next_spec.rb
-  string/shared/succ.rb
-  regexp/escape_spec.rb
-  regexp/quote_spec.rb
-  regexp/shared/quote.rb
-  symbol/to_s_spec.rb
-  symbol/name_spec.rb
-  symbol/shared/id2name.rb
-].freeze
+# `run`), one entry per ported TYPE naming its ported MEMBERS. ruby-compat ports
+# no type whole — `Hash` is 16 of ruby/spec's 69 files, `Range` 13 of 30,
+# `Rational` 14 of 33, `Comparable` 6 of 7 — so the unit is the member
+# everywhere, and ruby/spec is one file per member.
+#
+# A `<type>/<member>_spec.rb` is usually a one-line `it_behaves_like` shell
+# whose body is a shared file, which collect_shared_example /
+# materialize_shared_example re-parent under the shell's own describe. Those
+# bodies sit in EITHER `core/<type>/shared/` or the suite-level
+# `shared/<type>/`, and all of Rational's are in the latter
+# (`core/rational/plus_spec.rb:2` requires `../../shared/rational/plus`), so
+# both locations are globbed.
+#
+# Aliases are listed with their principal because they share one shared body:
+# `Hash#include?`/`#member?`/`#key?` are `#has_key?` (include_spec.rb:6
+# `it_behaves_like :hash_key_p`), `Range#member?` is `#include?`, `String#next`
+# is `#succ` (next_spec.rb:6), `Regexp.quote` is `.escape` (quote_spec.rb:6) and
+# `Symbol#to_s` shares `Symbol#id2name`'s body (to_s_spec.rb:5).
+# `Rational#numerator`/`#denominator` and `Range#begin`/`#end`/`#exclude_end?`
+# are ported as public readonly fields (`rational.ts:96` cites
+# `vendor/ruby/rational.c:580` `nurat_numerator`), so they count as ported.
+RUBY_COMPAT_SPECS = {
+  "comparable" => %w[between equal_value gt gte lt lte],
+  "hash" => %w[
+    default default_proc delete_if each_key each_pair except fetch has_key
+    include key member merge reject slice transform_values update
+  ],
+  "range" => %w[
+    begin case_compare cover end equal_value exclude_end first include last
+    max member min to_s
+  ],
+  "rational" => %w[
+    comparison denominator div inspect modulo multiply numerator plus quo round
+    to_f to_i to_s zero
+  ],
+  "regexp" => %w[escape quote],
+  "string" => %w[next succ],
+  "symbol" => %w[name to_s],
+}.freeze
 
 # Is `name` an assertion call? Matched by PREFIX (not a fixed list), the twin of
 # TS isAssertionCallee (extract-ts-core.ts), so both sides count the full breadth
@@ -1976,18 +1992,17 @@ def run
     end
 
     # For ruby-compat, include only the specs for surface the package ports.
-    # `pkg_dir` is ruby/spec's `spec/ruby/core`; vendor/sources.ts carries why
-    # the selection is scoped, how it grows, and why an unported spec is not a
-    # gap. A whole-type port takes its directory; a port of one member of a
-    # type takes that member's spec files, since ruby/spec is one file per
-    # member.
+    # `pkg_dir` is ruby/spec's `spec/ruby`; vendor/sources.ts carries why the
+    # selection is scoped, how it grows, and why an unported spec is not a gap.
     if pkg_name == "ruby-compat"
-      # Shared bodies are not named `*_spec.rb`, so the globs above miss them.
-      test_files += Dir.glob(File.join(pkg_dir, "**", "shared", "*.rb"))
+      # Shared bodies are not named `*_spec.rb`, so the globs above miss them,
+      # and they sit in either of two locations (see RUBY_COMPAT_SPECS).
+      test_files = RUBY_COMPAT_SPECS.flat_map do |type, members|
+        Dir.glob(File.join(pkg_dir, "core", type, "shared", "*.rb")) +
+          Dir.glob(File.join(pkg_dir, "shared", type, "*.rb")) +
+          members.map { |m| File.join(pkg_dir, "core", type, "#{m}_spec.rb") }
+      end
       test_files.uniq!
-      selected = RUBY_COMPAT_SPEC_DIRS.map { |d| File.join(pkg_dir, d) + File::SEPARATOR } +
-                 RUBY_COMPAT_SPEC_FILES.map { |f| File.join(pkg_dir, f) }
-      test_files.select! { |f| selected.any? { |s| f.start_with?(s) } }
     end
 
     # Apply skip patterns

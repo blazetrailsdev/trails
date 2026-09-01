@@ -58,6 +58,10 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
 export const AMBIGUOUS_RUBY_CALLS = new Map<string, string>([
   ["Hash#except", "`ActiveRecord::Relation#except` is also `except`."],
   ["Hash#fetch", "`ActiveSupport::Cache::Store#fetch` and `Array#fetch` too."],
+  [
+    "Hash#include?",
+    "`Enumerable#include?` and `Range#include?` (ported as `isInclude`) are also `include?`.",
+  ],
   ["Hash#merge", "`ActiveRecord::Relation#merge` is also `merge`."],
   ["Hash#merge!", "`ActiveRecord::Relation#merge!` is also `merge!`."],
   ["Hash#reject", "`Enumerable#reject` is also `reject`."],

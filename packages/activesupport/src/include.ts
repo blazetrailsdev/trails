@@ -1,3 +1,5 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
+
 /**
  * Ruby-style `include` for mixing module methods into a class.
  *
@@ -222,10 +224,6 @@ export function isModuleIncluded(
     }
   }
   return false;
-}
-
-class ArgumentError extends Error {
-  override name = "ArgumentError";
 }
 
 /**

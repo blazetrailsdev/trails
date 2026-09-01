@@ -22,7 +22,7 @@
  * require to rescue.
  */
 
-import { KeyError } from "@blazetrails/ruby-compat";
+import { ArgumentError, KeyError } from "@blazetrails/ruby-compat";
 
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";
@@ -48,13 +48,7 @@ export class RuntimeError extends Error {
   }
 }
 
-/** @internal */
-export class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
+export { ArgumentError };
 
 /** @internal */
 export class Thrown extends Error {
