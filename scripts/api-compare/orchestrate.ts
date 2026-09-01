@@ -46,7 +46,7 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { runFetch } from "../../vendor/fetch.js";
-import { libPathsManifest } from "../../vendor/sources.js";
+import { libEntryFilesManifest, libPathsManifest } from "../../vendor/sources.js";
 import { main as extractTsApi } from "./extract-ts-api.js";
 import { main as runCompare } from "./compare.js";
 import {
@@ -71,6 +71,7 @@ async function runRubyExtract(): Promise<void> {
     env: {
       ...process.env,
       LIB_PATHS_JSON: JSON.stringify(libPathsManifest()),
+      LIB_ENTRY_FILES_JSON: JSON.stringify(libEntryFilesManifest()),
       LOCKFILE_PATH: join(ROOT, "vendor/sources.lock.json"),
     },
     maxBuffer: 64 * 1024 * 1024,

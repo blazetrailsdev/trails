@@ -100,6 +100,48 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#build"]).toEqual(["ref:cached", "if", "new:Thing"]);
   });
 
+  // A `define_method(name) { … }` body IS the method body and is right there in
+  // the AST, so it goes through the same collectors the literal-`def` path uses
+  // — without this every generated method reads as a zero-call one to
+  // `parity:api:calls`, which is indistinguishable from a body that genuinely
+  // calls nothing (RFC 0126).
+  it("records the calls of a define_method block body", () => {
+    const fixtures = {
+      "foo.rb": `
+        class Foo
+          define_method(:language) { self[:language].send(:to_s) unless self[:language].nil? }
+
+          def literal
+            self[:language].send(:to_s) unless self[:language].nil?
+          end
+        end
+      `,
+    };
+    const calls = rubyCalls(fixtures);
+    expect(calls["Foo#language"]).toEqual(["nil?", "send"]);
+    expect(calls["Foo#language"]).toEqual(calls["Foo#literal"]);
+    expect(rubySkeletons(fixtures)["Foo#language"]).toEqual(rubySkeletons(fixtures)["Foo#literal"]);
+  });
+
+  // rfc4646.rb:34 — `RFC4646_FORMATS.each do |name, format| define_method(name)
+  // { self[name].send(format) … } end` generates four accessors whose dispatch
+  // is format-dependent. Each unrolled member records the same block body.
+  it("records the calls of a loop-unrolled define_method block body", () => {
+    const calls = rubyCalls({
+      "foo.rb": `
+        class Foo
+          FORMATS = { language: :downcase, script: :capitalize }
+
+          FORMATS.each do |name, format|
+            define_method(name) { self[name].send(format) unless self[name].nil? }
+          end
+        end
+      `,
+    });
+    expect(calls["Foo#language"]).toEqual(["nil?", "send"]);
+    expect(calls["Foo#script"]).toEqual(["nil?", "send"]);
+  });
+
   it("reads a named capture bound by `=~` as a local, not a call", () => {
     const fixtures = {
       "foo.rb": `
@@ -1111,11 +1153,7 @@ describe(
     // Lay out a package libPath with a `base.rb` and a sibling umbrella file
     // one level above it, scan the package then the umbrella, and return the
     // ActiveRecord::Base / ActiveRecord entries.
-    function scanWithUmbrella(
-      baseSrc: string,
-      umbrellaSrc: string,
-      full = false,
-    ): Record<string, ClassEntry> {
+    function scanWithUmbrella(baseSrc: string, umbrellaSrc: string): Record<string, ClassEntry> {
       const root = fs.mkdtempSync(path.join(os.tmpdir(), "umbrella-rb-"));
       try {
         const libPath = path.join(root, "active_record");
@@ -1127,7 +1165,7 @@ describe(
         require "json"
         ex = ApiExtractor.new
         ex.process_file(File.join(${JSON.stringify(libPath)}, "base.rb"), ${JSON.stringify(libPath)})
-        ex.scan_umbrella_file(File.join(${JSON.stringify(root)}, "active_record.rb"), ${JSON.stringify(libPath)}, full: ${full})
+        ex.scan_umbrella_file(File.join(${JSON.stringify(root)}, "active_record.rb"), ${JSON.stringify(libPath)})
         out = {}
         (ex.classes.merge(ex.modules)).each do |fqn, info|
           out[fqn] = { classMethods: info[:classMethods], instanceMethods: info[:instanceMethods], file: info[:file] }
@@ -1240,47 +1278,6 @@ describe(
       const mod = out["ActiveSupport"];
       const names = mod ? [...mod.classMethods, ...mod.instanceMethods].map((m) => m.name) : [];
       expect(names).not.toContain("error_reporter");
-    });
-
-    // `vendor/i18n/lib/i18n.rb` is not an autoload manifest: it is where
-    // `I18n::Base`, the gem's whole public facade, is defined. The config-only
-    // scan above sees only its three aliases, so the ported facade is measured
-    // against a denominator of 3. UMBRELLA_FULL_SCAN_PACKAGES opts such a package
-    // into a full walk.
-    it("extracts the method definitions of an umbrella file scanned in full", () => {
-      const out = scanWithUmbrella(
-        BASE_SRC,
-        `
-      module ActiveRecord
-        module Facade
-          def translate(key, **options); end
-          alias :t :translate
-
-          private
-
-          def translate_key(key); end
-        end
-
-        def self.reserve_key(key); end
-
-        extend Facade
-      end
-    `,
-        true,
-      );
-      const facade = out["ActiveRecord::Facade"];
-      expect(facade.instanceMethods.map((m) => m.name)).toEqual([
-        "translate",
-        "t",
-        "translate_key",
-      ]);
-      expect(facade.instanceMethods.map((m) => m.visibility)).toEqual([
-        "public",
-        "public",
-        "private",
-      ]);
-      expect(facade.file).toBe("../active_record.rb");
-      expect(out["ActiveRecord"].classMethods.map((m) => m.name)).toContain("reserve_key");
     });
 
     it("keeps a config-only umbrella scan free of those definitions", () => {
@@ -2757,5 +2754,110 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       `,
     });
     expect(c["Plain#call"]).toBeNull();
+  });
+});
+
+describe("Ruby extractor Struct.new members", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns a map of "<fqn>" -> instance method names for the given source.
+  function structMembers(src: string): Record<string, string[]> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "struct-rb-"));
+    try {
+      fs.writeFileSync(path.join(dir, "foo.rb"), src);
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "foo.rb"), ${JSON.stringify(dir)})
+        out = {}
+        ex.classes.each { |fqn, info| out[fqn] = info[:instanceMethods].map { |m| m[:name] } }
+        puts JSON.generate(out)
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  // `AddColumnDefinition = Struct.new(:column)` (schema_definitions.rb:113) has
+  // no block, so it took the plain-descent arm and contributed nothing — a
+  // faithful TS port of its member scored as extra surface.
+  it("records the members of a blockless CONST = Struct.new assignment", () => {
+    const out = structMembers(`
+      module Ns
+        ForeignKeyDefinition = Struct.new(:from_table, :to_table, :options)
+      end
+    `);
+    expect(out["Ns::ForeignKeyDefinition"]).toEqual([
+      "from_table",
+      "from_table=",
+      "to_table",
+      "to_table=",
+      "options",
+      "options=",
+      "initialize",
+    ]);
+  });
+
+  it("keeps recording a Struct.new do ... end body's defs alongside its members", () => {
+    const out = structMembers(`
+      module Ns
+        ForeignKeyDefinition = Struct.new(:from_table, :to_table, :options) do
+          def name
+            options[:name]
+          end
+        end
+      end
+    `);
+    expect(out["Ns::ForeignKeyDefinition"]).toContain("options");
+    expect(out["Ns::ForeignKeyDefinition"]).toContain("name");
+  });
+});
+
+describe("Ruby extractor gem entry file", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // `libPath` names a DIRECTORY (`activerecord/lib/arel`), so the gem's own
+  // entry file (`activerecord/lib/arel.rb`) is outside the package glob.
+  // Declared as `libEntryFile`, it is walked relative to its own directory so
+  // it records as `arel.rb` — the path `packages/arel/src/arel.ts` maps onto —
+  // rather than the umbrella scan's `../arel.rb`, which matches no TS file.
+  it("records a package entry file's methods against its own basename", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "entry-rb-"));
+    try {
+      fs.mkdirSync(path.join(root, "arel"), { recursive: true });
+      fs.writeFileSync(
+        path.join(root, "arel", "table.rb"),
+        "module Arel\n  class Table; end\nend\n",
+      );
+      fs.writeFileSync(
+        path.join(root, "arel.rb"),
+        `
+        module Arel
+          def self.arel_node?(value); end
+          def self.fetch_attribute(value, &block); end
+        end
+      `,
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(root)}, "arel/table.rb"), ${JSON.stringify(path.join(root, "arel"))})
+        entry = File.join(${JSON.stringify(root)}, "arel.rb")
+        ex.process_file(entry, File.dirname(entry))
+        out = {}
+        ex.modules.each { |fqn, info| out[fqn] = info[:classMethods].map { |m| [m[:name], m[:file]] } }
+        puts JSON.generate(out)
+      `;
+      const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      expect(out["Arel"]).toEqual([
+        ["arel_node?", "arel.rb"],
+        ["fetch_attribute", "arel.rb"],
+      ]);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
