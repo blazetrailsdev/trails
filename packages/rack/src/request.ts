@@ -159,6 +159,16 @@ export abstract class Helpers {
   }
 
   /**
+   * Mirrors `Rack::Request::Helpers#get_http_forwarded`
+   * (`rack/lib/rack/request.rb:668-670`).
+   *
+   * @internal
+   */
+  getHttpForwarded(token: string): string[] | null {
+    return forwardedValues(this.getHeader(HTTP_FORWARDED))?.[token] ?? null;
+  }
+
+  /**
    * Mirrors `Rack::Request::Helpers#forwarded_scheme`
    * (`rack/lib/rack/request.rb:752-774`).
    *
@@ -187,16 +197,6 @@ export abstract class Helpers {
     }
 
     return null;
-  }
-
-  /**
-   * Mirrors `Rack::Request::Helpers#get_http_forwarded`
-   * (`rack/lib/rack/request.rb:668-670`).
-   *
-   * @internal
-   */
-  getHttpForwarded(token: string): string[] | null {
-    return forwardedValues(this.getHeader(HTTP_FORWARDED))?.[token] ?? null;
   }
 
   /**
