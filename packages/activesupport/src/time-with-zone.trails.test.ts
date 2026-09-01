@@ -150,3 +150,28 @@ describe("TimeWithZone method_missing", () => {
     expect(range.end!.inspect()).toBe("1999-12-31 23:59:59.000000000 EST -05:00");
   });
 });
+
+describe("TimeWithZone Comparable", () => {
+  const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+  const twz = new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
+
+  it("<=> answers nil for an operand it cannot place", () => {
+    expect(twz.compareTo("foo")).toBeNull();
+  });
+
+  it("== is false for an operand <=> cannot place, and does not raise", () => {
+    expect(twz.equals("foo")).toBe(false);
+    expect(twz.equals(new Date(Date.UTC(2000, 0, 1)))).toBe(true);
+  });
+
+  it("< <= > >= and between? raise ArgumentError for an operand <=> cannot place", () => {
+    const message = "comparison of ActiveSupport::TimeWithZone with String failed";
+    expect(() => twz.lessThan("foo")).toThrow(message);
+    expect(() => twz.lessThanOrEqual("foo")).toThrow(message);
+    expect(() => twz.greaterThan("foo")).toThrow(message);
+    expect(() => twz.greaterThanOrEqual("foo")).toThrow(message);
+    expect(() => twz.isBefore("foo")).toThrow(message);
+    expect(() => twz.isAfter("foo")).toThrow(message);
+    expect(() => twz.isBetween("foo", "bar")).toThrow(message);
+  });
+});

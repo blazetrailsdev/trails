@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { extractOptionsBang, isPlainObject, methodMissingProxy } from "@blazetrails/activesupport";
 
 import { IrreversibleMigration } from "../migration.js";
@@ -460,7 +461,11 @@ export class CommandRecorder {
   invertRemoveColumns(args: unknown[]): [string, unknown[]] {
     const last = args[args.length - 1];
     if (
-      !(typeof last === "object" && last !== null && "type" in (last as Record<string, unknown>))
+      !(
+        typeof last === "object" &&
+        last !== null &&
+        hasKey(last as Record<string, unknown>, "type")
+      )
     ) {
       throw new IrreversibleMigration("remove_columns is only reversible if given a type.");
     }

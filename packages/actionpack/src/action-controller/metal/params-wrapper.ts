@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 /**
  * ActionController::ParamsWrapper::Options + private mixin methods
  *
@@ -177,7 +178,7 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
     const key = _wrapperKey.call(this);
     if (!formats || !formats.includes(ref)) return false;
     if (!key) return false;
-    return !Object.hasOwn(this.request.params, key);
+    return !hasKey(this.request.params, key);
   } catch (err) {
     if (err instanceof ParseError) return false;
     throw err;

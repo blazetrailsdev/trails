@@ -338,10 +338,10 @@ describe("significantMissingCalls", () => {
     );
   });
 
-  it("suppresses key?/has_key? — an options-hash port tests membership with `in`", () => {
-    // Rails `options.key?(:status)` ports to `"status" in options` / `options.status
-    // !== undefined`; the idiom table's only JS form is Map#has, which an object
-    // literal never calls, so no TS body could ever discharge the flag.
+  it("no longer suppresses key?/has_key? — ruby-compat's hasKey is their call form", () => {
+    // RFC 0129 gave `rb_hash_has_key` a callable TS spelling, so an options-hash
+    // port discharges the flag by calling it; only `to_str`, which becomes an
+    // implicit String coercion with no callee at all, stays suppressed.
     const missing = significantMissingCalls(
       "_extract_redirect_to_status",
       ["key?", "has_key?", "to_str"],
@@ -350,7 +350,7 @@ describe("significantMissingCalls", () => {
       map,
       SIGNIFICANT_CALLS,
     );
-    expect(missing).toEqual([]);
+    expect(missing).toEqual(["key? → key?", "has_key? → hasKey?"]);
   });
 
   describe("same-file helper extraction", () => {
@@ -3040,10 +3040,10 @@ describe("suppressedCallClaims", () => {
 
   it("claims nothing for a NO_JS_CALL_FORM name, whose port emits no callee", () => {
     const claimed = suppressedCallClaims(
-      ["key?"],
-      new Set(["has"]),
+      ["each"],
+      new Set(["forEach"]),
       () => false,
-      () => ["key"],
+      () => ["each"],
     );
     expect([...claimed]).toEqual([]);
   });

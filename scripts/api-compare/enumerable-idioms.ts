@@ -95,10 +95,14 @@ export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
 /** JS call names that count as making Ruby call `rubyCall`. The Ruby-core tail
  *  is `rubyCompatAliases` (scripts/parity/ruby-compat.ts), the FORWARD half of
  *  the RFC 0129 table that absorbed this file's `CORE_LIBRARY_ALIASES`; same
- *  silence-only contract as the two tables above it. */
+ *  silence-only contract as the two tables above it.
+ *
+ *  The two halves are UNIONED, not short-circuited: a name can be claimed by
+ *  both — `key?` is `Map#has` on a Map receiver AND ruby-compat's `hasKey` on
+ *  an object one — and either spelling is the whole call. */
 export function jsEnumerableAliases(rubyCall: string): string[] {
   const aliases = JS_ENUMERABLE_ALIASES.get(rubyCall) ?? FS_ADAPTER_ALIASES.get(rubyCall);
-  return aliases ?? rubyCompatAliases(rubyCall);
+  return [...new Set([...(aliases ?? []), ...rubyCompatAliases(rubyCall)])];
 }
 
 /**

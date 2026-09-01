@@ -1,5 +1,6 @@
 import * as zlib from "zlib";
-import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
+import { hasKey } from "@blazetrails/ruby-compat";
+import { CONTENT_TYPE, CONTENT_LENGTH, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 
 export interface DeflaterOptions {
   include?: string[];
@@ -72,17 +73,17 @@ export class Deflater {
     headers: Record<string, any>,
     body: any,
   ): boolean {
-    if ((status >= 100 && status < 200) || status === 204 || status === 304) return false;
+    if (hasKey(STATUS_WITH_NO_ENTITY_BODY, status)) return false;
     const cc = headers["cache-control"] || "";
     if (/\bno-transform\b/.test(cc)) return false;
     const ce = headers["content-encoding"];
     if (ce && !/\bidentity\b/.test(ce)) return false;
     if (this.include) {
-      if (!Object.prototype.hasOwnProperty.call(headers, CONTENT_TYPE)) return false;
+      if (!hasKey(headers, CONTENT_TYPE)) return false;
       const mediaType = (headers[CONTENT_TYPE] || "").split(";")[0].trim();
       if (!this.include.includes(mediaType)) return false;
     }
-    if (this.condition && !this.condition(env, status, headers, body)) return false;
+    if (this.condition && !this.condition.call(undefined, env, status, headers, body)) return false;
     if (headers[CONTENT_LENGTH] === "0") return false;
     return true;
   }

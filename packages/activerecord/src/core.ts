@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
 import {
   NameError,
@@ -874,10 +875,7 @@ export async function findBy(this: CoreHost, ...args: any[]): Promise<any> {
       if (respondsTo(value, pkey)) value = (value as any)[pkey];
     }
 
-    if (
-      !Object.prototype.hasOwnProperty.call(columnsHash.call(this as any), key) ||
-      StatementCache.unsupportedValue(value)
-    ) {
+    if (!hasKey(columnsHash.call(this as any), key) || StatementCache.unsupportedValue(value)) {
       return this.all().findBy(conditions);
     }
 

@@ -6,7 +6,16 @@
  */
 
 import { PeriodNotFound, TimeZone, TimezonePeriod } from "./values/time-zone.js";
-import { Range } from "@blazetrails/ruby-compat";
+import {
+  Range,
+  equals as cmpEquals,
+  greaterThan,
+  greaterThanOrEqual,
+  isBetween,
+  lessThan,
+  lessThanOrEqual,
+  rubyClass,
+} from "@blazetrails/ruby-compat";
 import { Object as ObjectExt } from "./core-ext/object/acts-like.js";
 import { Duration } from "./duration.js";
 import { currentTime } from "./time-travel.js";
@@ -942,32 +951,65 @@ export class TimeWithZone {
   // ---------------------------------------------------------------------------
 
   /**
-   * Compare to another TimeWithZone, Date, or Temporal.Instant. Returns -1, 0, or 1.
+   * Mirrors: ActiveSupport::TimeWithZone#<=> (time_with_zone.rb:231-233),
+   * `utc <=> other` — `Time#<=>`, which answers **nil** for an operand it
+   * cannot place, and that nil is what every Comparable operator below is
+   * derived from.
+   *
    * Comparison is nanosecond-precise for TimeWithZone / Temporal.Instant
    * arguments; Date arguments compare at millisecond resolution (Date's
    * native granularity).
    */
-  compareTo(other: TimeWithZone | Date | Temporal.Instant): number {
+  compareTo(other: unknown): number | null {
     if (other instanceof TimeWithZone) {
       return signOf(this._zoned.epochNanoseconds - other._zoned.epochNanoseconds);
     }
     if (other instanceof Temporal.Instant) {
       return signOf(this._zoned.epochNanoseconds - other.epochNanoseconds);
     }
-    const thisMs = this._epochMs;
-    const otherMs = other.getTime();
-    if (thisMs < otherMs) return -1;
-    if (thisMs > otherMs) return 1;
-    return 0;
+    // boundary: a JS `Date` compares at its own millisecond granularity.
+    if (other instanceof Date) {
+      const thisMs = this._epochMs;
+      const otherMs = other.getTime();
+      if (thisMs < otherMs) return -1;
+      if (thisMs > otherMs) return 1;
+      return 0;
+    }
+    return null;
   }
 
   /**
-   * Equality — two TimeWithZone instances are equal if they represent the same
-   * moment in time, regardless of timezone.
+   * `ActiveSupport::TimeWithZone` includes Comparable
+   * (time_with_zone.rb:48), so `<`, `<=`, `>`, `>=`, `==` and `between?` are
+   * all derived from {@link TimeWithZone#compareTo} above. They are
+   * `@blazetrails/ruby-compat`'s one copy of Ruby core's `compar.c`, assigned
+   * here as the repo's `this`-typed mixin shape — including `cmp_int`'s
+   * `ArgumentError` for a `<=>` that answers nil, which `equals` alone does
+   * not raise.
+   *
+   * `[rubyClass]` is the name `rb_cmperr` puts in that message.
    */
-  equals(other: TimeWithZone | Date | Temporal.Instant): boolean {
-    return this.compareTo(other) === 0;
-  }
+  readonly [rubyClass] = "ActiveSupport::TimeWithZone";
+
+  /** Ruby `Comparable#<` (Ruby core `compar.c` `cmp_lt`), `cmpint < 0`. */
+  lessThan = lessThan;
+
+  /** Ruby `Comparable#<=` (Ruby core `compar.c` `cmp_le`), `cmpint <= 0`. */
+  lessThanOrEqual = lessThanOrEqual;
+
+  /** Ruby `Comparable#>` (Ruby core `compar.c` `cmp_gt`), `cmpint > 0`. */
+  greaterThan = greaterThan;
+
+  /** Ruby `Comparable#>=` (Ruby core `compar.c` `cmp_ge`), `cmpint >= 0`. */
+  greaterThanOrEqual = greaterThanOrEqual;
+
+  /**
+   * Ruby `Comparable#==` (Ruby core `compar.c` `cmp_equal`), the one derived
+   * operator that does NOT raise: two TimeWithZone instances are equal if they
+   * represent the same moment in time, regardless of timezone, and an operand
+   * `<=>` cannot place is `false` rather than an `ArgumentError`.
+   */
+  equals = cmpEquals;
 
   /**
    * Equality based on UTC instant. Two times representing the same moment
@@ -993,14 +1035,11 @@ export class TimeWithZone {
   }
 
   /**
-   * Check if time falls between min and max (inclusive).
+   * Mirrors: ActiveSupport::TimeWithZone#between? (time_with_zone.rb:239-241),
+   * Comparable's `cmp_between` (Ruby core `compar.c`) — `cmpint` on both ends,
+   * so it raises for an operand `<=>` cannot place.
    */
-  between(
-    min: TimeWithZone | Date | Temporal.Instant,
-    max: TimeWithZone | Date | Temporal.Instant,
-  ): boolean {
-    return this.compareTo(min) >= 0 && this.compareTo(max) <= 0;
-  }
+  isBetween = isBetween;
 
   // ---------------------------------------------------------------------------
   // Temporal queries
@@ -1035,15 +1074,17 @@ export class TimeWithZone {
     );
   }
 
-  /** Returns true if this time is before the given time */
-  isBefore(other: TimeWithZone | Date | Temporal.Instant): boolean {
-    return this.compareTo(other) < 0;
-  }
+  /**
+   * Mirrors: `alias_method :before?, :<` (time_with_zone.rb:234) — the alias
+   * IS `Comparable#<`, so an operand `<=>` cannot place raises.
+   */
+  isBefore = lessThan;
 
-  /** Returns true if this time is after the given time */
-  isAfter(other: TimeWithZone | Date | Temporal.Instant): boolean {
-    return this.compareTo(other) > 0;
-  }
+  /**
+   * Mirrors: `alias_method :after?, :>` (time_with_zone.rb:235) — the alias
+   * IS `Comparable#>`.
+   */
+  isAfter = greaterThan;
 
   /** Alias for isYesterday */
   isPrevDay(): boolean {

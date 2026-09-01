@@ -514,6 +514,16 @@ export class Response {
   get header(): Record<string, string> {
     return this._headers;
   }
+  /**
+   * Mirrors: `has_header?` (response.rb:192), `@headers.key? key` — a plain
+   * delegation, because Rails' `@headers` is a `Rack::Headers` that downcases
+   * every key on write. This file's seat preserves the caller's casing and
+   * folds at the READ site instead, so an exact-key `key?` would answer `false`
+   * for a header stored under another casing; the membership question is the
+   * one {@link Response#getHeader} already answers.
+   *
+   * @missingRailsCall key? — CONVERGEABLE converge-actiondispatch-response-header-seat
+   */
   hasHeader(key: string): boolean {
     return this.getHeader(key) !== undefined;
   }

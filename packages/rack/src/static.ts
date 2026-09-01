@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { getPath } from "@blazetrails/activesupport";
 import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
@@ -43,10 +44,7 @@ export class Static {
   }
 
   overwriteFilePath(path: string): boolean {
-    return (
-      (!Array.isArray(this.urls) && Object.prototype.hasOwnProperty.call(this.urls, path)) ||
-      this.isAddIndexRoot(path)
-    );
+    return (!Array.isArray(this.urls) && hasKey(this.urls, path)) || this.isAddIndexRoot(path);
   }
 
   routeFile(path: string): boolean {

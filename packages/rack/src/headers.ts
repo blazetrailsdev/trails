@@ -112,6 +112,20 @@ export class Headers {
     this._defaultProc = undefined;
   }
 
+  /**
+   * `Hash#default_proc` (`rb_hash_default_proc`, `vendor/ruby/hash.c:2285`) and
+   * its paired `default=` / `default_proc=` mutual clearing above.
+   *
+   * @noRailsEquivalent PERMANENT — inherited from Ruby's `Hash`, which
+   * `Rack::Headers` subclasses. The copy of `@blazetrails/ruby-compat`'s `Hash`
+   * seat is a genuine TS shortcoming and NOT convergeable by delegation:
+   * `rb_hash_default_value` (`vendor/ruby/hash.c:2068`) yields the RECEIVER to
+   * the proc, so a held `Hash` would hand the block the inner seat where Ruby
+   * hands it this object, and inheriting the seat means inheriting `Hash`'s
+   * `Map` storage that this class already replaces with its own
+   * case-normalizing one. Recorded at BOTH hosts that carry the copy — see
+   * `activesupport/src/hash-with-indifferent-access.ts`.
+   */
   get defaultProc(): ((h: Headers, key: string) => string | null) | undefined {
     return this._defaultProc;
   }

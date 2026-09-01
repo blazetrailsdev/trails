@@ -22,7 +22,10 @@ export class ParameterEncodingRegistry {
   }
 
   actionEncodingTemplate(action: string): Map<string, string> | undefined {
-    return this._encodings.get(action);
+    if (this._encodings.has(action)) {
+      return this._encodings.get(action);
+    }
+    return undefined;
   }
 
   isSkipped(action: string): boolean {

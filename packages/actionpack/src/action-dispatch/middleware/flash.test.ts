@@ -17,7 +17,7 @@ function makeSession(initial: Record<string, unknown> = {}) {
   return {
     isEnabled: () => enabled,
     isLoaded: () => loaded,
-    hasKey: (k: string) => store.has(k),
+    isKey: (k: string) => store.has(k),
     get: (k: string) => store.get(k),
     set: (k: string, v: unknown) => {
       store.set(k, v);

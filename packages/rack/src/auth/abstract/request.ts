@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { Request } from "../../request.js";
 
 const AUTHORIZATION_KEYS = ["HTTP_AUTHORIZATION", "X-HTTP_AUTHORIZATION", "X_HTTP_AUTHORIZATION"];
@@ -50,8 +51,7 @@ export class AbstractRequest {
 
   private authorizationKey(): string | null {
     if (this._authKey === undefined) {
-      this._authKey =
-        AUTHORIZATION_KEYS.find((k) => Object.prototype.hasOwnProperty.call(this.env, k)) ?? null;
+      this._authKey = AUTHORIZATION_KEYS.find((k) => hasKey(this.env, k)) ?? null;
     }
     return this._authKey;
   }

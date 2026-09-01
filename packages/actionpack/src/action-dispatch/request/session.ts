@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { KeyError, stringifyKeys } from "@blazetrails/activesupport";
 
 /**
@@ -269,7 +270,7 @@ export class Session {
   /** Mirrors: `Session#has_key?` (`request/session.rb:132-135`). */
   hasKey(key: unknown): boolean {
     this.loadForReadBang();
-    return Object.hasOwn(this.delegate, String(key));
+    return hasKey(this.delegate, String(key));
   }
 
   /** Mirrors: `alias :key? :has_key?` (`request/session.rb:136`). */

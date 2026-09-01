@@ -7,7 +7,7 @@
  */
 
 import { Temporal } from "@blazetrails/date";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { cmp, equals as cmpEquals, rbEqual, rubyClass } from "@blazetrails/ruby-compat";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import { inspect } from "./core-ext/object/inspect.js";
@@ -889,33 +889,35 @@ export class Scalar {
   }
 
   /**
-   * Mirrors: ActiveSupport::Duration::Scalar#<=> (duration.rb:31-38). Ruby
-   * returns nil for an incomparable receiver; `Duration#compareTo` spells that
-   * NaN, so this does too.
+   * Mirrors: ActiveSupport::Duration::Scalar#<=> (duration.rb:31-38), whose
+   * `else` arm is Ruby's **nil** — the answer a `number` return has nowhere to
+   * put, and which every Comparable operator below is derived from.
    */
-  compareTo(other: unknown): number {
-    let b: number;
+  compareTo(other: unknown): number | null {
     if (other instanceof Scalar || other instanceof Duration) {
-      b = other.value;
+      return cmp(this.value, other.value);
     } else if (typeof other === "number") {
-      b = other;
+      return cmp(this.value, other);
     } else {
-      return NaN;
+      return null;
     }
-    if (this.value < b) return -1;
-    if (this.value > b) return 1;
-    return 0;
   }
 
   /**
-   * `Scalar < Numeric` includes Comparable, so `==` is Comparable's
-   * `(self <=> other) == 0` over `<=>` above — which is why
-   * `Scalar.new(172800) == 172800` is true, and why `Duration#==`'s
-   * `other == value` arm (duration.rb:341-347) answers a Scalar.
+   * The name `rb_cmperr` (Ruby core `compar.c`) puts in its message, which no
+   * JS `constructor.name` can spell.
    */
-  equals(other: unknown): boolean {
-    return this.compareTo(other) === 0;
-  }
+  readonly [rubyClass] = "ActiveSupport::Duration::Scalar";
+
+  /**
+   * `Scalar < Numeric` includes Comparable, so `==` IS Comparable's
+   * `cmp_equal` (Ruby core `compar.c`) over `<=>` above — which is why
+   * `Scalar.new(172800) == 172800` is true, and why `Duration#==`'s
+   * `other == value` arm (duration.rb:341-347) answers a Scalar. It is
+   * `@blazetrails/ruby-compat`'s one copy of that body, including the identity
+   * shortcut a hand-rolled `compareTo(other) === 0` does not have.
+   */
+  equals = cmpEquals;
 
   times(other: number): Scalar {
     return new Scalar(this.value * other);

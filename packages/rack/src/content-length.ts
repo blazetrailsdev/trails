@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { CONTENT_LENGTH, TRANSFER_ENCODING, STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -13,7 +14,7 @@ export class ContentLength {
     const [status, headers, body] = response;
 
     if (
-      !STATUS_WITH_NO_ENTITY_BODY[status] &&
+      !hasKey(STATUS_WITH_NO_ENTITY_BODY, status) &&
       !headers[CONTENT_LENGTH] &&
       !headers[TRANSFER_ENCODING] &&
       Array.isArray(body)

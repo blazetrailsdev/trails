@@ -1,6 +1,6 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
+import { except, hasKey } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
@@ -181,7 +181,7 @@ export class UniquenessValidator extends EachValidator {
       base as { predicateBuilder?: { buildBindAttribute(c: string, v: unknown): unknown } }
     ).predicateBuilder;
     const adapter = klass.connection ?? null;
-    const hasCsKey = Object.prototype.hasOwnProperty.call(this.options, "caseSensitive");
+    const hasCsKey = hasKey(this.options, "caseSensitive");
     const typeObj =
       typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
 

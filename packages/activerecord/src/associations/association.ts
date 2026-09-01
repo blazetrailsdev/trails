@@ -7,7 +7,7 @@ import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slo
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { ThroughAssociation } from "./through-association.js";
 import { camelize, safeConstantize, singularize } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
+import { except, hasKey } from "@blazetrails/ruby-compat";
 import { AssociationTargetReplacedDuringLoad, AssociationTypeMismatch } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
@@ -546,7 +546,7 @@ export class Association {
 
     if ((this.owner as { _validationContext?: unknown })._validationContext != null) return false;
 
-    if (Object.prototype.hasOwnProperty.call(this.reflection.options, "strictLoading")) {
+    if (hasKey(this.reflection.options, "strictLoading")) {
       return this.reflection.options.strictLoading === true;
     }
 

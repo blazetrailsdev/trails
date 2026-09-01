@@ -149,8 +149,16 @@ export class HashWithIndifferentAccess<V = unknown> {
   /**
    * `Hash#default_proc`, read by `set_defaults` (:417-418).
    *
-   * @noRailsEquivalent PERMANENT — inherited from Ruby's Hash, which this class
-   * subclasses; core Ruby has no file in the mapped Rails source to match against
+   * @noRailsEquivalent PERMANENT — inherited from Ruby's `Hash`, which this class
+   * subclasses. The copy of `@blazetrails/ruby-compat`'s `Hash` seat
+   * (`rb_hash_default_proc`, `vendor/ruby/hash.c:2285`, with its paired
+   * `default=` / `default_proc=` mutual clearing) is a genuine TS shortcoming
+   * and NOT convergeable by delegation: `rb_hash_default_value`
+   * (`vendor/ruby/hash.c:2068`) yields the RECEIVER to the proc, so a held
+   * `Hash` would hand the block the inner seat where Ruby hands it this object,
+   * and inheriting the seat means inheriting `Hash`'s `Map` storage that this
+   * class already replaces with its own key-converting one. Recorded at BOTH
+   * hosts that carry the copy — see `rack/src/headers.ts`.
    */
   defaultProc(): DefaultProc<V> | undefined {
     return this._defaultProc;
@@ -160,8 +168,16 @@ export class HashWithIndifferentAccess<V = unknown> {
    * `Hash#default_proc=`, which `initialize` (:77) and `set_defaults` (:418)
    * write through. MRI clears the default value on this write.
    *
-   * @noRailsEquivalent PERMANENT — inherited from Ruby's Hash, which this class
-   * subclasses; core Ruby has no file in the mapped Rails source to match against
+   * @noRailsEquivalent PERMANENT — inherited from Ruby's `Hash`, which this class
+   * subclasses. The copy of `@blazetrails/ruby-compat`'s `Hash` seat
+   * (`rb_hash_default_proc`, `vendor/ruby/hash.c:2285`, with its paired
+   * `default=` / `default_proc=` mutual clearing) is a genuine TS shortcoming
+   * and NOT convergeable by delegation: `rb_hash_default_value`
+   * (`vendor/ruby/hash.c:2068`) yields the RECEIVER to the proc, so a held
+   * `Hash` would hand the block the inner seat where Ruby hands it this object,
+   * and inheriting the seat means inheriting `Hash`'s `Map` storage that this
+   * class already replaces with its own key-converting one. Recorded at BOTH
+   * hosts that carry the copy — see `rack/src/headers.ts`.
    */
   setDefaultProc(proc: DefaultProc<V> | undefined): void {
     this._defaultProc = proc;

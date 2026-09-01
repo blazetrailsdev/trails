@@ -47,8 +47,8 @@ describe("rubyCompatExport", () => {
     expect(jsEnumerableAliases("escape")).toEqual(["regexpEscape"]);
   });
 
-  it("leaves the Enumerable and fs-adapter tables in front of it", () => {
-    expect(jsEnumerableAliases("key?")).toEqual(["has"]);
+  it("unions with the Enumerable table, and leaves the fs-adapter one alone", () => {
+    expect(jsEnumerableAliases("key?")).toEqual(["has", "hasKey"]);
     expect(jsEnumerableAliases("exist?")).toEqual(["existsSync", "exists"]);
   });
 });

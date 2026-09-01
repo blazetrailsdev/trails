@@ -1,3 +1,4 @@
+import { hasKey } from "@blazetrails/ruby-compat";
 import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
@@ -255,7 +256,7 @@ export class BelongsTo extends SingularAssociation {
   static override defineValidations(model: any, reflection: any): void {
     const options = reflection.options ?? {};
 
-    if ("required" in options) {
+    if (hasKey(options, "required")) {
       options.optional = !options.required;
       delete options.required;
     }
