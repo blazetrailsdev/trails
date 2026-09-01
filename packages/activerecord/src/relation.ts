@@ -1829,7 +1829,12 @@ export class Relation<T extends Base> {
 
 _registerRelationFamily("relation", Relation);
 
-export interface Relation<T extends Base> {
+/* eslint-disable @typescript-eslint/no-empty-object-type */
+/** @noRailsEquivalent PERMANENT */
+export interface RelationScopes<T extends Base> {}
+/* eslint-enable @typescript-eslint/no-empty-object-type */
+
+export interface Relation<T extends Base> extends RelationScopes<T> {
   isNullRelation(): boolean;
   then<TResult1 = T[], TResult2 = never>(
     onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,

@@ -37,6 +37,7 @@ import {
   Session,
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
+import { Collection } from "./initializable.js";
 import { Root } from "./paths.js";
 import { Trailtie } from "./trailtie.js";
 import { Trails } from "./rails.js";
@@ -433,7 +434,7 @@ describe("Application::Configuration", () => {
     expect(c.helpersPaths).toEqual([]);
     expect(c.reloadClassesOnlyOnChange).toBe(true);
     expect(c.autoflushLog).toBe(true);
-    expect(c.railtiesOrder).toEqual(["all"]);
+    expect(c.railtiesOrder).toEqual([":all"]);
     expect(c.rakeEagerLoad).toBe(false);
     expect(c.serverTiming).toBe(false);
     expect(c.yjit).toBe(false);
@@ -442,6 +443,115 @@ describe("Application::Configuration", () => {
     expect(c.addAutoloadPathsToLoadPath).toBe(true);
     expect(c.encoding).toBe("utf-8");
     expect(c.requireMasterKey).toBe(false);
+  });
+
+  it("config.load_defaults 5.0 assigns the 5.0 framework defaults", () => {
+    const c = new Configuration();
+    c.set("activeRecord", {});
+    c.set("actionController", {});
+    c.set("activeSupport", {});
+
+    c.loadDefaults("5.0");
+
+    expect(c.sslOptions).toEqual({ hsts: { subdomains: true } });
+    expect(c.get("activeRecord")).toEqual({ belongsToRequiredByDefault: true });
+    expect(c.get("activeSupport")).toEqual({ toTimePreservesTimezone: ":offset" });
+    expect(c.get("actionController")).toEqual({
+      perFormCsrfTokens: true,
+      forgeryProtectionOriginCheck: true,
+    });
+    expect(c.loadedConfigVersion).toBe("5.0");
+  });
+
+  it("config.load_defaults includes defaults for versions prior to the target version", () => {
+    const c = new Configuration();
+    c.set("activeRecord", { encryption: {} });
+
+    c.loadDefaults("7.2");
+
+    expect(c.yjit).toBe(true);
+    expect(c.addAutoloadPathsToLoadPath).toBe(false);
+    expect(c.precompileFilterParameters).toBe(true);
+    expect(c.domTestingDefaultHtmlVersion).toBe(":html4");
+    expect(c.sslOptions).toEqual({ hsts: { subdomains: true } });
+    expect((c.get("activeRecord") as Record<string, unknown>).belongsToRequiredByDefault).toBe(
+      true,
+    );
+    expect(c.loadedConfigVersion).toBe("7.2");
+  });
+
+  it("config.load_defaults skips a framework that has not registered its config", () => {
+    const c = new Configuration();
+    expect(() => c.loadDefaults("8.0")).not.toThrow();
+    expect(c.get("activeRecord")).toBeUndefined();
+  });
+
+  it("config.load_defaults raises on an unknown version", () => {
+    const c = new Configuration();
+    expect(() => c.loadDefaults("4.2")).toThrow('Unknown version "4.2"');
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (array ignore)", () => {
+    const c = new Configuration();
+    c.setRoot("/app");
+    c.autoloadLib({ ignore: ["tasks", "generators"] });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (empty array ignore)", () => {
+    const c = new Configuration();
+    c.setRoot("/app");
+    c.autoloadLib({ ignore: [] });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("config.autoload_lib adds lib to the expected paths (scalar ignore)", () => {
+    const c = new Configuration();
+    c.setRoot("/app");
+    c.autoloadLib({ ignore: "tasks" });
+
+    expect(c.autoloadPaths).toContain("/app/lib");
+    expect(c.eagerLoadPaths).toContain("/app/lib");
+  });
+
+  it("setting priority for engines with config.railties_order", () => {
+    class BukkitsEngine extends Engine {}
+    class BlogEngine extends Engine {}
+    class OrderApp extends Application {}
+    const app = OrderApp.instance();
+    app.config.railtiesOrder = [BukkitsEngine, BlogEngine, ":all", ":main_app"];
+
+    expect(app.orderedRailties()).toEqual([
+      BukkitsEngine.instance(),
+      BlogEngine.instance(),
+      expect.any(Array),
+      app,
+    ]);
+  });
+
+  it("railties_order adds :all with lowest priority if not given", () => {
+    class Bukkits2Engine extends Engine {}
+    class OrderApp2 extends Application {}
+    const app = OrderApp2.instance();
+    app.config.railtiesOrder = [Bukkits2Engine];
+
+    const order = app.orderedRailties();
+    expect(order[0]).toBe(Bukkits2Engine.instance());
+    expect(order[order.length - 1]).toEqual(expect.any(Array));
+    expect(order.flat()).toContain(app);
+  });
+
+  it("railtiesInitializers walks ordered_railties in reverse", () => {
+    class RiApp extends Application {}
+    const app = RiApp.instance();
+    app.config.railtiesOrder = [":all", ":main_app"];
+
+    const current = new Collection();
+    expect(app.railtiesInitializers(current)).toEqual(expect.any(Collection));
   });
 
   it("paths() appends the application-only 'public' entry on top of EngineConfiguration", () => {

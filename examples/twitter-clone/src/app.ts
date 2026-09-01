@@ -71,9 +71,9 @@ export function buildApp() {
     wrap(async (req, res) => {
       const user = await User.findByBang({ handle: req.params.handle });
       const followeeIds = (await user.following).map((u) => u.id);
-      const tweets = await Tweet.recent()
-        .where({ user_id: followeeIds })
+      const tweets = await Tweet.where({ user_id: followeeIds })
         .includes("author")
+        .recent()
         .limit(50);
       res.json(
         tweets.map((t: Tweet) => ({

@@ -34,6 +34,7 @@ const _registered = new WeakSet<typeof Application>();
 export class Application extends Engine {
   private _initialized = false;
   private _routesReloader?: RoutesReloader;
+  private _orderedRailties?: Array<Trailtie | Trailtie[] | string>;
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
   private _credentials?: EncryptedFile;
   private _app?: RackApp;
@@ -113,18 +114,63 @@ export class Application extends Engine {
   /**
    * Splice Bootstrap + Engine/Trailtie + Finisher initializers — mirrors
    * Rails' `Application#initializers` (`application.rb:445-449`).
-   *
-   * Rails wraps the inherited collection in `railties_initializers(super)`
-   * (`application.rb:447`) so `config.railties_order` can reorder engines
-   * around the app; `ordered_railties` is not ported (see `application.ts`
-   * PR 2.5), so the inherited collection is spliced in load order. The
-   * `@missingRailsCall` tag is gone because the call gate no longer flags the
-   * call once the getter's own call set is recorded, not because it converged.
    */
   get initializers(): Collection {
     const bootstrap = Bootstrap.initializersFor(this);
     const inherited = super.initializers;
-    return bootstrap.plus(inherited).plus(Finisher.initializersFor(this));
+    return bootstrap
+      .plus(this.railtiesInitializers(inherited))
+      .plus(Finisher.initializersFor(this));
+  }
+
+  /**
+   * Returns the ordered railties for this application considering
+   * railtiesOrder — mirrors `Application#ordered_railties`
+   * (`application.rb:588-612`). The `:all` slot holds the nested array Rails
+   * flattens back out in `railtiesInitializers`.
+   *
+   * @internal
+   */
+  orderedRailties(): Array<Trailtie | Trailtie[] | string> {
+    if (!this._orderedRailties) {
+      const order: Array<Trailtie | Trailtie[] | string> = this.config.railtiesOrder.map(
+        (railtie: unknown) => {
+          if (railtie === ":main_app") {
+            return this;
+          } else if (typeof (railtie as { instance?: unknown })?.instance === "function") {
+            return (railtie as { instance(): Trailtie }).instance();
+          } else {
+            return railtie as Trailtie | string;
+          }
+        },
+      );
+
+      const all = this.railties().minus(order as Trailtie[]);
+      if (!(all as unknown[]).concat(order).includes(this)) all.push(this);
+      if (!order.includes(":all")) order.push(":all");
+
+      const index = order.indexOf(":all");
+      order[index] = all;
+      this._orderedRailties = order;
+    }
+    return this._orderedRailties;
+  }
+
+  /**
+   * Mirrors `Application#railties_initializers` (`application.rb:614-624`).
+   *
+   * @internal
+   */
+  railtiesInitializers(current: Collection): Collection {
+    let initializers = new Collection();
+    for (const r of [...this.orderedRailties()].reverse().flat()) {
+      if (r === this) {
+        initializers = initializers.plus(current);
+      } else {
+        initializers = initializers.plus((r as Trailtie).initializers);
+      }
+    }
+    return initializers;
   }
 
   /**

@@ -50,6 +50,14 @@ export function isRelationInstanceMethod(name: string): boolean {
   return false;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export type ScopeMethod<T extends Base, A extends unknown[] = []> = (...args: A) => Relation<T>;
+
+/** @noRailsEquivalent PERMANENT */
+export type ScopeOn<T extends Base, M extends Base, A extends unknown[] = []> = [T] extends [M]
+  ? ScopeMethod<T, A>
+  : never;
+
 export function scope<T extends typeof Base>(
   this: T,
   name: string,

@@ -40,7 +40,7 @@ async function main() {
 
   // Home timeline for alice: tweets from bob + carol, newest first.
   const followeeIds = following.map((u) => u.id);
-  const timeline = await Tweet.recent().where({ user_id: followeeIds }).includes("author");
+  const timeline = await Tweet.where({ user_id: followeeIds }).includes("author").recent();
   console.log("alice's timeline:");
   for (const t of timeline) {
     console.log(`  @${t.author?.handle}: ${t.body}`);
