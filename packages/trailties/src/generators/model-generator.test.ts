@@ -53,7 +53,7 @@ describe("ModelGeneratorTest", () => {
     const gen = makeGen();
     gen.run("Account", ["name:string", "age:integer"]);
     const content = readModel("account");
-    expect(content).toContain("class Account extends Base");
+    expect(content).toContain("class Account extends ApplicationRecord");
   });
 
   it("model with parent option", () => {
@@ -456,7 +456,7 @@ describe("ModelGenerator (JavaScript project)", () => {
     const gen = makeJsGen();
     gen.run("User", ["name:string"]);
     const content = fs.readFileSync(path.join(jsTmpDir, "app/models/user.js"), "utf-8");
-    expect(content).toContain('import { Base } from "@blazetrails/activerecord"');
+    expect(content).toContain('import { ApplicationRecord } from "./application-record.js"');
     expect(content).toContain("export class User");
   });
 });

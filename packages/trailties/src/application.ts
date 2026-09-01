@@ -176,13 +176,6 @@ export class Application extends Engine {
   /**
    * Run the initializer chain — Rails' `initialize!`. Idempotency mirrors
    * Rails: re-entry raises rather than silently returning.
-   *
-   * `config.root` is pinned to the resolved root before the chain runs:
-   * Rails' `Application::Configuration#root` is `@root ||= find_root(...)`
-   * and so is never nil once the app boots, which is what lets
-   * `add_routing_paths` and `add_view_paths` read `paths[...]`. Trails'
-   * `Configuration#root` is a plain reader and its resolution is async, so
-   * it is pinned here rather than lazily in the getter.
    */
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
@@ -193,7 +186,6 @@ export class Application extends Engine {
     // `config.setRoot(...)` (e.g. in an initializer) stays visible; `bootRoot`
     // is the discovered/cwd fallback for before any explicit override.
     const bootRoot = await this.resolvedRoot();
-    if (this.config.root === null) this.config.setRoot(bootRoot);
     setTrailsRoot(() => this.config.root ?? bootRoot);
     await this.runInitializers(group, this);
     this._initialized = true;
@@ -245,17 +237,13 @@ export class Application extends Engine {
    * Mirrors `Application#ensure_generator_templates_added`
    * (`application.rb:631-634`).
    *
-   * Rails filters `paths["lib/templates"]` through `existent`;
-   * `Path#existent` is async in trails (`paths.ts:147`) while initializers run
-   * synchronously (`Initializable#runInitializers`), so the declared paths are
-   * unshifted unfiltered — see the `generator-templates-existent-paths` story.
-   *
    * @internal
    */
-  ensureGeneratorTemplatesAdded(): void {
+  async ensureGeneratorTemplatesAdded(): Promise<void> {
     const configuredPaths = this.config.generators().templates as string[];
-    const libTemplates = this.config.paths().get("lib/templates")?.toAry() ?? [];
-    configuredPaths.unshift(...libTemplates.filter((p) => !configuredPaths.includes(p)));
+    const libTemplates = (await this.paths()).get("lib/templates");
+    const existent = libTemplates ? await libTemplates.existent() : [];
+    configuredPaths.unshift(...existent.filter((p) => !configuredPaths.includes(p)));
   }
 
   routesReloader(): RoutesReloader {

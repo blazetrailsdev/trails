@@ -5,6 +5,7 @@ import { generateCommand } from "./commands/generate.js";
 import { serverCommand } from "./commands/server.js";
 import { dbCommand } from "./commands/db.js";
 import { routesCommand } from "./commands/routes.js";
+import { unusedRoutesCommand } from "./commands/unused-routes.js";
 import { consoleCommand } from "./commands/console.js";
 import { destroyCommand } from "./commands/destroy.js";
 import { appTemplateCommand } from "./commands/app.js";
@@ -41,6 +42,7 @@ export function createProgram(): Command {
   program.addCommand(serverCommand());
   program.addCommand(dbCommand());
   program.addCommand(routesCommand());
+  program.addCommand(unusedRoutesCommand(), { hidden: true });
   program.addCommand(consoleCommand());
   program.addCommand(destroyCommand());
   program.addCommand(appTemplateCommand());

@@ -73,14 +73,14 @@ export interface FinisherHost {
   reloader: FinisherReloader;
   routesReloader(): FinisherRoutesReloader;
   paths(): Promise<Root>;
-  ensureGeneratorTemplatesAdded(): void;
+  ensureGeneratorTemplatesAdded(): Promise<void>;
   buildMiddlewareStack(): void;
 }
 
 export class Finisher extends Initializable {}
 
-Finisher.initializer("add_generator_templates", function (this: FinisherHost) {
-  this.ensureGeneratorTemplatesAdded();
+Finisher.initializer("add_generator_templates", async function (this: FinisherHost) {
+  await this.ensureGeneratorTemplatesAdded();
 });
 
 /**

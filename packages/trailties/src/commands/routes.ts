@@ -6,6 +6,7 @@ import {
 } from "@blazetrails/actionpack";
 import { Command } from "commander";
 import { bootApplicationBang } from "../command/actions.js";
+import { UnusedRoutesCommand } from "./unused-routes.js";
 import { Trails } from "../rails.js";
 
 export function routesCommand(): Command {
@@ -18,7 +19,12 @@ export function routesCommand(): Command {
     )
     .option("-g, --grep <pattern>", "Grep routes by a specific pattern.")
     .option("-E, --expanded", "Print routes expanded vertically with parts explained.")
+    .option("-u, --unused", "Print unused routes.")
     .action(async (options) => {
+      if (options.unused) {
+        await new UnusedRoutesCommand(options).perform();
+        return;
+      }
       await bootApplicationBang();
       console.log(inspector().format(formatter(options), routesFilter(options)));
     });
@@ -30,6 +36,7 @@ interface RoutesOptions {
   controller?: string;
   grep?: string;
   expanded?: boolean;
+  unused?: boolean;
 }
 
 function inspector(): RoutesInspector {

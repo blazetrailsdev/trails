@@ -166,6 +166,35 @@ describe("Application", () => {
     });
   });
 
+  describe("ensure_generator_templates_added", () => {
+    it("unshifts the existent lib/templates paths ahead of the configured ones", async () => {
+      installFs(new Set(["/", "/app", "/app/lib", "/app/lib/templates"]), new Set());
+      class TemplatesApp extends Application {}
+      Application.register(TemplatesApp);
+      const app = TemplatesApp.instance();
+      app.config.setRoot("/app");
+      const templates = app.config.generators().templates as string[];
+      templates.push("/configured");
+
+      await app.ensureGeneratorTemplatesAdded();
+
+      expect(templates).toEqual(["/app/lib/templates", "/configured"]);
+    });
+
+    it("skips a lib/templates path that does not exist", async () => {
+      installFs(new Set(["/", "/app"]), new Set());
+      class NoTemplatesApp extends Application {}
+      Application.register(NoTemplatesApp);
+      const app = NoTemplatesApp.instance();
+      app.config.setRoot("/app");
+      const templates = app.config.generators().templates as string[];
+
+      await app.ensureGeneratorTemplatesAdded();
+
+      expect(templates).toEqual([]);
+    });
+  });
+
   describe("initialize!", () => {
     it("returns false from initialized? before initialize() is called", () => {
       class IApp extends Application {}

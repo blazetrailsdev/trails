@@ -43,7 +43,7 @@ describe("ScaffoldGeneratorTest", () => {
 
     // Model
     const model = readFile("app/models/product-line.ts");
-    expect(model).toContain("class ProductLine extends Base");
+    expect(model).toContain("class ProductLine extends ApplicationRecord");
 
     expect(files.some((f) => f.includes("test/models/product-line.test.ts"))).toBe(true);
 

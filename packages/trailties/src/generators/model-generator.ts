@@ -60,14 +60,31 @@ export class ModelGenerator extends GeneratorBase {
         .map((a) => a.split(":")[0]),
     );
 
-    const parentClass = parent ? classify(parent.replace(/::/g, "_").replace(/\//g, "_")) : "Base";
-    const parentPath = parent ? dasherize(parent.replace(/::/g, "/")) : null;
-    const importPath = parentPath
-      ? `import { ${parentClass} } from "./${parentPath}.js";`
-      : 'import { Base } from "@blazetrails/activerecord";';
+    const parentClassName = parent ?? "ApplicationRecord";
+    const parentClass = classify(parentClassName.replace(/::/g, "_").replace(/\//g, "_"));
+    const parentPath = dasherize(parentClassName.replace(/::/g, "/"));
+    const importPath = `import { ${parentClass} } from "./${parentPath}.js";`;
 
     const bodyLines: string[] = [];
 
+    for (const col of columns) {
+      if (col.type === "references" || col.type === "belongs_to") {
+        if (polymorphicNames.has(col.name)) {
+          bodyLines.push(`    this.belongsTo("${col.name}", { polymorphic: true });`);
+        } else {
+          bodyLines.push(`    this.belongsTo("${col.name}");`);
+        }
+      }
+    }
+    for (const col of columns) {
+      if (col.type === "rich_text") bodyLines.push(`    this.hasRichText("${col.name}");`);
+    }
+    for (const col of columns) {
+      if (col.type === "attachment") bodyLines.push(`    this.hasOneAttached("${col.name}");`);
+    }
+    for (const col of columns) {
+      if (col.type === "attachments") bodyLines.push(`    this.hasManyAttached("${col.name}");`);
+    }
     for (const col of columns) {
       if (col.type === "token") {
         if (col.name === "token") {
@@ -75,20 +92,6 @@ export class ModelGenerator extends GeneratorBase {
         } else {
           bodyLines.push(`    this.hasSecureToken("${col.name}");`);
         }
-      } else if (col.type === "rich_text") {
-        bodyLines.push(`    this.hasRichText("${col.name}");`);
-      } else if (col.type === "attachment") {
-        bodyLines.push(`    this.hasOneAttached("${col.name}");`);
-      } else if (col.type === "attachments") {
-        bodyLines.push(`    this.hasManyAttached("${col.name}");`);
-      } else if (col.type === "references" || col.type === "belongs_to") {
-        if (polymorphicNames.has(col.name)) {
-          bodyLines.push(`    this.belongsTo("${col.name}", { polymorphic: true });`);
-        } else {
-          bodyLines.push(`    this.belongsTo("${col.name}");`);
-        }
-      } else {
-        bodyLines.push(`    this.attribute("${col.name}", "${col.type}");`);
       }
     }
 
