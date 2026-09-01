@@ -36,6 +36,7 @@
  * `--rule '{"blazetrails/no-freeform-comments":["warn",{"report":true}]}'` to
  * audit without deleting.
  */
+import { lineLeadingTag } from "./jsdoc-tag-line.mjs";
 
 /**
  * Directives the toolchain reads. Deleting one silently changes behaviour.
@@ -106,14 +107,21 @@ const DIRECTIVE_RE =
 const KEPT_TAG_NAMES =
   "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|empty|deprecated";
 
+const KEPT_TAG_NAME_SET = new Set(KEPT_TAG_NAMES.split("|"));
+
 /**
- * A kept tag, which must LEAD its line — the same rule the extractors apply
- * (`isLineLeadingJsDocTag`, scripts/api-compare/extract-ts-api.ts). A tag
- * matched mid-sentence reads a quoted mention inside a reason as a second tag:
- * `which is itself \`@noRailsEquivalent PERMANENT\` for ...` then mints a
- * duplicate, and TypeScript truncates the real reason at it.
+ * A kept tag, which must LEAD its line — read through `jsdoc-tag-line.mjs`, the
+ * one parse `scripts/api-compare/extract-ts-api.ts` and the receipt lints share
+ * (RFC 0129), so a shape this rule keeps is a shape the extractor mints a tag
+ * from. A tag matched mid-sentence reads a quoted mention inside a reason as a
+ * second tag: `which is itself \`@noRailsEquivalent PERMANENT\` for ...` then
+ * mints a duplicate, and TypeScript truncates the real reason at it. A
+ * hang-indented `@` line is a CONTINUATION, not a tag, for the same reason.
  */
-const KEPT_TAG_RE = new RegExp(`^[\\s*]*@(${KEPT_TAG_NAMES})\\b`, "u");
+function keptLineLeadingTag(line) {
+  const opened = lineLeadingTag(line);
+  return opened !== null && KEPT_TAG_NAME_SET.has(opened.name) ? opened : null;
+}
 
 /** The same tags anywhere in the line, for a one-line block that has no
  *  leading position to occupy: `/** Mirrors: X. @internal *\/`. */
@@ -222,17 +230,23 @@ function keptLines(comment) {
     }
     block = null;
   };
-  const tagRe = lines.length === 1 ? INLINE_KEPT_TAG_RE : KEPT_TAG_RE;
+  const tagOf =
+    lines.length === 1
+      ? (line) => {
+          const m = INLINE_KEPT_TAG_RE.exec(line);
+          return m === null ? null : { name: m[1], text: line.slice(m.index + m[0].length) };
+        }
+      : keptLineLeadingTag;
   for (const line of lines) {
     if (DIRECTIVE_RE.test(line)) {
       flush();
       kept.push(line);
       continue;
     }
-    const tag = tagRe.exec(line);
+    const tag = tagOf(line);
     if (tag) {
       flush();
-      block = { name: tag[1], text: line.slice(tag.index + tag[0].length) };
+      block = { name: tag.name, text: tag.text };
       continue;
     }
     if (block) block.text += ` ${line.replace(/^[\s*]*/u, "")}`;
@@ -394,4 +408,4 @@ const rule = {
 };
 
 export default rule;
-export { KEPT_TAG_RE, DIRECTIVE_RE };
+export { keptLineLeadingTag, DIRECTIVE_RE };

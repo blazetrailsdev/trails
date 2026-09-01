@@ -1,8 +1,5 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { getFs, getPath } from "./fs-adapter.js";
-
-class ArgumentError extends Error {
-  override name = "ArgumentError";
-}
 
 /**
  * = File Update Checker

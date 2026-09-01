@@ -3,16 +3,10 @@
  * Mirrors ActiveSupport::Delegation and ActiveSupport::DelegationError.
  */
 
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
 import { constantize, registeredConstantName, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "./method-missing-proxy.js";
-
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
 
 /**
  * Ruby's `NoMethodError`, raised when the delegator calls a method the target

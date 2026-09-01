@@ -5,6 +5,7 @@
  * gets its own, exactly as Rails gives each fiber/thread its own.
  */
 
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
 import { CodeGenerator } from "./code-generator.js";
 import { objectWith } from "./core-ext/object/with.js";
@@ -19,11 +20,6 @@ type DefaultValue<T> = T | (() => T);
 
 interface AttributeDefinition<T = AttributeValue> {
   default?: DefaultValue<T>;
-}
-
-/** Mirrors Ruby ArgumentError. @internal */
-class ArgumentError extends Error {
-  override name = "ArgumentError";
 }
 
 /** A `:reset` callback, instance-exec'd (Rails' `set_callback :reset`). */

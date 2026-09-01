@@ -316,29 +316,26 @@ export const SOURCES: readonly UpstreamSource[] = [
         // 0129-ruby-compat measures ruby-compat with — no separate `ruby/spec`
         // clone (which RFC 0089 had planned).
         //
-        // Scoped to `spec/ruby/core`, and narrowed AGAIN inside the extractor
-        // to the surface ruby-compat actually ports (`RUBY_COMPAT_SPEC_DIRS` /
-        // `RUBY_COMPAT_SPEC_FILES` in
+        // Scoped inside the extractor to the surface ruby-compat actually
+        // ports (`RUBY_COMPAT_SPECS` in
         // scripts/test-compare/extract-ruby-tests.rb). The narrowing is
         // deliberate: all of `spec/ruby` is thousands of test names for
         // language and library surface ruby-compat has no port of, which would
         // drown the compare output.
         //
-        // The unit is the TYPE, not the directory, because ruby-compat ports
-        // some types whole and others by a single member. `Rational`, `Range`,
-        // `Hash` and `Comparable` are whole-type ports, so they take their
-        // whole spec directory. `String`, `Regexp` and `Symbol` are not:
-        // ruby-compat's entire String surface is `succ`, its entire Regexp
-        // surface is `escape`, and its entire Symbol surface is `to_s`. Taking
-        // those three directories whole would present 1,969 test names for
-        // members the package deliberately does not have — 74% of the measure,
-        // measuring nothing. ruby/spec is one file per member, so they take
-        // their member's spec files instead.
+        // The unit is the MEMBER, never the directory. ruby-compat ports no
+        // type whole — `Hash` is 16 of ruby/spec's 69 files, `Range` 13 of 30,
+        // `Rational` 14 of 33, `Comparable` 6 of 7 — so taking a directory
+        // presents test names for members the package deliberately does not
+        // have (`Comparable#clamp`, `Rational#abs`, `Hash#dig`, `Range#step`),
+        // which is the suite driving surface into the package.
         //
-        // Either list grows with the package: a new member of a ported type
-        // needs no change, a newly ported member of String/Regexp/Symbol adds
-        // its spec file, and a type that grows into a whole-type port
-        // graduates from the file list to the directory list.
+        // `testPath` is the suite ROOT, not `core/`, because the scoping is the
+        // selection's job and a member spec's shared body sits in either
+        // `core/<type>/shared/` or the suite-level `shared/<type>/` — all of
+        // Rational's are in the latter, which `spec/ruby/core` could not see.
+        //
+        // The map grows with the package: a newly ported member adds its name.
         //
         // An unported spec here is NOT a reason to port the member it covers.
         // ruby-compat's surface is driven by what the trails packages need
@@ -353,7 +350,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // not apply. extract-ruby-tests.rb already handles describe/it as its
         // Minitest::Spec style, so the description string IS the test name on
         // both sides and no mapping is needed.
-        testPath: "spec/ruby/core",
+        testPath: "spec/ruby",
         // Vendored as a read-anchor only, the way `date` above is. MRI's
         // surface is C, so `scripts/api-compare/extract-ruby-api.rb` — which
         // globs `**/*.rb` — extracts nothing from the files every citation

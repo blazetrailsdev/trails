@@ -1,13 +1,6 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { StringInquirer } from "./string-inquirer.js";
 import { isIn } from "./enumerable-utils.js";
-
-/** Ruby's `ArgumentError`, raised by the reserved-name guard. */
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
 
 /**
  * Environments that'll respond true for #local?

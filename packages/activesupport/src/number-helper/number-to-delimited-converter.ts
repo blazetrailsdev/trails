@@ -1,3 +1,4 @@
+import { fetch } from "@blazetrails/ruby-compat";
 import { NumberConverter } from "./number-converter.js";
 import type { NumberWithDelimiterOptions } from "../number-helper.js";
 
@@ -21,15 +22,12 @@ export class NumberToDelimitedConverter extends NumberConverter<NumberWithDelimi
     return right === undefined ? [delimited] : [delimited, right];
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT: Hash#fetch; a JS object has no `fetch`, and the
-   * `in` test is what distinguishes a stored `undefined` from an absent key.
-   */
   private delimiterPattern(): RegExp {
-    if (!("delimiterPattern" in this.options)) {
-      return NumberToDelimitedConverter.DEFAULT_DELIMITER_REGEX;
-    }
-    const pattern = this.options.delimiterPattern as RegExp;
+    const pattern = fetch<RegExp>(
+      this.options,
+      "delimiterPattern",
+      NumberToDelimitedConverter.DEFAULT_DELIMITER_REGEX,
+    );
     return pattern.global ? pattern : new RegExp(pattern.source, `${pattern.flags}g`);
   }
 }

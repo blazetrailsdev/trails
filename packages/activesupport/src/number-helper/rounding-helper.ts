@@ -1,10 +1,6 @@
-import { Rational } from "@blazetrails/ruby-compat";
+import { ArgumentError, Rational, fetch } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { BIGDECIMAL_STRING } from "./number-converter.js";
-
-class ArgumentError extends Error {
-  override name = "ArgumentError";
-}
 
 class NoMethodError extends Error {
   override name = "NoMethodError";
@@ -30,20 +26,13 @@ export class RoundingHelper {
     this.options = options;
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT: Ruby Hash#fetch with a default:
-   *   `options.fetch(:round_mode, :default)`
-   *   (number_helper/rounding_helper.rb:16) ports to the `"roundMode" in
-   *   this.options` check, which keeps fetch's stored-value-wins semantics that
-   *   `??` would not.
-   */
   round(number: unknown): unknown {
     const precision = this.absolutePrecision(number);
     if (precision == null) return number;
 
     const roundedNumber = this.convertToDecimal(number).round(
       precision,
-      ("roundMode" in this.options ? this.options.roundMode : ":default") as string,
+      fetch<string>(this.options, "roundMode", ":default"),
     );
     return roundedNumber.isZero() ? roundedNumber.abs() : roundedNumber; // prevent showing negative zeros
   }

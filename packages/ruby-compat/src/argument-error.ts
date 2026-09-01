@@ -8,7 +8,7 @@
  * inherits rather than defines.
  */
 export class ArgumentError extends Error {
-  constructor(message: string) {
+  constructor(message?: string) {
     super(message);
     this.name = "ArgumentError";
   }

@@ -1,3 +1,4 @@
+import { fetch } from "@blazetrails/ruby-compat";
 import { asJson, Float, isPlainObject } from "../core-ext/object/json.js";
 import { isEmpty } from "../ruby-empty.js";
 
@@ -26,16 +27,6 @@ export class JSONGemEncoder {
    * Rails escapes more than the JSON gem natively does: U+2028 and U+2029, and
    * optionally `>`, `<`, `&`, to work around certain browser problems
    * (encoding.rb:60-70).
-   *
-   * Deviation: Ruby's `@options.fetch(:escape_html_entities, ...)`
-   * (encoding.rb:63) returns the *stored* value whenever the key is present —
-   * including a stored nil, which `??` would replace with the default — and JS
-   * has no `Hash#fetch`, so the presence check is an `in` guard and the branch
-   * follows Ruby truthiness (nil and false only).
-   *
-   * @missingRailsCall fetch — PERMANENT: Ruby Hash#fetch has no JS call analogue; encode
-   *   reproduces its stored-value-wins semantics with an `in` guard rather than
-   *   `??`.
    */
   encode(value: unknown): string {
     if (!isEmpty(this.options)) {
@@ -43,10 +34,11 @@ export class JSONGemEncoder {
     }
     let json = this.stringify(this.jsonify(value));
 
-    const escapeHtmlEntities =
-      "escapeHtmlEntities" in this.options
-        ? this.options.escapeHtmlEntities
-        : Encoding.escapeHtmlEntitiesInJson;
+    const escapeHtmlEntities = fetch<unknown>(
+      this.options as Record<string, unknown>,
+      "escapeHtmlEntities",
+      Encoding.escapeHtmlEntitiesInJson,
+    );
     if (escapeHtmlEntities != null && escapeHtmlEntities !== false) {
       json = json.replaceAll(">", "\\u003e");
       json = json.replaceAll("<", "\\u003c");

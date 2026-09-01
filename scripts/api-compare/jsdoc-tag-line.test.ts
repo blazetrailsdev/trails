@@ -6,6 +6,8 @@ import { Linter } from "eslint";
 import ts from "typescript";
 import { parser } from "typescript-eslint";
 import rule from "../../eslint/ruby-compat-needs-mri-citation.mjs";
+import { keptLineLeadingTag } from "../../eslint/no-freeform-comments.mjs";
+import { hasReceipt } from "../../eslint/unbacked-internal-needs-receipt.mjs";
 import { noRailsEquivalentReason } from "./extract-ts-api.js";
 
 /** A stand-in for `vendor/ruby/` at the pinned SHA, as the rule's own test
@@ -38,6 +40,20 @@ function extractorCredits(source: string): boolean {
   return noRailsEquivalentReason(sf.statements[0]) !== undefined;
 }
 
+/** True when `blazetrails/no-freeform-comments` keeps the receipt as a tag
+ *  rather than reducing it away as prose. Its one-line branch is deliberately
+ *  looser — a one-line block has no leading position to occupy — so only the
+ *  multi-line forms are compared. */
+function noFreeformCommentsCredits(source: string): boolean {
+  const lines = source.slice(source.indexOf("/**"), source.indexOf("*/")).split("\n");
+  return lines.some((line) => keptLineLeadingTag(line)?.name === "noRailsEquivalent");
+}
+
+/** True when `blazetrails/unbacked-internal-needs-receipt` credits a receipt. */
+function unbackedInternalCredits(source: string): boolean {
+  return hasReceipt(source.slice(source.indexOf("/**") + 2, source.indexOf("*/")));
+}
+
 const body = `export function add(a: number, b: number): number { return a + b; }`;
 
 const forms: Record<string, string> = {
@@ -68,6 +84,16 @@ describe("@noRailsEquivalent tag parse", () => {
     it(`reaches the same verdict in the lint rule and the extractor: ${name}`, () => {
       expect(lintCredits(source)).toBe(extractorCredits(source));
     });
+
+    it(`reaches the same verdict in unbacked-internal-needs-receipt: ${name}`, () => {
+      expect(unbackedInternalCredits(source)).toBe(extractorCredits(source));
+    });
+
+    if (name !== "one-line comment") {
+      it(`reaches the same verdict in no-freeform-comments: ${name}`, () => {
+        expect(noFreeformCommentsCredits(source)).toBe(extractorCredits(source));
+      });
+    }
   }
 
   it("credits a tag that opens its line, closing the block or not", () => {

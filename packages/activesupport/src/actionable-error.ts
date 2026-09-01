@@ -1,3 +1,5 @@
+import { KeyError, fetch } from "@blazetrails/ruby-compat";
+
 export class NonActionable extends Error {
   constructor(message: string) {
     super(message);
@@ -61,20 +63,19 @@ export class ActionableError extends Error {
   }
 
   /**
-   * @missingRailsCall fetch — PERMANENT: actionable_error.rb:30
-   *   `actions(error).fetch(name).call` — Ruby Hash#fetch raises KeyError, which
-   *   the method's own `rescue KeyError` turns into NonActionable; JS object
-   *   indexing cannot raise, so the port spells the same pair as an explicit
-   *   `name in actions` guard (key presence, exactly as fetch tests it) plus the
-   *   NonActionable throw. Language shortcoming.
+   * @missingRailsCall call — PERMANENT: Ruby's `Proc#call` on the fetched action
+   *   is JS function invocation, which has no named call form.
+   * @missingRailsArgs fetch — PERMANENT: `@blazetrails/ruby-compat`'s `fetch` takes
+   *   the Hash Ruby calls it ON as its first argument, so this site passes
+   *   `(actions, name)` where `actions(error).fetch(name)` passes `name` alone.
    */
   static dispatch(error: any, name: string): void {
-    const actions = this.actions(error);
-    if (!(name in actions)) {
-      throw new NonActionable(`Cannot find action "${name}"`);
+    try {
+      fetch<() => void>(this.actions(error), name)();
+    } catch (e) {
+      if (e instanceof KeyError) throw new NonActionable(`Cannot find action "${name}"`);
+      throw e;
     }
-    const action = actions[name];
-    action();
   }
 
   static action(name: string, block: () => void): void {

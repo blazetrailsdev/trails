@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { Event } from "./instrumenter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
@@ -40,14 +41,6 @@ export function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => v
 
   // Rails' iterate_guarding_exceptions returns the collection (fanout.rb:41).
   return collection;
-}
-
-// Rails' Fanout::Handle#ensure_state! raises ArgumentError (fanout.rb:263-267).
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
 }
 
 type EventedListener = {

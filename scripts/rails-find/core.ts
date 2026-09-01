@@ -46,7 +46,7 @@ export const TEST_BASE: Record<string, string> = {
   rack: "vendor/rack/test",
   "did-you-mean": "vendor/did_you_mean/test",
   globalid: "vendor/globalid/test/cases",
-  "ruby-compat": "vendor/ruby/spec/ruby/core",
+  "ruby-compat": "vendor/ruby/spec/ruby",
 };
 
 export const LIB_BASE: Record<string, string> = {

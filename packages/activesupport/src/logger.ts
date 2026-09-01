@@ -2,23 +2,13 @@
  * Logger and TaggedLogging — mirroring ActiveSupport's logging API.
  */
 
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { stdout } from "./process-adapter.js";
 import { Temporal } from "@blazetrails/date";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { getFs } from "./fs-adapter.js";
 import { BroadcastLoggerClass } from "./broadcast-logger-slot.js";
 import { NameError } from "./core-ext/name-error.js";
-
-/**
- * Mirror of Ruby's `ArgumentError`, raised by `local_level=` on an
- * unrecognized level (`logger_thread_safe_level.rb:21`).
- */
-class ArgumentError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ArgumentError";
-  }
-}
 
 /**
  * Ruby's `Object#inspect` for the values `local_level=`'s ArgumentError can

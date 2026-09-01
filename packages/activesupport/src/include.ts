@@ -19,6 +19,8 @@
  *   include(Relation, QueryMethods);
  */
 
+import { ArgumentError } from "@blazetrails/ruby-compat";
+
 type AnyClass = new (...args: any[]) => any;
 type ModuleObject = Record<string, any>;
 
@@ -222,10 +224,6 @@ export function isModuleIncluded(
     }
   }
   return false;
-}
-
-class ArgumentError extends Error {
-  override name = "ArgumentError";
 }
 
 /**
