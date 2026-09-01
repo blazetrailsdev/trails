@@ -252,8 +252,8 @@ export class Persisted {
     const data = this.writeSession(req, sessionId, sessionData, options);
     if (!isTruthy(data)) {
       console.warn(`Warning! ${this.constructor.name} failed to save session. Content dropped.`);
+      // eslint-disable-next-line no-empty -- Ruby puts a $VERBOSE-only notice on rack.errors (abstract/id.rb:399); trails' Rack env carries no such stream
     } else if (isTruthy(options.get("defer")) && !isTruthy(options.get("renew"))) {
-      void sessionId;
     } else {
       const cookie: Record<string, unknown> = {};
       cookie["value"] = this.cookieValue(data);
