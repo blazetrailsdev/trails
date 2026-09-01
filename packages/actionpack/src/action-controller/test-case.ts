@@ -582,7 +582,12 @@ export class TestRequest extends AbstractTestRequest {
 
         const ct = this.getHeader("CONTENT_TYPE") ?? "";
         let data: string;
-        const mimeSymbol = MimeType.lookup(ct.split(";")[0].trim().toLowerCase()).symbol;
+        // The key `parseFormattedParameters` will look the parser up under:
+        // `contentMimeType` is `Mime::Type.lookup` of the stripped, lowercased
+        // media type (`mime-negotiation.ts` / `mime_type.rb:167-173`), so a raw
+        // header carrying parameters or non-canonical case would never match.
+        const mediaType = ct.split(";")[0].trim().toLowerCase();
+        const mimeSymbol = MimeType.lookup(mediaType).symbol ?? mediaType;
 
         if (mimeSymbol === "json") {
           data = JSON.stringify(nonPathParameters);

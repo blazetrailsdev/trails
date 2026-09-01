@@ -9,6 +9,7 @@ import {
   type SafeBuffer,
 } from "@blazetrails/activesupport";
 
+import { _setBase } from "./base-slot.js";
 import { OutputBuffer } from "./buffers.js";
 import { OutputFlow } from "./flows.js";
 import * as Helpers from "./helpers/index.js";
@@ -496,3 +497,5 @@ export interface Base extends HelperMethods, TseUtilMethods {
    */
   readonly yield: SafeBuffer;
 }
+
+_setBase(Base);

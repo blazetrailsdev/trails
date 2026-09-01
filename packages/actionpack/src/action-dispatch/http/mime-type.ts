@@ -29,7 +29,9 @@ export class Mimes {
   /** @internal Mirrors Ruby `<<`. */
   push(type: MimeType): void {
     this._mimes.push(type);
-    const sym = type.toSym();
+    // `to_sym` is nil only for the throwaway types `lookup` fabricates
+    // (`mime_type.rb:172`), which never reach `SET`.
+    const sym = type.toSym()!;
     this._symbols.push(sym);
     this._symbolsSet.add(sym);
   }
@@ -39,7 +41,7 @@ export class Mimes {
     const removed = new Set<string>();
     for (const m of this._mimes) {
       if (predicate(m)) {
-        removed.add(m.toSym());
+        removed.add(m.toSym()!);
       } else {
         kept.push(m);
       }
@@ -161,7 +163,7 @@ const ACCEPT_HEADER_REGEXP = /[^,\s"](?:[^,"]|"[^"]*")*/g;
 export class MimeType {
   /** @internal */
   readonly string: string;
-  readonly symbol: string;
+  readonly symbol: string | null;
   /** @internal */
   readonly synonyms: string[];
 
@@ -172,7 +174,7 @@ export class MimeType {
   /** Ordered set of all registered MIME types. Mirrors `Mime::SET`. */
   static readonly SET: Mimes = new Mimes();
 
-  constructor(string: string, symbol: string, synonyms: string[] = []) {
+  constructor(string: string, symbol: string | null = null, synonyms: string[] = []) {
     this.string = string;
     this.symbol = symbol;
     this.synonyms = synonyms;
@@ -193,10 +195,10 @@ export class MimeType {
   }
 
   ref(): string {
-    return this.symbol;
+    return this.symbol ?? this.toString();
   }
 
-  toSym(): string {
+  toSym(): string | null {
     return this.symbol;
   }
 
@@ -265,7 +267,7 @@ export class MimeType {
   static lookup(string: string): MimeType {
     if (MimeType.registry.has(string)) return MimeType.registry.get(string)!;
     const stripped = string.split(";")[0].trimEnd();
-    return MimeType.registry.get(stripped) ?? new MimeType(stripped, stripped);
+    return MimeType.registry.get(stripped) ?? new MimeType(stripped);
   }
 
   /**

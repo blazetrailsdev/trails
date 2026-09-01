@@ -12,6 +12,8 @@ import { OutputBuffer } from "./buffers.js";
 import { StrictLocalsMismatch } from "./strict-locals.js";
 import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
+import { Raw } from "./template/handlers/raw.js";
+import { Tse } from "./template/handlers/tse.js";
 import type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-location.js";
 
 type LocationTranslatingHandler = TemplateHandler & {
@@ -99,6 +101,16 @@ export interface TemplateOptions {
 }
 
 export class Template {
+  // `extend Template::Handlers` (`template.rb:178`), whose `Handlers.extended`
+  // hook (`template/handlers.rb:12-18`) seeds the registry. Rails registers
+  // `:raw`, `:erb`, `:html`, `:builder` and `:ruby`; trails has `raw` and the
+  // `.tse` analogue of `:erb`. `Html`, `Builder` and the `:ruby` lambda are
+  // unported.
+  static {
+    TemplateHandlers.registerDefaultTemplateHandler("raw", new Raw());
+    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  }
+
   static Error = TemplateError;
 
   readonly identifier: string;
