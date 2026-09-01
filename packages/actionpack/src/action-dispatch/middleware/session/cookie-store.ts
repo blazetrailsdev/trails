@@ -30,27 +30,46 @@ export interface CookieJarLike {
 }
 
 /**
- * Rails: `class SessionId < DelegateClass(Rack::Session::SessionId)`.
- * Carries the raw cookie hash alongside the session id so the commit path
- * can hand the whole payload to the cookie jar.
+ * Rails: `class SessionId < DelegateClass(Rack::Session::SessionId)`
+ * (`cookie_store.rb:53-59`). `DelegateClass` builds a wrapper, not a subclass:
+ * it holds the `Rack::Session::SessionId` and forwards its public surface,
+ * which is why `attr_reader :cookie_value` (`cookie_store.rb:54`) freely
+ * replaces the delegate's `alias :cookie_value :public_id`
+ * (`rack-session abstract/id.rb:34`) with the cookie hash.
  */
-export class SessionId extends RackSessionId {
+export class SessionId {
+  readonly #obj: RackSessionId;
   readonly #cookieValue: Record<string, unknown>;
+
+  /** Rails: `initialize(session_id, cookie_value = {})` (`cookie_store.rb:56-59`). */
   constructor(sessionId: RackSessionId, cookieValue: Record<string, unknown> = {}) {
-    super(sessionId.publicId);
+    this.#obj = sessionId;
     this.#cookieValue = cookieValue;
   }
 
-  /**
-   * Rails: `attr_reader :cookie_value` (`cookie_store.rb:54`). `DelegateClass`
-   * makes this a wrapper rather than a subclass, so the reader freely replaces
-   * the delegate's `alias :cookie_value :public_id`
-   * (`rack-session abstract/id.rb:34`) with a hash. TypeScript's `extends`
-   * demands an override be assignable to the base member, which a `String`
-   * reader and a `Hash` reader are not; the widened return type is that gap.
-   */
-  override get cookieValue(): any {
+  /** Rails: `attr_reader :cookie_value` (`cookie_store.rb:54`). */
+  get cookieValue(): Record<string, unknown> {
     return this.#cookieValue;
+  }
+
+  get publicId(): string {
+    return this.#obj.publicId;
+  }
+
+  get privateId(): string {
+    return this.#obj.privateId;
+  }
+
+  toString(): string {
+    return this.#obj.toString();
+  }
+
+  isEmpty(): boolean {
+    return this.#obj.isEmpty();
+  }
+
+  inspect(): string {
+    return this.#obj.inspect();
   }
 }
 

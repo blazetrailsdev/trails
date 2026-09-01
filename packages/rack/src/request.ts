@@ -134,15 +134,89 @@ function isTrustedProxy(ip: string): boolean {
  */
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers`; the class/interface merge is how the module's host state surfaces on the type side. */
 export interface Helpers {
-  /** Supplied by the including class (`Rack::Request#scheme`). */
-  readonly scheme: string;
+  /** Supplied by the including class (`Rack::Request::Env#get_header`). */
+  getHeader(name: string): any;
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export abstract class Helpers {
+  /** Mirrors `Rack::Request::Helpers#scheme` (`rack/lib/rack/request.rb:249-258`). */
+  get scheme(): string {
+    if (this.getHeader(HTTPS) === "on") {
+      return "https";
+    } else if (this.getHeader(HTTP_X_FORWARDED_SSL) === "on") {
+      return "https";
+    } else if (this.forwardedScheme) {
+      return this.forwardedScheme;
+    } else {
+      return this.getHeader(RACK_URL_SCHEME);
+    }
+  }
+
   /** Mirrors `Rack::Request::Helpers#ssl?` (`rack/lib/rack/request.rb:410-412`). */
   get ssl(): boolean {
     return this.scheme === "https" || this.scheme === "wss";
+  }
+
+  /**
+   * Mirrors `Rack::Request::Helpers#forwarded_scheme`
+   * (`rack/lib/rack/request.rb:752-774`).
+   *
+   * @internal
+   */
+  get forwardedScheme(): string | null {
+    for (const type of this.forwardedPriority()) {
+      if (type === "forwarded") {
+        const forwardedProto = this.getHttpForwarded("proto");
+        if (forwardedProto) {
+          const scheme = allowedScheme(forwardedProto[forwardedProto.length - 1]);
+          if (scheme) return scheme;
+        }
+      } else if (type === "x_forwarded") {
+        for (const xType of this.xForwardedProtoPriority()) {
+          const header = xType == null ? undefined : FORWARDED_SCHEME_HEADERS[xType];
+          if (header) {
+            const parts = splitHeader(this.getHeader(header));
+            for (let i = parts.length - 1; i >= 0; i--) {
+              const scheme = allowedScheme(parts[i]);
+              if (scheme) return scheme;
+            }
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Mirrors `Rack::Request::Helpers#get_http_forwarded`
+   * (`rack/lib/rack/request.rb:668-670`).
+   *
+   * @internal
+   */
+  getHttpForwarded(token: string): string[] | null {
+    return forwardedValues(this.getHeader(HTTP_FORWARDED))?.[token] ?? null;
+  }
+
+  /**
+   * Mirrors `Rack::Request::Helpers#forwarded_priority`
+   * (`rack/lib/rack/request.rb:780-782`).
+   *
+   * @internal
+   */
+  forwardedPriority(): Array<"forwarded" | "x_forwarded" | null> {
+    return Request.forwardedPriority;
+  }
+
+  /**
+   * Mirrors `Rack::Request::Helpers#x_forwarded_proto_priority`
+   * (`rack/lib/rack/request.rb:784-786`).
+   *
+   * @internal
+   */
+  xForwardedProtoPriority(): Array<"proto" | "scheme" | null> {
+    return Request.xForwardedProtoPriority;
   }
 }
 
@@ -237,19 +311,6 @@ export class Request {
   get contentLength(): number | null {
     const cl = this.env[CONTENT_LENGTH] || this.env["CONTENT_LENGTH"];
     return cl ? parseInt(cl) : null;
-  }
-
-  /** Mirrors `Rack::Request::Helpers#scheme` (`rack/lib/rack/request.rb:249-258`). */
-  get scheme(): string {
-    if (this.getHeader(HTTPS) === "on") {
-      return "https";
-    } else if (this.getHeader(HTTP_X_FORWARDED_SSL) === "on") {
-      return "https";
-    } else if (this.forwardedScheme) {
-      return this.forwardedScheme;
-    } else {
-      return this.getHeader(RACK_URL_SCHEME);
-    }
   }
 
   get host(): string {
@@ -576,11 +637,6 @@ export class Request {
     return this.parseHttpAcceptHeader(this.env["HTTP_ACCEPT_LANGUAGE"]);
   }
 
-  /** @internal */
-  getHttpForwarded(token: string): string[] | null {
-    return forwardedValues(this.env[HTTP_FORWARDED])?.[token] ?? null;
-  }
-
   get forwardedFor(): string[] | null {
     const priority = (this.constructor as typeof Request).forwardedPriority;
     for (const type of priority) {
@@ -620,34 +676,6 @@ export class Request {
         if (value) {
           const parts = splitHeader(value);
           return parts.length ? wrapIpv6(parts[parts.length - 1]) : null;
-        }
-      }
-    }
-    return null;
-  }
-
-  /** @internal */
-  get forwardedScheme(): string | null {
-    const priority = (this.constructor as typeof Request).forwardedPriority;
-    for (const type of priority) {
-      if (type === "forwarded") {
-        const fwdProto = this.getHttpForwarded("proto");
-        if (fwdProto) {
-          const scheme = allowedScheme(fwdProto[fwdProto.length - 1]);
-          if (scheme) return scheme;
-        }
-      } else if (type === "x_forwarded") {
-        const xPriority = (this.constructor as typeof Request).xForwardedProtoPriority;
-        for (const xType of xPriority) {
-          if (!xType) continue;
-          const header = FORWARDED_SCHEME_HEADERS[xType];
-          if (header) {
-            const parts = splitHeader(this.env[header]);
-            for (let i = parts.length - 1; i >= 0; i--) {
-              const scheme = allowedScheme(parts[i]);
-              if (scheme) return scheme;
-            }
-          }
         }
       }
     }
@@ -793,4 +821,4 @@ export class Request {
 
 include(Request, Helpers);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/request.rb:37`); the class/interface merge is how a mixin surfaces on the type side. */
-export interface Request extends Omit<Helpers, "scheme"> {}
+export interface Request extends Helpers {}
