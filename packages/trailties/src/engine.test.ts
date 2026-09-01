@@ -11,7 +11,7 @@ import {
   type PathAdapter,
 } from "@blazetrails/activesupport";
 import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
-import { setEnv } from "@blazetrails/activesupport/process-adapter";
+import { env, setEnv } from "@blazetrails/activesupport/process-adapter";
 import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { loaded } from "./__fixtures__/loaded.js";
@@ -391,7 +391,7 @@ describe("Engine", () => {
     let previousEnv: string | undefined;
 
     beforeEach(() => {
-      previousEnv = "test";
+      previousEnv = env.TRAILS_ENV;
       setEnv("TRAILS_ENV", "test");
       loaded.length = 0;
     });

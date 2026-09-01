@@ -45,9 +45,7 @@ export abstract class Bootstrap extends Initializable implements BootstrapHost {
 }
 
 Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {
-  // Rails: `initializer :load_environment_hook, group: :all do end`
-  // (`application/bootstrap.rb:13`) — an empty anchor that `Engine`'s
-  // `load_environment_config` orders itself before.
+  // Rails: `initializer :load_environment_hook, group: :all do end` (bootstrap.rb:13).
 });
 
 Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, function () {

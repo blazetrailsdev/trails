@@ -201,14 +201,11 @@ export class Engine extends Trailtie {
    */
   async loadConfigInitializer(initializer: string): Promise<void> {
     const { pathToFileURL } = await getPathAsync();
-    if (!pathToFileURL) {
-      throw new Error("PathAdapter.pathToFileURL() is required to load a config initializer.");
-    }
     await Notifications.instrumentAsync(
       "load_config_initializer.railties",
       { initializer },
       async () => {
-        await import(pathToFileURL(initializer).href);
+        await import(pathToFileURL!(initializer).href);
       },
     );
   }
@@ -256,14 +253,10 @@ Engine.initializer(
   "load_environment_config",
   { before: "load_environment_hook", group: "all" },
   async function (this: Engine) {
-    const environments = (await (await this.paths()).get("config/environments")?.existent()) ?? [];
-    if (environments.length === 0) return;
     const { pathToFileURL } = await getPathAsync();
-    if (!pathToFileURL) {
-      throw new Error("PathAdapter.pathToFileURL() is required to load an environment config.");
-    }
-    for (const environment of environments) {
-      await import(pathToFileURL(environment).href);
+    for (const environment of (await (await this.paths()).get("config/environments")?.existent()) ??
+      []) {
+      await import(pathToFileURL!(environment).href);
     }
   },
 );
@@ -304,7 +297,7 @@ Engine.initializer("add_view_paths", async function (this: Engine) {
 /** Mirrors `Engine`'s `prepend_helpers_path` initializer (`engine.rb:638-642`). */
 Engine.initializer("prepend_helpers_path", async function (this: Engine, ...args: unknown[]) {
   const app = args[0] as EngineInitializerApp;
-  if (!this.isolated() || (app as unknown) === (this as unknown)) {
+  if (!this.isolated() || (app as unknown) === this) {
     const helpers = (await (await this.paths()).get("app/helpers")?.existent()) ?? [];
     app.config.helpersPaths.unshift(...helpers);
   }
@@ -313,7 +306,7 @@ Engine.initializer("prepend_helpers_path", async function (this: Engine, ...args
 /** Mirrors `Engine`'s `load_config_initializers` initializer (`engine.rb:644-648`). */
 Engine.initializer("load_config_initializers", async function (this: Engine) {
   const existent = (await (await this.paths()).get("config/initializers")?.existent()) ?? [];
-  for (const initializer of [...existent].sort()) {
+  for (const initializer of existent.sort()) {
     await this.loadConfigInitializer(initializer);
   }
 });
