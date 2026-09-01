@@ -236,9 +236,7 @@ interface StoreDirtyHost {
 
 function dig(obj: unknown, key: string): unknown {
   if (obj == null) return undefined;
-  if (obj instanceof HashWithIndifferentAccess) {
-    return (obj.toHash() as Record<string, unknown>)[key];
-  }
+  if (obj instanceof HashWithIndifferentAccess) return obj.dig(key);
   if (typeof obj === "object") return (obj as Record<string, unknown>)[key];
   return undefined;
 }
