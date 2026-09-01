@@ -50,6 +50,8 @@ import {
   ambiguousRubyOwner,
   rubyOwnerSeat,
   tsOwnerSeat,
+  crossPackageIncludedMethodNames,
+  predicatePairedWithBareTwin,
   writerPairedWithReader,
   staleCallTags,
   applyCallTags,
@@ -1424,6 +1426,23 @@ describe("resolveEntityByDeclaringFile", () => {
     const http = entity("http/request.ts", "Request");
     const csp = entity("http/content-security-policy.ts", "Request");
     expect(resolveEntityByDeclaringFile([http, csp], "testing/test-request.ts")).toBeNull();
+  });
+
+  it("does not rank a dep package's identically-pathed candidate by proximity", () => {
+    const dep = entity("attribute-methods.ts", "ClassMethods");
+    const own = entity("attribute-methods/read.ts", "ClassMethods");
+    expect(
+      resolveEntityByDeclaringFile([dep, own], "attribute-methods.ts", undefined, undefined, (c) =>
+        Object.is(c, dep),
+      ),
+    ).toBe(own);
+  });
+
+  it("still resolves a dep candidate that is the only one in the running", () => {
+    const dep = entity("type/string.ts", "StringType");
+    expect(
+      resolveEntityByDeclaringFile([dep], "type/text.ts", undefined, undefined, () => true),
+    ).toBe(dep);
   });
 
   it("reports the unseparated candidates through onAmbiguous", () => {
@@ -3305,5 +3324,74 @@ describe("resolvePortedWithArgsSigs (Rails-private prefix)", () => {
     expect(resolvePortedWithArgsSigs(byFileName, byNameInPkg, "m.ts", "_readAttribute")).toEqual(
       [],
     );
+  });
+});
+
+describe("predicatePairedWithBareTwin", () => {
+  it("withholds a predicate paired with the TS port of its non-predicate twin", () => {
+    expect(predicatePairedWithBareTwin("deep_merge?", "deepMerge", new Set(["deep_merge"]))).toBe(
+      true,
+    );
+  });
+
+  it("leaves a predicate alone when Ruby has no bare twin", () => {
+    expect(predicatePairedWithBareTwin("permitted?", "permitted", new Set())).toBe(false);
+  });
+
+  it("leaves a predicate paired with its own spelling alone", () => {
+    expect(predicatePairedWithBareTwin("deep_merge?", "isDeepMerge", new Set(["deep_merge"]))).toBe(
+      false,
+    );
+  });
+
+  it("ignores a non-predicate", () => {
+    expect(predicatePairedWithBareTwin("deep_merge", "deepMerge", new Set(["deep_merge"]))).toBe(
+      false,
+    );
+  });
+});
+
+describe("crossPackageIncludedMethodNames", () => {
+  const manifest = {
+    packages: {
+      actioncontroller: { classes: {}, modules: {} },
+      activesupport: {
+        classes: {},
+        modules: {
+          "ActiveSupport::DeepMergeable": {
+            name: "DeepMergeable",
+            file: "deep-mergeable.ts",
+            includes: [],
+            extends: [],
+            instanceMethods: [{ name: "deep_merge", params: [] }],
+            classMethods: [],
+          },
+        },
+      },
+    },
+  } as unknown as Parameters<typeof crossPackageIncludedMethodNames>[2];
+
+  const host = {
+    name: "Parameters",
+    file: "metal/strong_parameters.rb",
+    includes: ["ActiveSupport::DeepMergeable"],
+    extends: [],
+    instanceMethods: [],
+    classMethods: [],
+  } as unknown as ClassInfo;
+
+  it("collects the names a host includes from another gem", () => {
+    expect([...crossPackageIncludedMethodNames([host], "actioncontroller", manifest)]).toEqual([
+      "deep_merge",
+    ]);
+  });
+
+  it("skips the host's own package", () => {
+    expect(crossPackageIncludedMethodNames([host], "activesupport", manifest).size).toBe(0);
+  });
+
+  it("ignores an unqualified include name", () => {
+    const local = { ...host, includes: ["DeepMergeable"] };
+    expect(crossPackageIncludedMethodNames([local], "actioncontroller", manifest).size).toBe(0);
   });
 });
