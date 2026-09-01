@@ -101,7 +101,6 @@ describe("prepend", () => {
     expect(after?.enumerable).toBe(before?.enumerable);
     expect(after?.writable).toBe(before?.writable);
     expect(after?.configurable).toBe(before?.configurable);
-    // Sanity: the wrapper doesn't leak into Object.keys(prototype).
     expect(Object.keys(Widget.prototype)).not.toContain("spin");
     expect(new Widget().spin()).toBe("wrapped-spin");
   });
@@ -147,7 +146,6 @@ describe("prepend", () => {
         reader: (s: (...args: unknown[]) => unknown) => `w-${s.call(undefined)}`,
       }),
     ).toThrow(/non-configurable accessor/);
-    // `loose` must NOT have been wrapped — atomicity guarantee.
     expect(target.loose).toBe(origLoose);
   });
 
@@ -172,7 +170,6 @@ describe("prepend", () => {
         locked: (s: (...args: unknown[]) => unknown) => `w-${s.call(undefined)}`,
       }),
     ).toThrow(/non-configurable and non-writable/);
-    // `loose` must NOT have been wrapped — atomicity guarantee.
     expect(target.loose).toBe(origLoose);
   });
 

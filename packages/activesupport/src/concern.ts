@@ -1,4 +1,4 @@
-import { extend as extendModule, extended } from "./include.js";
+import { extend as extendModule, extended } from "@blazetrails/ruby-compat";
 
 export class MultipleIncludedBlocks extends Error {
   constructor() {

@@ -10,6 +10,7 @@
       "@blazetrails/arel": ["../../arel/src/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/src/index.ts"],
       "@blazetrails/i18n": ["../../i18n/src/index.ts"],
+      "@blazetrails/ruby-compat/include": ["../../ruby-compat/src/include.ts"],
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/src/range.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
       "@blazetrails/date": ["../../date/src/index.ts"],
