@@ -121,6 +121,6 @@ describe("collection replace diffs instead of clearing", () => {
     expect((await Client.where({ client_of: id })).length).toBeGreaterThan(0);
 
     const fresh = new Firm({ name: "fresh" });
-    await expect(fresh.setAttributes({ clients: [] })).resolves.toBeUndefined();
+    expect(() => fresh.assignAttributes({ clients: [] })).not.toThrow();
   });
 });

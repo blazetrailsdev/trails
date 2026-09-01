@@ -18,15 +18,11 @@ export function delegate(
 
     Object.defineProperty(modelClass.prototype, delegatedName, {
       value: async function (this: Base) {
-        const ctor = this.constructor as typeof Base;
-        const assocDef = (ctor as any)._reflectOnAssociation?.(assocName);
-        if (!assocDef) {
-          throw new Error(`Association "${assocName}" not found on ${ctor.name}`);
-        }
+        const assoc = association.call(this, assocName);
 
         let target: Base | null = null;
-        if (assocDef.macro === "belongsTo" || assocDef.macro === "hasOne") {
-          target = (await association.call(this, assocName).loadTarget()) as Base | null;
+        if (assoc.reflection.macro === "belongsTo" || assoc.reflection.macro === "hasOne") {
+          target = (await assoc.loadTarget()) as Base | null;
         }
 
         if (!target) return null;

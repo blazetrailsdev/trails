@@ -660,13 +660,11 @@ export function addAutosaveAssociationCallbacks(this: any, reflection: any): voi
       ? reflection.isCollection()
       : reflection.collection === true ||
         reflection.macro === "hasMany" ||
-        reflection.macro === "hasAndBelongsToMany" ||
-        reflection.type === "hasMany" ||
-        reflection.type === "hasAndBelongsToMany";
+        reflection.macro === "hasAndBelongsToMany";
   const isHasOne: boolean =
     typeof reflection.hasOne === "function"
       ? reflection.hasOne()
-      : reflection.hasOne === true || reflection.macro === "hasOne" || reflection.type === "hasOne";
+      : reflection.hasOne === true || reflection.macro === "hasOne";
 
   if (isCollection) {
     this.aroundSave(":aroundSaveCollectionAssociation");
