@@ -95,16 +95,7 @@ export class Lint {
   }
 
   private checkEnv(env: Record<string, any>): void {
-    const required = [
-      REQUEST_METHOD,
-      SERVER_NAME,
-      SERVER_PORT,
-      SERVER_PROTOCOL,
-      RACK_INPUT,
-      RACK_ERRORS,
-      QUERY_STRING,
-      RACK_URL_SCHEME,
-    ];
+    const required = [REQUEST_METHOD, SERVER_NAME, QUERY_STRING, SERVER_PROTOCOL, RACK_ERRORS];
     for (const key of required) {
       if (!(key in env)) {
         throw new LintError(`env missing required key ${key}`);
@@ -147,8 +138,9 @@ export class Lint {
     if (typeof env[SERVER_NAME] !== "string" || env[SERVER_NAME] === "") {
       throw new LintError("SERVER_NAME must be a non-empty string");
     }
-    if (typeof env[SERVER_PORT] !== "string" || env[SERVER_PORT] === "") {
-      throw new LintError("SERVER_PORT must be a non-empty string");
+    const serverPort = env[SERVER_PORT];
+    if (serverPort != null && !/^-?\d+$/.test(String(serverPort))) {
+      throw new LintError("env[SERVER_PORT] is not an Integer");
     }
 
     if (typeof env[QUERY_STRING] !== "string") {

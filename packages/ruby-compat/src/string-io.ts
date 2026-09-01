@@ -51,6 +51,16 @@ export class StringIO {
     return string.length;
   }
 
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO` mixes in
+   * `IO#puts` (`vendor/ruby/ext/stringio/stringio.c:1958`), which is how
+   * `Rack::Session::Abstract::Persisted#commit_session` writes to `rack.errors`.
+   */
+  puts(string = ""): null {
+    this.write(string.endsWith("\n") ? string : `${string}\n`);
+    return null;
+  }
+
   rewind(): number {
     this._pos = 0;
     return 0;

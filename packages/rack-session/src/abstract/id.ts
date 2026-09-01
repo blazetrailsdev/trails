@@ -1,6 +1,12 @@
 import { ArgumentError, getCrypto, inspect, KeyError, valuesAt } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
-import { RACK_SESSION, RACK_SESSION_OPTIONS, Request, ResponseRaw } from "@blazetrails/rack";
+import {
+  RACK_ERRORS,
+  RACK_SESSION,
+  RACK_SESSION_OPTIONS,
+  Request,
+  ResponseRaw,
+} from "@blazetrails/rack";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 
 export class SessionId {
@@ -38,6 +44,10 @@ export class SessionId {
   }
 }
 
+interface RackErrors {
+  puts(string?: string): unknown;
+}
+
 const objectIds = new WeakMap<object, number>();
 let nextObjectId = 1;
 
@@ -56,6 +66,12 @@ function rubyClassPath(klass: unknown): string {
       return "Rack::Session::Abstract::SessionHash";
     case SecureSessionHash:
       return "Rack::Session::Abstract::PersistedSecure::SecureSessionHash";
+    case Persisted:
+      return "Rack::Session::Abstract::Persisted";
+    case PersistedSecure:
+      return "Rack::Session::Abstract::PersistedSecure";
+    case ID:
+      return "Rack::Session::Abstract::ID";
     default:
       return (klass as { name: string }).name;
   }
@@ -501,8 +517,10 @@ export class Persisted {
 
     const data = this.writeSession(req, sessionId, sessionData, options);
     if (!isTruthy(data)) {
-      console.warn(`Warning! ${this.constructor.name} failed to save session. Content dropped.`);
-      // eslint-disable-next-line no-empty -- Ruby puts a $VERBOSE-only notice on rack.errors (abstract/id.rb:399); trails' Rack env carries no such stream
+      (req.getHeader(RACK_ERRORS) as unknown as RackErrors).puts(
+        `Warning! ${rubyClassPath(this.constructor)} failed to save session. Content dropped.`,
+      );
+      // eslint-disable-next-line no-empty -- Ruby's notice here is `if $VERBOSE` (abstract/id.rb:399) and trails has no $VERBOSE
     } else if (isTruthy(options["defer"]) && !isTruthy(options["renew"])) {
     } else {
       const cookie: Record<string, unknown> = {};
@@ -609,5 +627,42 @@ export class PersistedSecure extends Persisted {
   /** @internal */
   override cookieValue(data: unknown): unknown {
     return (data as { cookieValue?: unknown }).cookieValue;
+  }
+}
+
+interface IdSubclass {
+  getSession(env: RackEnv, sid: unknown): [unknown, Record<string, unknown> | null];
+  setSession(
+    env: RackEnv,
+    sid: unknown,
+    session: Record<string, unknown>,
+    options: Record<string, unknown>,
+  ): unknown;
+  destroySession(env: RackEnv, sid: unknown, options: Record<string, unknown>): unknown;
+}
+
+export class ID extends Persisted {
+  override findSession(
+    req: PersistedRequest,
+    sid: unknown,
+  ): [unknown, Record<string, unknown> | null] {
+    return (this as unknown as IdSubclass).getSession(req.env, sid);
+  }
+
+  override writeSession(
+    req: PersistedRequest,
+    sid: unknown,
+    session: Record<string, unknown>,
+    options: Record<string, unknown>,
+  ): unknown {
+    return (this as unknown as IdSubclass).setSession(req.env, sid, session, options);
+  }
+
+  override deleteSession(
+    req: PersistedRequest,
+    sid: unknown,
+    options: Record<string, unknown>,
+  ): unknown {
+    return (this as unknown as IdSubclass).destroySession(req.env, sid, options);
   }
 }
