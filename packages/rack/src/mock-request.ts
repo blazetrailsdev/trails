@@ -200,9 +200,9 @@ export class MockRequest {
         opts["CONTENT_TYPE"] = "application/x-www-form-urlencoded";
         if (typeof params === "object") {
           const data = buildMultipart(params);
-          if (data != null) {
+          if (typeof data === "string") {
             opts.input = data;
-            opts["CONTENT_LENGTH"] ??= String((data as string).length);
+            opts["CONTENT_LENGTH"] ??= String(data.length);
             opts["CONTENT_TYPE"] = `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
           } else {
             opts.input = buildNestedQuery(params);
