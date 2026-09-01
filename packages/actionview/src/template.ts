@@ -10,7 +10,7 @@ import { htmlSafe } from "@blazetrails/activesupport";
 import type { Base, CompiledMethod, CompiledMethodContainer } from "./base.js";
 import { OutputBuffer } from "./buffers.js";
 import { StrictLocalsMismatch } from "./strict-locals.js";
-import { TemplateError } from "./template/error.js";
+import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 
 const STRICT_LOCALS_REGEX = /#\s+locals:\s+\((.*)\)/;
@@ -266,34 +266,6 @@ export class Template {
   }
 
   /**
-   * Mirrors `Template#compile(mod)` (`template.rb:499-521`) — Rails
-   * `module_eval`s `compiled_source` onto the container, which defines a real
-   * method named `method_name`; the JS analogue evaluates the same source to a
-   * function and stores it under that name. Rails' strict-locals parameter
-   * audit has no analogue: the tse compiler emits the check into the template
-   * body (see {@link compiledSource}), so there are no method parameters to
-   * inspect — and so no `to_sentence`d list of offending parameter names to
-   * put in a `StrictLocalsError`.
-   *
-   * @internal
-   * @missingRailsCall to_sentence — PERMANENT
-   */
-  private compile(mod: CompiledMethodContainer): void {
-    try {
-      const factory = new Function(
-        "StrictLocalsMismatch",
-        "htmlSafe",
-        `return ${this.compiledSource()};`,
-      ) as (mismatch: typeof StrictLocalsMismatch, safe: typeof htmlSafe) => CompiledMethod;
-      mod._compiledMethods.set(this.methodName(), factory(StrictLocalsMismatch, htmlSafe));
-    } catch (error) {
-      throw new SyntaxError(`Failed to compile ${this.identifier}: ${(error as Error).message}`, {
-        cause: error,
-      });
-    }
-  }
-
-  /**
    * Mirrors `Template#compiled_source` (`template.rb:443-485`): wrap the
    * handler's code string in the method `compile` defines, with
    * `@virtual_path =` and `locals_code` prepended.
@@ -335,6 +307,47 @@ export class Template {
   }
 
   /**
+   * Mirrors `Template#compile(mod)` (`template.rb:499-521`) — Rails
+   * `module_eval`s `compiled_source` onto the container, which defines a real
+   * method named `method_name`; the JS analogue evaluates the same source to a
+   * function and stores it under that name. Rails' strict-locals parameter
+   * audit has no analogue: the tse compiler emits the check into the template
+   * body (see {@link compiledSource}), so there are no method parameters to
+   * inspect — and so no `to_sentence`d list of offending parameter names to
+   * put in a `StrictLocalsError`.
+   *
+   * @internal
+   * @missingRailsCall to_sentence — PERMANENT
+   */
+  private compile(mod: CompiledMethodContainer): void {
+    const compiledSource = this.compiledSource();
+    let factory: (mismatch: typeof StrictLocalsMismatch, safe: typeof htmlSafe) => CompiledMethod;
+    try {
+      factory = new Function("StrictLocalsMismatch", "htmlSafe", `return ${compiledSource};`) as (
+        mismatch: typeof StrictLocalsMismatch,
+        safe: typeof htmlSafe,
+      ) => CompiledMethod;
+    } catch (error) {
+      throw new SyntaxErrorInTemplate(this, this.source, error as Error);
+    }
+
+    mod._compiledMethods.set(this.methodName(), factory(StrictLocalsMismatch, htmlSafe));
+  }
+
+  /** Mirrors `Template#handle_render_error(view, e)` (`template.rb:549-556`). */
+  private handleRenderError(view: Base, e: unknown): never {
+    if (e instanceof TemplateError) {
+      e.subTemplateOf(this);
+      throw e;
+    } else {
+      throw new TemplateError({
+        original: e instanceof Error ? e : new Error(String(e)),
+        template: this,
+      });
+    }
+  }
+
+  /**
    * Mirrors `Template#locals_code` (`template.rb:561-572`). The assignments
    * run inside `with (localAssigns)`, so a declared local the caller omitted
    * resolves to `undefined` — Ruby's `nil` — rather than falling through to a
@@ -358,19 +371,6 @@ export class Template {
   /** Mirrors `Template#identifier_method_name` (`template.rb:574-576`). */
   private identifierMethodName(): string {
     return this.shortIdentifier.replace(/[^a-z_]/g, "_");
-  }
-
-  /** Mirrors `Template#handle_render_error(view, e)` (`template.rb:549-556`). */
-  private handleRenderError(view: Base, e: unknown): never {
-    if (e instanceof TemplateError) {
-      e.subTemplateOf(this);
-      throw e;
-    } else {
-      throw new TemplateError({
-        original: e instanceof Error ? e : new Error(String(e)),
-        template: this,
-      });
-    }
   }
 
   /** @internal */

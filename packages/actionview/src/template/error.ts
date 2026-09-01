@@ -39,3 +39,18 @@ export class TemplateError extends Error {
     this.subTemplates.push(templatePath);
   }
 }
+
+/**
+ * Mirrors `ActionView::SyntaxErrorInTemplate` (`template/error.rb:256-266`) —
+ * raised by `Template#compile` when the compiled source will not parse.
+ */
+export class SyntaxErrorInTemplate extends TemplateError {
+  private readonly offendingCodeString: string;
+
+  constructor(template: Template, offendingCodeString: string, original: Error) {
+    super({ original, template });
+    this.offendingCodeString = offendingCodeString;
+    this.name = "ActionView::SyntaxErrorInTemplate";
+    this.message = `Encountered a syntax error while rendering template: check ${this.offendingCodeString}\n`;
+  }
+}

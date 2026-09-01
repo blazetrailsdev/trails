@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "./base.js";
 import { StrictLocalsMismatch } from "./strict-locals.js";
 import { Template } from "./template.js";
-import { TemplateError } from "./template/error.js";
+import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 
@@ -71,7 +71,34 @@ describe("ActionView::Template (smoke)", () => {
 
   it("render throws a helpful error when no handler is registered", () => {
     const t = new Template({ source: "x", identifier: "x", extension: "nope" });
-    expect(() => t.render(view())).toThrow(/No template handler registered for ".nope"/);
+    let raised: unknown;
+    try {
+      t.render(view());
+    } catch (e) {
+      raised = e;
+    }
+    expect(raised).toBeInstanceOf(TemplateError);
+    expect(raised).not.toBeInstanceOf(SyntaxErrorInTemplate);
+    expect((raised as TemplateError).message).toMatch(/No template handler registered for ".nope"/);
+  });
+
+  it("compile raises SyntaxErrorInTemplate when the compiled source will not parse", () => {
+    const t = new Template({
+      source: "x",
+      identifier: "posts/show",
+      extension: "txt",
+      handler: { extensions: ["txt"], call: () => "((((" },
+    });
+    let raised: unknown;
+    try {
+      t.render(view());
+    } catch (e) {
+      raised = e;
+    }
+    expect(raised).toBeInstanceOf(SyntaxErrorInTemplate);
+    expect((raised as Error).message).toBe(
+      "Encountered a syntax error while rendering template: check x\n",
+    );
   });
 
   it("asLayout returns a copy with isLayout flipped on", () => {
