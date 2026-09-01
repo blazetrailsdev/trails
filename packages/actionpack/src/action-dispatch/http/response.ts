@@ -97,13 +97,16 @@ export class ResponseBuffer {
 }
 
 /**
- * `Response#headers` is a `Rack::Headers` (response.rb:174), whose `[]`, `[]=`
- * and `delete` downcase the key (vendor/rack/lib/rack/headers.rb:110-129) — so
- * case-insensitivity is a property of the SEAT and every reader on top of it is
- * a plain delegation. Ruby gets index access from `Hash`; the ported
- * {@link Headers} is a `Map`, and a JS object's index operators are only
- * interceptable through a `Proxy`, so this is the index-access face of the seat
- * that consumers of {@link Response#headers} read as a plain header hash.
+ * `Response`'s header seat is a `Rack::Headers` (response.rb:174), whose `[]`,
+ * `[]=` and `delete` downcase the key (vendor/rack/lib/rack/headers.rb:110-129)
+ * — so case-insensitivity is a property of the SEAT and every reader on top of
+ * it is a plain delegation (response.rb:192-195).
+ *
+ * Rails reads that seat by index, both through `headers` and through
+ * `delegate :[], :[]=, to: :@headers` (response.rb:75). Ruby gets index access
+ * from `Hash`; the ported {@link Headers} is a `Map`, and a JS object's index
+ * operators are interceptable only through a `Proxy`, so this is the
+ * index-access face of the same seat.
  */
 function headersIndexView(headers: Headers): Record<string, string> {
   return new Proxy(Object.create(null) as Record<string, string>, {
@@ -221,7 +224,7 @@ export class Response {
   // --- Content type ---
 
   get contentType(): string | undefined {
-    const ct = this._headers.get(CONTENT_TYPE);
+    const ct = this.getHeader(CONTENT_TYPE);
     if (!ct) return undefined;
     return ct.split(";")[0].trim() || undefined;
   }
@@ -242,7 +245,7 @@ export class Response {
   }
 
   get charset(): string | undefined {
-    const ct = this._headers.get(CONTENT_TYPE);
+    const ct = this.getHeader(CONTENT_TYPE);
     if (!ct) return this._charset ?? (this.constructor as typeof Response).defaultCharset;
     const match = ct.match(/charset=([^\s;]+)/i);
     return match
@@ -262,11 +265,11 @@ export class Response {
 
   set body(value: string) {
     this._body = [value];
-    this._headers.set("content-length", String(Buffer.byteLength(value, "utf-8")));
+    this.setHeader("content-length", String(Buffer.byteLength(value, "utf-8")));
   }
 
   get contentLength(): number | undefined {
-    const cl = this._headers.get("content-length");
+    const cl = this.getHeader("content-length");
     if (!cl) return undefined;
     return parseInt(cl, 10);
   }
@@ -292,11 +295,11 @@ export class Response {
 
   /** The value of the `Location` header. Mirrors `Response#location`. */
   get location(): string {
-    return this._headers.get("location") ?? "";
+    return this.getHeader("location") ?? "";
   }
 
   set location(url: string) {
-    this._headers.set("location", url);
+    this.setHeader("location", url);
   }
 
   /**
@@ -375,14 +378,14 @@ export class Response {
    * @internal
    */
   get _cacheControl(): string | undefined {
-    return this._headers.get("cache-control");
+    return this.getHeader("cache-control");
   }
 
   set _cacheControl(value: string | undefined) {
     if (value) {
-      this._headers.set("cache-control", value);
+      this.setHeader("cache-control", value);
     } else {
-      this._headers.delete("cache-control");
+      this.deleteHeader("cache-control");
     }
   }
 
@@ -620,8 +623,8 @@ export class Response {
   /** @internal Rails: `handle_no_content!` — strips body headers on 1xx/204/205/304. */
   handleNoContentBang(): void {
     if ((NO_CONTENT_CODES as readonly number[]).includes(this._status)) {
-      this.deleteHeader(CONTENT_TYPE);
-      this.deleteHeader("Content-Length");
+      this._headers.delete(CONTENT_TYPE);
+      this._headers.delete("Content-Length");
     }
   }
 
