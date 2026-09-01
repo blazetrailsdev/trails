@@ -45,7 +45,8 @@ import type { Response as AdResponse } from "../http/response.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
-import { NameError, chomp } from "@blazetrails/activesupport";
+import { NameError } from "@blazetrails/activesupport";
+import { chomp } from "@blazetrails/ruby-compat";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
 import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
 

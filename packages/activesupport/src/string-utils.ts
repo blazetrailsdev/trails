@@ -7,9 +7,6 @@
 // file's long-standing importers keep reaching them.
 export { isBlank, isPresent } from "./core-ext/object/blank.js";
 
-// Ruby core `String#chomp`, which no Rails `.rb` declares, lives in
-// `@blazetrails/ruby-compat`; re-exported here so this file's importers keep
-// reaching it.
 export { chomp } from "@blazetrails/ruby-compat";
 
 export function squish(str: string): string {

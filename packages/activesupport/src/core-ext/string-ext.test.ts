@@ -622,6 +622,11 @@ describe("StringInflectionsTest", () => {
     expect(humanize("<b>foo</b>")).toBe("<b>foo</b>");
   });
 
+  it("ord", () => {
+    expect("a".codePointAt(0)).toBe(97);
+    expect("abc".codePointAt(0)).toBe(97);
+  });
+
   it("starts ends with alias", () => {
     expect("hello".startsWith("hel")).toBe(true);
     expect("hello".endsWith("llo")).toBe(true);

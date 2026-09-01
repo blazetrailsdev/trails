@@ -5,7 +5,8 @@
  * @see https://api.rubyonrails.org/classes/ActionController/RequestForgeryProtection.html
  */
 
-import { chomp, getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/activesupport";
+import { chomp } from "@blazetrails/ruby-compat";
 import {
   CookieJar,
   cookieJar,
