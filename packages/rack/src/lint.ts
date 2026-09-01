@@ -95,16 +95,7 @@ export class Lint {
   }
 
   private checkEnv(env: Record<string, any>): void {
-    const required = [
-      REQUEST_METHOD,
-      SERVER_NAME,
-      SERVER_PORT,
-      SERVER_PROTOCOL,
-      RACK_INPUT,
-      RACK_ERRORS,
-      QUERY_STRING,
-      RACK_URL_SCHEME,
-    ];
+    const required = [REQUEST_METHOD, SERVER_NAME, QUERY_STRING, SERVER_PROTOCOL, RACK_ERRORS];
     for (const key of required) {
       if (!(key in env)) {
         throw new LintError(`env missing required key ${key}`);

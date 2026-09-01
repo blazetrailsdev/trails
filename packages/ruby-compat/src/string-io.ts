@@ -51,6 +51,11 @@ export class StringIO {
     return string.length;
   }
 
+  puts(string = ""): null {
+    this.write(string.endsWith("\n") ? string : `${string}\n`);
+    return null;
+  }
+
   rewind(): number {
     this._pos = 0;
     return 0;
