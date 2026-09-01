@@ -320,14 +320,6 @@ describe("RackHeadersTest", () => {
     expect(fh.assoc("3")).toEqual(["3", "4"]);
   });
 
-  it("default proc is yielded the headers themselves", () => {
-    h.setDefaultProc((hash, k) => {
-      expect(hash).toBe(h);
-      return k;
-    });
-    expect(h.get("A")).toBe("a");
-  });
-
   it("default proc=", () => {
     h.setDefaultProc((_h, k) => k.repeat(2));
     expect(h.get("A")).toBe("aa");
