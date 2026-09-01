@@ -336,7 +336,7 @@ export abstract class Helpers {
   hostWithPort(authority: string | null = this.authority): string | null {
     const [host, , port] = this.splitAuthority(authority);
 
-    if (port === (DEFAULT_PORTS[this.scheme] ?? null)) {
+    if ((port ?? null) === (DEFAULT_PORTS[this.scheme] ?? null)) {
       return host ?? null;
     } else {
       return authority;
@@ -390,7 +390,7 @@ export abstract class Helpers {
         if (forwarded)
           return forwarded
             .map((authority) => this.splitAuthority(authority)[2])
-            .filter((p): p is number => p !== null);
+            .filter((p): p is number => p != null);
       } else if (type === "x_forwarded") {
         const value = this.getHeader(HTTP_X_FORWARDED_PORT);
         if (value) return this.splitHeader(value).map((v) => parseInt(v) || 0);
@@ -529,6 +529,7 @@ export abstract class Helpers {
       if (rackInput == null) {
         this.setHeader(RACK_REQUEST_FORM_INPUT, null);
         this.setHeader(RACK_REQUEST_FORM_HASH, {});
+        return this.getHeader(RACK_REQUEST_FORM_HASH);
       } else if (this.formData || this.isParseableData()) {
         const pairs = Multipart.parseMultipart(this.env, Multipart.ParamList);
         if (pairs) {
@@ -545,12 +546,12 @@ export abstract class Helpers {
         }
 
         this.setHeader(RACK_REQUEST_FORM_INPUT, this.getHeader(RACK_INPUT));
+        return this.getHeader(RACK_REQUEST_FORM_HASH);
       } else {
         this.setHeader(RACK_REQUEST_FORM_INPUT, this.getHeader(RACK_INPUT));
         this.setHeader(RACK_REQUEST_FORM_HASH, {});
+        return this.getHeader(RACK_REQUEST_FORM_HASH);
       }
-
-      return this.getHeader(RACK_REQUEST_FORM_HASH);
     } catch (error) {
       this.setHeader(RACK_REQUEST_FORM_ERROR, error);
       throw error;
@@ -714,12 +715,16 @@ export abstract class Helpers {
    * (`rack/request.rb:684-692`).
    * @internal
    */
-  expandParamPairs(pairs: Array<[string, any]>): Record<string, any> {
-    const parser = this.queryParser();
-    const params = parser.makeParams();
+  expandParamPairs(
+    pairs: Array<[string, any]>,
+    queryParser: QueryParser = this.queryParser(),
+  ): Record<string, any> {
+    const params = queryParser.makeParams();
+
     for (const [k, v] of pairs) {
-      parser.normalizeParams(params, k, v);
+      queryParser.normalizeParams(params, k, v);
     }
+
     return params.toParamsHash();
   }
 
@@ -734,6 +739,12 @@ export abstract class Helpers {
   /**
    * Mirrors `Rack::Request::Helpers#split_authority` (`rack/request.rb:737-741`)
    * over the `AUTHORITY` pattern (`rack/request.rb:722-733`).
+   *
+   * Both misses answer Ruby's `[]`, so `.length` and out-of-range reads match
+   * the Ruby exactly. Only the static type is looser: TypeScript cannot say
+   * "either 0 or 3 elements", so the arity-3 shape is spelled with optional
+   * positions, which is what makes `split_authority(x)[1]` yield `undefined`
+   * for `nil` the way Ruby's out-of-range indexing does.
    * @internal
    */
   splitAuthority(authority: string | null | undefined): [string?, string?, (number | null)?] {
