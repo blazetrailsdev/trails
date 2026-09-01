@@ -232,7 +232,6 @@ export {
 } from "./reflection.js";
 export {
   acceptsNestedAttributesFor,
-  assignNestedAttributes,
   REJECT_ALL_BLANK_PROC,
   TooManyRecords,
 } from "./nested-attributes.js";

@@ -1,6 +1,6 @@
 import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
-import { assignNestedAttributes, registerModel } from "./index.js";
+import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
 import { Category } from "./test-helpers/models/category.js";
@@ -50,7 +50,7 @@ describe("nested attributes (trails-only)", () => {
   it("assigns the owner's foreign key when a belongs_to nested attribute creates the target", async () => {
     Bird.acceptsNestedAttributesFor("pirate");
     const bird = await Bird.createBang({ name: "Polly" });
-    await assignNestedAttributes(bird, "pirate", { catchphrase: "Arr" });
+    await nested(bird).setPirateAttributes({ catchphrase: "Arr" });
     await bird.save();
 
     const pirate = await Pirate.where({ catchphrase: "Arr" }).first();

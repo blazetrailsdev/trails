@@ -54,27 +54,6 @@ export function acceptsNestedAttributesFor(
   modelClass.generateAssociationWriter(associationName, type);
 }
 
-export function assignNestedAttributes(
-  record: Base,
-  associationName: string,
-  attributesArray: Record<string, unknown> | Record<string, unknown>[],
-): Promise<void> | void {
-  const ctor = record.constructor as typeof Base;
-  const reflection = (ctor as any)._reflectOnAssociation?.(associationName);
-  if (reflection?.isCollection()) {
-    return assignNestedAttributesForCollectionAssociation(
-      record,
-      associationName,
-      attributesArray as Record<string, unknown>[],
-    );
-  }
-  return assignNestedAttributesForOneToOneAssociation(
-    record,
-    associationName,
-    attributesArray as Record<string, unknown>,
-  );
-}
-
 const UNASSIGNABLE_KEYS = ["id", "_destroy"] as const;
 
 /** @internal */
