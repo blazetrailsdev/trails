@@ -50,11 +50,14 @@ export type RackApp = (
 ) => [number, Record<string, string>, any] | Promise<[number, Record<string, string>, any]>;
 
 /**
- * `DEFAULT_PORT` for each scheme `URI.scheme_list` registers
- * (`ruby/lib/uri/{http,https,ldap,ldaps,file,ftp,mailto,ws,wss}.rb`), which is
+ * The `DEFAULT_PORT` of each scheme class `env_for` can be handed, as
+ * `URI.scheme_list` registers it
+ * (`ruby/lib/uri/{http,https,ldap,ldaps,file,ftp,mailto,ws,wss}.rb`) — which is
  * what `URI::Generic#port` answers for a URI that carries no explicit port —
  * the reader `env_for` leans on at `rack/lib/rack/mock_request.rb:106`. trails
- * has no `uri` package, so the registry is spelled here.
+ * has no `uri` package, so those entries are spelled here; a scheme absent
+ * from the table falls through to Ruby's own `nil` answer for a
+ * `URI::Generic` with no `DEFAULT_PORT`, which `env_for` reads as "80".
  *
  * @noRailsEquivalent PERMANENT
  */

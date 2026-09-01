@@ -1,5 +1,7 @@
+import { getPath } from "@blazetrails/activesupport";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
+import { escapePath } from "./utils.js";
 
 export class Sendfile {
   private app: RackApp;
@@ -19,12 +21,12 @@ export class Sendfile {
     if (body && typeof body.toPath === "function") {
       const type = this.variation || env["sendfile.type"] || null;
       if (type != null && /x-accel-redirect/i.test(type)) {
-        const path = body.toPath();
+        const path = getPath().resolve(body.toPath());
         const url = this.mapAccelPath(env, path);
         if (url != null) {
           headers["content-length"] = "0";
           // '?' must be percent-encoded because it is not query string but a part of path
-          headers[type.toLowerCase()] = url.replace(/%/g, "%25").replace(/\?/g, "%3F");
+          headers[type.toLowerCase()] = escapePath(url).replace(/\?/g, "%3F");
           const obody = body;
           if (typeof obody.close === "function") obody.close();
           response[2] = [];
@@ -32,7 +34,7 @@ export class Sendfile {
           env[RACK_ERRORS].puts("x-accel-mapping header missing");
         }
       } else if (type != null && /x-sendfile|x-lighttpd-send-file/i.test(type)) {
-        const path = body.toPath();
+        const path = getPath().resolve(body.toPath());
         headers["content-length"] = "0";
         headers[type.toLowerCase()] = path;
         const obody = body;
