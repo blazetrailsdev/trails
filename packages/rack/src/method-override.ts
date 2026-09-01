@@ -4,19 +4,6 @@ import { Request } from "./request.js";
 import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./query-parser.js";
 import { EmptyContentError } from "./multipart/parser.js";
 
-/**
- * Rails writes to `rack.errors` with `puts`, which the Rack SPEC requires of an
- * error stream; trails' lint accepts a `write`-only sink too (`lint.ts:171-173`),
- * so both are fed.
- */
-function putsError(errors: any, message: string): void {
-  if (errors && typeof errors.puts === "function") {
-    errors.puts(message);
-  } else if (errors && typeof errors.write === "function") {
-    errors.write(message + "\n");
-  }
-}
-
 const METHOD_OVERRIDE_PARAM_KEY = "_method";
 const HTTP_METHOD_OVERRIDE_HEADER = "HTTP_X_HTTP_METHOD_OVERRIDE";
 const HTTP_METHODS = ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS", "PATCH", "LINK", "UNLINK"];
@@ -52,7 +39,7 @@ export class MethodOverride {
       try {
         return method.toString().toUpperCase();
       } catch {
-        putsError(env[RACK_ERRORS], "Invalid string for method");
+        env[RACK_ERRORS].puts("Invalid string for method");
         return null;
       }
     }
@@ -78,11 +65,11 @@ export class MethodOverride {
         e instanceof ParameterTypeError ||
         e instanceof ParamsTooDeepError
       ) {
-        putsError(req.getHeader(RACK_ERRORS), "Invalid or incomplete POST params");
+        req.getHeader(RACK_ERRORS).puts("Invalid or incomplete POST params");
         return null;
       }
       if (e instanceof EmptyContentError) {
-        putsError(req.getHeader(RACK_ERRORS), "Bad request content body");
+        req.getHeader(RACK_ERRORS).puts("Bad request content body");
         return null;
       }
       throw e;

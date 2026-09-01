@@ -1,6 +1,5 @@
+import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
-
-const KNOWN_VARIATIONS = ["X-Sendfile", "X-Lighttpd-Send-File", "X-Accel-Redirect"];
 
 export class Sendfile {
   private app: RackApp;
@@ -15,45 +14,35 @@ export class Sendfile {
 
   async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
     const response = await this.app(env);
-    const [_status, headers, body] = response;
+    const [, headers, body] = response;
 
-    // Get the file path from body.toPath()
-    const path = body && typeof body.toPath === "function" ? body.toPath() : null;
-    if (!path) return response;
-
-    // Determine variation - from constructor or from env (not from HTTP headers for security)
-    const variation = this.variation || env["sendfile.type"] || null;
-    if (!variation) return response;
-
-    // Validate variation
-    if (!KNOWN_VARIATIONS.some((v) => v.toLowerCase() === variation.toLowerCase())) {
-      const errors = env["rack.errors"];
-      if (errors && typeof errors.write === "function") {
-        errors.write(`Unknown x-sendfile variation: "${variation}"\n`);
-      }
-      return response;
-    }
-
-    const headerName = variation.toLowerCase();
-
-    if (variation.toLowerCase() === "x-accel-redirect") {
-      const mappedPath = this.mapAccelPath(env, path);
-      if (mappedPath == null) {
-        const errors = env["rack.errors"];
-        if (errors && typeof errors.write === "function") {
-          errors.write("x-accel-mapping header missing\n");
+    if (body && typeof body.toPath === "function") {
+      const type = this.variation || env["sendfile.type"] || null;
+      if (type != null && /x-accel-redirect/i.test(type)) {
+        const path = body.toPath();
+        const url = this.mapAccelPath(env, path);
+        if (url != null) {
+          headers["content-length"] = "0";
+          // '?' must be percent-encoded because it is not query string but a part of path
+          headers[type.toLowerCase()] = url.replace(/%/g, "%25").replace(/\?/g, "%3F");
+          const obody = body;
+          if (typeof obody.close === "function") obody.close();
+          response[2] = [];
+        } else {
+          env[RACK_ERRORS].puts("x-accel-mapping header missing");
         }
-        return response;
+      } else if (type != null && /x-sendfile|x-lighttpd-send-file/i.test(type)) {
+        const path = body.toPath();
+        headers["content-length"] = "0";
+        headers[type.toLowerCase()] = path;
+        const obody = body;
+        if (typeof obody.close === "function") obody.close();
+        response[2] = [];
+      } else if (type === "" || type == null) {
+        // Rails' `when '', nil` arm is empty (`rack/sendfile.rb:138`).
+      } else {
+        env[RACK_ERRORS].puts(`Unknown x-sendfile variation: "${type}"`);
       }
-      headers[headerName] = mappedPath.replace(/%/g, "%25").replace(/\?/g, "%3F");
-      headers["content-length"] = "0";
-      if (body && typeof body.close === "function") body.close();
-      response[2] = [];
-    } else {
-      headers[headerName] = path;
-      headers["content-length"] = "0";
-      if (body && typeof body.close === "function") body.close();
-      response[2] = [];
     }
 
     return response;

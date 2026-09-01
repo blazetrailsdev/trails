@@ -1,4 +1,4 @@
-import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
+import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { escapeHtml } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
 
@@ -18,6 +18,8 @@ export class ShowExceptions {
       return await this.app(env);
     } catch (e: any) {
       const exceptionString = this.dumpException(e);
+
+      env[RACK_ERRORS].puts(exceptionString);
 
       let contentType: string;
       let body: string;

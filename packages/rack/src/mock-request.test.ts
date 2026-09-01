@@ -1,39 +1,62 @@
 import { it, expect } from "vitest";
-import { MockRequest } from "./mock-request.js";
+import { BodyProxy } from "./body-proxy.js";
+import { MockRequest, type RackApp } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
+import { UploadedFile } from "./multipart/uploaded-file.js";
+import { Request } from "./request.js";
+import { StringIO } from "@blazetrails/activesupport";
+import * as path from "path";
 
-const appId = async (_env: Record<string, any>): Promise<[number, Record<string, string>, any]> => {
-  return [200, { "content-type": "text/plain" }, ["OK"]];
+const fixtureDir = path.join(__dirname, "..", "test", "multipart");
+
+/**
+ * Rack's spec app serializes the env into the response body with `to_yaml`
+ * (`rack/test/spec_mock_request.rb:14-38`) and every case reads it back with
+ * `YAML.unsafe_load(res.body)`. A rack env holds `rack.input` and
+ * `rack.errors` objects that no JS serializer round-trips, so the env is
+ * captured by reference instead and `env` below is that same hash.
+ */
+let lastEnv: Record<string, any> = {};
+
+const app: RackApp = (env) => {
+  lastEnv = env;
+  const req = new Request(env);
+
+  const input = env["rack.input"];
+  if (input) env["mock.postdata"] = input.read();
+
+  if (req.GET["error"]) {
+    env["rack.errors"].puts(req.GET["error"]);
+    env["rack.errors"].flush();
+  }
+
+  return [200, { "content-type": "text/yaml" }, [""]];
 };
 
 it("return a MockResponse", async () => {
-  const req = new MockRequest(appId);
-  const res = await req.get("/");
+  const res = await new MockRequest(app).get("");
   expect(res).toBeInstanceOf(MockResponse);
-  expect(res.status).toBe(200);
-  expect(res.bodyString).toBe("OK");
 });
 
 it("be able to only return the environment", () => {
-  const env = MockRequest.envFor("/foo");
-  expect(env["REQUEST_METHOD"]).toBe("GET");
-  expect(env["PATH_INFO"]).toBe("/foo");
+  const env = MockRequest.envFor("");
+  expect(typeof env).toBe("object");
 });
 
-it("should handle a non-GET request with :input String and :params", async () => {
-  const env = MockRequest.envFor("/", { method: "POST", input: "hello", params: { foo: "bar" } });
-  // When input is already provided, params should not override it
-  expect(env["rack.input"].read()).toBe("hello");
+it("should handle a non-GET request with :input String and :params", () => {
+  const env = MockRequest.envFor("/", { method: "post", input: "", params: {} });
+  expect(env["PATH_INFO"]).toBe("/");
+  expect(typeof env).toBe("object");
+  expect(env["rack.input"].read()).toBe("");
 });
 
 it("should convert :input IO object to binary encoding", () => {
-  // In JS, strings are always UTF-16 internally; Buffer handles binary encoding
-  const env = MockRequest.envFor("/", { input: "binary data \xff" });
+  const f = new StringIO("binary data \xff");
+  const env = MockRequest.envFor("/", { method: "post", input: f });
   expect(env["rack.input"].read()).toBe("binary data \xff");
 });
 
 it("should handle :input object that does not respond to set_encoding", () => {
-  // In JS, any object with read() works as input
   const input = {
     read() {
       return "data";
@@ -45,147 +68,211 @@ it("should handle :input object that does not respond to set_encoding", () => {
 });
 
 it("return an environment with a path", () => {
-  const env = MockRequest.envFor("https://example.com/foo");
-  expect(env["PATH_INFO"]).toBe("/foo");
-  expect(env["SERVER_NAME"]).toBe("example.com");
+  const env = MockRequest.envFor(
+    "http://www.example.com/parse?location[]=1&location[]=2&age_group[]=2",
+  );
+  expect(env["QUERY_STRING"]).toBe("location[]=1&location[]=2&age_group[]=2");
+  expect(env["PATH_INFO"]).toBe("/parse");
+  expect(typeof env).toBe("object");
+});
+
+it("provide sensible defaults", async () => {
+  await new MockRequest(app).request();
+
+  const env = lastEnv;
+  expect(env["REQUEST_METHOD"]).toBe("GET");
+  expect(env["SERVER_NAME"]).toBe("example.org");
+  expect(env["SERVER_PORT"]).toBe("80");
+  expect(env["SERVER_PROTOCOL"]).toBe("HTTP/1.1");
+  expect(env["QUERY_STRING"]).toBe("");
+  expect(env["PATH_INFO"]).toBe("/");
+  expect(env["SCRIPT_NAME"]).toBe("");
+  expect(env["rack.url_scheme"]).toBe("http");
+  expect(env["mock.postdata"]).toBeUndefined();
+});
+
+it("allow GET/POST/PUT/DELETE/HEAD", async () => {
+  await new MockRequest(app).get("", { input: "foo" });
+  expect(lastEnv["REQUEST_METHOD"]).toBe("GET");
+
+  await new MockRequest(app).post("", { input: "foo" });
+  expect(lastEnv["REQUEST_METHOD"]).toBe("POST");
+
+  await new MockRequest(app).put("", { input: "foo" });
+  expect(lastEnv["REQUEST_METHOD"]).toBe("PUT");
+
+  await new MockRequest(app).patch("", { input: "foo" });
+  expect(lastEnv["REQUEST_METHOD"]).toBe("PATCH");
+
+  await new MockRequest(app).delete("", { input: "foo" });
+  expect(lastEnv["REQUEST_METHOD"]).toBe("DELETE");
+
+  expect(MockRequest.envFor("/", { method: "HEAD" })["REQUEST_METHOD"]).toBe("HEAD");
+
+  expect(MockRequest.envFor("/", { method: "OPTIONS" })["REQUEST_METHOD"]).toBe("OPTIONS");
+});
+
+it("set content length", () => {
+  let env = MockRequest.envFor("/", { input: "foo" });
+  expect(env["CONTENT_LENGTH"]).toBe("3");
+
+  env = MockRequest.envFor("/", { input: new StringIO("foo") });
+  expect(env["CONTENT_LENGTH"]).toBe("3");
+
+  env = MockRequest.envFor("/", { input: { read: () => "foo" } });
+  expect(env["CONTENT_LENGTH"]).toBeUndefined();
+});
+
+it("allow posting", async () => {
+  await new MockRequest(app).get("", { input: "foo" });
+  expect(lastEnv["mock.postdata"]).toBe("foo");
+
+  await new MockRequest(app).post("", { input: new StringIO("foo") });
+  expect(lastEnv["mock.postdata"]).toBe("foo");
+});
+
+it("use all parts of an URL", async () => {
+  const res = await new MockRequest(app).get("https://bla.example.org:9292/meh/foo?bar");
+  expect(res).toBeInstanceOf(MockResponse);
+
+  const env = lastEnv;
+  expect(env["REQUEST_METHOD"]).toBe("GET");
+  expect(env["SERVER_NAME"]).toBe("bla.example.org");
+  expect(env["SERVER_PORT"]).toBe("9292");
+  expect(env["QUERY_STRING"]).toBe("bar");
+  expect(env["PATH_INFO"]).toBe("/meh/foo");
   expect(env["rack.url_scheme"]).toBe("https");
 });
 
-it("provide sensible defaults", () => {
-  const env = MockRequest.envFor("/");
+it("set SSL port and HTTP flag on when using https", async () => {
+  const res = await new MockRequest(app).get("https://example.org/foo");
+  expect(res).toBeInstanceOf(MockResponse);
+
+  const env = lastEnv;
+  expect(env["REQUEST_METHOD"]).toBe("GET");
+  expect(env["SERVER_NAME"]).toBe("example.org");
+  expect(env["SERVER_PORT"]).toBe("443");
+  expect(env["QUERY_STRING"]).toBe("");
+  expect(env["PATH_INFO"]).toBe("/foo");
+  expect(env["rack.url_scheme"]).toBe("https");
+  expect(env["HTTPS"]).toBe("on");
+});
+
+it("prepend slash to uri path", async () => {
+  const res = await new MockRequest(app).get("foo");
+  expect(res).toBeInstanceOf(MockResponse);
+
+  const env = lastEnv;
   expect(env["REQUEST_METHOD"]).toBe("GET");
   expect(env["SERVER_NAME"]).toBe("example.org");
   expect(env["SERVER_PORT"]).toBe("80");
   expect(env["QUERY_STRING"]).toBe("");
-  expect(env["PATH_INFO"]).toBe("/");
-  expect(env["rack.url_scheme"]).toBe("http");
-  expect(env["SCRIPT_NAME"]).toBe("");
-  expect(env["rack.errors"]).toBeDefined();
-});
-
-it("allow GET/POST/PUT/DELETE/HEAD", async () => {
-  const req = new MockRequest(async (env) => [200, {}, [env["REQUEST_METHOD"]]]);
-  expect((await req.get("/")).bodyString).toBe("GET");
-  expect((await req.post("/")).bodyString).toBe("POST");
-  expect((await req.put("/")).bodyString).toBe("PUT");
-  expect((await req.delete("/")).bodyString).toBe("DELETE");
-  expect((await req.head("/")).bodyString).toBe("HEAD");
-});
-
-it("set content length", () => {
-  const env = MockRequest.envFor("/", { input: "foo" });
-  expect(env["CONTENT_LENGTH"]).toBe("3");
-});
-
-it("allow posting", async () => {
-  const req = new MockRequest(async (env) => {
-    return [200, {}, [env["rack.input"].read()]];
-  });
-  const res = await req.post("/", { input: "posting data" });
-  expect(res.bodyString).toBe("posting data");
-});
-
-it("use all parts of an URL", () => {
-  const env = MockRequest.envFor("https://bla.example.org:9292/meh?foo=bar");
-  expect(env["SERVER_NAME"]).toBe("bla.example.org");
-  expect(env["SERVER_PORT"]).toBe("9292");
-  expect(env["QUERY_STRING"]).toBe("foo=bar");
-  expect(env["PATH_INFO"]).toBe("/meh");
-  expect(env["rack.url_scheme"]).toBe("https");
-  expect(env["HTTPS"]).toBe("on");
-});
-
-it("set SSL port and HTTP flag on when using https", () => {
-  const env = MockRequest.envFor("https://example.org/");
-  expect(env["HTTPS"]).toBe("on");
-  expect(env["rack.url_scheme"]).toBe("https");
-});
-
-it("prepend slash to uri path", () => {
-  const env = MockRequest.envFor("foo");
   expect(env["PATH_INFO"]).toBe("/foo");
+  expect(env["rack.url_scheme"]).toBe("http");
 });
 
-it("properly convert method name to an uppercase string", () => {
-  const env = MockRequest.envFor("/", { method: "post" });
+it("properly convert method name to an uppercase string", async () => {
+  await new MockRequest(app).request("get");
+  expect(lastEnv["REQUEST_METHOD"]).toBe("GET");
+});
+
+it("accept :script_name option to set SCRIPT_NAME", async () => {
+  await new MockRequest(app).get("/", { script_name: "/foo" });
+  expect(lastEnv["SCRIPT_NAME"]).toBe("/foo");
+});
+
+it("accept :http_version option to set SERVER_PROTOCOL", async () => {
+  await new MockRequest(app).get("/", { http_version: "HTTP/1.0" });
+  expect(lastEnv["SERVER_PROTOCOL"]).toBe("HTTP/1.0");
+});
+
+it("accept params and build query string for GET requests", async () => {
+  await new MockRequest(app).get("/foo?baz=2", { params: { foo: { bar: "1" } } });
+
+  const env = lastEnv;
+  expect(env["REQUEST_METHOD"]).toBe("GET");
+  expect(env["QUERY_STRING"]).toContain("baz=2");
+  expect(env["QUERY_STRING"]).toContain("foo%5Bbar%5D=1");
+  expect(env["PATH_INFO"]).toBe("/foo");
+  expect(env["mock.postdata"]).toBeUndefined();
+});
+
+it("accept raw input in params for GET requests", async () => {
+  await new MockRequest(app).get("/foo?baz=2", { params: "foo%5Bbar%5D=1" });
+
+  const env = lastEnv;
+  expect(env["REQUEST_METHOD"]).toBe("GET");
+  expect(env["QUERY_STRING"]).toContain("baz=2");
+  expect(env["QUERY_STRING"]).toContain("foo%5Bbar%5D=1");
+  expect(env["PATH_INFO"]).toBe("/foo");
+  expect(env["mock.postdata"]).toBeUndefined();
+});
+
+it("accept params and build url encoded params for POST requests", async () => {
+  await new MockRequest(app).post("/foo", { params: { foo: { bar: "1" } } });
+
+  const env = lastEnv;
   expect(env["REQUEST_METHOD"]).toBe("POST");
-});
-
-it("accept :script_name option to set SCRIPT_NAME", () => {
-  const env = MockRequest.envFor("/", { script_name: "/myapp" });
-  expect(env["SCRIPT_NAME"]).toBe("/myapp");
-});
-
-it("accept :http_version option to set SERVER_PROTOCOL", () => {
-  const env = MockRequest.envFor("/", { http_version: "HTTP/2.0" });
-  expect(env["SERVER_PROTOCOL"]).toBe("HTTP/2.0");
-});
-
-it("accept params and build query string for GET requests", () => {
-  const env = MockRequest.envFor("/", { params: { foo: "bar", baz: "bla" } });
-  expect(env["QUERY_STRING"]).toContain("foo=bar");
-  expect(env["QUERY_STRING"]).toContain("baz=bla");
-});
-
-it("accept raw input in params for GET requests", () => {
-  const env = MockRequest.envFor("/", { params: "foo=bar" });
-  expect(env["QUERY_STRING"]).toContain("foo=bar");
-});
-
-it("accept params and build url encoded params for POST requests", () => {
-  const env = MockRequest.envFor("/", { method: "POST", params: { foo: "bar" } });
-  expect(env["rack.input"].read()).toContain("foo=bar");
+  expect(env["QUERY_STRING"]).toBe("");
+  expect(env["PATH_INFO"]).toBe("/foo");
   expect(env["CONTENT_TYPE"]).toBe("application/x-www-form-urlencoded");
+  expect(env["mock.postdata"]).toBe("foo%5Bbar%5D=1");
 });
 
-it("accept raw input in params for POST requests", () => {
-  const env = MockRequest.envFor("/", { method: "POST", params: "foo=bar" });
-  expect(env["rack.input"].read()).toBe("foo=bar");
+it("accept raw input in params for POST requests", async () => {
+  await new MockRequest(app).post("/foo", { params: "foo%5Bbar%5D=1" });
+
+  const env = lastEnv;
+  expect(env["REQUEST_METHOD"]).toBe("POST");
+  expect(env["QUERY_STRING"]).toBe("");
+  expect(env["PATH_INFO"]).toBe("/foo");
+  expect(env["CONTENT_TYPE"]).toBe("application/x-www-form-urlencoded");
+  expect(env["mock.postdata"]).toBe("foo%5Bbar%5D=1");
 });
 
-it("accept params and build multipart encoded params for POST requests", () => {
-  // MockRequest.envFor with multipart content type should preserve input
-  const env = MockRequest.envFor("/", {
-    method: "POST",
-    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
-    input: '--AaB03x\r\ncontent-disposition: form-data; name="foo"\r\n\r\nbar\r\n--AaB03x--\r\n',
+it("accept params and build multipart encoded params for POST requests", async () => {
+  const files = new UploadedFile(path.join(fixtureDir, "file1.txt"));
+  await new MockRequest(app).post("/foo", {
+    params: { "submit-name": "Larry", files },
   });
-  expect(env["CONTENT_TYPE"]).toContain("multipart");
-  expect(env["rack.input"].read()).toContain("foo");
+
+  const env = lastEnv;
+  expect(env["REQUEST_METHOD"]).toBe("POST");
+  expect(env["QUERY_STRING"]).toBe("");
+  expect(env["PATH_INFO"]).toBe("/foo");
+  expect(env["CONTENT_TYPE"]).toBe("multipart/form-data; boundary=AaB03x");
+  expect(env["mock.postdata"].replace(/\r/g, "").length).toBe(206);
 });
 
 it("behave valid according to the Rack spec", async () => {
-  const app = async (_env: any): Promise<[number, Record<string, string>, any]> => {
-    return [200, { "content-type": "text/plain" }, ["OK"]];
-  };
-  const req = new MockRequest(app);
-  const res = await req.get("/");
-  expect(res.status).toBe(200);
-  expect(res.headers["content-type"]).toBe("text/plain");
+  const url = "https://bla.example.org:9292/meh/foo?bar";
+  expect(await new MockRequest(app).get(url, { lint: true })).toBeInstanceOf(MockResponse);
 });
 
 it("call close on the original body object", async () => {
-  let closed = false;
-  const body = {
-    each(cb: (s: string) => void) {
-      cb("hi");
-    },
-    close() {
-      closed = true;
-    },
-  };
-  const app = async (_env: any): Promise<[number, Record<string, string>, any]> => {
-    return [200, { "content-type": "text/plain" }, body];
-  };
-  const req = new MockRequest(app);
-  await req.get("/");
-  expect(closed).toBe(true);
+  let called = false;
+  const body = new BodyProxy(["hi"], () => {
+    called = true;
+  });
+  const capp: RackApp = () => [200, { "content-type": "text/plain" }, body];
+  expect(called).toBe(false);
+  await new MockRequest(capp).get("/", { lint: true });
+  expect(called).toBe(true);
 });
 
 it("defaults encoding to ASCII 8BIT", () => {
-  // In JS, rack.input returns strings/Buffers. Verify it's accessible.
-  const env = MockRequest.envFor("/", { method: "POST", input: "hello" });
-  const data = env["rack.input"].read();
-  expect(typeof data).toBe("string");
-  expect(data).toBe("hello");
+  const req = MockRequest.envFor("/foo");
+
+  const keys = [
+    "REQUEST_METHOD",
+    "SERVER_NAME",
+    "SERVER_PORT",
+    "QUERY_STRING",
+    "PATH_INFO",
+    "HTTPS",
+    "rack.url_scheme",
+  ];
+  for (const k of keys) {
+    expect(typeof req[k]).toBe("string");
+  }
 });
