@@ -26,6 +26,17 @@ describe("Session::Options", () => {
     expect({ ...options }).toEqual({ skip: true, expireAfter: 60 });
     expect(options.get("skip")).toBe(true);
   });
+
+  it("keeps id callable over the stored id, and keeps it out of the merged cookie", () => {
+    const store = { extractSessionId: () => "extracted" };
+    const req = makeReq();
+    const options = new Options(store as never, { id: "stored", path: "/" });
+
+    expect(options.id(req)).toBe("stored");
+    expect(new Options(store as never, {}).id(req)).toBe("extracted");
+    expect({ ...options }).toEqual({ path: "/" });
+    expect(options.toHash()).toEqual({ id: "stored", path: "/" });
+  });
 });
 
 describe("Session", () => {

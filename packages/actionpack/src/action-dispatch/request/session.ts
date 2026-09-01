@@ -53,6 +53,14 @@ export class DisabledSessionError extends Error {
  * typing lets an Options answer all three through `[]` / `to_hash`. TS has no
  * operator overloading, so the constructor surfaces the delegate through a
  * Proxy as ordinary property reads, keeping `[]` ported as `get` beside them.
+ *
+ * Ruby dispatches `options[:id]` and `options.id` as two unrelated calls; one
+ * JS property read cannot, so a member name wins over a stored key of the same
+ * name — `Options#id` (`request/session.rb:65-69`) stays callable over the
+ * `:id` that `Session#load!` stores (`:275`), the one key Rails seats whose
+ * name a member also claims. Enumeration takes the other side: a colliding key
+ * is left out of `ownKeys` rather than handing `cookie.merge!(options)` a
+ * method, and `Rack::Utils.set_cookie_header` reads no such key anyway.
  */
 export class Options {
   [key: string]: unknown;
@@ -86,9 +94,11 @@ export class Options {
           ? Reflect.get(target, key, receiver)
           : target.delegate[key as string],
       has: (target, key) => Reflect.has(target, key) || key in target.delegate,
-      ownKeys: (target) => Reflect.ownKeys(target.delegate),
+      ownKeys: (target) => Reflect.ownKeys(target.delegate).filter((k) => !Reflect.has(target, k)),
       getOwnPropertyDescriptor: (target, key) =>
-        Object.getOwnPropertyDescriptor(target.delegate, key),
+        Reflect.has(target, key)
+          ? undefined
+          : Object.getOwnPropertyDescriptor(target.delegate, key),
     });
   }
 
