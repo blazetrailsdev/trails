@@ -58,9 +58,10 @@ export class DisabledSessionError extends Error {
  * JS property read cannot, so a member name wins over a stored key of the same
  * name — `Options#id` (`request/session.rb:65-69`) stays callable over the
  * `:id` that `Session#load!` stores (`:275`), the one key Rails seats whose
- * name a member also claims. Enumeration takes the other side: a colliding key
- * is left out of `ownKeys` rather than handing `cookie.merge!(options)` a
- * method, and `Rack::Utils.set_cookie_header` reads no such key anyway.
+ * name a member also claims. A colliding key is left out of `ownKeys` for the
+ * same reason, so generic JS iteration never hands a caller a method as data.
+ * `to_hash` (`:72`) is unfiltered, and it is what `cookie.merge!(options)`
+ * (`rack-session/lib/rack/session/abstract/id.rb:411`) converts through.
  */
 export class Options {
   [key: string]: unknown;

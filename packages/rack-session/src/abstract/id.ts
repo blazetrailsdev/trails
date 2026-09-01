@@ -511,7 +511,11 @@ export class Persisted {
         typeof this.sameSite === "function"
           ? (this.sameSite as (req: unknown, res: unknown) => unknown)(req, res)
           : this.sameSite;
-      this.setCookie(req, res, { ...cookie, ...options });
+      const other = options as { toHash?: () => Record<string, unknown> };
+      this.setCookie(req, res, {
+        ...cookie,
+        ...(typeof other.toHash === "function" ? other.toHash() : options),
+      });
     }
   }
 
