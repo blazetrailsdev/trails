@@ -48,8 +48,9 @@ describe("nested attributes (trails-only)", () => {
   });
 
   it("assigns the owner's foreign key when a belongs_to nested attribute creates the target", async () => {
+    Bird.acceptsNestedAttributesFor("pirate");
     const bird = await Bird.createBang({ name: "Polly" });
-    assignNestedAttributes(bird, "pirate", [{ catchphrase: "Arr" }]);
+    await assignNestedAttributes(bird, "pirate", { catchphrase: "Arr" });
     await bird.save();
 
     const pirate = await Pirate.where({ catchphrase: "Arr" }).first();

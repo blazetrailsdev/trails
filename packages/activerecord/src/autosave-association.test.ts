@@ -2242,7 +2242,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   it("valid adding with nested attributes", async () => {
     const { Pirate, Bird } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
+    await assignNestedAttributes(pirate, "birds", [{ name: "Polly" }]);
     await pirate.save();
     const birds = await Bird.where({ pirate_id: pirate.id });
     expect(birds.length).toBe(1);
@@ -2252,7 +2252,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   it("invalid adding with nested attributes", async () => {
     const { Pirate, Bird } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "" }]);
+    await assignNestedAttributes(pirate, "birds", [{ name: "" }]);
     await pirate.save();
     const birds = await Bird.where({ pirate_id: pirate.id });
     expect(birds.length).toBeLessThanOrEqual(1);
@@ -2270,10 +2270,8 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   it("errors should be indexed when passed as array", async () => {
     const { Pirate, Bird } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    assignNestedAttributes(pirate, "birds", [{ name: "Valid" }, { name: "" }]);
-    await pirate.save();
-    const birds = await Bird.where({ pirate_id: pirate.id });
-    expect(birds.some((b: any) => b.name === "Valid")).toBe(true);
+    await assignNestedAttributes(pirate, "birds", [{ name: "Valid" }, { name: "" }]);
+    expect(await pirate.save()).toBe(false);
   });
 
   function makeIndexedHasMany(opts: { indexErrors?: boolean } = {}) {
@@ -4007,7 +4005,7 @@ describe("should update children when autosave is true and parent is new but chi
     registerModel(NAutoTag);
     registerModel(NAutoArticle);
     const article = await NAutoArticle.create({ name: "auto save" });
-    assignNestedAttributes(article, "nautoTags", [{ name: "saved" }]);
+    await assignNestedAttributes(article, "nautoTags", [{ name: "saved" }]);
     await article.save();
     const tags = await NAutoTag.where({ author_id: article.id });
     expect(tags.length).toBe(1);
@@ -4043,7 +4041,7 @@ describe("should update children when autosave is true and parent is new but chi
     registerModel(ASB1Tag);
     registerModel(ASB1Article);
     const article = await ASB1Article.create({ name: "bang save" });
-    assignNestedAttributes(article, "asb1Tags", [{ name: "banged" }]);
+    await assignNestedAttributes(article, "asb1Tags", [{ name: "banged" }]);
     await article.save();
     const tags = await ASB1Tag.where({ author_id: article.id });
     expect(tags.length).toBe(1);
@@ -4216,7 +4214,7 @@ describe("should update children when autosave is true and parent is new but chi
     registerModel(BVUArticle);
     const article = await BVUArticle.create({ name: "test" });
     const tag = await BVUTag.create({ name: "original", author_id: article.id });
-    assignNestedAttributes(article, "bvuTags", [{ id: tag.id, name: "updated" }]);
+    await assignNestedAttributes(article, "bvuTags", [{ id: tag.id, name: "updated" }]);
     await article.save();
     const reloaded = await BVUTag.find(tag.id);
     expect(reloaded.name).toBe("updated");
@@ -4284,7 +4282,7 @@ describe("should update children when autosave is true and parent is new but chi
     registerModel(BVTag);
     registerModel(BVArticle);
     const article = await BVArticle.create({ name: "test" });
-    assignNestedAttributes(article, "bvTags", [{ name: "valid" }]);
+    await assignNestedAttributes(article, "bvTags", [{ name: "valid" }]);
     await article.save();
     const tags = await BVTag.where({ author_id: article.id });
     expect(tags.length).toBe(1);
@@ -4413,11 +4411,12 @@ describe("should update children when autosave is true and parent is new but chi
     registerModel(RBTag);
     registerModel(RBArticle);
     const article = await RBArticle.create({ name: "rollback test" });
-    assignNestedAttributes(article, "rbTags", [
-      { name: "good" },
-      { name: "bad", unknownCol: "boom" },
-    ]);
-    await expect(article.save()).rejects.toThrow(/unknown attribute/);
+    expect(() =>
+      assignNestedAttributes(article, "rbTags", [
+        { name: "good" },
+        { name: "bad", unknownCol: "boom" },
+      ]),
+    ).toThrow(/unknown attribute/);
     const tags = await RBTag.where({ author_id: article.id });
     expect(tags.length).toBeLessThanOrEqual(1);
   });
