@@ -629,7 +629,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Three instances exist and are the only ones:
+where Ruby resolves the constant. Four instances exist and are the only ones:
 
 - `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
   `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,
@@ -640,6 +640,10 @@ where Ruby resolves the constant. Three instances exist and are the only ones:
   / `In` / `Attribute` / `Dot` / `Table` ctors and `buildQuoted`, read by
   `nodes/node.ts`, `nodes/node-expression.ts`, `nodes/binary.ts`,
   `nodes/casted.ts`, `arel.ts`, `tree-manager.ts`.
+- `actionview/src/base-slot.ts` — `Base`, read by `template/handlers/tse.ts` for
+  `annotate_rendered_view_with_filenames` (`handlers/erb.rb:86-89`). The cycle
+  is closed by `template.rb:178`'s `extend Template::Handlers`, whose port
+  constructs the handler at `template.ts` class-static time.
 
 This is a genuine language shortcoming, not a preference, and it is the one
 sanctioned shape for it — do not re-derive a per-cluster justification, and do

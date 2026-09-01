@@ -410,7 +410,8 @@ export class Base extends Metal {
     // `lookup_context.formats` — negotiated in `process_action` and already
     // expanded past `"*/*"` by `LookupContext#formats=`
     // (`lookup_context.rb:263-280`). Rails passes the whole details hash down
-    // to the resolver; trails' `LookupContext#render` takes one format.
+    // to the resolver; trails' `LookupContext#render` takes one format —
+    // converged by lookup-context-render-takes-rails-prefixes-and-formats.
     const format = String(this.formats[0] ?? "html");
     const routeHelpers = (this.constructor as typeof Base).routeHelpers ?? {};
     const locals = { ...routeHelpers, ...options.locals };
@@ -435,17 +436,19 @@ export class Base extends Metal {
         this.body = await ctx.renderPartial(options.partial, controllerPrefix, format, locals);
       }
     } else {
-      // `options[:template] ||= (options[:action] || action_name).to_s`
-      // (`action_view/rendering.rb:_normalize_options`). A `:template` may name
-      // its own prefix ("posts/show"), which Rails resolves by leaving
-      // `:prefixes` unset; trails' `LookupContext#render` takes the prefix
-      // separately, so the qualified path is split here the way
-      // `renderPartialSync` splits a qualified partial name.
+      // `options[:template] ||= (options[:action] || action_name).to_s`, with
+      // `:prefixes` left unset for an explicit `:template`
+      // (`action_view/rendering.rb#_normalize_options`). `normalize_name`
+      // (`lookup_context.rb:209-225`) is what turns a qualified
+      // `"posts/show"` into its own prefix; trails' `LookupContext#render`
+      // takes one prefix rather than Rails' `_prefixes` chain — converged by
+      // lookup-context-render-takes-rails-prefixes-and-formats.
       const template = String(options.template ?? options.action ?? this.actionName);
-      const slash = template.lastIndexOf("/");
-      const prefix = slash === -1 ? controllerPrefix : template.slice(0, slash);
-      const action = slash === -1 ? template : template.slice(slash + 1);
-      this.body = await ctx.render(prefix, action, format, locals, {
+      const [action, prefixes] = ctx.normalizeName(
+        template,
+        options.template !== undefined ? [] : [controllerPrefix],
+      );
+      this.body = await ctx.render(String(prefixes[0]), action, format, locals, {
         layout: layout === false ? false : layout || undefined,
       });
     }

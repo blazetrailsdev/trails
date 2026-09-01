@@ -40,7 +40,10 @@ function registerDetail(name: string, proc: DefaultProc): void {
 
 // I18n is not yet ported; fall back to a single "en" locale.
 registerDetail("locale", () => ["en"]);
-registerDetail("formats", () => ["html", "text", "js", "css", "xml", "json"]);
+registerDetail(
+  "formats",
+  () => Base.defaultFormats ?? ["html", "text", "js", "css", "xml", "json"],
+);
 registerDetail("variants", () => []);
 registerDetail("handlers", () => TemplateHandlers.extensions() as DetailValue);
 
