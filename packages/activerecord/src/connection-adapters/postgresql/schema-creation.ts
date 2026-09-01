@@ -3,11 +3,7 @@ import {
   SchemaCreation as AbstractSchemaCreation,
   type SchemaCreationConn,
 } from "../abstract/schema-creation.js";
-import {
-  postgresqlNativeDatabaseTypes,
-  type NativeDatabaseTypes,
-} from "../abstract/native-database-types.js";
-import { pgDatetimeConfig } from "./pg-datetime-config.js";
+
 import {
   type ForeignKeyDefinition,
   type ColumnOptions,
@@ -50,28 +46,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
 
   constructor(adapter: PgSchemaCreationHost) {
     super(adapter);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
-   */
-  override typeToSql(
-    type: Parameters<AbstractSchemaCreation["typeToSql"]>[0],
-    options: Parameters<AbstractSchemaCreation["typeToSql"]>[1] = {},
-  ): string {
-    if (typeof this.conn.typeToSql === "function") {
-      return this.conn.typeToSql(type as string, options as Record<string, unknown>);
-    }
-    return super.typeToSql(type, options);
-  }
-
-  /** @internal */
-  protected override nativeDatabaseTypes(): NativeDatabaseTypes {
-    return postgresqlNativeDatabaseTypes(
-      pgDatetimeConfig.datetimeType,
-      pgDatetimeConfig.nativeDatabaseTypesOverrides,
-    );
   }
 
   /** @internal */
@@ -153,27 +127,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected async visitAddUniqueConstraint(o: UniqueConstraintDefinition): Promise<string> {
     return `ADD ${await this.accept(o)}`;
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
-   */
-  override accept(
-    o:
-      | Parameters<AbstractSchemaCreation["accept"]>[0]
-      | ChangeColumnDefinition
-      | ChangeColumnDefaultDefinition
-      | ExclusionConstraintDefinition
-      | UniqueConstraintDefinition,
-  ): Promise<string> {
-    if (o instanceof ExclusionConstraintDefinition)
-      return Promise.resolve(this.visitExclusionConstraintDefinition(o));
-    if (o instanceof UniqueConstraintDefinition) return this.visitUniqueConstraintDefinition(o);
-    if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
-    if (o instanceof ChangeColumnDefaultDefinition)
-      return this.visitChangeColumnDefaultDefinition(o);
-    return super.accept(o);
   }
 
   /** @internal */

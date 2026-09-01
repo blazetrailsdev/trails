@@ -182,22 +182,24 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
   });
 
   it("typeToSql emits float(24) for float without limit", async () => {
-    expect(sc.typeToSql("float", {})).toBe("float(24)");
+    expect((leased as any).typeToSql("float", {})).toBe("float(24)");
   });
 
   it("typeToSql emits float(N) for float with limit", async () => {
-    expect(sc.typeToSql("float", { limit: 5 })).toBe("float(5)");
-    expect(sc.typeToSql("float", { limit: 53 })).toBe("float(53)");
+    expect((leased as any).typeToSql("float", { limit: 5 })).toBe("float(5)");
+    expect((leased as any).typeToSql("float", { limit: 53 })).toBe("float(53)");
   });
 
   it("typeToSql delegates non-float types to super", async () => {
-    expect(sc.typeToSql("integer", {})).not.toContain("float");
-    expect(sc.typeToSql("string", {})).toMatch(/varchar/i);
+    expect((leased as any).typeToSql("integer", {})).not.toContain("float");
+    expect((leased as any).typeToSql("string", {})).toMatch(/varchar/i);
   });
 
   it("typeToSql preserves enum/set literal type fragments verbatim", async () => {
-    expect(sc.typeToSql("enum('text','blob','tiny')", {})).toBe("enum('text','blob','tiny')");
-    expect(sc.typeToSql("set('a','b')", {})).toBe("set('a','b')");
+    expect((leased as any).typeToSql("enum('text','blob','tiny')", {})).toBe(
+      "enum('text','blob','tiny')",
+    );
+    expect((leased as any).typeToSql("set('a','b')", {})).toBe("set('a','b')");
   });
 });
 

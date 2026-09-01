@@ -44,7 +44,10 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   ["quoteTableName", "renderer input — quotes a table name into DDL, emits nothing itself"],
   ["quoteDefaultExpression", "renderer input — renders a column default, emits nothing itself"],
   ["quotedColumnsForIndex", "renderer input — renders an index's column list"],
-  ["nativeDatabaseTypes", "renderer input — the type map typeToSql reads, a read not an emitter"],
+  [
+    "typeToSql",
+    "renderer input — renders a column's SQL type from the adapter's type map, emits no DDL itself",
+  ],
   ["useForeignKeys", "capability read — decides whether the renderer emits inline REFERENCES"],
   [
     "supportsCheckConstraints",
@@ -102,7 +105,7 @@ describe("STUBBED_DDL_METHODS", () => {
     expect(touched.has("createTable")).toBe(true);
     expect(touched.has("addIndex")).toBe(true);
     expect(touched.has("quoteTableName")).toBe(true);
-    expect(touched.has("nativeDatabaseTypes")).toBe(true);
+    expect(touched.has("typeToSql")).toBe(true);
 
     const unaccounted = [...touched]
       .filter((name) => !STUBBED_DDL_METHODS.includes(name) && !NON_EMITTING.has(name))

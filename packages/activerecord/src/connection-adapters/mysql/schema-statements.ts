@@ -6,6 +6,7 @@ import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
 } from "./schema-definitions.js";
+import type { ColumnType, ColumnOptions } from "../abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import type { Type } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
@@ -21,6 +22,92 @@ type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 export class MysqlSchemaStatements extends BaseSchemaStatements {
+  override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
+    if (options.array && type !== "primary_key") {
+      throw new Error("Array columns are only supported on PostgreSQL");
+    }
+    const limit = options.limit;
+    const unsigned = options.unsigned;
+    const size = (options as { size?: string | null }).size ?? limitToSize(limit ?? null, type);
+    let sql: string;
+    switch (type) {
+      case "float":
+        sql = `float(${limit ?? 24})`;
+        break;
+      case "integer":
+        sql = integerToSql(limit);
+        break;
+      case "text":
+        sql = typeWithSizeToSql("text", size);
+        break;
+      case "blob":
+        sql = typeWithSizeToSql("blob", size);
+        break;
+      case "binary":
+        sql =
+          limit != null && limit >= 0 && limit <= 0xfff
+            ? `varbinary(${limit})`
+            : typeWithSizeToSql("blob", size);
+        break;
+      case "string":
+        sql = `varchar(${limit ?? 255})`;
+        break;
+      case "datetime":
+      case "timestamp": {
+        const base = type === "timestamp" ? "timestamp" : "datetime";
+        const p = options.precision;
+        if (p != null && !(p >= 0 && p <= 6))
+          throw new ArgumentError(
+            `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+          );
+        sql = p != null ? `${base}(${p})` : base;
+        break;
+      }
+      case "time": {
+        const p = options.precision;
+        if (p != null && !(p >= 0 && p <= 6))
+          throw new ArgumentError(
+            `No time type has precision of ${p}. The allowed range of precision is from 0 to 6`,
+          );
+        sql = p != null ? `time(${p})` : "time";
+        break;
+      }
+      case "date":
+        sql = "date";
+        break;
+      case "bigint":
+        sql = "bigint";
+        break;
+      case "decimal": {
+        if (options.precision == null && options.scale != null)
+          throw new ArgumentError(
+            "Error adding decimal column: precision cannot be empty if scale is specified",
+          );
+        const p = options.precision;
+        const s = options.scale;
+        if (p != null && s != null) {
+          sql = `decimal(${p},${s})`;
+        } else if (p != null) {
+          sql = `decimal(${p})`;
+        } else {
+          sql = "decimal";
+        }
+        break;
+      }
+      case "boolean":
+        sql = "tinyint(1)";
+        break;
+      case "json":
+        sql = "json";
+        break;
+      default:
+        sql = super.typeToSql(type, options);
+        break;
+    }
+    if (unsigned && type !== "primary_key") sql += " unsigned";
+    return sql;
+  }
+
   /** @missingRailsCall order:constructor,quoteColumnName — PERMANENT */
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     let rows: Array<Record<string, unknown>>;

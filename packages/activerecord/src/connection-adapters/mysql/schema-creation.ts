@@ -2,11 +2,8 @@ import {
   SchemaCreation as AbstractSchemaCreation,
   type SchemaCreationConn,
 } from "../abstract/schema-creation.js";
-import { ArgumentError } from "@blazetrails/activemodel";
 import type {
   ColumnOptions,
-  AddColumnOptions,
-  ColumnType,
   AddColumnDefinition,
   AddIndexOptions,
   TableDefinitionConn,
@@ -19,7 +16,6 @@ import {
   IndexDefinition,
   TableDefinition,
 } from "../abstract/schema-definitions.js";
-import { integerToSql, typeWithSizeToSql, limitToSize } from "./schema-statements.js";
 
 interface MysqlColumnOptions extends Record<string, unknown> {
   column?: { sqlType?: string; type?: string; null?: boolean };
@@ -63,93 +59,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return this.conn.isMariadb();
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
-   */
-  override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
-    if (options.array && type !== "primary_key") {
-      throw new Error("Array columns are only supported on PostgreSQL");
-    }
-    const limit = options.limit;
-    const unsigned = options.unsigned;
-    const size = (options as { size?: string | null }).size ?? limitToSize(limit ?? null, type);
-    let sql: string;
-    switch (type) {
-      case "float":
-        sql = `float(${limit ?? 24})`;
-        break;
-      case "integer":
-        sql = integerToSql(limit);
-        break;
-      case "text":
-        sql = typeWithSizeToSql("text", size);
-        break;
-      case "blob":
-        sql = typeWithSizeToSql("blob", size);
-        break;
-      case "binary":
-        sql =
-          limit != null && limit >= 0 && limit <= 0xfff
-            ? `varbinary(${limit})`
-            : typeWithSizeToSql("blob", size);
-        break;
-      case "string":
-        sql = `varchar(${limit ?? 255})`;
-        break;
-      case "datetime":
-      case "timestamp": {
-        const base = type === "timestamp" ? "timestamp" : "datetime";
-        const p = options.precision;
-        if (p != null && !(p >= 0 && p <= 6))
-          throw new ArgumentError(
-            `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
-          );
-        sql = p != null ? `${base}(${p})` : base;
-        break;
-      }
-      case "time": {
-        const p = options.precision;
-        if (p != null && !(p >= 0 && p <= 6))
-          throw new ArgumentError(
-            `No time type has precision of ${p}. The allowed range of precision is from 0 to 6`,
-          );
-        sql = p != null ? `time(${p})` : "time";
-        break;
-      }
-      case "date":
-        sql = "date";
-        break;
-      case "bigint":
-        sql = "bigint";
-        break;
-      case "decimal": {
-        this.validateDecimalPrecision(options);
-        const p = options.precision;
-        const s = options.scale;
-        if (p != null && s != null) {
-          sql = `decimal(${p},${s})`;
-        } else if (p != null) {
-          sql = `decimal(${p})`;
-        } else {
-          sql = "decimal";
-        }
-        break;
-      }
-      case "boolean":
-        sql = "tinyint(1)";
-        break;
-      case "json":
-        sql = "json";
-        break;
-      default:
-        sql = super.typeToSql(type, options);
-        break;
-    }
-    if (unsigned && type !== "primary_key") sql += " unsigned";
-    return sql;
-  }
-
   /** @internal */
   protected visitDropForeignKey(name: string): string {
     return `DROP FOREIGN KEY ${name}`;
@@ -176,22 +85,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
   /** @internal */
   protected async supportsCheckConstraints(): Promise<boolean> {
     return this.conn.supportsCheckConstraints();
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
-   */
-  override accept(
-    o:
-      | Parameters<AbstractSchemaCreation["accept"]>[0]
-      | ChangeColumnDefinition
-      | ChangeColumnDefaultDefinition,
-  ): Promise<string> {
-    if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
-    if (o instanceof ChangeColumnDefaultDefinition)
-      return this.visitChangeColumnDefaultDefinition(o);
-    return super.accept(o);
   }
 
   /** @internal */
@@ -251,11 +144,11 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return this.addSqlCommentBang(super.addTableOptionsBang(createSql, o), o.comment);
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
-   */
-  override async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
+  /** @internal */
+  protected override async addColumnOptionsBang(
+    sql: string,
+    options: ColumnOptions,
+  ): Promise<string> {
     const mo = options as MysqlColumnOptions;
     const col = mo.column;
     if (col && /^\btimestamp\b/.test(col.sqlType ?? col.type ?? "") && !mo.primaryKey) {
@@ -275,12 +168,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       sql += ` AS (${mo.as})`;
       if (mo.stored) sql += (await this.isMariadb()) ? " PERSISTENT" : " STORED";
     }
-    return this.addSqlCommentBang(await super.addColumnOptions(sql, options), mo.comment);
-  }
-
-  /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
-    return this.addColumnOptions(sql, options);
+    return this.addSqlCommentBang(await super.addColumnOptionsBang(sql, options), mo.comment);
   }
 
   /** @internal */

@@ -964,7 +964,53 @@ export class SchemaStatements {
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
-    return this.schemaCreation.typeToSql(type, options);
+    let sql: string;
+    const native = type == null ? undefined : this.nativeDatabaseTypes()[type];
+    if (native === undefined) {
+      if (type == null) sql = "";
+      else if (!String(type).trim())
+        throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
+      else sql = String(type);
+    } else {
+      const spec = (typeof native === "string" ? { name: native } : native) as {
+        name?: string;
+        limit?: number;
+        precision?: number;
+        scale?: number;
+      };
+      sql = spec.name ?? String(type);
+      let { precision, scale, limit } = options;
+      if (type === "decimal") {
+        scale ??= spec.scale;
+        precision ??= spec.precision;
+        if (precision != null) {
+          sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
+        } else if (scale != null) {
+          throw new ArgumentError(
+            "Error adding decimal column: precision cannot be empty if scale is specified",
+          );
+        }
+      } else if (
+        (type === "datetime" || type === "timestamp" || type === "time" || type === "interval") &&
+        (precision ??= spec.precision) != null
+      ) {
+        if (precision >= 0 && precision <= 6) {
+          sql += `(${precision})`;
+        } else {
+          throw new ArgumentError(
+            `No ${spec.name} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
+          );
+        }
+      } else if (type !== "primary_key" && (limit ??= spec.limit) != null) {
+        sql += `(${limit})`;
+      }
+    }
+
+    if (options.array && type !== "primary_key") {
+      throw new Error("Array columns are only supported on PostgreSQL");
+    }
+
+    return sql;
   }
 
   nativeDatabaseTypes(): Record<string, unknown> {

@@ -663,9 +663,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
     } = {},
   ): string {
     const { limit, array, enumType } = options;
-    type = type ?? "";
     let sql: string;
-    switch (type) {
+    switch (String(type ?? "")) {
       case "binary":
         if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
           throw new ArgumentError(
@@ -697,32 +696,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         break;
       default: {
         const { precision, scale } = options;
-        const native = this.nativeDatabaseTypes()[type];
-        const baseName = native
-          ? typeof native === "string"
-            ? native
-            : (native.name ?? type)
-          : type;
-        sql = baseName;
-        if (type === "decimal") {
-          if (precision != null) {
-            sql += scale != null ? `(${precision},${scale})` : `(${precision})`;
-          } else if (scale != null) {
-            throw new ArgumentError(
-              "Error adding decimal column: precision cannot be empty if scale is specified",
-            );
-          }
-        } else if (["datetime", "timestamp", "time", "interval"].includes(type)) {
-          if (precision != null) {
-            if (precision < 0 || precision > 6)
-              throw new ArgumentError(
-                `No ${baseName} type has precision of ${precision}. The allowed range of precision is from 0 to 6`,
-              );
-            sql += `(${precision})`;
-          }
-        } else if (type !== "primary_key" && limit != null) {
-          sql += `(${limit})`;
-        }
+        sql = super.typeToSql(type as ColumnType, { limit, precision, scale });
       }
     }
     return array && type !== "primary_key" ? `${sql}[]` : sql;

@@ -325,7 +325,7 @@ describeIfPostgresqlAdapter("PostgreSQL::TableDefinition column methods", () => 
     td.bitVarying("c", { limit: 4 });
     td.bigserial("d", "e");
     const schemaCreation = new PgSchemaCreation(leased as unknown as PgSchemaCreationHost);
-    expect(td.columns.map((c) => schemaCreation.typeToSql(c.type, c.options))).toEqual([
+    expect(td.columns.map((c) => (leased as any).typeToSql(c.type, c.options))).toEqual([
       "bit(8)",
       "bit(8)",
       "bit varying(4)",

@@ -17,11 +17,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return false;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE schema-creation-manual-dispatch-and-delegation
-   */
-  override addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
+  /** @internal */
+  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): Promise<string> {
     const opts = options as Record<string, unknown>;
     if (opts["collation"]) {
       sql += ` COLLATE "${opts["collation"]}"`;
@@ -30,11 +27,6 @@ export class SchemaCreation extends AbstractSchemaCreation {
       sql += ` GENERATED ALWAYS AS (${opts["as"]})`;
       sql += opts["stored"] ? " STORED" : " VIRTUAL";
     }
-    return super.addColumnOptions(sql, options);
-  }
-
-  /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): Promise<string> {
-    return this.addColumnOptions(sql, options);
+    return super.addColumnOptionsBang(sql, options);
   }
 }
