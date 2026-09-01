@@ -1,7 +1,25 @@
 // Port of `Rails::Engine` from `railties/lib/rails/engine.rb`. Shell +
 // EngineConfiguration + railties() collection. `lazy_route_set` + `updater`
 // → 2.2c. `env_config`/`call`/`helpers` → blocked on PR 2.5.
-import { getFsAsync, getPathAsync, onLoad } from "@blazetrails/activesupport";
+//
+// Initializers deliberately not declared here, because the subsystem each one
+// drives is unported:
+//   - `:set_load_path` (`engine.rb:571`), `:set_autoload_paths` (`:578`),
+//     `:set_eager_load_paths` (`:586`) — `$LOAD_PATH` and
+//     `ActiveSupport::Dependencies` have no ESM analogue; module resolution is
+//     the bundler's job in trails.
+//   - `:add_locales` (`:610`) — `config.i18n.railties_load_path`; no `config.i18n`.
+//   - `:add_mailer_preview_paths` (`:622`) — ActionMailer is not ported.
+//   - `:add_fixture_paths` (`:629`) — `on_load(:active_record_fixtures)` and
+//     `fixtures_in_root_and_not_in_vendor_or_dot_dir?` are not ported.
+//   - `:wrap_reloader_around_load_seed` (`:650`) — `Engine#load_seed` and its
+//     `:load_seed` callback chain are not ported.
+//   - `:make_routes_lazy` (`:591`) — selecting `LazyRouteSet` is only safe once
+//     `Application#reload_routes_unless_loaded` is wired into the route set's
+//     reload hook; `RoutesReloader#executeUnlessLoaded` is async in trails while
+//     every `LazyRouteSet` call site that consults the hook is synchronous.
+//     Story: wire-lazy-route-set-reload-hook.
+import { Notifications, getFsAsync, getPathAsync, onLoad } from "@blazetrails/activesupport";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
@@ -176,6 +194,29 @@ export class Engine extends Trailtie {
   }
 
   /**
+   * Mirrors `Engine#load_config_initializer(initializer)` (`engine.rb:691-695`).
+   * Ruby's `load` is `import()` here, so the body is async and the
+   * instrumentation goes through `Notifications.instrumentAsync`.
+   *
+   * Deliberately carries no internal-visibility tag: the method sits in Engine's
+   * `private` section but has Rails' `# :doc:` directive (`engine.rb:691`),
+   * which republishes it as public API. `extract-ruby-api.rb:402-412` honours
+   * that directive and keeps the name out of the privates manifest, so
+   * `rails-private-jsdoc` does not ask for the tag and
+   * `unbacked-internal-needs-receipt` rejects it.
+   */
+  async loadConfigInitializer(initializer: string): Promise<void> {
+    const { pathToFileURL } = await getPathAsync();
+    await Notifications.instrumentAsync(
+      "load_config_initializer.railties",
+      { initializer },
+      async () => {
+        await import(pathToFileURL!(initializer).href);
+      },
+    );
+  }
+
+  /**
    * Mirrors: Rails `_all_load_paths(add_autoload_paths_to_load_path)` (engine.rb:730).
    *
    * @internal
@@ -201,6 +242,7 @@ export class Engine extends Trailtie {
  * `application.ts`, which imports this file.
  */
 export interface EngineInitializerApp {
+  config: { helpersPaths: string[] };
   routes(): { drawPaths: string[] };
   routesReloader(): {
     paths: string[];
@@ -208,6 +250,22 @@ export interface EngineInitializerApp {
     externalRoutes: string[];
   };
 }
+
+/**
+ * Mirrors `Engine`'s `load_environment_config` initializer (`engine.rb:565-569`).
+ * Ruby's `require environment` is a dynamic `import()` of the module URL.
+ */
+Engine.initializer(
+  "load_environment_config",
+  { before: "load_environment_hook", group: "all" },
+  async function (this: Engine) {
+    const { pathToFileURL } = await getPathAsync();
+    for (const environment of (await (await this.paths()).get("config/environments")?.existent()) ??
+      []) {
+      await import(pathToFileURL!(environment).href);
+    }
+  },
+);
 
 /**
  * Mirrors `Engine`'s `add_routing_paths` initializer (`engine.rb:595-606`).
@@ -240,6 +298,29 @@ Engine.initializer("add_view_paths", async function (this: Engine) {
   onLoad("action_controller", (base: ActionControllerBaseLike) => {
     if (typeof base.prependViewPath === "function") base.prependViewPath(views);
   });
+});
+
+/** Mirrors `Engine`'s `prepend_helpers_path` initializer (`engine.rb:638-642`). */
+Engine.initializer("prepend_helpers_path", async function (this: Engine, ...args: unknown[]) {
+  const app = args[0] as EngineInitializerApp;
+  if (!this.isolated() || (app as unknown) === this) {
+    const helpers = (await (await this.paths()).get("app/helpers")?.existent()) ?? [];
+    app.config.helpersPaths.unshift(...helpers);
+  }
+});
+
+/** Mirrors `Engine`'s `load_config_initializers` initializer (`engine.rb:644-648`). */
+Engine.initializer("load_config_initializers", async function (this: Engine) {
+  const existent = (await (await this.paths()).get("config/initializers")?.existent()) ?? [];
+  for (const initializer of existent.sort()) {
+    await this.loadConfigInitializer(initializer);
+  }
+});
+
+/** Mirrors `Engine`'s `engines_blank_point` initializer (`engine.rb:656-659`). */
+Engine.initializer("engines_blank_point", function () {
+  // We need this initializer so all extra initializers added in engines are
+  // consistently executed after all the initializers above across all engines.
 });
 
 /** @internal The `on_load(:action_controller)` receiver — see `add_view_paths`. */

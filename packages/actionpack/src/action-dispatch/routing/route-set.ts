@@ -464,13 +464,19 @@ export class RouteSet {
    * then copies over `relative_url_root` / `api_only` / `default_scope` from
    * any source object that responds to them. Engines may omit
    * `relativeUrlRoot`, so we only copy keys that are present.
+   *
+   * The final `new route_set_config` is `self.new`, so a subclass receiver
+   * (`Engine::LazyRouteSet.new_with_config`) builds an instance of itself.
    */
-  static newWithConfig(config: Partial<RouteSetConfig>): RouteSet {
+  static newWithConfig(
+    this: new (config?: RouteSetConfig) => RouteSet,
+    config: Partial<RouteSetConfig>,
+  ): RouteSet {
     const merged: RouteSetConfig = { ...DEFAULT_CONFIG };
     if ("relativeUrlRoot" in config) merged.relativeUrlRoot = config.relativeUrlRoot ?? null;
     if ("apiOnly" in config) merged.apiOnly = config.apiOnly ?? false;
     if ("defaultScope" in config) merged.defaultScope = config.defaultScope ?? null;
-    return new RouteSet(merged);
+    return new this(merged);
   }
 
   /** Rails: `attr_accessor :router`. Trails uses {@link journeyRouter} as the underlying lazy router. */

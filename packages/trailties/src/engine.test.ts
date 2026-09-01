@@ -11,8 +11,10 @@ import {
   type PathAdapter,
 } from "@blazetrails/activesupport";
 import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
+import { env, setEnv } from "@blazetrails/activesupport/process-adapter";
 import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
+import { loaded } from "./__fixtures__/loaded.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
@@ -382,5 +384,81 @@ describe("Engine", () => {
     await controller.renderAsync({ action: "index" });
     expect(controller.body).toBe("posts#index\n");
     resetLoadHooks();
+  });
+
+  describe("remaining Engine initializers", () => {
+    const fixtureRoot = new URL("./__fixtures__/initializer-engine", import.meta.url).pathname;
+    let previousEnv: string | undefined;
+
+    beforeEach(() => {
+      previousEnv = env.TRAILS_ENV;
+      setEnv("TRAILS_ENV", "test");
+      loaded.length = 0;
+    });
+    afterEach(() => {
+      setEnv("TRAILS_ENV", previousEnv);
+    });
+
+    it("initializers", async () => {
+      class InitializersEngine extends Engine {}
+      Trailtie.register(InitializersEngine);
+      const engine = InitializersEngine.instance();
+      engine.config.setRoot(fixtureRoot);
+
+      await engine.initializers.find((i) => i.name === "load_config_initializers")!.run();
+
+      expect(loaded).toEqual(["a-foo", "b-bar"]);
+    });
+
+    it("initializers are executed after application configuration initializers", () => {
+      class OrderingEngine extends Engine {}
+      Trailtie.register(OrderingEngine);
+      OrderingEngine.initializer("dummy_initializer", () => {});
+      const names = OrderingEngine.instance()
+        .initializers.tsort()
+        .map((i) => i.name);
+
+      expect(names.lastIndexOf("load_config_initializers")).toBeLessThan(
+        names.indexOf("dummy_initializer"),
+      );
+    });
+
+    it("load_environment_config requires config/environments/$env", async () => {
+      class EnvironmentEngine extends Engine {}
+      Trailtie.register(EnvironmentEngine);
+      const engine = EnvironmentEngine.instance();
+      engine.config.setRoot(fixtureRoot);
+
+      await engine.initializers.find((i) => i.name === "load_environment_config")!.run();
+
+      expect(loaded).toEqual(["environments/test"]);
+    });
+
+    it("prepend_helpers_path unshifts app/helpers onto the application config", async () => {
+      class HelpersEngine extends Engine {}
+      Trailtie.register(HelpersEngine);
+      const engine = HelpersEngine.instance();
+      engine.config.setRoot(fixtureRoot);
+      const app = { config: { helpersPaths: ["existing"] } };
+
+      await engine.initializers.find((i) => i.name === "prepend_helpers_path")!.run(app);
+
+      expect(app.config.helpersPaths).toHaveLength(2);
+      expect(app.config.helpersPaths[0]).toMatch(/app\/helpers$/);
+      expect(app.config.helpersPaths[1]).toBe("existing");
+    });
+
+    it("prepend_helpers_path skips an isolated engine that is not the application", async () => {
+      class IsolatedEngine extends Engine {}
+      Trailtie.register(IsolatedEngine);
+      IsolatedEngine.isolated(true);
+      const engine = IsolatedEngine.instance();
+      engine.config.setRoot(fixtureRoot);
+      const app = { config: { helpersPaths: [] as string[] } };
+
+      await engine.initializers.find((i) => i.name === "prepend_helpers_path")!.run(app);
+
+      expect(app.config.helpersPaths).toEqual([]);
+    });
   });
 });
