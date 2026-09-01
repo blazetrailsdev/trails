@@ -4,10 +4,8 @@
     "byFile": {}
   },
   "actioncontroller": {
-    "total": 1,
-    "byFile": {
-      "metal/strong_parameters.rb": 1
-    }
+    "total": 0,
+    "byFile": {}
   },
   "actiondispatch": {
     "total": 0,
