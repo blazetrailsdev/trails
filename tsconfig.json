@@ -27,6 +27,7 @@
     { "path": "packages/trails-tsc" },
     { "path": "packages/activerecord" },
     { "path": "packages/rack" },
+    { "path": "packages/rack-session" },
     { "path": "packages/actionview" },
     { "path": "packages/actionpack" },
     { "path": "packages/trailties" },
