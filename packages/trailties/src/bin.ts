@@ -19,9 +19,6 @@ for (const candidate of [
   }
 }
 
-// Rails runs `lookup!` lazily from `Generators.help`/`find_by_namespace`;
-// commander needs the subcommand tree before `parse`, so the scan is warmed
-// here — this is the one place with a top-level `await` to spend on it.
 await Generators.lookupBang();
 
 const program = createProgram();

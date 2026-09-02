@@ -193,15 +193,6 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
   this.reloaders.push(reloader);
 
   this.reloader.toRun(function (this: FinisherReloaderInstance) {
-    // We configure #execute rather than #execute_if_updated because if
-    // autoloaded constants are cleared we need to reload routes also in
-    // case any was used there, as in
-    //
-    //   mount MailPreview => 'mail_view'
-    //
-    // This means routes are also reloaded if i18n is updated, which
-    // might not be necessary, but in order to be more precise we need
-    // some sort of reloaders dependency support, to be added.
     this.requireUnloadLockBang();
     return reloader.execute().then(() => {
       runLoadHooks("after_routes_loaded", this);

@@ -265,7 +265,6 @@ async function importGenerator(href: string): Promise<GeneratorClass | undefined
   try {
     mod = (await import(href)) as Record<string, unknown>;
   } catch {
-    // Rails: `rescue Exception; # No problem` (`command/behavior.rb:61-62`).
     return undefined;
   }
   for (const value of Object.values(mod)) {
