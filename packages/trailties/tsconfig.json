@@ -11,6 +11,7 @@
     { "path": "../activesupport" },
     { "path": "../activerecord" },
     { "path": "../rack" },
-    { "path": "../actionpack" }
+    { "path": "../actionpack" },
+    { "path": "../actionview" }
   ]
 }

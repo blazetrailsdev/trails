@@ -735,7 +735,7 @@ export const filterParameters = [
   <title>${name}</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/assets/stylesheets/application.css">
+  <%= stylesheetLinkTag("application") %>
 </head>
 <body>
   <%= yield %>

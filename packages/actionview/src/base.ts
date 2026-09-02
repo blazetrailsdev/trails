@@ -5,6 +5,7 @@ import {
   htmlSafe,
   InheritableOptions,
   jsonEscape,
+  runLoadHooks,
   xmlNameEscape,
   type SafeBuffer,
 } from "@blazetrails/activesupport";
@@ -497,5 +498,8 @@ export interface Base extends HelperMethods, TseUtilMethods {
    */
   readonly yield: SafeBuffer;
 }
+
+/** `ActiveSupport.run_load_hooks(:action_view, self)` (`base.rb:311`). */
+runLoadHooks("action_view", Base);
 
 _setBase(Base);

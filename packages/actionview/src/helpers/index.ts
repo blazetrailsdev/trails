@@ -100,3 +100,28 @@ export {
   CONTROLLER_DELEGATES,
 } from "./controller-helper.js";
 export type { ControllerHelperHost } from "./controller-helper.js";
+
+export {
+  assetPath,
+  pathToAsset,
+  computeAssetExtname,
+  computeAssetPath,
+  publicComputeAssetPath,
+  stylesheetPath,
+  pathToStylesheet,
+  ASSET_EXTENSIONS,
+  ASSET_PUBLIC_DIRECTORIES,
+  URI_REGEXP,
+} from "./asset-url-helper.js";
+export type { AssetPathOptions, AssetUrlHelperHost } from "./asset-url-helper.js";
+
+export {
+  stylesheetLinkTag,
+  sendPreloadLinksHeader,
+  preloadLinksHeader,
+  applyStylesheetMediaDefault,
+  setPreloadLinksHeader,
+  setApplyStylesheetMediaDefault,
+  MAX_HEADER_SIZE,
+} from "./asset-tag-helper.js";
+export type { AssetTagHelperHost } from "./asset-tag-helper.js";
