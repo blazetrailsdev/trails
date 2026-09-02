@@ -1,4 +1,4 @@
-import { SafeBuffer, htmlSafe, isBlank } from "@blazetrails/activesupport";
+import { SafeBuffer, htmlSafe, isBlank, isPresent } from "@blazetrails/activesupport";
 
 import {
   pathToStylesheet,
@@ -25,14 +25,22 @@ export const AssetTagHelper: {
 const PATH_OPTION_KEYS = ["protocol", "extname", "host", "skipPipeline"] as const;
 
 /**
+ * `AssetUrlHelper`'s receiver plus the `content_security_policy_nonce`
+ * `stylesheet_link_tag` reaches for a `nonce: true` option
+ * (`asset_tag_helper.rb:226`).
+ */
+export interface AssetTagHelperHost extends AssetUrlHelperHost {
+  contentSecurityPolicyNonce?(): string | null;
+}
+
+/**
  * Returns a stylesheet link tag for the sources specified as arguments.
  * `asset_tag_helper.rb:202-242`.
  *
  * @missingRailsCall send_preload_links_header — CONVERGEABLE asset-tag-helper-preload-links-header
- * @missingRailsCall content_security_policy_nonce — CONVERGEABLE asset-tag-helper-preload-links-header
  */
 export function stylesheetLinkTag(
-  this: AssetUrlHelperHost | void,
+  this: AssetTagHelperHost | void,
   ...sources: unknown[]
 ): SafeBuffer {
   const last = sources[sources.length - 1];
@@ -50,19 +58,41 @@ export function stylesheetLinkTag(
       delete options[key];
     }
   }
-  let crossorigin = options["crossorigin"];
-  delete options["crossorigin"];
+  const usePreloadLinksHeader =
+    options["preloadLinksHeader"] == null
+      ? AssetTagHelper.preloadLinksHeader
+      : (deleteOption(options, "preloadLinksHeader") as boolean | null);
+  const preloadLinks: string[] = [];
+  let crossorigin = deleteOption(options, "crossorigin");
   if (crossorigin === true) crossorigin = "anonymous";
+  const nopush =
+    options["nopush"] == null ? true : (deleteOption(options, "nopush") as boolean | null);
+  const integrity = options["integrity"];
 
   const sourcesTags = [...new Set(sources)]
     .map((source) => {
       const href = pathToStylesheet.call(this, String(source), pathOptions);
+      if (
+        usePreloadLinksHeader != null &&
+        usePreloadLinksHeader !== false &&
+        isPresent(href) &&
+        !href.startsWith("data:")
+      ) {
+        let preloadLink = `<${href}>; rel=preload; as=style`;
+        if (crossorigin != null) preloadLink += `; crossorigin=${String(crossorigin)}`;
+        if (integrity != null) preloadLink += `; integrity=${String(integrity)}`;
+        if (nopush != null && nopush !== false) preloadLink += "; nopush";
+        preloadLinks.push(preloadLink);
+      }
       const tagOptions: Record<string, unknown> = {
         rel: "stylesheet",
         crossorigin,
         href,
         ...options,
       };
+      if (tagOptions["nonce"] === true) {
+        tagOptions["nonce"] = this!.contentSecurityPolicyNonce!();
+      }
 
       if (AssetTagHelper.applyStylesheetMediaDefault === true && isBlank(tagOptions["media"])) {
         tagOptions["media"] = "screen";
@@ -73,4 +103,11 @@ export function stylesheetLinkTag(
     .join("\n");
 
   return htmlSafe(sourcesTags);
+}
+
+/** `Hash#delete` — read the key out of `options` and remove it. */
+function deleteOption(options: Record<string, unknown>, key: string): unknown {
+  const value = options[key];
+  delete options[key];
+  return value;
 }

@@ -3,12 +3,12 @@
 // so the string-equality ports live here rather than reddening the matched
 // file's assertion-kind ratchet.
 import { describe, it, expect, beforeEach } from "vitest";
-import { assetPath, type AssetUrlHelperHost } from "../helpers/asset-url-helper.js";
-import { stylesheetLinkTag } from "../helpers/asset-tag-helper.js";
+import { assetPath } from "../helpers/asset-url-helper.js";
+import { stylesheetLinkTag, type AssetTagHelperHost } from "../helpers/asset-tag-helper.js";
 
 const FakeRequest = { protocol: "http://", baseUrl: "http://www.example.com" };
 
-let host: AssetUrlHelperHost;
+let host: AssetTagHelperHost;
 
 beforeEach(() => {
   host = { config: {}, request: { ...FakeRequest } };
@@ -82,5 +82,32 @@ describe("AssetTagHelper (assert_dom_equal ports)", () => {
     expect(stylesheetLinkTag.call(host, "wellington", { protocol: ":relative" }).toString()).toBe(
       '<link rel="stylesheet" href="//assets.example.com/stylesheets/wellington.css" />',
     );
+  });
+
+  it("resolves a nonce: true option through content_security_policy_nonce", () => {
+    host.contentSecurityPolicyNonce = () => "iyhD0Yc0W+c=";
+    expect(stylesheetLinkTag.call(host, "foo.css", { nonce: true }).toString()).toBe(
+      '<link rel="stylesheet" href="/stylesheets/foo.css" nonce="iyhD0Yc0W+c=" />',
+    );
+  });
+
+  it("consumes preloadLinksHeader and nopush rather than rendering them", () => {
+    expect(
+      stylesheetLinkTag.call(host, "bank", { preloadLinksHeader: false, nopush: false }).toString(),
+    ).toBe('<link rel="stylesheet" href="/stylesheets/bank.css" />');
+  });
+
+  it("passes the request to an asset_host callable only when its arity accepts one", () => {
+    host.config!.assetHost = (source: string, request?: unknown) => {
+      expect(request).toBe(host.request);
+      return `assets${source.length}.example.com`;
+    };
+    expect(assetPath.call(host, "/foo.css")).toBe("http://assets8.example.com/foo.css");
+
+    host.config!.assetHost = (...args: unknown[]) => {
+      expect(args).toHaveLength(1);
+      return "cdn.example.com";
+    };
+    expect(assetPath.call(host, "/foo.css")).toBe("http://cdn.example.com/foo.css");
   });
 });

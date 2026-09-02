@@ -20,7 +20,7 @@ export interface AssetPathOptions {
 
 /** `config` slots `AssetUrlHelper` reads (`abstract_controller/asset_paths.rb:5-9`). */
 export interface AssetPathsConfig {
-  assetHost?: string | null;
+  assetHost?: string | ((source: string, request?: unknown) => string | null | undefined) | null;
   relativeUrlRoot?: string | null;
   defaultAssetHostProtocol?: string | null;
 }
@@ -142,6 +142,11 @@ export const publicComputeAssetPath = computeAssetPath;
  * numbers 0-3 if it contains `%d` (the number is the source hash mod 4),
  * or the value returned from invoking call on an object responding to call.
  * `asset_url_helper.rb:277-310`.
+ *
+ * Ruby's `arity < 0` arm (a splat-argument host, which also receives the
+ * request) has no JS counterpart: a rest-parameter function reports
+ * `Function.length` 0, indistinguishable from a zero-arity one, so only the
+ * `arity > 1` arm survives.
  */
 export function computeAssetHost(
   this: AssetUrlHelperHost | void,
@@ -154,7 +159,10 @@ export function computeAssetHost(
 
   if (configured != null) {
     if (typeof configured === "function") {
-      host = configured(source, request ?? undefined);
+      const arity = configured.length;
+      const args: [string, unknown?] = [source];
+      if (request != null && arity > 1) args.push(request);
+      host = configured(...args);
     } else if (configured.includes("%d")) {
       host = configured.replace("%d", String(crc32(source) % 4));
     } else {
