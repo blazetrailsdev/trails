@@ -175,7 +175,7 @@ export class LazyAttributeHash {
     this.additionalTypes = additionalTypes;
     this.materialized = false;
     this.defaultAttributes = defaultAttributes;
-    this.delegate = delegateHash;
+    this.delegate = Object.setPrototypeOf(delegateHash, null) as Record<string, Attribute>;
   }
 
   isKey(key: string): boolean {

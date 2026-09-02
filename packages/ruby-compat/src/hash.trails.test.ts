@@ -103,6 +103,11 @@ describe("Hash#reject", () => {
     expect(reject(hash, (k) => k.startsWith("b"))).toEqual({ foo: 0 });
     expect(hash).toEqual({ foo: 0, bar: 1, baz: 2 });
   });
+
+  it("carries a __proto__ key across as an ordinary key", () => {
+    const hash = Object.assign(Object.create(null) as Record<string, number>, { ["__proto__"]: 1 });
+    expect(hasKey(transformValues(hash, (v) => v * 2), "__proto__")).toBe(true);
+  });
 });
 
 describe("Hash#each_pair", () => {
@@ -140,6 +145,11 @@ describe("Hash#slice", () => {
       ["baz", 2],
       ["foo", 0],
     ]);
+  });
+
+  it("keeps a __proto__ key as an ordinary key", () => {
+    const hash = Object.assign(Object.create(null) as Record<string, number>, { ["__proto__"]: 1 });
+    expect(hasKey(slice(hash, "__proto__"), "__proto__")).toBe(true);
   });
 
   it("ignores keys that are not found, and keeps a stored undefined", () => {

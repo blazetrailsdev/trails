@@ -23,6 +23,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import path from "node:path";
+import ts from "typescript";
 
 const NODE_BUILTINS = new Set(builtinModules.filter((m) => !m.startsWith("_")));
 
@@ -31,17 +32,35 @@ export function isCompiledTestFile(rel: string): boolean {
   return /\.test\.js$/.test(rel);
 }
 
-/** Every module specifier a built module names, in source order. */
+/**
+ * Every module specifier a built module names, in source order — parsed, not
+ * pattern-matched, so a side-effect `import "node:fs"`, an `export * from`, an
+ * `import type`, a dynamic `import()` and a `require()` all count.
+ */
 export function moduleSpecifiers(source: string): string[] {
+  const sourceFile = ts.createSourceFile("module.js", source, ts.ScriptTarget.ESNext, true);
   const specifiers: string[] = [];
-  const patterns = [
-    /\bfrom\s*["']([^"']+)["']/g,
-    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
-    /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g,
-  ];
-  for (const pattern of patterns) {
-    for (const match of source.matchAll(pattern)) specifiers.push(match[1]);
-  }
+
+  const record = (node: ts.Node | undefined): void => {
+    if (node && ts.isStringLiteralLike(node)) specifiers.push(node.text);
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      record(node.moduleSpecifier);
+    } else if (ts.isImportEqualsDeclaration(node)) {
+      if (ts.isExternalModuleReference(node.moduleReference))
+        record(node.moduleReference.expression);
+    } else if (ts.isCallExpression(node)) {
+      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";
+      if (isRequire || node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        record(node.arguments[0]);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+
+  ts.forEachChild(sourceFile, visit);
   return specifiers;
 }
 

@@ -21,13 +21,23 @@ describe("ruby-compat leaf guard", () => {
     expect(nodeBuiltinNamed("vitest")).toBeNull();
   });
 
-  it("reads static imports, dynamic imports and require calls", () => {
+  it("reads every module specifier, not just the `from` ones", () => {
     const source = [
       'import { readFile } from "node:fs/promises";',
+      'import "node:fs";',
+      'export * from "node:os";',
+      'export { join } from "node:path";',
       'const p = await import("./range.js");',
-      'const os = require("os");',
+      'const c = require("node:crypto");',
     ].join("\n");
-    expect(moduleSpecifiers(source)).toEqual(["node:fs/promises", "./range.js", "os"]);
+    expect(moduleSpecifiers(source)).toEqual([
+      "node:fs/promises",
+      "node:fs",
+      "node:os",
+      "node:path",
+      "./range.js",
+      "node:crypto",
+    ]);
   });
 
   it("exempts compiled test files", () => {

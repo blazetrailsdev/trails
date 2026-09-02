@@ -151,6 +151,22 @@ describe("LazyAttributeHash", () => {
     expect(hash.isKey("missing")).toBe(false);
   });
 
+  it("treats an Object.prototype name as an ordinary absent key", () => {
+    const hash = new LazyAttributeHash(new Map(), {});
+    expect(hash.isKey("toString")).toBe(false);
+    expect(hash.getAttribute("toString").value).toBeNull();
+    expect(hash.getAttribute("constructor").value).toBeNull();
+  });
+
+  it("stores __proto__ as an ordinary key", () => {
+    const hash = new LazyAttributeHash(new Map(), {});
+    const attr = Attribute.null("__proto__");
+    hash.set("__proto__", attr);
+    expect(hash.isKey("__proto__")).toBe(true);
+    expect(hash.getAttribute("__proto__")).toBe(attr);
+    expect(hash.deepDup().isKey("__proto__")).toBe(true);
+  });
+
   it("except returns a copy without the given names", () => {
     const hash = new LazyAttributeHash(
       new Map([

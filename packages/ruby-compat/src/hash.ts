@@ -241,7 +241,11 @@ export function transformValues<T, U>(
   hash: Record<string, T>,
   block: (value: T) => U,
 ): Record<string, U> {
-  const result: Record<string, U> = {};
+  /* `rb_hash_transform_values` (`vendor/ruby/hash.c:3366`) builds the new hash
+     with `rb_hash_new`, which has no ancestors: `__proto__` is an ordinary key
+     there, where `result["__proto__"] = v` on a plain `{}` reaches
+     Object.prototype's setter and stores nothing. */
+  const result: Record<string, U> = Object.create(null) as Record<string, U>;
   for (const key of Object.keys(hash)) {
     result[key] = block(hash[key]);
   }
@@ -254,7 +258,7 @@ export function transformValues<T, U>(
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#slice` (`vendor/ruby/hash.c:2651`).
  */
 export function slice<T>(hash: Record<string, T>, ...keys: string[]): Record<string, T> {
-  const result: Record<string, T> = {};
+  const result: Record<string, T> = Object.create(null) as Record<string, T>;
   for (const key of keys) {
     if (hasKey(hash, key)) result[key] = hash[key];
   }
