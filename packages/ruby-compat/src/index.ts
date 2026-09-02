@@ -13,8 +13,10 @@ export {
   rubyClass,
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
+export { rbBuiltinClassName, rbObjClass } from "./object.js";
 export {
   Hash,
+  block,
   deleteIf,
   dup,
   eachKey,
@@ -30,6 +32,7 @@ export {
   transformValues,
   update,
 } from "./hash.js";
+export type { Block, ConflictBlock } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
 export { FrozenError } from "./frozen-error.js";
 export {

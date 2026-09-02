@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   Hash,
+  block,
   deleteIf,
   dup,
   eachKey,
@@ -17,6 +18,7 @@ import {
   update,
 } from "./hash.js";
 import { KeyError } from "./key-error.js";
+import { FrozenError } from "./frozen-error.js";
 
 describe("Hash#fetch", () => {
   it("returns a stored null rather than the default", () => {
@@ -49,6 +51,35 @@ describe("Hash#fetch", () => {
   });
 });
 
+describe("Hash#fetch with a block", () => {
+  it("yields the missing key and returns what the block returns", () => {
+    const keys: string[] = [];
+    expect(
+      fetch(
+        { a: 1 },
+        "b",
+        block((key) => (keys.push(key), 42)),
+      ),
+    ).toBe(42);
+    expect(keys).toEqual(["b"]);
+  });
+
+  it("does not yield when the key is stored, even for a stored undefined", () => {
+    expect(
+      fetch(
+        { a: undefined },
+        "a",
+        block(() => "yielded"),
+      ),
+    ).toBeUndefined();
+  });
+
+  it("keeps a callable default as a default when it is not marked a block", () => {
+    const fallback = () => "called";
+    expect(fetch<unknown>({}, "a", fallback)).toBe(fallback);
+  });
+});
+
 describe("Hash#key?", () => {
   it("is true for a stored null and false for an absent key", () => {
     expect(hasKey({ offset: null }, "offset")).toBe(true);
@@ -77,6 +108,41 @@ describe("Hash#update", () => {
 
   it("is the same body as merge!", () => {
     expect(mergeBang).toBe(update);
+  });
+});
+
+describe("Hash#merge! with a conflict block", () => {
+  it("yields the key, the receiver's value and the argument's, and stores the result", () => {
+    const yielded: unknown[][] = [];
+    const hash = { a: 1, b: 2 };
+    mergeBang(hash, { b: 20, c: 30 }, (key, oldValue, newValue) => {
+      yielded.push([key, oldValue, newValue]);
+      return oldValue;
+    });
+    expect(hash).toEqual({ a: 1, b: 2, c: 30 });
+    expect(yielded).toEqual([["b", 2, 20]]);
+  });
+
+  it("leaves merge's copy semantics alone", () => {
+    const hash = { a: 1 };
+    expect(merge(hash, { a: 2 }, (_key, left) => left)).toEqual({ a: 1 });
+    expect(hash).toEqual({ a: 1 });
+  });
+});
+
+describe("Hash#freeze", () => {
+  it("raises FrozenError from every mutator once frozen", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1);
+    expect(hash.isFrozen()).toBe(false);
+    expect(hash.freeze()).toBe(hash);
+    expect(hash.isFrozen()).toBe(true);
+    expect(() => hash.set("b", 2)).toThrow(FrozenError);
+    expect(() => hash.set("b", 2)).toThrow('can\'t modify frozen Hash: {"a"=>1}');
+    expect(() => hash.delete("a")).toThrow(FrozenError);
+    expect(() => hash.clear()).toThrow(FrozenError);
+    expect(() => hash.setDefault(0)).toThrow(FrozenError);
+    expect(hash.get("a")).toBe(1);
   });
 });
 

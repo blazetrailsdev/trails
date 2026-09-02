@@ -6,17 +6,7 @@
 
 import { ArgumentError } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
-
-/** The class name Ruby's `string.class.name` reports for the offending value. */
-function rubyClassName(value: unknown): string {
-  if (value === null || value === undefined) return "NilClass";
-  if (value === true) return "TrueClass";
-  if (value === false) return "FalseClass";
-  if (Array.isArray(value)) return "Array";
-  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
-  return (value as object).constructor?.name ?? "Object";
-}
+import { rbObjClass, regexpEscape } from "@blazetrails/ruby-compat";
 
 /**
  * Replaces non-ASCII characters with an ASCII approximation, or if none
@@ -38,7 +28,7 @@ export function transliterate(
   { locale = null }: { locale?: string | null } = {},
 ): string {
   if (typeof string !== "string")
-    throw new ArgumentError(`Can only transliterate strings. Received ${rubyClassName(string)}`);
+    throw new ArgumentError(`Can only transliterate strings. Received ${rbObjClass(string)}`);
   // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (transliterate.rb:69)
   if (/^[\x00-\x7f]*$/.test(string)) return string;
 

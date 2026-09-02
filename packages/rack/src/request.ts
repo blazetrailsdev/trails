@@ -49,7 +49,7 @@ import {
   QueryParser,
   unescape,
 } from "./utils.js";
-import { fetch, hasKey } from "@blazetrails/ruby-compat";
+import { block as rbBlock, fetch } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/activesupport";
 import * as MediaTypeModule from "./media-type.js";
 import * as Multipart from "./multipart.js";
@@ -886,15 +886,14 @@ export class Request {
 
   /**
    * Mirrors: `Rack::Request::Env#fetch_header` (`rack/request.rb:106-108`) —
-   * `@env.fetch(name, &block)`. Ruby's block arm of `Hash#fetch` is not ported
-   * in `@blazetrails/ruby-compat`, so the miss-with-block case is answered
-   * ahead of the delegation rather than through it.
+   * `@env.fetch(name, &block)`.
    */
   fetchHeader(name: string): any;
   fetchHeader(name: string, block: (key: string) => any): any;
   fetchHeader(name: string, block?: (key: string) => any): any {
-    if (block !== undefined && !hasKey(this.env, name)) return block(name);
-    return fetch(this.env, name);
+    /* `&block` — an absent block is Ruby's `&nil`, which reaches `Hash#fetch`'s
+       one-argument arm rather than handing it a `nil` default. */
+    return block === undefined ? fetch(this.env, name) : fetch(this.env, name, rbBlock(block));
   }
 
   /** Mirrors: `Rack::Request::Env#set_header` (`rack/request.rb:116-118`). */

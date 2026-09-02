@@ -17,6 +17,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
+import { rbObjClass } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 
 /**
@@ -101,7 +102,11 @@ export function cmp(a: unknown, b: unknown): number | null {
   return rbEqual(a, b) ? 0 : null;
 }
 
-function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
   return (
     typeof (value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag] === "string" &&
     (value as { [Symbol.toStringTag]: string })[Symbol.toStringTag].startsWith("Temporal.") &&
@@ -144,27 +149,6 @@ function inspect(y: unknown): string {
 function specialConstP(y: unknown): boolean {
   if (typeof y === "bigint") return y <= 4611686018427387903n && y >= -4611686018427387904n;
   return y === null || y === undefined || typeof y === "boolean" || typeof y === "number";
-}
-
-/**
- * `rb_obj_class` (`vendor/ruby/object.c:296`) over the values trails carries:
- * the immediates Ruby answers a class for without a heap object, the
- * {@link rubyClass} brand, and otherwise the constructor's own name.
- *
- * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
- *  which one it is is read off the value; a Temporal value carrying an instant
- *  is a Ruby `Time`, by the same reading {@link cmp} orders it with.
- */
-function rbObjClass(x: unknown): string {
-  if (x === null || x === undefined) return "NilClass";
-  if (typeof x === "boolean") return x ? "TrueClass" : "FalseClass";
-  if (typeof x === "bigint") return "Integer";
-  if (typeof x === "number") return Number.isInteger(x) ? "Integer" : "Float";
-  if (typeof x === "string") return "String";
-  const branded = (x as Comparable)[rubyClass];
-  if (branded != null) return branded;
-  if (hasEpochNanoseconds(x)) return "Time";
-  return (x as object).constructor?.name ?? typeof x;
 }
 
 /**

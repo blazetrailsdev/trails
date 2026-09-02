@@ -12,6 +12,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
+import { rbBuiltinClassName } from "./object.js";
 
 const DECIMAL_REGEX =
   /^[+-]?(?:\d(?:_?\d)*(?:\.\d(?:_?\d)*)?|\.\d(?:_?\d)*)(?:[eE][+-]?\d(?:_?\d)*)?$/;
@@ -52,7 +53,7 @@ export function kernelFloat(val: unknown): number {
     const toF = (val as { toF?: unknown }).toF;
     if (typeof toF === "function") return (toF as () => number).call(val);
   }
-  throw new TypeError(`can't convert ${rbObjClass(val)} into Float`);
+  throw new TypeError(`can't convert ${rbBuiltinClassName(val)} into Float`);
 }
 
 function hexFloat(hex: RegExpExecArray): number {
@@ -62,13 +63,4 @@ function hexFloat(hex: RegExpExecArray): number {
   const mantissa = Number.parseInt(digits + frac, 16) / 16 ** frac.length;
   const scaled = mantissa * 2 ** Number(exponent ?? "0");
   return sign === "-" ? -scaled : scaled;
-}
-
-/** `rb_obj_class` (`vendor/ruby/object.c:296`) as `conversion_mismatch`
- *  spells it: `nil` for nil, the class name otherwise. */
-function rbObjClass(val: unknown): string {
-  if (val === null || val === undefined) return "nil";
-  if (Array.isArray(val)) return "Array";
-  if (typeof val === "boolean") return val ? "TrueClass" : "FalseClass";
-  return (val as object).constructor?.name ?? "Object";
 }
