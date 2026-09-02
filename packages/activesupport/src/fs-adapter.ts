@@ -258,9 +258,10 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   const nodeModule = require("node:module") as {
     createRequire(p: string): (id: string) => unknown;
   };
-  return nodeModule.createRequire(
-    typeof __filename !== "undefined" ? __filename : "file:///activesupport",
-  );
+  // Only Node builtins are loaded through this require, so the base path is
+  // never resolved against — a fixed sentinel keeps the file off `__filename`,
+  // which ruby-compat's browser-safe-leaf lint bans outright.
+  return nodeModule.createRequire("file:///activesupport");
 }
 
 function tryAutoRegisterNode(): boolean {

@@ -90,9 +90,10 @@ function tryAutoRegisterNode(): boolean {
           require("node:module")
         : null;
     if (!nodeModule) return false;
-    const req = nodeModule.createRequire(
-      typeof __filename !== "undefined" ? __filename : "file:///activesupport",
-    );
+    // Only Node builtins are loaded through this require, so the base path is
+    // never resolved against — a fixed sentinel keeps the file off `__filename`,
+    // which ruby-compat's browser-safe-leaf lint bans outright.
+    const req = nodeModule.createRequire("file:///activesupport");
     const asyncHooks = req("async_hooks") as typeof import("async_hooks");
     if (asyncHooks.AsyncLocalStorage) {
       registry.set("node", wrapNodeAsyncHooks(asyncHooks));

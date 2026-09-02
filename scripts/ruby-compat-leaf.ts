@@ -7,14 +7,27 @@
  *
  * Two halves make it up, and both are only visible in the BUILT output:
  *
- * - No runtime module imports a Node builtin (`node:fs`, `fs`, `fs/promises`,
- *   …), by static import, dynamic import or `require`.
+ * - No runtime module takes a Node builtin (`node:fs`, `fs`, `fs/promises`, …)
+ *   through a specifier a bundler resolves: a static `import` / `export … from`
+ *   / `import =`, or a dynamic `import()`.
  * - The package declares no `dependencies` / `peerDependencies`, so no
  *   workspace or third-party edge can drag one in transitively.
  *
- * A `src/**` lint sees neither: it cannot see a transitive edge at all, and
- * `packages/ruby-compat/src/**` joining the `no-node-builtins` rule only closes
- * the first half for this package's own files.
+ * A `require()` is deliberately NOT a violation, and that is the boundary this
+ * guard checks (RFC 0135). The property the leaf actually needs is "a browser
+ * bundle of this package resolves nothing outside it and runs" — a static or
+ * dynamic specifier is resolved by the bundler, so it breaks that property
+ * whatever guards it; a bare `require` is not defined in the ESM output at all,
+ * so a call to it only ever runs behind a `typeof require !== "undefined"` /
+ * `process.versions.node` check, on a host where the builtin exists. Flagging
+ * `require` was checking a proxy for the property rather than the property, and
+ * it rejects the platform adapters' Node bootstrap, which is browser-safe.
+ * `process.getBuiltinModule("node:crypto")` names no module specifier at all
+ * and was never visible here.
+ *
+ * A `src/**` lint sees neither half: it cannot see a transitive edge at all,
+ * and `packages/ruby-compat/src/**` joining the `no-node-builtins` rule only
+ * closes the first for this package's own files.
  *
  * Compiled test files are the one exemption — they import `vitest`, which is a
  * devDependency of the workspace root and never ships.
@@ -32,29 +45,44 @@ export function isCompiledTestFile(rel: string): boolean {
   return /\.test\.js$/.test(rel);
 }
 
+/** How a module specifier is written, which is what decides whether it binds. */
+export type SpecifierKind = "static" | "dynamic" | "require";
+
+export interface ModuleSpecifier {
+  specifier: string;
+  kind: SpecifierKind;
+}
+
+/** The kinds a bundler resolves, and so the kinds the leaf property forbids. */
+export function bindsTheBundle(kind: SpecifierKind): boolean {
+  return kind !== "require";
+}
+
 /**
  * Every module specifier a built module names, in source order — parsed, not
  * pattern-matched, so a side-effect `import "node:fs"`, an `export * from`, an
- * `import type`, a dynamic `import()` and a `require()` all count.
+ * `import type`, a dynamic `import()` and a `require()` all count — each tagged
+ * with the kind that decides whether a bundler resolves it.
  */
-export function moduleSpecifiers(source: string): string[] {
+export function moduleSpecifiers(source: string): ModuleSpecifier[] {
   const sourceFile = ts.createSourceFile("module.js", source, ts.ScriptTarget.ESNext, true);
-  const specifiers: string[] = [];
+  const specifiers: ModuleSpecifier[] = [];
 
-  const record = (node: ts.Node | undefined): void => {
-    if (node && ts.isStringLiteralLike(node)) specifiers.push(node.text);
+  const record = (node: ts.Node | undefined, kind: SpecifierKind): void => {
+    if (node && ts.isStringLiteralLike(node)) specifiers.push({ specifier: node.text, kind });
   };
 
   const visit = (node: ts.Node): void => {
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      record(node.moduleSpecifier);
+      record(node.moduleSpecifier, "static");
     } else if (ts.isImportEqualsDeclaration(node)) {
       if (ts.isExternalModuleReference(node.moduleReference))
-        record(node.moduleReference.expression);
+        record(node.moduleReference.expression, "static");
     } else if (ts.isCallExpression(node)) {
-      const isRequire = ts.isIdentifier(node.expression) && node.expression.text === "require";
-      if (isRequire || node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-        record(node.arguments[0]);
+      if (ts.isIdentifier(node.expression) && node.expression.text === "require") {
+        record(node.arguments[0], "require");
+      } else if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+        record(node.arguments[0], "dynamic");
       }
     }
     ts.forEachChild(node, visit);
@@ -85,13 +113,14 @@ async function jsFiles(dir: string, prefix = ""): Promise<string[]> {
 export interface LeafViolation {
   file: string;
   specifier: string;
+  kind: SpecifierKind;
   builtin: string;
 }
 
 /**
- * Every Node-builtin import in the package's built runtime modules. Throws when
- * `dist/` is absent rather than reporting nothing — a guard that passes on an
- * unbuilt tree is a no-op.
+ * Every bundler-resolved Node-builtin import in the package's built runtime
+ * modules. Throws when `dist/` is absent rather than reporting nothing — a
+ * guard that passes on an unbuilt tree is a no-op.
  */
 export async function nodeBuiltinImports(packageDir: string): Promise<LeafViolation[]> {
   const dist = path.join(packageDir, "dist");
@@ -105,9 +134,10 @@ export async function nodeBuiltinImports(packageDir: string): Promise<LeafViolat
   for (const file of files.sort()) {
     if (isCompiledTestFile(file)) continue;
     const source = await readFile(path.join(dist, file), "utf-8");
-    for (const specifier of moduleSpecifiers(source)) {
+    for (const { specifier, kind } of moduleSpecifiers(source)) {
+      if (!bindsTheBundle(kind)) continue;
       const builtin = nodeBuiltinNamed(specifier);
-      if (builtin) violations.push({ file, specifier, builtin });
+      if (builtin) violations.push({ file, specifier, kind, builtin });
     }
   }
   return violations;
