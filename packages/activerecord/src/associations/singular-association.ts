@@ -13,7 +13,6 @@ import {
 } from "../associations.js";
 import { Association } from "./association.js";
 import { AssociationNotFoundError } from "./errors.js";
-import { validateThroughReflection } from "./validate-through-reflection.js";
 import { camelize, underscore } from "@blazetrails/activesupport";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
@@ -127,10 +126,6 @@ export class SingularAssociation extends Association {
       const reflection = ctor._reflectOnAssociation?.(assocName);
       if (!reflection) throw new AssociationNotFoundError(owner, assocName);
       const isBelongsTo = reflection.macro === "belongsTo";
-
-      if (options.through) {
-        validateThroughReflection(ctor, assocName);
-      }
 
       if (this.disableJoins) return this.scope().first();
 

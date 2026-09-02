@@ -7,8 +7,10 @@ import {
   resolveAssocClass,
   association as collectionProxyFor,
   applyAssociationScope,
+  _builtAssociationScope,
   _hmtNotFound,
 } from "../associations.js";
+import { PolymorphicReflection, type AbstractReflection } from "../reflection.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { isThenable } from "./collection-association.js";
@@ -600,19 +602,13 @@ async function loadHasManyThrough(
       sourceAssoc?.options?.polymorphic &&
       sourceAssocKind === "belongsTo"
     ) {
-      const resolvedSourceName = sourceAssoc?.name ?? sourceName;
-      const sourceTypeCol = `${underscore(resolvedSourceName)}_type`;
-      const originalScope = throughAssoc.scope;
-      const sourceTypeScope = (rel: any) => rel.where({ [sourceTypeCol]: options.sourceType });
-      const sourceTypeReflection = Object.create(throughAssoc, {
-        scope: {
-          value: (rel: any) => {
-            const r = sourceTypeScope(rel);
-            return originalScope ? originalScope(r) : r;
-          },
-        },
-      }) as AssociationDefinition;
-      throughRecords = await findHasManyTarget(record, sourceTypeReflection);
+      const polymorphicReflection = new PolymorphicReflection(
+        throughAssoc as unknown as AbstractReflection,
+        assocDef as unknown as AbstractReflection,
+      );
+      let rel = _builtAssociationScope(record, throughAssoc.name, throughAssoc, throughModel);
+      for (const constraint of polymorphicReflection.constraints()) rel = constraint(rel);
+      throughRecords = await rel;
     } else {
       throughRecords = await findHasManyTarget(record, throughAssoc);
     }

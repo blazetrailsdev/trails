@@ -4,7 +4,6 @@ import { associationInstanceGet, _associateRecordsToOwner } from "../association
 import { AssociationScope, type AssociationScopeable } from "./association-scope.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
-import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { ThroughAssociation } from "./through-association.js";
 import { camelize, safeConstantize, singularize } from "@blazetrails/activesupport";
 import { except, hasKey } from "@blazetrails/ruby-compat";
@@ -64,11 +63,11 @@ export class Association {
   private _cachedScope: unknown = undefined;
 
   constructor(owner: Base, reflection: AssociationDefinition) {
+    reflection.checkValidityBang();
+
     this.owner = owner;
     this.reflection = reflection;
     this.disableJoins = this.reflection.options.disableJoins || false;
-
-    validateReflectionValidity(owner.constructor as typeof Base, reflection.name);
   }
 
   get name(): string {

@@ -5,7 +5,6 @@ import type { AssociationReflection, AbstractReflection } from "../reflection.js
 import { RuntimeReflection } from "../reflection.js";
 import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
-import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import { WhereClause } from "../relation/where-clause.js";
 import { constructJoinDependency } from "../relation/query-methods.js";
 import { drop } from "../ruby-drop.js";
@@ -240,7 +239,7 @@ export class AssociationScope {
     if (joinPks.length !== joinFks.length) {
       const name = (reflection as { name?: string }).name ?? "<unknown>";
       const ownerName = (owner.constructor as typeof Base).name;
-      routeThroughCheckValidity(owner.constructor as typeof Base, name);
+      (owner.constructor as typeof Base)._reflectOnAssociation?.(name)?.checkValidityBang?.();
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
@@ -315,7 +314,7 @@ export class AssociationScope {
       const name = base.name ?? "<unknown>";
       const ownerName = base.activeRecord?.name ?? "<unknown>";
       const ownerClass = base.activeRecord as unknown as typeof Base | undefined;
-      if (ownerClass) routeThroughCheckValidity(ownerClass, name);
+      ownerClass?._reflectOnAssociation?.(name)?.checkValidityBang?.();
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
