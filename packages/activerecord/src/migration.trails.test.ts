@@ -3,7 +3,7 @@ import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
-import { Migration, IllegalMigrationNameError } from "./migration.js";
+import { Current, Migration, IllegalMigrationNameError } from "./migration.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
@@ -412,5 +412,33 @@ describe("Migration#removeColumns forwards to the connection", () => {
     order.length = 0;
     await host.revert(RunOrderA, RunOrderB);
     expect(order).toEqual(["B:down", "A:down"]);
+  });
+
+  it("Current passes each yielded table definition through compatibleTableDefinition", async () => {
+    const seen: unknown[] = [];
+    const wrapped = { wrapped: true };
+    class Compat extends Current {
+      override write(): void {}
+      override compatibleTableDefinition<T>(t: T): T {
+        seen.push(t);
+        return wrapped as T;
+      }
+    }
+    const connection = Base.connection;
+    const migration = new Compat();
+    migration.connection = connection;
+    try {
+      const yielded: unknown[] = [];
+      await migration.createTable("compat_tables", (t) => {
+        yielded.push(t);
+      });
+      await migration.changeTable("compat_tables", (t) => {
+        yielded.push(t);
+      });
+      expect(seen).toHaveLength(2);
+      expect(yielded).toEqual([wrapped, wrapped]);
+    } finally {
+      await connection.dropTable("compat_tables", { ifExists: true });
+    }
   });
 });

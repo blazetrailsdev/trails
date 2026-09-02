@@ -36,7 +36,11 @@
  * can't be matched statically and is skipped — neither flagged as a create nor
  * counted as cleanup for a literal-named create. `dropTable` accepts several
  * names at once (`dropTable("a", "b")`); every static name it lists counts as
- * dropped. The call is matched by name whether it's bare (`createTable(...)`,
+ * dropped. A drop's name variable is resolved in exactly one case: a `for…of`
+ * binding over an array literal of string literals
+ * (`for (const t of ["a", "b"]) dropTable(t)`) drops every name that literal
+ * lists — see `loopLiteralNames`.
+ * The call is matched by name whether it's bare (`createTable(...)`,
  * e.g. an imported test helper) or invoked on a receiver (`ctx.createTable(...)`,
  * `adapter.`, `this.`, `conn.`, a SchemaMigration, …) — only a dynamic/computed
  * callee (`recv[fn](...)`) is invisible.
@@ -278,6 +282,37 @@ function createdTableName(call) {
  */
 function droppedTableNames(call) {
   return call.arguments.map(staticString).filter((n) => n !== null);
+}
+
+/**
+ * The statically-known table names a `for…of` loop binding iterates, when its
+ * iterable is an array literal of static strings:
+ *
+ *   for (const table of ["wagons", "trains"]) await conn.dropTable(table);
+ *
+ * `dropTable(table)` names no table on its own, but the binding's every value
+ * IS statically known, so each one is a real drop. Resolution goes exactly one
+ * level — through the loop binding to its literal iterable — and nothing
+ * further: a computed array, a `.map(…)`, a spread, a function parameter, or
+ * any element that is not a static string yields nothing, and the create such a
+ * teardown would have balanced stays reported.
+ */
+function loopLiteralNames(variable) {
+  if (variable === null) return [];
+  const names = [];
+  for (const def of variable.defs) {
+    const declarator = def.node;
+    if (declarator?.type !== "VariableDeclarator") continue;
+    const declaration = declarator.parent;
+    const loop = declaration?.parent;
+    if (loop?.type !== "ForOfStatement" || loop.left !== declaration) continue;
+    if (declarator.id.type !== "Identifier") continue;
+    if (loop.right?.type !== "ArrayExpression") continue;
+    const elements = loop.right.elements.map((el) => (el === null ? null : staticString(el)));
+    if (elements.some((name) => name === null)) continue;
+    names.push(...elements);
+  }
+  return names;
 }
 
 /**
@@ -1158,11 +1193,14 @@ const rule = {
           if (table !== null) recordCreate(table, node);
         } else if (name === "dropTable") {
           for (const table of droppedTableNames(node)) recordDrop(table, node);
-          // The helper spelling of a sweep's drop half: `dropTable(row.name)`
-          // names no table itself, so it arms only when its argument traces
-          // back to a sink-derived row binding. A fixed name arms nothing.
           for (const arg of node.arguments) {
-            if (staticString(arg) === null && isSweepBound(arg)) sawSweepDrop = true;
+            if (staticString(arg) !== null) continue;
+            // A loop over a literal name list drops every name in it.
+            for (const table of loopLiteralNames(resolve(arg))) recordDrop(table, node);
+            // The helper spelling of a sweep's drop half: `dropTable(row.name)`
+            // names no table itself, so it arms only when its argument traces
+            // back to a sink-derived row binding. A fixed name arms nothing.
+            if (isSweepBound(arg)) sawSweepDrop = true;
           }
         } else if (checkRawSql && name !== null && SQL_SINKS.has(name)) {
           recordSinkSql(node);

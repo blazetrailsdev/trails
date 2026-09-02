@@ -34,21 +34,10 @@ import {
 import { resolveMixinParent } from "./rails-file-structure-mixins.js";
 import { lastSegment, resolveLastSegmentCollision } from "./rails-file-structure-collisions.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
+import { PACKAGE_DIRS } from "./api-compare/config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-
-// Mirrors scripts/build-rails-privates-manifest.ts.
-const PACKAGE_DIRS: Record<string, string> = {
-  arel: "packages/arel/src",
-  activemodel: "packages/activemodel/src",
-  activerecord: "packages/activerecord/src",
-  activesupport: "packages/activesupport/src",
-  actiondispatch: "packages/actionpack/src/actiondispatch",
-  actioncontroller: "packages/actionpack/src/actioncontroller",
-  actionview: "packages/actionview/src",
-  trailties: "packages/trailties/src",
-};
 
 const RAILS_API_PATH = path.join(ROOT, "scripts/api-compare/output/rails-api.json");
 const OUT = path.join(ROOT, "eslint/rails-file-structure-method-order.json");

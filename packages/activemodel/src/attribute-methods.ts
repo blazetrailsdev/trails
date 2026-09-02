@@ -101,7 +101,7 @@ export class AttributeMethodPattern {
   }
 }
 
-interface ReadWriteHost {
+export interface ReadWriteHost {
   /** @internal */
   _readAttribute(attr: string): unknown;
   /** @internal */

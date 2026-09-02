@@ -51,6 +51,8 @@ export function validateAdapterName(adapterName: string): void {
     resolveErrors.set(adapterName, err);
     throw err;
   }
+  const loadError = resolveErrors.get(adapterName);
+  if (loadError !== undefined) throw loadError;
 }
 
 export async function resolve(adapterName: string): Promise<AdapterClass> {
@@ -67,8 +69,13 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
     })
     .catch((err) => {
       resolved.delete(adapterName);
-      resolveErrors.set(adapterName, err);
-      throw err;
+      const message = err instanceof Error ? err.message : String(err);
+      const loadError = new Error(
+        `Error loading the '${adapterName}' Active Record adapter. Missing a package it depends on? ${message}`,
+        { cause: err },
+      );
+      resolveErrors.set(adapterName, loadError);
+      throw loadError;
     });
   resolved.set(adapterName, promise);
   return promise;

@@ -585,9 +585,7 @@ describe("Migration", () => {
   describeIfSupports("foreign_keys", "ChangeSchemaWithDependentObjectsTest", () => {
     beforeEach(async () => {
       const connection = await ambientConnection();
-      // eslint-disable-next-line blazetrails/require-table-teardown
       await connection.createTable("trains");
-      // eslint-disable-next-line blazetrails/require-table-teardown
       await connection.createTable("wagons", (t) => {
         t.references("train");
       });
@@ -605,12 +603,10 @@ describe("Migration", () => {
       "create table with force cascade drops dependent objects",
       async () => {
         const connection = await ambientConnection();
-        // eslint-disable-next-line blazetrails/require-table-teardown -- dropped by the afterEach loop, whose dropTable(table) name the rule cannot read
         await expect(connection.createTable("trains", { force: true })).rejects.toThrow(
           StatementInvalid,
         );
 
-        // eslint-disable-next-line blazetrails/require-table-teardown -- dropped by the afterEach loop, whose dropTable(table) name the rule cannot read
         await connection.createTable("trains", { force: "cascade" });
         expect(await connection.foreignKeys("wagons")).toEqual([]);
       },
