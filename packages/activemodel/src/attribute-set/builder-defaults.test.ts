@@ -75,7 +75,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
     original.getAttribute("score");
 
     const restored = LazyAttributeHash.marshalLoad(original.marshalDump());
-    expect(restored.delegateHash().get("score")!.value).toBe(42);
+    expect(restored.delegateHash()["score"].value).toBe(42);
     const fresh = LazyAttributeHash.marshalLoad([types, {}, additional, defaults]);
     expect(fresh.getAttribute("status").value).toBe("active");
   });

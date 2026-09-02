@@ -2429,7 +2429,7 @@ class ApiExtractor
   # else is recorded by shape (`local`, `ivar`, `const`, `expr`), never guessed
   # at, so a row keyed `hash` can only ever match a Hash.
   def receiver_kind(recv)
-    return "self" if recv.nil?
+    return self_receiver_kind if recv.nil?
     return "expr" unless recv.is_a?(Array)
 
     case recv[0]
@@ -2456,9 +2456,18 @@ class ApiExtractor
     when :@ident then @hash_locals.include?(inner[1]) ? "hash" : "local"
     when :@ivar then "ivar"
     when :@const then hash_constant?(inner[1]) ? "hash" : "const"
-    when :@kw then inner[1] == "self" ? "self" : "expr"
+    when :@kw then inner[1] == "self" ? self_receiver_kind : "expr"
     else "expr"
     end
+  end
+
+  # An implicit (or explicit `self`) receiver inside a `core_ext` file that
+  # reopens `Hash` IS a Hash — `core_ext_file?` is the same fact the weak-call
+  # verdict reads (core_receiver_call?), and the namespace stack proves WHICH
+  # class the file reopens, so a `core_ext` file for another class is
+  # unaffected and keeps `self`.
+  def self_receiver_kind
+    core_ext_file? && @namespace_stack.last == "Hash" ? "hash" : "self"
   end
 
   # A constant THIS FILE assigns a hash literal — `MIME_TYPES` (rack/mime.rb:8),
@@ -2481,15 +2490,19 @@ class ApiExtractor
     assigned.select { |_name, hashy| hashy }.keys.to_set
   end
 
-  # `**opts` and `options = {}` — the parameter shapes whose value IS a Hash on
-  # entry. A `*args` rest is an Array and a required parameter is anything.
+  # `**opts`, `options = {}` and `b: {}` — the parameter shapes whose value IS a
+  # Hash on entry. A `*args` rest is an Array and a required parameter is
+  # anything.
   def hash_param_names(params_node)
     return [] unless params_node.is_a?(Array) && params_node[0] == :params
 
-    _, _required, optional, _rest, _post, _keywords, keyword_rest, _block = params_node
+    _, _required, optional, _rest, _post, keywords, keyword_rest, _block = params_node
     names = (optional || []).filter_map do |p|
       ident_name(p[0]) if p.is_a?(Array) && p[1].is_a?(Array) && p[1][0] == :hash
     end
+    names.concat((keywords || []).filter_map { |kw|
+      ident_name(kw[0])&.chomp(":") if kw.is_a?(Array) && kw[1].is_a?(Array) && kw[1][0] == :hash
+    })
     names << ident_name(keyword_rest) if keyword_rest && keyword_rest != 0
     names.compact
   end

@@ -220,6 +220,7 @@ export default defineConfig(
       "packages/rack/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
+      "packages/ruby-compat/src/**/*.ts",
     ],
     ignores: [
       "**/*.test.ts",
@@ -246,6 +247,28 @@ export default defineConfig(
     ],
     rules: {
       "blazetrails/no-node-builtins": "error",
+    },
+  },
+
+  // ── ruby-compat leaf: no Node AMBIENT globals ──
+  // An import guard sees `import … from "node:fs"`; it cannot see `Buffer`,
+  // `process`, `__dirname` or `__filename`, which are globals rather than
+  // imports and break a browser bundle just as thoroughly. `types: []` in
+  // packages/ruby-compat/tsconfig.json removes the automatic @types/node
+  // inclusion, but vitest's own types re-reference it transitively for the
+  // whole program, so the compiler alone does not close this. Enforced over
+  // the built output by scripts/ruby-compat-leaf.test.ts's sibling halves.
+  {
+    files: ["packages/ruby-compat/src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        { name: "Buffer", message: "ruby-compat is a browser-safe leaf (RFC 0129)." },
+        { name: "process", message: "ruby-compat is a browser-safe leaf (RFC 0129)." },
+        { name: "__dirname", message: "ruby-compat is a browser-safe leaf (RFC 0129)." },
+        { name: "__filename", message: "ruby-compat is a browser-safe leaf (RFC 0129)." },
+      ],
     },
   },
 

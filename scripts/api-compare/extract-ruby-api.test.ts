@@ -2800,6 +2800,43 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
     expect(c["Plain#call"]).toBeNull();
   });
+
+  it("proves the implicit self of a core_ext file that reopens Hash", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/core_ext/hash/keys.rb": `
+        class Hash
+          def call(options = {})
+            options.fetch(:x)
+            fetch(:y)
+            self.fetch(:z)
+          end
+        end
+      `,
+      "lib/active_support/core_ext/string/access.rb": `
+        class String
+          def call(options = {})
+            options.fetch(:x)
+            fetch(:y)
+          end
+        end
+      `,
+    });
+    expect(c["Hash#call"]).toEqual({ fetch: ["hash"] });
+    expect(c["String#call"]).toEqual({ fetch: ["hash", "self"] });
+  });
+
+  it("proves a Hash local from a keyword parameter defaulting to a hash literal", () => {
+    const c = rubyCallReceivers({
+      "lib/active_support/kwargs.rb": `
+        class Kwargs
+          def call(b: {})
+            b.fetch(:x)
+          end
+        end
+      `,
+    });
+    expect(c["Kwargs#call"]).toEqual({ fetch: ["hash"] });
+  });
 });
 
 describe("Ruby extractor Struct.new members", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS }, () => {

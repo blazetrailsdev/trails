@@ -75,13 +75,13 @@ describe("LazyAttributeHash", () => {
 
   it("delegateHash returns an empty map before any access", () => {
     const hash = new LazyAttributeHash(new Map([["name", strType]]), {});
-    expect(hash.delegateHash().size).toBe(0);
+    expect(Object.keys(hash.delegateHash()).length).toBe(0);
   });
 
   it("delegateHash reflects materialized entries after []", () => {
     const hash = new LazyAttributeHash(new Map([["name", strType]]), { name: "Bob" });
     hash.getAttribute("name");
-    expect(hash.delegateHash().has("name")).toBe(true);
+    expect(Object.hasOwn(hash.delegateHash(), "name")).toBe(true);
   });
 
   it("assignDefaultValue materializes from the value/type tables", () => {
@@ -99,13 +99,13 @@ describe("LazyAttributeHash", () => {
   it("transform_values materializes and maps every attribute", () => {
     const hash = new LazyAttributeHash(new Map([["age", intType]]), { age: "42" });
     const result = hash.transformValues((attr) => attr);
-    expect(result.get("age")!.value).toBe(42);
+    expect(result["age"].value).toBe(42);
   });
 
   it("transform_values is generic over the block result", () => {
     const hash = new LazyAttributeHash(new Map([["age", intType]]), { age: "42" });
-    const result: Map<string, unknown> = hash.transformValues((attr) => attr.type);
-    expect(result.get("age")).toBe(intType);
+    const result: Record<string, unknown> = hash.transformValues((attr) => attr.type);
+    expect(result["age"]).toBe(intType);
   });
 
   it("each_value yields every materialized attribute", () => {
@@ -160,7 +160,7 @@ describe("LazyAttributeHash", () => {
       { age: "42", name: "Alice" },
     );
     const rest = hash.except("age");
-    expect(rest.has("age")).toBe(false);
-    expect(rest.has("name")).toBe(true);
+    expect(Object.hasOwn(rest, "age")).toBe(false);
+    expect(Object.hasOwn(rest, "name")).toBe(true);
   });
 });
