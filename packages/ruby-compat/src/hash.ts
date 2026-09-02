@@ -1,4 +1,5 @@
 import { KeyError } from "./key-error.js";
+import { stringInspect } from "./string/inspect.js";
 import { isSymbol } from "./symbol.js";
 
 /**
@@ -154,41 +155,58 @@ export function eachPair<T>(hash: Record<string, T>, block: PairBlock<T>): Recor
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#inspect` (`vendor/ruby/hash.c:3483`).
  */
 export function inspect(hash: Record<string, unknown>): string {
-  const keys = Object.keys(hash);
-  if (keys.length === 0) return "{}";
-  return `{${keys.map((key) => `${rbInspect(key)}=>${rbInspect(hash[key])}`).join(", ")}}`;
+  return inspectHash(hash, new Set());
 }
 
 /**
- * The `rb_inspect` (`vendor/ruby/object.c:697`) dispatch `inspect_i` calls on
- * each key and value, over the core classes a JS value can be: `nil`, `true` /
- * `false`, Integer and Float, String (`vendor/ruby/string.c:7269`
- * `rb_str_inspect`), Array and Hash. Anything else falls through to the
- * receiver's own `inspect`, as `rb_inspect` does.
+ * `inspect_hash` (`vendor/ruby/hash.c:3459`) under the `rb_exec_recursive`
+ * (`hash.c:3487`) its caller wraps it in: a hash already on the recursion
+ * stack renders as `"{...}"` rather than recursing forever. `recursing` is that
+ * stack, which `rb_exec_recursive` keeps per-thread.
  */
-function rbInspect(value: unknown): string {
+function inspectHash(hash: Record<string, unknown>, recursing: Set<object>): string {
+  if (recursing.has(hash)) return "{...}";
+  const keys = Object.keys(hash);
+  if (keys.length === 0) return "{}";
+  recursing.add(hash);
+  try {
+    return `{${keys
+      .map((key) => `${rbInspect(key, recursing)}=>${rbInspect(hash[key], recursing)}`)
+      .join(", ")}}`;
+  } finally {
+    recursing.delete(hash);
+  }
+}
+
+/**
+ * `inspect_ary` (`vendor/ruby/array.c:2888`) under the `rb_exec_recursive`
+ * `rb_ary_inspect` (`array.c:2918`) wraps it in — the Array twin of
+ * {@link inspectHash}, down to the `"[...]"` recursive slot.
+ */
+function inspectAry(ary: unknown[], recursing: Set<object>): string {
+  if (recursing.has(ary)) return "[...]";
+  recursing.add(ary);
+  try {
+    return `[${ary.map((element) => rbInspect(element, recursing)).join(", ")}]`;
+  } finally {
+    recursing.delete(ary);
+  }
+}
+
+/**
+ * The `rb_inspect` (`vendor/ruby/object.c:704`) dispatch `inspect_i` calls on
+ * each key and value, over the core classes a JS value can be: `nil`, `true` /
+ * `false`, Integer and Float, Symbol, String, Array and Hash. Anything else
+ * falls through to the receiver's own `inspect`, as `rb_inspect` does.
+ */
+function rbInspect(value: unknown, recursing: Set<object>): string {
   if (value == null) return "nil";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   if (isSymbol(value)) return value;
-  if (typeof value === "string") {
-    /* eslint-disable no-control-regex */
-    return `"${value
-      .replace(/\\/g, "\\\\")
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, "\\n")
-      .replace(/\r/g, "\\r")
-      .replace(/\t/g, "\\t")
-      .replace(/\f/g, "\\f")
-      .replace(/\x08/g, "\\b")
-      .replace(/\v/g, "\\v")
-      .replace(/\0/g, "\\0")
-      .replace(/\x07/g, "\\a")
-      .replace(/\x1b/g, "\\e")}"`;
-    /* eslint-enable no-control-regex */
-  }
-  if (Array.isArray(value)) return `[${value.map(rbInspect).join(", ")}]`;
-  if (isPlainHash(value)) return inspect(value);
+  if (typeof value === "string") return stringInspect(value);
+  if (Array.isArray(value)) return inspectAry(value, recursing);
+  if (isPlainHash(value)) return inspectHash(value, recursing);
   return String(value);
 }
 
