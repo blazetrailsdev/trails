@@ -1,7 +1,3 @@
-import {
-  findCollectionTarget as findHasManyTarget,
-  findCollectionTarget as findHasManyThroughTarget,
-} from "../test-helpers/find-collection-target.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Notifications, throwAbort } from "@blazetrails/activesupport";
@@ -880,7 +876,7 @@ describe("HasManyAssociationsTest", () => {
     await DestroyAllPost.create({ author_id: author.id, title: "A", body: "body" });
     await DestroyAllPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "destroy_all_posts");
+    const remaining = await author.destroy_all_posts;
     expect(remaining.length).toBe(0);
   });
 
@@ -914,7 +910,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DeleteAllUnloadedAuthor.create({ name: "Alice" });
     await DeleteAllUnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "delete_all_unloaded_posts");
+    const remaining = await author.delete_all_unloaded_posts;
     expect(remaining.length).toBe(0);
   });
 
@@ -1030,7 +1026,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
@@ -1039,7 +1035,7 @@ describe("HasManyAssociationsTest", () => {
   it("get ids for loaded associations", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
   });
@@ -1053,7 +1049,7 @@ describe("HasManyAssociationsTest", () => {
   it("included in collection", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "Included", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.some((p: any) => p.id === post.id)).toBe(true);
   });
 
@@ -1061,7 +1057,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const newPost = HmPost.new({ author_id: author.id, title: "New" });
     expect(newPost.isNewRecord()).toBe(true);
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.some((p: any) => p.id === newPost.id)).toBe(false);
   });
 
@@ -1096,7 +1092,7 @@ describe("HasManyAssociationsTest", () => {
     await ClearPost.create({ author_id: author.id, title: "A", body: "body" });
     await ClearPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const posts = await findHasManyTarget(author, "clear_posts");
+    const posts = await author.clear_posts;
     expect(posts.length).toBe(0);
   });
 
@@ -1130,7 +1126,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ClearDepAuthor.create({ name: "Alice" });
     await ClearDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "clear_dep_posts");
+    const remaining = await author.clear_dep_posts;
     expect(remaining.length).toBe(0);
   });
 
@@ -1348,8 +1344,8 @@ describe("HasManyAssociationsTest", () => {
   it("no sql should be fired if association already loaded", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await findHasManyTarget(author, "posts");
-    const posts2 = await findHasManyTarget(author, "posts");
+    const posts1 = await author.posts;
+    const posts2 = await author.posts;
     expect(posts1.length).toBe(posts2.length);
   });
 
@@ -1387,8 +1383,8 @@ describe("HasManyAssociationsTest", () => {
   it("does not duplicate associations when used with natural primary keys", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await findHasManyTarget(author, "posts");
-    const posts2 = await findHasManyTarget(author, "posts");
+    const posts1 = await author.posts;
+    const posts2 = await author.posts;
     expect(posts1.length).toBe(posts2.length);
   });
 
@@ -1401,7 +1397,7 @@ describe("HasManyAssociationsTest", () => {
   it("prevent double insertion of new object when the parent association loaded in the after save callback", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     const unique = new Set(posts.map((p: any) => p.id));
     expect(unique.size).toBe(posts.length);
   });
@@ -1410,7 +1406,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(2);
   });
 
@@ -1442,7 +1438,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(AnonPost);
     const author = await AnonAuthor.create({ name: "Alice" });
     await AnonPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "anon_posts");
+    const posts = await author.anon_posts;
     expect(posts.length).toBe(1);
   });
   it("default scope on relations is not cached", async () => {
@@ -1670,7 +1666,7 @@ describe("HasManyAssociationsTest", () => {
     await DelAllPost.create({ author_id: author.id, title: "A", body: "body" });
     await DelAllPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "del_all_posts");
+    const remaining = await author.del_all_posts;
     expect(remaining.length).toBe(0);
   });
 
@@ -2032,6 +2028,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("finder method with dirty target", async () => {
     class FinderDirtyAuthor extends Base {
+      declare finder_dirty_posts: AssociationProxy<FinderDirtyPost>;
       declare name: string | null;
 
       static {
@@ -2057,7 +2054,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FinderDirtyPost);
     const author = await FinderDirtyAuthor.create({ name: "Alice" });
     const post = await FinderDirtyPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "finder_dirty_posts");
+    const posts = await author.finder_dirty_posts;
     const found = posts.find((p: any) => p.id === post.id);
     expect(found).toBeDefined();
   });
@@ -2066,7 +2063,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(Array.isArray(posts)).toBe(true);
     expect(posts.length).toBe(2);
     const found = await HmAuthor.order("id").detect((a: any) => a.id > 0);
@@ -2074,6 +2071,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("find many with merged options", async () => {
     class MergedAuthor extends Base {
+      declare merged_posts: AssociationProxy<MergedPost>;
       declare name: string | null;
 
       static {
@@ -2100,7 +2098,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await MergedAuthor.create({ name: "Alice" });
     const p1 = await MergedPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await MergedPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "merged_posts");
+    const posts = await author.merged_posts;
     expect(posts.length).toBe(2);
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
@@ -2108,6 +2106,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("find should append to association order", async () => {
     class AppOrdAuthor extends Base {
+      declare app_ord_posts: AssociationProxy<AppOrdPost>;
       declare name: string | null;
 
       static {
@@ -2134,11 +2133,12 @@ describe("HasManyAssociationsTest", () => {
     const author = await AppOrdAuthor.create({ name: "Alice" });
     await AppOrdPost.create({ author_id: author.id, title: "B", body: "body" });
     await AppOrdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "app_ord_posts");
+    const posts = await author.app_ord_posts;
     expect(posts.length).toBe(2);
   });
   it("dynamic find should respect association order", async () => {
     class DynOrdAuthor extends Base {
+      declare dyn_ord_posts: AssociationProxy<DynOrdPost>;
       declare name: string | null;
 
       static {
@@ -2165,7 +2165,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DynOrdAuthor.create({ name: "Alice" });
     await DynOrdPost.create({ author_id: author.id, title: "Z", body: "body" });
     await DynOrdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "dyn_ord_posts");
+    const posts = await author.dyn_ord_posts;
     expect(posts.length).toBe(2);
   });
   it("taking", async () => {
@@ -2203,7 +2203,7 @@ describe("HasManyAssociationsTest", () => {
   it("taking with inverse of", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBeGreaterThan(0);
     expect(posts[0]).toBeDefined();
   });
@@ -2244,7 +2244,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: 9999, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("A");
   });
@@ -2306,6 +2306,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("update all on association accessed before save with explicit foreign key", async () => {
     class UpdAllFkAuthor extends Base {
+      declare upd_all_fk_posts: AssociationProxy<UpdAllFkPost>;
       declare name: string | null;
 
       static {
@@ -2333,7 +2334,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await UpdAllFkPost.create({ author_id: author.id, title: "Old", body: "body" });
     post.title = "Updated";
     await post.save();
-    const posts = await findHasManyTarget(author, "upd_all_fk_posts");
+    const posts = await author.upd_all_fk_posts;
     expect((posts[0] as any).title).toBe("Updated");
   });
   it("belongs to with new object", async () => {
@@ -2353,7 +2354,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const p1 = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
@@ -2362,7 +2363,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "match", body: "body" });
     await HmPost.create({ author_id: author.id, title: "other", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     const matched: any[] = [];
     for (const p of posts) {
       if ((p as any).title === "match") matched.push(p);
@@ -2401,17 +2402,18 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(2);
   });
   it("find first sanitized", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts[0]).toBeDefined();
   });
   it("find first after reset scope", async () => {
     class ResetAuthor extends Base {
+      declare reset_posts: AssociationProxy<ResetPost>;
       declare name: string | null;
 
       static {
@@ -2437,12 +2439,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ResetPost);
     const author = await ResetAuthor.create({ name: "Alice" });
     await ResetPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts = await findHasManyTarget(author, "reset_posts");
+    const posts = await author.reset_posts;
     expect(posts[0]).toBeDefined();
     expect((posts[0] as any).title).toBe("First");
   });
   it("find first after reload", async () => {
     class ReloadAuthor extends Base {
+      declare reload_posts: AssociationProxy<ReloadPost>;
       declare name: string | null;
 
       static {
@@ -2468,9 +2471,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ReloadPost);
     const author = await ReloadAuthor.create({ name: "Alice" });
     await ReloadPost.create({ author_id: author.id, title: "First", body: "body" });
-    const posts1 = await findHasManyTarget(author, "reload_posts");
+    const posts1 = await author.reload_posts;
     expect(posts1[0]).toBeDefined();
-    const posts2 = await findHasManyTarget(author, "reload_posts");
+    const posts2 = await author.reload_posts;
     expect(posts2[0]).toBeDefined();
     expect((posts2[0] as any).title).toBe("First");
   });
@@ -2562,7 +2565,7 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     const groups: Record<string, any[]> = {};
     for (const p of posts) {
       const title = (p as any).title;
@@ -2578,28 +2581,28 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "X", body: "body" });
     await HmPost.create({ author_id: author.id, title: "X", body: "body" });
     await HmPost.create({ author_id: author.id, title: "Y", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     const xPosts = posts.filter((p: any) => p.title === "X");
     expect(xPosts.length).toBe(2);
   });
   it("default select", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect((posts[0] as any).title).toBe("A");
   });
   it("select with block and dirty target", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     const selected = posts.filter((p: any) => p.title === "A");
     expect(selected.length).toBe(1);
   });
   it("select without foreign key", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("A");
   });
@@ -2674,6 +2677,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("collection size with dirty target", async () => {
     class SizeDirtyAuthor extends Base {
+      declare size_dirty_posts: AssociationProxy<SizeDirtyPost>;
       declare name: string | null;
 
       static {
@@ -2699,12 +2703,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(SizeDirtyPost);
     const author = await SizeDirtyAuthor.create({ name: "Alice" });
     await SizeDirtyPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "size_dirty_posts");
+    const posts = await author.size_dirty_posts;
     expect(posts.length).toBe(1);
   });
 
   it("collection empty with dirty target", async () => {
     class EmptyDirtyAuthor extends Base {
+      declare empty_dirty_posts: AssociationProxy<EmptyDirtyPost>;
       declare name: string | null;
 
       static {
@@ -2729,12 +2734,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(EmptyDirtyAuthor);
     registerModel(EmptyDirtyPost);
     const author = await EmptyDirtyAuthor.create({ name: "Alice" });
-    const posts = await findHasManyTarget(author, "empty_dirty_posts");
+    const posts = await author.empty_dirty_posts;
     expect(posts.length === 0).toBe(true);
   });
 
   it("collection size twice for regressions", async () => {
     class SizeTwiceAuthor extends Base {
+      declare size_twice_posts: AssociationProxy<SizeTwicePost>;
       declare name: string | null;
 
       static {
@@ -2761,14 +2767,15 @@ describe("HasManyAssociationsTest", () => {
     const author = await SizeTwiceAuthor.create({ name: "Alice" });
     await SizeTwicePost.create({ author_id: author.id, title: "A", body: "body" });
     await SizeTwicePost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts1 = await findHasManyTarget(author, "size_twice_posts");
+    const posts1 = await author.size_twice_posts;
     expect(posts1.length).toBe(2);
-    const posts2 = await findHasManyTarget(author, "size_twice_posts");
+    const posts2 = await author.size_twice_posts;
     expect(posts2.length).toBe(2);
   });
 
   it("build followed by save does not load target", async () => {
     class BuildSaveAuthor extends Base {
+      declare build_save_posts: AssociationProxy<BuildSavePost>;
       declare name: string | null;
 
       static {
@@ -2796,7 +2803,7 @@ describe("HasManyAssociationsTest", () => {
     const post = BuildSavePost.new({ author_id: author.id, title: "Built", body: "body" });
     await post.save();
     expect(post.isNewRecord()).toBe(false);
-    const posts = await findHasManyTarget(author, "build_save_posts");
+    const posts = await author.build_save_posts;
     expect(posts.length).toBe(1);
   });
 
@@ -2829,6 +2836,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("create followed by save does not load target", async () => {
     class CreateSaveAuthor extends Base {
+      declare create_save_posts: AssociationProxy<CreateSavePost>;
       declare name: string | null;
 
       static {
@@ -2860,7 +2868,7 @@ describe("HasManyAssociationsTest", () => {
     });
     post.title = "Updated";
     await post.save();
-    const posts = await findHasManyTarget(author, "create_save_posts");
+    const posts = await author.create_save_posts;
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("Updated");
   });
@@ -2894,7 +2902,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ExclDepAuthor.create({ name: "Alice" });
     await ExclDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "excl_dep_posts");
+    const remaining = await author.excl_dep_posts;
     expect(remaining.length).toBe(0);
   });
   it("dependent association respects optional conditions on delete", async () => {
@@ -2928,7 +2936,7 @@ describe("HasManyAssociationsTest", () => {
     await DcClient.create({ firm_id: firm.id, name: "BigShot Inc." });
     await DcClient.create({ firm_id: firm.id, name: "SmallTime Inc." });
     expect((await DcClient.where({ firm_id: firm.id })).length).toBe(2);
-    const scoped = await findHasManyTarget(firm, "conditionalClients");
+    const scoped = await firm.conditionalClients;
     expect(scoped.length).toBe(1);
     await firm.destroy();
     expect((await DcClient.where({ firm_id: firm.id })).length).toBe(1);
@@ -3031,8 +3039,8 @@ describe("HasManyAssociationsTest", () => {
     await DelPkPost.create({ author_id: author1.id, title: "A1", body: "body" });
     await DelPkPost.create({ author_id: author2.id, title: "A2", body: "body" });
     await author1.destroy();
-    const remaining1 = await findHasManyTarget(author1, "del_pk_posts");
-    const remaining2 = await findHasManyTarget(author2, "del_pk_posts");
+    const remaining1 = await author1.del_pk_posts;
+    const remaining2 = await author2.del_pk_posts;
     expect(remaining1.length).toBe(0);
     expect(remaining2.length).toBe(1);
   });
@@ -3067,7 +3075,7 @@ describe("HasManyAssociationsTest", () => {
     await ClearNoAccessPost.create({ author_id: author.id, title: "A", body: "body" });
     await ClearNoAccessPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "clear_no_access_posts");
+    const remaining = await author.clear_no_access_posts;
     expect(remaining.length).toBe(0);
   });
   it("deleting a item which is not in the collection", async () => {
@@ -3075,7 +3083,7 @@ describe("HasManyAssociationsTest", () => {
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     const otherPost = await HmPost.create({ author_id: 9999, title: "Other", body: "body" });
     await otherPost.destroy();
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(1);
   });
 
@@ -3083,7 +3091,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await HmAuthor.create({ name: "Alice" });
     const post = await HmPost.create({ author_id: author.id, title: "A", body: "body" });
     await HmPost.destroy(String(post.id) as any);
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(0);
   });
 
@@ -3125,12 +3133,13 @@ describe("HasManyAssociationsTest", () => {
     await DestroyAllScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await DestroyAllScopePost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "destroy_all_scope_posts");
+    const remaining = await author.destroy_all_scope_posts;
     expect(remaining.length).toBe(0);
   });
 
   it("destroy on association clears scope", async () => {
     class DestroyScopeAuthor extends Base {
+      declare destroy_scope_posts: AssociationProxy<DestroyScopePost>;
       declare name: string | null;
 
       static {
@@ -3157,12 +3166,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await DestroyScopeAuthor.create({ name: "Alice" });
     const post = await DestroyScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await post.destroy();
-    const remaining = await findHasManyTarget(author, "destroy_scope_posts");
+    const remaining = await author.destroy_scope_posts;
     expect(remaining.length).toBe(0);
   });
 
   it("delete on association clears scope", async () => {
     class DeleteScopeAuthor extends Base {
+      declare delete_scope_posts: AssociationProxy<DeleteScopePost>;
       declare name: string | null;
 
       static {
@@ -3189,7 +3199,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DeleteScopeAuthor.create({ name: "Alice" });
     const post = await DeleteScopePost.create({ author_id: author.id, title: "A", body: "body" });
     await DeleteScopePost.destroy(post.id!);
-    const remaining = await findHasManyTarget(author, "delete_scope_posts");
+    const remaining = await author.delete_scope_posts;
     expect(remaining.length).toBe(0);
   });
   it("dependence for associations with hash condition", async () => {
@@ -3299,7 +3309,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DepTxAuthor.create({ name: "Alice" });
     await DepTxPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "dep_tx_posts");
+    const remaining = await author.dep_tx_posts;
     expect(remaining.length).toBe(0);
   });
 
@@ -3354,6 +3364,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("adding array and collection", async () => {
     class ArrAuthor extends Base {
+      declare arr_posts: AssociationProxy<ArrPost>;
       declare name: string | null;
 
       static {
@@ -3381,11 +3392,12 @@ describe("HasManyAssociationsTest", () => {
     await ArrPost.create({ author_id: author.id, title: "A", body: "body" });
     await ArrPost.create({ author_id: author.id, title: "B", body: "body" });
     await ArrPost.create({ author_id: author.id, title: "C", body: "body" });
-    const loaded = await findHasManyTarget(author, "arr_posts");
+    const loaded = await author.arr_posts;
     expect(loaded.length).toBe(3);
   });
   it("replace failure", async () => {
     class ReplFailAuthor extends Base {
+      declare repl_fail_posts: AssociationProxy<ReplFailPost>;
       declare name: string | null;
 
       static {
@@ -3413,11 +3425,12 @@ describe("HasManyAssociationsTest", () => {
     const post = await ReplFailPost.create({ author_id: author.id, title: "A", body: "body" });
     post.author_id = 999999;
     await post.save();
-    const posts = await findHasManyTarget(author, "repl_fail_posts");
+    const posts = await author.repl_fail_posts;
     expect(posts.length).toBe(0);
   });
   it("get ids for unloaded associations does not load them", async () => {
     class UnloadedAuthor extends Base {
+      declare unloaded_posts: AssociationProxy<UnloadedPost>;
       declare name: string | null;
 
       static {
@@ -3444,7 +3457,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await UnloadedAuthor.create({ name: "Alice" });
     const p1 = await UnloadedPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await UnloadedPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "unloaded_posts");
+    const posts = await author.unloaded_posts;
     const ids = posts.map((p: any) => p.id);
     expect(ids.length).toBe(2);
     expect(ids).toContain(p1.id);
@@ -3452,6 +3465,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("ids reader cache not used for size when association is dirty", async () => {
     class DirtyIdAuthor extends Base {
+      declare dirty_id_posts: AssociationProxy<DirtyIdPost>;
       declare name: string | null;
 
       static {
@@ -3477,15 +3491,16 @@ describe("HasManyAssociationsTest", () => {
     registerModel(DirtyIdPost);
     const author = await DirtyIdAuthor.create({ name: "Writer" });
     await DirtyIdPost.create({ author_id: author.id, title: "P1", body: "body" });
-    const posts = await findHasManyTarget(author, "dirty_id_posts");
+    const posts = await author.dirty_id_posts;
     expect(posts).toHaveLength(1);
     await DirtyIdPost.create({ author_id: author.id, title: "P2", body: "body" });
     await author.reload();
-    const posts2 = await findHasManyTarget(author, "dirty_id_posts");
+    const posts2 = await author.dirty_id_posts;
     expect(posts2).toHaveLength(2);
   });
   it("ids reader cache should be cleared when collection is deleted", async () => {
     class ClrIdAuthor extends Base {
+      declare clr_id_posts: AssociationProxy<ClrIdPost>;
       declare name: string | null;
 
       static {
@@ -3511,15 +3526,16 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ClrIdPost);
     const author = await ClrIdAuthor.create({ name: "Writer" });
     const post = await ClrIdPost.create({ author_id: author.id, title: "P1", body: "body" });
-    let posts = await findHasManyTarget(author, "clr_id_posts");
+    let posts = await author.clr_id_posts;
     expect(posts).toHaveLength(1);
     await post.destroy();
     await author.reload();
-    posts = await findHasManyTarget(author, "clr_id_posts");
+    posts = await author.clr_id_posts;
     expect(posts).toHaveLength(0);
   });
   it("get ids ignores include option", async () => {
     class GiiAuthor extends Base {
+      declare gii_posts: AssociationProxy<GiiPost>;
       declare name: string | null;
 
       static {
@@ -3545,12 +3561,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(GiiPost);
     const author = await GiiAuthor.create({ name: "Writer" });
     const p = await GiiPost.create({ author_id: author.id, title: "P1", body: "body" });
-    const posts = await findHasManyTarget(author, "gii_posts");
+    const posts = await author.gii_posts;
     const ids = posts.map((post: any) => post.id);
     expect(ids).toContain(p.id);
   });
   it("get ids for ordered association", async () => {
     class OrdIdAuthor extends Base {
+      declare ord_id_posts: AssociationProxy<OrdIdPost>;
       declare name: string | null;
 
       static {
@@ -3577,13 +3594,14 @@ describe("HasManyAssociationsTest", () => {
     const author = await OrdIdAuthor.create({ name: "Alice" });
     const p1 = await OrdIdPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await OrdIdPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "ord_id_posts");
+    const posts = await author.ord_id_posts;
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
   });
   it("set ids for association on new record applies association correctly", async () => {
     class SetIdAuthor extends Base {
+      declare set_id_posts: AssociationProxy<SetIdPost>;
       declare name: string | null;
 
       static {
@@ -3610,12 +3628,13 @@ describe("HasManyAssociationsTest", () => {
     const author = new SetIdAuthor({ name: "Alice" });
     await author.save();
     const post = await SetIdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "set_id_posts");
+    const posts = await author.set_id_posts;
     expect(posts.length).toBe(1);
     expect(posts[0].id).toBe(post.id);
   });
   it("assign ids ignoring blanks", async () => {
     class BlankIdAuthor extends Base {
+      declare blank_id_posts: AssociationProxy<BlankIdPost>;
       declare name: string | null;
 
       static {
@@ -3641,7 +3660,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(BlankIdPost);
     const author = await BlankIdAuthor.create({ name: "Alice" });
     const p1 = await BlankIdPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "blank_id_posts");
+    const posts = await author.blank_id_posts;
     const ids = posts.map((p: any) => p.id).filter((id: any) => id != null && id !== "");
     expect(ids.length).toBe(1);
     expect(ids).toContain(p1.id);
@@ -3697,7 +3716,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await ThrIdAuthor.create({ name: "Alice" });
     const post = await ThrIdPost.create({ author_id: author.id, title: "P", body: "body" });
     const comment = await ThrIdComment.create({ post_id: post.id, body: "C" });
-    const comments = await findHasManyThroughTarget(author, "thr_id_comments");
+    const comments = await author.thr_id_comments;
     const ids = comments.map((c: any) => c.id);
     expect(ids).toContain(comment.id);
   });
@@ -3731,6 +3750,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("associations order should be priority over throughs order", async () => {
     class OrdThrAuthor extends Base {
+      declare ord_thr_posts: AssociationProxy<OrdThrPost>;
       declare name: string | null;
 
       static {
@@ -3757,11 +3777,12 @@ describe("HasManyAssociationsTest", () => {
     const author = await OrdThrAuthor.create({ name: "Alice" });
     await OrdThrPost.create({ author_id: author.id, title: "B", body: "body" });
     await OrdThrPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "ord_thr_posts");
+    const posts = await author.ord_thr_posts;
     expect(posts.length).toBe(2);
   });
   it("dynamic find should respect association order for through", async () => {
     class DynThrAuthor extends Base {
+      declare dyn_thr_posts: AssociationProxy<DynThrPost>;
       declare name: string | null;
 
       static {
@@ -3788,7 +3809,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await DynThrAuthor.create({ name: "Alice" });
     await DynThrPost.create({ author_id: author.id, title: "First", body: "body" });
     await DynThrPost.create({ author_id: author.id, title: "Second", body: "body" });
-    const posts = await findHasManyTarget(author, "dyn_thr_posts");
+    const posts = await author.dyn_thr_posts;
     expect(posts.length).toBe(2);
   });
   it("has many through respects hash conditions", async () => {
@@ -3849,7 +3870,7 @@ describe("HasManyAssociationsTest", () => {
     await HcComment.create({ post_id: post.id, body: "hello" });
     await HcComment.create({ post_id: post.id, body: "goodbye" });
 
-    const comments = await findHasManyTarget(author, "helloPostComments");
+    const comments = await author.helloPostComments;
     expect(comments.length).toBe(1);
     expect((comments[0] as HcComment).body).toBe("hello");
   });
@@ -3919,6 +3940,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling first nth or last on association should not load association", async () => {
     class FnlAuthor extends Base {
+      declare fnl_posts: AssociationProxy<FnlPost>;
       declare name: string | null;
 
       static {
@@ -3945,12 +3967,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await FnlAuthor.create({ name: "Alice" });
     await FnlPost.create({ author_id: author.id, title: "A", body: "body" });
     await FnlPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "fnl_posts");
+    const posts = await author.fnl_posts;
     expect(posts[0]).toBeDefined();
     expect(posts[posts.length - 1]).toBeDefined();
   });
   it("calling first or last on loaded association should not fetch with query", async () => {
     class FlLoadAuthor extends Base {
+      declare fl_load_posts: AssociationProxy<FlLoadPost>;
       declare name: string | null;
 
       static {
@@ -3977,12 +4000,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await FlLoadAuthor.create({ name: "Alice" });
     await FlLoadPost.create({ author_id: author.id, title: "A", body: "body" });
     await FlLoadPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "fl_load_posts");
+    const posts = await author.fl_load_posts;
     expect(posts[0]).toBeDefined();
     expect(posts[posts.length - 1]).toBeDefined();
   });
   it("calling first nth or last on existing record with build should load association", async () => {
     class FnlBuildAuthor extends Base {
+      declare fnl_build_posts: AssociationProxy<FnlBuildPost>;
       declare name: string | null;
 
       static {
@@ -4009,12 +4033,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await FnlBuildAuthor.create({ name: "Alice" });
     await FnlBuildPost.create({ author_id: author.id, title: "A", body: "body" });
     FnlBuildPost.new({ author_id: author.id, title: "B" });
-    const posts = await findHasManyTarget(author, "fnl_build_posts");
+    const posts = await author.fnl_build_posts;
     expect(posts[0]).toBeDefined();
     expect(posts.length).toBe(1);
   });
   it("calling first nth or last on existing record with create should not load association", async () => {
     class FnlCreateAuthor extends Base {
+      declare fnl_create_posts: AssociationProxy<FnlCreatePost>;
       declare name: string | null;
 
       static {
@@ -4040,12 +4065,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FnlCreatePost);
     const author = await FnlCreateAuthor.create({ name: "Alice" });
     await FnlCreatePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "fnl_create_posts");
+    const posts = await author.fnl_create_posts;
     expect(posts[0]).toBeDefined();
     expect(posts.length).toBe(1);
   });
   it("calling first nth or last on new record should not run queries", async () => {
     class FnlNewAuthor extends Base {
+      declare fnl_new_posts: AssociationProxy<FnlNewPost>;
       declare name: string | null;
 
       static {
@@ -4070,11 +4096,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FnlNewAuthor);
     registerModel(FnlNewPost);
     const author = FnlNewAuthor.new({ name: "Unsaved" });
-    const posts = await findHasManyTarget(author, "fnl_new_posts");
+    const posts = await author.fnl_new_posts;
     expect(posts.length).toBe(0);
   });
   it("calling first or last with integer on association should not load association", async () => {
     class FlIntAuthor extends Base {
+      declare fl_int_posts: AssociationProxy<FlIntPost>;
       declare name: string | null;
 
       static {
@@ -4102,7 +4129,7 @@ describe("HasManyAssociationsTest", () => {
     await FlIntPost.create({ author_id: author.id, title: "A", body: "body" });
     await FlIntPost.create({ author_id: author.id, title: "B", body: "body" });
     await FlIntPost.create({ author_id: author.id, title: "C", body: "body" });
-    const posts = await findHasManyTarget(author, "fl_int_posts");
+    const posts = await author.fl_int_posts;
     const firstTwo = posts.slice(0, 2);
     expect(firstTwo.length).toBe(2);
   });
@@ -4361,6 +4388,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling one should count instead of loading association", async () => {
     class OneCountAuthor extends Base {
+      declare one_count_posts: AssociationProxy<OneCountPost>;
       declare name: string | null;
 
       static {
@@ -4386,11 +4414,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneCountPost);
     const author = await OneCountAuthor.create({ name: "Alice" });
     await OneCountPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "one_count_posts");
+    const posts = await author.one_count_posts;
     expect(posts.length === 1).toBe(true);
   });
   it("calling one on loaded association should not use query", async () => {
     class OneLoadAuthor extends Base {
+      declare one_load_posts: AssociationProxy<OneLoadPost>;
       declare name: string | null;
 
       static {
@@ -4416,11 +4445,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneLoadPost);
     const author = await OneLoadAuthor.create({ name: "Alice" });
     await OneLoadPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "one_load_posts");
+    const posts = await author.one_load_posts;
     expect(posts.length === 1).toBe(true);
   });
   it("subsequent calls to one should use query", async () => {
     class OneSubAuthor extends Base {
+      declare one_sub_posts: AssociationProxy<OneSubPost>;
       declare name: string | null;
 
       static {
@@ -4446,15 +4476,16 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneSubPost);
     const author = await OneSubAuthor.create({ name: "Alice" });
     await OneSubPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await findHasManyTarget(author, "one_sub_posts");
+    const posts1 = await author.one_sub_posts;
     expect(posts1.length === 1).toBe(true);
     await OneSubPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.reload();
-    const posts2 = await findHasManyTarget(author, "one_sub_posts");
+    const posts2 = await author.one_sub_posts;
     expect(posts2.length === 1).toBe(false);
   });
   it("calling one should defer to collection if using a block", async () => {
     class OneBlkAuthor extends Base {
+      declare one_blk_posts: AssociationProxy<OneBlkPost>;
       declare name: string | null;
 
       static {
@@ -4481,12 +4512,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await OneBlkAuthor.create({ name: "Alice" });
     await OneBlkPost.create({ author_id: author.id, title: "A", body: "body" });
     await OneBlkPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "one_blk_posts");
+    const posts = await author.one_blk_posts;
     const filtered = posts.filter((p: any) => p.title === "A");
     expect(filtered.length === 1).toBe(true);
   });
   it("calling one should return false if zero", async () => {
     class OneZeroAuthor extends Base {
+      declare one_zero_posts: AssociationProxy<OneZeroPost>;
       declare name: string | null;
 
       static {
@@ -4511,12 +4543,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OneZeroAuthor);
     registerModel(OneZeroPost);
     const author = await OneZeroAuthor.create({ name: "Alice" });
-    const posts = await findHasManyTarget(author, "one_zero_posts");
+    const posts = await author.one_zero_posts;
     expect(posts.length).toBe(0);
     expect(posts.length === 1).toBe(false);
   });
   it("calling one should return false if more than one", async () => {
     class OneMultiAuthor extends Base {
+      declare one_multi_posts: AssociationProxy<OneMultiPost>;
       declare name: string | null;
 
       static {
@@ -4543,7 +4576,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await OneMultiAuthor.create({ name: "Alice" });
     await OneMultiPost.create({ author_id: author.id, title: "A", body: "body" });
     await OneMultiPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "one_multi_posts");
+    const posts = await author.one_multi_posts;
     expect(posts.length).toBe(2);
     expect(posts.length === 1).toBe(false);
   });
@@ -4598,6 +4631,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("creating using primary key", async () => {
     class PkAuthor extends Base {
+      declare pk_posts: AssociationProxy<PkPost>;
       declare name: string | null;
 
       static {
@@ -4625,7 +4659,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await PkPost.create({ author_id: author.id, title: "PK Created", body: "body" });
     expect(post.isNewRecord()).toBe(false);
     expect((post as any).author_id).toBe(Number(author.id));
-    const posts = await findHasManyTarget(author, "pk_posts");
+    const posts = await author.pk_posts;
     expect(posts.length).toBe(1);
   });
   it("defining has many association with delete all dependency lazily evaluates target class", async () => {
@@ -4658,7 +4692,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await LazyDelAuthor.create({ name: "Alice" });
     await LazyDelPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "lazy_del_posts");
+    const remaining = await author.lazy_del_posts;
     expect(remaining.length).toBe(0);
   });
   it("defining has many association with nullify dependency lazily evaluates target class", async () => {
@@ -4734,6 +4768,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("load target respects protected attributes", async () => {
     class ProtAuthor extends Base {
+      declare prot_posts: AssociationProxy<ProtPost>;
       declare name: string | null;
 
       static {
@@ -4759,7 +4794,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ProtPost);
     const author = await ProtAuthor.create({ name: "Alice" });
     await ProtPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "prot_posts");
+    const posts = await author.prot_posts;
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("A");
   });
@@ -4852,6 +4887,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("collection association with private kernel method", async () => {
     class KernelAuthor extends Base {
+      declare kernel_posts: AssociationProxy<KernelPost>;
       declare name: string | null;
 
       static {
@@ -4877,11 +4913,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(KernelPost);
     const author = await KernelAuthor.create({ name: "Alice" });
     await KernelPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "kernel_posts");
+    const posts = await author.kernel_posts;
     expect(posts.length).toBe(1);
   });
   it("association with or doesnt set inverse instance key", async () => {
     class OrAuthor extends Base {
+      declare or_posts: AssociationProxy<OrPost>;
       declare name: string | null;
 
       static {
@@ -4907,11 +4944,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(OrPost);
     const author = await OrAuthor.create({ name: "Alice" });
     await OrPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "or_posts");
+    const posts = await author.or_posts;
     expect(posts.length).toBe(1);
   });
   it("association with rewhere doesnt set inverse instance key", async () => {
     class RewhereAuthor extends Base {
+      declare rewhere_posts: AssociationProxy<RewherePost>;
       declare name: string | null;
 
       static {
@@ -4937,11 +4975,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(RewherePost);
     const author = await RewhereAuthor.create({ name: "Alice" });
     await RewherePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "rewhere_posts");
+    const posts = await author.rewhere_posts;
     expect(posts.length).toBe(1);
   });
   it("first_or_initialize adds the record to the association", async () => {
     class FoiAuthor extends Base {
+      declare foi_posts: AssociationProxy<FoiPost>;
       declare name: string | null;
 
       static {
@@ -4966,7 +5005,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FoiAuthor);
     registerModel(FoiPost);
     const author = await FoiAuthor.create({ name: "Alice" });
-    const posts = await findHasManyTarget(author, "foi_posts");
+    const posts = await author.foi_posts;
     expect(posts.length).toBe(0);
     const post = FoiPost.new({ author_id: author.id, title: "Initialized" });
     expect(post.isNewRecord()).toBe(true);
@@ -4974,6 +5013,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("first_or_create adds the record to the association", async () => {
     class FocAuthor extends Base {
+      declare foc_posts: AssociationProxy<FocPost>;
       declare name: string | null;
 
       static {
@@ -4998,16 +5038,17 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FocAuthor);
     registerModel(FocPost);
     const author = await FocAuthor.create({ name: "Alice" });
-    const posts1 = await findHasManyTarget(author, "foc_posts");
+    const posts1 = await author.foc_posts;
     expect(posts1.length).toBe(0);
     const post = await FocPost.create({ author_id: author.id, title: "Created", body: "body" });
     expect(post.isNewRecord()).toBe(false);
     await author.reload();
-    const posts2 = await findHasManyTarget(author, "foc_posts");
+    const posts2 = await author.foc_posts;
     expect(posts2.length).toBe(1);
   });
   it("first_or_create! adds the record to the association", async () => {
     class FocBangAuthor extends Base {
+      declare foc_bang_posts: AssociationProxy<FocBangPost>;
       declare name: string | null;
 
       static {
@@ -5032,7 +5073,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(FocBangAuthor);
     registerModel(FocBangPost);
     const author = await FocBangAuthor.create({ name: "Alice" });
-    const posts1 = await findHasManyTarget(author, "foc_bang_posts");
+    const posts1 = await author.foc_bang_posts;
     expect(posts1.length).toBe(0);
     const post = await FocBangPost.create({
       author_id: author.id,
@@ -5041,7 +5082,7 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(post.isNewRecord()).toBe(false);
     await author.reload();
-    const posts2 = await findHasManyTarget(author, "foc_bang_posts");
+    const posts2 = await author.foc_bang_posts;
     expect(posts2.length).toBe(1);
   });
   it("delete_all, when not loaded, doesn't load the records", async () => {
@@ -5075,7 +5116,7 @@ describe("HasManyAssociationsTest", () => {
     await NoLoadDelPost.create({ author_id: author.id, title: "A", body: "body" });
     await NoLoadDelPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "no_load_del_posts");
+    const remaining = await author.no_load_del_posts;
     expect(remaining.length).toBe(0);
   });
   it("association with extend option with multiple extensions", async () => {
@@ -5106,7 +5147,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ExtPost);
     const author = await ExtAuthor.create({ name: "Alice" });
     await ExtPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "ext_posts");
+    const posts = await author.ext_posts;
     expect(posts.length).toBe(1);
   });
   it("extend option affects per association", async () => {
@@ -5137,11 +5178,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(ExtPerPost);
     const author = await ExtPerAuthor.create({ name: "Alice" });
     await ExtPerPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "ext_per_posts");
+    const posts = await author.ext_per_posts;
     expect(posts.length).toBe(1);
   });
   it("delete record with complex joins", async () => {
     class CjAuthor extends Base {
+      declare cj_posts: AssociationProxy<CjPost>;
       declare name: string | null;
 
       static {
@@ -5168,11 +5210,12 @@ describe("HasManyAssociationsTest", () => {
     const author = await CjAuthor.create({ name: "Alice" });
     const post = await CjPost.create({ author_id: author.id, title: "A", body: "body" });
     await post.destroy();
-    const posts = await findHasManyTarget(author, "cj_posts");
+    const posts = await author.cj_posts;
     expect(posts.length).toBe(0);
   });
   it("unscopes the default scope of associated model when used with include", async () => {
     class UsInclAuthor extends Base {
+      declare us_incl_posts: AssociationProxy<UsInclPost>;
       declare name: string | null;
 
       static {
@@ -5198,7 +5241,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(UsInclPost);
     const author = await UsInclAuthor.create({ name: "Alice" });
     await UsInclPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "us_incl_posts");
+    const posts = await author.us_incl_posts;
     expect(posts.length).toBe(1);
   });
   it("raises RecordNotDestroyed when replaced child can't be destroyed", async () => {
@@ -5241,6 +5284,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association with instance dependent scope", async () => {
     class InstScopeAuthor extends Base {
+      declare inst_scope_posts: AssociationProxy<InstScopePost>;
       declare name: string | null;
 
       static {
@@ -5266,11 +5310,12 @@ describe("HasManyAssociationsTest", () => {
     registerModel(InstScopePost);
     const author = await InstScopeAuthor.create({ name: "Alice" });
     await InstScopePost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "inst_scope_posts");
+    const posts = await author.inst_scope_posts;
     expect(posts.length).toBe(1);
   });
   it("associations replace in memory when records have the same id", async () => {
     class ReplMemAuthor extends Base {
+      declare repl_mem_posts: AssociationProxy<ReplMemPost>;
       declare name: string | null;
 
       static {
@@ -5300,13 +5345,13 @@ describe("HasManyAssociationsTest", () => {
       title: "Original",
       body: "body",
     });
-    const posts1 = await findHasManyTarget(author, "repl_mem_posts");
+    const posts1 = await author.repl_mem_posts;
     expect(posts1.length).toBe(1);
     expect((posts1[0] as any).title).toBe("Original");
     post.title = "Updated";
     await post.save();
     await author.reload();
-    const posts2 = await findHasManyTarget(author, "repl_mem_posts");
+    const posts2 = await author.repl_mem_posts;
     expect(posts2.length).toBe(1);
     expect((posts2[0] as any).title).toBe("Updated");
   });
@@ -5390,6 +5435,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("reattach to new objects replaces inverse association and foreign key", async () => {
     class ReattachAuthor extends Base {
+      declare reattach_posts: AssociationProxy<ReattachPost>;
       declare name: string | null;
 
       static {
@@ -5420,8 +5466,8 @@ describe("HasManyAssociationsTest", () => {
     await post.save();
     const reloaded = await ReattachPost.find(post.id!);
     expect((reloaded as any).author_id).toBe(Number(author2.id));
-    const oldPosts = await findHasManyTarget(author1, "reattach_posts");
-    const newPosts = await findHasManyTarget(author2, "reattach_posts");
+    const oldPosts = await author1.reattach_posts;
+    const newPosts = await author2.reattach_posts;
     expect(oldPosts.length).toBe(0);
     expect(newPosts.length).toBe(1);
   });
@@ -5486,6 +5532,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("ids reader memoization", async () => {
     class MemoAuthor extends Base {
+      declare memo_posts: AssociationProxy<MemoPost>;
       declare name: string | null;
 
       static {
@@ -5512,14 +5559,15 @@ describe("HasManyAssociationsTest", () => {
     const author = await MemoAuthor.create({ name: "Alice" });
     await MemoPost.create({ author_id: author.id, title: "A", body: "body" });
     await MemoPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts1 = await findHasManyTarget(author, "memo_posts");
+    const posts1 = await author.memo_posts;
     const ids1 = posts1.map((p: any) => p.id);
-    const posts2 = await findHasManyTarget(author, "memo_posts");
+    const posts2 = await author.memo_posts;
     const ids2 = posts2.map((p: any) => p.id);
     expect(ids1).toEqual(ids2);
   });
   it("loading association in validate callback doesnt affect persistence", async () => {
     class LoadValAuthor extends Base {
+      declare load_val_posts: AssociationProxy<LoadValPost>;
       declare name: string | null;
 
       static {
@@ -5545,12 +5593,13 @@ describe("HasManyAssociationsTest", () => {
     registerModel(LoadValPost);
     const author = await LoadValAuthor.create({ name: "Alice" });
     const post = await LoadValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "load_val_posts");
+    const posts = await author.load_val_posts;
     expect(posts.length).toBe(1);
     expect(post.isPersisted()).toBe(true);
   });
   it("create children could be rolled back by after save", async () => {
     class RollbackAuthor extends Base {
+      declare rollback_posts: AssociationProxy<RollbackPost>;
       declare name: string | null;
 
       static {
@@ -5577,13 +5626,13 @@ describe("HasManyAssociationsTest", () => {
     const author = await RollbackAuthor.create({ name: "Alice" });
     const post = await RollbackPost.create({ author_id: author.id, title: "A", body: "body" });
     expect(post.isPersisted()).toBe(true);
-    const posts = await findHasManyTarget(author, "rollback_posts");
+    const posts = await author.rollback_posts;
     expect(posts.length).toBe(1);
   });
   it("has many with out of range value", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: 999999999, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(0);
   });
   it("has many association with same foreign key name", async () => {
@@ -5613,8 +5662,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(SameFkPost);
     const author = await SameFkAuthor.create({ name: "Alice" });
     await SameFkPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
-    const pubPosts = await findHasManyTarget(author, "published_posts");
+    const posts = await author.posts;
+    const pubPosts = await author.published_posts;
     expect(posts.length).toBe(1);
     expect(pubPosts.length).toBe(1);
   });
@@ -5646,7 +5695,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(KeyValPost);
     const author = await KeyValAuthor.create({ name: "Alice" });
     await KeyValPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "key_val_posts");
+    const posts = await author.key_val_posts;
     expect(posts.length).toBe(1);
   });
   it("invalid key raises with message including all default options", async () => {
@@ -5696,7 +5745,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await AsyncDepAuthor.create({ name: "Alice" });
     await AsyncDepPost.create({ author_id: author.id, title: "A", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "async_dep_posts");
+    const remaining = await author.async_dep_posts;
     expect(remaining.length).toBe(0);
   });
   it("composite primary key malformed association class", () => {
@@ -5729,6 +5778,7 @@ describe("HasManyAssociationsTest", () => {
   });
   it("ids reader on preloaded association with composite primary key", async () => {
     class PreCpkAuthor extends Base {
+      declare pre_cpk_posts: AssociationProxy<PreCpkPost>;
       declare name: string | null;
 
       static {
@@ -5755,7 +5805,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await PreCpkAuthor.create({ name: "Alice" });
     const p1 = await PreCpkPost.create({ author_id: author.id, title: "A", body: "body" });
     const p2 = await PreCpkPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await findHasManyTarget(author, "pre_cpk_posts");
+    const posts = await author.pre_cpk_posts;
     const ids = posts.map((p: any) => p.id);
     expect(ids).toContain(p1.id);
     expect(ids).toContain(p2.id);
@@ -5791,7 +5841,7 @@ describe("HasManyAssociationsTest", () => {
     await DelAllOptPost.create({ author_id: author.id, title: "A", body: "body" });
     await DelAllOptPost.create({ author_id: author.id, title: "B", body: "body" });
     await author.destroy();
-    const remaining = await findHasManyTarget(author, "del_all_opt_posts");
+    const remaining = await author.del_all_opt_posts;
     expect(remaining.length).toBe(0);
   });
 });
@@ -5840,7 +5890,7 @@ describe("HasManyAssociationsTest", () => {
     const post = await HmPost.create({ title: "New", body: "body" });
     post.author_id = author.id as number;
     await post.save();
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.some((p: any) => p.id === post.id)).toBe(true);
   });
 
@@ -5852,14 +5902,14 @@ describe("HasManyAssociationsTest", () => {
       p.author_id = author.id as number;
       await p.save();
     }
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(2);
   });
 
   it("adding using create", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "Created", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("Created");
   });
@@ -5884,7 +5934,7 @@ describe("HasManyAssociationsTest", () => {
   it("collection not empty after building", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length > 0).toBe(true);
   });
 

@@ -1,4 +1,3 @@
-import { findCollectionTarget as findHasManyTarget } from "./test-helpers/find-collection-target.js";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -762,8 +761,8 @@ describe("PreloaderTest", () => {
     expect(firstReads).toHaveLength(0);
 
     const reloaded = (await Invoice.where({ id: invoice.id }))[0];
-    const lineItems = await findHasManyTarget(reloaded, "lineItems");
-    for (const li of lineItems) await findHasManyTarget(li, "discountApplications");
+    const lineItems = await (reloaded as any).lineItems;
+    for (const li of lineItems) await li.discountApplications;
     const secondSqls = await captureSql(async () => {
       await new Preloader({ records: [reloaded], associations: nested }).call();
     });
@@ -2241,23 +2240,23 @@ describe("AssociationsTest", () => {
     await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "A" });
     await ShardedComment.create({ blog_id: 1, blog_post_id: (post as any).id, body: "B" });
     await ShardedComment.create({ blog_id: 2, blog_post_id: (post as any).id, body: "Other" });
-    const comments = await findHasManyTarget(post, "comments");
+    const comments = await (post as any).comments;
     expect(comments).toHaveLength(2);
-    expect(comments.map((c) => (c as any).body).sort()).toEqual(["A", "B"]);
+    expect(comments.map((c: Base) => (c as any).body).sort()).toEqual(["A", "B"]);
   });
 
   it("has many loads via inline fallback resolving composite owner key as id attribute", async () => {
-    const order = await CpkOrder.create({ shop_id: 1 });
+    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
     const [, orderId] = order.id as [number, number];
     await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
     await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
-    const agreements = await findHasManyTarget(order, "orderAgreements");
+    const agreements = await order.orderAgreements;
     expect(agreements).toHaveLength(2);
-    expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
+    expect(agreements.map((a: Base) => (a as any).signature).sort()).toEqual(["abc", "def"]);
   });
 
   it("has one loads through a declared reflection with a composite foreign key", async () => {
-    const order = await CpkOrder.create({ shop_id: 1 });
+    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
     const [shopId, orderId] = order.id as [number, number];
     await CpkBook.create({ id: [1, 90001], shop_id: shopId, order_id: orderId, title: "Only" });
     expect((await (order as any).loadHasOne("book"))?.title).toBe("Only");
@@ -2271,14 +2270,14 @@ describe("AssociationsTest", () => {
   });
 
   it("has many loads via inline fallback ignoring enclosing current_scope", async () => {
-    const order = await CpkOrder.create({ shop_id: 1 });
+    const order = (await CpkOrder.create({ shop_id: 1 })) as CpkOrder;
     const [, orderId] = order.id as [number, number];
     await CpkOrderAgreement.create({ order_id: orderId, signature: "abc" });
     await CpkOrderAgreement.create({ order_id: orderId, signature: "def" });
     await (CpkOrderAgreement as any).where("1=0").scoping(async () => {
-      const agreements = await findHasManyTarget(order, "orderAgreements");
+      const agreements = await order.orderAgreements;
       expect(agreements).toHaveLength(2);
-      expect(agreements.map((a) => (a as any).signature).sort()).toEqual(["abc", "def"]);
+      expect(agreements.map((a: Base) => (a as any).signature).sort()).toEqual(["abc", "def"]);
     });
   });
 
@@ -2318,7 +2317,7 @@ describe("AssociationsTest", () => {
   });
 
   it("loading cpk association when persisted and in memory differ", async () => {
-    const order = await CpkOrder.create({ id: [1, 2], status: "paid" });
+    const order = (await CpkOrder.create({ id: [1, 2], status: "paid" })) as CpkOrder;
     await CpkBook.create({
       id: [3, 4],
       shop_id: 1,
@@ -2326,7 +2325,7 @@ describe("AssociationsTest", () => {
       title: "Book",
     });
     await CpkBook.where({ author_id: 3, id: 4 }).updateAll({ title: "A different title" });
-    const books = await findHasManyTarget(order, "books");
+    const books = await order.books;
     expect(books[0].id).toEqual([3, 4]);
   });
 });

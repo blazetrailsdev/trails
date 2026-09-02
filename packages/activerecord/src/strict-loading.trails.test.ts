@@ -1,4 +1,3 @@
-import { findCollectionTarget as findHasManyTarget } from "./test-helpers/find-collection-target.js";
 import { describe, it, expect } from "vitest";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
 import { StrictLoadingViolationError, registerModel } from "./index.js";
@@ -37,7 +36,7 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     const developer = new Developer({ name: "New Dev" });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(findHasManyTarget(developer, "auditLogs")).resolves.toEqual([]);
+    expect(await developer.association("auditLogs").loadTarget()).toEqual([]);
   });
 
   it("does not raise on lazy loading a has_one on a new strict-loading owner without the foreign key", async () => {
@@ -79,7 +78,7 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     const developer = new Developer({ name: "New Dev", id: 1 });
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(true);
-    await expect(findHasManyTarget(developer, "auditLogs")).rejects.toThrow(
+    await expect(async () => developer.association("auditLogs").loadTarget()).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });
@@ -87,7 +86,7 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
   it("does not raise on lazy loading a disable_joins has_many :through on a strict-loading owner", async () => {
     const author = await Author.find(authors("david").id);
     author.strictLoadingBang();
-    await expect(findHasManyTarget(author, "noJoinsComments")).resolves.toBeInstanceOf(Array);
+    expect(await author.association("noJoinsComments").loadTarget()).toBeInstanceOf(Array);
   });
 
   it("does not raise on lazy loading a disable_joins has_one :through on a strict-loading owner", async () => {
@@ -100,7 +99,7 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     const developer = await Developer.find(developers("david").id);
     developer.strictLoadingBang();
     expect(developer.isNewRecord()).toBe(false);
-    await expect(findHasManyTarget(developer, "auditLogs")).rejects.toThrow(
+    await expect(async () => developer.association("auditLogs").loadTarget()).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });

@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations, association } from "../associations.js";
-import { findCollectionTarget as findTarget } from "../test-helpers/find-collection-target.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {
@@ -126,7 +125,7 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
     });
     try {
       const reflection = (RwAuthor as any)._reflectOnAssociation("noJoinsRwMembers");
-      const members = await findTarget(author, "noJoinsRwMembers");
+      const members = (await author.association("noJoinsRwMembers").loadTarget()) as Base[];
       expect(members.map((m: any) => m.id).sort()).toEqual([m1.id, m2.id].sort());
       const count = await association(author, "noJoinsRwMembers").count();
       expect(count).toBe(2);

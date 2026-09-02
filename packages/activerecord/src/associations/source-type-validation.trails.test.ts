@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, association } from "../associations.js";
-import { findCollectionTarget as findTarget } from "../test-helpers/find-collection-target.js";
 import { fixtures } from "../test-fixtures.js";
 
 class StvAuthor extends Base {
@@ -100,9 +99,9 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    await expect(findTarget(author(), "originFromComments")).rejects.toThrow(
-      /polymorphic association 'origin'/,
-    );
+    await expect(async () =>
+      author().association("originFromComments").loadTarget(),
+    ).rejects.toThrow(/polymorphic association 'origin'/);
   });
 
   it("raises HasManyThroughSourceAssociationNotFoundError for an unresolvable source", () => {
