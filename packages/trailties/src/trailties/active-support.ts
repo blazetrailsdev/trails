@@ -62,16 +62,16 @@ export interface ActiveSupportConfig {
   disallowedDeprecationWarnings?: Deprecation["disallowedWarnings"];
 }
 
-/**
- * Trailtie wiring for ActiveSupport.
- *
- * Mirrors: ActiveSupport::Railtie (activesupport/lib/active_support/railtie.rb)
- */
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;
 }
 
+/**
+ * Trailtie wiring for ActiveSupport.
+ *
+ * Mirrors: ActiveSupport::Railtie (activesupport/lib/active_support/railtie.rb)
+ */
 export class Trailtie extends BaseTrailtie {
   static {
     registerTrailtie(this);

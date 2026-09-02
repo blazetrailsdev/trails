@@ -18,8 +18,11 @@
  * out of the configure body and will wire in as those classes gain the
  * matching surface — see actionpack-100-percent.md.
  */
-import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
-import type { Deprecators } from "@blazetrails/activesupport";
+import {
+  Trailtie as BaseTrailtie,
+  registerTrailtie,
+  type Deprecators,
+} from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 import { X_REQUEST_ID } from "./constants.js";
 import { URL as HttpURL } from "./http/url.js";

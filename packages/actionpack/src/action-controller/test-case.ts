@@ -367,11 +367,6 @@ export class TestCase {
 
     const httpMethod = String(method).toUpperCase();
 
-    // Rails dispatches the `@request` `TestRequest.create` built, so its
-    // `default_env` (`action_dispatch/testing/test_request.rb:11-15`, minus
-    // the PATH_INFO `ActionController::TestRequest.default_env` strips) is on
-    // every processed request — `REMOTE_ADDR` among them, which
-    // `test_remote_addr` (`controller/test_case_test.rb:734`) reads.
     const env: Record<string, unknown> = {
       ...TestRequest.defaultEnv(),
       REQUEST_METHOD: httpMethod,

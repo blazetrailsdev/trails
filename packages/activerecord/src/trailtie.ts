@@ -1,5 +1,9 @@
-import { onLoad, Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
-import type { Deprecators } from "@blazetrails/activesupport";
+import {
+  onLoad,
+  Trailtie as BaseTrailtie,
+  registerTrailtie,
+  type Deprecators,
+} from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { Base } from "./base.js";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";

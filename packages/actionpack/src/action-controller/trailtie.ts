@@ -20,8 +20,11 @@
  *
  * @see https://api.rubyonrails.org/classes/ActionController/Railtie.html
  */
-import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
-import type { Deprecators } from "@blazetrails/activesupport";
+import {
+  Trailtie as BaseTrailtie,
+  registerTrailtie,
+  type Deprecators,
+} from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 
 /**

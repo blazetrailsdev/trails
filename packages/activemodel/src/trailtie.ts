@@ -1,5 +1,8 @@
-import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
-import type { Deprecators } from "@blazetrails/activesupport";
+import {
+  Trailtie as BaseTrailtie,
+  registerTrailtie,
+  type Deprecators,
+} from "@blazetrails/activesupport";
 import { env as processEnv } from "@blazetrails/activesupport/process-adapter";
 import { SecurePassword } from "./secure-password.js";
 import { Error as ActiveModelError } from "./error.js";

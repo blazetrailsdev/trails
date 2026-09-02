@@ -17,8 +17,11 @@
  * ContentExfiltrationPreventionHelper / Resolver. The matching helper
  * setters either don't exist yet or live in unported namespaces.
  */
-import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
-import type { Deprecators } from "@blazetrails/activesupport";
+import {
+  Trailtie as BaseTrailtie,
+  registerTrailtie,
+  type Deprecators,
+} from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { deprecator } from "./deprecator.js";
 

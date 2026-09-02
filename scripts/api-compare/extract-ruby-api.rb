@@ -2588,10 +2588,6 @@ class ApiExtractor
     elsif kind == :bodystmt && (node[2] || node[4])
       tokens << "try"
     elsif kind == :rescue_mod
-      # `@v = expr rescue nil` is an `:assign` over a `:rescue_mod` — no
-      # `:bodystmt` — so the clause above never sees it, while the faithful
-      # `try`/`catch` port emits `try`. Emitted before the protected
-      # expression, for the same reason `:bodystmt` is.
       tokens << "try"
     elsif kind == :binary && SKELETON_LOGICAL_OPS.include?(node[2])
       walk_for_skeleton(node[1], tokens)

@@ -10,9 +10,9 @@ import {
   months,
   onLoad,
   registerTrailtie,
+  type Deprecators,
 } from "@blazetrails/activesupport";
 import { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
-import type { Deprecators } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { setApp } from "./config.js";
 import { GlobalID } from "./global-id.js";
