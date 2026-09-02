@@ -115,8 +115,8 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
 
   /** @missingRailsArgs build_middleware — PERMANENT */
   insert(index: MiddlewareFactory | number, klass: MiddlewareFactory, ...args: unknown[]): void {
-    const i = this.assertIndex(index, "before");
-    this.entries.splice(i, 0, this.buildMiddleware(klass, args));
+    index = this.assertIndex(index, "before");
+    this.middlewares.splice(index, 0, this.buildMiddleware(klass, args));
   }
 
   /** Rails: `alias_method :insert_before, :insert`. */
@@ -129,16 +129,14 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
   }
 
   insertAfter(index: MiddlewareFactory | number, ...args: unknown[]): void {
-    const i = this.assertIndex(index, "after");
-    const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
-    this.insert(i + 1, klass, ...rest);
+    index = this.assertIndex(index, "after");
+    this.insert(index + 1, ...(args as [MiddlewareFactory, ...unknown[]]));
   }
 
   swap(target: MiddlewareFactory | number, ...args: unknown[]): void {
     const index = this.assertIndex(target, "before");
-    const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
-    this.insert(index, klass, ...rest);
-    this.entries.splice(index + 1, 1);
+    this.insert(index, ...(args as [MiddlewareFactory, ...unknown[]]));
+    this.middlewares.splice(index + 1, 1);
   }
 
   delete(target: MiddlewareFactory): void {

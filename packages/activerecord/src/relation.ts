@@ -1011,29 +1011,25 @@ export class Relation<T extends Base> {
     ) {
       return;
     }
-    return this._materializeDeferredDistinctPkPredicatesAsync();
-  }
-
-  /** @internal */
-  private async _materializeDeferredDistinctPkPredicatesAsync(): Promise<void> {
-    const predicates = this.whereClause.predicates;
-    for (let i = 0; i < predicates.length; i++) {
-      const node = predicates[i];
-      if (node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn) {
-        const attribute = node.left as Nodes.Attribute;
-        const ids = await node.innerRelation._materializeDistinctPkIds();
-        predicates[i] =
-          node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
-      } else if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
-        const attribute = node.left as Nodes.Attribute;
-        const ids = [...node.literalIds];
-        for (const rel of node.innerRelations) {
-          ids.push(...(await rel.ids()));
+    return (async () => {
+      for (let i = 0; i < predicates.length; i++) {
+        const node = predicates[i];
+        if (node instanceof DeferredDistinctPkIn || node instanceof DeferredDistinctPkNotIn) {
+          const attribute = node.left as Nodes.Attribute;
+          const ids = await node.innerRelation._materializeDistinctPkIds();
+          predicates[i] =
+            node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
+        } else if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
+          const attribute = node.left as Nodes.Attribute;
+          const ids = [...node.literalIds];
+          for (const rel of node.innerRelations) {
+            ids.push(...(await rel.ids()));
+          }
+          const built = this.predicateBuilder.build(attribute, ids);
+          predicates[i] = node instanceof DeferredIdsNotIn ? built.invert() : built;
         }
-        const built = this.predicateBuilder.build(attribute, ids);
-        predicates[i] = node instanceof DeferredIdsNotIn ? built.invert() : built;
       }
-    }
+    })();
   }
 
   /**

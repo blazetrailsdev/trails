@@ -164,8 +164,9 @@ export interface PredicationsModule extends GroupingFolders {
   contains(other: unknown): Contains;
   overlaps(other: unknown): Overlaps;
   /** @internal */
-  quotedNode(other: unknown): Node;
   quotedArray(others: unknown[]): Node[];
+  /** @internal */
+  quotedNode(other: unknown): Node;
   isInfinity(value: unknown): 1 | -1 | 0;
   isUnboundable(value: unknown): 1 | -1 | 0;
   isOpenEnded(value: unknown): boolean;
@@ -422,9 +423,6 @@ export const Predications: PredicationsModule = {
   overlaps(this: Node & PredicationHost, other: unknown): Overlaps {
     return new Overlaps(this, this.quotedNode(other));
   },
-  quotedNode(this: Node, other: unknown): Node {
-    return _buildQuoted!(other, this);
-  },
   quotedArray(this: PredicationHost, others: unknown[]): Node[] {
     return others.map((v) => this.quotedNode(v));
   },
@@ -450,6 +448,9 @@ export const Predications: PredicationsModule = {
     return new Grouping(new And(nodes));
   },
 
+  quotedNode(this: Node, other: unknown): Node {
+    return _buildQuoted!(other, this);
+  },
   isInfinity(this: PredicationHost, value: unknown): 1 | -1 | 0 {
     void this;
     if (value === Infinity) return 1;
