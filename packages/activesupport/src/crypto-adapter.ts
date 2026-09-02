@@ -312,9 +312,7 @@ function tryAutoRegisterNode(): boolean {
           require("node:module")
         : null;
     if (!nodeModule) return false;
-    const req = nodeModule.createRequire(
-      typeof __filename !== "undefined" ? __filename : "file:///activesupport",
-    );
+    const req = nodeModule.createRequire("file:///activesupport");
     const nodeCrypto = req("node:crypto") as typeof import("node:crypto");
     registry.set("node", wrapNodeCrypto(nodeCrypto));
     return true;

@@ -90,9 +90,7 @@ function tryAutoRegisterNode(): boolean {
           require("node:module")
         : null;
     if (!nodeModule) return false;
-    const req = nodeModule.createRequire(
-      typeof __filename !== "undefined" ? __filename : "file:///activesupport",
-    );
+    const req = nodeModule.createRequire("file:///activesupport");
     const asyncHooks = req("async_hooks") as typeof import("async_hooks");
     if (asyncHooks.AsyncLocalStorage) {
       registry.set("node", wrapNodeAsyncHooks(asyncHooks));

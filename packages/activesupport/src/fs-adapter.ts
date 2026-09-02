@@ -258,9 +258,7 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   const nodeModule = require("node:module") as {
     createRequire(p: string): (id: string) => unknown;
   };
-  return nodeModule.createRequire(
-    typeof __filename !== "undefined" ? __filename : "file:///activesupport",
-  );
+  return nodeModule.createRequire("file:///activesupport");
 }
 
 function tryAutoRegisterNode(): boolean {

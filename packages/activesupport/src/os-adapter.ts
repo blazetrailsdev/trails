@@ -77,9 +77,7 @@ function tryAutoRegisterNode(): boolean {
     const nodeModule = require("node:module") as {
       createRequire: (from: string | URL) => NodeRequire;
     };
-    const req = nodeModule.createRequire(
-      typeof __filename !== "undefined" ? __filename : "file:///activesupport",
-    );
+    const req = nodeModule.createRequire("file:///activesupport");
     const os = req("node:os") as NodeOs;
     registry.set("node", wrap(os));
     return true;

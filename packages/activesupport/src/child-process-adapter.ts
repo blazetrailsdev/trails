@@ -131,9 +131,7 @@ function tryAutoRegisterNode(): boolean {
     const nodeModule = require("node:module") as {
       createRequire: (from: string | URL) => NodeRequire;
     };
-    const req = nodeModule.createRequire(
-      typeof __filename !== "undefined" ? __filename : "file:///activesupport",
-    );
+    const req = nodeModule.createRequire("file:///activesupport");
     const cp = req("node:child_process") as unknown as NodeChildProcess;
     registry.set("node", wrap(cp));
     return true;
