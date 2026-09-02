@@ -25,6 +25,9 @@ import { DefaultMiddlewareStack } from "./application/default-middleware-stack.j
 import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
+// Registers the Vite asset pipeline's trailtie, the way requiring an asset
+// gem registers its railtie.
+import "./assets/trailtie.js";
 import { resolveEnv, loadDatabaseConfig, type DatabaseConfig } from "./database.js";
 import { Collection, Initializer, type InitializerGroup } from "./initializable.js";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
