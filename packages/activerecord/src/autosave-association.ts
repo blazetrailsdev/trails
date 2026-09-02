@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { RecordInvalid } from "./validations.js";
 import { Rollback } from "./errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
-import { associationInstanceGet, type AssociationDefinition } from "./associations.js";
+import { associationInstanceGet } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { throwAbort, underscore } from "@blazetrails/activesupport";
 
@@ -295,11 +295,6 @@ export async function saveBelongsToAssociation(
   reflection: any,
 ): Promise<boolean> {
   const owner = this as unknown as Base;
-  const assoc: AssociationDefinition = {
-    name: reflection.name,
-    type: "belongsTo",
-    options: reflection.options ?? {},
-  } as AssociationDefinition;
   const association = associationInstanceGet.call(owner, reflection.name) as any;
   if (!association || !association.isLoaded() || association.isStaleTarget()) return true;
 
@@ -309,7 +304,7 @@ export async function saveBelongsToAssociation(
   if (typeof (record as any).isDestroyed === "function" && (record as any).isDestroyed())
     return true;
 
-  const autosave = assoc.options.autosave;
+  const autosave = reflection.options?.autosave;
   if (autosave === false) return true;
 
   if (autosave && record.markedForDestruction()) {
@@ -322,12 +317,12 @@ export async function saveBelongsToAssociation(
   }
 
   if (record.isNewRecord() || (autosave && record.changedForAutosave())) {
-    _setAutosavingBelongsToFor(owner, assoc, true);
+    _setAutosavingBelongsToFor(owner, association, true);
     let saved: boolean | undefined;
     try {
       saved = await record.save({ validate: !autosave });
     } finally {
-      _setAutosavingBelongsToFor(owner, assoc, false);
+      _setAutosavingBelongsToFor(owner, association, false);
     }
     if (!saved) {
       if (autosave) {

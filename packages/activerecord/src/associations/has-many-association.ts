@@ -16,10 +16,6 @@ import {
 } from "../associations.js";
 import { strictLoadingViolationBang } from "../core.js";
 import {
-  validateThroughReflection,
-  routeThroughCheckValidity,
-} from "./validate-through-reflection.js";
-import {
   AssociationNotFoundError,
   CompositePrimaryKeyMismatchError,
   DeleteRestrictionError,
@@ -389,9 +385,6 @@ async function findTarget(
   violatesStrictLoading = false,
 ): Promise<Base[]> {
   const options = assocDef.options;
-  if (options.through) {
-    validateThroughReflection(record.constructor as typeof Base, assocName);
-  }
   if (!queryExecutor) {
     const cache = record._associationCache(assocName);
     if (
@@ -473,7 +466,6 @@ export function scope(
 
   if (options.as && !reflection) {
     if (Array.isArray(foreignKey)) {
-      routeThroughCheckValidity(ctor, assocName);
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -482,7 +474,6 @@ export function scope(
       });
     }
     if (Array.isArray(primaryKey) && !primaryKey.includes("id")) {
-      routeThroughCheckValidity(ctor, assocName);
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
@@ -515,7 +506,6 @@ export function scope(
       const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
       const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
       if (pkCols.length !== foreignKey.length) {
-        routeThroughCheckValidity(ctor, assocName);
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
           name: assocName,

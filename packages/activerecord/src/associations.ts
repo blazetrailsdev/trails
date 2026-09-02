@@ -28,7 +28,6 @@ import {
 import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope, invokeScopeLambda } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
-import { validateThroughReflection } from "./associations/validate-through-reflection.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import {
   constantize,
@@ -765,7 +764,6 @@ export function association<T extends Base = Base>(
   if (!assocDef) {
     throw new AssociationNotFoundError(record, assocName);
   }
-  validateThroughReflection(ctor, assocName);
   const instance = record.association(assocName) as unknown as { isCollection(): boolean };
   if (!instance.isCollection()) {
     throw new TypeError(
