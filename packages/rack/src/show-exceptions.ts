@@ -123,13 +123,9 @@ export class ShowExceptions {
       ? (exception as any).detailedMessage()
       : exception.message || "";
     const name = exception.constructor?.name || (exception as any).name || "Error";
-    const backtrace = exception.stack
-      ? exception.stack
-          .split("\n")
-          .slice(1)
-          .map((l) => `\t${l}`)
-          .join("\n")
-      : "";
+    const backtrace = this.backtrace(exception)
+      .map((l) => `\t${l}`)
+      .join("\n");
     return `${name}: ${message}\n${backtrace}`;
   }
 
@@ -152,7 +148,7 @@ export class ShowExceptions {
             const lines = readlines(frame.filename!);
             frame.setPreContextLineno(Math.max(lineno - ShowExceptions.CONTEXT, 0));
             frame.setPreContext(lines.slice(frame.preContextLineno!, lineno));
-            frame.setContextLine(lines[lineno].replace(/\n$/, ""));
+            frame.setContextLine(lines[lineno].replace(/\r?\n$/, ""));
             frame.setPostContextLineno(Math.min(lineno + ShowExceptions.CONTEXT, lines.length));
             frame.setPostContext(lines.slice(lineno + 1, frame.postContextLineno! + 1));
           } catch {
@@ -170,7 +166,8 @@ export class ShowExceptions {
   }
 
   /**
-   * `Exception#backtrace`'s lines (`show_exceptions.rb:82`). Ruby answers
+   * `Exception#backtrace`'s lines, which `dump_exception` (`show_exceptions.rb:71`)
+   * and `pretty` (`:82`) both consume. Ruby answers
    * `"file:lineno:in `function'"` strings; a JS `Error` carries one decorated
    * `stack` string instead, so its frames are reshaped into that spelling for
    * the `/(.*?):(\d+)(:in `(.*)')?/` match at `:84`.
