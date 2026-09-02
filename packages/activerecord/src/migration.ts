@@ -2053,13 +2053,13 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
       | ((t: TableDefinitionOf<A>) => void),
     fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
-    if (fn !== undefined) {
-      await super.createTable(tableName, options, (t) => fn(this.compatibleTableDefinition(t)));
-    } else if (typeof options === "function") {
-      const block = options;
+    const block = typeof options === "function" ? options : fn;
+    if (block === undefined) {
+      await super.createTable(tableName, options);
+    } else if (block === options) {
       await super.createTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
-      await super.createTable(tableName, options);
+      await super.createTable(tableName, options, (t) => block(this.compatibleTableDefinition(t)));
     }
   }
 
@@ -2068,13 +2068,13 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
     options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
     fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
-    if (fn !== undefined) {
-      await super.changeTable(tableName, options, (t) => fn(this.compatibleTableDefinition(t)));
-    } else if (typeof options === "function") {
-      const block = options;
+    const block = typeof options === "function" ? options : fn;
+    if (block === undefined) {
+      await super.changeTable(tableName, options);
+    } else if (block === options) {
       await super.changeTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
-      await super.changeTable(tableName, options);
+      await super.changeTable(tableName, options, (t) => block(this.compatibleTableDefinition(t)));
     }
   }
 
@@ -2084,15 +2084,15 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
     options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
     fn?: (t: TableDefinitionOf<A>) => void,
   ): Promise<void> {
-    if (fn !== undefined) {
-      await super.createJoinTable(table1, table2, options, (t) =>
-        fn(this.compatibleTableDefinition(t)),
-      );
-    } else if (typeof options === "function") {
-      const block = options;
+    const block = typeof options === "function" ? options : fn;
+    if (block === undefined) {
+      await super.createJoinTable(table1, table2, options);
+    } else if (block === options) {
       await super.createJoinTable(table1, table2, (t) => block(this.compatibleTableDefinition(t)));
     } else {
-      await super.createJoinTable(table1, table2, options);
+      await super.createJoinTable(table1, table2, options, (t) =>
+        block(this.compatibleTableDefinition(t)),
+      );
     }
   }
 

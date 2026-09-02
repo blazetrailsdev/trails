@@ -429,16 +429,16 @@ describe("Migration#removeColumns forwards to the connection", () => {
     migration.connection = connection;
     try {
       const yielded: unknown[] = [];
-      await migration.createTable("compat_tables", (t) => {
+      await migration.createTable("testings", (t) => {
         yielded.push(t);
       });
-      await migration.changeTable("compat_tables", (t) => {
+      await migration.changeTable("testings", (t) => {
         yielded.push(t);
       });
       expect(seen).toHaveLength(2);
       expect(yielded).toEqual([wrapped, wrapped]);
     } finally {
-      await connection.dropTable("compat_tables", { ifExists: true });
+      await connection.dropTable("testings", { ifExists: true });
     }
   });
 });
