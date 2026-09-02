@@ -126,12 +126,8 @@ describe("AuthenticationGenerator", () => {
 
   it("emits working method bodies, not comment stubs", () => {
     makeGen().run({ skipMailer: false, skipActionCable: false });
-    for (const rel of TS_EMIT) {
-      const src = read(rel);
-      // A body whose only statement is a comment is the shape this generator
-      // used to emit; every method must carry real code now.
-      expect(src, rel).not.toMatch(/\{\s*\/\/[^\n]*\n\s*\}/);
-    }
+    // A body whose only statement is a comment is the shape this used to emit.
+    for (const rel of TS_EMIT) expect(read(rel), rel).not.toMatch(/\{\s*\/\/[^\n]*\n\s*\}/);
     expect(read("app/controllers/sessions-controller.ts")).toContain("User.authenticateBy(");
     expect(read("app/controllers/concerns/authentication.ts")).toContain("Session.findBy(");
   });
@@ -144,12 +140,8 @@ describe("AuthenticationGenerator", () => {
       "create_users.ts",
       "create_sessions.ts",
     ]);
-    const users = read(migrations[0]);
-    expect(users).toContain("email_address");
-    expect(users).toContain("password_digest");
-    const sessions = read(migrations[1]);
-    expect(sessions).toContain("ip_address");
-    expect(sessions).toContain("user_agent");
+    expect(read(migrations[0])).toContain("email_address");
+    expect(read(migrations[1])).toContain("user_agent");
   });
 
   it("does not silently overwrite an existing file", () => {

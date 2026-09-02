@@ -1,6 +1,5 @@
 /**
- * `railties/lib/rails/generators/rails/authentication/templates/**.tt`, in the
- * one shape a TypeScript package can carry them in.
+ * `railties/lib/rails/generators/rails/authentication/templates/**.tt`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -70,9 +69,7 @@ export const Authentication = defineModule(
     },
 
     async findSessionByCookie(this: any): Promise<unknown> {
-      // Rails reads a signed cookie; trails' \`Base#cookies\` is not the jar
-      // yet (action-controller-cookies-returns-the-request-cookie-jar).
-      const sessionId = this.session["session_id"];
+      const sessionId = this.cookies.signed["session_id"];
       return sessionId ? await Session.findBy({ id: sessionId }) : null;
     },
 
@@ -93,13 +90,17 @@ export const Authentication = defineModule(
         ip_address: this.request.remoteIp,
       });
       Current.session = session;
-      this.session["session_id"] = session.id;
+      this.cookies.signed.permanent["session_id"] = {
+        value: session.id,
+        httponly: true,
+        same_site: ":lax",
+      };
       return session;
     },
 
     async terminateSession(this: any): Promise<void> {
       await (Current.session as any).destroy();
-      delete this.session["session_id"];
+      this.cookies.delete("session_id");
     },
   },
 );
@@ -117,7 +118,7 @@ export class SessionsController extends ApplicationController {
       within: minutes(3),
       only: "create",
       with: function (this: SessionsController) {
-        this.redirectTo("/session/new");
+        this.redirectTo("/session/new", { alert: "Try again later." });
       },
     });
   }
@@ -132,7 +133,7 @@ export class SessionsController extends ApplicationController {
       await (this as any).startNewSessionFor(user);
       this.redirectTo((this as any).afterAuthenticationUrl());
     } else {
-      this.redirectTo("/session/new");
+      this.redirectTo("/session/new", { alert: "Try another email address or password." });
     }
   }
 
@@ -165,7 +166,9 @@ export class PasswordsController extends ApplicationController {
       await PasswordsMailer.reset(user).deliverLater();
     }
 
-    this.redirectTo("/session/new");
+    this.redirectTo("/session/new", {
+      notice: "Password reset instructions sent (if user with that email address exists).",
+    });
   }
 
   async edit(): Promise<void> {
@@ -174,17 +177,20 @@ export class PasswordsController extends ApplicationController {
 
   async update(): Promise<void> {
     if (await this.user.update(this.params.permit("password", "password_confirmation"))) {
-      this.redirectTo("/session/new");
+      this.redirectTo("/session/new", { notice: "Password has been reset." });
     } else {
-      this.redirectTo(\`/passwords/\${this.params.get("token")}/edit\`);
+      this.redirectTo(\`/passwords/\${this.params.get("token")}/edit\`, { alert: "Passwords did not match." });
     }
   }
 
   protected async setUserByToken(): Promise<void> {
     try {
       this.user = await User.findByPasswordResetTokenBang(this.params.get("token"));
-    } catch {
-      this.redirectTo("/passwords/new");
+    } catch (error) {
+      if (!(error instanceof InvalidSignature)) throw error;
+      this.redirectTo("/passwords/new", {
+        alert: "Password reset link is invalid or has expired.",
+      });
     }
   }
 }

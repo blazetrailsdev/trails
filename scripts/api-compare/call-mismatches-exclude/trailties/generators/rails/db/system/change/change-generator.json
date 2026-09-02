@@ -4,7 +4,7 @@
     "tsFile": "generators/rails/db/system/change/change-generator.ts",
     "rubyName": "edit_database_config",
     "call": "template",
-    "reason": "editDatabaseConfig writes the TS config module through writeOrUpdate; trails has no config/database.yml template file to copy."
+    "reason": "Surfaced, not introduced: naming a TS method `template` in this package first made Rails' template call comparable. Converges in converge-db-system-change-database-config-to-a-template, which gives both generators one per-adapter config template to call it on."
   },
   {
     "package": "trailties",
