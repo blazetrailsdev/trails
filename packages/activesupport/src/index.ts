@@ -751,7 +751,7 @@ export { NumberToPercentageConverter } from "./number-helper/number-to-percentag
 export { NumberToHumanConverter } from "./number-helper/number-to-human-converter.js";
 export { NumberToHumanSizeConverter } from "./number-helper/number-to-human-size-converter.js";
 export { RoundingHelper } from "./number-helper/rounding-helper.js";
-export { Railtie, registerRailtie } from "./railtie.js";
+export { Trailtie, registerTrailtie } from "./trailtie.js";
 export { inspect, toS } from "./core-ext/object/inspect.js";
 export {
   _ActionDispatchRequest,

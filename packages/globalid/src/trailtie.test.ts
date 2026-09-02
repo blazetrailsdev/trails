@@ -14,7 +14,7 @@ function blogApp(
   secretKeyBase: string | null = SECRET_KEY_BASE,
 ): TrailtieApp & { config: { globalId: GlobalIdConfig } } {
   return {
-    railtieName: () => "blog_app_application",
+    railtieName: "blog_app_application",
     config: { globalId: {} },
     keyGenerator: () => {
       if (secretKeyBase === null) {

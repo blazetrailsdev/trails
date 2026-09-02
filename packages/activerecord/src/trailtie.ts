@@ -1,4 +1,4 @@
-import { onLoad, Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
+import { onLoad, Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { Base } from "./base.js";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -120,14 +120,14 @@ const setPostgresqlDecodeDates = (adapter: typeof PostgreSQLAdapter): void => {
   adapter.decodeDates = true;
 };
 
-export class Trailtie extends BaseRailtie {
+export class Trailtie extends BaseTrailtie {
   static {
-    registerRailtie(this);
+    registerTrailtie(this);
 
     this.config["activeRecord"] = defaultActiveRecordConfig();
 
     this.initializer("active_record.deprecator", () => {
-      BaseRailtie.deprecators["activeRecord"] = deprecator();
+      BaseTrailtie.deprecators["activeRecord"] = deprecator();
     });
 
     this.initializer("active_record.initialize_timezone", () => {

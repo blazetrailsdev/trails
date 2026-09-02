@@ -1,9 +1,9 @@
 /**
- * Base Railtie class — mirrors Rails::Railtie.
+ * Base Trailtie class — mirrors Rails::Railtie.
  *
  * Each engine/component (ActiveModel, ActionController, etc.) subclasses
- * Railtie to register named initializer blocks and a shared configuration
- * object. The application runner calls `Railtie.runAllInitializers()` to
+ * Trailtie to register named initializer blocks and a shared configuration
+ * object. The application runner calls `Trailtie.runAllInitializers()` to
  * fire them in registration order.
  *
  * Mirrors: Rails::Railtie (railties/lib/rails/railtie.rb)
@@ -19,14 +19,14 @@ import type { Deprecation } from "./deprecation.js";
  */
 export type InitializerBlock = (...args: unknown[]) => void;
 
-export class Railtie {
+export class Trailtie {
   /**
    * All registered subclasses — tracked so the application can enumerate
    * all railties at boot.
    *
    * Mirrors: Rails::Railtie.subclasses
    */
-  static readonly subclasses: Array<typeof Railtie> = [];
+  static readonly subclasses: Array<typeof Trailtie> = [];
 
   /**
    * Shared registry of per-framework deprecators, keyed by framework name.
@@ -82,15 +82,24 @@ export class Railtie {
   }
 
   /**
+   * The initializers registered directly on this class, in registration
+   * order.
+   *
+   * Mirrors: Rails::Initializable::ClassMethods#initializers
+   * (`railties/lib/rails/initializable.rb:70-72`)
+   */
+  static get initializers(): Array<{ name: string; block: InitializerBlock }> {
+    const host = this as any;
+    return Object.prototype.hasOwnProperty.call(host, "_initializers") ? host._initializers : [];
+  }
+
+  /**
    * Run all initializers registered on this class (in registration order).
    *
    * Mirrors: Rails::Railtie#run_initializers
    */
   static runInitializers(...args: unknown[]): void {
-    const host = this as any;
-    const own: Array<{ name: string; block: InitializerBlock }> =
-      Object.prototype.hasOwnProperty.call(host, "_initializers") ? host._initializers : [];
-    for (const { block } of own) {
+    for (const { block } of this.initializers) {
       block(...args);
     }
   }
@@ -101,24 +110,24 @@ export class Railtie {
    * Mirrors: Rails application initialization pipeline.
    */
   static runAllInitializers(...args: unknown[]): void {
-    for (const sub of Railtie.subclasses) {
+    for (const sub of Trailtie.subclasses) {
       sub.runInitializers(...args);
     }
   }
 }
 
 /**
- * Register `subclass` with the Railtie registry.
+ * Register `subclass` with the Trailtie registry.
  *
  * Call this in each subclass's static init block:
- *   static { registerRailtie(this); }
+ *   static { registerTrailtie(this); }
  *
  * Mirrors: Rails::Railtie.inherited (called automatically by Ruby when
  * a class subclasses Railtie; we replicate it with an explicit call since
  * JavaScript has no `inherited` hook).
  */
-export function registerRailtie(subclass: typeof Railtie): void {
-  if (!Railtie.subclasses.includes(subclass)) {
-    Railtie.subclasses.push(subclass);
+export function registerTrailtie(subclass: typeof Trailtie): void {
+  if (!Trailtie.subclasses.includes(subclass)) {
+    Trailtie.subclasses.push(subclass);
   }
 }

@@ -20,7 +20,7 @@
  *
  * @see https://api.rubyonrails.org/classes/ActionController/Railtie.html
  */
-import { Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 
 /**
@@ -41,14 +41,14 @@ function defaultActionControllerConfig(): ActionControllerConfig {
   };
 }
 
-export class Trailtie extends BaseRailtie {
+export class Trailtie extends BaseTrailtie {
   static {
-    registerRailtie(this);
+    registerTrailtie(this);
 
     this.config["actionController"] = defaultActionControllerConfig();
 
     this.initializer("action_controller.deprecator", () => {
-      BaseRailtie.deprecators["actionController"] = deprecator();
+      BaseTrailtie.deprecators["actionController"] = deprecator();
     });
   }
 }

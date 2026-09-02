@@ -7,7 +7,7 @@
  * behavior without coupling to a hook surface that doesn't expose that
  * semantic yet.
  */
-import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
 
@@ -26,7 +26,7 @@ export class Configuration {
    * cannot import trailties — globalid, whose package trailties depends on
    * transitively — still runs `config.eager_load_namespaces << GlobalID`
    * against this list. */
-  static readonly _eagerLoadNamespaces: unknown[] = (BaseRailtie.config["eagerLoadNamespaces"] ??=
+  static readonly _eagerLoadNamespaces: unknown[] = (BaseTrailtie.config["eagerLoadNamespaces"] ??=
     []) as unknown[];
   /** @internal */
   static readonly _watchableFiles: string[] = [];

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import {
   ArgumentError,
-  Railtie as BaseRailtie,
+  Trailtie as BaseTrailtie,
   resetLoadHooks,
   runLoadHooks,
 } from "@blazetrails/activesupport";
@@ -13,11 +13,11 @@ import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./trailtie.js";
 
 describe("GlobalID::Railtie class body", () => {
   it("pushes GlobalID onto the shared eager-load namespace list", () => {
-    expect(BaseRailtie.config["eagerLoadNamespaces"]).toContain(GlobalID);
+    expect(BaseTrailtie.config["eagerLoadNamespaces"]).toContain(GlobalID);
   });
 
   it("seeds the config.global_id namespace before any initializer runs", () => {
-    expect(BaseRailtie.config["globalId"]).toBeDefined();
+    expect(BaseTrailtie.config["globalId"]).toBeDefined();
   });
 });
 
@@ -29,7 +29,7 @@ describe("GlobalID::Railtie verifier derivation", () => {
   });
 
   const blogApp = (): TrailtieApp & { config: { globalId: GlobalIdConfig } } => ({
-    railtieName: () => "blog_app_application",
+    railtieName: "blog_app_application",
     config: { globalId: {} },
     keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
   });
