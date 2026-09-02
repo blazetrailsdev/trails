@@ -25,8 +25,6 @@ afterEach(async () => {
 });
 
 async function generateApp(): Promise<string> {
-  // Inside the package so the generated `vite.config.ts` resolves `vite`
-  // through the workspace's node_modules, as a real generated app would.
   tmpDir = fs.mkdtempSync(
     path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "trails-dev-server-"),
   );

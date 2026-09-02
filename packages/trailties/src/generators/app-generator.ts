@@ -345,12 +345,9 @@ Trails.application.loadServer();
 
     this.createFile(
       "vite.config.ts",
-      `import { defineConfig } from "vite";
+      `import { fileURLToPath } from "node:url";
+import { defineConfig } from "vite";
 
-// Vite serves this app's assets at /assets/* and hands every other request to
-// the trails Rack app. That is why the root is "app" rather than "app/assets"
-// and the base is left at "/": a non-root base makes Vite's own base
-// middleware answer "/" with a redirect before Rack is ever reached.
 export default defineConfig({
   root: "app",
   publicDir: "../public",
@@ -359,7 +356,9 @@ export default defineConfig({
     manifest: true,
     rollupOptions: {
       input: {
-        application: new URL("app/assets/stylesheets/application.css", import.meta.url).pathname,
+        application: fileURLToPath(
+          new URL("app/assets/stylesheets/application.css", import.meta.url),
+        ),
       },
     },
   },
