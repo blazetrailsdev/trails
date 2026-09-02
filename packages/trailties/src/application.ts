@@ -123,21 +123,12 @@ export class Application extends Engine {
    * A managed collection of deprecators. The collection's configuration
    * methods affect all deprecators in it.
    *
-   * Mirrors `Application#deprecators` (`application.rb:244-248`). Rails'
-   * framework railties write into it through the app they are yielded; trails'
-   * write into activesupport's `Trailtie.deprecators`, the registry a
-   * framework package can reach without depending on trailties, so the
-   * collection is topped up from there on every read — which is also how
-   * Rails' own collection keeps seeing deprecators registered after the first
-   * read.
+   * Mirrors `Application#deprecators` (`application.rb:244-248`).
    */
   get deprecators(): Deprecators {
     if (!this._deprecators) {
       this._deprecators = new Deprecators();
       this._deprecators.set("trailties", deprecator());
-    }
-    for (const [name, d] of Object.entries(BaseTrailtie.deprecators)) {
-      if (d != null && this._deprecators.get(name) !== d) this._deprecators.set(name, d);
     }
     return this._deprecators;
   }

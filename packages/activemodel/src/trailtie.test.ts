@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { env as processEnv, setEnv } from "@blazetrails/activesupport/process-adapter";
 import { Trailtie } from "./trailtie.js";
-import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
-const { deprecators } = BaseTrailtie;
+import { Deprecators, Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
+let deprecators: Deprecators;
+let app: { deprecators: Deprecators };
 import { SecurePassword } from "./secure-password.js";
 import { Error as ActiveModelError } from "./error.js";
 import { deprecator } from "./deprecator.js";
@@ -12,6 +13,8 @@ describe("RailtieTest", () => {
   let savedConfig: Record<string, unknown>;
 
   beforeEach(() => {
+    deprecators = new Deprecators();
+    app = { deprecators };
     savedSubclasses = [...BaseTrailtie.subclasses];
     try {
       savedConfig =
@@ -32,9 +35,6 @@ describe("RailtieTest", () => {
       delete Trailtie.config[key];
     }
     Object.assign(Trailtie.config, savedConfig);
-    for (const key of Object.keys(deprecators)) {
-      delete deprecators[key];
-    }
   });
 
   it("secure password min_cost is false in the development environment", () => {
@@ -76,7 +76,7 @@ describe("RailtieTest", () => {
     const prev = processEnv.TRAILS_ENV;
     setEnv("TRAILS_ENV", "test");
     try {
-      Trailtie.runInitializers();
+      Trailtie.runInitializers(app);
       expect(SecurePassword.minCost).toBe(true);
     } finally {
       setEnv("TRAILS_ENV", prev);
@@ -84,26 +84,26 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers registers the ActiveModel deprecator", () => {
-    Trailtie.runInitializers();
-    expect(deprecators["activeModel"]).toBe(deprecator());
+    Trailtie.runInitializers(app);
+    expect(deprecators.get("activeModel")).toBe(deprecator());
   });
 
   it("runInitializers applies i18nCustomizeFullMessage from Railtie.config.activeModel", () => {
     Trailtie.config["activeModel"] = {
       i18nCustomizeFullMessage: true,
     };
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(app);
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });
 
   it("runInitializers applies i18nCustomizeFullMessage from flat Railtie.config (backwards-compat)", () => {
     Trailtie.config["i18nCustomizeFullMessage"] = true;
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(app);
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });
 
   it("runInitializers defaults i18nCustomizeFullMessage to false when config is absent", () => {
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(app);
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(false);
   });
 });

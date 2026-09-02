@@ -171,11 +171,9 @@ describe("rubyToConventionTs", () => {
 });
 
 describe("rejectsSiblingClassCandidate", () => {
-  const tsClasses = new Set(["ForeignKeyTest", "CompositeForeignKeyTest"]);
-
   it("refuses a candidate under a sibling class when the name collides", () => {
     expect(
-      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, tsClasses, [
+      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, [
         "migration",
         "ForeignKeyTest",
         "foreign key exists",
@@ -185,7 +183,7 @@ describe("rejectsSiblingClassCandidate", () => {
 
   it("accepts a candidate under the test's own class", () => {
     expect(
-      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, tsClasses, [
+      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, [
         "migration",
         "CompositeForeignKeyTest",
         "foreign key exists",
@@ -193,9 +191,18 @@ describe("rejectsSiblingClassCandidate", () => {
     ).toBe(false);
   });
 
+  it("accepts a candidate under a describe that qualifies the class with its module", () => {
+    expect(
+      rejectsSiblingClassCandidate("WithMountedEngine", 2, [
+        "TestGenerationPrefix::WithMountedEngine",
+        "[ENGINE] relative path root uses SCRIPT_NAME from request",
+      ]),
+    ).toBe(false);
+  });
+
   it("keys on the name alone when the name does not collide", () => {
     expect(
-      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 1, tsClasses, [
+      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 1, [
         "migration",
         "ForeignKeyTest",
         "foreign key exists",
@@ -203,14 +210,14 @@ describe("rejectsSiblingClassCandidate", () => {
     ).toBe(false);
   });
 
-  it("keys on the name alone when the TS file names no such describe", () => {
+  it("refuses a flat port, which names no class to key on", () => {
     expect(
-      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, new Set(["migration"]), [
+      rejectsSiblingClassCandidate("CompositeForeignKeyTest", 2, [
         "migration",
         "foreign key exists",
       ]),
-    ).toBe(false);
-    expect(rejectsSiblingClassCandidate(undefined, 2, tsClasses, ["x"])).toBe(false);
+    ).toBe(true);
+    expect(rejectsSiblingClassCandidate(undefined, 2, ["x"])).toBe(false);
   });
 });
 

@@ -605,7 +605,7 @@ class TestController extends Base {
 // action_controller/test_case_test.rb — TestCaseTest (ported)
 // ==========================================================================
 
-describe("TestCaseTest (ported)", () => {
+describe("TestCaseTest", () => {
   let tc: TestCase;
 
   beforeEach(() => {
@@ -666,9 +666,8 @@ describe("TestCaseTest (ported)", () => {
   });
 
   it("remote addr", async () => {
-    // Rails default is "0.0.0.0"; ours is "127.0.0.1" (request.ts line 487)
     await tc.get("testRemoteAddr");
-    expect(tc.responseBody).toBe("127.0.0.1");
+    expect(tc.responseBody).toBe("0.0.0.0");
 
     await tc.get("testRemoteAddr", { env: { REMOTE_ADDR: "192.0.0.1" } });
     expect(tc.responseBody).toBe("192.0.0.1");

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
+import { Deprecators, Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 import {
   Trailtie,
   type ActionDispatchConfig,
@@ -26,8 +26,7 @@ describe("ActionDispatch::Trailtie", () => {
   let savedPerformDeepMunge: boolean;
   let savedStrictFreshness: boolean;
   let savedDefaultCharset: string;
-  let hadDeprecator: boolean;
-  let savedDeprecator: (typeof BaseTrailtie.deprecators)[string];
+  let app: { deprecators: Deprecators };
 
   beforeEach(() => {
     savedConfig = structuredClone(cfg());
@@ -39,8 +38,7 @@ describe("ActionDispatch::Trailtie", () => {
     savedPerformDeepMunge = RequestUtils.performDeepMunge;
     savedStrictFreshness = CacheConfig.strictFreshness;
     savedDefaultCharset = Response.defaultCharset;
-    hadDeprecator = "actionDispatch" in BaseTrailtie.deprecators;
-    savedDeprecator = BaseTrailtie.deprecators["actionDispatch"];
+    app = { deprecators: new Deprecators() };
   });
 
   afterEach(() => {
@@ -51,8 +49,6 @@ describe("ActionDispatch::Trailtie", () => {
     RequestUtils.performDeepMunge = savedPerformDeepMunge;
     CacheConfig.strictFreshness = savedStrictFreshness;
     Response.defaultCharset = savedDefaultCharset;
-    if (hadDeprecator) BaseTrailtie.deprecators["actionDispatch"] = savedDeprecator;
-    else delete BaseTrailtie.deprecators["actionDispatch"];
   });
 
   it("registers itself with the Railtie registry", () => {
@@ -79,18 +75,18 @@ describe("ActionDispatch::Trailtie", () => {
     c.performDeepMunge = false;
     c.strictFreshness = true;
 
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(app);
 
     expect(HttpURL.tldLength).toBe(2);
     expect(QueryParser.strictQueryStringSeparator).toBe(true);
     expect(RequestUtils.performDeepMunge).toBe(false);
     expect(CacheConfig.strictFreshness).toBe(true);
-    expect(BaseTrailtie.deprecators["actionDispatch"]).toBeDefined();
+    expect(app.deprecators.get("actionDispatch")).toBeDefined();
   });
 
   it("runInitializers copies defaultCharset onto Response when configured", () => {
     cfg().defaultCharset = "iso-8859-1";
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(app);
     expect(Response.defaultCharset).toBe("iso-8859-1");
   });
 
@@ -152,7 +148,7 @@ describe("ActionDispatch::Trailtie", () => {
   it("runInitializers resets Response.defaultCharset to utf-8 when cfg is null", () => {
     Response.defaultCharset = "stale";
     cfg().defaultCharset = null;
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(app);
     expect(Response.defaultCharset).toBe("utf-8");
   });
 });

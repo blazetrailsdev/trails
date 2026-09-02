@@ -18,6 +18,7 @@
  * setters either don't exist yet or live in unported namespaces.
  */
 import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
+import type { Deprecators } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { deprecator } from "./deprecator.js";
 
@@ -45,14 +46,19 @@ export function defaultActionViewConfig(): ActionViewConfig {
   };
 }
 
+/** @noRailsEquivalent PERMANENT */
+interface TrailtieApp {
+  deprecators: Deprecators;
+}
+
 export class Trailtie extends BaseTrailtie {
   static {
     registerTrailtie(this);
 
     this.config["actionView"] = defaultActionViewConfig();
 
-    this.initializer("action_view.deprecator", () => {
-      BaseTrailtie.deprecators["actionView"] = deprecator();
+    this.initializer("action_view.deprecator", (app) => {
+      (app as TrailtieApp).deprecators.set("actionView", deprecator());
     });
 
     this.initializer("action_view.annotate_rendered_view_with_filenames", () => {

@@ -8,8 +8,6 @@
  *
  * Mirrors: Rails::Railtie (railties/lib/rails/railtie.rb)
  */
-import type { Deprecation } from "./deprecation.js";
-
 /**
  * An initializer body. Rails' `Initializable::Initializer#run` is
  * `@context.instance_exec(*args, &block)` (`railties/lib/rails/initializable.rb:31-33`)
@@ -27,15 +25,6 @@ export class Trailtie {
    * Mirrors: Rails::Railtie.subclasses
    */
   static readonly subclasses: Array<typeof Trailtie> = [];
-
-  /**
-   * Shared registry of per-framework deprecators, keyed by framework name.
-   * Each framework's railtie registers its own deprecator here during
-   * initialization.
-   *
-   * Mirrors: Rails `app.deprecators` (Rails::Application::DeprecatorsProxy)
-   */
-  static readonly deprecators: Partial<Record<string, Deprecation>> = {};
 
   private static _config: Record<string, unknown> = {};
 

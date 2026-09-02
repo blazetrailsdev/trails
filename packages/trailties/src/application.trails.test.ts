@@ -50,13 +50,26 @@ describe("Application framework railtie initializers", () => {
 
   it("runs the ActiveRecord railtie initializers on boot", async () => {
     expect(BaseTrailtie.subclasses).toContain(ActiveRecordTrailtie);
-    delete BaseTrailtie.deprecators["activeRecord"];
 
     class ActiveRecordBootApp extends Application {}
     Application.register(ActiveRecordBootApp);
     const app = ActiveRecordBootApp.instance();
     await app.initialize();
 
-    expect(app.deprecators.get("activeRecord")).toBe(BaseTrailtie.deprecators["activeRecord"]);
+    expect(app.deprecators.get("activeRecord")).toBeDefined();
+  });
+
+  it("two applications do not share deprecators", async () => {
+    class FirstDeprecatorApp extends Application {}
+    Application.register(FirstDeprecatorApp);
+    const first = FirstDeprecatorApp.instance();
+    await first.initialize();
+
+    class SecondDeprecatorApp extends Application {}
+    Application.register(SecondDeprecatorApp);
+    const second = SecondDeprecatorApp.instance();
+
+    expect(first.deprecators.get("activeRecord")).toBeDefined();
+    expect(second.deprecators.get("activeRecord")).toBeUndefined();
   });
 });

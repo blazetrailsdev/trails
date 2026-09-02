@@ -225,21 +225,37 @@ function rubyTestClass(tc: { rubyClass?: string }): string | undefined {
 }
 
 /**
+ * A describe name reduced to the class it names. Rails' own nesting puts a
+ * sibling class inside a `module` (`prefix_generation_test.rb:7`, `:26`), and
+ * the port that mirrors that writes the qualified
+ * `describe("TestGenerationPrefix::WithMountedEngine")` while the Rails
+ * manifest records the bare `WithMountedEngine`, so the two are compared on
+ * the trailing segment.
+ */
+function describedClass(name: string): string {
+  const at = name.lastIndexOf("::");
+  return at === -1 ? name : name.slice(at + 2);
+}
+
+/**
  * Whether a description-only candidate must be refused because it belongs to a
  * SIBLING test class. `classCount` is how many classes in the Rails file define
- * this description; `tsAncestorNames` is every describe name the convention TS
- * file uses. The key is (class, name) only when the name actually collides
- * across siblings AND the TS file names the class — a flat port has nothing to
- * key on, so it keeps matching by name alone.
+ * this description, so the key is (class, name) exactly where the name collides
+ * across siblings.
+ *
+ * The rule used to hold only when the TS file ALSO named the class, so a flat
+ * port kept matching by name alone; with the sibling-class ports nested (RFC
+ * 0126) that escape hatch matched nothing, and dropping it is what stops a
+ * Rails test being credited against a sibling class's port — the mis-pairing
+ * `recordGate` / `recordAssertion` would then score against.
  */
 export function rejectsSiblingClassCandidate(
   rubyClass: string | undefined,
   classCount: number,
-  tsAncestorNames: Set<string>,
   tsParts: string[],
 ): boolean {
-  if (rubyClass === undefined || classCount <= 1 || !tsAncestorNames.has(rubyClass)) return false;
-  return !tsParts.slice(0, -1).includes(rubyClass);
+  if (rubyClass === undefined || classCount <= 1) return false;
+  return !tsParts.slice(0, -1).some((n) => describedClass(n) === rubyClass);
 }
 
 function normPath(ancestors: string[], description: string): string {
@@ -753,11 +769,6 @@ export function main(args: string[] = process.argv.slice(2)) {
         isTestCaseUnported(file.file, tc.description, tc.ancestors[0]),
       ).length;
 
-      const tsAncestorNames = new Set<string>();
-      for (const t of tsTests)
-        for (const part of t.path.split(" > ").slice(0, -1)) {
-          tsAncestorNames.add(part);
-        }
       const rubyClassesByDesc = new Map<string, Set<string>>();
       for (const tc of file.testCases) {
         const klass = rubyTestClass(tc);
@@ -946,7 +957,7 @@ export function main(args: string[] = process.argv.slice(2)) {
             if (consumedTs.has(idx)) continue;
             const tsPath = tsTests[idx].path;
             const tsParts = tsPath.split(" > ");
-            if (rejectsSiblingClassCandidate(rubyClass, classCount, tsAncestorNames, tsParts)) {
+            if (rejectsSiblingClassCandidate(rubyClass, classCount, tsParts)) {
               continue;
             }
             // Score: suffix match (TS path ends with Ruby path) gets highest priority,

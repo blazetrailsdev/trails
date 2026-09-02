@@ -26,4 +26,12 @@ describe("foldSkeletonTokens", () => {
     const skeleton = ["if", "new:Relation", "try", "throw", "ref:get"];
     expect(foldSkeletonTokens(skeleton)).toEqual(skeleton);
   });
+
+  it("folds Ruby's catch/throw onto the try/throw its TS lowering is forced to use", () => {
+    expect(foldSkeletonTokens(["ref:catch", "ref:load", "ref:throw"])).toEqual([
+      "try",
+      "ref:load",
+      "throw",
+    ]);
+  });
 });
