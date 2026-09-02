@@ -3,6 +3,7 @@
  * `railties/lib/rails/railtie/configuration.rb`. Holds the shared config
  * accessed via `Trailtie.config`.
  */
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import { onLoad } from "../lazy-load-hooks.js";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
@@ -75,10 +76,25 @@ export class Configuration {
   get(key: string): unknown {
     return Configuration._options[key];
   }
+
+  /**
+   * Mirrors `method_missing`'s setter arm (`railtie/configuration.rb:99-105`),
+   * including its refusal to shadow a real configuration method.
+   */
   set(key: string, value: unknown): void {
+    if (this._actualMethod(key)) {
+      throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
+    }
     Configuration._options[key] = value;
   }
+
+  /** Mirrors `respond_to?` (`railtie/configuration.rb:90-92`). */
   respondTo(key: string): boolean {
-    return Object.prototype.hasOwnProperty.call(Configuration._options, key);
+    return key in this || Object.prototype.hasOwnProperty.call(Configuration._options, key);
+  }
+
+  /** Mirrors the private `actual_method?` (`railtie/configuration.rb:95-97`). */
+  private _actualMethod(key: string): boolean {
+    return !Object.prototype.hasOwnProperty.call(Configuration._options, key) && this.respondTo(key);
   }
 }
