@@ -798,23 +798,14 @@ export class TestSession extends SecureSessionHash {
     return true;
   }
 
-  /**
-   * Mirrors `TestSession#id_was` (`test_case.rb:237-239`). Ruby reads `@id`
-   * directly; `SessionHash`'s is TS-private, so this reads it back through the
-   * inherited `id()`, which returns `@id` unconditionally once `@loaded` is
-   * true (`vendor/rack-session/lib/rack/session/abstract/id.rb:74-78`) — as
-   * `initialize` makes it.
-   */
+  /** Mirrors `TestSession#id_was` (`test_case.rb:237-239`). */
   idWas(): unknown {
-    return this.id();
+    return this._id;
   }
 
-  /**
-   * @internal Mirrors private `TestSession#load!` (`test_case.rb:242-244`).
-   * Reads `@id` through the inherited `id()` for the reason `idWas` does.
-   */
+  /** @internal Mirrors private `TestSession#load!` (`test_case.rb:242-244`). */
   override loadBang(): unknown {
-    return this.id();
+    return this._id;
   }
 }
 

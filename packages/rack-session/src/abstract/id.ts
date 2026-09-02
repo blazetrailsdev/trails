@@ -90,8 +90,8 @@ export class SessionHash implements PersistedSession {
   private _store: Persisted;
   private req: PersistedRequest;
   protected loaded: boolean;
-  private _id: unknown;
-  private idDefined = false;
+  protected _id: unknown;
+  protected idDefined = false;
   private _exists!: boolean;
   private existsDefined = false;
   protected data!: Record<string, unknown>;
@@ -572,7 +572,7 @@ export class Persisted {
     return SessionHash;
   }
 
-  findSession(_req: PersistedRequest, _sid: unknown): [unknown, Record<string, unknown> | null] {
+  findSession(_env: PersistedRequest, _sid: unknown): [unknown, Record<string, unknown> | null] {
     // @nie disposition=keep-as-strategy-hook rails=rack-session/lib/rack/session/abstract/id.rb:440 cluster=rack-session
     throw new Error("#find_session not implemented.");
   }
