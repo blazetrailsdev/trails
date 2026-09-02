@@ -9,6 +9,13 @@ export class MasterKeyGenerator extends GeneratorBase {
     super(options);
   }
 
+  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
+    const generator = new MasterKeyGenerator(config);
+    generator.addMasterKeyFile();
+    generator.ignoreMasterKeyFile();
+    return generator.getCreatedFiles();
+  }
+
   addMasterKeyFile(): void {
     if (this.fileExists(MASTER_KEY_PATH)) return;
     const key = EncryptedFile.generateKey();

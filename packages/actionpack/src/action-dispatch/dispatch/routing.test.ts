@@ -545,7 +545,10 @@ describe("TestRoutingMapper", () => {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/3",
     };
-    await routes.call(env);
+    // `to: "posts#show"` pins `:controller`, so the route's dispatcher is built
+    // with `raise_on_name_error` (mapper.rb:301) and an absent `PostsController`
+    // raises rather than cascading; the params are set before dispatch either way.
+    await expect(routes.call(env)).rejects.toThrow(/uninitialized constant PostsController/);
     const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
     expect(params.controller).toBe("posts");
     expect(params.action).toBe("show");

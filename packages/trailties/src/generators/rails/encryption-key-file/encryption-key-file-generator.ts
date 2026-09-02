@@ -6,6 +6,12 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
     super(options);
   }
 
+  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
+    const generator = new EncryptionKeyFileGenerator(config);
+    generator.addKeyFile(args[0]);
+    return generator.getCreatedFiles();
+  }
+
   addKeyFile(keyPath: string): void {
     if (this.fileExists(keyPath)) return;
     const key = EncryptedFile.generateKey();

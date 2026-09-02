@@ -419,18 +419,13 @@ export class RouteSet {
   };
   /** @internal */
   private _journeyRouter: JourneyRouter | null = null;
-  /** @internal */
   /**
-   * One `Dispatcher` for the whole set. Rails builds one per route in the
-   * mapper and picks its `raise_on_name_error` from
-   * `defaults.key?(:controller)` (`mapper.rb:297,301`), so a route that pins
-   * a controller raises where a dynamic `:controller` segment cascades;
-   * threading that per-route flag through the Journey bridge is story
-   * `build-a-dispatcher-per-route-with-raise-on-name-error`.
+   * One `Dispatcher` per route, as Rails' `Mapping#app` builds it
+   * (`mapper.rb:294-303`), keyed by the `Route` it belongs to.
    *
    * @internal
    */
-  private readonly _routeDispatcher: Dispatcher = new Dispatcher(false);
+  private readonly _routeDispatchers = new WeakMap<Route, Dispatcher>();
 
   constructor(config: RouteSetConfig = { ...DEFAULT_CONFIG }) {
     // Rails: `def initialize(config = DEFAULT_CONFIG.dup)` — DEFAULT_CONFIG
@@ -866,7 +861,7 @@ export class RouteSet {
    */
   get journeyRouter(): JourneyRouter {
     if (!this._journeyRouter) {
-      this._journeyRouter = buildJourneyRouter(this.routes, { app: this._routeDispatcher });
+      this._journeyRouter = buildJourneyRouter(this.routes, { app: (r) => this._dispatcher(r) });
     }
     return this._journeyRouter;
   }
@@ -874,6 +869,26 @@ export class RouteSet {
   /** Route lookup via the Journey-backed router. */
   journeyRecognize(method: string, path: string): JourneyMatch | null {
     return recognizeViaJourney(this.journeyRouter, method, path);
+  }
+
+  /**
+   * Rails: `Mapping#dispatcher(raise_on_name_error)` (`mapper.rb:305-307`),
+   * called from `Mapping#app` with `defaults.key?(:controller)`
+   * (`mapper.rb:301`). A route that pins a controller — `to: "posts#index"`,
+   * or a `defaults:` entry — raises `ActionController::RoutingError` when the
+   * constant will not resolve; one that only matches a dynamic `:controller`
+   * segment cascades `[404, X-Cascade: pass, []]` so routing falls through.
+   *
+   * @internal
+   */
+  private _dispatcher(route: Route): Dispatcher {
+    let dispatcher = this._routeDispatchers.get(route);
+    if (!dispatcher) {
+      const raiseOnNameError = route.controller !== "" || "controller" in route.defaults;
+      dispatcher = new Dispatcher(raiseOnNameError);
+      this._routeDispatchers.set(route, dispatcher);
+    }
+    return dispatcher;
   }
 
   /** End-to-end `Router.serve` through this set's Journey router. */
@@ -1120,7 +1135,7 @@ export class RouteSet {
       ...params,
     };
 
-    return (await this._routeDispatcher.serve(
+    return (await this._dispatcher(route).serve(
       new AdRequest(env) as unknown as RouterRequest,
     )) as unknown as RackResponse;
   }

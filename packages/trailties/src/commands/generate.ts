@@ -4,6 +4,7 @@ import { ModelGenerator } from "../generators/model-generator.js";
 import { MigrationGenerator } from "../generators/migration-generator.js";
 import { ControllerGenerator } from "../generators/rails/controller/controller-generator.js";
 import { ScaffoldGenerator } from "../generators/rails/scaffold/scaffold-generator.js";
+import { Generators } from "../generators.js";
 
 export function generateCommand(): Command {
   const cmd = new Command("generate");
@@ -62,6 +63,18 @@ export function generateCommand(): Command {
       const gen = new ScaffoldGenerator({ cwd: cwd(), output: console.log });
       gen.run(name, attributes);
     });
+
+  const registered = new Set(cmd.commands.map((c) => c.name()));
+  for (const { name, namespace, hidden } of Generators.namespacesForHelp()) {
+    if (registered.has(name)) continue;
+    cmd
+      .command(name, { hidden })
+      .description(`Run the ${name} generator`)
+      .argument("[args...]", "Generator arguments")
+      .action(async (args: string[]) => {
+        await Generators.invoke(namespace, args, { cwd: cwd(), output: console.log });
+      });
+  }
 
   return cmd;
 }

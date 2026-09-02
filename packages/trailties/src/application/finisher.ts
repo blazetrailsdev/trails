@@ -46,8 +46,13 @@ export interface FinisherRoutes {
   defineMountedHelper(name: string): void;
 }
 
+export interface FinisherReloaderInstance {
+  requireUnloadLockBang(): void;
+}
+
 export interface FinisherReloader {
   toPrepare(block: ConfigurationBlock): void;
+  toRun(block: (this: FinisherReloaderInstance) => unknown): void;
   prepareBang(): void;
 }
 
@@ -62,6 +67,7 @@ export interface FinisherConfig {
 export interface FinisherRoutesReloader {
   eagerLoad: boolean;
   runAfterLoadPaths: () => void | Promise<void>;
+  execute(): Promise<void>;
   executeUnlessLoaded(application: unknown): Promise<boolean>;
 }
 
@@ -71,6 +77,7 @@ export interface FinisherHost {
   readonly railtieName: string;
   routes(): FinisherRoutes;
   reloader: FinisherReloader;
+  readonly reloaders: unknown[];
   routesReloader(): FinisherRoutesReloader;
   paths(): Promise<Root>;
   ensureGeneratorTemplatesAdded(): Promise<void>;
@@ -176,16 +183,30 @@ Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
  * Mirrors `Finisher`'s `set_routes_reloader_hook` initializer
  * (`finisher.rb:158-179`).
  *
- * @missingRailsCall reloaders — CONVERGEABLE: `Application#reloaders` is not
- * ported, so the reloader is never registered on the reloaders collection
- * (`finisher.rb:162`).
- * @missingRailsCall to_run — CONVERGEABLE: `ActiveSupport::Reloader#to_run` is
- * not ported, so the reloader is only executed once here instead of being
- * re-run on every reload (`finisher.rb:164-177`).
+ * `RoutesReloader#execute` is async in trails while `Reloader`'s `run`
+ * callbacks are synchronous, so the `to_run` block returns the promise it
+ * starts rather than blocking on it the way the Ruby block does.
  */
 Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherHost) {
   const reloader = this.routesReloader();
   reloader.eagerLoad = this.config.eagerLoad === true;
+  this.reloaders.push(reloader);
+
+  this.reloader.toRun(function (this: FinisherReloaderInstance) {
+    // We configure #execute rather than #execute_if_updated because if
+    // autoloaded constants are cleared we need to reload routes also in
+    // case any was used there, as in
+    //
+    //   mount MailPreview => 'mail_view'
+    //
+    // This means routes are also reloaded if i18n is updated, which
+    // might not be necessary, but in order to be more precise we need
+    // some sort of reloaders dependency support, to be added.
+    this.requireUnloadLockBang();
+    return reloader.execute().then(() => {
+      runLoadHooks("after_routes_loaded", this);
+    });
+  });
 
   if (!(this.routes() instanceof LazyRouteSet) || this.config.eagerLoad === true) {
     await reloader.executeUnlessLoaded(this);

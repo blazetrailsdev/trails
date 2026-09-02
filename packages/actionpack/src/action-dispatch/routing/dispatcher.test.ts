@@ -69,11 +69,20 @@ describe("RouteDispatcher", () => {
 
   it("returns 404 X-Cascade when no controller handler is registered", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/posts", { to: "posts#index" }));
+    routes.draw((r) => r.get("/:controller/:action"));
 
-    const res = await routes.serve(makeReq("/posts"));
+    const res = await routes.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
     expect(res[1]["x-cascade"]).toBe("pass");
+  });
+
+  it("raises ActionController::RoutingError when a pinned controller is missing", async () => {
+    const routes = new RouteSet();
+    routes.draw((r) => r.get("/posts", { to: "posts#index" }));
+
+    await expect(routes.serve(makeReq("/posts"))).rejects.toThrow(
+      /uninitialized constant PostsController/,
+    );
   });
 
   it("returns 404 X-Cascade when no route matches", async () => {
@@ -137,13 +146,13 @@ describe("RouteDispatcher", () => {
 
   it("unregister removes a handler so subsequent serves return 404 pass", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/p", { to: "posts#index" }));
+    routes.draw((r) => r.get("/:controller/:action"));
     registerController(
       "posts",
       makeControllerClass(() => [200, {}, []]),
     );
     controllerConstants.delete("posts");
-    const res = await routes.serve(makeReq("/p"));
+    const res = await routes.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
   });
 });

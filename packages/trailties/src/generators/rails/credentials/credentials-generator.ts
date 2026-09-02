@@ -21,6 +21,12 @@ export class CredentialsGenerator extends GeneratorBase {
     this.skipSecretKeyBase = options.skipSecretKeyBase ?? false;
   }
 
+  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
+    const generator = new CredentialsGenerator(config);
+    await generator.addCredentialsFile();
+    return generator.getCreatedFiles();
+  }
+
   async addCredentialsFile(): Promise<void> {
     if (this.fileExists(this.contentPath)) return;
     this.output(`Adding ${this.contentPath} to store encrypted credentials.`);

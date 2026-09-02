@@ -50,6 +50,14 @@ export class Application extends Engine {
   readonly reloader: typeof Reloader = class extends Reloader {};
   logger: Logger | null = null;
   cache: CacheStore | null = null;
+  /**
+   * Rails: `attr_reader :reloaders` (`application.rb:102`), seeded
+   * `@reloaders = []` (`application.rb:113`). Holds every object whose
+   * `updated?` the `:set_clear_dependencies_hook` initializer polls; the
+   * routes reloader registers itself here from `:set_routes_reloader_hook`
+   * (`finisher.rb:162`).
+   */
+  readonly reloaders: unknown[] = [];
 
   constructor() {
     super();
@@ -248,6 +256,16 @@ export class Application extends Engine {
 
   routesReloader(): RoutesReloader {
     return (this._routesReloader ??= new RoutesReloader());
+  }
+
+  /** Reload application routes regardless if they changed or not. */
+  async reloadRoutesBang(): Promise<void> {
+    await this.routesReloader().reload();
+  }
+
+  /** Rails: `reload_routes_unless_loaded` (`application.rb:164-166`). */
+  async reloadRoutesUnlessLoaded(): Promise<boolean> {
+    return this.initialized() && (await this.routesReloader().executeUnlessLoaded(this));
   }
 
   /** `config.secretKeyBase` wins, else `SECRET_KEY_BASE` env. */

@@ -12,6 +12,12 @@ export class EncryptedFileGenerator extends GeneratorBase {
     super(options);
   }
 
+  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
+    const generator = new EncryptedFileGenerator(config);
+    await generator.addEncryptedFileSilently(args[0], args[1]);
+    return generator.getCreatedFiles();
+  }
+
   async addEncryptedFileSilently(
     filePath: string,
     keyPath: string,
