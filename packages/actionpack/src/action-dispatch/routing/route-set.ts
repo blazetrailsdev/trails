@@ -1087,10 +1087,10 @@ export class RouteSet {
         action: route.action,
         ...params,
       };
-      const [status, headers, bodyArr] = redirectEndpoint.call(env);
+      const [status, headers, body] = redirectEndpoint.call(env);
       const lowerHeaders: Record<string, string> = {};
       for (const [k, v] of Object.entries(headers)) lowerHeaders[k.toLowerCase()] = v;
-      return [status, lowerHeaders, bodyFromString((bodyArr as string[]).join(""))];
+      return [status, lowerHeaders, body as RackResponse[2]];
     }
 
     // Mounted Rack app: forward the request after stripping the mount prefix

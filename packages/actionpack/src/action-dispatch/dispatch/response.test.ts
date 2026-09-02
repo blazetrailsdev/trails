@@ -204,7 +204,7 @@ describe("ResponseTest", () => {
     const [status, headers, body] = res.toRack();
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("text/plain");
-    expect(body).toEqual(["hi"]);
+    expect([...(body as Iterable<unknown>)]).toEqual(["hi"]);
   });
 
   // --- Inspect ---
@@ -484,10 +484,14 @@ describe("ResponseTest", () => {
 
   it("can be explicitly destructured into status, headers and an enumerable body", () => {
     const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
-    const [status, headers, body] = res.toRack() as [number, Record<string, string>, string[]];
+    const [status, headers, body] = res.toRack() as [
+      number,
+      Record<string, string>,
+      Iterable<unknown>,
+    ];
     expect(status).toBe(404);
     expect(headers["content-type"]).toBe("text/plain");
-    expect(body).toEqual(["Not Found"]);
+    expect([...body]).toEqual(["Not Found"]);
   });
 
   it.skip("[response.to_a].flatten does not recurse infinitely", () => {

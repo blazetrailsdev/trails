@@ -53,6 +53,8 @@ interface ContentTypeHeader {
   readonly charset: string | undefined;
 }
 const NULL_CONTENT_TYPE_HEADER: ContentTypeHeader = { mimeType: undefined, charset: undefined };
+/** Rails: `RackBody::BODY_METHODS` (response.rb:510), less `each`, which RackBody defines. */
+const BODY_METHODS = ["toAry", "call", "toPath"] as const;
 
 /** Mirrors Rails' `ActionDispatch::Response::Buffer` (response.rb:100-157). */
 export class ResponseBuffer {
@@ -99,6 +101,54 @@ export class ResponseBuffer {
 
   get isClosed(): boolean {
     return this.closed;
+  }
+}
+
+/**
+ * Mirrors Rails' `ActionDispatch::Response::RackBody` (response.rb:497-536) —
+ * the third element of the Rack triple. Rack body methods stay lazy and go
+ * through the response, so `close` is `Response#abort` and `each` is
+ * `Response#each`.
+ *
+ * Ruby gates `to_ary` / `call` / `to_path` behind a `respond_to?` that forwards
+ * to `@response.stream` (response.rb:512-518). JS has no `respond_to?` hook, so
+ * those three are installed on the instance only when the stream answers them —
+ * the response is committed before `to_a` builds this, so the stream is settled
+ * and the answer cannot change. `[Symbol.iterator]` is JS's spelling of `each`,
+ * which is how a Rack consumer walks the body here.
+ */
+export class RackBody {
+  private response: Response;
+
+  constructor(response: Response) {
+    this.response = response;
+    const stream = this.response.stream as Record<string, unknown> | null;
+    for (const method of BODY_METHODS) {
+      if (stream && typeof stream[method] === "function") {
+        (this as unknown as Record<string, unknown>)[method] = (...args: unknown[]): unknown =>
+          (stream[method] as (...a: unknown[]) => unknown)(...args);
+      }
+    }
+  }
+
+  close(): void {
+    this.response.abort();
+  }
+
+  get body(): string {
+    return this.response.body;
+  }
+
+  *each(): IterableIterator<unknown> {
+    yield* this.response.each();
+  }
+
+  [Symbol.iterator](): IterableIterator<unknown> {
+    return this.each();
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
+    for (const chunk of this.each()) yield chunk as string | Uint8Array;
   }
 }
 
@@ -609,20 +659,13 @@ export class Response {
     }
   }
 
-  /**
-   * @internal Rails: `rack_response(status, headers)` (response.rb:546-553).
-   * The non-empty arm is `RackBody.new(self)`, whose `to_path` forwards to the
-   * stream (response.rb:512-536); a file body is surfaced as the stream itself
-   * so `Rack::Sendfile` still sees `toPath()` instead of the drained bytes.
-   */
+  /** @internal Rails: `rack_response(status, headers)` (response.rb:546-553). */
   rackResponse(
     status: number,
     headers: Record<string, string>,
   ): [number, Record<string, string>, unknown] {
     if ((NO_CONTENT_CODES as readonly number[]).includes(status)) return [status, headers, []];
-    const stream = this.stream as { toPath?: unknown } | null;
-    if (stream && typeof stream.toPath === "function") return [status, headers, stream];
-    return [status, headers, this.bodyParts()];
+    return [status, headers, new RackBody(this)];
   }
 
   // --- ETag generators (delegated to cache module) ---
