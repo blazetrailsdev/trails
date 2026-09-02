@@ -21,8 +21,6 @@ export type GeneratorClass = Omit<typeof GeneratorBase, "prototype" | "start"> &
 /**
  * The `rails` group entries `sorted_groups` deletes before printing
  * (`generators.rb:208-214`) — still invocable, just not advertised.
- *
- * @internal
  */
 const HIDDEN_FROM_LISTING = [
   "app",
@@ -41,12 +39,10 @@ let _hiddenNamespaces: string[] | undefined;
  * Rails' `file_lookup_paths` is `["{rails/generators,generators}", "**", "*_generator.rb"]`
  * (`generators.rb:314-316`). trails ships its generators in one tree, so the
  * glob is that tree walked for `*-generator.{ts,js}`.
- *
- * @internal
  */
 const GENERATORS_ROOT = new URL("./generators/rails/", import.meta.url);
 
-/** @internal `file:` URL → path, without a `node:url` import. */
+/** `file:` URL → path, without a `node:url` import. */
 function urlToPath(url: URL): string {
   const p = decodeURIComponent(url.pathname);
   return /^\/[A-Za-z]:/.test(p) ? p.slice(1) : p;
@@ -75,8 +71,8 @@ export class Generators {
    *
    * @internal
    */
-  static async lookupBang(): Promise<readonly GeneratorClass[]> {
-    if (_subclasses) return _subclasses;
+  static async lookupBang(): Promise<void> {
+    if (_subclasses) return;
     const fs = await getFsAsync();
     const path = await getPathAsync();
     if (!path.pathToFileURL) {
@@ -104,7 +100,6 @@ export class Generators {
     };
     await walk(root, []);
     _subclasses = found;
-    return found;
   }
 
   /**
@@ -123,7 +118,8 @@ export class Generators {
       }
       lookups.push(name);
     }
-    const namespaces = new Map((await Generators.lookupBang()).map((k) => [k.namespace, k]));
+    await Generators.lookupBang();
+    const namespaces = new Map(Generators.subclasses().map((k) => [k.namespace, k]));
     for (const namespace of lookups) {
       const klass = namespaces.get(namespace);
       if (klass) return klass;
@@ -133,8 +129,15 @@ export class Generators {
 
   /**
    * Rails: `invoke(namespace, args = ARGV, config = {})` (`generators.rb:261-278`).
-   * Rails prints the correctable-name error and `exit 1`s; trails throws so the
-   * CLI layer decides.
+   *
+   * Rails prints a correctable-name error and `exit 1`s on a miss; trails
+   * throws so the CLI layer decides. The two calls in the found arm that this
+   * body does not make —
+   * `args << "--help" if args.empty? && klass.arguments.any?(&:required?)`
+   * (`generators.rb:264`) and `run_after_generate_callback`
+   * (`generators.rb:266`) — both read Thor state trails has no port of:
+   * `class_option`/`argument` declarations and
+   * `Generators.after_generate_callbacks`.
    */
   static async invoke(
     namespace: string,
@@ -155,7 +158,8 @@ export class Generators {
 
   /** Rails: `public_namespaces` (`generators.rb:187-190`). */
   static async publicNamespaces(): Promise<string[]> {
-    return (await Generators.lookupBang()).map((k) => k.namespace);
+    await Generators.lookupBang();
+    return Generators.subclasses().map((k) => k.namespace);
   }
 
   /**
@@ -165,11 +169,6 @@ export class Generators {
    */
   static hiddenNamespaces(): string[] {
     return (_hiddenNamespaces ??= ["rails", "resource_route"]);
-  }
-
-  /** Rails: `hide_namespaces(*namespaces)` (`generators.rb:164-166`). */
-  static hideNamespaces(...namespaces: string[]): void {
-    Generators.hiddenNamespaces().push(...namespaces);
   }
 
   /** Rails: `sorted_groups` (`generators.rb:196-219`). */
@@ -216,25 +215,35 @@ export class Generators {
     });
   }
 
-  /** Rails: `print_generators` (`generators.rb:192-194`). */
+  /**
+   * Rails: `print_generators` (`generators.rb:192-194`). Ruby prints through
+   * `puts`; the port takes the sink because trails has no process-global
+   * stdout to reach for.
+   */
   static async printGenerators(output: (msg: string) => void): Promise<void> {
     for (const [base, namespaces] of await Generators.sortedGroups()) {
-      const visible = namespaces.filter((n) => !Generators.hiddenNamespaces().includes(n));
-      if (visible.length === 0) continue;
-      output(`${base.charAt(0).toUpperCase()}${base.slice(1)}:`);
-      for (const n of visible) output(`  ${n}`);
-      output("");
+      Generators.printList(base, namespaces, output);
     }
+  }
+
+  /**
+   * Rails: `print_list(base, namespaces)` (`generators.rb:286-289`), whose
+   * `super` is Thor's — it prints the capitalized group and one indented line
+   * per namespace, and prints nothing for an empty group.
+   */
+  private static printList(
+    base: string,
+    namespaces: string[],
+    output: (msg: string) => void,
+  ): void {
+    namespaces = namespaces.filter((n) => !Generators.hiddenNamespaces().includes(n));
+    if (namespaces.length === 0) return;
+    output(`${base.charAt(0).toUpperCase()}${base.slice(1)}:`);
+    for (const n of namespaces) output(`  ${n}`);
+    output("");
   }
 }
 
-/** @internal Test-only — drops the cached lookup so a rescan can be observed. */
-export function _resetGeneratorsLookup(): void {
-  _subclasses = undefined;
-  _hiddenNamespaces = undefined;
-}
-
-/** @internal */
 async function isDirectory(
   fs: Awaited<ReturnType<typeof getFsAsync>>,
   p: string,
@@ -250,8 +259,6 @@ async function isDirectory(
  * Rails' `require path` inside `lookup!` — Thor's `inherited` hook then files
  * the class into `subclasses`. JS has no such hook, so the module's exports
  * are searched for the generator class instead.
- *
- * @internal
  */
 async function importGenerator(href: string): Promise<GeneratorClass | undefined> {
   let mod: Record<string, unknown>;
