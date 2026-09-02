@@ -1,18 +1,18 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { env as processEnv, setEnv } from "@blazetrails/activesupport/process-adapter";
 import { Trailtie } from "./trailtie.js";
-import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
-const { deprecators } = BaseRailtie;
+import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
+const { deprecators } = BaseTrailtie;
 import { SecurePassword } from "./secure-password.js";
 import { Error as ActiveModelError } from "./error.js";
 import { deprecator } from "./deprecator.js";
 
 describe("RailtieTest", () => {
-  let savedSubclasses: (typeof BaseRailtie)[];
+  let savedSubclasses: (typeof BaseTrailtie)[];
   let savedConfig: Record<string, unknown>;
 
   beforeEach(() => {
-    savedSubclasses = [...BaseRailtie.subclasses];
+    savedSubclasses = [...BaseTrailtie.subclasses];
     try {
       savedConfig =
         typeof structuredClone === "function"
@@ -26,8 +26,8 @@ describe("RailtieTest", () => {
   afterEach(() => {
     SecurePassword.minCost = false;
     ActiveModelError.i18nCustomizeFullMessage = false;
-    BaseRailtie.subclasses.length = 0;
-    BaseRailtie.subclasses.push(...savedSubclasses);
+    BaseTrailtie.subclasses.length = 0;
+    BaseTrailtie.subclasses.push(...savedSubclasses);
     for (const key of Object.keys(Trailtie.config)) {
       delete Trailtie.config[key];
     }
@@ -69,7 +69,7 @@ describe("RailtieTest", () => {
   });
 
   it("ActiveModel::Railtie is registered in the global subclasses list", () => {
-    expect(BaseRailtie.subclasses).toContain(Trailtie);
+    expect(BaseTrailtie.subclasses).toContain(Trailtie);
   });
 
   it("runInitializers applies the active_model.secure_password setting", () => {

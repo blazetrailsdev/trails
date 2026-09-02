@@ -18,7 +18,7 @@
  * out of the configure body and will wire in as those classes gain the
  * matching surface — see actionpack-100-percent.md.
  */
-import { Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 import { X_REQUEST_ID } from "./constants.js";
 import { URL as HttpURL } from "./http/url.js";
@@ -136,15 +136,15 @@ function cspAccessors(host: CspRequestHost): CspRequest {
   }) as CspRequest;
 }
 
-export class Trailtie extends BaseRailtie {
+export class Trailtie extends BaseTrailtie {
   static {
-    registerRailtie(this);
+    registerTrailtie(this);
 
     this.config["actionDispatch"] = defaultActionDispatchConfig();
     this.config["contentSecurityPolicy"] = defaultContentSecurityPolicyConfig();
 
     this.initializer("action_dispatch.deprecator", () => {
-      BaseRailtie.deprecators["actionDispatch"] = deprecator();
+      BaseTrailtie.deprecators["actionDispatch"] = deprecator();
     });
 
     this.initializer("action_dispatch.configure", () => {

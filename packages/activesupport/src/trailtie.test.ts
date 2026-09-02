@@ -1,33 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Railtie, registerRailtie } from "./railtie.js";
+import { Trailtie, registerTrailtie } from "./trailtie.js";
 
-describe("Railtie", () => {
+describe("Trailtie", () => {
   // Snapshot and restore global singletons so these tests don't interfere
   // with other test files (e.g. ActiveModel::Railtie expects to remain
-  // registered in Railtie.subclasses after module init).
-  let savedSubclasses: (typeof Railtie)[];
+  // registered in Trailtie.subclasses after module init).
+  let savedSubclasses: (typeof Trailtie)[];
   let savedConfig: Record<string, unknown>;
 
   beforeEach(() => {
-    savedSubclasses = [...Railtie.subclasses];
-    savedConfig = { ...Railtie.config };
-    Railtie.subclasses.length = 0;
-    for (const key of Object.keys(Railtie.config)) {
-      delete Railtie.config[key];
+    savedSubclasses = [...Trailtie.subclasses];
+    savedConfig = { ...Trailtie.config };
+    Trailtie.subclasses.length = 0;
+    for (const key of Object.keys(Trailtie.config)) {
+      delete Trailtie.config[key];
     }
   });
 
   afterEach(() => {
-    Railtie.subclasses.length = 0;
-    Railtie.subclasses.push(...savedSubclasses);
-    for (const key of Object.keys(Railtie.config)) {
-      delete Railtie.config[key];
+    Trailtie.subclasses.length = 0;
+    Trailtie.subclasses.push(...savedSubclasses);
+    for (const key of Object.keys(Trailtie.config)) {
+      delete Trailtie.config[key];
     }
-    Object.assign(Railtie.config, savedConfig);
+    Object.assign(Trailtie.config, savedConfig);
   });
 
   it("initializer registers a named block", () => {
-    class TestRailtie extends Railtie {}
+    class TestRailtie extends Trailtie {}
     const log: string[] = [];
     TestRailtie.initializer("test.hello", () => log.push("hello"));
     TestRailtie.runInitializers();
@@ -35,7 +35,7 @@ describe("Railtie", () => {
   });
 
   it("runInitializers runs blocks in registration order", () => {
-    class OrderRailtie extends Railtie {}
+    class OrderRailtie extends Trailtie {}
     const log: string[] = [];
     OrderRailtie.initializer("a", () => log.push("a"));
     OrderRailtie.initializer("b", () => log.push("b"));
@@ -44,8 +44,8 @@ describe("Railtie", () => {
   });
 
   it("initializers are isolated per subclass", () => {
-    class R1 extends Railtie {}
-    class R2 extends Railtie {}
+    class R1 extends Trailtie {}
+    class R2 extends Trailtie {}
     const log: string[] = [];
     R1.initializer("r1", () => log.push("r1"));
     R2.initializer("r2", () => log.push("r2"));
@@ -53,37 +53,37 @@ describe("Railtie", () => {
     expect(log).toEqual(["r1"]);
   });
 
-  it("registerRailtie adds subclass to registry", () => {
-    class MyRailtie extends Railtie {
+  it("registerTrailtie adds subclass to registry", () => {
+    class MyRailtie extends Trailtie {
       static {
-        registerRailtie(this);
+        registerTrailtie(this);
       }
     }
-    expect(Railtie.subclasses).toContain(MyRailtie);
+    expect(Trailtie.subclasses).toContain(MyRailtie);
   });
 
   it("runAllInitializers fires every registered subclass", () => {
-    class A extends Railtie {
+    class A extends Trailtie {
       static {
-        registerRailtie(this);
+        registerTrailtie(this);
       }
     }
-    class B extends Railtie {
+    class B extends Trailtie {
       static {
-        registerRailtie(this);
+        registerTrailtie(this);
       }
     }
     const log: string[] = [];
     A.initializer("a", () => log.push("A"));
     B.initializer("b", () => log.push("B"));
-    Railtie.runAllInitializers();
+    Trailtie.runAllInitializers();
     expect(log).toEqual(["A", "B"]);
   });
 
   it("yields the arguments run_initializers was called with", () => {
-    class C extends Railtie {
+    class C extends Trailtie {
       static {
-        registerRailtie(this);
+        registerTrailtie(this);
       }
     }
     const seen: unknown[] = [];
@@ -94,10 +94,10 @@ describe("Railtie", () => {
   });
 
   it("config is isolated per subclass (copy-on-first-access)", () => {
-    class Child extends Railtie {}
-    Railtie.config["shared"] = "base";
+    class Child extends Trailtie {}
+    Trailtie.config["shared"] = "base";
     Child.config["own"] = "child";
     expect(Child.config["shared"]).toBe("base");
-    expect(Railtie.config["own"]).toBeUndefined();
+    expect(Trailtie.config["own"]).toBeUndefined();
   });
 });

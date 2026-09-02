@@ -1,9 +1,9 @@
 /**
- * Base Railtie class — mirrors Rails::Railtie.
+ * Base Trailtie class — mirrors Rails::Railtie.
  *
  * Each engine/component (ActiveModel, ActionController, etc.) subclasses
- * Railtie to register named initializer blocks and a shared configuration
- * object. The application runner calls `Railtie.runAllInitializers()` to
+ * Trailtie to register named initializer blocks and a shared configuration
+ * object. The application runner calls `Trailtie.runAllInitializers()` to
  * fire them in registration order.
  *
  * Mirrors: Rails::Railtie (railties/lib/rails/railtie.rb)
@@ -19,14 +19,14 @@ import type { Deprecation } from "./deprecation.js";
  */
 export type InitializerBlock = (...args: unknown[]) => void;
 
-export class Railtie {
+export class Trailtie {
   /**
    * All registered subclasses — tracked so the application can enumerate
    * all railties at boot.
    *
-   * Mirrors: Rails::Railtie.subclasses
+   * Mirrors: Rails::Trailtie.subclasses
    */
-  static readonly subclasses: Array<typeof Railtie> = [];
+  static readonly subclasses: Array<typeof Trailtie> = [];
 
   /**
    * Shared registry of per-framework deprecators, keyed by framework name.
@@ -110,24 +110,24 @@ export class Railtie {
    * Mirrors: Rails application initialization pipeline.
    */
   static runAllInitializers(...args: unknown[]): void {
-    for (const sub of Railtie.subclasses) {
+    for (const sub of Trailtie.subclasses) {
       sub.runInitializers(...args);
     }
   }
 }
 
 /**
- * Register `subclass` with the Railtie registry.
+ * Register `subclass` with the Trailtie registry.
  *
  * Call this in each subclass's static init block:
- *   static { registerRailtie(this); }
+ *   static { registerTrailtie(this); }
  *
  * Mirrors: Rails::Railtie.inherited (called automatically by Ruby when
- * a class subclasses Railtie; we replicate it with an explicit call since
+ * a class subclasses Trailtie; we replicate it with an explicit call since
  * JavaScript has no `inherited` hook).
  */
-export function registerRailtie(subclass: typeof Railtie): void {
-  if (!Railtie.subclasses.includes(subclass)) {
-    Railtie.subclasses.push(subclass);
+export function registerTrailtie(subclass: typeof Trailtie): void {
+  if (!Trailtie.subclasses.includes(subclass)) {
+    Trailtie.subclasses.push(subclass);
   }
 }

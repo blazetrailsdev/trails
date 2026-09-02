@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 import {
   Trailtie,
   type ActionDispatchConfig,
@@ -27,7 +27,7 @@ describe("ActionDispatch::Trailtie", () => {
   let savedStrictFreshness: boolean;
   let savedDefaultCharset: string;
   let hadDeprecator: boolean;
-  let savedDeprecator: (typeof BaseRailtie.deprecators)[string];
+  let savedDeprecator: (typeof BaseTrailtie.deprecators)[string];
 
   beforeEach(() => {
     savedConfig = structuredClone(cfg());
@@ -39,8 +39,8 @@ describe("ActionDispatch::Trailtie", () => {
     savedPerformDeepMunge = RequestUtils.performDeepMunge;
     savedStrictFreshness = CacheConfig.strictFreshness;
     savedDefaultCharset = Response.defaultCharset;
-    hadDeprecator = "actionDispatch" in BaseRailtie.deprecators;
-    savedDeprecator = BaseRailtie.deprecators["actionDispatch"];
+    hadDeprecator = "actionDispatch" in BaseTrailtie.deprecators;
+    savedDeprecator = BaseTrailtie.deprecators["actionDispatch"];
   });
 
   afterEach(() => {
@@ -51,12 +51,12 @@ describe("ActionDispatch::Trailtie", () => {
     RequestUtils.performDeepMunge = savedPerformDeepMunge;
     CacheConfig.strictFreshness = savedStrictFreshness;
     Response.defaultCharset = savedDefaultCharset;
-    if (hadDeprecator) BaseRailtie.deprecators["actionDispatch"] = savedDeprecator;
-    else delete BaseRailtie.deprecators["actionDispatch"];
+    if (hadDeprecator) BaseTrailtie.deprecators["actionDispatch"] = savedDeprecator;
+    else delete BaseTrailtie.deprecators["actionDispatch"];
   });
 
   it("registers itself with the Railtie registry", () => {
-    expect(BaseRailtie.subclasses).toContain(Trailtie);
+    expect(BaseTrailtie.subclasses).toContain(Trailtie);
   });
 
   it("seeds Rails-compatible defaults on config.actionDispatch", () => {
@@ -85,7 +85,7 @@ describe("ActionDispatch::Trailtie", () => {
     expect(QueryParser.strictQueryStringSeparator).toBe(true);
     expect(RequestUtils.performDeepMunge).toBe(false);
     expect(CacheConfig.strictFreshness).toBe(true);
-    expect(BaseRailtie.deprecators["actionDispatch"]).toBeDefined();
+    expect(BaseTrailtie.deprecators["actionDispatch"]).toBeDefined();
   });
 
   it("runInitializers copies defaultCharset onto Response when configured", () => {

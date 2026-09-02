@@ -17,7 +17,7 @@
  * ContentExfiltrationPreventionHelper / Resolver. The matching helper
  * setters either don't exist yet or live in unported namespaces.
  */
-import { Railtie as BaseRailtie, registerRailtie } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { deprecator } from "./deprecator.js";
 
@@ -45,14 +45,14 @@ export function defaultActionViewConfig(): ActionViewConfig {
   };
 }
 
-export class Trailtie extends BaseRailtie {
+export class Trailtie extends BaseTrailtie {
   static {
-    registerRailtie(this);
+    registerTrailtie(this);
 
     this.config["actionView"] = defaultActionViewConfig();
 
     this.initializer("action_view.deprecator", () => {
-      BaseRailtie.deprecators["actionView"] = deprecator();
+      BaseTrailtie.deprecators["actionView"] = deprecator();
     });
 
     this.initializer("action_view.annotate_rendered_view_with_filenames", () => {

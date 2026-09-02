@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Trailtie, loadDefaults, type ActiveRecordConfig } from "./trailtie.js";
 import { Base } from "./base.js";
-import { Railtie as BaseRailtie, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
@@ -14,14 +14,14 @@ import { ActiveRecord } from "./ar-config.js";
 import { Executor } from "@blazetrails/activesupport";
 import { asynchronousQueriesTracker } from "./core.js";
 
-const { deprecators } = BaseRailtie;
+const { deprecators } = BaseTrailtie;
 
 const blogApp = (): { config: { filterParameters: Array<string | RegExp> } } => ({
   config: { filterParameters: [] },
 });
 
 describe("RailtieTest", () => {
-  let savedSubclasses: (typeof BaseRailtie)[];
+  let savedSubclasses: (typeof BaseTrailtie)[];
   let savedConfig: ActiveRecordConfig;
   let savedTimeZoneAware: boolean;
   let savedTimeZoneAwareTypes: string[];
@@ -36,7 +36,7 @@ describe("RailtieTest", () => {
   let savedAddToFilterParameters: boolean;
 
   beforeEach(() => {
-    savedSubclasses = [...BaseRailtie.subclasses];
+    savedSubclasses = [...BaseTrailtie.subclasses];
     savedConfig = structuredClone(Trailtie.config["activeRecord"] as ActiveRecordConfig);
     savedTimeZoneAware = Base.timeZoneAwareAttributes;
     savedTimeZoneAwareTypes = [...Base.timeZoneAwareTypes];
@@ -57,8 +57,8 @@ describe("RailtieTest", () => {
   });
 
   afterEach(() => {
-    BaseRailtie.subclasses.length = 0;
-    BaseRailtie.subclasses.push(...savedSubclasses);
+    BaseTrailtie.subclasses.length = 0;
+    BaseTrailtie.subclasses.push(...savedSubclasses);
     Trailtie.config["activeRecord"] = savedConfig;
     Base.timeZoneAwareAttributes = savedTimeZoneAware;
     Base.timeZoneAwareTypes = savedTimeZoneAwareTypes;
@@ -78,7 +78,7 @@ describe("RailtieTest", () => {
   });
 
   it("ActiveRecord::Railtie is registered in the global subclasses list", () => {
-    expect(BaseRailtie.subclasses).toContain(Trailtie);
+    expect(BaseTrailtie.subclasses).toContain(Trailtie);
   });
 
   it("runInitializers registers the ActiveRecord deprecator", () => {

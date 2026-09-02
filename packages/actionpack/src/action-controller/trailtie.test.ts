@@ -1,22 +1,22 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Trailtie, type ActionControllerConfig } from "./trailtie.js";
-import { Railtie as BaseRailtie } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 
-const { deprecators } = BaseRailtie;
+const { deprecators } = BaseTrailtie;
 
 describe("ActionController::Trailtie", () => {
-  let savedSubclasses: (typeof BaseRailtie)[];
+  let savedSubclasses: (typeof BaseTrailtie)[];
   let savedConfig: ActionControllerConfig;
 
   beforeEach(() => {
-    savedSubclasses = [...BaseRailtie.subclasses];
+    savedSubclasses = [...BaseTrailtie.subclasses];
     savedConfig = structuredClone(Trailtie.config["actionController"] as ActionControllerConfig);
   });
 
   afterEach(() => {
-    BaseRailtie.subclasses.length = 0;
-    BaseRailtie.subclasses.push(...savedSubclasses);
+    BaseTrailtie.subclasses.length = 0;
+    BaseTrailtie.subclasses.push(...savedSubclasses);
     Trailtie.config["actionController"] = savedConfig;
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];
@@ -24,7 +24,7 @@ describe("ActionController::Trailtie", () => {
   });
 
   it("ActionController::Railtie is registered in the global subclasses list", () => {
-    expect(BaseRailtie.subclasses).toContain(Trailtie);
+    expect(BaseTrailtie.subclasses).toContain(Trailtie);
   });
 
   it("runInitializers registers the ActionController deprecator", () => {

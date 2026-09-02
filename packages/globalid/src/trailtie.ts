@@ -4,12 +4,12 @@
 // and `:60-63` do.
 import {
   ArgumentError,
-  Railtie as BaseRailtie,
+  Trailtie as BaseTrailtie,
   dasherize,
   extend,
   months,
   onLoad,
-  registerRailtie,
+  registerTrailtie,
 } from "@blazetrails/activesupport";
 import { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -39,19 +39,19 @@ export interface TrailtieApp {
   keyGenerator(): { generateKey(salt: string): string | Buffer };
 }
 
-export class Trailtie extends BaseRailtie {
+export class Trailtie extends BaseTrailtie {
   static {
-    registerRailtie(this);
+    registerTrailtie(this);
 
-    BaseRailtie.config["globalId"] = {} as GlobalIdConfig;
-    ((BaseRailtie.config["eagerLoadNamespaces"] ??= []) as unknown[]).push(GlobalID);
+    BaseTrailtie.config["globalId"] = {} as GlobalIdConfig;
+    ((BaseTrailtie.config["eagerLoadNamespaces"] ??= []) as unknown[]).push(GlobalID);
 
     this.initializer("global_id", (app) => {
       Trailtie.initialize(app as TrailtieApp);
     });
 
     this.initializer("web_console.deprecator", () => {
-      BaseRailtie.deprecators["globalId"] = GlobalID.deprecator();
+      BaseTrailtie.deprecators["globalId"] = GlobalID.deprecator();
     });
   }
 
@@ -79,7 +79,7 @@ export class Trailtie extends BaseRailtie {
    * already imports globalid.
    */
   static initialize(app: TrailtieApp): void {
-    const config = (app.config.globalId ??= BaseRailtie.config["globalId"] as GlobalIdConfig);
+    const config = (app.config.globalId ??= BaseTrailtie.config["globalId"] as GlobalIdConfig);
     const defaultExpiresIn = months(1).toI();
     const defaultAppName = dasherize(app.railtieName.replace("_application", ""));
 

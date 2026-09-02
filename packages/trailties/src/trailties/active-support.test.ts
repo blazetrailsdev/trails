@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
-  Railtie as BaseRailtie,
+  Trailtie as BaseTrailtie,
   Deprecation,
   DEFAULT_BEHAVIORS,
   deprecator as activeSupportDeprecator,
@@ -9,15 +9,15 @@ import { Digest } from "@blazetrails/activesupport/digest";
 import { Trailtie, type ActiveSupportConfig } from "./active-support.js";
 
 const deprecator = activeSupportDeprecator();
-const { deprecators } = BaseRailtie;
+const { deprecators } = BaseTrailtie;
 
 describe("RailtieTest", () => {
-  let savedSubclasses: (typeof BaseRailtie)[];
+  let savedSubclasses: (typeof BaseTrailtie)[];
   let savedActiveSupport: unknown;
   let savedHashDigestClass: typeof Digest.hashDigestClass;
 
   beforeEach(() => {
-    savedSubclasses = [...BaseRailtie.subclasses];
+    savedSubclasses = [...BaseTrailtie.subclasses];
     savedHashDigestClass = Digest.hashDigestClass;
     const cur = Trailtie.config["activeSupport"];
     try {
@@ -29,8 +29,8 @@ describe("RailtieTest", () => {
   });
 
   afterEach(() => {
-    BaseRailtie.subclasses.length = 0;
-    BaseRailtie.subclasses.push(...savedSubclasses);
+    BaseTrailtie.subclasses.length = 0;
+    BaseTrailtie.subclasses.push(...savedSubclasses);
     Trailtie.config["activeSupport"] = savedActiveSupport;
     for (const key of Object.keys(deprecators)) {
       delete deprecators[key];
@@ -39,7 +39,7 @@ describe("RailtieTest", () => {
   });
 
   it("ActiveSupport::Railtie is registered in the global subclasses list", () => {
-    expect(BaseRailtie.subclasses).toContain(Trailtie);
+    expect(BaseTrailtie.subclasses).toContain(Trailtie);
   });
 
   it("seeds config.activeSupport on load", () => {

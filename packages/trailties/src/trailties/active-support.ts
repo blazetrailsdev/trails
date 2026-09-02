@@ -39,8 +39,8 @@
  *   - active_support.set_use_message_serializer_for_metadata — same
  */
 import {
-  Railtie as BaseRailtie,
-  registerRailtie,
+  Trailtie as BaseTrailtie,
+  registerTrailtie,
   deprecator,
   type Deprecation,
   type DeprecationBehavior,
@@ -66,32 +66,34 @@ export interface ActiveSupportConfig {
  *
  * Mirrors: ActiveSupport::Railtie (activesupport/lib/active_support/railtie.rb)
  */
-export class Trailtie extends BaseRailtie {
+export class Trailtie extends BaseTrailtie {
   static {
-    registerRailtie(this);
+    registerTrailtie(this);
 
     // Mirrors `config.active_support = ActiveSupport::OrderedOptions.new`.
     this.config["activeSupport"] ??= {};
 
     this.initializer("active_support.deprecator", () => {
-      BaseRailtie.deprecators["activeSupport"] = deprecator();
+      BaseTrailtie.deprecators["activeSupport"] = deprecator();
     });
 
     // ORDERING CAVEAT: in Rails, every `<framework>.deprecator` initializer
     // is annotated `before: :load_environment_config`, while
     // `active_support.deprecation_behavior` carries no `before:` — so by the
     // time this fires, *every* framework's deprecator has been registered
-    // and Rails' `app.deprecators` proxy iterates them all. Our BaseRailtie
+    // and Rails' `app.deprecators` proxy iterates them all. Our BaseTrailtie
     // does not yet support `before:`/`after:` initializer ordering, and
     // `app.deprecators` is a plain `Record`, not a proxy that tracks future
     // additions. This means a framework whose `.deprecator` initializer
     // runs *after* this block (registration order) won't get these
-    // settings applied. The Rails-shaped fix lives on BaseRailtie
+    // settings applied. The Rails-shaped fix lives on BaseTrailtie
     // (ordering + DeprecatorsProxy) and is a follow-up on PR 2.7a, not a
     // local patch here.
     this.initializer("active_support.deprecation_behavior", () => {
       const cfg = (this.config["activeSupport"] as ActiveSupportConfig | undefined) ?? {};
-      const all = Object.values(BaseRailtie.deprecators).filter((d): d is Deprecation => d != null);
+      const all = Object.values(BaseTrailtie.deprecators).filter(
+        (d): d is Deprecation => d != null,
+      );
       if (cfg.reportDeprecations === false) {
         for (const d of all) {
           d.silenced = true;
