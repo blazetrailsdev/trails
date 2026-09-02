@@ -16,7 +16,7 @@ export class TestResponse extends Response {
   private _responseParser?: ResponseParser;
 
   static fromResponse(response: Response): TestResponse {
-    return new TestResponse(response.status, response.headers, [response.body]);
+    return new TestResponse(response.status, response.headers.toHash(), [response.body]);
   }
 
   /**

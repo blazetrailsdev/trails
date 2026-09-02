@@ -31,8 +31,8 @@ describe("ActionController::Live::Buffer", () => {
     res.setHeader("content-length", "42");
     const buf = new Buffer(res);
     buf.write("hello");
-    expect(res.headers["cache-control"]).toBe("no-cache");
-    expect(res.headers["content-length"]).toBeUndefined();
+    expect(res.headers.get("cache-control")).toBe("no-cache");
+    expect(res.headers.get("content-length")).toBeUndefined();
   });
 
   it("write does not touch headers once response is committed", () => {
@@ -40,7 +40,7 @@ describe("ActionController::Live::Buffer", () => {
     res.close();
     const buf = new Buffer(res);
     buf.write("x");
-    expect(res.headers["cache-control"]).toBeUndefined();
+    expect(res.headers.get("cache-control")).toBeUndefined();
   });
 
   it("writeln appends a newline only when missing", () => {
@@ -191,7 +191,7 @@ describe("ActionController::Live::Response", () => {
   it("inherits DispatchResponse.create factory shape (status/headers/body args)", () => {
     const res = new Response(201, { "x-test": "1" }, ["seed"]);
     expect(res.status).toBe(201);
-    expect(res.headers["x-test"]).toBe("1");
+    expect(res.headers.get("x-test")).toBe("1");
     expect(res.body).toBe("seed");
     expect(res.stream).toBeInstanceOf(Buffer);
   });
@@ -201,7 +201,7 @@ describe("ActionController::Live::Response", () => {
     res.setCookie("session", "abc");
     res.setCookie("flash", "hi");
     res.stream.close();
-    expect(res.headers["set-cookie"]).toBe("session=abc\nflash=hi");
+    expect(res.headers.get("set-cookie")).toBe("session=abc\nflash=hi");
     expect(res.committed).toBe(true);
   });
 
@@ -210,7 +210,7 @@ describe("ActionController::Live::Response", () => {
     res.setCookie("session", "abc");
     res.setHeader("set-cookie", "manual=1");
     res.stream.close();
-    expect(res.headers["set-cookie"]).toBe("manual=1");
+    expect(res.headers.get("set-cookie")).toBe("manual=1");
   });
 });
 
@@ -265,19 +265,19 @@ describe("ActionController::Live#send_stream", () => {
   it("sets headers from filename, yields the stream, falls back to octet-stream", async () => {
     const a = makeHost();
     await sendStream.call(a, { filename: "subscribers.csv" }, (s) => s.write("x\n"));
-    expect(a.response.headers["content-type"]).toMatch(/csv/);
-    expect(a.response.headers["content-disposition"]).toContain("subscribers.csv");
-    expect(a.response.headers["content-disposition"]).toContain("attachment");
+    expect(a.response.headers.get("content-type")).toMatch(/csv/);
+    expect(a.response.headers.get("content-disposition")).toContain("subscribers.csv");
+    expect(a.response.headers.get("content-disposition")).toContain("attachment");
 
     const b = makeHost();
     await sendStream.call(b, { filename: "blob.zzz" }, () => {});
-    expect(b.response.headers["content-type"]).toBe("application/octet-stream");
+    expect(b.response.headers.get("content-type")).toBe("application/octet-stream");
   });
 
   it("accepts an explicit type string", async () => {
     const host = makeHost();
     await sendStream.call(host, { filename: "data.bin", type: "application/x-foo" }, () => {});
-    expect(host.response.headers["content-type"]).toBe("application/x-foo");
+    expect(host.response.headers.get("content-type")).toBe("application/x-foo");
   });
 
   it("closes the stream even when the block throws", async () => {

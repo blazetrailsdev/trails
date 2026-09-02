@@ -9,6 +9,7 @@ import { ContentDisposition } from "../../action-dispatch/http/content-dispositi
 import { MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { Response as DispatchResponse } from "../../action-dispatch/http/response.js";
+import type { Headers } from "@blazetrails/rack";
 import { merge } from "@blazetrails/ruby-compat";
 
 export class ClientDisconnected extends Error {
@@ -20,7 +21,7 @@ export class ClientDisconnected extends Error {
 
 interface LiveResponseLike {
   committed: boolean;
-  headers: Record<string, string>;
+  headers: Headers;
   setHeader(key: string, value: string): void;
   deleteHeader(key: string): void;
   close?(): void;
@@ -71,10 +72,9 @@ export class Buffer {
     if (this._closed) throw new Error("closed stream");
 
     if (!this._response.committed) {
-      if (!this._response.headers["cache-control"] && !this._response.headers["Cache-Control"]) {
-        this._response.setHeader("cache-control", "no-cache");
+      if (this._response.headers.get("Cache-Control") === undefined) {
+        this._response.headers.set("Cache-Control", "no-cache");
       }
-      this._response.deleteHeader("content-length");
       this._response.deleteHeader("Content-Length");
     }
 
@@ -259,9 +259,7 @@ export class Response extends DispatchResponse {
     const cookies = this.cookies;
     const names = Object.keys(cookies);
     if (names.length === 0) return;
-    if (this.headers["set-cookie"] !== undefined || this.headers["Set-Cookie"] !== undefined) {
-      return;
-    }
+    if (this.headers.get("set-cookie") !== undefined) return;
     this.setHeader("set-cookie", names.map((n) => `${n}=${cookies[n]}`).join("\n"));
   }
 
