@@ -1,13 +1,27 @@
+import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
 import { stringInspect } from "./string/inspect.js";
 import { isSymbol } from "./symbol.js";
 
+const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
+
+/** @noRailsEquivalent PERMANENT — Ruby's `&block`, read back by `rb_block_given_p` (`vendor/ruby/eval.c:866`); TypeScript has no such syntax, and a stored default may itself be callable, so the block carries a mark instead. */
+export type Block<T> = ((key: string) => T) & { readonly [BLOCK]: true };
+
+/** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/eval.c:866`) TypeScript has no equivalent of. */
+export function block<T>(fn: (key: string) => T): Block<T> {
+  return Object.assign((key: string) => fn(key), { [BLOCK]: true as const });
+}
+
+function blockGivenP(value: unknown): value is Block<unknown> {
+  return typeof value === "function" && (value as Partial<Block<unknown>>)[BLOCK] === true;
+}
+
 /**
- * Ruby `Hash#fetch` (`vendor/ruby/hash.c:2176` `rb_hash_fetch_m`), both arms:
- * with a second argument the stored value or that default, and with one
- * argument the stored value or a `KeyError`. Ruby's block form is the third
- * arm and is not ported — no call site yields the missing key through this
- * export.
+ * Ruby `Hash#fetch` (`vendor/ruby/hash.c:2176` `rb_hash_fetch_m`), all three
+ * arms: with one argument the stored value or a `KeyError`, with a second the
+ * stored value or that default, and with a {@link block} the stored value or
+ * what the block returns for the missing key.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/hash.c:2176`).
  */
 export function fetch<T>(hash: Record<string, unknown>, key: string): T;
@@ -19,19 +33,31 @@ export function fetch<T>(hash: Record<string, unknown>, key: string): T;
  */
 export function fetch<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T;
 /**
- * `rb_hash_fetch_m` dispatches on `argc`, so the two arms share one body over a
- * rest parameter: an absent second argument is the raising arm, and an
- * explicitly-passed `undefined` is a default, exactly as Ruby's `nil` is.
+ * The block arm: on a miss `rb_hash_fetch_m` yields the key and returns what
+ * the block returns, which is what `Rack::Request::Env#fetch_header`
+ * (`vendor/rack/lib/rack/request.rb:106-108`) installs a default through.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/hash.c:2176`).
+ */
+export function fetch<T>(hash: Record<string, unknown>, key: string, block: Block<T>): T;
+/**
+ * `rb_hash_fetch_m` dispatches on `argc` and `rb_block_given_p`, so the arms
+ * share one body over a rest parameter: an absent second argument is the
+ * raising arm, and an explicitly-passed `undefined` is a default, exactly as
+ * Ruby's `nil` is.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/hash.c:2176`).
  */
 export function fetch(hash: Record<string, unknown>, key: string, ...rest: unknown[]): unknown {
-  if (hasKey(hash, key)) {
-    return hash[key];
-  } else if (rest.length === 0) {
-    throw new KeyError(`key not found: ${strEllipsize(inspectKey(key), 65)}`);
-  } else {
-    return rest[0];
+  const blockGiven = blockGivenP(rest[0]);
+  if (!hasKey(hash, key)) {
+    if (blockGiven) {
+      return (rest[0] as Block<unknown>)(key);
+    } else if (rest.length === 0) {
+      throw new KeyError(`key not found: ${strEllipsize(inspectKey(key), 65)}`);
+    } else {
+      return rest[0];
+    }
   }
+  return hash[key];
 }
 
 /**
@@ -73,15 +99,22 @@ function strEllipsize(str: string, len: number): string {
 type PairBlock<T> = (key: string, value: T) => unknown;
 
 /**
+ * The conflict block `rb_hash_update` and `rb_hash_merge` take
+ * (`vendor/ruby/hash.c:4012-4022` `rb_hash_update_block_i`), yielded the key,
+ * the RECEIVER's value and the argument's, in that order.
+ */
+export type ConflictBlock<T> = (key: string, oldValue: T, newValue: T) => T;
+
+/**
  * Ruby `Hash#merge` (`vendor/ruby/hash.c:4144` `rb_hash_merge`), which is
  * `rb_hash_update` over `rb_hash_dup(self)` — a NEW hash, the receiver
- * untouched. Ruby's conflict block is the second arm and is not ported; no
- * call site passes one.
+ * untouched, and it inherits `rb_hash_update`'s conflict-block arm through
+ * that call.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#merge` (`vendor/ruby/hash.c:4144`).
  */
 export function merge<T>(
   hash: Record<string, T>,
-  ...others: Record<string, T>[]
+  ...others: (Record<string, T> | ConflictBlock<T>)[]
 ): Record<string, T> {
   return update({ ...hash }, ...others);
 }
@@ -89,16 +122,24 @@ export function merge<T>(
 /**
  * Ruby `Hash#update` (`vendor/ruby/hash.c:4028` `rb_hash_update`) — MUTATES
  * the receiver and returns it, which is the whole difference from `merge`.
- * Each argument is applied in turn, so a later one wins.
+ * Each argument is applied in turn, so a later one wins — unless a trailing
+ * conflict block is given, which `rb_hash_update_block_i`
+ * (`vendor/ruby/hash.c:4012-4022`) yields for a key already in the receiver,
+ * storing what it returns.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#update` (`vendor/ruby/hash.c:4028`).
  */
 export function update<T>(
   hash: Record<string, T>,
-  ...others: Record<string, T>[]
+  ...others: (Record<string, T> | ConflictBlock<T>)[]
 ): Record<string, T> {
-  for (const other of others) {
+  const block =
+    typeof others[others.length - 1] === "function"
+      ? (others.pop() as ConflictBlock<T>)
+      : undefined;
+  for (const other of others as Record<string, T>[]) {
     for (const key of Object.keys(other)) {
-      hash[key] = other[key];
+      hash[key] =
+        block !== undefined && hasKey(hash, key) ? block(key, hash[key], other[key]) : other[key];
     }
   }
   return hash;
@@ -106,7 +147,7 @@ export function update<T>(
 
 /**
  * Ruby `Hash#merge!` (`vendor/ruby/hash.c:7247`), which MRI defines onto the
- * same `rb_hash_update` body as `update`.
+ * same `rb_hash_update` body as `update`, conflict-block arm included.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#merge!` (`vendor/ruby/hash.c:4028`).
  */
 export const mergeBang = update;
@@ -154,7 +195,7 @@ export function eachPair<T>(hash: Record<string, T>, block: PairBlock<T>): Recor
  * `rb_inspect(value)`, joined by `", "`.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#inspect` (`vendor/ruby/hash.c:3483`).
  */
-export function inspect(hash: Record<string, unknown>): string {
+export function inspect(hash: Record<string, unknown> | Map<unknown, unknown>): string {
   return inspectHash(hash, new Set());
 }
 
@@ -164,14 +205,18 @@ export function inspect(hash: Record<string, unknown>): string {
  * stack renders as `"{...}"` rather than recursing forever. `recursing` is that
  * stack, which `rb_exec_recursive` keeps per-thread.
  */
-function inspectHash(hash: Record<string, unknown>, recursing: Set<object>): string {
+function inspectHash(
+  hash: Record<string, unknown> | Map<unknown, unknown>,
+  recursing: Set<object>,
+): string {
   if (recursing.has(hash)) return "{...}";
-  const keys = Object.keys(hash);
-  if (keys.length === 0) return "{}";
+  const pairs: [unknown, unknown][] =
+    hash instanceof Map ? [...hash.entries()] : Object.keys(hash).map((key) => [key, hash[key]]);
+  if (pairs.length === 0) return "{}";
   recursing.add(hash);
   try {
-    return `{${keys
-      .map((key) => `${rbInspect(key, recursing)}=>${rbInspect(hash[key], recursing)}`)
+    return `{${pairs
+      .map(([key, value]) => `${rbInspect(key, recursing)}=>${rbInspect(value, recursing)}`)
       .join(", ")}}`;
   } finally {
     recursing.delete(hash);
@@ -337,6 +382,7 @@ type MapBoundaryReturn = any;
 export class Hash<K, V> extends Map<K, V> {
   private _default?: V;
   private _defaultProc?: DefaultProc<K, V>;
+  private _frozen = false;
 
   /**
    * `Hash.new` (`vendor/ruby/hash.c:1782` `rb_hash_initialize`): a block is
@@ -361,6 +407,63 @@ export class Hash<K, V> extends Map<K, V> {
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]` (`vendor/ruby/hash.c:2121`).
    */
+  /**
+   * `Object#freeze` (`vendor/ruby/object.c:1284` `rb_obj_freeze`), which
+   * `Hash#freeze` (`vendor/ruby/hash.c:107`) is. `Object.freeze` cannot serve:
+   * it seals a JS object's properties, and a `Map`'s entries are not
+   * properties, so the seat is the `FL_FREEZE` flag `rb_hash_modify_check`
+   * reads.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Object#freeze` (`vendor/ruby/object.c:1284`).
+   */
+  freeze(): this {
+    this._frozen = true;
+    return this;
+  }
+
+  /**
+   * `Object#frozen?` (`vendor/ruby/object.c:1301` `rb_obj_frozen_p`). Ruby's
+   * `?` predicate suffix is `is` here, per the conventions.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Object#frozen?` (`vendor/ruby/object.c:1301`).
+   */
+  isFrozen(): boolean {
+    return this._frozen;
+  }
+
+  /**
+   * `rb_hash_modify_check` (`vendor/ruby/hash.c:1602`), which every mutator
+   * calls first: `rb_check_frozen` raises `FrozenError` naming the receiver's
+   * class and `inspect`.
+   */
+  private modifyCheck(): void {
+    if (this._frozen) {
+      throw new FrozenError(`can't modify frozen ${this.constructor.name}: ${inspect(this)}`);
+    }
+  }
+
+  /**
+   * `Hash#[]=` (`vendor/ruby/hash.c:2018` `rb_hash_aset`), whose
+   * `rb_hash_modify` goes through `rb_hash_modify_check` (`hash.c:1623`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]=` (`vendor/ruby/hash.c:2018`).
+   */
+  override set(key: K, value: V): this {
+    this.modifyCheck();
+    return super.set(key, value);
+  }
+
+  /**
+   * `Hash#clear` (`vendor/ruby/hash.c:1988` `rb_hash_clear`), which also
+   * begins with `rb_hash_modify_check`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#clear` (`vendor/ruby/hash.c:1988`).
+   */
+  override clear(): void {
+    this.modifyCheck();
+    super.clear();
+  }
+
   override get(key: K): V | undefined {
     if (super.has(key)) return super.get(key);
     return this.default(key);
@@ -390,6 +493,7 @@ export class Hash<K, V> extends Map<K, V> {
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#default=` (`vendor/ruby/hash.c:2265`).
    */
   setDefault(value: V | undefined): void {
+    this.modifyCheck();
     this._default = value;
     this._defaultProc = undefined;
   }
@@ -412,6 +516,7 @@ export class Hash<K, V> extends Map<K, V> {
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#default_proc=` (`vendor/ruby/hash.c:2308`).
    */
   setDefaultProc(proc: DefaultProc<K, V> | undefined): void {
+    this.modifyCheck();
     if (proc == null) {
       this.setDefault(undefined);
       return;
@@ -435,6 +540,7 @@ export class Hash<K, V> extends Map<K, V> {
    * @noRailsEquivalent PERMANENT — Ruby core `Hash#delete` (`vendor/ruby/hash.c:2441`).
    */
   override delete(key: K, block?: (key: K) => V): MapBoundaryReturn {
+    this.modifyCheck();
     if (super.has(key)) {
       const val = super.get(key);
       super.delete(key);

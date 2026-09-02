@@ -13,6 +13,7 @@ import {
   BlockValidator,
 } from "./index.js";
 import { Error as ActiveModelError } from "./error.js";
+import { FrozenError, Hash } from "@blazetrails/ruby-compat";
 import type { ValidatableRecord } from "./validator.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
@@ -623,5 +624,20 @@ describe("ValidatableRecord<TBase> type tests", () => {
 
     const p = new Person();
     expectTypeOf(p.errors).toEqualTypeOf<Errors<Person>>();
+  });
+});
+
+describe("Errors#messages", () => {
+  it("returns a frozen hash, the way `hash.freeze` in errors.rb:271 hands it back", () => {
+    const errors = new Errors({});
+    errors.add("name", "cannot be blank");
+
+    const messages = errors.messages as Hash<string, readonly string[]>;
+    expect(messages.isFrozen()).toBe(true);
+    expect(() => messages.set("name", [])).toThrow(FrozenError);
+
+    const details = errors.details as Hash<string, unknown>;
+    expect(details.isFrozen()).toBe(true);
+    expect(() => details.set("name", [])).toThrow(FrozenError);
   });
 });

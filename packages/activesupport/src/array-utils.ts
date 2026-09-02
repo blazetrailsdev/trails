@@ -9,6 +9,7 @@ import * as XmlMini from "./xml-mini.js";
 import { isPlainObject } from "./hash-utils.js";
 import { inspect, toS } from "./core-ext/object/inspect.js";
 import { isEmpty } from "./ruby-empty.js";
+import { rbObjClass } from "@blazetrails/ruby-compat";
 
 /**
  * Wraps its argument in an array unless it is already an array (or array-like).
@@ -276,28 +277,6 @@ export function toFs(self: unknown[], format = "default"): string {
 export { toFs as toFormattedS };
 
 /**
- * Ruby's `value.class.name` for the `all?(first.class)` root inference
- * (conversions.rb:190-192). JS has one `Number` where Ruby has `Integer` and
- * `Float`, so the split follows `XmlMini`'s own `TYPE_NAMES` mapping and
- * `[1, 2]` still roots at `integers` the way Rails does.
- */
-function rubyClassName(value: unknown): string {
-  if (value === null || value === undefined) return "NilClass";
-  switch (typeof value) {
-    case "boolean":
-      return value ? "TrueClass" : "FalseClass";
-    case "bigint":
-      return "Integer";
-    case "number":
-      return Number.isInteger(value) ? "Integer" : "Float";
-    case "string":
-      return "String";
-    default:
-      return (value as object).constructor.name;
-  }
-}
-
-/**
  * Returns a string that represents the array in XML by invoking `to_xml` on
  * each element. Mirrors: `Array#to_xml` (conversions.rb:183-212). Ruby `||=`
  * replaces only nil/false and `0` is truthy there, so `indent: 0` survives the
@@ -313,8 +292,8 @@ export function toXml(
   options.builder ??= new XmlMini.IndentedXmlStringBuilder("", options.indent);
   options.root ??= (() => {
     const first = self[0];
-    if (!isPlainObject(first) && self.every((e) => rubyClassName(e) === rubyClassName(first))) {
-      const underscored = underscore(rubyClassName(first));
+    if (!isPlainObject(first) && self.every((e) => rbObjClass(e) === rbObjClass(first))) {
+      const underscored = underscore(rbObjClass(first));
       return pluralize(underscored).replaceAll("/", "_");
     } else {
       return "objects";

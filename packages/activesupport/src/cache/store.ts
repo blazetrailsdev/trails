@@ -4,6 +4,7 @@ import {
   NotImplementedError,
   TypeError,
   regexpEscape,
+  rbBuiltinClassName,
 } from "@blazetrails/ruby-compat";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
@@ -29,17 +30,6 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
-/** The class name Ruby's conversion errors name the offending value by. */
-function rubyClassName(value: unknown): string {
-  if (value === null || value === undefined) return "nil";
-  if (value === true) return "true";
-  if (value === false) return "false";
-  if (Array.isArray(value)) return "Array";
-  if (typeof value === "string") return "String";
-  if (typeof value === "number") return Number.isInteger(value) ? "Integer" : "Float";
-  return (value as object)?.constructor?.name ?? "Object";
-}
-
 /**
  * Mirrors Ruby's `Kernel#Integer` — the conversion `retrieve_pool_options`
  * applies to `pool_options[:size]` (cache.rb:213). Numerics truncate, Strings
@@ -54,7 +44,7 @@ function Integer(value: unknown): number {
   }
   if (typeof value !== "string") {
     // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new TypeError(`can't convert ${rubyClassName(value)} into Integer`);
+    throw new TypeError(`can't convert ${rbBuiltinClassName(value)} into Integer`);
   }
   const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
   const body = digits.replace(/^[+-]/, "");
@@ -95,7 +85,7 @@ function Float(value: unknown): number {
   if (typeof value === "number") return value;
   if (typeof value !== "string") {
     // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new TypeError(`can't convert ${rubyClassName(value)} into Float`);
+    throw new TypeError(`can't convert ${rbBuiltinClassName(value)} into Float`);
   }
   const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
   const decimal = /^[+-]?([0-9]+(\.[0-9]+)?|\.[0-9]+)([eE][+-]?[0-9]+)?$/;

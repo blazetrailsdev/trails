@@ -116,6 +116,7 @@ export class Errors<TBase extends object = object> {
   get messages(): Map<string, readonly string[]> {
     const hash: Hash<string, readonly string[]> = this.toHash();
     hash.setDefault(EMPTY_ARRAY);
+    hash.freeze();
     return hash;
   }
 
@@ -128,6 +129,7 @@ export class Errors<TBase extends object = object> {
     )) {
       hash.set(attr, details);
     }
+    hash.freeze();
     return hash;
   }
 

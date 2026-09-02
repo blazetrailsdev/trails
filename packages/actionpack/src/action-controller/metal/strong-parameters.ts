@@ -1,7 +1,7 @@
 /** ActionController::StrongParameters Provides ActionController::Parameters, a hash-like object that controls which parameters are permitted for mass assignment. @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { KeyError, eachPair, hasKey, merge } from "@blazetrails/ruby-compat";
+import { KeyError, eachPair, hasKey, merge, mergeBang } from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
 
 // --- Error classes ---
@@ -315,14 +315,11 @@ export class Parameters {
     return this.reverseMerge(otherHash);
   }
 
-  /** Mutating reverse merge — merges other into self (self wins), returns self. */
+  /** Mirrors `reverse_merge!` (strong_parameters.rb:1042-1046) — the
+   *  receiver-wins conflict block is what makes it a REVERSE merge. */
   reverseMergeBang(otherHash: Parameters | Record<string, unknown>): this {
     const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
-    for (const [k, v] of Object.entries(otherData)) {
-      if (!(k in this._data)) {
-        this._data[k] = v;
-      }
-    }
+    mergeBang(this._data, otherData, (_key, left, _right) => left);
     return this;
   }
 
