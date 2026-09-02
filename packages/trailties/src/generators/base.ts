@@ -27,6 +27,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   git = Actions.git;
   afterInstall = Actions.afterInstall;
   rake = Actions.rake;
+  executeCommand = Actions.executeCommand;
 
   pkg = TrailsActions.pkg;
   route = TrailsActions.route;

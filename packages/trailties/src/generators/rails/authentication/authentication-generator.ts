@@ -113,17 +113,19 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 
   /**
-   * `authentication_generator.rb:41-47`. Rails' Gemfile arm has no analogue.
-   *
-   * @missingRailsCall execute_command — CONVERGEABLE port-execute-command-as-a-generator-action
+   * `authentication_generator.rb:41-47`, onto `package.json` — the trails
+   * analogue of the Gemfile. Rails' already-listed arm installs, its missing
+   * arm adds then installs; `bin/bundle` becomes the app's package manager.
    */
   private enableBcrypt(): void {
     if (!this.fileExists("package.json")) return;
     const full = this.path.join(this.cwd, "package.json");
     const json = JSON.parse(this.fs.readFileSync(full, "utf-8"));
-    if (json.dependencies?.["bcryptjs"]) return;
-    json.dependencies = { ...json.dependencies, bcryptjs: "*" };
-    this.fs.writeFileSync(full, JSON.stringify(json, null, 2) + "\n");
+    if (!json.dependencies?.["bcryptjs"]) {
+      json.dependencies = { ...json.dependencies, bcryptjs: "*" };
+      this.fs.writeFileSync(full, JSON.stringify(json, null, 2) + "\n");
+    }
+    this.executeCommand(json.packageManager?.split("@")[0] ?? "pnpm", "install --silent");
   }
 
   /** `authentication_generator.rb:52-55`. */

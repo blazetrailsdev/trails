@@ -66,14 +66,22 @@ export function rake(
   command: string,
   options: RakeOptions = {},
 ): string | undefined {
-  return executeCommand(this, "rake", command, options);
+  return executeCommand.call(this, "rake", command, options);
 }
 
-function executeCommand(
-  host: ActionsHost,
+/**
+ * Rails' `Actions#execute_command` (`actions.rb:461-472`), which runs
+ * `bin/<executor>`. Reachable from a generator the way Ruby's private instance
+ * method is.
+ *
+ * @missingRailsCall run — PERMANENT: `in_root { run(...) }` is Thor's shell-out,
+ * which trails has no port of; `spawnSync` with `cwd` is that call inlined.
+ */
+export function executeCommand(
+  this: ActionsHost,
   executor: string,
   command: string,
-  options: RakeOptions,
+  options: RakeOptions = {},
 ): string | undefined {
   // Mirrors Rails' RAILS_ENV resolution but defaults from TRAILS_ENV
   // (the trailties runtime convention, see database.ts:resolveEnv). Set
@@ -84,9 +92,9 @@ function executeCommand(
   if (options.sudo) parts.push("sudo");
   parts.push(executor, ...splitArgs(command));
   const [bin, ...args] = parts;
-  host.output(`          ${executor}  ${command}`);
+  this.output(`          ${executor}  ${command}`);
   const result = getChildProcess().spawnSync(bin, args, {
-    cwd: host.cwd,
+    cwd: this.cwd,
     env: { ...processEnv, TRAILS_ENV: envName, RAILS_ENV: envName } as NodeJS.ProcessEnv,
   });
   if (options.abortOnFailure && (result.status !== 0 || result.error)) {

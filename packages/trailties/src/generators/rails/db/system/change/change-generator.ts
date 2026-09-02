@@ -52,7 +52,9 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   /**
-   * @missingRailsCall template — CONVERGEABLE converge-db-system-change-database-config-to-a-template
+   * @missingRailsArgs template — PERMANENT: Rails writes `config/database.yml`;
+   * a trails app's database config is a TS module (`trailties/src/database.ts`
+   * loads it), so the destination is resolved, not a literal.
    */
   editDatabaseConfig(): void {
     // Candidate order matches the runtime loader in trailties/src/database.ts
@@ -60,7 +62,17 @@ export class ChangeGenerator extends GeneratorBase {
     const target =
       ["config/database.ts", "config/database.js"].find((p) => this.fileExists(p)) ??
       `config/database${this.ext()}`;
-    this.writeOrUpdate(target, databaseConfigTs(this.to, this.database, this.appName));
+    this.template(this.database.template, target);
+  }
+
+  /**
+   * Rails' `Thor::Actions#template`, whose `source` names the per-adapter
+   * template under `rails/generators/rails/app/templates/`. trails renders that
+   * config as a TypeScript module instead of copying a `.yml`, so `source`
+   * selects the renderer rather than a file on disk.
+   */
+  private template(source: string, destination: string): void {
+    this.writeOrUpdate(destination, databaseConfigTs(source, this.database, this.appName));
   }
 
   editPackageJson(): void {
@@ -236,8 +248,8 @@ export class ChangeGenerator extends GeneratorBase {
   }
 }
 
-function databaseConfigTs(to: DatabaseName, database: Database, appName: string): string {
-  if (to === "sqlite3") {
+function databaseConfigTs(template: string, database: Database, appName: string): string {
+  if (template === "config/databases/sqlite3.yml") {
     return [
       `export default {`,
       ...["development", "test", "production"].map(
@@ -247,9 +259,9 @@ function databaseConfigTs(to: DatabaseName, database: Database, appName: string)
       ``,
     ].join("\n");
   }
-  // `to` is the adapter id (`postgresql` | `mysql` | `mariadb-mysql`);
-  // `Database#name` is a service/volume identifier and not safe to switch on.
-  const adapter = to === "postgresql" ? "postgresql" : "mysql2";
+  // `Database#template` is the per-adapter template path; `Database#name` is a
+  // service/volume identifier and not safe to switch on.
+  const adapter = template === "config/databases/postgresql.yml" ? "postgresql" : "mysql2";
   const port = database.port!;
   const block = (env: string) =>
     `  ${env}: { adapter: "${adapter}", database: "${appName}_${env}", host: "localhost", port: ${port} },`;

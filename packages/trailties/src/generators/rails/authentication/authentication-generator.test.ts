@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetrails/activesupport";
 import { AuthenticationGenerator } from "./authentication-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
@@ -24,7 +25,16 @@ const write = (rel: string, content: string) => {
 };
 const writeAC = (find: string, replace: string) =>
   write(APP_CTRL_PATH, APP_CTRL_EMPTY.replace(find, replace));
+let spawned: string[][];
 beforeEach(() => {
+  spawned = [];
+  registerChildProcessAdapter("trailties-auth-test", {
+    spawnSync: (cmd, args) => {
+      spawned.push([cmd, ...args]);
+      return { status: 0, signal: null, stdout: "", stderr: "" };
+    },
+  });
+  childProcessAdapterConfig.adapter = "trailties-auth-test";
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
   write("tsconfig.json", "{}");
   write(APP_CTRL_PATH, APP_CTRL_EMPTY);
@@ -141,10 +151,11 @@ describe("AuthenticationGenerator", () => {
     expect(read(migrations[1])).toContain("user_agent");
   });
 
-  it("adds bcryptjs to the application's dependencies", () => {
+  it("adds bcryptjs to the application's dependencies and installs it", () => {
     write("package.json", '{ "dependencies": { "@blazetrails/activerecord": "*" } }');
     makeGen().run();
     expect(JSON.parse(read("package.json")).dependencies.bcryptjs).toBe("*");
+    expect(spawned).toContainEqual(["pnpm", "install", "--silent"]);
   });
 
   it("does not silently overwrite an existing file", () => {
