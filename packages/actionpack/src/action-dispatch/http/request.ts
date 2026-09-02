@@ -1321,9 +1321,10 @@ export class MissingController extends NameError {
  * `admin/posts`). Rails looks the `"#{name.camelize}Controller"` constant up
  * in the global Ruby namespace, which Zeitwerk autoloads on demand; ESM has
  * no `const_missing` seam, so railties' `setup_main_autoloader` populates
- * this map eagerly instead.
+ * this map eagerly instead. The map itself is convergeable onto the
+ * Inflector's constant table `constantize` already reads.
  *
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE controller-constant-resolution-throws-instead-of-constantize
  */
 export const controllerConstants = new Map<string, DispatchableControllerClass>();
 

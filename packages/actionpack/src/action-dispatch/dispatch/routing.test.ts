@@ -1,11 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
 import { Route } from "../routing/route.js";
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
-import type { Request } from "../http/request.js";
+import { controllerConstants, type Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 import { escapeSegment, unescapeUri } from "../journey/router/utils.js";
+
+afterEach(() => {
+  controllerConstants.delete("posts");
+});
 
 // ==========================================================================
 // Journey::Route tests (journey/route_test.rb)
@@ -517,7 +521,7 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
     });
-    routes.registerController(
+    controllerConstants.set(
       "posts",
       EchoParamsController as unknown as DispatchableControllerClass,
     );

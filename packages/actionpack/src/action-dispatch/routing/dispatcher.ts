@@ -1,11 +1,8 @@
 /**
  * Trails-private support for `ActionDispatch::Routing::RouteSet::Dispatcher`
- * — a RouteSet-scoped overlay on the controller constant table
- * `Request#controllerClassFor` resolves against. Ruby has one global constant
- * namespace, so Rails needs no such overlay; trails keeps one per RouteSet so
- * a route set can bind a controller without publishing it process-wide. The
- * matching `Dispatcher` / `StaticDispatcher` endpoint classes live in
- * `route-set.ts` to mirror Rails' inner-class layout.
+ * — the structural controller-class type its `dispatch` needs. The matching
+ * `Dispatcher` / `StaticDispatcher` endpoint classes live in `route-set.ts`
+ * to mirror Rails' inner-class layout.
  *
  * @internal trails-private (no Rails counterpart as a standalone file)
  */
@@ -13,32 +10,6 @@
 import type { RackResponse } from "@blazetrails/rack";
 import type { Request } from "../http/request.js";
 import type { Response } from "../http/response.js";
-
-/** @internal */
-export class DispatcherRegistry {
-  private readonly controllers = new Map<string, DispatchableControllerClass>();
-
-  register(controller: string, controllerClass: DispatchableControllerClass): void {
-    this.controllers.set(controller, controllerClass);
-  }
-
-  unregister(controller: string): void {
-    this.controllers.delete(controller);
-  }
-
-  has(controller: string): boolean {
-    return this.controllers.has(controller);
-  }
-
-  /** @internal */
-  resolve(controller: string): DispatchableControllerClass | undefined {
-    return this.controllers.get(controller);
-  }
-
-  clear(): void {
-    this.controllers.clear();
-  }
-}
 
 /**
  * The controller class shape `Dispatcher#dispatch` needs. Declared

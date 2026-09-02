@@ -40,7 +40,7 @@ import {
 } from "./url-for.js";
 import { Endpoint } from "./endpoint.js";
 import { X_CASCADE } from "../constants.js";
-import { DispatcherRegistry, type DispatchableControllerClass } from "./dispatcher.js";
+import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Response as AdResponse } from "../http/response.js";
 import { RoutingError, UrlGenerationError } from "../../action-controller/metal/exceptions.js";
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
@@ -118,19 +118,10 @@ export type DrawCallback = (mapper: Mapper) => void;
  */
 export class Dispatcher extends Endpoint {
   private readonly _raiseOnNameError: boolean;
-  /**
-   * Rails' Dispatcher has only `@raise_on_name_error`; controller resolution
-   * goes through Ruby's one global constant namespace. Trails keeps a
-   * RouteSet-scoped overlay on that namespace, which {@link _controller}
-   * consults first. Subclasses that bind a controller directly
-   * (e.g. {@link StaticDispatcher}) leave it undefined.
-   */
-  private readonly _registry: DispatcherRegistry | undefined;
 
-  constructor(raiseOnNameError: boolean, registry?: DispatcherRegistry) {
+  constructor(raiseOnNameError: boolean) {
     super();
     this._raiseOnNameError = raiseOnNameError;
-    this._registry = registry;
   }
 
   dispatcher(): boolean {
@@ -160,10 +151,6 @@ export class Dispatcher extends Endpoint {
    * @internal
    */
   protected _controller(req: RouterRequest): DispatchableControllerClass {
-    const params = req.pathParameters;
-    const controller = typeof params["controller"] === "string" ? params["controller"] : "";
-    const registered = this._registry?.resolve(controller);
-    if (registered) return registered;
     try {
       return (req as unknown as AdRequest).controllerClass() as DispatchableControllerClass;
     } catch (e) {
@@ -430,8 +417,6 @@ export class RouteSet {
     },
     polymorphicMappings: this.polymorphicMappings,
   };
-  /** Controller name → controller class, consulted by {@link Dispatcher}. */
-  readonly dispatcherRegistry: DispatcherRegistry = new DispatcherRegistry();
   /** @internal */
   private _journeyRouter: JourneyRouter | null = null;
   /** @internal */
@@ -445,7 +430,7 @@ export class RouteSet {
    *
    * @internal
    */
-  private readonly _routeDispatcher: Dispatcher = new Dispatcher(false, this.dispatcherRegistry);
+  private readonly _routeDispatcher: Dispatcher = new Dispatcher(false);
 
   constructor(config: RouteSetConfig = { ...DEFAULT_CONFIG }) {
     // Rails: `def initialize(config = DEFAULT_CONFIG.dup)` — DEFAULT_CONFIG
@@ -700,7 +685,6 @@ export class RouteSet {
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
-    this.dispatcherRegistry.clear();
     this._customUrlHelpers.clear();
     this._urlHelpersWithPaths = undefined;
     this._urlHelpersWithoutPaths = undefined;
@@ -892,12 +876,7 @@ export class RouteSet {
     return recognizeViaJourney(this.journeyRouter, method, path);
   }
 
-  /** Bind `controller` to a controller class in this set's {@link DispatcherRegistry}. */
-  registerController(controller: string, controllerClass: DispatchableControllerClass): void {
-    this.dispatcherRegistry.register(controller, controllerClass);
-  }
-
-  /** End-to-end `Router.serve` using this set's registered controllers. */
+  /** End-to-end `Router.serve` through this set's Journey router. */
   serve(req: RouterRequest): Promise<RackishResponse> {
     return this.journeyRouter.serve(req);
   }
@@ -1043,7 +1022,6 @@ export class RouteSet {
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
-    this.dispatcherRegistry.clear();
     this._customUrlHelpers.clear();
     this._urlHelpersWithPaths = undefined;
     this._urlHelpersWithoutPaths = undefined;

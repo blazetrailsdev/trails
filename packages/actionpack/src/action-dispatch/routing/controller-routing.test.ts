@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { Response } from "../http/response.js";
-import type { Request } from "../http/request.js";
+import { controllerConstants, type Request } from "../http/request.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
+
+afterEach(() => {
+  controllerConstants.delete("posts");
+});
 
 // ==========================================================================
 // Controller routing integration tests
@@ -237,7 +241,7 @@ describe("Controller routing integration", () => {
 
   it("call sets path parameters in env", async () => {
     const routes = new RouteSet();
-    routes.registerController(
+    controllerConstants.set(
       "posts",
       CaptureEnvController as unknown as DispatchableControllerClass,
     );

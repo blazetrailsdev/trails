@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
-import { DispatcherRegistry, type DispatchableControllerClass } from "./dispatcher.js";
+import type { DispatchableControllerClass } from "./dispatcher.js";
 import { X_CASCADE } from "../constants.js";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
@@ -36,13 +36,24 @@ function makeControllerClass(
   } as unknown as DispatchableControllerClass;
 }
 
-describe("RouteDispatcher / DispatcherRegistry", () => {
+describe("RouteDispatcher", () => {
+  const registered: string[] = [];
+
+  function registerController(controller: string, controllerClass: DispatchableControllerClass) {
+    controllerConstants.set(controller, controllerClass);
+    registered.push(controller);
+  }
+
+  afterEach(() => {
+    for (const controller of registered.splice(0)) controllerConstants.delete(controller);
+  });
+
   it("dispatches to a registered handler via RouteSet.serve", async () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/posts/:id", { to: "posts#show" }));
 
     const calls: Array<{ action: string; id: string }> = [];
-    routes.registerController(
+    registerController(
       "posts",
       makeControllerClass((action, req) => {
         const params = req.pathParameters as Record<string, string>;
@@ -68,7 +79,7 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
   it("returns 404 X-Cascade when no route matches", async () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/posts", { to: "posts#index" }));
-    routes.registerController(
+    registerController(
       "posts",
       makeControllerClass(() => [200, {}, []]),
     );
@@ -85,11 +96,11 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
       r.get("/x", { to: "second#index" });
     });
 
-    routes.registerController(
+    registerController(
       "first",
       makeControllerClass(() => [404, { "x-cascade": "pass" }, []]),
     );
-    routes.registerController(
+    registerController(
       "second",
       makeControllerClass(() => [200, {}, ["second"]]),
     );
@@ -98,26 +109,13 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
     expect(res[0]).toBe(200);
   });
 
-  it("clear() empties the dispatcher registry", () => {
-    const routes = new RouteSet();
-    routes.registerController(
-      "posts",
-      makeControllerClass(() => [200, {}, []]),
-    );
-    expect(routes.dispatcherRegistry.has("posts")).toBe(true);
-    routes.clear();
-    expect(routes.dispatcherRegistry.has("posts")).toBe(false);
-  });
-
   it("Dispatcher reports dispatcher()=true (Endpoint contract)", () => {
-    const reg = new DispatcherRegistry();
-    const d = new Dispatcher(false, reg);
+    const d = new Dispatcher(false);
     expect(d.dispatcher()).toBe(true);
   });
 
   it("Dispatcher with raiseOnNameError=true throws for unregistered controllers", async () => {
-    const reg = new DispatcherRegistry();
-    const d = new Dispatcher(true, reg);
+    const d = new Dispatcher(true);
     const req = makeReq("/x");
     req.pathParameters = { controller: "missing", action: "show" };
     await expect(d.serve(req)).rejects.toThrow(/uninitialized constant MissingController/);
@@ -140,11 +138,11 @@ describe("RouteDispatcher / DispatcherRegistry", () => {
   it("unregister removes a handler so subsequent serves return 404 pass", async () => {
     const routes = new RouteSet();
     routes.draw((r) => r.get("/p", { to: "posts#index" }));
-    routes.registerController(
+    registerController(
       "posts",
       makeControllerClass(() => [200, {}, []]),
     );
-    routes.dispatcherRegistry.unregister("posts");
+    controllerConstants.delete("posts");
     const res = await routes.serve(makeReq("/p"));
     expect(res[0]).toBe(404);
   });
