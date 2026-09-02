@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Trailtie, registerTrailtie } from "./trailtie.js";
 
-describe("Trailtie", () => {
+describe("Railtie", () => {
   // Snapshot and restore global singletons so these tests don't interfere
   // with other test files (e.g. ActiveModel::Railtie expects to remain
   // registered in Trailtie.subclasses after module init).
@@ -53,7 +53,7 @@ describe("Trailtie", () => {
     expect(log).toEqual(["r1"]);
   });
 
-  it("registerTrailtie adds subclass to registry", () => {
+  it("registerRailtie adds subclass to registry", () => {
     class MyRailtie extends Trailtie {
       static {
         registerTrailtie(this);

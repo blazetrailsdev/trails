@@ -24,7 +24,7 @@ export class Trailtie {
    * All registered subclasses — tracked so the application can enumerate
    * all railties at boot.
    *
-   * Mirrors: Rails::Trailtie.subclasses
+   * Mirrors: Rails::Railtie.subclasses
    */
   static readonly subclasses: Array<typeof Trailtie> = [];
 
@@ -123,7 +123,7 @@ export class Trailtie {
  *   static { registerTrailtie(this); }
  *
  * Mirrors: Rails::Railtie.inherited (called automatically by Ruby when
- * a class subclasses Trailtie; we replicate it with an explicit call since
+ * a class subclasses Railtie; we replicate it with an explicit call since
  * JavaScript has no `inherited` hook).
  */
 export function registerTrailtie(subclass: typeof Trailtie): void {
