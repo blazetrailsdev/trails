@@ -1,11 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
-import { Request } from "../../action-dispatch/request.js";
+import { Request, controllerConstants } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
 import { bodyToString } from "@blazetrails/rack";
+
+afterEach(() => {
+  controllerConstants.delete("posts");
+});
 
 describe("Controller JSON rendering integration", () => {
   it("renders JSON from a controller action", async () => {
@@ -110,7 +114,7 @@ describe("Controller JSON rendering integration", () => {
     routes.draw((r) => {
       r.resources("posts");
     });
-    routes.registerController("posts", PostsController as unknown as DispatchableControllerClass);
+    controllerConstants.set("posts", PostsController as unknown as DispatchableControllerClass);
 
     const [status, headers, body] = await routes.call({
       REQUEST_METHOD: "GET",
