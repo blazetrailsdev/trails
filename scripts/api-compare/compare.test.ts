@@ -29,9 +29,7 @@ import {
   reorderedCalls,
   ORDER_PREFIX,
   resolvePortedWithArgsSigs,
-  newTsOwnerMaps,
   newTsPortedWithArgsMaps,
-  recordTsOwner,
   recordTsPortedWithArgs,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
@@ -3441,19 +3439,5 @@ describe("ported-with-args population", () => {
         "fixtures",
       ),
     ).toEqual([]);
-  });
-
-  it("keeps the test-helper guard off the owner maps", () => {
-    const owners = newTsOwnerMaps();
-    recordTsOwner(
-      owners,
-      method("fixtures", "test-helpers/fixtures.ts"),
-      "test-helpers/fixtures.ts",
-      "FixtureSet",
-    );
-
-    expect(owners.ownersByFileName.get("test-helpers/fixtures.ts")?.get("fixtures")).toEqual(
-      new Set(["FixtureSet"]),
-    );
   });
 });

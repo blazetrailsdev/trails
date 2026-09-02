@@ -684,84 +684,6 @@ export function reorderedCalls(
 }
 
 /**
- * The owner-side populations `resolveTsOwner` reads: which classes declare a
- * name in a file, on which seat, in which shape, and where the declaration
- * really lives.
- */
-export interface TsOwnerMaps {
-  /** (file → name → every class declaring it), `resolveTsOwner`'s population. */
-  ownersByFileName: Map<string, Map<string, Set<string>>>;
-  /**
-   * (file → name → owner → the file the member is DECLARED in), recorded only
-   * where it differs from the entity's own file — see `declFileFor`.
-   */
-  declFileByFileNameOwner: Map<string, Map<string, Map<string, string>>>;
-  /**
-   * (file → name → owners) split by declaration shape — see
-   * `MethodInfo.bodyless` and `ownersWithBodies`.
-   */
-  bodylessOwnersByFileName: Map<string, Map<string, Set<string>>>;
-  bodiedOwnersByFileName: Map<string, Map<string, Set<string>>>;
-  /**
-   * The owners that declare the name as a `set` accessor (file → name →
-   * owners) — the port's spelling of Ruby's `name=` writer, so `resolveTsOwner`
-   * can keep a Ruby reader off it (RFC 0108).
-   */
-  writerOwnersByFileName: Map<string, Map<string, Set<string>>>;
-  /**
-   * The same population split by the SEAT each owner declares the name on
-   * (file → name → owners), so `resolveTsOwner` can pair a Ruby
-   * `X::ClassMethods` owner with the static declaration and the bare `X` owner
-   * with the prototype one (RFC 0108).
-   */
-  staticOwnersByFileName: Map<string, Map<string, Set<string>>>;
-  instanceOwnersByFileName: Map<string, Map<string, Set<string>>>;
-}
-
-export function newTsOwnerMaps(): TsOwnerMaps {
-  return {
-    ownersByFileName: new Map(),
-    declFileByFileNameOwner: new Map(),
-    bodylessOwnersByFileName: new Map(),
-    bodiedOwnersByFileName: new Map(),
-    writerOwnersByFileName: new Map(),
-    staticOwnersByFileName: new Map(),
-    instanceOwnersByFileName: new Map(),
-  };
-}
-
-/** Record one package-scoped TS member into the owner populations. */
-export function recordTsOwner(maps: TsOwnerMaps, m: MethodInfo, file: string, owner: string): void {
-  const owners = maps.ownersByFileName.get(file) ?? new Map<string, Set<string>>();
-  owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
-  maps.ownersByFileName.set(file, owners);
-  if (m.file !== undefined && m.file !== file) {
-    const byName = maps.declFileByFileNameOwner.get(file) ?? new Map<string, Map<string, string>>();
-    const byOwner = byName.get(m.name) ?? new Map<string, string>();
-    byOwner.set(owner, m.file);
-    byName.set(m.name, byOwner);
-    maps.declFileByFileNameOwner.set(file, byName);
-  }
-  const byShape = m.bodyless === true ? maps.bodylessOwnersByFileName : maps.bodiedOwnersByFileName;
-  const shapeOwners = byShape.get(file) ?? new Map<string, Set<string>>();
-  shapeOwners.set(m.name, (shapeOwners.get(m.name) ?? new Set<string>()).add(owner));
-  byShape.set(file, shapeOwners);
-  if (m.writer === true) {
-    const writerOwners = maps.writerOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
-    writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
-    maps.writerOwnersByFileName.set(file, writerOwners);
-  }
-  // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat.
-  if (owner !== "") {
-    const bySeat =
-      m.isStatic === true ? maps.staticOwnersByFileName : maps.instanceOwnersByFileName;
-    const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
-    seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(owner));
-    bySeat.set(file, seatOwners);
-  }
-}
-
-/**
  * The signature populations `resolvePortedWithArgsSigs` reads, plus the
  * option-key side-map recorded from the same members.
  */
@@ -826,10 +748,10 @@ export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
  *
  * The `isTestHelperFile` guard lives HERE, with the population it protects: a
  * test helper standing in for a Ruby method must not open the calls gate for a
- * body that never calls it (see config.ts#isTestHelperFile). Held on the
- * OWNER-map block instead — where a revert probe once put it — every gate, every
+ * body that never calls it (see config.ts#isTestHelperFile). Held on `main()`'s
+ * owner-map block instead — where a revert probe once put it — every gate, every
  * `scripts/api-compare/` test and the `call-mismatches.json` artifact itself
- * stay byte-identical, which is why the split is exported and pinned by a test
+ * stay byte-identical, which is why this half is exported and pinned by a test
  * rather than left as a closure over `main()`'s locals.
  */
 export function recordTsPortedWithArgs(
@@ -3271,17 +3193,25 @@ export function main() {
       string,
       Map<string, Map<string, Map<string, string>>>
     >();
-    // `resolveTsOwner`'s populations — see TsOwnerMaps.
-    const ownerMaps = newTsOwnerMaps();
-    const {
-      ownersByFileName: tsOwnersByFileName,
-      declFileByFileNameOwner: tsDeclFileByFileNameOwner,
-      bodylessOwnersByFileName: tsBodylessOwnersByFileName,
-      bodiedOwnersByFileName: tsBodiedOwnersByFileName,
-      writerOwnersByFileName: tsWriterOwnersByFileName,
-      staticOwnersByFileName: tsStaticOwnersByFileName,
-      instanceOwnersByFileName: tsInstanceOwnersByFileName,
-    } = ownerMaps;
+    // (file → name → every class declaring it), `resolveTsOwner`'s population.
+    const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // (file → name → owner → the file the member is DECLARED in), recorded only
+    // where it differs from the entity's own file — see `declFileFor`.
+    const tsDeclFileByFileNameOwner = new Map<string, Map<string, Map<string, string>>>();
+    // The same population split by the SEAT each owner declares the name on
+    // (file → name → owners), so `resolveTsOwner` can pair a Ruby
+    // `X::ClassMethods` owner with the static declaration and the bare `X`
+    // owner with the prototype one (RFC 0108).
+    const tsStaticOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    const tsInstanceOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // The owners that declare the name as a `set` accessor (file → name →
+    // owners) — the port's spelling of Ruby's `name=` writer, so
+    // `resolveTsOwner` can keep a Ruby reader off it (RFC 0108).
+    const tsWriterOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // (file → name → owners) split by declaration shape — see `MethodInfo.bodyless`
+    // and `ownersWithBodies`.
+    const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // (file → name → owner → the file the member is DECLARED in), recorded only
     // where it differs from the entity's own file — see `declFileFor`.
     // The same population split by the SEAT each owner declares the name on
@@ -3357,7 +3287,36 @@ export function main() {
       scope: "package" | "dep" = "package",
       owner = "",
     ) => {
-      if (scope === "package") recordTsOwner(ownerMaps, m, file, owner);
+      if (scope === "package") {
+        const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
+        owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
+        tsOwnersByFileName.set(file, owners);
+        if (m.file !== undefined && m.file !== file) {
+          const byName =
+            tsDeclFileByFileNameOwner.get(file) ?? new Map<string, Map<string, string>>();
+          const byOwner = byName.get(m.name) ?? new Map<string, string>();
+          byOwner.set(owner, m.file);
+          byName.set(m.name, byOwner);
+          tsDeclFileByFileNameOwner.set(file, byName);
+        }
+        const byShape = m.bodyless === true ? tsBodylessOwnersByFileName : tsBodiedOwnersByFileName;
+        const shapeOwners = byShape.get(file) ?? new Map<string, Set<string>>();
+        shapeOwners.set(m.name, (shapeOwners.get(m.name) ?? new Set<string>()).add(owner));
+        byShape.set(file, shapeOwners);
+        if (m.writer === true) {
+          const writerOwners = tsWriterOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
+          writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
+          tsWriterOwnersByFileName.set(file, writerOwners);
+        }
+        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat.
+        if (owner !== "") {
+          const bySeat =
+            m.isStatic === true ? tsStaticOwnersByFileName : tsInstanceOwnersByFileName;
+          const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
+          seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(owner));
+          bySeat.set(file, seatOwners);
+        }
+      }
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
