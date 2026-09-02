@@ -1,4 +1,8 @@
-import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
+import {
+  Trailtie as BaseTrailtie,
+  registerTrailtie,
+  type Deprecators,
+} from "@blazetrails/activesupport";
 import { env as processEnv } from "@blazetrails/activesupport/process-adapter";
 import { SecurePassword } from "./secure-password.js";
 import { Error as ActiveModelError } from "./error.js";
@@ -15,12 +19,17 @@ export interface TrailtieConfig {
   activeModel?: ActiveModelConfig;
 }
 
+/** @noRailsEquivalent PERMANENT */
+interface TrailtieApp {
+  deprecators: Deprecators;
+}
+
 export class Trailtie extends BaseTrailtie {
   static {
     registerTrailtie(this);
 
-    this.initializer("active_model.deprecator", () => {
-      BaseTrailtie.deprecators["activeModel"] = deprecator();
+    this.initializer("active_model.deprecator", (app) => {
+      (app as TrailtieApp).deprecators.set("activeModel", deprecator());
     });
 
     this.initializer("active_model.secure_password", () => {

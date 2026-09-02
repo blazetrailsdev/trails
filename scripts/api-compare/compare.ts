@@ -314,12 +314,26 @@ const LOOP_SKELETON_NAMES = new Set(
  * conventions live here. The one function runs over both sides, since {@link LOOP_SKELETON_NAMES} carries the
  * Ruby name and the JS analogue alike.
  */
+/**
+ * Ruby's `catch(:tag) { ... }` / `throw :tag` are ordinary `Kernel` calls, so
+ * the extractor emits them as `ref:catch` / `ref:throw`; their only faithful TS
+ * lowering is a `try` whose handler re-tests the tag and rethrows, which emits
+ * `try` / `throw`. Folding the pair onto the construct the port is forced to
+ * use is what lets a line-for-line body read as one — the residual `if` the TS
+ * tag test contributes is a real extra arm and is left flagged (RFC 0113).
+ */
+const CONSTRUCT_SKELETON_NAMES = new Map([
+  ["catch", "try"],
+  ["throw", "throw"],
+]);
+
 export function foldSkeletonTokens(skeleton: string[]): string[] {
-  return skeleton.map((token) =>
-    token.startsWith("ref:") && LOOP_SKELETON_NAMES.has(token.slice("ref:".length))
-      ? "loop"
-      : token,
-  );
+  return skeleton.map((token) => {
+    if (!token.startsWith("ref:")) return token;
+    const name = token.slice("ref:".length);
+    if (LOOP_SKELETON_NAMES.has(name)) return "loop";
+    return CONSTRUCT_SKELETON_NAMES.get(name) ?? token;
+  });
 }
 
 // The significant set (RFC 0047): admits EVERY ported Ruby call name as

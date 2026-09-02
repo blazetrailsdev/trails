@@ -1,15 +1,18 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { Trailtie, defaultActionViewConfig } from "./trailtie.js";
-import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
+import { Deprecators, Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 
-const { deprecators } = BaseTrailtie;
+let deprecators: Deprecators;
+let app: { deprecators: Deprecators };
 
 describe("RailtieTest", () => {
   let savedSubclasses: (typeof BaseTrailtie)[];
 
   beforeEach(() => {
+    deprecators = new Deprecators();
+    app = { deprecators };
     savedSubclasses = [...BaseTrailtie.subclasses];
   });
 
@@ -18,9 +21,6 @@ describe("RailtieTest", () => {
   afterEach(() => {
     BaseTrailtie.subclasses.length = 0;
     BaseTrailtie.subclasses.push(...savedSubclasses);
-    for (const key of Object.keys(deprecators)) {
-      delete deprecators[key];
-    }
     Base.annotateRenderedViewWithFilenames = originalAnnotate;
     (
       Trailtie.config["actionView"] as ReturnType<typeof defaultActionViewConfig>
@@ -36,15 +36,15 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers registers the ActionView deprecator", () => {
-    Trailtie.runInitializers();
-    expect(deprecators["actionView"]).toBe(deprecator());
+    Trailtie.runInitializers(app);
+    expect(deprecators.get("actionView")).toBe(deprecator());
   });
 
   it("runInitializers applies annotateRenderedViewWithFilenames config to Base", () => {
     (
       Trailtie.config["actionView"] as ReturnType<typeof defaultActionViewConfig>
     ).annotateRenderedViewWithFilenames = true;
-    Trailtie.runInitializers();
+    Trailtie.runInitializers(app);
     expect(Base.annotateRenderedViewWithFilenames).toBe(true);
   });
 });

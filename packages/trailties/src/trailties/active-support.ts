@@ -43,6 +43,7 @@ import {
   registerTrailtie,
   deprecator,
   type Deprecation,
+  type Deprecators,
   type DeprecationBehavior,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
@@ -61,6 +62,12 @@ export interface ActiveSupportConfig {
   disallowedDeprecationWarnings?: Deprecation["disallowedWarnings"];
 }
 
+/** @noRailsEquivalent PERMANENT */
+interface TrailtieApp {
+  config: { get(key: string): unknown };
+  deprecators: Deprecators;
+}
+
 /**
  * Trailtie wiring for ActiveSupport.
  *
@@ -73,43 +80,35 @@ export class Trailtie extends BaseTrailtie {
     // Mirrors `config.active_support = ActiveSupport::OrderedOptions.new`.
     this.config["activeSupport"] ??= {};
 
-    this.initializer("active_support.deprecator", () => {
-      BaseTrailtie.deprecators["activeSupport"] = deprecator();
+    this.initializer("active_support.deprecator", (app) => {
+      (app as TrailtieApp).deprecators.set("activeSupport", deprecator());
     });
 
-    // ORDERING CAVEAT: in Rails, every `<framework>.deprecator` initializer
-    // is annotated `before: :load_environment_config`, while
-    // `active_support.deprecation_behavior` carries no `before:` — so by the
-    // time this fires, *every* framework's deprecator has been registered
-    // and Rails' `app.deprecators` proxy iterates them all. Our BaseTrailtie
-    // does not yet support `before:`/`after:` initializer ordering, and
-    // `app.deprecators` is a plain `Record`, not a proxy that tracks future
-    // additions. This means a framework whose `.deprecator` initializer
-    // runs *after* this block (registration order) won't get these
-    // settings applied. The Rails-shaped fix lives on BaseTrailtie
-    // (ordering + DeprecatorsProxy) and is a follow-up on PR 2.7a, not a
-    // local patch here.
-    this.initializer("active_support.deprecation_behavior", () => {
-      const cfg = (this.config["activeSupport"] as ActiveSupportConfig | undefined) ?? {};
-      const all = Object.values(BaseTrailtie.deprecators).filter(
-        (d): d is Deprecation => d != null,
-      );
-      if (cfg.reportDeprecations === false) {
-        for (const d of all) {
-          d.silenced = true;
-          d.behavior = "silence";
-          d.disallowedBehavior = "silence";
+    this.initializer("active_support.deprecation_behavior", (app) => {
+      const activeSupport =
+        ((app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig | undefined) ??
+        (this.config["activeSupport"] as ActiveSupportConfig | undefined) ??
+        {};
+      const deprecators = (app as TrailtieApp).deprecators;
+      if (activeSupport.reportDeprecations === false) {
+        deprecators.setSilenced(true);
+        deprecators.setBehavior("silence");
+        deprecators.setDisallowedBehavior("silence");
+      } else {
+        const deprecation = activeSupport.deprecation;
+        if (deprecation != null) {
+          deprecators.setBehavior(deprecation);
         }
-        return;
-      }
-      if (cfg.deprecation !== undefined) {
-        for (const d of all) d.behavior = cfg.deprecation;
-      }
-      if (cfg.disallowedDeprecation !== undefined) {
-        for (const d of all) d.disallowedBehavior = cfg.disallowedDeprecation;
-      }
-      if (cfg.disallowedDeprecationWarnings !== undefined) {
-        for (const d of all) d.disallowedWarnings = cfg.disallowedDeprecationWarnings;
+
+        const disallowedDeprecation = activeSupport.disallowedDeprecation;
+        if (disallowedDeprecation != null) {
+          deprecators.setDisallowedBehavior(disallowedDeprecation);
+        }
+
+        const disallowedWarnings = activeSupport.disallowedDeprecationWarnings;
+        if (disallowedWarnings != null) {
+          deprecators.setDisallowedWarnings(disallowedWarnings);
+        }
       }
     });
 

@@ -368,6 +368,7 @@ export class TestCase {
     const httpMethod = String(method).toUpperCase();
 
     const env: Record<string, unknown> = {
+      ...TestRequest.defaultEnv(),
       REQUEST_METHOD: httpMethod,
       PATH_INFO: (params as Record<string, unknown>)?.["path"] ?? `/${action}`,
       HTTP_HOST: "test.host",

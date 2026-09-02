@@ -100,6 +100,19 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#build"]).toEqual(["ref:cached", "if", "new:Thing"]);
   });
 
+  it("emits try for a modifier rescue, which Ripper hangs off :rescue_mod", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def initialize(xs)
+            @v = load(xs) rescue nil
+          end
+        end
+      `,
+    });
+    expect(s["Foo#initialize"]).toEqual(["try", "ref:load"]);
+  });
+
   // A `define_method(name) { … }` body IS the method body and is right there in
   // the AST, so it goes through the same collectors the literal-`def` path uses
   // — without this every generated method reads as a zero-call one to

@@ -11,12 +11,14 @@ import { installExtendedQueriesIfConfigured } from "./encryption/install.js";
 import { UniquenessValidator } from "./validations.js";
 import { deprecator } from "./deprecator.js";
 import { ActiveRecord } from "./ar-config.js";
-import { Executor } from "@blazetrails/activesupport";
+import { Deprecators, Executor } from "@blazetrails/activesupport";
 import { asynchronousQueriesTracker } from "./core.js";
 
-const { deprecators } = BaseTrailtie;
-
-const blogApp = (): { config: { filterParameters: Array<string | RegExp> } } => ({
+const blogApp = (): {
+  config: { filterParameters: Array<string | RegExp> };
+  deprecators: Deprecators;
+} => ({
+  deprecators: new Deprecators(),
   config: { filterParameters: [] },
 });
 
@@ -72,9 +74,6 @@ describe("RailtieTest", () => {
     EncryptionConfigurable.config.addToFilterParameters = savedAddToFilterParameters;
     EncryptionConfigurable.config.extendQueries = savedExtendQueries;
     installExtendedQueriesIfConfigured();
-    for (const key of Object.keys(deprecators)) {
-      delete deprecators[key];
-    }
   });
 
   it("ActiveRecord::Railtie is registered in the global subclasses list", () => {
@@ -82,8 +81,9 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers registers the ActiveRecord deprecator", () => {
-    Trailtie.runInitializers(blogApp());
-    expect(deprecators["activeRecord"]).toBe(deprecator());
+    const app = blogApp();
+    Trailtie.runInitializers(app);
+    expect(app.deprecators.get("activeRecord")).toBe(deprecator());
   });
 
   it("seeds config.activeRecord with the Rails default OrderedOptions block", () => {
@@ -155,7 +155,10 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers enables auto filtered parameters when add_to_filter_parameters is set", () => {
-    const app = { config: { filterParameters: [] as Array<string | RegExp> } };
+    const app = {
+      deprecators: new Deprecators(),
+      config: { filterParameters: [] as Array<string | RegExp> },
+    };
     EncryptionConfigurable.config.addToFilterParameters = true;
 
     Trailtie.runInitializers(app);
@@ -165,7 +168,10 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers does not enable auto filtered parameters when add_to_filter_parameters is unset", () => {
-    const app = { config: { filterParameters: [] as Array<string | RegExp> } };
+    const app = {
+      deprecators: new Deprecators(),
+      config: { filterParameters: [] as Array<string | RegExp> },
+    };
     EncryptionConfigurable.config.addToFilterParameters = false;
 
     Trailtie.runInitializers(app);

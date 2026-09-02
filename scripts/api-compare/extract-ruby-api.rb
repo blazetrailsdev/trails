@@ -2563,12 +2563,14 @@ class ApiExtractor
   # vocabulary is deliberately identical; `calls` cannot stand in for it,
   # because `calls.uniq` drops both the repeats and the control flow.
   #
-  # Two places where Ripper's shape has to be converged rather than
+  # Three places where Ripper's shape has to be converged rather than
   # transcribed. `try` tokens on the `:bodystmt`, not on the `:rescue`/`:ensure`
   # clause Ripper hangs off its later slots, or it would land AFTER the
   # protected calls where the TS TryStatement puts it before them. And `raise`
   # tokens as `throw` rather than `ref:raise`, to line up with the port's
-  # `throw new X(...)` — a ThrowStatement on the TS side, never a call.
+  # `throw new X(...)` — a ThrowStatement on the TS side, never a call. And a
+  # modifier `rescue` tokens as `try`, which Ripper hangs off `:rescue_mod`
+  # rather than a `:bodystmt` (RFC 0113).
   def collect_method_skeleton(body_node)
     tokens = []
     with_capture_locals { walk_for_skeleton(body_node, tokens) }
@@ -2584,6 +2586,8 @@ class ApiExtractor
     elsif SKELETON_LOOP_NODES.include?(kind)
       tokens << "loop"
     elsif kind == :bodystmt && (node[2] || node[4])
+      tokens << "try"
+    elsif kind == :rescue_mod
       tokens << "try"
     elsif kind == :binary && SKELETON_LOGICAL_OPS.include?(node[2])
       walk_for_skeleton(node[1], tokens)

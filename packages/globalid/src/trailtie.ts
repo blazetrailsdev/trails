@@ -10,6 +10,7 @@ import {
   months,
   onLoad,
   registerTrailtie,
+  type Deprecators,
 } from "@blazetrails/activesupport";
 import { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
@@ -36,6 +37,11 @@ export interface TrailtieApp {
    * reader, so trails spells it a property (`trailties/src/trailtie.ts:115`). */
   railtieName: string;
   config: { globalId?: GlobalIdConfig };
+  /** `app.deprecators[:global_id] = ... if app.respond_to?(:deprecators)`
+   * (`railtie.rb:47`) — `Application#deprecators`
+   * (`railties/lib/rails/application.rb:244-248`). Optional because the Ruby
+   * carries the `respond_to?` guard. */
+  deprecators?: Deprecators;
   keyGenerator(): { generateKey(salt: string): string | Buffer };
 }
 
@@ -50,8 +56,8 @@ export class Trailtie extends BaseTrailtie {
       Trailtie.initialize(app as TrailtieApp);
     });
 
-    this.initializer("web_console.deprecator", () => {
-      BaseTrailtie.deprecators["globalId"] = GlobalID.deprecator();
+    this.initializer("web_console.deprecator", (app) => {
+      (app as TrailtieApp).deprecators?.set("globalId", GlobalID.deprecator());
     });
   }
 

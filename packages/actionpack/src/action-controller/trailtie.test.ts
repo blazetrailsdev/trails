@@ -1,15 +1,18 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Trailtie, type ActionControllerConfig } from "./trailtie.js";
-import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
+import { Deprecators, Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 
-const { deprecators } = BaseTrailtie;
+let deprecators: Deprecators;
+let app: { deprecators: Deprecators };
 
 describe("ActionController::Trailtie", () => {
   let savedSubclasses: (typeof BaseTrailtie)[];
   let savedConfig: ActionControllerConfig;
 
   beforeEach(() => {
+    deprecators = new Deprecators();
+    app = { deprecators };
     savedSubclasses = [...BaseTrailtie.subclasses];
     savedConfig = structuredClone(Trailtie.config["actionController"] as ActionControllerConfig);
   });
@@ -18,9 +21,6 @@ describe("ActionController::Trailtie", () => {
     BaseTrailtie.subclasses.length = 0;
     BaseTrailtie.subclasses.push(...savedSubclasses);
     Trailtie.config["actionController"] = savedConfig;
-    for (const key of Object.keys(deprecators)) {
-      delete deprecators[key];
-    }
   });
 
   it("ActionController::Railtie is registered in the global subclasses list", () => {
@@ -28,8 +28,8 @@ describe("ActionController::Trailtie", () => {
   });
 
   it("runInitializers registers the ActionController deprecator", () => {
-    Trailtie.runInitializers();
-    expect(deprecators["actionController"]).toBe(deprecator());
+    Trailtie.runInitializers(app);
+    expect(deprecators.get("actionController")).toBe(deprecator());
   });
 
   it("seeds config.actionController with the Rails default OrderedOptions block", () => {

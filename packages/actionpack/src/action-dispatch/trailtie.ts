@@ -5,7 +5,7 @@
  *
  * Registers the ActionDispatch config namespace and two initializers:
  *   - `action_dispatch.deprecator` — installs the ActionDispatch deprecator
- *     into the shared `deprecators` registry.
+ *     into the application's `deprecators` collection.
  *   - `action_dispatch.configure` — copies `config.actionDispatch.*` values
  *     (trails camelCase mirror of Rails' `config.action_dispatch.*`) onto
  *     the framework-level holders (URL, QueryParser, Request::Utils,
@@ -18,7 +18,11 @@
  * out of the configure body and will wire in as those classes gain the
  * matching surface — see actionpack-100-percent.md.
  */
-import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
+import {
+  Trailtie as BaseTrailtie,
+  registerTrailtie,
+  type Deprecators,
+} from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 import { X_REQUEST_ID } from "./constants.js";
 import { URL as HttpURL } from "./http/url.js";
@@ -136,6 +140,11 @@ function cspAccessors(host: CspRequestHost): CspRequest {
   }) as CspRequest;
 }
 
+/** @noRailsEquivalent PERMANENT */
+interface TrailtieApp {
+  deprecators: Deprecators;
+}
+
 export class Trailtie extends BaseTrailtie {
   static {
     registerTrailtie(this);
@@ -143,8 +152,8 @@ export class Trailtie extends BaseTrailtie {
     this.config["actionDispatch"] = defaultActionDispatchConfig();
     this.config["contentSecurityPolicy"] = defaultContentSecurityPolicyConfig();
 
-    this.initializer("action_dispatch.deprecator", () => {
-      BaseTrailtie.deprecators["actionDispatch"] = deprecator();
+    this.initializer("action_dispatch.deprecator", (app) => {
+      (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
     });
 
     this.initializer("action_dispatch.configure", () => {
