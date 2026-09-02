@@ -1577,9 +1577,6 @@ export function extractFromProgram(
     });
   }
 
-  // Generator pass. Unlike the two above, these loops live inside a mixin
-  // function rather than at top level, so the walk cannot stop at a file's own
-  // statements.
   for (const sourceFile of program.getSourceFiles()) {
     if (!sourceFile.fileName.startsWith(srcDir)) continue;
     if (sourceFile.fileName.endsWith(".test.ts")) continue;
@@ -1784,9 +1781,8 @@ function extractDefinePropertyForOf(
 }
 
 /**
- * Strip `(x)` and `x as T`. The command-recorder loop writes
- * `(CommandRecorder.prototype as unknown as Record<string, unknown>)`, which is
- * the same receiver as `CommandRecorder.prototype`.
+ * Strip `(x)` and `x as T` — the command-recorder loop writes
+ * `(CommandRecorder.prototype as unknown as Record<string, unknown>)`.
  */
 function unwrapTsExpression(expr: ts.Expression): ts.Expression {
   let e = expr;
@@ -1799,8 +1795,8 @@ function unwrapTsExpression(expr: ts.Expression): ts.Expression {
  * is not statically a string. Three shapes resolve and nothing else: an array
  * literal (spreads recursed into), an identifier bound to a const in the SAME
  * file, and a property access naming a static of `ownerClass`. A list from
- * another module resolves to null on purpose — the arms below would otherwise
- * credit a class with names this file never spells.
+ * another module is null on purpose — the arms below would otherwise credit a
+ * class with names this file never spells.
  */
 function resolveStringLiteralList(
   expr: ts.Expression,
@@ -1868,14 +1864,12 @@ function hostForClassDeclaration(
 }
 
 /**
- * Every class an `X.prototype` receiver names. `X` is either a class in the
- * package or a PARAMETER of a same-package function — the shape a Rails
- * `class_eval` generator takes in trails, where the loop lives in the mixin's
- * own file and the host is handed to it (`defineValueMethods(Relation)`,
- * packages/activerecord/src/relation.ts:2130). A parameter resolves through
- * the function's call sites — every one of them, since Ruby's generator runs
- * once per class it is applied to — so a generator nothing calls credits
- * nothing.
+ * Every class an `X.prototype` receiver names. `X` is a class in the package,
+ * or a PARAMETER of a same-package function — the shape a Rails `class_eval`
+ * generator takes in trails, where the loop lives in the mixin's own file and
+ * the host is handed to it (`defineValueMethods(Relation)`, relation.ts:2130).
+ * A parameter resolves through EVERY call site, since Ruby's generator runs
+ * once per class it is applied to; a generator nothing calls credits nothing.
  */
 function resolvePrototypeHosts(
   expr: ts.Expression,
@@ -1963,9 +1957,8 @@ function forOfElementName(node: ts.ForOfStatement): string | null {
 /**
  * The trails port of Ruby's name-array `class_eval` generator
  * (`activerecord/lib/active_record/migration/command_recorder.rb:125-132`) —
- * `for (const method of NAMES) { Cls.prototype[method] = function … }`. The
- * Ruby extractor credits the macro, so without this arm the port scores
- * all-missing.
+ * `for (const method of NAMES) { Cls.prototype[method] = function … }`. The Ruby
+ * extractor credits the macro, so without this arm the port scores all-missing.
  */
 function extractPrototypeAssignmentForOf(
   node: ts.ForOfStatement,
@@ -2092,9 +2085,9 @@ function pushGeneratedAccessor(
  * The property name a generated accessor takes for one value of the loop
  * variable: the loop variable itself, or a local assigned from an `if` chain
  * whose conditions are `<list>.includes(<var>)` and whose arms assign
- * `` `${var}Suffix` `` — the port of Rails' `#{name}_values` /
- * `#{name}_value` / `#{name}_clause` split (`query_methods.rb:162-186`).
- * Anything else returns null, and the caller credits nothing.
+ * `` `${var}Suffix` `` — the port of Rails' `#{name}_values` / `#{name}_value`
+ * / `#{name}_clause` split (`query_methods.rb:162-186`). Anything else is null,
+ * and the caller credits nothing.
  */
 function evaluateGeneratedName(
   nameExpr: ts.Expression,
@@ -2174,11 +2167,10 @@ function includesMembershipList(
 
 /**
  * The trails port of Ruby's `Relation::VALUE_METHODS` accessor generator
- * (`activerecord/lib/active_record/relation/query_methods.rb:162-186`) — a
- * loop installing `Object.defineProperty(<host>.prototype, methodName,
- * { get, set })`. Credits each accessor's reader, plus its writer when the
- * descriptor carries a `set` half, the pair Ruby's `def name` /
- * `def name=(value)` produces.
+ * (`activerecord/lib/active_record/relation/query_methods.rb:162-186`) — a loop
+ * installing `Object.defineProperty(<host>.prototype, methodName, { get, set })`.
+ * Credits each reader, plus its writer when the descriptor carries a `set`
+ * half, the pair Ruby's `def name` / `def name=(value)` produces.
  */
 function extractDefinePropertyAccessorForOf(
   node: ts.ForOfStatement,
@@ -2228,8 +2220,7 @@ function extractDefinePropertyAccessorForOf(
 /**
  * A single literal-named `Object.defineProperty(<host>.prototype, "name",
  * { get, set })` — the port of Rails' `alias extensions extending_values`
- * (`activerecord/lib/active_record/relation/query_methods.rb:185`), which sits
- * beside the generator loop rather than inside it.
+ * (`query_methods.rb:185`), which sits beside the loop rather than inside it.
  */
 function extractDefinePropertyAccessorDirect(
   expr: ts.Expression,

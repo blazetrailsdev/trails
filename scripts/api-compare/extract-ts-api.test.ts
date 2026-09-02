@@ -2160,6 +2160,32 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
     expect(names).toEqual([]);
   });
 
+  it("credits every class the generator's call sites pass, each exactly once", () => {
+    const info = extractFromFiles("/p", {
+      "relation.ts": `
+        import { defineValueMethods } from "./query-methods.js";
+        export class Relation { static readonly VALUE_METHODS = ["limit"] as const; }
+        export class AssociationRelation { static readonly VALUE_METHODS = ["offset"] as const; }
+        defineValueMethods(Relation);
+        defineValueMethods(AssociationRelation);
+        defineValueMethods(Relation);
+      `,
+      "query-methods.ts": `
+        export function defineValueMethods(relationClass: any): void {
+          for (const name of relationClass.VALUE_METHODS) {
+            Object.defineProperty(relationClass.prototype, name, {
+              get(this: any) { return null; },
+            });
+          }
+        }
+      `,
+    });
+    const namesOf = (cls: string): string[] =>
+      info.classes[`relation.ts:${cls}`].instanceMethods.map((m) => m.name);
+    expect(namesOf("Relation")).toEqual(["limit"]);
+    expect(namesOf("AssociationRelation")).toEqual(["offset"]);
+  });
+
   it("credits nothing when the generator function is never called with a class", () => {
     const info = extractFromFiles("/p", {
       "relation.ts": `export class Relation {}`,
