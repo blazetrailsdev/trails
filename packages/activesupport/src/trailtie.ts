@@ -25,11 +25,9 @@ let loadCounter = 0;
 export type BlockRunnerKind = "rakeTasks" | "console" | "runner" | "generators" | "server";
 export type TrailtieBlock = (this: Trailtie, app: unknown) => void;
 
+const _registry: Array<typeof Trailtie> = [];
+
 export class Trailtie extends Initializable {
-  /** @internal */
-  private static readonly _registry: Array<typeof Trailtie> = [];
-
-
   protected _config?: Configuration;
 
   constructor() {
@@ -42,7 +40,7 @@ export class Trailtie extends Initializable {
 
   /** Non-abstract subclasses, sorted by load order. Mirrors `Rails::Railtie.subclasses`. */
   static subclasses(): Array<typeof Trailtie> {
-    return [...Trailtie._registry]
+    return [..._registry]
       .filter((s) => !s.isAbstractRailtie())
       .sort(
         (a, b) =>
@@ -53,12 +51,12 @@ export class Trailtie extends Initializable {
 
   /** Explicit subclass registration — replaces Rails' `inherited` hook. */
   static register(subclass: typeof Trailtie): void {
-    if (Trailtie._registry.includes(subclass)) return;
+    if (_registry.includes(subclass)) return;
     assertNotSealed(subclass);
     if (readOwnState<number>(subclass, "_loadIndex") === undefined) {
       writeOwnState(subclass, "_loadIndex", ++loadCounter);
     }
-    Trailtie._registry.push(subclass);
+    _registry.push(subclass);
   }
 
   static isAbstractRailtie(): boolean {
@@ -178,3 +176,21 @@ function eachRegisteredBlock(
 }
 
 ABSTRACT_RAILTIES.push(Trailtie);
+
+/**
+ * Empty the railtie registry, returning the function that puts it back.
+ *
+ * @noRailsEquivalent PERMANENT — Rails resets `Railtie.subclasses` between
+ * cases by forking a subprocess per test (`include ActiveSupport::Testing::Isolation`,
+ * `railties/test/railties/railtie_test.rb:8`). A TS module's state outlives the
+ * suite and trails has no subprocess isolation, so tests need an explicit
+ * reset, as `resetLoadHooks` does for the load-hook registries.
+ */
+export function resetTrailtieRegistry(): () => void {
+  const saved = [..._registry];
+  _registry.length = 0;
+  return () => {
+    _registry.length = 0;
+    _registry.push(...saved);
+  };
+}

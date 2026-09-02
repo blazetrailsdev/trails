@@ -1,12 +1,20 @@
 // Mirrors railties/test/railties/railtie_test.rb. Block-runner and
 // lifecycle-hook cases land alongside PR 2.1b.
-import { describe, it, expect } from "vitest";
-import { Trailtie } from "./trailtie.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Trailtie, resetTrailtieRegistry } from "./trailtie.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { sealAgainstInheritance } from "./trailtie/configurable.js";
 import { runLoadHooks } from "./lazy-load-hooks.js";
 
 describe("Trailtie", () => {
+  let restoreRegistry: () => void;
+  beforeEach(() => {
+    restoreRegistry = resetTrailtieRegistry();
+  });
+  afterEach(() => {
+    restoreRegistry();
+  });
+
   it("cannot instantiate a Railtie object", () => {
     expect(() => new Trailtie()).toThrow(/abstract/);
   });
