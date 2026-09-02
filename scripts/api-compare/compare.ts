@@ -2124,7 +2124,7 @@ function shortName(fqn: string | undefined | null): string | null {
 // - `<X>Type` suffix: Trails suffixes attribute-type classes to avoid
 //   clashing with the value they represent (e.g. `Json` value vs
 //   `JsonType` the cast type).
-const TS_PARENT_ALIASES: { transform: (ruby: string) => string }[] = [
+export const TS_PARENT_ALIASES: { transform: (ruby: string) => string }[] = [
   { transform: (r) => `Abstract${r}` },
   { transform: (r) => `Base${r}` },
   { transform: (r) => `ActiveModel${r}` },

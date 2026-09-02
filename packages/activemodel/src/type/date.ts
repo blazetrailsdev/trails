@@ -35,7 +35,7 @@ export class DateType extends ValueType<DateCastResult> {
   readonly name: string = "date";
 
   type(): string {
-    return this.name;
+    return "date";
   }
 
   typeCastForSchema(value: unknown): string {

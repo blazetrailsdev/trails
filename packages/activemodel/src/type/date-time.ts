@@ -35,7 +35,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   readonly name: string = "datetime";
 
   type(): string {
-    return this.name;
+    return "datetime";
   }
 
   /** @internal */

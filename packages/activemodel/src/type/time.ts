@@ -27,7 +27,7 @@ export class TimeType extends ValueType<Temporal.Instant | TimeWithZone> {
   readonly name = "time";
 
   type(): string {
-    return this.name;
+    return "time";
   }
 
   userInputInTimeZone(
