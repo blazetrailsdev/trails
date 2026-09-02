@@ -391,6 +391,9 @@ importers:
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../actionpack
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../activerecord

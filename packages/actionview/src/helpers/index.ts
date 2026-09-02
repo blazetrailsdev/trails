@@ -100,3 +100,19 @@ export {
   CONTROLLER_DELEGATES,
 } from "./controller-helper.js";
 export type { ControllerHelperHost } from "./controller-helper.js";
+
+export {
+  URI_REGEXP,
+  ASSET_EXTENSIONS,
+  ASSET_PUBLIC_DIRECTORIES,
+  computeAssetExtname,
+  computeAssetPath,
+  publicComputeAssetPath,
+  assetPath,
+  pathToAsset,
+  stylesheetPath,
+  pathToStylesheet,
+} from "./asset-url-helper.js";
+export type { AssetPathOptions, AssetUrlHelperHost } from "./asset-url-helper.js";
+
+export { AssetTagHelper, stylesheetLinkTag } from "./asset-tag-helper.js";
