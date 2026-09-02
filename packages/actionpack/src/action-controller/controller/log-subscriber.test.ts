@@ -8,6 +8,9 @@ import { LogSubscriber } from "../log-subscriber.js";
 
 class CaptureLogger {
   messages: string[] = [];
+  get "info?"(): boolean {
+    return true;
+  }
   info(msg: string): void {
     this.messages.push(msg);
   }

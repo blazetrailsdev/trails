@@ -170,11 +170,10 @@ function rbInspect(value: unknown): string {
   if (value == null) return "nil";
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (isSymbol(value)) return value;
   if (typeof value === "string") {
-    if (isSymbol(value)) return value;
-    const str: string = value as string;
     /* eslint-disable no-control-regex */
-    return `"${str
+    return `"${value
       .replace(/\\/g, "\\\\")
       .replace(/"/g, '\\"')
       .replace(/\n/g, "\\n")

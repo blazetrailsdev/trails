@@ -25,11 +25,11 @@ export class LogSubscriber extends BaseLogSubscriber {
    * `ActionController::LogSubscriber#start_processing`
    * (`vendor/rails/actionpack/lib/action_controller/log_subscriber.rb:9-27`).
    *
-   * @missingRailsArgs each_pair — PERMANENT: Ruby's `payload[:params].each_pair`
-   * is a receiver call taking a block; ruby-compat's `eachPair` is a function
-   * taking that receiver first, so the argument list cannot match.
+   * @missingRailsArgs each_pair — PERMANENT
    */
   startProcessing(event: Event): void {
+    if (!this.logger?.["info?"]) return;
+
     const payload = event.payload as {
       controller: string;
       action: string;
@@ -102,4 +102,6 @@ export class LogSubscriber extends BaseLogSubscriber {
 
 // "action_controller" is the AS::Notifications channel identifier, which uses
 // Rails snake_case naming conventions as a cross-package wire protocol.
+LogSubscriber.subscribeLogLevel("start_processing", "info");
+
 LogSubscriber.attachTo("action_controller");
