@@ -1384,7 +1384,8 @@ function extractFromFiles(srcDir: string, files: Record<string, string>): Packag
   const ASC_PATH = "/_node_modules/@blazetrails/activesupport.ts";
   const all: Record<string, string> = {
     [ASC_PATH]: `export function include(klass: any, mod: any): void {}
-export function extend(klass: any, mod: any): void {}`,
+export function extend(klass: any, mod: any): void {}
+export function classAttribute(this: any, ...attrs: any[]): void {}`,
   };
   for (const [rel, text] of Object.entries(files)) all[`${srcDir}/${rel}`] = text;
 
@@ -4451,5 +4452,185 @@ describe("extractFromProgram — defineModule section visibility", () => {
         export const QueryMethods = defineModule({}, undefined, { elsewhere });
       `),
     ).toThrow(/defineModule private section entry does not resolve/);
+  });
+});
+
+describe("extractFromProgram — a bodied object literal beside a bodyless declaration", () => {
+  it("lets the object literal supersede a same-named all-bodyless module", () => {
+    const info = extractFromFiles("/p", {
+      "accepts-multiparameter-time.ts": `
+        export interface InstanceMethods {
+          serialize(value: unknown): unknown;
+          cast(value: unknown): unknown;
+        }
+        export const InstanceMethods = {
+          serialize(value: unknown) {
+            return value;
+          },
+          cast(value: unknown) {
+            return value;
+          },
+        };
+      `,
+    });
+    const mod = info.modules["accepts-multiparameter-time.ts:InstanceMethods"];
+    expect(mod.instanceMethods.map((m) => m.name).sort()).toEqual(["cast", "serialize"]);
+    expect(mod.instanceMethods.every((m) => m.bodyless !== true)).toBe(true);
+  });
+
+  it("keeps a declared member the object literal does not define", () => {
+    const info = extractFromFiles("/p", {
+      "helper.ts": `
+        export interface InstanceMethods {
+          serialize(value: unknown): unknown;
+          assertValidValue(value: unknown): void;
+        }
+        export const InstanceMethods = {
+          serialize(value: unknown) {
+            return value;
+          },
+        };
+      `,
+    });
+    const mod = info.modules["helper.ts:InstanceMethods"];
+    expect(mod.instanceMethods.map((m) => m.name).sort()).toEqual([
+      "assertValidValue",
+      "serialize",
+    ]);
+    expect(mod.instanceMethods.find((m) => m.name === "assertValidValue")!.bodyless).toBe(true);
+  });
+
+  it("leaves a module that has any bodied member alone", () => {
+    const info = extractFromFiles("/p", {
+      "ns.ts": `
+        export namespace Predications {
+          export function eq() {}
+        }
+        export const Predications = {
+          gt() {},
+        };
+      `,
+    });
+    const mod = info.modules["ns.ts:Predications"];
+    expect(mod.instanceMethods.map((m) => m.name)).not.toContain("gt");
+  });
+
+  it("leaves a registered class alone", () => {
+    const info = extractFromFiles("/p", {
+      "clazz.ts": `
+        export class Type {
+          cast(value: unknown) {
+            return value;
+          }
+        }
+        export const Type = { serialize() {} } as any;
+      `,
+    });
+    expect(info.classes["clazz.ts:Type"].instanceMethods.map((m) => m.name)).toEqual(["cast"]);
+    expect(info.modules["clazz.ts:Type"]).toBeUndefined();
+  });
+});
+
+describe("extractFromProgram — classAttribute() generated accessors", () => {
+  const TZ = `
+    import { classAttribute } from "@blazetrails/activesupport";
+    export interface TimeZoneConversionHost {
+      timeZoneAwareTypes: string[];
+      skipTimeZoneConversionForAttributes: string[];
+    }
+    export const TimeZoneConversion = {
+      included(base: any): void {
+        classAttribute.call(base, "timeZoneAwareTypes", { instanceWriter: false });
+        classAttribute.call(base, "skipTimeZoneConversionForAttributes", {
+          instanceAccessor: false,
+        });
+      },
+    };
+  `;
+
+  it("credits the accessor as a bodied member of the module that calls it", () => {
+    const info = extractFromFiles("/p", { "time-zone-conversion.ts": TZ });
+    const mod = info.modules["time-zone-conversion.ts:TimeZoneConversion"];
+    const generated = mod.classMethods.filter((m) => m.name.startsWith("timeZone"));
+    expect(generated.map((m) => m.name)).toEqual(["timeZoneAwareTypes"]);
+    expect(generated[0].bodyless).toBeUndefined();
+    expect(mod.instanceMethods.map((m) => m.name)).toContain("timeZoneAwareTypes");
+  });
+
+  it("omits the instance seat when instanceAccessor is false", () => {
+    const info = extractFromFiles("/p", { "time-zone-conversion.ts": TZ });
+    const mod = info.modules["time-zone-conversion.ts:TimeZoneConversion"];
+    expect(mod.classMethods.map((m) => m.name)).toContain("skipTimeZoneConversionForAttributes");
+    expect(mod.instanceMethods.map((m) => m.name)).not.toContain(
+      "skipTimeZoneConversionForAttributes",
+    );
+  });
+
+  it("credits nothing for a non-literal attribute name", () => {
+    const info = extractFromFiles("/p", {
+      "dynamic.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        export interface Host {
+          normalizedAttributes: Set<string>;
+        }
+        const name = "normalizedAttributes";
+        export const Normalization = {
+          included(base: any): void {
+            classAttribute.call(base, name);
+          },
+        };
+      `,
+    });
+    const mod = info.modules["dynamic.ts:Normalization"];
+    expect(mod.classMethods.map((m) => m.name)).not.toContain("normalizedAttributes");
+    expect(mod.instanceMethods.map((m) => m.name)).not.toContain("normalizedAttributes");
+  });
+
+  it("credits nothing for a name the file never declares", () => {
+    const info = extractFromFiles("/p", {
+      "undeclared.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        export const Normalization = {
+          included(base: any): void {
+            classAttribute.call(base, "normalizedAttributes");
+          },
+        };
+      `,
+    });
+    const mod = info.modules["undeclared.ts:Normalization"];
+    expect(mod.classMethods.map((m) => m.name)).not.toContain("normalizedAttributes");
+  });
+
+  it("credits nothing when neither the enclosing scope nor the receiver resolves", () => {
+    const info = extractFromFiles("/p", {
+      "loose.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        export interface Host {
+          executor: unknown;
+        }
+        classAttribute.call(Unknown, "executor");
+      `,
+    });
+    for (const mod of Object.values(info.modules)) {
+      expect(mod.classMethods.map((m) => m.name)).not.toContain("executor");
+    }
+  });
+
+  it("credits the receiver when the call site is top level", () => {
+    const info = extractFromFiles("/p", {
+      "reloader.ts": `
+        import { classAttribute } from "@blazetrails/activesupport";
+        export class Reloader {
+          static check() {}
+        }
+        export interface Reloader {
+          executor: unknown;
+        }
+        classAttribute.call(Reloader, "executor");
+      `,
+    });
+    expect(info.classes["reloader.ts:Reloader"].classMethods.map((m) => m.name)).toContain(
+      "executor",
+    );
   });
 });

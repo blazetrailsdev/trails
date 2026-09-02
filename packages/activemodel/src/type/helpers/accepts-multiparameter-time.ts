@@ -30,7 +30,7 @@ function superOf(
 
 type Receiver = InstanceMethods & { valueFromMultiparameterAssignment(value: unknown): unknown };
 
-const InstanceMethods = {
+export const InstanceMethods = {
   serialize(this: Receiver, value: unknown): unknown {
     return this.serializeCastValue(this.cast(value));
   },
