@@ -85,8 +85,6 @@ describe("DevServer", () => {
   it("builds into public/assets without copying public/ or doubling the assets path", async () => {
     const root = await generateApp();
 
-    // The config's relative root resolves against the process cwd, which for a
-    // real `vite build` is the app directory — spell it out here instead.
     await build({
       root: path.join(root, "app"),
       configFile: path.join(root, "vite.config.ts"),
