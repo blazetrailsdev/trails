@@ -91,6 +91,12 @@ tester.run("require-table-teardown", rule, {
     'await ctx.createTable("widgets", () => {});\nawait ctx.dropTable("widgets", { ifExists: true });',
     // No createTable at all.
     'await ctx.dropTable("widgets");',
+    // A for…of over an array literal of string literals drops every name in it.
+    'it("x", async () => { await ctx.createTable("wagons", () => {}); });\n' +
+      'it("y", async () => { await ctx.createTable("trains", () => {}); });\n' +
+      "afterEach(async () => {\n" +
+      '  for (const table of ["wagons", "trains"]) await ctx.dropTable(table, { ifExists: true });\n' +
+      "});",
     // dropTable removing several tables in one call satisfies each.
     'await ctx.createTable("a", () => {});\nawait ctx.createTable("b", () => {});\n' +
       'await ctx.dropTable("a", "b");',
@@ -566,6 +572,40 @@ tester.run("require-table-teardown", rule, {
       "}",
   ],
   invalid: [
+    // A for…of over a non-literal iterable resolves to nothing — the create is
+    // still reported, since the loop's names are not statically knowable.
+    {
+      code:
+        'await ctx.createTable("widgets", () => {});\n' +
+        "afterEach(async () => {\n" +
+        "  for (const table of names) await ctx.dropTable(table);\n" +
+        "});",
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 1 }],
+    },
+    // A `var` binding outlives its loop, so a read AFTER the loop names only the
+    // last value — the whole list is not credited there.
+    {
+      code:
+        'await ctx.createTable("a", () => {});\n' +
+        'await ctx.createTable("b", () => {});\n' +
+        "afterEach(async () => {\n" +
+        '  for (var table of ["a", "b"]) {}\n' +
+        "  await ctx.dropTable(table);\n" +
+        "});",
+      errors: [
+        { messageId: "missingTeardown", data: { table: "a" }, line: 1 },
+        { messageId: "missingTeardown", data: { table: "b" }, line: 2 },
+      ],
+    },
+    // Nor does an array literal holding a non-static element.
+    {
+      code:
+        'await ctx.createTable("widgets", () => {});\n' +
+        "afterEach(async () => {\n" +
+        '  for (const table of ["widgets", other]) await ctx.dropTable(table);\n' +
+        "});",
+      errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 1 }],
+    },
     // Two creates of the SAME name, neither torn down, report twice — one per
     // CALL SITE — so a disable on either suppresses only that one and neither
     // diagnostic depends on the other's presence.
@@ -928,8 +968,9 @@ tester.run("require-table-teardown", rule, {
       errors: [{ messageId: "missingTeardown", data: { table: "ex_int" } }],
     },
     // A for-of over a hand-written array is not a sweep: it drops exactly the
-    // names it lists, so crediting it with the filter's whole prefix would
-    // suppress the leak of every other table under that prefix.
+    // names it lists — `ex_int` and nothing else — so crediting it with the
+    // filter's whole prefix would suppress the leak of every other table under
+    // that prefix.
     {
       code:
         'await adapter.exec(`CREATE TABLE "ex_int" (id int)`);\n' +
@@ -940,10 +981,7 @@ tester.run("require-table-teardown", rule, {
         'for (const t of ["ex_int"]) {\n' +
         "  await adapter.dropTable(t);\n" +
         "}",
-      errors: [
-        { messageId: "missingTeardown", data: { table: "ex_int" } },
-        { messageId: "missingTeardown", data: { table: "ex_leak" } },
-      ],
+      errors: [{ messageId: "missingTeardown", data: { table: "ex_leak" } }],
     },
     // An escaped `%` is a literal, not a prefix wildcard: `ex\%` names one table.
     {

@@ -366,7 +366,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /**
    * @missingRailsCall compatible_table_definition — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE migration-current-nested-class-holds-table-overrides
+   * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
    */
   async createTable(
     tableName: string,
@@ -398,7 +398,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /**
    * @missingRailsCall compatible_table_definition — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE migration-current-nested-class-holds-table-overrides
+   * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
    */
   async dropTable(
     ...args: Array<
@@ -786,7 +786,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /**
    * @missingRailsCall compatible_table_definition — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE migration-current-nested-class-holds-table-overrides
+   * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
    */
   async createJoinTable(
     table1: string,
@@ -819,7 +819,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /**
    * @missingRailsCall compatible_table_definition — PERMANENT
-   * @noRailsEquivalent CONVERGEABLE migration-current-nested-class-holds-table-overrides
+   * @noRailsEquivalent CONVERGEABLE migration-delegators-belong-on-current-not-migration
    */
   async changeTable(
     tableName: string,
@@ -2035,7 +2035,88 @@ export class Migrator {
 export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migration<A> {
   static readonly VERSION = CURRENT_VERSION;
 
-  compatibleTableDefinition(t: unknown): unknown {
+  override async createTable(
+    tableName: string,
+    options?:
+      | {
+          id?: boolean | ColumnType | IdHashOptions;
+          primaryKey?: string | string[] | false;
+          force?: boolean | "cascade";
+          ifNotExists?: boolean;
+          default?: unknown;
+          options?: string;
+          comment?: string;
+          charset?: string;
+          collation?: string;
+          as?: string;
+        }
+      | ((t: TableDefinitionOf<A>) => void),
+    fn?: (t: TableDefinitionOf<A>) => void,
+  ): Promise<void> {
+    const block = typeof options === "function" ? options : fn;
+    if (block === undefined) {
+      await super.createTable(tableName, options);
+    } else if (options === undefined || options === block) {
+      await super.createTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
+    } else {
+      await super.createTable(tableName, options, (t) => block(this.compatibleTableDefinition(t)));
+    }
+  }
+
+  override async changeTable(
+    tableName: string,
+    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: TableOf<A>) => void | Promise<void>,
+  ): Promise<void> {
+    const block = typeof options === "function" ? options : fn;
+    if (block === undefined) {
+      await super.changeTable(tableName, options);
+    } else if (options === undefined || options === block) {
+      await super.changeTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
+    } else {
+      await super.changeTable(tableName, options, (t) => block(this.compatibleTableDefinition(t)));
+    }
+  }
+
+  override async createJoinTable(
+    table1: string,
+    table2: string,
+    options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
+    fn?: (t: TableDefinitionOf<A>) => void,
+  ): Promise<void> {
+    const block = typeof options === "function" ? options : fn;
+    if (block === undefined) {
+      await super.createJoinTable(table1, table2, options);
+    } else if (options === undefined || options === block) {
+      await super.createJoinTable(table1, table2, (t) => block(this.compatibleTableDefinition(t)));
+    } else {
+      await super.createJoinTable(table1, table2, options, (t) =>
+        block(this.compatibleTableDefinition(t)),
+      );
+    }
+  }
+
+  override async dropTable(
+    ...args: Array<
+      | string
+      | { ifExists?: boolean; force?: boolean | "cascade"; temporary?: boolean }
+      | ((t: TableDefinition) => void)
+    >
+  ): Promise<void> {
+    const rest = [...args];
+    const block = (typeof rest[rest.length - 1] === "function" ? rest.pop() : undefined) as
+      | ((t: TableDefinition) => void)
+      | undefined;
+    if (block !== undefined) {
+      await super.dropTable(...rest, (t: TableDefinition) =>
+        block(this.compatibleTableDefinition(t)),
+      );
+    } else {
+      await super.dropTable(...rest);
+    }
+  }
+
+  compatibleTableDefinition<T>(t: T): T {
     return t;
   }
 }

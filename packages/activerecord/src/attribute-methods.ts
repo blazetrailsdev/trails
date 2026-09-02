@@ -39,7 +39,7 @@ interface AttributeRecord {
 }
 
 /** @internal */
-interface InstanceMethodHost {
+export interface InstanceMethodHost {
   _attributes?: {
     isKey(name: string): boolean;
     keys(): Iterable<string>;
@@ -110,7 +110,7 @@ export class GeneratedAttributeMethods extends Module {
   }
 }
 
-interface AttributeMethodsHost {
+export interface AttributeMethodsHost {
   name: string;
   _attributeMethodsGenerated?: boolean;
   _aliasAttributesMassGenerated?: boolean;
