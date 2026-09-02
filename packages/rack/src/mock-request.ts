@@ -19,6 +19,7 @@ import {
   OPTIONS,
 } from "./constants.js";
 import { StringIO } from "@blazetrails/activesupport";
+import { isSymbol } from "@blazetrails/ruby-compat";
 import { Lint } from "./lint.js";
 import { MockResponse } from "./mock-response.js";
 import { buildMultipart } from "./multipart.js";
@@ -149,7 +150,13 @@ export class MockRequest {
    * Its option keys are Ruby Symbols, spelled here with the leading colon
    * (`":method"`, `":input"`, ...), so the trailing
    * `opts.each { |field, value| env[field] = value if String === field }`
-   * (line 154) is the literal colon test.
+   * (line 154) is {@link isSymbol}.
+   *
+   * `:147`'s `rack_input.set_encoding(Encoding::BINARY) if
+   * rack_input.respond_to?(:set_encoding)` has no port: trails' `StringIO`
+   * buffer is a Ruby binary String by construction
+   * (`ruby-compat/src/string-io.ts:7-11`), so no trails IO answers
+   * `set_encoding` and the guard is false for every one of them.
    */
   static envFor(uri = "", opts: Record<string, any> = {}): Record<string, any> {
     const parsedUri = MockRequest.parseUriRfc2396(uri);
@@ -211,7 +218,7 @@ export class MockRequest {
     }
 
     for (const [field, value] of Object.entries(opts)) {
-      if (!field.startsWith(":")) env[field] = value;
+      if (!isSymbol(field)) env[field] = value;
     }
 
     return env;

@@ -1,4 +1,5 @@
 import { getFs } from "@blazetrails/activesupport";
+import { chomp } from "@blazetrails/ruby-compat";
 
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
 import { Request } from "./request.js";
@@ -148,7 +149,7 @@ export class ShowExceptions {
             const lines = readlines(frame.filename!);
             frame.setPreContextLineno(Math.max(lineno - ShowExceptions.CONTEXT, 0));
             frame.setPreContext(lines.slice(frame.preContextLineno!, lineno));
-            frame.setContextLine(lines[lineno].replace(/\r?\n$/, ""));
+            frame.setContextLine(chomp(lines[lineno]));
             frame.setPostContextLineno(Math.min(lineno + ShowExceptions.CONTEXT, lines.length));
             frame.setPostContext(lines.slice(lineno + 1, frame.postContextLineno! + 1));
           } catch {
