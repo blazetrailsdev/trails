@@ -1981,6 +1981,203 @@ describe("extractFromProgram — Object.defineProperty wiring", () => {
   });
 });
 
+describe("extractFromProgram — name-list prototype generator", () => {
+  it("credits a for-of over a same-file const array assigning onto the prototype", () => {
+    const info = extractFromFiles("/p", {
+      "recorder.ts": `
+        export class CommandRecorder { record(name: string, args: unknown[]) {} }
+        const REVERSIBLE_AND_IRREVERSIBLE_METHODS = ["createTable", "addColumn"] as const;
+        for (const method of REVERSIBLE_AND_IRREVERSIBLE_METHODS) {
+          if (method in CommandRecorder.prototype) continue;
+          (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] =
+            function (this: CommandRecorder, ...args: unknown[]) {
+              return this.record(method, args);
+            };
+        }
+      `,
+    });
+    const methods = info.classes["recorder.ts:CommandRecorder"].instanceMethods;
+    expect(methods.map((m) => m.name)).toEqual(
+      expect.arrayContaining(["createTable", "addColumn"]),
+    );
+    const m = methods.find((x) => x.name === "createTable")!;
+    expect(m.visibility).toBe("public");
+    expect(m.params).toEqual([
+      { name: "this", kind: "required", type: "CommandRecorder" },
+      { name: "args", kind: "rest", type: "unknown[]" },
+    ]);
+  });
+
+  it("credits nothing when the name list is imported rather than same-file", () => {
+    const info = extractFromFiles("/p", {
+      "names.ts": `export const NAMES = ["createTable"] as const;`,
+      "recorder.ts": `
+        import { NAMES } from "./names.js";
+        export class CommandRecorder {}
+        for (const method of NAMES) {
+          (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function () {};
+        }
+      `,
+    });
+    const names = info.classes["recorder.ts:CommandRecorder"].instanceMethods.map((m) => m.name);
+    expect(names).not.toContain("createTable");
+  });
+
+  it("credits nothing when the list holds a non-literal element", () => {
+    const info = extractFromFiles("/p", {
+      "recorder.ts": `
+        export class CommandRecorder {}
+        const NAME = "createTable";
+        const NAMES = [NAME, "addColumn"] as const;
+        for (const method of NAMES) {
+          (CommandRecorder.prototype as unknown as Record<string, unknown>)[method] = function () {};
+        }
+      `,
+    });
+    const names = info.classes["recorder.ts:CommandRecorder"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual([]);
+  });
+
+  it("credits nothing when the assigned property name is computed", () => {
+    const info = extractFromFiles("/p", {
+      "recorder.ts": `
+        export class CommandRecorder {}
+        const NAMES = ["createTable"] as const;
+        for (const method of NAMES) {
+          (CommandRecorder.prototype as unknown as Record<string, unknown>)[method + "!"] =
+            function () {};
+        }
+      `,
+    });
+    const names = info.classes["recorder.ts:CommandRecorder"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual([]);
+  });
+});
+
+describe("extractFromProgram — defineProperty accessor generator", () => {
+  const relationFiles = {
+    "relation.ts": `
+      import { defineValueMethods } from "./query-methods.js";
+      export class Relation {
+        static readonly MULTI_VALUE_METHODS = ["includes", "order"] as const;
+        static readonly SINGLE_VALUE_METHODS = ["limit"] as const;
+        static readonly CLAUSE_METHODS = ["where"] as const;
+        static readonly VALUE_METHODS = [
+          ...Relation.MULTI_VALUE_METHODS,
+          ...Relation.SINGLE_VALUE_METHODS,
+          ...Relation.CLAUSE_METHODS,
+        ];
+      }
+      defineValueMethods(Relation);
+    `,
+    "query-methods.ts": `
+      export function defineValueMethods(relationClass: any): void {
+        for (const name of relationClass.VALUE_METHODS) {
+          let methodName: string;
+          if (relationClass.MULTI_VALUE_METHODS.includes(name)) {
+            methodName = \`\${name}Values\`;
+          } else if (relationClass.SINGLE_VALUE_METHODS.includes(name)) {
+            methodName = \`\${name}Value\`;
+          } else {
+            methodName = \`\${name}Clause\`;
+          }
+          Object.defineProperty(relationClass.prototype, methodName, {
+            get(this: any): unknown { return this._values[name]; },
+            set(this: any, value: unknown) { this._values[name] = value; },
+          });
+        }
+
+        Object.defineProperty(relationClass.prototype, "extensions", {
+          get(this: any) { return this.extendingValues; },
+        });
+      }
+    `,
+  };
+
+  it("credits every generated accessor to the class the generator is called with", () => {
+    const info = extractFromFiles("/p", relationFiles);
+    const methods = info.classes["relation.ts:Relation"].instanceMethods;
+    const readers = methods.filter((m) => m.writer !== true).map((m) => m.name);
+    expect(readers).toEqual(
+      expect.arrayContaining([
+        "includesValues",
+        "orderValues",
+        "limitValue",
+        "whereClause",
+        "extensions",
+      ]),
+    );
+  });
+
+  it("credits the writer half of a get/set pair, and only the reader without a set", () => {
+    const info = extractFromFiles("/p", relationFiles);
+    const methods = info.classes["relation.ts:Relation"].instanceMethods;
+    const writers = methods.filter((m) => m.writer === true).map((m) => m.name);
+    expect(writers).toEqual(expect.arrayContaining(["includesValues", "limitValue"]));
+    // `extensions` is Ruby's `alias extensions extending_values` — a reader alone.
+    expect(writers).not.toContain("extensions");
+    const writer = methods.find((m) => m.name === "limitValue" && m.writer === true)!;
+    expect(writer.params).toEqual([
+      { name: "this", kind: "required", type: "any" },
+      { name: "value", kind: "required", type: "unknown" },
+    ]);
+  });
+
+  it("credits nothing when the property name cannot be resolved to literals", () => {
+    const info = extractFromFiles("/p", {
+      "relation.ts": `
+        export class Relation {
+          static readonly VALUE_METHODS = ["limit"] as const;
+        }
+        install(Relation);
+        export function install(relationClass: any): void {
+          for (const name of relationClass.VALUE_METHODS) {
+            const methodName = suffixFor(name);
+            Object.defineProperty(relationClass.prototype, methodName, {
+              get(this: any) { return null; },
+            });
+          }
+        }
+        declare function suffixFor(name: string): string;
+      `,
+    });
+    const names = info.classes["relation.ts:Relation"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual([]);
+  });
+
+  it("credits nothing when defineProperty targets a non-prototype receiver", () => {
+    const info = extractFromFiles("/p", {
+      "relation.ts": `
+        export class Relation {
+          static readonly VALUE_METHODS = ["limit"] as const;
+        }
+        for (const name of Relation.VALUE_METHODS) {
+          Object.defineProperty(Relation, name, { get(this: any) { return null; } });
+        }
+      `,
+    });
+    const names = info.classes["relation.ts:Relation"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual([]);
+  });
+
+  it("credits nothing when the generator function is never called with a class", () => {
+    const info = extractFromFiles("/p", {
+      "relation.ts": `export class Relation {}`,
+      "query-methods.ts": `
+        export function defineValueMethods(relationClass: any): void {
+          for (const name of ["limit"] as const) {
+            Object.defineProperty(relationClass.prototype, name, {
+              get(this: any) { return null; },
+            });
+          }
+        }
+      `,
+    });
+    const names = info.classes["relation.ts:Relation"].instanceMethods.map((m) => m.name);
+    expect(names).toEqual([]);
+  });
+});
+
 describe("packageFingerprint (per-package cache key)", () => {
   // Track every tmp dir we create so afterEach can clean up; otherwise
   // repeated test runs leave /tmp/fp-*/ entries behind.
