@@ -71,6 +71,10 @@ function installFs(dirs: Set<string>, files: Set<string>, cwd = "/"): void {
     {
       cwd: () => cwd,
       exists: async (p: string) => dirs.has(p) || files.has(p),
+      readFile: async (p: string) => {
+        if (!files.has(p)) throw new Error("ENOENT");
+        return "";
+      },
       stat: async (p: string) => {
         if (dirs.has(p)) return stat(true);
         if (files.has(p)) return stat(false);

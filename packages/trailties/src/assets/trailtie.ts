@@ -1,4 +1,4 @@
-import { Railtie as BaseRailtie, registerRailtie, onLoad } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie, registerTrailtie, onLoad } from "@blazetrails/activesupport";
 import { loadViteManifest, setViteManifest, computeAssetPath } from "./vite-manifest.js";
 
 interface ViteAssetsHost {
@@ -17,9 +17,9 @@ interface ActionViewBaseLike {
  *
  * @noRailsEquivalent PERMANENT
  */
-export class Trailtie extends BaseRailtie {
+export class Trailtie extends BaseTrailtie {
   static {
-    registerRailtie(this);
+    registerTrailtie(this);
 
     this.initializer("vite.helpers", () => {
       onLoad("action_view", (base: ActionViewBaseLike) => {
