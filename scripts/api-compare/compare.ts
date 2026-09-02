@@ -718,7 +718,6 @@ export interface TsOwnerMaps {
   instanceOwnersByFileName: Map<string, Map<string, Set<string>>>;
 }
 
-/** @noRailsEquivalent PERMANENT */
 export function newTsOwnerMaps(): TsOwnerMaps {
   return {
     ownersByFileName: new Map(),
@@ -731,11 +730,7 @@ export function newTsOwnerMaps(): TsOwnerMaps {
   };
 }
 
-/**
- * Record one package-scoped TS member into the owner populations.
- *
- * @noRailsEquivalent PERMANENT
- */
+/** Record one package-scoped TS member into the owner populations. */
 export function recordTsOwner(maps: TsOwnerMaps, m: MethodInfo, file: string, owner: string): void {
   const owners = maps.ownersByFileName.get(file) ?? new Map<string, Set<string>>();
   owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
@@ -816,7 +811,6 @@ export interface TsPortedWithArgsMaps {
   optionKeysByFileName: Map<string, Map<string, (string[] | null)[]>>;
 }
 
-/** @noRailsEquivalent PERMANENT */
 export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
   return {
     paramsByNameInPkg: new Map(),
@@ -837,8 +831,6 @@ export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
  * `scripts/api-compare/` test and the `call-mismatches.json` artifact itself
  * stay byte-identical, which is why the split is exported and pinned by a test
  * rather than left as a closure over `main()`'s locals.
- *
- * @noRailsEquivalent PERMANENT
  */
 export function recordTsPortedWithArgs(
   maps: TsPortedWithArgsMaps,

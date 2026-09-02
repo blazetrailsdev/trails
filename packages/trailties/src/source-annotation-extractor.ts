@@ -10,19 +10,46 @@ export type ExtensionBuilder = (tagPattern: string) => RegExp;
 const DEFAULT_DIRECTORIES = ["app", "config", "db", "lib", "test"];
 const DEFAULT_TAGS = ["OPTIMIZE", "FIXME", "TODO"];
 
+/**
+ * Mirrors: Rails::SourceAnnotationExtractor::Annotation
+ * (`source_annotation_extractor.rb:71-101`) — the registers and the three
+ * registrars that mutate them are class-level state on this class, not on the
+ * enclosing extractor.
+ */
 export class Annotation {
   static directories: string[] = [...DEFAULT_DIRECTORIES];
   static tags: string[] = [...DEFAULT_TAGS];
   static extensions: Array<{ test: RegExp; builder: ExtensionBuilder }> = [];
 
+  /**
+   * Registers additional directories to be included
+   *   Annotation.registerDirectories("spec", "another")
+   *
+   * Mirrors: `self.register_directories` (`source_annotation_extractor.rb:78`).
+   */
   static registerDirectories(...dirs: string[]): void {
     this.directories.push(...dirs);
   }
 
+  /**
+   * Registers additional tags
+   *   Annotation.registerTags("TESTME", "DEPRECATEME")
+   *
+   * Mirrors: `self.register_tags` (`source_annotation_extractor.rb:88`).
+   */
   static registerTags(...additionalTags: string[]): void {
     this.tags.push(...additionalTags);
   }
 
+  /**
+   * Registers new Annotations File Extensions
+   *   Annotation.registerExtensions(["css", "scss"], (tag) => ...)
+   *
+   * Mirrors: `self.register_extensions` (`source_annotation_extractor.rb:98`).
+   * Ruby's trailing `&block` is the `builder` argument — the settled trails
+   * spelling for a block — which a TS rest parameter cannot follow, so `exts`
+   * is an array where Ruby splats.
+   */
   static registerExtensions(exts: string[], builder: ExtensionBuilder): void {
     this.extensions.push({ test: new RegExp(`\\.(${exts.join("|")})$`), builder });
   }

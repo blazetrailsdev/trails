@@ -26,10 +26,10 @@ import { extractOptionsBang } from "./hash-utils.js";
  *   delegate.call(MyClass.prototype, "name", { to: "place", prefix: true });
  */
 export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
-  const [syms, options] = extractOptionsBang(methods);
+  const [names, options] = extractOptionsBang(methods);
   const { to, prefix, allowNil } = options as unknown as DelegateOptions;
 
-  return Delegation.generate(this, syms as string[], { to, prefix, allowNil });
+  return Delegation.generate(this, names as string[], { to, prefix, allowNil });
 }
 
 /**
