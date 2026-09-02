@@ -413,6 +413,14 @@ export class SignedCookieJar {
     this.jar.set(key, { ...(options as SetCookieOptions), value: signed });
   }
 
+  /**
+   * Rails' `ChainedCookieJars#permanent`, which every `AbstractCookieJar`
+   * carries (cookies.rb:234, 507), so `cookies.signed.permanent[...]` chains.
+   */
+  get permanent(): PermanentCookieJar {
+    return new PermanentCookieJar(this as unknown as CookieJar);
+  }
+
   get(key: string): unknown {
     const raw = this.jar.get(key);
     if (raw === undefined) return undefined;

@@ -1,15 +1,15 @@
-/** `.../rails/authentication/templates/**.tt`. @noRailsEquivalent PERMANENT */
-
-export const SESSION = `import { ApplicationRecord } from "./application-record.js";
+/** `.../rails/authentication/templates/**.tt`, keyed as `template` names them. */
+export const TEMPLATES: Record<string, string> = {
+  "app/models/session.rb": `import { ApplicationRecord } from "./application-record.js";
 
 export class Session extends ApplicationRecord {
   static {
     this.belongsTo("user");
   }
 }
-`;
+`,
 
-export const USER = `import { ApplicationRecord } from "./application-record.js";
+  "app/models/user.rb": `import { ApplicationRecord } from "./application-record.js";
 
 export class User extends ApplicationRecord {
   static {
@@ -19,9 +19,9 @@ export class User extends ApplicationRecord {
     this.normalizes("email_address", { with: (e: string) => e.trim().toLowerCase() });
   }
 }
-`;
+`,
 
-export const CURRENT = `import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
+  "app/models/current.rb": `import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
 
 export class Current extends CurrentAttributes {
   static {
@@ -29,9 +29,45 @@ export class Current extends CurrentAttributes {
     delegate(this.prototype, ["user"], { to: "session", allowNil: true });
   }
 }
-`;
+`,
 
-export const AUTHENTICATION = `import { defineModule, extend, included } from "@blazetrails/activesupport";
+  "app/controllers/sessions_controller.rb": `import { minutes } from "@blazetrails/activesupport";
+import { ApplicationController } from "./application-controller.js";
+import { User } from "../models/user.js";
+
+export class SessionsController extends ApplicationController {
+  static {
+    (this as any).allowUnauthenticatedAccess({ only: ["new_", "create"] });
+    this.rateLimit({
+      to: 10, within: minutes(3), only: "create",
+      with: function (this: SessionsController) {
+        this.redirectTo("/session/new", { alert: "Try again later." });
+      },
+    });
+  }
+
+  async new_(): Promise<void> {
+    this.render({ action: "new" });
+  }
+
+  async create(): Promise<void> {
+    const user = await User.authenticateBy(this.params.permit("email_address", "password"));
+    if (user) {
+      await (this as any).startNewSessionFor(user);
+      this.redirectTo((this as any).afterAuthenticationUrl());
+    } else {
+      this.redirectTo("/session/new", { alert: "Try another email address or password." });
+    }
+  }
+
+  async destroy(): Promise<void> {
+    await (this as any).terminateSession();
+    this.redirectTo("/session/new");
+  }
+}
+`,
+
+  "app/controllers/concerns/authentication.rb": `import { defineModule, extend, included } from "@blazetrails/activesupport";
 import { Current } from "../../models/current.js";
 import { Session } from "../../models/session.js";
 
@@ -86,11 +122,11 @@ export const Authentication = defineModule(
         ip_address: this.request.remoteIp,
       });
       Current.session = session;
-      this.cookies.signed.permanent["session_id"] = {
+      this.cookies.signed.permanent.set("session_id", {
         value: session.id,
-        httponly: true,
-        same_site: ":lax",
-      };
+        httpOnly: true,
+        sameSite: "lax",
+      });
       return session;
     },
 
@@ -100,47 +136,9 @@ export const Authentication = defineModule(
     },
   },
 );
-`;
+`,
 
-export const SESSIONS_CONTROLLER = `import { minutes } from "@blazetrails/activesupport";
-import { ApplicationController } from "./application-controller.js";
-import { User } from "../models/user.js";
-
-export class SessionsController extends ApplicationController {
-  static {
-    (this as any).allowUnauthenticatedAccess({ only: ["new_", "create"] });
-    this.rateLimit({
-      to: 10,
-      within: minutes(3),
-      only: "create",
-      with: function (this: SessionsController) {
-        this.redirectTo("/session/new", { alert: "Try again later." });
-      },
-    });
-  }
-
-  async new_(): Promise<void> {
-    this.render({ action: "new" });
-  }
-
-  async create(): Promise<void> {
-    const user = await User.authenticateBy(this.params.permit("email_address", "password"));
-    if (user) {
-      await (this as any).startNewSessionFor(user);
-      this.redirectTo((this as any).afterAuthenticationUrl());
-    } else {
-      this.redirectTo("/session/new", { alert: "Try another email address or password." });
-    }
-  }
-
-  async destroy(): Promise<void> {
-    await (this as any).terminateSession();
-    this.redirectTo("/session/new");
-  }
-}
-`;
-
-export const PASSWORDS_CONTROLLER = `import { InvalidSignature } from "@blazetrails/activesupport";
+  "app/controllers/passwords_controller.rb": `import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ApplicationController } from "./application-controller.js";
 import { User } from "../models/user.js";
 import { PasswordsMailer } from "../mailers/passwords-mailer.js";
@@ -191,9 +189,9 @@ export class PasswordsController extends ApplicationController {
     }
   }
 }
-`;
+`,
 
-export const CONNECTION = `import { Session } from "../../models/session.js";
+  "app/channels/application_cable/connection.rb": `import { Session } from "../../models/session.js";
 
 export class Connection {
   declare currentUser: unknown;
@@ -209,21 +207,36 @@ export class Connection {
     if (session) return (this.currentUser = await session.user);
   }
 }
-`;
+`,
 
-export const PASSWORDS_MAILER = `import { ApplicationMailer } from "./application-mailer.js";
+  "app/mailers/passwords_mailer.rb": `import { ApplicationMailer } from "./application-mailer.js";
 
 export class PasswordsMailer extends ApplicationMailer {
   declare user: any;
+
+  // Rails reaches the instance method through ActionMailer's method_missing.
+  static reset(user: any): unknown {
+    return new PasswordsMailer().reset(user);
+  }
 
   reset(user: any): unknown {
     this.user = user;
     return this.mail({ subject: "Reset your password", to: user.email_address });
   }
 }
-`;
+`,
 
-export const PASSWORDS_MAILER_PREVIEW = `import { PasswordsMailer } from "../../../app/mailers/passwords-mailer.js";
+  "app/views/passwords_mailer/reset.html.erb": `<p>
+  You can reset your password within the next 15 minutes on
+  <%= linkTo("this password reset page", editPasswordUrl(user.passwordResetToken)) %>.
+</p>
+`,
+
+  "app/views/passwords_mailer/reset.text.erb": `You can reset your password within the next 15 minutes on this password reset page:
+<%= editPasswordUrl(user.passwordResetToken) %>
+`,
+
+  "test/mailers/previews/passwords_mailer_preview.rb": `import { PasswordsMailer } from "../../../app/mailers/passwords-mailer.js";
 import { User } from "../../../app/models/user.js";
 
 export class PasswordsMailerPreview {
@@ -231,29 +244,5 @@ export class PasswordsMailerPreview {
     return PasswordsMailer.reset(await User.take());
   }
 }
-`;
-
-export const RESET_HTML = `<p>
-  You can reset your password within the next 15 minutes on
-  <%= linkTo("this password reset page", editPasswordUrl(user.passwordResetToken)) %>.
-</p>
-`;
-
-export const RESET_TEXT = `You can reset your password within the next 15 minutes on this password reset page:
-<%= editPasswordUrl(user.passwordResetToken) %>
-`;
-
-/** Rails template path → its source, keyed as `template` names them. */
-export const TEMPLATES: Record<string, string> = {
-  "app/models/session.rb": SESSION,
-  "app/models/user.rb": USER,
-  "app/models/current.rb": CURRENT,
-  "app/controllers/sessions_controller.rb": SESSIONS_CONTROLLER,
-  "app/controllers/concerns/authentication.rb": AUTHENTICATION,
-  "app/controllers/passwords_controller.rb": PASSWORDS_CONTROLLER,
-  "app/channels/application_cable/connection.rb": CONNECTION,
-  "app/mailers/passwords_mailer.rb": PASSWORDS_MAILER,
-  "app/views/passwords_mailer/reset.html.erb": RESET_HTML,
-  "app/views/passwords_mailer/reset.text.erb": RESET_TEXT,
-  "test/mailers/previews/passwords_mailer_preview.rb": PASSWORDS_MAILER_PREVIEW,
+`,
 };

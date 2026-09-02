@@ -116,8 +116,7 @@ export class AuthenticationGenerator extends GeneratorBase {
    * `authentication_generator.rb:41-47`. Rails' Gemfile arm has no analogue.
    *
    * @missingRailsCall execute_command — PERMANENT: no trails generator shells
-   * out to the package manager; `pkg` only edits `package.json` too, and the
-   * install is the `afterInstall` action's job.
+   * out to the package manager; installing is the `afterInstall` action's job.
    */
   private enableBcrypt(): void {
     if (!this.fileExists("package.json")) return;

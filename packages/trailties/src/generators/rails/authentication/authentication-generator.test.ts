@@ -132,13 +132,11 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("emits create_users and create_sessions migrations", () => {
-    const created = makeGen().run();
-    const migrations = created.filter((f) => f.startsWith("db/migrate/"));
-    expect(migrations).toHaveLength(2);
-    expect(migrations.map((f) => f.replace(/^db\/migrate\/\d+_/, ""))).toEqual([
-      "create_users.ts",
-      "create_sessions.ts",
-    ]);
+    const migrations = makeGen()
+      .run()
+      .filter((f) => f.startsWith("db/migrate/"));
+    const names = migrations.map((f) => f.replace(/^db\/migrate\/\d+_/, ""));
+    expect(names).toEqual(["create_users.ts", "create_sessions.ts"]);
     expect(read(migrations[0])).toContain("email_address");
     expect(read(migrations[1])).toContain("user_agent");
   });

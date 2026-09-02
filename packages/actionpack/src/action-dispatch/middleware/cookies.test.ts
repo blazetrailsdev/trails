@@ -371,3 +371,15 @@ describe("checkForOverflowBang", () => {
     expect(() => checkForOverflowBang("session", { value: "x".repeat(4096) })).not.toThrow();
   });
 });
+
+describe("SignedCookieJar#permanent", () => {
+  it("signs the value and gives it the permanent jar's expiry", () => {
+    const jar = CookieJar.build(
+      { env: {}, cookies: {}, cookiesAppOptions: { secret: "x".repeat(32) } },
+      {},
+    );
+    jar.signed.permanent.set("session_id", { value: "42", httpOnly: true, sameSite: "lax" });
+    expect(jar.signed.get("session_id")).toBe("42");
+    expect(jar.get("session_id")).toMatch(/--/);
+  });
+});

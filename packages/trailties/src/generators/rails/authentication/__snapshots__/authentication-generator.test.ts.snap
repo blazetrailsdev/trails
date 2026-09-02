@@ -41,9 +41,7 @@ export class SessionsController extends ApplicationController {
   static {
     (this as any).allowUnauthenticatedAccess({ only: ["new_", "create"] });
     this.rateLimit({
-      to: 10,
-      within: minutes(3),
-      only: "create",
+      to: 10, within: minutes(3), only: "create",
       with: function (this: SessionsController) {
         this.redirectTo("/session/new", { alert: "Try again later." });
       },
@@ -126,11 +124,11 @@ export const Authentication = defineModule(
         ip_address: this.request.remoteIp,
       });
       Current.session = session;
-      this.cookies.signed.permanent["session_id"] = {
+      this.cookies.signed.permanent.set("session_id", {
         value: session.id,
-        httponly: true,
-        same_site: ":lax",
-      };
+        httpOnly: true,
+        sameSite: "lax",
+      });
       return session;
     },
 
@@ -142,7 +140,7 @@ export const Authentication = defineModule(
 );
 
 === app/controllers/passwords-controller.ts ===
-import { InvalidSignature } from "@blazetrails/activesupport";
+import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ApplicationController } from "./application-controller.js";
 import { User } from "../models/user.js";
 import { PasswordsMailer } from "../mailers/passwords-mailer.js";
@@ -217,6 +215,11 @@ import { ApplicationMailer } from "./application-mailer.js";
 
 export class PasswordsMailer extends ApplicationMailer {
   declare user: any;
+
+  // Rails reaches the instance method through ActionMailer's method_missing.
+  static reset(user: any): unknown {
+    return new PasswordsMailer().reset(user);
+  }
 
   reset(user: any): unknown {
     this.user = user;
