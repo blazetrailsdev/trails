@@ -21,6 +21,10 @@ export class LockingType extends ValueType<number> {
     this.name = subtype.name;
   }
 
+  override type(): string | undefined {
+    return this._subtype.type();
+  }
+
   override cast(value: unknown): number {
     return (this._subtype.cast(value) as number | null) ?? 0;
   }
