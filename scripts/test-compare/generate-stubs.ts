@@ -135,8 +135,6 @@ function main() {
   const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
   const write = args.includes("--write");
   const missingFilesOnly = args.includes("--missing-files-only");
-  // `normalize-skips.ts` string-matches `PERMANENT-SKIP:` and leaves an
-  // annotated body alone, so a stub generated with one is not re-annotated.
   const skipReason = args.includes("--skip-reason")
     ? args[args.indexOf("--skip-reason") + 1]
     : null;
@@ -203,9 +201,6 @@ function main() {
       let testsToStub: TestCaseInfo[];
 
       if (!convFile.tsFileExists) {
-        // No TS file at all — the whole Ruby file is unported, so a
-        // description credited by a fuzzy match against some OTHER file's TS
-        // test still has no stub here. Take every test case.
         testsToStub = rubyFileInfo.testCases;
       } else if (missingDescs && missingDescs.size > 0) {
         // We have specific missing test names — filter by description

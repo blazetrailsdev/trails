@@ -145,13 +145,6 @@ function classNameOf(value: unknown): string {
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
-/**
- * Ruby's `self.class`, which `Session#inspect` (`request/session.rb:225`)
- * interpolates, so the string follows the RECEIVER's class rather than being
- * fixed at one literal. Same shape as `rubyClassPath` in
- * `packages/rack-session/src/abstract/id.ts`; a subclass Rails does not define
- * falls through to its own JS name.
- */
 function rubyClassPath(klass: unknown): string {
   switch (klass) {
     case Session:
