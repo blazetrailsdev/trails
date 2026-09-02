@@ -22,7 +22,7 @@ describe("ModuleTest", () => {
         this.place = place;
       }
     }
-    delegate(Person.prototype, ["street", "city"], { to: "place" });
+    delegate.call(Person.prototype, "street", "city", { to: "place" });
     const p = new Person(new Place()) as Person & { street(): string; city(): string };
     expect(p.street()).toBe("Paulina");
     expect(p.city()).toBe("Chicago");
@@ -38,7 +38,7 @@ describe("ModuleTest", () => {
         this.client = client;
       }
     }
-    delegate(Invoice.prototype, ["label"], { to: "client", prefix: true });
+    delegate.call(Invoice.prototype, "label", { to: "client", prefix: true });
     const inv = new Invoice(new Client()) as Invoice & { client_label(): string };
     expect(inv.client_label()).toBe("David");
   });
@@ -53,7 +53,7 @@ describe("ModuleTest", () => {
         this.client = client;
       }
     }
-    delegate(Invoice.prototype, ["label"], { to: "client", prefix: "customer" });
+    delegate.call(Invoice.prototype, "label", { to: "client", prefix: "customer" });
     const inv = new Invoice(new Client()) as Invoice & { customer_label(): string };
     expect(inv.customer_label()).toBe("David");
   });
@@ -62,7 +62,7 @@ describe("ModuleTest", () => {
     class Project {
       person: null | { title: string } = null;
     }
-    delegate(Project.prototype, ["title"], { to: "person", allowNil: true });
+    delegate.call(Project.prototype, "title", { to: "person", allowNil: true });
     const proj = new Project() as Project & { title(): string | undefined };
     expect(proj.title()).toBeUndefined();
   });
@@ -71,26 +71,26 @@ describe("ModuleTest", () => {
     class Someone {
       place: null | { street: string } = null;
     }
-    delegate(Someone.prototype, ["street"], { to: "place" });
+    delegate.call(Someone.prototype, "street", { to: "place" });
     const s = new Someone() as Someone & { street(): string };
     expect(() => s.street()).toThrow();
   });
 
   it("delegate returns generated method names", () => {
     class Foo {}
-    const names = delegate(Foo.prototype, ["bar", "baz"], { to: "qux" });
+    const names = delegate.call(Foo.prototype, "bar", "baz", { to: "qux" });
     expect(names).toEqual(["bar", "baz"]);
   });
 
   it("delegate with prefix returns prefixed method names", () => {
     class Foo {}
-    const names = delegate(Foo.prototype, ["bar"], { to: "qux", prefix: "the" });
+    const names = delegate.call(Foo.prototype, "bar", { to: "qux", prefix: "the" });
     expect(names).toEqual(["the_bar"]);
   });
 
   it("mattr_accessor — defines class-level getter/setter", () => {
     class MyClass {}
-    mattrAccessor(MyClass as unknown as { new (): unknown } & Record<string, unknown>, ["setting"]);
+    mattrAccessor.call(MyClass, "setting");
     const klass = MyClass as unknown as Record<string, unknown>;
     klass["setting"] = 42;
     expect(klass["setting"]).toBe(42);
@@ -100,7 +100,7 @@ describe("ModuleTest", () => {
 
   it("cattr_accessor — alias for mattrAccessor", () => {
     class Config {}
-    cattrAccessor(Config as unknown as { new (): unknown } & Record<string, unknown>, ["value"]);
+    cattrAccessor.call(Config, "value");
     const klass = Config as unknown as Record<string, unknown>;
     klass["value"] = 99;
     expect(klass["value"]).toBe(99);
@@ -108,7 +108,7 @@ describe("ModuleTest", () => {
 
   it("attr_internal reader and writer — underscore-prefixed storage", () => {
     class Widget {}
-    attrInternal(Widget.prototype, "color");
+    attrInternal.call(Widget.prototype, "color");
     const w = new Widget() as Widget & { color: unknown };
     w.color = "red";
     expect(w.color).toBe("red");
@@ -118,7 +118,7 @@ describe("ModuleTest", () => {
 
   it("attr_internal writer method — sets value via assignment method", () => {
     class Widget {}
-    attrInternal(Widget.prototype, "size");
+    attrInternal.call(Widget.prototype, "size");
     const w = new Widget() as Widget & { size: unknown; "size=": (v: unknown) => void };
     w["size="]("large");
     expect(w.size).toBe("large");
@@ -149,45 +149,45 @@ describe("ModuleTest", () => {
 describe("ModuleAttributeAccessorTest", () => {
   it("should use mattr default", () => {
     class MyModule {}
-    mattrAccessor(MyModule, ["setting"]);
+    mattrAccessor.call(MyModule, "setting");
     expect((MyModule as any).setting).toBeUndefined();
   });
 
   it("mattr default keyword arguments", () => {
     class MyModule {}
-    mattrAccessor(MyModule, ["timeout"], { default: 5 });
+    mattrAccessor.call(MyModule, "timeout", { default: 5 });
     expect((MyModule as any).timeout).toBe(5);
   });
 
   it("mattr can default to false", () => {
     class MyModule {}
-    mattrAccessor(MyModule, ["flag"], { default: false });
+    mattrAccessor.call(MyModule, "flag", { default: false });
     expect((MyModule as any).flag).toBe(false);
   });
 
   it("mattr default priority", () => {
     class MyModule {}
-    mattrAccessor(MyModule, ["setting"], { default: "default" });
+    mattrAccessor.call(MyModule, "setting", { default: "default" });
     (MyModule as any).setting = "override";
     expect((MyModule as any).setting).toBe("override");
   });
 
   it("should set mattr value", () => {
     class MyModule {}
-    mattrAccessor(MyModule, ["value"]);
+    mattrAccessor.call(MyModule, "value");
     (MyModule as any).value = 42;
     expect((MyModule as any).value).toBe(42);
   });
 
   it("cattr accessor default value", () => {
     class MyClass {}
-    cattrAccessor(MyClass, ["level"], { default: 3 });
+    cattrAccessor.call(MyClass, "level", { default: 3 });
     expect((MyClass as any).level).toBe(3);
   });
 
   it("should not create instance writer", () => {
     class MyModule {}
-    mattrAccessor(MyModule, ["config"], { instanceWriter: false });
+    mattrAccessor.call(MyModule, "config", { instanceWriter: false });
     const instance = new MyModule() as any;
     // Instance reader works (delegates to class)
     (MyModule as any).config = "class_value";
@@ -199,7 +199,7 @@ describe("ModuleAttributeAccessorTest", () => {
 
   it("should not create instance reader", () => {
     class MyModule {}
-    mattrAccessor(MyModule, ["secret"], { instanceReader: false });
+    mattrAccessor.call(MyModule, "secret", { instanceReader: false });
     // Rails' `instance_reader: false` suppresses only the reader half —
     // `mattr_writer` still runs with its default `instance_writer: true`
     // (module/attribute_accessors.rb:210-211), so the prototype keeps a setter.
@@ -210,20 +210,20 @@ describe("ModuleAttributeAccessorTest", () => {
 
   it("should not create instance accessors", () => {
     class MyModule {}
-    mattrAccessor(MyModule, ["internal"], { instanceAccessor: false });
+    mattrAccessor.call(MyModule, "internal", { instanceAccessor: false });
     expect(Object.getOwnPropertyDescriptor(MyModule.prototype, "internal")).toBeUndefined();
   });
 
   it("should raise name error if attribute name is invalid", () => {
     class MyModule {}
-    expect(() => mattrAccessor(MyModule, ["1invalid"])).toThrow();
-    expect(() => mattrAccessor(MyModule, ["has space"])).toThrow();
+    expect(() => mattrAccessor.call(MyModule, "1invalid")).toThrow();
+    expect(() => mattrAccessor.call(MyModule, "has space")).toThrow();
   });
 
   it("should use default value if block passed", () => {
     class MyModule {}
     let callCount = 0;
-    mattrAccessor(MyModule, ["computed"], {
+    mattrAccessor.call(MyModule, "computed", {
       default: () => {
         callCount++;
         return "computed_val";
@@ -236,7 +236,7 @@ describe("ModuleAttributeAccessorTest", () => {
   it("method invocation should not invoke the default block", () => {
     class MyModule {}
     let callCount = 0;
-    mattrAccessor(MyModule, ["lazy"], {
+    mattrAccessor.call(MyModule, "lazy", {
       default: () => {
         callCount++;
         return "result";
@@ -255,7 +255,7 @@ describe("ModuleAttributeAccessorTest", () => {
       callCount++;
       return "val";
     };
-    mattrAccessor(MyModule, ["a", "b", "c"], { default: makeDefault });
+    mattrAccessor.call(MyModule, "a", "b", "c", { default: makeDefault });
     expect(callCount).toBe(3);
   });
 
@@ -282,19 +282,19 @@ describe("KernelSuppressTest", () => {
 describe("ConfigurableActiveSupport", () => {
   it("adds a configuration hash", () => {
     class MyApp {}
-    configAccessor(MyApp, ["log_level"], { default: "info" });
+    configAccessor.call(MyApp, "log_level", { default: "info" });
     expect((MyApp as any).log_level).toBe("info");
   });
 
   it("adds a configuration hash to a module as well", () => {
     class MyModule {}
-    configAccessor(MyModule, ["setting"]);
+    configAccessor.call(MyModule, "setting");
     expect((MyModule as any).setting).toBeUndefined();
   });
 
   it("configuration hash is inheritable", () => {
     class Base {}
-    configAccessor(Base, ["timeout"], { default: 30 });
+    configAccessor.call(Base, "timeout", { default: 30 });
     class Child extends Base {}
     // Child reads from Base's class-level accessor
     expect((Base as any).timeout).toBe(30);
@@ -302,13 +302,13 @@ describe("ConfigurableActiveSupport", () => {
 
   it("configuration accessors can take a default value as an option", () => {
     class Base {}
-    configAccessor(Base, ["max_connections"], { default: 100 });
+    configAccessor.call(Base, "max_connections", { default: 100 });
     expect((Base as any).max_connections).toBe(100);
   });
 
   it("configuration hash is available on instance", () => {
     class Base {}
-    configAccessor(Base, ["verbose"], { default: false });
+    configAccessor.call(Base, "verbose", { default: false });
     (Base as any).verbose = true;
     const instance = new Base() as any;
     expect(instance.verbose).toBe(true); // instance delegates to class
@@ -316,6 +316,6 @@ describe("ConfigurableActiveSupport", () => {
 
   it("should raise name error if attribute name is invalid", () => {
     class Base {}
-    expect(() => configAccessor(Base, ["1bad"])).toThrow();
+    expect(() => configAccessor.call(Base, "1bad")).toThrow();
   });
 });

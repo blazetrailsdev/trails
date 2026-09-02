@@ -1028,12 +1028,12 @@ class TestExtractor
     # `scan_run_condition` records each boolean in RUN space at its own negation
     # parity: `or_true` is "the source condition is a disjunction", `or_false`
     # is "its negation is" — which is what the `unless` path runs on (`unless
-    # A && B` runs on `!A || B`). The `unless` path keeps `or_true` in the union
-    # as well: `unless A || B` runs on the conjunction `!A && !B`, but treating
-    # it as a disjunction only withholds a decomposition, and holding the two
-    # paths' outcomes fixed for un-negated shapes is what keeps this change to
-    # the negated-boolean shapes it is about.
-    run_has_or = positive ? acc[:or_true] : (acc[:or_false] || acc[:or_true])
+    # A && B` runs on `!A || B`). Every rule below reads THIS boolean, so the
+    # whole method resolves in RUN space, the space `gates.ts` already reads
+    # (`runIsDisjunctive`). The two extractors used to disagree here — Ruby read
+    # the drop rules in SOURCE space — and produced different keys for the
+    # `skip if A || B` shape.
+    run_has_or = positive ? acc[:or_true] : acc[:or_false]
     split = !run_has_or
     # Feature polarity is read against the RUN condition: on the `unless` path a
     # textually-negated predicate is the one the test RUNS on (`skip if
@@ -1044,8 +1044,14 @@ class TestExtractor
     inverted_features = split ? run_neg_features : []
     any_feature = !features.empty? || !inverted_features.empty?
 
-    adapters = acc[:adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
-    neg_adapters = acc[:neg_adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
+    # Adapter polarity is read against the RUN condition too: on the `unless`
+    # path a textually-negated predicate is the one the test RUNS on (`skip if
+    # !current_adapter?(:X)` runs on X), so the two buckets swap exactly as the
+    # feature buckets above do.
+    source_adapters = acc[:adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
+    source_neg_adapters = acc[:neg_adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
+    adapters = positive ? source_adapters : source_neg_adapters
+    neg_adapters = positive ? source_neg_adapters : source_adapters
     # `current_adapter?(:Trilogy*)` is statically false in trails (see
     # ADAPTER_SYMBOL_MAP): an exclusion (`unless Trilogy`) excludes nothing and
     # a disjunct (`if Mysql2 || Trilogy`) reduces to the remaining adapters, so
@@ -1059,16 +1065,16 @@ class TestExtractor
     # Restricted to pure adapter conditions: a compound like `if Trilogy &&
     # supports_x?` keeps its feature/guard gate instead — conservative, but
     # comparable, and no such compound exists in the Rails suite today.
-    if trilogy_only && positive && !any_feature && acc[:guards].empty?
+    if trilogy_only && !any_feature && acc[:guards].empty?
       gate[:adapters] = []
     end
-    # A POSITIVE adapter set isn't sound — and must be dropped — when the
-    # condition mixes it with a feature under `||` or on the run-when-false path
-    # (`current_adapter?(:A) || supports_X?` runs on a union no single adapter
-    # set captures, and `unless A && supports_X?` negates the conjunction into
-    # exactly such a union); when it mixes with a guard at all (a guard is a
-    # runtime predicate the extractor deliberately treats as non-comparable, so
-    # a partial adapter restriction alongside it would over-claim); or when it
+    # A POSITIVE adapter set isn't sound — and must be dropped — when the RUN
+    # condition mixes it with a feature under `||` (`current_adapter?(:A) ||
+    # supports_X?` runs on a union no single adapter set captures, and `unless A
+    # && supports_X?` negates the conjunction into exactly such a union); when it
+    # mixes with a guard at all (a guard is a runtime predicate the extractor
+    # deliberately treats as non-comparable, so a partial adapter restriction
+    # alongside it would over-claim); or when it
     # mixes with a negated adapter under `||` (`current_adapter?(:A) ||
     # !current_adapter?(:B)` is the complement of B, not A). A pure positive
     # `||` (`A || B`) stays sound — it is the union the concat already
@@ -1078,18 +1084,19 @@ class TestExtractor
     # negated-adapter branch below uses.
     mixed = !adapters.empty? &&
             (!acc[:guards].empty? ||
-             (any_feature && (acc[:or_true] || !positive)) ||
-             (acc[:or_true] && !neg_adapters.empty?))
+             (any_feature && run_has_or) ||
+             (run_has_or && !neg_adapters.empty?))
     if !adapters.empty? && !mixed
-      gate[:adapters] = positive ? adapters : (ALL_ADAPTERS - adapters)
+      gate[:adapters] = adapters
     end
     # A NEGATED adapter predicate (`!current_adapter?(:X)`) in a pure conjunction
     # (`&&`, no `||`) is a sound adapter EXCLUSION that composes with a feature
     # gate: e.g. `end if supports_insert_returning? && !current_adapter?(:SQLite3Adapter)`
-    # runs on every adapter that supports the feature, minus SQLite. We can only
-    # emit it on the run-when-true (`if`) path; under `unless` the negation turns
-    # the conjunction into a disjunction that isn't expressible as one adapter set.
-    if positive && !neg_adapters.empty? && !run_has_or
+    # runs on every adapter that supports the feature, minus SQLite. Both the
+    # exclusion and `run_has_or` are read in RUN space, so the `unless` path is
+    # covered by the same test: there the negation turns a conjunction into a
+    # disjunction, which `run_has_or` reports and which drops the exclusion.
+    if !neg_adapters.empty? && !run_has_or
       base = gate[:adapters] || ALL_ADAPTERS
       gate[:adapters] = base - neg_adapters
     end

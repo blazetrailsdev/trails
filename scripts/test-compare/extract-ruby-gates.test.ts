@@ -338,6 +338,33 @@ describe("Ruby extractor gate detection", () => {
     });
   });
 
+  it("resolves a skip-if adapter/feature disjunction in the same RUN space as the TS extractor", () => {
+    const g = rubyGates({
+      "cases/run_space_test.rb": `
+        class RunSpaceTest < ActiveRecord::TestCase
+          def test_negated_adapter_disjunct
+            skip "x" if !current_adapter?(:Mysql2Adapter) || !supports_expression_index?
+          end
+          def test_positive_adapter_disjunct
+            skip "x" if current_adapter?(:Mysql2Adapter) || supports_expression_index?
+          end
+        end
+      `,
+    });
+    // `skip if !A || !ei` runs on `A && ei` — both dimensions are sound.
+    expect(g["negated adapter disjunct"]).toEqual({
+      adapters: ["mysql"],
+      features: ["expression_index"],
+      source: ["body-skip"],
+    });
+    // `skip if A || ei` runs on `!A && !ei`.
+    expect(g["positive adapter disjunct"]).toEqual({
+      adapters: ["postgresql", "sqlite"],
+      guards: ["no_expression_index"],
+      source: ["body-skip"],
+    });
+  });
+
   it("does not emit an adapter exclusion under `unless` (negation → disjunction)", () => {
     const g = rubyGates({
       // `unless feature && !sqlite` runs when `!feature || sqlite` — a disjunction

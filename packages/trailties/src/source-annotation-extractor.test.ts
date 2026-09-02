@@ -9,9 +9,6 @@ import {
 import {
   Annotation,
   SourceAnnotationExtractor,
-  registerDirectories,
-  registerExtensions,
-  registerTags,
   resetAnnotationRegistry,
 } from "./source-annotation-extractor.js";
 
@@ -97,14 +94,14 @@ describe("SourceAnnotationExtractor", () => {
 
   test("registerDirectories adds search roots", async () => {
     w("spec/m.ts", "// TODO: x");
-    registerDirectories("spec");
+    Annotation.registerDirectories("spec");
     expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
       `spec/m.ts:\n  * [1] [TODO] x\n\n`,
     );
   });
 
   test("registerExtensions adds new file types", async () => {
-    registerExtensions(["scss"], (tag) => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`));
+    Annotation.registerExtensions("scss", (tag) => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`));
     w("app/a.scss", "// TODO: styled");
     expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
       `app/a.scss:\n  * [1] [TODO] styled\n\n`,
@@ -114,7 +111,7 @@ describe("SourceAnnotationExtractor", () => {
   test("registerTags adds new tags; unregistered tags are ignored", async () => {
     w("app/a.ts", "// TESTME: yes");
     w("app/b.ts", "// BAD: no");
-    registerTags("TESTME");
+    Annotation.registerTags("TESTME");
     expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
       `app/a.ts:\n  * [1] [TESTME] yes\n\n`,
     );

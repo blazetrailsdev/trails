@@ -698,6 +698,103 @@ export function reorderedCalls(
 }
 
 /**
+ * The signature populations `resolvePortedWithArgsSigs` reads, plus the
+ * option-key side-map recorded from the same members.
+ */
+export interface TsPortedWithArgsMaps {
+  /**
+   * Every signature seen for a TS name, from THIS package only — no dep
+   * packages. Arity's pool is global (see `tsParamsByName` in main); this gate's
+   * must not be widened back to match it.
+   */
+  paramsByNameInPkg: Map<string, ParamInfo[][]>;
+  /**
+   * Per-(file, name) counterpart, package-only: relative paths collide across
+   * packages (`attribute-methods.ts` exists in both activemodel and
+   * activerecord), so a same-file map that also held dep-package files would
+   * still let a dep signature open the gate. Feeds the ported-with-args gate
+   * and the literal-default check.
+   */
+  paramsByFileNameInPkg: Map<string, Map<string, ParamInfo[][]>>;
+  /**
+   * The same signatures keyed by DECLARING CLASS too (`<owner>#<name>`), for
+   * the parameter-NAME check alone: a file-scoped pool lets two sibling classes
+   * lend each other a signature (`OutputBuffer#capture(*args)`, buffers.rb:72,
+   * scored against `StreamingBuffer#capture`, buffers.rb:126).
+   */
+  paramsByFileOwnerNameInPkg: Map<string, Map<string, ParamInfo[][]>>;
+  /**
+   * Signature objects (by identity) belonging to a `set` accessor. A Ruby
+   * writer is its own method (`where_clause=`) but conventions.ts maps it onto
+   * the bare camel name, so a get/set pair pools two signatures under one name.
+   * The ported-with-args gate must not read the writer's parameter as proof
+   * that the READER — the method a Ruby `where_clause` CALL maps to — takes
+   * arguments; that is what made adding a writer Rails already has surface call
+   * mismatches on bodies nobody touched. Arity keeps the signature; only this
+   * gate subtracts it. See MethodInfo.writer.
+   */
+  writerSigs: Set<readonly ParamInfo[]>;
+  /**
+   * Per-(file, name) resolved options-object keys (null = uncheckable),
+   * package-only for the same collision reason as `paramsByFileNameInPkg`.
+   * Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
+   * same-named method (e.g. PostgreSQL `createDatabase`) can't lend its keys to
+   * a different adapter's Ruby method and manufacture a cross-adapter
+   * `missingInTs` artifact (`create_database :charset`). The mixin
+   * re-export/real-type split is preserved because the option-key check runs
+   * against the file the method actually MATCHED in.
+   */
+  optionKeysByFileName: Map<string, Map<string, (string[] | null)[]>>;
+}
+
+export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
+  return {
+    paramsByNameInPkg: new Map(),
+    paramsByFileNameInPkg: new Map(),
+    paramsByFileOwnerNameInPkg: new Map(),
+    writerSigs: new Set(),
+    optionKeysByFileName: new Map(),
+  };
+}
+
+/**
+ * Record one package-scoped TS member into the ported-with-args populations.
+ *
+ * The `isTestHelperFile` guard lives HERE, with the population it protects: a
+ * test helper standing in for a Ruby method must not open the calls gate for a
+ * body that never calls it (see config.ts#isTestHelperFile). Held on `main()`'s
+ * owner-map block instead — where a revert probe once put it — every gate, every
+ * `scripts/api-compare/` test and the `call-mismatches.json` artifact itself
+ * stay byte-identical, which is why this half is exported and pinned by a test
+ * rather than left as a closure over `main()`'s locals.
+ */
+export function recordTsPortedWithArgs(
+  maps: TsPortedWithArgsMaps,
+  m: MethodInfo,
+  file: string,
+  owner: string,
+): void {
+  if (isTestHelperFile(file)) return;
+  const pkgSigs = maps.paramsByNameInPkg.get(m.name) ?? [];
+  pkgSigs.push(m.params);
+  maps.paramsByNameInPkg.set(m.name, pkgSigs);
+  const pkgByName = maps.paramsByFileNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
+  pkgByName.set(m.name, [...(pkgByName.get(m.name) ?? []), m.params]);
+  maps.paramsByFileNameInPkg.set(file, pkgByName);
+  const pkgByOwnerName =
+    maps.paramsByFileOwnerNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
+  const ownerKey = `${owner}#${m.name}`;
+  pkgByOwnerName.set(ownerKey, [...(pkgByOwnerName.get(ownerKey) ?? []), m.params]);
+  maps.paramsByFileOwnerNameInPkg.set(file, pkgByOwnerName);
+  if (m.writer) maps.writerSigs.add(m.params);
+  if (m.optionKeys !== undefined) {
+    const byName = maps.optionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
+    byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
+    maps.optionKeysByFileName.set(file, byName);
+  }
+}
+
+/**
  * Signature candidates the ported-with-args gate (gate 2 above) resolves a
  * mapped TS name against: the same file's signatures when that file defines the
  * name, else the ones from the SAME PACKAGE only.
@@ -3074,41 +3171,16 @@ export function main() {
     // pooling all signatures and matching ANY (see matchArityAgainst) finds the
     // true arity and keeps those bindings/overloads from false-positiving.
     const tsParamsByName = new Map<string, ParamInfo[][]>();
-    // Same signatures, but ONLY from this package — no dep packages. Feeds the
-    // calls-parity ported-with-args gate; see resolvePortedWithArgsSigs.
-    const tsParamsByNameInPkg = new Map<string, ParamInfo[][]>();
-    // Per-(file, name) counterpart, package-only: relative paths collide across
-    // packages (`attribute-methods.ts` exists in both activemodel and
-    // activerecord), so a same-file map that also held dep-package files would
-    // still let a dep signature open the gate. Feeds the ported-with-args gate
-    // and the literal-default check.
-    const tsParamsByFileNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
-    // The same signatures keyed by DECLARING CLASS too (`<owner>#<name>`), for
-    // the parameter-NAME check alone: a file-scoped pool lets two sibling
-    // classes lend each other a signature (`OutputBuffer#capture(*args)`,
-    // buffers.rb:72, scored against `StreamingBuffer#capture`, buffers.rb:126).
-    // Arity keeps the wider pool (see tsParamsByName).
-    const tsParamsByFileOwnerNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
-    // Signature objects (by identity) belonging to a `set` accessor. A Ruby
-    // writer is its own method (`where_clause=`) but conventions.ts maps it onto
-    // the bare camel name, so a get/set pair pools two signatures under one
-    // name. The ported-with-args gate must not read the writer's parameter as
-    // proof that the READER — the method a Ruby `where_clause` CALL maps to —
-    // takes arguments; that is what made adding a writer Rails already has
-    // surface call mismatches on bodies nobody touched. Arity keeps the
-    // signature (it is the real match for `where_clause=`); only this gate
-    // subtracts it. See MethodInfo.writer.
-    const tsWriterSigs = new Set<readonly ParamInfo[]>();
-    // Per-(file, name) resolved options-object keys (null = uncheckable),
-    // package-only for the same collision reason as tsParamsByFileNameInPkg.
-    // Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
-    // same-named method (e.g. PostgreSQL `createDatabase`) can't lend its keys
-    // to a different adapter's Ruby method and manufacture a cross-adapter
-    // `missingInTs` artifact (`create_database :charset`). The mixin
-    // re-export/real-type split is preserved because the option-key check runs
-    // against the file the method actually MATCHED in (the real-type file for
-    // include-chain matches), where the union within that file still applies.
-    const tsOptionKeysByFileName = new Map<string, Map<string, (string[] | null)[]>>();
+    // The package-only signature populations the calls-parity ported-with-args
+    // gate reads — see TsPortedWithArgsMaps for what each one is scoped to.
+    const portedWithArgsMaps = newTsPortedWithArgsMaps();
+    const {
+      paramsByNameInPkg: tsParamsByNameInPkg,
+      paramsByFileNameInPkg: tsParamsByFileNameInPkg,
+      paramsByFileOwnerNameInPkg: tsParamsByFileOwnerNameInPkg,
+      writerSigs: tsWriterSigs,
+      optionKeysByFileName: tsOptionKeysByFileName,
+    } = portedWithArgsMaps;
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
@@ -3251,25 +3323,7 @@ export function main() {
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
-      if (scope === "package" && !isTestHelperFile(file)) {
-        const pkgSigs = tsParamsByNameInPkg.get(m.name) ?? [];
-        pkgSigs.push(m.params);
-        tsParamsByNameInPkg.set(m.name, pkgSigs);
-        const pkgByName = tsParamsByFileNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
-        pkgByName.set(m.name, [...(pkgByName.get(m.name) ?? []), m.params]);
-        tsParamsByFileNameInPkg.set(file, pkgByName);
-        const pkgByOwnerName =
-          tsParamsByFileOwnerNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
-        const ownerKey = `${owner}#${m.name}`;
-        pkgByOwnerName.set(ownerKey, [...(pkgByOwnerName.get(ownerKey) ?? []), m.params]);
-        tsParamsByFileOwnerNameInPkg.set(file, pkgByOwnerName);
-        if (m.writer) tsWriterSigs.add(m.params);
-        if (m.optionKeys !== undefined) {
-          const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
-          byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
-          tsOptionKeysByFileName.set(file, byName);
-        }
-      }
+      if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
       if (m.missingRailsCalls !== undefined) {
         recordTaggedCalls(
           tsMissingCallTagsByFileName,
