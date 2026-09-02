@@ -5,6 +5,7 @@ import {
   dup,
   eachKey,
   eachPair,
+  inspect,
   except,
   fetch,
   hasKey,
@@ -213,5 +214,45 @@ describe("Hash#default", () => {
     const copy = dup(hash);
     copy.a = 2;
     expect(hash.a).toBe(1);
+  });
+
+  describe("inspect", () => {
+    it("renders an empty hash as {}", () => {
+      expect(inspect({})).toBe("{}");
+    });
+
+    it("renders keys and values as rb_inspect does, joined by =>", () => {
+      expect(inspect({ a: 1, b: [1, null], c: { d: true }, e: ":sym" })).toBe(
+        '{"a"=>1, "b"=>[1, nil], "c"=>{"d"=>true}, "e"=>:sym}',
+      );
+      expect(inspect({ f: 1.5, n: null, s: ":sym", empty: [] })).toBe(
+        '{"f"=>1.5, "n"=>nil, "s"=>:sym, "empty"=>[]}',
+      );
+    });
+
+    it("escapes strings as String#inspect does", () => {
+      expect(inspect({ q: 'a"b\\c', t: "tab\there", esc: "\n\r\f\v\b\u0007\u001b" })).toBe(
+        '{"q"=>"a\\"b\\\\c", "t"=>"tab\\there", "esc"=>"\\n\\r\\f\\v\\b\\a\\e"}',
+      );
+      expect(inspect({ nul: "\u0000", soh: "\u0001", del: "\u007f", nel: "\u0085" })).toBe(
+        '{"nul"=>"\\u0000", "soh"=>"\\u0001", "del"=>"\\u007F", "nel"=>"\\u0085"}',
+      );
+      expect(inspect({ uni: "\u00e9\u{1f600}\u200b\ufffd" })).toBe(
+        '{"uni"=>"\u00e9\u{1f600}\u200b\ufffd"}',
+      );
+      expect(inspect({ hash: "#z", interp: "#{y", dollar: "#$x", at: "#@y" })).toBe(
+        '{"hash"=>"#z", "interp"=>"\\#{y", "dollar"=>"\\#$x", "at"=>"\\#@y"}',
+      );
+    });
+
+    it("renders a recursive hash or array as MRI's recursive slot", () => {
+      const hash: Record<string, unknown> = { a: 1 };
+      hash.self = hash;
+      expect(inspect(hash)).toBe('{"a"=>1, "self"=>{...}}');
+
+      const ary: unknown[] = [1];
+      ary.push(ary);
+      expect(inspect({ ary })).toBe('{"ary"=>[1, [...]]}');
+    });
   });
 });

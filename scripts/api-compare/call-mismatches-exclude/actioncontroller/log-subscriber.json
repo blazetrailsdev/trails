@@ -16,21 +16,5 @@
       "num:1"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "log-subscriber.ts",
-    "rubyName": "start_processing",
-    "call": "each_pair",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "log-subscriber.ts",
-    "rubyName": "start_processing",
-    "call": "each_pair",
-    "kind": "rubyCompat",
-    "tsExport": "eachPair",
-    "reason": "Baseline (RFC 0129): the receiver is `payload[:params]`, and the whole params-logging branch of `start_processing` (log_subscriber.rb:13-16) is unported — there is no hash to walk yet, so the import waits on that port."
   }
 ]

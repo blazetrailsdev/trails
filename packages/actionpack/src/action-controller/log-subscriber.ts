@@ -11,6 +11,9 @@ import {
   NotificationEvent as Event,
 } from "@blazetrails/activesupport";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
+import { eachPair, inspect, isEmpty, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+
+const INTERNAL_PARAMS = ["controller", "action", "format", "_method", "only_path"];
 
 export class LogSubscriber extends BaseLogSubscriber {
   /** Rails `ActionController::LogSubscriber#logger` — delegates to `Base.logger`. @internal */
@@ -18,13 +21,31 @@ export class LogSubscriber extends BaseLogSubscriber {
     return LogSubscriber.logger;
   }
 
+  /**
+   * `ActionController::LogSubscriber#start_processing`
+   * (`vendor/rails/actionpack/lib/action_controller/log_subscriber.rb:9-27`).
+   *
+   * @missingRailsArgs each_pair — PERMANENT
+   */
   startProcessing(event: Event): void {
-    const { controller, action, format } = event.payload as {
+    if (!this.logger?.["info?"]) return;
+
+    const payload = event.payload as {
       controller: string;
       action: string;
-      format?: string;
+      params: Record<string, unknown>;
+      format?: string | null;
     };
-    this._info(`Processing by ${controller}#${action} as ${format ?? "*/*"}`);
+    const params: Record<string, unknown> = {};
+    eachPair(payload.params, (k, v) => {
+      if (!INTERNAL_PARAMS.includes(k)) params[k] = v;
+    });
+    let format = payload.format;
+    if (isSymbol(format)) format = symbolToS(format).toUpperCase();
+    if (format == null) format = "*/*";
+
+    this._info(`Processing by ${payload.controller}#${payload.action} as ${format}`);
+    if (!isEmpty(params)) this._info(`  Parameters: ${inspect(params)}`);
   }
 
   processAction(event: Event): void {
@@ -81,4 +102,6 @@ export class LogSubscriber extends BaseLogSubscriber {
 
 // "action_controller" is the AS::Notifications channel identifier, which uses
 // Rails snake_case naming conventions as a cross-package wire protocol.
+LogSubscriber.subscribeLogLevel("start_processing", "info");
+
 LogSubscriber.attachTo("action_controller");
