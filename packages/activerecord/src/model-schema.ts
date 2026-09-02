@@ -4,9 +4,11 @@ import { pluralize, underscore } from "@blazetrails/activesupport";
 import {
   AttributeSetBuilder,
   YAMLEncoder,
+  defaultValue,
   type AttributeSet,
   type Type,
 } from "@blazetrails/activemodel";
+import { Hash } from "@blazetrails/ruby-compat";
 import {
   isBaseClass,
   baseClass,
@@ -415,7 +417,9 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
   const defaults = this._defaultAttributes().except(
     ...columnNames.call(this as unknown as typeof Base).filter((name) => name !== primaryKey),
   );
-  const builder = new AttributeSetBuilder(new Map(Object.entries(this.attributeTypes())), defaults);
+  const types = new Hash<string, Type>(defaultValue());
+  for (const [name, type] of Object.entries(this.attributeTypes())) types.set(name, type);
+  const builder = new AttributeSetBuilder(types, defaults);
   this._attributesBuilder = builder;
   return builder;
 }

@@ -267,6 +267,14 @@ describe("Errors — trails-only coverage", () => {
       expect(errors.added("age", ":out_of_range", { range: { min: 1, max: 9 } })).toBe(false);
     });
 
+    it("import symbolizes a string :type override so added matches it", () => {
+      const source = new Errors({});
+      source.add("name", ":invalid");
+      const target = new Errors({});
+      target.import(source.objects[0], { type: "too_short" });
+      expect(target.added("name", ":too_short")).toBe(true);
+    });
+
     it("import accepts :attribute and :type override (rawType stays on inner)", () => {
       const source = new Errors({});
       source.add("name", ":invalid");
@@ -274,14 +282,14 @@ describe("Errors — trails-only coverage", () => {
       target.import(source.objects[0], { attribute: "title", type: "wrong" });
       const imported = target.objects[0];
       expect(imported.attribute).toBe("title");
-      expect(imported.type).toBe("wrong");
+      expect(imported.type).toBe(":wrong");
       expect(imported.rawType).toBe(":invalid");
 
       const copy = new Errors({});
       copy.copyBang(target);
       const round = copy.objects[0];
       expect(round.attribute).toBe("title");
-      expect(round.type).toBe("wrong");
+      expect(round.type).toBe(":wrong");
       expect(round.rawType).toBe(":invalid");
     });
   });

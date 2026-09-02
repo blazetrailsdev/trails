@@ -8,7 +8,7 @@ import {
   type SerializeOptions,
   type SerializationRecord,
 } from "../serialization.js";
-import { ModelName, Naming } from "../naming.js";
+import { ModelName, Naming, detectRelativeModelNamingParent } from "../naming.js";
 import {
   ActiveSupportJSON,
   include,
@@ -62,7 +62,7 @@ export class JSON {
 
   static get modelName(): ModelName {
     if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-      const namespace = null;
+      const namespace = detectRelativeModelNamingParent(this);
       this._modelName = new ModelName(this, namespace);
     }
     return this._modelName;

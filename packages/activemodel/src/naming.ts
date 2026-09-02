@@ -5,6 +5,7 @@ import {
   humanize,
   tableize,
   demodulize,
+  safeConstantize,
   isBlank,
   include,
   ToJsonWithActiveSupportEncoder,
@@ -19,10 +20,27 @@ export interface Naming {
 
 function modelName(this: NamingHost): ModelName {
   if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-    const namespace = null;
+    const namespace = detectRelativeModelNamingParent(this);
     this._modelName = new ModelName(this as unknown as ModelLike, namespace);
   }
   return this._modelName;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function detectRelativeModelNamingParent(klass: {
+  moduleName?: string;
+}): { name: string } | null {
+  const segments = (klass.moduleName ?? "").split("::").filter((segment) => segment !== "");
+  while (segments.length > 0) {
+    const parent = safeConstantize(segments.join("::")) as
+      | { name: string; useRelativeModelNaming?: () => unknown }
+      | null
+      | undefined;
+    const relative = parent?.useRelativeModelNaming?.();
+    if (relative != null && relative !== false) return parent!;
+    segments.pop();
+  }
+  return null;
 }
 
 function namingExtended(base: NamingHost): void {
@@ -36,6 +54,7 @@ function namingExtended(base: NamingHost): void {
 
 interface NamingHost {
   prototype: object;
+  moduleName?: string;
   _modelName?: ModelName | null;
 }
 

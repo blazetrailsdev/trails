@@ -1,7 +1,6 @@
 import { Attribute, Uninitialized } from "../attribute.js";
 import { KeyError, eachKey, except, hasKey, transformValues } from "@blazetrails/ruby-compat";
 import { Type } from "../type/value.js";
-import { defaultValue } from "../type.js";
 import { AttributeSet } from "../attribute-set.js";
 
 export class Builder {
@@ -79,8 +78,10 @@ export class LazyAttributeSet extends AttributeSet {
     }
 
     if (valuePresent) {
-      const type = this.additionalTypes.get(name) ?? this.types.get(name) ?? defaultValue();
-      const casted = type.deserialize(value);
+      const type = this.additionalTypes.has(name)
+        ? this.additionalTypes.get(name)
+        : this.types.get(name);
+      const casted = type!.deserialize(value);
       this.castedValues.set(name, casted);
       return casted;
     } else {
@@ -109,19 +110,17 @@ export class LazyAttributeSet extends AttributeSet {
       value = valuePresent ? this.values[name] : undefined;
     }
 
-    const type = this.additionalTypes.get(name) ?? this.types.get(name) ?? defaultValue();
+    const type = this.additionalTypes.has(name)
+      ? this.additionalTypes.get(name)
+      : this.types.get(name);
 
     if (valuePresent) {
-      const castedValue = this.castedValues.get(name);
-      const attr =
-        castedValue === undefined
-          ? Attribute.fromDatabase(name, value, type)
-          : Attribute.fromDatabase(name, value, type, castedValue);
+      const attr = Attribute.fromDatabase(name, value, type!, this.castedValues.get(name));
       this._attributes.set(name, attr);
       return attr;
     } else if (this.types.has(name)) {
       const attr = this.defaultAttributes.get(name);
-      const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
+      const built = attr ? attr.dup() : Attribute.uninitialized(name, type!);
       this._attributes.set(name, built);
       return built;
     } else {
@@ -246,7 +245,9 @@ export class LazyAttributeHash {
 
   /** @internal */
   assignDefaultValue(name: string): Attribute {
-    const type = this.additionalTypes.get(name) ?? this.types.get(name) ?? defaultValue();
+    const type = this.additionalTypes.has(name)
+      ? this.additionalTypes.get(name)
+      : this.types.get(name);
     let valuePresent = true;
     let value: unknown;
     if (Object.hasOwn(this.values, name)) {
@@ -256,12 +257,12 @@ export class LazyAttributeHash {
     }
 
     if (valuePresent) {
-      const attr = Attribute.fromDatabase(name, value, type);
+      const attr = Attribute.fromDatabase(name, value, type!);
       this.delegate[name] = attr;
       return attr;
     } else if (this.types.has(name)) {
       const attr = this.defaultAttributes.get(name);
-      const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
+      const built = attr ? attr.dup() : Attribute.uninitialized(name, type!);
       this.delegate[name] = built;
       return built;
     }

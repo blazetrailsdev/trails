@@ -54,15 +54,25 @@ export class Errors<TBase extends object = object> {
     });
   }
 
-  import(error: ActiveModelError, overrideOptions?: { attribute?: string; type?: string }): void {
+  import(
+    error: ActiveModelError,
+    overrideOptions: { attribute?: string; type?: string } = {},
+  ): void {
+    const type = overrideOptions.type;
+    if (type !== undefined) {
+      overrideOptions.type = type.startsWith(":") ? type : `:${type}`;
+    }
     this._errors.push(new NestedError(this._base, error, overrideOptions));
   }
 
-  mergeBang<U extends object>(other: Errors<U>): void {
-    if (Object.is(other, this)) return;
-    for (const error of other._errors) {
+  mergeBang<U extends object>(other: Errors<U>): this | ActiveModelError[] {
+    if (Object.is(other, this)) return this.errors;
+
+    const errors = other.errors.objects;
+    for (const error of errors) {
       this.import(error);
     }
+    return errors;
   }
 
   where(
@@ -70,9 +80,6 @@ export class Errors<TBase extends object = object> {
     type?: string | ((record: TBase | null, options: Record<string, unknown>) => string),
     options?: Record<string, unknown>,
   ): ActiveModelError[] {
-    if (type === undefined) {
-      return this._errors.filter((e) => e.match(attribute));
-    }
     const [normAttr, normType, normOpts] = this.normalizeArguments(attribute, type, options);
     return this._errors.filter((e) => e.match(normAttr, normType, normOpts));
   }
@@ -101,13 +108,19 @@ export class Errors<TBase extends object = object> {
     return matches;
   }
 
+  get(attribute: string): string[] {
+    return this.messagesFor(attribute);
+  }
+
   get attributeNames(): string[] {
     return [...new Set(this._errors.map((e) => e.attribute))];
   }
 
-  asJson(_options?: Record<string, unknown>): Record<string, string[]> {
+  asJson(options?: Record<string, unknown> | null): Record<string, string[]> {
     const result: Record<string, string[]> = {};
-    for (const [attr, msgs] of this.toHash(false)) {
+    for (const [attr, msgs] of this.toHash(
+      options != null && (options["fullMessages"] as boolean | undefined),
+    )) {
       result[attr] = msgs;
     }
     return result;
@@ -222,7 +235,19 @@ export class Errors<TBase extends object = object> {
     attribute: string,
     type: string | ((record: TBase | null, options: Record<string, unknown>) => string),
     options?: Record<string, unknown>,
-  ): [string, string, Record<string, unknown>] {
+  ): [string, string, Record<string, unknown>];
+  /** @internal */
+  normalizeArguments(
+    attribute: string,
+    type?: string | ((record: TBase | null, options: Record<string, unknown>) => string),
+    options?: Record<string, unknown>,
+  ): [string, string | undefined, Record<string, unknown>];
+  /** @internal */
+  normalizeArguments(
+    attribute: string,
+    type?: string | ((record: TBase | null, options: Record<string, unknown>) => string),
+    options?: Record<string, unknown>,
+  ): [string, string | undefined, Record<string, unknown>] {
     const opts = { ...(options ?? {}) };
     const resolvedType = typeof type === "function" ? type(this._base, opts) : type;
     return [attribute, resolvedType, opts];

@@ -78,9 +78,8 @@ describe("ErrorsTest", () => {
 
   it("error access is indifferent", () => {
     const errors = new Errors({});
-    errors.add("name", ":blank");
-    expect(errors.messagesFor("name")).toEqual(["can't be blank"]);
-    expect(errors.messagesFor("name")).toEqual(["can't be blank"]);
+    errors.add("name", "omg");
+    expect(errors.get("name")).toEqual(["omg"]);
   });
 
   it("add, with type as nil", () => {
@@ -150,9 +149,8 @@ describe("ErrorsTest", () => {
 
   it("as_json with :full_messages option creates a json formatted representation of the errors containing complete messages", () => {
     const errors = new Errors({});
-    errors.add("name", ":blank");
-    errors.add("age", ":invalid");
-    expect(errors.fullMessages).toEqual(["Name can't be blank", "Age is invalid"]);
+    errors.add("name", "cannot be nil");
+    expect(errors.asJson({ fullMessages: true })).toEqual({ name: ["Name cannot be nil"] });
   });
 
   it("merge does not import errors when merging with self", () => {
