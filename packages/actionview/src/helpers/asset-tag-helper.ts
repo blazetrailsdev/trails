@@ -37,7 +37,10 @@ export function stylesheetLinkTag(
 ): SafeBuffer {
   const last = sources[sources.length - 1];
   const options: Record<string, unknown> =
-    typeof last === "object" && last !== null && !(last instanceof SafeBuffer)
+    typeof last === "object" &&
+    last !== null &&
+    !Array.isArray(last) &&
+    !(last instanceof SafeBuffer)
       ? { ...(sources.pop() as Record<string, unknown>) }
       : {};
   const pathOptions: AssetPathOptions = {};

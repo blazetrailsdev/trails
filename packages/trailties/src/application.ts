@@ -26,6 +26,7 @@ import { resolveEnv, loadDatabaseConfig, type DatabaseConfig } from "./database.
 import { Collection, type InitializerGroup } from "./initializable.js";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import type { MiddlewareStack, RackApp } from "@blazetrails/actionpack";
+import "./trailties/assets.js";
 
 let _appClass: typeof Application | null = null;
 /** @internal Tracks which subclasses have fired `:before_configuration`. */
