@@ -32,6 +32,15 @@ import { builtinModules } from "node:module";
 // All Node.js built-in module names (without node: prefix), including underscored internals
 const NODE_BUILTINS = new Set(builtinModules.filter((m) => !m.startsWith("_")));
 
+// `@blazetrails/ruby-compat` is a leaf package with no workspace dependencies
+// (RFC 0129), so the activesupport adapter the replacement table points at is
+// itself a violation there — report the plain message and offer no autofix.
+const LEAF_PACKAGE_PATH = "packages/ruby-compat/";
+
+function isLeafPackageFile(filename) {
+  return typeof filename === "string" && filename.replace(/\\/g, "/").includes(LEAF_PACKAGE_PATH);
+}
+
 function normalizeModule(source) {
   return source.replace(/^node:/, "");
 }
@@ -58,6 +67,8 @@ const rule = {
     schema: [],
   },
   create(context) {
+    const leaf = isLeafPackageFile(context.filename ?? context.getFilename());
+
     function getReferencesForSpec(node, spec) {
       const sourceCode = context.sourceCode || context.getSourceCode();
       const scope = sourceCode.getScope(node);
@@ -166,7 +177,7 @@ const rule = {
     function check(node, source) {
       const mod = normalizeModule(source);
       const base = getBuiltinBase(mod);
-      const replacement = ACTIVESUPPORT_REPLACEMENTS[base];
+      const replacement = leaf ? undefined : ACTIVESUPPORT_REPLACEMENTS[base];
 
       // Only autofix exact base module imports (not subpaths like "fs/promises")
       if (replacement && base === mod) {
@@ -239,7 +250,7 @@ const rule = {
           const source = node.arguments[0].value;
           const mod = normalizeModule(source);
           const base = getBuiltinBase(mod);
-          const replacement = ACTIVESUPPORT_REPLACEMENTS[base];
+          const replacement = leaf ? undefined : ACTIVESUPPORT_REPLACEMENTS[base];
           if (replacement) {
             context.report({
               node,

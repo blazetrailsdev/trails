@@ -220,6 +220,7 @@ export default defineConfig(
       "packages/rack/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
+      "packages/ruby-compat/src/**/*.ts",
     ],
     ignores: [
       "**/*.test.ts",
@@ -246,6 +247,24 @@ export default defineConfig(
     ],
     rules: {
       "blazetrails/no-node-builtins": "error",
+    },
+  },
+
+  // ── ruby-compat leaf: no Node AMBIENT globals ──
+  // An import guard cannot see these — they are globals, not imports — and
+  // `types: []` does not fence them either, because vitest's own types
+  // re-reference @types/node transitively for the whole program.
+  {
+    files: ["packages/ruby-compat/src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        { name: "Buffer", message: "ruby-compat is a browser-safe leaf (RFC 0129)." },
+        { name: "process", message: "ruby-compat is a browser-safe leaf (RFC 0129)." },
+        { name: "__dirname", message: "ruby-compat is a browser-safe leaf (RFC 0129)." },
+        { name: "__filename", message: "ruby-compat is a browser-safe leaf (RFC 0129)." },
+      ],
     },
   },
 

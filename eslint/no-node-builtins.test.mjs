@@ -102,5 +102,23 @@ tester.run("no-node-builtins", rule, {
       code: 'const fs = require("fs");',
       errors: [{ messageId: "useAdapter" }],
     },
+    // Inside ruby-compat the activesupport adapter is itself a leaf violation.
+    {
+      filename: "/repo/packages/ruby-compat/src/hash.ts",
+      code: 'import * as fs from "fs";\nfs.readFileSync("x", "utf-8");',
+      errors: [{ messageId: "noNodeBuiltin" }],
+      output: null,
+    },
+    {
+      filename: "/repo/packages/ruby-compat/src/hash.ts",
+      code: 'import { createHash } from "node:crypto";\ncreateHash("sha256");',
+      errors: [{ messageId: "noNodeBuiltin" }],
+      output: null,
+    },
+    {
+      filename: "/repo/packages/ruby-compat/src/hash.ts",
+      code: 'const fs = require("fs");',
+      errors: [{ messageId: "noNodeBuiltin" }],
+    },
   ],
 });

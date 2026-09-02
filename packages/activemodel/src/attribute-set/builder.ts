@@ -1,5 +1,5 @@
 import { Attribute, Uninitialized } from "../attribute.js";
-import { KeyError, eachKey } from "@blazetrails/ruby-compat";
+import { KeyError, eachKey, except, hasKey, transformValues } from "@blazetrails/ruby-compat";
 import { Type } from "../type/value.js";
 import { defaultValue } from "../type.js";
 import { AttributeSet } from "../attribute-set.js";
@@ -131,39 +131,31 @@ export class LazyAttributeSet extends AttributeSet {
 }
 
 export class LazyAttributeHash {
-  private delegate: Map<string, Attribute>;
+  private delegate: Record<string, Attribute>;
   private types: Map<string, Type>;
   private values: Record<string, unknown>;
   private additionalTypes: Map<string, Type>;
   private defaultAttributes: Map<string, Attribute>;
   private materialized: boolean;
 
-  transformValues<T>(fn: (attr: Attribute) => T): Map<string, T> {
-    const result = new Map<string, T>();
-    for (const [name, attr] of this.materialize()) result.set(name, fn(attr));
-    return result;
+  transformValues<T>(fn: (attr: Attribute) => T): Record<string, T> {
+    return transformValues(this.materialize(), fn);
   }
 
   eachValue(fn: (attr: Attribute) => void): void {
-    for (const attr of this.materialize().values()) fn(attr);
+    for (const attr of Object.values(this.materialize())) fn(attr);
   }
 
   fetch(name: string, defaultOrBlock?: Attribute | ((name: string) => Attribute)): Attribute {
     const materialized = this.materialize();
-    const attr = materialized.get(name);
-    if (attr !== undefined) return attr;
+    if (hasKey(materialized, name)) return materialized[name];
     if (typeof defaultOrBlock === "function") return defaultOrBlock(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
     throw new KeyError(`key not found: ${JSON.stringify(name)}`);
   }
 
-  except(...names: string[]): Map<string, Attribute> {
-    const drop = new Set(names);
-    const result = new Map<string, Attribute>();
-    for (const [name, attr] of this.materialize()) {
-      if (!drop.has(name)) result.set(name, attr);
-    }
-    return result;
+  except(...names: string[]): Record<string, Attribute> {
+    return except(this.materialize(), ...names);
   }
 
   constructor(
@@ -171,31 +163,30 @@ export class LazyAttributeHash {
     values: Record<string, unknown>,
     additionalTypes: Map<string, Type> = new Map(),
     defaultAttributes: Map<string, Attribute> = new Map(),
-    delegateHash: Map<string, Attribute> = new Map(),
+    delegateHash: Record<string, Attribute> = {},
   ) {
     this.types = types;
     this.values = values;
     this.additionalTypes = additionalTypes;
     this.materialized = false;
     this.defaultAttributes = defaultAttributes;
-    this.delegate = delegateHash;
+    this.delegate = Object.setPrototypeOf(delegateHash, null) as Record<string, Attribute>;
   }
 
   isKey(key: string): boolean {
-    return this.delegate.has(key) || Object.hasOwn(this.values, key) || this.types.has(key);
+    return hasKey(this.delegate, key) || Object.hasOwn(this.values, key) || this.types.has(key);
   }
 
   getAttribute(key: string): Attribute {
-    return this.delegate.get(key) ?? this.assignDefaultValue(key);
+    return this.delegate[key] ?? this.assignDefaultValue(key);
   }
 
   set(key: string, value: Attribute): void {
-    this.delegate.set(key, value);
+    this.delegate[key] = value;
   }
 
   deepDup(): LazyAttributeHash {
-    const delegateHash = new Map<string, Attribute>();
-    for (const [name, attr] of this.delegate) delegateHash.set(name, attr.dup());
+    const delegateHash = transformValues(this.delegate, (attr) => attr.dup());
     return new LazyAttributeHash(
       this.types,
       this.values,
@@ -209,7 +200,7 @@ export class LazyAttributeHash {
     const keys = new Set([
       ...this.types.keys(),
       ...Object.keys(this.values),
-      ...this.delegate.keys(),
+      ...Object.keys(this.delegate),
     ]);
     for (const key of keys) fn(key);
   }
@@ -219,7 +210,7 @@ export class LazyAttributeHash {
     Record<string, unknown>,
     Map<string, Type>,
     Map<string, Attribute>,
-    Map<string, Attribute>,
+    Record<string, Attribute>,
   ] {
     return [this.types, this.values, this.additionalTypes, this.defaultAttributes, this.delegate];
   }
@@ -230,14 +221,14 @@ export class LazyAttributeHash {
       Record<string, unknown>,
       (Map<string, Type> | undefined)?,
       (Map<string, Attribute> | undefined)?,
-      (Map<string, Attribute> | undefined)?,
+      (Record<string, Attribute> | undefined)?,
     ],
   ): LazyAttributeHash {
     return new LazyAttributeHash(values[0], values[1], values[2], values[3], values[4]);
   }
 
   /** @internal */
-  protected materialize(): Map<string, Attribute> {
+  protected materialize(): Record<string, Attribute> {
     if (!this.materialized) {
       eachKey(this.values, (key) => this.getAttribute(key));
       for (const key of this.types.keys()) this.getAttribute(key);
@@ -249,7 +240,7 @@ export class LazyAttributeHash {
   }
 
   /** @internal */
-  delegateHash(): Map<string, Attribute> {
+  delegateHash(): Record<string, Attribute> {
     return this.delegate;
   }
 
@@ -266,12 +257,12 @@ export class LazyAttributeHash {
 
     if (valuePresent) {
       const attr = Attribute.fromDatabase(name, value, type);
-      this.delegate.set(name, attr);
+      this.delegate[name] = attr;
       return attr;
     } else if (this.types.has(name)) {
       const attr = this.defaultAttributes.get(name);
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
-      this.delegate.set(name, built);
+      this.delegate[name] = built;
       return built;
     }
     return Attribute.null(name);

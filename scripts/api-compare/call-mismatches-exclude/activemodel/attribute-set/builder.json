@@ -9,22 +9,6 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-set/builder.ts",
-    "rubyName": "deep_dup",
-    "call": "transform_values",
-    "reason": "builder.rb:120 `delegate_hash.transform_values(&:dup)`; the delegate hash is a JS Map, which has no `transform_values`, and `LazyAttributeHash#transformValues` cannot stand in because it materializes first — so the copy loop is spelled inline."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-set/builder.ts",
-    "rubyName": "deep_dup",
-    "call": "transform_values",
-    "kind": "rubyCompat",
-    "tsExport": "transformValues",
-    "reason": "Baseline (RFC 0129): `delegate_hash` (builder.rb:114) is ported as a `Map`, and `transformValues` takes a `Record`; converging it means porting the delegate hash to a Record, which is its own change."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-set/builder.ts",
     "rubyName": "default_attribute",
     "call": "fetch",
     "reason": "builder.rb:74 `additional_types.fetch(name, types[name])`; a JS Map has no two-argument `fetch`, and no type is ever stored as null, so `get(name) ?? types.get(name)` is exact (same gap as the `assign_default_value` -> `fetch` row)."
