@@ -45,6 +45,7 @@ export interface ProtectionMethods {
  * module cycle).
  */
 export type NullSessionRequest = Req &
+  PersistedRequest &
   RequestCookieMethodsHost & {
     session: unknown;
     flash: unknown;
@@ -58,9 +59,14 @@ export type NullSessionRequest = Req &
  * (`vendor/rack-session/lib/rack/session/abstract/id.rb:26`).
  */
 export class NullSessionHash extends SessionHash {
-  /** Mirrors `NullSessionHash#initialize` (rb:271-275). */
-  constructor(req: Req) {
-    super(null as unknown as Persisted, req as unknown as PersistedRequest);
+  /**
+   * Mirrors `NullSessionHash#initialize` (rb:271-275). Rails passes `nil` for
+   * the store (rb:272); `SessionHash`'s store field is typed `Persisted`
+   * because every other construction site has one, and this subclass overrides
+   * every member that would dereference it.
+   */
+  constructor(req: PersistedRequest) {
+    super(null as unknown as Persisted, req);
     this.data = {};
     this.loaded = true;
   }
