@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activemodel",
-    "tsFile": "type/helpers/time-value.ts",
-    "rubyName": "fast_string_to_time",
-    "call": "new",
-    "reason": "Reviewed: Rails builds `::Time.new(string, in: \"UTC\")` (time_value.rb:76-98); trails' `Time.new` (packages/date/src/time.ts:611) mirrors it, but `fastStringToTime` is seated on `Temporal.Instant`, which every caller (type/date-time.ts:52, type/time.ts:72) and the whole ActiveModel time-type surface reads. Swapping the seat is a return-type change across those types, tracked by `fast-string-to-time-construct-through-time-new`. The parse arms themselves are converged against MRI here."
-  }
-]

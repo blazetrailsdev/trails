@@ -65,7 +65,12 @@ interface CmpSpelling {
  * own `<=>` still wins, as it does in Ruby. A Temporal value carrying no
  * instant still reaches `rb_obj_cmp`;
  * `calculations.ts`'s `compare` — the one caller that orders those — hands
- * over each side's epoch reading instead.
+ * over each side's epoch reading instead, and a pair of plain Temporal values
+ * of the same shape is ordered by that shape's own `compare`, after a
+ * `PlainDate` is widened to its `PlainDateTime`: Ruby's `cmp_dd`
+ * (`date_core.c:6707-6761`) places a day against an instant on the same axis,
+ * which is what makes `Date.new(2002,3,19) == DateTime.new(2002,3,19, 0,0,0)`
+ * true.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — the `<=>` send it is defined over
  * (`vendor/ruby/compar.c:315`), which Rails inherits rather than defines.

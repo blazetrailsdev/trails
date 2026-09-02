@@ -113,7 +113,10 @@ export function newTime(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsCall new — CONVERGEABLE fast-string-to-time-construct-through-time-new
+ */
 export function fastStringToTime(
   this: TimezoneAware | void,
   string: string,
