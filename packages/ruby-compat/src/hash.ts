@@ -123,7 +123,9 @@ export function merge<T>(
  * Ruby `Hash#update` (`vendor/ruby/hash.c:4028` `rb_hash_update`) — MUTATES
  * the receiver and returns it, which is the whole difference from `merge`.
  * Each argument is applied in turn, so a later one wins — unless a trailing
- * conflict block is given, which decides every colliding key instead.
+ * conflict block is given, which `rb_hash_update_block_i`
+ * (`vendor/ruby/hash.c:4012-4022`) yields for a key already in the receiver,
+ * storing what it returns.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#update` (`vendor/ruby/hash.c:4028`).
  */
 export function update<T>(
@@ -136,9 +138,6 @@ export function update<T>(
       : undefined;
   for (const other of others as Record<string, T>[]) {
     for (const key of Object.keys(other)) {
-      /* `rb_hash_update_block_i` (`vendor/ruby/hash.c:4012-4022`) yields only
-         for a key already in the receiver, and stores what the block
-         returns. */
       hash[key] =
         block !== undefined && hasKey(hash, key) ? block(key, hash[key], other[key]) : other[key];
     }

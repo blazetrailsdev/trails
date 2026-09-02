@@ -886,13 +886,12 @@ export class Request {
 
   /**
    * Mirrors: `Rack::Request::Env#fetch_header` (`rack/request.rb:106-108`) —
-   * `@env.fetch(name, &block)`.
+   * `@env.fetch(name, &block)`, where an absent block is `&nil` and so reaches
+   * `Hash#fetch`'s one-argument arm rather than handing it a `nil` default.
    */
   fetchHeader(name: string): any;
   fetchHeader(name: string, block: (key: string) => any): any;
   fetchHeader(name: string, block?: (key: string) => any): any {
-    /* `&block` — an absent block is Ruby's `&nil`, which reaches `Hash#fetch`'s
-       one-argument arm rather than handing it a `nil` default. */
     return block === undefined ? fetch(this.env, name) : fetch(this.env, name, rbBlock(block));
   }
 
