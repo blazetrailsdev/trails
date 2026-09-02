@@ -1072,9 +1072,9 @@ class TestExtractor
     # condition mixes it with a feature under `||` (`current_adapter?(:A) ||
     # supports_X?` runs on a union no single adapter set captures, and `unless A
     # && supports_X?` negates the conjunction into exactly such a union); when it
-    # mixes with a guard at all (a guard is a
-    # runtime predicate the extractor deliberately treats as non-comparable, so
-    # a partial adapter restriction alongside it would over-claim); or when it
+    # mixes with a guard at all (a guard is a runtime predicate the extractor
+    # deliberately treats as non-comparable, so a partial adapter restriction
+    # alongside it would over-claim); or when it
     # mixes with a negated adapter under `||` (`current_adapter?(:A) ||
     # !current_adapter?(:B)` is the complement of B, not A). A pure positive
     # `||` (`A || B`) stays sound — it is the union the concat already
