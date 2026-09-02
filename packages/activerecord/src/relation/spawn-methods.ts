@@ -13,11 +13,11 @@ interface SpawnRelation<T = unknown> {
   _model: { all(): T; scopeRegistry(): unknown };
 }
 
-export function performSpawn<T extends SpawnRelation<T>>(this: T): T {
+export function spawn<T extends SpawnRelation<T>>(this: T): T {
   return this.isAlreadyInScope(this._model.scopeRegistry()) ? this._model.all() : this.clone();
 }
 
-export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T {
+export function merge<T extends SpawnRelation<T>>(this: T, other: any): T {
   if (Array.isArray(other)) {
     return recordsIntersection(this, other) as unknown as T;
   }
@@ -63,8 +63,8 @@ export function only<T extends SpawnRelation<T>>(this: T, ...onlies: Array<Excep
 
 /** @internal */
 export const SpawnMethodsPublicInstanceMethods = {
-  spawn: performSpawn,
-  merge: performMerge,
+  spawn,
+  merge,
   mergeBang,
   except,
   only,
