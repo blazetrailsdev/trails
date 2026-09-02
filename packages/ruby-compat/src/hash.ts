@@ -435,8 +435,6 @@ export class Hash<K, V> extends Map<K, V> {
    * `rb_hash_modify_check` (`vendor/ruby/hash.c:1602`), which every mutator
    * calls first: `rb_check_frozen` raises `FrozenError` naming the receiver's
    * class and `inspect`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `rb_hash_modify_check` (`vendor/ruby/hash.c:1602`).
    */
   private modifyCheck(): void {
     if (this._frozen) {
