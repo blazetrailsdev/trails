@@ -765,7 +765,8 @@ export function buildWhereClause(
     const mc = this.model;
     const aliases: Record<string, string> = mc?.attributeAliases ?? {};
     const transformed: Record<string, unknown> = {};
-    for (const [key, value] of hashEntries(opts)) {
+    for (const [rawKey, value] of toA(opts) as [unknown, unknown][]) {
+      const key = String(rawKey);
       const name = isRubySymbol(key) ? symbolToName(key) : key;
       const resolved = aliases[name] ?? name;
       transformed[resolved] = value;
@@ -928,10 +929,6 @@ function isAsyncFunction(fn: object): boolean {
 
 function isHash(value: unknown): value is Record<string, unknown> | Map<unknown, unknown> {
   return isPlainObject(value) || value instanceof Map;
-}
-
-function hashEntries(hash: Record<string, unknown> | Map<unknown, unknown>): [string, unknown][] {
-  return (toA(hash) as [unknown, unknown][]).map(([key, value]) => [String(key), value]);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

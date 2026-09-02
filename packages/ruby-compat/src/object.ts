@@ -124,7 +124,7 @@ function isPlainHash(value: unknown): value is Record<string, unknown> {
 /**
  * `rb_obj_as_string` (`vendor/ruby/string.c:1653`) — the `to_s` of any value.
  * `Array#to_s` and `Hash#to_s` are aliases of `inspect`
- * (`vendor/ruby/array.c:8615`, `vendor/ruby/hash.c:7197`), so those two classes
+ * (`vendor/ruby/array.c:8616`, `vendor/ruby/hash.c:7197`), so those two classes
  * render through {@link rbInspect}; every other value — a String above all,
  * which `rb_obj_as_string` returns unquoted — is its own `to_s`.
  *
@@ -136,6 +136,6 @@ function isPlainHash(value: unknown): value is Record<string, unknown> {
 export function rbObjAsString(value: unknown): string {
   if (value == null) return "";
   if (Array.isArray(value)) return rbInspect(value);
-  if (isPlainHash(value)) return rbInspect(value);
+  if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
   return String(value);
 }
