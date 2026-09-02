@@ -869,11 +869,6 @@ export function extractFromProgram(
           if (prior && !isAllBodyless(prior)) continue;
           const modReason = noRailsEquivalentReason(decl) ?? noRailsEquivalentReason(node);
           if (prior) {
-            // A bodyless same-named declaration — the `interface X` that types
-            // the mixin's members — was harvested first and would otherwise
-            // hide the object literal that carries the real bodies. The bodied
-            // half wins; members the literal does not define keep their
-            // signature.
             const bodied = new Set(methods.map((m) => m.name));
             prior.instanceMethods = [
               ...methods,
@@ -1023,13 +1018,6 @@ export function extractFromProgram(
       }
     });
 
-    // Ruby `class_attribute :foo` defines `foo`, `foo?` and `foo=`, and
-    // extract-ruby-api.rb credits all three (#process_mattr,
-    // activesupport/lib/active_support/core_ext/class/attribute.rb:80). trails'
-    // twin is `classAttribute.call(Host, "foo", opts)` from activesupport,
-    // which installs the same accessor pair on the class at load time; without
-    // this the generated members score only against the host interface that
-    // types them, i.e. declaration-only.
     for (const attr of collectClassAttributeCalls(sourceFile)) {
       const target =
         [attr.enclosing, attr.receiver]
@@ -1038,9 +1026,6 @@ export function extractFromProgram(
           .find((key) => info.classes[key] || info.modules[key]) ?? undefined;
       if (target === undefined) continue;
       const entity = info.classes[target] ?? info.modules[target];
-      // Credit only a name the file already declares. The accessor is real
-      // either way, but a name nothing in the file spells has no Rails
-      // counterpart to match and would land as novel extra surface.
       const declared = new Set(
         [
           ...Object.values(info.classes),
@@ -2391,14 +2376,25 @@ export function isConstantCaseName(name: string): boolean {
  * A `classAttribute.call(Host, "name", { … })` site — the trails port of Ruby's
  * `class_attribute` macro (activesupport/src/class-attribute.ts), which is how
  * an `included do class_attribute :foo end` block is spelled here (CLAUDE.md,
- * _Module mixins_).
+ * _Module mixins_). Ruby's macro defines `foo`, `foo?` and `foo=`, and
+ * extract-ruby-api.rb#process_mattr credits all three; ours installs the same
+ * accessors on the class at load time, so the extractor credits them the same
+ * way rather than leaving them to score against the host interface that types
+ * them (i.e. declaration-only).
  *
  * `enclosing` is the nearest named class or `const` the call sits inside — the
- * structural twin of extract-ruby-api.rb#process_mattr's `current_fqn`;
- * `receiver` is the `.call` receiver, which is all a top-level call site
- * (`classAttribute.call(Base, …)`) states. A non-literal name credits nothing.
+ * structural twin of `process_mattr`'s `current_fqn`; `receiver` is the `.call`
+ * receiver, which is all a top-level call site (`classAttribute.call(Base, …)`)
+ * states. Two sites credit nothing: a non-literal attribute name, and a name
+ * the file never declares — the accessor is real either way, but a name nothing
+ * in the file spells has no Rails counterpart to match and would land as novel
+ * extra surface.
+ *
+ * `instanceReader` / `instanceWriter` each fall back to `instanceAccessor`,
+ * which defaults to true, exactly as Ruby's do
+ * (core_ext/class/attribute.rb:80-84).
  */
-export interface ClassAttributeCall {
+interface ClassAttributeCall {
   enclosing?: string;
   receiver?: string;
   names: string[];
@@ -2407,7 +2403,7 @@ export interface ClassAttributeCall {
   line: number;
 }
 
-export function collectClassAttributeCalls(sourceFile: ts.SourceFile): ClassAttributeCall[] {
+function collectClassAttributeCalls(sourceFile: ts.SourceFile): ClassAttributeCall[] {
   const out: ClassAttributeCall[] = [];
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node) && isClassAttributeCallee(node.expression)) {
@@ -2442,9 +2438,6 @@ function readClassAttributeCall(
   if (names.length === 0) return null;
   const opts = rest.at(-1);
   const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
-  // Ruby's defaults: `instance_reader` / `instance_writer` each fall back to
-  // `instance_accessor`, which defaults to true
-  // (core_ext/class/attribute.rb:80-84, mirrored by process_mattr).
   const instanceAccessor = optionBool(options, "instanceAccessor") ?? true;
   return {
     ...(enclosingEntityName(node) !== undefined ? { enclosing: enclosingEntityName(node) } : {}),
@@ -2486,7 +2479,7 @@ function enclosingEntityName(node: ts.Node): string | undefined {
  * slot and every member scores declaration-only. An entity with ANY bodied
  * member is a real merge target and is left alone.
  */
-export function isAllBodyless(mod: ClassInfo): boolean {
+function isAllBodyless(mod: ClassInfo): boolean {
   const members = [...mod.instanceMethods, ...mod.classMethods];
   return members.length > 0 && members.every((m) => m.bodyless === true);
 }
