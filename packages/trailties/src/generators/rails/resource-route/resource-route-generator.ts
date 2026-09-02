@@ -1,5 +1,6 @@
 import { pluralize } from "@blazetrails/activesupport";
 import { NamedBase } from "../../named-base.js";
+import type { GeneratorOptions } from "../../base.js";
 
 // Mirrors railties/lib/rails/generators/rails/resource_route/resource_route_generator.rb.
 // Inserts router.resources() at the `// routes` marker in config/routes.{ts,js}
@@ -21,6 +22,13 @@ export function emitResourceRouteSnippet(namespaces: string[], resource: string)
 }
 
 export class ResourceRouteGenerator extends NamedBase {
+  /** Rails' Thor task is `add_resource_route` (`resource_route_generator.rb:9`). */
+  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
+    const generator = new ResourceRouteGenerator({ ...config, name: args[0] ?? "" });
+    generator.addResourceRoute();
+    return generator.getCreatedFiles();
+  }
+
   addResourceRoute(options: ResourceRouteOptions = {}): void {
     if (options.actions && options.actions.length > 0) return;
     const routesFile = ["config/routes.ts", "config/routes.js"].find((f) => this.fileExists(f));

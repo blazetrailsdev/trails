@@ -1,4 +1,5 @@
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import type { GeneratorOptions } from "../../base.js";
 
 export interface BenchmarkRunOptions {
   reports?: string[];
@@ -7,6 +8,13 @@ export interface BenchmarkRunOptions {
 export class BenchmarkGenerator extends NamedBase {
   constructor(options: NamedBaseOptions) {
     super(options);
+  }
+
+  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
+    const generator = new BenchmarkGenerator({ ...config, name: args[0] ?? "" });
+    const reports = args.slice(1);
+    generator.run(reports.length > 0 ? { reports } : {});
+    return generator.getCreatedFiles();
   }
 
   run(options: BenchmarkRunOptions = {}): string[] {

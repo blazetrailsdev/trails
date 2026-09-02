@@ -52,12 +52,13 @@ export interface BuildJourneyRouterOptions {
    */
   skipRequestConstraints?: boolean;
   /**
-   * App attached to every synthesized Journey route. When omitted, routes
-   * carry a throwing stub — callers that only use `Router.recognize` /
-   * `journeyRecognize` never trigger it. Pass a `RouteDispatcher` here to
-   * make `Router.serve` actually dispatch.
+   * App attached to each synthesized Journey route. Rails builds one app per
+   * route in `Mapping#app` (`mapper.rb:294-303`), so this is a per-route
+   * factory rather than one shared app. When omitted, routes carry a throwing
+   * stub — callers that only use `Router.recognize` / `journeyRecognize` never
+   * trigger it.
    */
-  app?: RoutableApp;
+  app?: (route: LocalRoute) => RoutableApp;
 }
 
 export function buildJourneyRouter(
@@ -88,7 +89,7 @@ export function buildJourneyRouter(
         );
       },
     };
-    const app = opts.app ?? fallbackApp;
+    const app = opts.app ? opts.app(r) : fallbackApp;
     journeyRoutes.addRoute(name, {
       makeRoute: (routeName, index) => {
         const journeyRoute = new JourneyRoute({

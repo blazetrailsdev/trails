@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { RouteSet } from "./route-set.js";
 import type { DispatchableControllerClass } from "./dispatcher.js";
 import { X_CASCADE } from "../constants.js";
+import { RoutingError } from "../../action-controller/metal/exceptions.js";
 import { Response } from "../http/response.js";
 import { controllerConstants, Request } from "../http/request.js";
 import { Dispatcher, StaticDispatcher } from "./route-set.js";
@@ -69,11 +70,27 @@ describe("RouteDispatcher", () => {
 
   it("returns 404 X-Cascade when no controller handler is registered", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/posts", { to: "posts#index" }));
+    routes.draw((r) => r.get("/:controller/:action"));
 
-    const res = await routes.serve(makeReq("/posts"));
+    const res = await routes.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
     expect(res[1]["x-cascade"]).toBe("pass");
+  });
+
+  it("raises ActionController::RoutingError when a pinned controller is missing", async () => {
+    const routes = new RouteSet();
+    routes.draw((r) => r.get("/posts", { to: "posts#index" }));
+
+    await expect(routes.serve(makeReq("/posts"))).rejects.toThrow(
+      /uninitialized constant PostsController/,
+    );
+  });
+
+  it("raises ActionController::RoutingError when defaults pin the controller", async () => {
+    const routes = new RouteSet();
+    routes.draw((r) => r.get("/x/:action", { defaults: { controller: "posts" } }));
+
+    await expect(routes.serve(makeReq("/x/index"))).rejects.toThrow(RoutingError);
   });
 
   it("returns 404 X-Cascade when no route matches", async () => {
@@ -137,13 +154,13 @@ describe("RouteDispatcher", () => {
 
   it("unregister removes a handler so subsequent serves return 404 pass", async () => {
     const routes = new RouteSet();
-    routes.draw((r) => r.get("/p", { to: "posts#index" }));
+    routes.draw((r) => r.get("/:controller/:action"));
     registerController(
       "posts",
       makeControllerClass(() => [200, {}, []]),
     );
     controllerConstants.delete("posts");
-    const res = await routes.serve(makeReq("/p"));
+    const res = await routes.serve(makeReq("/posts/index"));
     expect(res[0]).toBe(404);
   });
 });

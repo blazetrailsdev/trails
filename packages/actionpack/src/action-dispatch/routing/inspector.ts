@@ -77,6 +77,10 @@ export class RouteWrapper {
     return typeof target === "string" && re.test(target);
   }
 
+  /**
+   * @missingRailsCall app — CONVERGEABLE converge-routewrapper-endpoint-to-app-dispatcher
+   * @missingRailsCall dispatcher? — CONVERGEABLE converge-routewrapper-endpoint-to-app-dispatcher
+   */
   get endpoint(): string {
     // Rails dispatches on the wrapped app: `dispatcher?` → `controller#action`,
     // Proc rack apps → "Inline handler (Proc/Lambda)", otherwise `rack_app.inspect`.

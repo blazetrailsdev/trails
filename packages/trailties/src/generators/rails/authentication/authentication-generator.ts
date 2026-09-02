@@ -27,6 +27,18 @@ export class AuthenticationGenerator extends GeneratorBase {
     super(options);
   }
 
+  /**
+   * `run` takes an options object, so the generic `start` would hand it the
+   * name string. Rails fills it from `class_option :api`
+   * (`authentication_generator.rb:6-7`), which trails has no port of — story
+   * `wire-generator-class-options-through-trails-generate`.
+   */
+  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
+    const generator = new AuthenticationGenerator(config);
+    generator.run({});
+    return generator.getCreatedFiles();
+  }
+
   run(options: AuthenticationRunOptions = {}): string[] {
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");

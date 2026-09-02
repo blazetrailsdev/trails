@@ -545,7 +545,7 @@ describe("TestRoutingMapper", () => {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/3",
     };
-    await routes.call(env);
+    await expect(routes.call(env)).rejects.toThrow(/uninitialized constant PostsController/);
     const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
     expect(params.controller).toBe("posts");
     expect(params.action).toBe("show");

@@ -6,6 +6,7 @@ import {
   Finisher,
   type FinisherConfig,
   type FinisherReloader,
+  type FinisherReloaderInstance,
   type FinisherRoutes,
   type FinisherRoutesReloader,
 } from "./finisher.js";
@@ -50,9 +51,13 @@ class TestApp extends Finisher {
   };
 
   routesReloaderCalls: string[] = [];
+  reloaders: unknown[] = [];
   private _routesReloader: FinisherRoutesReloader = {
     eagerLoad: false,
     runAfterLoadPaths: () => {},
+    execute: async () => {
+      this.routesReloaderCalls.push("execute");
+    },
     executeUnlessLoaded: async () => {
       this.routesReloaderCalls.push("execute_unless_loaded");
       return true;
@@ -68,8 +73,10 @@ class TestApp extends Finisher {
   routes(): FinisherRoutes {
     return this._routes;
   }
+  toRun: Array<(this: FinisherReloaderInstance) => unknown> = [];
   reloader: FinisherReloader = {
     toPrepare: (block) => this.toPrepared.push(block),
+    toRun: (block) => this.toRun.push(block),
     prepareBang: () => this.calls.push("prepare!"),
   };
 
@@ -206,6 +213,32 @@ describe("Finisher", () => {
     await run(app, "set_routes_reloader_hook");
     expect(app.routesReloader().eagerLoad).toBe(true);
     expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded"]);
+  });
+
+  it("set_routes_reloader_hook pushes the routes reloader onto app.reloaders", async () => {
+    const app = new TestApp();
+    await run(app, "set_routes_reloader_hook");
+    expect(app.reloaders).toEqual([app.routesReloader()]);
+  });
+
+  it("set_routes_reloader_hook registers a to_run block that reloads the routes", async () => {
+    const app = new TestApp();
+    await run(app, "set_routes_reloader_hook");
+    expect(app.toRun).toHaveLength(1);
+
+    const seen: unknown[] = [];
+    onLoad("after_routes_loaded", (target) => seen.push(target));
+    let locked = false;
+    const instance: FinisherReloaderInstance = {
+      requireUnloadLockBang: () => {
+        locked = true;
+      },
+    };
+    await app.toRun[0].call(instance);
+    expect(locked).toBe(true);
+    expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded", "execute"]);
+    expect(seen).toEqual([instance]);
+    resetLoadHooks();
   });
 
   it("eager_load! runs the before_eager_load hooks and the eager load namespaces", async () => {
