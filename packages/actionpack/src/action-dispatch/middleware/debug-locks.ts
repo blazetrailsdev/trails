@@ -70,7 +70,7 @@ export class DebugLocks {
     const req = new Request(env);
 
     if (req.isGet()) {
-      const path = req.path.replace(/\/$/, "");
+      const path = req.pathInfo.replace(/\/$/, "");
       if (path === this.path) {
         return this.renderDetails();
       }
