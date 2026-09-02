@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CookieJar, cookieJar } from "../../action-dispatch/middleware/cookies.js";
-import { Session } from "../../action-dispatch/request/session.js";
+import { SessionHash } from "@blazetrails/rack-session";
 import {
   NullCookieJar,
   NullSession,
@@ -36,11 +36,19 @@ describe("NullSession", () => {
   it("NullSessionHash is a loaded, existing, disabled session that ignores destroy", () => {
     const hash = new NullSessionHash(buildRequest());
 
-    expect(hash).toBeInstanceOf(Session);
+    expect(hash).toBeInstanceOf(SessionHash);
     expect(hash.isLoaded()).toBe(true);
     expect(hash.isExists()).toBe(true);
     expect(hash.isEnabled()).toBe(false);
     expect(() => hash.destroy()).not.toThrow();
+  });
+
+  it("NullSessionHash#inspect renders its own Ruby constant path when not yet loaded", () => {
+    const unloaded = Object.create(NullSessionHash.prototype) as { inspect(): string };
+
+    expect(unloaded.inspect()).toMatch(
+      /^#<ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash:0x[0-9a-f]+ not yet loaded>$/,
+    );
   });
 
   it("NullCookieJar writes nothing", () => {
