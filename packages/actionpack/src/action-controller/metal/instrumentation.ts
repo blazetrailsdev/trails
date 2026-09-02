@@ -16,32 +16,35 @@ export function instrumentAction(
   controllerName: string,
   actionName: string,
   request: {
-    method?: string;
-    path?: string;
-    format?: { symbol: string | null };
+    headers: unknown;
+    format?: { ref(): string };
+    requestMethod?: string;
     filteredParameters(): Record<string, unknown>;
+    filteredPath(): string;
   },
   fn: () => Promise<unknown>,
   notifier?: Notifier,
 ): Promise<unknown> {
   const start = now();
-  const payload: Record<string, unknown> = {
+  const rawPayload: Record<string, unknown> = {
     controller: controllerName,
     action: actionName,
+    request: request,
     params: request.filteredParameters(),
-    method: request.method,
-    path: request.path,
-    format: request.format?.symbol,
+    headers: request.headers,
+    format: request.format?.ref(),
+    method: request.requestMethod,
+    path: request.filteredPath(),
   };
 
-  notifier?.instrument("start_processing.action_controller", { ...payload });
+  notifier?.instrument("start_processing.action_controller", { ...rawPayload });
 
   return Promise.resolve()
     .then(fn)
     .then(
       (result) => {
         notifier?.instrument("process_action.action_controller", {
-          ...payload,
+          ...rawPayload,
           status: deriveStatus(result, 200),
           duration: now() - start,
         });
@@ -49,7 +52,7 @@ export function instrumentAction(
       },
       (error) => {
         notifier?.instrument("process_action.action_controller", {
-          ...payload,
+          ...rawPayload,
           status: deriveStatus(error, 500),
           exception: error instanceof Error ? [error.name, error.message] : String(error),
           duration: now() - start,

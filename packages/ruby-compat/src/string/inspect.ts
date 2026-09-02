@@ -1,4 +1,14 @@
 /**
+ * `String#inspect` — a Ruby *core* method, not a Rails extension, so it has no
+ * `core_ext/string/*.rb` counterpart. It lives beside `succ.ts` and `chomp.ts`,
+ * the other Ruby core String methods the port carries.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `String#inspect`
+ * (`vendor/ruby/string.c:6825` `rb_str_inspect`), which Rails inherits rather
+ * than defines.
+ */
+
+/**
  * Ruby `String#inspect` (`vendor/ruby/string.c:6825` `rb_str_inspect`), the
  * receiver-qualified spelling `Symbol#to_s`'s `symbolToS` already establishes:
  * `Hash#inspect` takes the unqualified `inspect`, so the String one carries its
