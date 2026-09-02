@@ -11,7 +11,7 @@
  * Pass --write to actually create the stub files.
  *
  * Usage:
- *   npx tsx scripts/test-compare/generate-stubs.ts [--package activerecord] [--write] [--missing-files-only]
+ *   npx tsx scripts/test-compare/generate-stubs.ts [--package activerecord] [--write] [--missing-files-only] [--skip-reason "<text>"]
  */
 
 import * as fs from "fs";
@@ -28,6 +28,7 @@ const PKG_DIRS: Record<string, string> = {
   activerecord: "packages/activerecord/src/",
   activesupport: "packages/activesupport/src/",
   rack: "packages/rack/src/",
+  "rack-session": "packages/rack-session/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
@@ -76,7 +77,11 @@ function buildDescribeTree(testCases: TestCaseInfo[]): DescribeNode {
   return root;
 }
 
-function renderDescribeTree(node: DescribeNode, indent: number): string[] {
+function renderDescribeTree(
+  node: DescribeNode,
+  indent: number,
+  skipReason: string | null,
+): string[] {
   const lines: string[] = [];
   const pad = "  ".repeat(indent);
 
@@ -84,7 +89,7 @@ function renderDescribeTree(node: DescribeNode, indent: number): string[] {
     lines.push(`${pad}describe("${escapeTsString(child.name)}", () => {`);
 
     // Render nested describes
-    for (const childLine of renderDescribeTree(child, indent + 1)) {
+    for (const childLine of renderDescribeTree(child, indent + 1, skipReason)) {
       lines.push(childLine);
     }
 
@@ -93,13 +98,19 @@ function renderDescribeTree(node: DescribeNode, indent: number): string[] {
   }
 
   for (const testDesc of node.tests) {
-    lines.push(`${pad}it.skip("${escapeTsString(testDesc)}", () => {});`);
+    if (skipReason === null) {
+      lines.push(`${pad}it.skip("${escapeTsString(testDesc)}", () => {});`);
+    } else {
+      lines.push(`${pad}it.skip("${escapeTsString(testDesc)}", () => {`);
+      lines.push(`${pad}  // PERMANENT-SKIP: ${skipReason}`);
+      lines.push(`${pad}});`);
+    }
   }
 
   return lines;
 }
 
-function generateStubContent(testCases: TestCaseInfo[]): string {
+function generateStubContent(testCases: TestCaseInfo[], skipReason: string | null): string {
   const tree = buildDescribeTree(testCases);
   const lines: string[] = [];
 
@@ -108,7 +119,7 @@ function generateStubContent(testCases: TestCaseInfo[]): string {
     needsDescribe ? `import { describe, it } from "vitest";` : `import { it } from "vitest";`,
   );
   lines.push("");
-  lines.push(...renderDescribeTree(tree, 0));
+  lines.push(...renderDescribeTree(tree, 0, skipReason));
 
   // Remove trailing blank lines
   while (lines.length > 0 && lines[lines.length - 1] === "") {
@@ -124,6 +135,11 @@ function main() {
   const filterPkg = args.includes("--package") ? args[args.indexOf("--package") + 1] : null;
   const write = args.includes("--write");
   const missingFilesOnly = args.includes("--missing-files-only");
+  // `normalize-skips.ts` string-matches `PERMANENT-SKIP:` and leaves an
+  // annotated body alone, so a stub generated with one is not re-annotated.
+  const skipReason = args.includes("--skip-reason")
+    ? args[args.indexOf("--skip-reason") + 1]
+    : null;
 
   const railsPath = path.join(OUTPUT_DIR, "rails-tests.json");
   const conventionPath = path.join(OUTPUT_DIR, "convention-comparison.json");
@@ -186,7 +202,12 @@ function main() {
       const missingDescs = pkgMissing?.get(rubyFile);
       let testsToStub: TestCaseInfo[];
 
-      if (missingDescs && missingDescs.size > 0) {
+      if (!convFile.tsFileExists) {
+        // No TS file at all — the whole Ruby file is unported, so a
+        // description credited by a fuzzy match against some OTHER file's TS
+        // test still has no stub here. Take every test case.
+        testsToStub = rubyFileInfo.testCases;
+      } else if (missingDescs && missingDescs.size > 0) {
         // We have specific missing test names — filter by description
         testsToStub = [];
         for (const tc of rubyFileInfo.testCases) {
@@ -194,9 +215,6 @@ function main() {
             testsToStub.push(tc);
           }
         }
-      } else if (!convFile.tsFileExists) {
-        // No TS file at all — generate stubs for all tests
-        testsToStub = rubyFileInfo.testCases;
       } else {
         // TS file exists but missingTests wasn't populated — parity:test
         // was probably run without --missing. Skip to avoid over-generating.
@@ -208,7 +226,7 @@ function main() {
 
       if (testsToStub.length === 0) continue;
 
-      const content = generateStubContent(testsToStub);
+      const content = generateStubContent(testsToStub, skipReason);
 
       if (!write) {
         console.log(`  [report] ${tsFullPath} (${testsToStub.length} tests)`);

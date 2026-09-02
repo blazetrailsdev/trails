@@ -1,7 +1,9 @@
+import { StringIO } from "@blazetrails/activesupport";
+import { Request, ResponseRaw } from "@blazetrails/rack";
 import { describe, expect, it } from "vitest";
 
 import type { PersistedRequest, PersistedSession } from "./index.js";
-import { Pool, SessionId } from "./index.js";
+import { Persisted, Pool, SecureSessionHash, SessionId } from "./index.js";
 
 function stubRequest(): PersistedRequest {
   return {
@@ -78,5 +80,32 @@ describe("Rack::Session::Pool", () => {
     const first = pool.generateSid();
     pool.pool[first.privateId] = {};
     expect(pool.generateSid().privateId).not.toBe(first.privateId);
+  });
+
+  it("commit_session writes the store's own Ruby constant path to rack.errors", () => {
+    const pool = new Pool();
+    pool.writeSession = () => undefined as unknown as SessionId;
+    const errors = new StringIO();
+    const env: Record<string, unknown> = { "rack.errors": errors };
+    const req = new Request(env) as unknown as PersistedRequest;
+    const store = {
+      loadSession: () => [new SessionId("id"), {}],
+      sessionExists: () => true,
+    } as unknown as Persisted;
+    const session = (env["rack.session"] = new SecureSessionHash(store, req));
+    session.set("foo", "bar");
+    pool.commitSession(req, new ResponseRaw(200, {}));
+    errors.rewind();
+    expect(errors.read()).toBe(
+      "Warning! Rack::Session::Pool failed to save session. Content dropped.\n",
+    );
+  });
+
+  it("SecureSessionHash#inspect renders the not-yet-loaded form", () => {
+    const req = new Request({}) as unknown as PersistedRequest;
+    const session = new SecureSessionHash(new Pool(), req);
+    expect(session.inspect()).toMatch(
+      /^#<Rack::Session::Abstract::PersistedSecure::SecureSessionHash:0x[0-9a-f]+ not yet loaded>$/,
+    );
   });
 });

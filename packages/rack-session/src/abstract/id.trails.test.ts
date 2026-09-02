@@ -1,7 +1,10 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS, ResponseRaw } from "@blazetrails/rack";
-import { describe, expect, it } from "vitest";
+import { StringIO } from "@blazetrails/activesupport";
+import { Request } from "@blazetrails/rack";
+import { setVerbose } from "@blazetrails/ruby-compat";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type { PersistedRequest, PersistedSession } from "../index.js";
 import {
@@ -208,5 +211,38 @@ describe("Rack::Session::Abstract::Persisted#call", () => {
     const store = new TestStore(app, { skip: true });
     await store.call({ HTTP_COOKIE: "rack.session=sid" });
     expect(store.written).toEqual([]);
+  });
+
+  describe("commit_session deferral notice", () => {
+    afterEach(() => {
+      setVerbose(false);
+    });
+
+    function deferredCommit(): StringIO {
+      const errors = new StringIO();
+      const env: Record<string, unknown> = { "rack.errors": errors };
+      const req = new Request(env) as unknown as PersistedRequest;
+      const store = new Persisted(undefined, { defer: true });
+      store.writeSession = () => "data";
+      const backing = {
+        loadSession: () => ["sid", {}],
+        sessionExists: () => true,
+      } as unknown as Persisted;
+      const session = (env["rack.session"] = new SessionHash(backing, req));
+      session.set("foo", "bar");
+      req.setHeader(RACK_SESSION_OPTIONS, { defer: true });
+      store.commitSession(req, new ResponseRaw(200, {}));
+      errors.rewind();
+      return errors;
+    }
+
+    it("stays silent while $VERBOSE is false", () => {
+      expect(deferredCommit().read()).toBe("");
+    });
+
+    it("writes to rack.errors while $VERBOSE is true", () => {
+      setVerbose(true);
+      expect(deferredCommit().read()).toBe("Deferring cookie for sid\n");
+    });
   });
 });

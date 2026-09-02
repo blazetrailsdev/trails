@@ -146,6 +146,22 @@ function classNameOf(value: unknown): string {
 }
 
 /**
+ * Ruby's `self.class`, which `Session#inspect` (`request/session.rb:225`)
+ * interpolates, so the string follows the RECEIVER's class rather than being
+ * fixed at one literal. Same shape as `rubyClassPath` in
+ * `packages/rack-session/src/abstract/id.ts`; a subclass Rails does not define
+ * falls through to its own JS name.
+ */
+function rubyClassPath(klass: unknown): string {
+  switch (klass) {
+    case Session:
+      return "ActionDispatch::Request::Session";
+    default:
+      return (klass as { name: string }).name;
+  }
+}
+
+/**
  * Ruby's `object_id` — a per-object identity number JS does not expose, handed
  * out lazily and remembered on a WeakMap, shifted and hexed the way
  * `(object_id << 1).to_s(16)` renders it. Same spelling as
@@ -421,9 +437,9 @@ export class Session {
    */
   inspect(): string {
     if (this.isLoaded()) {
-      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)}>`;
+      return `#<${rubyClassPath(this.constructor)}:0x${objectIdHex(this)}>`;
     } else {
-      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<${rubyClassPath(this.constructor)}:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 

@@ -7,7 +7,9 @@ import {
   Request,
   ResponseRaw,
 } from "@blazetrails/rack";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError, SecureRandom, verbose } from "@blazetrails/ruby-compat";
+
+import { getRubyClassPath } from "../ruby-class-path-slot.js";
 
 export class SessionId {
   static ID_VERSION = 2;
@@ -73,7 +75,7 @@ function rubyClassPath(klass: unknown): string {
     case ID:
       return "Rack::Session::Abstract::ID";
     default:
-      return (klass as { name: string }).name;
+      return getRubyClassPath(klass) ?? (klass as { name: string }).name;
   }
 }
 
@@ -312,7 +314,7 @@ export const DEFAULT_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze(
   renew: false,
   sidbits: 128,
   cookieOnly: true,
-  secureRandom: true,
+  secureRandom: SecureRandom,
 });
 
 /** @noRailsEquivalent PERMANENT */
@@ -409,7 +411,7 @@ export class Persisted {
   generateSid(secure: unknown = this.sidSecure): unknown {
     try {
       if (isTruthy(secure)) {
-        return getCrypto().randomBytes(this.sidLength).toString("hex");
+        return (secure as { hex(n: number): string }).hex(this.sidLength);
       } else {
         const limit = (1n << BigInt(this.sidbits)) - 1n;
         let value = 0n;
@@ -520,8 +522,12 @@ export class Persisted {
       (req.getHeader(RACK_ERRORS) as unknown as RackErrors).puts(
         `Warning! ${rubyClassPath(this.constructor)} failed to save session. Content dropped.`,
       );
-      // eslint-disable-next-line no-empty -- Ruby's notice here is `if $VERBOSE` (abstract/id.rb:399) and trails has no $VERBOSE
     } else if (isTruthy(options["defer"]) && !isTruthy(options["renew"])) {
+      if (isTruthy(verbose())) {
+        (req.getHeader(RACK_ERRORS) as unknown as RackErrors).puts(
+          `Deferring cookie for ${String(sessionId)}`,
+        );
+      }
     } else {
       const cookie: Record<string, unknown> = {};
       cookie["value"] = this.cookieValue(data);
