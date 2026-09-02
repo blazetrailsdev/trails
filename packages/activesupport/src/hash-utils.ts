@@ -542,6 +542,7 @@ export function toParam(value: unknown): string | boolean | null {
     if (typeof (value as any).toParam === "function") {
       return (value as any).toParam();
     }
+    if (value instanceof Map) return toQuery(value);
     if (isPlainObject(value)) {
       // If toString is overridden, use it (mirrors Ruby Object#to_param → to_s)
       if (value.toString !== Object.prototype.toString) {
@@ -570,6 +571,11 @@ function buildQueryParts(value: unknown, prefix: string): string[] {
     return value.flatMap((v) => buildQueryParts(v, `${prefix}[]`));
   }
   if (typeof value === "object") {
+    // Ruby's fallback is `Object#to_query` (`core_ext/object/to_query.rb:11-13`)
+    // — anything answering `to_param` is a leaf, not a container to walk into.
+    if (typeof (value as { toParam?: unknown }).toParam === "function") {
+      return [`${encodeQueryKey(prefix)}=${encodeQueryValue(toParam(value))}`];
+    }
     const keys = Object.keys(value as Record<string, unknown>);
     if (keys.length === 0) return [];
     return keys.flatMap((k) =>
@@ -583,12 +589,21 @@ function buildQueryParts(value: unknown, prefix: string): string[] {
  * Convert an object to a URL query string with nested key support.
  * Mirrors Rails' Hash#to_query / Hash#to_param.
  */
-export function toQuery(obj: Record<string, unknown>, namespace?: string): string {
-  const sortedKeys = Object.keys(obj).sort();
+export function toQuery(
+  obj: Record<string, unknown> | Map<unknown, unknown>,
+  namespace?: string,
+): string {
+  // Ruby hashes key on any object, so `key.to_param`
+  // (`core_ext/object/to_query.rb:12`) is the key's spelling; a JS object keys
+  // only on strings, so a `Map` is the receiver that still carries one.
+  const entries: [string, unknown][] = (
+    obj instanceof Map ? [...obj.entries()] : Object.entries(obj)
+  ).map(([key, value]) => [String(toParam(key)), value]);
+  entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
   const parts: string[] = [];
-  for (const key of sortedKeys) {
+  for (const [key, value] of entries) {
     const fullKey = namespace ? `${namespace}[${key}]` : key;
-    parts.push(...buildQueryParts(obj[key], fullKey));
+    parts.push(...buildQueryParts(value, fullKey));
   }
   return parts.join("&");
 }
