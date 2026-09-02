@@ -6,6 +6,7 @@ import { PKG_SRC_DIRS, normalize, rubyToConventionTs } from "../test-compare/com
 import { extractTestsFromSource } from "../test-compare/extract-ts-tests.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import type { TestCaseInfo } from "../test-compare/types.js";
+import type { UnportedFile } from "./unported-files/index.js";
 import { UNPORTED_FILES } from "./unported-files/index.js";
 
 // Recurrence guard for the register-hides-a-ported-test bug (RFC 0126). A
@@ -57,6 +58,7 @@ describe("UNPORTED_FILES per-test entries do not name a ported test", () => {
       if (total === 0) return;
 
       const offenders: string[] = [];
+      const receiptsUsed = new Set<UnportedFile>();
       const parsed = new Map<string, TestCaseInfo[]>();
       for (const e of UNPORTED_FILES) {
         if (!e.testFile || !e.tests) continue;
@@ -82,18 +84,37 @@ describe("UNPORTED_FILES per-test entries do not name a ported test", () => {
               // `className` scopes the claim to one Ruby class; the TS describe
               // mirroring it is the only place that claim can be contradicted.
               if (e.className !== undefined && !tc.ancestors.includes(e.className)) continue;
+              // A receipt says this live test is deliberately not the Rails one.
+              if (e.liveTsCounterpart !== undefined) {
+                receiptsUsed.add(e);
+                continue;
+              }
               offenders.push(
                 `"${e.testFile}"${e.className ? ` (class ${e.className})` : ""} excludes ` +
                   `"${tc.description}", which ${tsPath}:${tc.line} defines as a live test.\n` +
                   "  Retire the entry (and its unported-files/baseline.json row) if the " +
-                  "test really is ported, or scope it with `className` / record why the " +
-                  "TS test of that name is not the Rails test.",
+                  "test really is ported, scope it with `className`, or record a " +
+                  "`liveTsCounterpart` receipt saying why the TS test of that name is " +
+                  "not the Rails test.",
               );
             }
           }
         }
       }
       expect(offenders, offenders.join("\n\n")).toEqual([]);
+
+      // The receipt has to keep earning itself. Once the port converges — or
+      // the TS test is renamed away — nothing contradicts the entry any more,
+      // and a `liveTsCounterpart` left behind would quietly excuse the next
+      // live test to take that name.
+      const stale = UNPORTED_FILES.filter(
+        (e) => e.tests && e.liveTsCounterpart !== undefined && !receiptsUsed.has(e),
+      ).map((e) => `"${e.testFile}" ${JSON.stringify(e.tests)}`);
+      expect(
+        stale,
+        "`liveTsCounterpart` receipt(s) matching no live TS test any more — drop the " +
+          `field:\n  ${stale.join("\n  ")}`,
+      ).toEqual([]);
     },
   );
 });

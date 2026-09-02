@@ -824,6 +824,23 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "Marshal.load(Marshal.dump(firm)) of an AR record with a loaded has-one " +
       "association cache. Ruby Marshal binary serialization has no Node.js equivalent.",
   },
+  // --- globalid: Ruby-Marshal exact-token assertion ---
+  {
+    testFile: "verifier_test.rb",
+    className: "VerifierTest",
+    tests: ["generates URL-safe messages"],
+    liveTsCounterpart:
+      "verifier.test.ts asserts the char-class guarantee (no `+` or `/` in the " +
+      "token) rather than the exact bytes, which is the whole of what the Rails " +
+      "test can portably mean here.",
+    reason:
+      "Asserts byte-for-byte equality against a known token produced by " +
+      "Ruby's Marshal serializer wrapped in MessageVerifier — the Rails source " +
+      "notes the bytes even differ across Ruby versions. Our globalid Verifier " +
+      "uses JSON serialization (the default for our MessageVerifier), so the " +
+      "encoded payload differs structurally and that byte string is " +
+      "unreproducible in principle, not merely unported.",
+  },
   {
     testFile: "associations_test.rb",
     tests: ["pretty print does not reload a not yet loaded target"],
