@@ -235,8 +235,8 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     ],
     reason:
       "Every case drives ActiveSupport::Concurrency::ShareLock from several `Thread.new` " +
-      "workers through the file's own `ThreadCatcher`/`assert_threads_stuck` helpers " +
-      "(share_lock_test.rb:8-58), asserting Monitor/ConditionVariable blocking, thread " +
+      "workers through the file's own `assert_threads_stuck` / `assert_threads_not_stuck` " +
+      "helpers (share_lock_test.rb:495-513), asserting Monitor/ConditionVariable blocking, thread " +
       "ownership and `Thread#kill` unwind. JS is single-threaded and has no preemptible " +
       "thread, no Monitor and no way to observe a blocked one, so the assertions have no " +
       "meaning; the lock's non-blocking bookkeeping is covered by the file's other cases.",
@@ -257,7 +257,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     ],
     reason:
       "`require_dependency` is a thin wrapper over Ruby's `Kernel#require` against " +
-      "`$LOAD_PATH`/`autoload_paths` (dependencies.rb:16-30), and each case asserts a " +
+      "`$LOAD_PATH`/`autoload_paths` (dependencies/require_dependency.rb:11-23), and each case asserts a " +
       "synchronous load, its idempotence on a second call, `Pathname#to_path` coercion, or " +
       "the `LoadError` it raises. ESM `import` is asynchronous, resolves through the " +
       "package graph rather than a mutable load path, and caches per specifier, so there " +
@@ -276,7 +276,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "ActiveSupport::Autoload registers `Module#autoload` entries and the cases assert " +
       "them through `autoload?`/`const_get` — a constant that resolves to a file on first " +
-      "reference (autoload.rb:38-64). JS has no lazily-resolved binding: an `import` is " +
+      "reference (dependencies/autoload.rb:30-42). JS has no lazily-resolved binding: an `import` is " +
       "eager and a namespace object exposes no autoload table, so `autoload?` has no " +
       "counterpart to assert against.",
   },
@@ -292,7 +292,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Each case builds a String in a non-UTF-8 Ruby Encoding (`force_encoding`, " +
       "`\\xC3\\x28`) and asserts `transliterate`'s `Encoding::CompatibilityError` / " +
-      "replacement-character behaviour (transliterate.rb:57-73). A JS string carries no " +
+      "replacement-character behaviour (inflector/transliterate.rb:64-90). A JS string carries no " +
       "encoding tag and cannot hold an invalid byte sequence, so neither the input nor " +
       "the error can be constructed.",
   },
@@ -302,7 +302,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "LoadInterlockAwareMonitor#synchronize hands the GVL back to the autoload interlock " +
       "while a second `Thread` contends for the monitor " +
-      "(load_interlock_aware_monitor.rb:12-25). The cases assert that hand-off from a " +
+      "(concurrency/load_interlock_aware_monitor.rb:8-25). The cases assert that hand-off from a " +
       "spawned thread; JS is single-threaded and has no monitor to contend for.",
   },
   {
@@ -316,7 +316,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "`thread_mattr_accessor` stores through `ActiveSupport::IsolatedExecutionState`, and " +
       "these cases assert the value is or is not visible from a second `Thread`/`Fiber` " +
-      "under each isolation level (attribute_accessors_per_thread.rb:52-77). JS has " +
+      "under each isolation level (core_ext/module/attribute_accessors_per_thread.rb). JS has " +
       "neither, and the source file is already an unported-file row above.",
   },
   {
@@ -330,7 +330,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "The first three declare or read `class_attribute` through an object's singleton " +
       "class (`object.singleton_class.setting=`, `class << self`), whose lookup chain is " +
-      "what class_attribute.rb:88-113 walks; the fourth asserts `singleton_class.prepend` " +
+      "what core_ext/class/attribute.rb:86-120 walks; the fourth asserts `singleton_class.prepend` " +
       "wraps the generated reader and writer. JS has no per-object singleton class and no " +
       "`Module#prepend`, so there is no receiver for either shape.",
   },
@@ -339,7 +339,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     tests: ["declaring attributes on singleton errors"],
     reason:
       "Asserts `mattr_accessor` inside `class << klass` raises TypeError " +
-      "(attribute_accessors.rb:53-55) and that no `@@my_attr` lands in " +
+      "(core_ext/module/attribute_accessors.rb:56, :122) and that no `@@my_attr` lands in " +
       "`Module.class_variables`. Both the singleton-class body and Ruby class variables " +
       "are Ruby-only, so the guard has nothing to fire on in TS.",
   },
@@ -349,7 +349,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Creates an anonymous subclass inside a `Thread.new` so the Ruby GC can collect it, " +
       "then asserts `descendants` drops it — the WeakSet behaviour of " +
-      "descendants_tracker.rb:38-56. JS exposes no way to force collection and " +
+      "descendants_tracker.rb:59-65, :107. JS exposes no way to force collection and " +
       "FinalizationRegistry gives no observation point, so the case cannot be written " +
       "deterministically.",
   },
@@ -358,7 +358,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     tests: ["custom multibyte encoder"],
     reason:
       "Swaps `ActiveSupport::Multibyte.proxy_class` and asserts `String#mb_chars` returns " +
-      "the replacement proxy (multibyte.rb:16-21). `core_ext/string/multibyte.rb` is " +
+      "the replacement proxy (multibyte.rb:14-21). `core_ext/string/multibyte.rb` is " +
       "already an unported-file row above — JS strings are Unicode and carry no Encoding, " +
       "so there is no `mb_chars` for a proxy class to answer.",
   },
@@ -390,7 +390,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Round-trip TimeWithZone through Psych — `to_yaml` emits the " +
       "`!ruby/object:ActiveSupport::TimeWithZone` tag and `YAML.load` rebuilds it from the " +
-      "`utc`/`zone`/`time` ivars (time_with_zone.rb:552-560). YAML with Ruby object tags " +
+      "`utc`/`zone`/`time` ivars (time_with_zone.rb:174-181). YAML with Ruby object tags " +
       "has no JS equivalent, and Psych is an unported format across the repo.",
   },
   {
@@ -418,7 +418,7 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Both run the shared `run_constantize_tests_on` block, which resolves nested Ruby " +
       "constant paths (`Ace::Base::Case`, `::Ace`) through `Object.const_get` and asserts " +
-      "the NameError/`nil` arms of inflector/methods.rb:280-311. JS has no global constant " +
+      "the NameError/`nil` arms of inflector/methods.rb:289-311. JS has no global constant " +
       "namespace to look a dotted path up in.",
   },
   {
