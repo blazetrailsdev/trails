@@ -35,6 +35,7 @@ export const GATED_PACKAGES = [
   "actiondispatch",
   "actionview",
   "activemodel",
+  "activerecord",
   "activesupport",
   "arel",
   "did-you-mean",

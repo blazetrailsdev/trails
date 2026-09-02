@@ -2,31 +2,12 @@
  * Logger and TaggedLogging — mirroring ActiveSupport's logging API.
  */
 
-import { ArgumentError } from "@blazetrails/ruby-compat";
 import { stdout } from "./process-adapter.js";
 import { Temporal } from "@blazetrails/date";
-import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { getFs } from "./fs-adapter.js";
 import { BroadcastLoggerClass } from "./broadcast-logger-slot.js";
-import { NameError } from "./core-ext/name-error.js";
-
-/**
- * Ruby's `Object#inspect` for the values `local_level=`'s ArgumentError can
- * carry (`logger_thread_safe_level.rb:21`): a String renders quoted, every
- * other value through `to_s`. Same shape as class-attribute.ts's.
- */
-function inspect(value: unknown): string {
-  if (typeof value === "string") return JSON.stringify(value);
-  return String(value);
-}
-
-function coerce(severity: number | string): number {
-  if (typeof severity === "number") return severity;
-  const name = severity.startsWith(":") ? severity.slice(1) : severity;
-  const level = LOG_LEVELS[`:${name.toLowerCase()}` as LogLevel];
-  if (level === undefined) throw new ArgumentError(`invalid log level: ${name}`);
-  return level;
-}
+import { include } from "@blazetrails/ruby-compat/include";
+import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";
 
 export type LogLevel = ":debug" | ":info" | ":warn" | ":error" | ":fatal" | ":unknown";
 
@@ -67,6 +48,7 @@ const defaultOutput: LoggerOutput = {
  * ActiveSupport::Logger — a structured logger with level filtering, silence blocks,
  * and formatter support. Mirrors the Rails API as closely as TypeScript allows.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerThreadSafeLevel` (`logger_silence.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
 export class Logger {
   progname: string = "trails";
   protected _formatter:
@@ -140,55 +122,6 @@ export class Logger {
 
   constructor(output: LoggerOutput | null = defaultOutput) {
     this.output = output;
-  }
-
-  get level(): number {
-    return this.localLevel ?? this._level;
-  }
-
-  set level(severity: number | LogLevel | string) {
-    this._level = coerce(severity);
-  }
-
-  /**
-   * `logger_thread_safe_level.rb:38` — `:"logger_thread_safe_level_#{object_id}"`.
-   * A JS Symbol is the private per-instance key here, exactly as Ruby's
-   * per-object_id Symbol is: it is never a Ruby Symbol *value*.
-   */
-  private _localLevelKey?: symbol;
-
-  protected get localLevelKey(): symbol {
-    return (this._localLevelKey ??= Symbol("loggerThreadSafeLevel"));
-  }
-
-  get localLevel(): number | null {
-    return IsolatedExecutionState.get<number>(this.localLevelKey) ?? null;
-  }
-
-  set localLevel(level: number | LogLevel | null) {
-    let value: number | null;
-    if (typeof level === "number") {
-      value = level;
-    } else if (typeof level === "string" && level.startsWith(":")) {
-      const constantName = level.slice(1).toUpperCase();
-      value = LOG_LEVELS[`:${level.slice(1).toLowerCase()}` as LogLevel];
-      if (value === undefined) {
-        throw new NameError(
-          `uninitialized constant Logger::Severity::${constantName}`,
-          constantName,
-        );
-      }
-    } else if (level == null) {
-      value = null;
-    } else {
-      throw new ArgumentError(`Invalid log level: ${inspect(level)}`);
-    }
-
-    if (value === null) {
-      IsolatedExecutionState.delete(this.localLevelKey);
-    } else {
-      IsolatedExecutionState.set(this.localLevelKey, value);
-    }
   }
 
   add(severity: number, message?: string | null, progname?: string): boolean {
@@ -265,17 +198,6 @@ export class Logger {
     }
   }
 
-  /** `logger_thread_safe_level.rb:31` — change the local level for the block. */
-  logAt(level: number | LogLevel, fn: () => void): void {
-    const oldLocalLevel = this.localLevel;
-    this.localLevel = level;
-    try {
-      fn();
-    } finally {
-      this.localLevel = oldLocalLevel;
-    }
-  }
-
   /** `ruby/logger lib/logger.rb#debug!` — sets the log level to DEBUG. */
   debugBang(): void {
     this.level = Logger.DEBUG;
@@ -323,6 +245,17 @@ export class Logger {
     });
   }
 }
+
+/** `logger_silence.rb:9` — `include ActiveSupport::LoggerThreadSafeLevel`. */
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the class/interface merge is how `include()` surfaces on the type side. */
+export interface Logger {
+  get level(): number;
+  set level(severity: number | LogLevel | string);
+  get localLevel(): number | null;
+  set localLevel(level: number | LogLevel | null);
+  logAt(level: number | LogLevel, fn: () => void): void;
+}
+include(Logger, LoggerThreadSafeLevel);
 
 /**
  * TaggedLogging — wraps a Logger to prepend tags to messages.

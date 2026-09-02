@@ -107,9 +107,17 @@ export function addModifier(
   registry().addModifier(options, klass, registrationOptions);
 }
 
-export function lookup(args: string, kwargs?: { adapter?: string; [key: string]: unknown }): Type {
+export function lookup(...argsAndKwargs: unknown[]): Type {
+  const last = argsAndKwargs[argsAndKwargs.length - 1];
+  const hasKwargs =
+    last !== null &&
+    typeof last === "object" &&
+    !Array.isArray(last) &&
+    Object.getPrototypeOf(last) === Object.prototype;
+  const args = (hasKwargs ? argsAndKwargs.slice(0, -1) : argsAndKwargs) as [string, ...unknown[]];
+  const kwargs = hasKwargs ? (last as { adapter?: string; [key: string]: unknown }) : undefined;
   const adapter = kwargs?.adapter ?? currentAdapterName();
-  return registry().lookup(args, { ...kwargs, adapter });
+  return registry().lookup(...args, { ...kwargs, adapter });
 }
 
 export function defaultValue(): Type {

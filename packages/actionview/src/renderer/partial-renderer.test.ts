@@ -25,14 +25,14 @@ describe("PartialRenderer", () => {
   });
 
   it("renders a bare partial", async () => {
-    vi.spyOn(lc, "findPartial").mockReturnValue(makeFakeTemplate("partial body") as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([makeFakeTemplate("partial body")]);
     const result = await new PartialRenderer(lc).render("users/card", ctx, undefined);
     expect(result.body).toBe("partial body");
   });
 
   it("renders a partial with locals", async () => {
     const fake = makeFakeTemplate("Hello Alice");
-    vi.spyOn(lc, "findPartial").mockReturnValue(fake as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     await new PartialRenderer(lc, { locals: { name: "Alice" } }).render(
       "users/card",
       ctx,
@@ -42,13 +42,15 @@ describe("PartialRenderer", () => {
   });
 
   it("looks up partial with underscore prefix", async () => {
-    const spy = vi.spyOn(lc, "findPartial").mockReturnValue(null);
-    await new PartialRenderer(lc).render("users/card", ctx, undefined).catch(() => {});
-    expect(spy).toHaveBeenCalledWith("card", "users", "html");
+    const spy = vi.spyOn(lc, "findAll").mockReturnValue([]);
+    await new PartialRenderer(lc, { locals: { name: "Alice" }, formats: ["html"] })
+      .render("users/card", ctx, undefined)
+      .catch(() => {});
+    expect(spy).toHaveBeenCalledWith("users/card", [], true, ["name"], { formats: ["html"] });
   });
 
   it("raises MissingTemplate when partial cannot be found", async () => {
-    vi.spyOn(lc, "findPartial").mockReturnValue(null);
+    vi.spyOn(lc, "findAll").mockReturnValue([]);
     await expect(
       new PartialRenderer(lc).render("users/missing", ctx, undefined),
     ).rejects.toBeInstanceOf(MissingTemplate);
@@ -66,7 +68,7 @@ describe("ObjectRenderer", () => {
 
   it("binds object under local variable derived from partial path", async () => {
     const fake = makeFakeTemplate("user body");
-    vi.spyOn(lc, "findPartial").mockReturnValue(fake as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     const user = { name: "Alice" };
     await new ObjectRenderer(lc).renderObjectWithPartial(user, "users/user", ctx, undefined);
     expect(fake.render).toHaveBeenCalledWith(ctx, expect.objectContaining({ user }));
@@ -74,7 +76,7 @@ describe("ObjectRenderer", () => {
 
   it("binds object under the as: option name", async () => {
     const fake = makeFakeTemplate();
-    vi.spyOn(lc, "findPartial").mockReturnValue(fake as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     const user = { name: "Alice" };
     await new ObjectRenderer(lc, { as: "person" }).renderObjectWithPartial(
       user,
@@ -86,7 +88,7 @@ describe("ObjectRenderer", () => {
   });
 
   it("derives partial path from toPartialPath()", async () => {
-    vi.spyOn(lc, "findPartial").mockReturnValue(makeFakeTemplate("account body") as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([makeFakeTemplate("account body")]);
     const result = await new ObjectRenderer(lc).renderObjectDerivePartial(
       { toPartialPath: () => "accounts/account" },
       ctx,
@@ -116,7 +118,7 @@ describe("CollectionRenderer", () => {
     (fake.render as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce("Alice")
       .mockResolvedValueOnce("Bob");
-    vi.spyOn(lc, "findPartial").mockReturnValue(fake as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     const result = await new CollectionRenderer(lc).renderCollectionWithPartial(
       ["a", "b"],
       "users/user",
@@ -146,7 +148,7 @@ describe("CollectionRenderer", () => {
         return Promise.resolve("x");
       }),
     };
-    vi.spyOn(lc, "findPartial").mockReturnValue(fake as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     await new CollectionRenderer(lc).renderCollectionWithPartial(
       ["a", "b"],
       "users/user",
@@ -168,7 +170,7 @@ describe("CollectionRenderer", () => {
         return Promise.resolve("x");
       }),
     };
-    vi.spyOn(lc, "findPartial").mockReturnValue(fake as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     await new CollectionRenderer(lc, { as: "person" }).renderCollectionWithPartial(
       ["a"],
       "users/user",
@@ -184,9 +186,9 @@ describe("CollectionRenderer", () => {
       .mockResolvedValueOnce("A")
       .mockResolvedValueOnce("B");
     const spacerTmpl = makeFakeTemplate("|");
-    vi.spyOn(lc, "findPartial").mockImplementation(
-      (name) => (name === "spacer" ? spacerTmpl : itemTmpl) as never,
-    );
+    vi.spyOn(lc, "findAll").mockImplementation((name) => [
+      name === "users/spacer" ? spacerTmpl : itemTmpl,
+    ]);
     const result = await new CollectionRenderer(lc, {
       spacerTemplate: "spacer",
     }).renderCollectionWithPartial(["a", "b"], "users/user", ctx, undefined);
@@ -198,7 +200,7 @@ describe("CollectionRenderer", () => {
     (fake.render as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce("P1")
       .mockResolvedValueOnce("P2");
-    vi.spyOn(lc, "findPartial").mockReturnValue(fake as never);
+    vi.spyOn(lc, "findAll").mockReturnValue([fake]);
     const posts = [{ toPartialPath: () => "posts/post" }, { toPartialPath: () => "posts/post" }];
     const result = await new CollectionRenderer(lc).renderCollectionDerivePartial(
       posts,

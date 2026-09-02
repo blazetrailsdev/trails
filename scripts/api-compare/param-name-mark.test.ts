@@ -27,7 +27,7 @@ describe("measure", () => {
   it("ignores rows from an ungated package, and reports zero with none", () => {
     const empty = zeroed();
     expect(measure([])).toEqual(empty);
-    expect(measure([row("activerecord", "a.rb")])).toEqual(empty);
+    expect(measure([row("ruby-compat", "a.rb")])).toEqual(empty);
   });
 });
 
@@ -79,7 +79,7 @@ describe("tightened", () => {
 
 describe("enrolment guards", () => {
   it("names a gated package the run never measured", () => {
-    expect(unmeasuredPackages(["activerecord"])).toEqual([...GATED_PACKAGES]);
+    expect(unmeasuredPackages(["ruby-compat"])).toEqual([...GATED_PACKAGES]);
     expect(unmeasuredPackages([...GATED_PACKAGES])).toEqual([]);
   });
 
@@ -93,5 +93,10 @@ describe("the committed mark", () => {
     const marks = JSON.parse(await fs.readFile(MARK_PATH, "utf-8")) as ParamNameMarks;
     expect(unmarkedPackages(marks)).toEqual([]);
     expect(marks.arel).toEqual({ total: 0, byFile: {} });
+  });
+
+  it("holds activerecord at zero (burned down by RFC 0128's six slices)", async () => {
+    const marks = JSON.parse(await fs.readFile(MARK_PATH, "utf-8")) as ParamNameMarks;
+    expect(marks.activerecord).toEqual({ total: 0, byFile: {} });
   });
 });

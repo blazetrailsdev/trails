@@ -38,7 +38,7 @@ describe("TypeTest", () => {
 
   it("registering a new type", () => {
     register("foo", ArgType);
-    expect(lookup("foo")).toStrictEqual(new ArgType());
+    expect(lookup("foo", ":arg")).toStrictEqual(new ArgType(":arg"));
   });
 
   it("looking up a type for a specific adapter", () => {
