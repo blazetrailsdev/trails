@@ -7,7 +7,7 @@ import {
   Request,
   ResponseRaw,
 } from "@blazetrails/rack";
-import { NotImplementedError, SecureRandom, verbose } from "@blazetrails/ruby-compat";
+import { kernelRand, NotImplementedError, SecureRandom, verbose } from "@blazetrails/ruby-compat";
 
 import { getRubyClassPath } from "../ruby-class-path-slot.js";
 
@@ -89,12 +89,12 @@ export class SessionHash implements PersistedSession {
 
   private _store: Persisted;
   private req: PersistedRequest;
-  private loaded: boolean;
+  protected loaded: boolean;
   private _id: unknown;
   private idDefined = false;
   private _exists!: boolean;
   private existsDefined = false;
-  private data!: Record<string, unknown>;
+  protected data!: Record<string, unknown>;
 
   static find(req: PersistedRequest): unknown {
     return req.getHeader(RACK_SESSION);
@@ -413,12 +413,9 @@ export class Persisted {
       if (isTruthy(secure)) {
         return (secure as { hex(n: number): string }).hex(this.sidLength);
       } else {
-        const limit = (1n << BigInt(this.sidbits)) - 1n;
-        let value = 0n;
-        for (let i = 0; i < this.sidbits; i += 32) {
-          value = (value << 32n) | BigInt(Math.floor(Math.random() * 0x1_0000_0000));
-        }
-        return (value % limit).toString(16).padStart(this.sidLength, "0");
+        return (kernelRand((1n << BigInt(this.sidbits)) - 1n) as bigint)
+          .toString(16)
+          .padStart(this.sidLength, "0");
       }
     } catch (error) {
       if (error instanceof NotImplementedError) return this.generateSid(false);

@@ -1,3 +1,4 @@
+import { getRubyClassPath } from "@blazetrails/rack-session";
 import { hasKey } from "@blazetrails/ruby-compat";
 import { KeyError, stringifyKeys } from "@blazetrails/activesupport";
 
@@ -150,7 +151,7 @@ function rubyClassPath(klass: unknown): string {
     case Session:
       return "ActionDispatch::Request::Session";
     default:
-      return (klass as { name: string }).name;
+      return getRubyClassPath(klass) ?? (klass as { name: string }).name;
   }
 }
 

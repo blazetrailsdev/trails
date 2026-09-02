@@ -36,6 +36,7 @@
 import { camelize, getCrypto } from "@blazetrails/activesupport";
 import { KeyError, merge } from "@blazetrails/ruby-compat";
 import { buildNestedQuery } from "@blazetrails/rack";
+import { setRubyClassPath } from "@blazetrails/rack-session";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
@@ -884,3 +885,5 @@ function formatToMime(format: string): string {
   };
   return MIMES[format] ?? format;
 }
+
+setRubyClassPath(TestSession, "ActionController::TestSession");

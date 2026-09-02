@@ -12,7 +12,9 @@ import {
   cookieJar,
   type RequestCookieMethodsHost,
 } from "../../action-dispatch/middleware/cookies.js";
-import { Session, type Req } from "../../action-dispatch/request/session.js";
+import { SessionHash, setRubyClassPath } from "@blazetrails/rack-session";
+import type { Persisted, PersistedRequest } from "@blazetrails/rack-session";
+import type { Req } from "../../action-dispatch/request/session.js";
 import { ActionControllerError } from "./exceptions.js";
 
 export class InvalidAuthenticityToken extends ActionControllerError {
@@ -43,6 +45,7 @@ export interface ProtectionMethods {
  * module cycle).
  */
 export type NullSessionRequest = Req &
+  PersistedRequest &
   RequestCookieMethodsHost & {
     session: unknown;
     flash: unknown;
@@ -51,17 +54,20 @@ export type NullSessionRequest = Req &
 
 /**
  * Mirrors `NullSession::NullSessionHash`
- * (request_forgery_protection.rb:270-287). Rails subclasses
+ * (request_forgery_protection.rb:270-287), which subclasses
  * `Rack::Session::Abstract::SessionHash`
- * (`vendor/rack-session/lib/rack/session/abstract/id.rb:50`); trails subclasses
- * `ActionDispatch::Request::Session`, which is the session object a trails
- * request carries.
+ * (`vendor/rack-session/lib/rack/session/abstract/id.rb:26`).
  */
-export class NullSessionHash extends Session {
-  /** Mirrors `NullSessionHash#initialize` (rb:271-275). */
-  constructor(req: Req) {
-    super(null, req);
-    this.delegate = {};
+export class NullSessionHash extends SessionHash {
+  /**
+   * Mirrors `NullSessionHash#initialize` (rb:271-275). Rails passes `nil` for
+   * the store (rb:272); `SessionHash`'s store field is typed `Persisted`
+   * because every other construction site has one, and this subclass overrides
+   * every member that would dereference it.
+   */
+  constructor(req: PersistedRequest) {
+    super(null as unknown as Persisted, req);
+    this.data = {};
     this.loaded = true;
   }
 
@@ -74,7 +80,7 @@ export class NullSessionHash extends Session {
   }
 
   /** Mirrors `NullSessionHash#enabled?` (rb:284-286). */
-  override isEnabled(): boolean {
+  isEnabled(): boolean {
     return false;
   }
 }
@@ -650,3 +656,8 @@ export function normalizeActionPath(this: CsrfController, actionPath: string): s
   }
   return chomp(parsedPath, "/");
 }
+
+setRubyClassPath(
+  NullSessionHash,
+  "ActionController::RequestForgeryProtection::ProtectionMethods::NullSession::NullSessionHash",
+);
