@@ -350,9 +350,14 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   root: "app",
-  publicDir: "../public",
+  // The app's static files under public/ are served by the Rack stack, not
+  // copied into the build — public/assets is written by the pipeline, the
+  // rest of public/ is hand-maintained.
+  publicDir: false,
   build: {
     outDir: "../public/assets",
+    assetsDir: ".",
+    emptyOutDir: true,
     manifest: true,
     rollupOptions: {
       input: {
