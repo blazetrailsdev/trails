@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { Hash, KeyError } from "@blazetrails/ruby-compat";
+
+/** Deeply unwraps a `Hash` tree into plain objects so `toEqual` can read it. */
+const plainly = (hash: Hash<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(
+    [...hash].map(([key, value]) => [key, value instanceof Hash ? plainly(value) : value]),
+  );
 
 describe("HashWithIndifferentAccessTest", () => {
   // Basic indifferent access
@@ -333,35 +339,45 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("to options for hash with indifferent access", () => {
-    expect(new HashWithIndifferentAccess({ a: 1, b: 2 }).toOptions()).toEqual({ a: 1, b: 2 });
-    expect(new HashWithIndifferentAccess({ ":a": 1, b: 2 }).toOptions()).toEqual({ a: 1, b: 2 });
+    expect(new HashWithIndifferentAccess({ a: 1, b: 2 }).toOptions()).toBeInstanceOf(Hash);
+    expect(plainly(new HashWithIndifferentAccess({ a: 1, b: 2 }).toOptions())).toEqual({
+      a: 1,
+      b: 2,
+    });
+    expect(plainly(new HashWithIndifferentAccess({ ":a": 1, b: 2 }).toOptions())).toEqual({
+      a: 1,
+      b: 2,
+    });
   });
 
   it("deep symbolize keys for hash with indifferent access", () => {
     const nestedSymbols = { a: { b: { c: 3 } } };
-    expect(new HashWithIndifferentAccess(nestedSymbols).deepSymbolizeKeys()).toEqual(nestedSymbols);
-    expect(new HashWithIndifferentAccess({ a: { b: { c: 3 } } }).deepSymbolizeKeys()).toEqual(
+    expect(new HashWithIndifferentAccess(nestedSymbols).deepSymbolizeKeys()).toBeInstanceOf(Hash);
+    expect(plainly(new HashWithIndifferentAccess(nestedSymbols).deepSymbolizeKeys())).toEqual(
       nestedSymbols,
     );
+    expect(
+      plainly(new HashWithIndifferentAccess({ a: { b: { c: 3 } } }).deepSymbolizeKeys()),
+    ).toEqual(nestedSymbols);
   });
 
   it("symbolize keys bang for hash with indifferent access", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    const plain = h.symbolizeKeys();
-    expect(plain["a"]).toBe(1);
+    const symbolized = h.symbolizeKeys();
+    expect(symbolized.get("a")).toBe(1);
   });
 
   it("deep symbolize keys bang for hash with indifferent access", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    const plain = h.symbolizeKeys();
-    expect(Object.keys(plain)).toContain("a");
+    const symbolized = h.symbolizeKeys();
+    expect([...symbolized.keys()]).toContain("a");
   });
 
   it("symbolize keys preserves keys that cant be symbolized for hash with indifferent access", () => {
     // All keys are strings in TS; just verify they survive
     const h = new HashWithIndifferentAccess({ "123": "val" });
-    const plain = h.symbolizeKeys();
-    expect(plain["123"]).toBe("val");
+    const symbolized = h.symbolizeKeys();
+    expect(symbolized.get("123")).toBe("val");
   });
 
   it("deep symbolize keys preserves keys that cant be symbolized for hash with indifferent access", () => {
@@ -705,8 +721,8 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("deep stringify and deep symbolize keys on indifferent preserves hash", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
-    const plain = h.symbolizeKeys();
-    expect(plain).toEqual({ a: 1 });
+    const symbolized = h.symbolizeKeys();
+    expect(plainly(symbolized)).toEqual({ a: 1 });
   });
 
   it("to options on indifferent preserves hash", () => {

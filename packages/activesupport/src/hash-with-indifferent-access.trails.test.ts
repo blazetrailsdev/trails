@@ -37,4 +37,11 @@ describe("HashWithIndifferentAccess", () => {
     expect(h.has("a")).toBe(true);
     expect(h.has(":b")).toBe(false);
   });
+
+  it("symbolize keys keeps the seat to_hash gave the copy", () => {
+    const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
+    h.setDefault(0);
+    expect(h.symbolizeKeys().default()).toBe(0);
+    expect(h.deepSymbolizeKeys().default()).toBe(0);
+  });
 });

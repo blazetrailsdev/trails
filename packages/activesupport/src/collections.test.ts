@@ -603,7 +603,7 @@ describe("HashWithIndifferentAccess", () => {
 
   it("symbolizeKeys returns plain object with string keys", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
-    expect(h.symbolizeKeys()).toEqual({ a: 1, b: 2 });
+    expect(Object.fromEntries(h.symbolizeKeys())).toEqual({ a: 1, b: 2 });
   });
 
   it("stringifyKeys returns a new HashWithIndifferentAccess", () => {
