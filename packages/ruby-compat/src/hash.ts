@@ -271,7 +271,10 @@ export function slice<T>(hash: Record<string, T>, ...keys: string[]): Record<str
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/hash.c:2683`).
  */
 export function except<T>(hash: Record<string, T>, ...keys: string[]): Record<string, T> {
-  const result = { ...hash };
+  /* `rb_hash_except` (`vendor/ruby/hash.c:2683`) deletes from a
+     `hash_dup_with_compare_by_id`, so the result is an ancestor-less Hash in
+     which `__proto__` stays an ordinary key. */
+  const result: Record<string, T> = Object.assign(Object.create(null) as Record<string, T>, hash);
   for (const key of keys) {
     delete result[key];
   }

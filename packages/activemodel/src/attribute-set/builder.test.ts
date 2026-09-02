@@ -178,5 +178,7 @@ describe("LazyAttributeHash", () => {
     const rest = hash.except("age");
     expect(Object.hasOwn(rest, "age")).toBe(false);
     expect(Object.hasOwn(rest, "name")).toBe(true);
+    hash.set("__proto__", Attribute.null("__proto__"));
+    expect(Object.hasOwn(hash.except("age"), "__proto__")).toBe(true);
   });
 });

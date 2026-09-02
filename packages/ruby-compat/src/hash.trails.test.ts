@@ -106,7 +106,12 @@ describe("Hash#reject", () => {
 
   it("carries a __proto__ key across as an ordinary key", () => {
     const hash = Object.assign(Object.create(null) as Record<string, number>, { ["__proto__"]: 1 });
-    expect(hasKey(transformValues(hash, (v) => v * 2), "__proto__")).toBe(true);
+    expect(
+      hasKey(
+        transformValues(hash, (v) => v * 2),
+        "__proto__",
+      ),
+    ).toBe(true);
   });
 });
 
@@ -163,6 +168,11 @@ describe("Hash#except", () => {
     const hash = { a: 100, b: 200, c: 300 };
     expect(except(hash, "a")).toEqual({ b: 200, c: 300 });
     expect(hash).toEqual({ a: 100, b: 200, c: 300 });
+  });
+
+  it("keeps a __proto__ key as an ordinary key", () => {
+    const hash = Object.assign(Object.create(null) as Record<string, number>, { ["__proto__"]: 1 });
+    expect(hasKey(except(hash, "nope"), "__proto__")).toBe(true);
   });
 });
 

@@ -1,5 +1,5 @@
 import { Attribute, Uninitialized } from "../attribute.js";
-import { KeyError, eachKey, hasKey, transformValues } from "@blazetrails/ruby-compat";
+import { KeyError, eachKey, except, hasKey, transformValues } from "@blazetrails/ruby-compat";
 import { Type } from "../type/value.js";
 import { defaultValue } from "../type.js";
 import { AttributeSet } from "../attribute-set.js";
@@ -155,12 +155,7 @@ export class LazyAttributeHash {
   }
 
   except(...names: string[]): Record<string, Attribute> {
-    const drop = new Set(names);
-    const result: Record<string, Attribute> = {};
-    for (const [name, attr] of Object.entries(this.materialize())) {
-      if (!drop.has(name)) result[name] = attr;
-    }
-    return result;
+    return except(this.materialize(), ...names);
   }
 
   constructor(
