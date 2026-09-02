@@ -7,6 +7,7 @@ import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { stderr } from "./process-adapter.js";
 import { trailsLogger } from "./trails-logger-slot.js";
+import { ThreadLocalVar } from "./thread-local-var.js";
 
 export type DeprecationBehavior = "raise" | "stderr" | "log" | "silence" | "notify" | "report";
 
@@ -219,11 +220,10 @@ export class Deprecation {
   disallowedWarnings: AllowMatcher[] | ":all" = [];
 
   // Rails: `@silence_counter = Concurrent::ThreadLocalVar.new(0)` (deprecation.rb:78).
-  private _silenceCounter = 0;
+  private _silenceCounter = new ThreadLocalVar(0);
   // Rails: `@explicitly_allowed_warnings = Concurrent::ThreadLocalVar.new(nil)`
-  // (deprecation.rb:77); JS is single-threaded, so the bound value is a plain
-  // field saved and restored around the block, as `ThreadLocalVar#bind` does.
-  private _explicitlyAllowedWarnings: AllowMatcher[] | ":all" | null = null;
+  // (deprecation.rb:77).
+  private _explicitlyAllowedWarnings = new ThreadLocalVar<AllowMatcher[] | ":all" | null>(null);
 
   /**
    * Returns the current behavior or if one isn't set, defaults to `:stderr`.
@@ -267,7 +267,7 @@ export class Deprecation {
   // Rails: `@silenced || @silence_counter.value.nonzero?`
   // (deprecation/reporting.rb:56-58).
   get silenced(): boolean {
-    return this._silenced || this._silenceCounter !== 0;
+    return this._silenced || this._silenceCounter.value !== 0;
   }
 
   set silenced(silenced: boolean) {
@@ -403,7 +403,7 @@ export class Deprecation {
 
   /** Mirrors: deprecation/disallowed.rb:38-49. */
   private isExplicitlyAllowed(message?: string): boolean {
-    const allowances = this._explicitlyAllowedWarnings;
+    const allowances = this._explicitlyAllowedWarnings.value;
     if (allowances == null) return false;
     if (allowances === ":all") return true;
     return (
@@ -428,12 +428,12 @@ export class Deprecation {
 
   /** Mirrors: Deprecation::Reporting#begin_silence (deprecation/reporting.rb:48-50). */
   beginSilence(): void {
-    this._silenceCounter += 1;
+    this._silenceCounter.value += 1;
   }
 
   /** Mirrors: Deprecation::Reporting#end_silence (deprecation/reporting.rb:52-54). */
   endSilence(): void {
-    this._silenceCounter -= 1;
+    this._silenceCounter.value -= 1;
   }
 
   /**
@@ -450,13 +450,7 @@ export class Deprecation {
     let conditional = "if" in options ? options.if : true;
     if (typeof conditional === "function") conditional = (conditional as () => unknown)();
     if (conditional != null && conditional !== false) {
-      const previous = this._explicitlyAllowedWarnings;
-      this._explicitlyAllowedWarnings = allowedWarnings;
-      try {
-        return block();
-      } finally {
-        this._explicitlyAllowedWarnings = previous;
-      }
+      return this._explicitlyAllowedWarnings.bind(allowedWarnings, block);
     } else {
       return block();
     }
