@@ -26,23 +26,27 @@ describe("MetalControllerInstanceTests", () => {
       async index() {}
     }
     const c = new TestController();
+    c.response = makeResponse();
     expect(c.status).toBe(200);
   });
 
   it("can set status with number", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.status = 404;
     expect(c.status).toBe(404);
   });
 
   it("can set status with symbol string", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.status = "not_found";
     expect(c.status).toBe(404);
   });
 
   it("throws on unknown status symbol", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     expect(() => {
       c.status = "bogus";
     }).toThrow("Unknown status: bogus");
@@ -50,35 +54,41 @@ describe("MetalControllerInstanceTests", () => {
 
   it("can set and get headers", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.setHeader("X-Custom", "value");
     expect(c.getHeader("x-custom")).toBe("value");
   });
 
   it("headers are case-insensitive", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.setHeader("Content-Type", "text/html");
     expect(c.getHeader("content-type")).toBe("text/html");
   });
 
   it("can set and get body", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.body = "hello";
     expect(c.body).toBe("hello");
   });
 
   it("can set and get content type", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.contentType = "application/json";
-    expect(c.contentType).toBe("application/json");
+    expect(c.contentType).toBe("application/json; charset=utf-8");
   });
 
   it("content type is null by default", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     expect(c.contentType).toBeNull();
   });
 
   it("head sets status and empty body and marks performed", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.head(204);
     expect(c.status).toBe(204);
     expect(c.body).toBe("");
@@ -87,12 +97,14 @@ describe("MetalControllerInstanceTests", () => {
 
   it("head with symbol", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.head("no_content");
     expect(c.status).toBe(204);
   });
 
   it("head throws on unknown symbol", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     expect(() => {
       c.head("bogus");
     }).toThrow("Unknown status: bogus");
@@ -152,7 +164,8 @@ describe("MetalControllerInstanceTests", () => {
       }
     }
     const c = new TestController();
-    const res = await c.dispatch("index", makeRequest(), makeResponse());
+    const res = makeResponse();
+    await c.dispatch("index", makeRequest(), res);
     expect(res.status).toBe(201);
   });
 
@@ -164,7 +177,8 @@ describe("MetalControllerInstanceTests", () => {
       }
     }
     const c = new TestController();
-    const res = await c.dispatch("index", makeRequest(), makeResponse());
+    const res = makeResponse();
+    await c.dispatch("index", makeRequest(), res);
     expect(res.getHeader("x-custom")).toBe("test");
   });
 
@@ -176,8 +190,9 @@ describe("MetalControllerInstanceTests", () => {
       }
     }
     const c = new TestController();
-    const res = await c.dispatch("index", makeRequest(), makeResponse());
-    expect(res.getHeader("content-type")).toBe("application/json");
+    const res = makeResponse();
+    await c.dispatch("index", makeRequest(), res);
+    expect(res.getHeader("content-type")).toBe("application/json; charset=utf-8");
   });
 
   it("dispatch commits body to response", async () => {
@@ -187,7 +202,8 @@ describe("MetalControllerInstanceTests", () => {
       }
     }
     const c = new TestController();
-    const res = await c.dispatch("index", makeRequest(), makeResponse());
+    const res = makeResponse();
+    await c.dispatch("index", makeRequest(), res);
     expect(res.body).toBe("hello world");
   });
 
@@ -207,11 +223,13 @@ describe("MetalControllerInstanceTests", () => {
 
   it("params default to empty Parameters", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     expect(c.params).toBeInstanceOf(Parameters);
   });
 
   it("toRackResponse returns [status, headers, body]", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.status = 200;
     c.setHeader("x-test", "val");
     c.contentType = "text/plain";
@@ -219,7 +237,7 @@ describe("MetalControllerInstanceTests", () => {
     const [status, headers] = c.toRackResponse();
     expect(status).toBe(200);
     expect(headers["x-test"]).toBe("val");
-    expect(headers["content-type"]).toBe("text/plain");
+    expect(headers["content-type"]).toBe("text/plain; charset=utf-8");
   });
 
   it("all status codes resolve correctly", () => {
@@ -255,6 +273,7 @@ describe("MetalControllerInstanceTests", () => {
   it("responseBody= writes through to response and marks performed", () => {
     const c = new (class extends Metal {})();
     c.response = makeResponse();
+    c.response = makeResponse();
     c.responseBody = "hello";
     expect(c.responseBody).toBe("hello");
     expect(c.response.body).toBe("hello");
@@ -264,12 +283,14 @@ describe("MetalControllerInstanceTests", () => {
   it("responseBody= accepts array form", () => {
     const c = new (class extends Metal {})();
     c.response = makeResponse();
+    c.response = makeResponse();
     c.responseBody = ["a", "b"];
     expect(c.responseBody).toBe("ab");
   });
 
   it("responseBody= with null resets body", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     c.response = makeResponse();
     c.responseBody = "hi";
     c.responseBody = null;
@@ -278,6 +299,7 @@ describe("MetalControllerInstanceTests", () => {
 
   it("isPerformed mirrors performed and reflects responseBody=", () => {
     const c = new (class extends Metal {})();
+    c.response = makeResponse();
     expect(c.isPerformed()).toBe(false);
     c.response = makeResponse();
     c.responseBody = "x";

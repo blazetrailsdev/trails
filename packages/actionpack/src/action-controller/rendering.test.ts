@@ -87,7 +87,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.contentType).toBe("application/vnd.api+json");
+      expect(c.contentType).toBe("application/vnd.api+json; charset=utf-8");
     });
   });
 
@@ -143,7 +143,7 @@ describe("ActionController rendering", () => {
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.body).toBe("raw");
-      expect(c.contentType).toBe("text/plain");
+      expect(c.contentType).toBe("text/plain; charset=utf-8");
     });
   });
 
@@ -442,7 +442,9 @@ describe("ActionController sendData", () => {
     }
     const c = new C();
     await c.dispatch("download", makeRequest(), makeResponse());
-    expect(c.getHeader("content-disposition")).toBe('attachment; filename="report.csv"');
+    expect(c.getHeader("content-disposition")).toBe(
+      "attachment; filename=\"report.csv\"; filename*=UTF-8''report.csv",
+    );
   });
 
   it("sets custom content type", async () => {
@@ -464,7 +466,9 @@ describe("ActionController sendData", () => {
     }
     const c = new C();
     await c.dispatch("download", makeRequest(), makeResponse());
-    expect(c.getHeader("content-disposition")).toBe('inline; filename="doc.pdf"');
+    expect(c.getHeader("content-disposition")).toBe(
+      "inline; filename=\"doc.pdf\"; filename*=UTF-8''doc.pdf",
+    );
   });
 
   it("sets content-length", async () => {
@@ -524,7 +528,7 @@ describe("ActionController render edge cases", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("application/vnd.api+json");
+    expect(c.contentType).toBe("application/vnd.api+json; charset=utf-8");
   });
 
   it("render json null", async () => {

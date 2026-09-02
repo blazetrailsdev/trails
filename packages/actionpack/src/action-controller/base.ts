@@ -60,7 +60,7 @@ import {
   authenticateWithHttpDigest,
   requestHttpDigestAuthentication,
 } from "./metal/http-authentication.js";
-import { sendFileHeadersBang } from "./metal/data-streaming.js";
+import { sendFileHeadersBang, type SendFileHeadersOptions } from "./metal/data-streaming.js";
 import {
   Options as ParamsWrapperOptions,
   _defaultWrapModel,
@@ -289,7 +289,7 @@ export class Base extends Metal {
     } else if (options.body !== undefined) {
       if (options.contentType != null) {
         this.contentType = String(options.contentType);
-      } else if (!this._contentType && !this.response.contentType) {
+      } else if (!this.response.mediaType) {
         this.contentType = "text/plain";
       }
       this.body = options.body;
@@ -469,18 +469,19 @@ export class Base extends Metal {
     // Rails' `render_to_string` is documented as side-effect free.
     const oldBody = this._responseBody;
     const oldPerformed = this._performed;
-    const oldStatus = this._status;
-    const oldContentType = this._contentType;
-    const oldHeaders = { ...this._headers };
+    const oldStatus = this.response.status;
+    const oldHeaders = this.response.headers.toHash();
     try {
       this.render(options);
       return this.body;
     } finally {
       this._responseBody = oldBody;
       this._performed = oldPerformed;
-      this._status = oldStatus;
-      this._contentType = oldContentType;
-      this._headers = oldHeaders;
+      this.response.status = oldStatus;
+      for (const key of Object.keys(this.response.headers.toHash())) {
+        this.response.deleteHeader(key);
+      }
+      for (const [key, value] of Object.entries(oldHeaders)) this.response.setHeader(key, value);
     }
   }
 
@@ -959,49 +960,22 @@ export class Base extends Metal {
   declare sendFileHeadersBang: typeof sendFileHeadersBang;
 
   /** Send file content. */
-  sendFile(
-    path: string,
-    options: { type?: string; disposition?: string; filename?: string } = {},
-  ): void {
+  sendFile(path: string, options: SendFileHeadersOptions = {}): void {
     const content = getFs().readFileSync(path);
     const filename = options.filename ?? getPath().basename(path);
-    const ext = getPath().extname(filename).toLowerCase();
 
-    this.contentType = options.type ?? SEND_FILE_MIME_TYPES[ext] ?? "application/octet-stream";
+    this.sendFileHeadersBang({ ...options, filename });
     this.body = content.toString();
-
-    if (options.disposition !== undefined && options.disposition !== null) {
-      this.setHeader("content-disposition", `${options.disposition}; filename="${filename}"`);
-    } else {
-      this.setHeader("content-disposition", `attachment; filename="${filename}"`);
-    }
-
     this.setHeader("content-length", String(content.length));
     this.markPerformed();
   }
 
   /** Send raw data as a download. */
-  sendData(
-    data: string | Buffer,
-    options: { type?: string; disposition?: string; filename?: string } = {},
-  ): void {
+  sendData(data: string | Buffer, options: SendFileHeadersOptions = {}): void {
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
-    let guessedType = "application/octet-stream";
-    if (options.filename) {
-      const ext = getPath().extname(options.filename).toLowerCase();
-      guessedType = SEND_FILE_MIME_TYPES[ext] ?? "application/octet-stream";
-    }
-    this.contentType = options.type ?? guessedType;
+    this.sendFileHeadersBang(options);
     this.body = buf.toString();
-
-    if (options.filename) {
-      const disposition = options.disposition ?? "attachment";
-      this.setHeader("content-disposition", `${disposition}; filename="${options.filename}"`);
-    } else if (options.disposition) {
-      this.setHeader("content-disposition", options.disposition);
-    }
-
     this.setHeader("content-length", String(buf.length));
     this.markPerformed();
   }
@@ -1130,20 +1104,3 @@ function escapeJsonForJs(json: string): string {
     }
   });
 }
-
-const SEND_FILE_MIME_TYPES: Record<string, string> = {
-  ".html": "text/html",
-  ".txt": "text/plain",
-  ".css": "text/css",
-  ".js": "text/javascript",
-  ".json": "application/json",
-  ".xml": "application/xml",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".pdf": "application/pdf",
-  ".zip": "application/zip",
-  ".csv": "text/csv",
-};

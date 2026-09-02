@@ -69,7 +69,7 @@ describe("ResponseTest", () => {
   it("content type", () => {
     const res = new Response();
     res.contentType = "application/json";
-    expect(res.contentType).toBe("application/json");
+    expect(res.contentType).toBe("application/json; charset=utf-8");
   });
 
   it("empty content type returns nil", () => {
@@ -141,7 +141,8 @@ describe("ResponseTest", () => {
   it("read charset and content type", () => {
     const res = new Response();
     res.setHeader("content-type", "text/html; charset=utf-8");
-    expect(res.contentType).toBe("text/html");
+    expect(res.contentType).toBe("text/html; charset=utf-8");
+    expect(res.mediaType).toBe("text/html");
     expect(res.charset).toBe("utf-8");
   });
 
@@ -276,19 +277,6 @@ describe("ResponseTest", () => {
     const res = new Response();
     res.contentType = "text/plain";
     expect(res.getHeader("content-type")).toBe("text/plain; charset=utf-8");
-  });
-
-  it("non-text content type has no charset", () => {
-    const res = new Response();
-    res.contentType = "application/json";
-    expect(res.getHeader("content-type")).toBe("application/json");
-  });
-
-  it("setting contentType to undefined clears it", () => {
-    const res = new Response();
-    res.contentType = "text/html";
-    res.contentType = undefined;
-    expect(res.contentType).toBeUndefined();
   });
 
   // --- Cookies with options ---

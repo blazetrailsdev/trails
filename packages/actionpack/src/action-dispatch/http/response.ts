@@ -4,7 +4,7 @@
  * Represents an HTTP response with status, headers, and body.
  */
 
-import { getFs } from "@blazetrails/activesupport";
+import { getFs, presence } from "@blazetrails/activesupport";
 import { deleteSetCookieHeaderBang, Headers, setCookieHeader, unescape } from "@blazetrails/rack";
 import type { CookieExpires } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
@@ -104,12 +104,9 @@ export class Response {
   private _headers: Headers;
   private _body: string[];
   private _committed = false;
-  private _charset: string | undefined;
   private _sending = false;
   private _sent = false;
   stream: unknown = null;
-  /** Rails: `response.sending_file = true` flag set by `send_file_headers!`. */
-  sendingFile = false;
   request: Request | null = null;
   /** Rails: `cattr_accessor :default_headers`. */
   static defaultHeaders: Record<string, string> | undefined;
@@ -190,38 +187,46 @@ export class Response {
 
   // --- Content type ---
 
+  /**
+   * Mirrors: `content_type` (response.rb:269-271) — `super.presence`, the whole
+   * `Content-Type` header. The bare media type is {@link mediaType}.
+   */
   get contentType(): string | undefined {
-    const ct = this.getHeader(CONTENT_TYPE);
-    if (!ct) return undefined;
-    return ct.split(";")[0].trim() || undefined;
+    return presence(this.getHeader(CONTENT_TYPE));
   }
 
+  /** Mirrors: `content_type=` (response.rb:259-266). */
   set contentType(value: string | undefined) {
-    if (!value) {
-      this.deleteHeader(CONTENT_TYPE);
-      return;
-    }
-    const newHeader = this.parseContentType(value);
-    const prevHeader = this.parsedContentTypeHeader();
-    let charset = newHeader.charset || prevHeader.charset || this._charset;
-    const mimeType = newHeader.mimeType ?? value;
-    if (!charset && mimeType.startsWith("text/")) {
+    if (value == null) return;
+    const newHeaderInfo = this.parseContentType(String(value));
+    const prevHeaderInfo = this.parsedContentTypeHeader();
+    let charset = newHeaderInfo.charset || prevHeaderInfo.charset;
+    if (!charset && !prevHeaderInfo.mimeType) {
       charset = (this.constructor as typeof Response).defaultCharset;
     }
-    this.setContentType(mimeType, charset);
+    this.setContentType(newHeaderInfo.mimeType, charset);
   }
 
+  /** Mirrors: `charset` (response.rb:300-303). */
   get charset(): string | undefined {
-    const ct = this.getHeader(CONTENT_TYPE);
-    if (!ct) return this._charset ?? (this.constructor as typeof Response).defaultCharset;
-    const match = ct.match(/charset=([^\s;]+)/i);
-    return match
-      ? match[1]
-      : (this._charset ?? (this.constructor as typeof Response).defaultCharset);
+    const headerInfo = this.parsedContentTypeHeader();
+    return headerInfo.charset || (this.constructor as typeof Response).defaultCharset;
   }
 
-  set charset(value: string | undefined) {
-    this._charset = value;
+  /** Mirrors: `charset=` (response.rb:288-295) — `false` strips the charset. */
+  set charset(charset: string | false | undefined) {
+    const contentType = this.parsedContentTypeHeader().mimeType;
+    if (charset === false) {
+      this.setContentType(contentType, undefined);
+    } else {
+      const defaultCharset = (this.constructor as typeof Response).defaultCharset;
+      this.setContentType(contentType, charset || defaultCharset);
+    }
+  }
+
+  /** Mirrors: `sending_file=` (response.rb:278-282). */
+  set sendingFile(v: boolean) {
+    if (v === true) this.charset = false;
   }
 
   // --- Body ---
