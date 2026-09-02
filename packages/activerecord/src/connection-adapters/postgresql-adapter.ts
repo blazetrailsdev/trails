@@ -188,7 +188,7 @@ export class PostgreSQLAdapter
    * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
    */
   override get typeRegistryKey(): AdapterName {
-    return "postgres";
+    return "postgresql";
   }
 
   static columnNameMatcher(): RegExp {

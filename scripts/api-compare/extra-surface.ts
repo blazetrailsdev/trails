@@ -853,6 +853,12 @@ export interface TaggedSummary {
   inheritedMatched: number;
   stale: TaggedEntry[];
   /**
+   * Written tags whose name IS in its file's allowed set — the receipt covers
+   * no extra surface. Distinct from `stale`, where the name is absent from the
+   * file entirely.
+   */
+  redundant: TaggedEntry[];
+  /**
    * Permanence claims across the WRITTEN tags (`total`). An inherited entry
    * repeats its interface declaration's reason, so counting it would multiply
    * one claim by the interface's member count. A non-zero `unclassified` fails
@@ -1898,6 +1904,7 @@ function buildPackageReport(
   novelOnly: boolean,
   tagKeys: Set<string>,
   matchedTagKeys: Set<string>,
+  redundantTagKeys: Set<string>,
   fileTagRejections: FileTagRejection[],
   concernHooks: Map<string, Set<string>>,
 ): PackageTotals {
@@ -2172,9 +2179,15 @@ function buildPackageReport(
     let allowlistedCount = 0;
     let interfaceExemptCount = 0;
     for (const name of tsNames) {
-      if (allowed.has(name)) continue;
-      if (scopedAllows(name)) continue;
       const allowKey = allowKeyOf({ package: pkg, tsFile: expectedTs, name });
+      // A tag on a name the scorer already allows covers no extra — it asserts
+      // a Ruby counterpart is absent where one was found. Reported as
+      // `redundant` rather than `stale`: the name is present, only the claim
+      // is empty, so the fix is deleting the tag and not the declaration.
+      if (allowed.has(name) || scopedAllows(name)) {
+        if (tagKeys.has(allowKey)) redundantTagKeys.add(allowKey);
+        continue;
+      }
       if (tagKeys.has(allowKey)) {
         matchedTagKeys.add(allowKey);
         allowlistedCount++;
@@ -2489,6 +2502,7 @@ export function buildReport(
   const tagged = collectTaggedEntries(ts);
   const tagKeys = new Set(tagged.map(allowKeyOf));
   const matchedTagKeys = new Set<string>();
+  const redundantTagKeys = new Set<string>();
   const globalRubyCandidates = buildGlobalRubyCandidates(ruby);
   const { modules: crossPackageModules, pkgByFqn: crossPackagePkgByFqn } =
     buildCrossPackageModules(ruby);
@@ -2512,6 +2526,7 @@ export function buildReport(
         opts.novelOnly,
         tagKeys,
         matchedTagKeys,
+        redundantTagKeys,
         fileTagRejections,
         concernHooks,
       ),
@@ -2528,7 +2543,15 @@ export function buildReport(
   );
 
   const staleTagged = tagged.filter(
-    (e) => !e.inherited && scannedPkgs.has(e.package) && !matchedTagKeys.has(allowKeyOf(e)),
+    (e) =>
+      !e.inherited &&
+      scannedPkgs.has(e.package) &&
+      !matchedTagKeys.has(allowKeyOf(e)) &&
+      !redundantTagKeys.has(allowKeyOf(e)),
+  );
+
+  const redundantTagged = tagged.filter(
+    (e) => !e.inherited && scannedPkgs.has(e.package) && redundantTagKeys.has(allowKeyOf(e)),
   );
 
   const inheritedKeys = new Set(tagged.filter((e) => e.inherited).map(allowKeyOf));
@@ -2551,6 +2574,7 @@ export function buildReport(
     matched: matchedTagKeys.size - inheritedMatched,
     inheritedMatched,
     stale: staleTagged,
+    redundant: redundantTagged,
     classification: {
       permanent: claims.permanent,
       convergeable: claims.convergeable,
@@ -2643,6 +2667,26 @@ export function gateStale(tagged: TaggedSummary): string | null {
 }
 
 /**
+ * The redundancy gate: a tag on a name the scorer already allows, so the
+ * receipt covers no extra surface. Separate from `gateStale` because the name
+ * is still there — only the claim is empty. Returns the failure message, or
+ * `null` when the run passes.
+ */
+export function gateRedundant(tagged: TaggedSummary): string | null {
+  if (tagged.redundant.length === 0) return null;
+  return (
+    `\nextra-surface: ${tagged.redundant.length} REDUNDANT @noRailsEquivalent tag(s) on ` +
+    "names the scorer already allows — the tag asserts a Rails counterpart is " +
+    "absent where one was found, so it covers no extra surface. Delete the tag " +
+    "next to the code:\n" +
+    tagged.redundant
+      .map((e) => `  - ${e.package}  ${e.tsFile}  ${e.fileLevel ? "(file-level tag)" : e.name}`)
+      .join("\n") +
+    "\n"
+  );
+}
+
+/**
  * The permanence gate: every written `@noRailsEquivalent` reason must open with
  * PERMANENT or CONVERGEABLE. Hard 0 rather than a ratchet on the count — the
  * population was brought to 0 by RFC 0080, and a ratchet re-admits exactly the
@@ -2714,6 +2758,8 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   if (args.excludeGlobs.length === 0) {
     const staleMessage = gateStale(report.tagged);
     if (staleMessage) failures.push(staleMessage);
+    const redundantMessage = gateRedundant(report.tagged);
+    if (redundantMessage) failures.push(redundantMessage);
   }
   const unclassifiedMessage = gateUnclassified(report.tagged);
   if (unclassifiedMessage) failures.push(unclassifiedMessage);

@@ -74,13 +74,13 @@ async function resetTables(
   bootLaid: ReadonlySet<string>,
 ): Promise<void> {
   switch (adapter.typeRegistryKey) {
-    case "postgres":
+    case "postgresql":
       await resetPgTables(adapter, mode, bootLaid);
       break;
     case "mysql2":
       await resetMysqlTables(adapter, mode, bootLaid);
       break;
-    case "sqlite":
+    case "sqlite3":
       await resetSqliteTables(adapter, mode, bootLaid);
       break;
   }

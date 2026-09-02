@@ -570,7 +570,7 @@ describe("SchemaReflectionTest", () => {
 });
 
 class MockAdapter {
-  typeRegistryKey = "sqlite" as const;
+  typeRegistryKey = "sqlite3" as const;
   quoteColumnName = (n: string) => `"${n}"`;
   quoteTableName = (n: string) => `"${n}"`;
   executeMutation = vi.fn().mockResolvedValue(0);

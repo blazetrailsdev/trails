@@ -114,35 +114,29 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
   }
 
   /** @missingRailsArgs build_middleware — PERMANENT */
-  insert(index: number, klass: MiddlewareFactory, ...args: unknown[]): void {
-    if (index < 0 || index > this.entries.length) {
-      throw new Error(`Invalid index ${index} for middleware stack of size ${this.entries.length}`);
-    }
-    this.entries.splice(index, 0, this.buildMiddleware(klass, args));
+  insert(index: MiddlewareFactory | number, klass: MiddlewareFactory, ...args: unknown[]): void {
+    index = this.assertIndex(index, "before");
+    this.middlewares.splice(index, 0, this.buildMiddleware(klass, args));
   }
 
-  insertBefore(index: MiddlewareFactory, klass: MiddlewareFactory, ...args: unknown[]): void {
-    const idx = this.findIndex(index);
-    if (idx === -1) throw new Error("No such middleware to insert before");
-    this.entries.splice(idx, 0, this.buildMiddleware(klass, args));
+  /** Rails: `alias_method :insert_before, :insert`. */
+  insertBefore(
+    index: MiddlewareFactory | number,
+    klass: MiddlewareFactory,
+    ...args: unknown[]
+  ): void {
+    this.insert(index, klass, ...args);
   }
 
   insertAfter(index: MiddlewareFactory | number, ...args: unknown[]): void {
-    const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
-    if (typeof index === "number") {
-      this.entries.splice(index + 1, 0, this.buildMiddleware(klass, rest));
-    } else {
-      const idx = this.findIndex(index);
-      if (idx === -1) throw new Error("No such middleware to insert after");
-      this.entries.splice(idx + 1, 0, this.buildMiddleware(klass, rest));
-    }
+    index = this.assertIndex(index, "after");
+    this.insert(index + 1, ...(args as [MiddlewareFactory, ...unknown[]]));
   }
 
-  swap(target: MiddlewareFactory, ...args: unknown[]): void {
-    const [klass, ...rest] = args as [MiddlewareFactory, ...unknown[]];
-    const idx = this.findIndex(target);
-    if (idx === -1) throw new Error("No such middleware to swap");
-    this.entries[idx] = this.buildMiddleware(klass, rest);
+  swap(target: MiddlewareFactory | number, ...args: unknown[]): void {
+    const index = this.assertIndex(target, "before");
+    this.insert(index, ...(args as [MiddlewareFactory, ...unknown[]]));
+    this.middlewares.splice(index + 1, 1);
   }
 
   delete(target: MiddlewareFactory): void {
@@ -223,7 +217,9 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
   assertIndex(index: number | MiddlewareFactory, where: "before" | "after"): number {
     const i = typeof index === "number" ? index : this.indexOf(index);
     if (i === -1) {
-      throw new Error(`No such middleware to insert ${where}: ${String(index)}`);
+      throw new Error(
+        `No such middleware to insert ${where}: ${typeof index === "number" ? index : index.name}`,
+      );
     }
     return i;
   }

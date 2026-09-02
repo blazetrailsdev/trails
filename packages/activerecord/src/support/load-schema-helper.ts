@@ -1,4 +1,7 @@
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type {
+  AbstractAdapter as DatabaseAdapter,
+  AdapterName,
+} from "../connection-adapters/abstract-adapter.js";
 import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { ActiveRecordError } from "../errors.js";
@@ -428,10 +431,10 @@ async function loadSqliteSpecificSchema(adapter: DatabaseAdapter): Promise<void>
   });
 }
 
-const ADAPTER_SPECIFIC_SCHEMAS: Record<string, (adapter: DatabaseAdapter) => Promise<void>> = {
-  postgres: (adapter) => loadPostgresqlSpecificSchema(adapter as unknown as PostgreSQLAdapter),
+const ADAPTER_SPECIFIC_SCHEMAS: Record<AdapterName, (adapter: DatabaseAdapter) => Promise<void>> = {
+  postgresql: (adapter) => loadPostgresqlSpecificSchema(adapter as unknown as PostgreSQLAdapter),
   mysql2: (adapter) => loadMysql2SpecificSchema(adapter as unknown as AbstractMysqlAdapter),
-  sqlite: loadSqliteSpecificSchema,
+  sqlite3: loadSqliteSpecificSchema,
 };
 
 export async function loadSchema(adapter: DatabaseAdapter): Promise<void> {

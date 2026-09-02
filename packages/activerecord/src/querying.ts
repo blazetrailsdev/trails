@@ -433,7 +433,7 @@ export function pluck<T extends typeof Base>(
   return rel.pluck(...columns) as ReturnType<ReturnType<T["all"]>["pluck"]>;
 }
 
-export function ids<T extends typeof Base>(this: T): Promise<unknown[]> {
+export function ids<T extends typeof Base>(this: T): Promise<unknown[]> | unknown[] {
   return this.all().ids();
 }
 

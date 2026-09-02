@@ -2669,6 +2669,7 @@ describe("buildReport — @noRailsEquivalent tags", () => {
       matched: 1,
       inheritedMatched: 0,
       stale: [],
+      redundant: [],
       classification: {
         permanent: 0,
         convergeable: 0,
@@ -2708,19 +2709,29 @@ describe("buildReport — @noRailsEquivalent tags", () => {
     expect(report.packages[0].totalAllowlisted).toBe(1);
   });
 
-  it("reports a tag on a name that does not flag as extra surface as stale", () => {
+  it("reports a tag on an allowed name as redundant rather than stale", () => {
     const m = makeManifests("no counterpart");
     m.ts.packages.activemodel.classes.Foo.instanceMethods[0].noRailsEquivalent = "no counterpart";
     const report = run(m);
-    expect(report.tagged.stale.map((e) => e.name)).toEqual(["bar"]);
+    expect(report.tagged.redundant.map((e) => e.name)).toEqual(["bar"]);
+    expect(report.tagged.stale).toEqual([]);
     expect(report.tagged.matched).toBe(1);
   });
 
-  it("reports a class-declaration tag on a name that does not flag as extra surface as stale", () => {
+  it("reports a class-declaration tag on an allowed name as redundant rather than stale", () => {
     const m = makeManifests("no counterpart");
     m.ts.packages.activemodel.classes.Foo.noRailsEquivalent = "no counterpart";
     const report = run(m);
-    expect(report.tagged.stale.map((e) => e.name)).toEqual(["Foo"]);
+    expect(report.tagged.redundant.map((e) => e.name)).toEqual(["Foo"]);
+    expect(report.tagged.stale).toEqual([]);
+    expect(report.tagged.matched).toBe(1);
+  });
+
+  it("does not report a tag that really does cover an extra", () => {
+    const m = makeManifests("no counterpart");
+    const report = run(m);
+    expect(report.tagged.redundant).toEqual([]);
+    expect(report.tagged.stale).toEqual([]);
     expect(report.tagged.matched).toBe(1);
   });
 
@@ -2749,6 +2760,7 @@ describe("buildReport — @noRailsEquivalent tags", () => {
       matched: 1,
       inheritedMatched: 1,
       stale: [],
+      redundant: [],
       // Inherited entries repeat one declaration's reason, so they are not
       // classified — the claim is counted once, where it is written (on the
       // declaration name).
@@ -3043,6 +3055,7 @@ describe("@noRailsEquivalent — extractor to report", () => {
       matched: 1,
       inheritedMatched: 0,
       stale: [],
+      redundant: [],
     });
     expect(report.packages[0].totalAllowlisted).toBe(1);
     expect(report.packages[0].totalNovel).toBe(0);
@@ -3589,6 +3602,7 @@ describe("printClassificationBlock", () => {
       matched: unclassifiedEntries.length + 3,
       inheritedMatched: 0,
       stale: [],
+      redundant: [],
       classification: {
         permanent: 2,
         convergeable: 1,
@@ -3638,6 +3652,7 @@ describe("gateUnclassified", () => {
     matched: unclassifiedEntries.length + 3,
     inheritedMatched: 0,
     stale,
+    redundant: [],
     classification: {
       permanent: 2,
       convergeable: 1,
@@ -3684,6 +3699,7 @@ describe("gateStale", () => {
     matched: 3,
     inheritedMatched: 0,
     stale,
+    redundant: [],
     classification: {
       permanent: 3,
       convergeable: 0,

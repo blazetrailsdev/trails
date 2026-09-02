@@ -1,3 +1,4 @@
+import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import { getEnv, getOsAsync } from "@blazetrails/activesupport";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import type { Schema, ColumnSpec, TableSchema, IndexSpec, ForeignKeySpec } from "./schema-types.js";
@@ -47,15 +48,15 @@ function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
   return type === "integer" || type === "big_integer";
 }
 
-function serialIdType(spec: ColumnSpec | undefined, typeRegistryKey?: string): string {
+function serialIdType(spec: ColumnSpec | undefined, typeRegistryKey?: AdapterName): string {
   const type = typeof spec === "string" ? spec : spec?.type;
   const isBig = type === "big_integer";
-  if (typeRegistryKey === "postgres") return isBig ? "bigserial" : "serial";
-  if (typeRegistryKey === "sqlite") return "integer";
+  if (typeRegistryKey === "postgresql") return isBig ? "bigserial" : "serial";
+  if (typeRegistryKey === "sqlite3") return "integer";
   return isBig ? "bigint" : "integer";
 }
 
-function colOpts(spec: ColumnSpec, primitive: string, typeRegistryKey?: string): string {
+function colOpts(spec: ColumnSpec, primitive: string, typeRegistryKey?: AdapterName): string {
   const parts: string[] = [];
   const hasPrecision = typeof spec === "object" && spec.precision !== undefined;
   if (typeof spec === "object") {
@@ -85,7 +86,7 @@ function schemaChecksum(code: string): string {
 
 function generateCode(
   schema: Schema,
-  typeRegistryKey?: string,
+  typeRegistryKey?: AdapterName,
   supportsExpressionIndex?: boolean,
 ): string {
   const lines: string[] = [
@@ -94,7 +95,7 @@ function generateCode(
     `export default async function defineSchema(ctx: DatabaseAdapter): Promise<void> {`,
   ];
 
-  const needsForce = typeRegistryKey === "postgres" || typeRegistryKey === "mysql2";
+  const needsForce = typeRegistryKey === "postgresql" || typeRegistryKey === "mysql2";
 
   if (needsForce) {
     for (const [tableName, tableSpec] of Object.entries(schema)) {
@@ -185,7 +186,7 @@ function generateCode(
 
 export async function generateSchemaFile(
   schema: Schema,
-  typeRegistryKey?: string,
+  typeRegistryKey?: AdapterName,
   supportsExpressionIndex?: boolean,
 ): Promise<string> {
   const [os, fs, path] = await Promise.all([getOsAsync(), getFsAsync(), getPathAsync()]);

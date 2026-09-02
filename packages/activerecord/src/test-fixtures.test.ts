@@ -32,7 +32,7 @@ async function resolvePrimaryModel(entry: {
 
 function makeAdapter(): DatabaseAdapter {
   return {
-    typeRegistryKey: "sqlite" as const,
+    typeRegistryKey: "sqlite3" as const,
     execute: vi.fn(async () => []),
     executeMutation: vi.fn(async () => 0),
     beginTransaction: vi.fn(async () => {}),

@@ -1,3 +1,4 @@
+import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { singularize } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "../errors.js";
@@ -49,7 +50,7 @@ class TableBuilder {
 
   constructor(
     private readonly t: TableDefinition,
-    private readonly typeRegistryKey: string,
+    private readonly typeRegistryKey: AdapterName,
     private readonly typeMap: Record<string, string | undefined>,
     private readonly serialPk: string | null,
   ) {}
@@ -182,7 +183,7 @@ export async function prepareSchema(
 ): Promise<{ ss: SchemaStatements; typeMap: Record<string, string | undefined> }> {
   const ss = adapter as unknown as SchemaStatements;
   const typeMap =
-    adapter.typeRegistryKey === "postgres"
+    adapter.typeRegistryKey === "postgresql"
       ? COLUMN_TYPE_MAP_PG
       : adapter.typeRegistryKey === "mysql2"
         ? COLUMN_TYPE_MAP_MYSQL
@@ -2081,7 +2082,7 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
         dependents.set(toTable, children);
       },
     } as unknown as TableDefinition;
-    def.fn(new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null));
+    def.fn(new TableBuilder(probe, "sqlite3", COLUMN_TYPE_MAP_SQLITE, null));
   }
   _dependents = dependents;
   return dependents;
@@ -2112,7 +2113,7 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
         foreignKeys.push(fk);
       },
     } as unknown as TableDefinition;
-    const builder = new TableBuilder(probe, "sqlite", COLUMN_TYPE_MAP_SQLITE, null);
+    const builder = new TableBuilder(probe, "sqlite3", COLUMN_TYPE_MAP_SQLITE, null);
     def.fn(builder);
     if (def.meta.serialPk !== undefined) {
       assertSerialPkIsPlainIntegral(def.name, def.meta.serialPk, columns[def.meta.serialPk]);

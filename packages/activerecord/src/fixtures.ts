@@ -474,7 +474,7 @@ export async function insertPreparedFixtureSets(
 
   await checkAllForeignKeysValidBang(adapter);
 
-  if (adapter.typeRegistryKey === "postgres") {
+  if (adapter.typeRegistryKey === "postgresql") {
     for (const p of prepared) {
       if (p.serialReset) await resetPkSequence(adapter, p.serialReset.table, p.serialReset.column);
     }

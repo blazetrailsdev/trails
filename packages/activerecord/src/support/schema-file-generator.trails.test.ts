@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { getPathAsync, getFsAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync, getEnv } from "@blazetrails/activesupport";
 import { generateSchemaFile } from "./schema-file-generator.js";
+import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type {
   Schema,
   ColumnSpec,
@@ -179,7 +180,7 @@ const FK_SCHEMA: Schema = {
 describe("generateSchemaFile foreign keys", () => {
   const written: string[] = [];
 
-  const generate = async (typeRegistryKey?: string): Promise<string> => {
+  const generate = async (typeRegistryKey?: AdapterName): Promise<string> => {
     const filePath = await generateSchemaFile(FK_SCHEMA, typeRegistryKey);
     written.push(filePath);
     return (await getFsAsync()).readFileSync(filePath, "utf-8");
@@ -202,7 +203,7 @@ describe("generateSchemaFile foreign keys", () => {
   });
 
   it("drops referencing tables up front on the force-recreate adapters", async () => {
-    const content = await generate("postgres");
+    const content = await generate("postgresql");
     const drop = content.indexOf('ctx.dropTable("fk_test_has_fk", { ifExists: true })');
     const createParent = content.indexOf('ctx.createTable("fk_test_has_pk"');
     expect(drop).toBeGreaterThan(-1);
@@ -216,7 +217,7 @@ describe("generateSchemaFile single-column integer PK id type per adapter", () =
   };
 
   it("uses serial on postgres (INT4 serial, not the bigint primary_key type)", async () => {
-    const filePath = await generateSchemaFile(SCHEMA, "postgres");
+    const filePath = await generateSchemaFile(SCHEMA, "postgresql");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"gadget_id", "serial", { primaryKey: true }');
@@ -238,7 +239,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
   };
 
   it("uses bigserial on postgres (INT8 serial, not the plain bigint primary_key type)", async () => {
-    const filePath = await generateSchemaFile(SCHEMA, "postgres");
+    const filePath = await generateSchemaFile(SCHEMA, "postgresql");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"widget_id", "bigserial", { primaryKey: true }');
@@ -254,7 +255,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
   });
 
   it("uses integer (rowid auto-increment) on sqlite", async () => {
-    const filePath = await generateSchemaFile(SCHEMA, "sqlite");
+    const filePath = await generateSchemaFile(SCHEMA, "sqlite3");
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"widget_id", "integer", { primaryKey: true }');
@@ -263,7 +264,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
 });
 
 describe("generateSchemaFile / define-schema.ts type-map parity", () => {
-  async function readGenerated(schema: Schema, adapter: string): Promise<string> {
+  async function readGenerated(schema: Schema, adapter: AdapterName): Promise<string> {
     const filePath = await generateSchemaFile(schema, adapter);
     const fs = await getFsAsync();
     const content = fs.readFileSync(filePath, "utf-8");
@@ -286,12 +287,12 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
   }
 
   const CASES: ReadonlyArray<{
-    adapter: string;
+    adapter: AdapterName;
     map: Record<string, string>;
   }> = [
-    { adapter: "postgres", map: COLUMN_TYPE_MAP_PG },
+    { adapter: "postgresql", map: COLUMN_TYPE_MAP_PG },
     { adapter: "mysql2", map: COLUMN_TYPE_MAP_MYSQL },
-    { adapter: "sqlite", map: COLUMN_TYPE_MAP_SQLITE },
+    { adapter: "sqlite3", map: COLUMN_TYPE_MAP_SQLITE },
   ];
 
   for (const { adapter, map } of CASES) {
@@ -321,14 +322,14 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
   });
 
   it("does not inject precision on non-MySQL datetime columns", async () => {
-    for (const adapter of ["postgres", "sqlite"]) {
+    for (const adapter of ["postgresql", "sqlite3"] as AdapterName[]) {
       const content = await readGenerated({ parity_probe: { at: "datetime" } }, adapter);
       expect(content).toContain('t.column("at", "datetime", {})');
     }
   });
 
   it("emits serial-PK width matching serialIdType for every adapter", async () => {
-    for (const adapter of ["postgres", "mysql2", "sqlite"]) {
+    for (const adapter of ["postgresql", "mysql2", "sqlite3"] as AdapterName[]) {
       for (const type of ["integer", "big_integer"] as PrimitiveColumnSpec[]) {
         const schema: Schema = {
           parity_probe: { columns: { pk: type }, primaryKey: ["pk"] },
@@ -378,7 +379,7 @@ function normalizeRecorded(recorded: RecordedIndex[]): string {
 
 async function generatorIndexes(
   schema: Schema,
-  adapter: string,
+  adapter: AdapterName,
   supportsExpressionIndex?: boolean,
 ): Promise<RecordedIndex[]> {
   const filePath = await generateSchemaFile(schema, adapter, supportsExpressionIndex);
@@ -438,7 +439,7 @@ const GENERATOR_SCHEMA: Schema = {
 };
 
 describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
-  for (const adapter of ["postgres", "sqlite"] as const) {
+  for (const adapter of ["postgresql", "sqlite3"] as const) {
     it(`emits the same addIndex calls as canonical-schema.ts on ${adapter}`, async () => {
       const [gen, canon] = await Promise.all([
         generatorIndexes(GENERATOR_SCHEMA, adapter),
@@ -461,7 +462,7 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
   });
 
   it("passes sub-part index length: through on non-MySQL adapters (both emitters)", async () => {
-    for (const adapter of ["postgres", "sqlite"] as const) {
+    for (const adapter of ["postgresql", "sqlite3"] as const) {
       const [gen, canon] = await Promise.all([
         generatorIndexes(GENERATOR_SCHEMA, adapter),
         canonicalIndexes(PARITY_INDEXES, adapter, true),

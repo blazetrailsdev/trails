@@ -41,20 +41,20 @@ describe("Type.currentAdapterName", () => {
   });
 
   it("normalizes the configured adapter to the registration namespace", () => {
-    expect(adapterNameFrom(modelWith("postgresql"))).toBe("postgres");
+    expect(adapterNameFrom(modelWith("postgresql"))).toBe("postgresql");
     expect(adapterNameFrom(modelWith("mysql2"))).toBe("mysql2");
-    expect(adapterNameFrom(modelWith("sqlite3"))).toBe("sqlite");
+    expect(adapterNameFrom(modelWith("sqlite3"))).toBe("sqlite3");
   });
 
   it("falls back to sqlite when the model has no configuration", () => {
-    expect(adapterNameFrom(modelWith(undefined))).toBe("sqlite");
+    expect(adapterNameFrom(modelWith(undefined))).toBe("sqlite3");
     expect(
       adapterNameFrom({
         connectionDbConfig: () => {
           throw new ConnectionNotDefined("No database connection defined.");
         },
       }),
-    ).toBe("sqlite");
+    ).toBe("sqlite3");
   });
 
   it("propagates errors other than a missing connection", () => {
@@ -90,7 +90,7 @@ describe("Type.lookup under a non-sqlite configuration", () => {
 
   it("picks the postgres registration", () => {
     register("foo", GenericType, { override: false });
-    register("foo", AdapterType, { adapter: "postgres" });
+    register("foo", AdapterType, { adapter: "postgresql" });
 
     stubAdapter("postgresql");
     expect(lookup("foo")).toBeInstanceOf(AdapterType);
@@ -116,7 +116,7 @@ describe("Type.lookup under a non-sqlite configuration", () => {
 
   it("leaves the generic registration in place under sqlite", () => {
     register("foo", GenericType, { override: false });
-    register("foo", AdapterType, { adapter: "postgres" });
+    register("foo", AdapterType, { adapter: "postgresql" });
 
     stubAdapter("sqlite3");
     expect(lookup("foo")).toBeInstanceOf(GenericType);
@@ -126,23 +126,23 @@ describe("Type.lookup under a non-sqlite configuration", () => {
 
 describe("the PostgreSQL OID registrations", () => {
   it("resolve only under a postgres adapter", () => {
-    expect(lookup("money", { adapter: "postgres" })).toBeInstanceOf(Money);
-    expect(lookup("interval", { adapter: "postgres" })).toBeInstanceOf(Interval);
-    expect(lookup("uuid", { adapter: "postgres" })).toBeInstanceOf(Uuid);
+    expect(lookup("money", { adapter: "postgresql" })).toBeInstanceOf(Money);
+    expect(lookup("interval", { adapter: "postgresql" })).toBeInstanceOf(Interval);
+    expect(lookup("uuid", { adapter: "postgresql" })).toBeInstanceOf(Uuid);
 
-    expect(() => lookup("money", { adapter: "sqlite" })).toThrow("Unknown type :money");
+    expect(() => lookup("money", { adapter: "sqlite3" })).toThrow("Unknown type :money");
     expect(() => lookup("interval", { adapter: "mysql2" })).toThrow("Unknown type :interval");
   });
 
   it("shadow the generic registrations of the same name under postgres", () => {
-    expect(lookup("date", { adapter: "postgres" })).toBeInstanceOf(OidDate);
-    expect(lookup("date", { adapter: "sqlite" })).not.toBeInstanceOf(OidDate);
+    expect(lookup("date", { adapter: "postgresql" })).toBeInstanceOf(OidDate);
+    expect(lookup("date", { adapter: "sqlite3" })).not.toBeInstanceOf(OidDate);
 
-    expect(lookup("binary", { adapter: "postgres" })).toBeInstanceOf(Bytea);
-    expect(lookup("binary", { adapter: "sqlite" })).not.toBeInstanceOf(Bytea);
+    expect(lookup("binary", { adapter: "postgresql" })).toBeInstanceOf(Bytea);
+    expect(lookup("binary", { adapter: "sqlite3" })).not.toBeInstanceOf(Bytea);
 
-    expect(lookup("datetime", { adapter: "postgres" })).toBeInstanceOf(OidDateTime);
-    expect(lookup("decimal", { adapter: "postgres" })).toBeInstanceOf(OidDecimal);
+    expect(lookup("datetime", { adapter: "postgresql" })).toBeInstanceOf(OidDateTime);
+    expect(lookup("decimal", { adapter: "postgresql" })).toBeInstanceOf(OidDecimal);
   });
 
   it("cover every type Rails registers for the postgresql adapter", () => {
@@ -166,18 +166,18 @@ describe("the PostgreSQL OID registrations", () => {
       "vector",
       "xml",
     ]) {
-      expect(() => lookup(name, { adapter: "postgres" })).not.toThrow();
+      expect(() => lookup(name, { adapter: "postgresql" })).not.toThrow();
     }
   });
 
   it("resolve for a model carrying a directly-assigned postgres adapter", () => {
     const model = {
-      _adapter: { typeRegistryKey: "postgres" as const },
+      _adapter: { typeRegistryKey: "postgresql" as const },
       connectionDbConfig: () => {
         throw new ConnectionNotDefined("No database connection defined.");
       },
     };
-    expect(adapterNameFrom(model)).toBe("postgres");
+    expect(adapterNameFrom(model)).toBe("postgresql");
     expect(lookup("interval", { adapter: adapterNameFrom(model) })).toBeInstanceOf(Interval);
   });
 });

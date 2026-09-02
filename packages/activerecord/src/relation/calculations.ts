@@ -126,9 +126,13 @@ interface CalculationRelation {
   _checkEagerLoadable(): void;
   toArray(): Promise<any[]>;
   loaded: boolean;
+  /** @internal */
+  readonly isScheduled: boolean;
   records(): Promise<
     Array<{ _readAttribute(name: string): unknown; get(attrName: string): unknown }>
   >;
+  /** @internal */
+  _records: Array<{ _readAttribute(name: string): unknown; get(attrName: string): unknown }>;
   table: Table;
   limit(value: number | null): CalculationRelation;
   where(opts: unknown): CalculationRelation;
@@ -140,7 +144,7 @@ interface CalculationRelation {
   pick(
     ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown>;
-  ids(): Promise<unknown[]>;
+  ids(): Promise<unknown[]> | unknown[];
   count(columnName?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
   sum(
     initialValueOrColumn?: string | Nodes.Node | number | null,
@@ -152,7 +156,7 @@ interface CalculationRelation {
   flattenedArgs(args: unknown[]): unknown[];
   skipQueryCacheIfNecessary<R>(fn: () => Promise<R>): Promise<R>;
   /** @internal */
-  _materializeDeferredDistinctPkPredicates(): Promise<void>;
+  _materializeDeferredDistinctPkPredicates(): Promise<void> | void;
   /** @internal */
   eagerLoadValues: unknown[];
   includesValues: unknown[];
@@ -163,7 +167,7 @@ interface CalculationRelation {
   readonly isEagerLoading: boolean;
   except(...values: string[]): CalculationRelation;
   group(...args: unknown[]): CalculationRelation;
-  ids(): Promise<unknown[]>;
+  ids(): Promise<unknown[]> | unknown[];
   /** @internal */
   arel(aliases?: unknown): SelectManager;
 }
@@ -185,7 +189,7 @@ function isCoerceNumericTypeName(name: string | undefined): boolean {
 }
 
 function needsBigintCast(rel: CalculationRelation): boolean {
-  return rel._conn().typeRegistryKey === "sqlite";
+  return rel._conn().typeRegistryKey === "sqlite3";
 }
 
 function wrapBigintAgg(
@@ -477,7 +481,7 @@ export function asyncPick(
   return this.pick(...columnNames);
 }
 
-export async function ids(this: CalculationRelation): Promise<unknown[]> {
+export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
   const primaryKey = this.model.primaryKey as string | string[] | null;
   const primaryKeyArray = Array.isArray(primaryKey)
     ? primaryKey
@@ -486,13 +490,15 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
       : [primaryKey];
 
   if (this.loaded) {
-    const result = (await this.records()).map((record) => {
+    const toId = (record: { _readAttribute(name: string): unknown }): unknown => {
       if (primaryKeyArray.length === 1) {
         return record._readAttribute(primaryKeyArray[0]);
       }
       return primaryKeyArray.map((column) => record._readAttribute(column));
-    });
-    return result;
+    };
+    return this.isScheduled
+      ? this.records().then((records) => records.map(toId))
+      : this._records.map(toId);
   }
 
   if (hasInclude(this as any, primaryKey as string)) {
@@ -503,20 +509,22 @@ export async function ids(this: CalculationRelation): Promise<unknown[]> {
   const relation = this.spawn();
   relation.selectValues = columns as (string | Nodes.Node)[];
 
-  const result = relation.whereClause.isContradiction()
-    ? Result.empty()
-    : await this.skipQueryCacheIfNecessary(() =>
-        this.withConnection(async (c) => {
-          const manager = relation.arel();
-          return c.selectAll(manager, `${this.model.name} Ids`);
-        }),
-      );
+  return (async () => {
+    const result = relation.whereClause.isContradiction()
+      ? Result.empty()
+      : await this.skipQueryCacheIfNecessary(() =>
+          this.withConnection(async (c) => {
+            const manager = relation.arel();
+            return c.selectAll(manager, `${this.model.name} Ids`);
+          }),
+        );
 
-  return await typeCastPluckValues.call(this, result, columns);
+    return await typeCastPluckValues.call(this, result, columns);
+  })();
 }
 
 export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
-  return this.ids();
+  return Promise.resolve(this.ids());
 }
 
 export interface CalculationMethods {
@@ -558,7 +566,7 @@ export interface CalculationMethods {
   asyncPick(
     ...columnNames: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown>;
-  ids(): Promise<unknown[]>;
+  ids(): Promise<unknown[]> | unknown[];
   asyncIds(): Promise<unknown[]>;
 }
 
@@ -573,13 +581,14 @@ function inQueryConnection<F extends (this: CalculationRelation, ...args: never[
 }
 
 function withDeferredDistinctPkPredicates<
-  F extends (this: CalculationRelation, ...args: never[]) => Promise<any>,
+  F extends (this: CalculationRelation, ...args: never[]) => unknown,
 >(fn: F): F {
-  return async function (this: CalculationRelation, ...args: never[]) {
-    await (
-      this as { _materializeDeferredDistinctPkPredicates?(): Promise<void> }
+  return function (this: CalculationRelation, ...args: never[]) {
+    const materializing = (
+      this as { _materializeDeferredDistinctPkPredicates?(): Promise<void> | void }
     )._materializeDeferredDistinctPkPredicates?.();
-    return fn.apply(this, args);
+    if (materializing == null) return fn.apply(this, args);
+    return materializing.then(() => fn.apply(this, args));
   } as unknown as F;
 }
 

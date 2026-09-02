@@ -2,7 +2,6 @@ import { ArgumentError, isBlank, rbHash } from "@blazetrails/activesupport";
 import { arelNode } from "../arel.js";
 import { Node } from "./node.js";
 import { Fragments } from "./fragments.js";
-import { buildQuoted } from "./casted.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SqlLiteral extends Node {
@@ -41,11 +40,6 @@ export class SqlLiteral extends Node {
   /** @noRailsEquivalent PERMANENT */
   isBlank(): boolean {
     return isBlank(this.value);
-  }
-
-  /** @internal */
-  quotedNode(other: unknown): Node {
-    return buildQuoted(other, this);
   }
 
   plus(other: unknown): Fragments {

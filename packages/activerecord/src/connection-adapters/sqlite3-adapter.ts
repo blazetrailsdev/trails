@@ -157,7 +157,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
    * @noRailsEquivalent CONVERGEABLE type-registry-key-replaces-per-adapter-overrides
    */
   override get typeRegistryKey(): AdapterName {
-    return "sqlite";
+    return "sqlite3";
   }
 
   get schemaCreation(): SQLite3SchemaCreation {

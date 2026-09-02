@@ -1,6 +1,4 @@
-import { Node } from "./node.js";
 import { Binary, type NodeOrValue } from "./binary.js";
-import { buildQuoted } from "./casted.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class InfixOperation extends Binary {
@@ -13,11 +11,6 @@ export class InfixOperation extends Binary {
     this.operator = operator;
     this.left = left;
     this.right = right;
-  }
-
-  /** @internal */
-  quotedNode(other: unknown): Node {
-    return buildQuoted(other, this);
   }
 }
 

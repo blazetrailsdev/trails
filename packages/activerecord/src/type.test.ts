@@ -43,10 +43,10 @@ describe("TypeTest", () => {
 
   it("looking up a type for a specific adapter", () => {
     register("foo", ArgType, { override: false });
-    register("foo", PgArgType, { adapter: "postgres" });
+    register("foo", PgArgType, { adapter: "postgresql" });
 
-    expect(lookup("foo", { adapter: "sqlite" })).toStrictEqual(new ArgType());
-    expect(lookup("foo", { adapter: "postgres" })).toStrictEqual(new PgArgType());
+    expect(lookup("foo", { adapter: "sqlite3" })).toStrictEqual(new ArgType());
+    expect(lookup("foo", { adapter: "postgresql" })).toStrictEqual(new PgArgType());
   });
 
   it("lookup defaults to the current adapter", () => {

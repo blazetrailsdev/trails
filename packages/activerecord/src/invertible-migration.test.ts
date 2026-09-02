@@ -60,7 +60,6 @@ class InvertibleRevertMigration extends SilentMigration {
 class InvertibleByPartsMigration extends SilentMigration {
   test?: (dir: symbol) => void;
   async change(): Promise<void> {
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("new_horses", (t) => {
       t.column("breed", "string");
     });

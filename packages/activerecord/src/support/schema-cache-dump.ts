@@ -1,7 +1,10 @@
 /** @internal */
 import { getEnv, getOsAsync, hexdigest } from "@blazetrails/activesupport";
 import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type {
+  AbstractAdapter as DatabaseAdapter,
+  AdapterName,
+} from "../connection-adapters/abstract-adapter.js";
 import { SchemaCache } from "../connection-adapters/schema-cache.js";
 import { BOOKKEEPING_TABLE_NAMES } from "./drop-all-tables.js";
 import { supportsExpressionIndex } from "./schema-types.js";
@@ -67,14 +70,14 @@ export function fingerprintOf(shapes: Map<string, string>, tables: ReadonlySet<s
 
 const MISSING_TABLE = "missing-table";
 
-const SHAPE_QUERIES: Record<string, string[]> = {
-  sqlite: [
+const SHAPE_QUERIES: Record<AdapterName, string[]> = {
+  sqlite3: [
     `SELECT tbl_name AS name, type || ' ' || coalesce(sql, '') AS col
      FROM sqlite_master
      WHERE name NOT LIKE 'sqlite_%'
      ORDER BY type, name`,
   ],
-  postgres: [
+  postgresql: [
     `SELECT t.relname AS name,
             a.attname || ' ' ||
               pg_catalog.format_type(a.atttypid, a.atttypmod) || ' ' ||

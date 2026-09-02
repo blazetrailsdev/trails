@@ -1,13 +1,7 @@
 import { Node } from "./node.js";
-import { _buildQuoted } from "../node-slots.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export abstract class NodeExpression extends Node {
-  /** @internal */
-  quotedNode(other: unknown): Node {
-    return _buildQuoted!(other, this);
-  }
-}
+export abstract class NodeExpression extends Node {}
 
 /**
  * Using `typeof import(...)` inline avoids pulling the mixin modules into

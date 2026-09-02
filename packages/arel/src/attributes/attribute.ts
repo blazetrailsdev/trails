@@ -1,7 +1,6 @@
 import { include, rbEqual, rbHash } from "@blazetrails/activesupport";
 import { _setAttribute } from "../node-slots.js";
 import { Node } from "../nodes/node.js";
-import { buildQuoted } from "../nodes/casted.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { NamedFunction } from "../nodes/named-function.js";
 import { Expressions, type ExpressionsModule } from "../expressions.js";
@@ -59,11 +58,6 @@ export class Attribute extends Node {
       rbEqual(this.relation, other.relation) &&
       rbEqual(this.name, other.name)
     );
-  }
-
-  /** @internal */
-  quotedNode(other: unknown): Node {
-    return buildQuoted(other, this);
   }
 }
 

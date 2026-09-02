@@ -163,7 +163,10 @@ async function main(tighten: boolean): Promise<number> {
     .map(
       ([name, m]) =>
         `${name} novel ${m.novel}/${taggedOnly.has(name) ? "0 (pinned)" : marks[name].novel}` +
-        `, total ${m.total}/${marks[name].total}`,
+        `, total ${m.total}/${marks[name].total}` +
+        (m.inlinedFrom === undefined
+          ? ""
+          : `, inlined-from ${m.inlinedFrom}/${marks[name].inlinedFrom}`),
     )
     .join("; ");
   console.log(`extra-surface gate: OK (${summary})`);

@@ -13,6 +13,7 @@ import {
   Deadlocked,
   LockWaitTimeout,
   NotImplementedError,
+  AdapterNotFound,
 } from "../errors.js";
 import {
   IsolatedExecutionState,
@@ -137,24 +138,34 @@ import { DateTime as DateTimeType } from "../type/date-time.js";
 import { Json as JsonType } from "../type/json.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
 
-export type AdapterName = "sqlite" | "postgres" | "mysql2";
+export type AdapterName = "sqlite3" | "postgresql" | "mysql2";
 
 /**
  * @internal
  * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
  */
 export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
-  switch (configAdapter?.toLowerCase()) {
+  switch (configAdapter) {
     case "postgresql":
     case "postgres":
     case "pg":
-      return "postgres";
-    case "mysql":
+      return "postgresql";
     case "mysql2":
+    case "mysql":
     case "mariadb":
       return "mysql2";
+    case "sqlite3":
+    case "sqlite":
+    case "node-sqlite":
+    case "expo-sqlite":
+    case "libsql":
+    case "libsql-remote":
+    case "libsql-replica":
+      return "sqlite3";
     default:
-      return "sqlite";
+      throw new AdapterNotFound(
+        `Database configuration specifies nonexistent '${configAdapter}' adapter.`,
+      );
   }
 }
 

@@ -8,13 +8,13 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 let adapter: DatabaseAdapter;
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
-  if (a.typeRegistryKey === "sqlite") {
+  if (a.typeRegistryKey === "sqlite3") {
     return (
       (await a.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
       )) as Array<{ name: string }>
     ).map((r) => r.name);
-  } else if (a.typeRegistryKey === "postgres") {
+  } else if (a.typeRegistryKey === "postgresql") {
     return (
       (await a.execute(
         `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
@@ -47,7 +47,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
     let executeCallCount = 0;
     const fakeAdapter = {
-      typeRegistryKey: "postgres" as const,
+      typeRegistryKey: "postgresql" as const,
       execute: vi.fn(async () => {
         executeCallCount++;
         if (executeCallCount === 1) throw connErr;
@@ -64,7 +64,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
   it("rethrows when execute throws a non-connection error", async () => {
     const appErr = new Error("syntax error");
     const fakeAdapter = {
-      typeRegistryKey: "postgres" as const,
+      typeRegistryKey: "postgresql" as const,
       execute: vi.fn(async () => {
         throw appErr;
       }),
@@ -83,7 +83,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
     let mutationCallCount = 0;
     const fakeAdapter = {
-      typeRegistryKey: "postgres" as const,
+      typeRegistryKey: "postgresql" as const,
       execute: vi.fn(async (sql: string) => {
         if (sql.includes("matviewname")) {
           return mutationCallCount === 0 ? [{ schemaname: "public", name: "mv1" }] : [];
@@ -201,7 +201,7 @@ describe("purge-only pre-snapshot path", () => {
   } as unknown as DatabaseAdapter;
 
   const armOnlyAdapter = {
-    typeRegistryKey: "sqlite",
+    typeRegistryKey: "sqlite3",
     createTable: async () => {},
   } as unknown as DatabaseAdapter;
 

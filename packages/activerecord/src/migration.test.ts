@@ -21,7 +21,7 @@ import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/s
 function emitTableSql(td: TableDefinition): Promise<string> {
   const adapter = (td as any).conn;
   const typeRegistryKey = adapter.typeRegistryKey;
-  if (typeRegistryKey === "postgres") return new PgSchemaCreation(adapter).accept(td);
+  if (typeRegistryKey === "postgresql") return new PgSchemaCreation(adapter).accept(td);
   if (typeRegistryKey === "mysql2") return new MysqlSchemaCreation(adapter).accept(td);
   return new SQLite3SchemaCreation(adapter).accept(td);
 }
@@ -300,7 +300,7 @@ describe("MigrationTest", () => {
 
     try {
       const typeRegistryKey = adapter.typeRegistryKey;
-      const isPgOrSqlite = typeRegistryKey === "postgres" || typeRegistryKey === "sqlite";
+      const isPgOrSqlite = typeRegistryKey === "postgresql" || typeRegistryKey === "sqlite3";
       class BigNumber extends Base {
         static _tableName = "big_numbers";
         static {
@@ -338,10 +338,10 @@ describe("MigrationTest", () => {
       expect(((b as any).big_bank_balance as BigDecimal).toString("F")).toBe("1000234000567.95");
 
       const valueOfE = (b as any).value_of_e;
-      if (typeRegistryKey === "postgres") {
+      if (typeRegistryKey === "postgresql") {
         expect(valueOfE).toBeInstanceOf(BigDecimal);
         expect((valueOfE as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
-      } else if (typeRegistryKey === "sqlite") {
+      } else if (typeRegistryKey === "sqlite3") {
         expect(valueOfE).toBeInstanceOf(BigDecimal);
         expect(
           Math.abs(Number((valueOfE as BigDecimal).toString("F")) - 2.71828182845905),

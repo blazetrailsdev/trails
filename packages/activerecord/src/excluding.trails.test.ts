@@ -52,3 +52,17 @@ describe("excluding a loaded relation of a model without a primary key (trails)"
     expect(() => Edge.excluding(loaded).toSql()).toThrow("can't quote Array");
   });
 });
+
+describe("excluding a model with a composite primary key (trails)", () => {
+  fixtures(["cpkBooks", "cpkAuthors", "cpkOrders"]);
+
+  it("builds the predicate over the composite key rather than raising", async () => {
+    const { CpkBook } = await import("./test-helpers/models/cpk.js");
+    registerModel(CpkBook);
+    const book = (await CpkBook.all())[0];
+
+    const relation = CpkBook.excluding(book);
+    const predicate = relation.whereClause.predicates.at(-1) as Nodes.NotIn;
+    expect((predicate.left as Nodes.Attribute).name).toEqual(["author_id", "id"]);
+  });
+});
