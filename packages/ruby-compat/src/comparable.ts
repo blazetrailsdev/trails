@@ -17,7 +17,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
-import { rbObjClass } from "./object.js";
+import { rbInspect, rbObjClass } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 
 /**
@@ -126,17 +126,8 @@ function isCmpSpelling(value: unknown): value is CmpSpelling {
  * Ruby's `rb_cmperr` (`vendor/ruby/compar.c:28`), which names the operand by
  * `inspect` for a special constant or a Float and by `rb_obj_class` otherwise. */
 function rbCmperr(x: unknown, y: unknown): never {
-  const classname = specialConstP(y) ? inspect(y) : rbObjClass(y);
+  const classname = specialConstP(y) ? rbInspect(y) : rbObjClass(y);
   throw new ArgumentError(`comparison of ${rbObjClass(x)} with ${classname} failed`);
-}
-
-/**
- * The `rb_inspect(y)` arm of `rb_cmperr` (`vendor/ruby/compar.c:32`): `nil`,
- * not `null`, is what Ruby prints for the one special constant this port
- * meets.
- */
-function inspect(y: unknown): string {
-  return y === null || y === undefined ? "nil" : String(y);
 }
 
 /**

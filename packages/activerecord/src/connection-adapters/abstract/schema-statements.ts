@@ -1,3 +1,4 @@
+import { block, fetch } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
@@ -1365,15 +1366,20 @@ export class SchemaStatements {
     return [idx, this.indexAlgorithm(options.algorithm), !!options.ifNotExists];
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
+  /** @missingRailsArgs fetch — PERMANENT */
   indexAlgorithm(algorithm?: string): string | undefined {
     if (algorithm == null) return undefined;
     const indexAlgorithms = this.indexAlgorithms();
-    if (Object.hasOwn(indexAlgorithms, algorithm)) return indexAlgorithms[algorithm];
-    throw new ArgumentError(
-      `Algorithm must be one of the following: ${Object.keys(indexAlgorithms)
-        .map((a) => `:${a}`)
-        .join(", ")}`,
+    return fetch<string>(
+      indexAlgorithms,
+      algorithm,
+      block(() => {
+        throw new ArgumentError(
+          `Algorithm must be one of the following: ${Object.keys(indexAlgorithms)
+            .map((a) => `:${a}`)
+            .join(", ")}`,
+        );
+      }),
     );
   }
 
@@ -1774,10 +1780,10 @@ export class SchemaStatements {
   /** @internal */
   /**
    * @internal
-   * @missingRailsCall fetch — PERMANENT
+   * @missingRailsArgs fetch — PERMANENT
    */
   isForeignKeysEnabled(): boolean {
-    const foreignKeys = "foreignKeys" in this._config ? this._config.foreignKeys : true;
+    const foreignKeys = fetch<unknown>(this._config, "foreignKeys", true);
     return foreignKeys != null && foreignKeys !== false;
   }
 

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-statements.ts",
+    "rubyName": "index_algorithm",
+    "call": "order:map,fetch",
+    "reason": "schema_statements.rb:1504-1508 — the call itself IS made now (`fetch(indexAlgorithms, algorithm, block(...))`); only the ORDER differs, because the Ruby extractor records a block-taking `send` after its block body while the TS one records the outer call before its argument. `keys.map(&:inspect)` lives inside the raising block in both languages, and hoisting it out of the block to match the traversal order would build the message eagerly on every hit."
+  }
+]

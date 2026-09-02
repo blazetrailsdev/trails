@@ -2002,6 +2002,7 @@ export interface Relation<T extends Base>
   where(): WhereChain<Relation<T>>;
   where(args: undefined): WhereChain<Relation<T>>;
   where(args: Record<string, unknown> | null): Relation<T>;
+  where(args: Map<unknown, unknown>): Relation<T>;
   where(sql: string, ...binds: unknown[]): Relation<T>;
   where(args: Nodes.Node): Relation<T>;
   where(args: unknown[]): Relation<T>;

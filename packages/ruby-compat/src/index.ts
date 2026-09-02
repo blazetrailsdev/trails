@@ -13,7 +13,7 @@ export {
   rubyClass,
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
-export { rbBuiltinClassName, rbObjClass } from "./object.js";
+export { rbBuiltinClassName, rbInspect, rbObjAsString, rbObjClass } from "./object.js";
 export {
   Hash,
   block,

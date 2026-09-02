@@ -1,3 +1,4 @@
+import { block, fetch } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
@@ -756,16 +757,16 @@ export class AssociationReflection extends MacroReflection {
 
   /**
    * @internal
-   * @missingRailsCall fetch — PERMANENT
+   * @missingRailsArgs fetch — PERMANENT
    */
   override inverseName(): string | null {
     if (this._inverseNameCache !== undefined) return this._inverseNameCache;
-    const explicit = this.options.inverseOf;
-    if (explicit !== undefined) {
-      this._inverseNameCache = explicit === false ? null : (explicit as string);
-    } else {
-      this._inverseNameCache = this.automaticInverseOf();
-    }
+    const inverseOf = fetch<string | false | null>(
+      this.options,
+      "inverseOf",
+      block(() => this.automaticInverseOf()),
+    );
+    this._inverseNameCache = inverseOf === false ? null : inverseOf;
     return this._inverseNameCache;
   }
 

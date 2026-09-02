@@ -180,7 +180,7 @@ export class ISO8601Parser {
   /**
    * @missingRailsArgs inspect — PERMANENT: Ruby's `String#inspect`
    * (iso8601_parser.rb:97) is a zero-arg receiver call; trails' `inspect` is
-   * the free function `core-ext/object/inspect.ts:43`, so the receiver is
+   * the free function `rbInspect` (`@blazetrails/ruby-compat`), so the receiver is
    * spelled as its argument.
    */
   private raiseParsingError(reason: string | null = null): never {
