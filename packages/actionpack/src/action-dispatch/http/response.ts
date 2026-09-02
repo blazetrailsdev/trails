@@ -403,12 +403,14 @@ export class Response {
 
   // --- Rack response ---
 
+  /**
+   * Mirrors: `to_a` (response.rb:410-413) — `commit!` then
+   * `rack_response @status, @headers.to_hash`. `to_a` is a Ruby core protocol
+   * name in `SKIP_GROUPS`, so it keeps its trails spelling.
+   */
   toRack(): [number, Record<string, string>, unknown] {
-    // If a stream is installed, surface it directly so Rack::Sendfile /
-    // BodyProxy can intercept via toPath()/close() rather than draining
-    // the file into memory.
-    if (this.stream) return [this._status, this._headers.toHash(), this.stream];
-    return [this._status, this._headers.toHash(), [...this._body]];
+    this.commitBang();
+    return this.rackResponse(this._status, this._headers.toHash());
   }
 
   // --- Stream / body parts ---
@@ -607,12 +609,19 @@ export class Response {
     }
   }
 
-  /** @internal Rails: `rack_response(status, headers)` — empty body for no-content statuses. */
+  /**
+   * @internal Rails: `rack_response(status, headers)` (response.rb:546-553).
+   * The non-empty arm is `RackBody.new(self)`, whose `to_path` forwards to the
+   * stream (response.rb:512-536); a file body is surfaced as the stream itself
+   * so `Rack::Sendfile` still sees `toPath()` instead of the drained bytes.
+   */
   rackResponse(
     status: number,
     headers: Record<string, string>,
-  ): [number, Record<string, string>, unknown[]] {
+  ): [number, Record<string, string>, unknown] {
     if ((NO_CONTENT_CODES as readonly number[]).includes(status)) return [status, headers, []];
+    const stream = this.stream as { toPath?: unknown } | null;
+    if (stream && typeof stream.toPath === "function") return [status, headers, stream];
     return [status, headers, this.bodyParts()];
   }
 

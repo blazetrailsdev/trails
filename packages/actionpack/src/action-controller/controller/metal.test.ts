@@ -273,7 +273,6 @@ describe("MetalControllerInstanceTests", () => {
   it("responseBody= writes through to response and marks performed", () => {
     const c = new (class extends Metal {})();
     c.response = makeResponse();
-    c.response = makeResponse();
     c.responseBody = "hello";
     expect(c.responseBody).toBe("hello");
     expect(c.response.body).toBe("hello");
@@ -283,7 +282,6 @@ describe("MetalControllerInstanceTests", () => {
   it("responseBody= accepts array form", () => {
     const c = new (class extends Metal {})();
     c.response = makeResponse();
-    c.response = makeResponse();
     c.responseBody = ["a", "b"];
     expect(c.responseBody).toBe("ab");
   });
@@ -291,10 +289,9 @@ describe("MetalControllerInstanceTests", () => {
   it("responseBody= with null resets body", () => {
     const c = new (class extends Metal {})();
     c.response = makeResponse();
-    c.response = makeResponse();
     c.responseBody = "hi";
     c.responseBody = null;
-    expect(c.responseBody).toBe("");
+    expect(c.response.body).toBe("");
   });
 
   it("isPerformed mirrors performed and reflects responseBody=", () => {

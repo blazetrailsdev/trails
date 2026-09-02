@@ -19,6 +19,7 @@ import {
 } from "../action-dispatch/middleware/stack.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { includeContent } from "./metal/head.js";
+import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { Renderers } from "./metal/renderers.js";
 import { resolveStatus } from "./metal/status-codes.js";
 import {
@@ -289,7 +290,13 @@ export class Metal extends AbstractController {
     }
     if (includeContent(this.status)) {
       if (!this.mediaType) {
-        this.contentType = contentType ? String(contentType) : "text/html";
+        const f = (this as Metal & { formats?: ReadonlyArray<string | symbol> }).formats;
+        const negotiated =
+          f && f.length > 0 && MimeType.isRegistered(String(f[0]))
+            ? MimeType.lookup(String(f[0])).toString()
+            : undefined;
+        this.contentType =
+          contentType != null ? String(contentType) : (negotiated ?? MimeType.HTML.toString());
       }
       this.response.charset = false;
     }
@@ -315,13 +322,7 @@ export class Metal extends AbstractController {
    */
   override set responseBody(body: string | string[] | Buffer | null | undefined) {
     if (body === null || body === undefined) {
-      // Mirror Rails' `else: response.reset_body!`. We assign the empty
-      // string (rather than leaving the prior body in place) so the
-      // visible `responseBody`/`body` getters reflect the reset; the
-      // non-null value still keeps `performed?` true, matching Rails'
-      // semantic where assigning falsy body still records the call.
-      this._responseBody = "";
-      if (this.response) this.response.body = "";
+      this.response.resetBodyBang();
       return;
     }
     const str = Array.isArray(body)
