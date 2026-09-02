@@ -31,8 +31,6 @@ describe("DescendantsTrackerTest", () => {
     expect(DescendantsTracker.descendants(Child2)).toEqual([]);
   });
 
-  it.skip(".descendants with garbage collected classes");
-
   it(".subclasses", () => {
     expect(new Set(DescendantsTracker.subclasses(Parent))).toEqual(new Set([Child1, Child2]));
     expect(new Set(DescendantsTracker.subclasses(Child1))).toEqual(

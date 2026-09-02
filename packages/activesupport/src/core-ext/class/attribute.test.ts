@@ -110,10 +110,6 @@ describe("ClassAttributeTest", () => {
     expect(Object.getPrototypeOf(object)).not.toHaveProperty("isSetting");
   });
 
-  it.skip("works well with singleton classes");
-  it.skip("when defined in a class's singleton");
-  it.skip("works well with module singleton classes");
-
   it("setter returns set value", () => {
     const val = (Klass.setting = 1);
     expect(val).toBe(1);
@@ -130,8 +126,6 @@ describe("ClassAttributeTest", () => {
     instance.system = 2;
     expect(instance.system).toBe(2);
   });
-
-  it.skip("allow to prepend accessors");
 
   it("can check if value is set on a sub class", () => {
     expect(Object.prototype.hasOwnProperty.call(Sub, "__class_attr_setting")).toBe(false);

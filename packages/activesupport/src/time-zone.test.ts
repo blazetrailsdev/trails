@@ -832,8 +832,6 @@ describe("TimeZoneTest", () => {
   it("country zones without mappings", () => {
     expect(TimeZone.countryZones("sv").map((z) => z.name)).toContain("America/El_Salvador");
   });
-  it.skip("to yaml");
-  it.skip("yaml load");
 
   it("abbr", () => {
     const tz = TimeZone.find("America/New_York")!;
@@ -848,6 +846,4 @@ describe("TimeZoneTest", () => {
     expect(tz.isDst(jan)).toBe(false);
     expect(tz.isDst(jul)).toBe(true);
   });
-
-  it.skip("works as ruby time zone");
 });
