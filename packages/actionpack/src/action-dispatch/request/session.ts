@@ -145,6 +145,15 @@ function classNameOf(value: unknown): string {
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
+function rubyClassPath(klass: unknown): string {
+  switch (klass) {
+    case Session:
+      return "ActionDispatch::Request::Session";
+    default:
+      return (klass as { name: string }).name;
+  }
+}
+
 /**
  * Ruby's `object_id` — a per-object identity number JS does not expose, handed
  * out lazily and remembered on a WeakMap, shifted and hexed the way
@@ -423,7 +432,7 @@ export class Session {
     if (this.isLoaded()) {
       return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)}>`;
     } else {
-      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<${rubyClassPath(this.constructor)}:0x${objectIdHex(this)} not yet loaded>`;
     }
   }
 

@@ -1,5 +1,6 @@
 import type { RackEnv } from "@blazetrails/rack";
 import { Request } from "@blazetrails/rack";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import type { PersistedRequest } from "./index.js";
@@ -9,12 +10,21 @@ const request = (env: Record<string, unknown> = {}): PersistedRequest =>
   new Request(env) as unknown as PersistedRequest;
 
 describe("Rack::Session::Abstract::ID", () => {
-  it.skip("use securerandom", () => {
-    // BLOCKED: converge-secure-random-provider — DEFAULT_OPTIONS.secureRandom is `true`, not a SecureRandom provider
+  it("use securerandom", () => {
+    expect(ID.DEFAULT_OPTIONS["secureRandom"]).toBe(SecureRandom);
+
+    const id = new ID(undefined);
+    expect(id.sidSecure).toBe(SecureRandom);
   });
 
-  it.skip("allow to use another securerandom provider", () => {
-    // BLOCKED: converge-secure-random-provider — generateSid ignores the secure_random provider it is handed
+  it("allow to use another securerandom provider", () => {
+    const secureRandom = class {
+      hex(..._args: unknown[]): string {
+        return "fake_hex";
+      }
+    };
+    const id = new ID(undefined, { secureRandom: new secureRandom() });
+    expect(id.generateSid()).toBe("fake_hex");
   });
 
   it.skip("should warn when subclassing", () => {

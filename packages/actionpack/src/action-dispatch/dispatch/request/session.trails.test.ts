@@ -115,4 +115,18 @@ describe("Session", () => {
     session.get("foo");
     expect(session.inspect()).toMatch(/^#<ActionDispatch::Request::Session:0x[0-9a-f]+>$/);
   });
+
+  it("inspect renders a subclass's own class rather than Session's", () => {
+    class MySession extends Session {}
+    const req = makeReq();
+    const store = {
+      loadSession: () => [1, {}] as [unknown, Record<string, unknown>],
+      sessionExists: () => true,
+      deleteSession: () => null,
+      extractSessionId: () => 1,
+    };
+    const session = new MySession(store, req, {});
+
+    expect(session.inspect()).toMatch(/^#<MySession:0x[0-9a-f]+ not yet loaded>$/);
+  });
 });
