@@ -288,7 +288,6 @@ import {
 } from "./delegated-type.js";
 import * as _Reflection from "./reflection.js";
 import * as _AssocInstance from "./associations/instance-methods.js";
-import { argumentError } from "./relation/query-methods.js";
 import type { WhereChain } from "./relation/query-methods.js";
 import {
   ScopeRegistry,
@@ -1527,7 +1526,7 @@ export class Base extends Model {
       conditionsOrSql.every((c) => typeof c === "string")
     ) {
       if (rest.length !== 1 || !Array.isArray(rest[0])) {
-        throw argumentError(
+        throw new ArgumentError(
           `${(this as { name?: string }).name ?? "Model"}.where(cols, tuples): composite-key form requires a tuples argument as an array of arrays`,
         );
       }
@@ -2194,7 +2193,7 @@ export class Base extends Model {
     const pk = this.primaryKey;
     if (Array.isArray(pk)) {
       if (!Array.isArray(id)) {
-        throw argumentError(
+        throw new ArgumentError(
           `${this.name}.delete expects a tuple (or array of tuples) matching the composite primary key [${pk.join(", ")}]`,
         );
       }
@@ -2202,7 +2201,7 @@ export class Base extends Model {
       const tuples: unknown[][] = Array.isArray(arr[0]) ? (arr as unknown[][]) : [arr];
       for (const tuple of tuples) {
         if (!Array.isArray(tuple) || tuple.length !== pk.length) {
-          throw argumentError(
+          throw new ArgumentError(
             `${this.name}.delete tuple length ${Array.isArray(tuple) ? tuple.length : "<scalar>"} does not match composite primary key arity ${pk.length}`,
           );
         }

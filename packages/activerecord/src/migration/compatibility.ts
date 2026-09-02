@@ -1,3 +1,4 @@
+import { MigrationError } from "../migration.js";
 import type { Migration } from "../migration.js";
 
 export type MigrationClass =
@@ -56,9 +57,7 @@ export function findVersion(version: string | number): MigrationClass {
   if (best) return best;
 
   const sorted = [...versionRegistry.keys()].sort(compareVersions).join(", ");
-  const err = new Error(`Unknown migration version: ${version}. Registered versions: ${sorted}`);
-  err.name = "MigrationError";
-  throw err;
+  throw new MigrationError(`Unknown migration version: ${version}. Registered versions: ${sorted}`);
 }
 
 export function currentVersion(): string {

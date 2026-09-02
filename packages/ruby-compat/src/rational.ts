@@ -4,6 +4,7 @@
  * (`vendor/ruby/rational.c:2691` `nurat_s_convert`). Ruby has both spellings
  * and Rails calls the function, so both ship here.
  */
+import { FloatDomainError } from "./float-domain-error.js";
 
 /** Ruby core `ZeroDivisionError`, what `rb_num_zerodiv`
  * (`vendor/ruby/numeric.c:206`) raises for a denominator of zero.
@@ -13,18 +14,6 @@ export class ZeroDivisionError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "ZeroDivisionError";
-  }
-}
-
-/** @internal Ruby core `FloatDomainError`, a `RangeError`
- * (`vendor/ruby/numeric.c:6155`). `float_decode_internal`
- * (`vendor/ruby/rational.c:2168`) refuses a non-finite Float with it, with the
- * Float's own `to_s` as the message: on ruby 3.3.11
- * `Rational(Float::INFINITY, 1)` is `FloatDomainError: Infinity`. */
-class FloatDomainError extends RangeError {
-  constructor(message: string) {
-    super(message);
-    this.name = "FloatDomainError";
   }
 }
 

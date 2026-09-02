@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { ArgumentError, hasKey } from "@blazetrails/ruby-compat";
 import { getApplicationRecordClass } from "./inheritance.js";
 import {
   NameError,
@@ -28,7 +28,6 @@ import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
 import { compactUniqIds, compactUniqTuples } from "./relation/compact-uniq-ids.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { TableMetadata } from "./table-metadata.js";
-import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import type { PrettyPrinter } from "./pretty-print.js";
 import { Table, Nodes } from "@blazetrails/arel";
@@ -254,7 +253,7 @@ export function strictLoadingBang<T extends StrictLoadingFields>(
 ): T {
   const mode = options.mode ?? "all";
   if (mode !== "all" && mode !== "n_plus_one_only") {
-    throw argumentError(
+    throw new ArgumentError(
       `The :mode option must be one of ["all", "n_plus_one_only"] but ${JSON.stringify(mode)} was provided.`,
     );
   }
@@ -736,7 +735,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   }
   if (ids.length > 1) {
     if (this.compositePrimaryKey && ids.some((i) => !Array.isArray(i))) {
-      throw argumentError(
+      throw new ArgumentError(
         `${this.name} has a composite primary key (${String(this.primaryKey)}); ` +
           `call find([...tuple]) or find([[...], [...]]) rather than variadic scalars.`,
       );
