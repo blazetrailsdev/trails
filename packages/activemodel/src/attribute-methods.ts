@@ -205,6 +205,7 @@ export const ClassMethods = {
     });
   },
 
+  /** @missingRailsArgs define_call — PERMANENT */
   aliasAttributeMethodDefinition(
     this: ClassMethodsHost,
     codeGenerator: CodeGenerator,
@@ -212,10 +213,28 @@ export const ClassMethods = {
     newName: string,
     oldName: string,
   ): void {
-    this.defineAttributeMethodPattern(pattern, oldName, {
-      owner: codeGenerator,
-      as: newName,
-      override: true,
+    const methodName = pattern.methodName(newName);
+    const targetName = pattern.methodName(oldName);
+    const parameters = pattern.parameters;
+
+    if (
+      typeof (this as unknown as Record<string, unknown>)[generateMethodFor(pattern)] === "function"
+    ) {
+      this.defineAttributeMethodPattern(pattern, oldName, {
+        owner: codeGenerator,
+        as: newName,
+        override: true,
+      });
+      return;
+    }
+
+    const mangledName = this.buildMangledName(targetName);
+
+    const callArgs: string[] = [];
+
+    this.defineCall(codeGenerator, methodName, targetName, mangledName, parameters, callArgs, {
+      namespace: "alias_attribute",
+      as: methodName,
     });
   },
 
@@ -277,11 +296,7 @@ export const ClassMethods = {
       return;
     }
 
-    const generateMethod = pattern.proxyTarget.endsWith("=")
-      ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
-      : camelize(`define_method_${pattern.proxyTarget}`, false);
-
-    const generator = (this as unknown as Record<string, unknown>)[generateMethod];
+    const generator = (this as unknown as Record<string, unknown>)[generateMethodFor(pattern)];
     if (typeof generator === "function") {
       (generator as (attrName: string, options: { owner: CodeGenerator; as: string }) => void).call(
         this,
@@ -517,9 +532,17 @@ export const AttributeMethods = {
   },
 };
 
+/** @noRailsEquivalent PERMANENT */
+function generateMethodFor(pattern: AttributeMethodPattern): string {
+  return pattern.proxyTarget.endsWith("=")
+    ? camelize(`set_define_method_${pattern.proxyTarget.slice(0, -1)}`, false)
+    : camelize(`define_method_${pattern.proxyTarget}`, false);
+}
+
 function sendProxyTarget(record: ReadWriteHost, targetName: string, args: unknown[]): unknown {
   const target = record[targetName] as ((...a: unknown[]) => unknown) | undefined;
   if (typeof target !== "function") {
+    if (targetName in record) return target;
     const [attrName, ...rest] = args as [string, ...unknown[]];
     return (record as unknown as AttributeMethods).attributeMissing(
       { proxyTarget: targetName, attrName },

@@ -1,3 +1,4 @@
+import { inspect } from "@blazetrails/activesupport";
 import { NoMethodError } from "../attribute-assignment.js";
 
 export abstract class Type<T = unknown> {
@@ -46,8 +47,7 @@ export abstract class Type<T = unknown> {
   }
 
   typeCastForSchema(value: unknown): string {
-    if (typeof value === "bigint") return value.toString();
-    return JSON.stringify(value) ?? String(value);
+    return inspect(value);
   }
 
   isBinary(): boolean {

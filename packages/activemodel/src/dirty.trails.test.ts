@@ -646,3 +646,35 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     expect(m.changed).not.toContain("ratio");
   });
 });
+
+describe("Dirty readers do not resolve attribute aliases", () => {
+  class Pirate extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+    declare static aliasAttribute: (newName: string, oldName: string) => void;
+    declare nomChanged: () => boolean;
+    declare nomWas: unknown;
+    declare nom: string | null;
+
+    static {
+      include(this, Attributes);
+      include(this, Dirty);
+      this.attribute("name", "string");
+      this.aliasAttribute("nom", "name");
+    }
+    constructor(attrs: Record<string, unknown> = {}) {
+      super(attrs);
+    }
+  }
+  interface Pirate extends Attributes, Dirty {}
+
+  it("attributeChanged does not resolve an alias, while the generated reader does", () => {
+    const pirate = new Pirate();
+    pirate._writeAttribute("name", "Blackbeard");
+
+    expect(pirate.attributeChanged("name")).toBe(true);
+    expect(pirate.attributeChanged("nom")).toBe(false);
+    expect(pirate.nomChanged()).toBe(true);
+    expect(pirate.nomWas).toBe(null);
+    expect(pirate.nom).toBe("Blackbeard");
+  });
+});

@@ -4,6 +4,8 @@ import {
   extend,
   include,
   included,
+  prepend,
+  runCallbacks,
 } from "@blazetrails/activesupport";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 
@@ -58,11 +60,13 @@ export const Callbacks = {
     extend(base, ClassMethods);
 
     include(base, ASCallbacks.InstanceMethods);
+    include(base, { _runValidationCallbacks });
     extend(base, ASCallbacks.ClassMethods);
     defineCallbacks(base.prototype, "validation", {
       skipAfterCallbacksIfTerminated: true,
       scope: ["kind", "name"],
     });
+    prepend(base.prototype, { runValidationsBang });
   },
 };
 
@@ -82,20 +86,15 @@ interface CallbackHostRecord {
 
 /** @internal */
 export interface RunValidationsBangHost {
-  _runValidationCallbacks?: (block: () => boolean | Promise<boolean>) => boolean | Promise<boolean>;
-  runValidations?: () => boolean | Promise<boolean>;
+  _runValidationCallbacks(block: () => Promise<boolean>): Promise<boolean>;
 }
 
 /** @internal */
-export async function runValidationsBang(this: RunValidationsBangHost): Promise<boolean> {
-  const block = (): boolean | Promise<boolean> => {
-    if (typeof this.runValidations === "function") return this.runValidations();
-    return true;
-  };
-  if (typeof this._runValidationCallbacks === "function") {
-    return this._runValidationCallbacks(block);
-  }
-  return block();
+export async function runValidationsBang(
+  this: RunValidationsBangHost,
+  super_: (...args: unknown[]) => unknown,
+): Promise<boolean> {
+  return this._runValidationCallbacks(async () => (await super_()) as boolean);
 }
 
 /** @internal */
@@ -112,4 +111,12 @@ export function setOptionsForCallback(options: CallbackOptions): void {
   const existingArr =
     existingIf == null ? [] : Array.isArray(existingIf) ? existingIf : [existingIf];
   options.if = [contextGuard, ...existingArr];
+}
+
+/** @internal */
+export async function _runValidationCallbacks(
+  this: object,
+  block: () => Promise<boolean>,
+): Promise<boolean> {
+  return (await runCallbacks(this, "validation", block)) as boolean;
 }

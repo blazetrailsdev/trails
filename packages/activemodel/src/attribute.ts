@@ -1,8 +1,8 @@
 import { Type } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { MissingAttributeError } from "./attribute-methods.js";
-import { RuntimeError } from "./attribute-assignment.js";
 import { isDuplicable } from "@blazetrails/activesupport";
+import { _UserProvidedDefaultCtor } from "./attribute/user-provided-default-slot.js";
 
 function dupValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.slice();
@@ -18,14 +18,6 @@ function dupValue(value: unknown): unknown {
 export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
   "@blazetrails/activemodel/UNINITIALIZED_ORIGINAL_VALUE",
 );
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _UserProvidedDefaultCtor: (new (...args: any[]) => Attribute) | null = null;
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function _registerUserProvidedDefault(ctor: new (...args: any[]) => Attribute): void {
-  _UserProvidedDefaultCtor = ctor;
-}
 
 const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
 
@@ -47,10 +39,7 @@ export abstract class Attribute {
     type: Type,
     value?: unknown,
   ): FromDatabase {
-    if (arguments.length >= 4) {
-      return new FromDatabase(name, valueBeforeTypeCast, type, null, value);
-    }
-    return new FromDatabase(name, valueBeforeTypeCast, type, null);
+    return new FromDatabase(name, valueBeforeTypeCast, type, null, value);
   }
 
   static fromUser(
@@ -90,7 +79,7 @@ export abstract class Attribute {
     this.type = type;
     this.originalAttribute = originalAttribute;
 
-    if (arguments.length >= 5) {
+    if (value != null) {
       this._value = value;
       this._hasValue = true;
     } else {
@@ -240,13 +229,7 @@ export abstract class Attribute {
   }
 
   withUserDefault(value: unknown): Attribute {
-    if (!_UserProvidedDefaultCtor) {
-      throw new RuntimeError(
-        "UserProvidedDefault not loaded. Import '@blazetrails/activemodel' " +
-          "or './attribute/user-provided-default.js' before calling withUserDefault().",
-      );
-    }
-    return new _UserProvidedDefaultCtor(
+    return new _UserProvidedDefaultCtor!(
       this.name,
       value,
       this.type,

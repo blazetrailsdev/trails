@@ -56,29 +56,19 @@ export class Dirty {
   }
 
   attributeChanged(attrName: string, options?: DirtyOptions): boolean {
-    return this.mutationsFromDatabase.isChanged(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-      options,
-    );
+    return this.mutationsFromDatabase.isChanged(attrName, options);
   }
 
   attributeWas(attrName: string): unknown {
-    return this.mutationsFromDatabase.originalValue(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-    );
+    return this.mutationsFromDatabase.originalValue(attrName);
   }
 
   attributePreviouslyChanged(attrName: string, options?: DirtyOptions): boolean {
-    return this.mutationsBeforeLastSave.isChanged(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-      options,
-    );
+    return this.mutationsBeforeLastSave.isChanged(attrName, options);
   }
 
   attributePreviouslyWas(attrName: string): unknown {
-    return this.mutationsBeforeLastSave.originalValue(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-    );
+    return this.mutationsBeforeLastSave.originalValue(attrName);
   }
 
   restoreAttributes(attrNames: string[] = this.changed): void {
@@ -108,16 +98,12 @@ export class Dirty {
   }
 
   attributeChangedInPlace(attrName: string): boolean {
-    return this.mutationsFromDatabase.changedInPlace(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-    );
+    return this.mutationsFromDatabase.changedInPlace(attrName);
   }
 
   /** @internal */
   clearAttributeChange(attrName: string): void {
-    this.mutationsFromDatabase.forgetChange(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-    );
+    this.mutationsFromDatabase.forgetChange(attrName);
   }
 
   /** @internal */
@@ -142,36 +128,27 @@ export class Dirty {
 
   /** @internal */
   attributeChange(attrName: string): [unknown, unknown] | null {
-    return this.mutationsFromDatabase.changeToAttribute(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-    );
+    return this.mutationsFromDatabase.changeToAttribute(attrName);
   }
 
   /** @internal */
   attributePreviousChange(attrName: string): [unknown, unknown] | null {
-    return this.mutationsBeforeLastSave.changeToAttribute(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-    );
+    return this.mutationsBeforeLastSave.changeToAttribute(attrName);
   }
 
   /** @internal */
   attributeWillChangeBang(attrName: string): unknown {
-    return this.mutationsFromDatabase.forceChange(
-      (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName),
-    );
+    return this.mutationsFromDatabase.forceChange(attrName);
   }
 
   /** @internal */
   restoreAttributeBang(attrName: string): void {
-    attrName = (this.constructor as unknown as DirtyClass).resolveAttributeName(attrName);
     if (this.attributeChanged(attrName)) {
       (this as unknown as Record<string, unknown>)[attrName] = this.attributeWas(attrName);
       this.clearAttributeChange(attrName);
     }
   }
 }
-
-type DirtyClass = { resolveAttributeName(name: string): string };
 
 export function initAttributes(
   this: { constructor: { _defaultAttributes?: () => AttributeSet } },

@@ -89,12 +89,7 @@ export class Validations {
     this.errors.clear();
 
     try {
-      const completed = await runCallbacks(this, "validation", async () => {
-        await this.runValidationsBang();
-        return true;
-      });
-      if (!completed) return false;
-      return this.errors.empty;
+      return await this.runValidationsBang();
     } finally {
       this.contextForValidation().context = currentContext;
     }
