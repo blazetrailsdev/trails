@@ -2,6 +2,7 @@ import { inspect } from "@blazetrails/activesupport";
 import { NoMethodError } from "../attribute-assignment.js";
 
 export abstract class Type<T = unknown> {
+  /** @noRailsEquivalent CONVERGEABLE type-name-property-registry-key-burndown */
   abstract readonly name: string;
   #precision?: number;
   #limit?: number;
@@ -30,7 +31,7 @@ export abstract class Type<T = unknown> {
   }
 
   type(): string | undefined {
-    return this.name;
+    return undefined;
   }
 
   deserialize(value: unknown): T | null {
@@ -134,11 +135,8 @@ export abstract class Type<T = unknown> {
 }
 
 export class ValueType<T = unknown> extends Type<T> {
+  /** @noRailsEquivalent CONVERGEABLE type-name-property-registry-key-burndown */
   readonly name: string = "value";
-
-  override type(): string | undefined {
-    return this.name === "value" ? undefined : this.name;
-  }
 
   equals(other: Type): boolean {
     return (

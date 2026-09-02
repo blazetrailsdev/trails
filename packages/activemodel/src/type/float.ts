@@ -7,7 +7,7 @@ export class FloatType extends NumericValueType {
   readonly name = "float";
 
   type(): string {
-    return this.name;
+    return "float";
   }
 
   typeCastForSchema(value: unknown): string {

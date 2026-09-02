@@ -11,10 +11,6 @@ export class BigIntegerType extends IntegerType {
     return Number.POSITIVE_INFINITY;
   }
 
-  override type(): string {
-    return "integer";
-  }
-
   /** @internal */
   protected override castValue(value: unknown): number | bigint | null {
     if (typeof value === "bigint") return this.narrowBigInt(value);

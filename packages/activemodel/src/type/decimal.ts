@@ -11,7 +11,7 @@ export class DecimalType extends NumericValueType {
   readonly name: string = "decimal";
 
   type(): string {
-    return this.name;
+    return "decimal";
   }
 
   typeCastForSchema(value: unknown): string {

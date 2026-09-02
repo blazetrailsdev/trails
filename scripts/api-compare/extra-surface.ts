@@ -101,7 +101,7 @@ import {
   scopedSkipMirrorName,
   snakeToCamel,
 } from "@blazetrails/parity/conventions";
-import { resolveModuleName } from "./compare.js";
+import { TS_PARENT_ALIASES, resolveModuleName } from "./compare.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { manifestIsStale } from "./build-freshness.js";
@@ -1607,6 +1607,14 @@ function collectAllowedNames(
       // scores 100% there while `ModelName` reads as novel surface here.
       const renamed = TS_CLASS_RENAMES[short];
       if (renamed !== undefined) allowed.add(renamed);
+      // Same disagreement, one rule over: `resolveTsClassForRuby` also resolves
+      // a Ruby class through `TS_PARENT_ALIASES` (`<X>Type`, `Abstract<X>`,
+      // `Base<X>`, `ActiveModel<X>`, `Numeric<X>Type`), so `Type::Integer` is
+      // already matched to `IntegerType` there while every one of ActiveModel's
+      // type classes read as novel surface here. Both tools are scoped to the
+      // Ruby file the entity came from, so this allows the alias spelling only
+      // in the file that mirrors it.
+      for (const { transform } of TS_PARENT_ALIASES) allowed.add(transform(short));
     }
     if (nameOnly) continue;
     let target = allowed;

@@ -7,7 +7,7 @@ export class BinaryType extends ValueType<unknown> {
   readonly name = "binary";
 
   type(): string {
-    return this.name;
+    return "binary";
   }
 
   isBinary(): boolean {

@@ -15,7 +15,7 @@ export class IntegerType extends NumericValueType {
   }
 
   type(): string {
-    return this.name;
+    return "integer";
   }
 
   deserialize(value: unknown): number | bigint | null {

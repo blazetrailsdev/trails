@@ -1652,6 +1652,61 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
   });
 
+  it("admits a TS_PARENT_ALIASES declaration name (Type::Integer -> IntegerType)", () => {
+    // `resolveTsClassForRuby` already matches Ruby `Type::Integer` to TS
+    // `IntegerType` through TS_PARENT_ALIASES, so the declaration-name pass
+    // has to admit the same spelling or every ActiveModel type class reads as
+    // novel surface here while scoring 100% in parity:api.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Type::Integer": rubyClass({ name: "Integer", file: "type/integer.rb" }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            IntegerType: {
+              name: "IntegerType",
+              file: "type/integer.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+            GenuinelyNovelType: {
+              name: "GenuinelyNovelType",
+              file: "type/integer.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activemodel",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "type/integer.ts");
+    expect(f).toBeDefined();
+    expect(f!.extras.map((e) => e.name)).toEqual(["GenuinelyNovelType"]);
+  });
+
   it("resolves the unported guard against a cross-package module's OWNING package", () => {
     // A cross-package `::`-qualified include where the module's source is
     // unported only in its OWN package (i18n_railtie.rb, scoped to

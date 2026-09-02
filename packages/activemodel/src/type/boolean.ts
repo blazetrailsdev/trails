@@ -24,7 +24,7 @@ export class BooleanType extends ValueType<boolean> {
   ]);
 
   type(): string {
-    return this.name;
+    return "boolean";
   }
 
   serialize(value: unknown): boolean | null {
