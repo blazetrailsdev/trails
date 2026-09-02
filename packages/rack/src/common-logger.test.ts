@@ -142,7 +142,7 @@ it("log path with SCRIPT_NAME", async () => {
     },
   };
   await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/path", {
-    script_name: "/script",
+    ":script_name": "/script",
   });
   expect(logdev.str).toMatch(/"GET \/script\/path HTTP\/1\.1" 200 6 /);
 });
@@ -160,7 +160,7 @@ it("log path with SERVER_PROTOCOL", async () => {
     },
   };
   await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/path", {
-    http_version: "HTTP/1.0",
+    ":http_version": "HTTP/1.0",
   });
   expect(logdev.str).toMatch(/"GET \/path HTTP\/1\.0" 200 6 /);
 });

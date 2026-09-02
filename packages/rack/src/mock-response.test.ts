@@ -145,7 +145,7 @@ it("optionally makes Rack errors fatal", async () => {
     env["rack.errors"].write("fatal!");
     return [200, {}, ["OK"]] as [number, Record<string, string>, any];
   };
-  await expect(new MockRequest(errApp).get("/", { fatal: true })).rejects.toThrow(FatalWarning);
+  await expect(new MockRequest(errApp).get("/", { ":fatal": true })).rejects.toThrow(FatalWarning);
 });
 
 it("does not calculate content length for streaming body", () => {

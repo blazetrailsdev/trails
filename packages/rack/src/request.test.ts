@@ -474,8 +474,8 @@ describe("RackRequestTest", () => {
 
   it("not unify GET and POST when calling params", () => {
     const req = makeReq("/?foo=get", {
-      method: "POST",
-      input: "foo=post",
+      ":method": "POST",
+      ":input": "foo=post",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.GET["foo"]).toBe("get");
@@ -504,8 +504,8 @@ describe("RackRequestTest", () => {
 
   it("raise if input params has invalid %-encoding", () => {
     const req = makeReq("/?foo=quux", {
-      method: "POST",
-      input: "a%=1",
+      ":method": "POST",
+      ":input": "a%=1",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     // Invalid %-encoding should either throw or handle gracefully
@@ -521,7 +521,7 @@ describe("RackRequestTest", () => {
   });
 
   it("parse POST data when method is POST and no content-type given", () => {
-    const req = makeReq("/?foo=quux", { method: "POST", input: "foo=bar&quux=bla" });
+    const req = makeReq("/?foo=quux", { ":method": "POST", ":input": "foo=bar&quux=bla" });
     expect(req.contentType).toBeNull();
     expect(req.mediaType).toBeNull();
     expect(req.queryString).toBe("foo=quux");
@@ -532,8 +532,8 @@ describe("RackRequestTest", () => {
 
   it("parse POST data with explicit content type regardless of method", () => {
     const req = makeReq("/", {
-      method: "PUT",
-      input: "foo=bar",
+      ":method": "PUT",
+      ":input": "foo=bar",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.POST["foo"]).toBe("bar");
@@ -541,8 +541,8 @@ describe("RackRequestTest", () => {
 
   it("not parse POST data when media type is not form-data", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: '{"foo":"bar"}',
+      ":method": "POST",
+      ":input": '{"foo":"bar"}',
       CONTENT_TYPE: "application/json",
     });
     expect(req.POST).toEqual({});
@@ -550,8 +550,8 @@ describe("RackRequestTest", () => {
 
   it("parse POST data on PUT when media type is form-data", () => {
     const req = makeReq("/", {
-      method: "PUT",
-      input: "foo=bar",
+      ":method": "PUT",
+      ":input": "foo=bar",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.POST["foo"]).toBe("bar");
@@ -559,8 +559,8 @@ describe("RackRequestTest", () => {
 
   it("safely accepts POST requests with empty body", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "",
+      ":method": "POST",
+      ":input": "",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.POST).toEqual({});
@@ -568,8 +568,8 @@ describe("RackRequestTest", () => {
 
   it("clean up Safari's ajax POST body", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "\0",
+      ":method": "POST",
+      ":input": "\0",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.POST).toEqual({});
@@ -597,8 +597,8 @@ describe("RackRequestTest", () => {
     // Very large body - should still parse (we don't enforce byte limit currently)
     const largeBody = "a=1&".repeat(1000);
     const req = makeReq("/", {
-      method: "POST",
-      input: largeBody,
+      ":method": "POST",
+      ":input": largeBody,
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.POST["a"]).toBeDefined();
@@ -623,8 +623,8 @@ describe("RackRequestTest", () => {
 
   it("return form_pairs for url-encoded POST data", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "foo=bar&baz=qux",
+      ":method": "POST",
+      ":input": "foo=bar&baz=qux",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.formPairs).toEqual([
@@ -635,8 +635,8 @@ describe("RackRequestTest", () => {
 
   it("preserve duplicate keys in form_pairs", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "foo=1&foo=2",
+      ":method": "POST",
+      ":input": "foo=1&foo=2",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.formPairs).toEqual([
@@ -647,8 +647,8 @@ describe("RackRequestTest", () => {
 
   it("handle empty values in form_pairs", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "foo=&bar=baz",
+      ":method": "POST",
+      ":input": "foo=&bar=baz",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.formPairs).toEqual([
@@ -659,8 +659,8 @@ describe("RackRequestTest", () => {
 
   it("return empty array for form_pairs with no POST data", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "",
+      ":method": "POST",
+      ":input": "",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(req.formPairs).toEqual([]);
@@ -668,8 +668,8 @@ describe("RackRequestTest", () => {
 
   it("return empty array for form_pairs with non-form content type", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: '{"a":1}',
+      ":method": "POST",
+      ":input": '{"a":1}',
       CONTENT_TYPE: "application/json",
     });
     expect(req.formPairs).toEqual([]);
@@ -677,8 +677,8 @@ describe("RackRequestTest", () => {
 
   it("raise same error for form_pairs as POST with invalid encoding", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "a%=1",
+      ":method": "POST",
+      ":input": "a%=1",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     expect(() => req.formPairs).toThrow();
@@ -910,8 +910,8 @@ describe("RackRequestTest", () => {
 
   it("modify params hash if param is in POST", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "foo=bar",
+      ":method": "POST",
+      ":input": "foo=bar",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     req.POST["foo"] = "modified";
@@ -932,8 +932,8 @@ describe("RackRequestTest", () => {
 
   it("modify params hash by changing only POST", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "foo=bar",
+      ":method": "POST",
+      ":input": "foo=bar",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     req.POST["foo"] = "updated";
@@ -942,8 +942,8 @@ describe("RackRequestTest", () => {
 
   it("modify params hash, even if param is defined in both POST and GET", () => {
     const req = makeReq("/?foo=get", {
-      method: "POST",
-      input: "foo=post",
+      ":method": "POST",
+      ":input": "foo=post",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     req.POST["foo"] = "new_post";
@@ -958,8 +958,8 @@ describe("RackRequestTest", () => {
 
   it("allow deleting from params hash if param is in POST", () => {
     const req = makeReq("/", {
-      method: "POST",
-      input: "foo=bar",
+      ":method": "POST",
+      ":input": "foo=bar",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     req.deleteParam("foo");
@@ -997,7 +997,7 @@ describe("RackRequestTest", () => {
   });
 
   it("restore the base URL", () => {
-    const req = makeReq("http://example.org:8080/app/page?q=1", { script_name: "/app" });
+    const req = makeReq("http://example.org:8080/app/page?q=1", { ":script_name": "/app" });
     expect(req.baseUrl).toContain("example.org");
   });
 
@@ -1529,8 +1529,8 @@ describe("RackRequestTest", () => {
   it("handles ASCII NUL input of  bytes", () => {
     const length = 256;
     const req = makeReq("/", {
-      method: "POST",
-      input: "\0".repeat(length),
+      ":method": "POST",
+      ":input": "\0".repeat(length),
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
     const keys = Object.keys(req.POST);
