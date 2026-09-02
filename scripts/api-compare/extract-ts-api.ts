@@ -1577,6 +1577,23 @@ export function extractFromProgram(
     });
   }
 
+  for (const sourceFile of program.getSourceFiles()) {
+    if (!sourceFile.fileName.startsWith(srcDir)) continue;
+    if (sourceFile.fileName.endsWith(".test.ts")) continue;
+    if (sourceFile.fileName.endsWith(".d.ts")) continue;
+
+    const walk = (node: ts.Node): void => {
+      if (ts.isForOfStatement(node)) {
+        extractPrototypeAssignmentForOf(node, info, checker, srcDir, program);
+        extractDefinePropertyAccessorForOf(node, info, checker, srcDir, program);
+      } else if (ts.isExpressionStatement(node)) {
+        extractDefinePropertyAccessorDirect(node.expression, info, checker, srcDir, program);
+      }
+      ts.forEachChild(node, walk);
+    };
+    ts.forEachChild(sourceFile, walk);
+  }
+
   return info;
 }
 
@@ -1760,6 +1777,466 @@ function extractDefinePropertyForOf(
   const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
   for (const entry of entries) {
     pushDefinePropertyMethod(classInfo, entry.name, line, entry.params);
+  }
+}
+
+/**
+ * Strip `(x)` and `x as T` — the command-recorder loop writes
+ * `(CommandRecorder.prototype as unknown as Record<string, unknown>)`.
+ */
+function unwrapTsExpression(expr: ts.Expression): ts.Expression {
+  let e = expr;
+  while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+  return e;
+}
+
+/**
+ * The array of string literals an expression denotes, or null when any element
+ * is not statically a string. Three shapes resolve and nothing else: an array
+ * literal (spreads recursed into), an identifier bound to a const in the SAME
+ * file, and a property access naming a static of `ownerClass`. A list from
+ * another module is null on purpose — the arms below would otherwise credit a
+ * class with names this file never spells.
+ */
+function resolveStringLiteralList(
+  expr: ts.Expression,
+  checker: ts.TypeChecker,
+  ownerClass: ts.ClassDeclaration | null,
+  depth = 0,
+): string[] | null {
+  if (depth > 4) return null;
+  const e = unwrapTsExpression(expr);
+
+  if (ts.isArrayLiteralExpression(e)) {
+    const out: string[] = [];
+    for (const el of e.elements) {
+      if (ts.isStringLiteral(el)) {
+        out.push(el.text);
+      } else if (ts.isSpreadElement(el)) {
+        const nested = resolveStringLiteralList(el.expression, checker, ownerClass, depth + 1);
+        if (nested === null) return null;
+        out.push(...nested);
+      } else {
+        return null;
+      }
+    }
+    return out;
+  }
+
+  if (ts.isIdentifier(e)) {
+    const sym = checker.getSymbolAtLocation(e);
+    const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
+    if (!decl || !ts.isVariableDeclaration(decl) || !decl.initializer) return null;
+    if (decl.getSourceFile() !== e.getSourceFile()) return null;
+    return resolveStringLiteralList(decl.initializer, checker, ownerClass, depth + 1);
+  }
+
+  if (ts.isPropertyAccessExpression(e) && ts.isIdentifier(e.name) && ownerClass) {
+    for (const member of ownerClass.members) {
+      if (!ts.isPropertyDeclaration(member)) continue;
+      if (!ts.isIdentifier(member.name) || member.name.text !== e.name.text) continue;
+      if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
+      if (!member.initializer) return null;
+      return resolveStringLiteralList(member.initializer, checker, ownerClass, depth + 1);
+    }
+  }
+
+  return null;
+}
+
+/** A generator's host: the class declaration plus the ClassInfo to credit. */
+interface PrototypeHost {
+  classInfo: ClassInfo;
+  decl: ts.ClassDeclaration;
+}
+
+/** The registered host for a class declaration, if the package has one. */
+function hostForClassDeclaration(
+  decl: ts.ClassDeclaration,
+  info: PackageInfo,
+  srcDir: string,
+): PrototypeHost | null {
+  const name = decl.name?.text;
+  if (name === undefined) return null;
+  const file = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
+  const classInfo = info.classes[`${file}:${name}`];
+  return classInfo ? { classInfo, decl } : null;
+}
+
+/**
+ * Every class an `X.prototype` receiver names. `X` is a class in the package,
+ * or a PARAMETER of a same-package function — the shape a Rails `class_eval`
+ * generator takes in trails, where the loop lives in the mixin's own file and
+ * the host is handed to it (`defineValueMethods(Relation)`, relation.ts:2130).
+ * A parameter resolves through EVERY call site, since Ruby's generator runs
+ * once per class it is applied to; a generator nothing calls credits nothing.
+ */
+function resolvePrototypeHosts(
+  expr: ts.Expression,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+  program: ts.Program,
+): PrototypeHost[] {
+  const e = unwrapTsExpression(expr);
+  if (!ts.isPropertyAccessExpression(e)) return [];
+  if (!ts.isIdentifier(e.name) || e.name.text !== "prototype") return [];
+  const base = unwrapTsExpression(e.expression);
+  if (!ts.isIdentifier(base)) return [];
+
+  const decl = resolvedDeclaration(base, checker);
+  if (!decl) return [];
+  if (ts.isClassDeclaration(decl)) {
+    const host = hostForClassDeclaration(decl, info, srcDir);
+    return host ? [host] : [];
+  }
+  if (ts.isParameter(decl)) return hostsPassedToParameter(decl, info, checker, srcDir, program);
+  return [];
+}
+
+/** The declaration an identifier resolves to, through import aliases. */
+function resolvedDeclaration(id: ts.Identifier, checker: ts.TypeChecker): ts.Declaration | null {
+  const sym0 = checker.getSymbolAtLocation(id);
+  if (!sym0) return null;
+  const sym = sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+  return sym.valueDeclaration ?? sym.declarations?.[0] ?? null;
+}
+
+/** Every class a same-package call site passes for `param`. */
+function hostsPassedToParameter(
+  param: ts.ParameterDeclaration,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+  program: ts.Program,
+): PrototypeHost[] {
+  const fn = param.parent;
+  if (!ts.isFunctionDeclaration(fn) || !fn.name) return [];
+  const index = fn.parameters.indexOf(param);
+  if (index < 0) return [];
+  const fnDecl = resolvedDeclaration(fn.name, checker) ?? fn;
+  const fnName = fn.name.text;
+
+  const hosts: PrototypeHost[] = [];
+  for (const sourceFile of program.getSourceFiles()) {
+    if (!sourceFile.fileName.startsWith(srcDir)) continue;
+    if (sourceFile.fileName.endsWith(".test.ts")) continue;
+    const walk = (n: ts.Node): void => {
+      if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === fnName) {
+        const callee = resolvedDeclaration(n.expression, checker);
+        const arg = n.arguments[index];
+        if ((callee === null || callee === fnDecl) && arg !== undefined) {
+          const argExpr = unwrapTsExpression(arg);
+          const argDecl = ts.isIdentifier(argExpr) ? resolvedDeclaration(argExpr, checker) : null;
+          if (argDecl && ts.isClassDeclaration(argDecl)) {
+            const host = hostForClassDeclaration(argDecl, info, srcDir);
+            if (host && !hosts.some((h) => h.decl === host.decl)) hosts.push(host);
+          }
+        }
+      }
+      ts.forEachChild(n, walk);
+    };
+    ts.forEachChild(sourceFile, walk);
+  }
+  return hosts;
+}
+
+/** The statements of a for-of body, whether or not it is a block. */
+function loopBodyStatements(node: ts.ForOfStatement): readonly ts.Statement[] {
+  return ts.isBlock(node.statement) ? node.statement.statements : [node.statement];
+}
+
+/** The single `const <ident> of ...` loop variable, or null for any other shape. */
+function forOfElementName(node: ts.ForOfStatement): string | null {
+  if (!ts.isVariableDeclarationList(node.initializer)) return null;
+  if (node.initializer.declarations.length !== 1) return null;
+  const name = node.initializer.declarations[0].name;
+  return ts.isIdentifier(name) ? name.text : null;
+}
+
+/**
+ * The trails port of Ruby's name-array `class_eval` generator
+ * (`activerecord/lib/active_record/migration/command_recorder.rb:125-132`) —
+ * `for (const method of NAMES) { Cls.prototype[method] = function … }`. The Ruby
+ * extractor credits the macro, so without this arm the port scores all-missing.
+ */
+function extractPrototypeAssignmentForOf(
+  node: ts.ForOfStatement,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+  program: ts.Program,
+): void {
+  const nameVar = forOfElementName(node);
+  if (nameVar === null) return;
+
+  let hosts: PrototypeHost[] = [];
+  let params: ParamInfo[] = [];
+  for (const stmt of loopBodyStatements(node)) {
+    if (!ts.isExpressionStatement(stmt)) continue;
+    const expr = stmt.expression;
+    if (!ts.isBinaryExpression(expr)) continue;
+    if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
+    const lhs = unwrapTsExpression(expr.left);
+    if (!ts.isElementAccessExpression(lhs)) continue;
+    const arg = lhs.argumentExpression;
+    if (!ts.isIdentifier(arg) || arg.text !== nameVar) continue;
+    hosts = resolvePrototypeHosts(lhs.expression, info, checker, srcDir, program);
+    if (hosts.length === 0) continue;
+    const rhs = unwrapTsExpression(expr.right);
+    params =
+      ts.isFunctionExpression(rhs) || ts.isArrowFunction(rhs)
+        ? extractParameters(rhs.parameters)
+        : (paramsOfCallableRef(rhs, checker) ?? []);
+    break;
+  }
+
+  const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
+  for (const host of hosts) {
+    const names = resolveStringLiteralList(node.expression, checker, host.decl);
+    if (names === null) continue;
+    for (const name of names) {
+      if (host.classInfo.instanceMethods.some((m) => m.name === name)) continue;
+      host.classInfo.instanceMethods.push({
+        name,
+        visibility: "public",
+        params,
+        line,
+        file: host.classInfo.file,
+      });
+    }
+  }
+}
+
+/** The `get` / `set` initializers of an `Object.defineProperty` descriptor. */
+function definePropertyAccessors(descriptor: ts.ObjectLiteralExpression): {
+  get: ts.Expression | ts.MethodDeclaration | null;
+  set: ts.Expression | ts.MethodDeclaration | null;
+} {
+  let getter: ts.Expression | ts.MethodDeclaration | null = null;
+  let setter: ts.Expression | ts.MethodDeclaration | null = null;
+  for (const p of descriptor.properties) {
+    if (!ts.isPropertyAssignment(p) && !ts.isMethodDeclaration(p)) continue;
+    if (!ts.isIdentifier(p.name)) continue;
+    const key = p.name.text;
+    if (key !== "get" && key !== "set") continue;
+    const value = ts.isPropertyAssignment(p) ? p.initializer : p;
+    if (key === "get") getter = value;
+    else setter = value;
+  }
+  return { get: getter, set: setter };
+}
+
+/** The parameters of a descriptor's `set` half, `this` included (arity.ts drops it). */
+function setterParams(set: ts.Expression | ts.MethodDeclaration): ParamInfo[] {
+  const node = set as ts.Node;
+  if (ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node)) {
+    return extractParameters(node.parameters);
+  }
+  return [];
+}
+
+/** An `Object.defineProperty(<target>, name, { get, … })` call, destructured. */
+function findDefinePropertyAccessorCall(call: ts.CallExpression): {
+  nameExpr: ts.Expression;
+  target: ts.Expression;
+  descriptor: ts.ObjectLiteralExpression;
+} | null {
+  if (!ts.isPropertyAccessExpression(call.expression)) return null;
+  const pa = call.expression;
+  if (!ts.isIdentifier(pa.expression) || pa.expression.text !== "Object") return null;
+  if (!ts.isIdentifier(pa.name) || pa.name.text !== "defineProperty") return null;
+  if (call.arguments.length < 3) return null;
+  const [target, nameExpr, descriptor] = call.arguments;
+  if (!ts.isObjectLiteralExpression(descriptor)) return null;
+  if (definePropertyAccessors(descriptor).get === null) return null;
+  return { nameExpr, target, descriptor };
+}
+
+/** Push the reader — and, for a `get`/`set` pair, the writer — of a generated accessor. */
+function pushGeneratedAccessor(
+  classInfo: ClassInfo,
+  name: string,
+  line: number,
+  writerParams: ParamInfo[] | null,
+): void {
+  if (!classInfo.instanceMethods.some((m) => m.name === name && m.writer !== true)) {
+    classInfo.instanceMethods.push({
+      name,
+      visibility: "public",
+      params: [],
+      line,
+      file: classInfo.file,
+    });
+  }
+  if (writerParams === null) return;
+  if (classInfo.instanceMethods.some((m) => m.name === name && m.writer === true)) return;
+  classInfo.instanceMethods.push({
+    name,
+    visibility: "public",
+    params: writerParams,
+    line,
+    file: classInfo.file,
+    writer: true,
+  });
+}
+
+/**
+ * The property name a generated accessor takes for one value of the loop
+ * variable: the loop variable itself, or a local assigned from an `if` chain
+ * whose conditions are `<list>.includes(<var>)` and whose arms assign
+ * `` `${var}Suffix` `` — the port of Rails' `#{name}_values` / `#{name}_value`
+ * / `#{name}_clause` split (`query_methods.rb:162-186`). Anything else is null,
+ * and the caller credits nothing.
+ */
+function evaluateGeneratedName(
+  nameExpr: ts.Expression,
+  nameVar: string,
+  statements: readonly ts.Statement[],
+  value: string,
+  checker: ts.TypeChecker,
+  ownerClass: ts.ClassDeclaration,
+): string | null {
+  if (ts.isStringLiteral(nameExpr)) return nameExpr.text;
+  if (!ts.isIdentifier(nameExpr)) return null;
+  if (nameExpr.text === nameVar) return value;
+
+  const chain = statements.find(
+    (s): s is ts.IfStatement =>
+      ts.isIfStatement(s) && assignedExpression(s.thenStatement, nameExpr.text) !== null,
+  );
+  if (chain === undefined) return null;
+
+  let stmt: ts.Statement | undefined = chain;
+  for (;;) {
+    if (stmt === undefined) return null;
+    if (!ts.isIfStatement(stmt)) {
+      return armName(assignedExpression(stmt, nameExpr.text), nameVar, value);
+    }
+    const list = includesMembershipList(stmt.expression, nameVar, checker, ownerClass);
+    if (list === null) return null;
+    if (list.includes(value)) {
+      return armName(assignedExpression(stmt.thenStatement, nameExpr.text), nameVar, value);
+    }
+    stmt = stmt.elseStatement;
+  }
+}
+
+/** The expression a statement (or single-statement block) assigns to `target`. */
+function assignedExpression(stmt: ts.Statement | undefined, target: string): ts.Expression | null {
+  if (stmt === undefined) return null;
+  const candidates = ts.isBlock(stmt) ? stmt.statements : [stmt];
+  for (const s of candidates) {
+    if (!ts.isExpressionStatement(s)) continue;
+    const expr = s.expression;
+    if (!ts.isBinaryExpression(expr)) continue;
+    if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
+    if (!ts.isIdentifier(expr.left) || expr.left.text !== target) continue;
+    return expr.right;
+  }
+  return null;
+}
+
+/** `` `${var}Suffix` `` or a plain string literal, evaluated for one loop value. */
+function armName(expr: ts.Expression | null, nameVar: string, value: string): string | null {
+  if (expr === null) return null;
+  if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) return expr.text;
+  if (!ts.isTemplateExpression(expr)) return null;
+  if (expr.head.text !== "" || expr.templateSpans.length !== 1) return null;
+  const span = expr.templateSpans[0];
+  if (!ts.isIdentifier(span.expression) || span.expression.text !== nameVar) return null;
+  return value + span.literal.text;
+}
+
+/** The list behind a `<list>.includes(<nameVar>)` condition, or null. */
+function includesMembershipList(
+  cond: ts.Expression,
+  nameVar: string,
+  checker: ts.TypeChecker,
+  ownerClass: ts.ClassDeclaration,
+): string[] | null {
+  if (!ts.isCallExpression(cond)) return null;
+  if (!ts.isPropertyAccessExpression(cond.expression)) return null;
+  if (!ts.isIdentifier(cond.expression.name) || cond.expression.name.text !== "includes") {
+    return null;
+  }
+  const arg = cond.arguments[0];
+  if (arg === undefined || !ts.isIdentifier(arg) || arg.text !== nameVar) return null;
+  return resolveStringLiteralList(cond.expression.expression, checker, ownerClass);
+}
+
+/**
+ * The trails port of Ruby's `Relation::VALUE_METHODS` accessor generator
+ * (`activerecord/lib/active_record/relation/query_methods.rb:162-186`) — a loop
+ * installing `Object.defineProperty(<host>.prototype, methodName, { get, set })`.
+ * Credits each reader, plus its writer when the descriptor carries a `set`
+ * half, the pair Ruby's `def name` / `def name=(value)` produces.
+ */
+function extractDefinePropertyAccessorForOf(
+  node: ts.ForOfStatement,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+  program: ts.Program,
+): void {
+  const nameVar = forOfElementName(node);
+  if (nameVar === null) return;
+
+  const statements = loopBodyStatements(node);
+  let call: ReturnType<typeof findDefinePropertyAccessorCall> = null;
+  for (const stmt of statements) {
+    if (!ts.isExpressionStatement(stmt)) continue;
+    if (!ts.isCallExpression(stmt.expression)) continue;
+    call = findDefinePropertyAccessorCall(stmt.expression);
+    if (call) break;
+  }
+  if (!call) return;
+
+  const set = definePropertyAccessors(call.descriptor).set;
+  const writerParams = set === null ? null : setterParams(set);
+  const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
+
+  for (const host of resolvePrototypeHosts(call.target, info, checker, srcDir, program)) {
+    const values = resolveStringLiteralList(node.expression, checker, host.decl);
+    if (values === null) continue;
+    const names: string[] = [];
+    for (const value of values) {
+      const name = evaluateGeneratedName(
+        call.nameExpr,
+        nameVar,
+        statements,
+        value,
+        checker,
+        host.decl,
+      );
+      if (name === null) break;
+      names.push(name);
+    }
+    if (names.length !== values.length) continue;
+    for (const name of names) pushGeneratedAccessor(host.classInfo, name, line, writerParams);
+  }
+}
+
+/**
+ * A single literal-named `Object.defineProperty(<host>.prototype, "name",
+ * { get, set })` — the port of Rails' `alias extensions extending_values`
+ * (`query_methods.rb:185`), which sits beside the loop rather than inside it.
+ */
+function extractDefinePropertyAccessorDirect(
+  expr: ts.Expression,
+  info: PackageInfo,
+  checker: ts.TypeChecker,
+  srcDir: string,
+  program: ts.Program,
+): void {
+  if (!ts.isCallExpression(expr)) return;
+  const call = findDefinePropertyAccessorCall(expr);
+  if (!call || !ts.isStringLiteral(call.nameExpr)) return;
+  const set = definePropertyAccessors(call.descriptor).set;
+  const writerParams = set === null ? null : setterParams(set);
+  const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
+  for (const host of resolvePrototypeHosts(call.target, info, checker, srcDir, program)) {
+    pushGeneratedAccessor(host.classInfo, call.nameExpr.text, line, writerParams);
   }
 }
 
