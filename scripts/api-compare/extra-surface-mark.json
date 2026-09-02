@@ -5,7 +5,8 @@
   },
   "arel": {
     "novel": 0,
-    "total": 35
+    "total": 35,
+    "inlinedFrom": 4
   },
   "ruby-compat": {
     "novel": 0,

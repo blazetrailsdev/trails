@@ -9,6 +9,7 @@ import {
   NullPool,
   withExecutionContext,
 } from "./connection-adapters/abstract/connection-pool.js";
+import { AdapterNotFound } from "./errors.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { ConnectionDescriptor } from "./connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "./connection-adapters/pool-config.js";
@@ -688,26 +689,28 @@ describe("ConnectionPool schema cache", () => {
 });
 
 describe("adapterNameFromConfig", () => {
-  it("maps postgresql variants to postgres", async () => {
-    expect(adapterNameFromConfig("postgresql")).toBe("postgres");
-    expect(adapterNameFromConfig("postgres")).toBe("postgres");
-    expect(adapterNameFromConfig("pg")).toBe("postgres");
+  it("resolves postgresql aliases to the registered postgresql name", async () => {
+    expect(adapterNameFromConfig("postgresql")).toBe("postgresql");
+    expect(adapterNameFromConfig("postgres")).toBe("postgresql");
+    expect(adapterNameFromConfig("pg")).toBe("postgresql");
   });
 
-  it("maps mysql variants to mysql", async () => {
+  it("resolves mysql aliases to the registered mysql2 name", async () => {
     expect(adapterNameFromConfig("mysql2")).toBe("mysql2");
     expect(adapterNameFromConfig("mysql")).toBe("mysql2");
     expect(adapterNameFromConfig("mariadb")).toBe("mysql2");
   });
 
-  it("maps sqlite variants to sqlite", async () => {
-    expect(adapterNameFromConfig("sqlite3")).toBe("sqlite");
-    expect(adapterNameFromConfig("sqlite")).toBe("sqlite");
+  it("resolves sqlite aliases to the registered sqlite3 name", async () => {
+    expect(adapterNameFromConfig("sqlite3")).toBe("sqlite3");
+    expect(adapterNameFromConfig("sqlite")).toBe("sqlite3");
   });
 
-  it("defaults unknown to sqlite", async () => {
-    expect(adapterNameFromConfig(undefined)).toBe("sqlite");
-    expect(adapterNameFromConfig("unknown")).toBe("sqlite");
+  it("raises AdapterNotFound for an unregistered adapter", async () => {
+    expect(() => adapterNameFromConfig(undefined)).toThrow(AdapterNotFound);
+    expect(() => adapterNameFromConfig("unknown")).toThrow(
+      "Database configuration specifies nonexistent 'unknown' adapter.",
+    );
   });
 });
 

@@ -38,27 +38,27 @@ import { Uuid } from "./oid/uuid.js";
 import { Vector } from "./oid/vector.js";
 import { Xml } from "./oid/xml.js";
 
-ArType.addModifier({ array: true }, OidArray, { adapter: "postgres" });
-ArType.addModifier({ range: true }, RangeType, { adapter: "postgres" });
+ArType.addModifier({ array: true }, OidArray, { adapter: "postgresql" });
+ArType.addModifier({ range: true }, RangeType, { adapter: "postgresql" });
 
-ArType.register("bit", Bit, { adapter: "postgres" });
-ArType.register("bit_varying", BitVarying, { adapter: "postgres" });
-ArType.register("binary", Bytea, { adapter: "postgres" });
-ArType.register("cidr", Cidr, { adapter: "postgres" });
-ArType.register("date", OidDate, { adapter: "postgres" });
-ArType.register("datetime", OidDateTime, { adapter: "postgres" });
-ArType.register("decimal", Decimal, { adapter: "postgres" });
-ArType.register("enum", Enum, { adapter: "postgres" });
-ArType.register("hstore", Hstore, { adapter: "postgres" });
-ArType.register("inet", Inet, { adapter: "postgres" });
-ArType.register("interval", Interval, { adapter: "postgres" });
-ArType.register("jsonb", Jsonb, { adapter: "postgres" });
-ArType.register("money", Money, { adapter: "postgres" });
-ArType.register("point", Point, { adapter: "postgres" });
-ArType.register("legacy_point", LegacyPoint, { adapter: "postgres" });
-ArType.register("uuid", Uuid, { adapter: "postgres" });
-ArType.register("vector", Vector, { adapter: "postgres" });
-ArType.register("xml", Xml, { adapter: "postgres" });
+ArType.register("bit", Bit, { adapter: "postgresql" });
+ArType.register("bit_varying", BitVarying, { adapter: "postgresql" });
+ArType.register("binary", Bytea, { adapter: "postgresql" });
+ArType.register("cidr", Cidr, { adapter: "postgresql" });
+ArType.register("date", OidDate, { adapter: "postgresql" });
+ArType.register("datetime", OidDateTime, { adapter: "postgresql" });
+ArType.register("decimal", Decimal, { adapter: "postgresql" });
+ArType.register("enum", Enum, { adapter: "postgresql" });
+ArType.register("hstore", Hstore, { adapter: "postgresql" });
+ArType.register("inet", Inet, { adapter: "postgresql" });
+ArType.register("interval", Interval, { adapter: "postgresql" });
+ArType.register("jsonb", Jsonb, { adapter: "postgresql" });
+ArType.register("money", Money, { adapter: "postgresql" });
+ArType.register("point", Point, { adapter: "postgresql" });
+ArType.register("legacy_point", LegacyPoint, { adapter: "postgresql" });
+ArType.register("uuid", Uuid, { adapter: "postgresql" });
+ArType.register("vector", Vector, { adapter: "postgresql" });
+ArType.register("xml", Xml, { adapter: "postgresql" });
 
 export function extractLimit(sqlType: string | undefined): number | undefined {
   if (!sqlType) return undefined;

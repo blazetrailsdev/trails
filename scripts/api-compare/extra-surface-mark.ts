@@ -122,6 +122,24 @@ export const GATED_PACKAGES: readonly GatedPackage[] = [
   ...TAGGED_ONLY_PACKAGES,
 ].sort();
 
+/**
+ * Gated packages whose `inlined-from` bucket is gated too — a Ruby module
+ * member whose TS body sits on an INCLUDING class's file rather than the file
+ * mirroring the module's own (RFC 0126). Report-only for every other package
+ * until its own burndown, exactly like `novel`'s enrollment: only-grow, and no
+ * package leaves to turn a red run green.
+ */
+export const INLINED_FROM_PACKAGES = ["arel"] as const;
+
+/** The dimensions gated for one package — see {@link INLINED_FROM_PACKAGES}. */
+function dimensionsFor(name: string): readonly MarkDimension[] {
+  return (INLINED_FROM_PACKAGES as readonly string[]).includes(name)
+    ? (["novel", "total", "inlinedFrom"] as const)
+    : (["novel", "total"] as const);
+}
+
+export type MarkDimension = "novel" | "total" | "inlinedFrom";
+
 export interface SurfaceMark {
   /**
    * Extras that appear NOWHERE in the Rails source — invented surface, the
@@ -130,6 +148,11 @@ export interface SurfaceMark {
   novel: number;
   /** All extras, novel plus moved-not-novel. */
   total: number;
+  /**
+   * Members inlined onto an including class's file. Present only for the
+   * packages in {@link INLINED_FROM_PACKAGES}.
+   */
+  inlinedFrom?: number;
 }
 
 export type SurfaceMarks = Record<string, SurfaceMark>;
@@ -139,6 +162,7 @@ export interface MeasuredTotals {
   package: string;
   totalNovel: number;
   totalExtras: number;
+  inlinedFrom: readonly unknown[];
 }
 
 export function measure(packages: readonly MeasuredTotals[]): SurfaceMarks {
@@ -147,13 +171,16 @@ export function measure(packages: readonly MeasuredTotals[]): SurfaceMarks {
     const measured = packages.find((p) => p.package === name);
     if (!measured) continue;
     marks[name] = { novel: measured.totalNovel, total: measured.totalExtras };
+    if ((INLINED_FROM_PACKAGES as readonly string[]).includes(name)) {
+      marks[name].inlinedFrom = measured.inlinedFrom.length;
+    }
   }
   return marks;
 }
 
 export interface MarkViolation {
   package: string;
-  dimension: "novel" | "total";
+  dimension: MarkDimension;
   mark: number;
   current: number;
 }
@@ -168,14 +195,12 @@ export function exceedances(marks: SurfaceMarks, current: SurfaceMarks): MarkVio
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
-    for (const dimension of ["novel", "total"] as const) {
-      if (now[dimension] > mark[dimension]) {
-        violations.push({
-          package: name,
-          dimension,
-          mark: mark[dimension],
-          current: now[dimension],
-        });
+    for (const dimension of dimensionsFor(name)) {
+      const markValue = mark[dimension];
+      const nowValue = now[dimension];
+      if (markValue === undefined || nowValue === undefined) continue;
+      if (nowValue > markValue) {
+        violations.push({ package: name, dimension, mark: markValue, current: nowValue });
       }
     }
   }
@@ -193,9 +218,12 @@ export function staleMarks(marks: SurfaceMarks, current: SurfaceMarks): MarkViol
     const mark = marks[name];
     const now = current[name];
     if (!mark || !now) continue;
-    for (const dimension of ["novel", "total"] as const) {
-      if (now[dimension] < mark[dimension]) {
-        stale.push({ package: name, dimension, mark: mark[dimension], current: now[dimension] });
+    for (const dimension of dimensionsFor(name)) {
+      const markValue = mark[dimension];
+      const nowValue = now[dimension];
+      if (markValue === undefined || nowValue === undefined) continue;
+      if (nowValue < markValue) {
+        stale.push({ package: name, dimension, mark: markValue, current: nowValue });
       }
     }
   }
@@ -262,6 +290,9 @@ export function tightened(marks: SurfaceMarks, current: SurfaceMarks): SurfaceMa
       novel: Math.min(mark.novel, now.novel),
       total: Math.min(mark.total, now.total),
     };
+    if (mark.inlinedFrom !== undefined && now.inlinedFrom !== undefined) {
+      next[name].inlinedFrom = Math.min(mark.inlinedFrom, now.inlinedFrom);
+    }
   }
   return next;
 }

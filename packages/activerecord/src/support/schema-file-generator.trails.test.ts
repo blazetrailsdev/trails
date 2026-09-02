@@ -289,9 +289,9 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
     adapter: string;
     map: Record<string, string>;
   }> = [
-    { adapter: "postgres", map: COLUMN_TYPE_MAP_PG },
+    { adapter: "postgresql", map: COLUMN_TYPE_MAP_PG },
     { adapter: "mysql2", map: COLUMN_TYPE_MAP_MYSQL },
-    { adapter: "sqlite", map: COLUMN_TYPE_MAP_SQLITE },
+    { adapter: "sqlite3", map: COLUMN_TYPE_MAP_SQLITE },
   ];
 
   for (const { adapter, map } of CASES) {

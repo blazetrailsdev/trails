@@ -19,13 +19,13 @@ const zeroMarks: SurfaceMarks = { "ruby-compat": { novel: 0, total: 0 } };
 describe("extra-surface mark", () => {
   it("measures only the gated packages", () => {
     const measured = measure([
-      { package: "arel", totalNovel: 0, totalExtras: 63 },
-      { package: "activerecord", totalNovel: 399, totalExtras: 1424 },
-      { package: "ruby-compat", totalNovel: 0, totalExtras: 0 },
-      { package: "activemodel", totalNovel: 12, totalExtras: 34 },
+      { package: "arel", totalNovel: 0, totalExtras: 63, inlinedFrom: [] },
+      { package: "activerecord", totalNovel: 399, totalExtras: 1424, inlinedFrom: [] },
+      { package: "ruby-compat", totalNovel: 0, totalExtras: 0, inlinedFrom: [] },
+      { package: "activemodel", totalNovel: 12, totalExtras: 34, inlinedFrom: [] },
     ]);
     expect(measured).toEqual({
-      arel: { novel: 0, total: 63 },
+      arel: { novel: 0, total: 63, inlinedFrom: 0 },
       activerecord: { novel: 399, total: 1424 },
       "ruby-compat": { novel: 0, total: 0 },
     });

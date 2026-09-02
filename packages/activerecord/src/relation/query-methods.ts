@@ -1309,16 +1309,7 @@ function excludingWithCallee(callee: "excluding" | "without") {
         deferredRelations.push(relation);
         continue;
       }
-      const primaryKey = relation.model.primaryKey;
-      const primaryKeyArray: string[] =
-        primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
-      for (const record of relation._records) {
-        flatMappedIds.push(
-          primaryKeyArray.length === 1
-            ? record._readAttribute(primaryKeyArray[0])
-            : primaryKeyArray.map((column: string) => record._readAttribute(column)),
-        );
-      }
+      flatMappedIds.push(...(relation.ids() as unknown[]));
     }
     const combined: unknown[] = [...records, ...flatMappedIds, ...deferredRelations];
     return excludingBang.call(this.spawn(), combined);
@@ -1330,11 +1321,7 @@ const excluding = excludingWithCallee("excluding");
 const without = excludingWithCallee("without");
 
 function excludingBang(this: QueryMethodsHost, records: any[]): any {
-  const primaryKey = this.primaryKey;
-  if (Array.isArray(primaryKey)) {
-    throw new Error("excluding does not support models with composite primary keys");
-  }
-  const pk = primaryKey;
+  const pk = this.primaryKey;
 
   const deferredRelations = records.filter((r) => isRelationLike(r));
   const literalRecords = records.filter((r) => !isRelationLike(r));
@@ -1343,14 +1330,14 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
     this.whereClause = this.whereClause.plus(
       new WhereClause([
         this.predicateBuilder
-          .build(this.predicateBuilder.table.arelTable.get(pk), literalRecords)
+          .build(this.predicateBuilder.table.arelTable.get(pk as string), literalRecords)
           .invert(),
       ]),
     );
     return this;
   }
 
-  const attribute = this.predicateBuilder.table.arelTable.get(pk);
+  const attribute = this.predicateBuilder.table.arelTable.get(pk as string);
   const literalIds = literalRecords.map((r) => (isBaseInstance(r) ? (r as any).id : r));
   const inlineSubquery = (this.predicateBuilder.build(attribute, deferredRelations[0]) as Nodes.In)
     .right as Nodes.Node;

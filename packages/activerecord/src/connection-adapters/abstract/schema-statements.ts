@@ -813,9 +813,9 @@ export class SchemaStatements {
 
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     switch (this.typeRegistryKey) {
-      case "sqlite":
+      case "sqlite3":
         return sqliteIndexes(this as unknown as DatabaseAdapter, tableName);
-      case "postgres": {
+      case "postgresql": {
         const rows = (
           await this.internalExecQuery(
             `SELECT i.relname AS name, ix.indisunique AS unique, array_agg(a.attname ORDER BY k.n) AS columns,

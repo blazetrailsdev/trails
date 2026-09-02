@@ -52,7 +52,7 @@ function makePool(size: number = 5): ConnectionPool {
 
 class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
   override get typeRegistryKey(): AdapterName {
-    return "sqlite";
+    return "sqlite3";
   }
   constructor() {
     super();

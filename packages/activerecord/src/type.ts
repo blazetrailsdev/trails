@@ -93,7 +93,7 @@ export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): vo
 export function register(
   typeName: string,
   klass?: (new (...args: any[]) => Type) | null,
-  options?: { adapter?: string; override?: boolean },
+  options?: { adapter?: AdapterName; override?: boolean },
   block?: (...args: unknown[]) => Type,
 ): void {
   registry().register(typeName, klass, options, block);
@@ -102,7 +102,7 @@ export function register(
 export function addModifier(
   options: Record<string, unknown>,
   klass: new (subtype: Type) => Type,
-  registrationOptions?: { adapter?: string },
+  registrationOptions?: { adapter?: AdapterName },
 ): void {
   registry().addModifier(options, klass, registrationOptions);
 }
@@ -133,15 +133,16 @@ export function adapterNameFrom(model: AdapterNameSource): AdapterName {
     configAdapter = model.connectionDbConfig()?.adapter;
   } catch (error) {
     if (!(error instanceof ConnectionNotEstablished)) throw error;
-    return "sqlite";
+    return "sqlite3";
   }
+  if (configAdapter === undefined) return "sqlite3";
   return adapterNameFromConfig(configAdapter);
 }
 
 /** @internal */
 export function currentAdapterName(): AdapterName {
   const base = _currentAdapterResolver?.();
-  return base ? adapterNameFrom(base) : "sqlite";
+  return base ? adapterNameFrom(base) : "sqlite3";
 }
 
 typeRegistry.register("date", null, () => new Date()); // boundary: AR Type::Date class, not JS Date

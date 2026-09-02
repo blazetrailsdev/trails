@@ -998,7 +998,24 @@ export class Relation<T extends Base> {
   }
 
   /** @internal */
-  async _materializeDeferredDistinctPkPredicates(): Promise<void> {
+  _materializeDeferredDistinctPkPredicates(): Promise<void> | void {
+    const predicates = this.whereClause.predicates;
+    if (
+      !predicates.some(
+        (node) =>
+          node instanceof DeferredDistinctPkIn ||
+          node instanceof DeferredDistinctPkNotIn ||
+          node instanceof DeferredIdsNotIn ||
+          node instanceof DeferredIdsIn,
+      )
+    ) {
+      return;
+    }
+    return this._materializeDeferredDistinctPkPredicatesAsync();
+  }
+
+  /** @internal */
+  private async _materializeDeferredDistinctPkPredicatesAsync(): Promise<void> {
     const predicates = this.whereClause.predicates;
     for (let i = 0; i < predicates.length; i++) {
       const node = predicates[i];

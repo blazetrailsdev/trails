@@ -19,6 +19,7 @@ import { And, Or } from "./nodes/nary.js";
 import { Grouping } from "./nodes/grouping.js";
 import { Case } from "./nodes/case.js";
 import { Concat, Contains, Overlaps } from "./nodes/infix-operation.js";
+import { _buildQuoted } from "./node-slots.js";
 import { rbEqual } from "@blazetrails/activesupport";
 
 function isSelectManagerLike(value: unknown): value is { ast: Node } {
@@ -162,6 +163,8 @@ export interface PredicationsModule extends GroupingFolders {
   concat(other: Node): Concat;
   contains(other: unknown): Contains;
   overlaps(other: unknown): Overlaps;
+  /** @internal */
+  quotedNode(other: unknown): Node;
   quotedArray(others: unknown[]): Node[];
   isInfinity(value: unknown): 1 | -1 | 0;
   isUnboundable(value: unknown): 1 | -1 | 0;
@@ -418,6 +421,9 @@ export const Predications: PredicationsModule = {
   },
   overlaps(this: Node & PredicationHost, other: unknown): Overlaps {
     return new Overlaps(this, this.quotedNode(other));
+  },
+  quotedNode(this: Node, other: unknown): Node {
+    return _buildQuoted!(other, this);
   },
   quotedArray(this: PredicationHost, others: unknown[]): Node[] {
     return others.map((v) => this.quotedNode(v));

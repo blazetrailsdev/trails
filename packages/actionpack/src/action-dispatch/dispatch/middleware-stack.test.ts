@@ -35,6 +35,16 @@ class BazMiddleware {
   }
 }
 
+class HiyaMiddleware {
+  private app: RackApp;
+  constructor(app: RackApp) {
+    this.app = app;
+  }
+  async call(env: RackEnv): Promise<RackResponse> {
+    return this.app(env);
+  }
+}
+
 class QuxMiddleware {
   private app: RackApp;
   private prefix: string;
@@ -225,7 +235,12 @@ describe("MiddlewareStackTest", () => {
 
   it("raise an error on invalid index", () => {
     const stack = new MiddlewareStack();
-    expect(() => stack.insert(5, FooMiddleware)).toThrow(/Invalid index/);
+    expect(() => stack.insert(HiyaMiddleware, BazMiddleware)).toThrow(
+      /No such middleware to insert before/,
+    );
+    expect(() => stack.insertAfter(HiyaMiddleware, BazMiddleware)).toThrow(
+      /No such middleware to insert after/,
+    );
   });
 
   it("can check if Middleware are equal - Class", () => {

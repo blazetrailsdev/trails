@@ -616,7 +616,7 @@ export class Builder implements InsertBuilder {
     if (v) return v;
     const q = this._connection as unknown as Visitors.ArelConnection;
     if (this._connection.typeRegistryKey === "mysql2") return new Visitors.MySQL(q);
-    if (this._connection.typeRegistryKey === "postgres") return new Visitors.PostgreSQL(q);
+    if (this._connection.typeRegistryKey === "postgresql") return new Visitors.PostgreSQL(q);
     return new Visitors.SQLite(q);
   }
 }

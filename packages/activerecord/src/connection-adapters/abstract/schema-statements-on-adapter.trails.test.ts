@@ -20,7 +20,7 @@ afterEach(async () => {
 
 class StubAdapter extends AbstractAdapter {
   override get typeRegistryKey() {
-    return "sqlite" as const;
+    return "sqlite3" as const;
   }
   execute(_sql: string) {
     return Promise.resolve([] as Record<string, unknown>[]);
@@ -33,7 +33,7 @@ class StubAdapter extends AbstractAdapter {
 class CapturingAdapter extends AbstractAdapter {
   lastSql = "";
   lastParams: unknown[] = [];
-  constructor(private readonly dialect: "sqlite" | "postgres" | "mysql2") {
+  constructor(private readonly dialect: "sqlite3" | "postgresql" | "mysql2") {
     super();
   }
   override get typeRegistryKey() {
@@ -66,7 +66,7 @@ class SqliteCapturingAdapter extends AbstractAdapter {
     return this.allSql.at(-1) ?? "";
   }
   override get typeRegistryKey() {
-    return "sqlite" as any;
+    return "sqlite3" as any;
   }
   execute(sql: string) {
     this.allSql.push(sql);

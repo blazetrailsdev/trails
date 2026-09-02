@@ -50,8 +50,8 @@ function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
 function serialIdType(spec: ColumnSpec | undefined, typeRegistryKey?: string): string {
   const type = typeof spec === "string" ? spec : spec?.type;
   const isBig = type === "big_integer";
-  if (typeRegistryKey === "postgres") return isBig ? "bigserial" : "serial";
-  if (typeRegistryKey === "sqlite") return "integer";
+  if (typeRegistryKey === "postgresql") return isBig ? "bigserial" : "serial";
+  if (typeRegistryKey === "sqlite3") return "integer";
   return isBig ? "bigint" : "integer";
 }
 
@@ -94,7 +94,7 @@ function generateCode(
     `export default async function defineSchema(ctx: DatabaseAdapter): Promise<void> {`,
   ];
 
-  const needsForce = typeRegistryKey === "postgres" || typeRegistryKey === "mysql2";
+  const needsForce = typeRegistryKey === "postgresql" || typeRegistryKey === "mysql2";
 
   if (needsForce) {
     for (const [tableName, tableSpec] of Object.entries(schema)) {

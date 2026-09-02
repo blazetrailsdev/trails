@@ -8,13 +8,13 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 let adapter: DatabaseAdapter;
 
 async function listTables(a: DatabaseAdapter): Promise<string[]> {
-  if (a.typeRegistryKey === "sqlite") {
+  if (a.typeRegistryKey === "sqlite3") {
     return (
       (await a.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
       )) as Array<{ name: string }>
     ).map((r) => r.name);
-  } else if (a.typeRegistryKey === "postgres") {
+  } else if (a.typeRegistryKey === "postgresql") {
     return (
       (await a.execute(
         `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
