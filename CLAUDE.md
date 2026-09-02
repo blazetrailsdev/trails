@@ -611,6 +611,46 @@ of the three cites **this section** — `@noRailsEquivalent` there is a pointer 
 a ratified repo-wide rule, not a local justification, and a new instance is not
 a new decision to argue.
 
+## Serialization's dual sync/async hash (`serializable_hash` / `as_json`)
+
+Ruby's `serializable_add_includes`
+(`activemodel/lib/active_model/serialization.rb:191`) reads an association
+synchronously — `if records = send(association)` — and `CollectionProxy#to_ary`
+lazily loads it in-line at `serialization.rb:143`. In trails an association read
+is async, so an `include:`-bearing `serializable_hash` cannot be fully
+synchronous.
+
+**The settled answer is the dual-shape return** — `thenableHash` in
+`activemodel/src/serialization.ts` builds a Proxy that is both a plain hash and
+a `PromiseLike`. Read a key off it and you get the synchronous hash, where an
+unloaded `include:` fails loud rather than silently serializing nothing;
+`await` it and the includes are lazily loaded first, which is where Ruby's
+in-line `to_ary` load lands. `asJsonThenable` is the same shape for
+`ActiveModel::Serializers::JSON#as_json`
+(`activemodel/lib/active_model/serializers/json.rb:96-110`), and
+`serializableHash`'s third parameter is the module-private sync re-entry flag
+the Proxy calls back through.
+
+**The alternative — `serializableHash` / `asJson` returning `Promise`
+unconditionally, the way RFC 0063 made `isValid()` return `Promise<boolean>` —
+was considered and rejected, because `toJSON` cannot answer it.**
+`JSON.stringify` calls `toJSON` synchronously and never awaits, and trails'
+`toJSON` (`activesupport/src/core-ext/object/json.ts:47-60`, the port of
+`ActiveSupport::ToJsonWithActiveSupportEncoder#to_json`,
+`core_ext/object/json.rb:35-43`) returns `this.asJson()` from inside that
+synchronous call. An unconditionally-async `asJson` would make
+`JSON.stringify(record)` emit `{}` for every model in the repo, which is not a
+cost the async boundary can be paid with. There is no third shape: `to_json` is
+Rails-facing API, so it cannot be dropped to buy the uniform Promise.
+
+This is a genuine language shortcoming — JS has no synchronous await and no
+lazily-loading collection read — and it is ratified repo-wide here.
+`thenableHash`, `asJsonThenable` and `preloadIncludes` carry
+`@noRailsEquivalent PERMANENT` receipts against this section, and the
+`SerializableHash` type and the `sync` re-entry parameter exist to serve them.
+Do not re-derive the decision per call site, and do not file a story to make
+them `Promise`.
+
 ## Call-time constant resolution (Ruby autoload → the zero-import slot)
 
 Ruby resolves a constant named inside a method body when the method **runs**,
