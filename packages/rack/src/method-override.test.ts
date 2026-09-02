@@ -22,14 +22,14 @@ it("not affect GET requests", async () => {
 
 it("sets rack.errors for invalid UTF8 _method values", async () => {
   const res = await new MockRequest((env) => makeApp().call(env)).post("/", {
-    input: "_method=\uFFFD",
+    ":input": "_method=\uFFFD",
   });
   expect(res.status).toBe(200);
 });
 
 it("modify REQUEST_METHOD for POST requests when _method parameter is set", async () => {
   const res = await new MockRequest((env) => makeApp().call(env)).post("/", {
-    input: "_method=put",
+    ":input": "_method=put",
   });
   expect(res.bodyString).toBe("PUT");
 });
@@ -43,14 +43,14 @@ it("modify REQUEST_METHOD for POST requests when X-HTTP-Method-Override is set",
 
 it("not modify REQUEST_METHOD if the method is unknown", async () => {
   const res = await new MockRequest((env) => makeApp().call(env)).post("/", {
-    input: "_method=UNKNOWN",
+    ":input": "_method=UNKNOWN",
   });
   expect(res.bodyString).toBe("POST");
 });
 
 it("not modify REQUEST_METHOD when _method is nil", async () => {
   const res = await new MockRequest((env) => makeApp().call(env)).post("/", {
-    input: "",
+    ":input": "",
   });
   expect(res.bodyString).toBe("POST");
 });
@@ -60,7 +60,7 @@ it("store the original REQUEST_METHOD prior to overriding", async () => {
     return [200, {}, [env["rack.methodoverride.original_method"] || "none"]];
   });
   const res = await new MockRequest((env) => app.call(env)).post("/", {
-    input: "_method=put",
+    ":input": "_method=put",
   });
   expect(res.bodyString).toBe("POST");
 });
@@ -72,8 +72,8 @@ it("not modify REQUEST_METHOD when given invalid multipart form data", async () 
   const env = MockRequest.envFor("/", {
     CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
     CONTENT_LENGTH: String(TRUNCATED_MULTIPART.length),
-    method: "POST",
-    input: TRUNCATED_MULTIPART,
+    ":method": "POST",
+    ":input": TRUNCATED_MULTIPART,
   });
   await makeApp().call(env);
   expect(env["REQUEST_METHOD"]).toBe("POST");
@@ -85,8 +85,8 @@ it("writes error to RACK_ERRORS when given invalid multipart form data", async (
     CONTENT_TYPE: "multipart/form-data, boundary=AaB03x",
     CONTENT_LENGTH: String(TRUNCATED_MULTIPART.length),
     "rack.errors": errors,
-    method: "POST",
-    input: TRUNCATED_MULTIPART,
+    ":method": "POST",
+    ":input": TRUNCATED_MULTIPART,
   });
   await new MethodOverride(async () => [200, { "content-type": "text/plain" }, []]).call(env);
   expect(errors.string()).toContain("Bad request content body");
@@ -98,7 +98,7 @@ it("writes error to RACK_ERRORS when using incompatible multipart encoding", asy
   });
   const res = await new MockRequest((env) => app.call(env)).post("/", {
     CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
-    input: "not valid multipart",
+    ":input": "not valid multipart",
   });
   // Should still return 200 even if multipart parsing fails
   expect(res.status).toBe(200);
@@ -109,7 +109,7 @@ it("not modify REQUEST_METHOD for POST requests when the params are unparseable 
     return [200, {}, [env["REQUEST_METHOD"]]];
   });
   const res = await new MockRequest((env) => app.call(env)).post("/", {
-    input: "_method=PUT&" + "a".repeat(50) + "=1",
+    ":input": "_method=PUT&" + "a".repeat(50) + "=1",
   });
   expect(res.bodyString).toBe("PUT");
 });
@@ -120,7 +120,7 @@ it("not modify REQUEST_METHOD for POST requests when the params are unparseable"
   });
   const res = await new MockRequest((env) => app.call(env)).post("/", {
     CONTENT_TYPE: "application/x-www-form-urlencoded",
-    input: "_method=DELETE",
+    ":input": "_method=DELETE",
   });
   expect(res.bodyString).toBe("DELETE");
 });
@@ -131,7 +131,7 @@ it("not set form input when the content type is JSON", async () => {
   });
   const res = await new MockRequest((env) => app.call(env)).post("/", {
     CONTENT_TYPE: "application/json",
-    input: '{"_method":"PUT"}',
+    ":input": '{"_method":"PUT"}',
   });
   expect(res.bodyString).toBe("POST");
 });

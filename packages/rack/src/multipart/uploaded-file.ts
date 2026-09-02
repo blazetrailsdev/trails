@@ -59,7 +59,7 @@ export class UploadedFile {
         throw new Error(`${path ?? ""} file does not exist`);
       }
       this.originalFilename = opts.filename ?? getPath().basename(path);
-      const content = getFs().readFileSync(path, binary ? "latin1" : "utf-8");
+      const content = getFs().readFileSync(path, "latin1");
       this._tempfile = makeTempfile(content, path);
     }
     this.contentType = contentType;

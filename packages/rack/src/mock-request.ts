@@ -19,6 +19,7 @@ import {
   OPTIONS,
 } from "./constants.js";
 import { StringIO } from "@blazetrails/activesupport";
+import { isSymbol } from "@blazetrails/ruby-compat";
 import { Lint } from "./lint.js";
 import { MockResponse } from "./mock-response.js";
 import { buildMultipart } from "./multipart.js";
@@ -84,22 +85,6 @@ function uriPort(uri: URL): number | null {
   return DEFAULT_PORT[uri.protocol.slice(0, -1)] ?? null;
 }
 
-/**
- * The `env_for` options Rack passes as Ruby Symbols, which its
- * `String === field` copy therefore skips (`rack/lib/rack/mock_request.rb:154`).
- *
- * @noRailsEquivalent PERMANENT
- */
-const SYMBOL_OPTS = new Set([
-  "method",
-  "params",
-  "script_name",
-  "http_version",
-  "fatal",
-  "input",
-  "lint",
-]);
-
 export class MockRequest {
   private app: RackApp;
 
@@ -130,10 +115,10 @@ export class MockRequest {
   }
 
   async request(method = GET, uri = "", opts: Record<string, any> = {}): Promise<MockResponse> {
-    const env = MockRequest.envFor(uri, { ...opts, method });
+    const env = MockRequest.envFor(uri, { ...opts, ":method": method });
 
     let app: RackApp;
-    if (opts.lint) {
+    if (opts[":lint"]) {
       const lint = new Lint(this.app);
       app = lint.call.bind(lint);
     } else {
@@ -162,9 +147,16 @@ export class MockRequest {
 
   /**
    * Mirrors `Rack::MockRequest.env_for` (`rack/lib/rack/mock_request.rb:98-159`).
-   * Its trailing `opts.each { |field, value| env[field] = value if String === field }`
-   * (line 154) skips Ruby Symbol keys; a Symbol key is a plain string here, so
-   * {@link SYMBOL_OPTS} is the exclusion instead.
+   * Its option keys are Ruby Symbols, spelled here with the leading colon
+   * (`":method"`, `":input"`, ...), so the trailing
+   * `opts.each { |field, value| env[field] = value if String === field }`
+   * (line 154) is {@link isSymbol}.
+   *
+   * `:147`'s `rack_input.set_encoding(Encoding::BINARY) if
+   * rack_input.respond_to?(:set_encoding)` has no port: trails' `StringIO`
+   * buffer is a Ruby binary String by construction
+   * (`ruby-compat/src/string-io.ts:7-11`), so no trails IO answers
+   * `set_encoding` and the guard is false for every one of them.
    */
   static envFor(uri = "", opts: Record<string, any> = {}): Record<string, any> {
     const parsedUri = MockRequest.parseUriRfc2396(uri);
@@ -173,47 +165,47 @@ export class MockRequest {
     const env: Record<string, any> = {};
     const port = uriPort(parsedUri);
 
-    env[REQUEST_METHOD] = opts.method ? String(opts.method).toUpperCase() : GET;
+    env[REQUEST_METHOD] = opts[":method"] ? String(opts[":method"]).toUpperCase() : GET;
     env[SERVER_NAME] = parsedUri.hostname || "example.org";
     env[SERVER_PORT] = port !== null ? String(port) : "80";
-    env[SERVER_PROTOCOL] = opts.http_version || "HTTP/1.1";
+    env[SERVER_PROTOCOL] = opts[":http_version"] || "HTTP/1.1";
     env[QUERY_STRING] = parsedUri.search.slice(1);
     env[PATH_INFO] = parsedUri.pathname;
     env[RACK_URL_SCHEME] = parsedUri.protocol.slice(0, -1) || "http";
     env[HTTPS] = env[RACK_URL_SCHEME] === "https" ? "on" : "off";
 
-    env[SCRIPT_NAME] = opts.script_name || "";
+    env[SCRIPT_NAME] = opts[":script_name"] || "";
 
-    if (opts.fatal) {
+    if (opts[":fatal"]) {
       env[RACK_ERRORS] = new FatalWarner();
     } else {
       env[RACK_ERRORS] = new StringIO();
     }
 
-    let params = opts.params;
+    let params = opts[":params"];
     if (params != null && params !== false) {
       if (env[REQUEST_METHOD] === GET) {
         if (typeof params === "string") params = parseNestedQuery(params);
         Object.assign(params, parseNestedQuery(env[QUERY_STRING]));
         env[QUERY_STRING] = buildNestedQuery(params);
-      } else if (!("input" in opts)) {
+      } else if (!(":input" in opts)) {
         opts["CONTENT_TYPE"] = "application/x-www-form-urlencoded";
         if (typeof params === "object") {
           const data = buildMultipart(params);
           if (typeof data === "string") {
-            opts.input = data;
+            opts[":input"] = data;
             opts["CONTENT_LENGTH"] ??= String(data.length);
             opts["CONTENT_TYPE"] = `multipart/form-data; boundary=${MULTIPART_BOUNDARY}`;
           } else {
-            opts.input = buildNestedQuery(params);
+            opts[":input"] = buildNestedQuery(params);
           }
         } else {
-          opts.input = params;
+          opts[":input"] = params;
         }
       }
     }
 
-    let rackInput = opts.input;
+    let rackInput = opts[":input"];
     if (typeof rackInput === "string") {
       rackInput = new StringIO(rackInput);
     }
@@ -226,8 +218,7 @@ export class MockRequest {
     }
 
     for (const [field, value] of Object.entries(opts)) {
-      if (SYMBOL_OPTS.has(field)) continue;
-      env[field] = value;
+      if (!isSymbol(field)) env[field] = value;
     }
 
     return env;
