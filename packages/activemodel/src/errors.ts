@@ -35,12 +35,12 @@ export class Errors<TBase extends object = object> {
     );
   }
 
-  get errors(): this {
-    return this;
+  get errors(): ActiveModelError[] {
+    return this._errors;
   }
 
   get objects(): ActiveModelError[] {
-    return this._errors;
+    return this.errors;
   }
 
   constructor(base: TBase | null) {
@@ -65,10 +65,10 @@ export class Errors<TBase extends object = object> {
     this._errors.push(new NestedError(this._base, error, overrideOptions));
   }
 
-  mergeBang<U extends object>(other: Errors<U>): this | ActiveModelError[] {
+  mergeBang<U extends object>(other: Errors<U>): ActiveModelError[] {
     if (Object.is(other, this)) return this.errors;
 
-    const errors = other.errors.objects;
+    const errors = other.errors;
     for (const error of errors) {
       this.import(error);
     }

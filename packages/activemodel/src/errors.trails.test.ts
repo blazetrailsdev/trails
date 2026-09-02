@@ -267,6 +267,17 @@ describe("Errors — trails-only coverage", () => {
       expect(errors.added("age", ":out_of_range", { range: { min: 1, max: 9 } })).toBe(false);
     });
 
+    it("mergeBang returns the error array on both arms, as Ruby's merge! does", () => {
+      const errors = new Errors({});
+      errors.add("name", ":blank");
+      expect(errors.mergeBang(errors)).toBe(errors.objects);
+
+      const other = new Errors({});
+      other.add("age", ":invalid");
+      expect(errors.mergeBang(other)).toBe(other.objects);
+      expect(errors.count).toBe(2);
+    });
+
     it("import symbolizes a string :type override so added matches it", () => {
       const source = new Errors({});
       source.add("name", ":invalid");

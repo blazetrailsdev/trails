@@ -26,7 +26,7 @@ function modelName(this: NamingHost): ModelName {
   return this._modelName;
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE serializers-json-duplicates-model-name */
 export function detectRelativeModelNamingParent(klass: {
   moduleName?: string;
 }): { name: string } | null {

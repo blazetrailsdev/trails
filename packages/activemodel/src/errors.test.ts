@@ -148,9 +148,9 @@ describe("ErrorsTest", () => {
   });
 
   it("as_json with :full_messages option creates a json formatted representation of the errors containing complete messages", () => {
-    const errors = new Errors({});
-    errors.add("name", "cannot be nil");
-    expect(errors.asJson({ fullMessages: true })).toEqual({ name: ["Name cannot be nil"] });
+    const person = new Person();
+    person.errors.add("name", "cannot be nil");
+    expect(person.errors.asJson({ fullMessages: true })).toEqual({ name: ["name cannot be nil"] });
   });
 
   it("merge does not import errors when merging with self", () => {
