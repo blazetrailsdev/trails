@@ -81,6 +81,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { EXTERNAL_DECL_FILE, PKG_DECL_PREFIX } from "@blazetrails/parity/types";
 import type {
   ApiManifest,
   CallSite,
@@ -3036,12 +3037,6 @@ export function buildEntitiesByName(
  * cross-package walk exists for (`AR::Base extends AM::Model`, AR
  * `type/text.ts` extends AM `type/string.ts`).
  */
-/** `declaringFile`'s marker for a symbol resolved outside the workspace. */
-export const EXTERNAL_DECL_FILE = "external:";
-
-/** `declaringFile`'s prefix for `pkg:<package>:<src-relative path>`. */
-export const PKG_DECL_PREFIX = "pkg:";
-
 export function resolveEntityByDeclaringFile(
   candidates: ClassInfo[],
   childFile: string,

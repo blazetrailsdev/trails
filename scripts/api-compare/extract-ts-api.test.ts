@@ -13,6 +13,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import {
   resolveRelModule,
+  declaringFile,
   extractClass,
   extractFileConstants,
   extractInternalFileConstants,
@@ -26,6 +27,7 @@ import { collectTsFileNames } from "./extra-surface.js";
 import { CALL_ARG_DESCRIPTOR_VOCABULARY } from "./extractor-skew.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
 import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
+import { EXTERNAL_DECL_FILE } from "@blazetrails/parity/types";
 import type { CallSite, ClassInfo, MethodInfo, PackageInfo } from "@blazetrails/parity/types";
 
 const VIRTUAL = "virtual.ts";
@@ -4224,6 +4226,81 @@ describe("callArgs", () => {
     const create = cls.instanceMethods.find((m) => m.name === "create")!;
     expect(create.calls).toEqual(["build", "save"]);
     expect(create.callSeq).toEqual(["build", "save"]);
+  });
+});
+
+describe("declaringFile (RFC 0126)", () => {
+  const SRC = "/repo/packages/activerecord/src";
+
+  // Only `getSourceFile().fileName` and which declaration is picked matter, so
+  // a stub says exactly what the checker would hand back.
+  const symbolAt = (fileName: string, valueDeclaration = true) => {
+    const decl = { getSourceFile: () => ({ fileName }) } as unknown as ts.Declaration;
+    return (valueDeclaration
+      ? { valueDeclaration: decl }
+      : { declarations: [decl] }) as unknown as ts.Symbol;
+  };
+
+  it("returns a bare src-relative path for a symbol declared in this package", () => {
+    expect(declaringFile(symbolAt(`${SRC}/model.ts`), SRC)).toBe("model.ts");
+    expect(
+      declaringFile(symbolAt(`${SRC}/connection-adapters/abstract/schema-statements.ts`), SRC),
+    ).toBe("connection-adapters/abstract/schema-statements.ts");
+    expect(declaringFile(symbolAt(`${SRC}/type/text.ts`), SRC)).toBe("type/text.ts");
+  });
+
+  it("falls back to the first declaration when there is no value declaration", () => {
+    expect(declaringFile(symbolAt(`${SRC}/model.ts`, false), SRC)).toBe("model.ts");
+  });
+
+  it("qualifies another workspace package by name, from its src or its dist", () => {
+    // `AR::Base extends AM::Model` resolves through activemodel's built
+    // `.d.ts`; both spellings must name the SAME manifest path, because that is
+    // what `resolveEntityByDeclaringFile` matches a candidate's `file` against.
+    expect(declaringFile(symbolAt("/repo/packages/activemodel/src/model.ts"), SRC)).toBe(
+      "pkg:activemodel:model.ts",
+    );
+    expect(declaringFile(symbolAt("/repo/packages/activemodel/dist/model.d.ts"), SRC)).toBe(
+      "pkg:activemodel:model.ts",
+    );
+    expect(declaringFile(symbolAt("/repo/packages/arel/dist/nodes/binary.d.ts"), SRC)).toBe(
+      "pkg:arel:nodes/binary.ts",
+    );
+  });
+
+  it("marks a TypeScript lib global external", () => {
+    // `class Cleaner extends Error` — no package entity is `Error`, and the
+    // walk must follow nothing rather than proximity-guess between same-named
+    // candidates.
+    expect(declaringFile(symbolAt("/repo/node_modules/typescript/lib/lib.es5.d.ts"), SRC)).toBe(
+      EXTERNAL_DECL_FILE,
+    );
+  });
+
+  it("marks a node_modules package external, symlinked scope directory included", () => {
+    // A workspace package reached through its node_modules symlink rather than
+    // its realpath does NOT match the packages-dir shape, so it classifies
+    // external — resolving to nothing, never to a wrong same-named candidate.
+    expect(
+      declaringFile(symbolAt("/repo/node_modules/@blazetrails/activemodel/dist/model.d.ts"), SRC),
+    ).toBe(EXTERNAL_DECL_FILE);
+    expect(declaringFile(symbolAt("/repo/node_modules/pg/lib/index.d.ts"), SRC)).toBe(
+      EXTERNAL_DECL_FILE,
+    );
+  });
+
+  it("marks a sibling of the packages dir external rather than qualifying it", () => {
+    // `<packagesDir>/<pkg>/(src|dist)/...` is the whole shape; a path that
+    // escapes upward has no package to name.
+    expect(declaringFile(symbolAt("/repo/scripts/parity/types.ts"), SRC)).toBe(EXTERNAL_DECL_FILE);
+    expect(declaringFile(symbolAt("/repo/packages/activemodel/model.ts"), SRC)).toBe(
+      EXTERNAL_DECL_FILE,
+    );
+  });
+
+  it("returns undefined when the symbol has no declaration at all", () => {
+    expect(declaringFile(undefined, SRC)).toBeUndefined();
+    expect(declaringFile({} as unknown as ts.Symbol, SRC)).toBeUndefined();
   });
 });
 

@@ -34,6 +34,7 @@ import { createHash } from "node:crypto";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 import { cpus } from "node:os";
+import { EXTERNAL_DECL_FILE, PKG_DECL_PREFIX } from "@blazetrails/parity/types";
 import type {
   ApiManifest,
   PackageInfo,
@@ -286,7 +287,7 @@ function recordExtendsFile(
  * "resolved, and the answer is outside this package" (RFC 0126) — the latter
  * used to arrive as a warned ambiguity that dropped the edge silently.
  */
-function declaringFile(sym: ts.Symbol | undefined, srcDir: string): string | undefined {
+export function declaringFile(sym: ts.Symbol | undefined, srcDir: string): string | undefined {
   const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
   if (!decl) return undefined;
   const abs = decl.getSourceFile().fileName.replace(/\\/g, "/");
@@ -298,8 +299,8 @@ function declaringFile(sym: ts.Symbol | undefined, srcDir: string): string | und
   const packagesDir = path.posix.dirname(path.posix.dirname(srcDir.replace(/\\/g, "/")));
   const rel = path.posix.relative(packagesDir, abs);
   const m = /^([^./][^/]*)\/(?:src|dist)\/(.+)$/.exec(rel);
-  if (!m) return "external:";
-  return `pkg:${m[1]}:${m[2].replace(/\.d\.ts$/, ".ts")}`;
+  if (!m) return EXTERNAL_DECL_FILE;
+  return `${PKG_DECL_PREFIX}${m[1]}:${m[2].replace(/\.d\.ts$/, ".ts")}`;
 }
 
 function resolveDeclarationSymbol(checker: ts.TypeChecker, node: ts.Node): ts.Symbol | undefined {
