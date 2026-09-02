@@ -20,7 +20,6 @@
  */
 import {
   Trailtie as BaseTrailtie,
-  registerTrailtie,
   type Deprecators,
 } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
@@ -148,17 +147,17 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.config["actionDispatch"] = defaultActionDispatchConfig();
-    this.config["contentSecurityPolicy"] = defaultContentSecurityPolicyConfig();
+    this.config.set("actionDispatch", defaultActionDispatchConfig());
+    this.config.set("contentSecurityPolicy", defaultContentSecurityPolicyConfig());
 
-    this.initializer("action_dispatch.deprecator", (app) => {
+    this.initializer("action_dispatch.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
     });
 
     this.initializer("action_dispatch.configure", () => {
-      const cfg = this.config["actionDispatch"] as ActionDispatchConfig;
+      const cfg = this.config.get("actionDispatch") as ActionDispatchConfig;
 
       HttpURL.tldLength = cfg.tldLength;
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
@@ -194,7 +193,7 @@ export class Trailtie extends BaseTrailtie {
    * `env_config` propagation in `railties/lib/rails/application.rb:342-346`.
    */
   static seedContentSecurityPolicyEnv(request: CspRequestHost): void {
-    const cfg = this.config["contentSecurityPolicy"] as ContentSecurityPolicyConfig;
+    const cfg = this.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig;
     // Mirror Rails application.rb:342-346 — all four slots are copied
     // unconditionally so toggling app config back to a falsy value
     // overwrites any stale env carried over from a prior request.

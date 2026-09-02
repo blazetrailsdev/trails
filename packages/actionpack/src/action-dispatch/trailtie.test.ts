@@ -14,8 +14,13 @@ import { CacheConfig } from "./http/cache.js";
 import { Response } from "./http/response.js";
 import { X_REQUEST_ID } from "./constants.js";
 
+async function runInitializers(app?: unknown): Promise<void> {
+  for (const initializer of Trailtie.instance().initializers) await initializer.run(app);
+}
+
+
 function cfg(): ActionDispatchConfig {
-  return Trailtie.config["actionDispatch"] as ActionDispatchConfig;
+  return Trailtie.config.get("actionDispatch") as ActionDispatchConfig;
 }
 
 describe("ActionDispatch::Trailtie", () => {
@@ -31,7 +36,7 @@ describe("ActionDispatch::Trailtie", () => {
   beforeEach(() => {
     savedConfig = structuredClone(cfg());
     savedCspConfig = {
-      ...(Trailtie.config["contentSecurityPolicy"] as ContentSecurityPolicyConfig),
+      ...(Trailtie.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig),
     };
     savedTldLength = HttpURL.tldLength;
     savedStrictQuery = QueryParser.strictQueryStringSeparator;
@@ -42,8 +47,8 @@ describe("ActionDispatch::Trailtie", () => {
   });
 
   afterEach(() => {
-    Trailtie.config["actionDispatch"] = savedConfig;
-    Trailtie.config["contentSecurityPolicy"] = savedCspConfig;
+    Trailtie.config.set("actionDispatch", savedConfig);
+    Trailtie.config.set("contentSecurityPolicy", savedCspConfig);
     HttpURL.tldLength = savedTldLength;
     QueryParser.strictQueryStringSeparator = savedStrictQuery;
     RequestUtils.performDeepMunge = savedPerformDeepMunge;
@@ -52,7 +57,7 @@ describe("ActionDispatch::Trailtie", () => {
   });
 
   it("registers itself with the Railtie registry", () => {
-    expect(BaseTrailtie.subclasses).toContain(Trailtie);
+    expect(BaseTrailtie.subclasses()).toContain(Trailtie);
   });
 
   it("seeds Rails-compatible defaults on config.actionDispatch", () => {
@@ -68,14 +73,14 @@ describe("ActionDispatch::Trailtie", () => {
     expect(c.cookiesRotations).toBeNull();
   });
 
-  it("runInitializers copies config onto framework holders", () => {
+  it("runInitializers copies config onto framework holders", async () => {
     const c = cfg();
     c.tldLength = 2;
     c.strictQueryStringSeparator = true;
     c.performDeepMunge = false;
     c.strictFreshness = true;
 
-    Trailtie.runInitializers(app);
+    await runInitializers(app);
 
     expect(HttpURL.tldLength).toBe(2);
     expect(QueryParser.strictQueryStringSeparator).toBe(true);
@@ -84,14 +89,14 @@ describe("ActionDispatch::Trailtie", () => {
     expect(app.deprecators.get("actionDispatch")).toBeDefined();
   });
 
-  it("runInitializers copies defaultCharset onto Response when configured", () => {
+  it("runInitializers copies defaultCharset onto Response when configured", async () => {
     cfg().defaultCharset = "iso-8859-1";
-    Trailtie.runInitializers(app);
+    await runInitializers(app);
     expect(Response.defaultCharset).toBe("iso-8859-1");
   });
 
   it("seeds Rails-compatible defaults on config.contentSecurityPolicy", () => {
-    const c = Trailtie.config["contentSecurityPolicy"] as ContentSecurityPolicyConfig;
+    const c = Trailtie.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig;
     expect(c.policy).toBeNull();
     expect(c.reportOnly).toBe(false);
     expect(c.nonceGenerator).toBeNull();
@@ -112,7 +117,7 @@ describe("ActionDispatch::Trailtie", () => {
     };
     const policy = new ContentSecurityPolicy((p) => p.defaultSrc("'self'"));
     const generator = () => "abc";
-    const cfg = Trailtie.config["contentSecurityPolicy"] as ContentSecurityPolicyConfig;
+    const cfg = Trailtie.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig;
     cfg.policy = policy;
     cfg.reportOnly = true;
     cfg.nonceGenerator = generator;
@@ -145,10 +150,10 @@ describe("ActionDispatch::Trailtie", () => {
     expect(headers["action_dispatch.content_security_policy_nonce_directives"]).toBeNull();
   });
 
-  it("runInitializers resets Response.defaultCharset to utf-8 when cfg is null", () => {
+  it("runInitializers resets Response.defaultCharset to utf-8 when cfg is null", async () => {
     Response.defaultCharset = "stale";
     cfg().defaultCharset = null;
-    Trailtie.runInitializers(app);
+    await runInitializers(app);
     expect(Response.defaultCharset).toBe("utf-8");
   });
 });

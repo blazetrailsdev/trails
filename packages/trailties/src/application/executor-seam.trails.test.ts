@@ -14,6 +14,11 @@ import { Configuration } from "./configuration.js";
 import { DefaultMiddlewareStack } from "./default-middleware-stack.js";
 import { Root } from "../paths.js";
 
+async function runInitializers(app?: unknown): Promise<void> {
+  for (const initializer of Trailtie.instance().initializers) await initializer.run(app);
+}
+
+
 const SESSION_ERROR = "Can't perform asynchronous queries without a query session";
 
 async function selectOneAsync(): Promise<unknown[]> {
@@ -28,8 +33,8 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
 
   // The initializers register the executor hooks on `ActiveSupport::Executor`
   // itself, so running them per-test would stack a second copy of every hook.
-  beforeAll(() => {
-    Trailtie.runInitializers({ deprecators: new Deprecators(), config: { filterParameters: [] } });
+  beforeAll(async () => {
+    await runInitializers({ deprecators: new Deprecators(), config: { filterParameters: [] } });
   });
 
   beforeEach(async () => {

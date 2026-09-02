@@ -7,7 +7,7 @@ import {
   resetLoadHooks,
 } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Initializable } from "../initializable.js";
+import { Initializable } from "@blazetrails/activesupport";
 import { Bootstrap, type BootstrapConfig, type BootstrapHost } from "./bootstrap.js";
 
 class TestApp extends Bootstrap implements BootstrapHost {

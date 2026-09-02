@@ -8,7 +8,7 @@ import {
   getEnv,
   getFsAsync,
   getPathAsync,
-  Trailtie as BaseTrailtie,
+  ABSTRACT_RAILTIES,
   runLoadHooks,
   setTrailsRoot,
   underscore,
@@ -19,7 +19,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Deprecators } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 import { Engine } from "./engine.js";
-import { Trailtie } from "./trailtie.js";
+import { Trailtie } from "@blazetrails/activesupport";
 import { Bootstrap } from "./application/bootstrap.js";
 import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";
 import { Finisher } from "./application/finisher.js";
@@ -29,16 +29,9 @@ import { RoutesReloader } from "./application/routes-reloader.js";
 // gem registers its railtie.
 import "./assets/trailtie.js";
 import { resolveEnv, loadDatabaseConfig, type DatabaseConfig } from "./database.js";
-import { Collection, Initializer, type InitializerGroup } from "./initializable.js";
+import { Collection, type InitializerGroup } from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import type { MiddlewareStack, RackApp } from "@blazetrails/actionpack";
-
-/**
- * A member of `ordered_railties`. Rails has one `Rails::Railtie`; trails has
- * two, so the `:all` bucket holds both trailties' `Trailtie` instances and the
- * activesupport `Trailtie` subclasses the framework packages register.
- */
-type OrderedRailtie = Trailtie | typeof BaseTrailtie;
 
 let _appClass: typeof Application | null = null;
 /** @internal Tracks which subclasses have fired `:before_configuration`. */
@@ -47,7 +40,7 @@ const _registered = new WeakSet<typeof Application>();
 export class Application extends Engine {
   private _initialized = false;
   private _routesReloader?: RoutesReloader;
-  private _orderedRailties?: Array<OrderedRailtie | OrderedRailtie[] | string>;
+  private _orderedRailties?: Array<Trailtie | Trailtie[] | string>;
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
   private _credentials?: EncryptedFile;
   private _deprecators?: Deprecators;
@@ -167,10 +160,10 @@ export class Application extends Engine {
    *
    * @internal
    */
-  orderedRailties(): Array<OrderedRailtie | OrderedRailtie[] | string> {
+  orderedRailties(): Array<Trailtie | Trailtie[] | string> {
     if (!this._orderedRailties) {
-      const order: Array<OrderedRailtie | OrderedRailtie[] | string> =
-        this.config.railtiesOrder.map((railtie: unknown) => {
+      const order: Array<Trailtie | Trailtie[] | string> = this.config.railtiesOrder.map(
+        (railtie: unknown) => {
           if (railtie === ":main_app") {
             return this;
           } else if (typeof (railtie as { instance?: unknown })?.instance === "function") {
@@ -178,12 +171,10 @@ export class Application extends Engine {
           } else {
             return railtie as Trailtie | string;
           }
-        });
+        },
+      );
 
-      const all: OrderedRailtie[] = [
-        ...BaseTrailtie.subclasses.filter((k) => !order.includes(k)),
-        ...this.railties().minus(order as Trailtie[]),
-      ];
+      const all: Trailtie[] = this.railties().minus(order as Trailtie[]);
       if (!(all as unknown[]).concat(order).includes(this)) all.push(this);
       if (!order.includes(":all")) order.push(":all");
 
@@ -197,12 +188,6 @@ export class Application extends Engine {
   /**
    * Mirrors `Application#railties_initializers` (`application.rb:614-624`).
    *
-   * A framework trailtie is a `Trailtie` from `@blazetrails/activesupport`
-   * rather than a trailties one, because a framework package cannot depend on
-   * trailties, so its initializers are bound here instead of arriving as a
-   * `Collection`. They travel in the `:all` slot like every other railtie, so
-   * `config.railtiesOrder` moves them the way it moves the rest.
-   *
    * @internal
    */
   railtiesInitializers(current: Collection): Collection {
@@ -210,10 +195,6 @@ export class Application extends Engine {
     for (const r of [...this.orderedRailties()].reverse().flat()) {
       if (r === this) {
         initializers = initializers.plus(current);
-      } else if (typeof r === "function") {
-        initializers = initializers.plus(
-          r.initializers.map(({ name, block }) => new Initializer<unknown>(name, this, {}, block)),
-        );
       } else {
         initializers = initializers.plus((r as Trailtie).initializers);
       }
@@ -406,3 +387,5 @@ async function defaultCredentialPaths(
     keyPath: path.resolve(root, "config", "master.key"),
   };
 }
+
+ABSTRACT_RAILTIES.push(Application);

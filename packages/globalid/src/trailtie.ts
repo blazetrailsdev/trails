@@ -9,7 +9,6 @@ import {
   extend,
   months,
   onLoad,
-  registerTrailtie,
   type Deprecators,
 } from "@blazetrails/activesupport";
 import { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
@@ -47,10 +46,10 @@ export interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    BaseTrailtie.config["globalId"] = {} as GlobalIdConfig;
-    ((BaseTrailtie.config["eagerLoadNamespaces"] ??= []) as unknown[]).push(GlobalID);
+    this.config.set("globalId", {} as GlobalIdConfig);
+    this.config.eagerLoadNamespaces.push(GlobalID);
 
     this.initializer("global_id", (app) => {
       Trailtie.initialize(app as TrailtieApp);
@@ -85,7 +84,7 @@ export class Trailtie extends BaseTrailtie {
    * already imports globalid.
    */
   static initialize(app: TrailtieApp): void {
-    const config = (app.config.globalId ??= BaseTrailtie.config["globalId"] as GlobalIdConfig);
+    const config = (app.config.globalId ??= Trailtie.config.get("globalId") as GlobalIdConfig);
     const defaultExpiresIn = months(1).toI();
     const defaultAppName = dasherize(app.railtieName.replace("_application", ""));
 

@@ -32,11 +32,11 @@
  *   analogue.
  */
 import { getFsAsync, getPathAsync, runLoadHooks, underscore } from "@blazetrails/activesupport";
-import { Initializable } from "../initializable.js";
+import { Initializable } from "@blazetrails/activesupport";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";
 import type { Root } from "../paths.js";
-import type { ConfigurationBlock } from "../trailtie/configuration.js";
+import type { ConfigurationBlock } from "@blazetrails/activesupport";
 import type { DrawCallback } from "@blazetrails/actionpack";
 import { controllerConstants, type DispatchableControllerClass } from "@blazetrails/actionpack";
 

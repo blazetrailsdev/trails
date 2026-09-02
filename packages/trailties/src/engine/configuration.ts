@@ -10,7 +10,7 @@
  */
 import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { getFs, getPath } from "@blazetrails/activesupport";
-import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
+import { TrailtieConfiguration as RailtieConfiguration } from "@blazetrails/activesupport";
 import { Root } from "../paths.js";
 import { resolveEnv } from "../database.js";
 

@@ -1,6 +1,6 @@
 // Port of railties/lib/rails/engine/railties.rb. Iterable collection of
 // instantiated Trailtie + Engine subclasses (excluding the abstract bases).
-import { Trailtie } from "../trailtie.js";
+import { Trailtie } from "@blazetrails/activesupport";
 import { Engine } from "../engine.js";
 
 export class Trailties implements Iterable<Trailtie> {

@@ -10,13 +10,13 @@ import {
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/activesupport";
-import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
+import { TrailtieConfiguration } from "@blazetrails/activesupport";
 import { env, setEnv } from "@blazetrails/activesupport/process-adapter";
 import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { loaded } from "./__fixtures__/loaded.js";
 import { EngineConfiguration } from "./engine/configuration.js";
-import { Trailtie } from "./trailtie.js";
+import { Trailtie } from "@blazetrails/activesupport";
 import { Trailties } from "./engine/trailties.js";
 
 const posixPath: PathAdapter = {
@@ -295,7 +295,7 @@ describe("Engine", () => {
     B.instance().config.eagerLoadNamespaces.push("BNs");
     expect(A.instance().config.eagerLoadNamespaces).toBe(B.instance().config.eagerLoadNamespaces);
     expect(A.instance().config.eagerLoadNamespaces).toBe(
-      BaseTrailtie.config["eagerLoadNamespaces"],
+      TrailtieConfiguration.eagerLoadNamespaces(),
     );
     expect(A.instance().config.eagerLoadNamespaces.length).toBe(before + 2);
   });

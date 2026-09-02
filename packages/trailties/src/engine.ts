@@ -23,10 +23,10 @@ import { Notifications, getFsAsync, getPathAsync, onLoad } from "@blazetrails/ac
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
-import { Trailtie } from "./trailtie.js";
+import { ABSTRACT_RAILTIES, Trailtie } from "@blazetrails/activesupport";
 import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
-import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
+import { readOwnState, writeOwnState } from "@blazetrails/activesupport";
 
 export class Engine extends Trailtie {
   private _railtiesCollection?: Trailties;
@@ -344,3 +344,5 @@ async function realpathOr(fs: Fs, p: string): Promise<string> {
     return p;
   }
 }
+
+ABSTRACT_RAILTIES.push(Engine);

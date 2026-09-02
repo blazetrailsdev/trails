@@ -6,6 +6,7 @@
  * `inherited`-raises sealed-class guard, used by `Application`.
  */
 import { Trailtie } from "../trailtie.js";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { ownState, readOwnState } from "./per-class-state.js";
 
 const SEALED_KEY = "_sealedFromInheritance";
@@ -30,7 +31,7 @@ export function assertNotSealed(subclass: typeof Trailtie): void {
   let parent = Object.getPrototypeOf(subclass) as typeof Trailtie | null;
   while (parent && parent !== Function.prototype && parent !== Object.prototype) {
     if (readOwnState<boolean>(parent, SEALED_KEY) === true) {
-      throw new Error(`You cannot inherit from a ${parent.name} child`);
+      throw new RuntimeError(`You cannot inherit from a ${parent.name} child`);
     }
     parent = Object.getPrototypeOf(parent) as typeof Trailtie | null;
   }

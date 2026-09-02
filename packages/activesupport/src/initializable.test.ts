@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Initializable } from "./initializable.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 let arr: number[] = [];
 let withArg: unknown = null;
@@ -128,7 +129,7 @@ describe("Basic", () => {
       class Bad extends Initializable {}
       // @ts-expect-error testing runtime guard
       Bad.initializer("foo", {});
-    }).toThrow(TypeError);
+    }).toThrow(ArgumentError);
   });
   test("Initializer provides context's class name", () => {
     const foo = new Foo();

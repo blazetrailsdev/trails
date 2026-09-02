@@ -17,7 +17,7 @@ import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
-import type { InitializerGroup } from "./initializable.js";
+import type { InitializerGroup } from "@blazetrails/activesupport";
 import { VERSION } from "./version.js";
 
 let _application: Application | null = null;

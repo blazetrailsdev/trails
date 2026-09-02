@@ -13,7 +13,7 @@ import {
 import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { Root } from "../paths.js";
 import { Trails } from "../rails.js";
-import type { ConfigurationBlock } from "../trailtie/configuration.js";
+import type { ConfigurationBlock } from "@blazetrails/activesupport";
 import type { Mapper } from "@blazetrails/actionpack";
 
 class TestApp extends Finisher {

@@ -37,9 +37,9 @@ import {
   Session,
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
-import { Collection } from "./initializable.js";
+import { Collection } from "@blazetrails/activesupport";
 import { Root } from "./paths.js";
-import { Trailtie } from "./trailtie.js";
+import { Trailtie } from "@blazetrails/activesupport";
 import { Trails } from "./rails.js";
 import { HelloWorldApp, buildRoutes } from "./__fixtures__/hello-world/app.js";
 import { bodyToString } from "@blazetrails/rack";
@@ -516,7 +516,7 @@ describe("Application::Configuration", () => {
   it("config.load_defaults skips a framework that has not registered its config", () => {
     const c = new Configuration();
     expect(() => c.loadDefaults("8.0")).not.toThrow();
-    expect(c.get("activeRecord")).toBeUndefined();
+    expect(c.get("activeJob")).toBeUndefined();
   });
 
   it("config.load_defaults raises on an unknown version", () => {

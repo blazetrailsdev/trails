@@ -19,7 +19,6 @@
  */
 import {
   Trailtie as BaseTrailtie,
-  registerTrailtie,
   type Deprecators,
 } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
@@ -56,16 +55,16 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.config["actionView"] = defaultActionViewConfig();
+    this.config.set("actionView", defaultActionViewConfig());
 
-    this.initializer("action_view.deprecator", (app) => {
+    this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionView", deprecator());
     });
 
     this.initializer("action_view.annotate_rendered_view_with_filenames", () => {
-      const cfg = this.config["actionView"] as ActionViewConfig;
+      const cfg = this.config.get("actionView") as ActionViewConfig;
       Base.annotateRenderedViewWithFilenames = cfg.annotateRenderedViewWithFilenames;
     });
   }

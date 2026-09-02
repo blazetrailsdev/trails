@@ -751,7 +751,14 @@ export { NumberToPercentageConverter } from "./number-helper/number-to-percentag
 export { NumberToHumanConverter } from "./number-helper/number-to-human-converter.js";
 export { NumberToHumanSizeConverter } from "./number-helper/number-to-human-size-converter.js";
 export { RoundingHelper } from "./number-helper/rounding-helper.js";
-export { Trailtie, registerTrailtie } from "./trailtie.js";
+export { Trailtie, ABSTRACT_RAILTIES } from "./trailtie.js";
+export type { BlockRunnerKind, TrailtieBlock } from "./trailtie.js";
+export { Configuration as TrailtieConfiguration } from "./trailtie/configuration.js";
+export type { ConfigurationBlock } from "./trailtie/configuration.js";
+export { sealAgainstInheritance, assertNotSealed } from "./trailtie/configurable.js";
+export { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
+export { Initializable, Initializer, Collection } from "./initializable.js";
+export type { InitializerBlock, InitializerGroup, InitializerOptions } from "./initializable.js";
 export { inspect, toS } from "./core-ext/object/inspect.js";
 export {
   _ActionDispatchRequest,

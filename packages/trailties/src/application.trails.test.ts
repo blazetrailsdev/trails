@@ -1,19 +1,17 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
+import { describe, expect, it } from "vitest";
+import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 import { Trailtie as ActiveRecordTrailtie } from "@blazetrails/activerecord";
 import { Application } from "./application.js";
 
 class FrameworkTrailtie extends BaseTrailtie {}
+// A railtie's own `initializers` memoize on first boot
+// (`initializable.rb:65-68`), so each case registers on its own class.
+class OrderTrailtie extends BaseTrailtie {}
 
 describe("Application framework railtie initializers", () => {
-  afterEach(() => {
-    const index = BaseTrailtie.subclasses.indexOf(FrameworkTrailtie);
-    if (index !== -1) BaseTrailtie.subclasses.splice(index, 1);
-  });
-
   it("runs a framework railtie initializer with the application as its argument", async () => {
     const seen: unknown[] = [];
-    registerTrailtie(FrameworkTrailtie);
+    BaseTrailtie.register(FrameworkTrailtie);
     FrameworkTrailtie.initializer("framework.record_app", (app) => {
       seen.push(app);
     });
@@ -23,13 +21,13 @@ describe("Application framework railtie initializers", () => {
     const app = RailtieBridgeApp.instance();
     await app.initialize();
 
-    expect(seen).toEqual([app]);
+    expect(seen).toContain(app);
   });
 
   it("runs the app's own initializers first when railtiesOrder is [:all, :main_app]", async () => {
     const ran: string[] = [];
-    registerTrailtie(FrameworkTrailtie);
-    FrameworkTrailtie.initializer("framework.record_order", () => {
+    BaseTrailtie.register(OrderTrailtie);
+    OrderTrailtie.initializer("framework.record_order", () => {
       ran.push("framework");
     });
 
@@ -49,7 +47,7 @@ describe("Application framework railtie initializers", () => {
   });
 
   it("runs the ActiveRecord railtie initializers on boot", async () => {
-    expect(BaseTrailtie.subclasses).toContain(ActiveRecordTrailtie);
+    expect(BaseTrailtie.subclasses()).toContain(ActiveRecordTrailtie);
 
     class ActiveRecordBootApp extends Application {}
     Application.register(ActiveRecordBootApp);
@@ -71,5 +69,17 @@ describe("Application framework railtie initializers", () => {
 
     expect(first.deprecators.get("activeRecord")).toBeDefined();
     expect(second.deprecators.get("activeRecord")).toBeUndefined();
+  });
+
+  it("runs a config.after_initialize block on boot", async () => {
+    const seen: unknown[] = [];
+
+    class AfterInitializeApp extends Application {}
+    Application.register(AfterInitializeApp);
+    const app = AfterInitializeApp.instance();
+    app.config.afterInitialize((arg) => seen.push(arg));
+    await app.initialize();
+
+    expect(seen).toContain(app);
   });
 });

@@ -40,7 +40,6 @@
  */
 import {
   Trailtie as BaseTrailtie,
-  registerTrailtie,
   deprecator,
   type Deprecation,
   type Deprecators,
@@ -75,19 +74,19 @@ interface TrailtieApp {
  */
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
     // Mirrors `config.active_support = ActiveSupport::OrderedOptions.new`.
-    this.config["activeSupport"] ??= {};
+    this.config.set("activeSupport", this.config.get("activeSupport") ?? {});
 
-    this.initializer("active_support.deprecator", (app) => {
+    this.initializer("active_support.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeSupport", deprecator());
     });
 
     this.initializer("active_support.deprecation_behavior", (app) => {
       const activeSupport =
         ((app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig | undefined) ??
-        (this.config["activeSupport"] as ActiveSupportConfig | undefined) ??
+        (this.config.get("activeSupport") as ActiveSupportConfig | undefined) ??
         {};
       const deprecators = (app as TrailtieApp).deprecators;
       if (activeSupport.reportDeprecations === false) {
@@ -113,7 +112,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_support.set_hash_digest_class", () => {
-      const klass = (this.config["activeSupport"] as ActiveSupportConfig | undefined)
+      const klass = (this.config.get("activeSupport") as ActiveSupportConfig | undefined)
         ?.hashDigestClass;
       if (klass) {
         Digest.hashDigestClass = klass;

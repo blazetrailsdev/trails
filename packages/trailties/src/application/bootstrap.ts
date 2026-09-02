@@ -24,7 +24,7 @@ import {
   NullStore,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { Initializable } from "../initializable.js";
+import { Initializable } from "@blazetrails/activesupport";
 
 export interface BootstrapConfig {
   logger?: Logger | null;

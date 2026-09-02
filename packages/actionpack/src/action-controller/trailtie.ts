@@ -22,7 +22,6 @@
  */
 import {
   Trailtie as BaseTrailtie,
-  registerTrailtie,
   type Deprecators,
 } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
@@ -52,11 +51,11 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.config["actionController"] = defaultActionControllerConfig();
+    this.config.set("actionController", defaultActionControllerConfig());
 
-    this.initializer("action_controller.deprecator", (app) => {
+    this.initializer("action_controller.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionController", deprecator());
     });
   }

@@ -1,6 +1,5 @@
 import {
   Trailtie as BaseTrailtie,
-  registerTrailtie,
   type Deprecators,
 } from "@blazetrails/activesupport";
 import { env as processEnv } from "@blazetrails/activesupport/process-adapter";
@@ -26,9 +25,9 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.initializer("active_model.deprecator", (app) => {
+    this.initializer("active_model.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeModel", deprecator());
     });
 
@@ -37,9 +36,12 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_model.i18n_customize_full_message", () => {
-      ActiveModelError.i18nCustomizeFullMessage = Trailtie.resolveI18nCustomizeFullMessage(
-        Trailtie.config as TrailtieConfig,
-      );
+      ActiveModelError.i18nCustomizeFullMessage = Trailtie.resolveI18nCustomizeFullMessage({
+        activeModel: Trailtie.config.get("activeModel") as ActiveModelConfig | undefined,
+        i18nCustomizeFullMessage: Trailtie.config.get("i18nCustomizeFullMessage") as
+          | boolean
+          | undefined,
+      });
     });
   }
 

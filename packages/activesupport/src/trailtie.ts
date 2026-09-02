@@ -1,122 +1,180 @@
 /**
- * Base Trailtie class — mirrors Rails::Railtie.
- *
- * Each engine/component (ActiveModel, ActionController, etc.) subclasses
- * Trailtie to register named initializer blocks and a shared configuration
- * object. The application runner calls `Trailtie.runAllInitializers()` to
- * fire them in registration order.
- *
- * Mirrors: Rails::Railtie (railties/lib/rails/railtie.rb)
+ * Port of `Rails::Railtie` from `railties/lib/rails/railtie.rb`. Subclasses
+ * opt in to the registry via `Trailtie.register(...)` — no `inherited`
+ * hook. Block runners (`rakeTasks`/`console`/`runner`/`generators`/
+ * `server`) walk ancestors like Rails' `each_registered_block`.
  */
+import { RuntimeError } from "@blazetrails/ruby-compat";
+import { underscore } from "./inflector.js";
+import { Initializable } from "./initializable.js";
+import { Configuration } from "./trailtie/configuration.js";
+import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
+import { assertNotSealed } from "./trailtie/configurable.js";
+
 /**
- * An initializer body. Rails' `Initializable::Initializer#run` is
- * `@context.instance_exec(*args, &block)` (`railties/lib/rails/initializable.rb:31-33`)
- * and `run_initializers(group = :default, *args)` passes the application
- * through (`initializable.rb:60-63`), so the block Rails writes as
- * `initializer "name" do |app|` receives it.
+ * Mirrors `ABSTRACT_RAILTIES` (`railties/lib/rails/railtie.rb:142`), whose
+ * Ruby members are the fully-qualified constant names `Rails::Railtie`,
+ * `Rails::Engine` and `Rails::Application`. A TypeScript class's `name` is
+ * unqualified and every framework railtie is spelled `Trailtie` in its own
+ * package, so membership is by class identity instead of by name; `Engine`
+ * and `Application` add themselves where they are defined.
  */
-export type InitializerBlock = (...args: unknown[]) => void;
+export const ABSTRACT_RAILTIES: unknown[] = [];
+let loadCounter = 0;
 
-export class Trailtie {
-  /**
-   * All registered subclasses — tracked so the application can enumerate
-   * all railties at boot.
-   *
-   * Mirrors: Rails::Railtie.subclasses
-   */
-  static readonly subclasses: Array<typeof Trailtie> = [];
+export type BlockRunnerKind = "rakeTasks" | "console" | "runner" | "generators" | "server";
+export type TrailtieBlock = (this: Trailtie, app: unknown) => void;
 
-  private static _config: Record<string, unknown> = {};
+export class Trailtie extends Initializable {
+  /** @internal */
+  private static readonly _registry: Array<typeof Trailtie> = [];
 
-  /**
-   * Per-class config object. Each subclass gets its own copy on first
-   * access — deep-cloned when possible, otherwise shallow-copied — so
-   * parent defaults propagate until the subclass config is read
-   * (copy-on-first-access).
-   *
-   * Mirrors: Rails::Railtie.config
-   */
-  static get config(): Record<string, unknown> {
-    const host = this as any;
-    if (!Object.prototype.hasOwnProperty.call(host, "_config")) {
-      const parent = Object.getPrototypeOf(host)._config ?? {};
-      // Best-effort deep-clone so nested objects/arrays are isolated per
-      // subclass. Falls back to a shallow copy when structuredClone is
-      // unavailable or the config contains non-clone-safe values (functions,
-      // class instances, cycles, BigInt) — config is expected to hold plain
-      // scalar/object settings in normal Rails-style usage.
-      try {
-        host._config =
-          typeof structuredClone === "function" ? structuredClone(parent) : { ...parent };
-      } catch {
-        host._config = { ...parent };
-      }
-    }
-    return host._config as Record<string, unknown>;
-  }
 
-  private static _initializers: Array<{ name: string; block: InitializerBlock }> = [];
+  protected _config?: Configuration;
 
-  /**
-   * Register a named initializer block.
-   *
-   * Mirrors: Rails::Railtie.initializer
-   */
-  static initializer(name: string, block: InitializerBlock): void {
-    const host = this as any;
-    if (!Object.prototype.hasOwnProperty.call(host, "_initializers")) {
-      host._initializers = [];
-    }
-    host._initializers.push({ name, block });
-  }
-
-  /**
-   * The initializers registered directly on this class, in registration
-   * order.
-   *
-   * Mirrors: Rails::Initializable::ClassMethods#initializers
-   * (`railties/lib/rails/initializable.rb:70-72`)
-   */
-  static get initializers(): Array<{ name: string; block: InitializerBlock }> {
-    const host = this as any;
-    return Object.prototype.hasOwnProperty.call(host, "_initializers") ? host._initializers : [];
-  }
-
-  /**
-   * Run all initializers registered on this class (in registration order).
-   *
-   * Mirrors: Rails::Railtie#run_initializers
-   */
-  static runInitializers(...args: unknown[]): void {
-    for (const { block } of this.initializers) {
-      block(...args);
+  constructor() {
+    super();
+    const klass = this.constructor as typeof Trailtie;
+    if (klass.isAbstractRailtie()) {
+      throw new RuntimeError(`${klass.name} is abstract, you cannot instantiate it directly.`);
     }
   }
 
-  /**
-   * Run initializers for every registered subclass.
-   *
-   * Mirrors: Rails application initialization pipeline.
-   */
-  static runAllInitializers(...args: unknown[]): void {
-    for (const sub of Trailtie.subclasses) {
-      sub.runInitializers(...args);
+  /** Non-abstract subclasses, sorted by load order. Mirrors `Rails::Railtie.subclasses`. */
+  static subclasses(): Array<typeof Trailtie> {
+    return [...Trailtie._registry]
+      .filter((s) => !s.isAbstractRailtie())
+      .sort(
+        (a, b) =>
+          (readOwnState<number>(a, "_loadIndex") ?? 0) -
+          (readOwnState<number>(b, "_loadIndex") ?? 0),
+      );
+  }
+
+  /** Explicit subclass registration — replaces Rails' `inherited` hook. */
+  static register(subclass: typeof Trailtie): void {
+    if (Trailtie._registry.includes(subclass)) return;
+    assertNotSealed(subclass);
+    if (readOwnState<number>(subclass, "_loadIndex") === undefined) {
+      writeOwnState(subclass, "_loadIndex", ++loadCounter);
     }
+    Trailtie._registry.push(subclass);
+  }
+
+  static isAbstractRailtie(): boolean {
+    return ABSTRACT_RAILTIES.includes(this);
+  }
+
+  /** Set or get the short railtie name (defaults to underscored class name). */
+  static railtieName(name?: string): string {
+    if (name !== undefined) writeOwnState(this, "_railtieName", name);
+    let existing = readOwnState<string>(this, "_railtieName");
+    if (!existing) {
+      existing = underscore(this.name).replace(/\//g, "_");
+      writeOwnState(this, "_railtieName", existing);
+    }
+    return existing;
+  }
+
+  /** Lazily-created per-class singleton. */
+  static instance<T extends typeof Trailtie>(this: T): InstanceType<T> {
+    return ownState(this, "_instance", () => new (this as unknown as new () => InstanceType<T>)());
+  }
+
+  static get config(): Configuration {
+    return this.instance().config;
+  }
+
+  static configure(block: (this: Trailtie) => void): void {
+    this.instance().configure(block);
+  }
+
+  static rakeTasks(block: TrailtieBlock): void {
+    registerBlockFor(this, "rakeTasks", block);
+  }
+  static console(block: TrailtieBlock): void {
+    registerBlockFor(this, "console", block);
+  }
+  static runner(block: TrailtieBlock): void {
+    registerBlockFor(this, "runner", block);
+  }
+  static generators(block: TrailtieBlock): void {
+    registerBlockFor(this, "generators", block);
+  }
+  static server(block: TrailtieBlock): void {
+    registerBlockFor(this, "server", block);
+  }
+
+  /**
+   * @internal Read the blocks registered directly on `klass` for `kind`.
+   *
+   * @noRailsEquivalent PERMANENT — Rails reads the per-class block array
+   * straight off the class with `instance_variable_get` (railtie.rb:235-241).
+   * JS class objects have no ivars, so own-state has to be read through a named
+   * accessor; see `ownState` in trailtie/per-class-state.ts.
+   */
+  static registeredBlocksFor(kind: BlockRunnerKind): TrailtieBlock[] {
+    return readOwnState<TrailtieBlock[]>(this, blockKey(kind)) ?? [];
+  }
+
+  get config(): Configuration {
+    if (!this._config) this._config = new Configuration();
+    return this._config;
+  }
+
+  get railtieName(): string {
+    return (this.constructor as typeof Trailtie).railtieName();
+  }
+
+  configure(block: (this: Trailtie) => void): void {
+    block.call(this);
+  }
+
+  inspect(): string {
+    return `#<${this.constructor.name}>`;
+  }
+
+  runConsoleBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "console", (b) => b.call(this, app));
+  }
+  runGeneratorsBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "generators", (b) => b.call(this, app));
+  }
+  runRunnerBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "runner", (b) => b.call(this, app));
+  }
+  runTasksBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "rakeTasks", (b) => b.call(this, app));
+  }
+  runServerBlocks(app: unknown): void {
+    eachRegisteredBlock(this, "server", (b) => b.call(this, app));
   }
 }
 
-/**
- * Register `subclass` with the Trailtie registry.
- *
- * Call this in each subclass's static init block:
- *   static { registerTrailtie(this); }
- *
- * Mirrors: Rails::Railtie.inherited (called automatically by Ruby when
- * a class subclasses Railtie; we replicate it with an explicit call since
- * JavaScript has no `inherited` hook).
- */
-export function registerTrailtie(subclass: typeof Trailtie): void {
-  if (!Trailtie.subclasses.includes(subclass)) {
-    Trailtie.subclasses.push(subclass);
+function blockKey(kind: BlockRunnerKind): string {
+  return `_blocks_${kind}`;
+}
+
+/** @internal */
+function registerBlockFor(
+  klass: typeof Trailtie,
+  type: BlockRunnerKind,
+  block: TrailtieBlock,
+): void {
+  ownState(klass, blockKey(type), () => [] as TrailtieBlock[]).push(block);
+}
+
+/** @internal */
+function eachRegisteredBlock(
+  instance: Trailtie,
+  kind: BlockRunnerKind,
+  fn: (b: TrailtieBlock) => void,
+): void {
+  let klass: typeof Trailtie | null = instance.constructor as typeof Trailtie;
+  while (klass && "registeredBlocksFor" in klass) {
+    for (const block of klass.registeredBlocksFor(kind)) fn(block);
+    klass = Object.getPrototypeOf(klass) as typeof Trailtie | null;
   }
 }
+
+ABSTRACT_RAILTIES.push(Trailtie);

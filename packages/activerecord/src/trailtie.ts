@@ -1,7 +1,6 @@
 import {
   onLoad,
   Trailtie as BaseTrailtie,
-  registerTrailtie,
   type Deprecators,
 } from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
@@ -132,11 +131,11 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.config["activeRecord"] = defaultActiveRecordConfig();
+    this.config.set("activeRecord", defaultActiveRecordConfig());
 
-    this.initializer("active_record.deprecator", (app) => {
+    this.initializer("active_record.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeRecord", deprecator());
     });
 
@@ -153,27 +152,27 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record.copy_schema_cache_config", () => {
-      const cfg = this.config["activeRecord"] as ActiveRecordConfig;
+      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
       SchemaReflection.useSchemaCacheDump = cfg.useSchemaCacheDump;
       SchemaReflection.checkSchemaCacheDumpVersion = cfg.checkSchemaCacheDumpVersion;
     });
 
     this.initializer("active_record.sqlite3_adapter_strict_strings_by_default", () => {
-      const cfg = this.config["activeRecord"] as ActiveRecordConfig;
+      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
       if (cfg.sqlite3AdapterStrictStringsByDefault) {
         onLoad("active_record_sqlite3adapter", { runOnce: true }, setSqlite3StrictStringsByDefault);
       }
     });
 
     this.initializer("active_record.postgresql_adapter_decode_dates", () => {
-      const cfg = this.config["activeRecord"] as ActiveRecordConfig;
+      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
       if (cfg.postgresqlAdapterDecodeDates) {
         onLoad("active_record_postgresqladapter", { runOnce: true }, setPostgresqlDecodeDates);
       }
     });
 
     this.initializer("active_record.set_configs", () => {
-      const cfg = this.config["activeRecord"] as ActiveRecordConfig;
+      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
       ActiveRecord.maintainTestSchema = cfg.maintainTestSchema;
       ActiveRecord.raiseOnAssignToAttrReadonly = cfg.raiseOnAssignToAttrReadonly;
       ActiveRecord.belongsToRequiredValidatesForeignKey = cfg.belongsToRequiredValidatesForeignKey;
@@ -188,7 +187,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_record_encryption.configuration", (app) => {
-      const cfg = this.config["activeRecord"] as ActiveRecordConfig;
+      const cfg = this.config.get("activeRecord") as ActiveRecordConfig;
       const enc = cfg.encryption;
       if (enc && Object.keys(enc).length > 0) {
         EncryptionConfigurable.configure(enc);
