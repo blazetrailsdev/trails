@@ -2829,6 +2829,13 @@ function propertySignatureParams(
  * property, so skipping them would be its own divergence. A property whose
  * type has call signatures carries that signature's parameters, so arity
  * comparison sees the same thing for both spellings.
+ *
+ * Every member is `bodyless`, including one arriving through a heritage
+ * clause's resolved type (`Extended<>` / `Included<>`): an interface declares
+ * no bodies, so pairing must prefer the real body — see `MethodInfo.bodyless`
+ * and `ownersWithBodies`. Without that the host interface outranks the body it
+ * types, which is why PR #6798 kept two of the activemodel hosts local
+ * (RFC 0126).
  */
 function extractInterface(
   node: ts.InterfaceDeclaration,
@@ -2907,11 +2914,6 @@ function extractInterface(
                   params: [],
                   line: 0,
                   file,
-                  // An interface declares no bodies, so a member arriving
-                  // through `Extended<>` / `Included<>` is as bodyless as one
-                  // written `foo(): void` below — see `MethodInfo.bodyless` and
-                  // `ownersWithBodies`. Without this the host interface
-                  // outranks the real body in call-parity pairing.
                   bodyless: true,
                   ...(foreign ? { declaredIn: propDeclFile } : {}),
                   ...(propVisibility !== "public" ||

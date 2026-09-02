@@ -39,10 +39,12 @@ interface RoutesOptions {
   unused?: boolean;
 }
 
+/** @internal */
 function inspector(): RoutesInspector {
   return new RoutesInspector(Trails.application!.routes().getRoutes());
 }
 
+/** @internal */
 function formatter(options: RoutesOptions): RoutesFormatter {
   if (options.expanded) {
     return new ConsoleFormatter.Expanded();
@@ -51,6 +53,7 @@ function formatter(options: RoutesOptions): RoutesFormatter {
   }
 }
 
+/** @internal */
 function routesFilter(options: RoutesOptions): RoutesFilter {
   const filter: RoutesFilter = {};
   if (options.controller !== undefined) filter.controller = options.controller;

@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { normalize, rubyToConventionTs } from "../test-compare/compare.js";
+import { PKG_SRC_DIRS, normalize, rubyToConventionTs } from "../test-compare/compare.js";
 import { extractTestsFromSource } from "../test-compare/extract-ts-tests.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import type { TestCaseInfo } from "../test-compare/types.js";
@@ -21,21 +21,6 @@ import { UNPORTED_FILES } from "./unported-files/index.js";
 // scopes the claim to one Ruby class, so the check is scoped to the matching
 // describe — that is how a Psych-safe_load subclass stays excluded while the
 // base class's live port keeps counting.
-
-const PKG_SRC: Record<string, string> = {
-  arel: "packages/arel/src/",
-  activemodel: "packages/activemodel/src/",
-  activerecord: "packages/activerecord/src/",
-  activesupport: "packages/activesupport/src/",
-  actionpack: "packages/actionpack/src/",
-  actionview: "packages/actionview/src/",
-  activejob: "packages/activejob/src/",
-  trailties: "packages/trailties/src/",
-  globalid: "packages/globalid/src/",
-  i18n: "packages/i18n/src/",
-  rack: "packages/rack/src/",
-  "rack-session": "packages/rack-session/src/",
-};
 
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -77,7 +62,7 @@ describe("UNPORTED_FILES per-test entries do not name a ported test", () => {
         if (!e.testFile || !e.tests) continue;
         const excluded = new Set(e.tests.map(normalize));
         for (const [pkg, rels] of Object.entries(relByPkg)) {
-          const srcDir = PKG_SRC[pkg];
+          const srcDir = PKG_SRC_DIRS[pkg];
           if (!srcDir) continue;
           for (const r of rels) {
             if (!r.includes(e.testFile)) continue;

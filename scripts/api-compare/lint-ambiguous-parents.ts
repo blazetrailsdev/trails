@@ -33,8 +33,8 @@ export interface MarkViolation {
 }
 
 /** Every package that grew past its mark. Empty means the gate passes. A
- *  package with no committed mark is held to zero: a new one appearing is
- *  exactly the silent growth this gate exists to catch. */
+ *  package with no committed mark is held to zero: a package appearing for the
+ *  first time is exactly the silent growth this gate exists to catch. */
 export function exceedances(
   marks: AmbiguousParentCounts,
   current: AmbiguousParentCounts,

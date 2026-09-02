@@ -36,6 +36,10 @@
  * the same pairs: where arity asks how many args a method takes, this asks what
  * they are CALLED, since CLAUDE.md makes the camelCased Rails identifier the
  * required spelling. A `params N/M` figure prints next to `arity` and
+ * output/ambiguous-parents.json carries the inheritance edges the walk followed
+ * to NOTHING, per package and omitting packages at zero, so the file IS the
+ * remainder lint-ambiguous-parents.ts gates only-shrink (RFC 0126).
+ *
  * output/param-name-mismatches.json is always written; `--params` adds the
  * per-position breakdown. lint-param-names.ts gates it against an only-shrink
  * per-package/per-file mark (param-name-mark.json).
@@ -1103,6 +1107,8 @@ interface PackageResult {
   excludedFiles: string[];
   files: FileResult[];
   inheritance: InheritanceResult;
+  /** Inheritance edges the walk followed to NOTHING — see `output/ambiguous-parents.json`. */
+  ambiguousParents: number;
   arity: ArityResult;
   paramNames: ParamNameResult;
   optionKeys: OptionKeyResult;
@@ -3008,6 +3014,14 @@ export function buildEntitiesByName(
  * candidates do share a directory prefix with the child, which is the signal
  * this heuristic exists to read; only a tie at zero is pure enumeration order.
  *
+ * `declFile` also arrives in two RESOLVED-but-not-here spellings, which the
+ * heuristic must not confuse with an absent one (RFC 0126). `external:` says
+ * the name bound a TypeScript lib global or a node_modules type, so no package
+ * entity is it and the walk follows nothing — silently, because a
+ * `class X extends Error` in an ambiguity warning is noise nobody can act on.
+ * `pkg:<package>:<path>` says it bound another workspace package, and
+ * `packageOf` is what separates that package's `model.ts` from this one's.
+ *
  * `isForeign` marks a candidate a DEP package contributed. A dep's path is
  * relative to ITS OWN src dir, so a shared prefix with the child is a
  * coincidence: activemodel and activerecord both port `attribute_methods.rb`
@@ -3037,10 +3051,6 @@ export function resolveEntityByDeclaringFile(
   packageOf?: (candidate: ClassInfo) => string | undefined,
 ): ClassInfo | null {
   if (candidates.length === 0) return null;
-  // `external:` is a resolved answer, not a missing one: the name is a
-  // TypeScript lib global or a node_modules type, so no package entity is it
-  // and the walk must follow nothing — reporting it as ambiguous would put a
-  // `class X extends Error` in a warning nobody can act on (RFC 0126).
   if (declFile === EXTERNAL_DECL_FILE) return null;
   if (declFile?.startsWith(PKG_DECL_PREFIX)) {
     const [depPkg, ...rest] = declFile.slice(PKG_DECL_PREFIX.length).split(":");
@@ -3467,8 +3477,6 @@ export function main() {
 
     // Propagate inherited methods transitively: follows both class `superclass`
     // and interface/module `extends` chains.
-    // Inheritance edges the walk followed to NOTHING, gated only-shrink by
-    // lint-ambiguous-parents.ts (RFC 0126).
     let ambiguousParentCount = 0;
     if (tsPkg) {
       // Key by short name → entity for superclass/extends resolution.
@@ -4901,9 +4909,6 @@ export function main() {
     ),
   );
 
-  // The ambiguous-parent artifact the RFC 0126 mark gate
-  // (lint-ambiguous-parents.ts) measures: unresolved inheritance edges per
-  // package. Packages at zero are omitted so the file IS the remainder.
   fs.writeFileSync(
     path.join(OUTPUT_DIR, `ambiguous-parents${modeSuffix}.json`),
     JSON.stringify(

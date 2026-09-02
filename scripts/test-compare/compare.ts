@@ -1483,27 +1483,28 @@ function formatGate(g?: TestGate): string {
 /**
  * Extract the relative path of a TS test file within its package src dir.
  */
-function extractRelativeTsPath(fullPath: string, pkg: string): string {
-  const pkgDirs: Record<string, string> = {
-    arel: "packages/arel/src/",
-    activemodel: "packages/activemodel/src/",
-    activerecord: "packages/activerecord/src/",
-    activesupport: "packages/activesupport/src/",
-    rack: "packages/rack/src/",
-    "rack-session": "packages/rack-session/src/",
-    actiondispatch: "packages/actionpack/src/action-dispatch/",
-    actioncontroller: "packages/actionpack/src/action-controller/",
-    abstractcontroller: "packages/actionpack/src/abstract-controller/",
-    actionview: "packages/actionview/src/",
-    trailties: "packages/trailties/src/",
-    globalid: "packages/globalid/src/",
-    "did-you-mean": "packages/did-you-mean/src/",
-    i18n: "packages/i18n/src/",
-    date: "packages/date/src/",
-    "ruby-compat": "packages/ruby-compat/src/",
-  };
+/** Each compare package's TS source root, repo-relative with a trailing slash. */
+export const PKG_SRC_DIRS: Record<string, string> = {
+  arel: "packages/arel/src/",
+  activemodel: "packages/activemodel/src/",
+  activerecord: "packages/activerecord/src/",
+  activesupport: "packages/activesupport/src/",
+  rack: "packages/rack/src/",
+  "rack-session": "packages/rack-session/src/",
+  actiondispatch: "packages/actionpack/src/action-dispatch/",
+  actioncontroller: "packages/actionpack/src/action-controller/",
+  abstractcontroller: "packages/actionpack/src/abstract-controller/",
+  actionview: "packages/actionview/src/",
+  trailties: "packages/trailties/src/",
+  globalid: "packages/globalid/src/",
+  "did-you-mean": "packages/did-you-mean/src/",
+  i18n: "packages/i18n/src/",
+  date: "packages/date/src/",
+  "ruby-compat": "packages/ruby-compat/src/",
+};
 
-  const prefix = pkgDirs[pkg];
+function extractRelativeTsPath(fullPath: string, pkg: string): string {
+  const prefix = PKG_SRC_DIRS[pkg];
   if (prefix && fullPath.startsWith(prefix)) {
     return fullPath.slice(prefix.length);
   }
