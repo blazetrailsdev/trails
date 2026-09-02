@@ -19,7 +19,8 @@
 
 import type { RackApp } from "@blazetrails/rack";
 import type { CacheStore as CacheStoreLike } from "@blazetrails/activesupport";
-import { AbstractSecureStore, SessionId } from "./abstract-store.js";
+import { SessionId } from "@blazetrails/rack-session";
+import { AbstractSecureStore } from "./abstract-store.js";
 
 export interface CacheStoreSessionOptions {
   cache?: CacheStoreLike;

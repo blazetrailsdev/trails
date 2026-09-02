@@ -6,7 +6,7 @@ import {
   type CookieStoreRequest,
   type CookieJarLike,
 } from "../../middleware/session/cookie-store.js";
-import { SessionId as RackSessionId } from "../../middleware/session/abstract-store.js";
+import { SessionId as RackSessionId } from "@blazetrails/rack-session";
 import { Session } from "../../request/session.js";
 
 const opts = (o: Record<string, unknown> = {}) => new Session.Options(null, o);

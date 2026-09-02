@@ -17,12 +17,8 @@
 
 import type { RackApp } from "@blazetrails/rack";
 import { include } from "@blazetrails/activesupport";
-import {
-  Compatibility,
-  type SessionId,
-  SessionObject,
-  StaleSessionCheck,
-} from "./abstract-store.js";
+import type { SessionId } from "@blazetrails/rack-session";
+import { Compatibility, SessionObject, StaleSessionCheck } from "./abstract-store.js";
 import { CacheStore, type CacheStoreSessionOptions } from "./cache-store.js";
 
 export interface MemCacheStoreSessionOptions extends CacheStoreSessionOptions {

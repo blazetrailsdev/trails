@@ -48,7 +48,7 @@ export class DisabledSessionError extends Error {
  * Mirrors: ActionDispatch::Request::Session::Options (`request/session.rb:47`).
  *
  * `Rack::Session::Abstract::Persisted` reads its options as a Hash —
- * `options[:skip]` (`rack-session/lib/rack/session/abstract/id.rb:351`),
+ * `options[:skip]` (`vendor/rack-session/lib/rack/session/abstract/id.rb:351`),
  * `values_at` (`:368`), `cookie.merge!(options)` (`:411`) — and Ruby's duck
  * typing lets an Options answer all three through `[]` / `to_hash`. TS has no
  * operator overloading, so the constructor surfaces the delegate through a
@@ -61,7 +61,7 @@ export class DisabledSessionError extends Error {
  * name a member also claims. A colliding key is left out of `ownKeys` for the
  * same reason, so generic JS iteration never hands a caller a method as data.
  * `to_hash` (`:72`) is unfiltered, and it is what `cookie.merge!(options)`
- * (`rack-session/lib/rack/session/abstract/id.rb:411`) converts through.
+ * (`vendor/rack-session/lib/rack/session/abstract/id.rb:411`) converts through.
  */
 export class Options {
   [key: string]: unknown;
@@ -486,7 +486,7 @@ export class Session {
    * is the same observable state.
    *
    * @internal Ruby-private; `Rack::Session::Abstract::Persisted#commit_session`
-   * reaches it with `session.send(:load!)` (`rack-session id.rb:392`).
+   * reaches it with `session.send(:load!)` (`vendor/rack-session/lib/rack/session/abstract/id.rb:392`).
    */
   loadBang(): void {
     if (this.isEnabled()) {

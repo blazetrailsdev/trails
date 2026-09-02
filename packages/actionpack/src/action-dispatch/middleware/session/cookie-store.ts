@@ -11,7 +11,8 @@
 
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
-import { AbstractSecureStore, SessionId as RackSessionId } from "./abstract-store.js";
+import { SessionId as RackSessionId } from "@blazetrails/rack-session";
+import { AbstractSecureStore } from "./abstract-store.js";
 
 /** @internal Minimum shape this store needs out of `ActionDispatch::Request`. */
 export interface CookieStoreRequest {
@@ -31,7 +32,7 @@ export interface CookieJarLike {
  * it holds the `Rack::Session::SessionId` and forwards its public surface,
  * which is why `attr_reader :cookie_value` (`cookie_store.rb:54`) freely
  * replaces the delegate's `alias :cookie_value :public_id`
- * (`rack-session abstract/id.rb:34`) with the cookie hash.
+ * (`vendor/rack-session/lib/rack/session/abstract/id.rb:34`) with the cookie hash.
  */
 export class SessionId {
   readonly #obj: RackSessionId;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MemoryStore } from "@blazetrails/activesupport";
 import { MemCacheStore } from "./mem-cache-store.js";
-import { SessionId } from "./abstract-store.js";
+import { SessionId } from "@blazetrails/rack-session";
 
 describe("ActionDispatch::Session::MemCacheStore", () => {
   it("aliases :expires to :expire_after", () => {

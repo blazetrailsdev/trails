@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MemoryStore } from "@blazetrails/activesupport";
 import { CacheStore } from "./cache-store.js";
-import { SessionId } from "./abstract-store.js";
+import { SessionId } from "@blazetrails/rack-session";
 import { Session } from "../../request/session.js";
 
 const opts = (o: Record<string, unknown> = {}) => new Session.Options(null, o);
