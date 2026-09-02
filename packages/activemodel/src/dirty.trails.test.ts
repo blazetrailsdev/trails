@@ -652,6 +652,8 @@ describe("Dirty readers do not resolve attribute aliases", () => {
     declare static attribute: AttributesClassHalf["attribute"];
     declare static aliasAttribute: (newName: string, oldName: string) => void;
     declare nomChanged: () => boolean;
+    declare nomWas: unknown;
+    declare nom: string | null;
 
     static {
       include(this, Attributes);
@@ -672,5 +674,7 @@ describe("Dirty readers do not resolve attribute aliases", () => {
     expect(pirate.attributeChanged("name")).toBe(true);
     expect(pirate.attributeChanged("nom")).toBe(false);
     expect(pirate.nomChanged()).toBe(true);
+    expect(pirate.nomWas).toBe(null);
+    expect(pirate.nom).toBe("Blackbeard");
   });
 });
