@@ -202,7 +202,7 @@ describe("TestDate", () => {
     expect(r.cover(today.minus(1))).toEqual(true);
   });
 
-  it("const", () => {
+  it(" const", () => {
     expect(RubyDate.MONTHNAMES[0]).toBeNull();
     expect(RubyDate.MONTHNAMES[1]).toEqual("January");
     expect(RubyDate.MONTHNAMES.length).toEqual(13);
