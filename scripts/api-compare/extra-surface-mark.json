@@ -1,12 +1,12 @@
 {
   "activerecord": {
-    "novel": 328,
-    "total": 856
+    "novel": 327,
+    "total": 855
   },
   "arel": {
     "novel": 0,
     "total": 35,
-    "inlinedFrom": 4
+    "inlinedFrom": 0
   },
   "ruby-compat": {
     "novel": 0,

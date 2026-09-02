@@ -35,6 +35,7 @@ export const Crud: Crud = {
     return new InsertManager();
   },
 
+  /** @missingRailsArgs offset — PERMANENT */
   compileUpdate(
     this: SelectManager,
     values: UpdateValues,
@@ -55,6 +56,7 @@ export const Crud: Crud = {
     return um;
   },
 
+  /** @missingRailsArgs offset — PERMANENT */
   compileDelete(
     this: SelectManager,
     key: Node | Node[] | null = null,

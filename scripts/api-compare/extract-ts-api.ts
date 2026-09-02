@@ -864,8 +864,24 @@ export function extractFromProgram(
           const methods = harvestObjectLiteralMethods(decl.initializer, checker, relPath);
           if (methods.length === 0) continue;
           const modKey = `${relPath}:${decl.name.text}`;
-          if (info.modules[modKey] || info.classes[modKey]) continue;
+          if (info.classes[modKey]) continue;
+          const prior = info.modules[modKey];
+          if (prior && !isAllBodyless(prior)) continue;
           const modReason = noRailsEquivalentReason(decl) ?? noRailsEquivalentReason(node);
+          if (prior) {
+            // A bodyless same-named declaration — the `interface X` that types
+            // the mixin's members — was harvested first and would otherwise
+            // hide the object literal that carries the real bodies. The bodied
+            // half wins; members the literal does not define keep their
+            // signature.
+            const bodied = new Set(methods.map((m) => m.name));
+            prior.instanceMethods = [
+              ...methods,
+              ...prior.instanceMethods.filter((m) => !bodied.has(m.name)),
+            ];
+            prior.noRailsEquivalent ??= modReason;
+            continue;
+          }
           info.modules[modKey] = {
             name: decl.name.text,
             file: relPath,
@@ -1006,6 +1022,59 @@ export function extractFromProgram(
         fileHasClassOrModule = true;
       }
     });
+
+    // Ruby `class_attribute :foo` defines `foo`, `foo?` and `foo=`, and
+    // extract-ruby-api.rb credits all three (#process_mattr,
+    // activesupport/lib/active_support/core_ext/class/attribute.rb:80). trails'
+    // twin is `classAttribute.call(Host, "foo", opts)` from activesupport,
+    // which installs the same accessor pair on the class at load time; without
+    // this the generated members score only against the host interface that
+    // types them, i.e. declaration-only.
+    for (const attr of collectClassAttributeCalls(sourceFile)) {
+      const target =
+        [attr.enclosing, attr.receiver]
+          .filter((n): n is string => n !== undefined)
+          .map((n) => `${relPath}:${n}`)
+          .find((key) => info.classes[key] || info.modules[key]) ?? undefined;
+      if (target === undefined) continue;
+      const entity = info.classes[target] ?? info.modules[target];
+      // Credit only a name the file already declares. The accessor is real
+      // either way, but a name nothing in the file spells has no Rails
+      // counterpart to match and would land as novel extra surface.
+      const declared = new Set(
+        [
+          ...Object.values(info.classes),
+          ...Object.values(info.modules),
+          ...(info.fileFunctions[relPath] ?? []),
+        ]
+          .flatMap((e) =>
+            "instanceMethods" in e ? [...e.instanceMethods, ...e.classMethods] : [e],
+          )
+          .filter((m) => m.file === relPath)
+          .map((m) => m.name),
+      );
+      for (const name of attr.names) {
+        if (!declared.has(name)) continue;
+        const seats: boolean[] = [true];
+        if (attr.instanceReader || attr.instanceWriter) seats.push(false);
+        for (const isStatic of seats) {
+          const members = isStatic ? entity.classMethods : entity.instanceMethods;
+          const at = members.findIndex((m) => m.name === name);
+          if (at !== -1 && members[at].bodyless !== true) continue;
+          const generated: MethodInfo = {
+            name,
+            visibility: "public",
+            params: [],
+            isStatic,
+            line: attr.line,
+            file: relPath,
+          };
+          if (at === -1) members.push(generated);
+          else members[at] = generated;
+        }
+      }
+      fileHasClassOrModule = true;
+    }
 
     // Also capture functions exported via `export { foo, bar }` (named export lists).
     // Resolve aliases so ExportSpecifier nodes reach the underlying FunctionDeclaration.
@@ -2316,6 +2385,110 @@ export function factoryClassMembers(
  */
 export function isConstantCaseName(name: string): boolean {
   return /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(name);
+}
+
+/**
+ * A `classAttribute.call(Host, "name", { … })` site — the trails port of Ruby's
+ * `class_attribute` macro (activesupport/src/class-attribute.ts), which is how
+ * an `included do class_attribute :foo end` block is spelled here (CLAUDE.md,
+ * _Module mixins_).
+ *
+ * `enclosing` is the nearest named class or `const` the call sits inside — the
+ * structural twin of extract-ruby-api.rb#process_mattr's `current_fqn`;
+ * `receiver` is the `.call` receiver, which is all a top-level call site
+ * (`classAttribute.call(Base, …)`) states. A non-literal name credits nothing.
+ */
+export interface ClassAttributeCall {
+  enclosing?: string;
+  receiver?: string;
+  names: string[];
+  instanceReader: boolean;
+  instanceWriter: boolean;
+  line: number;
+}
+
+export function collectClassAttributeCalls(sourceFile: ts.SourceFile): ClassAttributeCall[] {
+  const out: ClassAttributeCall[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && isClassAttributeCallee(node.expression)) {
+      const call = readClassAttributeCall(node, sourceFile);
+      if (call) out.push(call);
+    }
+    ts.forEachChild(node, visit);
+  };
+  ts.forEachChild(sourceFile, visit);
+  return out;
+}
+
+function isClassAttributeCallee(expr: ts.Expression): boolean {
+  return (
+    ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === "call" &&
+    ts.isIdentifier(expr.expression) &&
+    expr.expression.text === "classAttribute"
+  );
+}
+
+function readClassAttributeCall(
+  node: ts.CallExpression,
+  sourceFile: ts.SourceFile,
+): ClassAttributeCall | null {
+  const [recv, ...rest] = node.arguments;
+  if (recv === undefined) return null;
+  const names: string[] = [];
+  for (const arg of rest) {
+    if (ts.isStringLiteralLike(arg)) names.push(arg.text);
+  }
+  if (names.length === 0) return null;
+  const opts = rest.at(-1);
+  const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
+  // Ruby's defaults: `instance_reader` / `instance_writer` each fall back to
+  // `instance_accessor`, which defaults to true
+  // (core_ext/class/attribute.rb:80-84, mirrored by process_mattr).
+  const instanceAccessor = optionBool(options, "instanceAccessor") ?? true;
+  return {
+    ...(enclosingEntityName(node) !== undefined ? { enclosing: enclosingEntityName(node) } : {}),
+    ...(ts.isIdentifier(recv) ? { receiver: recv.text } : {}),
+    names,
+    instanceReader: optionBool(options, "instanceReader") ?? instanceAccessor,
+    instanceWriter: optionBool(options, "instanceWriter") ?? instanceAccessor,
+    line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+  };
+}
+
+function optionBool(
+  options: ts.ObjectLiteralExpression | undefined,
+  key: string,
+): boolean | undefined {
+  for (const prop of options?.properties ?? []) {
+    if (!ts.isPropertyAssignment(prop)) continue;
+    if (!ts.isIdentifier(prop.name) || prop.name.text !== key) continue;
+    if (prop.initializer.kind === ts.SyntaxKind.TrueKeyword) return true;
+    if (prop.initializer.kind === ts.SyntaxKind.FalseKeyword) return false;
+  }
+  return undefined;
+}
+
+function enclosingEntityName(node: ts.Node): string | undefined {
+  for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
+    if (ts.isClassDeclaration(cur) && cur.name) return cur.name.text;
+    if (ts.isVariableDeclaration(cur) && ts.isIdentifier(cur.name)) return cur.name.text;
+  }
+  return undefined;
+}
+
+/**
+ * Does every member this entity declares arrive as a bodyless signature?
+ *
+ * The settled trails mixin shape declares `interface X` beside `const X = {…}`
+ * — the interface types the bodies the literal carries. Interfaces are
+ * harvested first, so without this the signature-only half wins the file:name
+ * slot and every member scores declaration-only. An entity with ANY bodied
+ * member is a real merge target and is left alone.
+ */
+export function isAllBodyless(mod: ClassInfo): boolean {
+  const members = [...mod.instanceMethods, ...mod.classMethods];
+  return members.length > 0 && members.every((m) => m.bodyless === true);
 }
 
 function moduleObjectLiterals(
