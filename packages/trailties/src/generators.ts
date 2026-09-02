@@ -219,6 +219,10 @@ export class Generators {
    * Rails: `print_generators` (`generators.rb:192-194`). Ruby prints through
    * `puts`; the port takes the sink because trails has no process-global
    * stdout to reach for.
+   *
+   * @missingRailsArgs print_list — PERMANENT: Ruby's `print_list(b, n)` writes
+   * through Thor's shell, a process-global; `process.*` is out of reach in this
+   * package, so the sink is the third argument.
    */
   static async printGenerators(output: (msg: string) => void): Promise<void> {
     for (const [base, namespaces] of await Generators.sortedGroups()) {
