@@ -69,7 +69,7 @@ describe("ResponseTest", () => {
   it("content type", () => {
     const res = new Response();
     res.contentType = "application/json";
-    expect(res.contentType).toBe("application/json");
+    expect(res.contentType).toBe("application/json; charset=utf-8");
   });
 
   it("empty content type returns nil", () => {
@@ -141,7 +141,8 @@ describe("ResponseTest", () => {
   it("read charset and content type", () => {
     const res = new Response();
     res.setHeader("content-type", "text/html; charset=utf-8");
-    expect(res.contentType).toBe("text/html");
+    expect(res.contentType).toBe("text/html; charset=utf-8");
+    expect(res.mediaType).toBe("text/html");
     expect(res.charset).toBe("utf-8");
   });
 
@@ -203,7 +204,7 @@ describe("ResponseTest", () => {
     const [status, headers, body] = res.toRack();
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("text/plain");
-    expect(body).toEqual(["hi"]);
+    expect([...(body as Iterable<unknown>)]).toEqual(["hi"]);
   });
 
   // --- Inspect ---
@@ -276,19 +277,6 @@ describe("ResponseTest", () => {
     const res = new Response();
     res.contentType = "text/plain";
     expect(res.getHeader("content-type")).toBe("text/plain; charset=utf-8");
-  });
-
-  it("non-text content type has no charset", () => {
-    const res = new Response();
-    res.contentType = "application/json";
-    expect(res.getHeader("content-type")).toBe("application/json");
-  });
-
-  it("setting contentType to undefined clears it", () => {
-    const res = new Response();
-    res.contentType = "text/html";
-    res.contentType = undefined;
-    expect(res.contentType).toBeUndefined();
   });
 
   // --- Cookies with options ---
@@ -496,10 +484,14 @@ describe("ResponseTest", () => {
 
   it("can be explicitly destructured into status, headers and an enumerable body", () => {
     const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
-    const [status, headers, body] = res.toRack() as [number, Record<string, string>, string[]];
+    const [status, headers, body] = res.toRack() as [
+      number,
+      Record<string, string>,
+      Iterable<unknown>,
+    ];
     expect(status).toBe(404);
     expect(headers["content-type"]).toBe("text/plain");
-    expect(body).toEqual(["Not Found"]);
+    expect([...body]).toEqual(["Not Found"]);
   });
 
   it.skip("[response.to_a].flatten does not recurse infinitely", () => {

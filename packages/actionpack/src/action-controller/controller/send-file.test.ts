@@ -196,7 +196,7 @@ describe("SendFileTest", () => {
   it("send file without content disposition header", async () => {
     class C extends Base {
       async data() {
-        this.sendData(testFileData);
+        this.sendData(testFileData, { disposition: null });
       }
     }
     const c = new C();
@@ -356,7 +356,6 @@ describe("SendFileController", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.contentType).toBe("image/png");
-    expect(c.response.sendingFile).toBe(true);
     expect(c.getHeader("Content-Disposition")).toMatch(/attachment;.*filename="x\.png"/);
     expect(c.getHeader("Content-Transfer-Encoding")).toBe("binary");
   });

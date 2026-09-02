@@ -90,7 +90,7 @@ describe("RenderJsonTest", () => {
     }
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("application/vnd.api+json");
+    expect(c.contentType).toBe("application/vnd.api+json; charset=utf-8");
   });
 
   it("render symbol json", async () => {

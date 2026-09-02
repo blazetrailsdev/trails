@@ -4,8 +4,14 @@
  * Represents an HTTP response with status, headers, and body.
  */
 
-import { getFs } from "@blazetrails/activesupport";
-import { deleteSetCookieHeaderBang, Headers, setCookieHeader, unescape } from "@blazetrails/rack";
+import { getFs, presence } from "@blazetrails/activesupport";
+import {
+  deleteSetCookieHeaderBang,
+  Headers,
+  setCookieHeader,
+  statusCode,
+  unescape,
+} from "@blazetrails/rack";
 import type { CookieExpires } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
 import {
@@ -47,6 +53,8 @@ interface ContentTypeHeader {
   readonly charset: string | undefined;
 }
 const NULL_CONTENT_TYPE_HEADER: ContentTypeHeader = { mimeType: undefined, charset: undefined };
+/** Rails: `RackBody::BODY_METHODS` (response.rb:510), less `each`, which RackBody defines. */
+const BODY_METHODS = ["toAry", "call", "toPath"] as const;
 
 /** Mirrors Rails' `ActionDispatch::Response::Buffer` (response.rb:100-157). */
 export class ResponseBuffer {
@@ -96,6 +104,54 @@ export class ResponseBuffer {
   }
 }
 
+/**
+ * Mirrors Rails' `ActionDispatch::Response::RackBody` (response.rb:497-536) —
+ * the third element of the Rack triple. Rack body methods stay lazy and go
+ * through the response, so `close` is `Response#abort` and `each` is
+ * `Response#each`.
+ *
+ * Ruby gates `to_ary` / `call` / `to_path` behind a `respond_to?` that forwards
+ * to `@response.stream` (response.rb:512-518). JS has no `respond_to?` hook, so
+ * those three are installed on the instance only when the stream answers them —
+ * the response is committed before `to_a` builds this, so the stream is settled
+ * and the answer cannot change. `[Symbol.iterator]` is JS's spelling of `each`,
+ * which is how a Rack consumer walks the body here.
+ */
+export class RackBody {
+  private response: Response;
+
+  constructor(response: Response) {
+    this.response = response;
+    const stream = this.response.stream as Record<string, unknown> | null;
+    for (const method of BODY_METHODS) {
+      if (stream && typeof stream[method] === "function") {
+        (this as unknown as Record<string, unknown>)[method] = (...args: unknown[]): unknown =>
+          (stream[method] as (...a: unknown[]) => unknown)(...args);
+      }
+    }
+  }
+
+  close(): void {
+    this.response.abort();
+  }
+
+  get body(): string {
+    return this.response.body;
+  }
+
+  *each(): IterableIterator<unknown> {
+    yield* this.response.each();
+  }
+
+  [Symbol.iterator](): IterableIterator<unknown> {
+    return this.each();
+  }
+
+  async *[Symbol.asyncIterator](): AsyncIterableIterator<string | Uint8Array> {
+    for (const chunk of this.each()) yield chunk as string | Uint8Array;
+  }
+}
+
 export class Response {
   /** Rails: `cattr_accessor :default_charset, default: "utf-8"`. */
   static defaultCharset = "utf-8";
@@ -104,12 +160,9 @@ export class Response {
   private _headers: Headers;
   private _body: string[];
   private _committed = false;
-  private _charset: string | undefined;
   private _sending = false;
   private _sent = false;
   stream: unknown = null;
-  /** Rails: `response.sending_file = true` flag set by `send_file_headers!`. */
-  sendingFile = false;
   request: Request | null = null;
   /** Rails: `cattr_accessor :default_headers`. */
   static defaultHeaders: Record<string, string> | undefined;
@@ -128,8 +181,9 @@ export class Response {
   get status(): number {
     return this._status;
   }
-  set status(value: number) {
-    this._status = value;
+  /** Mirrors: `status=` (response.rb:247-249) — `Rack::Utils.status_code(status)`. */
+  set status(status: number | string) {
+    this._status = statusCode(status);
   }
 
   get code(): number {
@@ -190,38 +244,46 @@ export class Response {
 
   // --- Content type ---
 
+  /**
+   * Mirrors: `content_type` (response.rb:269-271) — `super.presence`, the whole
+   * `Content-Type` header. The bare media type is {@link mediaType}.
+   */
   get contentType(): string | undefined {
-    const ct = this.getHeader(CONTENT_TYPE);
-    if (!ct) return undefined;
-    return ct.split(";")[0].trim() || undefined;
+    return presence(this.getHeader(CONTENT_TYPE));
   }
 
+  /** Mirrors: `content_type=` (response.rb:259-266). */
   set contentType(value: string | undefined) {
-    if (!value) {
-      this.deleteHeader(CONTENT_TYPE);
-      return;
-    }
-    const newHeader = this.parseContentType(value);
-    const prevHeader = this.parsedContentTypeHeader();
-    let charset = newHeader.charset || prevHeader.charset || this._charset;
-    const mimeType = newHeader.mimeType ?? value;
-    if (!charset && mimeType.startsWith("text/")) {
+    if (value == null) return;
+    const newHeaderInfo = this.parseContentType(String(value));
+    const prevHeaderInfo = this.parsedContentTypeHeader();
+    let charset = newHeaderInfo.charset || prevHeaderInfo.charset;
+    if (!charset && !prevHeaderInfo.mimeType) {
       charset = (this.constructor as typeof Response).defaultCharset;
     }
-    this.setContentType(mimeType, charset);
+    this.setContentType(newHeaderInfo.mimeType, charset);
   }
 
+  /** Mirrors: `charset` (response.rb:300-303). */
   get charset(): string | undefined {
-    const ct = this.getHeader(CONTENT_TYPE);
-    if (!ct) return this._charset ?? (this.constructor as typeof Response).defaultCharset;
-    const match = ct.match(/charset=([^\s;]+)/i);
-    return match
-      ? match[1]
-      : (this._charset ?? (this.constructor as typeof Response).defaultCharset);
+    const headerInfo = this.parsedContentTypeHeader();
+    return headerInfo.charset || (this.constructor as typeof Response).defaultCharset;
   }
 
-  set charset(value: string | undefined) {
-    this._charset = value;
+  /** Mirrors: `charset=` (response.rb:288-295) — `false` strips the charset. */
+  set charset(charset: string | false | undefined) {
+    const contentType = this.parsedContentTypeHeader().mimeType;
+    if (charset === false) {
+      this.setContentType(contentType, undefined);
+    } else {
+      const defaultCharset = (this.constructor as typeof Response).defaultCharset;
+      this.setContentType(contentType, charset || defaultCharset);
+    }
+  }
+
+  /** Mirrors: `sending_file=` (response.rb:278-282). */
+  set sendingFile(v: boolean) {
+    if (v === true) this.charset = false;
   }
 
   // --- Body ---
@@ -391,12 +453,14 @@ export class Response {
 
   // --- Rack response ---
 
+  /**
+   * Mirrors: `to_a` (response.rb:410-413) — `commit!` then
+   * `rack_response @status, @headers.to_hash`. `to_a` is a Ruby core protocol
+   * name in `SKIP_GROUPS`, so it keeps its trails spelling.
+   */
   toRack(): [number, Record<string, string>, unknown] {
-    // If a stream is installed, surface it directly so Rack::Sendfile /
-    // BodyProxy can intercept via toPath()/close() rather than draining
-    // the file into memory.
-    if (this.stream) return [this._status, this._headers.toHash(), this.stream];
-    return [this._status, this._headers.toHash(), [...this._body]];
+    this.commitBang();
+    return this.rackResponse(this._status, this._headers.toHash());
   }
 
   // --- Stream / body parts ---
@@ -595,13 +659,13 @@ export class Response {
     }
   }
 
-  /** @internal Rails: `rack_response(status, headers)` — empty body for no-content statuses. */
+  /** @internal Rails: `rack_response(status, headers)` (response.rb:546-553). */
   rackResponse(
     status: number,
     headers: Record<string, string>,
-  ): [number, Record<string, string>, unknown[]] {
+  ): [number, Record<string, string>, unknown] {
     if ((NO_CONTENT_CODES as readonly number[]).includes(status)) return [status, headers, []];
-    return [status, headers, this.bodyParts()];
+    return [status, headers, new RackBody(this)];
   }
 
   // --- ETag generators (delegated to cache module) ---

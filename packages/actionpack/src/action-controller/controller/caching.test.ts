@@ -197,7 +197,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("cache-control")).toBe("max-age=3600");
+    expect(c.getHeader("cache-control")).toBe("max-age=3600, private");
   });
 
   it("expiresIn with public", async () => {
@@ -221,7 +221,7 @@ describe("FragmentCachingTest", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.getHeader("cache-control")).toBe("max-age=300, must-revalidate");
+    expect(c.getHeader("cache-control")).toBe("max-age=300, private, must-revalidate");
   });
 
   it("expiresIn with public and must-revalidate", async () => {

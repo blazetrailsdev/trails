@@ -77,7 +77,7 @@ describe("ControllerInstanceTests", () => {
     const c = new BodyController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.body).toBe("raw body");
-    expect(c.contentType).toBe("text/plain");
+    expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
 
   it("render text", async () => {
@@ -122,7 +122,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new CustomCtController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("text/csv");
+    expect(c.contentType).toBe("text/csv; charset=utf-8");
   });
 
   it("render implicit (no options) renders empty html", async () => {
@@ -261,6 +261,7 @@ describe("ActionController::Base redirecting", () => {
 describe("ActionController::Base flash", () => {
   it("notice sets flash notice", () => {
     const c = new (class extends Base {})();
+    c.response = makeResponse();
     // Rails' `notice=` writes `flash[:notice]`, and `flash` delegates to the
     // request (`metal/flash.rb:12`), so the controller needs one.
     c.setRequestBang(new Request({}));
@@ -271,6 +272,7 @@ describe("ActionController::Base flash", () => {
 
   it("alert sets flash alert", () => {
     const c = new (class extends Base {})();
+    c.response = makeResponse();
     c.setRequestBang(new Request({}));
     c.alert = "Danger!";
     expect(c.flash.alert).toBe("Danger!");
@@ -422,12 +424,14 @@ describe("ActionController::Base conditional GET", () => {
 
   it("expiresIn sets cache-control header", () => {
     const c = new (class extends Base {})();
+    c.response = makeResponse();
     c.expiresIn(3600, { public: true, mustRevalidate: true });
     expect(c.getHeader("cache-control")).toBe("max-age=3600, public, must-revalidate");
   });
 
   it("expiresNow sets no-cache", () => {
     const c = new (class extends Base {})();
+    c.response = makeResponse();
     c.expiresNow();
     expect(c.getHeader("cache-control")).toBe("no-cache");
   });
@@ -439,21 +443,28 @@ describe("ActionController::Base conditional GET", () => {
 describe("ActionController::Base sendData", () => {
   it("sends data with filename", () => {
     const c = new (class extends Base {})();
+    c.response = makeResponse();
     c.sendData("csv,data", { filename: "export.csv", type: "text/csv" });
     expect(c.body).toBe("csv,data");
     expect(c.contentType).toBe("text/csv");
-    expect(c.getHeader("content-disposition")).toBe('attachment; filename="export.csv"');
+    expect(c.getHeader("content-disposition")).toBe(
+      "attachment; filename=\"export.csv\"; filename*=UTF-8''export.csv",
+    );
     expect(c.performed).toBe(true);
   });
 
   it("sends data with custom disposition", () => {
     const c = new (class extends Base {})();
+    c.response = makeResponse();
     c.sendData("inline-data", { disposition: "inline", filename: "doc.pdf" });
-    expect(c.getHeader("content-disposition")).toBe('inline; filename="doc.pdf"');
+    expect(c.getHeader("content-disposition")).toBe(
+      "inline; filename=\"doc.pdf\"; filename*=UTF-8''doc.pdf",
+    );
   });
 
   it("sends data without filename", () => {
     const c = new (class extends Base {})();
+    c.response = makeResponse();
     c.sendData("raw");
     expect(c.body).toBe("raw");
     expect(c.contentType).toBe("application/octet-stream");

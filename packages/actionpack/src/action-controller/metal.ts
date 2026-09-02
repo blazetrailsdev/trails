@@ -10,7 +10,6 @@ import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
 import { underscore } from "@blazetrails/activesupport";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
@@ -20,8 +19,9 @@ import {
 } from "../action-dispatch/middleware/stack.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { includeContent } from "./metal/head.js";
+import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { Renderers } from "./metal/renderers.js";
-import { STATUS_CODES, resolveStatus } from "./metal/status-codes.js";
+import { resolveStatus } from "./metal/status-codes.js";
 import {
   _normalizeOptions as _normalizeOptionsFn,
   _normalizeText as _normalizeTextFn,
@@ -192,12 +192,8 @@ export class Metal extends AbstractController {
     return string;
   }
 
-  protected _status: number = 200;
-  protected _headers: Record<string, string> = {};
-  protected _contentType: string | null = null;
-
   /** Dispatch an action in the context of a request/response (`metal.rb:249-255`). */
-  async dispatch(name: string, request: Request, response: Response): Promise<Response> {
+  async dispatch(name: string, request: Request, response: Response): Promise<RackResponse> {
     this.setRequestBang(request);
     this.setResponseBang(response);
     const reqParams = request.parameters;
@@ -207,23 +203,7 @@ export class Metal extends AbstractController {
 
     request.commitFlash();
 
-    // Commit the response
-    this.response.status = this._status;
-    for (const [k, v] of Object.entries(this._headers)) {
-      this.response.setHeader(k, v);
-    }
-    if (this._contentType) {
-      this.response.setHeader("content-type", this._contentType);
-    }
-    // Commit on any explicit assignment — `_responseBody` is `null` only
-    // when no render/head ran. An empty string from `head()` must still
-    // clear any body the caller wrote earlier in the same request.
-    const body = this._responseBody;
-    if (body !== null) {
-      this.response.body = typeof body === "string" ? body : body.toString();
-    }
-
-    return this.response;
+    return this.toRackResponse();
   }
 
   setRequestBang(request: Request): void {
@@ -241,38 +221,44 @@ export class Metal extends AbstractController {
     }
   }
 
-  /** Set response status. Accepts number or symbol. */
+  /** Delegates to `ActionDispatch::Response#status=` (`metal.rb:183-184`). */
   set status(value: number | string) {
-    if (typeof value === "string") {
-      const code = STATUS_CODES[value];
-      if (!code) throw new Error(`Unknown status: ${value}`);
-      this._status = code;
-    } else {
-      this._status = value;
-    }
+    this.response.status = value;
   }
 
+  /** Delegates to `ActionDispatch::Response#status` (`metal.rb:195-196`). */
   get status(): number {
-    return this._status;
+    return this.response.status;
   }
 
-  /** Set a response header. */
+  /** Delegates to `ActionDispatch::Response#headers` (`metal.rb:179-180`). */
+  get headers(): Response["headers"] {
+    return this.response.headers;
+  }
+
+  /** `headers[name] = value` through the delegated `headers` (`metal.rb:179-180`). */
   setHeader(name: string, value: string): void {
-    this._headers[name.toLowerCase()] = value;
+    this.response.setHeader(name, value);
   }
 
-  /** Get a response header. */
+  /** `headers[name]` through the delegated `headers` (`metal.rb:179-180`). */
   getHeader(name: string): string | undefined {
-    return this._headers[name.toLowerCase()];
+    return this.response.getHeader(name);
   }
 
-  /** Set content type. */
+  /** Delegates to `ActionDispatch::Response#content_type=` (`metal.rb:191-192`). */
   set contentType(value: string) {
-    this._contentType = value;
+    this.response.contentType = value;
   }
 
+  /** Delegates to `ActionDispatch::Response#content_type` (`metal.rb:203-204`). */
   get contentType(): string | null {
-    return this._contentType;
+    return this.response.contentType ?? null;
+  }
+
+  /** Delegates to `ActionDispatch::Response#media_type` (`metal.rb:207-208`). */
+  get mediaType(): string | undefined {
+    return this.response.mediaType;
   }
 
   /** Send a head-only response with given status. Mirrors Rails'
@@ -298,20 +284,21 @@ export class Metal extends AbstractController {
         this.setHeader(key.replace(/_/g, "-"), String(value));
       }
     }
-    if (typeof resolvedStatus === "string") {
-      const code = STATUS_CODES[resolvedStatus];
-      if (!code) throw new Error(`Unknown status: ${resolvedStatus}`);
-      this._status = code;
-    } else {
-      this._status = resolvedStatus;
-    }
+    this.status = resolvedStatus;
     if (location !== undefined && location !== null) {
       this.setHeader("location", this.urlFor(String(location)));
     }
-    if (includeContent(this._status)) {
-      if (!this._contentType) {
-        this._contentType = contentType ? String(contentType) : "text/html";
+    if (includeContent(this.status)) {
+      if (!this.mediaType) {
+        const f = (this as Metal & { formats?: ReadonlyArray<string | symbol> }).formats;
+        const negotiated =
+          f && f.length > 0 && MimeType.isRegistered(String(f[0]))
+            ? MimeType.lookup(String(f[0])).toString()
+            : undefined;
+        this.contentType =
+          contentType != null ? String(contentType) : (negotiated ?? MimeType.HTML.toString());
       }
+      this.response.charset = false;
     }
     // Route through the public setter so the response stream is updated
     // in lock-step (mirrors Rails' `self.response_body = ""` in head.rb).
@@ -319,14 +306,13 @@ export class Metal extends AbstractController {
     return true;
   }
 
-  /** Set the response body directly. */
+  /** Writes through `response_body=` (`metal.rb:238-246`) so the Response carries it. */
   set body(value: string) {
-    this._responseBody = value;
+    this.responseBody = value;
   }
 
   get body(): string {
-    const body = this._responseBody;
-    return typeof body === "string" ? body : (body?.toString() ?? "");
+    return this.responseBody;
   }
 
   /**
@@ -336,13 +322,7 @@ export class Metal extends AbstractController {
    */
   override set responseBody(body: string | string[] | Buffer | null | undefined) {
     if (body === null || body === undefined) {
-      // Mirror Rails' `else: response.reset_body!`. We assign the empty
-      // string (rather than leaving the prior body in place) so the
-      // visible `responseBody`/`body` getters reflect the reset; the
-      // non-null value still keeps `performed?` true, matching Rails'
-      // semantic where assigning falsy body still records the call.
-      this._responseBody = "";
-      if (this.response) this.response.body = "";
+      this.response.resetBodyBang();
       return;
     }
     const str = Array.isArray(body)
@@ -368,13 +348,13 @@ export class Metal extends AbstractController {
     return this.performed || (this.response?.committed ?? false);
   }
 
-  /** Convert controller to a Rack-compatible response. */
+  /**
+   * Mirrors `ActionController::Metal#to_a` (`metal.rb:280-282`) — `response.to_a`.
+   * `to_a` is a Ruby core protocol name (SKIP_GROUPS in
+   * `scripts/parity/conventions.ts`), so it keeps its trails spelling.
+   */
   toRackResponse(): RackResponse {
-    const headers = { ...this._headers };
-    if (this._contentType) {
-      headers["content-type"] = this._contentType;
-    }
-    return [this._status, headers, bodyFromString(this.body)];
+    return this.response.toRack() as RackResponse;
   }
 
   /** Resolve a status symbol to a number. */
