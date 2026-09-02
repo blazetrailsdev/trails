@@ -345,18 +345,20 @@ Trails.application.loadServer();
 
     this.createFile(
       "vite.config.ts",
-      `import { defineConfig } from "vite";
+      `import { fileURLToPath } from "node:url";
+import { defineConfig } from "vite";
 
 export default defineConfig({
-  root: "app/assets",
-  base: "/assets/",
-  publicDir: "../../public",
+  root: "app",
+  publicDir: "../public",
   build: {
-    outDir: "../../public/assets",
+    outDir: "../public/assets",
     manifest: true,
     rollupOptions: {
       input: {
-        application: "stylesheets/application.css",
+        application: fileURLToPath(
+          new URL("app/assets/stylesheets/application.css", import.meta.url),
+        ),
       },
     },
   },
