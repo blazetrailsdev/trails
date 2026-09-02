@@ -17,7 +17,7 @@ export class AuthenticationGenerator extends GeneratorBase {
   /**
    * `run` takes an options object, so the generic `start` would hand it the
    * name string. Rails fills it from `class_option :api`
-   * (`authentication_generator.rb:6-7`), which trails has no port of — story
+   * (`authentication_generator.rb:6-7`) — story
    * `wire-generator-class-options-through-trails-generate`.
    */
   static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
@@ -32,13 +32,14 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.createAuthenticationFiles(options);
     this.configureApplicationController();
     this.configureAuthenticationRoutes();
+    this.enableBcrypt();
     this.addMigrations();
     return this.getCreatedFiles();
   }
 
   /** `authentication_generator.rb:14-30`. */
   private createAuthenticationFiles(options: AuthenticationRunOptions): void {
-    const { api = false, skipMailer = true, skipActionCable = true } = options;
+    const { api = false, skipMailer = false, skipActionCable = true } = options;
 
     this.template("app/models/session.rb");
     this.template("app/models/user.rb");
@@ -61,9 +62,8 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 
   /**
-   * Rails' `template` (`Thor::Actions#template` → `create_file`) asks on a
-   * conflict; trails' generators are non-interactive, so an existing file is
-   * left alone and reported.
+   * Rails' `template` asks on a conflict; trails' generators are
+   * non-interactive, so an existing file is left alone and reported.
    */
   private template(file: string): void {
     const destination = file
@@ -110,6 +110,22 @@ export class AuthenticationGenerator extends GeneratorBase {
       if (lines.length) this.insertIntoFile(f, "// routes", lines.join("\n") + "\n");
       return;
     }
+  }
+
+  /**
+   * `authentication_generator.rb:41-47`. Rails' Gemfile arm has no analogue.
+   *
+   * @missingRailsCall execute_command — PERMANENT: no trails generator shells
+   * out to the package manager; `pkg` only edits `package.json` too, and the
+   * install is the `afterInstall` action's job.
+   */
+  private enableBcrypt(): void {
+    if (!this.fileExists("package.json")) return;
+    const full = this.path.join(this.cwd, "package.json");
+    const json = JSON.parse(this.fs.readFileSync(full, "utf-8"));
+    if (json.dependencies?.["bcryptjs"]) return;
+    json.dependencies = { ...json.dependencies, bcryptjs: "*" };
+    this.fs.writeFileSync(full, JSON.stringify(json, null, 2) + "\n");
   }
 
   /** `authentication_generator.rb:52-55`. */

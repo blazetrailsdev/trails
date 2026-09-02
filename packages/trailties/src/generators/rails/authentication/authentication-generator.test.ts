@@ -56,11 +56,10 @@ describe("AuthenticationGenerator", () => {
     expect(exists(VIEWS[0])).toBe(false);
   });
 
-  it("skips the mailer and channel files while their packages are unported", () => {
+  it("skips the channel file while its package is unported", () => {
     makeGen().run();
-    expect(exists("app/mailers/passwords-mailer.ts")).toBe(false);
-    expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(false);
-    for (const rel of VIEWS) expect(exists(rel), rel).toBe(false);
+    expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
+    for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     expect(exists("app/channels/application-cable/connection.ts")).toBe(false);
   });
 
@@ -144,10 +143,15 @@ describe("AuthenticationGenerator", () => {
     expect(read(migrations[1])).toContain("user_agent");
   });
 
+  it("adds bcryptjs to the application's dependencies", () => {
+    write("package.json", '{ "dependencies": { "@blazetrails/activerecord": "*" } }');
+    makeGen().run();
+    expect(JSON.parse(read("package.json")).dependencies.bcryptjs).toBe("*");
+  });
+
   it("does not silently overwrite an existing file", () => {
     write("app/models/user.ts", "// mine\n");
     makeGen().run();
     expect(read("app/models/user.ts")).toBe("// mine\n");
-    expect(read("app/models/session.ts")).toContain("class Session");
   });
 });

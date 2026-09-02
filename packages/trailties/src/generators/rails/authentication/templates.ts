@@ -1,8 +1,4 @@
-/**
- * `railties/lib/rails/generators/rails/authentication/templates/**.tt`.
- *
- * @noRailsEquivalent PERMANENT
- */
+/** `.../rails/authentication/templates/**.tt`. @noRailsEquivalent PERMANENT */
 
 export const SESSION = `import { ApplicationRecord } from "./application-record.js";
 
@@ -144,7 +140,8 @@ export class SessionsController extends ApplicationController {
 }
 `;
 
-export const PASSWORDS_CONTROLLER = `import { ApplicationController } from "./application-controller.js";
+export const PASSWORDS_CONTROLLER = `import { InvalidSignature } from "@blazetrails/activesupport";
+import { ApplicationController } from "./application-controller.js";
 import { User } from "../models/user.js";
 import { PasswordsMailer } from "../mailers/passwords-mailer.js";
 
@@ -200,7 +197,7 @@ export const CONNECTION = `import { Session } from "../../models/session.js";
 
 export class Connection {
   declare currentUser: unknown;
-  declare cookies: Record<string, string>;
+  declare cookies: { signed: Record<string, string> };
   declare rejectUnauthorizedConnection: () => void;
 
   async connect(): Promise<void> {
@@ -208,7 +205,7 @@ export class Connection {
   }
 
   protected async setCurrentUser(): Promise<unknown> {
-    const session = await Session.findBy({ id: this.cookies["session_id"] });
+    const session = await Session.findBy({ id: this.cookies.signed["session_id"] });
     if (session) return (this.currentUser = await session.user);
   }
 }
@@ -217,13 +214,12 @@ export class Connection {
 export const PASSWORDS_MAILER = `import { ApplicationMailer } from "./application-mailer.js";
 
 export class PasswordsMailer extends ApplicationMailer {
-  static reset(user: any): PasswordsMailer {
-    const mailer = new PasswordsMailer();
-    mailer.user = user;
-    return mailer.mail({ subject: "Reset your password", to: user.email_address });
-  }
-
   declare user: any;
+
+  reset(user: any): unknown {
+    this.user = user;
+    return this.mail({ subject: "Reset your password", to: user.email_address });
+  }
 }
 `;
 

@@ -51,6 +51,9 @@ export class ChangeGenerator extends GeneratorBase {
     return this.getCreatedFiles();
   }
 
+  /**
+   * @missingRailsCall template — CONVERGEABLE converge-db-system-change-database-config-to-a-template
+   */
   editDatabaseConfig(): void {
     // Candidate order matches the runtime loader in trailties/src/database.ts
     // so editing prefers the active config.

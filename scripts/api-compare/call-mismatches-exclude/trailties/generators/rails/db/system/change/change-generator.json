@@ -2,13 +2,6 @@
   {
     "package": "trailties",
     "tsFile": "generators/rails/db/system/change/change-generator.ts",
-    "rubyName": "edit_database_config",
-    "call": "template",
-    "reason": "Surfaced, not introduced: naming a TS method `template` in this package first made Rails' template call comparable. Converges in converge-db-system-change-database-config-to-a-template, which gives both generators one per-adapter config template to call it on."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "generators/rails/db/system/change/change-generator.ts",
     "rubyName": "edit_dockerfile",
     "call": "gsub_file",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

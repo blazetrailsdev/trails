@@ -74,13 +74,7 @@ export class InvalidDirectiveError extends Error {}
  */
 export type DirectiveValue = CSPSource[] | true;
 
-/**
- * ActionDispatch::ContentSecurityPolicy::Middleware
- *
- * Materializes a per-request `ActionDispatch::ContentSecurityPolicy` into the
- * `Content-Security-Policy` (or `-Report-Only`) response header. Mirrors
- * actionpack/lib/action_dispatch/http/content_security_policy.rb:32-71.
- */
+/** Materializes a per-request policy into the `Content-Security-Policy` header. */
 export class Middleware {
   private app: RackApp;
 

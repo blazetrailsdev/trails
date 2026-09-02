@@ -23,13 +23,7 @@ const MAPPINGS: Record<string, string> = {
 
 export type PolicySource = string | ((context: unknown) => string);
 
-/**
- * ActionDispatch::PermissionsPolicy::Middleware
- *
- * Materializes a per-request `ActionDispatch::PermissionsPolicy` into the
- * `Feature-Policy` response header. Mirrors
- * actionpack/lib/action_dispatch/http/permissions_policy.rb:31-63.
- */
+/** Materializes a per-request policy into the `Feature-Policy` response header. */
 export class Middleware {
   private app: RackApp;
 
