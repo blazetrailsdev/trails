@@ -17,7 +17,6 @@ import {
   CreateIndexDefinition,
   ForeignKeyDefinition,
   CheckConstraintDefinition,
-  assertCompositeForeignKeyArity,
   type AddForeignKeyOptions,
   type AddIndexOptions,
   type AddReferenceOptions,
@@ -1207,7 +1206,14 @@ export class SchemaStatements {
       options.name = this.foreignKeyName(fromTable, options);
     }
 
-    assertCompositeForeignKeyArity(toTable, options.column, options.primaryKey);
+    if (Array.isArray(options.column) || Array.isArray(options.primaryKey)) {
+      if (wrap(options.primaryKey).length !== wrap(options.column).length) {
+        throw new ArgumentError(
+          `For composite primary keys, specify :column and :primary_key, where ` +
+            `:column must reference all the :primary_key columns from ${JSON.stringify(toTable)}`,
+        );
+      }
+    }
 
     return options;
   }
