@@ -1123,57 +1123,60 @@ Request.prototype.fresh = _fresh;
 include(Request, RequestHelpers);
 /**
  * `ActionDispatch::Request` includes `Rack::Request::Helpers`
- * (`http/request.rb:21`), so every helper arrives unless the class body
- * overrides it — and a Ruby class body outranks an included module. Each name
- * omitted here cites the Rails definition that does the overriding.
+ * (`action_dispatch/http/request.rb:21`), so every helper arrives unless the
+ * class body overrides it — a Ruby class body outranks an included module.
+ * Each name omitted here is the Rails definition that does the overriding:
+ *
+ * - `env`, `getHeader`, `setHeader`, `fetchHeader` — `Rack::Request::Env`'s,
+ *   the host contract the mixin is written against.
+ * - `body` — `Request#body` (request.rb:357-371).
+ * - `requestMethod` — `Request#request_method` (request.rb:152-158).
+ * - `host`, `port`, `hostWithPort`, `serverPort`, `url` —
+ *   `ActionDispatch::Http::URL#host` (url.rb:228-230), `#port` (url.rb:255-265),
+ *   `#host_with_port` (url.rb:244-246), `#server_port` (url.rb:317-319) and
+ *   `#url` (url.rb:191-193).
+ * - `fullpath` — `Request#fullpath` (request.rb:271-277).
+ * - `mediaType` — `Request#media_type` (request.rb:287-290).
+ * - `contentLength` — `Request#content_length` (request.rb:292-295).
+ * - `xhr` — `alias :xhr? :xml_http_request?` (request.rb:303).
+ * - `ip` — `Request#ip` (request.rb:306-310).
+ * - `params` — `alias :params :parameters` (parameters.rb:65).
+ * - `session`, `sessionOptions` — `Request#session=` (request.rb:386-388) and
+ *   `#session_options=` (request.rb:390-392). Rails overrides only the writers
+ *   and inherits both readers, but a JS property takes both halves from one
+ *   descriptor, so the inherited half is restated in the class body.
+ * - `logger` — `Request#logger` (request.rb:477-479).
+ * - `GET`, `POST` — `Request#GET` (request.rb:395-403) and `#POST`
+ *   (request.rb:408-433).
+ * - `formData` — `Request#form_data?` (request.rb:373-375).
+ * - `defaultSession` — `Request#default_session` (request.rb:505-507).
  */
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request extends Omit<
   RequestHelpers,
-  // `Rack::Request::Env`'s — the host contract the mixin is written against.
   | "env"
   | "getHeader"
   | "setHeader"
   | "fetchHeader"
-  // `Request#body` (request.rb:357-371).
   | "body"
-  // `Request#request_method` (request.rb:152-158).
   | "requestMethod"
-  // `ActionDispatch::Http::URL#host` (url.rb:228-230), `#port` (url.rb:255-265),
-  // `#host_with_port` (url.rb:244-246), `#server_port` (url.rb:317-319) and
-  // `#url` (url.rb:191-193).
   | "host"
   | "port"
   | "hostWithPort"
   | "serverPort"
   | "url"
-  // `Request#fullpath` (request.rb:271-277).
   | "fullpath"
-  // `Request#media_type` (request.rb:287-290).
   | "mediaType"
-  // `Request#content_length` (request.rb:292-295).
   | "contentLength"
-  // `alias :xhr? :xml_http_request?` (request.rb:303).
   | "xhr"
-  // `Request#ip` (request.rb:306-310).
   | "ip"
-  // `alias :params :parameters` (parameters.rb:65).
   | "params"
-  // `Request#session=` (request.rb:386-388) and `#session_options=`
-  // (request.rb:390-392). Rails overrides only the writers and inherits both
-  // readers, but a JS property takes both halves from one descriptor, so the
-  // reader cannot fall through the mixin while the writer overrides — the
-  // inherited half is restated in the class body.
   | "session"
   | "sessionOptions"
-  // `Request#logger` (request.rb:477-479).
   | "logger"
-  // `Request#GET` (request.rb:395-403) and `#POST` (request.rb:408-433).
   | "GET"
   | "POST"
-  // `Request#form_data?` (request.rb:373-375).
   | "formData"
-  // `Request#default_session` (request.rb:505-507).
   | "defaultSession"
 > {}
 
