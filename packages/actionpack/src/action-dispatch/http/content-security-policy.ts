@@ -100,16 +100,19 @@ export class Middleware {
     const request = new _RequestCtor!(env) as ContentSecurityPolicyRequest & {
       controllerInstance?: unknown;
     };
+
     const policy = request.contentSecurityPolicy;
-    if (!policy) return response;
+    if (policy) {
+      const nonce = request.contentSecurityPolicyNonce;
+      const nonceDirectives = request.contentSecurityPolicyNonceDirectives;
+      const context = request.controllerInstance ?? request;
+      headers[this.headerName(request)] = policy.build(
+        context,
+        nonce,
+        nonceDirectives ?? undefined,
+      );
+    }
 
-    const nonce = request.contentSecurityPolicyNonce;
-    const nonceDirectives = request.contentSecurityPolicyNonceDirectives;
-    // Rails: `context = request.controller_instance || request`
-    // (content_security_policy.rb:51).
-    const context = request.controllerInstance ?? request;
-
-    headers[this.headerName(request)] = policy.build(context, nonce, nonceDirectives ?? undefined);
     return response;
   }
 

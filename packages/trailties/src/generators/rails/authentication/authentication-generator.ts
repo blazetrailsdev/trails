@@ -52,23 +52,20 @@ export class AuthenticationGenerator extends GeneratorBase {
 
     if (!skipMailer) {
       this.template("app/mailers/passwords_mailer.rb");
-      this.template("test/mailers/previews/passwords_mailer_preview.rb");
       if (!api) {
         this.template("app/views/passwords_mailer/reset.html.erb");
         this.template("app/views/passwords_mailer/reset.text.erb");
       }
+      this.template("test/mailers/previews/passwords_mailer_preview.rb");
     }
   }
 
   /**
-   * Rails' `template` (`Thor::Actions#template` → `create_file`), which
-   * resolves a conflict with an existing file by asking. trails' generators
-   * are non-interactive, so an existing file is left alone and reported —
-   * never silently overwritten.
+   * Rails' `template` (`Thor::Actions#template` → `create_file`) asks on a
+   * conflict; trails' generators are non-interactive, so an existing file is
+   * left alone and reported.
    */
   private template(file: string): void {
-    // Rails derives the destination from the template's own path; trails'
-    // destinations are the dasherized `.ts` (`.tse` for a view) twin.
     const destination = file
       .replace(/\.rb$/, ".ts")
       .replace(/\.erb$/, ".tse")
@@ -80,8 +77,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.createFile(destination, TEMPLATES[file]);
   }
 
-  // `authentication_generator.rb:32-34`. Anchored on the class declaration;
-  // idempotent.
+  /** `authentication_generator.rb:32-34`. Anchored on the class declaration. */
   private configureApplicationController(): void {
     const file = "app/controllers/application-controller.ts";
     if (!this.fileExists(file)) return;
@@ -99,14 +95,15 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.fs.writeFileSync(full, src);
   }
 
-  // `authentication_generator.rb:36-39`. Each route checked independently for
-  // partial-config convergence.
+  /**
+   * `authentication_generator.rb:36-39`. Each route is checked independently
+   * so a partly-configured routes file converges.
+   */
   private configureAuthenticationRoutes(): void {
     for (const f of ["config/routes.ts", "config/routes.js"]) {
       if (!this.fileExists(f)) continue;
       const src = this.fs.readFileSync(this.path.join(this.cwd, f), "utf-8");
       const lines: string[] = [];
-      // Skip if any passwords route exists; appending alongside would duplicate it.
       if (!src.includes('router.resources("passwords"'))
         lines.push(`  router.resources("passwords", { param: "token" });`);
       if (!src.includes('router.resource("session")')) lines.push(`  router.resource("session");`);
@@ -127,13 +124,9 @@ export class AuthenticationGenerator extends GeneratorBase {
   }
 
   /**
-   * Rails' `generate` action shells out to `bin/rails generate`, so the
-   * migrations exist by the time the generator returns. trails' `generate`
-   * only queues the request (`generators/actions.ts:22-29`) and the sole
-   * drain loop lives in `app:template` (`commands/app.ts:24-28`), so the
-   * queue is run here in process.
-   *
-   * @noRailsEquivalent CONVERGEABLE drain-queued-generators-in-generators-invoke
+   * Rails' `generate` shells out, so the migrations exist when it returns;
+   * trails' only queues (`generators/actions.ts:22-29`). Converges with story
+   * `drain-queued-generators-in-generators-invoke`.
    */
   private runPendingGenerators(): void {
     for (const { what, args } of this.pendingGenerators.splice(0)) {

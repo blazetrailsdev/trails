@@ -1,6 +1,5 @@
 /**
- * The generator's templates, mirroring
- * `railties/lib/rails/generators/rails/authentication/templates/**.tt` — the
+ * `railties/lib/rails/generators/rails/authentication/templates/**.tt`, in the
  * one shape a TypeScript package can carry them in.
  *
  * @noRailsEquivalent PERMANENT
@@ -71,11 +70,8 @@ export const Authentication = defineModule(
     },
 
     async findSessionByCookie(this: any): Promise<unknown> {
-      // Rails signs a permanent \`session_id\` cookie
-      // (authentication.rb.tt \`find_session_by_cookie\`); trails'
-      // \`ActionController::Base#cookies\` is still the request's read-only
-      // cookie hash rather than \`request.cookie_jar\`, so the session id
-      // rides the controller session until that converges.
+      // Rails reads a signed cookie; trails' \`Base#cookies\` is not the jar
+      // yet (action-controller-cookies-returns-the-request-cookie-jar).
       const sessionId = this.session["session_id"];
       return sessionId ? await Session.findBy({ id: sessionId }) : null;
     },
@@ -207,11 +203,7 @@ export class Connection {
 
   protected async setCurrentUser(): Promise<unknown> {
     const session = await Session.findBy({ id: this.cookies["session_id"] });
-    if (session) {
-      this.currentUser = await session.user;
-      return this.currentUser;
-    }
-    return null;
+    if (session) return (this.currentUser = await session.user);
   }
 }
 `;
