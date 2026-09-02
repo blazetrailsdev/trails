@@ -2056,7 +2056,7 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
       await super.createTable(tableName, options);
-    } else if (block === options) {
+    } else if (options === undefined || options === block) {
       await super.createTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
       await super.createTable(tableName, options, (t) => block(this.compatibleTableDefinition(t)));
@@ -2071,7 +2071,7 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
       await super.changeTable(tableName, options);
-    } else if (block === options) {
+    } else if (options === undefined || options === block) {
       await super.changeTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
       await super.changeTable(tableName, options, (t) => block(this.compatibleTableDefinition(t)));
@@ -2087,7 +2087,7 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
       await super.createJoinTable(table1, table2, options);
-    } else if (block === options) {
+    } else if (options === undefined || options === block) {
       await super.createJoinTable(table1, table2, (t) => block(this.compatibleTableDefinition(t)));
     } else {
       await super.createJoinTable(table1, table2, options, (t) =>

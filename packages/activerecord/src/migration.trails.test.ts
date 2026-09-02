@@ -435,10 +435,16 @@ describe("Migration#removeColumns forwards to the connection", () => {
       await migration.changeTable("testings", (t) => {
         yielded.push(t);
       });
-      expect(seen).toHaveLength(2);
-      expect(yielded).toEqual([wrapped, wrapped]);
+      await migration.changeTable("testings", undefined, (t) => {
+        yielded.push(t);
+      });
+      await migration.createTable("more_testings", undefined, (t) => {
+        yielded.push(t);
+      });
+      expect(seen).toHaveLength(4);
+      expect(yielded).toEqual([wrapped, wrapped, wrapped, wrapped]);
     } finally {
-      await connection.dropTable("testings", { ifExists: true });
+      await connection.dropTable("testings", "more_testings", { ifExists: true });
     }
   });
 });
