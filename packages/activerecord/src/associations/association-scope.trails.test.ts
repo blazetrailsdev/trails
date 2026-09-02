@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "../index.js";
 import { Associations } from "../associations.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
-import { findCollectionTarget as findTarget } from "../test-helpers/find-collection-target.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -247,7 +246,7 @@ describe("AssociationScope", () => {
     await Post.create({ author_id: author.id, title: "draft", body: "x" });
     await Post.create({ author_id: author.id, title: "Welcome to the weblog", body: "y" });
 
-    const results = await findTarget(author, "welcomePosts");
+    const results = (await author.association("welcomePosts").loadTarget()) as Base[];
     expect(results).toHaveLength(1);
     expect((results[0] as any).title).toBe("Welcome to the weblog");
   });

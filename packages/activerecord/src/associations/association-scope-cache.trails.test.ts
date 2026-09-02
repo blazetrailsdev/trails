@@ -1,6 +1,5 @@
-import { findCollectionTarget as findHasManyTarget } from "../test-helpers/find-collection-target.js";
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import { registerModel, registerSubclass } from "../index.js";
+import { Base, registerModel, registerSubclass } from "../index.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
 import { fixtures } from "../test-fixtures.js";
@@ -50,7 +49,7 @@ describe("Association scope cache", () => {
 
     const spy = vi.spyOn(AssociationScope, "scope");
     const reflection = (Author as any)._reflectOnAssociation("noJoinsComments");
-    const records = await findHasManyTarget(author, "noJoinsComments");
+    const records = (await author.association("noJoinsComments").loadTarget()) as Base[];
     expect(records.length).toBeGreaterThan(0);
     expect(spy).not.toHaveBeenCalled();
   });
@@ -60,11 +59,11 @@ describe("Association scope cache", () => {
 
     const spy = vi.spyOn(AssociationScope, "scope");
 
-    await findHasManyTarget(author, "posts");
+    await author.association("posts").loadTarget();
     const afterFirst = spy.mock.calls.length;
     expect(afterFirst).toBeGreaterThan(0);
 
-    await findHasManyTarget(author, "posts");
+    await author.association("posts").loadTarget();
     expect(spy.mock.calls.length).toBe(afterFirst);
   });
 

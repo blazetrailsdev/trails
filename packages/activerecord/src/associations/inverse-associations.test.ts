@@ -1,4 +1,3 @@
-import { findCollectionTarget as findHasManyTarget } from "../test-helpers/find-collection-target.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import {
@@ -514,7 +513,7 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared with every child on find", async () => {
     const human = humans("gordon");
-    const interests = await findHasManyTarget(human, "interests");
+    const interests = await human.interests;
     expect(interests.length).toBeGreaterThan(0);
     for (const interest of interests) {
       expect((interest as any).human.name).toBe(human.name);
@@ -527,7 +526,7 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared with every child on find for sti", async () => {
     const author = authors("david");
-    const posts = await findHasManyTarget(author, "posts");
+    const posts = await author.posts;
     expect(posts.length).toBeGreaterThan(0);
     for (const post of posts) {
       expect((post as any).author.name).toBe((author as any).name);
@@ -537,7 +536,7 @@ describe("InverseHasManyTests", () => {
       expect((post as any).author.name).toBe((author as any).name);
     }
 
-    const specialPosts = await findHasManyTarget(author, "specialPosts");
+    const specialPosts = await author.specialPosts;
     expect(specialPosts.length).toBeGreaterThan(0);
     for (const post of specialPosts) {
       expect((post as any).author.name).toBe((author as any).name);
@@ -745,7 +744,7 @@ describe("InverseHasManyTests", () => {
 
   it("trying to use inverses that dont exist should raise an error", async () => {
     const human = (await Human.first())!;
-    await expect(findHasManyTarget(human, "secretInterests")).rejects.toThrow(
+    await expect(async () => human.secretInterests).rejects.toThrow(
       InverseOfAssociationNotFoundError,
     );
   });
@@ -768,7 +767,7 @@ describe("InverseHasManyTests", () => {
     });
     try {
       const human = (await Human.first())!;
-      const interests = await findHasManyTarget(human, "interests");
+      const interests = await human.interests;
       expect(interests.length).toBeGreaterThan(0);
 
       const preloaded = (await (Human as any).includes(":interests").first())!;
@@ -791,7 +790,7 @@ describe("InverseHasManyTests", () => {
     });
     try {
       const human = (await Human.first())!;
-      const interests = await findHasManyTarget(human, "interests");
+      const interests = await human.interests;
       expect(interests.length).toBeGreaterThan(0);
     } finally {
       (Interest as any).resetCallbacks("initialize");
@@ -806,14 +805,14 @@ describe("InverseHasManyTests", () => {
       body: "New Comment",
     });
     (comment as any).body = "OMG";
-    const children = await findHasManyTarget(comment, "children");
+    const children = await comment.children;
     expect((children[0] as any).parent.body).toBe((comment as any).body);
   });
 
   it("changing the association id makes the inversed association target stale", async () => {
     const post1 = (await Post.first())!;
     const post2 = (await Post.all().order("id").offset(1).first())!;
-    const comment = (await findHasManyTarget(post1, "comments"))[0] as any;
+    const comment = (await post1.comments)[0] as any;
     expect(await loadSingularTarget(comment, "post")).toBe(post1);
     await comment.updateBang({ post_id: (post2 as any).id });
     const reloaded = (await loadSingularTarget(comment, "post")) as any;

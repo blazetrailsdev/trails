@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readdir, readFile } from "node:fs/promises";
 import { fixtures } from "../test-fixtures.js";
-import { findCollectionTarget as findTarget } from "../test-helpers/find-collection-target.js";
 import { Preloader } from "./preloader.js";
 import { AssociationTargetReplacedDuringLoad } from "../errors.js";
 import type { Base } from "../base.js";
@@ -52,7 +51,7 @@ describe("has_many mid-flight reassignment", () => {
     expect(persisted.length).toBeGreaterThan(0);
 
     const inFlight = firm.association("clients").loadTarget();
-    await findTarget(firm, "clients");
+    await firm.association("clients").loadTarget();
     const loaded = (await inFlight) as Base[];
 
     expect(loaded.length).toBe(persisted.length);
