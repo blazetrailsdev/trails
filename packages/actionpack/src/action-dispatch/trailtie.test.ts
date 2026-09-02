@@ -6,7 +6,7 @@ import {
   type ContentSecurityPolicyConfig,
 } from "./trailtie.js";
 import { ContentSecurityPolicy } from "./http/content-security-policy.js";
-import { ContentSecurityPolicyMiddleware } from "./middleware/content-security-policy.js";
+import { Middleware as ContentSecurityPolicyMiddleware } from "./http/content-security-policy.js";
 import { URL as HttpURL } from "./http/url.js";
 import { QueryParser } from "./http/query-parser.js";
 import { RequestUtils } from "./request/utils.js";

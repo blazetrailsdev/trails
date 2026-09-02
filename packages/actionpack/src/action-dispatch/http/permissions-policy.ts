@@ -11,6 +11,9 @@
  */
 
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import { FEATURE_POLICY } from "../constants.js";
+import { _RequestCtor } from "./request-slot.js";
 
 /** @internal */
 const MAPPINGS: Record<string, string> = {
@@ -19,6 +22,46 @@ const MAPPINGS: Record<string, string> = {
 };
 
 export type PolicySource = string | ((context: unknown) => string);
+
+/** Materializes a per-request policy into the `Feature-Policy` response header. */
+export class Middleware {
+  private app: RackApp;
+
+  constructor(app: RackApp) {
+    this.app = app;
+  }
+
+  async call(env: RackEnv): Promise<RackResponse> {
+    const response = await this.app(env);
+    const [, headers] = response;
+
+    if (this.policyPresent(headers)) return response;
+
+    const request = new _RequestCtor!(env) as {
+      permissionsPolicy?: PermissionsPolicy | null;
+      controllerInstance?: unknown;
+    };
+
+    const policy = request.permissionsPolicy;
+    if (policy) {
+      headers[FEATURE_POLICY] = policy.build(request.controllerInstance);
+    }
+
+    if (this.policyEmpty(policy)) {
+      delete headers[FEATURE_POLICY];
+    }
+
+    return response;
+  }
+
+  private policyPresent(headers: Record<string, string>): boolean {
+    return headers[FEATURE_POLICY] != null;
+  }
+
+  private policyEmpty(policy: PermissionsPolicy | null | undefined): boolean {
+    return policy?.directives.size === 0;
+  }
+}
 
 export class PermissionsPolicy {
   /** @internal */

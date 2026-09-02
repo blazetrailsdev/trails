@@ -1,17 +1,15 @@
-// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
-
-exports[`AuthenticationGenerator > emits the full file set; each .ts file parses + carries no Ruby source 1`] = `
-"=== app/models/session.ts ===
-import { ApplicationRecord } from "./application-record.js";
+/** `.../rails/authentication/templates/**.tt`, keyed as `template` names them. */
+export const TEMPLATES: Record<string, string> = {
+  "app/models/session.rb": `import { ApplicationRecord } from "./application-record.js";
 
 export class Session extends ApplicationRecord {
   static {
     this.belongsTo("user");
   }
 }
+`,
 
-=== app/models/user.ts ===
-import { ApplicationRecord } from "./application-record.js";
+  "app/models/user.rb": `import { ApplicationRecord } from "./application-record.js";
 
 export class User extends ApplicationRecord {
   static {
@@ -21,9 +19,9 @@ export class User extends ApplicationRecord {
     this.normalizes("email_address", { with: (e: string) => e.trim().toLowerCase() });
   }
 }
+`,
 
-=== app/models/current.ts ===
-import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
+  "app/models/current.rb": `import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
 
 export class Current extends CurrentAttributes {
   static {
@@ -31,9 +29,9 @@ export class Current extends CurrentAttributes {
     delegate(this.prototype, ["user"], { to: "session", allowNil: true });
   }
 }
+`,
 
-=== app/controllers/sessions-controller.ts ===
-import { minutes } from "@blazetrails/activesupport";
+  "app/controllers/sessions_controller.rb": `import { minutes } from "@blazetrails/activesupport";
 import { ApplicationController } from "./application-controller.js";
 import { User } from "../models/user.js";
 
@@ -67,9 +65,9 @@ export class SessionsController extends ApplicationController {
     this.redirectTo("/session/new");
   }
 }
+`,
 
-=== app/controllers/concerns/authentication.ts ===
-import { defineModule, extend, included } from "@blazetrails/activesupport";
+  "app/controllers/concerns/authentication.rb": `import { defineModule, extend, included } from "@blazetrails/activesupport";
 import { Current } from "../../models/current.js";
 import { Session } from "../../models/session.js";
 
@@ -138,9 +136,9 @@ export const Authentication = defineModule(
     },
   },
 );
+`,
 
-=== app/controllers/passwords-controller.ts ===
-import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
+  "app/controllers/passwords_controller.rb": `import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { ApplicationController } from "./application-controller.js";
 import { User } from "../models/user.js";
 import { PasswordsMailer } from "../mailers/passwords-mailer.js";
@@ -191,9 +189,9 @@ export class PasswordsController extends ApplicationController {
     }
   }
 }
+`,
 
-=== app/channels/application-cable/connection.ts ===
-import { Session } from "../../models/session.js";
+  "app/channels/application_cable/connection.rb": `import { Session } from "../../models/session.js";
 
 export class Connection {
   declare currentUser: unknown;
@@ -209,9 +207,9 @@ export class Connection {
     if (session) return (this.currentUser = await session.user);
   }
 }
+`,
 
-=== app/mailers/passwords-mailer.ts ===
-import { ApplicationMailer } from "./application-mailer.js";
+  "app/mailers/passwords_mailer.rb": `import { ApplicationMailer } from "./application-mailer.js";
 
 export class PasswordsMailer extends ApplicationMailer {
   declare user: any;
@@ -226,9 +224,19 @@ export class PasswordsMailer extends ApplicationMailer {
     return this.mail({ subject: "Reset your password", to: user.email_address });
   }
 }
+`,
 
-=== test/mailers/previews/passwords-mailer-preview.ts ===
-import { PasswordsMailer } from "../../../app/mailers/passwords-mailer.js";
+  "app/views/passwords_mailer/reset.html.erb": `<p>
+  You can reset your password within the next 15 minutes on
+  <%= linkTo("this password reset page", editPasswordUrl(user.passwordResetToken)) %>.
+</p>
+`,
+
+  "app/views/passwords_mailer/reset.text.erb": `You can reset your password within the next 15 minutes on this password reset page:
+<%= editPasswordUrl(user.passwordResetToken) %>
+`,
+
+  "test/mailers/previews/passwords_mailer_preview.rb": `import { PasswordsMailer } from "../../../app/mailers/passwords-mailer.js";
 import { User } from "../../../app/models/user.js";
 
 export class PasswordsMailerPreview {
@@ -236,5 +244,5 @@ export class PasswordsMailerPreview {
     return PasswordsMailer.reset(await User.take());
   }
 }
-"
-`;
+`,
+};

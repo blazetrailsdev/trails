@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import { registerChildProcessAdapter, childProcessAdapterConfig } from "@blazetrails/activesupport";
 import { AuthenticationGenerator } from "./authentication-generator.js";
 import { parseTs, assertNoRubySource } from "../../../template-builder/testing.js";
 
@@ -24,7 +25,16 @@ const write = (rel: string, content: string) => {
 };
 const writeAC = (find: string, replace: string) =>
   write(APP_CTRL_PATH, APP_CTRL_EMPTY.replace(find, replace));
+let spawned: string[][];
 beforeEach(() => {
+  spawned = [];
+  registerChildProcessAdapter("trailties-auth-test", {
+    spawnSync: (cmd, args) => {
+      spawned.push([cmd, ...args]);
+      return { status: 0, signal: null, stdout: "", stderr: "" };
+    },
+  });
+  childProcessAdapterConfig.adapter = "trailties-auth-test";
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-auth-"));
   write("tsconfig.json", "{}");
   write(APP_CTRL_PATH, APP_CTRL_EMPTY);
@@ -56,11 +66,10 @@ describe("AuthenticationGenerator", () => {
     expect(exists(VIEWS[0])).toBe(false);
   });
 
-  it("skips the mailer and channel files while their packages are unported", () => {
+  it("skips the channel file while its package is unported", () => {
     makeGen().run();
-    expect(exists("app/mailers/passwords-mailer.ts")).toBe(false);
-    expect(exists("test/mailers/previews/passwords-mailer-preview.ts")).toBe(false);
-    for (const rel of VIEWS) expect(exists(rel), rel).toBe(false);
+    expect(exists("app/mailers/passwords-mailer.ts")).toBe(true);
+    for (const rel of VIEWS) expect(exists(rel), rel).toBe(true);
     expect(exists("app/channels/application-cable/connection.ts")).toBe(false);
   });
 
@@ -69,7 +78,7 @@ describe("AuthenticationGenerator", () => {
     makeGen().run();
     const ac = read(APP_CTRL_PATH);
     expect(parseTs(ac).diagnostics).toEqual([]);
-    expect(ac.indexOf("Authentication.includeInto")).toBeLessThan(ac.indexOf("preexisting"));
+    expect(ac.indexOf("include(this, Authentication)")).toBeLessThan(ac.indexOf("preexisting"));
   });
 
   it("no-op for missing application-controller / routes; throws clearly in JS projects", () => {
@@ -97,16 +106,16 @@ describe("AuthenticationGenerator", () => {
     expect(routes.match(/router\.resource\("session"\)/g)).toHaveLength(1);
     const ac = read(APP_CTRL_PATH);
     expect(ac.match(/import\s+\{\s*Authentication\b/g)).toHaveLength(1);
-    expect(ac).toContain("Authentication.includeInto(this);");
+    expect(ac).toContain("include(this, Authentication);");
     expect(parseTs(ac).diagnostics).toEqual([]);
   });
 
   it("repairs partial config: mixin present but import missing (and vice versa)", () => {
-    writeAC("{\n}", "{\n  static {\n    Authentication.includeInto(this);\n  }\n}");
+    writeAC("{\n}", "{\n  static {\n    include(this, Authentication);\n  }\n}");
     makeGen().run();
     const ac = read(APP_CTRL_PATH);
     expect(ac).toContain('import { Authentication } from "./concerns/authentication.js";');
-    expect(ac.match(/Authentication\.includeInto\(this\)/g)).toHaveLength(1);
+    expect(ac.match(/include\(this, Authentication\)/g)).toHaveLength(1);
     expect(parseTs(ac).diagnostics).toEqual([]);
   });
 
@@ -122,5 +131,36 @@ describe("AuthenticationGenerator", () => {
     makeGen().run();
     expect([read(APP_CTRL_PATH), read("config/routes.ts")]).toEqual([ac, rt]);
     expect(parseTs(ac).diagnostics).toEqual([]);
+  });
+
+  it("emits working method bodies, not comment stubs", () => {
+    makeGen().run({ skipMailer: false, skipActionCable: false });
+    // A body whose only statement is a comment is the shape this used to emit.
+    for (const rel of TS_EMIT) expect(read(rel), rel).not.toMatch(/\{\s*\/\/[^\n]*\n\s*\}/);
+    expect(read("app/controllers/sessions-controller.ts")).toContain("User.authenticateBy(");
+    expect(read("app/controllers/concerns/authentication.ts")).toContain("Session.findBy(");
+  });
+
+  it("emits create_users and create_sessions migrations", () => {
+    const migrations = makeGen()
+      .run()
+      .filter((f) => f.startsWith("db/migrate/"));
+    const names = migrations.map((f) => f.replace(/^db\/migrate\/\d+_/, ""));
+    expect(names).toEqual(["create_users.ts", "create_sessions.ts"]);
+    expect(read(migrations[0])).toContain("email_address");
+    expect(read(migrations[1])).toContain("user_agent");
+  });
+
+  it("adds bcryptjs to the application's dependencies and installs it", () => {
+    write("package.json", '{ "dependencies": { "@blazetrails/activerecord": "*" } }');
+    makeGen().run();
+    expect(JSON.parse(read("package.json")).dependencies.bcryptjs).toBe("*");
+    expect(spawned).toContainEqual(["pnpm", "install", "--silent"]);
+  });
+
+  it("does not silently overwrite an existing file", () => {
+    write("app/models/user.ts", "// mine\n");
+    makeGen().run();
+    expect(read("app/models/user.ts")).toBe("// mine\n");
   });
 });

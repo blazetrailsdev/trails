@@ -1,25 +1,12 @@
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
-import {
-  ref,
-  tsBody,
-  tsClass,
-  tsMethod,
-  tsModule,
-  type Method,
-  type Ref,
-} from "../../../template-builder/index.js";
+import { MigrationGenerator } from "../../migration-generator.js";
+import { TEMPLATES } from "./templates.js";
 
 export interface AuthenticationRunOptions {
   api?: boolean;
   skipMailer?: boolean;
   skipActionCable?: boolean;
 }
-
-const APP_RECORD = ref("ApplicationRecord", "./application-record.js");
-const APP_CONTROLLER = ref("ApplicationController", "./application-controller.js");
-const APP_MAILER = ref("ApplicationMailer", "./application-mailer.js");
-const CURRENT_ATTRS = ref("CurrentAttributes", "@blazetrails/activesupport");
-const PRIVATE = { visibility: "private" } as const;
 
 // Mirrors railties/lib/rails/generators/rails/authentication/authentication_generator.rb.
 export class AuthenticationGenerator extends GeneratorBase {
@@ -30,7 +17,7 @@ export class AuthenticationGenerator extends GeneratorBase {
   /**
    * `run` takes an options object, so the generic `start` would hand it the
    * name string. Rails fills it from `class_option :api`
-   * (`authentication_generator.rb:6-7`), which trails has no port of — story
+   * (`authentication_generator.rb:6-7`) — story
    * `wire-generator-class-options-through-trails-generate`.
    */
   static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
@@ -42,83 +29,64 @@ export class AuthenticationGenerator extends GeneratorBase {
   run(options: AuthenticationRunOptions = {}): string[] {
     if (!this.isTypeScript())
       throw new Error("AuthenticationGenerator currently emits TypeScript only.");
-    const { api = false, skipMailer = true, skipActionCable = true } = options;
-    this.emit("app/models/session.ts", "Session", APP_RECORD, [
-      stub("associations", "// belongsTo: User", { static: true }),
-    ]);
-    this.emit("app/models/user.ts", "User", APP_RECORD, [
-      stub("associations", "// hasSecurePassword; hasMany sessions, dependent: destroy", {
-        static: true,
-      }),
-      stub("normalizes", "// emailAddress → e.strip().toLowerCase()", { static: true }),
-    ]);
-    this.emit("app/models/current.ts", "Current", CURRENT_ATTRS, [
-      stub("attributes", "// attribute :session", { static: true }),
-    ]);
-    this.emit("app/controllers/sessions-controller.ts", "SessionsController", APP_CONTROLLER, [
-      asyncStub("new_", "// allowUnauthenticatedAccess only: [new_, create]"),
-      asyncStub("create", "// User.authenticateBy → startNewSessionFor → redirect"),
-      asyncStub("destroy", "// terminateSession → redirect to /session/new"),
-    ]);
-    this.emit(
-      "app/controllers/concerns/authentication.ts",
-      "Authentication",
-      undefined,
-      AUTH_CONCERN_METHODS,
-    );
-    this.emit("app/controllers/passwords-controller.ts", "PasswordsController", APP_CONTROLLER, [
-      asyncStub("new_", "// allowUnauthenticatedAccess"),
-      asyncStub("create", "// PasswordsMailer.reset(user).deliverLater"),
-      asyncStub("edit", "// setUserByToken"),
-      asyncStub("update", "// user.update(password, passwordConfirmation)"),
-      asyncStub("setUserByToken", "// User.findByPasswordResetTokenBang", PRIVATE),
-    ]);
-    // Don't clobber AppGenerator's Connection (or user customizations).
-    if (!skipActionCable && !this.fileExists("app/channels/application-cable/connection.ts"))
-      this.emit("app/channels/application-cable/connection.ts", "Connection", undefined, [
-        stub("identifiedBy", "// currentUser", { static: true }),
-        asyncStub("connect", "// setCurrentUser || rejectUnauthorizedConnection"),
-        asyncStub("setCurrentUser", "// Session.findBy(cookies.signed.sessionId)", PRIVATE),
-      ]);
-
-    if (!skipMailer) {
-      this.emit("app/mailers/passwords-mailer.ts", "PasswordsMailer", APP_MAILER, [
-        asyncStub("reset", '// mail subject: "Reset your password", to: user.emailAddress', {
-          param: "user",
-        }),
-      ]);
-      this.emit(
-        "test/mailers/previews/passwords-mailer-preview.ts",
-        "PasswordsMailerPreview",
-        undefined,
-        [stub("reset", "// TODO: preview PasswordsMailer.reset")],
-      );
-      if (!api) {
-        this.createFile("app/views/passwords-mailer/reset.html.tse", RESET_HTML);
-        this.createFile("app/views/passwords-mailer/reset.text.tse", RESET_TEXT);
-      }
-    }
-
+    this.createAuthenticationFiles(options);
     this.configureApplicationController();
     this.configureAuthenticationRoutes();
+    this.enableBcrypt();
+    this.addMigrations();
     return this.getCreatedFiles();
   }
 
-  private emit(file: string, name: string, ext: Ref | undefined, body: Method[]): void {
-    const cls = tsClass({ name, ...(ext ? { extends: ext } : {}), body });
-    this.createFile(file, tsModule({ declarations: [cls] }));
+  /** `authentication_generator.rb:14-30`. */
+  private createAuthenticationFiles(options: AuthenticationRunOptions): void {
+    const { api = false, skipMailer = false, skipActionCable = true } = options;
+
+    this.template("app/models/session.rb");
+    this.template("app/models/user.rb");
+    this.template("app/models/current.rb");
+
+    this.template("app/controllers/sessions_controller.rb");
+    this.template("app/controllers/concerns/authentication.rb");
+    this.template("app/controllers/passwords_controller.rb");
+
+    if (!skipActionCable) this.template("app/channels/application_cable/connection.rb");
+
+    if (!skipMailer) {
+      this.template("app/mailers/passwords_mailer.rb");
+      if (!api) {
+        this.template("app/views/passwords_mailer/reset.html.erb");
+        this.template("app/views/passwords_mailer/reset.text.erb");
+      }
+      this.template("test/mailers/previews/passwords_mailer_preview.rb");
+    }
   }
 
-  // Anchored on the class declaration; idempotent.
+  /**
+   * Rails' `template` asks on a conflict; trails' generators are
+   * non-interactive, so an existing file is left alone and reported.
+   */
+  private template(file: string): void {
+    const destination = file
+      .replace(/\.rb$/, ".ts")
+      .replace(/\.erb$/, ".tse")
+      .replace(/[^/]+(?=\/|\.)/g, (segment) => segment.replace(/_/g, "-"));
+    if (this.fileExists(destination)) {
+      this.output(`      skip  ${destination} (already exists)`);
+      return;
+    }
+    this.createFile(destination, TEMPLATES[file]);
+  }
+
+  /** `authentication_generator.rb:32-34`. Anchored on the class declaration. */
   private configureApplicationController(): void {
     const file = "app/controllers/application-controller.ts";
     if (!this.fileExists(file)) return;
     const full = this.path.join(this.cwd, file);
     let src = this.fs.readFileSync(full, "utf-8");
-    const mixin = src.includes("Authentication.includeInto(this)") ? "" : STATIC_INIT;
-    const imp = /import\s*\{[^}]*\bAuthentication\b[^}]*\}\s*from\s*["'][^"']+["']/.test(src)
-      ? ""
-      : AUTH_IMPORT;
+    const mixin = src.includes("include(this, Authentication)") ? "" : STATIC_INIT;
+    const hasAuth = /import\s*\{[^}]*\bAuthentication\b[^}]*\}\s*from\s*["'][^"']+["']/.test(src);
+    const hasInclude = /import\s*\{[^}]*\binclude\b[^}]*\}\s*from\s*["'][^"']+["']/.test(src);
+    const imp = (hasInclude ? "" : INCLUDE_IMPORT) + (hasAuth ? "" : AUTH_IMPORT);
     if (!mixin && !imp) return;
     const m = src.match(/export\s+class\s+ApplicationController\b[^{]*\{/);
     if (!m || m.index === undefined) return;
@@ -127,13 +95,15 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.fs.writeFileSync(full, src);
   }
 
-  // Each route checked independently for partial-config convergence.
+  /**
+   * `authentication_generator.rb:36-39`. Each route is checked independently
+   * so a partly-configured routes file converges.
+   */
   private configureAuthenticationRoutes(): void {
     for (const f of ["config/routes.ts", "config/routes.js"]) {
       if (!this.fileExists(f)) continue;
       const src = this.fs.readFileSync(this.path.join(this.cwd, f), "utf-8");
       const lines: string[] = [];
-      // Skip if any passwords route exists; appending alongside would duplicate it.
       if (!src.includes('router.resources("passwords"'))
         lines.push(`  router.resources("passwords", { param: "token" });`);
       if (!src.includes('router.resource("session")')) lines.push(`  router.resource("session");`);
@@ -141,56 +111,49 @@ export class AuthenticationGenerator extends GeneratorBase {
       return;
     }
   }
+
+  /**
+   * `authentication_generator.rb:41-47`, onto `package.json` — the trails
+   * analogue of the Gemfile. Rails' already-listed arm installs, its missing
+   * arm adds then installs; `bin/bundle` becomes the app's package manager.
+   */
+  private enableBcrypt(): void {
+    if (!this.fileExists("package.json")) return;
+    const full = this.path.join(this.cwd, "package.json");
+    const json = JSON.parse(this.fs.readFileSync(full, "utf-8"));
+    if (!json.dependencies?.["bcryptjs"]) {
+      json.dependencies = { ...json.dependencies, bcryptjs: "*" };
+      this.fs.writeFileSync(full, JSON.stringify(json, null, 2) + "\n");
+    }
+    this.executeCommand(json.packageManager?.split("@")[0] ?? "pnpm", "install --silent");
+  }
+
+  /** `authentication_generator.rb:52-55`. */
+  private addMigrations(): void {
+    this.generate(
+      "migration CreateUsers email_address:string!:uniq password_digest:string! --force",
+    );
+    this.generate(
+      "migration CreateSessions user:references ip_address:string user_agent:string --force",
+    );
+    this.runPendingGenerators();
+  }
+
+  /**
+   * Rails' `generate` shells out, so the migrations exist when it returns;
+   * trails' only queues (`generators/actions.ts:22-29`). Converges with story
+   * `drain-queued-generators-in-generators-invoke`.
+   */
+  private runPendingGenerators(): void {
+    for (const { what, args } of this.pendingGenerators.splice(0)) {
+      const words = [...what.split(/\s+/), ...args].filter(Boolean);
+      if (words.shift() !== "migration") continue;
+      const generator = new MigrationGenerator({ cwd: this.cwd, output: this.output });
+      for (const file of generator.run(words[0], words.slice(1))) this.createdFiles.push(file);
+    }
+  }
 }
 
-const AUTH_CONCERN_METHODS: Method[] = [
-  tsMethod({
-    name: "includeInto",
-    params: [{ name: "klass", type: "any" }],
-    static: true,
-    body: tsBody`klass.beforeAction?.((c: any) => c.requireAuthentication());\nklass.helperMethod?.("authenticated");`,
-  }),
-  asyncStub("authenticated", "// resumeSession"),
-  asyncStub("requireAuthentication", "// resumeSession || requestAuthentication"),
-  asyncStub("resumeSession", "// Current.session ||= findSessionByCookie", PRIVATE),
-  asyncStub("findSessionByCookie", "// Session.findBy(cookies.signed.sessionId)", PRIVATE),
-  asyncStub("startNewSessionFor", "// user.sessions.createBang + cookie", {
-    ...PRIVATE,
-    param: "user",
-  }),
-  asyncStub("terminateSession", "// Current.session.destroy + cookies.delete", PRIVATE),
-];
-
-interface StubOpts {
-  static?: boolean;
-  visibility?: "private" | "protected";
-  param?: string;
-  async?: boolean;
-}
-function stub(name: string, comment: string, o: StubOpts = {}): Method {
-  return tsMethod({
-    name,
-    params: o.param ? [{ name: o.param, type: "any" }] : [],
-    static: o.static,
-    visibility: o.visibility,
-    async: o.async,
-    returnType: o.async ? "Promise<void>" : undefined,
-    body: tsBody`${comment}`,
-  });
-}
-function asyncStub(name: string, comment: string, o: StubOpts = {}): Method {
-  return stub(name, comment, { ...o, async: true });
-}
-
+const INCLUDE_IMPORT = `import { include } from "@blazetrails/activesupport";\n`;
 const AUTH_IMPORT = `import { Authentication } from "./concerns/authentication.js";\n`;
-const STATIC_INIT = `\n  static {\n    Authentication.includeInto(this);\n  }`;
-
-const RESET_HTML = `<p>
-  You can reset your password within the next 15 minutes on
-  <%= linkTo("this password reset page", editPasswordUrl(user.passwordResetToken)) %>.
-</p>
-`;
-
-const RESET_TEXT = `You can reset your password within the next 15 minutes on this password reset page:
-<%= editPasswordUrl(user.passwordResetToken) %>
-`;
+const STATIC_INIT = `\n  static {\n    include(this, Authentication);\n  }`;

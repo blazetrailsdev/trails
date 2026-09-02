@@ -36,7 +36,8 @@ import {
   type CspRequestHost,
   ContentSecurityPolicyRequest as CspRequest,
 } from "./http/content-security-policy.js";
-import { ContentSecurityPolicyMiddleware } from "./middleware/content-security-policy.js";
+import { Middleware as ContentSecurityPolicyMiddleware } from "./http/content-security-policy.js";
+import { Middleware as PermissionsPolicyMiddleware } from "./http/permissions-policy.js";
 import { MiddlewareStack } from "./middleware/stack.js";
 
 /**
@@ -182,6 +183,7 @@ export class Trailtie extends BaseTrailtie {
   static defaultMiddleware(): MiddlewareStack {
     const stack = new MiddlewareStack();
     stack.use(ContentSecurityPolicyMiddleware);
+    stack.use(PermissionsPolicyMiddleware);
     return stack;
   }
 
