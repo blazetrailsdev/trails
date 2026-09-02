@@ -40,8 +40,6 @@ describe("InTest", () => {
     expect(outside >= start && outside <= end).toBe(false);
   });
 
-  it.skip("in module");
-
   it.skip("no method catching");
 
   it("presence in", () => {

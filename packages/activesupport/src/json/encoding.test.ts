@@ -91,8 +91,6 @@ function withTimePrecision(value: number, block: () => void): void {
 }
 
 describe("TestJSONEncoding", () => {
-  it.skip("process status");
-
   it("numeric", () => {
     // Rails' NumericTests (encoding_test_cases.rb:62-72); the RomanNumeral /
     // CustomNumeric cases need Ruby's `Numeric` subclassing and are unported.
@@ -170,8 +168,6 @@ describe("TestJSONEncoding", () => {
     expect(result).toBe('"✎☺"');
   });
 
-  it.skip("non utf8 string transcodes");
-
   it("wide utf8 chars", () => {
     const s = "🎉🚀";
     expect(JSON.parse(JSON.stringify(s))).toBe(s);
@@ -241,9 +237,6 @@ describe("TestJSONEncoding", () => {
     expect(JSON.parse(json)).toEqual({ foo: "hello" });
   });
 
-  it.skip("struct to json with options");
-  it.skip("struct to json with options nested");
-
   it("hash should pass encoding options to children in as json", () => {
     const h = { nested: { a: 1 } };
     expect(JSON.parse(JSON.stringify(h))).toEqual(h);
@@ -311,18 +304,12 @@ describe("TestJSONEncoding", () => {
     expect(JSON.parse(JSON.stringify(arr))).toEqual(arr);
   });
 
-  it.skip("struct encoding");
-  it.skip("data encoding");
-
   it("nil true and false represented as themselves", () => {
     expect(asJson(null)).toBeNull();
     expect(asJson(true)).toBe(true);
     expect(asJson(false)).toBe(false);
   });
 
-  it.skip("json gem dump by passing active support encoder");
-  it.skip("json gem generate by passing active support encoder");
-  it.skip("json gem pretty generate by passing active support encoder");
   it("twz to json with use standard json time format config set to false", () => {
     withStandardJsonTimeFormat(false, () => {
       const zone = TimeZone.find("Eastern Time (US & Canada)")!;
@@ -381,6 +368,4 @@ describe("TestJSONEncoding", () => {
   it("to json works when as json returns NaN number", () => {
     expect(new NaNNumber().toJSON()).toBe('{"number":null}');
   });
-
-  it.skip("to json works on io objects");
 });

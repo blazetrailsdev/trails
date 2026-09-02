@@ -218,14 +218,6 @@ describe("TimeWithZoneTest", () => {
     expect(twz.rfc3339(3)).toBe("1999-12-31T19:00:00.125-05:00");
   });
 
-  it.skip("to yaml");
-
-  it.skip("ruby to yaml");
-
-  it.skip("yaml load");
-
-  it.skip("ruby yaml load");
-
   it("httpdate", () => {
     const twz = maketwz();
     expect(twz.httpdate()).toBe("Sat, 01 Jan 2000 00:00:00 GMT");

@@ -80,12 +80,6 @@ describe("TransliterateTest", () => {
     expect(transliterate("hello")).toBe("hello");
   });
 
-  it.skip("transliterate handles strings with valid gb18030 encodings");
-  it.skip("transliterate handles strings with incompatible encodings");
-  it.skip("transliterate handles strings with invalid utf8 bytes");
-  it.skip("transliterate handles strings with invalid us ascii bytes");
-  it.skip("transliterate handles strings with invalid gb18030 bytes");
-
   it("transliterate returns a copy of ascii strings", () => {
     const original = "hello";
     const result = transliterate(original);

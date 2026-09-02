@@ -956,8 +956,6 @@ describe("OutputSafetyTest", () => {
     expect(isHtmlSafe(result)).toBe(true);
   });
 
-  it.skip("emits normal string YAML");
-
   it("call to_param returns a normal string", () => {
     const safe = htmlSafe("hello");
     expect(safe.toString()).toBe("hello");

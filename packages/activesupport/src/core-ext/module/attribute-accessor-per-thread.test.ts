@@ -3,9 +3,6 @@ import { describe, it, expect } from "vitest";
 import { mattrAccessor } from "../../module-ext.js";
 
 describe("ModuleAttributeAccessorPerThreadTest", () => {
-  it.skip("is shared between fibers");
-  it.skip("is not shared between fibers if isolation level is fiber");
-
   it("default value", () => {
     class M {}
     mattrAccessor(M, ["attr"], { default: "default_val" });
@@ -19,8 +16,6 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     // Class-level accessor is on the class object, not prototype-chained
     expect((Parent as unknown as Record<string, unknown>).shared).toBe(42);
   });
-
-  it.skip("default value is accessible from other threads");
 
   it("nonfrozen default value is duped and frozen", () => {
     const defaultArr = [1, 2, 3];
@@ -81,8 +76,6 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     const proto = M.prototype as Record<string, unknown>;
     expect(Object.getOwnPropertyDescriptor(proto, "z")).toBeUndefined();
   });
-
-  it.skip("values should not bleed between threads");
 
   it("should raise name error if attribute name is invalid", () => {
     class M {}

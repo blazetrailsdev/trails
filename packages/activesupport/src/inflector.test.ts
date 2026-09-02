@@ -468,10 +468,6 @@ describe("InflectorTest", () => {
     });
   });
 
-  it.skip("constantize");
-
-  it.skip("safe constantize");
-
   it("ordinal", () => {
     expect(ordinal(0)).toBe("th");
     expect(ordinal(1)).toBe("st");
