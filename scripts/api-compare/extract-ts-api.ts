@@ -1577,11 +1577,9 @@ export function extractFromProgram(
     });
   }
 
-  // Generated-member pass: the two shapes a Ruby `class_eval` / accessor
-  // generator takes in trails — a name-list loop assigning onto
-  // `<Class>.prototype`, and one installing `Object.defineProperty` accessor
-  // pairs. Both live inside a mixin function rather than at top level, so this
-  // pass walks the whole tree instead of only a file's own statements.
+  // Generator pass. Unlike the two above, these loops live inside a mixin
+  // function rather than at top level, so the walk cannot stop at a file's own
+  // statements.
   for (const sourceFile of program.getSourceFiles()) {
     if (!sourceFile.fileName.startsWith(srcDir)) continue;
     if (sourceFile.fileName.endsWith(".test.ts")) continue;
@@ -2222,6 +2220,7 @@ function extractDefinePropertyAccessorForOf(
   const writerParams = set === null ? null : setterParams(set);
   const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
 
+  const names: string[] = [];
   for (const value of values) {
     const name = evaluateGeneratedName(
       call.nameExpr,
@@ -2232,8 +2231,9 @@ function extractDefinePropertyAccessorForOf(
       host.decl,
     );
     if (name === null) return;
-    pushGeneratedAccessor(host.classInfo, name, line, writerParams);
+    names.push(name);
   }
+  for (const name of names) pushGeneratedAccessor(host.classInfo, name, line, writerParams);
 }
 
 /**
