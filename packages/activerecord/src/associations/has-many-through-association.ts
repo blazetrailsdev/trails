@@ -11,6 +11,7 @@ import {
   _hmtNotFound,
 } from "../associations.js";
 import { PolymorphicReflection, type AbstractReflection } from "../reflection.js";
+import { drop } from "../ruby-drop.js";
 import { ThroughAssociation, sourceReflection, throughBuildRecord } from "./through-association.js";
 import { associationKeysEqual } from "./key-normalization.js";
 import { isThenable } from "./collection-association.js";
@@ -607,7 +608,9 @@ async function loadHasManyThrough(
         assocDef as unknown as AbstractReflection,
       );
       let rel = _builtAssociationScope(record, throughAssoc.name, throughAssoc, throughModel);
-      for (const constraint of polymorphicReflection.constraints()) rel = constraint(rel);
+      const throughConstraints = (throughAssoc as unknown as AbstractReflection).constraints();
+      for (const constraint of drop(polymorphicReflection.constraints(), throughConstraints.length))
+        rel = constraint(rel);
       throughRecords = await rel;
     } else {
       throughRecords = await findHasManyTarget(record, throughAssoc);
