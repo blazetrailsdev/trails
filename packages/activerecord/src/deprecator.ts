@@ -1,6 +1,7 @@
 import { createRequire } from "node:module";
 import { Deprecation, getPath } from "@blazetrails/activesupport";
 import type { Migration } from "./migration.js";
+import { gemVersion } from "./gem-version.js";
 
 export { Deprecation as Deprecator };
 
@@ -8,10 +9,6 @@ const _deprecator = new Deprecation();
 
 export function deprecator(): Deprecation {
   return _deprecator;
-}
-
-export function gemVersion(): string {
-  return "8.0.2";
 }
 
 export function version(): string {
