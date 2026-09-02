@@ -75,16 +75,16 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       cachedColumnsHash(cacheHost) ??
       {};
     const ignored = new Set<string>(cacheHost.ignoredColumns ?? []);
-    const attributesHash = new Map<string, Attribute>();
+    const attributesHash: Record<string, Attribute> = Object.create(null) as Record<
+      string,
+      Attribute
+    >;
     for (const [name, column] of Object.entries(columns)) {
       if (ignored.has(name)) continue;
-      attributesHash.set(
+      attributesHash[name] = Attribute.fromDatabase(
         name,
-        Attribute.fromDatabase(
-          name,
-          (column as { default?: unknown }).default ?? null,
-          typeForColumn.call(cacheHost, connection, column),
-        ),
+        (column as { default?: unknown }).default ?? null,
+        typeForColumn.call(cacheHost, connection, column),
       );
     }
 

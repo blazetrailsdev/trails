@@ -982,26 +982,6 @@ export default defineConfig(
     },
   },
 
-  // ── ruby-compat: the Module mixin primitives ──
-  // `include.ts` / `prepend.ts` model Ruby's object model, whose method tables
-  // are heterogeneous by construction: `AnyClass`, `ModuleObject` and
-  // `CallableMethods<M>` need `any` because `unknown[]` breaks the constructor
-  // and `this`-parameter variance the mixin shapes are built on. They carried
-  // this same relaxation at their previous activesupport path (RFC 0129 moved
-  // the files, not their types), and it is scoped to the two files rather than
-  // the package so nothing else here inherits it.
-  {
-    files: [
-      "packages/ruby-compat/src/include.ts",
-      "packages/ruby-compat/src/include.test.ts",
-      "packages/ruby-compat/src/prepend.ts",
-      "packages/ruby-compat/src/prepend.test.ts",
-    ],
-    rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-    },
-  },
-
   // ── rack ──
   {
     files: ["packages/rack/src/**/*.ts"],

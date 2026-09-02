@@ -6,7 +6,7 @@ import { AttributeSet } from "../attribute-set.js";
 import { Attribute } from "../attribute.js";
 import { typeRegistry } from "../type/registry.js";
 
-function makeSet(attrs: Map<string, Attribute>): AttributeSet {
+function makeSet(attrs: Record<string, Attribute>): AttributeSet {
   return new AttributeSet(attrs);
 }
 
@@ -30,10 +30,10 @@ describe("YAMLEncoder", () => {
   });
 
   it("round-trips a simple set", () => {
-    const attrs = new Map([
-      ["name", stringAttr("name", "Alice")],
-      ["age", intAttr("age", 30)],
-    ]);
+    const attrs = {
+      name: stringAttr("name", "Alice"),
+      age: intAttr("age", 30),
+    };
     const set = makeSet(attrs);
     const decoded = coder.decode(coder.encode(set));
     expect(decoded.fetchValue("name")).toBe("Alice");
@@ -41,12 +41,12 @@ describe("YAMLEncoder", () => {
   });
 
   it("omits the type of an attribute whose type is the default type", () => {
-    const set = makeSet(new Map([["name", stringAttr("name", "Alice")]]));
+    const set = makeSet({ name: stringAttr("name", "Alice") });
     expect(JSON.parse(coder.encode(set)).types.name).toBeNull();
   });
 
   it("writes the type of an attribute whose type is not the default type", () => {
-    const set = makeSet(new Map([["name", intAttr("name", 7)]]));
+    const set = makeSet({ name: intAttr("name", 7) });
     expect(JSON.parse(coder.encode(set)).types.name).toBe("integer");
   });
 
@@ -62,7 +62,7 @@ describe("YAMLEncoder", () => {
   it("uninitialized attributes round-trip as uninitialized", () => {
     const intType = integerType;
     const localCoder = new YAMLEncoder({ score: intType });
-    const set = makeSet(new Map([["score", Attribute.uninitialized("score", intType)]]));
+    const set = makeSet({ score: Attribute.uninitialized("score", intType) });
 
     const encoded = localCoder.encode(set);
     expect(JSON.parse(encoded).defaultAttributes).toContain("score");
@@ -119,7 +119,7 @@ describe("YAMLEncoder", () => {
   it("uses attr.type.name (registry key) not type() for type storage", () => {
     const immutableType = typeRegistry.lookup("immutable_string");
     const attr = Attribute.fromUser("flag", "t", immutableType);
-    const set = makeSet(new Map([["flag", attr]]));
+    const set = makeSet({ flag: attr });
     const envelope = JSON.parse(coder.encode(set));
     expect(envelope.types.flag).toBe("immutable_string");
     const decoded = coder.decode(coder.encode(set));
@@ -136,7 +136,7 @@ describe("YAMLEncoder", () => {
       decode: vi.fn((input: string) => JSON.parse(input) as AttributeSetEnvelope),
     };
     const customCoder = new YAMLEncoder({}, { codec: customCodec });
-    const set = makeSet(new Map([["x", stringAttr("x", "hi")]]));
+    const set = makeSet({ x: stringAttr("x", "hi") });
     customCoder.decode(customCoder.encode(set));
     expect(customCodec.encode).toHaveBeenCalledOnce();
     expect(customCodec.decode).toHaveBeenCalledOnce();

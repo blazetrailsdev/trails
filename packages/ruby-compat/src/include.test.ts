@@ -14,6 +14,10 @@ import {
   type Extended,
 } from "./include.js";
 
+type DynMethods = Record<string, (...args: unknown[]) => unknown>;
+type DynProps = Record<string, unknown>;
+type DynSymbols = Record<symbol, unknown>;
+
 describe("include", () => {
   it("copies instance methods onto the prototype", () => {
     class User {}
@@ -23,7 +27,7 @@ describe("include", () => {
       },
     };
     include(User, mod);
-    expect(new (User as any)().greet()).toBe("hello");
+    expect(new (User as unknown as new () => DynMethods)().greet()).toBe("hello");
   });
 
   it("does not replace methods already on the prototype", () => {
@@ -65,7 +69,7 @@ describe("include", () => {
     include(User, A);
     include(User, B);
 
-    expect((new User() as any).shared()).toBe("B");
+    expect((new User() as unknown as DynMethods).shared()).toBe("B");
     expect(new User().classBody()).toBe("class-body");
   });
 
@@ -115,10 +119,10 @@ describe("include", () => {
       greet() {
         return "hello";
       },
-      [included](base: any) {
+      [included](base: unknown) {
         order.push("included");
         expect(base).toBe(User);
-        expect(new base().greet()).toBe("hello");
+        expect(new (base as new () => DynMethods)().greet()).toBe("hello");
       },
     };
     include(User, mod);
@@ -131,10 +135,10 @@ describe("include", () => {
       greet() {
         return "hello";
       },
-      [included](_base: any) {},
+      [included](_base: unknown) {},
     };
     include(User, mod);
-    expect((User.prototype as any)[included]).toBeUndefined();
+    expect((User.prototype as DynSymbols)[included]).toBeUndefined();
   });
 
   it("works without an included callback", () => {
@@ -144,7 +148,7 @@ describe("include", () => {
         return "hello";
       },
     });
-    expect(new (User as any)().greet()).toBe("hello");
+    expect(new (User as unknown as new () => DynMethods)().greet()).toBe("hello");
   });
 
   describe("class-prototype module (accessor descriptors)", () => {
@@ -162,8 +166,8 @@ describe("include", () => {
       }
       include(Host, Mod);
       const h = new Host();
-      (h as any).key = 42;
-      expect((h as any).key).toBe(42);
+      (h as unknown as DynProps).key = 42;
+      expect((h as unknown as DynProps).key).toBe(42);
       expect(h.data.key).toBe(42);
     });
 
@@ -175,7 +179,7 @@ describe("include", () => {
         }
       }
       include(Host, Mod);
-      expect((new Host() as any).greet()).toBe("hi");
+      expect((new Host() as unknown as DynMethods).greet()).toBe("hi");
     });
 
     it("does not replace a method already defined on the host (Ruby include semantics)", () => {
@@ -210,9 +214,9 @@ describe("include", () => {
       }
       include(Host, Mod);
       const h = new Host();
-      (h as any).key = 7;
+      (h as unknown as DynProps).key = 7;
       expect(h.data.key).toBe(7);
-      expect((h as any).key).toBe(7);
+      expect((h as unknown as DynProps).key).toBe(7);
     });
 
     it("later class module wins a plain-method collision, class body still beats both", () => {
@@ -239,7 +243,7 @@ describe("include", () => {
       }
       include(Host, A);
       include(Host, B);
-      expect((new Host() as any).shared()).toBe("B");
+      expect((new Host() as unknown as DynMethods).shared()).toBe("B");
       expect(new Host().classBody()).toBe("class-body");
     });
 
@@ -263,8 +267,8 @@ describe("include", () => {
       include(Host, A);
       include(Host, B);
       const h = new Host();
-      expect((h as any).key).toBe("B-getter");
-      (h as any).key = 1;
+      expect((h as unknown as DynProps).key).toBe("B-getter");
+      (h as unknown as DynProps).key = 1;
       expect(h.data.key).toBe("A:1");
     });
 
@@ -290,7 +294,7 @@ describe("extend", () => {
         return `found:${name}`;
       },
     });
-    expect((User as any).findByName("dean")).toBe("found:dean");
+    expect((User as unknown as DynMethods).findByName("dean")).toBe("found:dean");
   });
 
   it("fires the extended callback after methods are copied", () => {
@@ -300,10 +304,10 @@ describe("extend", () => {
       findByName() {
         return "found";
       },
-      [extended](base: any) {
+      [extended](base: unknown) {
         order.push("extended");
         expect(base).toBe(User);
-        expect(base.findByName()).toBe("found");
+        expect((base as DynMethods).findByName()).toBe("found");
       },
     };
     extend(User, mod);
@@ -316,10 +320,10 @@ describe("extend", () => {
       greet() {
         return "hello";
       },
-      [extended](_base: any) {},
+      [extended](_base: unknown) {},
     };
     extend(User, mod);
-    expect((User as any)[extended]).toBeUndefined();
+    expect((User as unknown as DynSymbols)[extended]).toBeUndefined();
   });
 
   it("works without an extended callback", () => {
@@ -329,7 +333,7 @@ describe("extend", () => {
         return "found";
       },
     });
-    expect((User as any).findByName()).toBe("found");
+    expect((User as unknown as DynMethods).findByName()).toBe("found");
   });
 
   it("leaves a class-body static alone", () => {
@@ -358,7 +362,7 @@ describe("extend", () => {
         return "second";
       },
     });
-    expect((User as any).findByName()).toBe("second");
+    expect((User as unknown as DynMethods).findByName()).toBe("second");
   });
 
   it("does not treat an inherited static as the subclass's own class body", () => {
@@ -390,8 +394,8 @@ describe("extend", () => {
       }
     }
     extend(User, Naming);
-    expect((User as any).tableName).toBe("users");
-    (User as any).tableName = "people";
+    expect((User as unknown as DynProps).tableName).toBe("users");
+    (User as unknown as DynProps).tableName = "people";
     expect(seen).toEqual(["people"]);
   });
 
@@ -414,8 +418,8 @@ describe("extend", () => {
     }
     extend(User, First);
     extend(User, Second);
-    expect((User as any).tableName).toBe("second");
-    (User as any).tableName = "people";
+    expect((User as unknown as DynProps).tableName).toBe("second");
+    (User as unknown as DynProps).tableName = "people";
     expect(seen).toEqual(["people"]);
   });
 
@@ -432,8 +436,8 @@ describe("extend", () => {
       }
     }
     extend(User, Naming);
-    expect((User as any).tableName).toBe("class body");
-    (User as any).tableName = "people";
+    expect((User as unknown as DynProps).tableName).toBe("class body");
+    (User as unknown as DynProps).tableName = "people";
     expect(seen).toEqual(["people"]);
   });
 });

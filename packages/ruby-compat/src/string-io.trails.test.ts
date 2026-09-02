@@ -62,4 +62,24 @@ describe("StringIO", () => {
     const read = io.read() as string;
     expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(bytes);
   });
+  it("puts writes each argument on its own line, appending a newline only when absent", () => {
+    const io = new StringIO();
+    expect(io.puts("a\n", "b")).toBe(null);
+    expect(io.string()).toBe("a\nb\n");
+  });
+
+  it("puts with no arguments or nil writes a bare newline", () => {
+    const io = new StringIO();
+    io.puts();
+    io.puts(null);
+    expect(io.string()).toBe("\n\n");
+  });
+
+  it("puts flattens an array and writes nothing for an empty one", () => {
+    const io = new StringIO();
+    io.puts([]);
+    expect(io.string()).toBe("");
+    io.puts([1, [2, 3]]);
+    expect(io.string()).toBe("1\n2\n3\n");
+  });
 });

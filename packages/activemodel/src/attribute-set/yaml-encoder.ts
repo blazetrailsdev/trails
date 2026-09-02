@@ -64,7 +64,7 @@ export class YAMLEncoder {
       throw new AttributeSetCodecError(`envelope version v=${envelope.v} not supported`);
     }
 
-    const attributesHash = new Map<string, Attribute>(
+    const attributesHash: Record<string, Attribute> = Object.fromEntries(
       Object.entries(envelope.types).map(([name, typeKey]) => {
         let type: Type;
         if (typeKey == null) {
@@ -87,7 +87,7 @@ export class YAMLEncoder {
     );
 
     for (const name of envelope.defaultAttributes ?? []) {
-      attributesHash.set(name, Attribute.uninitialized(name, this.defaultTypes[name]));
+      attributesHash[name] = Attribute.uninitialized(name, this.defaultTypes[name]);
     }
 
     return new AttributeSet(attributesHash);
