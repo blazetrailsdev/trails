@@ -1,8 +1,86 @@
+import { getFs } from "@blazetrails/activesupport";
+
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
+import { Request } from "./request.js";
 import { escapeHtml } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
 
+/**
+ * `Frame = Struct.new(:filename, :lineno, :function, :pre_context_lineno,
+ * :pre_context, :context_line, :post_context_lineno, :post_context)`
+ * (`rack/lib/rack/show_exceptions.rb:21-24`). A Struct member is a Ruby
+ * `attr_accessor` pair, so each is a reader property plus a `setX` writer.
+ */
+export class Frame {
+  private _filename: string | null = null;
+  private _lineno: number | null = null;
+  private _function: string | null = null;
+  private _preContextLineno: number | null = null;
+  private _preContext: string[] | null = null;
+  private _contextLine: string | null = null;
+  private _postContextLineno: number | null = null;
+  private _postContext: string[] | null = null;
+
+  get filename(): string | null {
+    return this._filename;
+  }
+  setFilename(filename: string | null): void {
+    this._filename = filename;
+  }
+
+  get lineno(): number | null {
+    return this._lineno;
+  }
+  setLineno(lineno: number | null): void {
+    this._lineno = lineno;
+  }
+
+  get function(): string | null {
+    return this._function;
+  }
+  setFunction(func: string | null): void {
+    this._function = func;
+  }
+
+  get preContextLineno(): number | null {
+    return this._preContextLineno;
+  }
+  setPreContextLineno(preContextLineno: number | null): void {
+    this._preContextLineno = preContextLineno;
+  }
+
+  get preContext(): string[] | null {
+    return this._preContext;
+  }
+  setPreContext(preContext: string[] | null): void {
+    this._preContext = preContext;
+  }
+
+  get contextLine(): string | null {
+    return this._contextLine;
+  }
+  setContextLine(contextLine: string | null): void {
+    this._contextLine = contextLine;
+  }
+
+  get postContextLineno(): number | null {
+    return this._postContextLineno;
+  }
+  setPostContextLineno(postContextLineno: number | null): void {
+    this._postContextLineno = postContextLineno;
+  }
+
+  get postContext(): string[] | null {
+    return this._postContext;
+  }
+  setPostContext(postContext: string[] | null): void {
+    this._postContext = postContext;
+  }
+}
+
 export class ShowExceptions {
+  static readonly CONTEXT = 7;
+
   private app: RackApp;
 
   constructor(app: RackApp) {
@@ -56,15 +134,67 @@ export class ShowExceptions {
   }
 
   pretty(env: Record<string, any>, exception: Error): string {
-    return this.template(env, exception);
+    const req = new Request(env);
+
+    const path = (req.scriptName + req.pathInfo).replace(/\/+/g, "/");
+
+    const frames = this.backtrace(exception)
+      .map((line) => {
+        const frame = new Frame();
+        const m = /(.*?):(\d+)(:in `(.*)')?/.exec(line);
+        if (m) {
+          frame.setFilename(m[1]);
+          frame.setLineno(parseInt(m[2], 10));
+          frame.setFunction(m[4] ?? null);
+
+          try {
+            const lineno = frame.lineno! - 1;
+            const lines = readlines(frame.filename!);
+            frame.setPreContextLineno(Math.max(lineno - ShowExceptions.CONTEXT, 0));
+            frame.setPreContext(lines.slice(frame.preContextLineno!, lineno));
+            frame.setContextLine(lines[lineno].replace(/\n$/, ""));
+            frame.setPostContextLineno(Math.min(lineno + ShowExceptions.CONTEXT, lines.length));
+            frame.setPostContext(lines.slice(lineno + 1, frame.postContextLineno! + 1));
+          } catch {
+            // Rails swallows a bare `rescue` here (show_exceptions.rb:98).
+          }
+
+          return frame;
+        } else {
+          return null;
+        }
+      })
+      .filter((frame): frame is Frame => frame !== null);
+
+    return this.template(env, exception, path, frames);
   }
 
-  protected template(env: Record<string, any>, exception: Error): string {
+  /**
+   * `Exception#backtrace`'s lines (`show_exceptions.rb:82`), which a JS
+   * `Error` carries as the tail of `stack`.
+   */
+  private backtrace(exception: Error): string[] {
+    if (!exception.stack) return [];
+    return exception.stack
+      .split("\n")
+      .slice(1)
+      .map((line) => {
+        const m = /^\s*at (?:(.*?) \()?(.*?):(\d+):\d+\)?$/.exec(line);
+        return m ? `${m[2]}:${m[3]}${m[1] ? `:in \`${m[1]}'` : ""}` : line.trim();
+      });
+  }
+
+  protected template(
+    env: Record<string, any>,
+    exception: Error,
+    _path?: string,
+    frames?: Frame[],
+  ): string {
     const name = exception.constructor?.name || (exception as any).name || "Error";
     const message = (exception as any).detailedMessage
       ? (exception as any).detailedMessage()
       : exception.message || "";
-    const stack = this.formatBacktrace(exception);
+    const stack = frames ? this.formatFrames(frames) : this.formatBacktrace(exception);
     const getData = this.formatGetData(env);
     const postData = this.formatPostData(env);
 
@@ -113,6 +243,18 @@ export class ShowExceptions {
     return escapeHtml(lines.join("\n"));
   }
 
+  private formatFrames(frames: Frame[]): string {
+    if (frames.length === 0) return "unknown location";
+    return escapeHtml(
+      frames
+        .map(
+          (frame) =>
+            `${frame.filename}:${frame.lineno}${frame.function ? `:in \`${frame.function}'` : ""}`,
+        )
+        .join("\n"),
+    );
+  }
+
   private formatGetData(env: Record<string, any>): string {
     const qs = env["QUERY_STRING"];
     if (!qs || qs === "") return "No GET data";
@@ -130,4 +272,10 @@ export class ShowExceptions {
       return "Invalid POST data";
     }
   }
+}
+
+function readlines(filename: string): string[] {
+  return getFs()
+    .readFileSync(filename, "utf-8")
+    .split(/(?<=\n)/);
 }
