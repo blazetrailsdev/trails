@@ -147,6 +147,59 @@ export function eachPair<T>(hash: Record<string, T>, block: PairBlock<T>): Recor
 }
 
 /**
+ * Ruby `Hash#inspect` (`vendor/ruby/hash.c:3483` `rb_hash_inspect`): `"{}"` for
+ * an empty hash, and otherwise `inspect_hash` (`hash.c:3459`) wrapping the
+ * `inspect_i` (`hash.c:3439`) pairs — each `rb_inspect(key)`, `"=>"`,
+ * `rb_inspect(value)`, joined by `", "`.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#inspect` (`vendor/ruby/hash.c:3483`).
+ */
+export function inspect(hash: Record<string, unknown>): string {
+  const keys = Object.keys(hash);
+  if (keys.length === 0) return "{}";
+  return `{${keys.map((key) => `${rbInspect(key)}=>${rbInspect(hash[key])}`).join(", ")}}`;
+}
+
+/**
+ * The `rb_inspect` (`vendor/ruby/object.c:697`) dispatch `inspect_i` calls on
+ * each key and value, over the core classes a JS value can be: `nil`, `true` /
+ * `false`, Integer and Float, String (`vendor/ruby/string.c:7269`
+ * `rb_str_inspect`), Array and Hash. Anything else falls through to the
+ * receiver's own `inspect`, as `rb_inspect` does.
+ */
+function rbInspect(value: unknown): string {
+  if (value == null) return "nil";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  if (typeof value === "string") {
+    if (isSymbol(value)) return value;
+    const str: string = value as string;
+    /* eslint-disable no-control-regex */
+    return `"${str
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t")
+      .replace(/\f/g, "\\f")
+      .replace(/\x08/g, "\\b")
+      .replace(/\v/g, "\\v")
+      .replace(/\0/g, "\\0")
+      .replace(/\x07/g, "\\a")
+      .replace(/\x1b/g, "\\e")}"`;
+    /* eslint-enable no-control-regex */
+  }
+  if (Array.isArray(value)) return `[${value.map(rbInspect).join(", ")}]`;
+  if (isPlainHash(value)) return inspect(value);
+  return String(value);
+}
+
+function isPlainHash(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  const proto: unknown = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
  * Ruby `Hash#each_key` (`vendor/ruby/hash.c:3098` `rb_hash_each_key`): yields
  * each key alone and returns the receiver.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/hash.c:3098`).

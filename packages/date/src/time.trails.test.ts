@@ -465,4 +465,28 @@ describe("Time", () => {
       );
     });
   });
+
+  describe("clock resolution", () => {
+    for (const [name, read] of [
+      ["Time.now", () => Time.now().nsec],
+      ["Time.new", () => Time.new().nsec],
+    ] as const) {
+      it(`${name} resolves finer than a millisecond, as CLOCK_REALTIME does`, () => {
+        let pairs = 0;
+        let distinct = 0;
+
+        for (let i = 0; i < 1_000; i++) {
+          const millisecond = Date.now();
+          const first = read();
+          const second = read();
+          if (Date.now() !== millisecond) continue;
+          pairs++;
+          if (first !== second) distinct++;
+        }
+
+        expect(pairs).toBeGreaterThan(0);
+        expect(distinct).toBeGreaterThan(pairs / 2);
+      });
+    }
+  });
 });

@@ -22,6 +22,7 @@ export {
   except,
   fetch,
   hasKey,
+  inspect,
   merge,
   mergeBang,
   reject,

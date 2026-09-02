@@ -41,7 +41,8 @@ describe("ACLogSubscriberTest", () => {
       makeEvent("start_processing.action_controller", {
         controller: "Another::LogSubscribersController",
         action: "show",
-        format: "HTML",
+        params: { controller: "another/log_subscribers", action: "show" },
+        format: ":html",
       }),
     );
     expect(logger.messages[0]).toBe("Processing by Another::LogSubscribersController#show as HTML");
@@ -52,7 +53,8 @@ describe("ACLogSubscriberTest", () => {
       makeEvent("start_processing.action_controller", {
         controller: "Another::LogSubscribersController",
         action: "show",
-        format: "JSON",
+        params: { controller: "another/log_subscribers", action: "show", format: "json" },
+        format: ":json",
       }),
     );
     expect(logger.messages[0]).toBe("Processing by Another::LogSubscribersController#show as JSON");
@@ -63,6 +65,7 @@ describe("ACLogSubscriberTest", () => {
       makeEvent("start_processing.action_controller", {
         controller: "Another::LogSubscribersController",
         action: "show",
+        params: { controller: "another/log_subscribers", action: "show", format: "noext" },
         format: undefined,
       }),
     );

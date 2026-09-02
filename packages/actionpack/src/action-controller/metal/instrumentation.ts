@@ -15,7 +15,12 @@ export interface Notifier {
 export function instrumentAction(
   controllerName: string,
   actionName: string,
-  request: { method?: string; path?: string; format?: { symbol: string | null } },
+  request: {
+    method?: string;
+    path?: string;
+    format?: { symbol: string | null };
+    filteredParameters(): Record<string, unknown>;
+  },
   fn: () => Promise<unknown>,
   notifier?: Notifier,
 ): Promise<unknown> {
@@ -23,6 +28,7 @@ export function instrumentAction(
   const payload: Record<string, unknown> = {
     controller: controllerName,
     action: actionName,
+    params: request.filteredParameters(),
     method: request.method,
     path: request.path,
     format: request.format?.symbol,

@@ -5,6 +5,7 @@ import {
   dup,
   eachKey,
   eachPair,
+  inspect,
   except,
   fetch,
   hasKey,
@@ -213,5 +214,17 @@ describe("Hash#default", () => {
     const copy = dup(hash);
     copy.a = 2;
     expect(hash.a).toBe(1);
+  });
+
+  describe("inspect", () => {
+    it("renders an empty hash as {}", () => {
+      expect(inspect({})).toBe("{}");
+    });
+
+    it("renders keys and values as rb_inspect does, joined by =>", () => {
+      expect(inspect({ a: 1, b: [1, null], c: { d: true }, e: ":sym" })).toBe(
+        '{"a"=>1, "b"=>[1, nil], "c"=>{"d"=>true}, "e"=>:sym}',
+      );
+    });
   });
 });

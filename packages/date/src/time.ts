@@ -39,6 +39,26 @@ function nowTimeZoneId(): string {
 }
 
 /**
+ * The wall clock `Time.now` reads. MRI reads `CLOCK_REALTIME` (`time.c`
+ * `rb_time_now` → `clock_gettime`/`gettimeofday`) at nanosecond resolution, so
+ * two reads inside one millisecond differ. `Temporal.Now.instant()` is
+ * `Date.now()` scaled to nanoseconds plus a sub-millisecond term itself
+ * derived from `Date.now()`, so two reads inside one millisecond are all but
+ * always the same instant (measured: 9 of 979 pairs differed, and then only by
+ * 1ns) — which drops `updated_at` out of `saved_changes` for a record created
+ * and updated inside that millisecond.
+ *
+ * The floor is a microsecond, not the nanosecond MRI delivers: an epoch
+ * millisecond is ~1.8e12, so a double runs out of integer precision well
+ * before `* 1e6`. That matches the precision Rails' own `datetime` columns
+ * default to, and is finer than any collision this guards against. The twin
+ * seat is `systemEpochNs` in `activesupport/src/time-travel.ts`.
+ */
+function systemEpochNs(): bigint {
+  return BigInt(Math.round((performance.timeOrigin + performance.now()) * 1_000)) * 1_000n;
+}
+
+/**
  * Drop the {@link nowTimeZoneId} memo. MRI re-reads the zone when `TZ` changes
  * under it (`tzset`); a test that rewrites `TZ` — or stubs
  * `Temporal.Now.timeZoneId` — mid-process needs the same.
@@ -553,7 +573,7 @@ export class Time {
    * `now` takes none.
    */
   static now({ in: inZone = null }: { in?: string | number | null } = {}): Time {
-    return Time.#atInstant(Temporal.Now.instant(), inZone);
+    return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(systemEpochNs()), inZone);
   }
 
   /**
@@ -617,7 +637,8 @@ export class Time {
     if (zone != null && inZone != null) {
       throw new ArgumentError("timezone argument given as positional and keyword arguments");
     }
-    if (year === undefined) return Time.#atInstant(Temporal.Now.instant(), inZone);
+    if (year === undefined)
+      return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(systemEpochNs()), inZone);
     if (typeof year === "string" && month === undefined) {
       const [y, mon, mday, hour, min, sec, zoneStr] = timeInitParse(year, options.precision ?? 9);
       return new Time(y, mon, mday, hour, min, sec, zoneStr ?? inZone);
