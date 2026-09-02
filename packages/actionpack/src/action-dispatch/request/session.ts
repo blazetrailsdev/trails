@@ -430,7 +430,7 @@ export class Session {
    */
   inspect(): string {
     if (this.isLoaded()) {
-      return `#<${rubyClassPath(this.constructor)}:0x${objectIdHex(this)}>`;
+      return `#<ActionDispatch::Request::Session:0x${objectIdHex(this)}>`;
     } else {
       return `#<${rubyClassPath(this.constructor)}:0x${objectIdHex(this)} not yet loaded>`;
     }
