@@ -668,10 +668,14 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   /**
-   * Return a plain object with all string keys (Rails' symbolize_keys).
-   * In TS all keys are already strings; returns a plain object.
+   * Mirrors `symbolize_keys` (hash_with_indifferent_access.rb:318) —
+   * `to_hash.symbolize_keys!`. Ruby's `symbolize_keys!`
+   * (core_ext/hash/keys.rb:33-35) is `transform_keys!`, which mutates the
+   * receiver and answers it, so the answer is the `Hash` `to_hash` just built
+   * — carrying the default `set_defaults` gave it (:379). A Ruby Symbol is a
+   * JS string in trails, so the key transform itself is the identity.
    */
-  symbolizeKeys(): AnyObject {
+  symbolizeKeys(): Hash<string, unknown> {
     return symbolizeKeysBang(this.toHash());
   }
 
@@ -679,14 +683,15 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * `alias_method :to_options, :symbolize_keys`
    * (hash_with_indifferent_access.rb:319).
    */
-  toOptions(): AnyObject {
+  toOptions(): Hash<string, unknown> {
     return this.symbolizeKeys();
   }
 
   /**
-   * Mirrors `deep_symbolize_keys` (hash_with_indifferent_access.rb:320).
+   * Mirrors `deep_symbolize_keys` (hash_with_indifferent_access.rb:320) —
+   * `to_hash.deep_symbolize_keys!`, whose answer is that same `Hash`.
    */
-  deepSymbolizeKeys(): AnyObject {
+  deepSymbolizeKeys(): Hash<string, unknown> {
     return deepSymbolizeKeysBang(this.toHash());
   }
 
