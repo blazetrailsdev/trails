@@ -64,6 +64,7 @@ export interface ActiveSupportConfig {
 
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
+  config: { get(key: string): unknown };
   deprecators: Deprecators;
 }
 
@@ -84,25 +85,28 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_support.deprecation_behavior", (app) => {
-      const cfg = (this.config["activeSupport"] as ActiveSupportConfig | undefined) ?? {};
+      const activeSupport =
+        ((app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig | undefined) ??
+        (this.config["activeSupport"] as ActiveSupportConfig | undefined) ??
+        {};
       const deprecators = (app as TrailtieApp).deprecators;
-      if (cfg.reportDeprecations === false) {
+      if (activeSupport.reportDeprecations === false) {
         deprecators.setSilenced(true);
         deprecators.setBehavior("silence");
         deprecators.setDisallowedBehavior("silence");
       } else {
-        const deprecation = cfg.deprecation;
-        if (deprecation !== undefined) {
+        const deprecation = activeSupport.deprecation;
+        if (deprecation != null) {
           deprecators.setBehavior(deprecation);
         }
 
-        const disallowedDeprecation = cfg.disallowedDeprecation;
-        if (disallowedDeprecation !== undefined) {
+        const disallowedDeprecation = activeSupport.disallowedDeprecation;
+        if (disallowedDeprecation != null) {
           deprecators.setDisallowedBehavior(disallowedDeprecation);
         }
 
-        const disallowedWarnings = cfg.disallowedDeprecationWarnings;
-        if (disallowedWarnings !== undefined) {
+        const disallowedWarnings = activeSupport.disallowedDeprecationWarnings;
+        if (disallowedWarnings != null) {
           deprecators.setDisallowedWarnings(disallowedWarnings);
         }
       }

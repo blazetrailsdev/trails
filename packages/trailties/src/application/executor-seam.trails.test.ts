@@ -29,7 +29,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   // The initializers register the executor hooks on `ActiveSupport::Executor`
   // itself, so running them per-test would stack a second copy of every hook.
   beforeAll(() => {
-    Trailtie.runInitializers({ deprecators: new Deprecators(), config: {} });
+    Trailtie.runInitializers({ deprecators: new Deprecators(), config: { filterParameters: [] } });
   });
 
   beforeEach(async () => {
