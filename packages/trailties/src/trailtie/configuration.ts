@@ -130,9 +130,21 @@ export class Configuration {
     this._options[key] = value;
   }
 
-  /** Mirrors `respond_to?` (`railtie/configuration.rb:90-92`). */
+  /**
+   * Mirrors `respond_to?` (`railtie/configuration.rb:90-92`). Ruby's `super` is
+   * `Object#respond_to?`, which answers for public METHODS: not for an ivar
+   * like `@@options`, and not for private methods, since `include_private`
+   * defaults to false. A TS instance field is the ivar analogue, so only the
+   * prototype chain is walked, and a leading underscore is trails' spelling of
+   * Ruby `private`.
+   */
   respondTo(key: string): boolean {
-    return key in this || Object.prototype.hasOwnProperty.call(this._options, key);
+    if (!key.startsWith("_")) {
+      for (let proto = Object.getPrototypeOf(this); proto; proto = Object.getPrototypeOf(proto)) {
+        if (Object.prototype.hasOwnProperty.call(proto, key)) return true;
+      }
+    }
+    return Object.prototype.hasOwnProperty.call(this._options, key);
   }
 
   /** Mirrors the private `actual_method?` (`railtie/configuration.rb:95-97`). */

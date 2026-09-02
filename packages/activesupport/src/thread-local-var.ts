@@ -34,6 +34,15 @@ export class ThreadLocalVar<T> {
   /**
    * Set `value` for the duration of `block`, restoring the previous value
    * afterwards — `ThreadLocalVar#bind`.
+   *
+   * Ruby restores only the bound variable, so another thread-local written
+   * inside the block persists after `bind` returns. This runs the block in a
+   * forked {@link IsolatedExecutionState} scope instead, which discards every
+   * write made inside it, not just this one. The fork is load-bearing:
+   * `IsolatedExecutionState` falls back to a process-global store when no scope
+   * is open, so a mutate-and-restore `bind` would be visible to concurrent
+   * tasks across an `await` — the bug this class exists to fix. Converging the
+   * two is thread-local-var-bind-discards-unrelated-writes.
    */
   bind<R>(value: T, block: () => R): R {
     return IsolatedExecutionState.scope(this, value, block);
