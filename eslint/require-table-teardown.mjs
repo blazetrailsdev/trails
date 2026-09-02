@@ -296,8 +296,12 @@ function droppedTableNames(call) {
  * further: a computed array, a `.map(…)`, a spread, a function parameter, or
  * any element that is not a static string yields nothing, and the create such a
  * teardown would have balanced stays reported.
+ *
+ * The read must sit INSIDE the loop body. A `var` binding outlives its loop,
+ * so `for (var t of ["a", "b"]) {}` followed by `dropTable(t)` drops only the
+ * last value — crediting the whole list there would suppress a real leak.
  */
-function loopLiteralNames(variable) {
+function loopLiteralNames(variable, node) {
   if (variable === null) return [];
   const names = [];
   for (const def of variable.defs) {
@@ -308,11 +312,18 @@ function loopLiteralNames(variable) {
     if (loop?.type !== "ForOfStatement" || loop.left !== declaration) continue;
     if (declarator.id.type !== "Identifier") continue;
     if (loop.right?.type !== "ArrayExpression") continue;
+    if (!isWithin(node, loop.body)) continue;
     const elements = loop.right.elements.map((el) => (el === null ? null : staticString(el)));
     if (elements.some((name) => name === null)) continue;
     names.push(...elements);
   }
   return names;
+}
+
+/** Whether `node` sits somewhere inside `ancestor`. */
+function isWithin(node, ancestor) {
+  for (let n = node; n; n = n.parent) if (n === ancestor) return true;
+  return false;
 }
 
 /**
@@ -1196,7 +1207,7 @@ const rule = {
           for (const arg of node.arguments) {
             if (staticString(arg) !== null) continue;
             // A loop over a literal name list drops every name in it.
-            for (const table of loopLiteralNames(resolve(arg))) recordDrop(table, node);
+            for (const table of loopLiteralNames(resolve(arg), arg)) recordDrop(table, node);
             // The helper spelling of a sweep's drop half: `dropTable(row.name)`
             // names no table itself, so it arms only when its argument traces
             // back to a sink-derived row binding. A fixed name arms nothing.

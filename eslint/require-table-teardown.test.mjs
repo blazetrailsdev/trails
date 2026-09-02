@@ -582,6 +582,21 @@ tester.run("require-table-teardown", rule, {
         "});",
       errors: [{ messageId: "missingTeardown", data: { table: "widgets" }, line: 1 }],
     },
+    // A `var` binding outlives its loop, so a read AFTER the loop names only the
+    // last value — the whole list is not credited there.
+    {
+      code:
+        'await ctx.createTable("a", () => {});\n' +
+        'await ctx.createTable("b", () => {});\n' +
+        "afterEach(async () => {\n" +
+        '  for (var table of ["a", "b"]) {}\n' +
+        "  await ctx.dropTable(table);\n" +
+        "});",
+      errors: [
+        { messageId: "missingTeardown", data: { table: "a" }, line: 1 },
+        { messageId: "missingTeardown", data: { table: "b" }, line: 2 },
+      ],
+    },
     // Nor does an array literal holding a non-static element.
     {
       code:
