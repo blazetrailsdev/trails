@@ -123,8 +123,11 @@ export class EmptyCollection {
  * inference from model objects and local-variable naming helpers.
  * @internal
  */
-export interface ObjectRenderingHost extends AbstractRenderer {
+export interface ObjectRenderingHost {
+  /** Mirrors `@context_prefix` (`abstract_renderer.rb:39`). */
   contextPrefix: string;
+  /** Mirrors `@options` (`partial_renderer.rb:225`). */
+  readonly options: RenderOptions;
 }
 
 /** Cached map: `[contextPrefix][objectPath] → prefixed path`. @internal */
@@ -153,8 +156,8 @@ const OPTION_AS_ERROR_MESSAGE =
   "and is followed by any combination of letters, numbers and underscores.";
 
 /** @internal */
-export function localVariable(path: string, options: Record<string, unknown>): string {
-  const as = options["as"];
+export function localVariable(this: ObjectRenderingHost, path: string): string {
+  const as = this.options["as"];
   if (as !== undefined) {
     if (!/^[a-z_]\w*$/.test(String(as))) raiseInvalidOptionAs(as);
     return String(as);
@@ -176,7 +179,8 @@ export function raiseInvalidOptionAs(as: unknown): never {
 }
 
 /** @internal */
-export function partialPath(object: unknown, view: ViewContext, contextPrefix: string): string {
+export function partialPath(this: ObjectRenderingHost, object: unknown, view: ViewContext): string {
+  const contextPrefix = this.contextPrefix;
   const model =
     object !== null &&
     object !== undefined &&

@@ -19,6 +19,10 @@
     "total": 0,
     "byFile": {}
   },
+  "activerecord": {
+    "total": 0,
+    "byFile": {}
+  },
   "activesupport": {
     "total": 0,
     "byFile": {}
