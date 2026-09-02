@@ -45,6 +45,35 @@ export const TOKEN_RENAMES: Record<string, string> = {
 };
 
 /**
+ * Per-class TS renames that don't fit the systematic alias patterns
+ * (`Abstract<X>`, `Base<X>`, `ActiveModel<X>`, `<X>Type`). Keyed by the Ruby
+ * short name → the literal TS class name in the expected file.
+ *
+ * - `Name` → `ModelName`: Rails `ActiveModel::Name` (`naming.rb:9`). `Name`
+ *   alone is too generic in TS, where the class is a flat package export
+ *   rather than a constant nested under `ActiveModel`, so it keeps the `Model`
+ *   prefix its Ruby namespace supplies.
+ * - `Registry` → `TypeRegistry`: `ActiveModel::Type::Registry`
+ *   (`type/registry.rb:5`), same rationale under `ActiveModel::Type`.
+ * - `Railtie` → `Trailtie`: trails railties are not `Rails::Railtie`
+ *   subclasses; the pun name signals that distinction across all packages.
+ * - `Rails` → `Trails`: top-level `module Rails` (`railties/lib/rails.rb`)
+ *   maps to the `Trails` global in `packages/trailties/src/rails.ts`.
+ *
+ * Both parity tools read this one table: `parity:api` resolves the Ruby class
+ * to its TS declaration through it, and `parity:api:extra` admits the renamed
+ * spelling as the faithful port of that Ruby constant. Encoding it in only one
+ * of them is what left `ModelName` matching at 100% in the first while scoring
+ * `novel` in the second.
+ */
+export const TS_CLASS_RENAMES: Record<string, string> = {
+  Name: "ModelName",
+  Railtie: "Trailtie",
+  Rails: "Trails",
+  Registry: "TypeRegistry",
+};
+
+/**
  * Alternation built from `TOKEN_RENAMES` itself, so an entry added to the table
  * can never be dead code — the regex used to restate the token list and the two
  * drifted (the `rb` entry sat unreachable on main until #6043 widened the

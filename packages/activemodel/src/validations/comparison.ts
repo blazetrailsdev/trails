@@ -1,25 +1,12 @@
-import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "../attribute-assignment.js";
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
 import { isBlank, slice, underscore } from "@blazetrails/activesupport";
+import { cmp, rbCmpint } from "@blazetrails/ruby-compat";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";
 import type { AttrNameArg, HelperMethodsHost } from "./helper-methods.js";
-
-function hasCompareTo(value: unknown): value is { compareTo(other: unknown): number | null } {
-  return value != null && typeof (value as { compareTo?: unknown }).compareTo === "function";
-}
-
-function comparisonFailed(a: unknown, b: unknown): string {
-  const nameOf = (x: unknown) => {
-    if (x === null || x === undefined) return "NilClass";
-    if (typeof x === "number") return Number.isInteger(x) ? "Integer" : "Float";
-    return (x as object).constructor?.name ?? typeof x;
-  };
-  return `comparison of ${nameOf(a)} with ${nameOf(b)} failed`;
-}
 
 export class ComparisonValidator extends EachValidator {
   resolveValue = resolveValue;
@@ -47,8 +34,13 @@ export class ComparisonValidator extends EachValidator {
       }
 
       try {
-        const cmp = this.compare(value, optionValue);
-        if (!compareOperator(COMPARE_CHECKS[option], cmp, 0)) {
+        if (
+          !compareOperator(
+            COMPARE_CHECKS[option],
+            rbCmpint(cmp(value, optionValue), value, optionValue),
+            0,
+          )
+        ) {
           record.errors.add(
             attrName,
             `:${underscore(option)}`,
@@ -60,33 +52,6 @@ export class ComparisonValidator extends EachValidator {
         record.errors.add(attrName, e.message);
       }
     }
-  }
-
-  private compare(a: unknown, b: unknown): number {
-    if (hasCompareTo(a)) {
-      const cmp = a.compareTo(b);
-      if (cmp === null || cmp === undefined) throw new ArgumentError(comparisonFailed(a, b));
-      return cmp;
-    }
-    if (a instanceof Temporal.PlainDate && b instanceof Temporal.PlainDateTime)
-      return Temporal.PlainDateTime.compare(a.toPlainDateTime(), b);
-    if (a instanceof Temporal.PlainDateTime && b instanceof Temporal.PlainDate)
-      return Temporal.PlainDateTime.compare(a, b.toPlainDateTime());
-    if (a instanceof Temporal.Instant && b instanceof Temporal.Instant)
-      return Temporal.Instant.compare(a, b);
-    if (a instanceof Temporal.PlainDateTime && b instanceof Temporal.PlainDateTime)
-      return Temporal.PlainDateTime.compare(a, b);
-    if (a instanceof Temporal.PlainDate && b instanceof Temporal.PlainDate)
-      return Temporal.PlainDate.compare(a, b);
-    if (a instanceof Temporal.PlainTime && b instanceof Temporal.PlainTime)
-      return Temporal.PlainTime.compare(a, b);
-    if (a instanceof Temporal.ZonedDateTime && b instanceof Temporal.ZonedDateTime)
-      return Temporal.ZonedDateTime.compare(a, b);
-    if (typeof a === "number" && typeof b === "number") return a - b;
-    if (typeof a === "string" && typeof b === "string") return a < b ? -1 : a > b ? 1 : 0;
-    // boundary: comparison validator accepts Date pairs by Rails parity.
-    if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
-    throw new ArgumentError(comparisonFailed(a, b));
   }
 }
 

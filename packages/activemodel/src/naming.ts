@@ -278,16 +278,7 @@ export class ModelName {
 
 include(ModelName, ToJsonWithActiveSupportEncoder);
 
-/**
- * The JS spelling of MRI's `rb_builtin_class_name`, which is what `get_pat`
- * (string.c) interpolates into `wrong argument type %s (expected Regexp)`:
- * `nil` / `true` / `false` for the special constants, the class name
- * otherwise. JS has one numeric type where Ruby has two, so an integral
- * `number` reports `Integer` and a fractional one `Float`, as MRI does.
- *
- * @noRailsEquivalent Module-private message helper for `ModelName#match`'s
- *   ported `TypeError`; Ruby gets the class name from the object itself.
- */
+/** @noRailsEquivalent PERMANENT */
 function builtinClassName(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "boolean") return String(value);

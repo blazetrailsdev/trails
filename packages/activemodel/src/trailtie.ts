@@ -43,6 +43,7 @@ export class Trailtie extends BaseTrailtie {
     });
   }
 
+  /** @noRailsEquivalent PERMANENT */
   static initialize(config?: TrailtieConfig): void {
     const env = config?.env ?? Trailtie.detectEnv();
     SecurePassword.minCost = env === "test";

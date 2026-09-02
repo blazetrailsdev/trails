@@ -63,6 +63,7 @@ export { MutableModule } from "./type/helpers/mutable.js";
 export type { Mutable } from "./type/helpers/mutable.js";
 export { ModelName } from "./naming.js";
 export type { ModelLike } from "./naming.js";
+/** @noRailsEquivalent PERMANENT */
 export { Dirty, initAttributes as dirtyInitAttributes } from "./dirty.js";
 export type { DirtyOptions } from "./dirty.js";
 export type {
@@ -75,6 +76,7 @@ export type { SerializeOptions, SerializableHash } from "./serialization.js";
 
 export { JSON as JSONSerializer } from "./serializers/json.js";
 export { Type } from "./type/value.js";
+/** @noRailsEquivalent PERMANENT */
 export { typeRegistry } from "./type/registry.js";
 
 export { StringType } from "./type/string.js";
@@ -91,6 +93,7 @@ export { ImmutableStringType } from "./type/immutable-string.js";
 export { ValueType } from "./type/value.js";
 export { BinaryType, Data as BinaryData } from "./type/binary.js";
 export { TimeType } from "./type/time.js";
+/** @noRailsEquivalent PERMANENT */
 export {
   isUtc as isUtcTimezone,
   defaultTimezone as getDefaultTimezone,
@@ -135,6 +138,7 @@ export {
 } from "./secure-password.js";
 export { SerializeCastValue } from "./type/serialize-cast-value.js";
 export { Builder as AttributeSetBuilder } from "./attribute-set/builder.js";
+/** @noRailsEquivalent PERMANENT */
 export {
   DateInfinity,
   DateNegativeInfinity,

@@ -70,7 +70,7 @@ describe("QueryAttribute", () => {
       },
       serialize: (v: unknown) => v,
     };
-    const attr = QueryAttribute.withCastValue("name", "already-cast", trackingType);
+    const attr = new QueryAttribute("name", "raw", trackingType).withCastValue("already-cast");
     expect(attr.value).toBe("already-cast");
     expect(castCalled).toBe(false);
   });

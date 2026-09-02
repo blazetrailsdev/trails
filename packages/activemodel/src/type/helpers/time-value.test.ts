@@ -130,6 +130,15 @@ describe("fastStringToTime", () => {
     expect(i?.toString().startsWith("2026-04-26T14:23:55.123456")).toBe(true);
   });
 
+  it("returns null for a date-only string, as Time.new raises 'no time information'", () => {
+    expect(fastStringToTime("2026-04-26")).toBeNull();
+  });
+
+  it("floors a sub-second longer than nine digits at the nanosecond", () => {
+    const i = fastStringToTime("2026-04-26 14:23:55.1234567891+00:00");
+    expect(i?.toString()).toBe("2026-04-26T14:23:55.123456789Z");
+  });
+
   it("truncates a pre-1970 sub-second instant on nsec, not toward zero", () => {
     const inst = Temporal.Instant.from("1969-12-31T23:59:59.123456789Z");
     const time = new TimeType({ precision: 3 });

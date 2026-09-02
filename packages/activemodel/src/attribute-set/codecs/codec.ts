@@ -10,6 +10,7 @@ export interface AttributeSetCodec {
   decode(input: string): AttributeSetEnvelope;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class AttributeSetCodecError extends Error {
   constructor(message: string) {
     super(message);

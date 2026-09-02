@@ -38,14 +38,8 @@ export class QueryAttribute extends Attribute {
     return value;
   }
 
-  static override withCastValue(name: string, value: unknown, type: CastType): QueryAttribute {
-    const attr = new QueryAttribute(name, value, type);
-    attr.overrideCastValue(value);
-    return attr;
-  }
-
   override withCastValue(value: unknown): QueryAttribute {
-    return QueryAttribute.withCastValue(this.name, value, this.type);
+    return new QueryAttribute(this.name, value, this.type);
   }
 
   override get valueForDatabase(): unknown {

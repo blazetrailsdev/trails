@@ -151,9 +151,8 @@ describe("Attribute — trails-only coverage", () => {
   describe("Attribute#changedInPlace delegates to type.isChangedInPlace", () => {
     it("returns true when type.isChangedInPlace returns true (StringType: raw vs new value differ)", () => {
       const stringType = typeRegistry.lookup("string");
-      const attr = Attribute.fromDatabase("name", "hello", stringType);
+      const attr = Attribute.fromDatabase("name", "hello", stringType, "world");
       void attr.value;
-      attr.overrideCastValue("world");
       expect(attr.changedInPlace()).toBe(true);
     });
 

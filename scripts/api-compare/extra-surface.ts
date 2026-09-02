@@ -93,6 +93,7 @@ import { OUTPUT_DIR, TS_ONLY_PACKAGES, apiComparePackageRoots } from "./config.j
 import {
   SKIP,
   SKIP_TS_MIRROR_IS_DRIFT,
+  TS_CLASS_RENAMES,
   rubyFileToTs,
   overriddenRubyFiles,
   rubyMethodToTs,
@@ -1599,7 +1600,14 @@ function collectAllowedNames(
     // either as a real TS nested class or as `static readonly Inner = Inner`
     // re-attaching a sibling export.
     const short = fqn.split("::").pop();
-    if (short) for (const c of rubyConstantCandidates(short)) allowed.add(c);
+    if (short) {
+      for (const c of rubyConstantCandidates(short)) allowed.add(c);
+      // The renamed spelling `parity:api` already resolves this Ruby class to
+      // (`TS_CLASS_RENAMES`). Without it the two tools disagree: `naming.rb`
+      // scores 100% there while `ModelName` reads as novel surface here.
+      const renamed = TS_CLASS_RENAMES[short];
+      if (renamed !== undefined) allowed.add(renamed);
+    }
     if (nameOnly) continue;
     let target = allowed;
     if (nestedIn !== undefined && short !== undefined && scoped !== undefined) {

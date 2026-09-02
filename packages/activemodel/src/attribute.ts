@@ -51,8 +51,8 @@ export abstract class Attribute {
     return new FromUser(name, valueBeforeTypeCast, type, originalAttribute);
   }
 
-  static withCastValue(name: string, value: unknown, type: Type): WithCastValue {
-    return new WithCastValue(name, value, type);
+  static withCastValue(name: string, valueBeforeTypeCast: unknown, type: Type): WithCastValue {
+    return new WithCastValue(name, valueBeforeTypeCast, type);
   }
 
   static null(name: string): Null {
@@ -150,7 +150,7 @@ export abstract class Attribute {
   }
 
   withCastValue(value: unknown): Attribute {
-    return new WithCastValue(this.name, value, this.type);
+    return (this.constructor as typeof Attribute).withCastValue(this.name, value, this.type);
   }
 
   withType(type: Type): Attribute {
@@ -219,13 +219,6 @@ export abstract class Attribute {
     if (isDuplicable(this._value)) {
       this._value = dupValue(this._value);
     }
-  }
-
-  overrideCastValue(value: unknown): void {
-    this._value = value;
-    this._hasValue = true;
-    this._cachedValueForDatabase = undefined;
-    this._hasValueForDatabase = false;
   }
 
   withUserDefault(value: unknown): Attribute {

@@ -225,20 +225,7 @@ function isIncludeHash(value: unknown): value is Record<string, SerializeOptions
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * Recursively lazy-load every `include`d association (and nested includes) via
- * `resolveIncludeAsync`, so the subsequent sync pass finds them all loaded.
- *
- * The entry walk is `serialization.rb:188`'s own
- * `Array(includes).flat_map { |n| n.is_a?(Hash) ? n.to_a : [[n, {}]] }`, taken
- * without the `Hash[...]` that wraps it there. That wrapper only dedupes, and
- * dropping it can visit a name twice — which for a preload is a superset of the
- * work, never a miss, so the sync pass still finds everything loaded.
- * `serializableAddIncludes` keeps the wrapper, since Rails' own iteration is
- * over the deduped hash.
- *
- * @noRailsEquivalent Serves trails' awaitable `serializable_hash` (RFC 0022 b2).
- */
+/** @noRailsEquivalent CONVERGEABLE serializable-hash-async-return-boundary */
 async function preloadIncludes(
   record: SerializationRecord,
   options: SerializeOptions,

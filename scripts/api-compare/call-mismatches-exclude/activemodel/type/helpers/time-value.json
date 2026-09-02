@@ -4,6 +4,6 @@
     "tsFile": "type/helpers/time-value.ts",
     "rubyName": "fast_string_to_time",
     "call": "new",
-    "reason": "Baseline (RFC 0126): pre-existing divergence newly VISIBLE to the gate — `ownerRecordsNothing` suppressed every pair whose resolved owner is a bodyless declaration beside the file's top-level body (the trails mixin shape), so this body was never compared and never baselined. Pending per-body convergence review."
+    "reason": "Reviewed per-body: Rails builds `::Time.new(string, in: \"UTC\")` (time_value.rb:76-98) and trails' `Time.new` (packages/date/src/time.ts:611) mirrors it, but `fastStringToTime` is seated on `Temporal.Instant` — the type its callers (type/date-time.ts:52, type/time.ts:72) and the ActiveModel time types read — so swapping the seat is a return-type change tracked by `fast-string-to-time-construct-through-time-new`. The parse arms are converged against MRI here."
   }
 ]

@@ -65,7 +65,12 @@ interface CmpSpelling {
  * own `<=>` still wins, as it does in Ruby. A Temporal value carrying no
  * instant still reaches `rb_obj_cmp`;
  * `calculations.ts`'s `compare` — the one caller that orders those — hands
- * over each side's epoch reading instead.
+ * over each side's epoch reading instead, and a pair of plain Temporal values
+ * of the same shape is ordered by that shape's own `compare`, after a
+ * `PlainDate` is widened to its `PlainDateTime`: Ruby's `cmp_dd`
+ * (`date_core.c:6707-6761`) places a day against an instant on the same axis,
+ * which is what makes `Date.new(2002,3,19) == DateTime.new(2002,3,19, 0,0,0)`
+ * true.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` — the `<=>` send it is defined over
  * (`vendor/ruby/compar.c:315`), which Rails inherits rather than defines.
@@ -84,6 +89,15 @@ export function cmp(a: unknown, b: unknown): number | null {
     const y = b.epochNanoseconds;
     return x < y ? -1 : x > y ? 1 : 0;
   }
+  if (temporalTag(a) !== null && temporalTag(b) !== null) {
+    const x = widenPlainDate(a);
+    const y = widenPlainDate(b);
+    if (temporalTag(x) === temporalTag(y)) {
+      return (
+        x as { constructor: { compare(l: unknown, r: unknown): number } }
+      ).constructor.compare(x, y);
+    }
+  }
   if (typeof a === "number" || typeof a === "bigint") {
     /* `rb_int_cmp` (`vendor/ruby/numeric.c:4696`) and `flo_cmp`
        (`vendor/ruby/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
@@ -100,6 +114,24 @@ export function cmp(a: unknown, b: unknown): number | null {
      `==` operand and nil otherwise, rather than JS relational coercion, which
      orders `false` before `true` where Ruby answers nil. */
   return rbEqual(a, b) ? 0 : null;
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+function temporalTag(value: unknown): string | null {
+  const tag = (value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag];
+  return typeof tag === "string" && tag.startsWith("Temporal.") ? tag : null;
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+function widenPlainDate(value: unknown): unknown {
+  const toPlainDateTime = (value as { toPlainDateTime?: unknown }).toPlainDateTime;
+  return typeof toPlainDateTime === "function" ? toPlainDateTime.call(value) : value;
 }
 
 /**
