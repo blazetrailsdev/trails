@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { bodyFromString } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { ContentSecurityPolicyMiddleware } from "./content-security-policy.js";
-import { ContentSecurityPolicy } from "../http/content-security-policy.js";
-import { Request } from "../http/request.js";
+import { ContentSecurityPolicy, Middleware } from "./content-security-policy.js";
+import { Request } from "./request.js";
 import { CONTENT_SECURITY_POLICY, CONTENT_SECURITY_POLICY_REPORT_ONLY } from "../constants.js";
 
 const DEFAULT_CSP = "default-src 'self' https: http:";
@@ -32,7 +31,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
   // middleware end-to-end and assert it produces a CSP header without raising.
   it("rack lint", async () => {
     const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
-    const mw = new ContentSecurityPolicyMiddleware(app);
+    const mw = new Middleware(app);
     const [, headers] = await mw.call(env);
     expect(headers[CONTENT_SECURITY_POLICY]).toContain("default-src 'self'");
   });
@@ -43,7 +42,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
       { [CONTENT_SECURITY_POLICY]: DEFAULT_CSP },
       bodyFromString(""),
     ];
-    const mw = new ContentSecurityPolicyMiddleware(app);
+    const mw = new Middleware(app);
     const [, headers] = await mw.call(env);
     expect(headers[CONTENT_SECURITY_POLICY]).toBe(DEFAULT_CSP);
   });
@@ -55,7 +54,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
       { [CONTENT_SECURITY_POLICY_REPORT_ONLY]: DEFAULT_CSP },
       bodyFromString(""),
     ];
-    const mw = new ContentSecurityPolicyMiddleware(app);
+    const mw = new Middleware(app);
     const [, headers] = await mw.call(env);
     expect(headers[CONTENT_SECURITY_POLICY_REPORT_ONLY]).toBe(DEFAULT_CSP);
   });
@@ -63,7 +62,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
   it("uses report-only header when configured", async () => {
     env["action_dispatch.content_security_policy_report_only"] = true;
     const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
-    const mw = new ContentSecurityPolicyMiddleware(app);
+    const mw = new Middleware(app);
     const [, headers] = await mw.call(env);
     expect(headers[CONTENT_SECURITY_POLICY_REPORT_ONLY]).toBeDefined();
     expect(headers[CONTENT_SECURITY_POLICY]).toBeUndefined();
@@ -71,7 +70,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
 
   it("skips CSP injection on 304 Not Modified", async () => {
     const app = async (): Promise<RackResponse> => [304, {}, bodyFromString("")];
-    const mw = new ContentSecurityPolicyMiddleware(app);
+    const mw = new Middleware(app);
     const [, headers] = await mw.call(env);
     expect(headers[CONTENT_SECURITY_POLICY]).toBeUndefined();
   });
@@ -79,7 +78,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
   it("returns response unchanged when no policy is set", async () => {
     const noPolicyEnv: RackEnv = { REQUEST_METHOD: "GET", PATH_INFO: "/" };
     const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
-    const mw = new ContentSecurityPolicyMiddleware(app);
+    const mw = new Middleware(app);
     const [, headers] = await mw.call(noPolicyEnv);
     expect(headers[CONTENT_SECURITY_POLICY]).toBeUndefined();
   });
@@ -89,7 +88,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
     policy.scriptSrc("'self'");
     env["action_dispatch.content_security_policy"] = policy;
     const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
-    const mw = new ContentSecurityPolicyMiddleware(app);
+    const mw = new Middleware(app);
     const [, headers] = await mw.call(env);
     expect(headers[CONTENT_SECURITY_POLICY]).toContain("'nonce-iyhD0Yc0W+c='");
   });
@@ -127,7 +126,7 @@ describe("ContentSecurityPolicyMiddleware", () => {
     policy.styleSrc("'self'");
     env["action_dispatch.content_security_policy"] = policy;
     const app = async (): Promise<RackResponse> => [200, {}, bodyFromString("")];
-    const [, headers] = await new ContentSecurityPolicyMiddleware(app).call(env);
+    const [, headers] = await new Middleware(app).call(env);
     const header = headers[CONTENT_SECURITY_POLICY];
     expect(header).toMatch(/script-src 'self' 'nonce-/);
     expect(header).not.toMatch(/style-src 'self' 'nonce-/);

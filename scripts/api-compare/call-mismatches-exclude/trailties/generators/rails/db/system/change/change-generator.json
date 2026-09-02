@@ -2,6 +2,13 @@
   {
     "package": "trailties",
     "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_database_config",
+    "call": "template",
+    "reason": "editDatabaseConfig writes the TS config module through writeOrUpdate; trails has no config/database.yml template file to copy."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
     "rubyName": "edit_dockerfile",
     "call": "gsub_file",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

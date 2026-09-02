@@ -1,17 +1,24 @@
-// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+/**
+ * The generator's templates, mirroring
+ * `railties/lib/rails/generators/rails/authentication/templates/**.tt`. Rails
+ * keeps one `.tt` file per emitted file; trails keeps the same set as source
+ * strings so the generator ships in a single package with no runtime file
+ * reads.
+ *
+ * @noRailsEquivalent PERMANENT — the `.tt` files themselves, in the one shape
+ * a TypeScript package can carry them.
+ */
 
-exports[`AuthenticationGenerator > emits the full file set; each .ts file parses + carries no Ruby source 1`] = `
-"=== app/models/session.ts ===
-import { ApplicationRecord } from "./application-record.js";
+export const SESSION = `import { ApplicationRecord } from "./application-record.js";
 
 export class Session extends ApplicationRecord {
   static {
     this.belongsTo("user");
   }
 }
+`;
 
-=== app/models/user.ts ===
-import { ApplicationRecord } from "./application-record.js";
+export const USER = `import { ApplicationRecord } from "./application-record.js";
 
 export class User extends ApplicationRecord {
   static {
@@ -21,9 +28,9 @@ export class User extends ApplicationRecord {
     this.normalizes("email_address", { with: (e: string) => e.trim().toLowerCase() });
   }
 }
+`;
 
-=== app/models/current.ts ===
-import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
+export const CURRENT = `import { CurrentAttributes, delegate } from "@blazetrails/activesupport";
 
 export class Current extends CurrentAttributes {
   static {
@@ -31,47 +38,9 @@ export class Current extends CurrentAttributes {
     delegate(this.prototype, ["user"], { to: "session", allowNil: true });
   }
 }
+`;
 
-=== app/controllers/sessions-controller.ts ===
-import { minutes } from "@blazetrails/activesupport";
-import { ApplicationController } from "./application-controller.js";
-import { User } from "../models/user.js";
-
-export class SessionsController extends ApplicationController {
-  static {
-    (this as any).allowUnauthenticatedAccess({ only: ["new_", "create"] });
-    this.rateLimit({
-      to: 10,
-      within: minutes(3),
-      only: "create",
-      with: function (this: SessionsController) {
-        this.redirectTo("/session/new");
-      },
-    });
-  }
-
-  async new_(): Promise<void> {
-    this.render({ action: "new" });
-  }
-
-  async create(): Promise<void> {
-    const user = await User.authenticateBy(this.params.permit("email_address", "password"));
-    if (user) {
-      await (this as any).startNewSessionFor(user);
-      this.redirectTo((this as any).afterAuthenticationUrl());
-    } else {
-      this.redirectTo("/session/new");
-    }
-  }
-
-  async destroy(): Promise<void> {
-    await (this as any).terminateSession();
-    this.redirectTo("/session/new");
-  }
-}
-
-=== app/controllers/concerns/authentication.ts ===
-import { defineModule, extend, included } from "@blazetrails/activesupport";
+export const AUTHENTICATION = `import { defineModule, extend, included } from "@blazetrails/activesupport";
 import { Current } from "../../models/current.js";
 import { Session } from "../../models/session.js";
 
@@ -141,9 +110,47 @@ export const Authentication = defineModule(
     },
   },
 );
+`;
 
-=== app/controllers/passwords-controller.ts ===
+export const SESSIONS_CONTROLLER = `import { minutes } from "@blazetrails/activesupport";
 import { ApplicationController } from "./application-controller.js";
+import { User } from "../models/user.js";
+
+export class SessionsController extends ApplicationController {
+  static {
+    (this as any).allowUnauthenticatedAccess({ only: ["new_", "create"] });
+    this.rateLimit({
+      to: 10,
+      within: minutes(3),
+      only: "create",
+      with: function (this: SessionsController) {
+        this.redirectTo("/session/new");
+      },
+    });
+  }
+
+  async new_(): Promise<void> {
+    this.render({ action: "new" });
+  }
+
+  async create(): Promise<void> {
+    const user = await User.authenticateBy(this.params.permit("email_address", "password"));
+    if (user) {
+      await (this as any).startNewSessionFor(user);
+      this.redirectTo((this as any).afterAuthenticationUrl());
+    } else {
+      this.redirectTo("/session/new");
+    }
+  }
+
+  async destroy(): Promise<void> {
+    await (this as any).terminateSession();
+    this.redirectTo("/session/new");
+  }
+}
+`;
+
+export const PASSWORDS_CONTROLLER = `import { ApplicationController } from "./application-controller.js";
 import { User } from "../models/user.js";
 import { PasswordsMailer } from "../mailers/passwords-mailer.js";
 
@@ -188,9 +195,9 @@ export class PasswordsController extends ApplicationController {
     }
   }
 }
+`;
 
-=== app/channels/application-cable/connection.ts ===
-import { Session } from "../../models/session.js";
+export const CONNECTION = `import { Session } from "../../models/session.js";
 
 export class Connection {
   declare currentUser: unknown;
@@ -210,9 +217,9 @@ export class Connection {
     return null;
   }
 }
+`;
 
-=== app/mailers/passwords-mailer.ts ===
-import { ApplicationMailer } from "./application-mailer.js";
+export const PASSWORDS_MAILER = `import { ApplicationMailer } from "./application-mailer.js";
 
 export class PasswordsMailer extends ApplicationMailer {
   static reset(user: any): PasswordsMailer {
@@ -223,9 +230,9 @@ export class PasswordsMailer extends ApplicationMailer {
 
   declare user: any;
 }
+`;
 
-=== test/mailers/previews/passwords-mailer-preview.ts ===
-import { PasswordsMailer } from "../../../app/mailers/passwords-mailer.js";
+export const PASSWORDS_MAILER_PREVIEW = `import { PasswordsMailer } from "../../../app/mailers/passwords-mailer.js";
 import { User } from "../../../app/models/user.js";
 
 export class PasswordsMailerPreview {
@@ -233,5 +240,58 @@ export class PasswordsMailerPreview {
     return PasswordsMailer.reset(await User.take());
   }
 }
-"
 `;
+
+export const RESET_HTML = `<p>
+  You can reset your password within the next 15 minutes on
+  <%= linkTo("this password reset page", editPasswordUrl(user.passwordResetToken)) %>.
+</p>
+`;
+
+export const RESET_TEXT = `You can reset your password within the next 15 minutes on this password reset page:
+<%= editPasswordUrl(user.passwordResetToken) %>
+`;
+
+/**
+ * Rails template path → the file the trails app gets, and its source. Rails'
+ * `template "app/models/session.rb"` derives the destination from the
+ * template's own path (`Thor::Actions#template`); trails' destinations are
+ * `.ts` files under `dasherize`d names, so the mapping is explicit.
+ */
+export const TEMPLATES: Record<string, { destination: string; source: string }> = {
+  "app/models/session.rb": { destination: "app/models/session.ts", source: SESSION },
+  "app/models/user.rb": { destination: "app/models/user.ts", source: USER },
+  "app/models/current.rb": { destination: "app/models/current.ts", source: CURRENT },
+  "app/controllers/sessions_controller.rb": {
+    destination: "app/controllers/sessions-controller.ts",
+    source: SESSIONS_CONTROLLER,
+  },
+  "app/controllers/concerns/authentication.rb": {
+    destination: "app/controllers/concerns/authentication.ts",
+    source: AUTHENTICATION,
+  },
+  "app/controllers/passwords_controller.rb": {
+    destination: "app/controllers/passwords-controller.ts",
+    source: PASSWORDS_CONTROLLER,
+  },
+  "app/channels/application_cable/connection.rb": {
+    destination: "app/channels/application-cable/connection.ts",
+    source: CONNECTION,
+  },
+  "app/mailers/passwords_mailer.rb": {
+    destination: "app/mailers/passwords-mailer.ts",
+    source: PASSWORDS_MAILER,
+  },
+  "app/views/passwords_mailer/reset.html.erb": {
+    destination: "app/views/passwords-mailer/reset.html.tse",
+    source: RESET_HTML,
+  },
+  "app/views/passwords_mailer/reset.text.erb": {
+    destination: "app/views/passwords-mailer/reset.text.tse",
+    source: RESET_TEXT,
+  },
+  "test/mailers/previews/passwords_mailer_preview.rb": {
+    destination: "test/mailers/previews/passwords-mailer-preview.ts",
+    source: PASSWORDS_MAILER_PREVIEW,
+  },
+};

@@ -69,7 +69,7 @@ describe("AuthenticationGenerator", () => {
     makeGen().run();
     const ac = read(APP_CTRL_PATH);
     expect(parseTs(ac).diagnostics).toEqual([]);
-    expect(ac.indexOf("Authentication.includeInto")).toBeLessThan(ac.indexOf("preexisting"));
+    expect(ac.indexOf("include(this, Authentication)")).toBeLessThan(ac.indexOf("preexisting"));
   });
 
   it("no-op for missing application-controller / routes; throws clearly in JS projects", () => {
@@ -97,16 +97,16 @@ describe("AuthenticationGenerator", () => {
     expect(routes.match(/router\.resource\("session"\)/g)).toHaveLength(1);
     const ac = read(APP_CTRL_PATH);
     expect(ac.match(/import\s+\{\s*Authentication\b/g)).toHaveLength(1);
-    expect(ac).toContain("Authentication.includeInto(this);");
+    expect(ac).toContain("include(this, Authentication);");
     expect(parseTs(ac).diagnostics).toEqual([]);
   });
 
   it("repairs partial config: mixin present but import missing (and vice versa)", () => {
-    writeAC("{\n}", "{\n  static {\n    Authentication.includeInto(this);\n  }\n}");
+    writeAC("{\n}", "{\n  static {\n    include(this, Authentication);\n  }\n}");
     makeGen().run();
     const ac = read(APP_CTRL_PATH);
     expect(ac).toContain('import { Authentication } from "./concerns/authentication.js";');
-    expect(ac.match(/Authentication\.includeInto\(this\)/g)).toHaveLength(1);
+    expect(ac.match(/include\(this, Authentication\)/g)).toHaveLength(1);
     expect(parseTs(ac).diagnostics).toEqual([]);
   });
 
@@ -122,5 +122,40 @@ describe("AuthenticationGenerator", () => {
     makeGen().run();
     expect([read(APP_CTRL_PATH), read("config/routes.ts")]).toEqual([ac, rt]);
     expect(parseTs(ac).diagnostics).toEqual([]);
+  });
+
+  it("emits working method bodies, not comment stubs", () => {
+    makeGen().run({ skipMailer: false, skipActionCable: false });
+    for (const rel of TS_EMIT) {
+      const src = read(rel);
+      // A body whose only statement is a comment is the shape this generator
+      // used to emit; every method must carry real code now.
+      expect(src, rel).not.toMatch(/\{\s*\/\/[^\n]*\n\s*\}/);
+    }
+    expect(read("app/controllers/sessions-controller.ts")).toContain("User.authenticateBy(");
+    expect(read("app/controllers/concerns/authentication.ts")).toContain("Session.findBy(");
+  });
+
+  it("emits create_users and create_sessions migrations", () => {
+    const created = makeGen().run();
+    const migrations = created.filter((f) => f.startsWith("db/migrate/"));
+    expect(migrations).toHaveLength(2);
+    expect(migrations.map((f) => f.replace(/^db\/migrate\/\d+_/, ""))).toEqual([
+      "create_users.ts",
+      "create_sessions.ts",
+    ]);
+    const users = read(migrations[0]);
+    expect(users).toContain("email_address");
+    expect(users).toContain("password_digest");
+    const sessions = read(migrations[1]);
+    expect(sessions).toContain("ip_address");
+    expect(sessions).toContain("user_agent");
+  });
+
+  it("does not silently overwrite an existing file", () => {
+    write("app/models/user.ts", "// mine\n");
+    makeGen().run();
+    expect(read("app/models/user.ts")).toBe("// mine\n");
+    expect(read("app/models/session.ts")).toContain("class Session");
   });
 });

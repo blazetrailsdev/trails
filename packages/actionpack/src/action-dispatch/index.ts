@@ -71,7 +71,8 @@ export {
   type CspSymbol,
   type DirectiveValue,
 } from "./http/content-security-policy.js";
-export { ContentSecurityPolicyMiddleware } from "./middleware/content-security-policy.js";
+export { Middleware as ContentSecurityPolicyMiddleware } from "./http/content-security-policy.js";
+export { Middleware as PermissionsPolicyMiddleware } from "./http/permissions-policy.js";
 export { redirectTo, redirectBack, type RedirectResult } from "./redirect.js";
 export { FlashHash } from "./middleware/flash.js";
 export { Static, type StaticOptions } from "./middleware/static.js";
