@@ -269,17 +269,37 @@ function recordExtendsFile(
 }
 
 /**
- * src-relative file a symbol was declared in, POSIX-normalized so it can be
- * compared against a manifest `ClassInfo.file`. Returns undefined for symbols
- * declared outside `srcDir` (node_modules, other packages) — those can't be
- * matched against this package's entities anyway.
+ * File a symbol was declared in, in the spelling `resolveEntityByDeclaringFile`
+ * matches on. Three shapes, POSIX-normalized:
+ *
+ * - a bare src-relative path, comparable against a manifest `ClassInfo.file`,
+ *   when the declaration is inside `srcDir`;
+ * - `pkg:<package>:<src-relative path>` when it is another workspace package's
+ *   `src` or its built `dist/*.d.ts` — a cross-package edge (`AR::Base extends
+ *   AM::Model`), whose real counterpart is that package's entity;
+ * - `external:` when it resolves outside the workspace entirely — a TypeScript
+ *   lib global (`class X extends Error`) or a node_modules type. No package
+ *   entity is that name, so the walk must follow nothing.
+ *
+ * Returning undefined only for a symbol with no declaration at all is what
+ * lets the resolver tell "unresolved, fall back to proximity" apart from
+ * "resolved, and the answer is outside this package" (RFC 0126) — the latter
+ * used to arrive as a warned ambiguity that dropped the edge silently.
  */
 function declaringFile(sym: ts.Symbol | undefined, srcDir: string): string | undefined {
   const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
   if (!decl) return undefined;
-  const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
-  if (declFile.startsWith("..")) return undefined;
-  return declFile;
+  const abs = decl.getSourceFile().fileName.replace(/\\/g, "/");
+  const declFile = path.relative(srcDir, abs).replace(/\\/g, "/");
+  if (!declFile.startsWith("..")) return declFile;
+  // `srcDir` is `<root>/packages/<pkg>/src`, so its grandparent is the
+  // workspace's packages directory — where a sibling package's own src (or the
+  // `dist/*.d.ts` a cross-package import actually resolves through) lives.
+  const packagesDir = path.posix.dirname(path.posix.dirname(srcDir.replace(/\\/g, "/")));
+  const rel = path.posix.relative(packagesDir, abs);
+  const m = /^([^./][^/]*)\/(?:src|dist)\/(.+)$/.exec(rel);
+  if (!m) return "external:";
+  return `pkg:${m[1]}:${m[2].replace(/\.d\.ts$/, ".ts")}`;
 }
 
 function resolveDeclarationSymbol(checker: ts.TypeChecker, node: ts.Node): ts.Symbol | undefined {
@@ -2887,6 +2907,12 @@ function extractInterface(
                   params: [],
                   line: 0,
                   file,
+                  // An interface declares no bodies, so a member arriving
+                  // through `Extended<>` / `Included<>` is as bodyless as one
+                  // written `foo(): void` below — see `MethodInfo.bodyless` and
+                  // `ownersWithBodies`. Without this the host interface
+                  // outranks the real body in call-parity pairing.
+                  bodyless: true,
                   ...(foreign ? { declaredIn: propDeclFile } : {}),
                   ...(propVisibility !== "public" ||
                   (propDecl !== undefined && internalJsDocTagApplies(propDecl))

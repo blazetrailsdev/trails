@@ -413,15 +413,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
       "own YAML tag. Psych is unported.",
   },
   {
-    testFile: "inflector_test.rb",
-    tests: ["constantize", "safe constantize"],
-    reason:
-      "Both run the shared `run_constantize_tests_on` block, which resolves nested Ruby " +
-      "constant paths (`Ace::Base::Case`, `::Ace`) through `Object.const_get` and asserts " +
-      "the NameError/`nil` arms of inflector/methods.rb:289-311. JS has no global constant " +
-      "namespace to look a dotted path up in.",
-  },
-  {
     testFile: "core_ext/object/inclusion_test.rb",
     tests: ["in module"],
     reason:

@@ -1380,6 +1380,53 @@ describe("resolveEntityByDeclaringFile", () => {
     expect(resolveEntityByDeclaringFile([], "a.ts", "b.ts")).toBeNull();
   });
 
+  it("follows nothing when the name resolved outside the workspace", () => {
+    // `class Cleaner extends Error` binds lib.es5.d.ts, so neither same-named
+    // package entity is the parent — and it is not an ambiguity to warn about.
+    const a = entity("errors.ts", "Error");
+    const b = entity("connection-adapters/errors.ts", "Error");
+    const seen: ClassInfo[][] = [];
+    expect(
+      resolveEntityByDeclaringFile([a, b], "cleaner.ts", "external:", (c) => seen.push(c)),
+    ).toBeNull();
+    expect(seen).toEqual([]);
+  });
+
+  it("binds the dep package's entity for a cross-package edge", () => {
+    // `AR::Base extends AM::Model`: activerecord and activemodel both carry a
+    // `model.ts`, and only the recorded package separates them.
+    const own = entity("model.ts", "Model");
+    const dep = entity("model.ts", "Model");
+    const pkgOf = (c: ClassInfo) => (c === dep ? "activemodel" : "activerecord");
+    expect(
+      resolveEntityByDeclaringFile(
+        [own, dep],
+        "base.ts",
+        "pkg:activemodel:model.ts",
+        undefined,
+        undefined,
+        pkgOf,
+      ),
+    ).toBe(dep);
+  });
+
+  it("falls back to the dep package's same-named entity when the file differs", () => {
+    // The dist `.d.ts` a cross-package import resolves through can sit at a
+    // path the manifest spells differently; the package still separates.
+    const dep = entity("core-ext/module.ts", "Module");
+    const pkgOf = () => "ruby-compat";
+    expect(
+      resolveEntityByDeclaringFile(
+        [entity("module.ts", "Module"), dep],
+        "concern.ts",
+        "pkg:ruby-compat/nope.ts".replace("/", ":"),
+        undefined,
+        undefined,
+        (c) => (c === dep ? pkgOf() : "activesupport"),
+      ),
+    ).toBe(dep);
+  });
+
   it("prefers the candidate whose file the extends clause resolved to", () => {
     // Proximity alone picks the sibling under `postgresql/`; the recorded
     // declaring file says the `extends` actually bound the abstract one.

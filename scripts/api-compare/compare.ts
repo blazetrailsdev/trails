@@ -2954,6 +2954,7 @@ export function buildEntitiesByName(
   pkg: string,
   ts: ApiManifest,
   foreign?: Set<ClassInfo>,
+  pkgOf?: Map<ClassInfo, string>,
 ): Map<string, ClassInfo[]> {
   const map = new Map<string, ClassInfo[]>();
 
@@ -2965,6 +2966,7 @@ export function buildEntitiesByName(
     if (!p) return;
     for (const entity of [...Object.values(p.classes), ...Object.values(p.modules)]) {
       if (isFixture(entity)) continue;
+      pkgOf?.set(entity, pkgKey);
       if (pkgKey !== pkg) foreign?.add(entity);
       const list = map.get(entity.name) ?? [];
       list.push(entity);
@@ -3020,14 +3022,35 @@ export function buildEntitiesByName(
  * cross-package walk exists for (`AR::Base extends AM::Model`, AR
  * `type/text.ts` extends AM `type/string.ts`).
  */
+/** `declaringFile`'s marker for a symbol resolved outside the workspace. */
+export const EXTERNAL_DECL_FILE = "external:";
+
+/** `declaringFile`'s prefix for `pkg:<package>:<src-relative path>`. */
+export const PKG_DECL_PREFIX = "pkg:";
+
 export function resolveEntityByDeclaringFile(
   candidates: ClassInfo[],
   childFile: string,
   declFile?: string,
   onAmbiguous?: (candidates: ClassInfo[]) => void,
   isForeign?: (candidate: ClassInfo) => boolean,
+  packageOf?: (candidate: ClassInfo) => string | undefined,
 ): ClassInfo | null {
   if (candidates.length === 0) return null;
+  // `external:` is a resolved answer, not a missing one: the name is a
+  // TypeScript lib global or a node_modules type, so no package entity is it
+  // and the walk must follow nothing — reporting it as ambiguous would put a
+  // `class X extends Error` in a warning nobody can act on (RFC 0126).
+  if (declFile === EXTERNAL_DECL_FILE) return null;
+  if (declFile?.startsWith(PKG_DECL_PREFIX)) {
+    const [depPkg, ...rest] = declFile.slice(PKG_DECL_PREFIX.length).split(":");
+    const depFile = rest.join(":");
+    return (
+      candidates.find((c) => packageOf?.(c) === depPkg && c.file === depFile) ??
+      candidates.find((c) => packageOf?.(c) === depPkg) ??
+      null
+    );
+  }
   if (candidates.length === 1) return candidates[0];
   if (declFile) {
     const exact = candidates.find((c) => c.file === declFile);
@@ -3444,12 +3467,16 @@ export function main() {
 
     // Propagate inherited methods transitively: follows both class `superclass`
     // and interface/module `extends` chains.
+    // Inheritance edges the walk followed to NOTHING, gated only-shrink by
+    // lint-ambiguous-parents.ts (RFC 0126).
+    let ambiguousParentCount = 0;
     if (tsPkg) {
       // Key by short name → entity for superclass/extends resolution.
       // Includes dep-package entities so walks can cross package boundaries
       // (e.g. AR Base extends AM Model).
       const foreignEntities = new Set<ClassInfo>();
-      const entitiesByName = buildEntitiesByName(pkg, ts, foreignEntities);
+      const entityPackages = new Map<ClassInfo, string>();
+      const entitiesByName = buildEntitiesByName(pkg, ts, foreignEntities, entityPackages);
 
       const entityKey = (e: ClassInfo) => `${e.file}:${e.name}`;
 
@@ -3462,6 +3489,7 @@ export function main() {
           declFile,
           (cands) => ambiguousParents.set(name, cands.length),
           (c) => foreignEntities.has(c),
+          (c) => entityPackages.get(c),
         );
 
       const inheritedCache = new Map<string, Set<string>>();
@@ -3505,6 +3533,7 @@ export function main() {
         tsMethodsByFile.set(entity.file, fileMethods);
       }
 
+      ambiguousParentCount = ambiguousParents.size;
       if (ambiguousParents.size > 0) {
         const names = [...ambiguousParents.keys()].sort((a, b) => a.localeCompare(b));
         console.warn(
@@ -4771,6 +4800,7 @@ export function main() {
       excludedFiles: [...excludedFiles].sort(),
       files: fileResults,
       inheritance,
+      ambiguousParents: ambiguousParentCount,
       arity: {
         compared: arityCompared,
         forwardingSkipped: arityForwardingSkipped,
@@ -4869,6 +4899,23 @@ export function main() {
       null,
       2,
     ),
+  );
+
+  // The ambiguous-parent artifact the RFC 0126 mark gate
+  // (lint-ambiguous-parents.ts) measures: unresolved inheritance edges per
+  // package. Packages at zero are omitted so the file IS the remainder.
+  fs.writeFileSync(
+    path.join(OUTPUT_DIR, `ambiguous-parents${modeSuffix}.json`),
+    JSON.stringify(
+      Object.fromEntries(
+        results
+          .filter((r) => r.ambiguousParents > 0)
+          .map((r) => [r.package, r.ambiguousParents])
+          .sort(([a], [b]) => String(a).localeCompare(String(b))),
+      ),
+      null,
+      2,
+    ) + "\n",
   );
 
   // Advisory parameter-name artifact — always written; flat across packages;

@@ -398,6 +398,24 @@ describe("rubyFileToTs", () => {
     );
   });
 
+  it("flattens a nested rails/commands/<dir>/<dir>_command.rb onto commands/<dir>.ts", () => {
+    expect(rubyFileToTs("commands/routes/routes_command.rb", "trailties")).toBe(
+      "commands/routes.ts",
+    );
+    expect(rubyFileToTs("commands/unused_routes/unused_routes_command.rb", "trailties")).toBe(
+      "commands/unused-routes.ts",
+    );
+  });
+
+  it("leaves a commands/ path that is not the nested-and-suffixed shape alone", () => {
+    expect(rubyFileToTs("commands/rake/rake_command.rb", "trailties")).toBe("commands/rake.ts");
+    // Directory and stem disagree, so the flattening rule does not fire.
+    expect(rubyFileToTs("commands/db/dbconsole_command.rb", "trailties")).toBe(
+      "commands/db/dbconsole-command.ts",
+    );
+    expect(rubyFileToTs("commands/helper.rb", "trailties")).toBe("commands/helper.ts");
+  });
+
   it("aliases `railtie` basename → `trailtie` across all framework source roots", () => {
     // The path-segment alias table applies globally — no per-package
     // override needed. Any framework's `railtie.rb` maps to `trailtie.ts`.

@@ -323,6 +323,23 @@ export function hasRubyFileTsOverride(rubyFile: string, pkg?: string): boolean {
 }
 
 /**
+ * Rails nests each command one directory deep and suffixes the file —
+ * `rails/commands/routes/routes_command.rb`,
+ * `rails/commands/unused_routes/unused_routes_command.rb` — while trails
+ * flattens both onto `commands/<name>.ts`. Only the nested-and-suffixed shape
+ * matches, and only when the directory and the file's stem agree, so
+ * `commands/rake/rake_command.rb` maps and a stray `commands/foo/bar.rb` does
+ * not.
+ *
+ * Returns undefined for every other path, leaving the kebab-case rule alone.
+ */
+export function railsCommandFileToTs(rubyFile: string): string | undefined {
+  const m = /^commands\/([a-z0-9_]+)\/([a-z0-9_]+)_command\.rb$/.exec(rubyFile);
+  if (!m || m[1] !== m[2]) return undefined;
+  return `commands/${applyFileTokenRenames(m[1].replace(/_/g, "-"))}.ts`;
+}
+
+/**
  * Ruby file path → expected TS file path (kebab-case, .ts extension).
  *
  * Uses `path.posix.*` so the mapping stays cross-platform stable —
@@ -333,6 +350,8 @@ export function hasRubyFileTsOverride(rubyFile: string, pkg?: string): boolean {
 export function rubyFileToTs(rubyFile: string, pkg?: string): string {
   const override = rubyFileTsOverride(rubyFile, pkg);
   if (override !== undefined) return override;
+  const command = railsCommandFileToTs(rubyFile);
+  if (command !== undefined) return command;
   const dir = path.posix.dirname(rubyFile);
   const base = path.posix.basename(rubyFile, ".rb");
   const aliasedBase = PATH_SEGMENT_ALIASES[base] ?? base;
@@ -1784,6 +1803,13 @@ applied first (trails railties are not \`Rails::Railtie\` subclasses):
 | Ruby segment | trails segment |
 | ------------ | -------------- |
 ${pathAliasRows}
+
+Rails nests each command one directory deep and suffixes the file; trails
+flattens both segments onto one file, so
+\`commands/<dir>/<dir>_command.rb\` → \`commands/<dir kebab-cased>.ts\`
+(\`commands/unused_routes/unused_routes_command.rb\` →
+\`commands/unused-routes.ts\`). The directory and the file's stem must agree;
+anything else takes the plain kebab-case rule.
 
 ## Skipped methods
 

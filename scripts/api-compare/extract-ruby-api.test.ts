@@ -1635,6 +1635,10 @@ describe(
       notes?: string;
       visibility: string;
       params: { kind: string }[];
+      calls?: string[];
+      callArgs?: { name: string; args: string[] }[];
+      skeleton?: string[];
+      bodyDigest?: string;
     };
 
     // Returns "<fqn>" -> instance methods, so a test can assert both the
@@ -1898,6 +1902,64 @@ describe(
         "create_table",
         "add_column",
       ]);
+    });
+
+    // The class_eval-with-a-string-template half of RFC 0126: the template is
+    // re-parsed per member so the generated body reaches record_body_facts the
+    // way a literal `def`'s does. `command_recorder.rb:125-131` is the live
+    // population — 43 methods whose body is `record(:"#{method}", args, &block)`.
+    it("records the calls a class_eval template body makes", () => {
+      const m = metaMethods(`
+      module ActiveRecord
+        class Migration
+          class CommandRecorder
+            ReversibleAndIrreversibleMethods = [:create_table, :add_column]
+
+            ReversibleAndIrreversibleMethods.each do |method|
+              class_eval <<-EOV, __FILE__, __LINE__ + 1
+                def #{method}(*args, &block)
+                  record(:"#{method}", args, &block)
+                end
+              EOV
+            end
+          end
+        end
+      end
+    `);
+      const created = m["ActiveRecord::Migration::CommandRecorder"].find(
+        (x) => x.name === "create_table",
+      )!;
+      expect(created.calls).toEqual(["record"]);
+      expect(created.callArgs?.[0]).toMatchObject({
+        name: "record",
+        args: ["sym:create_table", "id:args"],
+      });
+      expect(created.skeleton).toEqual(["ref:record"]);
+      expect(created.bodyDigest).toBeTypeOf("string");
+      // Each member gets its OWN body: the symbol argument follows the name.
+      expect(
+        m["ActiveRecord::Migration::CommandRecorder"].find((x) => x.name === "add_column")!
+          .callArgs?.[0].args,
+      ).toEqual(["sym:add_column", "id:args"]);
+    });
+
+    it("records no body facts for a class_eval template that does not parse standalone", () => {
+      const m = metaMethods(`
+      module Sample
+        [:alpha, :beta].each do |name|
+          class_eval <<-EOV, __FILE__, __LINE__ + 1
+            def #{name}
+              record(:#{name})
+            end
+            end
+          EOV
+        end
+      end
+    `);
+      const alpha = m["Sample"].find((x) => x.name === "alpha")!;
+      expect(alpha.notes).toBe("class_eval");
+      expect(alpha.calls).toBeUndefined();
+      expect(alpha.bodyDigest).toBeUndefined();
     });
 
     it("unrolls a constant-array each loop whose template is a define_method", () => {
@@ -2891,6 +2953,25 @@ describe("Ruby extractor Struct.new members", { timeout: RUBY_SUBPROCESS_TIMEOUT
       "to_table=",
       "options",
       "options=",
+      "initialize",
+    ]);
+  });
+
+  // `ContentTypeHeader = Struct.new :mime_type, :charset`
+  // (actionpack/lib/action_dispatch/http/response.rb:434) is the paren-less
+  // command form, which Ripper parses as `:command_call` rather than
+  // `:method_add_arg` — it fell through to the plain-descent arm.
+  it("records the members of a paren-less CONST = Struct.new command", () => {
+    const out = structMembers(`
+      module Ns
+        ContentTypeHeader = Struct.new :mime_type, :charset
+      end
+    `);
+    expect(out["Ns::ContentTypeHeader"]).toEqual([
+      "mime_type",
+      "mime_type=",
+      "charset",
+      "charset=",
       "initialize",
     ]);
   });

@@ -202,11 +202,7 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "adapter_test.rb",
     className: "AdapterConnectionTest",
-    tests: [
-      "transaction restores after remote disconnection",
-      "active transaction is restored after remote disconnection",
-      "dirty transaction cannot be restored after remote disconnection",
-    ],
+    tests: ["transaction restores after remote disconnection"],
     reason:
       "These tests call the `remote_disconnect` helper, which only supports " +
       'PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip("remote_disconnect ' +
@@ -269,7 +265,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     tests: [
       "symbol for class name",
       "name error from incidental code is not converted to name error for association",
-      "automatic inverse suppresses name error for association",
       "automatic inverse does not suppress name error from incidental code",
     ],
     reason:
@@ -324,7 +319,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "associations spanning cross modules",
       "find account and include company",
       "eager loading in modules",
-      "compute type can infer class name of sibling inside module",
     ],
     reason:
       "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. " +
@@ -365,17 +359,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     ],
     reason:
       "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js.",
-  },
-  {
-    testFile: "connection_pool_test.rb",
-    tests: ["new connection no query"],
-    reason: "Rails skips this test when in_memory_db? is true; TS always uses :memory: SQLite.",
-  },
-  {
-    testFile: "disconnected_test.rb",
-    tests: ["reconnects to execute statements when disconnected"],
-    reason:
-      "Rails wraps this entire test in `unless in_memory_db?`; TS always uses :memory: SQLite.",
   },
   {
     testFile: "connection_management_test.rb",
@@ -531,35 +514,53 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
-    testFile: "adapters/postgresql/hstore_test.rb",
-    tests: ["yaml round trip with store accessors"],
-    reason:
-      "Ruby YAML/Marshal round-trip of an AR instance with hstore store accessors. " +
-      "Node.js has no YAML.dump/Marshal.dump for ActiveRecord records.",
-  },
-  {
     testFile: "serialized_attribute_test.rb",
     tests: [
       "serialized class attribute",
       "serialized class does not become frozen",
       "serialized attribute should raise exception on assignment with wrong type",
-      "serialized attribute with class constraint",
-      "where by serialized attribute with array",
-      "where by serialized attribute with hash",
-      "where by serialized attribute with hash in array",
-      "serialize attribute via select method when time zone available",
-      "serialize attribute can be serialized in an integer column",
       "classes without no arg constructors are not supported",
       "is not changed when stored blob",
       "is not changed when stored in blob frozen payload",
       "decorated type with type for attribute",
       "decorated type with decorator block",
       "serialized attribute works under concurrent initial access",
-      "serialized time attribute",
       "supports permitted classes for default column serializer",
     ],
     reason:
       "YAML/Psych column serialization and class-constrained serializers — Ruby-only format with no Node.js equivalent.",
+  },
+  // `SerializedAttributeTestWithYamlSafeLoad < SerializedAttributeTest`
+  // (serialized_attribute_test.rb:579) re-runs the whole suite under Psych
+  // safe_load. Only the safe_load arm is out of reach — the base class's
+  // versions of these are ported live in the `SerializedAttributeTest`
+  // describe — so the exclusion is scoped to the subclass rather than
+  // silently subtracting the ported test too (RFC 0126).
+  {
+    testFile: "serialized_attribute_test.rb",
+    className: "SerializedAttributeTestWithYamlSafeLoad",
+    tests: [
+      "serialized attribute with class constraint",
+      "where by serialized attribute with array",
+      "where by serialized attribute with hash",
+      "where by serialized attribute with hash in array",
+      "serialize attribute can be serialized in an integer column",
+      "serialized time attribute",
+    ],
+    reason:
+      "Psych safe_load re-run of tests the base class ports live; only the " +
+      "permitted-classes YAML arm has no Node.js equivalent.",
+  },
+  // The mirror case: the base class's version is the one out of reach (it
+  // needs `with_timezone_config aware_attributes:` over a Ruby MyObject
+  // serializer), while the subclass's Hash-typed rewrite is ported live.
+  {
+    testFile: "serialized_attribute_test.rb",
+    className: "SerializedAttributeTest",
+    tests: ["serialize attribute via select method when time zone available"],
+    reason:
+      "Serializes a Ruby MyObject through Psych under aware_attributes; the " +
+      "subclass's Hash-typed rewrite of the same test is ported.",
   },
   {
     testFile: "base_test.rb",
@@ -773,20 +774,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
 
   // --- globalid: Ruby-Marshal exact-token assertion ---
-  {
-    testFile: "verifier_test.rb",
-    className: "VerifierTest",
-    tests: ["generates URL-safe messages"],
-    reason:
-      "Asserts byte-for-byte equality against a known token produced by " +
-      "Ruby's Marshal serializer wrapped in MessageVerifier. Our globalid " +
-      "Verifier uses JSON serialization (the default for our MessageVerifier), " +
-      "so the encoded payload differs structurally — the same input produces " +
-      "a different (but equivalent) token. The behavioral guarantee this " +
-      "test cares about (urlsafe encoding, no +/=/ chars) is covered by " +
-      "packages/globalid/src/verifier.test.ts asserting char-class absence " +
-      "rather than exact bytes.",
-  },
 
   // --- activesupport: legacy Ruby-Marshal ciphertext ---
   {
@@ -838,29 +825,12 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "association cache. Ruby Marshal binary serialization has no Node.js equivalent.",
   },
   {
-    testFile: "associations/inverse_associations_test.rb",
-    tests: ["has many and belongs to should find inverse automatically for model in module"],
-    reason:
-      "Asserts automatic inverse_of detection for namespaced models " +
-      "(Admin::Account / Admin::User). Ruby modules (`::`) have no TypeScript " +
-      "equivalent — JS class names cannot contain `::`, so the demodulized " +
-      "automatic-inverse scenario isn't representable.",
-  },
-  {
     testFile: "associations_test.rb",
     tests: ["pretty print does not reload a not yet loaded target"],
     reason:
       "Uses Ruby's PP.pp / pretty_print over a not-yet-loaded collection proxy " +
       "(associations_test.rb). Ruby's pretty-printer has no Node.js equivalent; " +
       "the inspect-without-reload behavior is covered by the inspect test.",
-  },
-  {
-    testFile: "associations_test.rb",
-    tests: ["proxy object can be stubbed"],
-    reason:
-      "Stubs a collection proxy via Mocha (`.stubs(...)`) to assert the proxy " +
-      "forwards to the stub. Ruby Mocha test-double infrastructure has no " +
-      "Node.js equivalent.",
   },
   // --- Cross-version Psych/YAML schema-cache deserialization ---
   {
@@ -884,15 +854,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "(test_yaml_dump_and_load[_with_gzip], which use our own dump path).",
   },
   // --- Thread.new / Thread.kill / GVL concurrency ---
-  {
-    testFile: "prepared_statement_status_test.rb",
-    tests: ["prepared statement status is thread and instance specific"],
-    reason:
-      "Spawns two Ruby Threads and asserts PreparedStatementStatus is isolated " +
-      "per thread+instance via fiber-local state under the GVL " +
-      "(prepared_statement_status_test.rb:9-40). Node.js has no shared-memory " +
-      "Thread model; worker threads use isolated heaps.",
-  },
   {
     testFile: "transactions_test.rb",
     tests: [
@@ -979,14 +940,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Provokes a MySQL deadlock across two Ruby Threads " +
       "(transaction_test.rb:38-60). A deadlock requires genuine concurrency; " +
-      "single-threaded JS cannot reproduce it.",
-  },
-  {
-    testFile: "adapters/postgresql/transaction_test.rb",
-    tests: ["raises Deadlocked when a deadlock is encountered"],
-    reason:
-      "Provokes a PostgreSQL deadlock across two Ruby Threads " +
-      "(transaction_test.rb:38-50). A deadlock requires genuine concurrency; " +
       "single-threaded JS cannot reproduce it.",
   },
   // --- fork() / pid ---
