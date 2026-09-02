@@ -452,21 +452,9 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       const modelClass = target._model as typeof Base;
 
       if (modelClass._scopes.has(prop)) {
-        return (...args: any[]) => {
-          const scopeFn = modelClass._scopes.get(prop)!;
-          const result = target._execScope(...args, scopeFn);
-          const extensions = modelClass._scopeExtensions?.get(prop);
-          if (extensions && result && typeof result === "object") {
-            if (typeof result.extendingBang === "function") {
-              result.extendingBang(extensions);
-            } else {
-              for (const [name, fn] of Object.entries(extensions)) {
-                result[name] = fn.bind(result);
-              }
-            }
-          }
-          return result;
-        };
+        const scopeMethod = modelClass._scopes.get(prop)!;
+        return (...args: any[]) =>
+          scopeMethod.apply(Object.create(modelClass, { all: { value: () => target } }), args);
       }
 
       if (target._loaded) {

@@ -66,7 +66,7 @@ import {
   parameterFilter as _parameterFilter,
   parameterFilterFor as _parameterFilterFor,
 } from "./filter-parameters.js";
-import { ContentSecurityPolicyRequest as CspRequest } from "./content-security-policy.js";
+import { Request as CspRequest } from "./content-security-policy.js";
 import { QueryParser } from "./query-parser.js";
 import { X_CASCADE } from "../constants.js";
 import type { PermissionsPolicy } from "../permissions-policy.js";

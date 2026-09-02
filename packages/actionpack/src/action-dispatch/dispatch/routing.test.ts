@@ -11,6 +11,11 @@ afterEach(() => {
   controllerConstants.delete("posts");
 });
 
+/** `"controller#action"` for a recognised route — Rails' `@response.body` in
+ *  `routing_test.rb`, whose controllers echo exactly that. */
+const routeSpec = (match: ReturnType<RouteSet["recognize"]>): string =>
+  `${match!.route.controller}#${match!.route.action}`;
+
 // ==========================================================================
 // Journey::Route tests (journey/route_test.rb)
 // ==========================================================================
@@ -1843,24 +1848,99 @@ describe("TestRoutingMapper", () => {
     );
   });
 
-  it.skip("namespaced shallow routes with module option", () => {
-    // namespace() does not accept options object — only (name, callback) signature supported
+  it("namespaced shallow routes with module option", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.namespace("foo", { module: "bar" }, (r) => {
+        r.resources("posts", { only: ["index", "show"] }, (r) => {
+          r.resources("comments", { only: ["index", "show"], shallow: true });
+        });
+      });
+    });
+    expect(routes.pathFor("foo_posts")).toBe("/foo/posts");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts"))).toBe("bar/posts#index");
+    expect(routes.pathFor("foo_post", { id: "1" })).toBe("/foo/posts/1");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts/1"))).toBe("bar/posts#show");
+    expect(routes.pathFor("foo_post_comments", { post_id: "1" })).toBe("/foo/posts/1/comments");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts/1/comments"))).toBe("bar/comments#index");
+    expect(routes.pathFor("foo_comment", { id: "2" })).toBe("/foo/comments/2");
+    expect(routeSpec(routes.recognize("GET", "/foo/comments/2"))).toBe("bar/comments#show");
   });
 
-  it.skip("namespaced shallow routes with path option", () => {
-    // namespace() does not accept options object — only (name, callback) signature supported
+  it("namespaced shallow routes with path option", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.namespace("foo", { path: "bar" }, (r) => {
+        r.resources("posts", { only: ["index", "show"] }, (r) => {
+          r.resources("comments", { only: ["index", "show"], shallow: true });
+        });
+      });
+    });
+    expect(routes.pathFor("foo_posts")).toBe("/bar/posts");
+    expect(routeSpec(routes.recognize("GET", "/bar/posts"))).toBe("foo/posts#index");
+    expect(routes.pathFor("foo_post", { id: "1" })).toBe("/bar/posts/1");
+    expect(routeSpec(routes.recognize("GET", "/bar/posts/1"))).toBe("foo/posts#show");
+    expect(routes.pathFor("foo_post_comments", { post_id: "1" })).toBe("/bar/posts/1/comments");
+    expect(routeSpec(routes.recognize("GET", "/bar/posts/1/comments"))).toBe("foo/comments#index");
+    expect(routes.pathFor("foo_comment", { id: "2" })).toBe("/bar/comments/2");
+    expect(routeSpec(routes.recognize("GET", "/bar/comments/2"))).toBe("foo/comments#show");
   });
 
-  it.skip("namespaced shallow routes with as option", () => {
-    // namespace() does not accept options object — only (name, callback) signature supported
+  it("namespaced shallow routes with as option", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.namespace("foo", { as: "bar" }, (r) => {
+        r.resources("posts", { only: ["index", "show"] }, (r) => {
+          r.resources("comments", { only: ["index", "show"], shallow: true });
+        });
+      });
+    });
+    expect(routes.pathFor("bar_posts")).toBe("/foo/posts");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts"))).toBe("foo/posts#index");
+    expect(routes.pathFor("bar_post", { id: "1" })).toBe("/foo/posts/1");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts/1"))).toBe("foo/posts#show");
+    expect(routes.pathFor("bar_post_comments", { post_id: "1" })).toBe("/foo/posts/1/comments");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts/1/comments"))).toBe("foo/comments#index");
+    expect(routes.pathFor("bar_comment", { id: "2" })).toBe("/foo/comments/2");
+    expect(routeSpec(routes.recognize("GET", "/foo/comments/2"))).toBe("foo/comments#show");
   });
 
-  it.skip("namespaced shallow routes with shallow path option", () => {
-    // namespace() does not accept options object — only (name, callback) signature supported
+  it("namespaced shallow routes with shallow path option", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.namespace("foo", { shallowPath: "bar" }, (r) => {
+        r.resources("posts", { only: ["index", "show"] }, (r) => {
+          r.resources("comments", { only: ["index", "show"], shallow: true });
+        });
+      });
+    });
+    expect(routes.pathFor("foo_posts")).toBe("/foo/posts");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts"))).toBe("foo/posts#index");
+    expect(routes.pathFor("foo_post", { id: "1" })).toBe("/foo/posts/1");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts/1"))).toBe("foo/posts#show");
+    expect(routes.pathFor("foo_post_comments", { post_id: "1" })).toBe("/foo/posts/1/comments");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts/1/comments"))).toBe("foo/comments#index");
+    expect(routes.pathFor("foo_comment", { id: "2" })).toBe("/bar/comments/2");
+    expect(routeSpec(routes.recognize("GET", "/bar/comments/2"))).toBe("foo/comments#show");
   });
 
-  it.skip("namespaced shallow routes with shallow prefix option", () => {
-    // namespace() does not accept options object — only (name, callback) signature supported
+  it("namespaced shallow routes with shallow prefix option", () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.namespace("foo", { shallowPrefix: "bar" }, (r) => {
+        r.resources("posts", { only: ["index", "show"] }, (r) => {
+          r.resources("comments", { only: ["index", "show"], shallow: true });
+        });
+      });
+    });
+    expect(routes.pathFor("foo_posts")).toBe("/foo/posts");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts"))).toBe("foo/posts#index");
+    expect(routes.pathFor("foo_post", { id: "1" })).toBe("/foo/posts/1");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts/1"))).toBe("foo/posts#show");
+    expect(routes.pathFor("foo_post_comments", { post_id: "1" })).toBe("/foo/posts/1/comments");
+    expect(routeSpec(routes.recognize("GET", "/foo/posts/1/comments"))).toBe("foo/comments#index");
+    expect(routes.pathFor("bar_comment", { id: "2" })).toBe("/foo/comments/2");
+    expect(routeSpec(routes.recognize("GET", "/foo/comments/2"))).toBe("foo/comments#show");
   });
 
   it.skip("optional scoped root multiple choice", () => {

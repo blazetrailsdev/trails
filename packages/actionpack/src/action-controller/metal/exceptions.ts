@@ -17,8 +17,8 @@ export class ActionControllerError extends Error {
 }
 
 export class BadRequest extends ActionControllerError {
-  constructor(message?: string) {
-    super(message);
+  constructor(msg?: string) {
+    super(msg);
     this.name = "BadRequest";
   }
 }
