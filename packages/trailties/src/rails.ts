@@ -19,6 +19,7 @@ import type { Configuration } from "./application/configuration.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
 import { VERSION } from "./version.js";
+import { _setTrails } from "./trails-slot.js";
 
 let _application: Application | null = null;
 let _cache: CacheStore | null = null;
@@ -185,3 +186,5 @@ export function _resetTrailsEnv(): void {
   _env = undefined;
   _backtraceCleaner = undefined;
 }
+
+_setTrails(Trails);

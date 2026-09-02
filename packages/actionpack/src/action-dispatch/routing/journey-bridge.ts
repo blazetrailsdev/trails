@@ -54,9 +54,8 @@ export interface BuildJourneyRouterOptions {
   /**
    * App attached to each synthesized Journey route. Rails builds one app per
    * route in `Mapping#app` (`mapper.rb:294-303`), so this is a per-route
-   * factory rather than one shared app. When omitted, routes carry a throwing
-   * stub — callers that only use `Router.recognize` / `journeyRecognize` never
-   * trigger it.
+   * factory rather than one shared app. When omitted the routes carry no app,
+   * which is all `Router.recognize` / `journeyRecognize` need.
    */
   app?: (route: LocalRoute) => RoutableApp;
 }
@@ -82,14 +81,7 @@ export function buildJourneyRouter(
     // controller/action are authoritative on the local Route; user defaults
     // must not overwrite them. Precedence is the insertion index so
     // Router.recognize's precedence sort preserves RouteSet order.
-    const fallbackApp: RoutableApp = {
-      serve: () => {
-        throw new Error(
-          `Journey-bridge route '${name}' has no app — use RouteSet.call(), not journeyRouter.serve().`,
-        );
-      },
-    };
-    const app = opts.app ? opts.app(r) : fallbackApp;
+    const app = opts.app?.(r);
     journeyRoutes.addRoute(name, {
       makeRoute: (routeName, index) => {
         const journeyRoute = new JourneyRoute({
@@ -97,7 +89,14 @@ export function buildJourneyRouter(
           app,
           path: pattern,
           constraints: opts.skipRequestConstraints ? {} : r.requestConstraints,
-          defaults: { ...r.defaults, controller: r.controller, action: r.action },
+          // `Mapping#normalize_options!` returns options unchanged when the
+          // endpoint answers `action` or `call` (`mapper.rb:228-229`), so a
+          // mounted app or a redirect contributes no controller/action default.
+          defaults: {
+            ...r.defaults,
+            ...(r.controller ? { controller: r.controller } : {}),
+            ...(r.action ? { action: r.action } : {}),
+          },
           requestMethodMatch,
           precedence: index,
         });

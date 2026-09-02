@@ -81,11 +81,6 @@ describe("ActionView::Base", () => {
     expect(view.lookupContext).toBeInstanceOf(LookupContext);
   });
 
-  it("withHelpers builds on an empty template cache, per rendering.rb:53", () => {
-    const klass = Base.withHelpers({ currentUser: () => "Ada" });
-    expect(() => new klass(null, {}, null).compiledMethodContainer()).not.toThrow();
-  });
-
   it("withEmptyTemplateCache gives each subclass its own compiled methods", () => {
     const a = Base.withEmptyTemplateCache();
     const b = Base.withEmptyTemplateCache();
@@ -100,70 +95,9 @@ describe("ActionView::Base", () => {
     expect(typeof view.contentFor).toBe("function");
   });
 
-  it("withHelpers includes a controller's helpers module onto the view", () => {
-    const helpers = {
-      currentUser(this: Base) {
-        return (this.controller as { user: string }).user;
-      },
-    };
-    const klass = Base.withHelpers(helpers);
-    const view = new klass(null, {}, { user: "Ada" });
-    expect((view as unknown as { currentUser(): string }).currentUser()).toBe("Ada");
-  });
-
-  it("makes a helper_method-style helper resolvable as a bare identifier in a template", () => {
-    TemplateHandlers.registerTemplateHandler("tse", new Tse());
-    try {
-      const helpers = {
-        currentUser(this: Base) {
-          return (this.controller as { user: string }).user;
-        },
-      };
-      const view = new (Base.withHelpers(helpers))(null, {}, { user: "Ada" });
-      const out = renderTse("<%= currentUser() %>", {}, view);
-      expect(out).toBe("Ada");
-    } finally {
-      TemplateHandlers.clear();
-    }
-  });
-
   it("lets a local shadow a helper of the same name, as locals_code does", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
     expect(renderTse("<%= raw %>", { raw: "local wins" }, view)).toBe("local wins");
-  });
-});
-
-describe("ActionView::Base.withHelpers", () => {
-  it("brings an accessor across, the way Ruby's include does", () => {
-    const helpers = {
-      get currentUser(): string {
-        return ((this as unknown as Base).controller as { user: string }).user;
-      },
-    };
-    const view = new (Base.withHelpers(helpers))(null, {}, { user: "Ada" });
-    expect((view as unknown as { currentUser: string }).currentUser).toBe("Ada");
-  });
-
-  it("walks the module's own prototype chain, as include walks ancestors", () => {
-    const parent = { fromParent: () => "parent" };
-    const helpers = Object.create(parent) as Record<string, unknown>;
-    helpers.fromChild = () => "child";
-    const view = new (Base.withHelpers(helpers))(null, {}, null) as unknown as {
-      fromParent(): string;
-      fromChild(): string;
-    };
-    expect(view.fromParent()).toBe("parent");
-    expect(view.fromChild()).toBe("child");
-  });
-
-  it("lets a helper shadow an inherited Base method, as include ranks above the superclass", () => {
-    const view = new (Base.withHelpers({ capture: () => "from the helper module" }))(
-      null,
-      {},
-      null,
-    );
-    expect((view.capture as unknown as () => string)()).toBe("from the helper module");
-    expect(Base.prototype.capture).not.toBe(view.capture);
   });
 });
 

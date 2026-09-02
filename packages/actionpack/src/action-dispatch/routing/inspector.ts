@@ -79,7 +79,6 @@ export class RouteWrapper {
 
   /**
    * @missingRailsCall app — CONVERGEABLE converge-routewrapper-endpoint-to-app-dispatcher
-   * @missingRailsCall dispatcher? — CONVERGEABLE converge-routewrapper-endpoint-to-app-dispatcher
    */
   get endpoint(): string {
     // Rails dispatches on the wrapped app: `dispatcher?` → `controller#action`,

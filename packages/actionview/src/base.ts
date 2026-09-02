@@ -157,44 +157,6 @@ export class Base {
     return this.compiledMethodContainer() !== other.compiledMethodContainer();
   }
 
-  /**
-   * Mirrors the `Class.new(klass) { include helpers }` arm of
-   * `Rendering::ClassMethods#build_view_context_class`
-   * (`actionview/lib/action_view/rendering.rb:59-73`) — the subclass a
-   * controller renders through, carrying its `_helpers` module so
-   * `helper_method :current_user` is an ordinary method on the view.
-   *
-   * The module is a prototype-chained plain object, so the copy walks the
-   * chain the way Ruby's `include` walks ancestors.
-   *
-   * Rails puts this on the controller, memoized, and includes the route
-   * helpers alongside; only the `include helpers` arm lands here.
-   *
-   * @noRailsEquivalent CONVERGEABLE port-view-context-class-on-controller
-   */
-  static withHelpers(helpers: object | null | undefined): typeof Base {
-    // Rails builds on `DetailsKey.view_context_class` (rendering.rb:53), which
-    // is itself a `with_empty_template_cache` subclass.
-    const base = this.withEmptyTemplateCache();
-    // `Class.new(klass) do ... end` (rendering.rb:64) always builds the
-    // subclass; the `if helpers` guard is inside it.
-    const subclass = class extends base {};
-    if (!helpers) return subclass;
-    // Ruby's `include` brings every member, accessors included, and walks the
-    // module's ancestors; a descriptor copy up the prototype chain is the JS
-    // equivalent. A plain `for…in` value read would flatten a getter.
-    for (let mod: object | null = helpers; mod && mod !== Object.prototype; ) {
-      for (const [name, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(mod))) {
-        if (name === "constructor") continue;
-        if (!Object.hasOwn(subclass.prototype, name)) {
-          Object.defineProperty(subclass.prototype, name, descriptor);
-        }
-      }
-      mod = Object.getPrototypeOf(mod) as object | null;
-    }
-    return subclass;
-  }
-
   /** Mirrors `Base.empty` (base.rb:229-231). */
   static empty(): Base {
     return this.withViewPaths([]);

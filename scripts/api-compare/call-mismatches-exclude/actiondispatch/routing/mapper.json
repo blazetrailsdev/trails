@@ -1,0 +1,55 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "constraints",
+    "call": "scope",
+    "reason": "Homonym artifact of porting `Mapper::Constraints` into its Rails file (`mapper.rb:29-81`): mapper.rb defines `initialize`, `constraints` and `dispatcher?` on more than one host, so the added class's members are compared against `Mapping`'s and `Mapper`'s call sets. No TS body omits a call its own Ruby counterpart makes."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "dispatcher",
+    "call": "new",
+    "reason": "Homonym artifact of porting `Mapper::Constraints` into its Rails file (`mapper.rb:29-81`): mapper.rb defines `initialize`, `constraints` and `dispatcher?` on more than one host, so the added class's members are compared against `Mapping`'s and `Mapper`'s call sets. No TS body omits a call its own Ruby counterpart makes."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "initialize",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "kwargs{pathNames=ref:resourcesPathNames}"
+    ],
+    "reason": "Homonym artifact of porting `Mapper::Constraints` into its Rails file (`mapper.rb:29-81`): mapper.rb defines `initialize`, `constraints` and `dispatcher?` on more than one host, so the added class's members are compared against `Mapping`'s and `Mapper`'s call sets. No TS body omits a call its own Ruby counterpart makes."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "new",
+    "call": "action_path",
+    "reason": "Homonym artifact of porting `Mapper::Constraints` into its Rails file (`mapper.rb:29-81`): mapper.rb defines `initialize`, `constraints` and `dispatcher?` on more than one host, so the added class's members are compared against `Mapping`'s and `Mapper`'s call sets. No TS body omits a call its own Ruby counterpart makes."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "new",
+    "call": "path_scope",
+    "reason": "Homonym artifact of porting `Mapper::Constraints` into its Rails file (`mapper.rb:29-81`): mapper.rb defines `initialize`, `constraints` and `dispatcher?` on more than one host, so the added class's members are compared against `Mapping`'s and `Mapper`'s call sets. No TS body omits a call its own Ruby counterpart makes."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "new",
+    "call": "resource_scope?",
+    "reason": "Homonym artifact of porting `Mapper::Constraints` into its Rails file (`mapper.rb:29-81`): mapper.rb defines `initialize`, `constraints` and `dispatcher?` on more than one host, so the added class's members are compared against `Mapping`'s and `Mapper`'s call sets. No TS body omits a call its own Ruby counterpart makes."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "routing/mapper.ts",
+    "rubyName": "new",
+    "call": "with_scope_level",
+    "reason": "Homonym artifact of porting `Mapper::Constraints` into its Rails file (`mapper.rb:29-81`): mapper.rb defines `initialize`, `constraints` and `dispatcher?` on more than one host, so the added class's members are compared against `Mapping`'s and `Mapper`'s call sets. No TS body omits a call its own Ruby counterpart makes."
+  }
+]

@@ -383,7 +383,7 @@ describe("Engine", () => {
     runLoadHooks("action_controller", PostsController);
 
     const controller = new PostsController();
-    controller.response = new Response();
+    controller.setResponseBang(new Response());
     await controller.renderAsync({ action: "index" });
     expect(controller.body).toBe("posts#index\n");
     resetLoadHooks();

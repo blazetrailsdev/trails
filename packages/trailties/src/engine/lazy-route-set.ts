@@ -3,50 +3,24 @@
 // calls `Trails.application?.reloadRoutesUnlessLoaded` before each routing
 // operation so the route table is materialised on first use.
 //
-// `Trails.application` lands in PR 2.6; until then the reload hook is
-// injected via {@link setReloadRoutesHook}. PR 2.6 wires the global
-// `Trails.application?.reloadRoutesUnlessLoaded` callback through this seam.
+// `Trails` is read through {@link _Trails}, the zero-import slot, because a
+// direct import of `rails.js` closes a module cycle through `Application`; see
+// `trails-slot.ts`.
 //
-// Skipped vs. Rails:
-//   - `NamedRouteCollection` inner class — trails RouteSet keeps named routes
-//     in a plain Map; there is no Rails-shape `NamedRouteCollection#route_defined?`
-//     hook to override. Re-add when ported.
-//   - `method_missing_module` / `ProxyUrlHelpers#optimize_routes_generation?` —
-//     JS has no `method_missing`; the proxy wraps explicit helper methods
-//     instead (see {@link generateUrlHelpers}).
-//   - `def routes; ...; super; end` — trails' `RouteSet#routes` is a private
-//     field (no `attr_reader :routes`), so there is no parent method to wrap.
-//     If `routes` is later exposed as a Rails-shape getter, mirror the
-//     `reloadHook(); super` pattern then.
+// `RoutesReloader#executeUnlessLoaded` loads `config/routes.ts` through a
+// dynamic `import()`, so `Application#reloadRoutesUnlessLoaded` is a promise
+// where Ruby's is a plain value. `call` — the Rack entry point, and the one
+// that has to see a drawn route table — is async and awaits it; the
+// synchronous routing ops below make the same call and cannot await the
+// result. Closing that residual gap is
+// `converge-lazy-route-set-sync-ops-to-await-the-reload`.
 import { RouteSet, type DrawCallback } from "@blazetrails/actionpack";
+import type { RackEnv, RackResponse } from "@blazetrails/rack";
+import { _Trails } from "../trails-slot.js";
 
-type ReloadHook = () => boolean | undefined;
-let reloadHook: ReloadHook = () => undefined;
-
-/**
- * @internal Trails-private. Inject the
- * `Trails.application?.reloadRoutesUnlessLoaded` callback. PR 2.6's
- * `Trails.application` setter calls this; tests use it to assert each
- * routing op consults the hook exactly once. Not part of Rails.
- *
- * @noRailsEquivalent CONVERGEABLE — Rails names
- * `Rails.application&.reload_routes_unless_loaded` directly at each call site
- * (engine/lazy_route_set.rb:12-104); there is no setter because the constant
- * resolves at call time. The seam exists only until `Trails.application` lands,
- * and disappears with it.
- */
-export function setReloadRoutesHook(fn: ReloadHook): void {
-  reloadHook = fn;
-}
-
-/**
- * @internal Reset to the default no-op. Used by tests.
- *
- * @noRailsEquivalent CONVERGEABLE — the teardown half of `setReloadRoutesHook`
- * above, and it retires with it.
- */
-export function resetReloadRoutesHook(): void {
-  reloadHook = () => undefined;
+/** Rails: `Rails.application&.reload_routes_unless_loaded` (`lazy_route_set.rb:12`). */
+function reloadRoutesUnlessLoaded(): Promise<boolean> | undefined {
+  return _Trails!.application?.reloadRoutesUnlessLoaded();
 }
 
 type AnyFn = (...args: unknown[]) => unknown;
@@ -57,7 +31,7 @@ type ProxyHelpers = Record<
 
 export class LazyRouteSet extends RouteSet {
   override draw(callback: DrawCallback): void {
-    reloadHook();
+    void reloadRoutesUnlessLoaded();
     super.draw(callback);
   }
 
@@ -65,7 +39,7 @@ export class LazyRouteSet extends RouteSet {
     options: Record<string, unknown>,
     recall: Record<string, unknown> = {},
   ): [string, string[]] {
-    reloadHook();
+    void reloadRoutesUnlessLoaded();
     return super.generateExtras(options, recall);
   }
 
@@ -73,7 +47,7 @@ export class LazyRouteSet extends RouteSet {
     path: string,
     environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
-    reloadHook();
+    void reloadRoutesUnlessLoaded();
     return super.recognizePath(path, environment);
   }
 
@@ -83,14 +57,14 @@ export class LazyRouteSet extends RouteSet {
     extras: Record<string, unknown> = {},
     options: { raiseOnMissing?: boolean } = {},
   ): Record<string, unknown> | undefined {
-    reloadHook();
+    void reloadRoutesUnlessLoaded();
     return super.recognizePathWithRequest(req, path, extras, options);
   }
 
-  /** Rails: `def call(req)` — the Rack entrypoint, named `serve` in trails. */
-  override serve(req: Parameters<RouteSet["serve"]>[0]): ReturnType<RouteSet["serve"]> {
-    reloadHook();
-    return super.serve(req);
+  /** Rails: `def call(req)` (`lazy_route_set.rb:66-69`). */
+  override async call(req: RackEnv): Promise<RackResponse> {
+    await reloadRoutesUnlessLoaded();
+    return super.call(req);
   }
 
   /**
@@ -104,7 +78,7 @@ export class LazyRouteSet extends RouteSet {
     const wrap = (name: keyof ProxyHelpers): void => {
       const original = helpers[name].bind(helpers);
       helpers[name] = (...args: unknown[]): unknown => {
-        reloadHook();
+        void reloadRoutesUnlessLoaded();
         return original(...args);
       };
     };

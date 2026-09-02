@@ -85,9 +85,43 @@ export class Middleware {
 const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
 
 export class Metal extends AbstractController {
-  request!: Request;
-  response!: Response;
-  params: Parameters = new Parameters({});
+  /**
+   * Rails: `attr_internal :request` (`metal.rb:164`) and
+   * `attr_internal_reader :response` (`metal.rb:170`) — the ivars are
+   * `@_request` / `@_response`, which is why `PROTECTED_IVARS` names them and
+   * `view_assigns` never carries the request or response into a view.
+   */
+  _request!: Request;
+  _response!: Response;
+  /** Rails: `@_params` — `Metal#params` reads `request.parameters` (`metal.rb:181-187`). */
+  _params: Parameters = new Parameters({});
+
+  get params(): Parameters {
+    return this._params;
+  }
+  set params(value: Parameters) {
+    this._params = value;
+  }
+
+  get request(): Request {
+    return this._request;
+  }
+  set request(value: Request) {
+    this._request = value;
+  }
+
+  get response(): Response {
+    return this._response;
+  }
+  /** Mirrors `Metal#response=` (`metal.rb:268-273`). */
+  set response(value: Response) {
+    this.setResponseBang(value);
+
+    // Rails: `@_response_body = true` — "Force `performed?` to return true".
+    // trails' `_responseBody` is the body slot, not a flag, so the same forcing
+    // is spelled through `markPerformed`.
+    this.markPerformed();
+  }
 
   static controllerPath(): string {
     return underscore(this.name.replace(/Controller$/, ""));
@@ -212,7 +246,7 @@ export class Metal extends AbstractController {
   }
 
   setResponseBang(response: Response): void {
-    this.response = response;
+    this._response = response;
   }
 
   resetSession(): void {

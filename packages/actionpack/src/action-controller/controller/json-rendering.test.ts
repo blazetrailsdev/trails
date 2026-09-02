@@ -138,7 +138,7 @@ describe("Controller JSON rendering integration", () => {
     });
 
     expect(status).toBe(404);
-    expect(await bodyToString(body)).toContain("No route matches");
+    expect(await bodyToString(body)).toContain("Not Found");
   });
 
   it("API controller renders JSON", async () => {

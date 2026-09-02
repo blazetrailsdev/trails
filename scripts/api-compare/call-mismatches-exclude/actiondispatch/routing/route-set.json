@@ -23,20 +23,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "routing/route-set.ts",
-    "rubyName": "call",
-    "call": "make_request",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
-    "rubyName": "call",
-    "call": "normalize_path",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/route-set.ts",
     "rubyName": "default_env",
     "call": "full_url_for",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

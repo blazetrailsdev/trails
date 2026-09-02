@@ -200,6 +200,13 @@ describe("Application", () => {
   });
 
   describe("initialize!", () => {
+    // A LazyRouteSet routing op reads `Trails.application`, which memoizes
+    // `@application ||= app_class.instance` (`rails.rb`); clear it so the next
+    // registration is what the following test sees.
+    afterEach(() => {
+      Trails.application = null;
+    });
+
     it("returns false from initialized? before initialize() is called", () => {
       class IApp extends Application {}
       Application.register(IApp);
@@ -385,13 +392,17 @@ describe("Trails.application integration (boot-app fixture)", () => {
     await Trails.initialize();
 
     expect(app).toBeInstanceOf(BootApp);
-    expect(app.routesReloader().loaded).toBe(true);
+    // `make_routes_lazy` (`engine.rb:591-593`) selects `LazyRouteSet` in a
+    // local env, so `set_routes_reloader_hook` skips the eager load
+    // (`application/finisher.rb:164-177`) and the first request draws them.
+    expect(app.routesReloader().loaded).toBe(false);
     const [status, , body] = await app.app()({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts",
     });
     expect(status).toBe(200);
     expect(JSON.parse(await bodyToString(body))).toEqual({ posts: [] });
+    expect(app.routesReloader().loaded).toBe(true);
 
     const [nestedStatus, , nestedBody] = await app.app()({
       REQUEST_METHOD: "GET",

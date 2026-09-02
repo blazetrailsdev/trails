@@ -14,11 +14,6 @@
 //     `fixtures_in_root_and_not_in_vendor_or_dot_dir?` are not ported.
 //   - `:wrap_reloader_around_load_seed` (`:650`) — `Engine#load_seed` and its
 //     `:load_seed` callback chain are not ported.
-//   - `:make_routes_lazy` (`:591`) — selecting `LazyRouteSet` is only safe once
-//     `Application#reload_routes_unless_loaded` is wired into the route set's
-//     reload hook; `RoutesReloader#executeUnlessLoaded` is async in trails while
-//     every `LazyRouteSet` call site that consults the hook is synchronous.
-//     Story: wire-lazy-route-set-reload-hook.
 import { Notifications, getFsAsync, getPathAsync, onLoad } from "@blazetrails/activesupport";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
@@ -26,6 +21,8 @@ import type { RouteSetLike } from "./application/routes-reloader.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
+import { LazyRouteSet } from "./engine/lazy-route-set.js";
+import { _Trails } from "./trails-slot.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
 export class Engine extends Trailtie {
@@ -266,6 +263,16 @@ Engine.initializer(
     }
   },
 );
+
+/**
+ * Mirrors `Engine`'s `make_routes_lazy` initializer (`engine.rb:591-593`).
+ * Declared between `set_eager_load_paths` and `add_routing_paths`, as Rails
+ * declares it; `set_eager_load_paths` itself is one of the unported
+ * initializers listed at the top of this file.
+ */
+Engine.initializer("make_routes_lazy", { before: "bootstrap_hook" }, function (this: Engine) {
+  if (_Trails!.env.isLocal()) this.config.routeSetClass = LazyRouteSet;
+});
 
 /**
  * Mirrors `Engine`'s `add_routing_paths` initializer (`engine.rb:595-606`).

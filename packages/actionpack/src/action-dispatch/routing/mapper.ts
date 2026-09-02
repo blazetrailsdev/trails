@@ -22,6 +22,9 @@ import {
   type MountableApp,
 } from "./route.js";
 import { Redirect, redirect as redirectFactory } from "./redirection.js";
+import { Endpoint } from "./endpoint.js";
+import type { Request } from "../http/request.js";
+import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeLevel } from "./scope.js";
 import { getFsAsync, getPathAsync, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -56,6 +59,103 @@ interface RouteSetLike {
   resourcesPathNames?: Record<string, string>;
   drawPaths?: string[];
   defaultUrlOptions?: Record<string, unknown>;
+}
+
+/**
+ * Port of `ActionDispatch::Routing::Mapper::Constraints`
+ * (`actionpack/lib/action_dispatch/routing/mapper.rb:29-81`) — the endpoint
+ * wrapper `Mapping#app` puts around a route's target so the Journey router can
+ * `serve` something that only answers `call(env)`.
+ *
+ * @internal
+ */
+export class Constraints extends Endpoint {
+  /** Rails: `attr_reader :app` (`mapper.rb:30`). */
+  override app(): unknown {
+    return this._app;
+  }
+  readonly constraints: readonly unknown[];
+
+  static readonly SERVE: ConstraintsStrategy = (app, req) =>
+    (app as { serve(req: ConstraintsRequest): unknown }).serve(req);
+  // Ruby's `app.call req.env` reaches a lambda through `Proc#call`; a JS
+  // function carries its own `Function.prototype.call`, so a callable app is
+  // invoked directly.
+  static readonly CALL: ConstraintsStrategy = (app, req) =>
+    typeof app === "function"
+      ? (app as (env: Record<string, unknown>) => unknown)(req.env)
+      : (app as { call(env: Record<string, unknown>): unknown }).call(req.env);
+
+  private readonly _strategy: ConstraintsStrategy;
+  private readonly _app: unknown;
+
+  constructor(app: unknown, constraints: readonly unknown[], strategy: ConstraintsStrategy) {
+    super();
+    if (app instanceof Constraints) {
+      constraints = [...constraints, ...app.constraints];
+      app = app.app();
+    }
+
+    this._strategy = strategy;
+
+    this._app = app;
+    this.constraints = constraints;
+  }
+
+  override dispatcher(): boolean {
+    return this._strategy === Constraints.SERVE;
+  }
+
+  override matches(req: Request): boolean {
+    return this.constraints.every((constraint) => {
+      const c = constraint as ConstraintLike;
+      if (typeof c.matches === "function") {
+        const matched = c.matches(req);
+        if (matched != null && matched !== false) return true;
+      }
+      if (typeof c.call === "function") {
+        const called = c.call(...this.constraintArgs(c, req));
+        if (called != null && called !== false) return true;
+      }
+      return false;
+    });
+  }
+
+  serve(req: ConstraintsRequest): unknown {
+    if (!this.matches(req as unknown as Request)) {
+      return [404, { [X_CASCADE]: "pass" }, []];
+    }
+
+    return this._strategy(this._app, req);
+  }
+
+  /** @internal */
+  private constraintArgs(constraint: ConstraintLike, request: Request): readonly unknown[] {
+    const arity = typeof constraint.arity === "number" ? constraint.arity : constraint.call!.length;
+
+    if (arity < 1) {
+      return [];
+    } else if (arity === 1) {
+      return [request];
+    } else {
+      return [request.pathParameters, request];
+    }
+  }
+}
+
+/** @internal */
+interface ConstraintLike {
+  arity?: number;
+  matches?: (req: Request) => unknown;
+  call?: (...args: unknown[]) => unknown;
+}
+
+/** @internal */
+export type ConstraintsStrategy = (app: unknown, req: ConstraintsRequest) => unknown;
+
+/** @internal */
+export interface ConstraintsRequest {
+  env: Record<string, unknown>;
 }
 
 export class Mapper {
