@@ -25,9 +25,10 @@ import { Redirect, redirect as redirectFactory } from "./redirection.js";
 import { Endpoint } from "./endpoint.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
-import { Scope, type ScopeLevel } from "./scope.js";
+import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
 import { getFsAsync, getPathAsync, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { fetch } from "@blazetrails/ruby-compat";
 
 type MapperCallback = (mapper: Mapper) => void;
 type ConcernCallback = (mapper: Mapper) => void;
@@ -264,9 +265,14 @@ export class Mapper {
     // For shallow routes, member routes drop *parent resource* segments but
     // keep outer scope/namespace prefixes. Rails: shallow_path = path until
     // outermost resource; shallow_prefix preserves outer non-resource as: keys.
-    const shallowPrefix = shallow ? this.outerNonResourcePrefix() : prefix;
+    const shallowPrefix = shallow
+      ? ((this._scope.get("shallowPath") as string | undefined) ?? this.outerNonResourcePrefix())
+      : prefix;
     const shallowPath = shallow ? `${shallowPrefix}/${name}` : basePath;
-    const outerNamePrefix = shallow ? this.outerNonResourceNamePrefix() : undefined;
+    const outerNamePrefix = shallow
+      ? ((this._scope.get("shallowPrefix") as string | undefined) ??
+        this.outerNonResourceNamePrefix())
+      : undefined;
     const shallowRouteName = (suffix: string) =>
       outerNamePrefix ? `${outerNamePrefix}_${suffix}` : suffix;
     const shallowName = (suffix: string) =>
@@ -474,10 +480,11 @@ export class Mapper {
   namespace(
     path: string,
     options: (ScopeOptions & { path?: string }) | MapperCallback = {},
-    callback?: MapperCallback,
+    block?: MapperCallback,
   ): void {
-    const opts = typeof options === "function" ? {} : options;
-    const cb = typeof options === "function" ? options : callback;
+    const opts: ScopeOptions & Record<string, unknown> =
+      typeof options === "function" ? {} : { ...options };
+    const cb = typeof options === "function" ? options : block;
     if (!cb) throw new Error("no block given (yield)");
     // Rails mapper.rb:1626-1632: inside a resource scope, namespace must go
     // through nested so parent-resource path segments are included correctly.
@@ -487,14 +494,18 @@ export class Mapper {
       this.nested(() => this.namespace(path, opts, cb));
       return;
     }
-    // Rails mapper.rb:961-974 — `:path`, `:as` and `:module` each default to `path`.
-    this.scopeStack.push({
-      path: this.currentPrefix() + "/" + (opts.path ?? path),
-      namePrefix: opts.as ?? path,
-      controller: opts.module ?? path,
+    path = String(path);
+
+    const defaults: ScopeOptions & Record<string, unknown> = {
+      module: path,
+      as: fetch(opts, "as", path),
+      shallowPath: fetch(opts, "path", path),
+      shallowPrefix: fetch(opts, "as", path),
+    };
+
+    this.pathScope(deleteWithDefault(opts, "path", path), () => {
+      this.scope(Object.assign(defaults, opts), cb);
     });
-    cb(this);
-    this.scopeStack.pop();
   }
 
   // --- scope ---
@@ -525,13 +536,32 @@ export class Mapper {
       ? this.currentPrefix() + "/" + path.replace(/^\/+/, "")
       : this.currentPrefix();
 
+    const previous = this._scope;
+    const frame: ScopeFrameHash = { ...options };
+    if (frame.shallowPath !== undefined) {
+      frame.shallowPath = this.mergeShallowPathScope(
+        this._scope.get("shallowPath") as string | undefined,
+        frame.shallowPath as string,
+      );
+    }
+    if (frame.shallowPrefix !== undefined) {
+      frame.shallowPrefix = this.mergeShallowPrefixScope(
+        this._scope.get("shallowPrefix") as string | undefined,
+        frame.shallowPrefix as string,
+      );
+    }
+    this._scope = this._scope.newChild(frame);
     this.scopeStack.push({
       path: prefix,
       namePrefix: options.as,
       controller: options.module,
     });
-    cb(this);
-    this.scopeStack.pop();
+    try {
+      cb(this);
+    } finally {
+      this.scopeStack.pop();
+      this._scope = previous;
+    }
   }
 
   // --- member / collection ---
@@ -1447,9 +1477,15 @@ export class Mapper {
     const previous = this._scope;
     const merged = this.mergePathScope(this._scope.get("path") as string | undefined, path);
     this._scope = this._scope.newChild({ path: merged });
+    this.scopeStack.push({
+      path: Mapper.normalizePath(this.currentPrefix() + "/" + path),
+      namePrefix: undefined,
+      controller: undefined,
+    });
     try {
       return fn();
     } finally {
+      this.scopeStack.pop();
       this._scope = previous;
     }
   }
@@ -1657,9 +1693,24 @@ interface ScopeFrame {
   resourcePathNames?: Record<string, string>;
 }
 
+/**
+ * Ruby's `Hash#delete(key) { default }` — removes the key and returns its
+ * value, or the block's result when it was absent.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+function deleteWithDefault<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {
+  if (!(key in hash)) return defaultValue;
+  const value = hash[key] as T;
+  delete hash[key];
+  return value;
+}
+
 interface ScopeOptions {
   as?: string;
   module?: string;
+  shallowPath?: string;
+  shallowPrefix?: string;
 }
 
 interface MountOptions extends RouteOptions {

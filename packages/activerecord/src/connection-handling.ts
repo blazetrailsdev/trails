@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import { _Base } from "./base-slot.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -376,7 +377,7 @@ export function connection(this: typeof Base): DatabaseAdapter {
 }
 
 export function isPrimaryClass(this: typeof Base): boolean {
-  return this.name === "Base" || coreIsApplicationRecordClass.call(this as any);
+  return (this as unknown) === _Base || coreIsApplicationRecordClass.call(this as any);
 }
 
 export function adapterClass(this: typeof Base): Promise<new (...args: any[]) => DatabaseAdapter> {
@@ -421,7 +422,7 @@ export function connectionSpecificationName(this: typeof Base): string {
   }
 
   if (ownHas) {
-    if (this.name === "Base") return "ActiveRecord::Base";
+    if ((this as unknown) === _Base) return "ActiveRecord::Base";
     const parent = Object.getPrototypeOf(this);
     if (parent && typeof parent === "function" && parent !== this) {
       return connectionSpecificationName.call(parent as typeof Base);
@@ -429,7 +430,7 @@ export function connectionSpecificationName(this: typeof Base): string {
     return "ActiveRecord::Base";
   }
 
-  if (this.name === "Base") return "ActiveRecord::Base";
+  if ((this as unknown) === _Base) return "ActiveRecord::Base";
   if (typeof (this as any).primaryClassQ === "function" && (this as any).primaryClassQ()) {
     return "ActiveRecord::Base";
   }

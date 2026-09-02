@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { bareIdentifier, compareParamNames, matchParamNamesAgainst } from "./param-names.js";
+import {
+  bareIdentifier,
+  compareParamNames,
+  isNestedConstructorHomonym,
+  matchParamNamesAgainst,
+} from "./param-names.js";
 import type { ParamInfo } from "@blazetrails/parity/types";
 
 const req = (name: string, type?: string): ParamInfo => ({ name, kind: "required", type });
@@ -206,5 +211,22 @@ describe("positions with no identifier to compare", () => {
         [req("name"), opt("defaultValue"), opt("isSerial")],
       ),
     ).toEqual([{ position: 2, ruby: "serial", ts: "isSerial" }]);
+  });
+});
+
+describe("isNestedConstructorHomonym", () => {
+  const declared = new Set(["Core", "InspectionMask"]);
+  const defineInitialize = new Set(["Core"]);
+
+  it("rejects a nested class the Ruby file declares without an initialize", () => {
+    expect(isNestedConstructorHomonym("InspectionMask", declared, defineInitialize)).toBe(true);
+  });
+
+  it("keeps a nested class that declares its own initialize", () => {
+    expect(isNestedConstructorHomonym("Core", declared, defineInitialize)).toBe(false);
+  });
+
+  it("keeps a TS class the Ruby file never names", () => {
+    expect(isNestedConstructorHomonym("Base", declared, defineInitialize)).toBe(false);
   });
 });

@@ -39,6 +39,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Relation } from "./relation.js";
 import "./relation.js";
 import { generatedRelationMethods as _generatedRelationMethods } from "./relation/delegation.js";
+import { _setBase } from "./base-slot.js";
 import { _registerBase as _registerBaseWithQueryCache } from "./query-cache.js";
 import { _registerBase as _registerBaseWithSchemaMigration } from "./schema-migration.js";
 import { _registerBase as _registerBaseWithInternalMetadata } from "./internal-metadata.js";
@@ -1401,8 +1402,6 @@ export class Base extends Model {
     }
   }
 
-  static _scopeExtensions: Map<string, Record<string, (...args: any[]) => any>> = new Map();
-
   declare static scope: typeof NamedScoping.scope;
   declare static scopeForAssociation: typeof NamedScoping.scopeForAssociation;
   declare static defaultScoped: typeof NamedScoping.defaultScoped;
@@ -2681,6 +2680,8 @@ export class Base extends Model {
     return _generateTokenFor.call(this, purpose);
   }
 }
+
+_setBase(Base);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {

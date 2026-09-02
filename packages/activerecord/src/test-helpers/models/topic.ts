@@ -61,7 +61,9 @@ export class Topic extends Base {
       return this.all();
     });
     this.scope("writtenBefore", function (this: any, time: any) {
-      return time ? this.where("written_on < ?", time) : this;
+      if (time) {
+        return this.where("written_on < ?", time);
+      }
     });
     this.scope("approved", function (this: any) {
       return this.where({ approved: true });
@@ -106,8 +108,11 @@ export class Topic extends Base {
         return this;
       });
     } as any);
-    this.scope("withObject", function (this: any) {
-      return this.where({ approved: true });
+    const klass = this;
+    this.scope("withObject", {
+      call() {
+        return klass.where({ approved: true });
+      },
     });
     this.scope("withKwargs", function (this: any, approved = false) {
       return this.where({ approved });

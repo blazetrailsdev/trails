@@ -61,12 +61,12 @@ export type ScopeOn<T extends Base, M extends Base, A extends unknown[] = []> = 
 export function scope<T extends typeof Base>(
   this: T,
   name: string,
-  fn: (this: Relation<InstanceType<T>>, ...args: any[]) => Relation<any>,
-  extension?: Record<string, (...args: any[]) => any>,
+  body: ((this: Relation<InstanceType<T>>, ...args: any[]) => any) | { call(...args: any[]): any },
+  block?: Record<string, (...args: any[]) => any>,
 ): void {
   const modelClass = this as any;
 
-  if (typeof fn !== "function") {
+  if (!respondTo(body, "call")) {
     throw new ArgumentError("The scope body needs to be callable.");
   }
 
@@ -86,22 +86,45 @@ export function scope<T extends typeof Base>(
     );
   }
 
+  const extension = block;
+
+  if (respondTo(body, "toProc")) {
+    singletonClassDefineMethod(modelClass, name, function (this: any, ...args: any[]) {
+      let scope = this.all()._execScope(...args, body);
+      if (extension) scope = scope.extending(extension);
+      return scope;
+    });
+  } else {
+    singletonClassDefineMethod(modelClass, name, function (this: any, ...args: any[]) {
+      let scope = (body as { call(...args: any[]): any }).call(...args) || this.all();
+      if (extension) scope = scope.extending(extension);
+      return scope;
+    });
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+function respondTo(body: unknown, method: "call" | "toProc"): boolean {
+  if (typeof body === "function") return true;
+  if (body == null || typeof body !== "object") return false;
+  for (let o: object | null = body; o && o !== Object.prototype; o = Object.getPrototypeOf(o)) {
+    if (Object.getOwnPropertyDescriptor(o, method)) return true;
+  }
+  return false;
+}
+
+/** @noRailsEquivalent PERMANENT */
+function singletonClassDefineMethod(
+  modelClass: any,
+  name: string,
+  fn: (this: any, ...args: any[]) => any,
+): void {
   if (!Object.prototype.hasOwnProperty.call(modelClass, "_scopes")) {
     modelClass._scopes = new Map(modelClass._scopes);
   }
   modelClass._scopes.set(name, fn);
-
-  if (extension) {
-    if (!Object.prototype.hasOwnProperty.call(modelClass, "_scopeExtensions")) {
-      modelClass._scopeExtensions = new Map(modelClass._scopeExtensions);
-    }
-    modelClass._scopeExtensions.set(name, extension);
-  }
-
   Object.defineProperty(modelClass, name, {
-    value: function (...args: any[]) {
-      return this.all()[name](...args);
-    },
+    value: fn,
     writable: true,
     configurable: true,
   });

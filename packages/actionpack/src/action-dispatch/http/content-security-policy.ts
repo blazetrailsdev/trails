@@ -91,7 +91,7 @@ export class Middleware {
     if (status === 304) return response;
     if (this.policyPresent(headers)) return response;
 
-    const request = new _RequestCtor!(env) as ContentSecurityPolicyRequest & {
+    const request = new _RequestCtor!(env) as Request & {
       controllerInstance?: unknown;
     };
 
@@ -110,7 +110,7 @@ export class Middleware {
     return response;
   }
 
-  private headerName(request: ContentSecurityPolicyRequest): string {
+  private headerName(request: Request): string {
     return request.contentSecurityPolicyReportOnly
       ? CONTENT_SECURITY_POLICY_REPORT_ONLY
       : CONTENT_SECURITY_POLICY;
@@ -457,7 +457,7 @@ export interface CspRequestHost {
 /** @internal Per-request nonce generator: `(request) => string`. */
 export type NonceGenerator = (request: unknown) => string;
 
-export class ContentSecurityPolicyRequest {
+export class Request {
   declare getHeader: CspRequestHost["getHeader"];
   declare setHeader: CspRequestHost["setHeader"];
 

@@ -279,3 +279,24 @@ export function matchParamNamesAgainst(
   }
   return best === null ? { aligned: false, rows: [] } : { aligned: true, rows: best };
 }
+
+/**
+ * Is this TS `constructor` candidate a NESTED class's, paired with the
+ * enclosing Ruby module's `initialize` purely because both are spelled the
+ * same? `ActiveRecord::Core::InspectionMask` (`core.rb:858`) is
+ * `class InspectionMask < DelegateClass(::String)` and defines no `initialize`
+ * — the one it has is the delegator's, whose parameter is the delegated object
+ * — so scoring it against `Core#initialize(attributes = nil)` (`core.rb:471`)
+ * reports a rename whose only honest fix would make the port worse.
+ *
+ * Only a class the RUBY FILE also declares is judged: an owner Ruby never
+ * names is a TS-side class whose Ruby counterpart is the module itself, which
+ * is exactly the pairing the check is for.
+ */
+export function isNestedConstructorHomonym(
+  owner: string,
+  rubyOwnerShortNames: ReadonlySet<string>,
+  rubyOwnersDefiningInitialize: ReadonlySet<string>,
+): boolean {
+  return rubyOwnerShortNames.has(owner) && !rubyOwnersDefiningInitialize.has(owner);
+}

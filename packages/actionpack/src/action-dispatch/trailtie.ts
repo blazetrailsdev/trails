@@ -34,7 +34,7 @@ import {
   ContentSecurityPolicy,
   type NonceGenerator,
   type CspRequestHost,
-  ContentSecurityPolicyRequest as CspRequest,
+  Request as CspRequest,
 } from "./http/content-security-policy.js";
 import { Middleware as ContentSecurityPolicyMiddleware } from "./http/content-security-policy.js";
 import { Middleware as PermissionsPolicyMiddleware } from "./http/permissions-policy.js";

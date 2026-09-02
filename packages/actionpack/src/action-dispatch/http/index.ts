@@ -5,7 +5,7 @@ export { UploadedFile, type UploadedFileOptions } from "./upload.js";
 export {
   ContentSecurityPolicy,
   DEFAULT_NONCE_DIRECTIVES,
-  ContentSecurityPolicyRequest,
+  Request as ContentSecurityPolicyRequest,
   type CSPSource,
   type CspRequestHost,
   type NonceGenerator,

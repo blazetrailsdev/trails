@@ -59,6 +59,7 @@ export interface Core {
 
 export { InspectionMask } from "./attribute-inspection.js";
 import { inspectionFilter as _inspectionFilterImpl } from "./attribute-inspection.js";
+import { _Base } from "./base-slot.js";
 
 interface CoreRecord {
   id: unknown;
@@ -456,7 +457,7 @@ export function connectionClassForSelf(this: CoreHost): CoreHost {
   while (klass) {
     if (Object.prototype.hasOwnProperty.call(klass, "_connectionClass") && klass._connectionClass)
       return klass;
-    if (klass.name === "Base") return klass;
+    if ((klass as unknown) === _Base) return klass;
     klass = parentClass(klass);
   }
   return this;

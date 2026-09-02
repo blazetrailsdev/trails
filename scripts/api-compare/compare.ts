@@ -114,7 +114,7 @@ import {
   stripThis,
   type ArityRange,
 } from "./arity.js";
-import { matchParamNamesAgainst } from "./param-names.js";
+import { isNestedConstructorHomonym, matchParamNamesAgainst } from "./param-names.js";
 import {
   ARITY_EXCLUDE_PATH,
   arityExcludeKeyOf,
@@ -3722,6 +3722,8 @@ export function main() {
       >();
       const rubyCallArgsByOwnerName = new Map<string, CallSite[]>();
       const rubyReaderNames = new Set<string>();
+      const rubyOwnerShortNames = new Set<string>();
+      const rubyOwnersDefiningInitialize = new Set<string>();
       // (owner, name) pairs the extractor bucketed as CLASS methods — the
       // singleton seat wherever the owner FQN does not already say so (see
       // rubyOwnerSeat).
@@ -3731,6 +3733,11 @@ export function main() {
         const f = flattenIncludedMethodInfos(item.info, item.fqn, rubyPkg, moduleFqnByShort, pkg);
         const rubyMethods = [...f.instance, ...f.klass];
         const klassNames = new Set(f.klass.map((rm) => rm.name));
+        const itemShort = item.fqn.split("::").at(-1) ?? item.fqn;
+        rubyOwnerShortNames.add(itemShort);
+        if (rubyMethods.some((rm) => rm.name === "initialize")) {
+          rubyOwnersDefiningInitialize.add(itemShort);
+        }
         for (const rm of rubyMethods) {
           // Collected ahead of the mode filter: a Rails `attr_reader` is
           // usually private while the bodies reading it are public, so a
@@ -4207,7 +4214,27 @@ export function main() {
           // every constructor in the package, so `Table#initialize(name, as:,
           // klass:, type_caster:)` would align against an unrelated 4-arg
           // constructor and report three renames that exist nowhere.
-          const fileCandidates = tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [];
+          let fileCandidates = tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [];
+          if (tsName === "constructor") {
+            const byOwner = tsParamsByFileOwnerNameInPkg.get(tsFile);
+            if (byOwner) {
+              fileCandidates = [];
+              for (const [key, sigs] of byOwner) {
+                const [owner, name] = key.split("#");
+                if (name !== tsName) continue;
+                if (
+                  isNestedConstructorHomonym(
+                    owner,
+                    rubyOwnerShortNames,
+                    rubyOwnersDefiningInitialize,
+                  )
+                ) {
+                  continue;
+                }
+                fileCandidates.push(...sigs);
+              }
+            }
+          }
           // A clean candidate anywhere in the file settles the pair: which
           // declaration carries Rails' identifiers (the `this`-typed function,
           // the interface re-declaring it, the class assigning it) is the mixin
