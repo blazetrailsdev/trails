@@ -121,7 +121,6 @@ export class XMLConverter {
       // how multipart uploaded files from HTML appear
       return xmlValue["file"] instanceof StringIO ? xmlValue["file"] : xmlValue;
     }
-    // Ruby's `if`/`elsif` chain (conversions.rb:186-214) answers `nil` here.
     return null;
   }
 
