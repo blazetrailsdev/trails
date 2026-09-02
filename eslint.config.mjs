@@ -251,13 +251,9 @@ export default defineConfig(
   },
 
   // ── ruby-compat leaf: no Node AMBIENT globals ──
-  // An import guard sees `import … from "node:fs"`; it cannot see `Buffer`,
-  // `process`, `__dirname` or `__filename`, which are globals rather than
-  // imports and break a browser bundle just as thoroughly. `types: []` in
-  // packages/ruby-compat/tsconfig.json removes the automatic @types/node
-  // inclusion, but vitest's own types re-reference it transitively for the
-  // whole program, so the compiler alone does not close this. Enforced over
-  // the built output by scripts/ruby-compat-leaf.test.ts's sibling halves.
+  // An import guard cannot see these — they are globals, not imports — and
+  // `types: []` does not fence them either, because vitest's own types
+  // re-reference @types/node transitively for the whole program.
   {
     files: ["packages/ruby-compat/src/**/*.ts"],
     ignores: ["**/*.test.ts"],
