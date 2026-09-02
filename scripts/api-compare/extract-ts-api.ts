@@ -1784,24 +1784,14 @@ function extractDefinePropertyForOf(
 }
 
 /**
- * Strip `(x)` / `x as T` / `x satisfies T` / `x!`. The command-recorder loop
- * writes `(CommandRecorder.prototype as unknown as Record<string, unknown>)`,
- * which is the same receiver as `CommandRecorder.prototype`.
+ * Strip `(x)` and `x as T`. The command-recorder loop writes
+ * `(CommandRecorder.prototype as unknown as Record<string, unknown>)`, which is
+ * the same receiver as `CommandRecorder.prototype`.
  */
 function unwrapTsExpression(expr: ts.Expression): ts.Expression {
   let e = expr;
-  for (;;) {
-    if (
-      ts.isParenthesizedExpression(e) ||
-      ts.isAsExpression(e) ||
-      ts.isSatisfiesExpression(e) ||
-      ts.isNonNullExpression(e)
-    ) {
-      e = e.expression;
-      continue;
-    }
-    return e;
-  }
+  while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+  return e;
 }
 
 /**
@@ -1858,95 +1848,95 @@ function resolveStringLiteralList(
   return null;
 }
 
-/** The ClassInfo registered for a class declaration, if the package has one. */
-function classInfoForDeclaration(
+/** A generator's host: the class declaration plus the ClassInfo to credit. */
+interface PrototypeHost {
+  classInfo: ClassInfo;
+  decl: ts.ClassDeclaration;
+}
+
+/** The registered host for a class declaration, if the package has one. */
+function hostForClassDeclaration(
   decl: ts.ClassDeclaration,
   info: PackageInfo,
   srcDir: string,
-): ClassInfo | null {
+): PrototypeHost | null {
   const name = decl.name?.text;
   if (name === undefined) return null;
   const file = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
-  return info.classes[`${file}:${name}`] ?? null;
+  const classInfo = info.classes[`${file}:${name}`];
+  return classInfo ? { classInfo, decl } : null;
 }
 
 /**
- * The class an `X.prototype` receiver names. `X` is either a class in the
+ * Every class an `X.prototype` receiver names. `X` is either a class in the
  * package or a PARAMETER of a same-package function — the shape a Rails
  * `class_eval` generator takes in trails, where the loop lives in the mixin's
  * own file and the host is handed to it (`defineValueMethods(Relation)`,
  * packages/activerecord/src/relation.ts:2130). A parameter resolves through
- * the function's call sites, so a generator nothing calls credits nothing.
+ * the function's call sites — every one of them, since Ruby's generator runs
+ * once per class it is applied to — so a generator nothing calls credits
+ * nothing.
  */
-function resolvePrototypeHost(
+function resolvePrototypeHosts(
   expr: ts.Expression,
   info: PackageInfo,
   checker: ts.TypeChecker,
   srcDir: string,
   program: ts.Program,
-): { classInfo: ClassInfo; decl: ts.ClassDeclaration } | null {
+): PrototypeHost[] {
   const e = unwrapTsExpression(expr);
-  if (!ts.isPropertyAccessExpression(e)) return null;
-  if (!ts.isIdentifier(e.name) || e.name.text !== "prototype") return null;
+  if (!ts.isPropertyAccessExpression(e)) return [];
+  if (!ts.isIdentifier(e.name) || e.name.text !== "prototype") return [];
   const base = unwrapTsExpression(e.expression);
-  if (!ts.isIdentifier(base)) return null;
+  if (!ts.isIdentifier(base)) return [];
 
-  const sym0 = checker.getSymbolAtLocation(base);
-  if (!sym0) return null;
-  const sym = sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
-  const decl = sym.valueDeclaration ?? sym.declarations?.[0];
-  if (!decl) return null;
-
+  const decl = resolvedDeclaration(base, checker);
+  if (!decl) return [];
   if (ts.isClassDeclaration(decl)) {
-    const classInfo = classInfoForDeclaration(decl, info, srcDir);
-    return classInfo ? { classInfo, decl } : null;
+    const host = hostForClassDeclaration(decl, info, srcDir);
+    return host ? [host] : [];
   }
-
-  if (ts.isParameter(decl)) return hostPassedToParameter(decl, info, checker, srcDir, program);
-  return null;
+  if (ts.isParameter(decl)) return hostsPassedToParameter(decl, info, checker, srcDir, program);
+  return [];
 }
 
-/** The class a same-package call site passes for `param`. */
-function hostPassedToParameter(
+/** The declaration an identifier resolves to, through import aliases. */
+function resolvedDeclaration(id: ts.Identifier, checker: ts.TypeChecker): ts.Declaration | null {
+  const sym0 = checker.getSymbolAtLocation(id);
+  if (!sym0) return null;
+  const sym = sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+  return sym.valueDeclaration ?? sym.declarations?.[0] ?? null;
+}
+
+/** Every class a same-package call site passes for `param`. */
+function hostsPassedToParameter(
   param: ts.ParameterDeclaration,
   info: PackageInfo,
   checker: ts.TypeChecker,
   srcDir: string,
   program: ts.Program,
-): { classInfo: ClassInfo; decl: ts.ClassDeclaration } | null {
+): PrototypeHost[] {
   const fn = param.parent;
-  if (!ts.isFunctionDeclaration(fn) || !fn.name) return null;
+  if (!ts.isFunctionDeclaration(fn) || !fn.name) return [];
   const index = fn.parameters.indexOf(param);
-  if (index < 0) return null;
-  const fnSym = checker.getSymbolAtLocation(fn.name);
+  if (index < 0) return [];
+  const fnDecl = resolvedDeclaration(fn.name, checker) ?? fn;
   const fnName = fn.name.text;
 
-  let found: { classInfo: ClassInfo; decl: ts.ClassDeclaration } | null = null;
+  const hosts: PrototypeHost[] = [];
   for (const sourceFile of program.getSourceFiles()) {
-    if (found) break;
     if (!sourceFile.fileName.startsWith(srcDir)) continue;
     if (sourceFile.fileName.endsWith(".test.ts")) continue;
     const walk = (n: ts.Node): void => {
-      if (found) return;
       if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === fnName) {
-        const calleeSym0 = checker.getSymbolAtLocation(n.expression);
-        const calleeSym =
-          calleeSym0 && calleeSym0.flags & ts.SymbolFlags.Alias
-            ? checker.getAliasedSymbol(calleeSym0)
-            : calleeSym0;
-        if (fnSym === undefined || calleeSym === undefined || calleeSym === fnSym) {
-          const arg = n.arguments[index];
-          if (arg !== undefined) {
-            const argExpr = unwrapTsExpression(arg);
-            if (ts.isIdentifier(argExpr)) {
-              const s0 = checker.getSymbolAtLocation(argExpr);
-              const s = s0 && s0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(s0) : s0;
-              const argDecl = s?.valueDeclaration ?? s?.declarations?.[0];
-              if (argDecl && ts.isClassDeclaration(argDecl)) {
-                const classInfo = classInfoForDeclaration(argDecl, info, srcDir);
-                if (classInfo) found = { classInfo, decl: argDecl };
-              }
-            }
+        const callee = resolvedDeclaration(n.expression, checker);
+        const arg = n.arguments[index];
+        if ((callee === null || callee === fnDecl) && arg !== undefined) {
+          const argExpr = unwrapTsExpression(arg);
+          const argDecl = ts.isIdentifier(argExpr) ? resolvedDeclaration(argExpr, checker) : null;
+          if (argDecl && ts.isClassDeclaration(argDecl)) {
+            const host = hostForClassDeclaration(argDecl, info, srcDir);
+            if (host && !hosts.some((h) => h.decl === host.decl)) hosts.push(host);
           }
         }
       }
@@ -1954,7 +1944,7 @@ function hostPassedToParameter(
     };
     ts.forEachChild(sourceFile, walk);
   }
-  return found;
+  return hosts;
 }
 
 /** The statements of a for-of body, whether or not it is a block. */
@@ -1987,7 +1977,7 @@ function extractPrototypeAssignmentForOf(
   const nameVar = forOfElementName(node);
   if (nameVar === null) return;
 
-  let host: { classInfo: ClassInfo; decl: ts.ClassDeclaration } | null = null;
+  let hosts: PrototypeHost[] = [];
   let params: ParamInfo[] = [];
   for (const stmt of loopBodyStatements(node)) {
     if (!ts.isExpressionStatement(stmt)) continue;
@@ -1998,8 +1988,8 @@ function extractPrototypeAssignmentForOf(
     if (!ts.isElementAccessExpression(lhs)) continue;
     const arg = lhs.argumentExpression;
     if (!ts.isIdentifier(arg) || arg.text !== nameVar) continue;
-    host = resolvePrototypeHost(lhs.expression, info, checker, srcDir, program);
-    if (!host) continue;
+    hosts = resolvePrototypeHosts(lhs.expression, info, checker, srcDir, program);
+    if (hosts.length === 0) continue;
     const rhs = unwrapTsExpression(expr.right);
     params =
       ts.isFunctionExpression(rhs) || ts.isArrowFunction(rhs)
@@ -2007,21 +1997,21 @@ function extractPrototypeAssignmentForOf(
         : (paramsOfCallableRef(rhs, checker) ?? []);
     break;
   }
-  if (!host) return;
-
-  const names = resolveStringLiteralList(node.expression, checker, host.decl);
-  if (names === null || names.length === 0) return;
 
   const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
-  for (const name of names) {
-    if (host.classInfo.instanceMethods.some((m) => m.name === name)) continue;
-    host.classInfo.instanceMethods.push({
-      name,
-      visibility: "public",
-      params,
-      line,
-      file: host.classInfo.file,
-    });
+  for (const host of hosts) {
+    const names = resolveStringLiteralList(node.expression, checker, host.decl);
+    if (names === null) continue;
+    for (const name of names) {
+      if (host.classInfo.instanceMethods.some((m) => m.name === name)) continue;
+      host.classInfo.instanceMethods.push({
+        name,
+        visibility: "public",
+        params,
+        line,
+        file: host.classInfo.file,
+      });
+    }
   }
 }
 
@@ -2210,30 +2200,29 @@ function extractDefinePropertyAccessorForOf(
   }
   if (!call) return;
 
-  const host = resolvePrototypeHost(call.target, info, checker, srcDir, program);
-  if (!host) return;
-
-  const values = resolveStringLiteralList(node.expression, checker, host.decl);
-  if (values === null || values.length === 0) return;
-
   const set = definePropertyAccessors(call.descriptor).set;
   const writerParams = set === null ? null : setterParams(set);
   const line = node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1;
 
-  const names: string[] = [];
-  for (const value of values) {
-    const name = evaluateGeneratedName(
-      call.nameExpr,
-      nameVar,
-      statements,
-      value,
-      checker,
-      host.decl,
-    );
-    if (name === null) return;
-    names.push(name);
+  for (const host of resolvePrototypeHosts(call.target, info, checker, srcDir, program)) {
+    const values = resolveStringLiteralList(node.expression, checker, host.decl);
+    if (values === null) continue;
+    const names: string[] = [];
+    for (const value of values) {
+      const name = evaluateGeneratedName(
+        call.nameExpr,
+        nameVar,
+        statements,
+        value,
+        checker,
+        host.decl,
+      );
+      if (name === null) break;
+      names.push(name);
+    }
+    if (names.length !== values.length) continue;
+    for (const name of names) pushGeneratedAccessor(host.classInfo, name, line, writerParams);
   }
-  for (const name of names) pushGeneratedAccessor(host.classInfo, name, line, writerParams);
 }
 
 /**
@@ -2252,16 +2241,12 @@ function extractDefinePropertyAccessorDirect(
   if (!ts.isCallExpression(expr)) return;
   const call = findDefinePropertyAccessorCall(expr);
   if (!call || !ts.isStringLiteral(call.nameExpr)) return;
-  const host = resolvePrototypeHost(call.target, info, checker, srcDir, program);
-  if (!host) return;
   const set = definePropertyAccessors(call.descriptor).set;
+  const writerParams = set === null ? null : setterParams(set);
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
-  pushGeneratedAccessor(
-    host.classInfo,
-    call.nameExpr.text,
-    line,
-    set === null ? null : setterParams(set),
-  );
+  for (const host of resolvePrototypeHosts(call.target, info, checker, srcDir, program)) {
+    pushGeneratedAccessor(host.classInfo, call.nameExpr.text, line, writerParams);
+  }
 }
 
 /**
