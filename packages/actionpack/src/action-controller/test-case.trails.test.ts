@@ -22,3 +22,16 @@ describe("ActionController::TestSession", () => {
     expect(getRubyClassPath(TestSession)).toBe("ActionController::TestSession");
   });
 });
+
+// Trails-only cover: `SessionHash#inspect`'s not-yet-loaded arm
+// (`vendor/rack-session/lib/rack/session/abstract/id.rb:152-156`) renders the
+// Ruby constant path a `TestSession` registers. Ruby reaches an unloaded
+// TestSession through `allocate`; `Object.create` is its JS analogue.
+describe("TestSession#inspect", () => {
+  it("renders the not-yet-loaded arm with the Ruby constant path", () => {
+    const session = Object.create(TestSession.prototype) as TestSession;
+    expect(session.inspect()).toMatch(
+      /^#<ActionController::TestSession:0x[0-9a-f]+ not yet loaded>$/,
+    );
+  });
+});

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { SessionId } from "@blazetrails/rack-session";
 import { TestCase, TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 import { UploadedFile } from "../action-dispatch/http/upload.js";
 import { Base } from "./base.js";
@@ -32,15 +33,16 @@ describe("TestSession Rails-mirroring API", () => {
     const s = new TestSession({ a: 1 });
     expect(s.fetch("a")).toBe(1);
     expect(s.fetch("b", 99)).toBe(99);
-    expect(s.fetch("c", () => "lazy")).toBe("lazy");
-    expect(s.fetch("d", (k: string) => `missing:${k}`)).toBe("missing:d");
+    expect(s.fetch("c", undefined, () => "lazy")).toBe("lazy");
+    expect(s.fetch("d", undefined, (k: string) => `missing:${k}`)).toBe("missing:d");
     expect(() => s.fetch("missing")).toThrow();
   });
 
   it("idWas / loadBang return the constructor-frozen id", () => {
-    const s = new TestSession({}, "abc123");
-    expect(s.idWas()).toBe("abc123");
-    expect(s.loadBang()).toBe("abc123");
+    const id = new SessionId("abc123");
+    const s = new TestSession({}, id);
+    expect(s.idWas()).toBe(id);
+    expect(s.loadBang()).toBe(id);
   });
 });
 
