@@ -253,7 +253,6 @@ export class AppGenerator extends AppBase {
       `/node_modules/
 /dist/
 /.trails/
-/public/assets
 /.env*
 !/.env.example
 
@@ -269,7 +268,7 @@ export class AppGenerator extends AppBase {
 /storage/*
 !/storage/.gitkeep
 
-/public/assets/
+/public/assets
 
 *.tsbuildinfo
 `,
