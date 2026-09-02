@@ -13,8 +13,8 @@ import {
   type RequestCookieMethodsHost,
 } from "../../action-dispatch/middleware/cookies.js";
 import { SessionHash, setRubyClassPath } from "@blazetrails/rack-session";
-import type { PersistedRequest, Persisted } from "@blazetrails/rack-session";
-import { type Req } from "../../action-dispatch/request/session.js";
+import type { Persisted, PersistedRequest } from "@blazetrails/rack-session";
+import type { Req } from "../../action-dispatch/request/session.js";
 import { ActionControllerError } from "./exceptions.js";
 
 export class InvalidAuthenticityToken extends ActionControllerError {
