@@ -168,15 +168,16 @@ export class Application extends Engine {
   /**
    * Mirrors `Application#railties_initializers` (`application.rb:614-624`).
    *
+   * Rails has a single `Rails::Railtie`, so `ActiveRecord::Railtie` and its
+   * siblings arrive here inside `ordered_railties`' `:all` slot
+   * (`application.rb:588-612`). trails splits the class in two — framework
+   * railties subclass `Railtie` from `@blazetrails/activesupport`, because a
+   * framework package cannot depend on trailties — so their registry is
+   * collected first, the position the `:all` bucket puts them in.
+   *
    * @internal
    */
   railtiesInitializers(current: Collection): Collection {
-    // Rails has a single `Rails::Railtie`, so `ActiveRecord::Railtie` and its
-    // siblings reach here through `ordered_railties`' `:all` slot
-    // (`application.rb:588-624`). trails splits the class in two — framework
-    // railties subclass `Railtie` from `@blazetrails/activesupport`, because a
-    // framework package cannot depend on trailties — so their registry is
-    // collected first, which is the position the `:all` bucket puts them in.
     let initializers = new Collection();
     for (const railtie of BaseRailtie.subclasses) {
       for (const { name, block } of railtie.initializers) {
