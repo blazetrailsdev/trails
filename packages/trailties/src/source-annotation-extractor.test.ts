@@ -101,7 +101,7 @@ describe("SourceAnnotationExtractor", () => {
   });
 
   test("registerExtensions adds new file types", async () => {
-    Annotation.registerExtensions(["scss"], (tag) => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`));
+    Annotation.registerExtensions("scss", (tag) => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`));
     w("app/a.scss", "// TODO: styled");
     expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
       `app/a.scss:\n  * [1] [TODO] styled\n\n`,

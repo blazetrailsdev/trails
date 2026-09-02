@@ -43,15 +43,19 @@ export class Annotation {
 
   /**
    * Registers new Annotations File Extensions
-   *   Annotation.registerExtensions(["css", "scss"], (tag) => ...)
+   *   Annotation.registerExtensions("css", "scss", "sass", "less", "js", (tag) =>
+   *     new RegExp(`//\\s*(${tag}):?\\s*(.*)$`))
    *
-   * Mirrors: `self.register_extensions` (`source_annotation_extractor.rb:98`).
-   * Ruby's trailing `&block` is the `builder` argument — the settled trails
-   * spelling for a block — which a TS rest parameter cannot follow, so `exts`
-   * is an array where Ruby splats.
+   * Mirrors: `self.register_extensions` (`source_annotation_extractor.rb:98-99`).
+   * Ruby's trailing `&block` is the `ExtensionBuilder` argument — the settled
+   * trails spelling for a block — so it rides the splat's last slot.
    */
-  static registerExtensions(exts: string[], builder: ExtensionBuilder): void {
-    this.extensions.push({ test: new RegExp(`\\.(${exts.join("|")})$`), builder });
+  static registerExtensions(...exts: [...string[], ExtensionBuilder]): void {
+    const block = exts.pop() as ExtensionBuilder;
+    this.extensions.push({
+      test: new RegExp(`\\.(${(exts as string[]).join("|")})$`),
+      builder: block,
+    });
   }
 
   constructor(
@@ -82,11 +86,12 @@ export function resetAnnotationRegistry(): void {
 
 function registerDefaults(): void {
   const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
-  Annotation.registerExtensions(["ts", "js", "mjs", "cjs", "tsx", "jsx"], slash);
-  Annotation.registerExtensions(["css", "scss", "sass", "less"], slash);
-  Annotation.registerExtensions(["yml", "yaml"], (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
+  Annotation.registerExtensions("ts", "js", "mjs", "cjs", "tsx", "jsx", slash);
+  Annotation.registerExtensions("css", "scss", "sass", "less", slash);
+  Annotation.registerExtensions("yml", "yaml", (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
   Annotation.registerExtensions(
-    ["ejs", "tse"],
+    "ejs",
+    "tse",
     (tag) => new RegExp(`<%\\s*#\\s*(${tag}):?\\s*(.*?)\\s*%>`),
   );
 }
