@@ -558,7 +558,7 @@ describe("DefineAttributeTest", () => {
       }
     }
     expect(Post._defaultAttributes().getAttribute("score")).toBeInstanceOf(UserProvidedDefault);
-    expect(Post._defaultAttributes().getAttribute("score").getOriginalAttribute()).toBeNull();
+    expect(Post._defaultAttributes().getAttribute("score").originalAttribute).toBeNull();
   });
 
   it("define_attribute writes into the memoized _defaultAttributes", () => {

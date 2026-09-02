@@ -81,7 +81,7 @@ describe("Attribute — trails-only coverage", () => {
     const original = Attribute.fromDatabase("name", "old", stringType);
     const changed = original.withValueFromUser("new");
     const retyped = changed.withType(otherType);
-    expect(retyped.getOriginalAttribute()).toBe(original);
+    expect(retyped.originalAttribute).toBe(original);
     expect(retyped.type).toBe(otherType);
     expect(retyped.valueBeforeTypeCast).toBe("new");
   });
@@ -211,7 +211,7 @@ describe("Attribute — trails-only coverage", () => {
       const duped = assigned.deepDup();
 
       expect(duped).not.toBe(assigned);
-      expect(duped.getOriginalAttribute()).toBe(assigned.getOriginalAttribute());
+      expect(duped.originalAttribute).toBe(assigned.originalAttribute);
       expect(duped.originalValue).toBe("Alice");
       expect(duped.isChanged()).toBe(true);
     });

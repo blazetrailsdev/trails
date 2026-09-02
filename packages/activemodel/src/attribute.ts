@@ -22,12 +22,14 @@ export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
 const rubyNamespace: unique symbol = Symbol.for("@blazetrails:rubyNamespace");
 
 export abstract class Attribute {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel";
 
   readonly name: string;
   protected _valueBeforeTypeCast: unknown;
   readonly type: Type;
-  protected originalAttribute: Attribute | null;
+  /** @internal */
+  originalAttribute: Attribute | null;
   private _value: unknown;
   private _hasValue: boolean;
   private _cachedValueForDatabase: unknown;
@@ -235,26 +237,10 @@ export abstract class Attribute {
     dup.initializeDup(this);
     return dup;
   }
-
-  getOriginalAttribute(): Attribute | null {
-    return this.originalAttribute;
-  }
-
-  setOriginalAttribute(attr: Attribute | null): void {
-    this.originalAttribute = attr;
-  }
-
-  static fromUserWithValue(
-    name: string,
-    rawValue: unknown,
-    castValue: unknown,
-    type: Type,
-  ): FromUser {
-    return new FromUser(name, rawValue, type, null, castValue);
-  }
 }
 
 export class FromDatabase extends Attribute {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type.deserialize(value);
@@ -272,6 +258,7 @@ export class FromDatabase extends Attribute {
 }
 
 export class FromUser extends Attribute {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return this.type.cast(value);
@@ -292,6 +279,7 @@ export class FromUser extends Attribute {
 }
 
 export class WithCastValue extends Attribute {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
     return value;
@@ -303,6 +291,7 @@ export class WithCastValue extends Attribute {
 }
 
 export class Null extends Attribute {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string) {
     super(name, null, defaultValue());
@@ -326,6 +315,7 @@ export class Null extends Attribute {
 }
 
 export class Uninitialized extends Attribute {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   constructor(name: string, type: Type) {
     super(name, null, type);

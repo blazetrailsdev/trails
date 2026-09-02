@@ -225,7 +225,7 @@ function isIncludeHash(value: unknown): value is Record<string, SerializeOptions
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** @noRailsEquivalent CONVERGEABLE serializable-hash-async-return-boundary */
+/** @noRailsEquivalent PERMANENT */
 async function preloadIncludes(
   record: SerializationRecord,
   options: SerializeOptions,
@@ -278,6 +278,7 @@ async function resolveIncludeAsync(record: SerializationRecord, name: string): P
   return raw;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function asJsonThenable(
   serialize: () => Record<string, unknown>,
   root: boolean | string | null | undefined,
@@ -297,6 +298,7 @@ export function asJsonThenable(
   );
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function thenableHash(
   sync: () => Record<string, unknown>,
   async: () => Promise<Record<string, unknown>>,
