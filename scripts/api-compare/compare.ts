@@ -3212,17 +3212,6 @@ export function main() {
     // and `ownersWithBodies`.
     const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
-    // (file → name → owner → the file the member is DECLARED in), recorded only
-    // where it differs from the entity's own file — see `declFileFor`.
-    // The same population split by the SEAT each owner declares the name on
-    // (file → name → owners), so `resolveTsOwner` can pair a Ruby
-    // `X::ClassMethods` owner with the static declaration and the bare `X`
-    // owner with the prototype one (RFC 0108).
-    // The owners that declare the name as a `set` accessor (file → name →
-    // owners) — the port's spelling of Ruby's `name=` writer, so
-    // `resolveTsOwner` can keep a Ruby reader off it (RFC 0108).
-    // (file → name → owners) split by declaration shape — see `MethodInfo.bodyless`
-    // and `ownersWithBodies`.
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
