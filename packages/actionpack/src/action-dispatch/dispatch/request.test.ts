@@ -215,7 +215,7 @@ describe("RequestMethod", () => {
 
     expect(req.requestMethod).toBe("GET");
     expect(req.env["REQUEST_METHOD"]).toBe("GET");
-    expect(req.isGet).toBe(true);
+    expect(req.isGet()).toBe(true);
   });
 
   it("method returns original value of environment request method on POST", () => {
@@ -231,7 +231,7 @@ describe("RequestMethod", () => {
 
     expect(req.method).toBe("POST");
     expect(req.requestMethod).toBe("PATCH");
-    expect(req.isPatch).toBe(true);
+    expect(req.isPatch()).toBe(true);
   });
 
   it("post masquerading as put", () => {
@@ -241,7 +241,7 @@ describe("RequestMethod", () => {
     });
     expect(req.method).toBe("POST");
     expect(req.requestMethod).toBe("PUT");
-    expect(req.isPut).toBe(true);
+    expect(req.isPut()).toBe(true);
   });
 
   it("invalid http method raises exception", () => {
@@ -276,7 +276,7 @@ describe("RequestMimeType", () => {
     const req = new Request({});
     expect(req.contentMimeType).toBeNull();
     expect(req.mediaType).toBeUndefined();
-    expect(req.contentType).toBeUndefined();
+    expect(req.contentType).toBeNull();
   });
 
   it("content type is XML", () => {
@@ -331,7 +331,7 @@ describe("RequestMimeType", () => {
 describe("RequestParamsParsing", () => {
   it("doesn't break when content type has charset", () => {
     const req = new Request({ CONTENT_TYPE: "text/html; charset=utf-8" });
-    expect(req.contentType).toBe("text/html");
+    expect(req.mediaType).toBe("text/html");
   });
 
   it("doesn't interpret request uri as query string when missing", () => {

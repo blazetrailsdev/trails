@@ -34,8 +34,8 @@ export interface ImplicitRenderHost {
   /** Rails' messages read `self.class.name`, not `controller_name`. */
   constructor: { name: string };
   request?: {
-    /** Rails `request.get?` — a boolean getter on trails' `Request`. */
-    isGet?: boolean;
+    /** Rails `request.get?` — `Rack::Request::Helpers#get?`. */
+    isGet?(): boolean;
     /** Rails compares `request.format == Mime[:html]`; `symbol` is the trails
      *  spelling, answered by both `MimeType` and `NullType`. */
     format?: { symbol?: string | null };
@@ -138,5 +138,5 @@ export function methodForAction(
 export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   const req = this.request;
   if (!req) return false;
-  return req.isGet === true && req.format?.symbol === "html" && req.xhr !== true;
+  return req.isGet?.() === true && req.format?.symbol === "html" && req.xhr !== true;
 }
