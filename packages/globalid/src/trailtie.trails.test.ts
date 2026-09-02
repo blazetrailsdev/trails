@@ -29,7 +29,7 @@ describe("GlobalID::Railtie verifier derivation", () => {
   });
 
   const blogApp = (): TrailtieApp & { config: { globalId: GlobalIdConfig } } => ({
-    railtieName: () => "blog_app_application",
+    railtieName: "blog_app_application",
     config: { globalId: {} },
     keyGenerator: () => new KeyGenerator("x".repeat(30), { iterations: 1000 }),
   });

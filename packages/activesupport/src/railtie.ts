@@ -82,15 +82,24 @@ export class Railtie {
   }
 
   /**
+   * The initializers registered directly on this class, in registration
+   * order.
+   *
+   * Mirrors: Rails::Initializable::ClassMethods#initializers
+   * (`railties/lib/rails/initializable.rb:70-72`)
+   */
+  static get initializers(): Array<{ name: string; block: InitializerBlock }> {
+    const host = this as any;
+    return Object.prototype.hasOwnProperty.call(host, "_initializers") ? host._initializers : [];
+  }
+
+  /**
    * Run all initializers registered on this class (in registration order).
    *
    * Mirrors: Rails::Railtie#run_initializers
    */
   static runInitializers(...args: unknown[]): void {
-    const host = this as any;
-    const own: Array<{ name: string; block: InitializerBlock }> =
-      Object.prototype.hasOwnProperty.call(host, "_initializers") ? host._initializers : [];
-    for (const { block } of own) {
+    for (const { block } of this.initializers) {
       block(...args);
     }
   }

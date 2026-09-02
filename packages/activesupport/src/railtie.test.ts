@@ -88,7 +88,7 @@ describe("Railtie", () => {
     }
     const seen: unknown[] = [];
     C.initializer("c", (app) => seen.push(app));
-    const app = { railtieName: () => "blog_app_application" };
+    const app = { railtieName: "blog_app_application" };
     C.runInitializers(app);
     expect(seen).toEqual([app]);
   });

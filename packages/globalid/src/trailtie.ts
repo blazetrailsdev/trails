@@ -32,7 +32,9 @@ export interface GlobalIdConfig {
  * `railtie.rb:13` seeded, so `globalId` is optional here and defaults to that
  * same seed rather than being a slot each app has to build. */
 export interface TrailtieApp {
-  railtieName(): string;
+  /** Rails: `delegate :railtie_name, to: :class` (`railtie.rb:220`) — a zero-arg
+   * reader, so trails spells it a property (`trailties/src/trailtie.ts:115`). */
+  railtieName: string;
   config: { globalId?: GlobalIdConfig };
   keyGenerator(): { generateKey(salt: string): string | Buffer };
 }
@@ -79,7 +81,7 @@ export class Trailtie extends BaseRailtie {
   static initialize(app: TrailtieApp): void {
     const config = (app.config.globalId ??= BaseRailtie.config["globalId"] as GlobalIdConfig);
     const defaultExpiresIn = months(1).toI();
-    const defaultAppName = dasherize(app.railtieName().replace("_application", ""));
+    const defaultAppName = dasherize(app.railtieName.replace("_application", ""));
 
     setApp((config.app ??= defaultAppName));
     SignedGlobalID.expiresIn =

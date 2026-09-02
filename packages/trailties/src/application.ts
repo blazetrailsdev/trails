@@ -8,6 +8,7 @@ import {
   getEnv,
   getFsAsync,
   getPathAsync,
+  Railtie as BaseRailtie,
   runLoadHooks,
   setTrailsRoot,
   underscore,
@@ -23,7 +24,7 @@ import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
 import { resolveEnv, loadDatabaseConfig, type DatabaseConfig } from "./database.js";
-import { Collection, type InitializerGroup } from "./initializable.js";
+import { Collection, Initializer, type InitializerGroup } from "./initializable.js";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import type { MiddlewareStack, RackApp } from "@blazetrails/actionpack";
 
@@ -170,7 +171,18 @@ export class Application extends Engine {
    * @internal
    */
   railtiesInitializers(current: Collection): Collection {
+    // Rails has a single `Rails::Railtie`, so `ActiveRecord::Railtie` and its
+    // siblings reach here through `ordered_railties`' `:all` slot
+    // (`application.rb:588-624`). trails splits the class in two — framework
+    // railties subclass `Railtie` from `@blazetrails/activesupport`, because a
+    // framework package cannot depend on trailties — so their registry is
+    // collected first, which is the position the `:all` bucket puts them in.
     let initializers = new Collection();
+    for (const railtie of BaseRailtie.subclasses) {
+      for (const { name, block } of railtie.initializers) {
+        initializers.push(new Initializer<unknown>(name, this, {}, block));
+      }
+    }
     for (const r of [...this.orderedRailties()].reverse().flat()) {
       if (r === this) {
         initializers = initializers.plus(current);
