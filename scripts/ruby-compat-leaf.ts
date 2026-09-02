@@ -53,11 +53,6 @@ export interface ModuleSpecifier {
   kind: SpecifierKind;
 }
 
-/** The kinds a bundler resolves, and so the kinds the leaf property forbids. */
-export function bindsTheBundle(kind: SpecifierKind): boolean {
-  return kind !== "require";
-}
-
 /**
  * Every module specifier a built module names, in source order — parsed, not
  * pattern-matched, so a side-effect `import "node:fs"`, an `export * from`, an
@@ -135,7 +130,7 @@ export async function nodeBuiltinImports(packageDir: string): Promise<LeafViolat
     if (isCompiledTestFile(file)) continue;
     const source = await readFile(path.join(dist, file), "utf-8");
     for (const { specifier, kind } of moduleSpecifiers(source)) {
-      if (!bindsTheBundle(kind)) continue;
+      if (kind === "require") continue;
       const builtin = nodeBuiltinNamed(specifier);
       if (builtin) violations.push({ file, specifier, kind, builtin });
     }

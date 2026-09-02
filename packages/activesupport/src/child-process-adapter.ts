@@ -131,9 +131,6 @@ function tryAutoRegisterNode(): boolean {
     const nodeModule = require("node:module") as {
       createRequire: (from: string | URL) => NodeRequire;
     };
-    // Only Node builtins are loaded through this require, so the base path is
-    // never resolved against — a fixed sentinel keeps the file off `__filename`,
-    // which ruby-compat's browser-safe-leaf lint bans outright.
     const req = nodeModule.createRequire("file:///activesupport");
     const cp = req("node:child_process") as unknown as NodeChildProcess;
     registry.set("node", wrap(cp));

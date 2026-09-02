@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import {
   declaredDependencies,
   isCompiledTestFile,
-  bindsTheBundle,
   moduleSpecifiers,
   nodeBuiltinImports,
   nodeBuiltinNamed,
@@ -55,12 +54,6 @@ describe("ruby-compat leaf guard", () => {
     ]);
   });
 
-  it("binds the bundle for the specifier kinds a bundler resolves", () => {
-    expect(bindsTheBundle("static")).toBe(true);
-    expect(bindsTheBundle("dynamic")).toBe(true);
-    expect(bindsTheBundle("require")).toBe(false);
-  });
-
   it("exempts compiled test files", () => {
     expect(isCompiledTestFile("hash.trails.test.js")).toBe(true);
     expect(isCompiledTestFile("hash.js")).toBe(false);
@@ -73,9 +66,13 @@ describe("ruby-compat leaf guard", () => {
     expect(await nodeBuiltinImports(dir)).toEqual([]);
 
     await writeFile(path.join(dir, "dist", "static.js"), 'import "node:fs";\n');
+    await writeFile(path.join(dir, "dist", "dynamic.js"), 'await import("node:os");\n');
     expect(await nodeBuiltinImports(dir)).toEqual([
+      { file: "dynamic.js", specifier: "node:os", kind: "dynamic", builtin: "os" },
       { file: "static.js", specifier: "node:fs", kind: "static", builtin: "fs" },
     ]);
+
+    await rm(dir, { recursive: true, force: true });
   });
 
   it("no built ruby-compat runtime module imports a Node builtin", async () => {
