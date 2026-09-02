@@ -110,4 +110,10 @@ describe("AssetTagHelper (assert_dom_equal ports)", () => {
     };
     expect(assetPath.call(host, "/foo.css")).toBe("http://cdn.example.com/foo.css");
   });
+
+  it("raises rather than masking a :request protocol asked for without a request", () => {
+    host.request = null;
+    host.config!.assetHost = "assets.example.com";
+    expect(() => assetPath.call(host, "/foo.css", { protocol: ":request" })).toThrow(TypeError);
+  });
 });

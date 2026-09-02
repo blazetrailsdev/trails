@@ -184,7 +184,7 @@ export function computeAssetHost(
       case ":relative":
         return `//${host}`;
       case ":request":
-        return `${request?.protocol ?? ""}${host}`;
+        return `${request!.protocol}${host}`;
       default:
         return `${protocol.replace(/^:/, "")}://${host}`;
     }
