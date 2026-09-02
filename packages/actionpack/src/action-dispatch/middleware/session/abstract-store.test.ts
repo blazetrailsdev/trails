@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { Request as RackRequest, ResponseRaw } from "@blazetrails/rack";
+import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
 
 import { Request } from "../../request.js";
 import { Session as RequestSession } from "../../request/session.js";
@@ -8,9 +9,6 @@ import {
   AbstractSecureStore,
   AbstractStore,
   Compatibility,
-  Persisted,
-  PersistedSecure,
-  SessionId,
   SessionObject,
   SessionRestoreError,
   StaleSessionCheck,

@@ -52,7 +52,8 @@ export type NullSessionRequest = Req &
 /**
  * Mirrors `NullSession::NullSessionHash`
  * (request_forgery_protection.rb:270-287). Rails subclasses
- * `Rack::Session::Abstract::SessionHash`; trails' analogue is
+ * `Rack::Session::Abstract::SessionHash`
+ * (`vendor/rack-session/lib/rack/session/abstract/id.rb:50`); trails subclasses
  * `ActionDispatch::Request::Session`, which is the session object a trails
  * request carries.
  */

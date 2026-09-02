@@ -8,7 +8,8 @@
  * `AbstractSecureStore` base classes that `include` all three on top
  * of `Rack::Session::Abstract::Persisted` / `PersistedSecure`. Those two
  * Rack base classes live in the `rack-session` gem rather than in Rails,
- * so they are ported in `@blazetrails/rack-session` and re-exported here.
+ * so they are ported in `@blazetrails/rack-session`
+ * (`vendor/rack-session/lib/rack/session/abstract/id.rb`).
  */
 
 import { include as includeMixin, getCrypto } from "@blazetrails/activesupport";
@@ -17,16 +18,6 @@ import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
 import { Request } from "../../request.js";
 import { Session as RequestSession } from "../../request/session.js";
-
-export {
-  DEFAULT_OPTIONS,
-  Persisted,
-  PersistedSecure,
-  SessionId,
-  type PersistedRequest,
-  type PersistedSession,
-  type SessionClass,
-} from "@blazetrails/rack-session";
 
 /** Raised when a session payload references a class that isn't loaded. */
 export class SessionRestoreError extends Error {
