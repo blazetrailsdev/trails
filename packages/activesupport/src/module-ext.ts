@@ -1,6 +1,7 @@
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
+import { extractOptionsBang } from "./hash-utils.js";
 
 /**
  * Module extensions mirroring Rails ActiveSupport module/class extensions.
@@ -21,13 +22,14 @@ import { Delegation, type DelegateOptions } from "./delegation.js";
  * so neither keyword has a counterpart to carry.
  *
  * Usage:
- *   delegate(MyClass.prototype, ["street", "city"], { to: "place" });
- *   delegate(MyClass.prototype, ["name"], { to: "place", prefix: true });
+ *   delegate.call(MyClass.prototype, "street", "city", { to: "place" });
+ *   delegate.call(MyClass.prototype, "name", { to: "place", prefix: true });
  */
-export function delegate(target: object, methods: string[], options: DelegateOptions): string[] {
-  const { to, prefix, allowNil } = options;
+export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
+  const [syms, options] = extractOptionsBang(methods);
+  const { to, prefix, allowNil } = options as unknown as DelegateOptions;
 
-  return Delegation.generate(target, methods, { to, prefix, allowNil });
+  return Delegation.generate(this, syms as string[], { to, prefix, allowNil });
 }
 
 /**
@@ -109,11 +111,13 @@ function setMattrDefault(
  * Mirrors: Module#mattr_reader (`module/attribute_accessors.rb:54-73`).
 
  */
-export function mattrReader(target: any, syms: string[], options: MattrOptions = {}): void {
+export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void {
+  const target = this;
+  const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
   const instanceReader = options.instanceReader !== false;
   const instanceAccessor = options.instanceAccessor !== false;
 
-  for (const sym of syms) {
+  for (const sym of names) {
     assertValidAttrName(sym);
     const storageKey = `__mattr_${sym}__`;
 
@@ -138,11 +142,13 @@ export const cattrReader = mattrReader;
  *
  * Mirrors: Module#mattr_writer (`module/attribute_accessors.rb:121-139`).
  */
-export function mattrWriter(target: any, syms: string[], options: MattrOptions = {}): void {
+export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void {
+  const target = this;
+  const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
   const instanceWriter = options.instanceWriter !== false;
   const instanceAccessor = options.instanceAccessor !== false;
 
-  for (const sym of syms) {
+  for (const sym of names) {
     assertValidAttrName(sym);
     const storageKey = `__mattr_${sym}__`;
 
@@ -181,12 +187,13 @@ export const cattrWriter = mattrWriter;
  * trails drops `default` before the writer call instead, which is the same
  * no-op reached without evaluating a function-valued default a second time.
  */
-export function mattrAccessor(target: any, syms: string[], options: MattrOptions = {}): void {
+export function mattrAccessor(this: any, ...syms: (string | MattrOptions)[]): void {
+  const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
   const writerOptions: MattrOptions = { ...options };
   delete writerOptions.default;
 
-  mattrReader(target, syms, options);
-  mattrWriter(target, syms, writerOptions);
+  mattrReader.call(this, ...names, options);
+  mattrWriter.call(this, ...names, writerOptions);
 }
 
 /**
@@ -204,8 +211,8 @@ export const cattrAccessor = mattrAccessor;
  * manifest cannot back it here because trails hosts it in module-ext.ts rather than a
  * configurable.ts, and the manifest keys private names by the .rb they live in.
  */
-export function configAccessor(target: any, syms: string[], options: MattrOptions = {}): void {
-  mattrAccessor(target, syms, options);
+export function configAccessor(this: any, ...syms: (string | MattrOptions)[]): void {
+  mattrAccessor.call(this, ...syms);
 }
 
 let _attrInternalNamingFormat = "_%s";
@@ -232,7 +239,8 @@ function internalStorageKey(name: string): string {
 /**
  * attrInternalReader — defines a reader for an attribute stored in a prefixed key.
  */
-export function attrInternalReader(target: object, ...attrs: string[]): void {
+export function attrInternalReader(this: object, ...attrs: string[]): void {
+  const target = this;
   for (const name of attrs) {
     assertValidAttrName(name);
     const storageKey = internalStorageKey(name);
@@ -247,7 +255,8 @@ export function attrInternalReader(target: object, ...attrs: string[]): void {
 /**
  * attrInternalWriter — defines a writer for an attribute stored in a prefixed key.
  */
-export function attrInternalWriter(target: object, ...attrs: string[]): void {
+export function attrInternalWriter(this: object, ...attrs: string[]): void {
+  const target = this;
   for (const name of attrs) {
     assertValidAttrName(name);
     const storageKey = internalStorageKey(name);
@@ -273,9 +282,9 @@ export function attrInternalWriter(target: object, ...attrs: string[]): void {
  *
  * Mirrors: Module#attr_internal_accessor (`module/attr_internal.rb:16-19`).
  */
-export function attrInternalAccessor(target: object, ...attrs: string[]): void {
-  attrInternalReader(target, ...attrs);
-  attrInternalWriter(target, ...attrs);
+export function attrInternalAccessor(this: object, ...attrs: string[]): void {
+  attrInternalReader.call(this, ...attrs);
+  attrInternalWriter.call(this, ...attrs);
 }
 
 /**
@@ -385,17 +394,20 @@ function getRescueHandlers(target: object): RescueEntry[] {
  * Mirrors Rails Rescuable::ClassMethods#rescue_from.
  *
  * Usage:
- *   rescueFrom(MyClass, [SomeError], { with: (e) => console.log(e) });
- *   rescueFrom(MyClass, [SomeError], { with: "handleError" });
+ *   rescueFrom.call(MyClass, SomeError, { with: (e) => console.log(e) });
+ *   rescueFrom.call(MyClass, SomeError, { with: "handleError" });
  */
 export function rescueFrom(
-  target: any,
-  klasses: Array<new (...args: any[]) => Error>,
-  options: { with?: ErrorHandler } = {},
+  this: any,
+  ...klasses: Array<(new (...args: any[]) => Error) | { with?: ErrorHandler }>
 ): void {
+  const [errorClasses, options] = extractOptionsBang(klasses) as [
+    Array<new (...args: any[]) => Error>,
+    { with?: ErrorHandler },
+  ];
   const handler = options.with;
   if (!handler) throw new Error("rescueFrom requires a :with handler");
-  getRescueHandlers(target).push({ errorClasses: klasses, handler });
+  getRescueHandlers(this).push({ errorClasses, handler });
 }
 
 /**

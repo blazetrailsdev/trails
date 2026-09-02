@@ -181,7 +181,7 @@ describe("DeprecationTest", () => {
 describe("ModuleTest", () => {
   it("mattr_accessor — defines class-level getter/setter", () => {
     class MyClass {}
-    mattrAccessor(MyClass as unknown as { new (): unknown } & Record<string, unknown>, ["setting"]);
+    mattrAccessor.call(MyClass, "setting");
     const klass = MyClass as unknown as Record<string, unknown>;
     klass["setting"] = 42;
     expect(klass["setting"]).toBe(42);
@@ -189,7 +189,7 @@ describe("ModuleTest", () => {
 
   it("cattr_accessor — alias for mattrAccessor", () => {
     class Config {}
-    cattrAccessor(Config as unknown as { new (): unknown } & Record<string, unknown>, ["value"]);
+    cattrAccessor.call(Config, "value");
     const klass = Config as unknown as Record<string, unknown>;
     klass["value"] = 99;
     expect(klass["value"]).toBe(99);
@@ -197,7 +197,7 @@ describe("ModuleTest", () => {
 
   it("attr_internal reader and writer — underscore-prefixed storage", () => {
     class Widget {}
-    attrInternal(Widget.prototype, "color");
+    attrInternal.call(Widget.prototype, "color");
     const w = new Widget() as Widget & { color: unknown };
     w.color = "red";
     expect(w.color).toBe("red");
@@ -226,13 +226,13 @@ describe("ModuleTest", () => {
 
   it("delegate returns generated method names", () => {
     class Foo {}
-    const names = delegate(Foo.prototype, ["bar", "baz"], { to: "qux" });
+    const names = delegate.call(Foo.prototype, "bar", "baz", { to: "qux" });
     expect(names).toEqual(["bar", "baz"]);
   });
 
   it("delegate with prefix returns prefixed method names", () => {
     class Foo {}
-    const names = delegate(Foo.prototype, ["bar"], { to: "qux", prefix: "the" });
+    const names = delegate.call(Foo.prototype, "bar", { to: "qux", prefix: "the" });
     expect(names).toEqual(["the_bar"]);
   });
 });

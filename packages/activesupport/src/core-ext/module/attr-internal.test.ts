@@ -21,7 +21,7 @@ describe("AttrInternalTest", () => {
 
   it("reader", () => {
     class Target {}
-    attrInternalReader(Target.prototype, "foo");
+    attrInternalReader.call(Target.prototype, "foo");
     const instance = new Target() as any;
 
     expect(instance._foo).toBeUndefined();
@@ -35,7 +35,7 @@ describe("AttrInternalTest", () => {
 
   it("writer", () => {
     class Target {}
-    attrInternalWriter(Target.prototype, "foo");
+    attrInternalWriter.call(Target.prototype, "foo");
     const instance = new Target() as any;
 
     expect(instance._foo).toBeUndefined();
@@ -47,7 +47,7 @@ describe("AttrInternalTest", () => {
 
   it("accessor", () => {
     class Target {}
-    attrInternalAccessor(Target.prototype, "foo");
+    attrInternalAccessor.call(Target.prototype, "foo");
     const instance = new Target() as any;
 
     expect(instance._foo).toBeUndefined();
@@ -66,7 +66,7 @@ describe("AttrInternalTest", () => {
   it("naming format", () => {
     setAttrInternalNamingFormat("abc%sdef");
     class Target {}
-    attrInternal(Target.prototype, "foo");
+    attrInternal.call(Target.prototype, "foo");
     const instance = new Target() as any;
 
     expect(instance._foo).toBeUndefined();

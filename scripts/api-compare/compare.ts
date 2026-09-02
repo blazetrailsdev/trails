@@ -684,6 +684,189 @@ export function reorderedCalls(
 }
 
 /**
+ * The owner-side populations `resolveTsOwner` reads: which classes declare a
+ * name in a file, on which seat, in which shape, and where the declaration
+ * really lives.
+ */
+export interface TsOwnerMaps {
+  /** (file → name → every class declaring it), `resolveTsOwner`'s population. */
+  ownersByFileName: Map<string, Map<string, Set<string>>>;
+  /**
+   * (file → name → owner → the file the member is DECLARED in), recorded only
+   * where it differs from the entity's own file — see `declFileFor`.
+   */
+  declFileByFileNameOwner: Map<string, Map<string, Map<string, string>>>;
+  /**
+   * (file → name → owners) split by declaration shape — see
+   * `MethodInfo.bodyless` and `ownersWithBodies`.
+   */
+  bodylessOwnersByFileName: Map<string, Map<string, Set<string>>>;
+  bodiedOwnersByFileName: Map<string, Map<string, Set<string>>>;
+  /**
+   * The owners that declare the name as a `set` accessor (file → name →
+   * owners) — the port's spelling of Ruby's `name=` writer, so `resolveTsOwner`
+   * can keep a Ruby reader off it (RFC 0108).
+   */
+  writerOwnersByFileName: Map<string, Map<string, Set<string>>>;
+  /**
+   * The same population split by the SEAT each owner declares the name on
+   * (file → name → owners), so `resolveTsOwner` can pair a Ruby
+   * `X::ClassMethods` owner with the static declaration and the bare `X` owner
+   * with the prototype one (RFC 0108).
+   */
+  staticOwnersByFileName: Map<string, Map<string, Set<string>>>;
+  instanceOwnersByFileName: Map<string, Map<string, Set<string>>>;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function newTsOwnerMaps(): TsOwnerMaps {
+  return {
+    ownersByFileName: new Map(),
+    declFileByFileNameOwner: new Map(),
+    bodylessOwnersByFileName: new Map(),
+    bodiedOwnersByFileName: new Map(),
+    writerOwnersByFileName: new Map(),
+    staticOwnersByFileName: new Map(),
+    instanceOwnersByFileName: new Map(),
+  };
+}
+
+/**
+ * Record one package-scoped TS member into the owner populations.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function recordTsOwner(maps: TsOwnerMaps, m: MethodInfo, file: string, owner: string): void {
+  const owners = maps.ownersByFileName.get(file) ?? new Map<string, Set<string>>();
+  owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
+  maps.ownersByFileName.set(file, owners);
+  if (m.file !== undefined && m.file !== file) {
+    const byName = maps.declFileByFileNameOwner.get(file) ?? new Map<string, Map<string, string>>();
+    const byOwner = byName.get(m.name) ?? new Map<string, string>();
+    byOwner.set(owner, m.file);
+    byName.set(m.name, byOwner);
+    maps.declFileByFileNameOwner.set(file, byName);
+  }
+  const byShape = m.bodyless === true ? maps.bodylessOwnersByFileName : maps.bodiedOwnersByFileName;
+  const shapeOwners = byShape.get(file) ?? new Map<string, Set<string>>();
+  shapeOwners.set(m.name, (shapeOwners.get(m.name) ?? new Set<string>()).add(owner));
+  byShape.set(file, shapeOwners);
+  if (m.writer === true) {
+    const writerOwners = maps.writerOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
+    writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
+    maps.writerOwnersByFileName.set(file, writerOwners);
+  }
+  // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat.
+  if (owner !== "") {
+    const bySeat =
+      m.isStatic === true ? maps.staticOwnersByFileName : maps.instanceOwnersByFileName;
+    const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
+    seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(owner));
+    bySeat.set(file, seatOwners);
+  }
+}
+
+/**
+ * The signature populations `resolvePortedWithArgsSigs` reads, plus the
+ * option-key side-map recorded from the same members.
+ */
+export interface TsPortedWithArgsMaps {
+  /**
+   * Every signature seen for a TS name, from THIS package only — no dep
+   * packages. Arity's pool is global (see `tsParamsByName` in main); this gate's
+   * must not be widened back to match it.
+   */
+  paramsByNameInPkg: Map<string, ParamInfo[][]>;
+  /**
+   * Per-(file, name) counterpart, package-only: relative paths collide across
+   * packages (`attribute-methods.ts` exists in both activemodel and
+   * activerecord), so a same-file map that also held dep-package files would
+   * still let a dep signature open the gate. Feeds the ported-with-args gate
+   * and the literal-default check.
+   */
+  paramsByFileNameInPkg: Map<string, Map<string, ParamInfo[][]>>;
+  /**
+   * The same signatures keyed by DECLARING CLASS too (`<owner>#<name>`), for
+   * the parameter-NAME check alone: a file-scoped pool lets two sibling classes
+   * lend each other a signature (`OutputBuffer#capture(*args)`, buffers.rb:72,
+   * scored against `StreamingBuffer#capture`, buffers.rb:126).
+   */
+  paramsByFileOwnerNameInPkg: Map<string, Map<string, ParamInfo[][]>>;
+  /**
+   * Signature objects (by identity) belonging to a `set` accessor. A Ruby
+   * writer is its own method (`where_clause=`) but conventions.ts maps it onto
+   * the bare camel name, so a get/set pair pools two signatures under one name.
+   * The ported-with-args gate must not read the writer's parameter as proof
+   * that the READER — the method a Ruby `where_clause` CALL maps to — takes
+   * arguments; that is what made adding a writer Rails already has surface call
+   * mismatches on bodies nobody touched. Arity keeps the signature; only this
+   * gate subtracts it. See MethodInfo.writer.
+   */
+  writerSigs: Set<readonly ParamInfo[]>;
+  /**
+   * Per-(file, name) resolved options-object keys (null = uncheckable),
+   * package-only for the same collision reason as `paramsByFileNameInPkg`.
+   * Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
+   * same-named method (e.g. PostgreSQL `createDatabase`) can't lend its keys to
+   * a different adapter's Ruby method and manufacture a cross-adapter
+   * `missingInTs` artifact (`create_database :charset`). The mixin
+   * re-export/real-type split is preserved because the option-key check runs
+   * against the file the method actually MATCHED in.
+   */
+  optionKeysByFileName: Map<string, Map<string, (string[] | null)[]>>;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function newTsPortedWithArgsMaps(): TsPortedWithArgsMaps {
+  return {
+    paramsByNameInPkg: new Map(),
+    paramsByFileNameInPkg: new Map(),
+    paramsByFileOwnerNameInPkg: new Map(),
+    writerSigs: new Set(),
+    optionKeysByFileName: new Map(),
+  };
+}
+
+/**
+ * Record one package-scoped TS member into the ported-with-args populations.
+ *
+ * The `isTestHelperFile` guard lives HERE, with the population it protects: a
+ * test helper standing in for a Ruby method must not open the calls gate for a
+ * body that never calls it (see config.ts#isTestHelperFile). Held on the
+ * OWNER-map block instead — where a revert probe once put it — every gate, every
+ * `scripts/api-compare/` test and the `call-mismatches.json` artifact itself
+ * stay byte-identical, which is why the split is exported and pinned by a test
+ * rather than left as a closure over `main()`'s locals.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function recordTsPortedWithArgs(
+  maps: TsPortedWithArgsMaps,
+  m: MethodInfo,
+  file: string,
+  owner: string,
+): void {
+  if (isTestHelperFile(file)) return;
+  const pkgSigs = maps.paramsByNameInPkg.get(m.name) ?? [];
+  pkgSigs.push(m.params);
+  maps.paramsByNameInPkg.set(m.name, pkgSigs);
+  const pkgByName = maps.paramsByFileNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
+  pkgByName.set(m.name, [...(pkgByName.get(m.name) ?? []), m.params]);
+  maps.paramsByFileNameInPkg.set(file, pkgByName);
+  const pkgByOwnerName =
+    maps.paramsByFileOwnerNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
+  const ownerKey = `${owner}#${m.name}`;
+  pkgByOwnerName.set(ownerKey, [...(pkgByOwnerName.get(ownerKey) ?? []), m.params]);
+  maps.paramsByFileOwnerNameInPkg.set(file, pkgByOwnerName);
+  if (m.writer) maps.writerSigs.add(m.params);
+  if (m.optionKeys !== undefined) {
+    const byName = maps.optionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
+    byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
+    maps.optionKeysByFileName.set(file, byName);
+  }
+}
+
+/**
  * Signature candidates the ported-with-args gate (gate 2 above) resolves a
  * mapped TS name against: the same file's signatures when that file defines the
  * name, else the ones from the SAME PACKAGE only.
@@ -3060,41 +3243,16 @@ export function main() {
     // pooling all signatures and matching ANY (see matchArityAgainst) finds the
     // true arity and keeps those bindings/overloads from false-positiving.
     const tsParamsByName = new Map<string, ParamInfo[][]>();
-    // Same signatures, but ONLY from this package — no dep packages. Feeds the
-    // calls-parity ported-with-args gate; see resolvePortedWithArgsSigs.
-    const tsParamsByNameInPkg = new Map<string, ParamInfo[][]>();
-    // Per-(file, name) counterpart, package-only: relative paths collide across
-    // packages (`attribute-methods.ts` exists in both activemodel and
-    // activerecord), so a same-file map that also held dep-package files would
-    // still let a dep signature open the gate. Feeds the ported-with-args gate
-    // and the literal-default check.
-    const tsParamsByFileNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
-    // The same signatures keyed by DECLARING CLASS too (`<owner>#<name>`), for
-    // the parameter-NAME check alone: a file-scoped pool lets two sibling
-    // classes lend each other a signature (`OutputBuffer#capture(*args)`,
-    // buffers.rb:72, scored against `StreamingBuffer#capture`, buffers.rb:126).
-    // Arity keeps the wider pool (see tsParamsByName).
-    const tsParamsByFileOwnerNameInPkg = new Map<string, Map<string, ParamInfo[][]>>();
-    // Signature objects (by identity) belonging to a `set` accessor. A Ruby
-    // writer is its own method (`where_clause=`) but conventions.ts maps it onto
-    // the bare camel name, so a get/set pair pools two signatures under one
-    // name. The ported-with-args gate must not read the writer's parameter as
-    // proof that the READER — the method a Ruby `where_clause` CALL maps to —
-    // takes arguments; that is what made adding a writer Rails already has
-    // surface call mismatches on bodies nobody touched. Arity keeps the
-    // signature (it is the real match for `where_clause=`); only this gate
-    // subtracts it. See MethodInfo.writer.
-    const tsWriterSigs = new Set<readonly ParamInfo[]>();
-    // Per-(file, name) resolved options-object keys (null = uncheckable),
-    // package-only for the same collision reason as tsParamsByFileNameInPkg.
-    // Scoped per-FILE — unlike arity's global pool — so a sibling adapter's
-    // same-named method (e.g. PostgreSQL `createDatabase`) can't lend its keys
-    // to a different adapter's Ruby method and manufacture a cross-adapter
-    // `missingInTs` artifact (`create_database :charset`). The mixin
-    // re-export/real-type split is preserved because the option-key check runs
-    // against the file the method actually MATCHED in (the real-type file for
-    // include-chain matches), where the union within that file still applies.
-    const tsOptionKeysByFileName = new Map<string, Map<string, (string[] | null)[]>>();
+    // The package-only signature populations the calls-parity ported-with-args
+    // gate reads — see TsPortedWithArgsMaps for what each one is scoped to.
+    const portedWithArgsMaps = newTsPortedWithArgsMaps();
+    const {
+      paramsByNameInPkg: tsParamsByNameInPkg,
+      paramsByFileNameInPkg: tsParamsByFileNameInPkg,
+      paramsByFileOwnerNameInPkg: tsParamsByFileOwnerNameInPkg,
+      writerSigs: tsWriterSigs,
+      optionKeysByFileName: tsOptionKeysByFileName,
+    } = portedWithArgsMaps;
     // Body call-sets scoped per (file, name) for the advisory calls-parity check.
     const tsCallsByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallSeqByFileName = new Map<string, Map<string, string[][]>>();
@@ -3121,25 +3279,28 @@ export function main() {
       string,
       Map<string, Map<string, Map<string, string>>>
     >();
-    // (file → name → every class declaring it), `resolveTsOwner`'s population.
-    const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    // `resolveTsOwner`'s populations — see TsOwnerMaps.
+    const ownerMaps = newTsOwnerMaps();
+    const {
+      ownersByFileName: tsOwnersByFileName,
+      declFileByFileNameOwner: tsDeclFileByFileNameOwner,
+      bodylessOwnersByFileName: tsBodylessOwnersByFileName,
+      bodiedOwnersByFileName: tsBodiedOwnersByFileName,
+      writerOwnersByFileName: tsWriterOwnersByFileName,
+      staticOwnersByFileName: tsStaticOwnersByFileName,
+      instanceOwnersByFileName: tsInstanceOwnersByFileName,
+    } = ownerMaps;
     // (file → name → owner → the file the member is DECLARED in), recorded only
     // where it differs from the entity's own file — see `declFileFor`.
-    const tsDeclFileByFileNameOwner = new Map<string, Map<string, Map<string, string>>>();
     // The same population split by the SEAT each owner declares the name on
     // (file → name → owners), so `resolveTsOwner` can pair a Ruby
     // `X::ClassMethods` owner with the static declaration and the bare `X`
     // owner with the prototype one (RFC 0108).
-    const tsStaticOwnersByFileName = new Map<string, Map<string, Set<string>>>();
-    const tsInstanceOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // The owners that declare the name as a `set` accessor (file → name →
     // owners) — the port's spelling of Ruby's `name=` writer, so
     // `resolveTsOwner` can keep a Ruby reader off it (RFC 0108).
-    const tsWriterOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // (file → name → owners) split by declaration shape — see `MethodInfo.bodyless`
     // and `ownersWithBodies`.
-    const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
-    const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
@@ -3204,58 +3365,11 @@ export function main() {
       scope: "package" | "dep" = "package",
       owner = "",
     ) => {
-      if (scope === "package") {
-        const owners = tsOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
-        owners.set(m.name, (owners.get(m.name) ?? new Set<string>()).add(owner));
-        tsOwnersByFileName.set(file, owners);
-        if (m.file !== undefined && m.file !== file) {
-          const byName =
-            tsDeclFileByFileNameOwner.get(file) ?? new Map<string, Map<string, string>>();
-          const byOwner = byName.get(m.name) ?? new Map<string, string>();
-          byOwner.set(owner, m.file);
-          byName.set(m.name, byOwner);
-          tsDeclFileByFileNameOwner.set(file, byName);
-        }
-        const byShape = m.bodyless === true ? tsBodylessOwnersByFileName : tsBodiedOwnersByFileName;
-        const shapeOwners = byShape.get(file) ?? new Map<string, Set<string>>();
-        shapeOwners.set(m.name, (shapeOwners.get(m.name) ?? new Set<string>()).add(owner));
-        byShape.set(file, shapeOwners);
-        if (m.writer === true) {
-          const writerOwners = tsWriterOwnersByFileName.get(file) ?? new Map<string, Set<string>>();
-          writerOwners.set(m.name, (writerOwners.get(m.name) ?? new Set<string>()).add(owner));
-          tsWriterOwnersByFileName.set(file, writerOwners);
-        }
-        // A top-level function (`owner === ""`) states no seat — see tsOwnerSeat.
-        if (owner !== "") {
-          const bySeat =
-            m.isStatic === true ? tsStaticOwnersByFileName : tsInstanceOwnersByFileName;
-          const seatOwners = bySeat.get(file) ?? new Map<string, Set<string>>();
-          seatOwners.set(m.name, (seatOwners.get(m.name) ?? new Set<string>()).add(owner));
-          bySeat.set(file, seatOwners);
-        }
-      }
+      if (scope === "package") recordTsOwner(ownerMaps, m, file, owner);
       const sigs = tsParamsByName.get(m.name) ?? [];
       sigs.push(m.params);
       tsParamsByName.set(m.name, sigs);
-      if (scope === "package" && !isTestHelperFile(file)) {
-        const pkgSigs = tsParamsByNameInPkg.get(m.name) ?? [];
-        pkgSigs.push(m.params);
-        tsParamsByNameInPkg.set(m.name, pkgSigs);
-        const pkgByName = tsParamsByFileNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
-        pkgByName.set(m.name, [...(pkgByName.get(m.name) ?? []), m.params]);
-        tsParamsByFileNameInPkg.set(file, pkgByName);
-        const pkgByOwnerName =
-          tsParamsByFileOwnerNameInPkg.get(file) ?? new Map<string, ParamInfo[][]>();
-        const ownerKey = `${owner}#${m.name}`;
-        pkgByOwnerName.set(ownerKey, [...(pkgByOwnerName.get(ownerKey) ?? []), m.params]);
-        tsParamsByFileOwnerNameInPkg.set(file, pkgByOwnerName);
-        if (m.writer) tsWriterSigs.add(m.params);
-        if (m.optionKeys !== undefined) {
-          const byName = tsOptionKeysByFileName.get(file) ?? new Map<string, (string[] | null)[]>();
-          byName.set(m.name, [...(byName.get(m.name) ?? []), m.optionKeys]);
-          tsOptionKeysByFileName.set(file, byName);
-        }
-      }
+      if (scope === "package") recordTsPortedWithArgs(portedWithArgsMaps, m, file, owner);
       if (m.missingRailsCalls !== undefined) {
         recordTaggedCalls(
           tsMissingCallTagsByFileName,

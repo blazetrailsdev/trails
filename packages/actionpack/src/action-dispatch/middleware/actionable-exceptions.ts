@@ -32,7 +32,7 @@ export class ActionableExceptions {
   }
 
   static {
-    cattrAccessor(ActionableExceptions, ["endpoint"], { default: "/rails/actions" });
+    cattrAccessor.call(ActionableExceptions, "endpoint", { default: "/rails/actions" });
   }
 
   async call(env: RackEnv): Promise<RackResponse> {

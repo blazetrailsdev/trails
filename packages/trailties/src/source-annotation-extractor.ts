@@ -5,7 +5,28 @@ export interface AnnotationOptions {
   indent?: number;
 }
 
+export type ExtensionBuilder = (tagPattern: string) => RegExp;
+
+const DEFAULT_DIRECTORIES = ["app", "config", "db", "lib", "test"];
+const DEFAULT_TAGS = ["OPTIMIZE", "FIXME", "TODO"];
+
 export class Annotation {
+  static directories: string[] = [...DEFAULT_DIRECTORIES];
+  static tags: string[] = [...DEFAULT_TAGS];
+  static extensions: Array<{ test: RegExp; builder: ExtensionBuilder }> = [];
+
+  static registerDirectories(...dirs: string[]): void {
+    this.directories.push(...dirs);
+  }
+
+  static registerTags(...additionalTags: string[]): void {
+    this.tags.push(...additionalTags);
+  }
+
+  static registerExtensions(exts: string[], builder: ExtensionBuilder): void {
+    this.extensions.push({ test: new RegExp(`\\.(${exts.join("|")})$`), builder });
+  }
+
   constructor(
     public readonly line: number,
     public readonly tag: string,
@@ -20,35 +41,27 @@ export class Annotation {
   }
 }
 
-export type ExtensionBuilder = (tagPattern: string) => RegExp;
-
-const DEFAULT_DIRECTORIES = ["app", "config", "db", "lib", "test"];
-const DEFAULT_TAGS = ["OPTIMIZE", "FIXME", "TODO"];
-
-let directories: string[] = [...DEFAULT_DIRECTORIES];
-let tags: string[] = [...DEFAULT_TAGS];
-let extensions: Array<{ test: RegExp; builder: ExtensionBuilder }> = [];
-
-export const registerDirectories = (...dirs: string[]): void => void directories.push(...dirs);
-export const registerTags = (...additionalTags: string[]): void =>
-  void tags.push(...additionalTags);
-export const registerExtensions = (exts: string[], builder: ExtensionBuilder): void =>
-  void extensions.push({ test: new RegExp(`\\.(${exts.join("|")})$`), builder });
-
-/** Test-only convenience: reset the directories/tags/extensions registries. */
+/**
+ * Test-only convenience: reset the directories/tags/extensions registries.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
 export function resetAnnotationRegistry(): void {
-  directories = [...DEFAULT_DIRECTORIES];
-  tags = [...DEFAULT_TAGS];
-  extensions = [];
+  Annotation.directories = [...DEFAULT_DIRECTORIES];
+  Annotation.tags = [...DEFAULT_TAGS];
+  Annotation.extensions = [];
   registerDefaults();
 }
 
 function registerDefaults(): void {
   const slash = (tag: string): RegExp => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`);
-  registerExtensions(["ts", "js", "mjs", "cjs", "tsx", "jsx"], slash);
-  registerExtensions(["css", "scss", "sass", "less"], slash);
-  registerExtensions(["yml", "yaml"], (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
-  registerExtensions(["ejs", "tse"], (tag) => new RegExp(`<%\\s*#\\s*(${tag}):?\\s*(.*?)\\s*%>`));
+  Annotation.registerExtensions(["ts", "js", "mjs", "cjs", "tsx", "jsx"], slash);
+  Annotation.registerExtensions(["css", "scss", "sass", "less"], slash);
+  Annotation.registerExtensions(["yml", "yaml"], (tag) => new RegExp(`#\\s*(${tag}):?\\s*(.*)$`));
+  Annotation.registerExtensions(
+    ["ejs", "tse"],
+    (tag) => new RegExp(`<%\\s*#\\s*(${tag}):?\\s*(.*?)\\s*%>`),
+  );
 }
 
 registerDefaults();
@@ -62,9 +75,9 @@ export class SourceAnnotationExtractor {
     tag: string | null = null,
     options: AnnotationOptions & { dirs?: readonly string[] } = {},
   ): Promise<string> {
-    tag ??= tags.join("|");
+    tag ??= Annotation.tags.join("|");
     const extractor = new SourceAnnotationExtractor(tag);
-    const dirs = options.dirs ?? directories;
+    const dirs = options.dirs ?? Annotation.directories;
     delete options.dirs;
     return extractor.display(await extractor.find(dirs), options);
   }
@@ -89,7 +102,7 @@ export class SourceAnnotationExtractor {
         for (const [k, v] of await this.findIn(item)) results.set(k, v);
         continue;
       }
-      const ext = extensions.find((e) => e.test.test(item));
+      const ext = Annotation.extensions.find((e) => e.test.test(item));
       if (!ext) continue;
       const annotations = await extractFromFile(item, ext.builder(this.tag));
       if (annotations.length > 0) results.set(item, annotations);

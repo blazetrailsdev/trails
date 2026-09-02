@@ -268,6 +268,33 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
+  it("resolves a skipIf adapter/feature disjunction in the same RUN space as the Ruby extractor", () => {
+    // The twin of the Ruby extractor's `resolves a skip-if adapter/feature
+    // disjunction in the same RUN space as the TS extractor`: both sides read
+    // the positive-adapter drop rule against the RUN condition, so the two keys
+    // are identical for this shape.
+    expect(
+      gateFromGuardExpr(
+        '!currentAdapter("Mysql2Adapter") || !adapterSupports("expression_index")',
+        false,
+      ),
+    ).toEqual({
+      adapters: ["mysql"],
+      features: ["expression_index"],
+      source: ["test"],
+    });
+    expect(
+      gateFromGuardExpr(
+        'currentAdapter("Mysql2Adapter") || adapterSupports("expression_index")',
+        false,
+      ),
+    ).toEqual({
+      adapters: ["postgresql", "sqlite"],
+      guards: ["no_expression_index"],
+      source: ["test"],
+    });
+  });
+
   it("drops the adapter set, positive or exclusion, when the RUN condition is a disjunction", () => {
     // `runIf(A || B)` runs on `mysql ∪ default_expression?` and the De Morgan
     // twin `skipIf(A && B)` runs on the same union — neither is one adapter set,

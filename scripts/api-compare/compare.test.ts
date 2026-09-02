@@ -29,6 +29,10 @@ import {
   reorderedCalls,
   ORDER_PREFIX,
   resolvePortedWithArgsSigs,
+  newTsOwnerMaps,
+  newTsPortedWithArgsMaps,
+  recordTsOwner,
+  recordTsPortedWithArgs,
   jsEnumerableAliases,
   JS_ENUMERABLE_ALIASES,
   NEGATED_ALIASES,
@@ -3400,5 +3404,56 @@ describe("crossPackageIncludedMethodNames", () => {
   it("ignores an unqualified include name", () => {
     const local = { ...host, includes: ["DeepMergeable"] };
     expect(crossPackageIncludedMethodNames([local], "actioncontroller", manifest).size).toBe(0);
+  });
+});
+
+describe("ported-with-args population", () => {
+  const method = (name: string, file: string): MethodInfo => ({
+    name,
+    visibility: "public",
+    params: [{ name: "value", kind: "required" }],
+    file,
+  });
+
+  it("admits an ordinary source file's signature and withholds a test helper's", () => {
+    const maps = newTsPortedWithArgsMaps();
+    recordTsPortedWithArgs(maps, method("buildFrom", "relation.ts"), "relation.ts", "Relation");
+    recordTsPortedWithArgs(
+      maps,
+      method("fixtures", "test-helpers/fixtures.ts"),
+      "test-helpers/fixtures.ts",
+      "FixtureSet",
+    );
+
+    expect(
+      resolvePortedWithArgsSigs(
+        maps.paramsByFileNameInPkg,
+        maps.paramsByNameInPkg,
+        "relation.ts",
+        "buildFrom",
+      ),
+    ).toHaveLength(1);
+    expect(
+      resolvePortedWithArgsSigs(
+        maps.paramsByFileNameInPkg,
+        maps.paramsByNameInPkg,
+        "test-helpers/fixtures.ts",
+        "fixtures",
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps the test-helper guard off the owner maps", () => {
+    const owners = newTsOwnerMaps();
+    recordTsOwner(
+      owners,
+      method("fixtures", "test-helpers/fixtures.ts"),
+      "test-helpers/fixtures.ts",
+      "FixtureSet",
+    );
+
+    expect(owners.ownersByFileName.get("test-helpers/fixtures.ts")?.get("fixtures")).toEqual(
+      new Set(["FixtureSet"]),
+    );
   });
 });

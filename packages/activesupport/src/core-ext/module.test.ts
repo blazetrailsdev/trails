@@ -16,7 +16,7 @@ describe("ModuleTest", () => {
         this.container = new Container();
       }
     }
-    delegate(Wrapper.prototype, ["get"], { to: "container" });
+    delegate.call(Wrapper.prototype, "get", { to: "container" });
     const w = new Wrapper() as Wrapper & { get(key: string): unknown };
     expect(w.get("key")).toBe("value");
   });
@@ -37,7 +37,7 @@ describe("ModuleTest", () => {
         this.container = new Container();
       }
     }
-    delegate(Wrapper.prototype, ["set", "get"], { to: "container" });
+    delegate.call(Wrapper.prototype, "set", "get", { to: "container" });
     const w = new Wrapper() as Wrapper & {
       set(k: string, v: unknown): void;
       get(k: string): unknown;
@@ -53,7 +53,7 @@ describe("ModuleTest", () => {
     class App {
       settings: Settings | null = new Settings();
     }
-    delegate(App.prototype, ["enabled"], { to: "settings", allowNil: true });
+    delegate.call(App.prototype, "enabled", { to: "settings", allowNil: true });
     const app = new App() as App & { enabled(): boolean | undefined };
     expect(app.enabled()).toBe(false);
   });
@@ -65,7 +65,7 @@ describe("ModuleTest", () => {
     class Host {
       target: Target | null = new Target();
     }
-    delegate(Host.prototype, ["value"], { to: "target", allowNil: true });
+    delegate.call(Host.prototype, "value", { to: "target", allowNil: true });
     const h = new Host() as Host & { value(): unknown };
     expect(h.value()).toBeUndefined();
     h.target = null;
@@ -81,7 +81,7 @@ describe("ModuleTest", () => {
     class Host {
       greeter: Greeter | null = null;
     }
-    delegate(Host.prototype, ["greet"], { to: "greeter", allowNil: true });
+    delegate.call(Host.prototype, "greet", { to: "greeter", allowNil: true });
     const h = new Host() as Host & { greet(): unknown };
     expect(h.greet()).toBeUndefined();
     h.greeter = new Greeter();
@@ -95,7 +95,7 @@ describe("ModuleTest", () => {
     class Person {
       name: Name | null = null;
     }
-    delegate(Person.prototype, ["first"], { to: "name", allowNil: true });
+    delegate.call(Person.prototype, "first", { to: "name", allowNil: true });
     const p = new Person() as Person & { first(): string | undefined };
     expect(p.first()).toBeUndefined();
   });
@@ -109,7 +109,7 @@ describe("ModuleTest", () => {
     class Host {
       real: Real = new Real();
     }
-    delegate(Host.prototype, ["exists"], { to: "real" });
+    delegate.call(Host.prototype, "exists", { to: "real" });
     const h = new Host() as Host & Record<string, unknown>;
     expect((h as any).exists()).toBe(true);
     expect(typeof h.nonExistent).toBe("undefined");
@@ -124,7 +124,7 @@ describe("ModuleTest", () => {
     registerConstant("Admin::Json", Json);
     try {
       class C {}
-      delegate(C, ["parse"], { to: Json });
+      delegate.call(C, "parse", { to: Json });
       const c = C as typeof C & { parse(source: string): unknown };
       expect(c.parse("[1]")).toEqual([1]);
     } finally {
@@ -140,7 +140,7 @@ describe("ModuleTest", () => {
     class Person {
       constructor(public place: Place) {}
     }
-    delegate(Person.prototype, ["street", "city"], { to: "place" });
+    delegate.call(Person.prototype, "street", "city", { to: "place" });
     const p = new Person(new Place()) as Person & { street(): string; city(): string };
     expect(p.street()).toBe("Paulina");
     expect(p.city()).toBe("Chicago");
@@ -159,7 +159,7 @@ describe("ModuleTest", () => {
     class Container {
       box = new Box();
     }
-    delegate(Container.prototype, ["color"], { to: "box" });
+    delegate.call(Container.prototype, "color", { to: "box" });
     const c = new Container() as Container & { color(): string };
     expect(c.color()).toBe("red");
   });
@@ -176,7 +176,7 @@ describe("ModuleTest", () => {
     class Child {
       p = new Parent();
     }
-    delegate(Parent.prototype, ["greet"], { to: "gp" });
+    delegate.call(Parent.prototype, "greet", { to: "gp" });
     const parent = new Parent() as Parent & { greet: () => string };
     expect(parent.greet()).toBe("hello");
   });
@@ -188,7 +188,7 @@ describe("ModuleTest", () => {
     class Thing {
       owner = new Owner();
     }
-    delegate(Thing.prototype, ["name"], { to: "owner" });
+    delegate.call(Thing.prototype, "name", { to: "owner" });
     const t = new Thing() as Thing & { name(): string };
     expect(t.name()).toBe("Owner");
   });
@@ -211,7 +211,7 @@ describe("ModuleTest", () => {
     class Someone {
       place: null | { street: string } = null;
     }
-    delegate(Someone.prototype, ["street"], { to: "place" });
+    delegate.call(Someone.prototype, "street", { to: "place" });
     const s = new Someone() as Someone & { street(): string };
     expect(() => s.street()).toThrow();
   });
@@ -223,7 +223,7 @@ describe("ModuleTest", () => {
     class Invoice {
       client = new Client();
     }
-    delegate(Invoice.prototype, ["name"], { to: "client", prefix: true });
+    delegate.call(Invoice.prototype, "name", { to: "client", prefix: true });
     const inv = new Invoice() as Invoice & { client_name(): string };
     expect(inv.client_name()).toBe("David");
   });
@@ -235,7 +235,7 @@ describe("ModuleTest", () => {
     class Invoice {
       client = new Client();
     }
-    delegate(Invoice.prototype, ["name"], { to: "client", prefix: true });
+    delegate.call(Invoice.prototype, "name", { to: "client", prefix: true });
     const inv = new Invoice() as Invoice & { client_name(): string };
     expect(inv.client_name()).toBe("David");
   });
@@ -247,7 +247,7 @@ describe("ModuleTest", () => {
     class Invoice {
       client = new Client();
     }
-    delegate(Invoice.prototype, ["name"], { to: "client", prefix: "customer" });
+    delegate.call(Invoice.prototype, "name", { to: "client", prefix: "customer" });
     const inv = new Invoice() as Invoice & { customer_name(): string };
     expect(inv.customer_name()).toBe("David");
   });
@@ -259,7 +259,7 @@ describe("ModuleTest", () => {
     class Person {
       place = new Place();
     }
-    delegate(Person.prototype, ["street"], { to: "place", prefix: false });
+    delegate.call(Person.prototype, "street", { to: "place", prefix: false });
     const p = new Person() as Person & { street(): string };
     expect(p.street()).toBe("Paulina");
   });
@@ -271,7 +271,7 @@ describe("ModuleTest", () => {
     class Invoice {
       client = new Client();
     }
-    delegate(Invoice.prototype, ["name"], { to: "client", prefix: "client" });
+    delegate.call(Invoice.prototype, "name", { to: "client", prefix: "client" });
     const inv = new Invoice() as Invoice & { client_name(): string };
     expect(inv.client_name()).toBe("David");
   });
@@ -285,7 +285,7 @@ describe("ModuleTest", () => {
     class Proxy {
       greeter = new Greeter();
     }
-    delegate(Proxy.prototype, ["greet"], { to: "greeter" });
+    delegate.call(Proxy.prototype, "greet", { to: "greeter" });
     const p = new Proxy() as Proxy & { greet: (name: string) => string };
     expect(p.greet("World")).toBe("Hello World");
   });
@@ -294,7 +294,7 @@ describe("ModuleTest", () => {
     class Project {
       person: null | { name: string } = null;
     }
-    delegate(Project.prototype, ["name"], { to: "person", allowNil: true });
+    delegate.call(Project.prototype, "name", { to: "person", allowNil: true });
     const proj = new Project() as Project & { name(): string | undefined };
     expect(proj.name()).toBeUndefined();
   });
@@ -303,7 +303,7 @@ describe("ModuleTest", () => {
     class Project {
       person: null | { name: string } = null;
     }
-    delegate(Project.prototype, ["name"], { to: "person", allowNil: true });
+    delegate.call(Project.prototype, "name", { to: "person", allowNil: true });
     const proj = new Project() as Project & { name(): string | undefined };
     expect(proj.name()).toBeUndefined();
   });
@@ -312,7 +312,7 @@ describe("ModuleTest", () => {
     class Project {
       person: null | { name: string } = null;
     }
-    delegate(Project.prototype, ["name"], { to: "person", allowNil: true, prefix: true });
+    delegate.call(Project.prototype, "name", { to: "person", allowNil: true, prefix: true });
     const proj = new Project() as Project & { person_name(): string | undefined };
     expect(proj.person_name()).toBeUndefined();
   });
@@ -321,7 +321,7 @@ describe("ModuleTest", () => {
     class Someone {
       place: null | { street: string } = null;
     }
-    delegate(Someone.prototype, ["street"], { to: "place" });
+    delegate.call(Someone.prototype, "street", { to: "place" });
     const s = new Someone() as Someone & { street(): string };
     expect(() => s.street()).toThrow();
   });
@@ -331,7 +331,7 @@ describe("ModuleTest", () => {
     class Container {
       val: null = null;
     }
-    delegate(Container.prototype, ["toString"], { to: "val" });
+    delegate.call(Container.prototype, "toString", { to: "val" });
     const c = new Container() as Container & { toString: () => string };
     expect(() => c.toString()).toThrow();
   });
@@ -339,21 +339,21 @@ describe("ModuleTest", () => {
   it("delegation does not raise error when removing singleton instance methods", () => {
     class Foo {}
     expect(() => {
-      delegate(Foo.prototype, ["bar"], { to: "qux", allowNil: true });
+      delegate.call(Foo.prototype, "bar", { to: "qux", allowNil: true });
     }).not.toThrow();
   });
 
   it("delegation line number", () => {
     // Not applicable in TS; verify delegate works
     class Foo {}
-    expect(() => delegate(Foo.prototype, ["bar"], { to: "baz", allowNil: true })).not.toThrow();
+    expect(() => delegate.call(Foo.prototype, "bar", { to: "baz", allowNil: true })).not.toThrow();
   });
 
   it("delegation exception backtrace", () => {
     class Someone {
       place: null = null;
     }
-    delegate(Someone.prototype, ["street"], { to: "place" });
+    delegate.call(Someone.prototype, "street", { to: "place" });
     const s = new Someone() as Someone & { street(): string };
     let err: Error | null = null;
     try {
@@ -369,7 +369,7 @@ describe("ModuleTest", () => {
     class Someone {
       place: null = null;
     }
-    delegate(Someone.prototype, ["street"], { to: "place", allowNil: true });
+    delegate.call(Someone.prototype, "street", { to: "place", allowNil: true });
     const s = new Someone() as Someone & { street(): string | undefined };
     expect(() => s.street()).not.toThrow();
   });
@@ -385,7 +385,7 @@ describe("ModuleTest", () => {
     class Wrapper {
       counter = new Counter();
     }
-    delegate(Wrapper.prototype, ["value"], { to: "counter" });
+    delegate.call(Wrapper.prototype, "value", { to: "counter" });
     const w = new Wrapper() as Wrapper & { value(): string };
     w.value();
     expect(calls).toBe(1);
@@ -401,8 +401,8 @@ describe("ModuleTest", () => {
         return (null as unknown as { typeName(): { name: string } }).typeName();
       }
     }
-    delegate(Product.prototype, ["name"], { to: "manufacturer", prefix: true });
-    delegate(Product.prototype, ["name"], { to: "type", prefix: true });
+    delegate.call(Product.prototype, "name", { to: "manufacturer", prefix: true });
+    delegate.call(Product.prototype, "name", { to: "type", prefix: true });
     const product = new Product("Widget") as Product & {
       manufacturer_name(): string;
       type_name(): string;
@@ -420,7 +420,7 @@ describe("ModuleTest", () => {
     class Proxy {
       greeter = new Greeter();
     }
-    delegate(Proxy.prototype, ["greet"], { to: "greeter" });
+    delegate.call(Proxy.prototype, "greet", { to: "greeter" });
     const p = new Proxy() as Proxy & { greet: (name: string, g?: string) => string };
     expect(p.greet("World", "Hi")).toBe("Hi World");
   });
@@ -435,7 +435,7 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    delegate(Proxy.prototype, ["bar"], { to: "foo" });
+    delegate.call(Proxy.prototype, "bar", { to: "foo" });
     const p = new Proxy() as Proxy & { bar: () => string };
     expect(p.bar()).toBe("bar");
   });
@@ -449,7 +449,7 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    delegate(Proxy.prototype, ["toString"], { to: "foo" });
+    delegate.call(Proxy.prototype, "toString", { to: "foo" });
     const p = new Proxy() as Proxy & { toString: () => string };
     expect(p.toString()).toBe("Foo");
   });
@@ -478,7 +478,7 @@ describe("ModuleTest", () => {
     class Proxy {
       source = new Source();
     }
-    delegate(Proxy.prototype, ["for"], { to: "source" });
+    delegate.call(Proxy.prototype, "for", { to: "source" });
     const p = new Proxy() as Proxy & { for: (x: number) => number };
     expect(p.for(5)).toBe(10);
   });
@@ -492,7 +492,7 @@ describe("ModuleTest", () => {
     class Container {
       val: null = null;
     }
-    delegate(Container.prototype, ["something"], { to: "val" });
+    delegate.call(Container.prototype, "something", { to: "val" });
     const c = new Container() as Container & { something(): unknown };
     expect(() => c.something()).toThrow();
   });
@@ -501,7 +501,7 @@ describe("ModuleTest", () => {
     class Container {
       val: null = null;
     }
-    delegate(Container.prototype, ["something"], { to: "val", allowNil: true });
+    delegate.call(Container.prototype, "something", { to: "val", allowNil: true });
     const c = new Container() as Container & { something(): unknown };
     expect(c.something()).toBeUndefined();
   });
@@ -510,7 +510,7 @@ describe("ModuleTest", () => {
     class Container {
       val: null = null;
     }
-    delegate(Container.prototype, ["something"], { to: "val", allowNil: true });
+    delegate.call(Container.prototype, "something", { to: "val", allowNil: true });
     const c = new Container() as Container & { something(): unknown };
     expect(c.something()).toBeUndefined();
   });
@@ -524,7 +524,7 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    delegate(Proxy.prototype, ["bar"], { to: "foo" });
+    delegate.call(Proxy.prototype, "bar", { to: "foo" });
     const p = new Proxy() as Proxy & { bar: () => number };
     expect(typeof (p as unknown as Record<string, unknown>)["bar"]).toBe("function");
   });
@@ -548,7 +548,7 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    delegate(Proxy.prototype, ["bar"], { to: "foo" });
+    delegate.call(Proxy.prototype, "bar", { to: "foo" });
     const p = new Proxy() as Proxy & { bar: () => number };
     expect(JSON.stringify(p)).toBeDefined();
   });
@@ -562,7 +562,7 @@ describe("ModuleTest", () => {
     class Handler {
       reporter = new Reporter();
     }
-    delegate(Handler.prototype, ["report"], { to: "reporter" });
+    delegate.call(Handler.prototype, "report", { to: "reporter" });
     const h = new Handler() as Handler & { report: () => string };
     expect(h.report()).toBe("report");
   });
@@ -577,7 +577,7 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    const names = delegate(Proxy.prototype, ["bar"], { to: "foo" });
+    const names = delegate.call(Proxy.prototype, "bar", { to: "foo" });
     expect(names).toEqual(["bar"]);
   });
 
@@ -590,7 +590,7 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    const names = delegate(Proxy.prototype, ["bar"], { to: "foo", prefix: true });
+    const names = delegate.call(Proxy.prototype, "bar", { to: "foo", prefix: true });
     expect(names).toEqual(["foo_bar"]);
   });
 
@@ -603,7 +603,7 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    const names = delegate(Proxy.prototype, ["bar"], { to: "foo" });
+    const names = delegate.call(Proxy.prototype, "bar", { to: "foo" });
     expect(names).toEqual(["bar"]);
   });
 
@@ -619,7 +619,7 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    const names = delegate(Proxy.prototype, ["bar", "baz"], { to: "foo" });
+    const names = delegate.call(Proxy.prototype, "bar", "baz", { to: "foo" });
     expect(names).toEqual(["bar", "baz"]);
   });
 
@@ -632,13 +632,13 @@ describe("ModuleTest", () => {
     class Proxy {
       foo = new Foo();
     }
-    const names = delegate(Proxy.prototype, ["bar"], { to: "foo", prefix: true });
+    const names = delegate.call(Proxy.prototype, "bar", { to: "foo", prefix: true });
     expect(names).toEqual(["foo_bar"]);
   });
 
   it("delegate with private option returns names of delegate methods", () => {
     class Foo {}
-    const names = delegate(Foo.prototype, ["bar", "baz"], { to: "qux" });
+    const names = delegate.call(Foo.prototype, "bar", "baz", { to: "qux" });
     expect(names).toEqual(["bar", "baz"]);
   });
 
@@ -647,14 +647,14 @@ describe("ModuleTest", () => {
 
     expect(() => {
       class C {}
-      delegate(C.prototype, ["something"], { to: anonymousClass });
+      delegate.call(C.prototype, "something", { to: anonymousClass });
     }).toThrow(/Can't delegate to anonymous class or module/);
 
     Object.defineProperty(anonymousClass, "name", { value: "FakeName" });
 
     expect(() => {
       class C {}
-      delegate(C.prototype, ["something"], { to: anonymousClass });
+      delegate.call(C.prototype, "something", { to: anonymousClass });
     }).toThrow(/Can't delegate to detached class or module: FakeName/);
   });
 
@@ -667,7 +667,7 @@ describe("ModuleTest", () => {
     class Proxy {
       mod = new Module();
     }
-    delegate(Proxy.prototype, ["fn"], { to: "mod" });
+    delegate.call(Proxy.prototype, "fn", { to: "mod" });
     const p = new Proxy() as Proxy & { fn: (a: string, b: number) => string };
     expect(p.fn("x", 1)).toBe("x:1");
   });
@@ -681,7 +681,7 @@ describe("ModuleTest", () => {
     class Service {
       helper = new Helper();
     }
-    delegate(Service.prototype, ["compute"], { to: "helper" });
+    delegate.call(Service.prototype, "compute", { to: "helper" });
     const s = new Service() as Service & { compute: (x: number) => number };
     expect(s.compute(4)).toBe(16);
   });
