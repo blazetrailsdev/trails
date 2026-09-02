@@ -1,3 +1,4 @@
+import { block, fetch } from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";
@@ -240,9 +241,9 @@ export class ForeignKeyDefinition {
     return "id";
   }
 
-  /** @missingRailsCall fetch — PERMANENT */
+  /** @missingRailsArgs fetch — PERMANENT */
   get isValidate(): boolean | null {
-    return this.validate;
+    return fetch<boolean | null>(this.options, "validate", true);
   }
 
   get isValidated(): boolean | null {
@@ -734,11 +735,15 @@ export class ReferenceDefinition {
 
   /**
    * @internal
-   * @missingRailsCall fetch — PERMANENT
+   * @missingRailsArgs fetch — PERMANENT
    */
   private foreignTableName(): string {
     const fkOpts = this.foreignKeyOptions();
-    return fkOpts.toTable ?? (globalPluralizeTableNames() ? pluralize(this.name) : this.name);
+    return fetch<string>(
+      fkOpts as unknown as Record<string, unknown>,
+      "toTable",
+      block(() => (globalPluralizeTableNames() ? pluralize(this.name) : this.name)),
+    );
   }
 
   /** @internal */

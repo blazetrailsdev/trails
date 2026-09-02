@@ -1,3 +1,4 @@
+import { block, fetch } from "@blazetrails/ruby-compat";
 import { FutureResult, type Complete } from "./future-result.js";
 
 export type ColumnType = { deserialize(value: unknown): unknown };
@@ -189,7 +190,6 @@ export class Result {
 
   /**
    * @missingRailsCall first — PERMANENT
-   * @missingRailsCall new — PERMANENT
    * @missingRailsCall one? — PERMANENT
    */
   castValues(typeOverrides: ColumnTypes | ColumnType[] = {}): unknown[] {
@@ -255,7 +255,7 @@ function emptyAsync(): Complete {
 
 /**
  * @internal
- * @missingRailsCall fetch — PERMANENT
+ * @missingRailsArgs fetch — PERMANENT
  */
 export function columnType(
   result: Result,
@@ -264,8 +264,15 @@ export function columnType(
   typeOverrides: ColumnTypes,
 ): ColumnType {
   const columnTypes = result.columnTypes;
-  if (typeOverrides && name in typeOverrides) return typeOverrides[name];
-  if (index in columnTypes) return columnTypes[index as unknown as string];
-  if (name in columnTypes) return columnTypes[name];
-  return IDENTITY_TYPE;
+  return fetch<ColumnType>(
+    typeOverrides ?? {},
+    name,
+    block(() =>
+      fetch<ColumnType>(
+        columnTypes,
+        index as unknown as string,
+        block(() => fetch<ColumnType>(columnTypes, name, IDENTITY_TYPE)),
+      ),
+    ),
+  );
 }

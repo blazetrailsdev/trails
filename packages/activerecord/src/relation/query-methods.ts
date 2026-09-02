@@ -752,11 +752,12 @@ export function buildWhereClause(
     } else {
       parts = [this.model.sanitizeSql(rest.length === 0 ? opts : [opts, ...rest])!];
     }
-  } else if (isPlainObject(opts)) {
+  } else if (isHash(opts)) {
     const mc = this.model;
     const aliases: Record<string, string> = mc?.attributeAliases ?? {};
     const transformed: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(opts)) {
+    for (const [rawKey, value] of toA(opts) as [unknown, unknown][]) {
+      const key = String(rawKey);
       const name = isRubySymbol(key) ? symbolToName(key) : key;
       const resolved = aliases[name] ?? name;
       transformed[resolved] = value;
@@ -779,7 +780,14 @@ export function buildWhereClause(
 
 function where(
   this: QueryMethodsHost,
-  conditionsOrSql?: Record<string, unknown> | string | Nodes.Node | string[] | unknown[] | null,
+  conditionsOrSql?:
+    | Record<string, unknown>
+    | Map<unknown, unknown>
+    | string
+    | Nodes.Node
+    | string[]
+    | unknown[]
+    | null,
   ...rest: unknown[]
 ): any {
   if (conditionsOrSql === undefined) return new WhereChain(this.spawn());
@@ -903,6 +911,10 @@ function deepEqual(a: unknown, b: unknown): boolean {
 
 function isAsyncFunction(fn: object): boolean {
   return Object.prototype.toString.call(fn) === "[object AsyncFunction]";
+}
+
+function isHash(value: unknown): value is Record<string, unknown> | Map<unknown, unknown> {
+  return isPlainObject(value) || value instanceof Map;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -1378,6 +1390,7 @@ export function isBlankArgument(value: unknown): boolean {
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
   if (isPlainObject(value)) return Object.keys(value).length === 0;
+  if (value instanceof Map) return value.size === 0;
   return false;
 }
 

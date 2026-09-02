@@ -1496,6 +1496,10 @@ export class Base extends Model {
   ): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
+    conditions: Map<unknown, unknown>,
+  ): Relation<InstanceType<T>>;
+  static where<T extends typeof Base>(
+    this: T,
     sql: string,
     ...binds: unknown[]
   ): Relation<InstanceType<T>>;
@@ -1508,7 +1512,13 @@ export class Base extends Model {
   static where<T extends typeof Base>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
-    conditionsOrSql?: Record<string, unknown> | string | string[] | unknown[] | Nodes.Node,
+    conditionsOrSql?:
+      | Record<string, unknown>
+      | Map<unknown, unknown>
+      | string
+      | string[]
+      | unknown[]
+      | Nodes.Node,
     ...rest: unknown[]
   ): Relation<InstanceType<T>> | WhereChain<Relation<InstanceType<T>>> {
     if (conditionsOrSql === undefined) {
@@ -1535,7 +1545,7 @@ export class Base extends Model {
     if (Array.isArray(conditionsOrSql)) {
       return this.all().where(conditionsOrSql as unknown[]);
     }
-    return this.all().where(conditionsOrSql);
+    return this.all().where(conditionsOrSql as Record<string, unknown>);
   }
 
   static update<T extends typeof Base>(

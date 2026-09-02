@@ -66,8 +66,8 @@ export interface ImplicitRenderHost {
  * @missingRailsArgs inspect — PERMANENT
  *   Ruby's `x.inspect` is a method on the receiver; TypeScript cannot reopen
  *   `Array`, so trails spells it as the free `inspect(x)` ActiveSupport
- *   exports (`core-ext/object/inspect.ts`) and the receiver moves into the
- *   argument list.
+ *   re-exports from `@blazetrails/ruby-compat`'s `rbInspect`, and the receiver
+ *   moves into the argument list.
  * @internal
  */
 export function defaultRender(this: ImplicitRenderHost): void {
