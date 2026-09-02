@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SessionId } from "@blazetrails/rack-session";
 import { TestSession } from "../../../action-controller/test-case.js";
 
 // ==========================================================================
@@ -74,13 +75,13 @@ describe("ActionController::TestSessionTest", () => {
 
   it("fetch returns block value", () => {
     const session = new TestSession({ one: "1" });
-    expect(session.fetch("2", (key: string) => parseInt(key, 10))).toBe(2);
+    expect(session.fetch("2", undefined, (key: string) => parseInt(key, 10))).toBe(2);
   });
 
   it("session id", () => {
     const session = new TestSession();
-    expect(typeof session.id.publicId).toBe("string");
-    expect(session.id.publicId).toBe(session.get("session_id"));
+    expect(typeof (session.id() as SessionId).publicId).toBe("string");
+    expect((session.id() as SessionId).publicId).toBe(session.get("session_id"));
   });
 
   it("merge!", () => {

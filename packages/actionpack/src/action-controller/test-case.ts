@@ -33,10 +33,17 @@
  *   });
  */
 
-import { camelize, getCrypto } from "@blazetrails/activesupport";
-import { KeyError, merge } from "@blazetrails/ruby-compat";
+import { camelize } from "@blazetrails/activesupport";
+import { KeyError, merge, SecureRandom } from "@blazetrails/ruby-compat";
+import {
+  DEFAULT_OPTIONS,
+  Persisted,
+  SecureSessionHash,
+  SessionId,
+  setRubyClassPath,
+  type PersistedRequest,
+} from "@blazetrails/rack-session";
 import { buildNestedQuery } from "@blazetrails/rack";
-import { setRubyClassPath } from "@blazetrails/rack-session";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import { TestRequest as AbstractTestRequest } from "../action-dispatch/testing/test-request.js";
@@ -717,160 +724,101 @@ export class LiveTestResponse extends Response {
   }
 }
 
-export class TestSession {
-  private _data = new Map<string, unknown>();
-  /** @internal Mirrors Rails `@id`. */
-  private _id: string;
+/**
+ * Mirrors `ActionController::TestSession` (`test_case.rb:196-260`). Methods
+ * `destroy` and `load!` are overridden to avoid calling methods on the
+ * `@store` object, which does not exist for the TestSession class.
+ */
+export class TestSession extends SecureSessionHash {
+  static DEFAULT_OPTIONS = DEFAULT_OPTIONS;
 
-  constructor(initial: Record<string, unknown> = {}, id?: string) {
-    this._id = id ?? randomHex(16);
-    for (const [k, v] of Object.entries(initial)) this._data.set(String(k), v);
-  }
-
-  /** Mirrors Rails `TestSession#id` — session identity object with `publicId`. */
-  get id(): { publicId: string } {
-    const pid = this._id;
-    return { publicId: pid };
-  }
-
-  get(key: string): unknown {
-    if (String(key) === "session_id") return this._id;
-    return this._data.get(String(key));
-  }
-
-  set(key: string, value: unknown): void {
-    this._data.set(String(key), value);
-  }
-
-  has(key: string): boolean {
-    return this._data.has(String(key));
-  }
-
-  delete(key: string): unknown {
-    const k = String(key);
-    const val = this._data.get(k);
-    this._data.delete(k);
-    return val;
-  }
-
-  /** Mirrors Rails `TestSession#update` — merges hash into session data. */
-  update(hash: Record<string, unknown>): void {
-    for (const [k, v] of Object.entries(hash)) this._data.set(String(k), v);
-  }
-
-  /** Mirrors Rails `TestSession#merge!` — alias for {@link update}. */
-  mergeBang(hash: Record<string, unknown>): void {
-    this.update(hash);
-  }
-
-  clear(): void {
-    this._data.clear();
-  }
-
-  toHash(): Record<string, unknown> {
-    return Object.fromEntries(this._data);
-  }
-
-  toH(): Record<string, unknown> {
-    return this.toHash();
-  }
-
-  toObject(): Record<string, unknown> {
-    return this.toHash();
-  }
-
-  /** Mirrors Rails `TestSession#exists?` (`test_case.rb:208-210`) — always `true`. */
-  isExists(): boolean {
-    return true;
-  }
+  /** @internal Mirrors Rails `@initially_empty`. */
+  protected initiallyEmpty: boolean;
 
   /**
-   * Mirrors `SessionHash#loaded?`. Rails' `TestSession#initialize` sets
-   * `@loaded = true` (`test_case.rb:206`), so it is always loaded.
+   * Mirrors `TestSession#initialize` (`test_case.rb:198-206`). Ruby's
+   * `super(nil, nil)` passes the store and request a TestSession does not
+   * have; TS has no untyped `nil`, so the two `nil`s are cast at this call.
    */
-  isLoaded(): boolean {
+  constructor(
+    session: Record<string, unknown> = {},
+    id: SessionId = new SessionId(SecureRandom.hex(16)),
+  ) {
+    super(null as unknown as Persisted, null as unknown as PersistedRequest);
+    this.setId(id);
+    this.data = this.stringifyKeys(session);
+    this.loaded = true;
+    this.initiallyEmpty = Object.keys(this.data).length === 0;
+  }
+
+  /** Mirrors `TestSession#exists?` (`test_case.rb:208-210`). */
+  override isExists(): boolean {
     return true;
   }
 
-  /** Mirrors `SessionHash#has_key?`, inherited from `Rack::Session::Abstract`. */
-  hasKey(key: string): boolean {
-    return this.has(key);
+  /** Mirrors `TestSession#keys` (`test_case.rb:212-214`). */
+  override keys(): string[] {
+    return Object.keys(this.data);
   }
 
-  /** Mirrors `alias :key? :has_key?` (rack-session, `abstract/id.rb:111`). */
-  isKey(key: string): boolean {
-    return this.hasKey(key);
+  /** Mirrors `TestSession#values` (`test_case.rb:216-218`). */
+  override values(): unknown[] {
+    return Object.values(this.data);
   }
 
-  /** Mirrors `alias :include? :has_key?` (rack-session, `abstract/id.rb:112`). */
-  isInclude(key: string): boolean {
-    return this.hasKey(key);
-  }
-
-  /** Mirrors Rails `TestSession#keys` — stored data keys. */
-  keys(): string[] {
-    return [...this._data.keys()];
-  }
-
-  /** Mirrors Rails `TestSession#values` — stored data values. */
-  values(): unknown[] {
-    return [...this._data.values()];
-  }
-
-  /** Mirrors Rails `TestSession#destroy` — `def destroy; clear; end`. */
-  destroy(): void {
+  /** Mirrors `TestSession#destroy` (`test_case.rb:220-222`). */
+  override destroy(): void {
     this.clear();
   }
 
-  /** Mirrors Rails `TestSession#dig(*keys)` — first key is coerced to string. */
-  dig(...keys: unknown[]): unknown {
-    if (keys.length === 0) return undefined;
-    let cur: unknown = this._data.get(String(keys[0]));
-    for (let i = 1; i < keys.length; i++) {
-      if (cur == null) return undefined;
-      const k = keys[i] as string;
-      if (cur instanceof Map) cur = cur.get(k);
-      else if (typeof cur === "object") cur = (cur as Record<string, unknown>)[k];
-      else return undefined;
+  /** Mirrors `TestSession#dig(*keys)` (`test_case.rb:224-227`). */
+  override dig(key: unknown, ...keys: unknown[]): unknown {
+    let value: unknown = this.data[String(key)];
+    for (const k of keys) {
+      if (value == null) return undefined;
+      if (typeof value !== "object") {
+        throw new TypeError(`${(value as object).constructor.name} does not have #dig method`);
+      }
+      value = (value as Record<string, unknown>)[k as string];
     }
-    return cur;
+    return value;
   }
 
-  /**
-   * Mirrors Rails `TestSession#fetch(key, *args, &block)`. Returns the
-   * value at `key`; if missing, returns `fallback` (or the result of
-   * `fallback()` when callable), else throws.
-   */
-  fetch(key: string, args?: unknown): unknown {
+  /** Mirrors `TestSession#fetch(key, *args, &block)` (`test_case.rb:229-231`). */
+  override fetch(key: unknown, args?: unknown, block?: (key: string) => unknown): unknown {
     const k = String(key);
-    if (this._data.has(k)) return this._data.get(k);
-    if (arguments.length >= 2) {
-      // Ruby `Hash#fetch(key) { |k| ... }` yields the missing key to the
-      // block; mirror by passing the stringified key when the default is callable.
-      return typeof args === "function" ? (args as (key: string) => unknown)(k) : args;
-    }
-    throw new KeyError(`key not found: "${k}"`);
+    if (Object.hasOwn(this.data, k)) return this.data[k];
+    if (block) return block(k);
+    if (arguments.length < 2) throw new KeyError(`key not found: "${k}"`);
+    return args;
   }
 
-  /** Mirrors Rails `TestSession#enabled?` — always `true`. */
+  /** Mirrors `TestSession#enabled?` (`test_case.rb:233-235`). */
   isEnabled(): boolean {
     return true;
   }
 
-  /** Mirrors Rails `TestSession#id_was` — the session id frozen at init. */
-  idWas(): string {
-    return this._id;
+  /**
+   * Mirrors `TestSession#id_was` (`test_case.rb:237-239`). Ruby reads `@id`
+   * directly; `SessionHash`'s is TS-private, so this reads it back through the
+   * inherited `id()`, which returns `@id` unconditionally once `@loaded` is
+   * true (`vendor/rack-session/lib/rack/session/abstract/id.rb:74-78`) — as
+   * `initialize` makes it.
+   */
+  idWas(): unknown {
+    return this.id();
   }
 
-  /** @internal Mirrors Rails private `TestSession#load!` — returns `@id`. */
-  loadBang(): string {
-    return this._id;
+  /**
+   * @internal Mirrors private `TestSession#load!` (`test_case.rb:242-244`).
+   * Reads `@id` through the inherited `id()` for the reason `idWas` does.
+   */
+  override loadBang(): unknown {
+    return this.id();
   }
 }
 
-function randomHex(bytes: number): string {
-  return getCrypto().randomBytes(bytes).toString("hex");
-}
+setRubyClassPath(TestSession, "ActionController::TestSession");
 
 function formatToMime(format: string): string {
   const MIMES: Record<string, string> = {
@@ -885,5 +833,3 @@ function formatToMime(format: string): string {
   };
   return MIMES[format] ?? format;
 }
-
-setRubyClassPath(TestSession, "ActionController::TestSession");
