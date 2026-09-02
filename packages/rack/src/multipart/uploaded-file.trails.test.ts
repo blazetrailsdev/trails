@@ -10,11 +10,6 @@ import { UploadedFile } from "./uploaded-file.js";
 const fixtureDir = path.join(__dirname, "..", "..", "test", "multipart");
 const logo = path.join(fixtureDir, "rack-logo.png");
 
-// `Tempfile.new(..., encoding: Encoding::BINARY)` (uploaded_file.rb:24) opens the
-// tempfile in BINARY whether or not `binary:` was passed, so the contents are a
-// one-character-per-byte ASCII-8BIT String and `Generator#dump`'s body length is
-// the byte length `MockRequest.env_for` writes to CONTENT_LENGTH
-// (mock_request.rb:131).
 describe("Rack::Multipart::UploadedFile", () => {
   it("reads its tempfile as a binary String regardless of the binary flag", () => {
     const size = getFs().statSync(logo).size;

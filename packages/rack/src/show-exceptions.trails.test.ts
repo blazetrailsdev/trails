@@ -2,8 +2,6 @@ import { expect, it } from "vitest";
 
 import { Frame, ShowExceptions } from "./show-exceptions.js";
 
-// `pretty` builds one `Frame` per backtrace line (`show_exceptions.rb:82-104`),
-// filling the eight Struct members (:21-24) with the source context around it.
 class Exposed extends ShowExceptions {
   frames(exception: Error): Frame[] {
     const captured: Frame[] = [];

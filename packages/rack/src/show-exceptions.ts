@@ -156,7 +156,7 @@ export class ShowExceptions {
             frame.setPostContextLineno(Math.min(lineno + ShowExceptions.CONTEXT, lines.length));
             frame.setPostContext(lines.slice(lineno + 1, frame.postContextLineno! + 1));
           } catch {
-            // Rails swallows a bare `rescue` here (show_exceptions.rb:98).
+            /* empty */
           }
 
           return frame;
@@ -170,8 +170,10 @@ export class ShowExceptions {
   }
 
   /**
-   * `Exception#backtrace`'s lines (`show_exceptions.rb:82`), which a JS
-   * `Error` carries as the tail of `stack`.
+   * `Exception#backtrace`'s lines (`show_exceptions.rb:82`). Ruby answers
+   * `"file:lineno:in `function'"` strings; a JS `Error` carries one decorated
+   * `stack` string instead, so its frames are reshaped into that spelling for
+   * the `/(.*?):(\d+)(:in `(.*)')?/` match at `:84`.
    */
   private backtrace(exception: Error): string[] {
     if (!exception.stack) return [];
@@ -187,7 +189,7 @@ export class ShowExceptions {
   protected template(
     env: Record<string, any>,
     exception: Error,
-    _path?: string,
+    path?: string,
     frames?: Frame[],
   ): string {
     const name = exception.constructor?.name || (exception as any).name || "Error";
@@ -199,7 +201,7 @@ export class ShowExceptions {
     const postData = this.formatPostData(env);
 
     return (
-      `<!DOCTYPE html><html><head><title>${this.h(name)} at ${this.h(env["PATH_INFO"] || "/")}</title></head>` +
+      `<!DOCTYPE html><html><head><title>${this.h(name)} at ${this.h(path ?? env["PATH_INFO"] ?? "/")}</title></head>` +
       `<body><h1>${this.h(name)}: ${this.h(message)}</h1>` +
       `<p>You're seeing this error because you use <code>Rack::ShowExceptions</code>.</p>` +
       `<h3>Backtrace</h3><pre>${stack}</pre>` +

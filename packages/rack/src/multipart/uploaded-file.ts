@@ -59,9 +59,6 @@ export class UploadedFile {
         throw new Error(`${path ?? ""} file does not exist`);
       }
       this.originalFilename = opts.filename ?? getPath().basename(path);
-      // `Tempfile.new(..., encoding: Encoding::BINARY)` (uploaded_file.rb:24) is
-      // unconditional — `binmode` (:25) only suppresses newline translation — so
-      // the contents are always an ASCII-8BIT String, one character per byte.
       const content = getFs().readFileSync(path, "latin1");
       this._tempfile = makeTempfile(content, path);
     }
