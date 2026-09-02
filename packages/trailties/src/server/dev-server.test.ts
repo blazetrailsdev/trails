@@ -82,6 +82,35 @@ describe("DevServer", () => {
     );
   }, 60_000);
 
+  it("builds into public/assets without copying public/ or doubling the assets path", async () => {
+    const root = await generateApp();
+
+    await build({
+      root: path.join(root, "app"),
+      configFile: path.join(root, "vite.config.ts"),
+      logLevel: "warn",
+    });
+
+    const outDir = path.join(root, "public", "assets");
+    const emitted = fs
+      .readdirSync(outDir, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => path.relative(outDir, path.join(entry.parentPath, entry.name)));
+
+    expect(emitted.filter((file) => !file.startsWith(".vite/"))).toEqual([
+      expect.stringMatching(/^application-[^/]*\.css$/),
+    ]);
+    for (const copied of ["404.html", "422.html", "500.html", "robots.txt", "favicon.ico"]) {
+      expect(emitted).not.toContain(copied);
+      expect(fs.existsSync(path.join(root, "public", copied))).toBe(true);
+    }
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(outDir, ".vite/manifest.json"), "utf-8"));
+    const file = manifest["assets/stylesheets/application.css"].file;
+    expect(file).not.toContain("/");
+    expect(fs.existsSync(path.join(outDir, file))).toBe(true);
+  }, 60_000);
+
   it("serves the generated stylesheet the layout links to", async () => {
     const origin = await startOn(await generateApp());
 

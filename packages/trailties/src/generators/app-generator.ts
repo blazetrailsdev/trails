@@ -268,7 +268,7 @@ export class AppGenerator extends AppBase {
 /storage/*
 !/storage/.gitkeep
 
-/public/assets/
+/public/assets
 
 *.tsbuildinfo
 `,
@@ -350,9 +350,11 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   root: "app",
-  publicDir: "../public",
+  publicDir: false,
   build: {
     outDir: "../public/assets",
+    assetsDir: ".",
+    emptyOutDir: true,
     manifest: true,
     rollupOptions: {
       input: {
