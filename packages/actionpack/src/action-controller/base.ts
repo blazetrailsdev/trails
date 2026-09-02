@@ -61,6 +61,7 @@ import {
   requestHttpDigestAuthentication,
 } from "./metal/http-authentication.js";
 import { sendFileHeadersBang, type SendFileHeadersOptions } from "./metal/data-streaming.js";
+import { statusCode } from "@blazetrails/rack";
 import {
   Options as ParamsWrapperOptions,
   _defaultWrapModel,
@@ -498,8 +499,8 @@ export class Base extends Metal {
       );
     }
 
-    const status = responseOptions.status ? Metal.resolveStatus(responseOptions.status) : 302;
-    this.status = status;
+    const proposedStatus = responseOptions.status ? statusCode(responseOptions.status) : 302;
+    this.status = proposedStatus;
     this.setHeader("location", options);
     this.contentType = "text/html; charset=utf-8";
     this.body = `<html><body>You are being <a href="${options}">redirected</a>.</body></html>`;

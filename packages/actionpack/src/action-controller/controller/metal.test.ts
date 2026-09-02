@@ -49,7 +49,7 @@ describe("MetalControllerInstanceTests", () => {
     c.response = makeResponse();
     expect(() => {
       c.status = "bogus";
-    }).toThrow("Unknown status: bogus");
+    }).toThrow("Unrecognized status code :bogus");
   });
 
   it("can set and get headers", () => {
@@ -107,7 +107,7 @@ describe("MetalControllerInstanceTests", () => {
     c.response = makeResponse();
     expect(() => {
       c.head("bogus");
-    }).toThrow("Unknown status: bogus");
+    }).toThrow("Unrecognized status code :bogus");
   });
 
   it("resolveStatus with number returns number", () => {

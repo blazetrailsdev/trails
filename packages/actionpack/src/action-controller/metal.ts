@@ -20,7 +20,7 @@ import {
 import type { RackEnv } from "@blazetrails/rack";
 import { includeContent } from "./metal/head.js";
 import { Renderers } from "./metal/renderers.js";
-import { STATUS_CODES, resolveStatus } from "./metal/status-codes.js";
+import { resolveStatus } from "./metal/status-codes.js";
 import {
   _normalizeOptions as _normalizeOptionsFn,
   _normalizeText as _normalizeTextFn,
@@ -220,18 +220,9 @@ export class Metal extends AbstractController {
     }
   }
 
-  /**
-   * Delegates to `ActionDispatch::Response#status=` (`metal.rb:183-184`). The
-   * Symbol arm is Rails' `Rack::Utils.status_code`, applied by `Response#status=`.
-   */
+  /** Delegates to `ActionDispatch::Response#status=` (`metal.rb:183-184`). */
   set status(value: number | string) {
-    if (typeof value === "string") {
-      const code = STATUS_CODES[value];
-      if (!code) throw new Error(`Unknown status: ${value}`);
-      this.response.status = code;
-    } else {
-      this.response.status = value;
-    }
+    this.response.status = value;
   }
 
   /** Delegates to `ActionDispatch::Response#status` (`metal.rb:195-196`). */
@@ -264,6 +255,11 @@ export class Metal extends AbstractController {
     return this.response.contentType ?? null;
   }
 
+  /** Delegates to `ActionDispatch::Response#media_type` (`metal.rb:207-208`). */
+  get mediaType(): string | undefined {
+    return this.response.mediaType;
+  }
+
   /** Send a head-only response with given status. Mirrors Rails'
    * `ActionController::Head#head` (`actionpack/lib/action_controller/metal/head.rb`):
    * sets status, optional `location` / `content_type` / extra headers,
@@ -292,9 +288,10 @@ export class Metal extends AbstractController {
       this.setHeader("location", this.urlFor(String(location)));
     }
     if (includeContent(this.status)) {
-      if (!this.contentType) {
+      if (!this.mediaType) {
         this.contentType = contentType ? String(contentType) : "text/html";
       }
+      this.response.charset = false;
     }
     // Route through the public setter so the response stream is updated
     // in lock-step (mirrors Rails' `self.response_body = ""` in head.rb).

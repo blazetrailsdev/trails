@@ -5,7 +5,13 @@
  */
 
 import { getFs, presence } from "@blazetrails/activesupport";
-import { deleteSetCookieHeaderBang, Headers, setCookieHeader, unescape } from "@blazetrails/rack";
+import {
+  deleteSetCookieHeaderBang,
+  Headers,
+  setCookieHeader,
+  statusCode,
+  unescape,
+} from "@blazetrails/rack";
 import type { CookieExpires } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
 import {
@@ -125,8 +131,9 @@ export class Response {
   get status(): number {
     return this._status;
   }
-  set status(value: number) {
-    this._status = value;
+  /** Mirrors: `status=` (response.rb:247-249) — `Rack::Utils.status_code(status)`. */
+  set status(status: number | string) {
+    this._status = statusCode(status);
   }
 
   get code(): number {
