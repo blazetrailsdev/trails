@@ -513,7 +513,7 @@ describe("TestRoutingMapper", () => {
       PATH_INFO: "/nope",
     });
     expect(status).toBe(404);
-    expect(await bodyToString(body)).toContain("No route matches");
+    expect(await bodyToString(body)).toContain("Not Found");
   });
 
   it("dispatches matched route", async () => {

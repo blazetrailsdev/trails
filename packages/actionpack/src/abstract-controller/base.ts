@@ -89,8 +89,26 @@ export class ActionNotFound extends Error {
 }
 
 export class AbstractController {
+  /**
+   * Rails: `attr_internal :action_name` (`abstract_controller/base.rb:32`) —
+   * the ivar is `@_action_name`, which is why
+   * `DEFAULT_PROTECTED_INSTANCE_VARIABLES` names it and `view_assigns` never
+   * carries the action name into a view.
+   */
+  _actionName: string = "";
+
   /** The action currently being processed. */
-  actionName: string = "";
+  get actionName(): string {
+    return this._actionName;
+  }
+  set actionName(value: string) {
+    this._actionName = value;
+  }
+
+  /** Mirrors `AbstractController::Base.supports_path?` (`abstract_controller/base.rb:200`). */
+  static supportsPathQ(): boolean {
+    return true;
+  }
 
   /** When true, ActionFilter#isMatch raises if `:only`/`:except` references
    * an action that doesn't exist on the controller. Rails 7.1 mattr_accessor. */

@@ -175,10 +175,19 @@ export class DetailsKey {
    * wires real entries into `PathRegistry`, the resolver loop is a
    * no-op.
    */
+  /** Mirrors `DetailsKey.view_context_class` (`lookup_context.rb:90-94`). */
+  static viewContextClass(): typeof Base {
+    return (DetailsKey._viewContextClass ??= Base.withEmptyTemplateCache());
+  }
+
+  /** @internal Rails: `@view_context_class` (`lookup_context.rb:81,92`). */
+  private static _viewContextClass: typeof Base | null = null;
+
   static clear(): void {
     for (const resolver of PathRegistry.allResolvers()) {
       resolver.clearCache?.();
     }
+    DetailsKey._viewContextClass = null;
     DetailsKey._detailsKeys.clear();
     DetailsKey._digestCache.clear();
   }
@@ -578,7 +587,7 @@ export class LookupContext {
     action: string,
     format: string,
     locals: Record<string, unknown> = {},
-    options: { layout?: string | false } = {},
+    options: { layout?: string | false; view?: Base } = {},
   ): Promise<string> {
     const template = this.findTemplate(action, controller, format);
     if (!template) {
@@ -601,7 +610,7 @@ export class LookupContext {
     // (`TemplateRenderer#render_with_layout`, `template_renderer.rb:71-78`:
     // `view.view_flow.set(:layout, yield(layout)); layout.render(view, locals)`),
     // which is what carries a `content_for` section from one to the other.
-    const view = this.buildViewContext();
+    const view = options.view ?? this.buildViewContext();
     let output = await this.renderTemplate(template, locals, { ...context, view });
 
     const layoutName = options.layout !== undefined ? options.layout : this.layoutName;
@@ -630,6 +639,7 @@ export class LookupContext {
     prefix: string,
     format: string,
     locals: Record<string, unknown> = {},
+    view?: Base,
   ): Promise<string> {
     const template = this.findPartial(name, prefix, format);
     if (!template) {
@@ -648,7 +658,7 @@ export class LookupContext {
       format,
     };
 
-    return this.renderTemplate(template, locals, context);
+    return this.renderTemplate(template, locals, { ...context, view });
   }
 
   /**
@@ -740,19 +750,14 @@ export class LookupContext {
   }
 
   /**
-   * The view a template renders against. Rails caches the view class on
-   * `LookupContext::DetailsKey` (`lookup_context.rb`,
-   * `DetailsKey.view_context_class`), which is a `with_empty_template_cache`
-   * subclass, so compiled methods are shared across renders but never across
-   * caches. Rails builds it on the controller instead; see
-   * `port-view-context-class-on-controller`.
+   * The view a template renders against when no controller supplied one — a
+   * bare `DetailsKey.view_context_class` (`lookup_context.rb:90-94`). A
+   * controller-driven render passes its own `view_context`
+   * (`action_view/rendering.rb:108-110`) instead.
    */
   private buildViewContext(): Base {
-    this._viewContextClass ??= Base.withEmptyTemplateCache();
-    return new this._viewContextClass(this, {}, null);
+    return new (DetailsKey.viewContextClass())(this, {}, null);
   }
-
-  private _viewContextClass: typeof Base | null = null;
 
   private resolverNames(): string[] {
     return this._viewPaths.toArray().map((r) => r.constructor.name);

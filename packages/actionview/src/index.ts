@@ -30,6 +30,16 @@ export type {
   Layouts,
   LayoutsClass,
   RenderOptions as RenderingOptions,
+  ViewContextClassMethods,
+  ViewContextHost,
+  ViewContextRoutes,
+} from "./rendering.js";
+
+export {
+  buildViewContextClass,
+  inheritViewContextClassQ,
+  viewContext,
+  viewContextClass,
 } from "./rendering.js";
 
 export {

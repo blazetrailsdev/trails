@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { bodyToString } from "@blazetrails/rack";
 import { OptionRedirect, PathRedirect, Redirect, redirect } from "./redirection.js";
+import { RouteSet } from "./route-set.js";
 import { Request } from "../http/request.js";
 
 function makeRequest(env: Record<string, unknown> = {}): Request {
@@ -115,5 +117,52 @@ describe("OptionRedirect", () => {
     expect(new OptionRedirect(301, { subdomain: "stores" }).inspect()).toBe(
       "redirect(301, subdomain: stores)",
     );
+  });
+});
+
+describe("RouteSet#call through a Redirect endpoint", () => {
+  const env = (path: string): Record<string, unknown> => ({
+    REQUEST_METHOD: "GET",
+    PATH_INFO: path,
+    SERVER_NAME: "example.com",
+    SERVER_PORT: "80",
+    "rack.url_scheme": "http",
+  });
+
+  it("serves the redirect the mapper attached to the route", async () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/account", { to: r.redirect("/dashboard") });
+    });
+
+    const [status, headers, body] = await routes.call(env("/account"));
+
+    expect(status).toBe(301);
+    expect(headers["location"]).toBe("http://example.com/dashboard");
+    expect(await bodyToString(body)).toBe("");
+  });
+
+  it("hands the redirect block the path parameters Journey matched", async () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/old/:id", { to: r.redirect((params) => `/new/${params.id}`) });
+    });
+
+    const [status, headers] = await routes.call(env("/old/42"));
+
+    expect(status).toBe(301);
+    expect(headers["location"]).toBe("http://example.com/new/42");
+  });
+
+  it("falls through to the Journey 404 when nothing matches", async () => {
+    const routes = new RouteSet();
+    routes.draw((r) => {
+      r.get("/account", { to: r.redirect("/dashboard") });
+    });
+
+    const [status, headers] = await routes.call(env("/nope"));
+
+    expect(status).toBe(404);
+    expect(headers["x-cascade"]).toBe("pass");
   });
 });

@@ -434,19 +434,21 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
       }
     }
   } else {
-    for (const key of Object.keys(mod as ModuleObject)) {
-      const value = (mod as ModuleObject)[key];
-      if (typeof value !== "function" || /^[A-Z]/.test(key)) continue;
-      if (Object.prototype.hasOwnProperty.call(klass.prototype, key) && !installed.has(key)) {
-        continue;
+    for (
+      let ancestor: object | null = mod as ModuleObject;
+      ancestor && ancestor !== Object.prototype;
+    ) {
+      for (const [key, modDesc] of Object.entries(Object.getOwnPropertyDescriptors(ancestor))) {
+        if (key === "constructor" || /^[A-Z]/.test(key)) continue;
+        if ("value" in modDesc && typeof modDesc.value !== "function") continue;
+        if (Object.prototype.hasOwnProperty.call(descriptors, key)) continue;
+        if (Object.prototype.hasOwnProperty.call(klass.prototype, key) && !installed.has(key)) {
+          continue;
+        }
+        installed.add(key);
+        descriptors[key] = { ...modDesc, configurable: true, enumerable: false };
       }
-      installed.add(key);
-      descriptors[key] = {
-        value,
-        writable: true,
-        configurable: true,
-        enumerable: false,
-      };
+      ancestor = Object.getPrototypeOf(ancestor) as object | null;
     }
   }
   Object.defineProperties(klass.prototype, descriptors);

@@ -34,8 +34,19 @@ import {
   lookupContext,
   templateExists,
 } from "@blazetrails/actionview";
-import type { PathSet, ViewPathsInput } from "@blazetrails/actionview";
-import type { RouteHelpersMap } from "../action-dispatch/routing/route-helpers.js";
+import {
+  Base as ActionViewBase,
+  buildViewContextClass,
+  inheritViewContextClassQ,
+  viewContext,
+  viewContextClass,
+} from "@blazetrails/actionview";
+import type {
+  PathSet,
+  ViewPathsInput,
+  ViewContextHost,
+  ViewContextRoutes,
+} from "@blazetrails/actionview";
 import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
@@ -74,6 +85,7 @@ import { Parameters as StrongParameters } from "./metal/strong-parameters.js";
 import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   DoubleRenderError,
+  viewAssigns,
 } from "../abstract-controller/rendering.js";
 
 // Re-export callback registration
@@ -196,9 +208,18 @@ export class Base extends Metal {
    *
    * Rails delegates this to the request (`delegate :session, to: "@_request"`,
    * `metal.rb:176`); converging it is
-   * `converge-controller-session-delegation`.
+   * `converge-controller-session-delegation`. It is spelled as an ivar plus an
+   * accessor pair in the meantime, so `view_assigns` treats it as the
+   * delegated method Rails has rather than as an assign.
    */
-  session: Record<string, unknown> = {};
+  _session: Record<string, unknown> = {};
+
+  get session(): Record<string, unknown> {
+    return this._session;
+  }
+  set session(value: Record<string, unknown>) {
+    this._session = value;
+  }
 
   /** Template resolver (pluggable, legacy). */
   static templateResolver?: (controller: string, action: string, format: string) => string | null;
@@ -224,8 +245,30 @@ export class Base extends Metal {
   /** Layout name. Set to false to disable, or a string name. */
   static layout: string | false = "application";
 
-  /** Route helpers (_path/_url functions) available to controller and templates. */
-  static routeHelpers?: RouteHelpersMap;
+  /** Rails: `ActionView::Rendering::ClassMethods#_routes` (`action_view/rendering.rb:46`). */
+  static _routes: ViewContextRoutes | null = null;
+
+  /** Rails: `ActionView::Rendering::ClassMethods` (`action_view/rendering.rb:52-92`). */
+  static inheritViewContextClassQ = inheritViewContextClassQ;
+  static buildViewContextClass = buildViewContextClass;
+  static viewContextClass = viewContextClass;
+  /** @internal Rails: `@view_context_class`. */
+  static _viewContextClass?: typeof ActionViewBase;
+
+  /** Rails: `ActionView::Rendering#view_context_class` (`action_view/rendering.rb:95-97`). */
+  viewContextClass(): typeof ActionViewBase {
+    return (
+      this.constructor as unknown as { viewContextClass(): typeof ActionViewBase }
+    ).viewContextClass();
+  }
+
+  /** Rails: `AbstractController::Rendering#view_assigns` (`abstract_controller/rendering.rb:44-50`). */
+  viewAssigns = viewAssigns;
+
+  /** Rails: `ActionView::Rendering#view_context` (`action_view/rendering.rb:108-110`). */
+  viewContext(): ActionViewBase {
+    return viewContext.call(this as unknown as ViewContextHost);
+  }
 
   /** Rescue handlers (class-level, inherited). */
   private static _rescueHandlers: Array<{
@@ -414,8 +457,9 @@ export class Base extends Metal {
     // to the resolver; trails' `LookupContext#render` takes one format —
     // converged by lookup-context-render-takes-rails-prefixes-and-formats.
     const format = String(this.formats[0] ?? "html");
-    const routeHelpers = (this.constructor as typeof Base).routeHelpers ?? {};
-    const locals = { ...routeHelpers, ...options.locals };
+    const locals = { ...options.locals };
+    // `_render_template`'s `context = view_context` (`action_view/rendering.rb:130`).
+    const view = this.viewContext();
     const layout =
       options.layout === false
         ? false
@@ -434,7 +478,13 @@ export class Base extends Metal {
           options.as,
         );
       } else {
-        this.body = await ctx.renderPartial(options.partial, controllerPrefix, format, locals);
+        this.body = await ctx.renderPartial(
+          options.partial,
+          controllerPrefix,
+          format,
+          locals,
+          view,
+        );
       }
     } else {
       // `options[:template] ||= (options[:action] || action_name).to_s`, with
@@ -451,6 +501,7 @@ export class Base extends Metal {
       );
       this.body = await ctx.render(String(prefixes[0]), action, format, locals, {
         layout: layout === false ? false : layout || undefined,
+        view,
       });
     }
 

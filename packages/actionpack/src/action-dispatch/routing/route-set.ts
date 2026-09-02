@@ -9,8 +9,7 @@
  */
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { bodyFromString } from "@blazetrails/rack";
-import { Mapper } from "./mapper.js";
+import { Constraints, Mapper } from "./mapper.js";
 import type { MatchedRoute } from "./route.js";
 import { Route } from "./route.js";
 import {
@@ -18,7 +17,12 @@ import {
   journeyRecognize as recognizeViaJourney,
   type JourneyMatch,
 } from "./journey-bridge.js";
-import type { Router as JourneyRouter, RackishResponse, RouterRequest } from "../journey/router.js";
+import type {
+  Router as JourneyRouter,
+  RackishResponse,
+  RoutableApp,
+  RouterRequest,
+} from "../journey/router.js";
 import {
   polymorphicUrl as polymorphicUrlFn,
   polymorphicMapping as polymorphicMappingFn,
@@ -46,7 +50,7 @@ import { RoutingError, UrlGenerationError } from "../../action-controller/metal/
 import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
 import { NameError } from "@blazetrails/activesupport";
-import { chomp } from "@blazetrails/ruby-compat";
+import { normalizePath } from "../journey/router/utils.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
 import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
 
@@ -420,12 +424,12 @@ export class RouteSet {
   /** @internal */
   private _journeyRouter: JourneyRouter | null = null;
   /**
-   * One `Dispatcher` per route, as Rails' `Mapping#app` builds it
+   * One endpoint per route, as Rails' `Mapping#app` builds it
    * (`mapper.rb:294-303`), keyed by the `Route` it belongs to.
    *
    * @internal
    */
-  private readonly _routeDispatchers = new WeakMap<Route, Dispatcher>();
+  private readonly _routeApps = new WeakMap<Route, RoutableApp>();
 
   constructor(config: RouteSetConfig = { ...DEFAULT_CONFIG }) {
     // Rails: `def initialize(config = DEFAULT_CONFIG.dup)` — DEFAULT_CONFIG
@@ -861,7 +865,7 @@ export class RouteSet {
    */
   get journeyRouter(): JourneyRouter {
     if (!this._journeyRouter) {
-      this._journeyRouter = buildJourneyRouter(this.routes, { app: (r) => this._dispatcher(r) });
+      this._journeyRouter = buildJourneyRouter(this.routes, { app: (r) => this._app(r) });
     }
     return this._journeyRouter;
   }
@@ -872,23 +876,40 @@ export class RouteSet {
   }
 
   /**
-   * Rails: `Mapping#dispatcher(raise_on_name_error)` (`mapper.rb:305-307`),
-   * called from `Mapping#app` with `defaults.key?(:controller)`
-   * (`mapper.rb:301`). A route that pins a controller — `to: "posts#index"`,
-   * or a `defaults:` entry — raises `ActionController::RoutingError` when the
-   * constant will not resolve; one that only matches a dynamic `:controller`
-   * segment cascades `[404, X-Cascade: pass, []]` so routing falls through.
+   * Rails: `Mapping#app(blocks)` (`mapper.rb:294-303`) — the endpoint a route
+   * serves through. A mounted Rack app and a `Redirect` both answer `call`, so
+   * both take the `to.respond_to?(:call)` arm and are wrapped in
+   * {@link Constraints} with the `CALL` strategy; everything else is the
+   * `Mapping#dispatcher(defaults.key?(:controller))` arm (`mapper.rb:305-307`).
+   * A route that pins a controller — `to: "posts#index"`, or a `defaults:`
+   * entry — raises `ActionController::RoutingError` when the constant will not
+   * resolve; one that only matches a dynamic `:controller` segment cascades
+   * `[404, X-Cascade: pass, []]` so routing falls through.
+   *
+   * The other two arms have nothing to dispatch to yet, and each is owned by
+   * the story that ports what it needs: `to.respond_to?(:action)` →
+   * `StaticDispatcher` (`mapper.rb:295-296`) needs `Mapper#mount`'s
+   * `rack_app.respond_to?(:action)` arm, and `blocks.any?` →
+   * `Constraints(dispatcher, blocks, SERVE)` (`mapper.rb:299-300`) needs the
+   * `constraints do ... end` blocks that `Route` does not carry — trails keeps
+   * request constraints on the Journey `Route` and evaluates them in
+   * `Route#matches` instead. Both are pre-existing gaps, not new ones.
    *
    * @internal
    */
-  private _dispatcher(route: Route): Dispatcher {
-    let dispatcher = this._routeDispatchers.get(route);
-    if (!dispatcher) {
-      const raiseOnNameError = route.controller !== "" || "controller" in route.defaults;
-      dispatcher = new Dispatcher(raiseOnNameError);
-      this._routeDispatchers.set(route, dispatcher);
+  private _app(route: Route): RoutableApp {
+    let app = this._routeApps.get(route);
+    if (!app) {
+      const to = route.app ?? route.redirectEndpoint;
+      if (to !== undefined) {
+        app = new Constraints(to, [], Constraints.CALL) as unknown as RoutableApp;
+      } else {
+        const raiseOnNameError = route.controller !== "" || "controller" in route.defaults;
+        app = new Dispatcher(raiseOnNameError) as unknown as RoutableApp;
+      }
+      this._routeApps.set(route, app);
     }
-    return dispatcher;
+    return app;
   }
 
   /** End-to-end `Router.serve` through this set's Journey router. */
@@ -1058,85 +1079,10 @@ export class RouteSet {
     return this.routes;
   }
 
-  /**
-   * Rack-compatible dispatch: match the request and call the dispatcher.
-   */
+  /** Mirrors `RouteSet#call(env)` (`route_set.rb:905-909`). */
   async call(env: RackEnv): Promise<RackResponse> {
-    const method = (env["REQUEST_METHOD"] as string) || "GET";
-    const path = (env["PATH_INFO"] as string) || "/";
-
-    const matched = this.recognize(method, path);
-    if (!matched) {
-      return [
-        404,
-        { "content-type": "text/plain" },
-        bodyFromString(`No route matches [${method}] "${path}"`),
-      ];
-    }
-
-    const { route, params } = matched;
-
-    // Handle redirect routes by dispatching through the Redirect endpoint
-    // (PathRedirect / OptionRedirect / Redirect). Path captures are surfaced
-    // to the endpoint via `path_parameters` on the env, matching how Rails'
-    // routing layer hands captures to ActionDispatch::Routing::Redirect.
-    const redirectEndpoint = route.redirectEndpoint;
-    if (redirectEndpoint) {
-      env["action_dispatch.request.path_parameters"] = {
-        controller: route.controller,
-        action: route.action,
-        ...params,
-      };
-      const [status, headers, body] = redirectEndpoint.call(env);
-      const lowerHeaders: Record<string, string> = {};
-      for (const [k, v] of Object.entries(headers)) lowerHeaders[k.toLowerCase()] = v;
-      return [status, lowerHeaders, body as RackResponse[2]];
-    }
-
-    // Mounted Rack app: forward the request after stripping the mount prefix
-    // from PATH_INFO and appending it to SCRIPT_NAME. Mirrors Rails' Journey
-    // anchor: false dispatch into the engine's app.
-    const mountedApp = route.app;
-    if (mountedApp) {
-      // Mirrors Rails' `action_dispatch/journey/router.rb#serve`:
-      // - SCRIPT_NAME/PATH_INFO are rewritten ONLY for unanchored routes
-      //   (`unless route.path.anchored`). Anchored mounts forward env
-      //   unchanged. matchedPrefix / postMatch on `matched` are populated
-      //   by `journeyRecognize` from `match.to_s` / `match.post_match`,
-      //   so dynamic mount points (`/:tenant` → `/acme`) work without
-      //   relying on literal `route.path` slicing.
-      // - `path_parameters` is set on the forwarded request unconditionally
-      //   (Rails: `req.path_parameters = tmp_params` before `route.app.serve`).
-      const forwarded: RackEnv = { ...env };
-      if (matched.matchedPrefix !== undefined) {
-        const scriptName = (env["SCRIPT_NAME"] as string) ?? "";
-        forwarded["SCRIPT_NAME"] = chomp(scriptName + matched.matchedPrefix, "/");
-        forwarded["PATH_INFO"] = matched.postMatch ?? "/";
-      }
-      // Rails (journey/router.rb:45-50): `tmp_params = set_params.merge route.defaults`
-      // then overlay matched parameters. Preserves outer-mount captures
-      // when engines are nested.
-      const setParams =
-        (env["action_dispatch.request.path_parameters"] as Record<string, unknown>) ?? {};
-      forwarded["action_dispatch.request.path_parameters"] = {
-        ...setParams,
-        ...route.defaults,
-        ...params,
-      };
-      return typeof mountedApp === "function"
-        ? await mountedApp(forwarded)
-        : await mountedApp.call(forwarded);
-    }
-
-    // Merge route params into the env (like Rails does with request.params)
-    env["action_dispatch.request.path_parameters"] = {
-      controller: route.controller,
-      action: route.action,
-      ...params,
-    };
-
-    return (await this._dispatcher(route).serve(
-      new AdRequest(env) as unknown as RouterRequest,
-    )) as unknown as RackResponse;
+    const req = this.makeRequest(env);
+    req.pathInfo = normalizePath(req.pathInfo);
+    return (await this.router.serve(req as unknown as RouterRequest)) as unknown as RackResponse;
   }
 }

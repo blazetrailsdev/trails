@@ -629,7 +629,7 @@ with `Super` still in TDZ and the module throws
 imports at all (so it cannot join any cycle) exporting a mutable binding plus a
 `_setX()` setter, which the defining module calls at the bottom of its own
 body. Readers import the binding from the slot and use it at call time, exactly
-where Ruby resolves the constant. Five instances exist and are the only ones:
+where Ruby resolves the constant. Six instances exist and are the only ones:
 
 - `activerecord/src/encryption/configurable-slot.ts` — `Configurable`, read by
   `encryptor.ts`, `context.ts`, `scheme.ts`, `key-provider.ts`,
@@ -645,6 +645,11 @@ where Ruby resolves the constant. Five instances exist and are the only ones:
   `self.class`, `rack-session/lib/rack/session/abstract/id.rb:155,396`). The
   cycle is closed by `class Pool extends PersistedSecure` (`pool.ts`), so
   `id.ts` cannot import `pool.ts` back.
+- `trailties/src/trails-slot.ts` — the `Trails` constant, read by
+  `engine/lazy-route-set.ts` for `Rails.application&.reload_routes_unless_loaded`
+  (`engine/lazy_route_set.rb:12-104`). The cycle is closed by
+  `class Application extends Engine` (`application.ts`), so `lazy-route-set.ts`
+  cannot import `rails.ts` back.
 - `actionview/src/base-slot.ts` — `Base`, read by `template/handlers/tse.ts` for
   `annotate_rendered_view_with_filenames` (`handlers/erb.rb:86-89`). The cycle
   is closed by `template.rb:178`'s `extend Template::Handlers`, whose port

@@ -5,7 +5,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mapper } from "@blazetrails/actionpack";
 import { RouteSet } from "@blazetrails/actionpack";
-import { LazyRouteSet, resetReloadRoutesHook, setReloadRoutesHook } from "./lazy-route-set.js";
+import { LazyRouteSet } from "./lazy-route-set.js";
+import { Trails } from "../rails.js";
 
 describe("LazyRouteSet", () => {
   let routes: LazyRouteSet;
@@ -13,12 +14,12 @@ describe("LazyRouteSet", () => {
 
   beforeEach(() => {
     routes = new LazyRouteSet();
-    reload = vi.fn(() => true);
-    setReloadRoutesHook(reload);
+    reload = vi.fn(async () => true);
+    Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
   });
 
   afterEach(() => {
-    resetReloadRoutesHook();
+    Trails.application = null;
     vi.restoreAllMocks();
   });
 
@@ -54,16 +55,14 @@ describe("LazyRouteSet", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it("reloads routes when serve (Rails: call) is invoked", () => {
-    const superServe = vi.spyOn(RouteSet.prototype, "serve").mockResolvedValue({
-      0: 200,
-      1: {},
-      2: [],
-    });
+  it("reloads routes when call is invoked", async () => {
+    const superCall = vi
+      .spyOn(RouteSet.prototype, "call")
+      .mockResolvedValue([200, {}, []] as never);
     reload.mockClear();
-    routes.serve({ pathInfo: "/", scriptName: "", requestMethod: "GET", pathParameters: {} });
+    await routes.call({ REQUEST_METHOD: "GET", PATH_INFO: "/" });
     expect(reload).toHaveBeenCalledTimes(1);
-    expect(superServe).toHaveBeenCalledTimes(1);
+    expect(superCall).toHaveBeenCalledTimes(1);
   });
 
   it("reloads routes when url helpers are invoked", () => {
@@ -74,8 +73,8 @@ describe("LazyRouteSet", () => {
     expect(reload).toHaveBeenCalled();
   });
 
-  it("tolerates a missing application (default hook is a no-op)", () => {
-    resetReloadRoutesHook();
+  it("tolerates a missing application", () => {
+    Trails.application = null;
     expect(() => routes.draw(() => {})).not.toThrow();
   });
 
