@@ -38,12 +38,8 @@ export class QueryAttribute extends Attribute {
     return value;
   }
 
-  static override withCastValue(
-    name: string,
-    valueBeforeTypeCast: unknown,
-    type: CastType,
-  ): QueryAttribute {
-    return new QueryAttribute(name, valueBeforeTypeCast, type);
+  override withCastValue(value: unknown): QueryAttribute {
+    return new QueryAttribute(this.name, value, this.type);
   }
 
   override get valueForDatabase(): unknown {
