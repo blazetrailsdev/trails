@@ -137,6 +137,13 @@ applied first (trails railties are not `Rails::Railtie` subclasses):
 | `railtie`    | `trailtie`     |
 | `railties`   | `trailties`    |
 
+Rails nests each command one directory deep and suffixes the file; trails
+flattens both segments onto one file, so
+`commands/<dir>/<dir>_command.rb` → `commands/<dir kebab-cased>.ts`
+(`commands/unused_routes/unused_routes_command.rb` →
+`commands/unused-routes.ts`). The directory and the file's stem must agree;
+anything else takes the plain kebab-case rule.
+
 ## Skipped methods
 
 parity:api never expects a TS counterpart for these Ruby methods:

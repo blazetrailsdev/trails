@@ -36,6 +36,10 @@
  * the same pairs: where arity asks how many args a method takes, this asks what
  * they are CALLED, since CLAUDE.md makes the camelCased Rails identifier the
  * required spelling. A `params N/M` figure prints next to `arity` and
+ * output/ambiguous-parents.json carries the inheritance edges the walk followed
+ * to NOTHING, per package and omitting packages at zero, so the file IS the
+ * remainder lint-ambiguous-parents.ts gates only-shrink (RFC 0126).
+ *
  * output/param-name-mismatches.json is always written; `--params` adds the
  * per-position breakdown. lint-param-names.ts gates it against an only-shrink
  * per-package/per-file mark (param-name-mark.json).
@@ -77,6 +81,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { EXTERNAL_DECL_FILE, PKG_DECL_PREFIX } from "@blazetrails/parity/types";
 import type {
   ApiManifest,
   CallSite,
@@ -1103,6 +1108,8 @@ interface PackageResult {
   excludedFiles: string[];
   files: FileResult[];
   inheritance: InheritanceResult;
+  /** Inheritance edges the walk followed to NOTHING — see `output/ambiguous-parents.json`. */
+  ambiguousParents: number;
   arity: ArityResult;
   paramNames: ParamNameResult;
   optionKeys: OptionKeyResult;
@@ -2954,6 +2961,7 @@ export function buildEntitiesByName(
   pkg: string,
   ts: ApiManifest,
   foreign?: Set<ClassInfo>,
+  pkgOf?: Map<ClassInfo, string>,
 ): Map<string, ClassInfo[]> {
   const map = new Map<string, ClassInfo[]>();
 
@@ -2965,6 +2973,7 @@ export function buildEntitiesByName(
     if (!p) return;
     for (const entity of [...Object.values(p.classes), ...Object.values(p.modules)]) {
       if (isFixture(entity)) continue;
+      pkgOf?.set(entity, pkgKey);
       if (pkgKey !== pkg) foreign?.add(entity);
       const list = map.get(entity.name) ?? [];
       list.push(entity);
@@ -3006,6 +3015,14 @@ export function buildEntitiesByName(
  * candidates do share a directory prefix with the child, which is the signal
  * this heuristic exists to read; only a tie at zero is pure enumeration order.
  *
+ * `declFile` also arrives in two RESOLVED-but-not-here spellings, which the
+ * heuristic must not confuse with an absent one (RFC 0126). `external:` says
+ * the name bound a TypeScript lib global or a node_modules type, so no package
+ * entity is it and the walk follows nothing — silently, because a
+ * `class X extends Error` in an ambiguity warning is noise nobody can act on.
+ * `pkg:<package>:<path>` says it bound another workspace package, and
+ * `packageOf` is what separates that package's `model.ts` from this one's.
+ *
  * `isForeign` marks a candidate a DEP package contributed. A dep's path is
  * relative to ITS OWN src dir, so a shared prefix with the child is a
  * coincidence: activemodel and activerecord both port `attribute_methods.rb`
@@ -3026,8 +3043,19 @@ export function resolveEntityByDeclaringFile(
   declFile?: string,
   onAmbiguous?: (candidates: ClassInfo[]) => void,
   isForeign?: (candidate: ClassInfo) => boolean,
+  packageOf?: (candidate: ClassInfo) => string | undefined,
 ): ClassInfo | null {
   if (candidates.length === 0) return null;
+  if (declFile === EXTERNAL_DECL_FILE) return null;
+  if (declFile?.startsWith(PKG_DECL_PREFIX)) {
+    const [depPkg, ...rest] = declFile.slice(PKG_DECL_PREFIX.length).split(":");
+    const depFile = rest.join(":");
+    return (
+      candidates.find((c) => packageOf?.(c) === depPkg && c.file === depFile) ??
+      candidates.find((c) => packageOf?.(c) === depPkg) ??
+      null
+    );
+  }
   if (candidates.length === 1) return candidates[0];
   if (declFile) {
     const exact = candidates.find((c) => c.file === declFile);
@@ -3444,12 +3472,14 @@ export function main() {
 
     // Propagate inherited methods transitively: follows both class `superclass`
     // and interface/module `extends` chains.
+    let ambiguousParentCount = 0;
     if (tsPkg) {
       // Key by short name → entity for superclass/extends resolution.
       // Includes dep-package entities so walks can cross package boundaries
       // (e.g. AR Base extends AM Model).
       const foreignEntities = new Set<ClassInfo>();
-      const entitiesByName = buildEntitiesByName(pkg, ts, foreignEntities);
+      const entityPackages = new Map<ClassInfo, string>();
+      const entitiesByName = buildEntitiesByName(pkg, ts, foreignEntities, entityPackages);
 
       const entityKey = (e: ClassInfo) => `${e.file}:${e.name}`;
 
@@ -3462,6 +3492,7 @@ export function main() {
           declFile,
           (cands) => ambiguousParents.set(name, cands.length),
           (c) => foreignEntities.has(c),
+          (c) => entityPackages.get(c),
         );
 
       const inheritedCache = new Map<string, Set<string>>();
@@ -3505,6 +3536,7 @@ export function main() {
         tsMethodsByFile.set(entity.file, fileMethods);
       }
 
+      ambiguousParentCount = ambiguousParents.size;
       if (ambiguousParents.size > 0) {
         const names = [...ambiguousParents.keys()].sort((a, b) => a.localeCompare(b));
         console.warn(
@@ -4771,6 +4803,7 @@ export function main() {
       excludedFiles: [...excludedFiles].sort(),
       files: fileResults,
       inheritance,
+      ambiguousParents: ambiguousParentCount,
       arity: {
         compared: arityCompared,
         forwardingSkipped: arityForwardingSkipped,
@@ -4869,6 +4902,20 @@ export function main() {
       null,
       2,
     ),
+  );
+
+  fs.writeFileSync(
+    path.join(OUTPUT_DIR, `ambiguous-parents${modeSuffix}.json`),
+    JSON.stringify(
+      Object.fromEntries(
+        results
+          .filter((r) => r.ambiguousParents > 0)
+          .map((r) => [r.package, r.ambiguousParents])
+          .sort(([a], [b]) => String(a).localeCompare(String(b))),
+      ),
+      null,
+      2,
+    ) + "\n",
   );
 
   // Advisory parameter-name artifact — always written; flat across packages;

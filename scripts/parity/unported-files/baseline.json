@@ -83,16 +83,6 @@
   },
   {
     "testFile": "adapter_test.rb",
-    "className": "AdapterConnectionTest",
-    "tests": [
-      "transaction restores after remote disconnection",
-      "active transaction is restored after remote disconnection",
-      "dirty transaction cannot be restored after remote disconnection"
-    ],
-    "reason": "These tests call the `remote_disconnect` helper, which only supports PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip(\"remote_disconnect unsupported\")`, so Rails never runs them on SQLite. A genuine remote disconnect cannot be simulated against in-memory SQLite (closing the handle discards the database), which is also why the surrounding suite is gated `unless in_memory_db?`. Trails always uses :memory: SQLite."
-  },
-  {
-    "testFile": "adapter_test.rb",
     "className": "AdapterThreadSafetyTest",
     "tests": ["#active? is synchronized", "#verify! is synchronized"],
     "reason": "AdapterThreadSafetyTest exercises Ruby Thread.new/Thread.pass concurrency on a single shared connection, asserting mutex-style serialization of #active?/#verify!/#disconnect! under the GVL. Node Worker threads use isolated heaps and structured-clone message passing, not the shared-memory Thread.new model this test relies on, so the GVL interleaving this test pins has no equivalent in our runtime target."
@@ -118,16 +108,6 @@
     "testFile": "adapters/sqlite3/sqlite3_adapter_test.rb",
     "tests": ["supports extensions", "respond to enable extension", "respond to disable extension"],
     "reason": "Rails' SQLite3::Database exposes load_extension / enable_load_extension via the sqlite3-ruby C bindings. better-sqlite3 does not expose the SQLITE_LOAD_EXTENSION entry points, so supports_extensions? / enable_extension / disable_extension cannot be implemented against the driver Trails uses."
-  },
-  {
-    "testFile": "reflection_test.rb",
-    "tests": [
-      "symbol for class name",
-      "name error from incidental code is not converted to name error for association",
-      "automatic inverse suppresses name error for association",
-      "automatic inverse does not suppress name error from incidental code"
-    ],
-    "reason": "Ruby Symbol type for class_name and const_missing hook for NameError discrimination have no JavaScript equivalent."
   },
   {
     "testFile": "inheritance_test.rb",
@@ -156,18 +136,6 @@
     "className": "InheritanceComputeTypeTest",
     "tests": ["instantiation doesnt try to require corresponding file"],
     "reason": "Exercises Ruby constant-lookup/dependencies integration: a DB type with no top-level constant raises RecordNotFound, then const_set on the test class vs on Firm changes which constant compute_type sees. JS has no const_missing/autoload namespace walk."
-  },
-  {
-    "testFile": "modules_test.rb",
-    "tests": [
-      "module spanning associations",
-      "module spanning has and belongs to many associations",
-      "associations spanning cross modules",
-      "find account and include company",
-      "eager loading in modules",
-      "compute type can infer class name of sibling inside module"
-    ],
-    "reason": "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. No JS equivalent for namespace-scoped class discovery."
   },
   {
     "testFile": "connection_handlers_sharding_db_test.rb",
@@ -201,16 +169,6 @@
       "pin connection nesting lock inverse"
     ],
     "reason": "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js."
-  },
-  {
-    "testFile": "connection_pool_test.rb",
-    "tests": ["new connection no query"],
-    "reason": "Rails skips this test when in_memory_db? is true; TS always uses :memory: SQLite."
-  },
-  {
-    "testFile": "disconnected_test.rb",
-    "tests": ["reconnects to execute statements when disconnected"],
-    "reason": "Rails wraps this entire test in `unless in_memory_db?`; TS always uses :memory: SQLite."
   },
   {
     "testFile": "connection_management_test.rb",
@@ -320,34 +278,6 @@
       "schema dumper for uuid primary key with default nil in legacy migration"
     ],
     "reason": "Pre-1.0: ActiveRecord::Migration[5.0] legacy version-compatibility semantics are out of scope (matches the migration/compatibility exclusion). The non-legacy schema-dump emission is covered by the passing sibling tests."
-  },
-  {
-    "testFile": "adapters/postgresql/hstore_test.rb",
-    "tests": ["yaml round trip with store accessors"],
-    "reason": "Ruby YAML/Marshal round-trip of an AR instance with hstore store accessors. Node.js has no YAML.dump/Marshal.dump for ActiveRecord records."
-  },
-  {
-    "testFile": "serialized_attribute_test.rb",
-    "tests": [
-      "serialized class attribute",
-      "serialized class does not become frozen",
-      "serialized attribute should raise exception on assignment with wrong type",
-      "serialized attribute with class constraint",
-      "where by serialized attribute with array",
-      "where by serialized attribute with hash",
-      "where by serialized attribute with hash in array",
-      "serialize attribute via select method when time zone available",
-      "serialize attribute can be serialized in an integer column",
-      "classes without no arg constructors are not supported",
-      "is not changed when stored blob",
-      "is not changed when stored in blob frozen payload",
-      "decorated type with type for attribute",
-      "decorated type with decorator block",
-      "serialized attribute works under concurrent initial access",
-      "serialized time attribute",
-      "supports permitted classes for default column serializer"
-    ],
-    "reason": "YAML/Psych column serialization and class-constrained serializers — Ruby-only format with no Node.js equivalent."
   },
   {
     "testFile": "base_test.rb",
@@ -549,12 +479,6 @@
     "reason": "Exercises Ruby's Ractor (actor-model concurrency) isolation guarantees for DidYouMean checkers. JS has no Ractor equivalent."
   },
   {
-    "testFile": "verifier_test.rb",
-    "className": "VerifierTest",
-    "tests": ["generates URL-safe messages"],
-    "reason": "Asserts byte-for-byte equality against a known token produced by Ruby's Marshal serializer wrapped in MessageVerifier. Our globalid Verifier uses JSON serialization (the default for our MessageVerifier), so the encoded payload differs structurally — the same input produces a different (but equivalent) token. The behavioral guarantee this test cares about (urlsafe encoding, no +/=/ chars) is covered by packages/globalid/src/verifier.test.ts asserting char-class absence rather than exact bytes."
-  },
-  {
     "testFile": "message_encryptor_test.rb",
     "tests": ["backwards compatibility decrypt previously encrypted messages without metadata"],
     "reason": "Decrypts a ciphertext minted before message metadata existed (message_encryptor_test.rb:147-154). The plaintext is the Ruby Marshal payload `\\x04\\x08I\"\\x12Ruby on Rails\\x06:\\x06ET` — an ivar-wrapped Ruby String — so passing it requires a real Ruby Marshal wire reader. trails has no Ruby Marshal runtime: the `:marshal` serializer in messages/serializer-with-fallback.ts is a trails-native codec behind Rails' `\\x04\\x08` signature, matching the project-wide Marshal exclusion above (marshalling.rb / marshal_serialization_test.rb). Ruby-only wire format."
@@ -575,19 +499,9 @@
     "reason": "Marshal.load(Marshal.dump(firm)) of an AR record with a loaded has-one association cache. Ruby Marshal binary serialization has no Node.js equivalent."
   },
   {
-    "testFile": "associations/inverse_associations_test.rb",
-    "tests": ["has many and belongs to should find inverse automatically for model in module"],
-    "reason": "Asserts automatic inverse_of detection for namespaced models (Admin::Account / Admin::User). Ruby modules (`::`) have no TypeScript equivalent — JS class names cannot contain `::`, so the demodulized automatic-inverse scenario isn't representable."
-  },
-  {
     "testFile": "associations_test.rb",
     "tests": ["pretty print does not reload a not yet loaded target"],
     "reason": "Uses Ruby's PP.pp / pretty_print over a not-yet-loaded collection proxy (associations_test.rb). Ruby's pretty-printer has no Node.js equivalent; the inspect-without-reload behavior is covered by the inspect test."
-  },
-  {
-    "testFile": "associations_test.rb",
-    "tests": ["proxy object can be stubbed"],
-    "reason": "Stubs a collection proxy via Mocha (`.stubs(...)`) to assert the proxy forwards to the stub. Ruby Mocha test-double infrastructure has no Node.js equivalent."
   },
   {
     "testFile": "connection_adapters/schema_cache_test.rb",
@@ -596,11 +510,6 @@
       "yaml loads 5 1 dump without indexes still queries for indexes"
     ],
     "reason": "Loads the fixed Rails-5.1-era schema-cache dump asset (test/assets/schema_dump_5_1.yml) and deserializes it via Psych (schema_cache_test.rb:124-142). Note this is NOT covered by our YAML syntax support (the `yaml` package backing coders/yaml-column.ts): the asset is a Psych object graph of `!ruby/object:ActiveRecord::ConnectionAdapters::{SchemaCache,Column,SqlTypeMetadata}` tags with Ruby symbol values and anchors. Loading it requires (a) unsafe-load reconstruction of Ruby class instances from `!ruby/object:` tags — the same Psych machinery already documented as having no JS analog in the coders/yaml_column.rb and attribute_set/yaml_encoder.rb entries — and (b) the 5.1→current legacy-format migration handled by legacy_yaml_adapter.rb (itself unported above). Our `yaml` parser yields plain tagged nodes, not SchemaCache instances. The live schema-cache round-trip is exercised by the portable tests in the same file (test_yaml_dump_and_load[_with_gzip], which use our own dump path)."
-  },
-  {
-    "testFile": "prepared_statement_status_test.rb",
-    "tests": ["prepared statement status is thread and instance specific"],
-    "reason": "Spawns two Ruby Threads and asserts PreparedStatementStatus is isolated per thread+instance via fiber-local state under the GVL (prepared_statement_status_test.rb:9-40). Node.js has no shared-memory Thread model; worker threads use isolated heaps."
   },
   {
     "testFile": "transactions_test.rb",
@@ -657,11 +566,6 @@
     "testFile": "adapters/abstract_mysql_adapter/transaction_test.rb",
     "tests": ["raises Deadlocked when a deadlock is encountered"],
     "reason": "Provokes a MySQL deadlock across two Ruby Threads (transaction_test.rb:38-60). A deadlock requires genuine concurrency; single-threaded JS cannot reproduce it."
-  },
-  {
-    "testFile": "adapters/postgresql/transaction_test.rb",
-    "tests": ["raises Deadlocked when a deadlock is encountered"],
-    "reason": "Provokes a PostgreSQL deadlock across two Ruby Threads (transaction_test.rb:38-50). A deadlock requires genuine concurrency; single-threaded JS cannot reproduce it."
   },
   {
     "testFile": "adapters/sqlite3/statement_pool_test.rb",
@@ -896,5 +800,73 @@
   {
     "pattern": "/version.rb",
     "reason": "`Module.version` / `VERSION` returns the gem version as a Gem::Version (e.g. active_record/version.rb:8). Every trails package carries its version in package.json, which is the JS ecosystem's registry for it, so there is nothing to port. Anchored (leading `/`) so it cannot also exclude `gem_version.rb`, which IS ported and owns real surface (`ActionPack.gem_version`)."
+  },
+  {
+    "testFile": "adapter_test.rb",
+    "className": "AdapterConnectionTest",
+    "tests": ["transaction restores after remote disconnection"],
+    "reason": "These tests call the `remote_disconnect` helper, which only supports PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip(\"remote_disconnect unsupported\")`, so Rails never runs them on SQLite. A genuine remote disconnect cannot be simulated against in-memory SQLite (closing the handle discards the database), which is also why the surrounding suite is gated `unless in_memory_db?`. Trails always uses :memory: SQLite."
+  },
+  {
+    "testFile": "reflection_test.rb",
+    "tests": [
+      "symbol for class name",
+      "name error from incidental code is not converted to name error for association",
+      "automatic inverse does not suppress name error from incidental code"
+    ],
+    "reason": "Ruby Symbol type for class_name and const_missing hook for NameError discrimination have no JavaScript equivalent."
+  },
+  {
+    "testFile": "modules_test.rb",
+    "tests": [
+      "module spanning associations",
+      "module spanning has and belongs to many associations",
+      "associations spanning cross modules",
+      "find account and include company",
+      "eager loading in modules"
+    ],
+    "reason": "Ruby Module#ancestors / constant-path lookup for cross-module association resolution. No JS equivalent for namespace-scoped class discovery."
+  },
+  {
+    "testFile": "serialized_attribute_test.rb",
+    "tests": [
+      "serialized class attribute",
+      "serialized class does not become frozen",
+      "serialized attribute should raise exception on assignment with wrong type",
+      "classes without no arg constructors are not supported",
+      "is not changed when stored blob",
+      "is not changed when stored in blob frozen payload",
+      "decorated type with type for attribute",
+      "decorated type with decorator block",
+      "serialized attribute works under concurrent initial access",
+      "supports permitted classes for default column serializer"
+    ],
+    "reason": "YAML/Psych column serialization and class-constrained serializers — Ruby-only format with no Node.js equivalent."
+  },
+  {
+    "testFile": "serialized_attribute_test.rb",
+    "className": "SerializedAttributeTestWithYamlSafeLoad",
+    "tests": [
+      "serialized attribute with class constraint",
+      "where by serialized attribute with array",
+      "where by serialized attribute with hash",
+      "where by serialized attribute with hash in array",
+      "serialize attribute can be serialized in an integer column",
+      "serialized time attribute"
+    ],
+    "reason": "Psych safe_load re-run of tests the base class ports live; only the permitted-classes YAML arm has no Node.js equivalent."
+  },
+  {
+    "testFile": "serialized_attribute_test.rb",
+    "className": "SerializedAttributeTest",
+    "tests": ["serialize attribute via select method when time zone available"],
+    "reason": "Serializes a Ruby MyObject through Psych under aware_attributes; the subclass's Hash-typed rewrite of the same test is ported."
+  },
+  {
+    "testFile": "verifier_test.rb",
+    "className": "VerifierTest",
+    "tests": ["generates URL-safe messages"],
+    "liveTsCounterpart": "verifier.test.ts asserts the char-class guarantee (no `+` or `/` in the token) rather than the exact bytes, which is the whole of what the Rails test can portably mean here.",
+    "reason": "Asserts byte-for-byte equality against a known token produced by Ruby's Marshal serializer wrapped in MessageVerifier — the Rails source notes the bytes even differ across Ruby versions. Our globalid Verifier uses JSON serialization (the default for our MessageVerifier), so the encoded payload differs structurally and that byte string is unreproducible in principle, not merely unported."
   }
 ]

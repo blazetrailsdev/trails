@@ -34,6 +34,7 @@ import { createHash } from "node:crypto";
 import { Worker, isMainThread, parentPort, workerData } from "node:worker_threads";
 import { fileURLToPath } from "node:url";
 import { cpus } from "node:os";
+import { EXTERNAL_DECL_FILE, PKG_DECL_PREFIX } from "@blazetrails/parity/types";
 import type {
   ApiManifest,
   PackageInfo,
@@ -269,17 +270,37 @@ function recordExtendsFile(
 }
 
 /**
- * src-relative file a symbol was declared in, POSIX-normalized so it can be
- * compared against a manifest `ClassInfo.file`. Returns undefined for symbols
- * declared outside `srcDir` (node_modules, other packages) — those can't be
- * matched against this package's entities anyway.
+ * File a symbol was declared in, in the spelling `resolveEntityByDeclaringFile`
+ * matches on. Three shapes, POSIX-normalized:
+ *
+ * - a bare src-relative path, comparable against a manifest `ClassInfo.file`,
+ *   when the declaration is inside `srcDir`;
+ * - `pkg:<package>:<src-relative path>` when it is another workspace package's
+ *   `src` or its built `dist/*.d.ts` — a cross-package edge (`AR::Base extends
+ *   AM::Model`), whose real counterpart is that package's entity;
+ * - `external:` when it resolves outside the workspace entirely — a TypeScript
+ *   lib global (`class X extends Error`) or a node_modules type. No package
+ *   entity is that name, so the walk must follow nothing.
+ *
+ * Returning undefined only for a symbol with no declaration at all is what
+ * lets the resolver tell "unresolved, fall back to proximity" apart from
+ * "resolved, and the answer is outside this package" (RFC 0126) — the latter
+ * used to arrive as a warned ambiguity that dropped the edge silently.
  */
-function declaringFile(sym: ts.Symbol | undefined, srcDir: string): string | undefined {
+export function declaringFile(sym: ts.Symbol | undefined, srcDir: string): string | undefined {
   const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
   if (!decl) return undefined;
-  const declFile = path.relative(srcDir, decl.getSourceFile().fileName).replace(/\\/g, "/");
-  if (declFile.startsWith("..")) return undefined;
-  return declFile;
+  const abs = decl.getSourceFile().fileName.replace(/\\/g, "/");
+  const declFile = path.relative(srcDir, abs).replace(/\\/g, "/");
+  if (!declFile.startsWith("..")) return declFile;
+  // `srcDir` is `<root>/packages/<pkg>/src`, so its grandparent is the
+  // workspace's packages directory — where a sibling package's own src (or the
+  // `dist/*.d.ts` a cross-package import actually resolves through) lives.
+  const packagesDir = path.posix.dirname(path.posix.dirname(srcDir.replace(/\\/g, "/")));
+  const rel = path.posix.relative(packagesDir, abs);
+  const m = /^([^./][^/]*)\/(?:src|dist)\/(.+)$/.exec(rel);
+  if (!m) return EXTERNAL_DECL_FILE;
+  return `${PKG_DECL_PREFIX}${m[1]}:${m[2].replace(/\.d\.ts$/, ".ts")}`;
 }
 
 function resolveDeclarationSymbol(checker: ts.TypeChecker, node: ts.Node): ts.Symbol | undefined {
@@ -2809,6 +2830,13 @@ function propertySignatureParams(
  * property, so skipping them would be its own divergence. A property whose
  * type has call signatures carries that signature's parameters, so arity
  * comparison sees the same thing for both spellings.
+ *
+ * Every member is `bodyless`, including one arriving through a heritage
+ * clause's resolved type (`Extended<>` / `Included<>`): an interface declares
+ * no bodies, so pairing must prefer the real body — see `MethodInfo.bodyless`
+ * and `ownersWithBodies`. Without that the host interface outranks the body it
+ * types, which is why PR #6798 kept two of the activemodel hosts local
+ * (RFC 0126).
  */
 function extractInterface(
   node: ts.InterfaceDeclaration,
@@ -2887,6 +2915,7 @@ function extractInterface(
                   params: [],
                   line: 0,
                   file,
+                  bodyless: true,
                   ...(foreign ? { declaredIn: propDeclFile } : {}),
                   ...(propVisibility !== "public" ||
                   (propDecl !== undefined && internalJsDocTagApplies(propDecl))

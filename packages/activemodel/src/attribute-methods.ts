@@ -121,7 +121,7 @@ export interface AttributeMethodHost {
   _generatedAttributeMethods?: Module;
 }
 
-interface ClassMethodsHost extends AttributeMethodHost, Extended<typeof ClassMethods> {}
+export interface ClassMethodsHost extends AttributeMethodHost, Extended<typeof ClassMethods> {}
 
 export interface InstanceHost {
   _attributes?: { isKey(name: string): boolean };
@@ -130,7 +130,7 @@ export interface InstanceHost {
   constructor: AttributeMethodHost;
 }
 
-interface InstanceMethodsHost extends InstanceHost, Included<typeof InstanceMethods> {
+export interface InstanceMethodsHost extends InstanceHost, Included<typeof InstanceMethods> {
   constructor: ClassMethodsHost;
 }
 

@@ -273,6 +273,25 @@ export interface MethodInfo {
   reExportedFrom?: string;
 }
 
+/**
+ * `superclassFile` / `extendsFiles[name]` when the symbol resolved OUTSIDE the
+ * workspace — a TypeScript lib global (`class X extends Error`) or a
+ * node_modules type. Distinct from the field being absent, which means the
+ * extractor found no declaration at all: no package entity can be an external
+ * name, so a consumer resolves it to nothing rather than falling back to
+ * filename proximity (RFC 0126).
+ */
+export const EXTERNAL_DECL_FILE = "external:";
+
+/**
+ * Prefix for `superclassFile` / `extendsFiles[name]` when the symbol resolved
+ * to ANOTHER workspace package: `pkg:<package>:<that package's src-relative
+ * path>`. A cross-package edge (`AR::Base extends AM::Model`) whose counterpart
+ * is that package's entity — activerecord and activemodel both carry a
+ * `model.ts`, so only the package separates them (RFC 0126).
+ */
+export const PKG_DECL_PREFIX = "pkg:";
+
 export interface ClassInfo {
   name: string;
   superclass?: string;
@@ -280,9 +299,11 @@ export interface ClassInfo {
    * TS-side only: the src-relative file `superclass` was declared in. Same
    * problem `extendsFiles` solves for include/extend edges — the superclass is
    * recorded by its bare short name, and sibling adapter directories declare
-   * same-named classes, which filename proximity cannot separate. Absent when
-   * the superclass resolves outside the package's `src` (a dep package, a
-   * mixin-factory call expression); consumers fall back to proximity then.
+   * same-named classes, which filename proximity cannot separate. A superclass
+   * resolving outside the package's `src` carries {@link PKG_DECL_PREFIX} or
+   * {@link EXTERNAL_DECL_FILE} instead; the field is absent only when the
+   * extractor found no declaration at all, and consumers fall back to
+   * proximity then.
    */
   superclassFile?: string;
   file?: string;
@@ -296,7 +317,9 @@ export interface ClassInfo {
    * `connection-adapters/abstract/`, `postgresql/` and `sqlite3/`), and
    * filename-proximity scoring cannot tell them apart from the host's path.
    * Consumers resolving an edge should prefer the candidate whose `file`
-   * matches the entry here and fall back to proximity only when absent.
+   * matches the entry here and fall back to proximity only when absent. Carries
+   * {@link PKG_DECL_PREFIX} or {@link EXTERNAL_DECL_FILE} when the symbol
+   * resolved outside this package's `src`.
    */
   extendsFiles?: Record<string, string>;
   /**

@@ -1591,6 +1591,15 @@ jobs:
         # every other package is measured, reported, and joins by its own
         # burndown story.
         run: pnpm exec tsx scripts/api-compare/lint-param-names.ts
+      - name: Ambiguous-parent ratchet
+        # RFC 0126. An inheritance edge whose parent name resolves to several
+        # same-named candidates, none sharing a leading path segment with the
+        # child, is followed to NOTHING — so a Ruby method trails answers
+        # through that parent reads as missing. Only-shrink over
+        # scripts/api-compare/ambiguous-parent-mark.json: the fix is to record
+        # the edge's declaring file in extract-ts-api.ts, never to raise the
+        # mark. Converged one? `pnpm parity:api:parents:tighten`; no reseed.
+        run: pnpm exec tsx scripts/api-compare/lint-ambiguous-parents.ts
       - name: Ratchet baseline reseed drift
         # RFC 0083. The ratchet above only READS the committed baseline, so a
         # change that converges or seeds rows passes it and still leaves the

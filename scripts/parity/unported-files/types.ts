@@ -40,5 +40,20 @@ export type UnportedFile = { reason: string } &
     // `className` narrows a per-test exclusion to one Ruby *Test class within
     // the file, so a GVL-only subclass can be dropped while a portable sibling
     // sharing a test name stays counted. Per-test entries never touch parity:api.
-    | { pattern?: never; testFile: string; className?: string; tests: string[]; package?: never }
+    //
+    // `liveTsCounterpart` is the receipt for the one shape that otherwise reads
+    // as a contradiction: a LIVE TS test carries this exact name, and is
+    // deliberately not this Rails test. It states what the TS test asserts
+    // instead and why the Rails assertion is unreachable, and
+    // unported-live-test.test.ts requires one wherever such a test exists —
+    // and, in the other direction, refuses one that no longer matches any live
+    // test, so the receipt cannot outlive its reason.
+    | {
+        pattern?: never;
+        testFile: string;
+        className?: string;
+        tests: string[];
+        liveTsCounterpart?: string;
+        package?: never;
+      }
   );

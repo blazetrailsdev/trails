@@ -686,10 +686,15 @@ class ApiExtractor
   # The `Struct.new(...)` call node of a `CONST = Struct.new(…)` RHS, bare or
   # block-suffixed; nil otherwise. A dynamic member list is not matched —
   # struct_member_names resolves only inline symbols and a `*CONST` splat.
+  #
+  # Both call shapes count: `:method_add_arg` is the parenthesised
+  # `Struct.new(:a, :b)`, `:command_call` the paren-less
+  # `Struct.new :a, :b` (actionpack/lib/action_dispatch/http/response.rb:434).
   def struct_new_call(rhs)
     return nil unless rhs.is_a?(Array)
     call = rhs[0] == :method_add_block ? rhs[1] : rhs
-    return nil unless call.is_a?(Array) && call[0] == :method_add_arg
+    return nil unless call.is_a?(Array) &&
+                      (call[0] == :method_add_arg || call[0] == :command_call)
     const_name(call[1]) == "Struct" ? call : nil
   end
 
@@ -2045,13 +2050,16 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return false unless target
 
+    template = codegen_template(body, name_local)
+
     suffix_map.each do |members, suffix|
       members.each do |member|
         base = "#{member}#{suffix}"
+        defs = codegen_template_defs(template, base)
         forms.each do |suffix_in_def, form|
           name = "#{base}#{suffix_in_def}"
           method_name = form == :writer ? "#{name}=" : name
-          target[:instanceMethods] << {
+          entry = {
             name: method_name,
             visibility: "public",
             params: form == :writer ? [{ name: "value", kind: "required" }] : [],
@@ -2059,6 +2067,9 @@ class ApiExtractor
             line: @current_line,
             notes: "class_eval",
           }
+          generated = defs[method_name]
+          record_body_facts(entry, generated[:body], generated[:params], fqn) if generated
+          target[:instanceMethods] << entry
         end
       end
     end
@@ -2179,6 +2190,43 @@ class ApiExtractor
       forms << [suffix, writer == "=" ? :writer : :reader]
     end
     forms.uniq
+  end
+
+  # The `def`s a class_eval string template generates for one member, keyed by
+  # generated method name, as `{ body:, params: }` — the same two nodes
+  # process_def hands record_body_facts, so a template-written body carries the
+  # calls, call args, skeleton and digest a literal `def` does (RFC 0126).
+  # `command_recorder.rb:125-131` generates 43 methods this way, each whose body
+  # is `record(:"#{method}", args, &block)`.
+  #
+  # The template is reconstructed with SENTINEL standing in for the interpolated
+  # name (see codegen_template), so substituting `member_name` back in yields the
+  # source Ruby would have evaluated. A template that does not parse standalone —
+  # a fragment, an unbalanced `end`, a dropped interpolation that was carrying
+  # syntax — records no body facts rather than being guessed at. Line numbers
+  # inside the re-parse are meaningless; the entry keeps the class_eval call
+  # site's `@current_line`.
+  def codegen_template_defs(template, member_name)
+    return {} unless template
+    sexp =
+      begin
+        Ripper.sexp(template.gsub(SENTINEL, member_name))
+      rescue StandardError, SyntaxError
+        nil
+      end
+    return {} unless sexp
+    out = {}
+    collect_template_defs(sexp, out)
+    out
+  end
+
+  def collect_template_defs(node, out)
+    return unless node.is_a?(Array)
+    if node[0] == :def
+      name = ident_name(node[1])
+      out[name] ||= { body: node[3], params: find_params(node) } if name
+    end
+    node.each { |child| collect_template_defs(child, out) if child.is_a?(Array) }
   end
 
   # Reconstruct the first `class_eval`/`module_eval` string template, substituting
