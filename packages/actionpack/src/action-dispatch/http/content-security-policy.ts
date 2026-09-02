@@ -222,7 +222,8 @@ export class ContentSecurityPolicy {
     return this.setDirective("plugin-types", types as CSPSource[]);
   }
   reportUri(uri: CSPSource): this {
-    return this.setDirective("report-uri", [uri]);
+    this.directives.set("report-uri", [uri]);
+    return this;
   }
   reportTo(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("report-to", sources);

@@ -2,10 +2,10 @@ import { describe, it, expect, afterEach } from "vitest";
 import { ArgumentError, months, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./trailtie.js";
-import { getApp, _resetApp } from "./config.js";
-import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
-import { Verifier } from "./verifier.js";
+import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./global-id.js";
+import { getApp, _resetApp } from "@blazetrails/globalid";
+import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "@blazetrails/globalid";
+import { Verifier } from "@blazetrails/globalid";
 
 const SECRET_KEY_BASE = "x".repeat(30);
 

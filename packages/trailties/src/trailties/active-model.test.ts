@@ -1,40 +1,31 @@
+import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { env as processEnv, setEnv } from "@blazetrails/activesupport/process-adapter";
-import { Trailtie } from "./trailtie.js";
-import { Deprecators, Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
+import { Trailtie } from "./active-model.js";
+import { Deprecators } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
 let deprecators: Deprecators;
 let app: { deprecators: Deprecators };
-import { SecurePassword } from "./secure-password.js";
-import { Error as ActiveModelError } from "./error.js";
-import { deprecator } from "./deprecator.js";
+import { SecurePassword } from "@blazetrails/activemodel";
+import { Error as ActiveModelError } from "@blazetrails/activemodel";
+import { deprecator } from "@blazetrails/activemodel";
 
 describe("RailtieTest", () => {
-  let savedSubclasses: (typeof BaseTrailtie)[];
   let savedConfig: Record<string, unknown>;
 
   beforeEach(() => {
     deprecators = new Deprecators();
     app = { deprecators };
-    savedSubclasses = [...BaseTrailtie.subclasses];
-    try {
-      savedConfig =
-        typeof structuredClone === "function"
-          ? structuredClone(Trailtie.config)
-          : { ...Trailtie.config };
-    } catch {
-      savedConfig = { ...Trailtie.config };
-    }
+    savedConfig = {
+      activeModel: Trailtie.config.get("activeModel"),
+      i18nCustomizeFullMessage: Trailtie.config.get("i18nCustomizeFullMessage"),
+    };
   });
 
   afterEach(() => {
     SecurePassword.minCost = false;
     ActiveModelError.i18nCustomizeFullMessage = false;
-    BaseTrailtie.subclasses.length = 0;
-    BaseTrailtie.subclasses.push(...savedSubclasses);
-    for (const key of Object.keys(Trailtie.config)) {
-      delete Trailtie.config[key];
-    }
-    Object.assign(Trailtie.config, savedConfig);
+    for (const [key, value] of Object.entries(savedConfig)) Trailtie.config.set(key, value);
   });
 
   it("secure password min_cost is false in the development environment", () => {
@@ -69,41 +60,41 @@ describe("RailtieTest", () => {
   });
 
   it("ActiveModel::Railtie is registered in the global subclasses list", () => {
-    expect(BaseTrailtie.subclasses).toContain(Trailtie);
+    expect(BaseTrailtie.subclasses()).toContain(Trailtie);
   });
 
-  it("runInitializers applies the active_model.secure_password setting", () => {
+  it("runInitializers applies the active_model.secure_password setting", async () => {
     const prev = processEnv.TRAILS_ENV;
     setEnv("TRAILS_ENV", "test");
     try {
-      Trailtie.runInitializers(app);
+      await runTrailtieInitializers(Trailtie, app);
       expect(SecurePassword.minCost).toBe(true);
     } finally {
       setEnv("TRAILS_ENV", prev);
     }
   });
 
-  it("runInitializers registers the ActiveModel deprecator", () => {
-    Trailtie.runInitializers(app);
+  it("runInitializers registers the ActiveModel deprecator", async () => {
+    await runTrailtieInitializers(Trailtie, app);
     expect(deprecators.get("activeModel")).toBe(deprecator());
   });
 
-  it("runInitializers applies i18nCustomizeFullMessage from Railtie.config.activeModel", () => {
-    Trailtie.config["activeModel"] = {
+  it("runInitializers applies i18nCustomizeFullMessage from Railtie.config.activeModel", async () => {
+    Trailtie.config.set("activeModel", {
       i18nCustomizeFullMessage: true,
-    };
-    Trailtie.runInitializers(app);
+    });
+    await runTrailtieInitializers(Trailtie, app);
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });
 
-  it("runInitializers applies i18nCustomizeFullMessage from flat Railtie.config (backwards-compat)", () => {
-    Trailtie.config["i18nCustomizeFullMessage"] = true;
-    Trailtie.runInitializers(app);
+  it("runInitializers applies i18nCustomizeFullMessage from flat Railtie.config (backwards-compat)", async () => {
+    Trailtie.config.set("i18nCustomizeFullMessage", true);
+    await runTrailtieInitializers(Trailtie, app);
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(true);
   });
 
-  it("runInitializers defaults i18nCustomizeFullMessage to false when config is absent", () => {
-    Trailtie.runInitializers(app);
+  it("runInitializers defaults i18nCustomizeFullMessage to false when config is absent", async () => {
+    await runTrailtieInitializers(Trailtie, app);
     expect(ActiveModelError.i18nCustomizeFullMessage).toBe(false);
   });
 });

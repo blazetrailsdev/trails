@@ -1,0 +1,47 @@
+import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { Base } from "@blazetrails/actionview";
+import { Trailtie, defaultActionViewConfig } from "./action-view.js";
+import { Deprecators } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { deprecator } from "@blazetrails/actionview";
+
+let deprecators: Deprecators;
+let app: { deprecators: Deprecators };
+
+describe("RailtieTest", () => {
+  beforeEach(() => {
+    deprecators = new Deprecators();
+    app = { deprecators };
+  });
+
+  const originalAnnotate = Base.annotateRenderedViewWithFilenames;
+
+  afterEach(() => {
+    Base.annotateRenderedViewWithFilenames = originalAnnotate;
+    (
+      Trailtie.config.get("actionView") as ReturnType<typeof defaultActionViewConfig>
+    ).annotateRenderedViewWithFilenames = false;
+  });
+
+  it("ActionView::Railtie is registered in the global subclasses list", () => {
+    expect(BaseTrailtie.subclasses()).toContain(Trailtie);
+  });
+
+  it("seeds the actionView config slot with Rails-matching defaults", () => {
+    expect(Trailtie.config.get("actionView")).toEqual(defaultActionViewConfig());
+  });
+
+  it("runInitializers registers the ActionView deprecator", async () => {
+    await runTrailtieInitializers(Trailtie, app);
+    expect(deprecators.get("actionView")).toBe(deprecator());
+  });
+
+  it("runInitializers applies annotateRenderedViewWithFilenames config to Base", async () => {
+    (
+      Trailtie.config.get("actionView") as ReturnType<typeof defaultActionViewConfig>
+    ).annotateRenderedViewWithFilenames = true;
+    await runTrailtieInitializers(Trailtie, app);
+    expect(Base.annotateRenderedViewWithFilenames).toBe(true);
+  });
+});

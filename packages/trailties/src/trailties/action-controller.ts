@@ -3,8 +3,7 @@
  *
  * Mirrors: ActionController::Railtie < Rails::Railtie (railtie.rb)
  *
- * Extends the base Railtie from `@blazetrails/activesupport`, registers
- * itself in the global initialization pipeline, and seeds the
+ * Registers itself in the global initialization pipeline and seeds the
  * `config.actionController` namespace with the same defaults Rails sets at
  * the top of `actionpack/lib/action_controller/railtie.rb` (the
  * `ActiveSupport::OrderedOptions` block).
@@ -20,12 +19,9 @@
  *
  * @see https://api.rubyonrails.org/classes/ActionController/Railtie.html
  */
-import {
-  Trailtie as BaseTrailtie,
-  registerTrailtie,
-  type Deprecators,
-} from "@blazetrails/activesupport";
-import { deprecator } from "./deprecator.js";
+import { type Deprecators } from "@blazetrails/activesupport";
+import { ActionController } from "@blazetrails/actionpack";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 /**
  * Shape of `config.actionController` — mirrors the
@@ -52,12 +48,16 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.config["actionController"] = defaultActionControllerConfig();
+    this.config.set("actionController", defaultActionControllerConfig());
 
-    this.initializer("action_controller.deprecator", (app) => {
-      (app as TrailtieApp).deprecators.set("actionController", deprecator());
-    });
+    this.initializer(
+      "action_controller.deprecator",
+      { before: ":load_environment_config" },
+      (app) => {
+        (app as TrailtieApp).deprecators.set("actionController", ActionController.deprecator());
+      },
+    );
   }
 }

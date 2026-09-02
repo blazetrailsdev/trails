@@ -44,10 +44,10 @@ export abstract class Metadata {
   protected abstract readonly serializer: MessageSerializer;
   protected abstract encode(data: string | Buffer, options?: { urlSafe?: boolean }): string;
   protected abstract decode(encoded: string, options?: { urlSafe?: boolean }): Buffer;
-  protected abstract serialize(data: unknown): string;
+  protected abstract serialize(data: unknown): unknown;
   protected abstract deserialize(serialized: string): unknown;
 
-  protected serializeWithMetadata(data: unknown, metadata: MetadataOptions = {}): string {
+  protected serializeWithMetadata(data: unknown, metadata: MetadataOptions = {}): unknown {
     const hasMetadata = Object.values(metadata).some(isPresent);
 
     if (hasMetadata && !this.useMessageSerializerForMetadata()) {
@@ -208,7 +208,10 @@ export abstract class Metadata {
   }
 
   protected serializeToJsonSafeString(data: unknown): string {
-    return this.encode(this.serialize(data), { urlSafe: false });
+    // Ruby's `encode` is `::Base64.strict_encode64`, which raises on anything
+    // but a String — the narrowing `serializer.dump`'s duck type does not state
+    // (messages/codec.rb:35-37).
+    return this.encode(this.serialize(data) as string, { urlSafe: false });
   }
 
   protected deserializeFromJsonSafeString(string: string): unknown {

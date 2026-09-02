@@ -193,6 +193,10 @@ const alias = {
     __dirname,
     "packages/activerecord/src/connection-adapters/expo-sqlite-adapter.ts",
   ),
+  "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js": path.resolve(
+    __dirname,
+    "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
+  ),
   "@blazetrails/activerecord/adapters/postgresql-adapter.js": path.resolve(
     __dirname,
     "packages/activerecord/src/adapters/postgresql-adapter.ts",
@@ -236,6 +240,14 @@ const alias = {
   "@blazetrails/activerecord/sqlite/expo-sqlite": path.resolve(
     __dirname,
     "packages/activerecord/src/sqlite/expo-sqlite.ts",
+  ),
+  "@blazetrails/activerecord/encryption/install": path.resolve(
+    __dirname,
+    "packages/activerecord/src/encryption/install.ts",
+  ),
+  "@blazetrails/activerecord/encryption": path.resolve(
+    __dirname,
+    "packages/activerecord/src/encryption/index.ts",
   ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
   "@blazetrails/rack-session/": path.resolve(__dirname, "packages/rack-session/src") + "/",

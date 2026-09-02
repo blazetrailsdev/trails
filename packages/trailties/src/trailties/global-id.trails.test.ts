@@ -1,23 +1,18 @@
 import { describe, it, expect, afterEach } from "vitest";
-import {
-  ArgumentError,
-  Trailtie as BaseTrailtie,
-  resetLoadHooks,
-  runLoadHooks,
-} from "@blazetrails/activesupport";
+import { ArgumentError, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
-import { GlobalID } from "./global-id.js";
-import { _resetApp } from "./config.js";
-import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
-import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./trailtie.js";
+import { GlobalID } from "@blazetrails/globalid";
+import { _resetApp } from "@blazetrails/globalid";
+import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "@blazetrails/globalid";
+import { Trailtie, type GlobalIdConfig, type TrailtieApp } from "./global-id.js";
 
 describe("GlobalID::Railtie class body", () => {
   it("pushes GlobalID onto the shared eager-load namespace list", () => {
-    expect(BaseTrailtie.config["eagerLoadNamespaces"]).toContain(GlobalID);
+    expect(Trailtie.config.eagerLoadNamespaces).toContain(GlobalID);
   });
 
   it("seeds the config.global_id namespace before any initializer runs", () => {
-    expect(BaseTrailtie.config["globalId"]).toBeDefined();
+    expect(Trailtie.config.get("globalId")).toBeDefined();
   });
 });
 

@@ -12,6 +12,8 @@
     { "path": "../activerecord" },
     { "path": "../rack" },
     { "path": "../actionpack" },
-    { "path": "../actionview" }
+    { "path": "../actionview" },
+    { "path": "../activemodel" },
+    { "path": "../globalid" }
   ]
 }

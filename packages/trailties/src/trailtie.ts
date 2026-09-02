@@ -3,6 +3,26 @@
  * opt in to the registry via `Trailtie.register(...)` — no `inherited`
  * hook. Block runners (`rakeTasks`/`console`/`runner`/`generators`/
  * `server`) walk ancestors like Rails' `each_registered_block`.
+ *
+ * This is the ONLY `Trailtie` in trails. Every framework railtie subclasses it
+ * — `ActiveModel::Railtie`, `ActiveRecord::Railtie`, `ActionView::Railtie`,
+ * `ActionController::Railtie`, `ActionDispatch::Railtie`, `GlobalID::Railtie`,
+ * `ActiveSupport::Railtie` — and they live in `src/trailties/` rather than at
+ * their own gem's `railtie.rb` path.
+ *
+ * That relocation is the one deviation this file's shape costs, and it is
+ * forced: `tsc --build` requires a DAG, `trailties` already depends on
+ * `activerecord` → `activemodel`, so `packages/activemodel/src/trailtie.ts`
+ * cannot import `Trailtie` from here without a cycle. Ruby escapes it because
+ * `active_model/railtie.rb:4`'s `require "rails"` is a runtime, opt-in load
+ * with no static graph, and the zero-import slot idiom does not help across an
+ * `extends` edge (see CLAUDE.md — nothing would then load the subclass modules
+ * at all, so their registration never runs). Moving `Rails::Railtie` DOWN into
+ * activesupport instead was tried and rejected (PR #7386): it costs 58 methods
+ * off trailties' `parity:api` score, since `PATH_SEGMENT_ALIASES` maps
+ * `railtie.rb` here. The six moved files contribute no methods at all, so this
+ * direction costs ~0 — and it matches the framework → railties edge Rails
+ * itself takes.
  */
 import { underscore } from "@blazetrails/activesupport";
 import { Initializable } from "./initializable.js";
@@ -10,13 +30,33 @@ import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 import { assertNotSealed } from "./trailtie/configurable.js";
 
-export const ABSTRACT_RAILTIES = ["Trailtie", "Engine", "Application"] as const;
+/**
+ * Mirrors `ABSTRACT_RAILTIES` (`railtie.rb:142`), which lists the three
+ * classes by their FULLY-QUALIFIED Ruby names — `Rails::Railtie`,
+ * `Rails::Engine`, `Rails::Application`. TypeScript class names carry no
+ * namespace, and every framework railtie is `Trailtie` inside its own package
+ * (`ActiveModel::Railtie`, `ActionView::Railtie`, ...), so a bare-name list
+ * would call all of them abstract. The list holds the three classes
+ * themselves, which is what the Ruby names denote.
+ *
+ * @noRailsEquivalent PERMANENT — see the paragraph above; this is the
+ * unqualified-class-name shortcoming, not a new concept.
+ */
+export const ABSTRACT_RAILTIES: unknown[] = [];
+
+export function abstractRailtie(klass: unknown): void {
+  ABSTRACT_RAILTIES.push(klass);
+}
 let loadCounter = 0;
 
 export type BlockRunnerKind = "rakeTasks" | "console" | "runner" | "generators" | "server";
 export type TrailtieBlock = (this: Trailtie, app: unknown) => void;
 
 export class Trailtie extends Initializable {
+  static {
+    abstractRailtie(this);
+  }
+
   /** @internal */
   private static readonly _registry: Array<typeof Trailtie> = [];
 
@@ -52,7 +92,7 @@ export class Trailtie extends Initializable {
   }
 
   static isAbstractRailtie(): boolean {
-    return (ABSTRACT_RAILTIES as readonly string[]).includes(this.name);
+    return ABSTRACT_RAILTIES.includes(this);
   }
 
   /** Set or get the short railtie name (defaults to underscored class name). */

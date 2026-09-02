@@ -1,4 +1,5 @@
-import { Trailtie as BaseTrailtie, registerTrailtie, onLoad } from "@blazetrails/activesupport";
+import { onLoad } from "@blazetrails/activesupport";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import { loadViteManifest, setViteManifest, computeAssetPath } from "./vite-manifest.js";
 
 interface ViteAssetsHost {
@@ -19,7 +20,7 @@ interface ActionViewBaseLike {
  */
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
     this.initializer("vite.helpers", () => {
       onLoad("action_view", (base: ActionViewBaseLike) => {
@@ -27,8 +28,8 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
-    this.initializer("vite.manifest", async function (this: ViteAssetsHost) {
-      setViteManifest(await loadViteManifest(await this.resolvedRoot()));
+    this.initializer("vite.manifest", async (app) => {
+      setViteManifest(await loadViteManifest(await (app as ViteAssetsHost).resolvedRoot()));
     });
   }
 }

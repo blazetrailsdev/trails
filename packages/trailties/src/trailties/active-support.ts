@@ -4,14 +4,6 @@
  * Mirrors: ActiveSupport::Railtie < ::Rails::Railtie
  * (activesupport/lib/active_support/railtie.rb)
  *
- * Resolves docs/trailties-plan.md open question #2: the activesupport
- * trailtie lives **inside the trailties package** (not in activesupport
- * itself) so the dependency direction stays trailties → activesupport.
- * Putting it under `packages/activesupport/src/` would force activesupport
- * to depend on `@blazetrails/activesupport`'s own Railtie base via a
- * self-import, and worse, would couple the leaf framework to the
- * application-runner concept it should stay agnostic of.
- *
  * Only the initializers whose targets are already ported to trails are
  * wired here. The rest are documented as skipped on the PR (and become
  * follow-ups as the underlying helpers land):
@@ -38,9 +30,8 @@
  *     ported
  *   - active_support.set_use_message_serializer_for_metadata — same
  */
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import {
-  Trailtie as BaseTrailtie,
-  registerTrailtie,
   deprecator,
   type Deprecation,
   type Deprecators,
@@ -75,19 +66,19 @@ interface TrailtieApp {
  */
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
     // Mirrors `config.active_support = ActiveSupport::OrderedOptions.new`.
-    this.config["activeSupport"] ??= {};
+    if (this.config.get("activeSupport") === undefined) this.config.set("activeSupport", {});
 
-    this.initializer("active_support.deprecator", (app) => {
+    this.initializer("active_support.deprecator", { before: ":load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeSupport", deprecator());
     });
 
     this.initializer("active_support.deprecation_behavior", (app) => {
       const activeSupport =
         ((app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig | undefined) ??
-        (this.config["activeSupport"] as ActiveSupportConfig | undefined) ??
+        (this.config.get("activeSupport") as ActiveSupportConfig | undefined) ??
         {};
       const deprecators = (app as TrailtieApp).deprecators;
       if (activeSupport.reportDeprecations === false) {
@@ -113,7 +104,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_support.set_hash_digest_class", () => {
-      const klass = (this.config["activeSupport"] as ActiveSupportConfig | undefined)
+      const klass = (this.config.get("activeSupport") as ActiveSupportConfig | undefined)
         ?.hashDigestClass;
       if (klass) {
         Digest.hashDigestClass = klass;

@@ -1,9 +1,9 @@
 export const VERSION = "8.0.2";
 
 export { Deprecator, deprecator } from "./deprecator.js";
-export { Trailtie, type ActionDispatchConfig } from "./trailtie.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export * as Constants from "./constants.js";
+export { X_REQUEST_ID } from "./constants.js";
 export * as Journey from "./journey/index.js";
 
 import { LogSubscriber as _LogSubscriber } from "./log-subscriber.js";
@@ -40,7 +40,7 @@ export {
   UnfilteredParameters,
   InvalidParameterKey,
 } from "../action-controller/metal/strong-parameters.js";
-export { type UrlOptions } from "./http/url.js";
+export { URL, type UrlOptions } from "./http/url.js";
 export {
   Cookies,
   CookieJar,
@@ -71,7 +71,12 @@ export {
   type CspSymbol,
   type DirectiveValue,
 } from "./http/content-security-policy.js";
-export { Middleware as ContentSecurityPolicyMiddleware } from "./http/content-security-policy.js";
+export {
+  Middleware as ContentSecurityPolicyMiddleware,
+  Request as ContentSecurityPolicyRequest,
+  type NonceGenerator,
+  type CspRequestHost,
+} from "./http/content-security-policy.js";
 export { Middleware as PermissionsPolicyMiddleware } from "./http/permissions-policy.js";
 export { redirectTo, redirectBack, type RedirectResult } from "./redirect.js";
 export { FlashHash } from "./middleware/flash.js";
@@ -167,3 +172,5 @@ export {
   type ServerHandle,
   type ServerAddress,
 } from "./system-testing/server.js";
+export { RequestUtils } from "./request/utils.js";
+export { CacheConfig } from "./http/cache.js";

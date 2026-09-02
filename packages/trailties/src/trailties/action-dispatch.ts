@@ -18,27 +18,24 @@
  * out of the configure body and will wire in as those classes gain the
  * matching surface — see actionpack-100-percent.md.
  */
+import { type Deprecators } from "@blazetrails/activesupport";
 import {
-  Trailtie as BaseTrailtie,
-  registerTrailtie,
-  type Deprecators,
-} from "@blazetrails/activesupport";
-import { deprecator } from "./deprecator.js";
-import { X_REQUEST_ID } from "./constants.js";
-import { URL as HttpURL } from "./http/url.js";
-import { QueryParser } from "./http/query-parser.js";
-import { RequestUtils } from "./request/utils.js";
-import { CacheConfig } from "./http/cache.js";
-import { Response } from "./http/response.js";
-import {
+  deprecator,
+  X_REQUEST_ID,
+  URL as HttpURL,
+  QueryParser,
+  RequestUtils,
+  CacheConfig,
+  Response,
   ContentSecurityPolicy,
   type NonceGenerator,
   type CspRequestHost,
-  Request as CspRequest,
-} from "./http/content-security-policy.js";
-import { Middleware as ContentSecurityPolicyMiddleware } from "./http/content-security-policy.js";
-import { Middleware as PermissionsPolicyMiddleware } from "./http/permissions-policy.js";
-import { MiddlewareStack } from "./middleware/stack.js";
+  ContentSecurityPolicyRequest as CspRequest,
+  ContentSecurityPolicyMiddleware,
+  PermissionsPolicyMiddleware,
+  MiddlewareStack,
+} from "@blazetrails/actionpack";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 /**
  * Shape of `config.actionDispatch` — mirrors the
@@ -148,17 +145,21 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.config["actionDispatch"] = defaultActionDispatchConfig();
-    this.config["contentSecurityPolicy"] = defaultContentSecurityPolicyConfig();
+    this.config.set("actionDispatch", defaultActionDispatchConfig());
+    this.config.set("contentSecurityPolicy", defaultContentSecurityPolicyConfig());
 
-    this.initializer("action_dispatch.deprecator", (app) => {
-      (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
-    });
+    this.initializer(
+      "action_dispatch.deprecator",
+      { before: ":load_environment_config" },
+      (app) => {
+        (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
+      },
+    );
 
     this.initializer("action_dispatch.configure", () => {
-      const cfg = this.config["actionDispatch"] as ActionDispatchConfig;
+      const cfg = this.config.get("actionDispatch") as ActionDispatchConfig;
 
       HttpURL.tldLength = cfg.tldLength;
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
@@ -194,7 +195,7 @@ export class Trailtie extends BaseTrailtie {
    * `env_config` propagation in `railties/lib/rails/application.rb:342-346`.
    */
   static seedContentSecurityPolicyEnv(request: CspRequestHost): void {
-    const cfg = this.config["contentSecurityPolicy"] as ContentSecurityPolicyConfig;
+    const cfg = this.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig;
     // Mirror Rails application.rb:342-346 — all four slots are copied
     // unconditionally so toggling app config back to a falsy value
     // overwrites any stale env carried over from a prior request.

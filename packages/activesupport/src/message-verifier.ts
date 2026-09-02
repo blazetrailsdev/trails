@@ -66,7 +66,7 @@ export class MessageVerifier extends Codec {
   }
 
   createMessage(value: unknown, options: GenerateOptions = {}): string {
-    return this.signEncoded(this.encode(this.serializeWithMetadata(value, options)));
+    return this.signEncoded(this.encode(this.serializeWithMetadata(value, options) as string));
   }
 
   verify(message: string, options: VerifyOptions = {}): unknown {

@@ -1,23 +1,25 @@
-// Port of `GlobalID::Railtie` (`global_id/railtie.rb`). Trails railties are
-// `Railtie` (activesupport) subclasses rather than `Rails::Railtie`; the
-// initializer block is yielded the application, as `initializable.rb:31-33`
-// and `:60-63` do.
+/**
+ * Port of `GlobalID::Railtie` (`global_id/railtie.rb`). The initializer block
+ * is yielded the application, as `initializable.rb:31-33` and `:60-63` do.
+ */
 import {
   ArgumentError,
-  Trailtie as BaseTrailtie,
   dasherize,
   extend,
   months,
   onLoad,
-  registerTrailtie,
   type Deprecators,
 } from "@blazetrails/activesupport";
-import { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { setApp } from "./config.js";
-import { GlobalID } from "./global-id.js";
-import { SignedGlobalID } from "./signed-global-id.js";
-import { Verifier } from "./verifier.js";
+import {
+  FixtureSet,
+  type FixtureSetHost,
+  setApp,
+  GlobalID,
+  SignedGlobalID,
+  Verifier,
+} from "@blazetrails/globalid";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 /** Mirrors `config.global_id = ActiveSupport::OrderedOptions.new` (`railtie.rb:13`). */
 export interface GlobalIdConfig {
@@ -47,10 +49,10 @@ export interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    BaseTrailtie.config["globalId"] = {} as GlobalIdConfig;
-    ((BaseTrailtie.config["eagerLoadNamespaces"] ??= []) as unknown[]).push(GlobalID);
+    this.config.set("globalId", {} as GlobalIdConfig);
+    this.config.eagerLoadNamespaces.push(GlobalID);
 
     this.initializer("global_id", (app) => {
       Trailtie.initialize(app as TrailtieApp);
@@ -72,20 +74,17 @@ export class Trailtie extends BaseTrailtie {
    * `config.global_id.expires_in = nil` disables expiration.
    *
    * The class body's `config.global_id = ActiveSupport::OrderedOptions.new`
-   * and `config.eager_load_namespaces << GlobalID` (`railtie.rb:13-14`)
-   * are seeded on activesupport's `Railtie.config`, the analogue of the
-   * `@@`-level state `Railtie::Configuration` holds
-   * (`railtie/configuration.rb:17-20`): trailties' `Configuration` reads its
-   * `eagerLoadNamespaces` off that same array, so the namespace reaches the
-   * app-facing list even though globalid cannot import trailties (trailties
-   * depends on activerecord, which depends on globalid).
+   * and `config.eager_load_namespaces << GlobalID` (`railtie.rb:13-14`) both
+   * land on `Railtie::Configuration`'s `@@`-level state
+   * (`railtie/configuration.rb:17-20`, `:96-108`), so the seed this reads back
+   * is the one the class body wrote.
    *
    * `ActiveSupport.on_load(:active_record)` (`railtie.rb:36-39`) needs no arm:
    * `Base` includes `GlobalID::Identification` statically, because base.ts
    * already imports globalid.
    */
   static initialize(app: TrailtieApp): void {
-    const config = (app.config.globalId ??= BaseTrailtie.config["globalId"] as GlobalIdConfig);
+    const config = (app.config.globalId ??= Trailtie.config.get("globalId") as GlobalIdConfig);
     const defaultExpiresIn = months(1).toI();
     const defaultAppName = dasherize(app.railtieName.replace("_application", ""));
 
