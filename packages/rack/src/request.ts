@@ -70,8 +70,11 @@ const ipv6 = [
 
 /**
  * Mirrors the private `AUTHORITY` constant (`rack/request.rb:722-735`). Ruby's
- * `[[:graph:]&&[^\[\]]]` is a printable non-space character that is not a
- * square bracket.
+ * `[[:graph:]]` under UTF-8 is Onigmo's "not space, and not `Cc`, `Cn` or
+ * `Cs`" — `Cf` (U+00AD, U+200B, U+FEFF) and `Co` are graph, while unassigned
+ * code points and C1 controls are not — so the class is derived as
+ * `[^\p{Cc}\p{Cn}\p{Cs}\p{White_Space}]` under the `u` flag, which agrees
+ * with MRI on every code point that both Unicode tables assign.
  */
 const AUTHORITY = new RegExp(
   "^(?<host>" +
@@ -81,9 +84,10 @@ const AUTHORITY = new RegExp(
     ")\\]" +
     "|" +
     // Match any other printable string (except square brackets) as a hostname
-    "(?<address>[^\\[\\]\\s\\x00-\\x20\\x7f]*?)" +
+    "(?<address>[^\\p{Cc}\\p{Cn}\\p{Cs}\\p{White_Space}\\[\\]]*?)" +
     ")" +
     "(:(?<port>\\d+))?$",
+  "u",
 );
 
 const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"];
@@ -365,17 +369,16 @@ export abstract class Helpers {
   }
 
   /** Mirrors `Rack::Request::Helpers#forwarded_for` (`rack/request.rb:353-372`). */
-  get forwardedFor(): string[] | null {
+  get forwardedFor(): Array<string | undefined> | null {
     for (const type of this.forwardedPriority()) {
       if (type === "forwarded") {
         const forwardedFor = this.getHttpForwarded("for");
-        if (forwardedFor)
-          return forwardedFor.map((authority) => this.splitAuthority(authority)[1]!);
+        if (forwardedFor) return forwardedFor.map((authority) => this.splitAuthority(authority)[1]);
       } else if (type === "x_forwarded") {
         const value = this.getHeader(HTTP_X_FORWARDED_FOR);
         if (value)
           return this.splitHeader(value).map(
-            (authority) => this.splitAuthority(this.wrapIpv6(authority))[1]!,
+            (authority) => this.splitAuthority(this.wrapIpv6(authority))[1],
           );
       }
     }
@@ -433,7 +436,7 @@ export abstract class Helpers {
     const forwardedFor = this.forwardedFor;
     if (forwardedFor && forwardedFor.length !== 0) {
       const external = this.rejectTrustedIpAddresses(forwardedFor);
-      return external[external.length - 1] ?? forwardedFor[0];
+      return external[external.length - 1] ?? forwardedFor[0] ?? null;
     }
 
     return remoteAddresses[0] ?? null;
@@ -622,7 +625,7 @@ export abstract class Helpers {
   }
 
   /** Mirrors `Rack::Request::Helpers#trusted_proxy?` (`rack/request.rb:615-617`). */
-  trustedProxy(ip: string): boolean {
+  trustedProxy(ip: string | undefined): boolean {
     return Request.ipFilter(ip);
   }
 
@@ -760,7 +763,7 @@ export abstract class Helpers {
    * (`rack/request.rb:743-745`).
    * @internal
    */
-  rejectTrustedIpAddresses(ipAddresses: string[]): string[] {
+  rejectTrustedIpAddresses<T extends string | undefined>(ipAddresses: T[]): T[] {
     return ipAddresses.filter((ip) => !this.trustedProxy(ip));
   }
 
@@ -825,7 +828,8 @@ export abstract class Helpers {
 export class Request {
   env: Record<string, any>;
 
-  static ipFilter: (ip: string) => boolean = (ip: string) => trustedProxies.test(ip);
+  static ipFilter: (ip: string | undefined) => boolean = (ip: string | undefined) =>
+    ip != null && trustedProxies.test(ip);
   static forwardedPriority: Array<"forwarded" | "x_forwarded" | null> = [
     "forwarded",
     "x_forwarded",

@@ -1437,7 +1437,7 @@ describe("RackRequestTest", () => {
 
   it("uses a custom trusted proxy filter", () => {
     const oldIp = Request.ipFilter;
-    Request.ipFilter = (ip: string) => ip === "foo";
+    Request.ipFilter = (ip: string | undefined) => ip === "foo";
     try {
       const req = makeReq("/");
       expect(req.trustedProxy("foo")).toBe(true);
