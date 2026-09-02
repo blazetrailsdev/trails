@@ -1,10 +1,6 @@
-import { ArgumentError, Rational, fetch } from "@blazetrails/ruby-compat";
+import { ArgumentError, NoMethodError, Rational, fetch } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { BIGDECIMAL_STRING } from "./number-converter.js";
-
-class NoMethodError extends Error {
-  override name = "NoMethodError";
-}
 
 /** Ruby's `Kernel#BigDecimal(value)` over a String, which `convert_to_decimal`
  *  reaches from two of its three arms (`rounding_helper.rb:28` and `:32`). */

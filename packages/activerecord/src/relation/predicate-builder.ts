@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Nodes, sql } from "@blazetrails/arel";
 import { wrap, toS, Range } from "@blazetrails/activesupport";
 
@@ -9,7 +10,6 @@ import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
 import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
-import { argumentError } from "./query-methods.js";
 import type { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
 
@@ -137,7 +137,7 @@ export class PredicateBuilder {
           value === null || value === undefined ? [] : Array.isArray(value) ? value : [value];
         const queryGroups: Nodes.Node[][] = values.map((idsSet) => {
           if (!Array.isArray(idsSet)) {
-            throw argumentError(
+            throw new ArgumentError(
               `Expected corresponding value for [${rawPk.map((c) => `"${c}"`).join(", ")}] to be an Array`,
             );
           }
@@ -217,21 +217,21 @@ export class PredicateBuilder {
     fallback?: (name: string) => typeof Base | null,
   ): Nodes.Node[] {
     if (cols.length === 0) {
-      throw argumentError("PredicateBuilder.buildComposite: empty column list");
+      throw new ArgumentError("PredicateBuilder.buildComposite: empty column list");
     }
     if (!Array.isArray(tuples)) {
-      throw argumentError(
+      throw new ArgumentError(
         `PredicateBuilder.buildComposite: tuples must be an array, got ${tuples === null ? "null" : typeof tuples}`,
       );
     }
     for (const tuple of tuples) {
       if (!Array.isArray(tuple)) {
-        throw argumentError(
+        throw new ArgumentError(
           `PredicateBuilder.buildComposite: tuple must be an array, got ${typeof tuple}`,
         );
       }
       if (tuple.length !== cols.length) {
-        throw argumentError(
+        throw new ArgumentError(
           `PredicateBuilder.buildComposite: tuple arity ${tuple.length} does not match column count ${cols.length} (cols=[${cols.join(", ")}])`,
         );
       }

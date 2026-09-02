@@ -1,5 +1,7 @@
 import {
   ArgumentError,
+  NameError,
+  NoMethodError,
   NotImplementedError,
   RuntimeError,
   TypeError,
@@ -150,20 +152,6 @@ function classOf(value: unknown): string {
   if (ctorName) return ctorName;
   const t = typeof value;
   return t.charAt(0).toUpperCase() + t.slice(1);
-}
-
-class NameError extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NameError";
-  }
-}
-
-class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
 }
 
 export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError, RuntimeError };

@@ -1,7 +1,7 @@
 import { defineModule, slice } from "@blazetrails/activesupport";
-import { except as exceptValues } from "@blazetrails/ruby-compat";
+import { ArgumentError, except as exceptValues } from "@blazetrails/ruby-compat";
 import { Merger, HashMerger } from "./merger.js";
-import { argumentError, setValues } from "./query-methods.js";
+import { setValues } from "./query-methods.js";
 import type { ExceptSkip } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
@@ -22,7 +22,7 @@ export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T
     return recordsIntersection(this, other) as unknown as T;
   }
   if (other === null || other === undefined || other === false) {
-    throw argumentError(`invalid argument: ${other === false ? "false" : "nil"}.`);
+    throw new ArgumentError(`invalid argument: ${other === false ? "false" : "nil"}.`);
   }
   return (this as any).spawn().mergeBang(other) as T;
 }
@@ -50,7 +50,7 @@ export function mergeBang(this: any, other: any): any {
   if (typeof other === "function") {
     return other.call(this);
   }
-  throw argumentError(`${String(other)} is not an ActiveRecord::Relation`);
+  throw new ArgumentError(`${String(other)} is not an ActiveRecord::Relation`);
 }
 
 export function except<T extends SpawnRelation<T>>(this: T, ...skips: Array<ExceptSkip>): T {

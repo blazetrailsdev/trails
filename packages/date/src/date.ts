@@ -20,7 +20,7 @@
  * both.
  */
 
-import { FrozenError } from "@blazetrails/ruby-compat";
+import { FloatDomainError, FrozenError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   ArgumentError,
@@ -797,21 +797,6 @@ export function strftime(
    which is where a Ruby class belongs, and is what `Comparable`'s derived
    operators raise. Re-exported so this file's public surface is unchanged. */
 export { ArgumentError };
-
-/**
- * @internal Ruby core `FloatDomainError`, a `RangeError` subclass, spelled
- * locally for the reason {@link NoMethodError} below is. `rb_num2int` — what
- * `FIX2INT` is for the non-Fixnum operand of `d_lite_rshift`'s `f_idiv` /
- * `f_mod` arm (`date_core.c:6459`) — raises it for a non-finite Float, with the
- * Float's own `to_s` as the message: `Date.new(2000,1,31) >> Float::INFINITY`
- * is `FloatDomainError: Infinity`.
- */
-class FloatDomainError extends RangeError {
-  constructor(message: string) {
-    super(message);
-    this.name = "FloatDomainError";
-  }
-}
 
 /**
  * @internal Ruby core `NoMethodError`. It is here rather than imported because

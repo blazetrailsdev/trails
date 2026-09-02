@@ -122,7 +122,7 @@ export class WhereChain<R = any> {
     const model = (this._scope as unknown as QueryMethodsHost).model as any;
     const reflection = model?._reflectOnAssociation?.(association);
     if (!reflection) {
-      throw argumentError(
+      throw new ArgumentError(
         `An association named \`:${association}\` does not exist on the model \`${model?.name}\`.`,
       );
     }
@@ -346,7 +346,7 @@ export function referencesFromConditions(conditions: unknown): Nodes.SqlLiteral[
 
 function withCte(this: QueryMethodsHost, ...args: any[]): any {
   if (args.some((cte) => typeof cte === "function")) {
-    throw argumentError("ActiveRecord::Relation#with does not accept a block");
+    throw new ArgumentError("ActiveRecord::Relation#with does not accept a block");
   }
   checkIfMethodHasArgumentsBang.call(this, ":with", args);
   return withBang.apply(this.spawn(), args);
@@ -682,7 +682,7 @@ function unscopeBang(
     if (typeof rawScope === "string") {
       const scope = rawScope === "leftJoins" ? "leftOuterJoins" : rawScope;
       if (!VALID_UNSCOPING_VALUES.has(scope as UnscopeType)) {
-        throw argumentError(
+        throw new ArgumentError(
           `Called unscope() with invalid unscoping argument ':${scope}'. Valid arguments are :${[...VALID_UNSCOPING_VALUES].join(", :")}.`,
         );
       }
@@ -690,7 +690,7 @@ function unscopeBang(
     } else if (rawScope && typeof rawScope === "object") {
       for (const [key, target] of Object.entries(rawScope)) {
         if (key !== "where") {
-          throw argumentError(
+          throw new ArgumentError(
             `Object arguments to unscope() must use "where" as the key, e.g. unscope({ where: "column_name" }).`,
           );
         }
@@ -698,7 +698,7 @@ function unscopeBang(
         this.whereClause = this.whereClause.except(...targets);
       }
     } else {
-      throw argumentError(
+      throw new ArgumentError(
         `Unrecognized scoping: ${JSON.stringify(rawScope)}. Use unscope({ where: "column_name" }) or one of: ${[...VALID_UNSCOPING_VALUES].join(", ")}.`,
       );
     }
@@ -779,7 +779,7 @@ export function buildWhereClause(
   } else if (opts instanceof Nodes.Node) {
     parts = [opts];
   } else {
-    throw argumentError(`Unsupported argument type: ${String(opts)} (${typeof opts})`);
+    throw new ArgumentError(`Unsupported argument type: ${String(opts)} (${typeof opts})`);
   }
 
   return new WhereClause(parts);
@@ -804,7 +804,7 @@ function where(
 function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
   if (Array.isArray(opts) && rest.length > 0 && opts.every((c) => typeof c === "string")) {
     if (rest.length !== 1 || !Array.isArray(rest[0])) {
-      throw argumentError(
+      throw new ArgumentError(
         "Relation#where(cols, tuples): composite-key form requires a tuples argument as an array of arrays",
       );
     }
@@ -853,12 +853,6 @@ function invertWhere(this: QueryMethodsHost): any {
 function invertWhereBang(this: QueryMethodsHost): any {
   this.whereClause = this.whereClause.invert();
   return this;
-}
-
-export function argumentError(message: string): Error {
-  const err = new Error(message);
-  err.name = "ArgumentError";
-  return err;
 }
 
 function uniqArray(arr: unknown[]): unknown[] {
@@ -1006,7 +1000,7 @@ function rubyClassNameOf(value: unknown): string {
 
 function assertRelationForCombining(other: unknown, methodName: string): void {
   if (!isRelationForCombining(other)) {
-    throw argumentError(
+    throw new ArgumentError(
       `You have passed ${rubyClassNameOf(other)} object to #${methodName}. Pass an ActiveRecord::Relation object instead.`,
     );
   }
@@ -1019,7 +1013,7 @@ function assertStructurallyCompatible(
 ): void {
   const incompat = structurallyIncompatibleValuesFor.call(self, other);
   if (incompat.length > 0) {
-    throw argumentError(
+    throw new ArgumentError(
       `Relation passed to #${methodName} must be structurally compatible. Incompatible values: [${incompat.map((v) => `:${v}`).join(", ")}]`,
     );
   }
@@ -1404,7 +1398,9 @@ export function checkIfMethodHasArgumentsBang(
   block?: (args: unknown[]) => void,
 ): void {
   if (!args || args.length === 0) {
-    throw argumentError(message ?? `The method .${methodName.slice(1)}() must contain arguments.`);
+    throw new ArgumentError(
+      message ?? `The method .${methodName.slice(1)}() must contain arguments.`,
+    );
   } else {
     block?.(args);
 
@@ -1437,7 +1433,7 @@ export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void
     if (arg instanceof Map) {
       for (const [, value] of arg) {
         if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
-          throw argumentError(
+          throw new ArgumentError(
             `Direction "${value}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
           );
         }
@@ -1449,7 +1445,7 @@ export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void
       if (isPlainObject(value)) {
         validateOrderArgs.call(this, [value]);
       } else if (!VALID_DIRECTIONS.has(String(value).toLowerCase())) {
-        throw argumentError(
+        throw new ArgumentError(
           `Direction "${value}" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]`,
         );
       }
@@ -1472,7 +1468,7 @@ export function processWithArgs(
             : typeof arg !== "object"
               ? `${String(arg)} (${typeof arg})`
               : ((arg as any).constructor?.name ?? "object");
-      throw argumentError(`Unsupported argument type: ${desc}. Expected a plain object/hash.`);
+      throw new ArgumentError(`Unsupported argument type: ${desc}. Expected a plain object/hash.`);
     }
     return Object.entries(arg).map(([k, v]) => ({ [k]: v }));
   });
@@ -1644,7 +1640,7 @@ function isRubySymbol(value: unknown): value is string {
 function symbolToName(s: string): string {
   const name = s.slice(1);
   if (name.trim() === "") {
-    throw argumentError("Order symbols must have a non-blank name");
+    throw new ArgumentError("Order symbols must have a non-blank name");
   }
   return name;
 }
@@ -2184,7 +2180,9 @@ export function buildWithExpressionFromValue(
       (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
     );
   }
-  throw argumentError(`Unsupported argument type: \`${String(value)}\` ${rubyClassNameOf(value)}`);
+  throw new ArgumentError(
+    `Unsupported argument type: \`${String(value)}\` ${rubyClassNameOf(value)}`,
+  );
 }
 
 /** @internal */
@@ -2344,9 +2342,9 @@ export function selectAssociationList(
 export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
   for (const v of values) {
     if (typeof v === "string") {
-      if (/\s/.test(v)) throw argumentError("only Hash, Symbol and Array are allowed");
+      if (/\s/.test(v)) throw new ArgumentError("only Hash, Symbol and Array are allowed");
     } else if (!Array.isArray(v) && !isPlainObject(v) && !(v instanceof JoinDependency)) {
-      throw argumentError("only Hash, Symbol and Array are allowed");
+      throw new ArgumentError("only Hash, Symbol and Array are allowed");
     }
   }
 }
@@ -2398,7 +2396,7 @@ export function buildJoinBuckets(
       if (left instanceof CTEJoin) {
         buckets.join_node.push(buildWithJoinNode.call(this, left.name, Nodes.OuterJoin));
       } else {
-        throw argumentError("only Hash, Symbol and Array are allowed");
+        throw new ArgumentError("only Hash, Symbol and Array are allowed");
       }
     });
 

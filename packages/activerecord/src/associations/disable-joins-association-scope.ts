@@ -1,3 +1,4 @@
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { any } from "@blazetrails/activesupport";
 import { Nodes } from "@blazetrails/arel";
 import type { AliasTracker } from "./alias-tracker.js";
@@ -15,7 +16,6 @@ import { WhereClause } from "../relation/where-clause.js";
 import type { ExceptKey } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
 import type { AbstractReflection } from "../reflection.js";
-import { argumentError } from "../relation/query-methods.js";
 import { setDjasScopeBuilder } from "./_scope-slots.js";
 
 type ChainEntry = AbstractReflection | ReflectionProxy;
@@ -136,12 +136,12 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       const arity = keyCols.length;
       const tuples = joinIds.map((t, i) => {
         if (!Array.isArray(t)) {
-          throw argumentError(
+          throw new ArgumentError(
             `DisableJoinsAssociationScope: composite joinIds[${i}] must be an array (got ${typeof t})`,
           );
         }
         if (t.length !== arity) {
-          throw argumentError(
+          throw new ArgumentError(
             `DisableJoinsAssociationScope: composite joinIds[${i}] arity ${t.length} does not match key columns [${keyCols.join(", ")}] (arity ${arity})`,
           );
         }

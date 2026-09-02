@@ -34,6 +34,7 @@ export {
 } from "./hash.js";
 export type { Block, ConflictBlock } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
+export { FloatDomainError } from "./float-domain-error.js";
 export { FrozenError } from "./frozen-error.js";
 export {
   Module,

@@ -12,7 +12,6 @@ import { defaultValue } from "../type.js";
 import {
   arelColumn,
   arelColumns,
-  argumentError,
   buildJoinDependencies,
   eachJoinDependencies,
 } from "./query-methods.js";
@@ -422,7 +421,7 @@ export async function pluck(
       }
       if (typeof c !== "string") return c;
       if (hasTopLevelComma(c)) {
-        throw argumentError(
+        throw new ArgumentError(
           `pluck does not allow comma-separated column lists in a single argument. ` +
             `Pass each column as a separate argument: pluck("col1", "col2")`,
         );

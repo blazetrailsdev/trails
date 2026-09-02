@@ -1,5 +1,5 @@
 import { Attribute, Uninitialized } from "./attribute.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { FrozenError, KeyError } from "@blazetrails/ruby-compat";
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 
@@ -105,9 +105,7 @@ export class AttributeSet {
 
   writeFromUser(name: string, value: unknown): unknown {
     if (Object.isFrozen(this)) {
-      const err = new Error("can't modify frozen attributes");
-      err.name = "FrozenError";
-      throw err;
+      throw new FrozenError("can't modify frozen attributes");
     }
     this._attributes.set(name, this.getAttribute(name).withValueFromUser(value));
     return value;
@@ -175,9 +173,7 @@ export class AttributeSet {
 
   private assertNotFrozen(): void {
     if (Object.isFrozen(this)) {
-      const err = new Error("can't modify frozen AttributeSet");
-      err.name = "FrozenError";
-      throw err;
+      throw new FrozenError("can't modify frozen AttributeSet");
     }
   }
 

@@ -18,6 +18,7 @@ import {
   InsertManager,
 } from "@blazetrails/arel";
 import { RangeError as ActiveModelRangeError, ArgumentError } from "@blazetrails/activemodel";
+import { FloatDomainError } from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
   NotImplementedError,
@@ -700,13 +701,6 @@ function integerFromString(str: string): number {
   const digits = { 2: "[01]", 8: "[0-7]", 10: "[0-9]", 16: "[0-9a-fA-F]" }[radix]!;
   if (!new RegExp(`^${digits}(?:_?${digits})*$`).test(body)) throw invalid();
   return (sign === "-" ? -1 : 1) * Number.parseInt(body.replace(/_/g, ""), radix);
-}
-
-class FloatDomainError extends globalThis.RangeError {
-  constructor(message: string) {
-    super(message);
-    this.name = "FloatDomainError";
-  }
 }
 
 function rubyClassName(value: unknown): string {
