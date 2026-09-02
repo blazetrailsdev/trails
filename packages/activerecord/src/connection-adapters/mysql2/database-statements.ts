@@ -1,6 +1,6 @@
 import type { Type } from "@blazetrails/activemodel";
 import type mysql from "mysql2/promise";
-import { Result, type ColumnTypes } from "../../result.js";
+import { Result } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
 import type { StatementPool } from "../statement-pool.js";
@@ -41,32 +41,6 @@ const MYSQL_NUMERIC_FIELD_SQL_TYPE: Readonly<Record<number, string>> = {
   8: "bigint",
   13: "year",
 };
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function buildColumnTypes(
-  fields: ReadonlyArray<Mysql2FieldDescriptor>,
-  lookupCastType: (sqlType: string) => Type,
-): ColumnTypes | null {
-  let columnTypes: Record<string | number, Type> | null = null;
-  for (let i = 0; i < fields.length; i++) {
-    const f = fields[i];
-    const code = f.columnType ?? f.type;
-    if (code == null) continue;
-    let sqlType = MYSQL_NUMERIC_FIELD_SQL_TYPE[code];
-    if (sqlType == null) continue;
-    if (sqlType === "decimal" && typeof f.decimals === "number" && f.decimals > 0) {
-      sqlType = `decimal(65,${f.decimals})`;
-    }
-    const type = lookupCastType(sqlType);
-    columnTypes ??= {};
-    columnTypes[i] = type;
-    if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
-  }
-  return columnTypes;
-}
 
 /** @internal */
 interface PerformQueryHost {
@@ -156,28 +130,6 @@ export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
   return false;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function unwrapMultiResult(
-  rawResult: unknown,
-  rawFields: mysql.FieldPacket[] | undefined,
-): {
-  result: mysql.RowDataPacket[] | mysql.ResultSetHeader;
-  fields: mysql.FieldPacket[] | undefined;
-} {
-  let result = rawResult as mysql.RowDataPacket[] | mysql.ResultSetHeader;
-  let fields = rawFields;
-  if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
-    result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
-    fields = rawFields[0] as mysql.FieldPacket[];
-  } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
-    result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
-  }
-  return { result, fields };
-}
-
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
@@ -224,7 +176,14 @@ export async function performQuery(
     )) as [unknown, mysql.FieldPacket[]];
   }
 
-  const { result, fields } = unwrapMultiResult(rawResult, rawFields);
+  let result = rawResult as mysql.RowDataPacket[] | mysql.ResultSetHeader;
+  let fields = rawFields;
+  if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
+    result = (rawResult as unknown[])[0] as mysql.RowDataPacket[];
+    fields = rawFields[0] as mysql.FieldPacket[];
+  } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
+    result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
+  }
   let rows: unknown[][] | null = null;
   let fieldList: Mysql2FieldDescriptor[] = [];
   let affectedRows = 0;
@@ -261,14 +220,31 @@ export function castResult(
 
   const fields = rawResult.fields;
 
-  const result =
-    fields.length === 0
-      ? Result.empty()
-      : new Result(
-          fields.map((f) => f.name),
-          rawResult.rows,
-          buildColumnTypes(fields, (t) => this.lookupCastType(t)),
-        );
+  let result: Result;
+  if (fields.length === 0) {
+    result = Result.empty();
+  } else {
+    let columnTypes: Record<string | number, Type> | null = null;
+    for (let i = 0; i < fields.length; i++) {
+      const f = fields[i];
+      const code = f.columnType ?? f.type;
+      if (code == null) continue;
+      let sqlType = MYSQL_NUMERIC_FIELD_SQL_TYPE[code];
+      if (sqlType == null) continue;
+      if (sqlType === "decimal" && typeof f.decimals === "number" && f.decimals > 0) {
+        sqlType = `decimal(65,${f.decimals})`;
+      }
+      const type = this.lookupCastType(sqlType);
+      columnTypes ??= {};
+      columnTypes[i] = type;
+      if (!/^\d+$/.test(f.name)) columnTypes[f.name] = type;
+    }
+    result = new Result(
+      fields.map((f) => f.name),
+      rawResult.rows,
+      columnTypes,
+    );
+  }
 
   freeRawResult(rawResult);
 

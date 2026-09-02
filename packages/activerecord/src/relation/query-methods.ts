@@ -335,15 +335,6 @@ function unionReferences(
   return result;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function referencesFromConditions(conditions: unknown): Nodes.SqlLiteral[] {
-  if (!isPlainObject(conditions)) return [];
-  return PredicateBuilder.references(conditions);
-}
-
 function withCte(this: QueryMethodsHost, ...args: any[]): any {
   if (args.some((cte) => typeof cte === "function")) {
     throw new ArgumentError("ActiveRecord::Relation#with does not accept a block");
@@ -771,7 +762,8 @@ export function buildWhereClause(
       transformed[resolved] = value;
     }
     opts = transformed;
-    referencesBang.call(this, ...referencesFromConditions(opts));
+    const references = PredicateBuilder.references(opts as Record<string, unknown>);
+    if (references.length > 0) referencesBang.call(this, ...references);
     parts = this.predicateBuilder.buildFromHash(
       opts as Record<string, unknown>,
       (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName),

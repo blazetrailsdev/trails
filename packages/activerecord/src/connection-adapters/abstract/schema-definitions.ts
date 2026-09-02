@@ -157,25 +157,6 @@ export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
   toTable?: string;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function assertCompositeForeignKeyArity(
-  toTable: string,
-  column: unknown,
-  primaryKey: unknown,
-): void {
-  if (!Array.isArray(column) && !Array.isArray(primaryKey)) return;
-  const size = (v: unknown): number => (Array.isArray(v) ? v.length : v == null ? 0 : 1);
-  if (size(primaryKey) !== size(column)) {
-    throw new ArgumentError(
-      `For composite primary keys, specify :column and :primary_key, where ` +
-        `:column must reference all the :primary_key columns from ${JSON.stringify(toTable)}`,
-    );
-  }
-}
-
 export interface ForeignKeyLookupOptions {
   toTable?: string;
   column?: string | string[];
@@ -194,21 +175,6 @@ export type ForeignKeyStoredOptionKey =
   | "onDelete"
   | "onUpdate"
   | "deferrable";
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function foreignKeyOptionsStoredKeys(
-  options: Pick<AddForeignKeyOptions, "primaryKey" | "onDelete" | "onUpdate" | "deferrable">,
-): ForeignKeyStoredOptionKey[] {
-  const keys: ForeignKeyStoredOptionKey[] = ["column", "name"];
-  if (options.primaryKey !== undefined) keys.push("primaryKey");
-  if (options.onDelete !== undefined) keys.push("onDelete");
-  if (options.onUpdate !== undefined) keys.push("onUpdate");
-  if (options.deferrable !== undefined) keys.push("deferrable");
-  return keys;
-}
 
 export class ForeignKeyDefinition {
   readonly fromTable: string;
@@ -1033,6 +999,11 @@ export class TableDefinition {
     const suffix = this.conn.tableNameSuffix ?? globalTableNameSuffix();
     const prefixedToTable = `${prefix}${toTable}${suffix}`;
     const opts = this.conn.foreignKeyOptions(this.name, prefixedToTable, { ...options });
+    const storedOptionKeys: ForeignKeyStoredOptionKey[] = ["column", "name"];
+    if (options.primaryKey !== undefined) storedOptionKeys.push("primaryKey");
+    if (options.onDelete !== undefined) storedOptionKeys.push("onDelete");
+    if (options.onUpdate !== undefined) storedOptionKeys.push("onUpdate");
+    if (options.deferrable !== undefined) storedOptionKeys.push("deferrable");
     return new ForeignKeyDefinition(
       this.name,
       prefixedToTable,
@@ -1043,7 +1014,7 @@ export class TableDefinition {
       opts.onUpdate as ReferentialAction | undefined,
       opts.deferrable as "immediate" | "deferred" | false | undefined,
       opts.validate as boolean | undefined,
-      foreignKeyOptionsStoredKeys(options),
+      storedOptionKeys,
     );
   }
 
