@@ -43,8 +43,10 @@ describe("PartialRenderer", () => {
 
   it("looks up partial with underscore prefix", async () => {
     const spy = vi.spyOn(lc, "findAll").mockReturnValue([]);
-    await new PartialRenderer(lc).render("users/card", ctx, undefined).catch(() => {});
-    expect(spy).toHaveBeenCalledWith("users/card", [], true, [], {});
+    await new PartialRenderer(lc, { locals: { name: "Alice" }, formats: ["html"] })
+      .render("users/card", ctx, undefined)
+      .catch(() => {});
+    expect(spy).toHaveBeenCalledWith("users/card", [], true, ["name"], { formats: ["html"] });
   });
 
   it("raises MissingTemplate when partial cannot be found", async () => {
