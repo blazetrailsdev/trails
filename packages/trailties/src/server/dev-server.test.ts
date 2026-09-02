@@ -57,6 +57,17 @@ describe("DevServer", () => {
     expect(await response.text()).toBe("from rack");
   }, 30_000);
 
+  it("hands application source under app/ to Rack rather than serving it", async () => {
+    const origin = await startOn(await generateApp());
+
+    const response = await fetch(`${origin}/controllers/application-controller.ts`, {
+      redirect: "manual",
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("from rack");
+  }, 30_000);
+
   it("builds the generated app's assets — rollupOptions.input resolves", async () => {
     const root = await generateApp();
 
