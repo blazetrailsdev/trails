@@ -1,12 +1,9 @@
 /**
  * The generator's templates, mirroring
- * `railties/lib/rails/generators/rails/authentication/templates/**.tt`. Rails
- * keeps one `.tt` file per emitted file; trails keeps the same set as source
- * strings so the generator ships in a single package with no runtime file
- * reads.
+ * `railties/lib/rails/generators/rails/authentication/templates/**.tt` — the
+ * one shape a TypeScript package can carry them in.
  *
- * @noRailsEquivalent PERMANENT — the `.tt` files themselves, in the one shape
- * a TypeScript package can carry them.
+ * @noRailsEquivalent PERMANENT
  */
 
 export const SESSION = `import { ApplicationRecord } from "./application-record.js";
@@ -252,46 +249,17 @@ export const RESET_TEXT = `You can reset your password within the next 15 minute
 <%= editPasswordUrl(user.passwordResetToken) %>
 `;
 
-/**
- * Rails template path → the file the trails app gets, and its source. Rails'
- * `template "app/models/session.rb"` derives the destination from the
- * template's own path (`Thor::Actions#template`); trails' destinations are
- * `.ts` files under `dasherize`d names, so the mapping is explicit.
- */
-export const TEMPLATES: Record<string, { destination: string; source: string }> = {
-  "app/models/session.rb": { destination: "app/models/session.ts", source: SESSION },
-  "app/models/user.rb": { destination: "app/models/user.ts", source: USER },
-  "app/models/current.rb": { destination: "app/models/current.ts", source: CURRENT },
-  "app/controllers/sessions_controller.rb": {
-    destination: "app/controllers/sessions-controller.ts",
-    source: SESSIONS_CONTROLLER,
-  },
-  "app/controllers/concerns/authentication.rb": {
-    destination: "app/controllers/concerns/authentication.ts",
-    source: AUTHENTICATION,
-  },
-  "app/controllers/passwords_controller.rb": {
-    destination: "app/controllers/passwords-controller.ts",
-    source: PASSWORDS_CONTROLLER,
-  },
-  "app/channels/application_cable/connection.rb": {
-    destination: "app/channels/application-cable/connection.ts",
-    source: CONNECTION,
-  },
-  "app/mailers/passwords_mailer.rb": {
-    destination: "app/mailers/passwords-mailer.ts",
-    source: PASSWORDS_MAILER,
-  },
-  "app/views/passwords_mailer/reset.html.erb": {
-    destination: "app/views/passwords-mailer/reset.html.tse",
-    source: RESET_HTML,
-  },
-  "app/views/passwords_mailer/reset.text.erb": {
-    destination: "app/views/passwords-mailer/reset.text.tse",
-    source: RESET_TEXT,
-  },
-  "test/mailers/previews/passwords_mailer_preview.rb": {
-    destination: "test/mailers/previews/passwords-mailer-preview.ts",
-    source: PASSWORDS_MAILER_PREVIEW,
-  },
+/** Rails template path → its source, keyed as `template` names them. */
+export const TEMPLATES: Record<string, string> = {
+  "app/models/session.rb": SESSION,
+  "app/models/user.rb": USER,
+  "app/models/current.rb": CURRENT,
+  "app/controllers/sessions_controller.rb": SESSIONS_CONTROLLER,
+  "app/controllers/concerns/authentication.rb": AUTHENTICATION,
+  "app/controllers/passwords_controller.rb": PASSWORDS_CONTROLLER,
+  "app/channels/application_cable/connection.rb": CONNECTION,
+  "app/mailers/passwords_mailer.rb": PASSWORDS_MAILER,
+  "app/views/passwords_mailer/reset.html.erb": RESET_HTML,
+  "app/views/passwords_mailer/reset.text.erb": RESET_TEXT,
+  "test/mailers/previews/passwords_mailer_preview.rb": PASSWORDS_MAILER_PREVIEW,
 };

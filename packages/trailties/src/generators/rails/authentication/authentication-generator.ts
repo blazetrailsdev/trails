@@ -67,12 +67,17 @@ export class AuthenticationGenerator extends GeneratorBase {
    * never silently overwritten.
    */
   private template(file: string): void {
-    const { destination, source } = TEMPLATES[file];
+    // Rails derives the destination from the template's own path; trails'
+    // destinations are the dasherized `.ts` (`.tse` for a view) twin.
+    const destination = file
+      .replace(/\.rb$/, ".ts")
+      .replace(/\.erb$/, ".tse")
+      .replace(/[^/]+(?=\/|\.)/g, (segment) => segment.replace(/_/g, "-"));
     if (this.fileExists(destination)) {
       this.output(`      skip  ${destination} (already exists)`);
       return;
     }
-    this.createFile(destination, source);
+    this.createFile(destination, TEMPLATES[file]);
   }
 
   // `authentication_generator.rb:32-34`. Anchored on the class declaration;
