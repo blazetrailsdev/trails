@@ -154,6 +154,12 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // core-ext/range/compare-range.ts `caseEquals` (the `include?` sibling at :42
   // maps through `rubyMethodToTs` as `isInclude` and needs no pin).
   "ActiveSupport::CompareWithRange": { "===": ["caseEquals"] },
+  // rack-session abstract/id.rb:88 `def [](key)` → abstract/id.ts
+  // `SessionHash#get`.
+  "Rack::Session::Abstract::SessionHash": { "[]": ["get"] },
+  // rack-session abstract/id.rb:462 `def [](key)` → abstract/id.ts
+  // `SecureSessionHash#get`.
+  "Rack::Session::Abstract::PersistedSecure::SecureSessionHash": { "[]": ["get"] },
 };
 
 // `fqn#operator` keys this process has actually resolved. A key that is never

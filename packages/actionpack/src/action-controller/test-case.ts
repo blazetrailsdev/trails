@@ -522,7 +522,7 @@ export class TestRequest extends AbstractTestRequest {
     this.setHeader("QUERY_STRING", string);
   }
 
-  get contentType(): string | undefined {
+  get contentType(): string | null {
     return super.contentType;
   }
 

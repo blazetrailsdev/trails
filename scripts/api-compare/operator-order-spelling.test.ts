@@ -63,6 +63,13 @@ describe("operatorSpelling", () => {
     expect(operatorSpelling("ActiveSupport::CompareWithRange", "===")).toEqual(["caseEquals"]);
   });
 
+  it("resolves both rack-session session-hash element readers to get", () => {
+    expect(operatorSpelling("Rack::Session::Abstract::SessionHash", "[]")).toEqual(["get"]);
+    expect(
+      operatorSpelling("Rack::Session::Abstract::PersistedSecure::SecureSessionHash", "[]"),
+    ).toEqual(["get"]);
+  });
+
   it("returns undefined for an unlisted class (stays unmapped)", () => {
     expect(operatorSpelling("Arel::Nodes::Casted", "[]")).toBeUndefined();
     expect(operatorSpelling("Arel::Table", "==")).toBeUndefined();

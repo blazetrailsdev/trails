@@ -219,25 +219,6 @@ export class Request {
     return this.getHeader("REQUEST_METHOD") as string;
   }
 
-  get isGet(): boolean {
-    return this.requestMethod === "GET";
-  }
-  get isHead(): boolean {
-    return this.requestMethod === "HEAD";
-  }
-  get isPost(): boolean {
-    return this.requestMethod === "POST";
-  }
-  get isPut(): boolean {
-    return this.requestMethod === "PUT";
-  }
-  get isPatch(): boolean {
-    return this.requestMethod === "PATCH";
-  }
-  get isDelete(): boolean {
-    return this.requestMethod === "DELETE";
-  }
-
   // --- URL components ---
 
   /**
@@ -309,14 +290,6 @@ export class Request {
 
   // --- Path ---
 
-  get path(): string {
-    return (this.env["PATH_INFO"] as string) || "/";
-  }
-
-  get queryString(): string {
-    return (this.env["QUERY_STRING"] as string) || "";
-  }
-
   get fullpath(): string {
     const qs = this.queryString;
     return qs ? `${this.path}?${qs}` : this.path;
@@ -356,14 +329,12 @@ export class Request {
 
   // --- Headers ---
 
-  get contentType(): string | undefined {
-    const ct = this.env["CONTENT_TYPE"] as string | undefined;
-    if (!ct) return undefined;
-    return ct.split(";")[0].trim() || undefined;
-  }
-
+  /**
+   * The `String` MIME type of the request. Mirrors `Request#media_type`
+   * (request.rb:287-290) — `content_mime_type&.to_s`.
+   */
   get mediaType(): string | undefined {
-    return this.contentType;
+    return this.contentMimeType?.toString();
   }
 
   /**
@@ -376,10 +347,6 @@ export class Request {
     if (!cl) return undefined;
     const n = parseInt(cl, 10);
     return isNaN(n) ? undefined : n;
-  }
-
-  get userAgent(): string {
-    return (this.env["HTTP_USER_AGENT"] as string) || "";
   }
 
   get accept(): string {
@@ -711,7 +678,10 @@ export class Request {
    * `fetch_header(RACK_SESSION) { |k| set_header RACK_SESSION, default_session }`.
    * ActionDispatch supplies `default_session` (`request.rb:505-507`) as
    * `Session.disabled(self)`, so a request with no session middleware answers a
-   * disabled `Session` and seeds `Session::Options` as a side effect.
+   * disabled `Session` and seeds `Session::Options` as a side effect. Rails
+   * overrides only `session=` (`request.rb:386-388`) and inherits this reader,
+   * but a JS property takes both halves from one descriptor, so the inherited
+   * half is restated here.
    */
   get session(): Session {
     return this.fetchHeader(RACK_SESSION, (k) =>
@@ -737,26 +707,6 @@ export class Request {
   /** @internal Rails: `Flash::RequestMethods#flash_hash` (`flash.rb:288-290`). */
   flashHash(): FlashHash | null {
     return flashHash.call(this as never);
-  }
-
-  // --- Cookies ---
-  //
-  // Parses the `HTTP_COOKIE` header into a `name → value` map. Trails layers
-  // a richer `CookieJar` on top via `ActionDispatch::Cookies`; this getter
-  // returns the raw seed used to build it.
-
-  get cookies(): Record<string, string> {
-    const header = (this.env.HTTP_COOKIE as string | undefined) ?? "";
-    const out: Record<string, string> = {};
-    if (!header) return out;
-    for (const pair of header.split(";")) {
-      const eq = pair.indexOf("=");
-      if (eq < 0) continue;
-      const k = pair.slice(0, eq).trim();
-      const v = pair.slice(eq + 1).trim();
-      if (k) out[k] = v;
-    }
-    return out;
   }
 
   // --- Cookies (app-wide options) ---
@@ -1171,6 +1121,36 @@ Request.prototype.etagMatches = _etagMatches;
 Request.prototype.fresh = _fresh;
 
 include(Request, RequestHelpers);
+/**
+ * `ActionDispatch::Request` includes `Rack::Request::Helpers`
+ * (`action_dispatch/http/request.rb:21`), so every helper arrives unless the
+ * class body overrides it — a Ruby class body outranks an included module.
+ * Each name omitted here is the Rails definition that does the overriding:
+ *
+ * - `env`, `getHeader`, `setHeader`, `fetchHeader` — `Rack::Request::Env`'s,
+ *   the host contract the mixin is written against.
+ * - `body` — `Request#body` (request.rb:357-371).
+ * - `requestMethod` — `Request#request_method` (request.rb:152-158).
+ * - `host`, `port`, `hostWithPort`, `serverPort`, `url` —
+ *   `ActionDispatch::Http::URL#host` (url.rb:228-230), `#port` (url.rb:255-265),
+ *   `#host_with_port` (url.rb:244-246), `#server_port` (url.rb:317-319) and
+ *   `#url` (url.rb:191-193).
+ * - `fullpath` — `Request#fullpath` (request.rb:271-277).
+ * - `mediaType` — `Request#media_type` (request.rb:287-290).
+ * - `contentLength` — `Request#content_length` (request.rb:292-295).
+ * - `xhr` — `alias :xhr? :xml_http_request?` (request.rb:303).
+ * - `ip` — `Request#ip` (request.rb:306-310).
+ * - `params` — `alias :params :parameters` (parameters.rb:65).
+ * - `session`, `sessionOptions` — `Request#session=` (request.rb:386-388) and
+ *   `#session_options=` (request.rb:390-392). Rails overrides only the writers
+ *   and inherits both readers, but a JS property takes both halves from one
+ *   descriptor, so the inherited half is restated in the class body.
+ * - `logger` — `Request#logger` (request.rb:477-479).
+ * - `GET`, `POST` — `Request#GET` (request.rb:395-403) and `#POST`
+ *   (request.rb:408-433).
+ * - `formData` — `Request#form_data?` (request.rb:373-375).
+ * - `defaultSession` — `Request#default_session` (request.rb:505-507).
+ */
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request extends Omit<
   RequestHelpers,
@@ -1180,30 +1160,19 @@ export interface Request extends Omit<
   | "fetchHeader"
   | "body"
   | "requestMethod"
-  | "isGet"
-  | "isHead"
-  | "isPost"
-  | "isPut"
-  | "isPatch"
-  | "isDelete"
   | "host"
   | "port"
   | "hostWithPort"
   | "serverPort"
-  | "path"
-  | "queryString"
-  | "fullpath"
   | "url"
-  | "contentType"
+  | "fullpath"
   | "mediaType"
   | "contentLength"
-  | "userAgent"
   | "xhr"
   | "ip"
   | "params"
   | "session"
   | "sessionOptions"
-  | "cookies"
   | "logger"
   | "GET"
   | "POST"

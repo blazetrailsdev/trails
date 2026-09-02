@@ -43,7 +43,7 @@ export class BrowserBlocker {
 
   /** @internal */
   parsedUserAgent(): UAParser {
-    this._parsed ??= new UAParser(this.request.userAgent);
+    this._parsed ??= new UAParser(this.request.userAgent ?? "");
     return this._parsed;
   }
 
@@ -66,7 +66,7 @@ export class BrowserBlocker {
 
   /** @internal */
   isBot(): boolean {
-    return /bot|crawl|spider|slurp/i.test(this.request.userAgent);
+    return /bot|crawl|spider|slurp/i.test(this.request.userAgent ?? "");
   }
 
   /** @internal */

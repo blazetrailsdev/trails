@@ -15,7 +15,7 @@ export interface RouterRequest {
   requestMethod: string;
   pathParameters: Record<string, unknown>;
   routeUriPattern?: string | null;
-  isHead?: boolean;
+  isHead?(): boolean;
   /** Route matching is verb-based; constraints may inspect arbitrary keys. */
   [key: string]: unknown;
 }
@@ -169,7 +169,7 @@ export class Router {
       ...this.customRoutes().filter((r) => r.path.isMatch(pathInfo)),
     ];
 
-    if (req.isHead || req.requestMethod === "HEAD") {
+    if (req.isHead?.() || req.requestMethod === "HEAD") {
       routes = this.matchHeadRoutes(routes, req);
     } else {
       routes = routes.filter((r) =>

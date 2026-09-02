@@ -69,8 +69,8 @@ export class DebugLocks {
   async call(env: RackEnv): Promise<RackResponse> {
     const req = new Request(env);
 
-    if (req.isGet) {
-      const path = req.path.replace(/\/$/, "");
+    if (req.isGet()) {
+      const path = req.pathInfo.replace(/\/$/, "");
       if (path === this.path) {
         return this.renderDetails();
       }

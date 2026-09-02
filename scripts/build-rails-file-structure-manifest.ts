@@ -447,7 +447,17 @@ if (staleExpectedCollisions.length > 0) {
 // how the `ActiveModel::AttributeSet::LazyAttributeHash` key survived. Fail after
 // the manifest is written, so the emitted order is still correct/usable and the
 // failure is purely the signal.
-const deadOperatorEntries = unusedOperatorSpellings();
+// A package with no `PACKAGE_DIRS` row is never walked, so its entries cannot
+// resolve and are unvisited rather than dead.
+const unwalkedFqns = new Set<string>();
+for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
+  if (PACKAGE_DIRS[pkg]) continue;
+  for (const fqn of Object.keys(rubyPkg.classes ?? {})) unwalkedFqns.add(fqn);
+  for (const fqn of Object.keys(rubyPkg.modules ?? {})) unwalkedFqns.add(fqn);
+}
+const deadOperatorEntries = unusedOperatorSpellings().filter(
+  (entry) => !unwalkedFqns.has(entry.slice(0, entry.lastIndexOf("#"))),
+);
 if (deadOperatorEntries.length > 0) {
   throw new Error(
     `[build-rails-file-structure-manifest] ${deadOperatorEntries.length} dead ` +

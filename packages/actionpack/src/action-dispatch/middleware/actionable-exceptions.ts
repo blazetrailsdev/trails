@@ -54,7 +54,7 @@ export class ActionableExceptions {
   /** @internal */
   private actionableRequest(request: Request): boolean {
     const flag = request.env["action_dispatch.show_detailed_exceptions"];
-    return Boolean(flag) && request.isPost && request.path === ActionableExceptions.endpoint;
+    return Boolean(flag) && request.isPost() && request.path === ActionableExceptions.endpoint;
   }
 
   /** @internal */
