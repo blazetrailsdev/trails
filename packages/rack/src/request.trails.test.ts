@@ -47,9 +47,6 @@ describe("RackRequestTrailsTest", () => {
     expect(req.ip).toBe("1.2.3.4");
   });
 
-  // MRI answers, from `Rack::Request#host` over the vendored gem: Ruby's
-  // `[[:graph:]]` admits `Cf` and `Co` and rejects `Cc`, `Cn`, `Cs` and every
-  // Unicode space, which JS `\s` and a C0/DEL range cannot express.
   const graphCases: Array<[string, number, boolean]> = [
     ["a C1 control", 0x80, false],
     ["a soft hyphen", 0x00ad, true],

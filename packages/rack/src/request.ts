@@ -828,8 +828,6 @@ export abstract class Helpers {
 export class Request {
   env: Record<string, any>;
 
-  // `trusted_proxies.match?(ip)` (`rack/request.rb:58`) answers false for a nil
-  // ip — which `forwarded_for` can hand it — where JS `test` would stringify it.
   static ipFilter: (ip: string | undefined) => boolean = (ip: string | undefined) =>
     ip != null && trustedProxies.test(ip);
   static forwardedPriority: Array<"forwarded" | "x_forwarded" | null> = [
