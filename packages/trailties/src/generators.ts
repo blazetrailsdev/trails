@@ -107,6 +107,13 @@ export class Generators {
    * (`generators.rb:234-259`). The `context` arm and the fallbacks Rails
    * consults after the lookup miss belong to generator groups (`test_unit`,
    * `shoulda`) that trails has no analogue for.
+   *
+   * Rails calls the targeted `lookup(lookups)` here and reserves the full-tree
+   * `lookup!` for `public_namespaces`; this body calls `lookupBang` for both
+   * tiers, because a namespace does not map to one directory spelling on disk
+   * (`rails:encrypted_file` lives in `encrypted-file/` while
+   * `rails:scaffold_controller` keeps the underscore). Tracked by story
+   * `converge-generators-findbynamespace-to-targeted-lookup`.
    */
   static async findByNamespace(name: string, base?: string): Promise<GeneratorClass | undefined> {
     const lookups: string[] = [];
@@ -151,7 +158,10 @@ export class Generators {
       names.length ? names.join(":") : undefined,
     );
     if (!klass) {
-      throw new Error(`Could not find generator '${namespace}'.`);
+      throw new Error(
+        `Could not find generator '${namespace}'.\n` +
+          "Run `bin/trails generate --help` for more options.\n",
+      );
     }
     return klass.start(args, config);
   }
@@ -165,10 +175,16 @@ export class Generators {
   /**
    * Rails: `hidden_namespaces` (`generators.rb:134-160`). Only the entries
    * whose subsystem trails has: the ORM/test-framework/template-engine groups
-   * Rails interpolates do not exist here.
+   * Rails interpolates, and `action_text:install` / `action_mailbox:install`,
+   * name generators that do not exist here.
    */
   static hiddenNamespaces(): string[] {
-    return (_hiddenNamespaces ??= ["rails", "resource_route"]);
+    return (_hiddenNamespaces ??= ["rails", "resource_route", "devcontainer"]);
+  }
+
+  /** Rails: `hide_namespaces(*namespaces)` (`generators.rb:164-166`). */
+  static hideNamespaces(...namespaces: string[]): void {
+    Generators.hiddenNamespaces().push(...namespaces);
   }
 
   /** Rails: `sorted_groups` (`generators.rb:196-219`). */
@@ -211,7 +227,9 @@ export class Generators {
       const name = k.namespace.startsWith("rails:")
         ? k.namespace.slice("rails:".length)
         : k.namespace;
-      return { name, namespace: k.namespace, hidden: HIDDEN_FROM_LISTING.includes(name) };
+      const hidden =
+        HIDDEN_FROM_LISTING.includes(name) || Generators.hiddenNamespaces().includes(name);
+      return { name, namespace: k.namespace, hidden };
     });
   }
 

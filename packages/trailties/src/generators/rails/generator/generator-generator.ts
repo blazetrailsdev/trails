@@ -1,5 +1,6 @@
 import { camelize } from "@blazetrails/activesupport";
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
+import type { GeneratorOptions } from "../../base.js";
 
 export interface GeneratorRunOptions {
   namespace?: boolean;
@@ -8,6 +9,12 @@ export interface GeneratorRunOptions {
 export class GeneratorGenerator extends NamedBase {
   constructor(options: NamedBaseOptions) {
     super(options);
+  }
+
+  static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
+    const generator = new GeneratorGenerator({ ...config, name: args[0] ?? "" });
+    generator.run({});
+    return generator.getCreatedFiles();
   }
 
   run(options: GeneratorRunOptions = {}): string[] {
