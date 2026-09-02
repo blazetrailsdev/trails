@@ -25,23 +25,22 @@ import {
   type AttributeRegistrationHost,
 } from "./attribute-registration.js";
 
+export function constructor(
+  this: AttributeInstanceHost & { constructor: { _defaultAttributes(): AttributeSet } },
+  super_: () => void,
+): void {
+  this._attributes = this.constructor._defaultAttributes().deepDup();
+  super_();
+}
+
 export function attributes(attrs: AttributeSet): Record<string, unknown> {
   return attrs.toHash();
 }
 
-export function attributeNames(this: { attributeTypes(): Record<string, Type> }): string[] {
-  return Object.keys(this.attributeTypes());
-}
-
 export type AttributeInstanceHost = { _attributes: AttributeSet };
 
-/** @internal */
-export function _writeAttribute(
-  this: AttributeInstanceHost,
-  attrName: string,
-  value: unknown,
-): void {
-  this._attributes.writeFromUser(attrName, value);
+export function attributeNames(this: { attributeTypes(): Record<string, Type> }): string[] {
+  return Object.keys(this.attributeTypes());
 }
 
 /** @internal */
@@ -50,6 +49,15 @@ export interface AttributeOptions {
   limit?: number | null;
   array?: boolean;
   range?: boolean;
+}
+
+/** @internal */
+export function _writeAttribute(
+  this: AttributeInstanceHost,
+  attrName: string,
+  value: unknown,
+): void {
+  this._attributes.writeFromUser(attrName, value);
 }
 
 export function attribute(
@@ -83,18 +91,6 @@ export function setDefineMethodAttribute(
       });
     });
   });
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function initialize(
-  this: AttributeInstanceHost & { constructor: { _defaultAttributes(): AttributeSet } },
-  super_: () => void,
-): void {
-  this._attributes = this.constructor._defaultAttributes().deepDup();
-  super_();
 }
 
 export function initializeDup(
@@ -146,7 +142,7 @@ export class Attributes {
     extend(base, ClassMethods);
     extend(base, { defineMethodAttribute });
 
-    prepend(base.prototype, { initInternals: initialize });
+    prepend(base.prototype, { initInternals: constructor });
     prepend(base.prototype, { initializeDup });
     prepend(base.prototype, { freeze });
 
