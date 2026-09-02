@@ -21,7 +21,7 @@ import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/s
 function emitTableSql(td: TableDefinition): Promise<string> {
   const adapter = (td as any).conn;
   const typeRegistryKey = adapter.typeRegistryKey;
-  if (typeRegistryKey === "postgres") return new PgSchemaCreation(adapter).accept(td);
+  if (typeRegistryKey === "postgresql") return new PgSchemaCreation(adapter).accept(td);
   if (typeRegistryKey === "mysql2") return new MysqlSchemaCreation(adapter).accept(td);
   return new SQLite3SchemaCreation(adapter).accept(td);
 }

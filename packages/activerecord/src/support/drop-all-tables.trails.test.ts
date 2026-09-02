@@ -47,7 +47,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
     let executeCallCount = 0;
     const fakeAdapter = {
-      typeRegistryKey: "postgres" as const,
+      typeRegistryKey: "postgresql" as const,
       execute: vi.fn(async () => {
         executeCallCount++;
         if (executeCallCount === 1) throw connErr;
@@ -64,7 +64,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
   it("rethrows when execute throws a non-connection error", async () => {
     const appErr = new Error("syntax error");
     const fakeAdapter = {
-      typeRegistryKey: "postgres" as const,
+      typeRegistryKey: "postgresql" as const,
       execute: vi.fn(async () => {
         throw appErr;
       }),
@@ -83,7 +83,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
     let mutationCallCount = 0;
     const fakeAdapter = {
-      typeRegistryKey: "postgres" as const,
+      typeRegistryKey: "postgresql" as const,
       execute: vi.fn(async (sql: string) => {
         if (sql.includes("matviewname")) {
           return mutationCallCount === 0 ? [{ schemaname: "public", name: "mv1" }] : [];
@@ -201,7 +201,7 @@ describe("purge-only pre-snapshot path", () => {
   } as unknown as DatabaseAdapter;
 
   const armOnlyAdapter = {
-    typeRegistryKey: "sqlite",
+    typeRegistryKey: "sqlite3",
     createTable: async () => {},
   } as unknown as DatabaseAdapter;
 

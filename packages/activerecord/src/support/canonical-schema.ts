@@ -1,3 +1,4 @@
+import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { singularize } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "../errors.js";
@@ -49,7 +50,7 @@ class TableBuilder {
 
   constructor(
     private readonly t: TableDefinition,
-    private readonly typeRegistryKey: string,
+    private readonly typeRegistryKey: AdapterName,
     private readonly typeMap: Record<string, string | undefined>,
     private readonly serialPk: string | null,
   ) {}

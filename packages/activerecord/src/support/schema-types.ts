@@ -1,4 +1,7 @@
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type {
+  AbstractAdapter as DatabaseAdapter,
+  AdapterName,
+} from "../connection-adapters/abstract-adapter.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 
 export type PrimitiveColumnSpec =
@@ -91,11 +94,11 @@ export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema
   return true;
 }
 
-export function serialIdType(spec: ColumnSpec | undefined, adapterName: string): string {
+export function serialIdType(spec: ColumnSpec | undefined, adapterName: AdapterName): string {
   const type = typeof spec === "string" ? spec : spec?.type;
   const isBig = type === "big_integer";
-  if (adapterName === "postgres") return isBig ? "bigserial" : "serial";
-  if (adapterName === "sqlite") return "integer";
+  if (adapterName === "postgresql") return isBig ? "bigserial" : "serial";
+  if (adapterName === "sqlite3") return "integer";
   return isBig ? "bigint" : "integer";
 }
 
