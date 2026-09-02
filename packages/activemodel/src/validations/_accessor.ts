@@ -1,3 +1,4 @@
+/** @noRailsEquivalent PERMANENT */
 export interface InheritedAccessor {
   hasGetter: boolean;
   hasSetter: boolean;

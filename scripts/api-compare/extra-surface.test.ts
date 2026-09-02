@@ -1645,9 +1645,11 @@ describe("buildReport — novel vs moved classification", () => {
     });
     const f = report.packages[0].extraFiles.find((x) => x.tsFile === "trailtie.ts");
     expect(f).toBeDefined();
-    // `Trailtie` is the declaration name, and railtie.rb declares `Railtie` —
-    // a renamed port is drift the declaration-name pass now reports.
-    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel", "Trailtie"]);
+    // `Trailtie` is the declaration name, and railtie.rb declares `Railtie`.
+    // `TS_CLASS_RENAMES` sanctions that rename and `parity:api` already
+    // resolves the pair through it, so the declaration-name pass admits it
+    // rather than reporting the port as drift.
+    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
   });
 
   it("resolves the unported guard against a cross-package module's OWNING package", () => {

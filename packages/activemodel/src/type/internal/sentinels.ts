@@ -1,3 +1,5 @@
+/** @noRailsEquivalent PERMANENT */
+
 declare const dateInfinityBrand: unique symbol;
 declare const dateNegativeInfinityBrand: unique symbol;
 
@@ -11,10 +13,12 @@ export const DateInfinity: DateInfinity = Number.POSITIVE_INFINITY as DateInfini
 export const DateNegativeInfinity: DateNegativeInfinity =
   Number.NEGATIVE_INFINITY as DateNegativeInfinity;
 
+/** @noRailsEquivalent PERMANENT */
 export function isDateInfinity(v: unknown): v is DateInfinity {
   return v === DateInfinity;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function isDateNegativeInfinity(v: unknown): v is DateNegativeInfinity {
   return v === DateNegativeInfinity;
 }

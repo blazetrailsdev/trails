@@ -84,6 +84,15 @@ export function cmp(a: unknown, b: unknown): number | null {
     const y = b.epochNanoseconds;
     return x < y ? -1 : x > y ? 1 : 0;
   }
+  if (temporalTag(a) !== null && temporalTag(b) !== null) {
+    const x = widenPlainDate(a);
+    const y = widenPlainDate(b);
+    if (temporalTag(x) === temporalTag(y)) {
+      return (
+        x as { constructor: { compare(l: unknown, r: unknown): number } }
+      ).constructor.compare(x, y);
+    }
+  }
   if (typeof a === "number" || typeof a === "bigint") {
     /* `rb_int_cmp` (`vendor/ruby/numeric.c:4696`) and `flo_cmp`
        (`vendor/ruby/numeric.c:1700`) answer nil for a non-Numeric, and for NaN. */
@@ -100,6 +109,24 @@ export function cmp(a: unknown, b: unknown): number | null {
      `==` operand and nil otherwise, rather than JS relational coercion, which
      orders `false` before `true` where Ruby answers nil. */
   return rbEqual(a, b) ? 0 : null;
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+function temporalTag(value: unknown): string | null {
+  const tag = (value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag];
+  return typeof tag === "string" && tag.startsWith("Temporal.") ? tag : null;
+}
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+function widenPlainDate(value: unknown): unknown {
+  const toPlainDateTime = (value as { toPlainDateTime?: unknown }).toPlainDateTime;
+  return typeof toPlainDateTime === "function" ? toPlainDateTime.call(value) : value;
 }
 
 /**

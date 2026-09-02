@@ -100,6 +100,7 @@ import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 import { operatorSpelling } from "./operator-order-spelling.js";
 import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-closure.js";
 import {
+  TS_CLASS_RENAMES,
   isArityOverridden,
   isRubyOnlyClass,
   isScopedSkip,
@@ -2181,23 +2182,6 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   // `Codec extends Metadata` reproduces both the chain and that `super`.
   ["Codec", "Metadata"],
 ]);
-
-// Per-class TS renames that don't fit the systematic alias patterns
-// (Abstract<X>, Base<X>, ActiveModel<X>, <X>Type). Keyed by the Ruby
-// short name → the literal TS class name in the expected file.
-// - `Name` → `ModelName`: Rails `ActiveModel::Name`. `Name` alone is
-//   too generic in TS, so the flattened class keeps the `Model` prefix.
-// - `Railtie` → `Trailtie`: Trails railties are not Rails::Railtie subclasses;
-//   the pun name signals that distinction across all packages.
-// - `Rails` → `Trails`: top-level `module Rails` in `railties/lib/rails.rb`
-//   maps to the `Trails` global in `packages/trailties/src/rails.ts`.
-// - `Registry` → `TypeRegistry`: same rationale for `ActiveModel::Type::Registry`.
-const TS_CLASS_RENAMES: Record<string, string> = {
-  Name: "ModelName",
-  Railtie: "Trailtie",
-  Rails: "Trails",
-  Registry: "TypeRegistry",
-};
 
 /**
  * Resolve the TS class that corresponds to a Ruby class. Tries, in order:

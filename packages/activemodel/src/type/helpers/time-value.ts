@@ -122,9 +122,8 @@ export function fastStringToTime(
   const normalized = string
     .replace(" ", "T")
     .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
-  const datetimeString = /^\d{4}-\d{2}-\d{2}$/.test(normalized)
-    ? `${normalized}T00:00:00`
-    : normalized;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
+  const datetimeString = normalized.replace(/(\.\d{9})\d+/, "$1");
   const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(datetimeString);
   try {
     if (hasOffset) return Temporal.Instant.from(datetimeString);

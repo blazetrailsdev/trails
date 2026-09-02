@@ -6,6 +6,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const yamlCodec: AttributeSetCodec = {
   encode(envelope: AttributeSetEnvelope): string {
     return yamlStringify(envelope, (_key, value) =>

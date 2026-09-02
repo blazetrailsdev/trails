@@ -1,7 +1,10 @@
 import { type Included } from "@blazetrails/activesupport";
 import { Type } from "../value.js";
 
-/** @internal */
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
 export const MutableModule = {
   cast(this: Type, value: unknown): unknown {
     return this.deserialize(this.serialize(value));

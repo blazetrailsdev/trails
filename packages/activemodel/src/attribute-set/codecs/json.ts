@@ -5,6 +5,7 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const jsonCodec: AttributeSetCodec = {
   encode(envelope: AttributeSetEnvelope): string {
     return JSON.stringify(envelope, (_key, value) =>

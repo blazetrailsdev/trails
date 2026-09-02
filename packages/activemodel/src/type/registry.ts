@@ -61,4 +61,5 @@ export class TypeRegistry {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const typeRegistry = new TypeRegistry();

@@ -552,12 +552,7 @@ function sendProxyTarget(record: ReadWriteHost, targetName: string, args: unknow
   return target.call(record, ...args);
 }
 
-/**
- * @noRailsEquivalent Peels Ruby's trailing `parameters:` keyword back off the
- * splat that carries it — the arg-shape half of `attribute_method_prefix` /
- * `attribute_method_suffix`, which TS cannot spell as a real keyword after a
- * rest element.
- */
+/** @noRailsEquivalent PERMANENT */
 function extractParameters(
   affixes: Array<string | { parameters?: string | null | false }>,
 ): string | null | false {
@@ -567,7 +562,6 @@ function extractParameters(
   return last.parameters ?? null;
 }
 
-/** @noRailsEquivalent PERMANENT */
 /** @noRailsEquivalent PERMANENT */
 function answersWithAMethod(klass: unknown, name: string): boolean {
   const start = (klass as { prototype?: object }).prototype;
