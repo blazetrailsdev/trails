@@ -22,7 +22,7 @@ describe("TestDateArith", () => {
     expect(() => d.newOffset(n as never)).toThrow(TypeError);
   });
 
-  it("plus", () => {
+  it(" plus", () => {
     let d = new Date(2000, 2, 29).plus(-1);
     expect([d.year, d.mon, d.mday]).toEqual([2000, 2, 28]);
     d = new Date(2000, 2, 29).plus(0);
@@ -34,7 +34,7 @@ describe("TestDateArith", () => {
     expect([dt.year, dt.mon, dt.mday, dt.hour, dt.min, dt.sec]).toEqual([2000, 2, 29, 12, 0, 0]);
   });
 
-  it("plus ex", () => {
+  it(" plus  ex", () => {
     const e = TypeError;
     expect(() => new Date(2000, 2, 29).plus("foo" as never)).toThrow(e);
     expect(() => new DateTime(2000, 2, 29).plus("foo" as never)).toThrow(e);
@@ -46,7 +46,7 @@ describe("TestDateArith", () => {
     expect(() => new DateTime(2000, 2, 29).plus(n as never)).toThrow(e);
   });
 
-  it("minus", () => {
+  it(" minus", () => {
     let d = new Date(2000, 3, 1).minus(-1) as Date;
     expect([d.year, d.mon, d.mday]).toEqual([2000, 3, 2]);
     d = new Date(2000, 3, 1).minus(0) as Date;
@@ -62,7 +62,7 @@ describe("TestDateArith", () => {
     expect([dt.year, dt.mon, dt.mday, dt.hour, dt.min, dt.sec]).toEqual([2000, 2, 29, 12, 0, 0]);
   });
 
-  it("minus ex", () => {
+  it(" minus  ex", () => {
     const e = TypeError;
     expect(() => new Date(2000, 2, 29).minus("foo" as never)).toThrow(e);
     expect(() => new DateTime(2000, 2, 29).minus("foo" as never)).toThrow(e);
@@ -70,7 +70,7 @@ describe("TestDateArith", () => {
     expect(() => new DateTime(2000, 2, 29).minus(new Time(2000, 2, 29) as never)).toThrow(e);
   });
 
-  it("compare", () => {
+  it(" compare", () => {
     expect(new Date(2000, 1, 1).cmp(new Date(2000, 1, 1))).toBe(0);
     expect(new Date(2000, 1, 1).cmp(new Date(2000, 1, 2))).toBe(-1);
     expect(new Date(2000, 1, 2).cmp(new Date(2000, 1, 1))).toBe(1);

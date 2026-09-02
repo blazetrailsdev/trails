@@ -431,7 +431,7 @@ describe("TestDateStrftime", () => {
     expect(d.strftime("%^+")).toEqual("SAT FEB  3 04:05:06 +09:00 2001");
   });
 
-  it("different format", () => {
+  it(" different format", () => {
     let d: RubyDate = new RubyDate(2001, 2, 3);
 
     expect(d.ctime()).toEqual("Sat Feb  3 00:00:00 2001");

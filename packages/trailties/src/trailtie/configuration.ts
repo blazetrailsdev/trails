@@ -8,6 +8,7 @@
  * semantic yet.
  */
 import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
+import { NoMethodError } from "@blazetrails/ruby-compat";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
 
@@ -117,10 +118,37 @@ export class Configuration {
   get(key: string): unknown {
     return this._options[key];
   }
+
+  /**
+   * Mirrors `method_missing`'s setter arm (`railtie/configuration.rb:99-105`),
+   * including its refusal to shadow a real configuration method.
+   */
   set(key: string, value: unknown): void {
+    if (this._actualMethod(key)) {
+      throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
+    }
     this._options[key] = value;
   }
+
+  /**
+   * Mirrors `respond_to?` (`railtie/configuration.rb:90-92`). Ruby's `super` is
+   * `Object#respond_to?`, which answers for public METHODS: not for an ivar
+   * like `@@options`, and not for private methods, since `include_private`
+   * defaults to false. A TS instance field is the ivar analogue, so only the
+   * prototype chain is walked, and a leading underscore is trails' spelling of
+   * Ruby `private`.
+   */
   respondTo(key: string): boolean {
+    if (!key.startsWith("_")) {
+      for (let proto = Object.getPrototypeOf(this); proto; proto = Object.getPrototypeOf(proto)) {
+        if (Object.prototype.hasOwnProperty.call(proto, key)) return true;
+      }
+    }
     return Object.prototype.hasOwnProperty.call(this._options, key);
+  }
+
+  /** Mirrors the private `actual_method?` (`railtie/configuration.rb:95-97`). */
+  private _actualMethod(key: string): boolean {
+    return !Object.prototype.hasOwnProperty.call(this._options, key) && this.respondTo(key);
   }
 }
