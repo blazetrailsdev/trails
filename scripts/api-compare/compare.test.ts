@@ -3422,22 +3422,10 @@ describe("ported-with-args population", () => {
       "test-helpers/fixtures.ts",
       "FixtureSet",
     );
+    const sigs = (file: string, name: string) =>
+      resolvePortedWithArgsSigs(maps.paramsByFileNameInPkg, maps.paramsByNameInPkg, file, name);
 
-    expect(
-      resolvePortedWithArgsSigs(
-        maps.paramsByFileNameInPkg,
-        maps.paramsByNameInPkg,
-        "relation.ts",
-        "buildFrom",
-      ),
-    ).toHaveLength(1);
-    expect(
-      resolvePortedWithArgsSigs(
-        maps.paramsByFileNameInPkg,
-        maps.paramsByNameInPkg,
-        "test-helpers/fixtures.ts",
-        "fixtures",
-      ),
-    ).toEqual([]);
+    expect(sigs("relation.ts", "buildFrom")).toHaveLength(1);
+    expect(sigs("test-helpers/fixtures.ts", "fixtures")).toEqual([]);
   });
 });
