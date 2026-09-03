@@ -1827,29 +1827,27 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       "pragmas",
       {},
     );
-    if (pragmas) {
-      const SAFE = /^\w+$/;
-      for (const [pragma, value] of Object.entries(pragmas)) {
-        if (!SAFE.test(pragma)) {
-          console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
-          continue;
-        }
-        const scalar =
-          typeof value === "boolean"
-            ? value
-              ? "1"
-              : "0"
-            : typeof value === "number"
-              ? String(value)
-              : SAFE.test(value)
-                ? value
-                : null;
-        if (scalar === null) {
-          console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
-          continue;
-        }
-        stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
+    const SAFE = /^\w+$/;
+    for (const [pragma, value] of Object.entries(pragmas)) {
+      if (!SAFE.test(pragma)) {
+        console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
+        continue;
       }
+      const scalar =
+        typeof value === "boolean"
+          ? value
+            ? "1"
+            : "0"
+          : typeof value === "number"
+            ? String(value)
+            : SAFE.test(value)
+              ? value
+              : null;
+      if (scalar === null) {
+        console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
+        continue;
+      }
+      stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
     }
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
