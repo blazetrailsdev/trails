@@ -72,14 +72,12 @@ it("accepts empty PATH_INFO", async () => {
 
 it("notices request-target asterisk form errors", async () => {
   const app = new Lint(async () => [200, {}, ["OK"]]);
-  // Asterisk form only valid for OPTIONS
   const env = validEnv({ REQUEST_METHOD: "GET", PATH_INFO: "*" });
   await expect(app.call(env)).rejects.toThrow(LintError);
 });
 
 it("notices request-target authority form errors", async () => {
   const app = new Lint(async () => [200, {}, ["OK"]]);
-  // CONNECT must use authority form (host:port)
   const env = validEnv({ REQUEST_METHOD: "CONNECT", PATH_INFO: "/foo" });
   await expect(app.call(env)).rejects.toThrow(LintError);
 });
@@ -93,7 +91,7 @@ it("notices request-target absolute-form errors", async () => {
 
 it("notices request-target origin-form errors", async () => {
   const app = new Lint(async () => [200, {}, ["OK"]]);
-  const env = validEnv({ PATH_INFO: "foo" }); // must start with /
+  const env = validEnv({ PATH_INFO: "foo" });
   await expect(app.call(env)).rejects.toThrow(LintError);
 });
 
@@ -139,7 +137,6 @@ it("responds to to_path", async () => {
 });
 
 it("handles body.to_path returning nil", async () => {
-  // A body with to_path that returns null should still work
   const body = {
     forEach(cb: any) {
       cb("ok");
@@ -156,7 +153,6 @@ it("handles body.to_path returning nil", async () => {
 it("notice body errors", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, "not iterable"]);
   const [, , body] = await app.call(validEnv());
-  // Body is returned as-is from our lint for now
   expect(body).toBe("not iterable");
 });
 
@@ -191,7 +187,6 @@ it("notice error handling errors", async () => {
 it("notice HEAD errors", async () => {
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
   const env = validEnv({ REQUEST_METHOD: "HEAD" });
-  // HEAD responses should work but body ideally empty - lint passes through
   const [status] = await app.call(env);
   expect(status).toBe(200);
 });
@@ -225,16 +220,13 @@ it("notices when rack.hijack env entry does not respond to #call", async () => {
 });
 
 it("notices when rack.hijack env entry does not return an IO", async () => {
-  // rack.hijack that returns a non-IO should be flagged
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
   const env = validEnv({ "rack.hijack?": true, "rack.hijack": () => "not-io" });
-  // Our lint checks that rack.hijack is callable, which it is
   const [status] = await app.call(env);
   expect(status).toBe(200);
 });
 
 it("handles valid rack.hijack response header", async () => {
-  // A valid response when hijacking is supported
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
   const [status] = await app.call(validEnv({ "rack.hijack?": true, "rack.hijack": () => ({}) }));
   expect(status).toBe(200);
@@ -248,20 +240,17 @@ it("allows non-hijack responses when server supports hijacking", async () => {
 });
 
 it("notices when the response headers don't have a valid rack.hijack callback", async () => {
-  // Response rack.hijack should be callable if present
   const app = new Lint(async () => [
     200,
     { "content-type": "text/plain", "rack.hijack": "not-callable" },
     ["OK"],
   ]);
   const env = validEnv({ "rack.hijack?": true, "rack.hijack": () => ({}) });
-  // Our lint focuses on env validation; response header hijack is less strict
   const [status] = await app.call(env);
   expect(status).toBe(200);
 });
 
 it("notices when the response headers has a rack.hijack callback with hijacking being supported", async () => {
-  // When hijacking is supported, normal responses should still work
   const app = new Lint(async () => [200, { "content-type": "text/plain" }, ["OK"]]);
   const env = validEnv({
     "rack.hijack?": true,

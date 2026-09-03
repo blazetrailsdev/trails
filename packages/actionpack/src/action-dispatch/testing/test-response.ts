@@ -1,13 +1,3 @@
-/**
- * ActionDispatch::TestResponse
- *
- * Integration test methods such as `Integration::RequestHelpers#get` and
- * `#post` return objects of class TestResponse, which represent the HTTP
- * response results of the requested controller actions.
- *
- * See {@link Response} for more information on controller response objects.
- */
-
 import { Response } from "../http/response.js";
 import { RequestEncoder, type ResponseParser } from "./request-encoder.js";
 
@@ -19,10 +9,6 @@ export class TestResponse extends Response {
     return new TestResponse(response.status, response.headers.toHash(), [response.body]);
   }
 
-  /**
-   * Returns a parsed body depending on the response MIME type. When a parser
-   * corresponding to the MIME type is not found, it returns the raw body.
-   */
   get parsedBody(): unknown {
     if (this._parsedBody === undefined) {
       this._parsedBody = this.responseParser(this.body);

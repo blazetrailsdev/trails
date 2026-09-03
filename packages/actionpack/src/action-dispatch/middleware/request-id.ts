@@ -1,16 +1,9 @@
-/**
- * ActionDispatch::RequestId
- *
- * Middleware that sets a unique X-Request-Id header on each request.
- */
-
 import { getCrypto } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
 export interface RequestIdOptions {
-  /** Header to read existing request IDs from (default: "X-Request-Id") */
   header?: string;
 }
 

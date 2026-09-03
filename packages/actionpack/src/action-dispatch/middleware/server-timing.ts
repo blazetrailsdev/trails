@@ -1,10 +1,3 @@
-/**
- * ActionDispatch::ServerTiming
- *
- * Collects ActiveSupport::Notifications events fired during a request and
- * exposes their durations via the `Server-Timing` response header.
- */
-
 import {
   Notifications,
   IsolatedExecutionState,

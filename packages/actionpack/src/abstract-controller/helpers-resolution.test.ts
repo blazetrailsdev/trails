@@ -81,11 +81,7 @@ describe("allHelpersFromPath", () => {
     writeFileSync(join(root, "users_helper.ts"), "export const x = 1;");
     writeFileSync(join(root, "legacy_helper.rb"), "module LegacyHelper; end");
     writeFileSync(join(root, "nested", "admin_helper.ts"), "export const x = 1;");
-    // not a helper file — should be ignored
     writeFileSync(join(root, "controller.ts"), "export const x = 1;");
-    // allHelpersFromPath does a dynamic import on its first call; warm it up
-    // here so the cold-start cost (tinyglobby/fdir module init) is paid in
-    // beforeAll rather than inside the first it(), which has a 5 s timeout.
     await allHelpersFromPath(root);
   }, 15_000);
 
@@ -132,7 +128,6 @@ describe("helperModulesFromPaths", () => {
 
   it("globs + resolves in one shot", async () => {
     const mods = await helperModulesFromPaths(root, { resolve });
-    // sorted: bar, foo
     expect(mods).toEqual([BarHelper, FooHelper]);
   });
 });
@@ -166,9 +161,6 @@ describe("defaultHelperModuleBang", () => {
   });
 
   it("still tries to resolve when the class name lacks a Controller suffix (Rails delete_suffix is a no-op then)", () => {
-    // Rails: `helper_prefix = name.delete_suffix("Controller")` returns
-    // "Plain" unchanged, then `helper("Plain")` is called. PlainHelper
-    // doesn't exist → NameError → swallowed.
     const cls: HelpersClassMethods = { name: "Plain" };
     defaultHelperModuleBang(cls, { resolve });
     expect(cls._helpers).toBeUndefined();
@@ -178,10 +170,6 @@ describe("defaultHelperModuleBang", () => {
     const cls: HelpersClassMethods = { name: "FooController" };
     const surprising = (name: string): HelperMethodsModule | undefined => {
       if (name === "FooHelper") {
-        // simulate: FooHelper file exists but references some other missing
-        // const. Rails' scenario (helpers.rb:241) is a real NameError whose
-        // missing_name differs, so the rescue must reject on the NAME, not on
-        // the error type — throw a NameError to exercise that branch.
         throw new NameError("uninitialized constant SomeOtherThing", "SomeOtherThing");
       }
       return undefined;

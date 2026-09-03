@@ -1,12 +1,3 @@
-/**
- * AbstractController::Callbacks
- *
- * Action callback type definitions, option normalization, and the
- * ActiveSupport::Callbacks integration that wires AbstractController#processAction
- * onto an AS callback chain.
- * @see https://api.rubyonrails.org/classes/AbstractController/Callbacks.html
- */
-
 import {
   defineCallbacks as asDefineCallbacks,
   setCallback as asSetCallback,
@@ -28,22 +19,11 @@ export type AroundCallback = (
   next: () => Promise<void>,
 ) => void | Promise<void>;
 
-/**
- * A predicate object stored on a callback's `if`/`unless` list after
- * normalization, used to match the action name being processed.
- */
 export interface CallbackPredicateLike {
   isMatch(controller: AbstractController): boolean;
 }
 
 export interface CallbackOptions {
-  /**
-   * Symbolic name for the callback. When a subclass registers a callback
-   * with the same `name`, it replaces the inherited entry (Rails
-   * identifies callbacks by symbol in AS::Callbacks). Without `name`,
-   * callbacks are identified by function reference and don't dedup
-   * across the inheritance chain.
-   */
   name?: string;
   only?: string | string[];
   except?: string | string[];
@@ -56,27 +36,15 @@ export interface CallbackOptions {
   prepend?: boolean;
 }
 
-/**
- * Internal extension of CallbackOptions used by _insertCallbacks /
- * _normalizeCallbackOption to thread the registered callback list
- * through to ActionFilter (mirrors Rails' `options[:filters]`).
- *
- * @internal
- */
+/** @internal */
 type CallbackOptionsWithFilters = CallbackOptions & {
   filters?: Array<ActionCallback | AroundCallback>;
 };
 
-/** Name of the AS::Callbacks chain that backs `processAction`. @internal */
+/** @internal */
 export const PROCESS_ACTION_CHAIN = "processAction";
 
-/**
- * Matches the controller's current action name against a fixed set of
- * action names. Stored on `if`/`unless` after `only`/`except` are
- * normalized away. Mirrors AbstractController::Callbacks::ActionFilter.
- *
- * @internal
- */
+/** @internal */
 export class ActionFilter implements CallbackPredicateLike {
   private readonly _filters: ReadonlyArray<ActionCallback | AroundCallback>;
   private readonly _conditionalKey: "only" | "except";
@@ -92,7 +60,6 @@ export class ActionFilter implements CallbackPredicateLike {
     this._actions = new Set((Array.isArray(actions) ? actions : [actions]).map((a) => String(a)));
   }
 
-  /** True iff the controller's current action is in the configured set. */
   isMatch(controller: AbstractController): boolean {
     const Constructor = controller.constructor as { raiseOnMissingCallbackActions?: boolean };
     if (Constructor.raiseOnMissingCallbackActions) {
@@ -102,8 +69,6 @@ export class ActionFilter implements CallbackPredicateLike {
           this._filters.length === 1
             ? _inspectFilter(this._filters[0])
             : `[${this._filters.map(_inspectFilter).join(", ")}]`;
-        // Ruby `:key.inspect` renders as `:key`; preserve that for parity
-        // with Rails' error message format (the literal `:only` / `:except`).
         const message =
           `The ${missingAction} action could not be found for the ${filterNames} ` +
           `callback on ${controller.constructor.name}, but it is listed in the controller's ` +
@@ -116,14 +81,7 @@ export class ActionFilter implements CallbackPredicateLike {
     return this._actions.has(controller.actionName);
   }
 
-  /**
-   * Rails aliases `after`/`before`/`around` to `match?` so the same
-   * filter object can be invoked by ActiveSupport::Callbacks for each
-   * callback kind. Mirrored here for fidelity even though our dispatch
-   * doesn't currently look them up by kind.
-   *
-   * @internal
-   */
+  /** @internal */
   after(controller: AbstractController): boolean {
     return this.isMatch(controller);
   }
@@ -137,23 +95,13 @@ export class ActionFilter implements CallbackPredicateLike {
   }
 }
 
-/**
- * If `:only` or `:except` are used, convert them into the `:if` and
- * `:unless` options expected by the callback engine.
- *
- * @internal
- */
+/** @internal */
 export function _normalizeCallbackOptions(options: CallbackOptions): void {
   _normalizeCallbackOption(options, "only", "if");
   _normalizeCallbackOption(options, "except", "unless");
 }
 
-/**
- * Convert one of `:only`/`:except` on `options` into a prepended
- * ActionFilter on the corresponding `:if`/`:unless` slot.
- *
- * @internal
- */
+/** @internal */
 export function _normalizeCallbackOption(
   options: CallbackOptions,
   from: "only" | "except",
@@ -173,26 +121,13 @@ export function _normalizeCallbackOption(
   options[to] = list;
 }
 
-/**
- * Take an array of callbacks (optionally followed by an options object)
- * and an optional block, normalize the options, then invoke `yieldFn`
- * for each callback. Mirrors Rails' `_insert_callbacks`.
- *
- * In Ruby this is `extract_options!` + `yield`. In TypeScript callers
- * typically already split callbacks from options, so we accept an
- * explicit `options` parameter and an optional `block`.
- *
- * @internal
- */
+/** @internal */
 export function _insertCallbacks(
   callbacks: Array<ActionCallback | AroundCallback>,
   options: CallbackOptions,
   block: ActionCallback | AroundCallback | null,
   yieldFn: (callback: ActionCallback | AroundCallback, options: CallbackOptions) => void,
 ): void {
-  // Rails splats `*names` into a fresh array, so its in-place push is
-  // invisible to callers. JS callers own the array they pass in — copy
-  // to preserve that effective immutability.
   const list = callbacks.slice();
   if (block) list.push(block);
   const opts = options as CallbackOptionsWithFilters;
@@ -204,13 +139,13 @@ export function _insertCallbacks(
   }
 }
 
-/** Named fn → `:name`; anon → `#<Proc:…>` (Rails Proc#inspect parity). @internal */
+/** @internal */
 function _inspectFilter(filter: ActionCallback | AroundCallback): string {
   const fn = filter as { name?: string };
   return fn.name && fn.name.length > 0 ? `:${fn.name}` : "#<Proc:anonymous>";
 }
 
-/** Lower CallbackPredicateLike entries (ActionFilter) into plain fns for AS. @internal */
+/** @internal */
 function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | undefined {
   if (pred === undefined) return undefined;
   const list = Array.isArray(pred) ? pred : [pred];
@@ -226,15 +161,7 @@ interface WrappedBefore {
   __originalCb: ActionCallback;
 }
 
-/**
- * Wrap a before callback to halt (throw the abort sentinel) once the controller
- * is marked performed. Replaces Rails' `terminator: ->(c, lambda) { lambda.call;
- * c.performed? }`: AS rejects custom terminators paired with async befores, so we
- * encode the performed? check in the callback and halt via {@link throwAbort} —
- * the sentinel the default terminator catches (Rails 5+ no longer halts on a
- * `false` return).
- * @internal
- */
+/** @internal */
 function _wrapBefore(callback: ActionCallback): WrappedBefore {
   const wrapped = async (target: object): Promise<unknown> => {
     const result = await callback(target as AbstractController);
@@ -245,12 +172,12 @@ function _wrapBefore(callback: ActionCallback): WrappedBefore {
   return wrapped as WrappedBefore;
 }
 
-/** Provision the `processAction` AS::Callbacks chain on a class prototype. @internal */
+/** @internal */
 export function _defineActionCallbacks(prototype: object): void {
   asDefineCallbacks(prototype, PROCESS_ACTION_CHAIN, { skipAfterCallbacksIfTerminated: true });
 }
 
-/** Register a before/after/around action callback on `prototype`. @internal */
+/** @internal */
 export function _registerActionCallback(
   prototype: object,
   kind: CallbackKind,
@@ -261,9 +188,6 @@ export function _registerActionCallback(
   _normalizeCallbackOptions(opts);
   delete opts.filters;
 
-  // Name-based dedup: AS::Callbacks Callback#isDuplicates only fires for
-  // string (method-name) filters — trails registers function refs, so we
-  // dedupe via an explicit `name` stashed on options.
   if (options.name !== undefined) {
     const chain = getCallbackChains(prototype).get(PROCESS_ACTION_CHAIN);
     if (chain) {
@@ -293,21 +217,13 @@ export function _registerActionCallback(
   );
 }
 
-/**
- * Skip an existing action callback. Mirrors Rails `skip_callback`: with
- * `if`/`unless`/`only`/`except`, replaces the entry with one whose
- * conditions are merged (`Callback#mergeConditionalOptions`); without
- * conditions, removes outright.
- * @internal
- */
+/** @internal */
 export function _skipActionCallback(
   prototype: object,
   kind: CallbackKind,
   filter: ActionCallback | AroundCallback | string,
   options: CallbackOptions,
 ): void {
-  // For string-name skips, thread a synthetic { name } so ActionFilter's
-  // raise-on-missing-action message renders `:name` rather than `[]`.
   const namedFilter =
     typeof filter === "function" ? filter : ({ name: filter } as unknown as ActionCallback);
   const opts: CallbackOptionsWithFilters = { ...options, filters: [namedFilter] };
@@ -340,9 +256,6 @@ export function _skipActionCallback(
         { name: PROCESS_ACTION_CHAIN, config: cb.chainConfig },
         { ifOption: ifConds, unlessOption: unlessConds },
       );
-      // mergeConditionalOptions creates fresh options ({ if, unless } only),
-      // dropping trails' _trailsName metadata. Re-attach it so future name-based
-      // skips/overrides on this entry continue to match.
       if (stored !== undefined) {
         (merged.options as Record<string, unknown>)._trailsName = stored;
       }
@@ -352,24 +265,10 @@ export function _skipActionCallback(
   }
 }
 
-/**
- * Host contract for the `*_action` macros: any controller class whose
- * prototype backs the `processAction` callback chain.
- */
 export interface ActionCallbackHost {
   readonly prototype: object;
 }
 
-/**
- * Register a before_action callback.
- *
- * Rails defines `before_action` / `after_action` / `around_action` (and the
- * `prepend_`/`skip_`/`append_` variants) metaprogrammatically inside
- * `Callbacks::ClassMethods` — see the `[:before, :after, :around].each` +
- * `define_method "#{callback}_action"` loop in
- * `vendor/rails/actionpack/lib/abstract_controller/callbacks.rb`. TypeScript
- * has no `define_method`, so each name is spelled out here.
- */
 export function beforeAction(
   this: ActionCallbackHost,
   callback: ActionCallback,
@@ -378,7 +277,6 @@ export function beforeAction(
   _registerActionCallback(this.prototype, "before", callback, options);
 }
 
-/** Register an after_action callback. See {@link beforeAction}. */
 export function afterAction(
   this: ActionCallbackHost,
   callback: ActionCallback,
@@ -387,7 +285,6 @@ export function afterAction(
   _registerActionCallback(this.prototype, "after", callback, options);
 }
 
-/** Register an around_action callback. See {@link beforeAction}. */
 export function aroundAction(
   this: ActionCallbackHost,
   callback: AroundCallback,
@@ -396,12 +293,6 @@ export function aroundAction(
   _registerActionCallback(this.prototype, "around", callback, options);
 }
 
-/**
- * Skip a registered before_action. Accepts the callback reference or
- * (for callbacks registered with `name`) the name string. Conditional
- * options (`if`/`unless`/`only`/`except`) merge via Rails skip semantics.
- * See {@link beforeAction} for why the name is spelled out.
- */
 export function skipBeforeAction(
   this: ActionCallbackHost,
   cb: ActionCallback | string,
@@ -410,7 +301,6 @@ export function skipBeforeAction(
   _skipActionCallback(this.prototype, "before", cb, options);
 }
 
-/** Skip a registered after_action. See {@link skipBeforeAction}. */
 export function skipAfterAction(
   this: ActionCallbackHost,
   cb: ActionCallback | string,
@@ -419,7 +309,6 @@ export function skipAfterAction(
   _skipActionCallback(this.prototype, "after", cb, options);
 }
 
-/** Skip a registered around_action. See {@link skipBeforeAction}. */
 export function skipAroundAction(
   this: ActionCallbackHost,
   cb: AroundCallback | string,
@@ -428,7 +317,7 @@ export function skipAroundAction(
   _skipActionCallback(this.prototype, "around", cb, options);
 }
 
-/** Rails `AC::Callbacks#process_action` — runs the chain around `dispatch`. @internal */
+/** @internal */
 export async function processAction(
   controller: AbstractController,
   _action: string,

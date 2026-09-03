@@ -4,7 +4,6 @@ import type {
   ErrorSubscriber as ErrorSubscriberInterface,
 } from "../error-reporter.js";
 
-/** Mirrors: `activesupport/lib/active_support/error_reporter/test_helper.rb`. */
 export class ErrorSubscriber implements ErrorSubscriberInterface {
   events: Array<[unknown, boolean, ErrorSeverity, string, ErrorContext]> = [];
 

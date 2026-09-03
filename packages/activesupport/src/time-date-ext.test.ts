@@ -1,8 +1,5 @@
 import { describe, it } from "vitest";
 
-// TimeWithZoneTest and TimeZoneTest require ActiveSupport::TimeZone infrastructure
-// which depends on a full timezone database (TZInfo) not available in plain JS/TS.
-// All tests are skipped pending timezone support implementation.
 describe("TimeZoneTest", () => {
   it.skip("utc_to_local");
   it.skip("local_to_utc");

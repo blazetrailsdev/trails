@@ -1,25 +1,6 @@
-/**
- * Mirrors: active_support/testing/tests_without_assertions.rb
- *
- * Warns when a test case does not perform any assertions.
- *
- * This is helpful in detecting broken tests that do not perform intended
- * assertions.
- */
 import type { Assertion, UnexpectedError } from "./assertions.js";
 
-/**
- * The running test — the Minitest instance Ruby reads `assertions`,
- * `skipped?`, `error?`, `name`, `method(name).source_location` and
- * `failures` off. The ported hooks are free functions with no such receiver,
- * so the runner's task is handed to them instead; test-case.ts builds this
- * from vitest's per-test context, once per test, which is the lifetime
- * `Minitest::Runnable#failures` has.
- *
- * @noRailsEquivalent PERMANENT — a structural stand-in for the `self` of a
- * `Minitest::Test`, which lives in the minitest gem and so has no file in the
- * mapped Rails source to match against.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface RunningTest {
   assertions: number;
   skipped: boolean;
@@ -29,7 +10,6 @@ export interface RunningTest {
   failures: (Assertion | UnexpectedError)[];
 }
 
-/** Mirrors `after_teardown` (tests_without_assertions.rb:10-17). */
 export function afterTeardown(test: RunningTest): void {
   if (test.assertions === 0 && !test.skipped && !test.error) {
     const [file, line] = test.sourceLocation;
@@ -37,12 +17,7 @@ export function afterTeardown(test: RunningTest): void {
   }
 }
 
-/**
- * Ruby's `Kernel#warn`, which writes to stderr.
- *
- * @noRailsEquivalent PERMANENT — a Ruby core method, with no file in the
- * mapped Rails source to match against.
- */
+/** @noRailsEquivalent PERMANENT */
 function warn(message: string): void {
   console.warn(message);
 }

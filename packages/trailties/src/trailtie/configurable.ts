@@ -1,16 +1,8 @@
-/**
- * Port of `Rails::Railtie::Configurable` from
- * `railties/lib/rails/railtie/configurable.rb`. The Rails module's other
- * roles (delegating `config`, caching `instance`, `method_missing`) are
- * already provided by `Trailtie` itself; what remains is the
- * `inherited`-raises sealed-class guard, used by `Application`.
- */
 import { Trailtie } from "../trailtie.js";
 import { ownState, readOwnState } from "./per-class-state.js";
 
 const SEALED_KEY = "_sealedFromInheritance";
 
-/** Seal `klass` against being a superclass of any future registration. */
 export function sealAgainstInheritance(klass: typeof Trailtie): void {
   ownState(klass, SEALED_KEY, () => true);
 }

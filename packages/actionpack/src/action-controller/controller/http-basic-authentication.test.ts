@@ -9,8 +9,6 @@ import {
   type BasicControllerHost,
 } from "../metal/http-authentication.js";
 
-// Mirrors the minimal controller setup from Rails'
-// HttpBasicAuthenticationTest (test/controller/http_basic_authentication_test.rb).
 function makeController(authHeader?: string): BasicControllerHost {
   return {
     request: { authorization: authHeader },
@@ -102,7 +100,6 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authentication request without credential", () => {
-    // Rails: GET /display with no auth → request_http_basic_authentication("SuperSecret", "Authentication Failed\n")
     const c = makeController();
     requestHttpBasicAuthentication.call(c, "SuperSecret", "Authentication Failed\n");
     expect(c.status).toBe(401);
@@ -111,7 +108,6 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authentication request with invalid credential", () => {
-    // Rails: encode_credentials("pretty", "foo") — valid base64, wrong user/pass
     const c = makeController(encodeCredentials("pretty", "foo"));
     const result = authenticateOrRequestWithHttpBasic.call(
       c,
@@ -126,7 +122,6 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authentication request with a missing password", () => {
-    // Rails: Base64("David") — no colon, so password is absent
     const noColon = `Basic ${Buffer.from("David").toString("base64")}`;
     const c = makeController(noColon);
     const result = authenticateOrRequestWithHttpBasic.call(
@@ -140,10 +135,8 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authentication request with no required password", () => {
-    // Rails: Base64("George") — no colon, password is "" (absent)
     const noColon = `Basic ${Buffer.from("George").toString("base64")}`;
     const c = makeController(noColon);
-    // Mirrors DummyController#no_password: authenticate_with_http_basic { |u, p| [u, p] }
     const result = authenticateWithHttpBasic.call(c, (user, pass) => [user, pass]);
     expect(result).toEqual(["George", ""]);
     expect(c.status).toBe(200);
@@ -191,7 +184,6 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authentication request with wrong scheme", () => {
-    // Rails: "Bearer " + encode_credentials("David","Goliath").split(" ",2)[1]
     const basicCreds = encodeCredentials("David", "Goliath");
     const token = basicCreds.split(" ")[1];
     const c = makeController(`Bearer ${token}`);

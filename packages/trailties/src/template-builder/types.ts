@@ -16,7 +16,6 @@ export type Body = {
 export interface Import {
   from: string;
   default?: string;
-  /** `"named"` value is shorthand for "alias === original name". */
   named?: Record<string, string | "named">;
   typeOnly?: boolean;
 }
@@ -34,24 +33,13 @@ export interface Field {
   initializer?: string;
   comment?: string;
   static?: boolean;
-  /**
-   * Omit the `: type` annotation; rely on the initializer for typing.
-   * Requires `initializer` — `emitField` throws otherwise.
-   */
   inferType?: boolean;
 }
 export interface MethodParam {
   name: string;
   type: FieldType;
 }
-/**
- * A method node in the template builder's code-generation AST.
- *
- * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Method`
- * constants are the core reflection class and
- * `ActiveRecord::DynamicMatchers::Method`, a `method_missing` matcher;
- * neither is a codegen node.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface Method {
   name: string;
   params: MethodParam[];

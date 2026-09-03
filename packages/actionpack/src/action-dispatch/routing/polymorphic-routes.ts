@@ -1,68 +1,29 @@
-/**
- * ActionDispatch::Routing::PolymorphicRoutes
- *
- * Mirrors `vendor/rails/actionpack/lib/action_dispatch/routing/polymorphic_routes.rb`.
- *
- * Polymorphic URL helpers resolve a record (or [namespace, parent, record]
- * array) to a named-route call. They are designed to mix into any host that
- * exposes `_routes` (returning an object with `polymorphicMappings`) and
- * answers the generated route-helper names via `[method](...args)`.
- *
- * Usage matches Rails:
- *
- *     polymorphicUrl(post)                       // post_url(post)
- *     polymorphicUrl([blog, post])               // blog_post_url(blog, post)
- *     polymorphicUrl([Symbol.for("admin"), post]) // admin_post_url(post)
- *     polymorphicUrl(Comment)                    // comments_url()
- *
- * When the first element of the array is a `RoutesProxy`, it becomes the
- * recipient of the resolved helper call (mirroring Rails' `shift` in
- * `HelperMethodBuilder.polymorphic_method`).
- */
-
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { ModelName } from "@blazetrails/activemodel";
 
 import { RoutesProxy } from "./routes-proxy.js";
 
-/** Record-shaped argument: anything with `toModel()`. */
 export interface ToModel {
   toModel(): PolymorphicModel;
 }
 
-/** What `toModel()` must return — the model surface we read off of. */
 export interface PolymorphicModel {
   modelName: ModelName;
   persisted(): boolean;
 }
 
-/** A class-shaped argument carrying `modelName`. */
 export interface ModelClass {
   modelName: ModelName;
 }
 
-/** Custom URL helper registered via `direct(:name) { ... }` in Rails. */
 export interface PolymorphicMappingEntry {
   call(host: PolymorphicHost, args: unknown[], onlyPath: boolean): string;
 }
 
-/**
- * Surface the host's `_routes` must expose for polymorphic dispatch.
- *
- * Optional because not every RouteSet-shaped object has been wired with the
- * `direct(:name) { ... }` registry yet; {@link polymorphicMapping} treats a
- * missing map as "no custom direct routes" so test doubles and partial
- * implementations don't trip a `TypeError` on the first polymorphic call.
- */
 export interface PolymorphicRoutesAccessor {
   polymorphicMappings?: Map<string, PolymorphicMappingEntry>;
 }
 
-/**
- * Host interface a PolymorphicRoutes consumer must satisfy. `_routes` provides
- * the polymorphic-mapping registry; the index signature is the dynamic dispatch
- * Rails performs via `recipient.public_send(method, *args, options)`.
- */
 export interface PolymorphicHost {
   _routes: PolymorphicRoutesAccessor;
   [helper: string]: unknown;
@@ -74,7 +35,6 @@ export type PolymorphicArg =
   | string
   | symbol
   | ReadonlyArray<ToModel | ModelClass | string | symbol | RoutesProxy | null | undefined>
-  // Hash form: { id: record, ...opts }
   | Record<string, unknown>;
 
 export interface PolymorphicOptions {
@@ -97,9 +57,6 @@ function isHash(x: unknown): boolean {
   if (typeof x !== "object") return false;
   if (Array.isArray(x)) return false;
   if (isToModel(x)) return false;
-  // Mirrors Rails `is_a?(Hash)`: accept both plain object literals and
-  // `Object.create(null)` (`JSON.parse(..., { ... })` shapes, prototype-less
-  // bags) — anything that walks like a hash.
   const proto = Object.getPrototypeOf(x);
   return proto === Object.prototype || proto === null;
 }
@@ -115,7 +72,6 @@ export function symbolToString(s: symbol): string {
   return name;
 }
 
-/** Mirrors Rails `polymorphic_url`. */
 export function polymorphicUrl(
   this: PolymorphicHost,
   recordOrHashOrArray: PolymorphicArg,
@@ -140,7 +96,6 @@ export function polymorphicUrl(
   return HelperMethodBuilder.polymorphicMethod(this, recordOrHashOrArray, action, type, opts);
 }
 
-/** Mirrors Rails `polymorphic_path`. */
 export function polymorphicPath(
   this: PolymorphicHost,
   recordOrHashOrArray: PolymorphicArg,
@@ -195,7 +150,7 @@ export function newPolymorphicPath(
   return polymorphicPathForAction.call(this, "new", recordOrHash, options);
 }
 
-/** @internal Rails-private helper. */
+/** @internal */
 export function polymorphicUrlForAction(
   this: PolymorphicHost,
   action: string,
@@ -205,7 +160,7 @@ export function polymorphicUrlForAction(
   return polymorphicUrl.call(this, recordOrHash, { ...options, action });
 }
 
-/** @internal Rails-private helper. */
+/** @internal */
 export function polymorphicPathForAction(
   this: PolymorphicHost,
   action: string,
@@ -215,7 +170,7 @@ export function polymorphicPathForAction(
   return polymorphicPath.call(this, recordOrHash, { ...options, action });
 }
 
-/** @internal Rails-private helper. */
+/** @internal */
 export function polymorphicMapping(
   target: PolymorphicHost,
   record: unknown,
@@ -232,23 +187,13 @@ export function polymorphicMapping(
 
 type KeyStrategy = (name: ModelName) => string;
 
-/**
- * Mirrors Rails `PolymorphicRoutes::HelperMethodBuilder`. Resolves the
- * `record_or_hash_or_array` to `[method, args]` for the host's dynamic
- * route-helper dispatch.
- *
- * @internal Rails-private helper.
- */
+/** @internal */
 export class HelperMethodBuilder {
-  /** Cache of `[type][action]` builders. Mirrors Rails CACHE. */
   private static readonly CACHE: {
     path: Map<string | null, HelperMethodBuilder>;
     url: Map<string | null, HelperMethodBuilder>;
   } = { path: new Map(), url: new Map() };
 
-  // Mirrors Rails' bottom-of-class CACHE seeding loop. Static initializer
-  // block guarantees this runs as part of class evaluation — no ordering
-  // hazard from import side effects.
   static {
     for (const action of [null, "new", "edit"] as const) {
       HelperMethodBuilder.CACHE.url.set(action, HelperMethodBuilder.build(action, "url"));

@@ -1,19 +1,9 @@
-/**
- * ActionView::FixtureResolver / ActionView::NullResolver
- *
- * Mirrors `actionview/lib/action_view/testing/resolvers.rb`.
- */
-
 import type { LookupDetails } from "../path-set.js";
 import { Template } from "../template.js";
 import { TemplatePath } from "../template-path.js";
 import { Raw } from "../template/handlers/raw.js";
 import { FileSystemResolver, Resolver } from "../template/resolver.js";
 
-/**
- * Use FixtureResolver in your tests to simulate the presence of files on the
- * file system.
- */
 export class FixtureResolver extends FileSystemResolver {
   private hash: Record<string, string>;
 

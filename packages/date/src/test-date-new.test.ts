@@ -4,18 +4,6 @@ import { Date, DateTime } from "./date.js";
 import { Time } from "./time.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
-/**
- * `vendor/date/test/date/test_date_new.rb`, the `Date.jd` / `Date.ordinal` /
- * `Date.civil` / `Date.commercial` constructors, the `weeknum` / `nth_kday`
- * private ones, the clock readers `Date.today` / `DateTime.now`, and the
- * shared invalid-type guards.
- *
- * The builders answer `Temporal` where Ruby answers a `Date` / `DateTime`
- * (RFC 0088, `vendor/sources.ts:212-221`), so `[d.year, d.mon, d.mday]` is read
- * here as `[d.year, d.month, d.day]` and Ruby's `d.offset` — a day fraction —
- * as the offset the `Temporal` carries: none at all for the UTC arm, which is a
- * `PlainDateTime`, and `"+09:00"` for `'+0900'`, which is a `ZonedDateTime`.
- */
 describe("TestDateNew", () => {
   const ymd = (d: { year: number; month: number; day: number }): number[] => [
     d.year,
@@ -23,14 +11,9 @@ describe("TestDateNew", () => {
     d.day,
   ];
 
-  /**
-   * Ruby `DateTime#offset`, as the offset the `Temporal` carries: a
-   * `PlainDateTime` carries none, which is the `0` Ruby reads there.
-   */
   const offset = (d: Temporal.PlainDateTime | Temporal.ZonedDateTime): string | number =>
     d instanceof Temporal.ZonedDateTime ? d.offset : 0;
 
-  /** Ruby subtracts two `Time`s to a number of seconds; this is that number. */
   const epochSeconds = (t: Time): number => t.toTime().epochMilliseconds / 1000;
 
   it("jd", () => {
@@ -81,8 +64,6 @@ describe("TestDateNew", () => {
   });
 
   it("invalid types", () => {
-    // The arguments are typed `number` — Ruby's TypeError is the runtime half of
-    // what TypeScript says statically — so each call is cast at the seam.
     const o = {} as unknown as number;
     expect(() => Date.isJulianLeap(o)).toThrow(TypeError);
     expect(() => Date.isGregorianLeap(o)).toThrow(TypeError);
@@ -207,7 +188,6 @@ describe("TestDateNew", () => {
     expect([...ymd(d9), d9.hour, d9.minute, d9.second]).toEqual([2001, 2, 3, 4, 5, 30]);
     const d10 = DateTime.civil(2001, 2, 3, 4, 5, new Rational(13, 2)) as Temporal.PlainDateTime;
     expect([...ymd(d10), d10.hour, d10.minute, d10.second]).toEqual([2001, 2, 3, 4, 5, 6]);
-    // Ruby's `sec_fraction` is 1/2; the `Temporal` carries it as milliseconds.
     expect(d10.millisecond).toBe(500);
 
     const d11 = DateTime.civil(2001, 2) as Temporal.PlainDateTime;
@@ -223,13 +203,6 @@ describe("TestDateNew", () => {
   });
 
   it("civil reform", () => {
-    // Ruby's receivers are `Date.jd(...)` / `DateTime.jd(...)`, which answer the
-    // `Temporal` seat here (RFC 0088) and so carry no arithmetic. Ruby's own
-    // call is kept and the seat is fed back through the `Temporal` constructor
-    // overload, `d_simple_new_internal`'s (date_core.c:3036) other entry point,
-    // which is the documented inverse of `to_date` / `to_datetime`.
-    //
-    // `d -= 1` is `minus(1)` (`d_lite_minus`, date_core.c:6343-6360).
     let d = new Date(Date.jd(Date.ENGLAND, Date.ENGLAND), Date.ENGLAND);
     let dt = new DateTime(
       DateTime.jd(Date.ENGLAND, 0, 0, 0, 0, Date.ENGLAND) as Temporal.PlainDateTime,
@@ -349,21 +322,14 @@ describe("TestDateNew", () => {
     const t = Time.now();
     const t2 = Time.utc(t.year, t.mon, t.day);
     const t3 = Time.utc(d.year, d.month, d.day);
-    // Ruby's delta is `t - z + 2` seconds; vitest spells a tolerance as a
-    // number of digits, and `-1` is the nearest one (5s) that still covers it.
     expect(epochSeconds(t2)).toBeCloseTo(epochSeconds(t3), -1);
 
-    // `rb_undef_method(CLASS_OF(cDateTime), "today")` (date_core.c:9985). TS
-    // undefines it at the type level — the `@ts-expect-error` is that check —
-    // while at runtime the static is only ever inherited from `Date`, never
-    // `DateTime`'s own.
     // @ts-expect-error see above
     void DateTime.today;
     expect(Object.hasOwn(DateTime, "today")).toEqual(false);
   });
 
   it("now", () => {
-    // `now` is a `DateTime` singleton method alone (date_core.c:9987).
     // @ts-expect-error see above
     void Date.now;
     expect(Object.hasOwn(Date, "now")).toEqual(false);
@@ -371,7 +337,6 @@ describe("TestDateNew", () => {
     const d = DateTime.now() as Temporal.ZonedDateTime;
     const t = Time.now();
     const t2 = Time.mktime(d.year, d.month, d.day, d.hour, d.minute, d.second);
-    // See `today` above for why the Ruby delta becomes a digit count here.
     expect(epochSeconds(t)).toBeCloseTo(epochSeconds(t2), -1);
   });
 });

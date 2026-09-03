@@ -11,7 +11,6 @@ export class TempfileReaper {
   async call(env: Record<string, any>): Promise<[number, Record<string, string>, any]> {
     env[RACK_TEMPFILES] = env[RACK_TEMPFILES] || [];
 
-    // If rack.response_finished is available, register cleanup callback
     if (Array.isArray(env["rack.response_finished"])) {
       env["rack.response_finished"].push((cbEnv: Record<string, any>) => {
         this.closeTempfiles(cbEnv);
@@ -28,7 +27,6 @@ export class TempfileReaper {
 
     const [status, headers, body] = response;
 
-    // Wrap body to clean up tempfiles on close
     const wrappedBody = {
       [Symbol.iterator]: body[Symbol.iterator]?.bind(body),
       each: body.each?.bind(body),
@@ -40,7 +38,6 @@ export class TempfileReaper {
       map: body.map?.bind(body),
     };
 
-    // For arrays, copy array-like behavior
     if (Array.isArray(body)) {
       Object.defineProperty(wrappedBody, "length", { get: () => body.length });
       for (let i = 0; i < body.length; i++) {
@@ -56,7 +53,6 @@ export class TempfileReaper {
     if (!Array.isArray(tempfiles)) return;
     for (const tf of tempfiles) {
       if (typeof tf.close === "function") tf.close();
-      // Ruby uses close! (bang), mapped here
       if (typeof tf["close!"] === "function") tf["close!"]();
     }
   }

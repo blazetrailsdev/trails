@@ -119,8 +119,6 @@ describe("PublicExceptions", () => {
     const prior = Response.defaultCharset;
     const priorBody = "<h1>500</h1>";
     try {
-      // Non-ASCII payload makes the utf-8 vs latin1 byte-count divergence
-      // observable: "résumé" is 8 bytes UTF-8, 6 bytes Latin-1.
       writeFileSync(path.join(publicPath, "500.html"), "résumé");
 
       Response.defaultCharset = "utf-8";

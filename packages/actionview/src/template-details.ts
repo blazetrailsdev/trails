@@ -1,10 +1,3 @@
-/**
- * ActionView::TemplateDetails
- *
- * The `{locale, handler, format, variant}` tuple used by LookupContext keying
- * to match concrete templates against a `Requested` set.
- */
-
 import type { TemplateHandler } from "./template/handlers.js";
 import { TemplateHandlers } from "./template/handlers.js";
 
@@ -17,7 +10,6 @@ export interface RequestedInit {
   variants: ReadonlyArray<DetailKey> | "any";
 }
 
-/** Sentinel for `variants: :any` — every variant matches with score 1. */
 const ANY = Symbol.for("ActionView::TemplateDetails::ANY");
 
 export class Requested {
@@ -43,11 +35,7 @@ export class Requested {
     this.variantsIdx = variants === "any" ? "any" : this.buildIdxHash(variants);
   }
 
-  /**
-   * @internal
-   * Builds the `value -> idx` lookup map (Rails `build_idx_hash`). Includes
-   * `null` as a trailing entry so unspecified facets still resolve.
-   */
+  /** @internal */
   private buildIdxHash(arr: ReadonlyArray<DetailKey>): ReadonlyMap<DetailKey, number> {
     const m = new Map<DetailKey, number>();
     let i = 0;
@@ -101,19 +89,11 @@ export class TemplateDetails {
     ];
   }
 
-  /**
-   * Look up the handler registered for this template's extension.
-   * Mirrors Rails `Template.handler_for_extension`.
-   */
   handlerClass(): TemplateHandler | undefined {
     if (typeof this.handler !== "string") return undefined;
     return TemplateHandlers.handlerForExtension(this.handler);
   }
 
-  /**
-   * Format if set, else fall back to the handler's `defaultFormat`. Used by
-   * `LookupContext` when callers omit an explicit format.
-   */
   formatOrDefault(): DetailKey {
     if (this.format !== null) return this.format;
     const handler = this.handlerClass() as

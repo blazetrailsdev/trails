@@ -4,9 +4,6 @@ import { assertErrorReported, assertNoErrorReported } from "./error-reporter-ass
 
 class IOError extends Error {}
 
-// `ErrorReporterAssertions` has no Rails test file of its own — Rails exercises
-// it through the suites that use it (deprecation_test.rb, cache_store_behavior)
-// — so its own coverage lives here.
 describe("ActiveSupport::Testing::ErrorReporterAssertions", () => {
   it("returns the matching report", async () => {
     const report = await assertErrorReported(IOError, () => {
@@ -43,8 +40,6 @@ describe("ActiveSupport::Testing::ErrorReporterAssertions", () => {
     ).rejects.toThrow(/to be empty\?/);
   });
 
-  // Each `record` stacks its own recorder, so an inner assertion does not
-  // swallow the reports an outer one is watching for.
   it("records nested blocks independently", async () => {
     const outer = await assertErrorReported(Error, async () => {
       await assertErrorReported(IOError, () => {

@@ -8,7 +8,6 @@ function configFile(name: string): string {
 }
 
 it("can provide options", async () => {
-  // Builder can be constructed with a block that configures it
   const builder = new Builder();
   builder.run(async () => [200, { "content-type": "text/plain" }, ["options"]]);
   const app = builder.toApp();
@@ -86,7 +85,6 @@ it("doesn't dupe env even when mapping", async () => {
 });
 
 it("dupe #to_app when mapping so Rack::Reloader can reload the application on each request", async () => {
-  // Each call to toApp should produce a working app
   const builder = new Builder();
   builder.map("/foo", (b) => {
     b.run(async () => [200, {}, ["foo"]]);
@@ -135,7 +133,6 @@ it("has implicit #to_app", async () => {
 });
 
 it("supports blocks on use", async () => {
-  // In Ruby, use can take a block. In TS, we pass a class with a call method.
   class BlockMiddleware {
     private app: any;
     constructor(app: any) {
@@ -176,7 +173,6 @@ it("can mix map and run for endpoints", async () => {
 });
 
 it("accepts middleware-only map blocks", async () => {
-  // A map block with middleware but no explicit run uses the inner app
   const builder = new Builder();
   builder.map("/api", (b) => {
     b.run(async () => [200, {}, ["api"]]);
@@ -250,9 +246,6 @@ it("complains about a missing run", () => {
   const builder = new Builder();
   expect(() => builder.toApp()).toThrow("missing run or map statement");
 });
-
-// The following Ruby Rack tests relate to .ru file parsing (Ruby eval).
-// These are not applicable to TypeScript, so we test equivalent Builder behavior.
 
 it("handles builder with no middleware and just run", async () => {
   const builder = new Builder();

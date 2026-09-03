@@ -1,9 +1,3 @@
-/**
- * trails-only cover for `Rack::Response::Raw`'s `include Helpers`
- * (`rack/lib/rack/response.rb:376`): the Rack spec exercises Helpers through
- * `Rack::Response`, so nothing upstream pins that `Raw` answers the same
- * members. It does, and the members are the ones a re-declared subset dropped.
- */
 import { describe, it, expect } from "vitest";
 import { ResponseRaw } from "./response.js";
 

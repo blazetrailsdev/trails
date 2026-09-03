@@ -50,18 +50,7 @@ export type RackApp = (
   env: Record<string, any>,
 ) => [number, Record<string, string>, any] | Promise<[number, Record<string, string>, any]>;
 
-/**
- * The `DEFAULT_PORT` of each scheme class `env_for` can be handed, as
- * `URI.scheme_list` registers it
- * (`ruby/lib/uri/{http,https,ldap,ldaps,file,ftp,mailto,ws,wss}.rb`) — which is
- * what `URI::Generic#port` answers for a URI that carries no explicit port —
- * the reader `env_for` leans on at `rack/lib/rack/mock_request.rb:106`. trails
- * has no `uri` package, so those entries are spelled here; a scheme absent
- * from the table falls through to Ruby's own `nil` answer for a
- * `URI::Generic` with no `DEFAULT_PORT`, which `env_for` reads as "80".
- *
- * @noRailsEquivalent PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 const DEFAULT_PORT: Record<string, number | null> = {
   http: 80,
   https: 443,
@@ -74,12 +63,6 @@ const DEFAULT_PORT: Record<string, number | null> = {
   wss: 443,
 };
 
-/**
- * `URI::Generic#port` (`ruby/lib/uri/generic.rb`): the explicit port when the
- * URI carries one, else the scheme's `DEFAULT_PORT`, else nil. A JS `URL`
- * normalizes a default port away, so both arms read through
- * {@link DEFAULT_PORT}.
- */
 function uriPort(uri: URL): number | null {
   if (uri.port !== "") return Number(uri.port);
   return DEFAULT_PORT[uri.protocol.slice(0, -1)] ?? null;
@@ -145,19 +128,6 @@ export class MockRequest {
     }
   }
 
-  /**
-   * Mirrors `Rack::MockRequest.env_for` (`rack/lib/rack/mock_request.rb:98-159`).
-   * Its option keys are Ruby Symbols, spelled here with the leading colon
-   * (`":method"`, `":input"`, ...), so the trailing
-   * `opts.each { |field, value| env[field] = value if String === field }`
-   * (line 154) is {@link isSymbol}.
-   *
-   * `:147`'s `rack_input.set_encoding(Encoding::BINARY) if
-   * rack_input.respond_to?(:set_encoding)` has no port: trails' `StringIO`
-   * buffer is a Ruby binary String by construction
-   * (`ruby-compat/src/string-io.ts:7-11`), so no trails IO answers
-   * `set_encoding` and the guard is false for every one of them.
-   */
   static envFor(uri = "", opts: Record<string, any> = {}): Record<string, any> {
     const parsedUri = MockRequest.parseUriRfc2396(uri);
     if (parsedUri.pathname[0] !== "/") parsedUri.pathname = `/${parsedUri.pathname}`;

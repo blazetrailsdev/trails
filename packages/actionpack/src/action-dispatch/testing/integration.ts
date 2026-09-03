@@ -1,36 +1,3 @@
-/**
- * ActionDispatch::IntegrationTest
- *
- * Full-stack integration testing that drives requests through the routing
- * layer and dispatches to controllers. Supports multi-request sessions
- * with persistent cookies, session, and flash.
- *
- * Usage with Vitest:
- *
- *   import { IntegrationTest } from "@blazetrails/actionpack/action-dispatch/testing/integration";
- *
- *   describe("Posts API", () => {
- *     const app = new IntegrationTest();
- *
- *     beforeAll(() => {
- *       app.routes.draw((r) => { r.resources("posts"); });
- *       app.registerController("posts", PostsController);
- *     });
- *
- *     it("GET /posts returns 200", async () => {
- *       await app.get("/posts");
- *       app.assertResponse("success");
- *     });
- *
- *     it("POST /posts creates and redirects", async () => {
- *       await app.post("/posts", { params: { title: "Hello" } });
- *       app.assertResponse("redirect");
- *       await app.followRedirect();
- *       app.assertResponse("success");
- *     });
- *   });
- */
-
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 import { TestSession } from "../../action-controller/test-case.js";
@@ -77,10 +44,6 @@ const STATUS_RANGES: Record<string, [number, number]> = {
   error: [500, 599],
 };
 
-// Match only paths that *begin* with a scheme (e.g. `http://…`). Rails uses
-// `path.include?("://")` which is fine in Ruby because `URI.parse` is lenient
-// with relative inputs, but JS `new URL` throws on relative paths — so we
-// have to be stricter to avoid breaking `/callback?return=http://example.com`.
 const ABSOLUTE_URL_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 const DEFAULT_HOST = "www.example.com";
@@ -93,7 +56,6 @@ function splitHostPort(host: string): [string, string | undefined] {
     const rest = host.slice(close + 1);
     return [host.slice(0, close + 1), rest.startsWith(":") ? rest.slice(1) : undefined];
   }
-  // Unbracketed multi-colon string is a bare IPv6 address with no port.
   const colons = (host.match(/:/g) ?? []).length;
   if (colons > 1) return [host, undefined];
   const idx = host.indexOf(":");
@@ -106,25 +68,18 @@ const DEFAULT_ACCEPT =
   "*/*;q=0.5";
 
 export class IntegrationTest {
-  /** The route set for this test. */
   routes: RouteSet = new RouteSet();
 
-  /** Controller registry: maps controller names to classes. */
   private controllers: Map<string, ControllerClass> = new Map();
 
-  /** Session data persisted across requests. */
   session: Record<string, unknown> = {};
 
-  /** The hostname used in the last request. */
   host: string = DEFAULT_HOST;
 
-  /** The remote address used in the last request. */
   remoteAddr: string = DEFAULT_REMOTE_ADDR;
 
-  /** The Accept header to send. */
   accept: string = DEFAULT_ACCEPT;
 
-  /** A running counter of the number of requests processed. */
   requestCount: number = 0;
 
   /** @internal */
@@ -133,24 +88,13 @@ export class IntegrationTest {
   /** @internal */
   _urlOptions?: Record<string, unknown>;
 
-  /**
-   * Caller-supplied defaults merged into {@link urlOptions}. Rails sources
-   * this from the `UrlFor` mixin; until UrlFor is ported, sessions can still
-   * populate it directly (it's also what `Runner#default_url_options=` writes
-   * through to).
-   *
-   * @internal
-   */
+  /** @internal */
   _defaultUrlOptions: Record<string, unknown> = {};
 
   constructor() {
     this.resetBang();
   }
 
-  /**
-   * Reset the instance. Mirrors `Integration::Session#reset!`. Existing
-   * `reset()` is kept as a friendly alias.
-   */
   resetBang(): void {
     this.session = {};
     this._mockSessionMemo = undefined;
@@ -167,21 +111,14 @@ export class IntegrationTest {
     this.accept = DEFAULT_ACCEPT;
   }
 
-  /** Mirror of Rails `Integration::Session#https!`. */
   httpsBang(flag: boolean = true): void {
     this._https = flag;
   }
 
-  /** Returns true if the session is mimicking a secure HTTPS request. */
   isHttps(): boolean {
     return this._https;
   }
 
-  /**
-   * Default URL options for this session, derived from host/scheme.
-   * Mirrors `Integration::Session#url_options`, memoized per-request like
-   * Rails (cleared inside `_processPath`).
-   */
   urlOptions(): Record<string, unknown> {
     if (!this._urlOptions) {
       this._urlOptions = {
@@ -193,13 +130,6 @@ export class IntegrationTest {
     return this._urlOptions;
   }
 
-  /**
-   * Caller-supplied defaults merged into {@link urlOptions} (Rails
-   * `Runner#default_url_options`). Exposed as a getter so the `UrlFor`
-   * mixin can read it as a record (`Object.keys(this.defaultUrlOptions)`)
-   * while writes still invalidate the per-request memo computed by
-   * {@link urlOptions}.
-   */
   get defaultUrlOptions(): Record<string, unknown> {
     return this._defaultUrlOptions;
   }
@@ -209,33 +139,12 @@ export class IntegrationTest {
     this._urlOptions = undefined;
   }
 
-  /**
-   * Rails-shaped routes adapter consumed by the `UrlFor` and
-   * `PolymorphicRoutes` mixins. Delegates to `RouteSet._routes`, the same
-   * inner adapter Rails wires through `proxy_class.new(routes)._routes` —
-   * it carries `polymorphicMappings` (so `polymorphicUrl/Path` resolve
-   * direct routes) and a `urlFor(options, routeName?)` slot that
-   * currently throws a documented "needs Rails-shape signature — see
-   * PR b" error until trails' legacy `RouteSet.urlFor(name, params,
-   * options)` is rewritten. Callers of `urlFor/fullUrlFor/routeFor` will
-   * surface that same error; `polymorphicUrl/Path` and
-   * `polymorphicMapping` (which read only `polymorphicMappings`) work
-   * end-to-end today. Writable (Rails: `attr_accessor :_routes` via
-   * UrlFor) so `_withRoutes` can swap the adapter for a block.
-   *
-   * @internal
-   */
+  /** @internal */
   get _routes(): UrlForRoutes {
     return this._routesOverride ?? this.routes._routes;
   }
 
   set _routes(value: UrlForRoutes | null) {
-    // `_withRoutes` saves `old = this._routes` (the computed delegate) and
-    // later writes it back. If we stored that snapshot verbatim, the
-    // override would shadow future updates to `this.routes`. Detect
-    // round-trips back to the natural delegate and clear the override so
-    // delegation resumes — mirrors Rails' `attr_accessor :_routes` where
-    // the ivar simply re-points at the same object.
     if (value == null || value === this.routes._routes) {
       this._routesOverride = undefined;
     } else {
@@ -246,24 +155,12 @@ export class IntegrationTest {
   /** @internal */
   _routesOverride?: UrlForRoutes;
 
-  /**
-   * Build the absolute URI for the current request. Matches Rails
-   * `Integration::Session#build_full_uri(path, env)`. Called by `_processPath`
-   * to populate `env.REQUEST_URI`.
-   *
-   * @internal
-   */
+  /** @internal */
   buildFullUri(path: string, env: Record<string, unknown>): string {
     return `${env["rack.url_scheme"]}://${env["SERVER_NAME"]}:${env["SERVER_PORT"]}${path}`;
   }
 
-  /**
-   * Expand a path that may itself contain a scheme/host, optionally letting
-   * the caller observe the parsed location to update `host`/`https`. Mirrors
-   * `Integration::Session#build_expanded_path`.
-   *
-   * @internal
-   */
+  /** @internal */
   buildExpandedPath(path: string, onLocation?: (url: URL) => void): string {
     if (!ABSOLUTE_URL_RE.test(path)) return path;
     const location = new URL(path);
@@ -271,9 +168,6 @@ export class IntegrationTest {
     return location.search ? `${location.pathname}${location.search}` : location.pathname;
   }
 
-  /**
-   * Rails-shaped `Integration::Session#process`. Verb helpers delegate here.
-   */
   async process(
     method: string,
     path: string,
@@ -290,11 +184,6 @@ export class IntegrationTest {
     return this.status;
   }
 
-  /**
-   * Rails-shaped `RequestHelpers#follow_redirect!`. Preserves the verb on
-   * 307/308 (per RFC 7231/7538) and sets `HTTP_REFERER` to the previous URL,
-   * mirroring the Rails implementation.
-   */
   async followRedirectBang(options: IntegrationRequestOptions = {}): Promise<number> {
     if (!this.response || this.status < 300 || this.status >= 400) {
       throw new Error(`not a redirect! ${this.status}`);
@@ -324,76 +213,43 @@ export class IntegrationTest {
     return this.status;
   }
 
-  /** Backing store for the memoized {@link _mockSession} (Rails' `@_mock_session`). */
   private _mockSessionMemo?: MockSession;
 
-  /** The controller instance from the last request. */
   controller!: Metal;
 
-  /** The Request from the last request. */
   request!: Request;
 
-  /** The Response from the last request. */
   response!: Response;
 
-  /** The response status code. */
   get status(): number {
     return this.response?.statusCode ?? this.controller?.status ?? 0;
   }
 
-  /** The response body as a string. */
   get responseBody(): string {
     return this.response?.body ?? this.controller?.body ?? "";
   }
 
-  /** Parsed JSON response body. */
   get parsedBody(): unknown {
     return JSON.parse(this.responseBody);
   }
 
-  /** The response Location header. */
   get redirectUrl(): string | undefined {
     return this.response?.getHeader("location") ?? this.controller?.getHeader("location");
   }
 
-  /**
-   * Flash from the last request. Delegates to
-   * `ActionDispatch::TestProcess#flash`, which reads off
-   * `this.request.flash` — wired up by `_processPath` after each dispatch so
-   * the value survives between requests like the real flash middleware.
-   */
   get flash(): FlashHash {
     if (!this.request) return new FlashHash();
     return testProcessFlash.call(this as unknown as TestProcessHost);
   }
 
-  /**
-   * A map of the cookies returned by the last response, and which will be sent
-   * with the next request.
-   *
-   * Mirrors `ActionDispatch::Integration::Session#cookies`
-   * (integration.rb:114-116) — `_mock_session.cookie_jar`, the one jar the whole
-   * session shares. This overrides `ActionDispatch::TestProcess#cookies`, which
-   * would build a per-request jar off `request.cookies` instead.
-   */
   get cookies(): CookieJar {
     return this._mockSession.cookieJar;
   }
 
-  /** Mirror of `ActionDispatch::TestProcess#redirectToUrl`. */
   get redirectToUrl(): string | undefined {
     return testProcessRedirectToUrl.call(this as unknown as TestProcessHost);
   }
 
-  /**
-   * Lazy-cached parsed document for the last response body. Returns an
-   * `XML::Document` when the response content-type ends with `xml`; throws
-   * for other mime types (HTML parsing via rails-dom-testing is not yet
-   * implemented). The previous document is **disposed** (libxml2-wasm memory
-   * freed) at the start of each new request and on `resetBang()` — do not
-   * hold references to a prior `htmlDocument` across requests.
-   * Mirrors `ActionDispatch::Assertions#html_document`.
-   */
   get htmlDocument(): XmlDocument {
     if (!this._htmlDocument) {
       const mimeType = this.response?.getHeader("content-type") ?? undefined;
@@ -402,43 +258,19 @@ export class IntegrationTest {
     return this._htmlDocument;
   }
 
-  /**
-   * Root element of the last response document. Mirrors
-   * `Integration::Runner#document_root_element`.
-   */
   get documentRootElement() {
     return this.htmlDocument.root;
   }
 
-  /**
-   * The underlying mock session used to dispatch requests, memoized as in
-   * `Integration::Session#_mock_session` (integration.rb:318-320):
-   * `@_mock_session ||= Rack::MockSession.new(@app, host)`. It owns the
-   * session's single cookie jar, which is why dropping it is how `reset!`
-   * (integration.rb:159) makes the session forget its cookies.
-   *
-   * @internal
-   */
+  /** @internal */
   get _mockSession(): MockSession {
     this._mockSessionMemo ??= new MockSession(this.app, this.host);
     return this._mockSessionMemo;
   }
 
-  /** Mirror of `ActionDispatch::TestProcess#session` (no-op delegation). */
-  // `session` is kept as an instance field above so multi-request tests can
-  // observe accumulated state directly. TestProcess#session reads the same
-  // value off the Request via `rack.session`, which `_processPath` syncs.
-
-  /**
-   * Register a controller class for a given name.
-   * The name should match the controller segment from routes
-   * (e.g., "posts" for PostsController, "admin/posts" for namespaced).
-   */
   registerController(name: string, klass: ControllerClass): void {
     this.controllers.set(name, klass);
   }
-
-  // --- HTTP verb methods ---
 
   async get(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
     await this.process("GET", path, options);
@@ -464,15 +296,10 @@ export class IntegrationTest {
     await this.process("HEAD", path, options);
   }
 
-  /** Performs an OPTIONS request. Mirrors `RequestHelpers#options`. */
   async options(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
     await this.process("OPTIONS", path, options);
   }
 
-  /**
-   * Follow the redirect from the last response.
-   * Issues a GET to the Location header.
-   */
   async followRedirect(): Promise<void> {
     const location = this.redirectUrl;
     if (!location) {
@@ -481,27 +308,11 @@ export class IntegrationTest {
     await this.get(location);
   }
 
-  // --- Runner / Behavior surface ---
-
-  /**
-   * The current integration session. Rails has separate `Runner` and
-   * `Session` classes; trails collapses them into a single `IntegrationTest`,
-   * so the session is `this`.
-   */
   get integrationSession(): this {
     return this;
   }
 
-  /**
-   * Create a new session for `app`. Rails dynamically subclasses
-   * `Integration::Session`, mixing in `app.routes.url_helpers` and
-   * `mounted_helpers`. trails doesn't yet have a Rack-app facade with
-   * generated helpers, so this creates a fresh `IntegrationTest` and
-   * propagates the current routes + controller registry — the
-   * functional equivalent for tests that share `this.routes`/`this.app`.
-   *
-   * @internal
-   */
+  /** @internal */
   createSession(app?: unknown): IntegrationTest {
     const Ctor = this.constructor as new () => IntegrationTest;
     const sess = new Ctor();
@@ -511,32 +322,16 @@ export class IntegrationTest {
     return sess;
   }
 
-  /**
-   * Releases the current session so the next access lazily creates a new
-   * one. Mirrors Rails `Runner#remove!`.
-   *
-   * @internal
-   */
+  /** @internal */
   removeBang(): void {
     this.resetBang();
   }
 
-  /**
-   * Open a new session, optionally yielding it to a block before returning.
-   * Mirrors Rails `Runner#open_session`, which is `dup.tap { reset!; ... }` —
-   * the dup preserves the integration test's class-level configuration
-   * (`app`, registered controllers, routes) while `resetBang` clears all
-   * per-request state on the copy.
-   */
   openSession(block?: (sess: IntegrationTest) => void): IntegrationTest {
     const sess: IntegrationTest = Object.assign(
       Object.create(Object.getPrototypeOf(this) as object),
       this,
     );
-    // Routes/controllers are shared with the parent (Rails dup is shallow
-    // for object refs); per-request state is cleared by resetBang below.
-    // Null out _htmlDocument before resetBang so the parent's cached document
-    // isn't disposed — the shallow copy shares the same XmlDocument reference.
     sess._htmlDocument = undefined;
     sess.resetBang();
     sess.rootSession = this.rootSession ?? this;
@@ -544,21 +339,10 @@ export class IntegrationTest {
     return sess;
   }
 
-  /**
-   * Root session for nested `openSession` instances. Rails: `attr_accessor
-   * :root_session`. `undefined` on a top-level test; the field is set by
-   * {@link openSession} on each spawned child.
-   *
-   * @internal
-   */
+  /** @internal */
   rootSession?: IntegrationTest;
 
-  /**
-   * Assertions counter. Rails delegates to Minitest; trails keeps a plain
-   * integer so frameworks that wrap us can read/write it.
-   *
-   * @internal
-   */
+  /** @internal */
   get assertions(): number {
     return this.rootSession ? this.rootSession.assertions : (this._assertions ?? 0);
   }
@@ -571,56 +355,24 @@ export class IntegrationTest {
   /** @internal */
   _assertions: number = 0;
 
-  /**
-   * Cached parsed HTML/XML document for the last response. Cleared at the
-   * start of each new request. Rails: `@html_document`.
-   *
-   * @internal
-   */
+  /** @internal */
   _htmlDocument?: XmlDocument;
 
-  /**
-   * Copies session-owned ivars onto the test. In Rails the Runner uses
-   * this after delegating to the Session; trails uses a single class so
-   * this is a no-op kept for parity.
-   *
-   * @internal
-   */
-  copySessionVariablesBang(): void {
-    // No-op: Runner and Session share `this` in trails.
-  }
+  /** @internal */
+  copySessionVariablesBang(): void {}
 
-  /**
-   * Lifecycle hook (Rails `Runner#before_setup`). Resets `app` so the next
-   * call lazily falls back to the class default.
-   *
-   * @internal
-   */
+  /** @internal */
   beforeSetup(): void {
     this._app = undefined;
   }
 
-  /**
-   * Lifecycle hook (Rails `Session#setup`). Currently delegates to the
-   * routing-assertions setup so `this.routes` matches the integration
-   * default. Tests rarely call this directly.
-   */
   setup(): void {
     routingAssertions.setup.call(this);
   }
 
-  /**
-   * Per-instance app override. Reads through to the class-level default
-   * (mirrors `Behavior#app` falling back to `self.class.app`).
-   *
-   * @internal
-   */
+  /** @internal */
   _app?: unknown;
 
-  /**
-   * Application under test. Mirrors `Behavior#app` (instance method that
-   * falls back to the class-level default).
-   */
   get app(): unknown {
     return this._app ?? (this.constructor as typeof IntegrationTest).app;
   }
@@ -629,12 +381,8 @@ export class IntegrationTest {
     this._app = value;
   }
 
-  /** Class-level default app for the test process. Mirrors `Behavior.app=`. */
   static app: unknown = null;
 
-  /**
-   * Register a custom request encoder. Mirrors `Behavior::ClassMethods#register_encoder`.
-   */
   static registerEncoder(
     args: string,
     options: {
@@ -645,18 +393,10 @@ export class IntegrationTest {
     RequestEncoder.registerEncoder(args, options);
   }
 
-  /**
-   * Controller-instance-variable accessor. Rails extracted this to a gem;
-   * trails mirrors the deprecation by raising via TestProcess#assigns.
-   */
   assigns(key?: string | symbol): never {
     return assignsFn.call(this as unknown as TestProcessHost, key);
   }
 
-  /**
-   * Shortcut for an UploadedFile from `file_fixture_path`. Delegates to
-   * `TestProcess::FixtureFile#fileFixtureUpload`.
-   */
   fileFixtureUpload(path: string, mimeType?: string | null, binary: boolean = false): UploadedFile {
     return testProcessFileFixtureUpload.call(
       this as unknown as TestProcessHost,
@@ -666,7 +406,6 @@ export class IntegrationTest {
     );
   }
 
-  /** Alias of {@link fileFixtureUpload}. */
   fixtureFileUpload(path: string, mimeType?: string | null, binary: boolean = false): UploadedFile {
     return testProcessFixtureFileUpload.call(
       this as unknown as TestProcessHost,
@@ -676,18 +415,12 @@ export class IntegrationTest {
     );
   }
 
-  /** Human-friendly description used by debuggers. Mirrors `Session#inspect`. */
   inspect(): string {
     const url = this.request?.env?.REQUEST_URI ?? "(no request)";
     return `#<${this.constructor.name} ${url}>`;
   }
 
-  // --- Mixin surface (attached via prototype below) ---------------------
-  // Declared as class properties so parity:api sees the names. Real
-  // implementations live in the imported `this`-typed modules and are
-  // wired onto `IntegrationTest.prototype` after the class body. The
-  // `_`-prefixed and helper-message slots are Rails-private — keep
-  // `@internal` JSDoc grouped at the prototype block, not per-line.
+  // @internal
   declare assertRecognizes: typeof routingAssertions.assertRecognizes;
   declare assertGenerates: typeof routingAssertions.assertGenerates;
   declare assertRouting: typeof routingAssertions.assertRouting;
@@ -712,11 +445,6 @@ export class IntegrationTest {
   declare polymorphicMapping: typeof polymorphicRoutes.polymorphicMapping;
   declare parameterize: typeof responseAssertions.parameterize;
   declare normalizeArgumentToRedirection: typeof responseAssertions.normalizeArgumentToRedirection;
-  // The remaining response-message helpers (generateResponseMessage,
-  // responseBodyIfShort, exceptionIfPresent, locationIfRedirected,
-  // codeWithName) take an explicit host argument in `assertions/response.ts`;
-  // re-expose them as Rails-shape (`this`-only) instance methods below so
-  // call sites can use Rails-private patterns directly.
   /** @internal */
   generateResponseMessage(expected: number | string, actual: number): string {
     return responseAssertions.generateResponseMessage(this, expected, actual);
@@ -737,8 +465,6 @@ export class IntegrationTest {
   codeWithName(codeOrName: number | string): string {
     return responseAssertions.codeWithName(codeOrName);
   }
-
-  // --- Assertions ---
 
   assertResponse(expected: number | string): void {
     const actual = this.status;
@@ -842,14 +568,9 @@ export class IntegrationTest {
     }
   }
 
-  /**
-   * Reset all session state (cookies, session, flash). Alias of {@link resetBang}.
-   */
   reset(): void {
     this.resetBang();
   }
-
-  // --- Internal ---
 
   private async _processPath(
     method: string,
@@ -857,27 +578,19 @@ export class IntegrationTest {
     options: IntegrationRequestOptions,
   ): Promise<void> {
     this.requestCount += 1;
-    // Clear per-request memos up front so they don't leak across requests,
-    // including down the no-route 404 path.
     this._urlOptions = undefined;
     this._htmlDocument?.dispose();
     this._htmlDocument = undefined;
 
-    // Split path into PATH_INFO + QUERY_STRING; Rack stores them separately.
     const qIdx = path.indexOf("?");
     const pathInfo = qIdx >= 0 ? path.slice(0, qIdx) : path;
     let queryString = qIdx >= 0 ? path.slice(qIdx + 1) : "";
-    // Rails serializes GET/HEAD params into the query string (via _process_path).
     if (options.params && (method === "GET" || method === "HEAD")) {
       const extra = buildNestedQuery(options.params);
       if (extra) queryString = queryString ? `${queryString}&${extra}` : extra;
     }
-    // Match route on pathname only.
     const matched = this.routes.recognize(method, pathInfo);
     if (!matched) {
-      // No route matched — create a 404-like response. Mirror the same
-      // host/scheme/cookie env keys as the matched branch so request.url and
-      // request.cookies are accurate for 404s too.
       const [noRouteHostname, noRoutePort] = splitHostPort(this.host);
       const noRouteEnv: Record<string, unknown> = {
         REQUEST_METHOD: method,
@@ -924,7 +637,6 @@ export class IntegrationTest {
     const controllerName = route.controller;
     const action = route.action;
 
-    // Look up controller class
     const ControllerClass = this.controllers.get(controllerName);
     if (!ControllerClass) {
       throw new Error(
@@ -933,7 +645,6 @@ export class IntegrationTest {
       );
     }
 
-    // Build env
     const sessionSeed = { ...this.session };
     const [hostname, port] = splitHostPort(this.host);
     const env: Record<string, unknown> = {
@@ -955,8 +666,6 @@ export class IntegrationTest {
       },
       ...(options.env ?? {}),
     };
-    // Build REQUEST_URI from the *finalized* env so options.env overrides of
-    // PATH_INFO/QUERY_STRING are honored.
     const finalPath =
       (env.PATH_INFO as string) + (env.QUERY_STRING ? `?${env.QUERY_STRING as string}` : "");
     env.REQUEST_URI = this.buildFullUri(finalPath, env);
@@ -966,7 +675,6 @@ export class IntegrationTest {
       env.HTTP_COOKIE = cookieHeader;
     }
 
-    // Format / content type
     if (options.format || options.as) {
       const fmt = options.format ?? options.as;
       env.HTTP_ACCEPT = formatToMime(fmt!);
@@ -975,12 +683,10 @@ export class IntegrationTest {
       }
     }
 
-    // XHR
     if (options.xhr) {
       env.HTTP_X_REQUESTED_WITH = "XMLHttpRequest";
     }
 
-    // Custom headers
     if (options.headers) {
       for (const [name, value] of Object.entries(options.headers)) {
         const envKey = name.startsWith("HTTP_")
@@ -990,7 +696,6 @@ export class IntegrationTest {
       }
     }
 
-    // Body
     if (options.body) {
       env["rack.input"] = options.body;
     } else if (options.params && options.as === "json" && method !== "GET" && method !== "HEAD") {
@@ -1000,10 +705,6 @@ export class IntegrationTest {
     this.request = new Request(env);
     this.response = new Response();
 
-    // Build params: route params + parsed query string + caller-supplied params.
-    // Rails merges request.GET/request.POST into request.parameters via the
-    // ParamsParser; we mirror that here so query-string params survive the
-    // PATH_INFO/QUERY_STRING split done above.
     const allParams: Record<string, unknown> = { ...params };
     if (env.QUERY_STRING) {
       Object.assign(allParams, this.request.queryParameters);
@@ -1015,15 +716,10 @@ export class IntegrationTest {
       Object.fromEntries(Object.entries(allParams).map(([k, v]) => [k, v])),
     );
 
-    // Instantiate and dispatch
     this.controller = new ControllerClass();
 
     await this.controller.dispatch(action, this.request, this.response);
 
-    // `Metal#dispatch` has run `request.commit_flash` (`metal.rb:253`), which
-    // DELETES `rack.session`'s flash key once the flash is swept — so the
-    // store's view has to carry forward with its deletions, or the flash never
-    // expires. Only seeded keys can be deleted; controller writes are new state.
     const committed = (env["rack.session"] as TestSession).toHash();
     for (const key of Object.keys(sessionSeed)) {
       if (!(key in committed)) delete this.session[key];
@@ -1053,14 +749,6 @@ export class IntegrationTest {
   }
 }
 
-/**
- * The mock session `Integration::Session#_mock_session` memoizes
- * (integration.rb:318-320, `Rack::MockSession.new(@app, host)`). Rack::Test
- * lives outside Rails so there is no file to port; what fidelity turns on is
- * that the mock session owns THE cookie jar for the session — `#cookies` is
- * `_mock_session.cookie_jar` (integration.rb:114-116) — so cookies sent,
- * cookies received and cookies read back by a test are one store.
- */
 class MockSession {
   readonly cookieJar: CookieJar = CookieJar.build(undefined, {});
 
@@ -1069,26 +757,12 @@ class MockSession {
     readonly host: string,
   ) {}
 
-  /**
-   * The `HTTP_COOKIE` the jar sends with the next request, which Rack::Test's
-   * mock session builds as `cookie_jar.for(uri)`. `undefined` for an empty jar,
-   * so the header is omitted rather than sent blank.
-   */
   httpCookie(): string | undefined {
     const entries = Object.entries(this.cookieJar.toHash());
     if (entries.length === 0) return undefined;
     return entries.map(([k, v]) => `${k}=${v}`).join("; ");
   }
 }
-
-// --- Mixin attachments ---------------------------------------------------
-// Rails composes IntegrationTest from `RoutingAssertions`,
-// `Routing::UrlFor`, `PolymorphicRoutes`, and the response-message helpers
-// from `Assertions::ResponseAssertions`. trails ports each module as
-// `this`-typed standalone functions (CLAUDE.md "Module mixins" pattern).
-// We declare the surface here and attach the implementations on
-// `IntegrationTest.prototype` so parity:api sees the names and runtime
-// callers get a working method.
 
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
 proto.assertRecognizes = routingAssertions.assertRecognizes;
@@ -1112,11 +786,6 @@ proto.polymorphicPathForAction = polymorphicRoutes.polymorphicPathForAction;
 proto.polymorphicMapping = polymorphicRoutes.polymorphicMapping;
 proto.parameterize = responseAssertions.parameterize;
 proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
-// generateResponseMessage / responseBodyIfShort / exceptionIfPresent /
-// locationIfRedirected / codeWithName are defined as real instance
-// methods on the class above (their source signatures take an explicit
-// host arg, so wrapping them into Rails-shape `this`-only methods keeps
-// call sites idiomatic).
 
 function formatToMime(format: string): string {
   const MIMES: Record<string, string> = {

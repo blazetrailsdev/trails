@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Store } from "./store.js";
 
-// trails-only coverage for `Cache::Store.retrieve_pool_options`
-// (cache.rb:200-220); Rails reaches it through MemCacheStore/RedisCacheStore,
-// neither of which is ported.
 describe("Store.retrievePoolOptions", () => {
   it("defaults to the default pool options when :pool is absent", () => {
     expect(Store.retrievePoolOptions({})).toEqual({ size: 5, timeout: 5 });
@@ -11,8 +8,6 @@ describe("Store.retrievePoolOptions", () => {
 
   it("returns false for pool: false and for a stored nil", () => {
     expect(Store.retrievePoolOptions({ pool: false })).toBe(false);
-    // `options.key?(:pool)` sees the key, so the `when false, nil` arm runs
-    // rather than the absent-key `true` default.
     expect(Store.retrievePoolOptions({ pool: null })).toBe(false);
   });
 
@@ -51,8 +46,6 @@ describe("Store.retrievePoolOptions", () => {
   });
 
   it("accepts the Float literal forms Kernel#Float does", () => {
-    // Verified against MRI: a leading-dot decimal and a hexadecimal float are
-    // valid, while a trailing-dot one is not.
     expect(Store.retrievePoolOptions({ pool: { timeout: ".5" } })).toEqual({
       size: 5,
       timeout: 0.5,
@@ -71,8 +64,6 @@ describe("Store.retrievePoolOptions", () => {
   });
 
   it("converts pool size and timeout the way Kernel#Integer and Kernel#Float do", () => {
-    // `Integer("012")` is octal (10), `Integer("1_000")` allows the separator,
-    // and a Float size truncates rather than rounding.
     expect(Store.retrievePoolOptions({ pool: { size: "012" } })).toEqual({ size: 10, timeout: 5 });
     expect(Store.retrievePoolOptions({ pool: { size: "1_000" } })).toEqual({
       size: 1000,

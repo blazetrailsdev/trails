@@ -9,12 +9,8 @@ afterEach(() => {
   controllerConstants.delete("posts");
 });
 
-// ==========================================================================
-// Controller routing integration tests
-// ==========================================================================
 let capturedEnv: RackEnv = {};
 
-/** Hands the dispatching request's Rack env back to the test. */
 class CaptureEnvController {
   static makeResponseBang(request: Request): Response {
     const res = new Response();

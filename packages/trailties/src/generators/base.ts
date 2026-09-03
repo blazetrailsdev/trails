@@ -36,17 +36,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     this.output = options.output;
   }
 
-  /**
-   * Rails: `Thor::Base::ClassMethods#start(given_args, config)`, which
-   * `Rails::Generators.invoke` calls (`generators.rb:265`). Thor maps the
-   * remaining ARGV onto the generator's declared `argument`s and then runs
-   * every public method as a task; trails generators expose one `run` method
-   * instead, so the CLI arguments are handed to it positionally and the
-   * generator's name/attributes are seeded on the instance the way
-   * `NamedBase` reads them.
-   *
-   * A generator whose entry point is not `run` overrides this.
-   */
   static async start(
     this: new (options: GeneratorOptions & { name: string; attributes: string[] }) => GeneratorBase,
     args: string[],
@@ -115,7 +104,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
 export function migrationTimestamp(): string {
   // boundary: generator timestamp uses local-clock components for the
-  // YYYYMMDDHHMMSS migration filename prefix.
   const now = new Date();
   const y = now.getFullYear().toString();
   const m = (now.getMonth() + 1).toString().padStart(2, "0");

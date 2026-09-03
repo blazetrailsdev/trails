@@ -32,9 +32,6 @@ describe("StringInquirerTest", () => {
   });
 
   it("respond to fallback to string respond to", () => {
-    // Rails reopens `String` with a `respond_to_missing?` that answers `:bar`.
-    // The `super` arm of the inquirer's `has` trap is the prototype chain, so
-    // teaching `String` one more name is `String.prototype`.
     Object.defineProperty(String.prototype, "bar", { value: () => true, configurable: true });
     const str = new StringInquirer("hello");
 

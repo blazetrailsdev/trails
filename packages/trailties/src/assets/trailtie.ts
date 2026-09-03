@@ -10,14 +10,7 @@ interface ActionViewBaseLike {
   prototype: Record<string, unknown>;
 }
 
-/**
- * Trailtie wiring for the Vite asset pipeline, shaped like
- * `Propshaft::Railtie`: one initializer installs the helper override on the
- * view, the other loads the build manifest. Rails' own frameworks have no
- * counterpart — the pipeline is a separate gem there too.
- *
- * @noRailsEquivalent PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);

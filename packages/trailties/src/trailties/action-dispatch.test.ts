@@ -138,8 +138,6 @@ describe("ActionDispatch::Trailtie", () => {
       getHeader: (k: string) => headers[k],
       setHeader: (k: string, v: unknown) => (headers[k] = v),
     };
-    // Defaults are all falsy — Rails copies them anyway (application.rb:344),
-    // which must overwrite the stale `true` carried over from a prior request.
     Trailtie.seedContentSecurityPolicyEnv(req);
     expect(headers["action_dispatch.content_security_policy_report_only"]).toBe(false);
     expect(headers["action_dispatch.content_security_policy"]).toBeNull();

@@ -18,7 +18,6 @@ export abstract class Node {
     }
   }
 
-  /** Visit every descendant whose constructor is `klass`. Rails `node.grep(Klass)`. */
   grep<T extends Node>(klass: new (...args: never[]) => T): T[] {
     const out: T[] = [];
     for (const n of this) if (n instanceof klass) out.push(n);
@@ -31,7 +30,6 @@ export abstract class Node {
 
   abstract get type(): NodeType;
 
-  /** Rails `node.name` — strips `*` and `:` from the leading marker. */
   get name(): string {
     return this._computeName();
   }
@@ -48,12 +46,10 @@ export abstract class Node {
     return this.name;
   }
 
-  /** Rails `node.each(&block)` — walks the subtree via the Each visitor. */
   each(block: (node: Node) => void): void {
     Visitors.Each.INSTANCE.accept(this, block);
   }
 
-  /** Rails `node.to_dot` — renders the AST as a Graphviz dot string. */
   toDot(): string {
     return Visitors.Dot.INSTANCE.render(this);
   }
@@ -84,7 +80,6 @@ export abstract class Node {
 }
 
 export class Terminal extends Node {
-  /** Rails alias :symbol :left — kept as a getter for callers. */
   get symbol(): Node | string {
     return this.left;
   }
@@ -237,11 +232,6 @@ export class Or extends Node {
   }
 }
 
-/**
- * Rails `ActionDispatch::Journey::Ast` (defined alongside Nodes in
- * `journey/nodes/node.rb`). Walks an AST once and collects symbol nodes,
- * star nodes, terminals, names, and path-params.
- */
 export class Ast {
   readonly tree: Node;
   readonly pathParams: string[] = [];
@@ -257,7 +247,6 @@ export class Ast {
     this.visitTree(formatted);
   }
 
-  /** Rails alias :root :tree */
   get root(): Node {
     return this.tree;
   }

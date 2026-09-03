@@ -10,7 +10,6 @@ class A extends Parent {}
 class B extends A {}
 class C extends B {}
 
-// Register the hierarchy
 DescendantsTracker.registerSubclass(Parent, Foo);
 DescendantsTracker.registerSubclass(Foo, Bar);
 DescendantsTracker.registerSubclass(Bar, Baz);
@@ -40,7 +39,6 @@ describe("ClassTest", () => {
   });
 
   it("descendants excludes singleton classes", () => {
-    // JS doesn't have singleton classes; verify regular instances aren't included
     const desc = DescendantsTracker.descendants(Parent);
     for (const d of desc) {
       expect(typeof d).toBe("function");

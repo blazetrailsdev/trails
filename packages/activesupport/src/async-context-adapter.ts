@@ -1,10 +1,3 @@
-/**
- * Async context adapter — wraps AsyncLocalStorage for browser compatibility.
- *
- * In Node, auto-registers using async_hooks. In browsers, a custom adapter
- * can be registered (or the fallback single-context implementation is used).
- */
-
 export interface AsyncContext<T> {
   getStore(): T | undefined;
   run<R>(store: T, fn: () => R): R;
@@ -22,11 +15,6 @@ function wrapNodeAsyncHooks(asyncHooks: typeof import("async_hooks")): AsyncCont
   };
 }
 
-/**
- * Fallback adapter for environments without AsyncLocalStorage.
- * Uses a simple stack — safe for sequential async but not for truly
- * concurrent async contexts (e.g. multiple in-flight requests).
- */
 function createFallbackAdapter(): AsyncContextAdapter {
   return {
     create<T>(): AsyncContext<T> {
@@ -118,7 +106,6 @@ function resolve(): AsyncContextAdapter {
     return resolved;
   }
 
-  // Fallback: single-context (no true async isolation)
   resolved = createFallbackAdapter();
   return resolved;
 }

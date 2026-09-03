@@ -68,7 +68,6 @@ describe("TestEvents", () => {
     const e = new Events(app, [se]);
 
     await e.call({});
-    // Body not consumed yet
     expect(events.map(([_, m]) => m)).toEqual(["on_start", "call", "on_commit"]);
   });
 

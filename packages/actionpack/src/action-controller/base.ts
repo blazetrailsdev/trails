@@ -1,10 +1,3 @@
-/**
- * ActionController::Base
- *
- * Full-featured controller with rendering, redirecting, filters,
- * flash, CSRF, content negotiation, caching, rescue, and more.
- */
-
 import { ArgumentError, Notifications, runLoadHooks } from "@blazetrails/activesupport";
 import { File, getCrypto } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
@@ -89,7 +82,6 @@ import {
   viewAssigns,
 } from "../abstract-controller/rendering.js";
 
-// Re-export callback registration
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
 
 export type RenderOptions = {
@@ -98,19 +90,12 @@ export type RenderOptions = {
   html?: string;
   body?: string;
   text?: string;
-  /** Render a specific action's template */
   action?: string;
-  /** Render a specific template, optionally prefixed ("posts/show") */
   template?: string;
-  /** Render a partial */
   partial?: string;
-  /** Locals to pass to template */
   locals?: Record<string, unknown>;
-  /** Collection to render with a partial */
   collection?: unknown[];
-  /** Variable name for each collection item */
   as?: string;
-  /** JSONP callback function name */
   callback?: string;
   status?: number | string;
   contentType?: string;
@@ -120,12 +105,6 @@ export type RenderOptions = {
 
 export type RescueHandler = (error: Error) => void | Promise<void>;
 
-/**
- * The full list of modules included by `ActionController::Base`. Mirrors
- * Rails' `MODULES` constant in `action_controller/base.rb`. Trails wires
- * these mixins onto `Base` directly (not via Ruby `include`), so this
- * array is informational and used by {@link Base.withoutModules}.
- */
 export const MODULES: readonly string[] = [
   "AbstractController::Rendering",
   "AbstractController::Translation",
@@ -165,20 +144,6 @@ export const MODULES: readonly string[] = [
   "ParamsWrapper",
 ];
 
-/**
- * Instance variables that should not be propagated to the view. Mirrors
- * Rails' `PROTECTED_IVARS` in `action_controller/base.rb`: extends the
- * abstract-layer `DEFAULT_PROTECTED_INSTANCE_VARIABLES` with the controller-
- * level slots (`_params`, `_response`, `_request`, …).
- *
- * Names follow the abstract-layer transliteration convention (Rails
- * `@_action_name` → trails `_actionName`). This is currently a literal
- * Rails-parity constant — `viewAssigns` already filters all leading-`_`
- * fields plus `DEFAULT_PROTECTED_INSTANCE_VARIABLES`, so wiring through
- * `_protectedIvars()` is unnecessary until trails grows underscored
- * backing fields for `params`/`request`/`response` (Rails' `@_params`
- * etc.) and the controller pipeline starts consulting it directly.
- */
 export const PROTECTED_IVARS: readonly string[] = [
   ...DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   "_params",
@@ -199,21 +164,12 @@ export const PROTECTED_IVARS: readonly string[] = [
 ];
 
 export class Base extends Metal {
-  /** Rails: `delegate :flash, to: :request` (`action_controller/metal/flash.rb:12`). */
   get flash(): FlashHash {
     return this.request.flash!;
   }
 
-  /** Template resolver (pluggable, legacy). */
   static templateResolver?: (controller: string, action: string, format: string) => string | null;
 
-  /**
-   * Rails `ActionView::ViewPaths::ClassMethods` — included into
-   * `AbstractController::Base` through `AbstractController::Rendering`
-   * (`abstract_controller/rendering.rb:20`), which is why
-   * `Engine`'s `add_view_paths` finds `respond_to?(:prepend_view_path)`
-   * true. Assigned per the module-mixin convention.
-   */
   static _viewPaths: {
     (): PathSet;
     (paths: PathSet): void;
@@ -225,64 +181,43 @@ export class Base extends Metal {
     (paths: ViewPathsInput): void;
   } = ViewPathsClassMethods.viewPaths;
 
-  /** Layout name. Set to false to disable, or a string name. */
   static layout: string | false = "application";
 
-  /** Rails: `ActionView::Rendering::ClassMethods#_routes` (`action_view/rendering.rb:46`). */
   static _routes: ViewContextRoutes | null = null;
 
-  /** Rails: `ActionView::Rendering::ClassMethods` (`action_view/rendering.rb:52-92`). */
   static inheritViewContextClassQ = inheritViewContextClassQ;
   static buildViewContextClass = buildViewContextClass;
   static viewContextClass = viewContextClass;
-  /** @internal Rails: `@view_context_class`. */
+  /** @internal */
   static _viewContextClass?: typeof ActionViewBase;
 
-  /** Rails: `ActionView::Rendering#view_context_class` (`action_view/rendering.rb:95-97`). */
   viewContextClass(): typeof ActionViewBase {
     return (
       this.constructor as unknown as { viewContextClass(): typeof ActionViewBase }
     ).viewContextClass();
   }
 
-  /** Rails: `AbstractController::Rendering#view_assigns` (`abstract_controller/rendering.rb:44-50`). */
   viewAssigns = viewAssigns;
 
-  /** Rails: `ActionView::Rendering#view_context` (`action_view/rendering.rb:108-110`). */
   viewContext(): ActionViewBase {
     return viewContext.call(this as unknown as ViewContextHost);
   }
 
-  /** Rescue handlers (class-level, inherited). */
   private static _rescueHandlers: Array<{
     errorClass: new (...args: any[]) => Error;
     handler: RescueHandler;
   }> = [];
 
-  /**
-   * Returns all modules included in {@link MODULES} except those passed
-   * as arguments. Mirrors Rails `ActionController::Base.without_modules`.
-   *
-   *     Base.withoutModules("ParamsWrapper", "Streaming")
-   */
   static withoutModules(...modules: string[]): readonly string[] {
     const drop = new Set(modules);
     return MODULES.filter((m) => !drop.has(m));
   }
 
-  /**
-   * The ivar names hidden from `viewAssigns`. Rails declares this private
-   * on `Base` to extend the abstract-layer default with controller-level
-   * slots; see {@link PROTECTED_IVARS}.
-   * @internal
-   */
+  /** @internal */
   _protectedIvars(): readonly string[] {
     return PROTECTED_IVARS;
   }
 
-  // --- Rendering ---
-
-  /** Render a response. Supports json, plain, html, body, text, action, partial, collection. */
   render(options: RenderOptions = {}): void {
     if (this.performed) {
       throw new DoubleRenderError(
@@ -324,25 +259,21 @@ export class Base extends Metal {
       this.contentType = options.contentType ?? "text/plain; charset=utf-8";
       this.body = options.text;
     } else if (options.partial !== undefined) {
-      // Render partial via LookupContext (synchronous wrapper, actual render is async)
       this._pendingRender = { type: "partial", options };
-      return; // Will be handled by async processAction wrapper
+      return;
     } else if (
       options.template !== undefined ||
       options.action !== undefined ||
       options.collection !== undefined
     ) {
-      // Render action template or collection via LookupContext
       this._pendingRender = { type: "template", options };
-      return; // Will be handled by async processAction wrapper
+      return;
     } else if (this.lookupContext.viewPaths.size > 0) {
       this._pendingRender = { type: "template", options };
       return;
     } else {
-      // Implicit render — try template resolver
       this._renderTemplate(this.actionName, options);
       if (!this.performed) {
-        // No template found, render empty 200
         this.contentType = "text/html; charset=utf-8";
         this.body = "";
       }
@@ -351,32 +282,20 @@ export class Base extends Metal {
     this.markPerformed();
   }
 
-  /** Pending async render (for template/partial rendering). */
   _pendingRender: { type: string; options: RenderOptions } | null = null;
 
-  /**
-   * Rails `ActionView::ViewPaths#_prefixes` — mixed in from the file that
-   * matches `action_view/view_paths.rb`, per the module-mixin convention.
-   *
-   * @internal
-   */
+  /** @internal */
   _prefixes = _prefixes;
 
-  /** @internal Rails `ActionView::ViewPaths#_lookup_context` memo. */
+  /** @internal */
   _lookupContext?: LookupContext;
 
-  /** Rails `ActionView::ViewPaths#lookup_context` (`view_paths.rb:63-65`). */
   get lookupContext(): LookupContext {
     return lookupContext.call(this as never);
   }
 
-  /** Rails `ActionView::ViewPaths#details_for_lookup` (`view_paths.rb:67-69`). */
   detailsForLookup = detailsForLookup;
 
-  /**
-   * `delegate :formats, :formats=, to: :lookup_context`
-   * (`action_view/view_paths.rb:12-13`).
-   */
   get formats(): ReadonlyArray<string | symbol> {
     return this.lookupContext.formats;
   }
@@ -384,7 +303,6 @@ export class Base extends Metal {
     this.lookupContext.formats = values;
   }
 
-  /** `delegate :locale, :locale=, to: :lookup_context` (`view_paths.rb:12-13`). */
   get locale(): string | symbol | null {
     return this.lookupContext.locale;
   }
@@ -392,34 +310,18 @@ export class Base extends Metal {
     this.lookupContext.locale = value;
   }
 
-  /** Rails `ActionView::ViewPaths#template_exists?` (`view_paths.rb:83-85`). */
   templateExists = templateExists;
 
-  /** Rails `ActionView::ViewPaths#any_templates?` (`view_paths.rb:87-89`). */
   isAnyTemplates = isAnyTemplates;
 
-  /**
-   * Rails `ImplicitRender#default_render` — mixed in from
-   * `metal/implicit-render.ts`, the file that matches
-   * `action_controller/metal/implicit_render.rb`.
-   */
   defaultRender = defaultRender;
 
-  /**
-   * Rails `BasicImplicitRender#send_action`
-   * (`basic_implicit_render.rb:7-11`): `ret = super; default_render unless
-   * performed?; ret`. A `_pendingRender` counts as performed here — the
-   * render was requested by the action, it just resolves asynchronously in
-   * {@link processAction}.
-   *
-   * @internal
-   */
+  /** @internal */
   override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
     await super._dispatchAction(action, ...args);
     if (!this.performed && !this._pendingRender) this.defaultRender();
   }
 
-  /** Async render — resolves pending template/partial renders. */
   async renderAsync(options: RenderOptions): Promise<void> {
     if (this.performed) {
       throw new DoubleRenderError(
@@ -434,14 +336,9 @@ export class Base extends Metal {
     const ctx = this.lookupContext;
 
     const controllerPrefix = this.controllerPath();
-    // `lookup_context.formats` — negotiated in `process_action` and already
-    // expanded past `"*/*"` by `LookupContext#formats=`
-    // (`lookup_context.rb:263-280`). Rails passes the whole details hash down
-    // to the resolver, so the cascade goes through whole.
     const formats = this.formats;
     const format = String(formats[0] ?? "html");
     const locals = { ...options.locals };
-    // `_render_template`'s `context = view_context` (`action_view/rendering.rb:130`).
     const view = this.viewContext();
     const layout =
       options.layout === false
@@ -452,7 +349,6 @@ export class Base extends Metal {
 
     if (options.partial !== undefined) {
       if (options.collection !== undefined) {
-        // Render collection with partial
         this.body = await ctx.renderCollection(
           options.partial,
           controllerPrefix,
@@ -470,13 +366,6 @@ export class Base extends Metal {
         );
       }
     } else {
-      // `options[:template] ||= (options[:action] || action_name).to_s`, with
-      // `:prefixes` left unset for an explicit `:template`
-      // (`action_view/rendering.rb#_normalize_options`, which otherwise fills
-      // them from `_prefixes` — the controller's whole inheritance chain,
-      // `action_view/view_paths.rb:96-104`). `normalize_name`
-      // (`lookup_context.rb:209-225`) is what turns a qualified
-      // `"posts/show"` into its own prefix.
       const template = String(options.template ?? options.action ?? this.actionName);
       const [action, prefixes] = ctx.normalizeName(
         template,
@@ -492,16 +381,7 @@ export class Base extends Metal {
     this.markPerformed();
   }
 
-  /** Render to string without committing the response. */
   renderToString(options: RenderOptions = {}): string {
-    // Snapshot the underlying body slot (not the stringified getter) so we
-    // can restore the original `null`/non-null state. `body=` now routes
-    // through `_responseBody`, which doubles as the `performed?` signal —
-    // assigning "" would otherwise leave the controller permanently
-    // "performed" after a render-to-string.
-    // Snapshot every response-affecting slot — `render()` may mutate
-    // status, content-type, and headers in addition to the body, and
-    // Rails' `render_to_string` is documented as side-effect free.
     const oldBody = this._responseBody;
     const oldPerformed = this._performed;
     const oldStatus = this.response.status;
@@ -520,9 +400,6 @@ export class Base extends Metal {
     }
   }
 
-  // --- Redirecting ---
-
-  /** Redirect to a URL. */
   redirectTo(
     options: string,
     responseOptions: { status?: number | string; allow_other_host?: boolean } = {},
@@ -541,7 +418,6 @@ export class Base extends Metal {
     this.markPerformed();
   }
 
-  /** Redirect back to the referer or a fallback URL. */
   redirectBack(options: {
     fallbackLocation: string;
     status?: number | string;
@@ -552,9 +428,6 @@ export class Base extends Metal {
     this.redirectTo(url, { status: options.status });
   }
 
-  // --- Content Negotiation ---
-
-  /** Mirrors: `respond_to(*mimes)` (`metal/mime_responds.rb:211-228`). */
   respondTo(...mimes: Array<string | ((collector: Collector) => void)>): void {
     const last = mimes[mimes.length - 1];
     const block = typeof last === "function" ? (mimes.pop() as (c: Collector) => void) : undefined;
@@ -576,9 +449,6 @@ export class Base extends Metal {
     result.handler();
   }
 
-  // --- Flash ---
-
-  /** Set a flash notice. */
   set notice(value: string) {
     this.flash.notice = value;
   }
@@ -587,7 +457,6 @@ export class Base extends Metal {
     return this.flash.notice;
   }
 
-  /** Set a flash alert. */
   set alert(value: string) {
     this.flash.alert = value;
   }
@@ -596,11 +465,8 @@ export class Base extends Metal {
     return this.flash.alert;
   }
 
-  // --- CSRF Protection ---
-
   private static _csrfProtection: RequestForgeryProtection | null = null;
 
-  /** Enable CSRF protection (class-level). */
   static protectFromForgery(
     options: { with?: "exception" | "reset_session" | "null_session" } = {},
   ): void {
@@ -609,7 +475,6 @@ export class Base extends Metal {
     });
   }
 
-  /** Verify the CSRF token. Called as a before_action. */
   verifyAuthenticityToken(): void {
     const csrf = (this.constructor as typeof Base)._csrfProtection;
     if (!csrf) return;
@@ -631,15 +496,12 @@ export class Base extends Metal {
     }
   }
 
-  /** Get the form authenticity token for the current session. */
   formAuthenticityToken(): string {
     const csrf = (this.constructor as typeof Base)._csrfProtection;
     if (!csrf) return "";
     const realToken = csrf.getRealToken(this.session);
     return csrf.maskToken(realToken);
   }
-
-  // --- Allow Browser ---
 
   static allowBrowser(options: {
     versions: BrowserVersions;
@@ -679,114 +541,57 @@ export class Base extends Metal {
     }, callbackOptions);
   }
 
-  // --- Permissions Policy ---
-
-  /**
-   * Override the globally configured Permissions-Policy on a per-action basis.
-   * Mirrors Rails `permissions_policy` class DSL.
-   */
   static permissionsPolicy = permissionsPolicy;
 
-  // --- Content Security Policy ---
-
-  /**
-   * Override the globally configured Content-Security-Policy on a
-   * per-action basis. Mirrors Rails `content_security_policy` class DSL.
-   */
   static contentSecurityPolicy = contentSecurityPolicy;
 
-  /**
-   * Override the globally configured Content-Security-Policy-Report-Only
-   * header. Mirrors Rails `content_security_policy_report_only` class DSL.
-   */
   static contentSecurityPolicyReportOnly = contentSecurityPolicyReportOnly;
 
-  /**
-   * Defined as prototype methods (not instance fields) so subclasses can
-   * override via the normal class-method syntax — the DSL dispatches through
-   * `this.currentContentSecurityPolicy` (content-security-policy.ts:80) for
-   * Rails parity (content_security_policy.rb:42 resolves via `self`).
-   */
-  /** @internal Private in Rails; exposed for parity coverage. */
+  /** @internal */
   isContentSecurityPolicy(): boolean {
     return isContentSecurityPolicy.call(this as never);
   }
-  /** @internal Private in Rails; exposed for parity coverage. */
+  /** @internal */
   contentSecurityPolicyNonce(): string | null {
     return contentSecurityPolicyNonce.call(this as never);
   }
-  /** @internal Private in Rails; exposed for parity coverage. */
+  /** @internal */
   currentContentSecurityPolicy(): ReturnType<typeof currentContentSecurityPolicy> {
     return currentContentSecurityPolicy.call(this as never);
   }
 
-  /**
-   * Apply a rate limit to all actions (or those selected by `only:`/`except:`).
-   * Mirrors Rails `rate_limit` class DSL.
-   */
   static rateLimit = rateLimit;
 
-  /** Rails: `include Logging` (base.rb:302) — `log_at` (metal/logging.rb:17). */
   static logAt = logAt;
   static logProcessAction = logProcessAction;
 
-  /**
-   * Per-request enforcement. Private in Rails; exposed as a prototype
-   * method so subclass overrides win (the DSL dispatches through
-   * `this.rateLimiting`). Listed in AbstractController._internalMethods
-   * so it isn't picked up as an action.
-   * @internal
-   */
+  /** @internal */
   async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
     return rateLimiting.call(this, args);
   }
 
-  /**
-   * Class DSL: override the default form builder for all views rendered by
-   * this controller and its subclasses. Mirrors Rails
-   * `ActionController::FormBuilder::ClassMethods#default_form_builder`.
-   */
   static defaultFormBuilder = defaultFormBuilder;
 
-  /** Instance reader for the configured form builder (Rails parity). */
   defaultFormBuilder(): unknown {
     return defaultFormBuilder.call(this);
   }
 
-  /** @internal Rails parity — caching instrumentation payload. */
+  /** @internal */
   instrumentPayload(key: unknown): { controller: string; action: string; key: unknown } {
     return instrumentPayload.call(this, key);
   }
 
-  /** @internal Rails parity — caching instrumentation name. */
+  /** @internal */
   instrumentName(): string {
     return instrumentName.call(this);
   }
 
-  // --- Params Wrapper ---
-
-  /**
-   * Class-level wrapper options. Mirrors Rails'
-   * `class_attribute :_wrapper_options, default: Options.from_hash(format: [])`.
-   * Statics are inherited through the class chain; `wrapParameters` assigns an
-   * own property on the calling subclass.
-   */
   static _wrapperOptions: ParamsWrapperOptions = ParamsWrapperOptions.fromHash({ format: [] });
 
-  /** Instance accessor for the active wrapper options (reads from constructor). */
   get _wrapperOptions(): ParamsWrapperOptions {
     return (this.constructor as typeof Base)._wrapperOptions;
   }
 
-  /**
-   * Class DSL: configure parameter wrapping. Mirrors Rails
-   * `ActionController::ParamsWrapper::ClassMethods#wrap_parameters`.
-   *
-   *     wrapParameters({ format: ["json"] })
-   *     wrapParameters("person", { include: ["name"] })
-   *     wrapParameters(false)                    // disable wrapping
-   *     wrapParameters(SomeModelClass)
-   */
   static wrapParameters(
     nameOrModelOrOptions:
       | string
@@ -815,35 +620,16 @@ export class Base extends Metal {
     const newOpts = ParamsWrapperOptions.fromHash(merged);
     newOpts.model = model;
     newOpts.klass = this;
-    // Rails' `Options#name` is a lazy getter that derives a default from
-    // `klass.controller_name.singularize` (or `model.to_s.demodulize.underscore`)
-    // on first read. We store name eagerly, so assign the derived default
-    // here when wrapping is enabled but no name was provided — otherwise
-    // `_wrapperEnabled` would always return false for the common Rails form
-    // `wrap_parameters format: [...]`. `nameSet` stays `false` in that
-    // case so subclasses re-derive from their own `klass` via
-    // `inheritedParamsWrapper`.
     if ((newOpts.format?.length ?? 0) > 0 && !newOpts.name) {
       newOpts.name = _defaultWrapModel.call({ _wrapperOptions: newOpts });
     }
     this._wrapperOptions = newOpts;
   }
 
-  /**
-   * Rails' ParamsWrapper `inherited` hook duplicates the parent's options
-   * and rebinds `klass` to the subclass when wrapping is enabled (format
-   * non-empty). JS class statics already inherit; this static method should
-   * be invoked explicitly by subclasses that need a per-subclass `klass`
-   * rebind for `_defaultWrapModel` to derive a name from the subclass.
-   * @internal
-   */
+  /** @internal */
   static inheritedParamsWrapper(): void {
     const inherited = this._wrapperOptions;
     if (!inherited.format || inherited.format.length === 0) return;
-    // Mirrors Rails' `Options#dup` semantics: copy all fields including
-    // `nameSet`, then rebind `klass`. Pass `null` for name so fromHash's
-    // `nameSet` defaults to false, then assign explicitly below to
-    // preserve the parent's explicit-vs-derived state.
     const dup = ParamsWrapperOptions.fromHash({
       format: inherited.format,
       include: inherited.include,
@@ -852,35 +638,24 @@ export class Base extends Metal {
     dup.model = inherited.model;
     dup.klass = this;
     if (inherited.nameSet) {
-      // Parent's name was explicitly provided — inherit it as-is.
       dup.name = inherited.name;
       dup.nameSet = true;
     } else {
-      // Parent's name (if any) was auto-derived; re-derive from the
-      // subclass `klass` so `Child < Parent` wraps under its own name.
       dup.name = _defaultWrapModel.call({ _wrapperOptions: dup });
     }
     this._wrapperOptions = dup;
   }
 
-  // --- HTTP Basic authentication (Rails parity, P17a) ---
-
-  /** Class DSL: `http_basic_authenticate_with name:, password:, realm:, **options`. */
   static httpBasicAuthenticateWith = httpBasicAuthenticateWith;
   httpBasicAuthenticateOrRequestWith = httpBasicAuthenticateOrRequestWith;
   authenticateOrRequestWithHttpBasic = authenticateOrRequestWithHttpBasic;
   authenticateWithHttpBasic = authenticateWithHttpBasic;
   requestHttpBasicAuthentication = requestHttpBasicAuthentication;
 
-  // --- HTTP Digest authentication ---
-
   authenticateOrRequestWithHttpDigest = authenticateOrRequestWithHttpDigest;
   authenticateWithHttpDigest = authenticateWithHttpDigest;
   requestHttpDigestAuthentication = requestHttpDigestAuthentication;
 
-  // --- Rescue ---
-
-  /** Register a rescue handler for a specific error class. */
   static rescueFrom(errorClass: new (...args: any[]) => Error, handler: RescueHandler): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_rescueHandlers")) {
       (this as any)._rescueHandlers = [];
@@ -888,36 +663,14 @@ export class Base extends Metal {
     (this as any)._rescueHandlers.push({ errorClass, handler });
   }
 
-  /**
-   * Process action with rescue handling and async template rendering.
-   *
-   * @internal
-   */
+  /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
-    // `ActionController::Instrumentation` is included last, so its
-    // `process_action` (`instrumentation.rb:60`) is the outermost one in
-    // Rails' ancestry and everything below runs as its `super`.
-    //
-    // Rails' `AbstractController::Base#process` sets `@_action_name` before
-    // dispatching (`abstract_controller/base.rb:155`), so `raw_payload`'s
-    // `action` is already populated. trails assigns it one layer lower, in
-    // `AbstractController::Base#processAction`, which direct callers depend
-    // on — so prime it here for the payload rather than move it.
     this.actionName = action;
     await _instrumentProcessAction.call(this as never, async () => {
       try {
-        // `ActionController::Rendering#process_action` (`rendering.rb:190-194`)
-        // — `self.formats = request.formats.filter_map(&:ref)` before the
-        // action runs, so the lookup context negotiates `"*/*"` down to the
-        // default formats rather than searching for a `*/*` template.
         _processAction.call(this as never, action, ...args);
         if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
           _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
-          // Rails' controller `params` is `request.parameters` by reference, so
-          // the merge in `_performParameterWrapping` is visible to actions. Our
-          // Metal.dispatch snapshots `request.params` into `this.params` before
-          // processAction runs, so we re-sync after wrapping to surface the
-          // wrapped root key to the action.
           this.params = new StrongParameters({
             ...this.request.params,
             ...this.request.pathParameters,
@@ -925,7 +678,6 @@ export class Base extends Metal {
         }
         await super.processAction(action, ...args);
 
-        // Resolve any pending async renders (template/partial)
         if (this._pendingRender && !this.performed) {
           await this.renderAsync(this._pendingRender.options);
           this._pendingRender = null;
@@ -943,9 +695,6 @@ export class Base extends Metal {
     });
   }
 
-  // --- Caching / Conditional GET ---
-
-  /** Check if the response should be fresh (304 Not Modified). */
   freshWhen(options: {
     etag?: string;
     lastModified?: Date | Temporal.Instant;
@@ -957,8 +706,6 @@ export class Base extends Metal {
     }
     if (options.lastModified) {
       // boundary: Realm-safe Date check (instanceof breaks across vm/iframe
-      // realms). Last-Modified is RFC 7231 — emit via Date#toUTCString,
-      // bridging a Temporal.Instant input through epoch ms.
       const isDate = Object.prototype.toString.call(options.lastModified) === "[object Date]";
       // boundary: bridge Temporal.Instant input → Date for toUTCString rendering.
       const lm = isDate
@@ -975,7 +722,6 @@ export class Base extends Metal {
     }
   }
 
-  /** Check if the resource is stale. Returns true if a re-render is needed. */
   stale(options: {
     etag?: string;
     lastModified?: Date | Temporal.Instant;
@@ -985,7 +731,6 @@ export class Base extends Metal {
     return !this.performed;
   }
 
-  /** Set cache control headers. */
   expiresIn(seconds: number, options: { public?: boolean; mustRevalidate?: boolean } = {}): void {
     const parts = [`max-age=${seconds}`];
     if (options.public) parts.push("public");
@@ -993,18 +738,11 @@ export class Base extends Metal {
     this.setHeader("cache-control", parts.join(", "));
   }
 
-  /** Mark response as expired. */
   expiresNow(): void {
     this.setHeader("cache-control", "no-cache");
   }
 
-  // --- Send File / Send Data ---
-
-  /**
-   * Mirrors Rails `send_file_headers!`; wired below via `Base.prototype`.
-   *
-   * @internal
-   */
+  /** @internal */
   declare sendFileHeadersBang: typeof sendFileHeadersBang;
   /** @internal */
   declare appendInfoToPayload: typeof appendInfoToPayload;
@@ -1013,7 +751,6 @@ export class Base extends Metal {
   /** @internal */
   declare haltedCallbackHook: typeof haltedCallbackHook;
 
-  /** Send file content. */
   sendFile(path: string, options: SendFileHeadersOptions = {}): void {
     const content = Buffer.from(
       File.open(path, "rb", (file) => file.read()),
@@ -1027,7 +764,6 @@ export class Base extends Metal {
     this.markPerformed();
   }
 
-  /** Send raw data as a download. */
   sendData(data: string | Buffer, options: SendFileHeadersOptions = {}): void {
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
 
@@ -1037,14 +773,9 @@ export class Base extends Metal {
     this.markPerformed();
   }
 
-  // --- Cookies ---
-
-  /** Get cookie jar (from request). */
   get cookies(): Record<string, string> {
     return (this.request as any)?.cookies ?? {};
   }
-
-  // --- Private helpers ---
 
   private _renderTemplate(action: string, _options: RenderOptions): void {
     const resolver = (this.constructor as typeof Base).templateResolver;
@@ -1114,31 +845,21 @@ export class Base extends Metal {
     }
     if (ifModifiedSince && lastModified) {
       // boundary: HTTP If-Modified-Since / Last-Modified are RFC 7231 date
-      // strings; parse via Date.parse semantics for comparison.
       return new Date(ifModifiedSince) >= new Date(lastModified);
     }
     return false;
   }
 }
 
-// Rails: `base.rb:293-294`.
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
 
-// Rails: `ActionController::DataStreaming#send_file_headers!` mixed in via
-// `include DataStreaming`. Trails wires it onto Base.prototype explicitly.
 Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
 
-// Rails: `ActionController::Instrumentation`'s private hooks, provided by the
-// module and overridable by subclasses (`instrumentation.rb:86-110`).
 Base.prototype.appendInfoToPayload = appendInfoToPayload;
 Base.prototype.cleanupViewRuntime = cleanupViewRuntime;
 Base.prototype.haltedCallbackHook = haltedCallbackHook;
 
-// Rails: `included do helper_method :content_security_policy?,
-// :content_security_policy_nonce end` (content_security_policy.rb:13).
-// Trails wires mixins onto Base explicitly, so register the helper-method
-// proxies here so templates can call these via the helpers module.
 helperMethod(
   Base as unknown as HelpersClassMethods,
   "isContentSecurityPolicy",

@@ -1,21 +1,9 @@
-/**
- * Mirrors: i18n/lib/i18n/backend/transliterator.rb
- *
- * Ruby mixes `Transliterator` into `Backend::Base` with `include`; the JS
- * equivalent is the `this`-typed `transliterate` below, assigned to `Base` so
- * the code stays in the file that matches the gem's layout.
- */
-
 import { ArgumentError } from "../exceptions.js";
 import { t, type Locale } from "../i18n.js";
 import type { Base } from "./base.js";
 
 export const DEFAULT_REPLACEMENT_CHAR = "?";
 
-/**
- * Given a locale and a UTF-8 string, return the locale's ASCII
- * approximation for the string.
- */
 export function transliterate(
   this: Base,
   locale: Locale,
@@ -29,7 +17,6 @@ export function transliterate(
   return this.transliterators[locale].transliterate(string, replacement);
 }
 
-/** Get a transliterator instance. */
 export function get(rule: unknown = null): HashTransliterator | ProcTransliterator {
   if (rule == null || rule === false || isHash(rule)) {
     return new HashTransliterator(rule as Record<string, unknown> | null);
@@ -44,7 +31,6 @@ function isHash(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** A transliterator which accepts a Proc as its transliteration rule. */
 export class ProcTransliterator {
   private rule: (string: string) => string;
 
@@ -52,21 +38,12 @@ export class ProcTransliterator {
     this.rule = rule;
   }
 
-  /**
-   * @missingRailsCall call — PERMANENT: Ruby invokes a Proc with `Proc#call`; the JS
-   * analogue of a Proc is a function, which is invoked by application. There is
-   * no `call` to make (JS `Function#call` takes a receiver and means something
-   * else).
-   */
+  /** @missingRailsCall call — PERMANENT */
   transliterate(string: string, _replacement: string | null = null): string {
     return this.rule(string);
   }
 }
 
-/**
- * A transliterator which accepts a Hash of characters as its translation
- * rule.
- */
 export class HashTransliterator {
   static DEFAULT_APPROXIMATIONS: Readonly<Record<string, string>> = Object.freeze({
     À: "A",
@@ -290,7 +267,6 @@ export class HashTransliterator {
     }
   }
 
-  /** Add transliteration rules to the approximations hash. */
   private add(hash: Record<string, unknown>): void {
     for (const [key, value] of Object.entries(hash)) {
       this.approximations()[String(key)] = String(value);

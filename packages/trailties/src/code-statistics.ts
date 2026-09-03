@@ -1,7 +1,3 @@
-/**
- * Port of railties/lib/rails/code_statistics.rb.
- */
-
 import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
@@ -71,11 +67,6 @@ export class CodeStatistics {
 
   private constructor(private pairs: DirectoryPair[]) {}
 
-  /**
-   * Build a CodeStatistics instance. Async because directory walking
-   * uses the async `fsAdapter` (per the trailties async-only rule),
-   * unlike Rails' synchronous `initialize`.
-   */
   static async create(...pairs: DirectoryPair[]): Promise<CodeStatistics> {
     const inst = new CodeStatistics(pairs);
     for (const [label, dir] of pairs) inst.statistics.set(label, await inst.walk(dir));

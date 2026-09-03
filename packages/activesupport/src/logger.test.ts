@@ -19,10 +19,6 @@ function makeBuffer() {
   };
 }
 
-// ---------------------------------------------------------------------------
-// LoggerTest
-// ---------------------------------------------------------------------------
-
 describe("LoggerTest", () => {
   let output: ReturnType<typeof makeBuffer>;
   let logger: Logger;
@@ -209,9 +205,6 @@ describe("LoggerTest", () => {
 
     try {
       expect(Logger.isLoggerOutputsTo(broadcast, path)).toBe(true);
-      // Ruby's File.join concatenates without normalizing, so Rails' third
-      // assertion (logger_test.rb:48) is what drives `normalize_sources`'
-      // File.realpath branch — `join()` would collapse the dot segment first.
       expect(
         Logger.isLoggerOutputsTo(broadcast, `${dirname(path)}${sep}.${sep}${basename(path)}`),
       ).toBe(true);
@@ -260,13 +253,11 @@ describe("LoggerTest", () => {
   });
 
   it("log outputs to with a filename", () => {
-    // In JS, we use buffer-based output rather than file; verify basic logging
     logger.info("file message");
     expect(output.string).toContain("file message");
   });
 
   it("write binary data to existing file", () => {
-    // In JS, binary data is logged as string; verify it doesn't throw
     expect(() => logger.info(Buffer.from([0x00, 0x01, 0x02]).toString())).not.toThrow();
   });
 
@@ -280,7 +271,6 @@ describe("LoggerTest", () => {
   });
 
   it("logger level main fiber safety", () => {
-    // JS has no fibers; verify level works
     logger.level = Logger.WARN;
     expect(logger.level).toBe(Logger.WARN);
   });
@@ -290,10 +280,6 @@ describe("LoggerTest", () => {
     expect(logger.localLevel).toBe(Logger.ERROR);
   });
 });
-
-// ---------------------------------------------------------------------------
-// BroadcastLoggerTest
-// ---------------------------------------------------------------------------
 
 describe("BroadcastLoggerTest", () => {
   let log1Output: ReturnType<typeof makeBuffer>;
@@ -346,10 +332,6 @@ describe("BroadcastLoggerTest", () => {
     expect(log2Output.string).toContain("msg");
   });
 });
-
-// ---------------------------------------------------------------------------
-// TaggedLoggingTest
-// ---------------------------------------------------------------------------
 
 describe("TaggedLoggingTest", () => {
   let output: ReturnType<typeof makeBuffer>;
@@ -418,7 +400,3 @@ describe("SimpleFormatter", () => {
     expect(fmt.call("DEBUG", Temporal.Now.instant(), null, "")).toBe("\n");
   });
 });
-
-// ---------------------------------------------------------------------------
-// TaggedLoggingWithoutBlockTest
-// ---------------------------------------------------------------------------

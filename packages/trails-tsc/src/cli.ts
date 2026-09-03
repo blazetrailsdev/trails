@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-/**
- * `trails-tsc-views` CLI entrypoint. Phase 2c-a shipped `build`;
- * Phase 2c-b adds `dev` (watch mode). `init` is deferred to 2c-c.
- *
- * Named `trails-tsc-views` (not `trails-tsc`) because activerecord
- * already publishes a `trails-tsc` bin — its tsc-passthrough wrapper
- * for AR model virtualization (packages/activerecord/bin/trails-tsc.js).
- * Unifying the two CLIs under a single `trails-tsc` is tracked as a
- * follow-up; not in scope for Phase 2c.
- */
 
 import { buildViews, type BuildViewsOptions } from "./build-views.js";
 import { watchViews, type WatchHandle } from "./watch-views.js";
@@ -56,10 +46,6 @@ export function runCli(argv: readonly string[]): number {
       return 1;
     }
   }
-  // `dev`: process stays alive on the open fs.watch handle; SIGINT/SIGTERM
-  // close cleanly. The initial `buildViews` runs synchronously inside
-  // `watchViews`, so capturing its failure via `onError` lets us exit
-  // non-zero before the watcher takes over the event loop.
   let initialErr: Error | null = null;
   let started = false;
   let handle: WatchHandle;
@@ -94,19 +80,9 @@ export function runCli(argv: readonly string[]): number {
   return 0;
 }
 
-/**
- * Entry point. Invoked by `bin/trails-tsc-views.js`; not run on import, so
- * tests can exercise `runCli` directly. The bin is a different file from
- * this module, so an `import.meta.url === argv[1]` self-execution guard here
- * would never fire through it and the CLI would be a no-op.
- */
 export function main(): void {
   const argv = process.argv.slice(2);
   const rc = runCli(argv);
-  // `dev` registers SIGINT/SIGTERM handlers and returns 0; calling
-  // `process.exit` here would tear down the watcher immediately. The
-  // open fs.watch handle keeps the event loop alive on its own —
-  // only exit explicitly for one-shot commands.
   if (argv[0] !== "dev") process.exit(rc);
   else if (rc !== 0) process.exit(rc);
 }

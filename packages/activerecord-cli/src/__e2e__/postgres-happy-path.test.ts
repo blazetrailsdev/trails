@@ -1,5 +1,3 @@
-// Postgres E2E suite — mirrors sqlite-happy-path.test.ts. Set PG_TEST_URL to run.
-
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readdir, writeFile } from "fs/promises";
 import { join } from "path";
@@ -20,14 +18,6 @@ function pgUrlWithDb(url: string, dbName: string): string {
   return parsed.toString();
 }
 
-// This suite drives real PostgreSQL: every `run([...])` does a cold connect +
-// CREATE/DROP DATABASE on the postgres maintenance DB. On a heavily loaded
-// PostgreSQL CI runner those round-trips occasionally blow past vitest's
-// defaults (5s test, 10s hook), surfacing as "Hook timed out in 10000ms". The
-// activerecord-cli suite runs under the "other" vitest project, which doesn't
-// bump timeouts. Give the body 30s (suite option, mirrors #2758) and the
-// afterEach teardown its own 30s below (suite timeout doesn't reach hooks;
-// matches the activerecord project's hookTimeout: 30_000).
 describe.skipIf(!PG_URL)("postgres-happy-path E2E", { timeout: 30_000 }, () => {
   let tmpDir: string;
   let dbUrl: string;
@@ -41,12 +31,10 @@ describe.skipIf(!PG_URL)("postgres-happy-path E2E", { timeout: 30_000 }, () => {
   });
 
   afterEach(async () => {
-    // Drop before restoring mocks so the test's existing console suppressors
-    // keep teardown quiet. Best-effort — ignore if create never succeeded.
     try {
       await run(["db:drop"], tmpDir);
     } catch {
-      // ignore
+      /** @empty */
     }
     vi.restoreAllMocks();
     if (origTrailsEnv === undefined) {
@@ -55,20 +43,15 @@ describe.skipIf(!PG_URL)("postgres-happy-path E2E", { timeout: 30_000 }, () => {
       process.env.TRAILS_ENV = origTrailsEnv;
     }
     await teardownE2eFixture(tmpDir);
-    // Per-hook timeout: the suite-level option above covers tests, not hooks,
-    // and db:drop here does the same cold connect + DROP DATABASE. See the
-    // describe block for the full rationale.
   }, 30_000);
 
   it("init → db:create → generate:migration → db:migrate → db:version → db:migrate:status", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const errors = captureConsoleErrors();
 
-    // 1. ar init — scaffolds config/database.ts, db/migrate/, app/models/, db.ts
     const initCode = await run(["init", "--driver", "pg"], tmpDir);
     expect(initCode, exitReason("ar init should exit 0", errors)).toBe(0);
 
-    // 2. Overwrite config/database.ts: init scaffolds a sqlite default; replace with our unique PG DB.
     const pgConfig = `const config = {
   development: { adapter: "postgresql", url: "${dbUrl}" },
   test:        { adapter: "postgresql", url: "${dbUrl}" },
@@ -78,11 +61,9 @@ export default config;
 `;
     await writeFile(join(tmpDir, "config", "database.ts"), pgConfig, "utf8");
 
-    // 3. ar db:create
     const createCode = await run(["db:create"], tmpDir);
     expect(createCode, exitReason("ar db:create should exit 0", errors)).toBe(0);
 
-    // 4. ar generate:migration AddUsersTable
     const genCode = await run(["generate:migration", "AddUsersTable"], tmpDir);
     expect(genCode, exitReason("ar generate:migration should exit 0", errors)).toBe(0);
 
@@ -94,14 +75,11 @@ export default config;
     const migrationPath = join(migrateDir, migrationEntry!);
     const version = migrationEntry!.split("_")[0];
 
-    // 5. Patch the generated migration
     await writeFile(migrationPath, MIGRATION_BODY, "utf8");
 
-    // 6. ar db:migrate
     const migrateCode = await run(["db:migrate"], tmpDir);
     expect(migrateCode, exitReason("ar db:migrate should exit 0", errors)).toBe(0);
 
-    // 7. ar db:version
     const versionLines: string[] = [];
     vi.spyOn(console, "log").mockImplementation(
       (...args) => void versionLines.push(args.map(String).join(" ")),
@@ -110,7 +88,6 @@ export default config;
     expect(versionCode, exitReason("ar db:version should exit 0", errors)).toBe(0);
     expect(versionLines.join("\n")).toContain(`Current version: ${version}`);
 
-    // 8. ar db:migrate:status
     const statusChunks: string[] = [];
     vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
       statusChunks.push(String(chunk));

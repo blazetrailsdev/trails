@@ -36,7 +36,6 @@ describe("filteredLocation", () => {
   });
 
   it("returns FILTERED when the URL cannot be parsed", () => {
-    // `http://[invalid` triggers a WHATWG URL parse error (invalid IPv6 host).
     const host = makeHost("http://[invalid", makeRequest([]));
     expect(filteredLocation.call(host)).toBe(FILTERED);
   });

@@ -41,7 +41,6 @@ describe("AttrInternalTest", () => {
     expect(instance._foo).toBeUndefined();
     instance.foo = 1;
     expect(instance._foo).toBe(1);
-    // In JS, accessing a setter-only property returns undefined (not an error like Ruby's NoMethodError)
     expect(instance.foo).toBeUndefined();
   });
 
@@ -76,11 +75,6 @@ describe("AttrInternalTest", () => {
     expect(instance.abcfoodef).toBe(1);
   });
 
-  /**
-   * trails-only: `attr_internal` is an `alias_method` of
-   * `attr_internal_accessor` (`module/attr_internal.rb:20`), so the two names
-   * have to be the same function.
-   */
   it("attrInternal is an alias of attrInternalAccessor", () => {
     expect(attrInternal).toBe(attrInternalAccessor);
   });

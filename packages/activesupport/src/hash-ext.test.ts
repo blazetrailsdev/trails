@@ -36,11 +36,9 @@ import {
   compactBlank,
 } from "./hash-utils.js";
 
-// ── HashExtTest ────────────────────────────────────────────────────────────────
-
 describe("HashExtTest", () => {
   const strings = { a: 1, b: 2 };
-  const symbols = { a: 1, b: 2 }; // in TS keys are always strings
+  const symbols = { a: 1, b: 2 };
   const mixed = { a: 1, b: 2 };
 
   it("deep_transform_keys — transforms all keys recursively", () => {
@@ -127,8 +125,6 @@ describe("HashExtTest", () => {
   });
 
   it("assert_valid_keys — throws on unknown key", () => {
-    // Rails' assert_valid_keys raises Ruby's ArgumentError (keys.rb:52), so
-    // callers can narrow on the type — assert both the message and the type.
     expect(() =>
       assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
     ).toThrow("Unknown key: :failore. Valid keys are: :failure, :funny");
@@ -217,8 +213,6 @@ describe("HashExtTest", () => {
   });
 });
 
-// ── HashExtToParamTests ────────────────────────────────────────────────────────
-
 describe("HashExtToParamTests", () => {
   it("empty hash returns empty string", () => {
     expect(toParam({})).toBe("");
@@ -249,7 +243,6 @@ describe("HashExtToParamTests", () => {
   it("encodes spaces and special chars", () => {
     const result = toParam({ "param 1": "A string with / characters" });
     expect(result).toContain("param");
-    // encoded space
     expect(result).toMatch(/param[+%20]/);
   });
 
@@ -264,14 +257,8 @@ describe("HashExtToParamTests", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Ruby-named tests — exact names from core_ext/hash_ext_test.rb
-// Used by test comparison pipeline to match real coverage.
-// ---------------------------------------------------------------------------
-
 describe("HashExtTest", () => {
   it("methods", () => {
-    // verify core methods exist
     expect(typeof deepMerge).toBe("function");
     expect(typeof symbolizeKeys).toBe("function");
     expect(typeof stringifyKeys).toBe("function");
@@ -296,7 +283,6 @@ describe("HashExtTest", () => {
   });
 
   it("deep transform keys with bang mutates", () => {
-    // In our immutable TS implementation, ! just means the same transformation
     const h = { x: 1 };
     const r = deepTransformKeys(h, (k) => k.toString() + "!");
     expect((r as any)["x!"]).toBe(1);
@@ -455,7 +441,6 @@ describe("HashExtTest", () => {
   });
 
   it("deep merge with block", () => {
-    // Our deepMerge doesn't support a block, but basic merge still works
     const h = deepMerge({ a: 1 }, { a: 2 });
     expect(h.a).toBe(2);
   });

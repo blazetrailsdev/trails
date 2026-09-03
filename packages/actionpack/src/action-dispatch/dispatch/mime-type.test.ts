@@ -12,8 +12,6 @@ describe("MimeTypeTest", () => {
     const custom = MimeType.register("text/x-custom-test", "x_custom_test");
     expect(MimeType.lookup("x_custom_test")).toBe(custom);
     MimeType.unregister("x_custom_test");
-    // Rails: Mime::Type.lookup always returns (creates ad-hoc type for unknowns).
-    // The Rails unregister test only asserts Mime[:sym] (lookupByExtension) is nil.
     expect(MimeType.lookupByExtension("x_custom_test")).toBeUndefined();
   });
 
@@ -185,7 +183,6 @@ describe("MimeTypeTest", () => {
   it("all() returns unique registered types in registration order", () => {
     const all = MimeType.all();
     expect(new Set(all).size).toBe(all.length);
-    // HTML is registered first (see static initializers), JSON after.
     const htmlIdx = all.indexOf(MimeType.HTML);
     const jsonIdx = all.indexOf(MimeType.JSON);
     expect(htmlIdx).toBeGreaterThanOrEqual(0);
@@ -204,7 +201,6 @@ describe("MimeTypeTest", () => {
     MimeType.registerAlias("aliased", "aliased_alias");
     expect(MimeType.lookup("aliased_alias")?.symbol).toBe("aliased");
     MimeType.unregister("aliased");
-    // Rails lookup creates ad-hoc types; isRegistered is the existence check.
     expect(MimeType.isRegistered("aliased")).toBe(false);
     expect(MimeType.isRegistered("aliased_alias")).toBe(false);
     expect(MimeType.isRegistered("application/aliased")).toBe(false);

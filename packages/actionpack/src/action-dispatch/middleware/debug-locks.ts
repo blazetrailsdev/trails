@@ -1,23 +1,9 @@
-/**
- * ActionDispatch::DebugLocks
- *
- * Diagnostic middleware exposing a snapshot of the autoload interlock
- * (`/rails/locks`) — threads, their lock state, and the relationships
- * between them. Strictly diagnostic; output formatting is human-readable
- * and not part of the public contract.
- */
-
 import { bodyFromString, CONTENT_TYPE, CONTENT_LENGTH } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
 
 export interface ThreadLike {
-  /**
-   * Mirrors Ruby's `Thread#status`: "run" | "sleep" | "aborting" | false (terminated
-   * with exception) | nil (terminated normally). The middleware renders falsy as "dead",
-   * mirroring `thread.status || 'dead'` in the Ruby source.
-   */
   status: string | false | null;
   backtrace(): string[] | null;
   id: number;
@@ -39,18 +25,8 @@ export interface InterlockLike {
 }
 
 export class DebugLocks {
-  /**
-   * Source of `raw_state`. Mirrors Ruby's `ActiveSupport::Dependencies.interlock`,
-   * which has no port yet — assign before mounting the middleware.
-   */
   static interlock: InterlockLike | null = null;
 
-  /**
-   * Charset used for the response `content-type`. Rails reads
-   * `ActionDispatch::Response.default_charset` directly at request time
-   * (`debug_locks.rb:104`); this getter mirrors that so the railtie's
-   * `config.actionDispatch.defaultCharset` flows through here as well.
-   */
   static get defaultCharset(): string {
     return Response.defaultCharset;
   }
@@ -88,8 +64,6 @@ export class DebugLocks {
       );
     }
     const threads = interlock.rawState<Map<ThreadLike, ThreadInfo>>((rawThreads) => {
-      // The Interlock comes to a complete halt while this block runs, so do as
-      // little as possible here.
       let idx = 0;
       for (const [thread, info] of rawThreads) {
         info.index = idx++;

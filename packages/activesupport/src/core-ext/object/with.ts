@@ -1,7 +1,3 @@
-/**
- * Temporarily sets attributes on an object, executes a block, then restores
- * the original values. Mirrors Ruby's Object#with from ActiveSupport.
- */
 export function objectWith<T extends object, R>(
   obj: T,
   attrs: Partial<Record<Extract<keyof T, string>, unknown>>,
@@ -33,9 +29,7 @@ export function objectWith<T extends object, R>(
           } else {
             delete (obj as Record<string, unknown>)[key];
           }
-        } catch {
-          // Best-effort restoration when unwinding from an error
-        }
+        } catch {}
       } else {
         if (existed[key]) {
           obj[key as keyof T] = saved[key as keyof T] as T[keyof T];

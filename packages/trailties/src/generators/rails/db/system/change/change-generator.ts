@@ -1,13 +1,3 @@
-// Mirrors railties/lib/rails/generators/rails/db/system/change/change_generator.rb.
-// Trailties substitutions: the Rails generator rewrites `config/database.yml`
-// (ERB/YAML) and `Gemfile`. Trailties emits `config/database.ts` and
-// `package.json` instead, so `editDatabaseConfig` rewrites the TS module and
-// `editPackageJson` swaps the database dependency. Dockerfile rewriting
-// mirrors Rails when the Dockerfile carries db-specific apt packages.
-// `editDevcontainerFiles` mirrors Rails' edit_devcontainer_json / edit_compose_yaml;
-// compose.yaml is read/written as JSON because DevcontainerGenerator serialises it
-// with JSON.stringify (JSON is valid YAML, so Docker Compose accepts it).
-
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
@@ -34,7 +24,6 @@ export class ChangeGenerator extends GeneratorBase {
       );
     }
     this.to = options.to as DatabaseName;
-    // Mirrors railties' AppName module: derive from destination_root basename.
     this.appName = options.appName ?? File.basename(this.cwd);
   }
 
@@ -52,26 +41,14 @@ export class ChangeGenerator extends GeneratorBase {
     return this.getCreatedFiles();
   }
 
-  /**
-   * @missingRailsArgs template — PERMANENT: Rails writes `config/database.yml`;
-   * a trails app's database config is a TS module (`trailties/src/database.ts`
-   * loads it), so the destination is resolved, not a literal.
-   */
+  /** @missingRailsArgs template — PERMANENT */
   editDatabaseConfig(): void {
-    // Candidate order matches the runtime loader in trailties/src/database.ts
-    // so editing prefers the active config.
     const target =
       ["config/database.ts", "config/database.js"].find((p) => this.fileExists(p)) ??
       `config/database${this.ext()}`;
     this.template(this.database.template, target);
   }
 
-  /**
-   * Rails' `Thor::Actions#template`, whose `source` names the per-adapter
-   * template under `rails/generators/rails/app/templates/`. trails renders that
-   * config as a TypeScript module instead of copying a `.yml`, so `source`
-   * selects the renderer rather than a file on disk.
-   */
   private template(source: string, destination: string): void {
     this.writeOrUpdate(destination, databaseConfigTs(source, this.database, this.appName));
   }
@@ -107,13 +84,6 @@ export class ChangeGenerator extends GeneratorBase {
     this.writeOrUpdate("package.json", JSON.stringify(pkg, null, 2) + "\n");
   }
 
-  // Mirrors railties change_generator.rb's exact-string gsub against
-  // all_docker_bases_regex / all_docker_builds_regex: matches only the
-  // package lists `dockerPackages(...)` would emit for a known database.
-  // Trailties' current AppGenerator Dockerfile (app-generator.ts) doesn't
-  // emit those lines today, so on a default-generated app this is a no-op
-  // until AppGenerator's Dockerfile is aligned with the Database registry
-  // (tracked under PR 1.14d in docs/trailties-plan.md).
   editDockerfile(): void {
     if (!this.fileExists("Dockerfile")) return;
     const fullPath = File.join(this.cwd, "Dockerfile");
@@ -169,7 +139,6 @@ export class ChangeGenerator extends GeneratorBase {
       );
     }
 
-    // Mirrors edit_devcontainer_json: update DB_HOST and db feature entry.
     const env = (json.containerEnv ?? {}) as Record<string, string>;
     if (this.database.service) {
       env.DB_HOST = this.database.name;
@@ -260,8 +229,6 @@ function databaseConfigTs(template: string, database: Database, appName: string)
       ``,
     ].join("\n");
   }
-  // `Database#template` is the per-adapter template path; `Database#name` is a
-  // service/volume identifier and not safe to switch on.
   const adapter = template === "config/databases/postgresql.yml" ? "postgresql" : "mysql2";
   const port = database.port!;
   const block = (env: string) =>
@@ -281,11 +248,6 @@ function dockerPackages(base: string[], extra: string | undefined): string {
 }
 
 function dockerPackagesRegex(base: string[], pick: (d: Database) => string | undefined): RegExp {
-  // Mirrors railties change_generator.rb: each alternation arm is wrapped in
-  // \b boundaries so the package list only matches as a whole word run
-  // (e.g. won't partial-match inside `build-essential git libfoo-dev` if the
-  // arm is `build-essential git`). Sort by descending length first because
-  // JS regex alternation is first-match, not longest-match.
   const alts = [...new Set(Database.all().map((d) => dockerPackages(base, pick(d))))].sort(
     (a, b) => b.length - a.length,
   );

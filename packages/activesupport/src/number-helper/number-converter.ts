@@ -4,10 +4,8 @@ import { camelize } from "../inflector.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { merge, mergeBang } from "../hash-utils.js";
 
-/** `BigDecimal.double_fig * 2`, the default precision `Rational#to_d(0)` uses. */
 const RATIONAL_DEFAULT_PRECISION = 32;
 
-/** What `BigDecimal(str, exception: false)` accepts (number_converter.rb:183). */
 export const BIGDECIMAL_STRING = /^\s*[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?\s*$/;
 
 export type NumberFormatOptions = object;
@@ -85,12 +83,6 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     this.opts = options;
   }
 
-  /**
-   * Mirrors: `NumberConverter#execute` (number_converter.rb:130-137). The
-   * first two arms answer `nil` and the unconverted `number` — a `String`
-   * comes back out of `number_to_human("x")` only because the input already
-   * was one.
-   */
   execute(): unknown {
     if (this.number == null || this.number === false) return null;
     if (this.validateFloat && !this.validBigdecimal()) return this.number;
@@ -103,23 +95,6 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
     return false;
   }
 
-  /**
-   * Mirrors: ActiveSupport::NumberHelper::NumberConverter#valid_bigdecimal
-   * (number_converter.rb:178-187).
-   *
-   * The String arm reproduces `BigDecimal(number, exception: false)` — the
-   * whole string must parse, so `"1,11"` and `"12.5abc"` are `null`, while
-   * surrounding whitespace and an exponent are accepted. The final arm is
-   * Ruby's `number.to_d rescue nil`: a `BigDecimal` is already converted, and
-   * anything else answering `to_d` is converted through it.
-   *
-   * The `when Float, Rational` arm is `number.to_d(0)`; `to_d(0)` on a
-   * Rational is BigDecimal's default precision — `BigDecimal.double_fig * 2`,
-   * so `Rational(1, 3).to_d(0)` carries 32 significant digits on MRI 3.3.11 —
-   * which has to be supplied here because this port raises without a
-   * precision for a Rational, exactly as `Kernel#BigDecimal` does. A Float
-   * needs no explicit precision: its decimal expansion is already finite.
-   */
   protected validBigdecimal(): BigDecimal | null {
     const number = this.number;
     if (number instanceof Rational) return new BigDecimal(number, RATIONAL_DEFAULT_PRECISION);

@@ -114,40 +114,28 @@ describe("ActionDispatch::Journey::Path::Pattern — matching", () => {
   });
 
   it("test_insensitive_regexp_with_group", () => {
-    // /i flags on requirement regexes are lifted to the compiled
-    // Pattern regex. Rails inline-scopes flags via Regexp.union (impossible
-    // in JS), so the flag leaks to the whole pattern — practical impact is
-    // limited because the surrounding regex is mostly non-letter.
     const p = buildPath("/page/:name/aaron", { name: /(tender|love)/i });
     expect(p.isMatch("/page/TENDER/aaron")).toBe(true);
     expect(p.isMatch("/page/loVE/aaron")).toBe(true);
   });
 
   it("does not lift /m flag — would break ^/$ anchoring", () => {
-    // If /m leaked to the outer regex, ^/$ would become line-anchors.
-    // Use a USED requirement so the flag is actually a candidate.
     const p = buildPath("/page/:name", { name: /foo/m });
     expect(p.isMatch("xxx\n/page/foo")).toBe(false);
     expect(p.isMatch("/page/foo")).toBe(true);
   });
 
   it("does not lift flags from unused requirements", () => {
-    // {ignored: /x/i} would have made the whole pattern case-insensitive
-    // before the names-filter landed. With it, the unused requirement is
-    // ignored entirely.
     const p = buildPath("/Page", { ignored: /x/i });
     expect(p.isMatch("/Page")).toBe(true);
     expect(p.isMatch("/page")).toBe(false);
   });
 
   it("escapes char-class metacharacters in separators", () => {
-    // Separators containing `]`, `-`, `^`, or `\` would have produced
-    // invalid regex / unintended ranges before escapeCharClass landed.
     expect(() => buildPath("/:foo", { foo: /.+/ }, "]^-\\", true)).not.toThrow();
   });
 
   it("propagates /u flag so Unicode property escapes compile", () => {
-    // \p{Letter} requires the /u flag — would throw without flag lifting.
     const p = buildPath("/page/:name", { name: /\p{Letter}+/u });
     expect(p.isMatch("/page/Größe")).toBe(true);
     expect(p.isMatch("/page/123")).toBe(false);
@@ -255,8 +243,6 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
   });
 
   it("anchors the union as a single alternation, not split anchors", () => {
-    // /^a|b$/ parses as /(^a)|(b$)/. Verify the (?:…) wrapping by
-    // checking that neither branch leaks past its anchor.
     const p = buildPath("/page/:name", { name: [/foo/, /bar/] });
     const re = p.requirementsForMissingKeysCheck["name"];
     expect(re.test("foo")).toBe(true);
@@ -271,9 +257,6 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
   });
 
   it("Pattern pushes RegExp requirements into the SymbolNode for GTG widening", () => {
-    // Mirrors Rails `ast.requirements = …` — the symbol's effective regex
-    // becomes the user-supplied requirement so the GTG accepts characters
-    // (e.g. `.`) that the default `[^./?]+` char-class would reject.
     const tree = new Parser().parse("/posts/:filename");
     const ast = new Ast(tree, true);
     new Pattern(ast, { filename: /(.+)/ }, "/.?", true);
@@ -286,24 +269,13 @@ describe("ActionDispatch::Journey::Path::Pattern — requirements", () => {
 });
 
 describe("ActionDispatch::Journey::Path::Pattern — leading-optional normalization", () => {
-  // The Pattern constructor rewrites a leading-optional spec so callers
-  // don't have to do Mapper-style path-string surgery before building one.
-  // Two shapes are handled, both mirroring Rails Mapper.normalize_path.
-
   it("drops a duplicate top-level SLASH when followed by an optional group starting with SLASH", () => {
-    // `(/:locale)/posts` after journey-normalize is `/(/:locale)/posts`.
-    // Without the fix the regex would be `^/(?:/(...))?/posts$` (matches
-    // neither `/posts` nor `/en/posts`). The fix drops the leading `/`.
     const p = buildPath("/(/:locale)/posts");
     expect(p.match("/posts")).toBeDefined();
     expect(p.match("/en/posts")).toBeDefined();
   });
 
   it("keeps the top-level SLASH but drops the inner SLASH of the first group for all-optional paths", () => {
-    // `(/:locale)(/:platform)` normalized → `/(/:locale)(/:platform)`. We
-    // want `/`, `/en`, and `/en/us` to all match. The fix moves the slash
-    // out of the first group so the leading `/` separates the first
-    // capture: regex becomes `^/(?:(...))?(?:/(...))?$`.
     const p = buildPath("/(/:locale)(/:platform)");
     expect(p.match("/")).toBeDefined();
     expect(p.match("/en")).toBeDefined();
@@ -311,8 +283,6 @@ describe("ActionDispatch::Journey::Path::Pattern — leading-optional normalizat
   });
 
   it("handles all-optional paths with non-`/:` second group (e.g. `(.:format)`)", () => {
-    // `(/:locale)(.:format)` is all-optional but the second group starts
-    // with `.`; the fix should still classify the path as all-optional.
     const p = buildPath("/(/:locale)(.:format)");
     expect(p.match("/")).toBeDefined();
     expect(p.match("/en")).toBeDefined();
@@ -320,25 +290,18 @@ describe("ActionDispatch::Journey::Path::Pattern — leading-optional normalizat
   });
 
   it("leaves paths whose second top-level node isn't a SLASH-led Group alone", () => {
-    // `/posts/:id` has no leading-optional group — no rewrite, regex
-    // stays `^/posts/([^/.?]+)$`.
     const p = buildPath("/posts/:id");
     expect(p.toRegexp().source).toBe("^\\/posts\\/([^/.?]+)$");
   });
 
   it("handles the single-group all-optional shape `/(/:locale)`", () => {
-    // Smallest all-optional path: one SLASH + one Group whose body
-    // starts with SLASH. Both `/` and `/en` should match.
     const p = buildPath("/(/:locale)");
     expect(p.match("/")).toBeDefined();
     expect(p.match("/en")).toBeDefined();
   });
 
   it("doesn't rewrite when the second top-level Group's body is just a SLASH", () => {
-    // Degenerate body `(/)`: there's no symbol after the slash so the
-    // normalization can't safely drop it. Leave the spec alone.
     const p = buildPath("/(/)/foo");
-    // No crash, no exception — that's the contract.
     expect(p.toRegexp()).toBeInstanceOf(RegExp);
   });
 });

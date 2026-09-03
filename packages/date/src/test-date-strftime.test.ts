@@ -1,36 +1,9 @@
-/**
- * Port of ruby/date's `test/date/test_date_strftime.rb`, the standard
- * directive set (`:70-215`, through `test_strftime__minus`), the GNU
- * coreutils extensions (`:216-356`, through `test_strftime__gnuext_complex`),
- * `test__different_format` (`:359-443`) and `test_overflow` (`:445-452`).
- *
- * The gem's statics answer `Temporal` under RFC 0088, so where Ruby writes
- * `DateTime.parse(s)` and then calls `#strftime` on the result, this file goes
- * through the exported `dtNewByFrags`/`dNewByFrags` builders those statics
- * themselves call — the gem-shaped object that carries `strftime`.
- *
- * `test__different_format`'s `limit:` arms go through the statics, which answer
- * `Temporal` under RFC 0088, so where Ruby compares the parsed `DateTime` to
- * `d2` directly this file compares the seat each side names.
- *
- * `test_strftime__offset`'s `assert_warning(/invalid offset/)` arm goes through
- * {@link assertWarning}, which sets `$VERBOSE` for the block the way Ruby's
- * does — `rb_warning("invalid offset is ignored")` (`date_core.c:8304`) is
- * emitted only under it.
- */
-
 import { describe, it, expect, vi } from "vitest";
 import { Date as RubyDate, DateTime as RubyDateTime, dNewByFrags, dtNewByFrags } from "./date.js";
 import { Time as RubyTime } from "./time.js";
 import { setRubyVerbose } from "./rb-warning.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
-/**
- * Ruby's `assert_warning` (`test/lib/core_assertions.rb`): runs the block with
- * `$VERBOSE` set, capturing what `rb_warning` writes, and matches it against
- * the pattern. `$VERBOSE` is restored in a `finally` so it cannot leak past the
- * block, let alone past this file.
- */
 function assertWarning(pattern: RegExp, block: () => void): void {
   const stderr = vi.spyOn(console, "warn").mockImplementation(() => {});
   let output: string;
@@ -171,7 +144,7 @@ describe("TestDateStrftime", () => {
     expect(d.strftime("")).toEqual("");
     expect(d.strftime(" ".repeat(3))).toEqual(" ".repeat(3));
     expect(d.strftime("\tfoo\n\0\r")).toEqual("\tfoo\n\0\r");
-    expect(d.strftime("%\n")).toEqual("%\n"); // gnu
+    expect(d.strftime("%\n")).toEqual("%\n");
     expect(d.strftime("%A".repeat(1024) + ",")).toEqual("Saturday".repeat(1024) + ",");
     expect(d.strftime("%%%")).toEqual("%%");
     expect(d.strftime("Anton von Webern")).toEqual("Anton von Webern");
@@ -287,7 +260,6 @@ describe("TestDateStrftime", () => {
   });
 
   it("strftime gnuext", () => {
-    // coreutils
     let d = new RubyDateTime(2006, 8, 8, 23, 15, 33, new Rational(9, 24));
 
     expect(d.strftime("%-Y")).toEqual("2006");
@@ -389,7 +361,6 @@ describe("TestDateStrftime", () => {
   });
 
   it("strftime gnuext LN", () => {
-    // coreutils
     const d = gemDateTimeParse("2008-11-25T00:11:22.0123456789");
     expect(d.strftime("%L")).toEqual("012");
     expect(d.strftime("%0L")).toEqual("012");
@@ -408,7 +379,6 @@ describe("TestDateStrftime", () => {
   });
 
   it("strftime gnuext z", () => {
-    // coreutils
     const d = gemDateTimeParse("2006-08-08T23:15:33+09:08:07");
     expect(d.strftime("%z")).toEqual("+0908");
     expect(d.strftime("%:z")).toEqual("+09:08");
@@ -526,16 +496,11 @@ describe("TestDateStrftime", () => {
   });
 
   it("overflow", () => {
-    // `assert_raise(ArgumentError, Errno::ERANGE)` names two acceptable
-    // classes, and `date_strftime_alloc` raises the second
-    // (`date_core.c:1780` → `rb_syserr_fail`); vitest's `toThrow` takes one
-    // class, so the raise is asserted without naming either.
     expect(() => new RubyDate(2000, 1, 1).strftime("%2147483647c")).toThrow();
     expect(() => new RubyDateTime(2000, 1, 1).strftime("%2147483647c")).toThrow();
   });
 });
 
-/** Ruby's `Object#inspect` over the message argument, whose Rationals hold BigInts. */
 function inspect(value: unknown): string {
   return JSON.stringify(value, (_k, v) => (typeof v === "bigint" ? String(v) : v));
 }

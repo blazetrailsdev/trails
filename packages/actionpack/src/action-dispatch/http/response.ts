@@ -1,9 +1,3 @@
-/**
- * ActionDispatch::Response
- *
- * Represents an HTTP response with status, headers, and body.
- */
-
 import { presence } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import {
@@ -41,9 +35,7 @@ import {
   parameterFilteredLocation as _parameterFilteredLocation,
 } from "./filter-redirect.js";
 
-/** Rails: `CONTENT_TYPE = "Content-Type"` (response.rb:84). */
 const CONTENT_TYPE = "Content-Type";
-/** Rack: `SET_COOKIE = 'set-cookie'` (rack/lib/rack/constants.rb:24). */
 const SET_COOKIE = "set-cookie";
 const NO_CONTENT_CODES = [100, 101, 102, 103, 204, 205, 304] as const;
 const CONTENT_TYPE_PARSER =
@@ -54,10 +46,8 @@ interface ContentTypeHeader {
   readonly charset: string | undefined;
 }
 const NULL_CONTENT_TYPE_HEADER: ContentTypeHeader = { mimeType: undefined, charset: undefined };
-/** Rails: `RackBody::BODY_METHODS` (response.rb:510), less `each`, which RackBody defines. */
 const BODY_METHODS = ["toAry", "call", "toPath"] as const;
 
-/** Mirrors Rails' `ActionDispatch::Response::Buffer` (response.rb:100-157). */
 export class ResponseBuffer {
   private response: Response;
   private buf: Array<unknown>;
@@ -71,7 +61,6 @@ export class ResponseBuffer {
 
   get body(): string {
     if (this.strBody !== null) return this.strBody;
-    // Rails: `@buf.each { |chunk| buf << chunk }`. Join avoids O(n²) concat.
     this.strBody = this.buf.map((c) => String(c)).join("");
     return this.strBody;
   }
@@ -105,19 +94,6 @@ export class ResponseBuffer {
   }
 }
 
-/**
- * Mirrors Rails' `ActionDispatch::Response::RackBody` (response.rb:497-536) —
- * the third element of the Rack triple. Rack body methods stay lazy and go
- * through the response, so `close` is `Response#abort` and `each` is
- * `Response#each`.
- *
- * Ruby gates `to_ary` / `call` / `to_path` behind a `respond_to?` that forwards
- * to `@response.stream` (response.rb:512-518). JS has no `respond_to?` hook, so
- * those three are installed on the instance only when the stream answers them —
- * the response is committed before `to_a` builds this, so the stream is settled
- * and the answer cannot change. `[Symbol.iterator]` is JS's spelling of `each`,
- * which is how a Rack consumer walks the body here.
- */
 export class RackBody {
   private response: Response;
 
@@ -154,7 +130,6 @@ export class RackBody {
 }
 
 export class Response {
-  /** Rails: `cattr_accessor :default_charset, default: "utf-8"`. */
   static defaultCharset = "utf-8";
 
   private _status: number;
@@ -165,7 +140,6 @@ export class Response {
   private _sent = false;
   stream: unknown = null;
   request: Request | null = null;
-  /** Rails: `cattr_accessor :default_headers`. */
   static defaultHeaders: Record<string, string> | undefined;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
@@ -177,12 +151,9 @@ export class Response {
     this._body = [...body];
   }
 
-  // --- Status ---
-
   get status(): number {
     return this._status;
   }
-  /** Mirrors: `status=` (response.rb:247-249) — `Rack::Utils.status_code(status)`. */
   set status(status: number | string) {
     this._status = statusCode(status);
   }
@@ -198,62 +169,42 @@ export class Response {
     return STATUS_MESSAGES[this._status] || "";
   }
 
-  // --- Status predicates (Rack::Response::Helpers parity) ---
-
-  /** 2xx response. */
   get successful(): boolean {
     return this._status >= 200 && this._status < 300;
   }
-  /** 3xx response. */
   get redirection(): boolean {
     return this._status >= 300 && this._status < 400;
   }
-  /** 4xx response. */
   get clientError(): boolean {
     return this._status >= 400 && this._status < 500;
   }
-  /** 5xx response. */
   get serverError(): boolean {
     return this._status >= 500 && this._status < 600;
   }
-  /** Exact 404. */
   get notFound(): boolean {
     return this._status === 404;
   }
 
-  // --- Headers ---
-
-  /** Mirrors: `attr_reader :headers` (response.rb:174) — a `Rack::Headers`. */
   get headers(): Headers {
     return this._headers;
   }
 
-  /** Mirrors: `get_header` (response.rb:193). */
   getHeader(key: string): string | undefined {
     return this._headers.get(key);
   }
 
-  /** Mirrors: `set_header` (response.rb:194). */
   setHeader(key: string, v: string): void {
     this._headers.set(key, v);
   }
 
-  /** Mirrors: `delete_header` (response.rb:195). */
   deleteHeader(key: string): void {
     this._headers.delete(key);
   }
 
-  // --- Content type ---
-
-  /**
-   * Mirrors: `content_type` (response.rb:269-271) — `super.presence`, the whole
-   * `Content-Type` header. The bare media type is {@link mediaType}.
-   */
   get contentType(): string | undefined {
     return presence(this.getHeader(CONTENT_TYPE));
   }
 
-  /** Mirrors: `content_type=` (response.rb:259-266). */
   set contentType(value: string | undefined) {
     if (value == null) return;
     const newHeaderInfo = this.parseContentType(String(value));
@@ -265,13 +216,11 @@ export class Response {
     this.setContentType(newHeaderInfo.mimeType, charset);
   }
 
-  /** Mirrors: `charset` (response.rb:300-303). */
   get charset(): string | undefined {
     const headerInfo = this.parsedContentTypeHeader();
     return headerInfo.charset || (this.constructor as typeof Response).defaultCharset;
   }
 
-  /** Mirrors: `charset=` (response.rb:288-295) — `false` strips the charset. */
   set charset(charset: string | false | undefined) {
     const contentType = this.parsedContentTypeHeader().mimeType;
     if (charset === false) {
@@ -282,12 +231,9 @@ export class Response {
     }
   }
 
-  /** Mirrors: `sending_file=` (response.rb:278-282). */
   set sendingFile(v: boolean) {
     if (v === true) this.charset = false;
   }
-
-  // --- Body ---
 
   get body(): string {
     return this._body.join("");
@@ -304,8 +250,6 @@ export class Response {
     return parseInt(cl, 10);
   }
 
-  // --- Stream-like writing ---
-
   write(data: string): void {
     if (this._committed) {
       throw new Error("Response already committed");
@@ -321,9 +265,6 @@ export class Response {
     return this._committed;
   }
 
-  // --- Location ---
-
-  /** The value of the `Location` header. Mirrors `Response#location`. */
   get location(): string {
     return this.getHeader("location") ?? "";
   }
@@ -332,35 +273,17 @@ export class Response {
     this.setHeader("location", url);
   }
 
-  /**
-   * Returns the redirect location with sensitive query parameters filtered
-   * out. See `ActionDispatch::Http::FilterRedirect`.
-   */
   filteredLocation(): string {
     return _filteredLocation.call(this);
   }
 
-  // --- Cookies ---
-
-  /**
-   * Mirrors `Rack::Response::Helpers#set_cookie` (rack-3.1.12
-   * rack/response.rb:270-272, mixed into `Response` at response.rb:91). Rack's `add_header` keeps an Array of values;
-   * our header hash is string-valued, so they are newline-joined — the shape
-   * `cookies` reads back with `split("\n")`.
-   *
-   * @internal
-   */
+  /** @internal */
   setCookie(name: string, value: string | CookieOptions): void {
     const header = this.getHeader(SET_COOKIE);
     const cookie = setCookieHeader(name, rackCookieValue(value));
     this.setHeader(SET_COOKIE, header === undefined ? cookie : `${header}\n${cookie}`);
   }
 
-  /**
-   * Mirrors `Rack::Response::Helpers#delete_cookie` (rack-3.1.12
-   * rack/response.rb:274-280), mixed into `Response` at response.rb:91.
-   * Newline-joined for the same reason as {@link setCookie}.
-   */
   deleteCookie(name: string, options: Partial<CookieOptions> = {}): void {
     const header = deleteSetCookieHeaderBang(
       this.getHeader(SET_COOKIE) ?? null,
@@ -370,17 +293,6 @@ export class Response {
     this.setHeader(SET_COOKIE, Array.isArray(header) ? header.join("\n") : header);
   }
 
-  /**
-   * Mirrors `Response#cookies` (response.rb:418-430). Ruby's `"k=".split("=")`
-   * drops the trailing empty field so a deleted cookie reads back as `nil`;
-   * JS keeps it, so the same pair reads back as `""`. A pair with no `=` at
-   * all yields `nil` in Ruby and `undefined` here, hence the value type.
-   *
-   * The array arm mirrors Rails' `header.respond_to?(:to_str)` branch, which
-   * exists because Rack stores `Set-Cookie` as an Array of values. Our header
-   * hash is string-valued, so `getHeader` only ever returns the split arm — the
-   * branch is kept so the body reads as the same method.
-   */
   get cookies(): Record<string, string | undefined> {
     const cookies: Record<string, string | undefined> = {};
     let header: string | string[] | undefined = this.getHeader(SET_COOKIE);
@@ -397,16 +309,7 @@ export class Response {
     return cookies;
   }
 
-  // --- Cache-Control (raw string accessor; Rails aliases this as `_cache_control`) ---
-
-  /**
-   * Raw `Cache-Control` header value. Mirrors Rails'
-   * `Response#_cache_control` alias (`Rack::Response::Helpers#cache_control`),
-   * which is the un-parsed header string. The parsed directive hash is
-   * exposed via {@link cacheControl} (wired below from `Cache::Response`).
-   *
-   * @internal
-   */
+  /** @internal */
   get _cacheControl(): string | undefined {
     return this.getHeader("cache-control");
   }
@@ -419,7 +322,6 @@ export class Response {
     }
   }
 
-  // --- Cache::Response wiring (declared here for typing; bound below) ---
   declare lastModified: Date | undefined;
   declare date: Date | undefined;
   declare etag: string | undefined;
@@ -434,44 +336,28 @@ export class Response {
   declare handleConditionalGetBang: () => void;
   /** @internal */
   declare mergeAndNormalizeCacheControlBang: (cacheControl: CacheControlHash) => void;
-  /**
-   * Parsed `Cache-Control` directives as a hash, mirroring Rails'
-   * `Cache::Response#cache_control` (an `attr_reader` set by
-   * `prepare_cache_control!`). The raw header string is exposed via
-   * {@link _cacheControl}.
-   */
   declare readonly cacheControl: CacheControlHash;
-  /** @internal Rails: `cache_control_segments` private. */
+  /** @internal */
   declare cacheControlSegments: () => string[] | undefined;
-  /** @internal Rails: `cache_control_headers` private. */
+  /** @internal */
   declare cacheControlHeaders: () => CacheControlHash;
-  /** @internal Rails: `FilterRedirect#location_filters` private. */
+  /** @internal */
   declare locationFilters: () => Array<string | RegExp>;
-  /** @internal Rails: `FilterRedirect#location_filter_match?` private. */
+  /** @internal */
   declare isLocationFilterMatch: () => boolean;
-  /** @internal Rails: `FilterRedirect#parameter_filtered_location` private. */
+  /** @internal */
   declare parameterFilteredLocation: () => string;
 
-  // --- Rack response ---
-
-  /**
-   * Mirrors: `to_a` (response.rb:410-413) — `commit!` then
-   * `rack_response @status, @headers.to_hash`. `to_a` is a Ruby core protocol
-   * name in `SKIP_GROUPS`, so it keeps its trails spelling.
-   */
   toRack(): [number, Record<string, string>, unknown] {
     this.commitBang();
     return this.rackResponse(this._status, this._headers.toHash());
   }
-
-  // --- Stream / body parts ---
 
   private _ensureStream(): unknown {
     if (!this.stream) this.stream = this.buildBuffer(this, this.mungeBodyObject(this._body));
     return this.stream;
   }
 
-  /** Drains the stream into a parts array (Rails `body_parts`). */
   bodyParts(): unknown[] {
     const stream = this._ensureStream() as { each(): IterableIterator<unknown> };
     const parts: unknown[] = [];
@@ -479,13 +365,10 @@ export class Response {
     return parts;
   }
 
-  /** Mirrors `Response#send_file(path)` — commits + sets the stream to a `Response::FileBody`-style object. */
   sendFile(path: string): void {
     this.commitBang();
     let cached: string | null = null;
     const read = () => (cached ??= File.open(path, "rb", (file) => file.read()));
-    // Rack::Sendfile detects file bodies via `body.toPath()` (callable);
-    // Rails' FileBody uses `attr_reader :to_path` which is also a method.
     this.stream = {
       toPath(): string {
         return path;
@@ -499,13 +382,11 @@ export class Response {
     };
   }
 
-  /** Discards stream contents (Rails `reset_body!`). */
   resetBodyBang(): void {
     this.stream = this.buildBuffer(this, []);
     this._body = [];
   }
 
-  /** Wraps stream iteration in `sending!`/`sent!` (Rails `each(&block)`). */
   *each(): IterableIterator<unknown> {
     const stream = this._ensureStream() as { each(): IterableIterator<unknown> };
     this.sendingBang();
@@ -513,7 +394,6 @@ export class Response {
     this.sentBang();
   }
 
-  /** Mirrors `Response#abort` — forwards to stream.abort, falling back to close. */
   abort(): void {
     const s = this.stream;
     if (!s) return;
@@ -524,48 +404,36 @@ export class Response {
     }
   }
 
-  // --- Lifecycle (commit / sending / sent) ---
-
-  /** Mirrors `Response#commit!`. Idempotent; runs beforeCommitted on transition. */
   commitBang(): void {
     if (this._committed) return;
     this.beforeCommitted();
     this._committed = true;
   }
 
-  /** Mirrors `Response#sending!`. */
   sendingBang(): void {
     if (this._sending) return;
     this.beforeSending();
     this._sending = true;
   }
 
-  /** Mirrors `Response#sent!`. */
   sentBang(): void {
     this._sent = true;
   }
 
-  /** Mirrors `Response#sending?`. */
   get isSending(): boolean {
     return this._sending;
   }
 
-  /** Mirrors `Response#sent?`. */
   get isSent(): boolean {
     return this._sent;
   }
 
-  /** Rails uses MonitorMixin to block; single-threaded JS makes this a no-op. */
   async awaitCommit(): Promise<void> {}
   async awaitSent(): Promise<void> {}
 
-  // --- Header / mime helpers ---
-
-  /** Rails: `alias_method :header, :headers`. */
   get header(): Headers {
     return this._headers;
   }
-  /** Mirrors: `has_header?` (response.rb:192), `@headers.key? key`. */
   hasHeader(key: string): boolean {
     return this._headers.hasKey(key);
   }
@@ -575,7 +443,6 @@ export class Response {
   get statusMessage(): string {
     return this.message;
   }
-  /** Rails: `alias_method :redirect_url, :location`. */
   get redirectUrl(): string {
     return this.location;
   }
@@ -583,9 +450,7 @@ export class Response {
     return this.parsedContentTypeHeader().mimeType;
   }
 
-  // --- Content-type parsing (private in Rails) ---
-
-  /** @internal Rails: `parse_content_type(str)`. */
+  /** @internal */
   parseContentType(contentType: string | undefined): ContentTypeHeader {
     if (!contentType) return NULL_CONTENT_TYPE_HEADER;
     const match = CONTENT_TYPE_PARSER.exec(contentType);
@@ -596,21 +461,19 @@ export class Response {
     };
   }
 
-  /** @internal Rails: `parsed_content_type_header` private. */
+  /** @internal */
   parsedContentTypeHeader(): ContentTypeHeader {
     return this.parseContentType(this.getHeader(CONTENT_TYPE));
   }
 
-  /** @internal Rails: `set_content_type(content_type, charset)` private. */
+  /** @internal */
   setContentType(contentType: string | undefined, charset: string | undefined): void {
     const type = contentType ?? "";
     const value = charset ? `${type}; charset=${String(charset).toLowerCase()}` : type;
     this.setHeader(CONTENT_TYPE, value);
   }
 
-  // --- Lifecycle hooks (private) ---
-
-  /** @internal Rails: `before_committed` private. */
+  /** @internal */
   protected beforeCommitted(): void {
     if (this._committed) return;
     this.assignDefaultContentTypeAndCharsetBang();
@@ -619,19 +482,19 @@ export class Response {
     this.handleNoContentBang();
   }
 
-  /** @internal Rails: `before_sending` — flushes cookie jar via request before headers freeze. */
+  /** @internal */
   beforeSending(): void {
     if (!this._committed) this.commitBang();
     const req = this.request as (Request & { commitCookieJarBang?: () => void }) | null;
     if (req && typeof req.commitCookieJarBang === "function") req.commitCookieJarBang();
   }
 
-  /** @internal Rails: `build_buffer(response, body)` private. */
+  /** @internal */
   buildBuffer(response: unknown, body: unknown[]): unknown {
     return new ResponseBuffer(response as Response, body);
   }
 
-  /** @internal Rails: `munge_body_object(body)` — wraps non-iterables into a 1-element array. */
+  /** @internal */
   mungeBodyObject(body: unknown): unknown[] {
     if (Array.isArray(body)) return body;
     if (
@@ -644,7 +507,7 @@ export class Response {
     return [body];
   }
 
-  /** @internal Rails: `assign_default_content_type_and_charset!`. */
+  /** @internal */
   assignDefaultContentTypeAndCharsetBang(): void {
     if (this.mediaType) return;
     const ct = this.parsedContentTypeHeader();
@@ -652,7 +515,7 @@ export class Response {
     this.setContentType(ct.mimeType ?? "text/html", charset);
   }
 
-  /** @internal Rails: `handle_no_content!` — strips body headers on 1xx/204/205/304. */
+  /** @internal */
   handleNoContentBang(): void {
     if ((NO_CONTENT_CODES as readonly number[]).includes(this._status)) {
       this._headers.delete(CONTENT_TYPE);
@@ -660,7 +523,7 @@ export class Response {
     }
   }
 
-  /** @internal Rails: `rack_response(status, headers)` (response.rb:546-553). */
+  /** @internal */
   rackResponse(
     status: number,
     headers: Record<string, string>,
@@ -669,38 +532,21 @@ export class Response {
     return [status, headers, new RackBody(this)];
   }
 
-  // --- ETag generators (delegated to cache module) ---
-
-  /**
-   * Rails: `generate_weak_etag(validators)`.
-   *
-   * @internal
-   */
+  /** @internal */
   generateWeakEtag(validators: unknown): string {
     return _generateWeakEtag(validators);
   }
 
-  /**
-   * Rails: `generate_strong_etag(validators)`.
-   *
-   * @internal
-   */
+  /** @internal */
   generateStrongEtag(validators: unknown): string {
     return _generateStrongEtag(validators);
   }
 
-  /**
-   * Rails: `prepare_cache_control!` private.
-   *
-   * @internal
-   */
+  /** @internal */
   prepareCacheControlBang(): CacheControlHash {
     return _prepareCacheControlBang.call(this);
   }
 
-  // --- Default-headers merge (static) ---
-
-  /** Rails: `Response.merge_default_headers(original, default)`. */
   static mergeDefaultHeaders(
     original: Record<string, string>,
     defaults: Record<string, string> | undefined,
@@ -709,13 +555,9 @@ export class Response {
     return { ...defaults, ...original };
   }
 
-  // --- Inspect ---
-
   inspect(): string {
     return `#<ActionDispatch::Response ${this._status} ${this.message}>`;
   }
-
-  // --- Factory ---
 
   static create<T extends typeof Response>(
     this: T,
@@ -724,22 +566,12 @@ export class Response {
     body: string | string[] = [],
     { defaultHeaders }: { defaultHeaders?: Record<string, string> } = {},
   ): InstanceType<T> {
-    // Rails: `merge_default_headers(headers, default_headers)`, where the
-    // `default_headers:` keyword defaults to `self.default_headers`.
     const merged = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
-    // Rails passes body to `new` → `body=` → `munge_body_object` (wraps a
-    // non-enumerable like a bare string into a 1-element array); TS pre-munges
-    // here because the constructor bypasses the setter.
     const parts = Array.isArray(body) ? body : [body];
     return new this(status, merged, parts) as InstanceType<T>;
   }
 }
 
-// Mix in ActionDispatch::Http::Cache::Response. Property-style helpers
-// (Rails no-arg accessors) are wired as getters/setters; methods that take
-// arguments are wired as prototype methods. The raw `Cache-Control` header
-// string is exposed via `_cacheControl` (Rails: aliased `_cache_control`),
-// and `cacheControl` (this wiring) is the parsed directive hash.
 for (const name of ["lastModified", "date", "etag"] as const) {
   Object.defineProperty(Response.prototype, name, {
     ...Object.getOwnPropertyDescriptor(CacheResponse.prototype, name)!,
@@ -816,11 +648,6 @@ export interface CookieOptions {
   sameSite?: "strict" | "lax" | "none";
 }
 
-/**
- * Rails hands `Rack::Utils.set_cookie_header` the cookie option hash
- * untouched; the keys pass through unchanged, and only `expires` is narrowed
- * to the JS `Date` that header formatter reads.
- */
 function rackCookieValue(value: string | Partial<CookieOptions>): Record<string, unknown> {
   const opts = typeof value === "string" ? { value } : value;
   return {
@@ -828,7 +655,6 @@ function rackCookieValue(value: string | Partial<CookieOptions>): Record<string,
     path: opts.path,
     domain: opts.domain,
     // boundary: `Rack::Utils.set_cookie_header` formats `expires` through
-    // `Date#toUTCString`, so a Temporal.Instant is narrowed to a JS Date here.
     expires:
       opts.expires === undefined || opts.expires instanceof Date
         ? opts.expires

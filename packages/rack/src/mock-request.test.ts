@@ -9,13 +9,6 @@ import * as path from "path";
 
 const fixtureDir = path.join(__dirname, "..", "test", "multipart");
 
-/**
- * Rack's spec app serializes the env into the response body with `to_yaml`
- * (`rack/test/spec_mock_request.rb:14-38`) and every case reads it back with
- * `YAML.unsafe_load(res.body)`. A rack env holds `rack.input` and
- * `rack.errors` objects that no JS serializer round-trips, so the env is
- * captured by reference instead and `env` below is that same hash.
- */
 let lastEnv: Record<string, any> = {};
 
 const app: RackApp = (env) => {

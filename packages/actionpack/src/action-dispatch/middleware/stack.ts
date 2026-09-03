@@ -1,23 +1,8 @@
-/**
- * ActionDispatch::MiddlewareStack
- *
- * An ordered list of middleware with insertion/removal operations.
- */
-
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 export type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
-/**
- * A Rack application that answers `call` as a method rather than being one.
- * Ruby has a single shape here — `MiddlewareStack#build` folds over anything
- * that responds to `call` (`stack.rb:166-175`), which is how
- * `Engine#endpoint` hands its `RouteSet` straight to the stack
- * (`engine.rb:521`) — while JS keeps a function and a `call`-bearing object
- * apart, so both spellings are named.
- *
- * @noRailsEquivalent PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 export interface RackAppObject {
   call(env: RackEnv): Promise<RackResponse>;
 }
@@ -30,20 +15,13 @@ export interface MiddlewareEntry {
   klass: MiddlewareFactory;
   args: unknown[];
   block?: (app: RackApp) => RackApp;
-  /**
-   * `ActionController::MiddlewareStack::Middleware#valid?`
-   * (`action_controller/metal.rb:26-28`) — absent on a plain
-   * `ActionDispatch` entry, which Ruby models as a different class.
-   */
   valid?(action: string): boolean;
 }
 
 export class MiddlewareStack implements Iterable<MiddlewareEntry> {
   private entries: MiddlewareEntry[] = [];
 
-  constructor() {
-    // matches Rails `initialize(*args)` — block form is not ported.
-  }
+  constructor() {}
 
   get middlewares(): MiddlewareEntry[] {
     return this.entries;
@@ -61,14 +39,12 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return this.entries.length;
   }
 
-  /** Ruby `Object#dup` — a shallow copy of the entry list. */
   dup(): this {
     const copy = new (this.constructor as new () => this)();
     copy.middlewares = [...this.entries];
     return copy;
   }
 
-  /** `Enumerable#any?` over the stack — `middleware_stack.any?` at `metal.rb:322, :332`. */
   isAny(): boolean {
     return this.entries.length > 0;
   }
@@ -90,12 +66,7 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.splice(idx, 1);
   }
 
-  /**
-   * A Ruby `&block` has no positional spelling next to `*args`; trails names
-   * the block form `useWithBlock`, so this arm has no block to forward.
-   *
-   * @missingRailsArgs build_middleware — PERMANENT
-   */
+  /** @missingRailsArgs build_middleware — PERMANENT */
   use(klass: MiddlewareFactory, ...args: unknown[]): void {
     this.entries.push(this.buildMiddleware(klass, args));
   }
@@ -119,7 +90,6 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.middlewares.splice(index, 0, this.buildMiddleware(klass, args));
   }
 
-  /** Rails: `alias_method :insert_before, :insert`. */
   insertBefore(
     index: MiddlewareFactory | number,
     klass: MiddlewareFactory,
@@ -160,7 +130,6 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     this.entries.splice(targetIndex, 0, sourceMiddleware);
   }
 
-  /** Rails: `alias_method :move_before, :move`. */
   moveBefore(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {
     this.move(target, source);
   }
@@ -185,12 +154,7 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return [...this.entries];
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`use-site:vendor/rails/actionpack/lib/action_dispatch/middleware/stack.rb:72, :81` — `include
-   *   Enumerable` plus `def each`).
-   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
-   */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): Iterator<MiddlewareEntry> {
     return this.entries[Symbol.iterator]();
   }
@@ -224,13 +188,7 @@ export class MiddlewareStack implements Iterable<MiddlewareEntry> {
     return i;
   }
 
-  /**
-   * `MiddlewareStack#build_middleware` (`stack.rb:184-186`) — the one place
-   * an entry is constructed, so `ActionController::MiddlewareStack` can
-   * override it (`action_controller/metal.rb:44-52`).
-   *
-   * @internal
-   */
+  /** @internal */
   buildMiddleware(
     klass: MiddlewareFactory,
     args: unknown[],

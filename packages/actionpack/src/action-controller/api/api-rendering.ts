@@ -1,12 +1,3 @@
-/**
- * ActionController::ApiRendering — aggregator mirroring
- * `action_controller/api/api_rendering.rb`. Rails `includes Rendering`
- * into the host class; trails re-exports the Rendering helpers here so
- * parity:api sees the full mixed-in surface on this file.
- *
- * @see https://api.rubyonrails.org/classes/ActionController/ApiRendering.html
- */
-
 import * as rendering from "../metal/rendering.js";
 
 /** @internal */

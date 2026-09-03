@@ -11,15 +11,9 @@ afterEach(() => {
   controllerConstants.delete("posts");
 });
 
-/** `"controller#action"` for a recognised route — Rails' `@response.body` in
- *  `routing_test.rb`, whose controllers echo exactly that. */
 const routeSpec = (match: ReturnType<RouteSet["recognize"]>): string =>
   `${match!.route.controller}#${match!.route.action}`;
 
-// ==========================================================================
-// Journey::Route tests (journey/route_test.rb)
-// ==========================================================================
-/** Echoes the matched `path_parameters` back as JSON. */
 class EchoParamsController {
   static makeResponseBang(request: Request): Response {
     const res = new Response();
@@ -87,13 +81,11 @@ describe("TestRoute", () => {
   it("score", () => {
     const r1 = new Route("GET", "/posts/:id", "posts", "show");
     const r2 = new Route("GET", "/posts/featured", "posts", "featured");
-    // Static segments score higher than dynamic ones
     expect(r2.score()).toBeGreaterThan(r1.score());
   });
 
   it("route adds itself as memo", () => {
     const route = new Route("GET", "/posts/:id", "posts", "show", { name: "post" });
-    // The route itself is the memo — we can match and get it back
     const m = route.match("GET", "/posts/1");
     expect(m!.route).toBe(route);
   });
@@ -107,14 +99,10 @@ describe("TestRoute", () => {
 
   it("default ip", () => {
     const route = new Route("GET", "/posts", "posts", "index");
-    // Default IP matches everything
     expect(route.ip).toEqual(/(?:)/);
   });
 });
 
-// ==========================================================================
-// Journey::Router tests (journey/router_test.rb)
-// ==========================================================================
 describe("TestRouter", () => {
   it("dashes", () => {
     const routes = new RouteSet();
@@ -217,8 +205,6 @@ describe("TestRouter", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    // URL-unsafe characters in path params are percent-escaped (mirrors
-    // Rails Journey Utils.escape_segment).
     expect(routes.pathFor("post", { id: "hello world" })).toBe("/posts/hello%20world");
   });
 
@@ -235,7 +221,6 @@ describe("TestRouter", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post", constraints: { id: /\d+/ } });
     });
-    // Anchored constraint — "123abc" should NOT match
     expect(routes.recognize("GET", "/posts/123abc")).toBeNull();
     expect(routes.recognize("GET", "/posts/123")).not.toBeNull();
   });
@@ -257,7 +242,6 @@ describe("TestRouter", () => {
   });
 
   it("x cascade", () => {
-    // When no route matches, recognize returns null (cascade behavior)
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/posts", { to: "posts#index" });
@@ -285,7 +269,6 @@ describe("TestRouter", () => {
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", constraints: { id: /\d+/ } });
     });
-    // Unbound regexp gets anchored — partial matches don't count
     expect(routes.recognize("GET", "/posts/123")).not.toBeNull();
     expect(routes.recognize("GET", "/posts/abc")).toBeNull();
   });
@@ -317,20 +300,15 @@ describe("TestRouter", () => {
   it("recall should be used when scoring", () => {
     const r1 = new Route("GET", "/posts/:id", "posts", "show");
     const r2 = new Route("GET", "/posts/:id", "posts", "show");
-    // Score with knowledge of id increases specificity
     expect(r1.score({ id: true })).toBeGreaterThan(r2.score());
   });
 
   it("nil path parts are ignored", () => {
     const route = new Route("GET", "/page(/:id)", "pages", "show");
-    // Without the optional param, path should still work
     expect(route.pathFor({})).toBe("/page");
   });
 });
 
-// ==========================================================================
-// dispatch/routing_test.rb (TestRoutingMapper)
-// ==========================================================================
 describe("TestRoutingMapper", () => {
   it("logout", () => {
     const routes = new RouteSet();
@@ -506,11 +484,9 @@ describe("TestRoutingMapper", () => {
       r.root("pages#home");
       r.resources("posts");
     });
-    // root + 8 resource routes
     expect(routes.getRoutes().length).toBe(9);
   });
 
-  // --- Rack integration ---
   it("returns 404 for unmatched routes", async () => {
     const routes = new RouteSet();
     const [status, , body] = await routes.call({
@@ -558,7 +534,6 @@ describe("TestRoutingMapper", () => {
   });
 
   it("session singleton resource for api app", () => {
-    // API apps typically exclude new/edit — test with only
     const routes = new RouteSet();
     routes.draw((r) => {
       r.resource("session", { except: ["new", "edit"] });
@@ -731,7 +706,6 @@ describe("TestRoutingMapper", () => {
         r.root("products#root");
       });
     });
-    // The nested root should be at /products/:id/
     expect(routes.recognize("GET", "/products")!.route.action).toBe("index");
   });
 
@@ -758,7 +732,6 @@ describe("TestRoutingMapper", () => {
   });
 
   it("dynamic controller segments are deprecated", () => {
-    // We just verify that a route with :controller segment works at the basic level
     const route = new Route("GET", "/:controller/:action", "default", "index");
     const m = route.match("GET", "/foo/bar");
     expect(m).not.toBeNull();
@@ -976,7 +949,6 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.match("/search", { to: "search#index" });
     });
-    // Without via, should match ALL methods
     expect(routes.recognize("GET", "/search")).not.toBeNull();
     expect(routes.recognize("POST", "/search")).not.toBeNull();
   });
@@ -1107,8 +1079,6 @@ describe("TestRoutingMapper", () => {
   it("sprockets", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
-      // Glob captures dotted segments; `:path` would stop at the `.` per
-      // Journey's default separator set `/.?`.
       r.get("/assets/*path", { to: "assets#show", as: "asset" });
     });
     expect(routes.recognize("GET", "/assets/application.js")).not.toBeNull();
@@ -1208,9 +1178,7 @@ describe("TestRoutingMapper", () => {
     });
     expect(routes.recognize("GET", "/clubs")).not.toBeNull();
     expect(routes.recognize("GET", "/clubs/1")).not.toBeNull();
-    // /clubs/new matches show with id="new" since new route is excluded
     expect(routes.recognize("GET", "/clubs/new")!.route.action).toBe("show");
-    // /clubs/1/edit has no matching route (3 segments, no edit route)
     expect(routes.recognize("GET", "/clubs/1/edit")).toBeNull();
   });
 
@@ -1239,7 +1207,6 @@ describe("TestRoutingMapper", () => {
         r.resources("comments");
       });
     });
-    // Comments should have all 7 routes (only doesn't propagate)
     expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
     expect(routes.recognize("POST", "/posts/1/comments")).not.toBeNull();
     expect(routes.recognize("GET", "/posts/1/comments/new")).not.toBeNull();
@@ -1252,7 +1219,6 @@ describe("TestRoutingMapper", () => {
         r.resources("comments");
       });
     });
-    // Comments should have all 7 routes
     expect(routes.recognize("DELETE", "/posts/1/comments/2")).not.toBeNull();
   });
 
@@ -1263,7 +1229,6 @@ describe("TestRoutingMapper", () => {
     });
     expect(routes.recognize("GET", "/projects")).not.toBeNull();
     expect(routes.recognize("GET", "/projects/1")).not.toBeNull();
-    // Without new route, /projects/new falls through to show with id="new"
     expect(routes.recognize("GET", "/projects/new")!.route.action).toBe("show");
     expect(routes.recognize("GET", "/projects/1/edit")).toBeNull();
   });
@@ -1321,7 +1286,6 @@ describe("TestRoutingMapper", () => {
   });
 
   it("resources path can be a symbol", () => {
-    // In TS, we use strings, but test the path option
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/pages", { to: "wiki_pages#index", as: "wiki_pages" });
@@ -1331,7 +1295,6 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor("wiki_page", { id: "Ruby_on_Rails" })).toBe("/pages/Ruby_on_Rails");
   });
 
-  // --- Redirect tests ---
   it("login redirect", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
@@ -1501,7 +1464,6 @@ describe("TestRoutingMapper", () => {
   });
 
   it("redirect class", () => {
-    // A redirect "class" is just a function that returns a redirect target
     const customRedirect = (params: Record<string, string>) => `/custom/${params.id}`;
     const routes = new RouteSet();
     routes.draw((r) => {
@@ -1517,7 +1479,6 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.resources("sheep");
     });
-    // Even with an uncountable name, index route is created
     expect(routes.recognize("GET", "/sheep")).not.toBeNull();
     expect(routes.recognize("GET", "/sheep/1")).not.toBeNull();
   });
@@ -1551,10 +1512,8 @@ describe("TestRoutingMapper", () => {
         r.resources("comments", { shallow: true });
       });
     });
-    // Collection routes are nested
     expect(routes.recognize("GET", "/posts/1/comments")).not.toBeNull();
     expect(routes.recognize("POST", "/posts/1/comments")).not.toBeNull();
-    // Member routes are shallow (not nested)
     expect(routes.recognize("GET", "/comments/1")).not.toBeNull();
     expect(routes.recognize("GET", "/comments/1")!.route.action).toBe("show");
     expect(routes.recognize("DELETE", "/comments/1")).not.toBeNull();
@@ -1567,9 +1526,7 @@ describe("TestRoutingMapper", () => {
         r.resources("posts", { shallow: true });
       });
     });
-    // Collection routes are nested under the singular resource
     expect(routes.recognize("GET", "/account/posts")).not.toBeNull();
-    // Member routes are shallow
     expect(routes.recognize("GET", "/posts/1")).not.toBeNull();
     expect(routes.recognize("GET", "/posts/1")!.route.action).toBe("show");
   });
@@ -1629,9 +1586,7 @@ describe("TestRoutingMapper", () => {
       });
       r.get("/articles/:id", { to: "articles#show" });
     });
-    // Inside constraints block — only digits
     expect(routes.recognize("GET", "/posts/123")).not.toBeNull();
-    // Outside constraints block — any string matches
     expect(routes.recognize("GET", "/articles/abc")).not.toBeNull();
   });
 
@@ -1657,13 +1612,9 @@ describe("TestRoutingMapper", () => {
     expect(routes.recognize("GET", "/posts/")).not.toBeNull();
   });
 
-  it.skip("accepts a constraint object responding to call", () => {
-    // constraint call() not checked during recognition — feature not ported
-  });
+  it.skip("accepts a constraint object responding to call", () => {});
 
-  it.skip("namespace with controller segment", () => {
-    // ArgumentError for :controller segment in namespace not ported
-  });
+  it.skip("namespace with controller segment", () => {});
 
   it("namespace without controller segment", () => {
     const routes = new RouteSet();
@@ -1682,7 +1633,6 @@ describe("TestRoutingMapper", () => {
     routes.draw((r) => {
       r.connect("chat/live", { to: "chat#live" });
     });
-    // connect() maps via ["GET", "CONNECT"] — any GET matches, not just upgrade requests
     expect(routes.recognize("GET", "/chat/live")!.route.action).toBe("live");
     expect(routes.recognize("CONNECT", "/chat/live")!.route.action).toBe("live");
   });
@@ -1702,7 +1652,6 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor("bookmark_new")).toBe("/bookmark/build");
     expect(routes.recognize("POST", "/bookmark/create")!.route.controller).toBe("bookmarks");
     expect(routes.recognize("POST", "/bookmark/create")!.route.action).toBe("create");
-    // as: "" should register bookmark_path → "/bookmark/create" in Rails; gap — not yet implemented
     expect(routes.recognize("PUT", "/bookmark/update")!.route.action).toBe("update");
     expect(routes.pathFor("bookmark_update")).toBe("/bookmark/update");
     expect(routes.recognize("GET", "/bookmark/remove")!.route.action).toBe("destroy");
@@ -1732,9 +1681,7 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor("pagemark_show")).toBe("/pagemark");
   });
 
-  it.skip("admin", () => {
-    // IP-based object constraint routing (IpRestrictor) not ported — constraint call() not applied during recognition
-  });
+  it.skip("admin", () => {});
 
   it("global", () => {
     const routes = new RouteSet();
@@ -1762,7 +1709,6 @@ describe("TestRoutingMapper", () => {
   });
 
   it("local", () => {
-    // dynamic :action segment is deprecated in Rails; skip dispatch assertion
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/local/dashboard", { to: "local#dashboard" });
@@ -1771,7 +1717,6 @@ describe("TestRoutingMapper", () => {
   });
 
   it("url for with no side effects", () => {
-    // url_for not ported; verify the route itself is recognized
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/projects/status(.:format)", { to: "projects#status" });
@@ -1780,7 +1725,6 @@ describe("TestRoutingMapper", () => {
   });
 
   it("url for does not modify controller", () => {
-    // url_for not ported; verify route recognition
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/projects/status(.:format)", { to: "projects#status" });
@@ -1797,29 +1741,18 @@ describe("TestRoutingMapper", () => {
         });
       });
     });
-    // url_for side-effect semantics not ported; verify route resolves
     expect(routes.recognize("GET", "/customers/1/profile")).not.toBeNull();
   });
 
-  it.skip("projects", () => {
-    // resources() ignores controller: option — always uses resource name as controller
-  });
+  it.skip("projects", () => {});
 
-  it.skip("projects with post action and new path on collection", () => {
-    // resources() ignores controller: option — always uses resource name as controller
-  });
+  it.skip("projects with post action and new path on collection", () => {});
 
-  it.skip("projects involvements", () => {
-    // nested resource name generation ("new_project_involvement") not matching expected pattern
-  });
+  it.skip("projects involvements", () => {});
 
-  it.skip("projects posts", () => {
-    // collection action routes registered after member :id routes — ordering conflict
-  });
+  it.skip("projects posts", () => {});
 
-  it.skip("path option override", () => {
-    // custom path: and pathNames: on: "new" action within scoped resources not fully ported
-  });
+  it.skip("path option override", () => {});
 
   it("namespace nested in resources", () => {
     const routes = new RouteSet();
@@ -1943,49 +1876,27 @@ describe("TestRoutingMapper", () => {
     expect(routeSpec(routes.recognize("GET", "/foo/comments/2"))).toBe("foo/comments#show");
   });
 
-  it.skip("optional scoped root multiple choice", () => {
-    // scope constraint regex on optional segment not applied during recognition
-  });
+  it.skip("optional scoped root multiple choice", () => {});
 
-  it.skip("scope with format option", () => {
-    // format: false scope/route option not implemented — format segment suppression not supported
-  });
+  it.skip("scope with format option", () => {});
 
-  it.skip("resources with format false from scope", () => {
-    // format: false scope option not implemented — scope() does not accept format key
-  });
+  it.skip("resources with format false from scope", () => {});
 
-  it.skip("match with many paths containing a slash", () => {
-    // deprecated multi-path match (variadic path strings) not supported
-  });
+  it.skip("match with many paths containing a slash", () => {});
 
-  it.skip("match shorthand with no scope", () => {
-    // auto-naming and controller/action derivation from bare path not implemented
-  });
+  it.skip("match shorthand with no scope", () => {});
 
-  it.skip("match shorthand inside namespace", () => {
-    // auto-naming and controller/action derivation from bare path not implemented
-  });
+  it.skip("match shorthand inside namespace", () => {});
 
-  it.skip("match shorthand with multiple paths inside namespace", () => {
-    // deprecated variadic path match not supported
-  });
+  it.skip("match shorthand with multiple paths inside namespace", () => {});
 
-  it.skip("match shorthand inside namespace with controller", () => {
-    // auto-naming and controller/action derivation from bare path not implemented
-  });
+  it.skip("match shorthand inside namespace with controller", () => {});
 
-  it.skip("match shorthand inside scope with variables with controller", () => {
-    // shorthand controller derivation from path without explicit `to:` not implemented
-  });
+  it.skip("match shorthand inside scope with variables with controller", () => {});
 
-  it.skip("match shorthand inside nested namespaces and scopes with controller", () => {
-    // shorthand controller derivation from path without explicit `to:` not implemented
-  });
+  it.skip("match shorthand inside nested namespaces and scopes with controller", () => {});
 
-  it.skip("not matching shorthand with dynamic parameters", () => {
-    // deprecated :controller dynamic segment not supported
-  });
+  it.skip("not matching shorthand with dynamic parameters", () => {});
 
   it("dynamically generated helpers on collection do not clobber resources url helper", () => {
     const routes = new RouteSet();
@@ -2000,13 +1911,9 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor("replies")).toBe("/replies");
   });
 
-  it.skip("scoped controller with namespace and action", () => {
-    // dynamic :action segment in constraints not supported
-  });
+  it.skip("scoped controller with namespace and action", () => {});
 
-  it.skip("convention match nested and with leading slash", () => {
-    // controller/action derivation from path without explicit `to:` not implemented
-  });
+  it.skip("convention match nested and with leading slash", () => {});
 
   it("convention with explicit end", () => {
     const routes = new RouteSet();
@@ -2020,13 +1927,9 @@ describe("TestRoutingMapper", () => {
     expect(routes.pathFor("sign_in")).toBe("/sign_in");
   });
 
-  it.skip("redirect with complete url and status", () => {
-    // redirect() helper not implemented in RouteSet
-  });
+  it.skip("redirect with complete url and status", () => {});
 
-  it.skip("redirect with port", () => {
-    // redirect() helper not implemented in RouteSet
-  });
+  it.skip("redirect with port", () => {});
 
   it("optional scoped root", () => {
     const routes = new RouteSet();
@@ -2042,17 +1945,11 @@ describe("TestRoutingMapper", () => {
     expect(m!.route.action).toBe("index");
   });
 
-  it.skip("optional scoped path", () => {
-    // optional segment recognition without the segment fails (no-locale paths return null)
-  });
+  it.skip("optional scoped path", () => {});
 
-  it.skip("nested optional scoped path", () => {
-    // optional segment recognition without the segment fails (no-locale path returns null)
-  });
+  it.skip("nested optional scoped path", () => {});
 
-  it.skip("nested optional path shorthand", () => {
-    // shorthand without `to:` not implemented; optional segment recognition also fails
-  });
+  it.skip("nested optional path shorthand", () => {});
 
   it("keyed default string params with match", () => {
     const routes = new RouteSet();
@@ -2064,9 +1961,7 @@ describe("TestRoutingMapper", () => {
     expect(m!.route.defaults?.id).toBe("home");
   });
 
-  it.skip("default string params with match", () => {
-    // inline route options (id: "home") not treated as defaults
-  });
+  it.skip("default string params with match", () => {});
 
   it("keyed default string params with root", () => {
     const routes = new RouteSet();
@@ -2078,21 +1973,13 @@ describe("TestRoutingMapper", () => {
     expect(m!.route.defaults?.id).toBe("home");
   });
 
-  it.skip("default string params with root", () => {
-    // root() only accepts string `to`; inline default options not implemented
-  });
+  it.skip("default string params with root", () => {});
 
-  it.skip("custom param", () => {
-    // resources `param:` option not implemented
-  });
+  it.skip("custom param", () => {});
 
-  it.skip("custom param constraint", () => {
-    // resources `param:` option not implemented
-  });
+  it.skip("custom param constraint", () => {});
 
-  it.skip("colon containing custom param", () => {
-    // resources `param:` option not implemented; no colon validation
-  });
+  it.skip("colon containing custom param", () => {});
 
   it("invalid route name raises error", () => {
     const routes = new RouteSet();
@@ -2118,18 +2005,14 @@ describe("TestRoutingMapper", () => {
     ).toThrow(/Invalid route name/);
   });
 
-  it.skip("duplicate route name raises error", () => {
-    // RouteSet currently allows duplicate named routes (Mapper emits singular for index+show)
-  });
+  it.skip("duplicate route name raises error", () => {});
 
-  // draw-time validation not yet implemented in Mapper/RouteSet
   it.skip("duplicate route name via resources raises error", () => {});
   it.skip("controller name with leading slash raise error", () => {});
   it.skip("match with empty via", () => {});
   it.skip("multiple roots raises error", () => {});
   it.skip("multiple namespaced roots", () => {});
 
-  // shallow: routing not ported
   it.skip("resource new actions", () => {});
   it.skip("shallow false inside nested shallow resource", () => {});
   it.skip("shallow deeply nested resources", () => {});
@@ -2145,7 +2028,6 @@ describe("TestRoutingMapper", () => {
   it.skip("scope shallow prefix is not overwritten by as", () => {});
   it.skip("scope shallow path is not overwritten by path", () => {});
 
-  // url_helpers (ActionDispatch::Routing::UrlFor) not ported
   it.skip("url generator for optional prefix static and dynamic segment", () => {});
   it.skip("url recognition for optional static segments", () => {});
   it.skip("except option should override scoped only", () => {});
@@ -2169,11 +2051,9 @@ describe("TestRoutingMapper", () => {
   it.skip("passing action parameters to url helpers raises error if parameters are not permitted", () => {});
   it.skip("passing action parameters to url helpers is allowed if parameters are permitted", () => {});
 
-  // redirect() helper not ported
   it.skip("redirect https", () => {});
   it.skip("redirect argument error", () => {});
 
-  // HTTP dispatch integration tests — require live request cycle
   it.skip("greedy resource id regexp doesnt match edit and custom action", () => {});
   it.skip("path parameters is not stale", () => {});
   it.skip("action from path is frozen", () => {});
@@ -2190,16 +2070,12 @@ describe("TestRoutingMapper", () => {
   it.skip("routes with double colon", () => {});
 });
 
-// ==========================================================================
-// controller/routing_test.rb
-// ==========================================================================
 describe("ActionController::Routing", () => {
   it("route generation allows passing non string values to generated helper", () => {
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show", as: "post" });
     });
-    // Numbers should be coerced to strings
     expect(routes.pathFor("post", { id: 42 })).toBe("/posts/42");
   });
 
@@ -2279,7 +2155,6 @@ describe("ActionController::Routing", () => {
   });
 
   it("id encoding", () => {
-    // Captured path params are URI-decoded (Rails Utils.unescape_uri).
     const routes = new RouteSet();
     routes.draw((r) => {
       r.get("/posts/:id", { to: "posts#show" });
@@ -2310,7 +2185,6 @@ describe("TestAppendingRoutes", () => {
     routes.draw((r) => {
       r.get("/hello", { to: "hello#second" });
     });
-    // First match wins
     expect(routes.recognize("GET", "/hello")!.route.action).toBe("first");
   });
 
@@ -2349,13 +2223,9 @@ describe("TestRecognizePath", () => {
     expect(m!.params.bar).toBe("bar");
   });
 
-  it.skip("proc constraints dont leak between routes", () => {
-    // function/proc constraints are not evaluated during recognition
-  });
+  it.skip("proc constraints dont leak between routes", () => {});
 
-  it.skip("class constraints dont leak between routes", () => {
-    // constraint objects with matches() method not supported — only key/value request-attribute constraints are evaluated
-  });
+  it.skip("class constraints dont leak between routes", () => {});
 });
 
 describe("TestTildeAndMinusPaths", () => {
@@ -2400,28 +2270,20 @@ describe("TestUrlGenerationErrors", () => {
     expect(() => routes.pathFor("nonexistent")).toThrow(/No route matches name/);
   });
 
-  it.skip("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {
-    // pending: requires url_helpers optimized helper (product_path(nil) positional form) not ported
-  });
+  it.skip("URL helpers raise a 'missing keys' error for a nil param with optimized helpers", () => {});
 
-  it.skip("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", () => {
-    // pending: requires url_helpers non-optimized helper (product_path(id: nil) keyword form) not ported
-  });
+  it.skip("URL helpers raise a 'constraint failure' error for a nil param with non-optimized helpers", () => {});
 
-  it.skip("exceptions have suggestions for fix", () => {
-    // pending: error.detailed_message (Ruby DidYouMean hook) not yet wired for UrlGenerationError
-  });
+  it.skip("exceptions have suggestions for fix", () => {});
 });
 
 describe("TestAltApp", () => {
-  // All tests require HTTP dispatch with custom Rack middleware — not ported
   it.skip("alt request without header", () => {});
   it.skip("alt request with matched header", () => {});
   it.skip("alt request with unmatched header", () => {});
 });
 
 describe("TestNamespaceWithControllerOption", () => {
-  // All tests require draw-time validation not yet implemented in Mapper
   it.skip("missing controller", () => {});
   it.skip("missing controller with to", () => {});
   it.skip("implicit controller with to", () => {});
@@ -2435,14 +2297,12 @@ describe("TestNamespaceWithControllerOption", () => {
 });
 
 describe("TestGlobRoutingMapper", () => {
-  // All tests require HTTP dispatch integration — glob constraint dispatch not ported
   it.skip("glob constraint", () => {});
   it.skip("glob constraint skip route", () => {});
   it.skip("glob constraint skip all", () => {});
 });
 
 describe("TestOptimizedNamedRoutes", () => {
-  // All tests require url_helpers / UrlFor module not ported
   it.skip("enabled when not mounted and default_url_options is empty", () => {});
   it.skip("named route called as singleton method", () => {});
   it.skip("named route called on included module", () => {});
@@ -2456,13 +2316,10 @@ describe("TestOptimizedNamedRoutes", () => {
 });
 
 describe("TestNamedRouteUrlHelpers", () => {
-  it.skip("URL helpers do not ignore nil parameters when using non-optimized routes", () => {
-    // url_helpers / UrlFor not ported
-  });
+  it.skip("URL helpers do not ignore nil parameters when using non-optimized routes", () => {});
 });
 
 describe("TestUrlConstraints", () => {
-  // All tests require url_helpers + constraint propagation to defaults not ported
   it.skip("constraints are copied to defaults when using constraints method", () => {});
   it.skip("constraints are copied to defaults when using scope constraints hash", () => {});
   it.skip("constraints are copied to defaults when using route constraints hash", () => {});
@@ -2471,20 +2328,16 @@ describe("TestUrlConstraints", () => {
 });
 
 describe("TestInvalidUrls", () => {
-  // All tests require HTTP dispatch integration — request encoding handling not ported
   it.skip("invalid UTF-8 encoding returns a bad request", () => {});
   it.skip("params param_encoding uses ASCII 8bit", () => {});
   it.skip("does not encode params besides id", () => {});
 });
 
 describe("TestOptionalRootSegments", () => {
-  it.skip("optional root segments", () => {
-    // url_helpers not ported
-  });
+  it.skip("optional root segments", () => {});
 });
 
 describe("TestPortConstraints", () => {
-  // All tests require HTTP dispatch with port-based constraint matching not ported
   it.skip("integer port constraints", () => {});
   it.skip("string port constraints", () => {});
   it.skip("array port constraints", () => {});
@@ -2492,7 +2345,6 @@ describe("TestPortConstraints", () => {
 });
 
 describe("TestFormatConstraints", () => {
-  // All tests require HTTP dispatch with format constraint matching not ported
   it.skip("string format constraints", () => {});
   it.skip("regexp format constraints", () => {});
   it.skip("enforce with format true with constraint", () => {});
@@ -2500,31 +2352,23 @@ describe("TestFormatConstraints", () => {
 });
 
 describe("TestCallableConstraintValidation", () => {
-  it.skip("constraint with object not callable", () => {
-    // Draw-time validation of callable constraints not ported
-  });
+  it.skip("constraint with object not callable", () => {});
 });
 
 describe("TestRouteDefaults", () => {
-  // Both tests require url_helpers not ported
   it.skip("route options are required for url for", () => {});
   it.skip("route defaults are not required for url for", () => {});
 });
 
 describe("TestRackAppRouteGeneration", () => {
-  it.skip("mounted application doesnt match unnamed route", () => {
-    // url_helpers + Rack app mounting not ported
-  });
+  it.skip("mounted application doesnt match unnamed route", () => {});
 });
 
 describe("TestRedirectRouteGeneration", () => {
-  it.skip("redirect doesnt match unnamed route", () => {
-    // url_helpers + redirect() helper not ported
-  });
+  it.skip("redirect doesnt match unnamed route", () => {});
 });
 
 describe("TestErrorsInController", () => {
-  // All tests require HTTP dispatch — controller error propagation not ported
   it.skip("legit no method errors are not caught", () => {});
   it.skip("legit name errors are not caught", () => {});
   it.skip("legit routing not found responses", () => {});
@@ -2557,15 +2401,12 @@ describe("TestPartialDynamicPathSegments", () => {
 });
 
 describe("TestOptionalScopesWithOrWithoutParams", () => {
-  // Both tests require url_helpers with optional scope segments not ported
   it.skip("stays unscoped with or without params", () => {});
   it.skip("preserves scope with or without params", () => {});
 });
 
 describe("TestPathParameters", () => {
-  it.skip("path parameters are not mutated", () => {
-    // HTTP dispatch integration test — path_parameters on live request not ported
-  });
+  it.skip("path parameters are not mutated", () => {});
 });
 
 describe("TestInternalRoutingParams", () => {
@@ -2583,22 +2424,15 @@ describe("TestInternalRoutingParams", () => {
 });
 
 describe("FlashRedirectTest", () => {
-  it.skip("block redirect commits flash", () => {
-    // Requires ActionDispatch::Flash middleware and HTTP dispatch — not ported
-  });
+  it.skip("block redirect commits flash", () => {});
 });
 
 describe("TestRelativeUrlRootGeneration", () => {
-  // Both tests require url_helpers with SCRIPT_NAME/relative_url_root not ported
   it.skip("url helpers", () => {});
   it.skip("optimized url helpers", () => {});
 });
 
 describe("TestHttpMethods", () => {
-  // Rails generates ~30 tests dynamically: "request method #{method.underscore} can be matched"
-  // for every RFC HTTP method. parity:test cannot statically resolve Ruby interpolation, so
-  // none of these will appear in parity:test counts regardless of stub name.
-  // Requires RoutedRackApp HTTP dispatch — not ported.
   it.skip("request method get can be matched", () => {});
 });
 
@@ -2639,34 +2473,19 @@ describe("TestUriPathEscaping", () => {
 });
 
 describe("TestMultipleNestedController", () => {
-  it.skip("controller option which starts with '/' from multiple nested controller", () => {
-    // pending: url_for with '/' absolute controller prefix in nested namespace not ported
-  });
+  it.skip("controller option which starts with '/' from multiple nested controller", () => {});
 });
 
 describe("TestRedirectInterpolation", () => {
-  // Tests require HTTP dispatch with redirect middleware and %{param} interpolation
-  it.skip("redirect escapes interpolated parameters with redirect proc", () => {
-    // pending: redirect() string interpolation escaping not ported
-  });
-  it.skip("redirect escapes interpolated parameters with option proc", () => {
-    // pending: redirect(path:) option interpolation escaping not ported
-  });
-  it.skip("path redirect escapes interpolated parameters correctly", () => {
-    // pending: redirect() path + query string interpolation escaping not ported
-  });
+  it.skip("redirect escapes interpolated parameters with redirect proc", () => {});
+  it.skip("redirect escapes interpolated parameters with option proc", () => {});
+  it.skip("path redirect escapes interpolated parameters correctly", () => {});
 });
 
 describe("TestConstraintsAccessingParameters", () => {
-  it.skip("parameters are reset between constraint checks", () => {
-    // pending: request.params isolation between successive constraint evaluations
-    // requires HTTP dispatch layer not ported
-  });
+  it.skip("parameters are reset between constraint checks", () => {});
 });
 
 describe("TestDefaultUrlOptions", () => {
-  it.skip("positional args with format false", () => {
-    // pending: positional argument form of url_helpers (archived_posts_path(2014, 12, 13))
-    // and default_url_options scoping not ported
-  });
+  it.skip("positional args with format false", () => {});
 });

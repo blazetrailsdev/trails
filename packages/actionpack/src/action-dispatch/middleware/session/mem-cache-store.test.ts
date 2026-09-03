@@ -32,19 +32,15 @@ describe("ActionDispatch::Session::MemCacheStore", () => {
     expect(() => new MemCacheStore(undefined, {})).toThrow(/cache/);
   });
 
-  // Rails: `class MemCacheStore < Rack::Session::Dalli; include Compatibility;
-  // include StaleSessionCheck; include SessionObject`. The mixins must land on
-  // MemCacheStore's own prototype (not just inherited via CacheStore) so the
-  // class's effective surface matches Rails.
   it("registers mixin methods as own properties on the prototype", () => {
     const proto = MemCacheStore.prototype;
     const ownNames = [
-      "initializeSid", // Compatibility
-      "makeRequest", // Compatibility
-      "staleSessionCheckBang", // StaleSessionCheck
-      "prepareSession", // SessionObject
-      "isLoadedSession", // SessionObject
-      "generateSid", // class-defined override; not the Compatibility hex form
+      "initializeSid",
+      "makeRequest",
+      "staleSessionCheckBang",
+      "prepareSession",
+      "isLoadedSession",
+      "generateSid",
     ];
     for (const name of ownNames) {
       expect(Object.prototype.hasOwnProperty.call(proto, name)).toBe(true);

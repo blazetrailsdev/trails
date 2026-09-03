@@ -1,12 +1,3 @@
-/**
- * ActionDispatch::SSL
- *
- * Middleware that enforces HTTPS connections.
- * - Redirects HTTP requests to HTTPS
- * - Sets HSTS headers
- * - Sets secure cookies flag
- */
-
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { merge } from "@blazetrails/ruby-compat";
@@ -16,7 +7,6 @@ export interface RedirectOptions {
   port?: number;
   host?: string;
   body?: string[];
-  /** Exclude matching requests from redirect and secure-cookie flagging. */
   exclude?: (env: RackEnv) => boolean;
 }
 
@@ -24,7 +14,6 @@ export interface SSLOptions {
   redirect?: boolean | RedirectOptions;
   hsts?: boolean | HSTSOptions;
   secureCookies?: boolean;
-  /** Mirrors Rails `ssl_default_redirect_status:` constructor kwarg. */
   sslDefaultRedirectStatus?: number;
 }
 

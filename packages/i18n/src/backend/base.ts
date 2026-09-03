@@ -1,20 +1,3 @@
-/**
- * Mirrors: i18n/lib/i18n/backend/base.rb
- *
- * Ruby mixes `Base` into a backend with `include`; the JS equivalent is an
- * abstract class that concrete backends extend, which keeps the file layout of
- * the gem. `store_translations` (base.rb:24-26), `available_locales`
- * (base.rb:97-99) and `lookup` (base.rb:116-118) keep the gem's raising bodies
- * rather than being `abstract`: Ruby lets a partial backend exist and fail at
- * call time, and `Chain` includes `Base` without defining a `lookup` at all.
- *
- * A Ruby Symbol value is a JS string that keeps its leading colon — `":short"`
- * is `:short` — which is the discriminator Ruby gets from the type, and is how
- * the value already renders through `inspect`. That is the spelling `localize`,
- * `default` and `resolve` all use for the `Symbol === x` arms of the gem
- * (base.rb:84, base.rb:154).
- */
-
 import {
   ArgumentError,
   InvalidLocale,
@@ -52,7 +35,6 @@ import { tr } from "./flatten.js";
 
 export type TranslateOptions = { [key: string]: unknown };
 
-/** Reads a translation file and hands back its contents. */
 export type FileReader = (filename: string) => Promise<string>;
 
 let fileReader: FileReader | undefined;
@@ -60,57 +42,17 @@ let yamlParse: ((source: string) => unknown) | undefined;
 const fileContents = new Map<string, string>();
 const localeModules = new Map<string, unknown>();
 
-/**
- * @noRailsEquivalent PERMANENT — the gem reads translation files with Ruby core —
- * `YAML.load_file` (base.rb:246) and `JSON.load_file` (base.rb:262). JS has no
- * filesystem in the language, and `packages/i18n` imports nothing from `node:*`
- * so it stays usable off a server, so the host registers the reader instead.
- */
+/** @noRailsEquivalent PERMANENT */
 export function registerFileReader(reader: FileReader): void {
   fileReader = reader;
 }
 
-/**
- * Registers an already-imported JavaScript locale module under the load-path
- * entry that names it, so that `load_rb`'s port can evaluate it synchronously.
- *
- * @noRailsEquivalent PERMANENT — `load_rb` (base.rb:254) is
- * `eval(IO.read(filename), binding, filename)`: Ruby evaluates a source file
- * synchronously, wherever it sits. JS evaluates one with `import()`, which is a
- * Promise, and the four lazy `init_translations` call sites (simple.rb:83-86)
- * are synchronous in Rails all the way up. A host that puts a `.js` file on the
- * load path has already imported it, so it hands the module over here — the
- * module counterpart of `preloadTranslationFiles` below.
- */
+/** @noRailsEquivalent PERMANENT */
 export function registerLocaleModule(filename: string, translations: unknown): void {
   localeModules.set(filename, translations);
 }
 
-/**
- * Reads every file in `I18n.load_path` into memory, so that the gem's loading
- * chain — `load_translations` / `load_file` / `load_yml` / `load_json`, and
- * `Simple#init_translations` above them — can stay synchronous exactly as the
- * gem writes it.
- *
- * @noRailsEquivalent PERMANENT — the gem has no preload because Ruby reads
- * files synchronously, so `init_translations` can read at its four lazy call
- * sites (simple.rb:83-86). Here the read is a Promise and those sites are
- * synchronous in Rails all the way up through `Error#message`,
- * `Naming#human` and `NumberConverter#format`; making them async would push a
- * deviation through five packages to remove one from this file. Awaiting the
- * I/O once at boot keeps the async fs and leaves every ported body verbatim.
- *
- * It resolves the `yaml` package on the same seam and for the same reason.
- * `base.rb:3` `require 'yaml'` is synchronous and unconditional, but `yaml` is
- * an `optionalDependency` here rather than stdlib, and a module-scope
- * `import "yaml"` would put that resolution in `@blazetrails/i18n`'s root graph
- * — an eager ESM link-time edge failing `import "@blazetrails/i18n"` outright
- * for a consumer that never reads a locale file. Awaiting it here keeps the
- * miss local to the callers that actually load translations, and keeps
- * `load_yml` synchronous the way `YAML.load_file` is. A top-level `await` would
- * do neither: it does not build to the `iife` or `cjs` bundles this package
- * ships through.
- */
+/** @noRailsEquivalent PERMANENT */
 export async function preloadTranslationFiles(...filenames: (string | string[])[]): Promise<void> {
   yamlParse ??= (
     await import("yaml").catch(() => {
@@ -125,19 +67,7 @@ export async function preloadTranslationFiles(...filenames: (string | string[])[
   }
 }
 
-/**
- * Drops the preloaded bytes and re-reads `I18n.load_path`, so that the
- * `load_translations` the next lazy `init_translations` runs sees what is on
- * disk now — which is what `YAML.load_file` (base.rb:246) does on every
- * `I18n.reload!` in the gem. A host that never registered a reader has no
- * files to re-read, and `I18n.reload!` there is only the in-memory clear.
- *
- * @noRailsEquivalent PERMANENT — the counterpart of `preloadTranslationFiles`
- * above: the gem's re-read is a synchronous `YAML.load_file` inside
- * `init_translations`, and the four call sites that reach it are synchronous in
- * Rails all the way up. Awaiting the re-read at the reload seams — the ones the
- * gem also treats as a whole-backend reset — is what the language leaves.
- */
+/** @noRailsEquivalent PERMANENT */
 export async function reloadTranslationFiles(): Promise<void> {
   if (!fileReader) return;
   fileContents.clear();
@@ -171,10 +101,6 @@ function readYaml(source: string): unknown {
   return yamlParse(source);
 }
 
-/**
- * Psych's and `JSON.load_file`'s `freeze: true` (base.rb:264, base.rb:281),
- * which freezes the whole parsed structure, not just its root.
- */
 function deepFreeze(value: unknown): unknown {
   if (typeof value !== "object" || value === null) return value;
   if (Object.isFrozen(value)) return value;
@@ -193,24 +119,16 @@ function readFile(filename: string): string {
   return contents;
 }
 
-/** Mirrors: Ruby's `File.extname`, down to the leading dot. */
 function extname(filename: string): string {
   const base = filename.slice(filename.lastIndexOf("/") + 1);
   const dot = base.lastIndexOf(".");
   return dot <= 0 ? "" : base.slice(dot);
 }
 
-/** Mirrors: Ruby's `Exception#inspect`, which the rescues in load_yml/load_json use. */
 function inspectError(e: unknown): string {
   return e instanceof Error ? `#<${e.name}: ${e.message}>` : String(e);
 }
 
-/**
- * Ruby `x.nil?`, which — unlike JS `x == null` — is an ordinary method an
- * object may override. `I18n::Backend::KeyValue::SubtreeProxy` does exactly
- * that (key_value.rb:178-180), and the four `entry.nil?` tests in `translate`
- * below are what make its lazy, still-unfetched form behave as a miss.
- */
 function isNil(value: unknown): boolean {
   if (value == null) return true;
   if (typeof value !== "object") return false;
@@ -218,7 +136,6 @@ function isNil(value: unknown): boolean {
   return typeof nil === "function" && (nil as () => boolean).call(value) === true;
 }
 
-/** Ruby truthiness: only `nil` and `false` are falsy — `0` and `""` are not. */
 function truthy(value: unknown): boolean {
   return value !== undefined && value !== null && value !== false;
 }
@@ -227,26 +144,17 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Ruby `#to_s` (i18n gem `lib/i18n.rb:447`), for the values a format argument can hold. */
 function toS(subject: unknown): string {
   if (subject == null) return "";
   return isSymbol(subject) ? symbolToS(subject) : String(subject);
 }
 
-/**
- * Ruby `respond_to?`. A Ruby reader that returns a value is a property or a
- * getter in JS, not a function, so membership — not callability — is the test.
- */
 function respondTo(object: unknown, name: string): boolean {
   return (
     object != null && (typeof object === "object" || typeof object === "function") && name in object
   );
 }
 
-/**
- * The duck type `localize` accepts: the gem asks the object for `strftime`,
- * `wday`, `mon`, `hour` and `sec` and nothing else.
- */
 interface Localizable {
   strftime(format: string): string;
   wday: number;
@@ -255,17 +163,7 @@ interface Localizable {
   sec?: number;
 }
 
-/**
- * @internal The duck type above, read off a `Temporal` value. Ruby's
- * `::Date`/`::Time` answer `strftime`, `wday`, `mon`, `hour` and `sec`
- * themselves (base.rb:83-107 sends them straight at the object), so the gem
- * needs no such seam; a `Temporal` value answers none of them. `strftime` is the
- * date gem's own, which reads a `Temporal` value directly.
- *
- * A `PlainDate` answers no `sec`, which is what routes it to `date.formats`
- * rather than `time.formats` — the `object.respond_to?(:sec)` arm at
- * base.rb:85.
- */
+/** @internal */
 function temporalLocalizable(
   object: Temporal.PlainDate | Temporal.PlainDateTime | Temporal.ZonedDateTime | Temporal.Instant,
 ): Localizable {
@@ -287,13 +185,7 @@ function temporalLocalizable(
   return localizable;
 }
 
-/**
- * @internal `object` as the duck type `localize` sends at — itself for the
- * gem-shaped `Date`/`DateTime`/`Time`, and {@link temporalLocalizable} for a
- * `Temporal` value. `localize` sends every reader at the result, and keeps the
- * object as it came in for `options[:object]` and the ArgumentError message,
- * where the gem passes the object itself.
- */
+/** @internal */
 function localizable(object: unknown): unknown {
   if (
     object instanceof Temporal.PlainDate ||
@@ -307,25 +199,15 @@ function localizable(object: unknown): unknown {
 }
 
 export abstract class Base {
-  /** Mirrors: `include I18n::Backend::Transliterator` (base.rb:9). */
   transliterate = transliterate;
   /**
-   * Ruby's `@transliterators` ivar, which has no public reader.
-   *
    * @internal
-   * @noRailsEquivalent PERMANENT — a Ruby ivar is private to the object; the
-   * TS field cannot be `private` because `Transliterator`'s `this`-typed mixin
-   * functions live in another file and read it.
+   * @noRailsEquivalent PERMANENT
    */
   transliterators?: Record<Locale, HashTransliterator | ProcTransliterator>;
 
   private eagerLoadedFlag = false;
 
-  /**
-   * Accepts a list of paths to translation files. Loads translations from
-   * plain JavaScript (*.js), YAML files (*.yml), or JSON files (*.json). See
-   * #loadJs, #loadYml, and #loadJson for details. Ruby's optional block is the trailing argument here.
-   */
   loadTranslations(...filenames: unknown[]): void {
     const block =
       typeof filenames[filenames.length - 1] === "function"
@@ -338,10 +220,6 @@ export abstract class Base {
     }
   }
 
-  /**
-   * This method receives a locale, a data hash and options for storing
-   * translations. Should be implemented.
-   */
   storeTranslations(
     _locale: Locale,
     _data: TranslationData,
@@ -400,18 +278,6 @@ export abstract class Base {
     return this.lookup(locale, key, options.scope) != null;
   }
 
-  /**
-   * Acts the same as `strftime`, but uses a localized version of the format
-   * string. Takes a key from the date/time formats translations as a format
-   * argument (*e.g.*, `short` in `date.formats`).
-   *
-   * The Symbol `format` arm builds its lookup key the way the gem does, with
-   * `:"#{type}.formats.#{key}"`. Interpolating a Ruby Symbol yields its name,
-   * which for a `":short"`-spelled Symbol is `.slice(1)` — the interpolation
-   * itself, not a pre-strip of a value passed on to `translate`. The key that
-   * results is a Symbol, so it keeps its own leading colon and `normalizeKey`
-   * is still the only place a colon is dropped from a value in flight.
-   */
   localize(
     locale: Locale,
     object: unknown,
@@ -439,21 +305,10 @@ export abstract class Base {
     return (object as Localizable).strftime(format as string);
   }
 
-  /**
-   * Returns an array of locales for which translations are available ignoring
-   * the reserved translation meta data key `i18n`.
-   */
   availableLocales(): Locale[] {
     throw new NotImplementedError();
   }
 
-  /**
-   * The re-read of `I18n.load_path` precedes the gem's body because in the gem
-   * it happens later, inside the next lazy `init_translations` (simple.rb:83-86)
-   * — a synchronous `YAML.load_file` (base.rb:246). Here that read is a Promise,
-   * so it is pulled forward to this seam, where one read serves both the lazy
-   * arm and the `eager_load!` the guard below may run during the reload itself.
-   */
   async reloadBang(): Promise<void> {
     await reloadTranslationFiles();
     if (this.eagerLoaded()) await this.eagerLoadBang();
@@ -467,7 +322,6 @@ export abstract class Base {
     return this.eagerLoadedFlag;
   }
 
-  /** The method which actually looks up for the translation in the store. */
   protected lookup(
     _locale: Locale,
     _key: TranslationKey,
@@ -481,11 +335,6 @@ export abstract class Base {
     return true;
   }
 
-  /**
-   * Evaluates defaults. If given subject is an Array, it walks the array and
-   * returns the first translation that can be resolved. Otherwise it tries to
-   * resolve the translation directly.
-   */
   protected default(
     locale: Locale,
     object: TranslationKey | null | undefined,
@@ -505,11 +354,6 @@ export abstract class Base {
     return this.resolve(locale, object, subject, options);
   }
 
-  /**
-   * Resolves a translation. If the given subject is a Symbol, it will be
-   * translated with the given options. If it is a Proc then it will be
-   * evaluated. All other subjects will be returned directly.
-   */
   protected resolve(
     locale: Locale,
     object: TranslationKey | null | undefined,
@@ -550,15 +394,6 @@ export abstract class Base {
     return this.resolve(locale, object, subject, options);
   }
 
-  /**
-   * Picks a translation from a pluralized mnemonic subkey according to English
-   * pluralization rules:
-   * - It will pick the `one` subkey if count is equal to 1.
-   * - It will pick the `other` subkey otherwise.
-   * - It will pick the `zero` subkey in the special case where count is equal
-   *   to 0 and there is a `zero` subkey present. This behaviour is not standard
-   *   with regards to the CLDR pluralization rules.
-   */
   protected pluralize(_locale: Locale, entry: unknown, count: unknown): unknown {
     entry = isHash(entry) ? except(entry, "attributes") : entry;
     if (!isHash(entry) || !truthy(count)) return entry;
@@ -568,10 +403,6 @@ export abstract class Base {
     return entry[key];
   }
 
-  /**
-   * Interpolates values into a given subject. Arrays are interpolated
-   * element-wise, recursively.
-   */
   protected interpolate(
     locale: Locale,
     subject: unknown,
@@ -585,12 +416,6 @@ export abstract class Base {
     return subject;
   }
 
-  /**
-   * Deep interpolation.
-   *
-   *     deepInterpolate({ people: { ann: "Ann is %{ann}" } }, { ann: "good" })
-   *     //=> { people: { ann: "Ann is good" } }
-   */
   protected deepInterpolate(
     locale: Locale,
     data: unknown,
@@ -666,12 +491,6 @@ export abstract class Base {
     }
   }
 
-  /**
-   * Loads a single translations file by delegating to #loadJs or #loadYml
-   * depending on the file extension and directly merges the data to the
-   * existing translations. Raises I18n::UnknownFileType for all other file
-   * extensions.
-   */
   protected loadFile(filename: string): TranslationData {
     let type = extname(filename);
     type = tr(type, ".", "").toLowerCase();
@@ -693,39 +512,12 @@ export abstract class Base {
     return data;
   }
 
-  /**
-   * Loads a plain JavaScript translations file. Evaluating the file must yield
-   * translation data with locales as toplevel keys — the gem `eval`s Ruby
-   * source for that hash (`load_rb`, base.rb:254-257), and a JS module's
-   * exports are the same hash.
-   */
   protected loadJs(filename: string): [unknown, boolean] {
     const translations = readLocaleModule(filename);
     return [translations, false];
   }
 
-  /**
-   * Loads a YAML translations file. The data must have locales as toplevel
-   * keys. There is no `YAML.respond_to?(:unsafe_load_file)` probe to port —
-   * JS has no second parser generation — so this takes the Psych 4 arm the gem
-   * takes on every supported Ruby (base.rb:263-264): `keys_symbolized` is
-   * true, and the parsed structure is frozen. Symbolizing keys is inherent in
-   * JS, where a Hash key is already a string, so what the flag buys is
-   * `store_translations` skipping the walk.
-   *
-   * The npm `yaml` package stands in for Psych, resolved on the
-   * `preloadTranslationFiles` seam rather than imported at module scope, so a
-   * consumer who never loads a locale file can still import this package —
-   * see that function. It is resolved directly rather than through
-   * `@blazetrails/activesupport/yaml`: the workspace edge runs
-   * activesupport -> i18n, so consuming that re-export would invert it.
-   *
-   * @missingRailsCall load_file — PERMANENT: `YAML.load_file` (base.rb:266) is the
-   * pre-Psych-4 arm, which no supported Ruby takes and there is no probe to
-   * reach it by; the arm this body does take, `unsafe_load_file`, reads and
-   * parses in one call, and the npm `yaml` package only parses, so the read is
-   * served from the preload (`preloadTranslationFiles`).
-   */
+  /** @missingRailsCall load_file — PERMANENT */
   protected loadYml(filename: string): [unknown, boolean] {
     try {
       return [deepFreeze(readYaml(readFile(filename))), true];
@@ -734,26 +526,11 @@ export abstract class Base {
     }
   }
 
-  /**
-   * Mirrors: `alias_method :load_yaml, :load_yml` (base.rb:272). The call goes
-   * through `Base.prototype` rather than `this` because `alias_method` copies
-   * the method entry as it stands here, so a subclass override of `loadYml` is
-   * not observed by the alias.
-   */
   protected loadYaml(filename: string): [unknown, boolean] {
     return Base.prototype.loadYml.call(this, filename);
   }
 
-  /**
-   * Loads a JSON translations file. The data must have locales as toplevel
-   * keys. As in #loadYml there is no `JSON.respond_to?(:load_file)` probe to
-   * port, so this takes the arm the gem takes (base.rb:279-280): symbolized —
-   * inherent in JS — and frozen.
-   *
-   * @missingRailsCall load_file — PERMANENT: Ruby's `JSON.load_file` (base.rb:280) reads
-   * and parses in one call; `JSON.parse` only parses, so the read is served
-   * from the preload (`preloadTranslationFiles`).
-   */
+  /** @missingRailsCall load_file — PERMANENT */
   protected loadJson(filename: string): [unknown, boolean] {
     try {
       return [deepFreeze(JSON.parse(readFile(filename))), true];

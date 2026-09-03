@@ -100,7 +100,6 @@ it("writes error to RACK_ERRORS when using incompatible multipart encoding", asy
     CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
     ":input": "not valid multipart",
   });
-  // Should still return 200 even if multipart parsing fails
   expect(res.status).toBe(200);
 });
 

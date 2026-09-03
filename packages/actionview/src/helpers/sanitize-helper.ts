@@ -1,12 +1,5 @@
 import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
 
-/**
- * ActionView::Helpers::SanitizeHelper
- *
- * Provides sanitize, strip_tags, and strip_links methods.
- * Uses a pluggable sanitizer vendor system.
- */
-
 export interface Sanitizer {
   sanitize(html: string | null | undefined, options?: Record<string, unknown>): string;
   sanitizeCss?(style: string): string;
@@ -27,12 +20,6 @@ export interface SanitizerVendor {
   };
 }
 
-/**
- * Default sanitizer using basic regex tag stripping.
- *
- * This is NOT safe for untrusted input — configure a real HTML
- * parser-based SanitizerVendor (e.g. DOMPurify) for production use.
- */
 class DefaultFullSanitizer implements Sanitizer {
   sanitize(html: string): string {
     if (html === null || html === undefined) return "";
@@ -123,7 +110,6 @@ class DefaultSafeListSanitizer implements Sanitizer {
         return "";
       }
 
-      // For allowed tags, filter attributes
       if (match.startsWith("</")) {
         return `</${lower}>`;
       }
@@ -135,7 +121,6 @@ class DefaultSafeListSanitizer implements Sanitizer {
         const attrName = attrMatch[1].toLowerCase();
         if (allowedAttrs.includes(attrName)) {
           const rawValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? "";
-          // Reject dangerous URI schemes (strip control chars to prevent obfuscation)
           if (
             (attrName === "href" || attrName === "src") &&
             // eslint-disable-next-line no-control-regex -- intentionally stripping control chars
@@ -159,7 +144,6 @@ class DefaultSafeListSanitizer implements Sanitizer {
   }
 
   sanitizeCss(style: string): string {
-    // Strip potentially dangerous CSS properties
     return style
       .split(";")
       .filter((prop) => {
@@ -189,7 +173,6 @@ export function getSanitizerVendor(): SanitizerVendor {
 
 export function setSanitizerVendor(vendor: SanitizerVendor): void {
   _sanitizerVendor = vendor;
-  // Reset memoized instances
   _fullSanitizer = null;
   _linkSanitizer = null;
   _safeListSanitizer = null;
@@ -240,9 +223,6 @@ export function sanitizedAllowedAttributes(): string[] {
   return _sanitizerVendor.safeListSanitizer.allowedAttributes;
 }
 
-/**
- * sanitize — sanitizes HTML input, stripping dangerous tags/attributes.
- */
 export function sanitize(
   html: string | null | undefined,
   options: Record<string, unknown> = {},
@@ -251,9 +231,6 @@ export function sanitize(
   return htmlSafe(result ?? "");
 }
 
-/**
- * sanitizeCss — sanitizes a block of CSS code.
- */
 export function sanitizeCss(style: string): string {
   const sanitizer = getSafeListSanitizer();
   if (sanitizer.sanitizeCss) {
@@ -262,32 +239,15 @@ export function sanitizeCss(style: string): string {
   return style;
 }
 
-/**
- * stripTags — strips all HTML tags from the input.
- */
 export function stripTags(html: string | null | undefined): SafeBuffer {
   const result = getFullSanitizer().sanitize(html ?? "");
   return htmlSafe(result ?? "");
 }
 
-/**
- * stripLinks — strips all link tags, leaving link text.
- */
 export function stripLinks(html: string | null | undefined): string {
   return getLinkSanitizer().sanitize(html ?? "");
 }
 
-/**
- * ActionView::Helpers::SanitizeHelper class-method surface.
- *
- * Rails mirrors a `ClassMethods` sub-module included via Concern that
- * exposes `full_sanitizer`, `link_sanitizer`, `safe_list_sanitizer` (with
- * matching writers) plus `sanitizer_vendor`. Exposed here as static
- * getter/setter accessors using the camelCase equivalents of those
- * Rails snake_case names (`fullSanitizer`, `linkSanitizer`,
- * `safeListSanitizer`, `sanitizerVendor`) per the trails camelCase
- * convention.
- */
 export class SanitizeHelper {
   static get fullSanitizer(): Sanitizer {
     return getFullSanitizer();

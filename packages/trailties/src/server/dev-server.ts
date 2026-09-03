@@ -7,7 +7,6 @@ export interface DevServerOptions {
   port: number;
   host: string;
   cwd: string;
-  /** `run Rails.application` — the booted app's middleware-wrapped endpoint. */
   app?: RackApp;
 }
 
@@ -36,8 +35,6 @@ export class DevServer {
     const configFile = hasViteConfig ? (hasTsConfig ? tsConfig : jsConfig) : false;
 
     this.server = await createServer({
-      // Only set root when no config file — the project's vite.config
-      // defines its own root (e.g. "app") which should win.
       ...(hasViteConfig ? {} : { root: this.cwd }),
       configFile,
       plugins: this.app ? [trailsPlugin({ app: this.app })] : [],

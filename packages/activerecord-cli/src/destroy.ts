@@ -15,7 +15,6 @@ export interface DestroyMigrationResult {
   path: string;
   deleted: boolean;
   modified?: string;
-  /** Set when multiple migration files match the name suffix. */
   ambiguous?: string[];
 }
 
@@ -24,9 +23,7 @@ export interface DestroyModelResult {
   migrationPath: string | undefined;
   deleted: boolean;
   modified?: string;
-  /** Set when multiple create migrations match and the target is ambiguous. */
   ambiguous?: string[];
-  /** False when the model file was absent (migration-only cleanup). */
   modelDeleted: boolean;
 }
 
@@ -74,7 +71,6 @@ async function safeUnlink(path: string): Promise<void> {
   });
 }
 
-/** `ar destroy:migration <Name>` — deletes `*_<snake_name>.ts`. */
 export async function destroyMigration(
   root: string,
   name: string,
@@ -105,7 +101,6 @@ export async function destroyMigration(
   return { path: filePath, deleted: true };
 }
 
-/** `ar destroy:model <Name>` — deletes model + migration, re-runs manifest. */
 export async function destroyModel(
   root: string,
   name: string,
@@ -154,10 +149,6 @@ export async function destroyModel(
   if (!options.dryRun) {
     if (modelPresent) await safeUnlink(modelPath);
     if (migrationPath !== undefined) await safeUnlink(migrationPath);
-    // Regenerate manifest when the model was present (models dir guaranteed to
-    // exist) OR when the manifest already exists (stale import after manual
-    // model deletion). Skipping both avoids the plain Error generateManifest
-    // throws when the models dir doesn't exist at all (migration-only project).
     const modelsDir = join(root, "app", "models");
     const manifestExists = (await readIfPresent(join(modelsDir, "index.ts"))) !== undefined;
     if (modelPresent || manifestExists) {

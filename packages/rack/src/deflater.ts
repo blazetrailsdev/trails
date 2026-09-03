@@ -44,7 +44,6 @@ export class Deflater {
     const encoding = this.preferredEncoding(acceptEncoding);
 
     if (!encoding) {
-      // No acceptable encoding - respond with 406? No, just pass through per Rack behavior
       return [status, headers, body];
     }
 
@@ -52,7 +51,6 @@ export class Deflater {
       return [status, headers, body];
     }
 
-    // Update Vary header
     const vary = headers["vary"];
     if (!vary || (!vary.includes("*") && !vary.toLowerCase().includes("accept-encoding"))) {
       headers["vary"] = vary ? vary + ", Accept-Encoding" : "Accept-Encoding";

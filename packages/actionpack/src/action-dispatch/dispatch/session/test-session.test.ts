@@ -2,16 +2,6 @@ import { describe, expect, it } from "vitest";
 import { SessionId } from "@blazetrails/rack-session";
 import { TestSession } from "../../../action-controller/test-case.js";
 
-// ==========================================================================
-// dispatch/session/test_session_test.rb  (ActionController::TestSessionTest)
-//
-// Rails design: ActionController::TestSession is an in-memory session store
-// backed by a plain hash. Keys are always coerced to strings. `id` returns a
-// session-ID value object whose `publicId` is the hex string; the special
-// key "session_id" returns that same value via `[]`. `fetch` follows Ruby's
-// Hash#fetch contract: block wins over default when both are given.
-// ==========================================================================
-
 describe("ActionController::TestSessionTest", () => {
   it("initialize with values", () => {
     const session = new TestSession({ one: "one", two: "two" });

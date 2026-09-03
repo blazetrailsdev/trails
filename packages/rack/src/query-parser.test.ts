@@ -20,7 +20,6 @@ it("accepts bytesize_limit to specify maximum size of query string to parse", ()
 
 it("handles separator strings containing regex metacharacters without throwing", () => {
   const queryParser = QueryParser.makeDefault(32);
-  // "|" is a regex metacharacter; must be escaped before embedding in a character class
   expect(queryParser.parseQuery("a=1|b=2", "|")).toEqual({ a: "1", b: "2" });
   expect(queryParser.parseNestedQuery("a=1|b=2", "|")).toEqual({ a: "1", b: "2" });
 });

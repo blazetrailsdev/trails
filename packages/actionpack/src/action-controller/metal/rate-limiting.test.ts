@@ -61,8 +61,6 @@ describe("MemoryRateLimitStore", () => {
     };
     const peek = (store: MemoryRateLimitStore): StoreInternals =>
       store as unknown as StoreInternals;
-    // Derive tuning constants from the implementation so these tests
-    // assert behavior, not specific numeric values.
     const STATICS = MemoryRateLimitStore as unknown as {
       _PRUNE_BASELINE: number;
       _PRUNE_MAX: number;
@@ -78,12 +76,9 @@ describe("MemoryRateLimitStore", () => {
           store.increment(`old:${i}`, 1, { expiresIn: 1 });
         }
         vi.advanceTimersByTime(2000);
-        // Stays just under the threshold — no sweep yet.
         expect(peek(store)._entries.size).toBe(BASELINE - 1);
         store.increment("trigger", 1, { expiresIn: 60 });
-        // Crossing the threshold triggers a sweep that drops all expired keys.
         expect(peek(store)._entries.size).toBe(1);
-        // Sweep freed space → threshold relaxes back to the baseline.
         expect(peek(store)._pruneThreshold).toBe(BASELINE);
       } finally {
         vi.useRealTimers();
@@ -95,19 +90,12 @@ describe("MemoryRateLimitStore", () => {
       for (let i = 0; i < BASELINE; i += 1) {
         store.increment(`live:${i}`, 1, { expiresIn: 3600 });
       }
-      // All entries are live, so the sweep freed nothing and the next
-      // threshold doubles.
       expect(peek(store)._pruneThreshold).toBe(BASELINE * 2);
       expect(peek(store)._skipSweepInserts).toBe(0);
     });
 
     it("saturates the threshold at _PRUNE_MAX and arms _skipSweepInserts", () => {
       const store = new MemoryRateLimitStore();
-      // Each sterile (all-live) sweep doubles the threshold:
-      // BASELINE → 2·BASELINE → 4·BASELINE → … → PRUNE_MAX.
-      // The Nth all-live insert (where N == current threshold) trips the
-      // sweep, so the run that saturates at PRUNE_MAX happens once size
-      // reaches PRUNE_MAX/2 == BASELINE * 8 (when PRUNE_MAX = 16·BASELINE).
       const saturatingInsertCount = PRUNE_MAX / 2;
       for (let i = 0; i < saturatingInsertCount; i += 1) {
         store.increment(`live:${i}`, 1, { expiresIn: 3600 });
@@ -121,9 +109,6 @@ describe("MemoryRateLimitStore", () => {
       for (let i = 0; i < PRUNE_MAX; i += 1) {
         store.increment(`live:${i}`, 1, { expiresIn: 3600 });
       }
-      // size now == _PRUNE_MAX; the most recent insert hit the sweep block,
-      // saw the skip counter armed, and decremented it once rather than
-      // walking the whole map.
       expect(peek(store)._pruneThreshold).toBe(PRUNE_MAX);
       expect(peek(store)._skipSweepInserts).toBe(BASELINE - 1);
     });
@@ -478,8 +463,6 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
       new Response(),
     );
     expect(overrideCalls).toEqual(["method-override"]);
-    // Sanity: the override lives on the subclass prototype (not as an own
-    // instance field), which is the override shape this PR is enabling.
     expect(
       Object.prototype.hasOwnProperty.call(MethodOverrideController.prototype, "rateLimiting"),
     ).toBe(true);

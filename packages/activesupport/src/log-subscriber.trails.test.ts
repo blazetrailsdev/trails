@@ -3,12 +3,6 @@ import { LogSubscriber } from "./log-subscriber.js";
 import { _setTrailsLogger } from "./trails-logger-slot.js";
 import type { Logger } from "./logger.js";
 
-/**
- * `LogSubscriber.logger`'s application-logger fallback
- * (`activesupport/lib/active_support/log_subscriber.rb:93-97`). Rails has no
- * test for it — `defined?(Rails)` is false in its own suite — so the coverage
- * is trails-only and lives here rather than in the ported `log-subscriber.test.ts`.
- */
 describe("LogSubscriber.logger fallback", () => {
   afterEach(() => {
     LogSubscriber.logger = null;

@@ -1,21 +1,3 @@
-/**
- * ActionView::LookupContext
- *
- * Orchestrates template resolution and rendering. Combines resolvers
- * (which find templates) with handlers (which render them).
- *
- * Usage:
- *   const ctx = new LookupContext();
- *   ctx.addResolver(new FileSystemResolver("app/views"));
- *   ctx.addResolver(new InMemoryResolver()); // fallback
- *
- *   const output = await ctx.render("posts", "index", "html", { posts: [...] });
- *
- * Phase 1d fleshes out the registered-details cascade (locale, formats,
- * variants, handlers) and a real `DetailsKey` cache mirroring
- * `action_view/lookup_context.rb`.
- */
-
 import type { RenderContext } from "./template/handlers.js";
 import { Base } from "./base.js";
 import { TemplateHandlers } from "./template/handlers.js";
@@ -38,7 +20,6 @@ function registerDetail(name: string, proc: DefaultProc): void {
   DEFAULT_PROCS[name] = proc;
 }
 
-// I18n is not yet ported; fall back to a single "en" locale.
 registerDetail("locale", () => ["en"]);
 registerDetail(
   "formats",
@@ -48,18 +29,18 @@ registerDetail("variants", () => []);
 registerDetail("handlers", () => TemplateHandlers.extensions() as DetailValue);
 
 export class MissingTemplate extends Error {
-  /** Rails-shape accessors — refined in Phase 1d. @internal stub - real impl in Phase 1d */
+  /** @internal */
   readonly path: string;
-  /** @internal stub - real impl in Phase 1d */
+  /** @internal */
   readonly paths: string[];
-  /** @internal stub - real impl in Phase 1d */
+  /** @internal */
   readonly prefixes: string[];
-  /** @internal stub - real impl in Phase 1d */
+  /** @internal */
   readonly partial: boolean;
-  /** @internal stub - real impl in Phase 1d */
+  /** @internal */
   readonly templateKeys: readonly string[];
 
-  /** Flat list of all template paths known to the resolvers at throw time. @internal */
+  /** @internal */
   readonly candidatePaths: readonly string[];
 
   #cachedCorrections?: string[];
@@ -85,12 +66,6 @@ export class MissingTemplate extends Error {
     this.candidatePaths = candidatePaths;
   }
 
-  /**
-   * Mirrors `ActionView::MissingTemplate#corrections` — suggests the closest
-   * known template paths using `DidYouMean::Jaro.distance`. Rails weights
-   * prefix and basename separately; this port scores the full path string,
-   * which produces equivalent rankings for the common case.
-   */
   get corrections(): string[] {
     if (this.#cachedCorrections !== undefined) return this.#cachedCorrections;
 
@@ -121,18 +96,12 @@ export class MissingTemplate extends Error {
   }
 }
 
-/**
- * Per-process cache of `{locale, formats, variants, handlers}` detail
- * tuples + their associated digest caches. Mirrors
- * `ActionView::LookupContext::DetailsKey`.
- */
 export class DetailsKey {
   /** @internal */
   static _detailsKeys = new Map<string, Requested>();
   /** @internal */
   static _digestCache = new Map<Requested, Map<string, string>>();
 
-  /** Canonical Requested object for a given detail tuple. */
   static detailsCacheKey(details: DetailsMap): Requested {
     let formats = details.formats;
     if (formats && !Types.isValidSymbols(formats)) {
@@ -154,7 +123,6 @@ export class DetailsKey {
     return req;
   }
 
-  /** Digest cache scoped to a given detail tuple. */
   static digestCache(details: DetailsMap): Map<string, string> {
     const req = DetailsKey.detailsCacheKey(details);
     let cache = DetailsKey._digestCache.get(req);
@@ -169,18 +137,11 @@ export class DetailsKey {
     return Array.from(DetailsKey._digestCache.values());
   }
 
-  /**
-   * Clear the details and digest caches, plus any resolver caches
-   * advertised by `PathRegistry`. Until the resolver port (Phase 1c)
-   * wires real entries into `PathRegistry`, the resolver loop is a
-   * no-op.
-   */
-  /** Mirrors `DetailsKey.view_context_class` (`lookup_context.rb:90-94`). */
   static viewContextClass(): typeof Base {
     return (DetailsKey._viewContextClass ??= Base.withEmptyTemplateCache());
   }
 
-  /** @internal Rails: `@view_context_class` (`lookup_context.rb:81,92`). */
+  /** @internal */
   private static _viewContextClass: typeof Base | null = null;
 
   static clear(): void {
@@ -192,11 +153,7 @@ export class DetailsKey {
     DetailsKey._digestCache.clear();
   }
 
-  /** @internal Per-symbol identity tag, so two non-global Symbols with
-   * the same description don't collide in `_stableKey`. Mirrors Ruby's
-   * symbol interning (where `:foo == :foo` is always true) by giving
-   * each non-interned Symbol a stable per-process numeric id. Stored
-   * in a WeakMap so unreferenced symbols can be GC'd. */
+  /** @internal */
   private static _symbolIds: WeakMap<WeakKey, number> = new WeakMap();
   private static _nextSymbolId = 0;
   private static _tagSymbol(s: symbol): string {
@@ -210,8 +167,7 @@ export class DetailsKey {
     return `s#${id}`;
   }
 
-  /** @internal Unambiguous key for a details tuple — JSON encoding so
-   * raw `:`, `,`, or `|` inside a detail value can't collide. */
+  /** @internal */
   private static _stableKey(details: DetailsMap): string {
     return JSON.stringify(
       REGISTERED_DETAILS.map((k) => [
@@ -225,12 +181,11 @@ export class DetailsKey {
 export class LookupContext {
   static DetailsKey: typeof DetailsKey;
 
-  /** Names of detail facets registered process-wide. */
   static get registeredDetails(): ReadonlyArray<string> {
     return REGISTERED_DETAILS;
   }
 
-  /** @internal Register a new detail facet (used by extensions). */
+  /** @internal */
   static registerDetail(name: string, proc: DefaultProc): void {
     registerDetail(name, proc);
   }
@@ -240,10 +195,8 @@ export class LookupContext {
     return DEFAULT_PROCS;
   }
 
-  // --- Existing high-level renderer state (kept for AC integration) ---
   private layoutName: string | false | null = "application";
 
-  // --- Rails-faithful state ---
   private _details: DetailsMap;
   private _prefixes: string[];
   private _detailsKey: Requested | null = null;
@@ -262,12 +215,7 @@ export class LookupContext {
     this._viewPaths = this.buildViewPaths(viewPaths);
   }
 
-  /**
-   * @internal
-   * Populate `target` with the registered detail facets, falling back to
-   * each facet's default proc when `details` doesn't supply a value.
-   * Mirrors `LookupContext#initialize_details`.
-   */
+  /** @internal */
   initializeDetails(target: DetailsMap, details: DetailsMap): DetailsMap {
     for (const k of REGISTERED_DETAILS) {
       target[k] = details[k] ?? DEFAULT_PROCS[k]();
@@ -275,7 +223,6 @@ export class LookupContext {
     return target;
   }
 
-  // --- prefixes ---
   get prefixes(): string[] {
     return this._prefixes;
   }
@@ -283,7 +230,6 @@ export class LookupContext {
     this._prefixes = value;
   }
 
-  // --- details accessors ---
   get locale(): string | symbol | null {
     return this._details.locale[0] ?? null;
   }
@@ -348,7 +294,6 @@ export class LookupContext {
     this._details = { ...this._details, [key]: value };
   }
 
-  // --- cache controls (DetailsCache module) ---
   get cache(): boolean {
     return this._detailsCache;
   }
@@ -356,14 +301,12 @@ export class LookupContext {
     this._detailsCache = value;
   }
 
-  /** Cache key for the current details tuple (null when cache is off). */
   detailsKey(): Requested | null {
     if (!this._detailsCache) return null;
     if (!this._detailsKey) this._detailsKey = DetailsKey.detailsCacheKey(this._details);
     return this._detailsKey;
   }
 
-  /** Run `block` with the details cache disabled. */
   disableCache<T>(block: () => T): T {
     const prev = this._detailsCache;
     this._detailsCache = false;
@@ -374,52 +317,33 @@ export class LookupContext {
     }
   }
 
-  /** Digest cache scoped to the current details tuple. */
   digestCache(): Map<string, string> {
     return DetailsKey.digestCache(this._details);
   }
 
-  /**
-   * Return a sibling `LookupContext` whose `formats` detail is replaced
-   * with the given list. Mirrors `LookupContext#with_prepended_formats`.
-   */
   withPrependedFormats(formats: DetailValue): LookupContext {
     const details = { ...this._details, formats };
     return new LookupContext(this._viewPaths, details, this._prefixes);
   }
 
-  // --- ViewPaths module ---
-  /** Frozen `PathSet` of resolvers used for Rails-shape lookups. */
   get viewPaths(): PathSet {
     return this._viewPaths;
   }
 
-  /**
-   * @internal
-   * Whenever setting view paths, make a copy so we can manipulate them
-   * per-instance without aliasing. Mirrors
-   * `ViewPaths#build_view_paths` (the `String`/`Pathname` wrapping there
-   * is deferred to the resolver port).
-   */
+  /** @internal */
   buildViewPaths(paths: PathSet | ReadonlyArray<PathSetResolver> | null): PathSet {
     if (paths instanceof PathSet) return paths;
     return new PathSet(paths ?? []);
   }
 
-  /** Append `paths` to the current view-path set. */
   appendViewPaths(paths: ReadonlyArray<PathSetResolver>): void {
     this._viewPaths = this.buildViewPaths([...this._viewPaths.toArray(), ...paths]);
   }
 
-  /** Prepend `paths` to the current view-path set. */
   prependViewPaths(paths: ReadonlyArray<PathSetResolver>): void {
     this._viewPaths = this.buildViewPaths([...paths, ...this._viewPaths.toArray()]);
   }
 
-  /**
-   * Find one matching template (Rails-shape signature). Aliased as
-   * `findTemplate` for the existing 3-arg call sites.
-   */
   find(
     name: string,
     prefixes: ReadonlyArray<string> = [],
@@ -432,7 +356,6 @@ export class LookupContext {
     return this._viewPaths.find(base, pfxs, partial, details, key, keys);
   }
 
-  /** Rails-shape `find_all`. */
   findAll(
     name: string,
     prefixes: ReadonlyArray<string> = [],
@@ -445,7 +368,6 @@ export class LookupContext {
     return this._viewPaths.findAll(base, pfxs, partial, details, key, keys);
   }
 
-  /** Rails-shape `exists?` / `template_exists?`. */
   isExists(
     name: string,
     prefixes: ReadonlyArray<string> = [],
@@ -458,21 +380,13 @@ export class LookupContext {
     return this._viewPaths.exists(base, pfxs, partial, details, key, keys);
   }
 
-  /**
-   * Rails-shape `any?` / `any_templates?` — ignores format/locale/variant
-   * constraints by using `detail_args_for_any`.
-   */
   isAny(name: string, prefixes: ReadonlyArray<string> = [], partial = false): boolean {
     const [base, pfxs] = this.normalizeName(name, prefixes);
     const [details, key] = this.detailArgsForAny();
     return this._viewPaths.exists(base, pfxs, partial, details, key, []);
   }
 
-  /**
-   * @internal
-   * Compute the (details, detailsKey) pair for a lookup. Returns the
-   * memoized request details when `options` is empty (the hot path).
-   */
+  /** @internal */
   detailArgsFor(options: Record<string, DetailValue>): [DetailsMap, Requested | null] {
     if (Object.keys(options).length === 0) return [this._details, this.detailsKey()];
     const userDetails = { ...this._details, ...options };
@@ -480,22 +394,13 @@ export class LookupContext {
     return [userDetails, key];
   }
 
-  /**
-   * @internal
-   * Details tuple for `any?` lookups — every facet at its default except
-   * `variants`, which is wildcarded.
-   */
+  /** @internal */
   detailArgsForAny(): [DetailsMap, Requested | null] {
     if (this._detailArgsForAny) return this._detailArgsForAny;
     const details: DetailsMap = {};
     for (const k of REGISTERED_DETAILS) {
       details[k] = DEFAULT_PROCS[k]();
     }
-    // Rails passes `variants: :any` here; the canonical Requested uses
-    // a sentinel-array branch ("any") that matches every variant. We
-    // bypass DetailsKey._detailsKeys for this special form since
-    // `Requested.variantsIdx === "any"` is not representable in the
-    // DetailsMap.
     const key = this._detailsCache
       ? new Requested({
           locale: details.locale,
@@ -508,11 +413,7 @@ export class LookupContext {
     return this._detailArgsForAny;
   }
 
-  /**
-   * @internal
-   * Splits a possibly-namespaced template name (`"admin/users/show"`)
-   * into `(name, prefixes)`. Mirrors `ViewPaths#normalize_name`.
-   */
+  /** @internal */
   normalizeName(name: string, prefixes: ReadonlyArray<string>): [string, ReadonlyArray<string>] {
     const idx = name.lastIndexOf("/");
     if (idx < 0) return [name, prefixes.length > 0 ? prefixes : [""]];
@@ -523,32 +424,20 @@ export class LookupContext {
     return [base, pfxs];
   }
 
-  /**
-   * Add a resolver to the lookup chain. First added = highest priority.
-   * An alias for Rails' `append_view_paths` (`view_paths.rb:87-89`), so
-   * every resolver reaches the same `PathSet` the Rails-shape lookups read.
-   *
-   * @noRailsEquivalent CONVERGEABLE actionview-drop-add-resolver-for-append-view-paths
-   */
+  /** @noRailsEquivalent CONVERGEABLE actionview-drop-add-resolver-for-append-view-paths */
   addResolver(resolver: PathSetResolver): void {
     this.appendViewPaths([resolver]);
   }
 
-  /** Set the layout to use. Pass false to disable layout. */
   setLayout(name: string | false): void {
     this.layoutName = name;
   }
 
-  /** Get the current layout name. */
   getLayout(): string | false | null {
     return this.layoutName;
   }
 
-  /**
-   * Find a template across all resolvers.
-   *
-   * @internal
-   */
+  /** @internal */
   findTemplate(
     name: string,
     prefixes: ReadonlyArray<string> = [],
@@ -559,9 +448,6 @@ export class LookupContext {
     );
   }
 
-  /**
-   * Find a partial template. Partials are prefixed with underscore.
-   */
   findPartial(
     name: string,
     prefixes: ReadonlyArray<string> = [],
@@ -572,17 +458,7 @@ export class LookupContext {
     );
   }
 
-  /**
-   * Find a layout template.
-   *
-   * `prefixes` defaults to `["layouts"]` rather than Rails' `nil`: Rails'
-   * `resolve_layout` (`renderer/template_renderer.rb:92-104`) passes the whole
-   * `"layouts/application"` path as the NAME and lets `normalize_name`
-   * (`lookup_context.rb:209-225`) split it, where trails' callers pass the bare
-   * layout name.
-   *
-   * @internal
-   */
+  /** @internal */
   findLayout(
     name: string,
     prefixes: ReadonlyArray<string> = ["layouts"],
@@ -594,21 +470,6 @@ export class LookupContext {
     return template ? template.asLayout() : null;
   }
 
-  /**
-   * Render a template by prefixes/action.
-   *
-   * `prefixes` is the controller's whole inheritance chain, as
-   * `ActionView::Rendering#_normalize_options` fills it from `_prefixes`, and
-   * `formats` is the registered-details cascade `LookupContext#formats=`
-   * (`lookup_context.rb:263-280`) computed — not one of each.
-   *
-   * @param prefixes Controller prefixes (e.g., ["posts", "application"])
-   * @param action   Action name (e.g., "index")
-   * @param formats  Response formats (e.g., ["html", "text"])
-   * @param locals   Template variables
-   * @param options  Additional options
-   * @returns Rendered output string
-   */
   async render(
     prefixes: ReadonlyArray<string>,
     action: string,
@@ -635,10 +496,6 @@ export class LookupContext {
       format,
     };
 
-    // Rails renders the content template and its layout against the SAME view
-    // (`TemplateRenderer#render_with_layout`, `template_renderer.rb:71-78`:
-    // `view.view_flow.set(:layout, yield(layout)); layout.render(view, locals)`),
-    // which is what carries a `content_for` section from one to the other.
     const view = options.view ?? this.buildViewContext();
     let output = await this.renderTemplate(template, locals, { ...context, view });
 
@@ -654,15 +511,6 @@ export class LookupContext {
     return output;
   }
 
-  /**
-   * Render a partial.
-   *
-   * @param name       Partial name (without underscore prefix)
-   * @param prefix     Controller prefix
-   * @param format     Response format
-   * @param locals     Template variables
-   * @returns Rendered partial output
-   */
   async renderPartial(
     name: string,
     prefix: string,
@@ -690,16 +538,6 @@ export class LookupContext {
     return this.renderTemplate(template, locals, { ...context, view });
   }
 
-  /**
-   * Render a collection of items with a partial.
-   *
-   * @param partial    Partial name
-   * @param prefix     Controller prefix
-   * @param format     Response format
-   * @param collection Array of items
-   * @param as         Local variable name for each item (defaults to partial name)
-   * @returns Rendered collection output
-   */
   async renderCollection(
     partial: string,
     prefix: string,
@@ -722,10 +560,6 @@ export class LookupContext {
     return parts.join("");
   }
 
-  /**
-   * Render a Template against a view, as `Template#render` (`template.rb:271`)
-   * does.
-   */
   async renderTemplate(
     template: Template,
     locals: Record<string, unknown>,
@@ -736,21 +570,7 @@ export class LookupContext {
     return template.render(view, locals);
   }
 
-  /**
-   * Render a partial synchronously, for a nested `render partial:` inside a
-   * compiled template. Rails needs no such entry point: partial rendering is
-   * synchronous end to end and the template's own `self` answers `render`.
-   * trails' handler protocol permits an async `render`, so a handler that
-   * returns a promise says so rather than emitting `[object Promise]`.
-   *
-   * A qualified `name` ("users/user") replaces `prefix` with its leading
-   * segments, mirroring `PartialRenderer#partial_path`
-   * (`actionview/lib/action_view/renderer/partial_renderer.rb`).
-   *
-   * @noRailsEquivalent PERMANENT — trails' render path is asynchronous by
-   * design where Rails' is synchronous, so the synchronous entry point a
-   * compiled template needs has no Rails counterpart and will not converge.
-   */
+  /** @noRailsEquivalent PERMANENT */
   renderPartialSync(
     name: string,
     prefix: string,
@@ -778,15 +598,7 @@ export class LookupContext {
     return template.render(partialView, locals);
   }
 
-  /**
-   * Render a template synchronously, for a `render template:` inside a
-   * compiled template — the sibling of {@link renderPartialSync}, over
-   * `find_template` rather than `find_partial`.
-   *
-   * @noRailsEquivalent PERMANENT — trails' render path is asynchronous by
-   * design where Rails' is synchronous, so the synchronous entry point a
-   * compiled template needs has no Rails counterpart and will not converge.
-   */
+  /** @noRailsEquivalent PERMANENT */
   renderTemplateSync(
     name: string,
     prefix: string,
@@ -812,12 +624,6 @@ export class LookupContext {
     return template.render(view ?? this.buildViewContext(), locals);
   }
 
-  /**
-   * The view a template renders against when no controller supplied one — a
-   * bare `DetailsKey.view_context_class` (`lookup_context.rb:90-94`). A
-   * controller-driven render passes its own `view_context`
-   * (`action_view/rendering.rb:108-110`) instead.
-   */
   private buildViewContext(): Base {
     return new (DetailsKey.viewContextClass())(this, {}, null);
   }
@@ -826,7 +632,7 @@ export class LookupContext {
     return this._viewPaths.toArray().map((r) => r.constructor.name);
   }
 
-  /** @internal Collect all template paths from resolvers that expose them. */
+  /** @internal */
   private allCandidatePaths(): string[] {
     const seen = new Set<string>();
     for (const resolver of this._viewPaths) {
@@ -836,7 +642,7 @@ export class LookupContext {
           for (const p of paths) seen.add(p.virtual);
         }
       } catch {
-        // best-effort — don't let enumeration errors mask the MissingTemplate
+        /** @empty */
       }
     }
     return Array.from(seen);

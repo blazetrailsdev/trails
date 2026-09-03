@@ -1,15 +1,3 @@
-/**
- * trails-only cover for the `ActionDispatch::Request` arms that the
- * Rack-header convergence brought over and that `request_test.rb` does not
- * exercise directly: the chunked-transfer branch of `content_length`
- * (request.rb:292-295), the `fetch_header` memoization of `GET`
- * (request.rb:395-404), and the by-reference env `Rack::Request::Env#initialize`
- * gives every `set_header` — the semantics
- * `HostAuthorization#mark_as_authorized` (host_authorization.rb:167) relies on;
- * and the two halves of `include Rack::Request::Helpers` (request.rb:21): the
- * members the class body does not declare, which arrive through the mixin, and
- * the ones it does, which outrank it as they do in Ruby.
- */
 import { describe, it, expect } from "vitest";
 import type { RackEnv } from "@blazetrails/rack";
 import { Request } from "../request.js";
@@ -82,9 +70,6 @@ describe("Request", () => {
     req.requestMethod = "PATCH";
     expect(req.requestMethod).toBe("PATCH");
     expect(req.getHeader("REQUEST_METHOD")).toBe("PATCH");
-    // Rack's form_data? treats a POST with no Content-Type as form data
-    // (rack/request.rb:470-475); ActionDispatch's override does not
-    // (action_dispatch/http/request.rb:371-373).
     expect(new Request({ REQUEST_METHOD: "POST" }).formData).toBe(false);
   });
 });

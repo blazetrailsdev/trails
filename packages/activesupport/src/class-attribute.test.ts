@@ -42,7 +42,6 @@ describe("classAttribute", () => {
     classAttribute.call(Base, "color", { default: "red" });
 
     class Child extends Base {}
-    // Child should inherit
     expect((Child as any).color).toBe("red");
   });
 
@@ -64,7 +63,6 @@ describe("classAttribute", () => {
     const instance = new Model() as any;
     expect(instance.locked).toBe(true);
 
-    // Attempting to set should have no effect (setter is undefined)
     expect(() => {
       instance.locked = false;
     }).toThrow();
@@ -78,9 +76,7 @@ describe("classAttribute", () => {
     });
 
     const instance = new Model() as any;
-    // No property on prototype
     expect(instance.secret).toBeUndefined();
-    // But class-level still works
     expect((Model as any).secret).toBe("hidden");
   });
 

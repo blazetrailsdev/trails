@@ -118,7 +118,6 @@ describe("NumberHelperTest", () => {
       expect(isHtmlSafe(fn("<script></script>"))).toBe(false);
       expect(isHtmlSafe(fn(raw("1")))).toBe(true);
     }
-    // phone helper always html-escapes its output, so result is marked safe
     expect(isHtmlSafe(numberToPhone(1))).toBe(true);
     expect(isHtmlSafe(numberToPhone("<script></script>"))).toBe(true);
   });
@@ -150,6 +149,5 @@ describe("NumberHelperTest", () => {
     for (const fn of fns) expect(() => fn("3.33", { raise: true })).not.toThrow();
   });
 
-  // I18n.backend.store_translations support is not yet ported.
   it.skip("number to human with custom translation scope", () => {});
 });

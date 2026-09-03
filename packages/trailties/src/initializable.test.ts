@@ -34,7 +34,6 @@ class Child extends Parent {
     Child.initializer("four", { after: "one", before: "two" }, push(4));
   }
 }
-// Re-open Parent (the Rails fixture does this) to add :five.
 Parent.initializer("five", { before: "one" }, push(5));
 
 class Instance extends Initializable {

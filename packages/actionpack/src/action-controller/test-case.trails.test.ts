@@ -1,8 +1,3 @@
-// Trails-only cover: `TestRequest#assignParameters`' custom-parser fallback for
-// a content type `Mime::Type` does not register. Rails raises
-// `Unknown Content-Type` here instead (`action_controller/test_case.rb:119-121`)
-// and has no counterpart test; the behaviour is tracked for convergence by
-// actionpack-assign-parameters-raises-on-unknown-content-type.
 import { getRubyClassPath } from "@blazetrails/rack-session";
 import { describe, it, expect } from "vitest";
 import { TestRequest, TestSession } from "./test-case.js";
@@ -23,10 +18,6 @@ describe("ActionController::TestSession", () => {
   });
 });
 
-// Trails-only cover: `SessionHash#inspect`'s not-yet-loaded arm
-// (`vendor/rack-session/lib/rack/session/abstract/id.rb:152-156`) renders the
-// Ruby constant path a `TestSession` registers. Ruby reaches an unloaded
-// TestSession through `allocate`; `Object.create` is its JS analogue.
 describe("TestSession#inspect", () => {
   it("renders the not-yet-loaded arm with the Ruby constant path", () => {
     const session = Object.create(TestSession.prototype) as TestSession;

@@ -71,9 +71,6 @@ afterEach(() => {
 
 const w = (p: string, c: string): void => void files.set(p, c);
 
-// Smoke tests for the extractor — verbatim Rails-mirrored
-// (Rails::Command::NotesTest) coverage lands in the follow-up PR off updated
-// main, per CLAUDE.md's <base>/<base>b non-overlapping-file split pattern.
 describe("SourceAnnotationExtractor", () => {
   test("aligned line number indent + default tags + nested directory walk", async () => {
     w("app/x.ts", "// TODO: a");

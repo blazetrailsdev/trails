@@ -1,19 +1,8 @@
-/**
- * Mirrors: i18n/test/locale/fallbacks_test.rb
- *
- * `#inspect` renders `self.class.name`, which in the gem carries Ruby's module
- * nesting (`I18n::Locale::Fallbacks`); the class declares that name over
- * `Function.name`, so `this.constructor.name` renders the gem's string.
- */
-
 import { beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks } from "./fallbacks.js";
 import { config, resetConfig, setDefaultLocale } from "../i18n.js";
 import { resetClassConfig } from "../config.js";
 
-// Minitest's `assert_predicate` / `refute_predicate`, which i18n cannot import
-// (no activesupport dependency). Ruby names the predicate with a Symbol; JS has
-// no such protocol to send, so it is a function applied to `actual`.
 function assertPredicate<T>(actual: T, predicate: (value: T) => unknown): void {
   expect(predicate(actual)).toBe(true);
 }
@@ -23,7 +12,6 @@ function refutePredicate<T>(actual: T, predicate: (value: T) => unknown): void {
 }
 import { Disabled } from "../exceptions.js";
 
-/** Mirrors: `I18n::TestCase#setup` (i18n/test/test_helper.rb:17-20). */
 function setup(): void {
   resetConfig();
   resetClassConfig();
@@ -104,8 +92,6 @@ describe("I18nFallbacksComputationTest", () => {
     expect(fallbacks.get("en-US")).toEqual(["en-US", "en"]);
   });
 
-  // Most people who speak Catalan also live in Spain, so it is safe to assume
-  // that they also speak Spanish as spoken in Spain.
   it("with a Catalan mapping defined it returns [:ca, :es-ES, :es, :en-US] for :ca", () => {
     fallbacks.map({ ca: "es-ES" });
     expect(fallbacks.get("ca")).toEqual(["ca", "es-ES", "es", "en-US", "en"]);
@@ -115,10 +101,6 @@ describe("I18nFallbacksComputationTest", () => {
     fallbacks.map({ ca: "es-ES" });
     expect(fallbacks.get("ca-ES")).toEqual(["ca-ES", "ca", "es-ES", "es", "en-US", "en"]);
   });
-
-  // People who speak Arabic as spoken in Palestine often times also speak
-  // Hebrew as spoken in Israel. However it is in no way safe to assume that
-  // everybody who speaks Arabic also speaks Hebrew.
 
   it("with a Hebrew mapping defined it returns [:ar, :en-US] for :ar", () => {
     fallbacks.map({ "ar-PS": "he-IL" });
@@ -135,10 +117,6 @@ describe("I18nFallbacksComputationTest", () => {
     expect(fallbacks.get("ar-PS")).toEqual(["ar-PS", "ar", "he-IL", "he", "en-US", "en"]);
   });
 
-  // Sami people live in several scandinavian countries. In Finnland many people
-  // know Swedish and Finnish. Thus, it can be assumed that Sami living in
-  // Finnland also speak Swedish and Finnish.
-
   it("with a Sami mapping defined it returns [:sms-FI, :sms, :se-FI, :se, :fi-FI, :fi, :en-US] for :sms-FI", () => {
     fallbacks.map({ sms: ["se-FI", "fi-FI"] });
     expect(fallbacks.get("sms-FI")).toEqual([
@@ -152,8 +130,6 @@ describe("I18nFallbacksComputationTest", () => {
       "en",
     ]);
   });
-
-  // Austrian people understand German as spoken in Germany
 
   it("with a German mapping defined it returns [:de, :en-US] for de", () => {
     fallbacks.map({ "de-AT": "de-DE" });
@@ -170,8 +146,6 @@ describe("I18nFallbacksComputationTest", () => {
     expect(fallbacks.get("de-AT")).toEqual(["de-AT", "de", "de-DE", "en-US", "en"]);
   });
 
-  // Mapping :de => :en, :he => :en
-
   it("with a mapping :de => :en, :he => :en defined it returns [:de, :en] for :de", () => {
     expect(fallbacks.get("de")).toEqual(["de", "en-US", "en"]);
   });
@@ -179,8 +153,6 @@ describe("I18nFallbacksComputationTest", () => {
   it("with a mapping :de => :en, :he => :en defined it [:he, :en] for :de", () => {
     expect(fallbacks.get("he")).toEqual(["he", "en-US", "en"]);
   });
-
-  // Test allowing mappings that fallback to each other
 
   it("with :no => :nb, :nb => :no defined :no returns [:no, :nb, :en-US, :en]", () => {
     fallbacks.map({ no: "nb", nb: "no" });
@@ -191,8 +163,6 @@ describe("I18nFallbacksComputationTest", () => {
     fallbacks.map({ no: "nb", nb: "no" });
     expect(fallbacks.get("nb")).toEqual(["nb", "no", "en-US", "en"]);
   });
-
-  // Test I18n::Disabled  is raised correctly when locale is false during fallback
 
   it("with locale equals false", () => {
     expect(() => fallbacks.get(false)).toThrow(Disabled);
@@ -220,8 +190,6 @@ describe("I18nFallbacksHashCompatibilityTest", () => {
   });
 
   it("#inspect", () => {
-    // fallbacks_test.rb:182 interpolates the Hash literal's own rendering;
-    // `Fallbacks#inspect`'s renderers are file-private, so it is spelled out.
     const map = `{:"de-AT"=>[:"de-DE"]}`;
     expect(fallbacks.inspect()).toBe(
       `#<I18n::Locale::Fallbacks @map=${map} @defaults=[:"en-US", :en]>`,

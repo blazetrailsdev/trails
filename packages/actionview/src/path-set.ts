@@ -1,26 +1,7 @@
-/**
- * ActionView::PathSet
- *
- * An ordered collection of view paths (Resolvers). LookupContext stores its
- * paths in a PathSet. Searches iterate prefixes outer, resolvers inner:
- * given prefixes [A, B] and resolvers [r1, r2], the order is
- * (r1,A), (r2,A), (r1,B), (r2,B).
- *
- * Phase 0c is a data-shape leaf: this file defines the PathSet container and
- * a minimal `PathSetResolver` protocol. The real `Resolver`/`FileSystemResolver`
- * port lands in Phase 1c.
- */
-
 import type { Requested, TemplateDetails } from "./template-details.js";
 import type { TemplatePath } from "./template-path.js";
 import type { Template } from "./template.js";
 
-/**
- * Argument shape for the `details` parameter of resolver lookups. Rails
- * passes the raw details hash here (see `view_paths.rb#find`); the
- * `TemplateDetails`/`Requested` cases are accepted for resolvers that
- * already work in canonical-key form.
- */
 export type LookupDetails =
   | TemplateDetails
   | Requested
@@ -36,20 +17,12 @@ export interface PathSetResolver {
     locals: ReadonlyArray<string>,
   ): unknown[];
 
-  /** @internal Resolvers with internal caches implement this. */
+  /** @internal */
   clearCache?(): void;
 
-  /**
-   * Templates this resolver has already built, keyed by method name in
-   * `ExceptionWrapper#build_backtrace` (`exception_wrapper.rb:257-261`).
-   */
   builtTemplates?(): Template[];
 
-  /**
-   * Every template path this resolver knows, used by `MissingTemplate#corrections`
-   * to suggest close matches. Resolvers that cannot enumerate them may omit it.
-   * @internal
-   */
+  /** @internal */
   allTemplatePaths?(): readonly TemplatePath[];
 }
 
@@ -60,10 +33,7 @@ export class PathSet implements Iterable<PathSetResolver> {
     this.paths = Object.freeze(this.typecast(paths));
   }
 
-  /**
-   * @internal
-   * Clone for Ruby's `initialize_copy(other)` — frozen, deep-ish copy of paths.
-   */
+  /** @internal */
   initializeCopy(other: PathSet): this {
     (this as { paths: ReadonlyArray<PathSetResolver> }).paths = Object.freeze(other.paths.slice());
     return this;
@@ -81,16 +51,11 @@ export class PathSet implements Iterable<PathSetResolver> {
     return this.paths.includes(resolver);
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT (`vendor/rails/actionview/lib/action_view/path_set.rb:12, :16` —
-   *   `include Enumerable` plus `delegate :each, to: :paths`).
-   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
-   */
+  /** @noRailsEquivalent PERMANENT */
   *[Symbol.iterator](): IterableIterator<PathSetResolver> {
     for (const r of this.paths) yield r;
   }
 
-  /** Materialize as a plain array (matches Rails `to_ary`). */
   toArray(): PathSetResolver[] {
     return this.paths.slice();
   }
@@ -100,18 +65,11 @@ export class PathSet implements Iterable<PathSetResolver> {
     return new PathSet(this.paths.filter((p): p is PathSetResolver => p != null));
   }
 
-  /** Concatenate another PathSet or array (returns a new PathSet). */
   plus(other: PathSet | ReadonlyArray<PathSetResolver>): PathSet {
     const arr = Array.isArray(other) ? other : (other as PathSet).paths;
     return new PathSet([...this.paths, ...arr]);
   }
 
-  /**
-   * Find one matching template; throws if none match.
-   *
-   * Note: the concrete return type (`Template`) is defined in Phase 1b. Until
-   * then this returns `unknown` to keep this file's dependency surface narrow.
-   */
   find(
     path: TemplatePath | string,
     prefixes: string | ReadonlyArray<string>,
@@ -141,11 +99,7 @@ export class PathSet implements Iterable<PathSetResolver> {
     return [];
   }
 
-  /**
-   * @internal
-   * Iterates `(resolver, prefix)` pairs in Rails' `search_combinations` order:
-   * prefixes outer, resolvers inner.
-   */
+  /** @internal */
   private *searchCombinations(
     prefixes: string | ReadonlyArray<string>,
   ): IterableIterator<{ resolver: PathSetResolver; prefix: string }> {
@@ -157,12 +111,7 @@ export class PathSet implements Iterable<PathSetResolver> {
     }
   }
 
-  /**
-   * @internal
-   * Validates incoming paths. `String`/`Pathname` wrapping happens up front in
-   * `PathRegistry.castFileSystemResolvers` (`ViewPaths#_build_view_paths`), so
-   * only resolvers reach this point.
-   */
+  /** @internal */
   private typecast(paths: ReadonlyArray<PathSetResolver | unknown>): PathSetResolver[] {
     return paths.map((path) => {
       if (

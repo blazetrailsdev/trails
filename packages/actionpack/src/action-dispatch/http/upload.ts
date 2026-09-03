@@ -1,9 +1,3 @@
-/**
- * ActionDispatch::Http::UploadedFile
- *
- * Represents a file uploaded via multipart form data.
- */
-
 import { File } from "@blazetrails/ruby-compat";
 
 export interface UploadedFileOptions {
@@ -38,12 +32,10 @@ export class UploadedFile {
         : null;
   }
 
-  /** The file extension (including dot). */
   get extname(): string {
     return File.extname(this.originalFilename);
   }
 
-  /** The file size in bytes. */
   get size(): number {
     if (this._content) return this._content.length;
     if (this._tempfile) {
@@ -56,13 +48,7 @@ export class UploadedFile {
     return 0;
   }
 
-  /**
-   * Read the file content. `File.open(path, "rb")` answers a binary String —
-   * one character per byte — which is the encoding node's "latin1" decodes
-   * back verbatim.
-   *
-   * @missingRailsArgs read — CONVERGEABLE uploaded-file-read-drops-rails-length-and-buffer-arguments
-   */
+  /** @missingRailsArgs read — CONVERGEABLE uploaded-file-read-drops-rails-length-and-buffer-arguments */
   read(): Buffer {
     if (this._content) return this._content;
     if (this._tempfile) {
@@ -74,12 +60,10 @@ export class UploadedFile {
     return Buffer.alloc(0);
   }
 
-  /** Read the file content as a string. */
   readAsString(encoding: BufferEncoding = "utf-8"): string {
     return this.read().toString(encoding);
   }
 
-  /** Write content to the tempfile or in-memory buffer. */
   write(data: Buffer | string): void {
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
     if (this._content) {
@@ -89,12 +73,8 @@ export class UploadedFile {
     }
   }
 
-  /** Rewind to the beginning (no-op for in-memory, resets read position). */
-  rewind(): void {
-    // No-op for in-memory storage
-  }
+  rewind(): void {}
 
-  /** Close the file handle. */
   close(unlinkNow = false): void {
     if (unlinkNow && this._tempfile) {
       const tempPath = this._tempfile;
@@ -107,29 +87,25 @@ export class UploadedFile {
             this._tempfile = null;
           }
         } catch {
-          // Leave _tempfile as-is if existence check fails.
+          /** @empty */
         }
       }
     }
     this._closed = true;
   }
 
-  /** Whether the file has been closed. */
   get closed(): boolean {
     return this._closed;
   }
 
-  /** Whether the file is empty (zero bytes). */
   get empty(): boolean {
     return this.size === 0;
   }
 
-  /** Get the tempfile path. */
   get tempfilePath(): string | null {
     return this._tempfile;
   }
 
-  /** Rails `tempfile` accessor — returns the tempfile path string. */
   get tempfile(): string | null {
     return this._tempfile;
   }
@@ -137,43 +113,35 @@ export class UploadedFile {
     this._tempfile = value;
   }
 
-  /** Rails `tempfile.open` — re-opens the underlying file for reading. */
   open(): Buffer {
     this._closed = false;
     return this.read();
   }
 
-  /** Rails `tempfile.path`. */
   path(): string | null {
     return this._tempfile;
   }
 
-  /** Rails `tempfile.to_path`. */
   toPath(): string | null {
     return this._tempfile;
   }
 
-  /** Rails `tempfile.eof?` — no streaming cursor, so reflects emptiness. */
   isEof(): boolean {
     return this.size === 0;
   }
 
-  /** Rails `tempfile.to_io` — returns the raw bytes as an IO-like Buffer. */
   toIo(): Buffer {
     return this.read();
   }
 
-  /** Check if this looks like a valid uploaded file. */
   get valid(): boolean {
     return this.originalFilename.length > 0 && this.size > 0;
   }
 
-  /** String representation. */
   toString(): string {
     return `#<ActionDispatch::Http::UploadedFile filename="${this.originalFilename}" content_type="${this.contentType}" size=${this.size}>`;
   }
 
-  /** Inspect (same as toString). */
   inspect(): string {
     return this.toString();
   }

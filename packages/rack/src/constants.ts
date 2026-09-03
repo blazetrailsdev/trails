@@ -1,4 +1,3 @@
-// Request env keys
 export const HTTP_HOST = "HTTP_HOST";
 export const HTTP_PORT = "HTTP_PORT";
 export const HTTPS = "HTTPS";
@@ -19,7 +18,6 @@ export const SERVER_NAME = "SERVER_NAME";
 export const SERVER_PORT = "SERVER_PORT";
 export const HTTP_COOKIE = "HTTP_COOKIE";
 
-// Response Header Keys
 export const CACHE_CONTROL = "cache-control";
 export const CONTENT_LENGTH = "content-length";
 export const CONTENT_TYPE = "content-type";
@@ -28,7 +26,6 @@ export const EXPIRES = "expires";
 export const SET_COOKIE = "set-cookie";
 export const TRANSFER_ENCODING = "transfer-encoding";
 
-// HTTP method verbs
 export const GET = "GET";
 export const POST = "POST";
 export const PUT = "PUT";
@@ -41,7 +38,6 @@ export const LINK = "LINK";
 export const UNLINK = "UNLINK";
 export const TRACE = "TRACE";
 
-// Rack environment variables
 export const RACK_VERSION = "rack.version";
 export const RACK_TEMPFILES = "rack.tempfiles";
 export const RACK_EARLY_HINTS = "rack.early_hints";
@@ -71,7 +67,6 @@ export const RACK_REQUEST_QUERY_STRING = "rack.request.query_string";
 export const RACK_REQUEST_TRUSTED_PROXY = "rack.request.trusted_proxy";
 export const RACK_METHODOVERRIDE_ORIGINAL_METHOD = "rack.methodoverride.original_method";
 
-// Status codes with no entity body
 export const STATUS_WITH_NO_ENTITY_BODY: Record<number, boolean> = Object.fromEntries([
   ...Array.from({ length: 100 }, (_, i) => [100 + i, true]),
   [204, true],

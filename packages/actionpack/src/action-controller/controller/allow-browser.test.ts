@@ -76,9 +76,6 @@ function createController(
   return AllowBrowserController;
 }
 
-// ==========================================================================
-// controller/allow_browser_test.rb
-// ==========================================================================
 describe("AllowBrowserTest", () => {
   it("blocked browser below version limit with callable", async () => {
     const C = createController(

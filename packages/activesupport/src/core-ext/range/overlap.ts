@@ -14,16 +14,11 @@ import { Range } from "@blazetrails/ruby-compat/range";
 // boundary: Date endpoints, as in ruby-compat's range.ts
 const toNum = <T extends number | Date>(v: T): number => (v instanceof Date ? v.getTime() : v);
 
-/** Ruby's `b == e` on two endpoints, which for `Date` is a value comparison. */
 function eq<T extends number | Date>(b: T | null, e: T | null): boolean {
   if (b === null || e === null) return b === e;
   return toNum(b) === toNum(e);
 }
 
-/**
- * Ruby's private `Range#_empty_range?` (overlap.rb:31). The spelling is what
- * the `parity:api` name convention produces from `_empty_range?`.
- */
 function is_emptyRange<T extends number | Date>(b: T | null, e: T | null, excl: boolean): boolean {
   if (b === null || e === null) return false;
 
@@ -31,11 +26,6 @@ function is_emptyRange<T extends number | Date>(b: T | null, e: T | null, excl: 
   return Number.isNaN(comp) || comp > 0 || (comp === 0 && excl);
 }
 
-/**
- * Compare two ranges and see if they overlap each other
- *  (1..5).overlap?(4..6) # => true
- *  (1..5).overlap?(7..9) # => false
- */
 export function overlap<T extends number | Date>(this: Range<T>, other: Range<T>): boolean {
   // eslint-disable-next-line blazetrails/rails-error-parity
   if (!(other instanceof Range)) throw new TypeError();

@@ -19,15 +19,6 @@ export class AddUsersTable extends Migration {
 }
 `;
 
-/**
- * Silences `console.error` the way each happy-path suite already did, but keeps
- * what was written. A bare `mockImplementation(() => {})` throws the CLI's own
- * diagnostics away, so a red `expect(exitCode).toBe(0)` reports "expected 1 to
- * be +0" and nothing else — which is exactly how a MariaDB-only `ar db:create`
- * failure (run 30566573740, missing `ar_cli_e2e%` grant) reached CI with no
- * attributable cause. Pair with {@link exitReason} on every exit-code
- * assertion.
- */
 export function captureConsoleErrors(): string[] {
   const errors: string[] = [];
   vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
@@ -38,7 +29,6 @@ export function captureConsoleErrors(): string[] {
   return errors;
 }
 
-/** The assertion message for an exit-code check, carrying whatever {@link captureConsoleErrors} collected. */
 export function exitReason(label: string, errors: string[]): string {
   return errors.length === 0 ? label : `${label}\n${errors.join("\n")}`;
 }

@@ -1,7 +1,3 @@
-/**
- * Port of `GlobalID::Railtie` (`global_id/railtie.rb`). The initializer block
- * is yielded the application, as `initializable.rb:31-33` and `:60-63` do.
- */
 import {
   ArgumentError,
   dasherize,
@@ -21,28 +17,15 @@ import {
 } from "@blazetrails/globalid";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
-/** Mirrors `config.global_id = ActiveSupport::OrderedOptions.new` (`railtie.rb:13`). */
 export interface GlobalIdConfig {
   app?: string;
   expiresIn?: number | null;
   verifier?: MessageVerifier;
 }
 
-/** The `|app|` the `global_id` initializer is yielded (`railtie.rb:16`).
- *
- * Ruby's `app.config.global_id` resolves through `Railtie::Configuration`'s
- * `@@options` (`railtie/configuration.rb:96-108`) to the very hash
- * `railtie.rb:13` seeded, so `globalId` is optional here and defaults to that
- * same seed rather than being a slot each app has to build. */
 export interface TrailtieApp {
-  /** Rails: `delegate :railtie_name, to: :class` (`railtie.rb:220`) — a zero-arg
-   * reader, so trails spells it a property (`trailties/src/trailtie.ts:115`). */
   railtieName: string;
   config: { globalId?: GlobalIdConfig };
-  /** `app.deprecators[:global_id] = ... if app.respond_to?(:deprecators)`
-   * (`railtie.rb:47`) — `Application#deprecators`
-   * (`railties/lib/rails/application.rb:244-248`). Optional because the Ruby
-   * carries the `respond_to?` guard. */
   deprecators?: Deprecators;
   keyGenerator(): { generateKey(salt: string): string | Buffer };
 }
@@ -63,26 +46,6 @@ export class Trailtie extends BaseTrailtie {
     });
   }
 
-  /**
-   * Mirrors the `initializer 'global_id'` block (`railtie.rb:16-42`). Its
-   * `config.after_initialize` half is registered on the `after_initialize`
-   * load hook, which `Application#initialize` fires.
-   *
-   * `expires_in` is read the way Ruby's
-   * `app.config.global_id.fetch(:expires_in, default)` reads it — a stored
-   * `nil` wins over the default, which is how
-   * `config.global_id.expires_in = nil` disables expiration.
-   *
-   * The class body's `config.global_id = ActiveSupport::OrderedOptions.new`
-   * and `config.eager_load_namespaces << GlobalID` (`railtie.rb:13-14`) both
-   * land on `Railtie::Configuration`'s `@@`-level state
-   * (`railtie/configuration.rb:17-20`, `:96-108`), so the seed this reads back
-   * is the one the class body wrote.
-   *
-   * `ActiveSupport.on_load(:active_record)` (`railtie.rb:36-39`) needs no arm:
-   * `Base` includes `GlobalID::Identification` statically, because base.ts
-   * already imports globalid.
-   */
   static initialize(app: TrailtieApp): void {
     const config = (app.config.globalId ??= Trailtie.config.get("globalId") as GlobalIdConfig);
     const defaultExpiresIn = months(1).toI();

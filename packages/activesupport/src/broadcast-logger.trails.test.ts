@@ -2,10 +2,6 @@ import { describe, expect, it } from "vitest";
 import { Logger } from "./logger.js";
 import { BroadcastLogger } from "./broadcast-logger.js";
 
-/**
- * Rails covers `#debug!` and friends only indirectly (`broadcast_logger.rb`
- * has no test of its own for them), so their cover lives here.
- */
 describe("BroadcastLogger severity setters", () => {
   const build = (): [BroadcastLogger, Logger, Logger] => {
     const log1 = new Logger({ write: () => {} });

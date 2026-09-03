@@ -9,20 +9,17 @@ import { asJson, ToJsonWithActiveSupportEncoder } from "../core-ext/object/json.
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
 
-/** Rails' `JSONTest::Hashlike` (encoding_test_cases.rb:16-20). */
 class Hashlike {
   toHash(): Record<string, unknown> {
     return { foo: "hello", bar: "world" };
   }
 }
 
-/** Stands in for Rails' bare `Object.new` with `@foo`/`@bar` set (encoding_test.rb:151-153). */
 class Bare {
   foo?: string;
   bar?: string;
 }
 
-/** Rails' `JSONTest::People` (encoding_test.rb:227-240) — a bare Enumerable. */
 class People {
   #people = [
     { name: "John", address: { city: "London", country: "UK" } },
@@ -38,7 +35,6 @@ class People {
   }
 }
 
-/** Rails' `JSONTest::InfiniteNumber` (encoding_test.rb:462-466). */
 class InfiniteNumber {
   asJson(_options?: EncodeOptions | null): unknown {
     return { number: Infinity };
@@ -47,7 +43,6 @@ class InfiniteNumber {
   toJSON = ToJsonWithActiveSupportEncoder.toJSON;
 }
 
-/** Rails' `JSONTest::NaNNumber` (encoding_test.rb:472-476). */
 class NaNNumber {
   asJson(_options?: EncodeOptions | null): unknown {
     return { number: NaN };
@@ -56,7 +51,6 @@ class NaNNumber {
   toJSON = ToJsonWithActiveSupportEncoder.toJSON;
 }
 
-/** Mirrors `sorted_json` (encoding_test.rb:14-20). */
 function sortedJson(json: string): string {
   if (json.startsWith("{") && json.endsWith("}")) {
     return "{" + json.slice(1, -1).split(",").sort().join(",") + "}";
@@ -65,7 +59,6 @@ function sortedJson(json: string): string {
   }
 }
 
-/** Mirrors `object_keys` (encoding_test.rb:487-489). */
 function objectKeys(jsonObject: string): string[] {
   return [...jsonObject.slice(1, -1).matchAll(/([^{}:,\s]+):/g)].map((match) => match[1]).sort();
 }
@@ -92,8 +85,6 @@ function withTimePrecision(value: number, block: () => void): void {
 
 describe("TestJSONEncoding", () => {
   it("numeric", () => {
-    // Rails' NumericTests (encoding_test_cases.rb:62-72); the RomanNumeral /
-    // CustomNumeric cases need Ruby's `Numeric` subclassing and are unported.
     expect(ActiveSupportJSON.encode(1)).toBe("1");
     expect(ActiveSupportJSON.encode(2.5)).toBe("2.5");
     expect(ActiveSupportJSON.encode(NaN)).toBe("null");
@@ -103,22 +94,17 @@ describe("TestJSONEncoding", () => {
   });
 
   it("module", () => {
-    // Rails' ModuleTests (encoding_test_cases.rb:95-98). Ruby's `name` is the
-    // fully-qualified constant path; a JS class carries only its own name.
     expect(ActiveSupportJSON.encode(Hashlike)).toBe('"Hashlike"');
     expect(ActiveSupportJSON.encode(People)).toBe('"People"');
   });
 
   it("range", () => {
-    // Rails' RangeTests (encoding_test_cases.rb:86-88).
     expect(ActiveSupportJSON.encode(new Range(1, 2))).toBe('"1..2"');
     expect(ActiveSupportJSON.encode(new Range(1, 2, true))).toBe('"1...2"');
     expect(ActiveSupportJSON.encode(new Range(1.5, 2.5))).toBe('"1.5..2.5"');
   });
 
   it("uri", () => {
-    // Rails' URITests (encoding_test_cases.rb:112). `URL#toString` normalizes
-    // an empty path to "/", where Ruby's `URI#to_s` echoes the input back.
     expect(ActiveSupportJSON.encode(new URL("http://example.com"))).toBe('"http://example.com/"');
   });
 
@@ -158,9 +144,6 @@ describe("TestJSONEncoding", () => {
   });
 
   it("utf8 string encoded properly", () => {
-    // Rails follows each `assert_equal` with `assert_equal(Encoding::UTF_8,
-    // result.encoding)`; a JS string has no encoding to name, so the two
-    // encoding assertions have no counterpart.
     let result = ActiveSupportJSON.encode("€2.99");
     expect(result).toBe('"€2.99"');
 

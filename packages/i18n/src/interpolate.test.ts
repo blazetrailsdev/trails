@@ -1,13 +1,3 @@
-/**
- * Mirrors: i18n/test/i18n/interpolate_test.rb
- *
- * `RailsSafeBuffer` is a Ruby `String` subclass redefining `gsub`; the JS
- * `String` wrapper object is subclassable the same way, and `gsub` is
- * `replace`. `interpolate` is typed for the primitive because that is what
- * every trails caller hands it, so the two cases cast at the call site the way
- * Ruby's duck typing does implicitly.
- */
-
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as I18n from "./index.js";
 import { ArgumentError, MissingInterpolationArgument, config } from "./index.js";

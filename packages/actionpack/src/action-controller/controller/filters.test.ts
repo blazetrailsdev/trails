@@ -16,9 +16,6 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// action_controller/filters_test.rb — Controller-level filters
-// ==========================================================================
 describe("FilterTest", () => {
   it("before_action on controller", async () => {
     const log: string[] = [];
@@ -388,10 +385,6 @@ describe("FilterTest", () => {
   });
 });
 
-// ==========================================================================
-// controller/filters_test.rb — verbatim Rails test names
-// ==========================================================================
-
 function rq(): Request {
   return new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "test.host" });
 }
@@ -406,8 +399,6 @@ function push(name: string, prop = "ranFilter") {
     self[prop].push(name);
   };
 }
-
-// --- shared controller classes for FilterTest ---
 
 const _ftEnsureLogin = push("ensure_login");
 const _ftCleanUp = push("clean_up", "ranAfterAction");
@@ -578,7 +569,6 @@ const classFilterFn = (c: AbstractController) => {
 class FT_ClassController extends FT_ConditionalFilterController {}
 FT_ClassController.beforeAction(classFilterFn);
 
-// ==========================================================================
 describe("FilterTest", () => {
   it("non yielding around actions do not raise", async () => {
     await expect(run(new FT_NonYieldingAroundFilterController(), "index")).resolves.toBeDefined();
@@ -603,22 +593,15 @@ describe("FilterTest", () => {
   });
 
   it.skip("after actions are not run if around action does not yield", async () => {
-    // non-yielding around does not halt subsequent before filters in current callbacks impl
     const c = await run(new FT_NonYieldingAroundFilterController(), "index");
     expect((c as any).filters).toEqual(["filter_one", "it didn't yield"]);
   });
 
-  it.skip("added action to inheritance graph", () => {
-    // requires beforeActions reflection not yet implemented
-  });
+  it.skip("added action to inheritance graph", () => {});
 
-  it.skip("base class in isolation", () => {
-    // requires beforeActions reflection not yet implemented
-  });
+  it.skip("base class in isolation", () => {});
 
-  it.skip("prepending action", () => {
-    // requires beforeActions reflection not yet implemented
-  });
+  it.skip("prepending action", () => {});
 
   it("running actions", async () => {
     const c = await run(new FT_PrependingController());
@@ -761,6 +744,4 @@ describe("FilterTest", () => {
         .ranFilter,
     ).toBeUndefined();
   });
-
-  // Tests for around/skipping/rendering/redirection deferred to follow-up PR (T-AC14b)
 });

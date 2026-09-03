@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
 
-// ==========================================================================
-// dispatch/routing_assertions_test.rb
-// ==========================================================================
 describe("ActionDispatch::Routing::Assertions", () => {
   it("assert generates", () => {
     const routes = new RouteSet();

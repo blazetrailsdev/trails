@@ -2,7 +2,6 @@ import { describe, it } from "vitest";
 import { localCacheBehavior } from "../behaviors/local-cache-behavior.js";
 
 describe("MemCacheStoreTest", () => {
-  // Mirrors `include LocalCacheBehavior` (mem_cache_store_test.rb:85).
   localCacheBehavior();
 
   it.skip("validate pool arguments");

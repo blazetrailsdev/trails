@@ -1,9 +1,3 @@
-/**
- * Trails-only cover for the shape of `Simple` — the gem has no test for it
- * because Ruby's `class Simple; include Implementation` needs none. The second
- * case is the gem's own extension example (simple.rb:10-19).
- */
-
 import { describe, expect, it } from "vitest";
 
 import { Base } from "./base.js";
@@ -45,7 +39,6 @@ describe("Backend::Simple", () => {
     expect(backend.translations()).toEqual({ en: { foo: "bar", baz: "baz" } });
   });
 
-  // simple.rb:99-100 retries a missed key with `_key = _key.to_s.to_sym`.
   it("looks a Symbol-spelled key up in the same entry as its String form", () => {
     const backend = new Simple();
     backend.storeTranslations("en", { foo: { bar: "baz" } });
@@ -54,9 +47,6 @@ describe("Backend::Simple", () => {
     expect(backend.translate(":en", ":foo.bar")).toBe("baz");
   });
 
-  // simple_test.rb:184's `skip_symbolize_keys: true` arm is unobservable in the
-  // gem's terms here — JS object keys are already strings — so the only visible
-  // difference is that the stored subtree is the caller's object, not a copy.
   it("stores the caller's own subtree when skipSymbolizeKeys is set", () => {
     const backend = new Simple();
     const data = { foo: { bar: "barfr", baz: "bazfr" } };

@@ -48,7 +48,6 @@ describe("HashExtTest", () => {
   });
 
   it("deep transform keys!", () => {
-    // In-place transform: we simulate by reassigning
     const obj: Record<string, unknown> = { a: 1, b: 2 };
     const result = deepTransformKeys(obj, (k) => k.toUpperCase()) as Record<string, unknown>;
     expect(result["A"]).toBe(1);
@@ -106,7 +105,6 @@ describe("HashExtTest", () => {
   });
 
   it("symbolize keys!", () => {
-    // In TS symbolize_keys! is the same since keys are strings
     const obj = { a: 1, b: 2 };
     const result = symbolizeKeys(obj);
     expect(result).toEqual({ a: 1, b: 2 });
@@ -213,7 +211,6 @@ describe("HashExtTest", () => {
   });
 
   it("deep merge with block", () => {
-    // deepMerge without a block simply has source win
     const a = { x: 1 };
     const b = { x: 2 };
     const result = deepMerge(a, b);
@@ -311,7 +308,6 @@ describe("HashExtTest", () => {
     expect(result).toEqual({ a: 1, c: 3 });
   });
 });
-/** Mirrors: `HashExtToParamTests::ToParam` (`hash_ext_test.rb:435-439`). */
 class ToParam extends String {
   toParam(): string {
     return `${this}-1`;
@@ -348,21 +344,13 @@ describe("HashExtToParamTests", () => {
   });
 });
 
-/**
- * `XMLMiniEngineTest.run_with_gem` (`xml_mini_engine_test.rb:8-13`), which
- * gates the Nokogiri legs of Rails' backend matrix. Ruby's `rescue LoadError`
- * catches only the package being absent; `import()` signals that as
- * `ERR_MODULE_NOT_FOUND` naming the specifier. Ruby's block then reads
- * `Nokogiri::XML::SyntaxError` off the constant the `require` installed; ESM
- * has no such ambient constant, so the imported module is yielded to it.
- */
 async function runWithGem(
   gemName: string,
   block: (gem: Record<string, any>) => void,
 ): Promise<void> {
   let gem: Record<string, any>;
   try {
-    gem = await import(/* @vite-ignore */ gemName);
+    gem = await import(gemName);
   } catch (e) {
     if (
       !(
@@ -378,10 +366,8 @@ async function runWithGem(
   block(gem);
 }
 
-/** `Nokogiri::XML::SyntaxError`, once `runWithGem` has imported the gem. */
 let nokogiriSyntaxError: (new (...args: any[]) => Error) | undefined;
 
-/** Mirrors: `IWriteMyOwnXML` (`hash_ext_test.rb:423-432`). */
 class IWriteMyOwnXML {
   toXml(options: XmlMini.ToXmlOptions): void {
     options.indent ??= 2;
@@ -833,8 +819,6 @@ function hashToXmlTests(engine: string): void {
     it("empty cdata from xml", async () => {
       const xml = "<data><![CDATA[]]></data>";
 
-      // NokogiriSAX's `end_element` deletes a `CONTENT_KEY` that is `""`
-      // (`xml_mini/nokogirisax.rb:54-56`), so an empty CDATA node is `nil` there.
       expect(((await fromXml(xml)) as any)["data"]).toBe(
         XmlMini.backend() === XmlMini_NokogiriSAX ? null : "",
       );
@@ -916,8 +900,6 @@ function hashToXmlTests(engine: string): void {
       expect(await fromTrustedXml('<product><name type="symbol">value</name></product>')).toEqual(
         expected,
       );
-      // `PARSING["yaml"]` is the one entry that answers a Promise
-      // (xml-mini.ts:224), so the parsed leaf is awaited here.
       const yamlHash = (await fromTrustedXml(
         '<product><name type="yaml">:value</name></product>',
       )) as any;
@@ -925,8 +907,6 @@ function hashToXmlTests(engine: string): void {
       expect(yamlHash).toEqual(expected);
     });
 
-    // The XML builder seems to fail miserably when trying to tag something
-    // with the same name as a Kernel method (throw, test, loop, select ...)
     it("kernel method names to xml", async () => {
       const hash = { throw: { ball: "red" } };
       const expected = "<person><throw><ball>red</ball></throw></person>";
@@ -979,7 +959,6 @@ function hashToXmlTests(engine: string): void {
       </alert>
     `;
       const alertAt = ((await fromXml(alertXml)) as any)["alert"]["alert_at"];
-      // A `Temporal.Instant` is absolute time — the trails analogue of `utc?`.
       expect(alertAt).toBeInstanceOf(Temporal.Instant);
       expect(alertAt).toEqual(Temporal.Instant.from("2008-02-10T15:30:45Z"));
     });
@@ -1015,13 +994,10 @@ function hashToXmlTests(engine: string): void {
     it("to xml dups options", () => {
       const options = { skipInstruct: true };
       toXml({}, options);
-      // :builder, etc, shouldn't be added to options
       expect(options).toEqual({ skipInstruct: true });
     });
 
     it("expansion count is limited", async () => {
-      // hash_ext_test.rb:1023-1032 switches on `XmlMini.backend.name`; a trails
-      // backend is the module namespace object, not a named constant.
       const backend = XmlMini.backend();
       const expected =
         backend === XmlMini_REXML

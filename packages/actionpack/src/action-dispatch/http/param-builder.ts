@@ -1,21 +1,3 @@
-/**
- * ActionDispatch::ParamBuilder
- *
- * Port of `actionpack/lib/action_dispatch/http/param_builder.rb`. Parses
- * query strings (and pre-parsed pair sequences) into nested parameter
- * hashes. Mirrors Rails' implementation, which is itself derived from
- * Rack::QueryParser.
- *
- * Rack 2's legacy "ignore leading brackets" behavior is reachable only
- * when callers explicitly opt in via {@link ParamBuilder.ignoreLeadingBrackets}.
- * trails targets Rack 3 (see `action-dispatch/constants.ts`), so the
- * `LEADING_BRACKETS_COMPAT` constant is hard-coded false.
- *
- * `Hash` in Rails maps to a null-prototype plain object here — both for
- * indifferent-key semantics (object keys are strings only in JS) and to
- * keep attacker-controlled `__proto__` keys from polluting the prototype.
- */
-
 import { deprecator } from "../deprecator.js";
 import { UploadedFile } from "./upload.js";
 import { QueryParser, type QueryPair } from "./query-parser.js";
@@ -24,7 +6,7 @@ import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from ".
 
 export type EncodingTemplate = Record<string, string>;
 
-/** @internal Rack 2 compat sentinel — always false under trails' Rack 3 target. */
+/** @internal */
 const LEADING_BRACKETS_COMPAT = false;
 
 export class ParamBuilder {
@@ -38,10 +20,8 @@ export class ParamBuilder {
     return new ParamBuilder(paramDepthLimit);
   }
 
-  /** Mirrors `cattr_accessor :ignore_leading_brackets`. */
   static ignoreLeadingBrackets: boolean | null = null;
 
-  /** Mirrors `cattr_accessor :default`. */
   static default: ParamBuilder = ParamBuilder.makeDefault(100);
 
   static fromQueryString(
@@ -85,20 +65,11 @@ export class ParamBuilder {
       for (const [k, rawV] of pairs) {
         let v = rawV as ParamValue;
         if (this.paramsHashType(v)) {
-          // Rails: `if Hash === v` — wrap plain hashes (multipart parser
-          // output) as UploadedFile. Class-strict, so an already-built
-          // UploadedFile passes through.
           v = new UploadedFile(v as never) as unknown as ParamValue;
         }
         this.storeNestedParam(params, k, v, 0, encodingTemplate);
       }
     } catch (e) {
-      // Rails rescues ArgumentError here — in Ruby, malformed percent-
-      // encoding in QueryParser raises ArgumentError, and UploadedFile
-      // raises ArgumentError on missing :tempfile/:content. In JS the
-      // analogs are URIError (from decodeURIComponent) and the codebase
-      // convention of `new Error("ArgumentError: …")` for Ruby-style
-      // ArgumentErrors that haven't been promoted to a dedicated class.
       if (
         e instanceof URIError ||
         e instanceof RangeError ||
@@ -117,9 +88,6 @@ export class ParamBuilder {
     hash: ParamHash,
     _options: { encodingTemplate?: EncodingTemplate | null } = {},
   ): ParamHash {
-    // CustomParamEncoder/check_param_encoding are no-ops in JS (UTF-16
-    // strings, no per-string encoding). Normalize through the same
-    // pipeline as parseNestedQuery.
     return RequestUtils.normalizeEncodeParams(hash) as ParamHash;
   }
 
@@ -139,22 +107,13 @@ export class ParamBuilder {
     return Object.create(null) as ParamHash;
   }
 
-  /**
-   * Mirrors Rails' `new_depth_limit` — but Rails' own implementation
-   * is broken (references an undefined `@params_class`); kept as a thin
-   * `new(depthLimit)` factory for source-level parity.
-   * @internal
-   */
+  /** @internal */
   newDepthLimit(paramDepthLimit: number): ParamBuilder {
     return new (this.constructor as typeof ParamBuilder)(paramDepthLimit);
   }
 
   /** @internal */
   paramsHashType(obj: unknown): obj is ParamHash {
-    // Rails: `Hash === obj` — true for any Hash (literal `{}` or
-    // makeParams-built). Class-strict, so subclasses-of-Object like
-    // UploadedFile do NOT qualify and fall through to trigger
-    // ParameterTypeError on hash-container paths.
     if (obj === null || typeof obj !== "object" || Array.isArray(obj)) return false;
     const proto = Object.getPrototypeOf(obj);
     return proto === null || proto === Object.prototype;
@@ -174,7 +133,6 @@ export class ParamBuilder {
 }
 
 function classNameOf(v: unknown): string {
-  // Mirrors Rails' `obj.class.name` in ParameterTypeError messages.
   if (v === null) return "NilClass";
   if (Array.isArray(v)) return "Array";
   if (typeof v === "string") return "String";
@@ -247,9 +205,6 @@ function storeNestedParamImpl(
 
   if (k === "") return params;
 
-  // Rails applies encodingTemplate[k] via force_encoding + valid_encoding?
-  // here. Both are no-ops in JS (strings are UTF-16, structurally valid),
-  // so the InvalidParameterError("Invalid encoding…") branch is absent.
   void encodingTemplate;
 
   if (after === "") {
@@ -267,7 +222,6 @@ function storeNestedParamImpl(
     }
     if (v !== null || !RequestUtils.performDeepMunge) arr.push(v);
   } else if (after.startsWith("[]")) {
-    // Recognize x[][y] (hash inside array) parameters
     let childKey: string;
     if (after[2] === "[" && after.endsWith("]")) {
       const candidate = after.slice(3, after.length - 1);

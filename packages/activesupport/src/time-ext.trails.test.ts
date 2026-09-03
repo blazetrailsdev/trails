@@ -1,11 +1,3 @@
-/**
- * trails-only coverage for the offset-carrying `to_time` arms in
- * `time-ext.ts` — `Time#to_time` (`core_ext/time/compatibility.rb:13-15`) and
- * `DateTime#to_time` (`core_ext/date_time/compatibility.rb:15-17`). Rails'
- * `test_to_time` reads these off a bare `Time` receiver; trails' matching
- * tests in `time-ext.test.ts` are bound to the JS-`Date` arm, so the switch is
- * exercised here instead.
- */
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 import { toTime } from "./core-ext/time/compatibility.js";
@@ -13,9 +5,6 @@ import { advance, change } from "./time-ext.js";
 import { offsetInSeconds, secondsSinceUnixEpoch } from "./core-ext/date-time/conversions.js";
 import { setPreserveTimezone } from "./core-ext/date-and-time/compatibility.js";
 
-/**
- * `TimeZoneTestHelpers#with_env_tz` (`test/time_zone_test_helpers.rb:20-25`).
- */
 function withEnvTz<T>(tz: string, fn: () => T): T {
   const orig = process.env.TZ;
   process.env.TZ = tz;
@@ -116,17 +105,6 @@ describe("change over a ::Time receiver", () => {
   });
 });
 
-/**
- * `Time#advance`'s `:weeks`/`:days` normalisation is `divmod(1)`
- * (`core_ext/time/calculations.rb:195-201`), which FLOORS: `(-1.5).divmod(1)`
- * is `[-2, 0.5]` on ruby 3.3.11, not the `[-1, -0.5]` truncation would give.
- * The two quotients only part company across a DST boundary, where the whole
- * days are added on the calendar and the carried remainder in seconds. Rails
- * has no test over a negative fractional `:weeks`/`:days`, so the two
- * expectations below are MRI's own answers for the Rails body, transcribed.
- * The `::Time` receiver is covered in
- * `core-ext/time/calculations.trails.test.ts`; this is the JS-`Date` arm.
- */
 describe("advance over a JS Date receiver", () => {
   it("floors a negative fractional weeks like Ruby's divmod", () => {
     withEnvTz("US/Eastern", () => {

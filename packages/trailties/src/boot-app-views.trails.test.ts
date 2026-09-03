@@ -1,6 +1,3 @@
-// End-to-end cover for RFC 0104: a generated app renders its own `.tse` view,
-// wrapped in `app/views/layouts/application.html.tse`. Trails-only — Rails has
-// no `.tse` handler, so there is no counterpart test to mirror.
 import { afterEach, describe, expect, it } from "vitest";
 import { bodyToString } from "@blazetrails/rack";
 import { Application } from "./application.js";

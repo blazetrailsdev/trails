@@ -185,7 +185,6 @@ describe("RangeTest", () => {
   });
 
   it("cover is not override", () => {
-    // Rails: `range.method(:include?) != range.method(:cover?)`.
     expect(Range.prototype.isInclude).not.toBe(Range.prototype.cover);
   });
   it("overlap on time", () => {
@@ -228,17 +227,14 @@ describe("RangeTest", () => {
   });
 
   it("string include uses succ order not lexicographic", () => {
-    // Mirrors Ruby ("aaa".."bbb").include? — succ order (length, then lex).
     const r = new Range("aaa", "bbb");
     expect(r.isInclude("aaa")).toBe(true);
     expect(r.isInclude("abc")).toBe(true);
     expect(r.isInclude("bbb")).toBe(true);
-    expect(r.isInclude("bbc")).toBe(false); // past end
-    expect(r.isInclude("aa")).toBe(false); // shorter than begin
-    expect(r.isInclude("aaab")).toBe(false); // longer than end
+    expect(r.isInclude("bbc")).toBe(false);
+    expect(r.isInclude("aa")).toBe(false);
+    expect(r.isInclude("aaab")).toBe(false);
 
-    // succ order, not lexical: "z" is shorter than "bbb" so it sorts before it,
-    // even though "z" > "bbb" lexically. Ruby: ("a".."bbb").include?("z") == true.
     const r2 = new Range("a", "bbb");
     expect(r2.isInclude("z")).toBe(true);
     expect(r2.isInclude("ab")).toBe(true);
@@ -246,21 +242,15 @@ describe("RangeTest", () => {
   });
 
   it("string include approximates succ for mixed character classes", () => {
-    // Ruby's String#succ never produces "a1" from "a" (it carries within a
-    // single character class and never mixes letters with digits), so
-    // ("a".."bbb").include?("a1") == false. Faithful succ enumeration matches.
     expect(new Range("a", "bbb").isInclude("a1")).toBe(false);
   });
 
   it("string include raises on beginless/endless ranges", () => {
-    // Ruby's Range#include? raises TypeError on beginless/endless string
-    // ranges ("cannot determine inclusion in beginless/endless ranges").
     expect(() => new Range(null, "bbb").isInclude("z")).toThrow(TypeError);
     expect(() => new Range("a", null).isInclude("z")).toThrow(TypeError);
   });
 
   it("string succ carries within character classes", () => {
-    // Mirrors Ruby String#succ.
     expect(succ("abcd")).toBe("abce");
     expect(succ("az")).toBe("ba");
     expect(succ("zz")).toBe("aaa");
@@ -269,12 +259,9 @@ describe("RangeTest", () => {
     expect(succ("a9")).toBe("b0");
     expect(succ("1.9")).toBe("2.0");
     expect(succ("<<")).toBe("<=");
-    // Carry stops at a non-alnum gap into a different class.
     expect(succ("z.9")).toBe("z.10");
     expect(succ("a.z")).toBe("b.a");
-    // Astral (non-alnum) chars succ as whole code points, not UTF-16 units.
     expect(succ("\u{1F600}")).toBe("\u{1F601}");
-    // Wrapping is per UTF-8 encoded width (`enc_succ_char` NEIGHBOR_WRAPPED).
     const points = (str: string) => Array.from(str, (c) => c.codePointAt(0));
     expect(points(succ("\u{10FFFF}"))).toEqual([0x1, 0x10000]);
     expect(points(succ("\u{FFFF}"))).toEqual([0x1, 0x800]);

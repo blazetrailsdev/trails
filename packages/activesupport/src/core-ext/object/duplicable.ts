@@ -1,11 +1,3 @@
-/**
- * Duplicable — checks whether an object can safely be duplicated.
- * Mirrors Rails' core_ext/object/duplicable.rb.
- *
- * In JS, most values are duplicable (via structuredClone or spread).
- * Notable exceptions include functions, symbols, WeakRef, WeakMap, and WeakSet.
- */
-
 export function isDuplicable(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   if (typeof value === "function") return false;

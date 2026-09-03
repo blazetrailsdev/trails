@@ -3,12 +3,6 @@ import { basename, dirname, join } from "path";
 import { renderManifest } from "./generate-manifest.js";
 import { FRESH_TSCONFIG, mergeTsconfig, TsconfigMergeResult } from "./tsconfig-merge.js";
 
-// The files `ar init` writes, mirroring the §4.7 layout in the
-// standalone-activerecord-cli proposal. `db/migrate/` is a directory, kept
-// under git via a `.gitkeep`.
-// Each SQLite driver is its own registered adapter name; the adapter subclass
-// bundles its driver, so the config alone selects the backend (no side-effect
-// driver import needed). better-sqlite3 backs the canonical `sqlite3` name.
 const SQLITE_ADAPTER: Record<string, string> = {
   "better-sqlite3": "sqlite3",
   "node-sqlite": "node-sqlite",
@@ -33,9 +27,6 @@ export default config;
 
 const CONFIG_DATABASE = configDatabase("sqlite3");
 
-// The empty starter manifest is rendered by the generator itself, so
-// `ar init` and `ar generate:manifest` agree byte-for-byte — re-running the
-// generator on a freshly-`init`ed project (or `--check` in CI) reports no drift.
 const MODELS_INDEX = renderManifest([]);
 
 const DB_GLUE = `import { Base } from "@blazetrails/activerecord";
@@ -65,7 +56,6 @@ export async function seed(): Promise<void> {
 }
 `;
 
-/** Files (path relative to root → body) that `ar init` scaffolds. */
 const SCAFFOLD: ReadonlyArray<readonly [string, string]> = [
   ["config/database.ts", CONFIG_DATABASE],
   ["db/migrate/.gitkeep", ""],
@@ -74,7 +64,6 @@ const SCAFFOLD: ReadonlyArray<readonly [string, string]> = [
   ["db.ts", DB_GLUE],
 ];
 
-// Pinned driver peer versions — same values as new.ts to stay in sync.
 const INIT_DRIVER_DEPS: Record<string, Record<string, string>> = {
   "better-sqlite3": { "better-sqlite3": "^12.6.2" },
   "node-sqlite": {},
@@ -87,7 +76,6 @@ const AR_DEPS = {
   "@blazetrails/activerecord-cli": "*",
 };
 
-// trails-tsc is a devDep: only needed for `ar typecheck` and the TS language service plugin.
 const AR_DEV_DEPS = {
   "@blazetrails/trails-tsc": "*",
 };
@@ -123,9 +111,7 @@ const LOCKFILES: ReadonlyArray<[string, PackageManager]> = [
   ["package-lock.json", "npm"],
 ];
 
-/** Detect the package manager by inspecting `packageManager` field then walking up for lockfiles. */
 export async function detectPackageManager(startDir: string): Promise<PackageManager> {
-  // packageManager field takes precedence over lockfile detection.
   try {
     const raw = await readFile(join(startDir, "package.json"), "utf8");
     const pkg = JSON.parse(raw) as { packageManager?: unknown };
@@ -134,7 +120,7 @@ export async function detectPackageManager(startDir: string): Promise<PackageMan
       if (pm === "pnpm" || pm === "yarn" || pm === "bun" || pm === "npm") return pm;
     }
   } catch {
-    // no package.json or parse error → continue to lockfile walk
+    /** @empty */
   }
 
   let dir = startDir;
@@ -144,7 +130,7 @@ export async function detectPackageManager(startDir: string): Promise<PackageMan
         await access(join(dir, file));
         return pm;
       } catch {
-        // not present here
+        /** @empty */
       }
     }
     const parent = dirname(dir);
@@ -155,7 +141,6 @@ export async function detectPackageManager(startDir: string): Promise<PackageMan
   return "npm";
 }
 
-/** Add deps to an existing package.json, preserving key order and indentation. */
 export async function addDepsToPackageJson(
   pkgPath: string,
   deps: Record<string, string>,
@@ -205,43 +190,20 @@ export async function addDepsToPackageJson(
 }
 
 export interface InitResult {
-  /** Paths (relative to root) that were written. */
   created: string[];
-  /** Paths (relative to root) skipped because a file already existed. */
   skipped: string[];
-  /** Set when an existing package.json was updated (not created fresh). */
   packageJsonUpdated?: { added: string[]; alreadyPresent: string[] };
-  /** Set when an existing tsconfig.json was merged (not created fresh). */
   tsconfigMerged?: TsconfigMergeResult;
 }
 
 export interface InitOptions {
-  /** Overwrite existing files instead of skipping them. */
   force?: boolean;
-  /** Per-path content overrides (relative paths → body). `ar new` uses this to inject driver-specific config. */
   overrides?: Record<string, string>;
-  /** Driver peer to add to package.json (default: "better-sqlite3"). */
   driver?: string;
-  /**
-   * Skip all package.json management (creation and dep injection).
-   * Set by `ar new`, which writes its own package.json before calling init().
-   */
   skipPackageJson?: boolean;
-  /**
-   * Skip tsconfig.json management (creation and merge).
-   * Use when the caller has already written or merged tsconfig.json before delegating to init().
-   */
   skipTsconfig?: boolean;
 }
 
-/**
- * Scaffold a standalone-activerecord project under `root`. Existing files are
- * skipped by default; pass `force: true` to overwrite them.
- *
- * If a `package.json` already exists, its `dependencies` are updated in place
- * instead of overwriting the file. Pass `force: true` to replace it with a
- * fresh scaffold.
- */
 export async function init(root: string, opts: InitOptions = {}): Promise<InitResult> {
   const {
     force = false,
@@ -250,9 +212,6 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
     skipPackageJson = false,
     skipTsconfig = false,
   } = opts;
-  // Non-better-sqlite3 SQLite drivers select their adapter purely via
-  // config/database.ts (the adapter subclass bundles its own driver). A
-  // caller-supplied override still wins.
   const driverAdapter = SQLITE_ADAPTER[driver];
   const effectiveOverrides: Record<string, string> =
     driverAdapter && driverAdapter !== "sqlite3"
@@ -270,7 +229,7 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
       await access(pkgPath);
       pkgExists = true;
     } catch {
-      // doesn't exist yet
+      /** @empty */
     }
 
     if (pkgExists && !force) {
@@ -287,7 +246,6 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
     }
   }
 
-  // tsconfig.json: merge into existing if present, else scaffold fresh.
   if (!skipTsconfig && !Object.prototype.hasOwnProperty.call(effectiveOverrides, "tsconfig.json")) {
     const tsconfigPath = join(root, "tsconfig.json");
     let tsconfigExists = false;
@@ -295,7 +253,7 @@ export async function init(root: string, opts: InitOptions = {}): Promise<InitRe
       await access(tsconfigPath);
       tsconfigExists = true;
     } catch {
-      // doesn't exist yet
+      /** @empty */
     }
 
     if (tsconfigExists && !force) {

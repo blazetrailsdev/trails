@@ -20,14 +20,6 @@ export function normalizeSqlitePaths(
     if (!database || !config.adapter?.startsWith("sqlite")) return config;
     if (isMemoryOrUri(database) || isAbsolute(database)) return config;
     const absolute = resolve(root, database);
-    // Rebuild through the config's own class: a UrlConfig flattened into a
-    // HashConfig would lose its `url` reader. Its constructor re-derives the
-    // hash from the URL and spreads it last, so an expanded `database` in the
-    // configuration would be overwritten by the URL's relative one — the URL
-    // itself has to carry the expansion. That is only a safe rewrite when the
-    // database is the URL's tail (`sqlite3:db/dev.sqlite3`, `db/dev.sqlite3`);
-    // anything else (query parameters, say) is left alone rather than
-    // rewritten by guesswork.
     if (config instanceof UrlConfig) {
       if (!config.url.endsWith(database)) return config;
       const expandedUrl = config.url.slice(0, -database.length) + absolute;

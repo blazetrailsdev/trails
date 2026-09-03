@@ -4,11 +4,6 @@ import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
 import { deflate, inflate } from "../gzip.js";
 
-// Port of Rails' CacheCoderTest (test/cache/cache_coder_test.rb). The custom
-// Serializer/Compressor mirror the Rails test doubles; the fidelity `coder`
-// (coder.ts) stands in for Marshal. Serializer#dump round-trips both Entries
-// (legacy/no-signature path) and bare values (Coder's framed path), tagged so
-// load can tell them apart — Marshal does this implicitly in Rails.
 const Serializer = {
   dump(value: unknown): string {
     return value instanceof Entry ? "E" + coder.dump(value.pack()) : "V" + coder.dump(value);
@@ -100,9 +95,6 @@ describe("CacheCoderTest", () => {
   });
 
   it("dumps bare strings with reduced overhead when possible", () => {
-    // Rails compares supported vs unsupported string encodings; JS strings carry
-    // no encoding, so trails collapses all strings onto one fast path. The
-    // equivalent saving: a bare string skips the serializer that an object pays.
     const unoptimized = c.dump(new Entry({ s: "" }));
     const optimized = c.dump(new Entry(""));
     expect(optimized.length).toBeLessThan(unoptimized.length);

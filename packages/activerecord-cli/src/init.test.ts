@@ -30,11 +30,9 @@ describe("ArInitTest", () => {
     for (const rel of scaffoldFiles) {
       expect(await readFile(join(root, rel), "utf8")).not.toMatch(/["']node:/);
     }
-    // config/database.ts is the only file allowed to read process.env.
     for (const rel of scaffoldFiles.filter((r) => r !== "config/database.ts")) {
       expect(await readFile(join(root, rel), "utf8")).not.toMatch(/\bprocess\./);
     }
-    // Config is keyed by TRAILS_ENV (not NODE_ENV) with the three Rails envs.
     const config = await readFile(join(root, "config/database.ts"), "utf8");
     expect(config).toContain("TRAILS_ENV");
     for (const env of ["development", "test", "production"]) expect(config).toContain(env);
@@ -50,24 +48,18 @@ describe("ArInitTest", () => {
     expect(await readFile(join(root, "config/database.ts"), "utf8")).toBe("// mine\n");
 
     const second = await init(root);
-    // tsconfig.json is merged (not skipped) on re-run; package.json is updated (not skipped).
     expect(second.created).toEqual([]);
     const expectedSkipped = EXPECTED.filter((r) => r !== "package.json" && r !== "tsconfig.json");
     expect(second.skipped.sort()).toEqual([...expectedSkipped].sort());
   });
 
   it("scaffolds a manifest the generator considers already up to date", async () => {
-    // init's starter models/index.ts must be byte-identical to what
-    // `ar generate:manifest` emits for an empty models dir, or CI's
-    // `--check` would flag drift the moment a project is scaffolded.
     await init(root);
     const result = await generateManifest(join(root, "app", "models"), { check: true });
     expect(result.changed).toBe(false);
   });
 
   it("surfaces real filesystem errors instead of silently skipping", async () => {
-    // A plain file where init() needs to create the `config/` directory makes
-    // mkdir fail — a real error that must propagate, not be swallowed as a skip.
     await writeFile(join(root, "config"), "not a dir\n", "utf8");
     await expect(init(root)).rejects.toThrow();
   });
@@ -88,7 +80,6 @@ describe("ArInitTest", () => {
       version: string;
       dependencies: Record<string, string>;
     };
-    // Original keys preserved
     expect(pkg.name).toBe("my-app");
     expect(pkg.version).toBe("1.0.0");
     expect(pkg.dependencies["express"]).toBe("^4.0.0");
@@ -137,8 +128,6 @@ describe("ArInitTest", () => {
     expect(created).toContain("config/database.ts");
     const config = await readFile(join(root, "config/database.ts"), "utf8");
     expect(config).toContain('adapter: "node-sqlite"');
-    // No side-effect driver import: the node-sqlite adapter subclass bundles
-    // its driver, so config alone selects the backend.
     const dbTs = await readFile(join(root, "db.ts"), "utf8");
     expect(dbTs).not.toContain("node-sqlite");
   });
@@ -190,7 +179,6 @@ describe("detectPackageManager", () => {
   });
 
   it("finds a lockfile in an ancestor directory (monorepo root)", async () => {
-    // pnpm-lock.yaml lives at the workspace root — child packages share it
     await writeFile(join(root, "pnpm-lock.yaml"), "", "utf8");
     await writeFile(join(root, "package.json"), "{}", "utf8");
     const child = join(root, "packages", "my-pkg");
@@ -199,7 +187,6 @@ describe("detectPackageManager", () => {
   });
 
   it("packageManager field in package.json takes precedence over lockfile", async () => {
-    // yarn.lock present, but packageManager says pnpm — field wins
     await writeFile(join(root, "yarn.lock"), "", "utf8");
     await writeFile(
       join(root, "package.json"),

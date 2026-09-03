@@ -1,9 +1,3 @@
-/**
- * ActionView::Helpers::NumberHelper — thin wrappers around `@blazetrails/activesupport`
- * NumberHelper that add `raise: true`, HTML-escaping of user-supplied format options,
- * and html_safe marking when the input parses as a number or is already html_safe.
- */
-
 import {
   NumberHelper,
   SafeBuffer,
@@ -115,13 +109,7 @@ export function escapeUnits(units: Record<string, string | SafeBuffer>): Record<
   return escaped;
 }
 
-/**
- * Mirrors: `wrap_with_output_safety_handling` (number_helper.rb:141-152). On the
- * `valid_float` arm `NumberConverter#execute` took its `convert` arm, so
- * `formatted_number` (number_helper.rb:148) is a String.
- *
- * @internal
- */
+/** @internal */
 export function wrapWithOutputSafetyHandling(
   number: unknown,
   raiseOnInvalid: boolean,
@@ -135,7 +123,6 @@ export function wrapWithOutputSafetyHandling(
 /** @internal */
 export const validFloat = (number: unknown) => parseFloat(number, false) !== null;
 
-// Ruby's Float() rejects strings with trailing junk; mimic with a strict numeric regex.
 const FLOAT_RE = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/;
 
 /** @internal */

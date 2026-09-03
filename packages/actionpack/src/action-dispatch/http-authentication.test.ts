@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BasicAuth, TokenAuth, DigestAuth } from "./http-authentication.js";
 
-// ==========================================================================
-// controller/http_basic_authentication_test.rb
-// ==========================================================================
 describe("ActionController::HttpAuthentication::Basic", () => {
   it("decode valid credentials", () => {
     const header = BasicAuth.encode("admin", "secret");
@@ -85,9 +82,6 @@ describe("ActionController::HttpAuthentication::Basic", () => {
   });
 });
 
-// ==========================================================================
-// controller/http_token_authentication_test.rb
-// ==========================================================================
 describe("ActionController::HttpAuthentication::Token", () => {
   it("decode valid token", () => {
     const header = TokenAuth.encode("abc123");
@@ -180,9 +174,6 @@ describe("ActionController::HttpAuthentication::Token", () => {
   });
 });
 
-// ==========================================================================
-// controller/http_digest_authentication_test.rb
-// ==========================================================================
 describe("ActionController::HttpAuthentication::Digest", () => {
   it("has digest credentials", () => {
     expect(DigestAuth.hasDigestCredentials('Digest username="admin"')).toBe(true);
@@ -297,9 +288,7 @@ describe("ActionController::HttpAuthentication::Digest", () => {
 
   it("different nonces each time", () => {
     const n1 = DigestAuth.generateNonce("secret");
-    // Small delay to ensure different timestamp
     const n2 = DigestAuth.generateNonce("secret");
-    // They might be the same if called in the same millisecond, so just check they're valid
     expect(DigestAuth.validateNonce(n1, "secret")).toBe(true);
     expect(DigestAuth.validateNonce(n2, "secret")).toBe(true);
   });

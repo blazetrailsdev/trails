@@ -3,7 +3,6 @@ import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
 import { environmentDbConfig, establishEnvironmentConnection } from "./environment.js";
 
 export interface StartOptions {
-  /** Override of repl.start — injected by tests to avoid opening a real REPL. */
   startRepl?: (opts: { prompt: string; useGlobal: boolean }) => {
     context: Record<string, unknown>;
     on(event: string, cb: () => void): void;
@@ -56,7 +55,7 @@ export async function arConsole(
       try {
         Base.removeConnection();
       } catch {
-        // pool may already be gone
+        /** @empty */
       }
       res(0);
     });

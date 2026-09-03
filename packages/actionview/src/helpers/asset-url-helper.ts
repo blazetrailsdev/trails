@@ -1,21 +1,13 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { ArgumentError, Zlib } from "@blazetrails/ruby-compat";
 
-/**
- * `ActionView::Helpers::AssetUrlHelper`
- * (`actionview/lib/action_view/helpers/asset_url_helper.rb`).
- */
-
-/** `asset_url_helper.rb:122`. */
 export const URI_REGEXP = /^[-a-z]+:\/\/|^(?:cid|data):|^\/\//i;
 
-/** `asset_url_helper.rb:229-232`. */
 export const ASSET_EXTENSIONS: Record<string, string> = {
   javascript: ".js",
   stylesheet: ".css",
 };
 
-/** `asset_url_helper.rb:253-260`. */
 export const ASSET_PUBLIC_DIRECTORIES: Record<string, string> = {
   audio: "/audios",
   font: "/fonts",
@@ -33,11 +25,6 @@ export interface AssetPathOptions {
   protocol?: string;
 }
 
-/**
- * The view members `assetPath` dispatches through. `computeAssetPath` is read
- * off `this` so an asset pipeline's override wins, as Ruby method lookup gives
- * Sprockets and Propshaft their hook.
- */
 export interface AssetUrlHelperHost {
   config?: {
     relativeUrlRoot?: string;
@@ -49,7 +36,6 @@ export interface AssetUrlHelperHost {
   publicComputeAssetPath(source: string, options?: AssetPathOptions): string;
 }
 
-/** Ruby `File.join` — joins with a single separator between segments. */
 function fileJoin(...segments: string[]): string {
   return segments
     .map((segment, index) =>
@@ -58,7 +44,6 @@ function fileJoin(...segments: string[]): string {
     .join("/");
 }
 
-/** Mirrors `AssetUrlHelper#asset_path` (`asset_url_helper.rb:184-217`). */
 export function assetPath(
   this: AssetUrlHelperHost,
   source: string | null | undefined,
@@ -103,10 +88,8 @@ export function assetPath(
   return `${source}${tail ?? ""}`;
 }
 
-/** `alias_method :path_to_asset, :asset_path` (`asset_url_helper.rb:218`). */
 export const pathToAsset = assetPath;
 
-/** Mirrors `AssetUrlHelper#compute_asset_extname` (`asset_url_helper.rb:236-244`). */
 export function computeAssetExtname(source: string, options: AssetPathOptions = {}): string | null {
   if (options.extname === false) return null;
   const extname =
@@ -117,30 +100,20 @@ export function computeAssetExtname(source: string, options: AssetPathOptions = 
   return null;
 }
 
-/** Ruby `File.extname` — the final dotted segment of the basename, or `""`. */
 function extnameOf(source: string): string {
   const base = source.slice(source.lastIndexOf("/") + 1);
   const dot = base.lastIndexOf(".");
   return dot <= 0 ? "" : base.slice(dot);
 }
 
-/** Mirrors `AssetUrlHelper#compute_asset_path` (`asset_url_helper.rb:265-268`). */
 export function computeAssetPath(source: string, options: AssetPathOptions = {}): string {
   const dir =
     (options.type === undefined ? undefined : ASSET_PUBLIC_DIRECTORIES[options.type]) ?? "";
   return fileJoin(dir, source);
 }
 
-/** `alias :public_compute_asset_path :compute_asset_path` (`asset_url_helper.rb:269`). */
 export const publicComputeAssetPath = computeAssetPath;
 
-/**
- * Mirrors `AssetUrlHelper#compute_asset_host` (`asset_url_helper.rb:275-306`).
- *
- * Ruby branches the callable arm on `arity > 1 || arity < 0`, where a negative
- * arity is a splat. A JS function's `length` excludes rest parameters, so the
- * `arity < 0` half has nothing to read and only `length > 1` survives.
- */
 export function computeAssetHost(
   this: AssetUrlHelperHost,
   source = "",
@@ -186,7 +159,6 @@ export function computeAssetHost(
   }
 }
 
-/** Mirrors `AssetUrlHelper#stylesheet_path` (`asset_url_helper.rb:348-350`). */
 export function stylesheetPath(
   this: AssetUrlHelperHost,
   source: string,
@@ -195,5 +167,4 @@ export function stylesheetPath(
   return pathToAsset.call(this, source, { type: "stylesheet", ...options });
 }
 
-/** `alias_method :path_to_stylesheet, :stylesheet_path` (`asset_url_helper.rb:351`). */
 export const pathToStylesheet = stylesheetPath;

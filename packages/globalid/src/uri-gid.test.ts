@@ -7,11 +7,6 @@ import {
   BadURIError,
 } from "./uri/gid.js";
 
-// Mirrors the private assertion helpers on URI::GIDValidationTest /
-// URI::GIDAppValidationTest (vendor/globalid/test/cases/uri_gid_test.rb:143-171).
-// Mirrors minitest's `assert_raise(Klass) { ... }`, which returns the raised
-// error so a following `assert_match` can read its message. Vitest's
-// `toThrow` doesn't hand the error back.
 function assertRaise(klass: new (...args: never[]) => Error, block: () => unknown): Error {
   try {
     block();
@@ -107,19 +102,12 @@ describe("URI::GIDTest", () => {
   });
 
   it("build with wrong ordered array creates a wrong ordered gid", () => {
-    // Rails: URI::GID.build(['Person', '5', 'bcx', nil]) misorders the
-    // positional (app, modelName, modelId, params) tuple. The resulting
-    // URI is not equal to the canonical gid://bcx/Person/5.
     expect(GID.build({ app: "Person", modelName: "5", modelId: "bcx" }).toString()).not.toBe(
       "gid://bcx/Person/5",
     );
   });
 
   it("new returns invalid gid when not checking", () => {
-    // Rails: URI::GID.new(*URI.split('gid:///')) bypasses URI::GID.parse
-    // validation. The Trails analog is constructing GID directly with
-    // synthetic components — the parse path is skipped so no error is
-    // raised even though the URI string is non-canonical.
     const synthetic = new GID("gid:///", {
       app: "",
       modelName: "",
@@ -230,8 +218,6 @@ describe("URI::GIDParamsTest", () => {
       params: { hello: "world" },
     }).toString();
     const gid = GID.parse(uri);
-    // Rails asserts both `params[:hello]` and `params['hello']` — a Ruby
-    // Symbol key is a plain JS string here, so both arms read the same key.
     expect(gid.params["hello"]).toBe("world");
     expect(gid.params["hello"]).toBe("world");
   });
@@ -263,10 +249,6 @@ describe("URI::GIDParamsTest", () => {
   });
 
   it("immutable params", () => {
-    // Rails: mutating @gid.params doesn't affect @gid.to_s, because to_s
-    // returns the URI string fixed at construction time. Trails: toString()
-    // returns the cached uri, so post-construction params writes don't
-    // leak into the rendered URI either.
     const gid = GID.parse("gid://bcx/Person/5?hello=world");
     gid.params["param"] = "value";
     expect(gid.toString()).not.toBe("gid://bcx/Person/5?hello=world&param=value");
@@ -309,7 +291,6 @@ describe("URI::GID class wrapper", () => {
     const gid = GID.parse("gid://bcx/Person/5?k=v");
     const a = gid.deconstructKeys();
     expect(a).toEqual({ app: "bcx", modelName: "Person", modelId: "5", params: { k: "v" } });
-    // Mutating any field of the returned object must not affect the GID.
     (a as { app: string }).app = "evil";
     a.params["k"] = "evil";
     expect(gid.app).toBe("bcx");

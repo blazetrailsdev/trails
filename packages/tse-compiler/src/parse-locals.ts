@@ -1,5 +1,3 @@
-/** Parse the body of a `<%# locals: (...) %>` magic comment into named entries. */
-
 export interface LocalEntry {
   name: string;
   defaultExpr: string | null;
@@ -7,8 +5,6 @@ export interface LocalEntry {
 
 export class LocalsSignatureError extends Error {}
 
-// Words reserved in ES strict mode + module context — would crash
-// `const { <name> } = locals;` at parse or runtime.
 // prettier-ignore
 const RESERVED_NAMES = new Set([
   "break", "case", "catch", "class", "const", "continue", "debugger",
@@ -18,18 +14,13 @@ const RESERVED_NAMES = new Set([
   "typeof", "var", "void", "while", "with", "yield", "implements",
   "interface", "let", "package", "private", "protected", "public",
   "static", "await",
-  // async is a contextual keyword, not reserved — `const { async } = x;` is valid.
-  // Restricted identifiers in strict mode — `const { eval } = x;` is a syntax error in ESM.
   "eval", "arguments",
 ]);
 
-// Names used as parameters or internal bindings in the generated render function.
-// Declaring a local with any of these names would produce a duplicate-declaration
-// SyntaxError or shadow the binding in a way that breaks the emitted code.
 // prettier-ignore
 const EMITTER_RESERVED = new Set([
-  "context", "locals", "_ob",       // render() parameters / output-buffer binding
-  "__allowedKeys", "__extraKeys",    // strict-locals check bindings
+  "context", "locals", "_ob",
+  "__allowedKeys", "__extraKeys",
 ]);
 
 function isUsableLocalName(name: string): boolean {

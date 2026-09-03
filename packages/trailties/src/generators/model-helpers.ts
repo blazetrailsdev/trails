@@ -1,9 +1,6 @@
 import { pluralize, singularize, underscore } from "@blazetrails/activesupport";
 import { GeneratorError } from "./generated-attribute.js";
 
-// Mirrors railties/lib/rails/generators/model_helpers.rb. Trailties
-// generators call normalizeModelName() from their constructor. Warning
-// strings are kept verbatim from Rails so `pnpm parity:api` can match.
 // prettier-ignore
 const PLURAL_WARN = "[WARNING] The model name '%s' was recognized as a plural, using the singular '%s' instead. Override with --force-plural or setup custom inflection rules for this noun before running the generator.";
 // prettier-ignore

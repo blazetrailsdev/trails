@@ -20,8 +20,6 @@ export function emitType(t: FieldType): { text: string; refs: Ref[] } {
 }
 
 function emitJsDoc(comment: string): string {
-  // Neutralize comment terminator and split on newlines so the JSDoc block
-  // cannot be broken out of by user-supplied text.
   const safe = comment.replace(/\*\//g, "*\\/");
   const lines = safe.split("\n");
   if (lines.length === 1) return `/** ${lines[0]} */\n  `;

@@ -121,7 +121,6 @@ describe("ExecutorTest", () => {
     const requests = 5;
     for (let i = 0; i < requests; i++) await mw.call({} as RackEnv);
     expect(ran).toBe(requests);
-    // Bodies never closed → complete callbacks never run.
     expect(completed).toBe(0);
   });
 

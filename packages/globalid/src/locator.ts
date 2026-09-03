@@ -1,9 +1,3 @@
-// LAZY-IMPORT CYCLE: locator ↔ global-id ↔ signed-global-id. GlobalID and
-// SignedGlobalID are only referenced inside class/method bodies below
-// (e.g. `GlobalID.parse(...)` inside `Locator.locate`); don't add a
-// module-level `const X = GlobalID.something` — native ESM throws
-// ReferenceError (TDZ) for an uninitialized imported binding accessed
-// during the initial circular evaluation.
 import { GlobalID } from "./global-id.js";
 import { SignedGlobalID } from "./signed-global-id.js";
 import { validateApp } from "./uri/gid.js";
@@ -11,86 +5,36 @@ import { safeConstantize } from "@blazetrails/activesupport";
 import type { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
-/**
- * Duck-typed model interface; globalid stays AR-agnostic.
- *
- * @noRailsEquivalent PERMANENT (`vendor/globalid/lib/global_id/locator.rb:165`, `:196` — Ruby's
- *   `BaseLocator` calls `model_class.find` / `model_class.where` on an undeclared duck type;
- *   TypeScript needs a declared interface to type the same collaborator, and no Ruby entity maps
- *   onto it. The interface-level tag is the end state of
- *   `extra-surface-skip-duck-typed-interface-members` (PR #5467), which chose declaration-level
- *   marking over a member-by-member rule.)
- * Declares the Active Record surface Rails' BaseLocator
- * calls duck-typed — `model_class.find gid.model_id` and
- * `model_class.where(primary_key => ids)` on the ignore_missing path. Ruby
- * needs no such declaration, so neither the interface nor any member of it has
- * a Ruby counterpart.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface LocatorModel {
   name: string;
   primaryKey?: string | string[];
-  /** Single-id form returns a record; array form returns an ordered array. */
   find(id: unknown): Promise<unknown> | unknown;
   where?(conditions: Record<string, unknown>): {
     toArray?(): Promise<unknown[]> | unknown[];
   };
-  /**
-   * Rails: `Model.unscoped { ... }` — optional escape hatch
-   * `UnscopedLocator` uses. Block may be sync or async; return matches.
-   * Shape is permissive so AR's `unscoped(block)`
-   * (`(block: () => R | Promise<R>) => Promise<R>`) is assignable
-   * without casts, and a synchronous duck-typed `unscoped(block) => R`
-   * also works.
-   *
-   * @internal
-   */
+  /** @internal */
   unscoped?<R>(block: () => R | Promise<R>): R | Promise<R>;
 }
 
 export interface LocateOptions {
   only?: LocatorModel | LocatorModel[];
-  /**
-   * Use `where(pk: ids)` instead of `find(ids)` so missing records are
-   * silently skipped (the result array is shorter than the input). Without
-   * this option, a missing record causes `klass.find` to throw (Rails
-   * raises `RecordNotFound`). Use `ignoreMissing: true` for graceful
-   * missing-record handling.
-   */
   ignoreMissing?: boolean;
 }
 
 export interface LocateSignedOptions extends LocateOptions {
-  /** Purpose to verify against (Rails: `for:`). */
   for?: string;
-  /** Verifier to validate the SGID signature. */
   verifier: MessageVerifier;
 }
 
-// ─── BaseLocator / UnscopedLocator / BlockLocator ──────────────────────────
-
-/** Block-form locator function — accepts a parsed GlobalID + options. */
 export type LocatorBlock = (gid: GlobalID, options?: LocateOptions) => Promise<unknown> | unknown;
 
-/**
- * Anything that can be plugged in as a locator — `BaseLocator`,
- * `UnscopedLocator`, `BlockLocator`, or a custom class that implements
- * the same `locate` / `locateMany` shape. Used as the public type for
- * `Locator.defaultLocator` and `Locator.use` so callers don't have to
- * cast between class hierarchies.
- */
 export interface LocatorLike {
   locate(gid: GlobalID, options?: LocateOptions): Promise<unknown | null>;
   locateMany(gids: GlobalID[], options?: LocateOptions): Promise<unknown[]>;
 }
 
-/**
- * Mirrors: GlobalID::Locator::BaseLocator. Resolves GlobalIDs by constantizing
- * the model name and delegating to
- * `klass.find(id)` (or `klass.where({pk: ids})` for the batch + ignoreMissing
- * path).
- */
 export class BaseLocator {
-  /** Mirrors: BaseLocator#locate */
   async locate(gid: GlobalID, _options: LocateOptions = {}): Promise<unknown | null> {
     if (!this.modelIdIsValid(gid)) return null;
     const klass = safeConstantize(gid.modelName) as LocatorModel | undefined;
@@ -99,7 +43,6 @@ export class BaseLocator {
     return record ?? null;
   }
 
-  /** Mirrors: BaseLocator#locate_many */
   async locateMany(gids: GlobalID[], options: LocateOptions = {}): Promise<unknown[]> {
     const idsByClass = new Map<LocatorModel, unknown[]>();
     const allowed: Array<{ gid: GlobalID; klass: LocatorModel }> = [];
@@ -116,9 +59,6 @@ export class BaseLocator {
     for (const [klass, ids] of idsByClass) {
       const records = await this.findRecords(klass, ids, options);
       const byId = new Map<string, unknown>();
-      // Read the record's PK property from the same source of truth as
-      // findRecords/modelIdIsValid — this.primaryKey(klass) — so a
-      // subclass that overrides primaryKey() indexes consistently.
       const pkProp = recordIdProp(this.primaryKey(klass));
       for (const rec of records) {
         byId.set(idKey((rec as Record<string, unknown>)[pkProp]), rec);
@@ -134,19 +74,12 @@ export class BaseLocator {
     return result;
   }
 
-  /** @internal Mirrors: BaseLocator#find_records — batch find or where(pk: ids). */
+  /** @internal */
   protected async findRecords(
     modelClass: LocatorModel,
     ids: unknown[],
     options: LocateOptions,
   ): Promise<unknown[]> {
-    // Composite primary keys would need where(cols, tuples); Rails relation
-    // form not yet supported by our AR layer. CPK + ignoreMissing falls
-    // through to find(ids) (raises on missing) as a known limitation.
-    //
-    // Use this.primaryKey(modelClass) as the single source of truth for the PK
-    // shape — a subclass overriding primaryKey() must affect both the
-    // composite-key gate AND the where() key consistently.
     const pk = this.primaryKey(modelClass);
     if (options.ignoreMissing && modelClass.where && !Array.isArray(pk)) {
       const rel = modelClass.where({ [pk]: ids });
@@ -162,24 +95,19 @@ export class BaseLocator {
     return Array.isArray(result) ? result : [result];
   }
 
-  /** @internal Mirrors: BaseLocator#model_id_is_valid? — modelId arity matches PK arity. */
+  /** @internal */
   protected modelIdIsValid(gid: GlobalID): boolean {
     const modelClass = safeConstantize(gid.modelName) as LocatorModel | undefined;
     if (!modelClass) return false;
     return modelIdArityMatches(modelClass, gid.modelId, this.primaryKey(modelClass));
   }
 
-  /** @internal Mirrors: BaseLocator#primary_key. */
+  /** @internal */
   protected primaryKey(modelClass: LocatorModel): string | string[] {
     return modelClass.primaryKey ?? "id";
   }
 }
 
-/**
- * Mirrors: GlobalID::Locator::UnscopedLocator. Wraps lookups in
- * `Model.unscoped { ... }` when the model supports it; otherwise yields
- * (most TS models don't have an unscoped escape hatch).
- */
 export class UnscopedLocator extends BaseLocator {
   async locate(gid: GlobalID, options: LocateOptions = {}): Promise<unknown | null> {
     const modelClass = safeConstantize(gid.modelName) as LocatorModel | undefined;
@@ -195,7 +123,7 @@ export class UnscopedLocator extends BaseLocator {
     return this.unscoped(modelClass, () => super.findRecords(modelClass, ids, options));
   }
 
-  /** @internal Mirrors: UnscopedLocator#unscoped. */
+  /** @internal */
   protected unscoped<R>(
     modelClass: LocatorModel | undefined,
     block: () => R | Promise<R>,
@@ -204,10 +132,6 @@ export class UnscopedLocator extends BaseLocator {
   }
 }
 
-/**
- * Mirrors: GlobalID::Locator::BlockLocator. Wraps a `(gid, options) → record`
- * function as a locator. Created by `Locator.use(app, block)`.
- */
 export class BlockLocator {
   private readonly _locator: LocatorBlock;
 
@@ -220,18 +144,6 @@ export class BlockLocator {
     return result ?? null;
   }
 
-  /**
-   * Locate each GID via the block sequentially (Rails parity — Ruby's
-   * `gids.map { |gid| locate(gid, options) }` runs single-threaded).
-   * Sequential ordering matters here: a block that touches global state
-   * or external resources would behave unpredictably under `Promise.all`.
-   *
-   * Divergence from Rails: Rails' `BlockLocator#locate_many` returns the
-   * block results including nils (preserving input order with gaps). We
-   * filter nulls to stay consistent with `BaseLocator#locateMany` (which
-   * uses `filter_map` in Rails). If positional alignment with the input
-   * matters, callers should call `locate` per GID directly.
-   */
   async locateMany(gids: GlobalID[], options: LocateOptions = {}): Promise<unknown[]> {
     const results: unknown[] = [];
     for (const gid of gids) {
@@ -242,14 +154,10 @@ export class BlockLocator {
   }
 }
 
-// ─── Locator (top-level facade — dispatches to per-app or default locator) ─
-
 const _appLocators = new Map<string, LocatorLike>();
 let _defaultLocator: LocatorLike = new UnscopedLocator();
 
-/** Mirrors: GlobalID::Locator */
 export class Locator {
-  /** Mirrors: Locator.locate */
   static async locate(
     gid: string | GlobalID,
     options: LocateOptions = {},
@@ -259,27 +167,12 @@ export class Locator {
     const klass = safeConstantize(parsed.modelName) as LocatorModel | undefined;
     if (!klass) return null;
     if (!Locator.findAllowed(klass, options.only)) return null;
-    // Arity-check at the facade so BlockLocator / custom LocatorLike dispatch
-    // doesn't run on a GID that BaseLocator would reject. Matches the
-    // mismatched-modelId-returns-null behavior across all locator kinds.
     if (!modelIdArityMatches(klass, parsed.modelId)) return null;
     const locator = Locator.locatorFor(parsed);
-    // Rails: options.except(:only) — the only: filter is the facade's
-    // concern, not the per-locator one.
     const { only: _, ...rest } = options;
     return locator.locate(parsed, rest);
   }
 
-  /**
-   * Mirrors: Locator.locate_many. Rails' contract: "All GlobalIDs must
-   * belong to the same app, as they will be located using the same
-   * locator." Rails relies on the caller and silently misroutes
-   * mismatched-app GIDs through the first GID's locator — which is unsafe
-   * with BlockLocators that only know one app's models. We make this
-   * explicit: only GIDs matching the first allowed GID's app are passed
-   * to the locator; the rest are dropped. (Rails-faithful for the
-   * single-app happy path; safer for the mixed-app misuse case.)
-   */
   static async locateMany(
     gids: Array<string | GlobalID>,
     options: LocateOptions = {},
@@ -289,12 +182,10 @@ export class Locator {
     const app = Locator.normalizeApp(allowed[0].app);
     const sameApp = allowed.filter((g) => Locator.normalizeApp(g.app) === app);
     const locator = Locator.locatorFor(allowed[0]);
-    // Same as locate: strip the only: option before delegating.
     const { only: _, ...rest } = options;
     return locator.locateMany(sameApp, rest);
   }
 
-  /** Mirrors: Locator.locate_signed */
   static async locateSigned(
     sgid: string | SignedGlobalID,
     options: LocateSignedOptions,
@@ -307,7 +198,6 @@ export class Locator {
     return Locator.locate(parsed.uri.toString(), options);
   }
 
-  /** Mirrors: Locator.locate_many_signed */
   static async locateManySigned(
     sgids: Array<string | SignedGlobalID>,
     options: LocateSignedOptions,
@@ -322,25 +212,14 @@ export class Locator {
     );
   }
 
-  // ─── Class-level config (Rails: attr_accessor :default_locator) ───────────
-
-  /** Mirrors: Locator.default_locator */
   static get defaultLocator(): LocatorLike {
     return _defaultLocator;
   }
-  /** Mirrors: Locator.default_locator= */
   static set defaultLocator(locator: LocatorLike) {
     _defaultLocator = locator;
   }
 
-  /**
-   * Mirrors: Locator.use(app, locator | &block) — register a per-app locator.
-   * Accepts any locator-like object or a plain block function (wrapped
-   * automatically as a BlockLocator).
-   */
   static use(app: string, locator?: LocatorLike | LocatorBlock): void {
-    // Ruby's block arrives as `&locator_block`; trails takes it in the
-    // `locator` position, so `locator || block_given?` is that parameter alone.
     const locatorBlock = typeof locator === "function" ? locator : undefined;
     if (locator == null) {
       throw new ArgumentError(
@@ -356,14 +235,12 @@ export class Locator {
     );
   }
 
-  // ─── Private helpers (Rails class << self private) ───────────────────────
-
-  /** @internal Mirrors: Locator.locator_for. */
+  /** @internal */
   static locatorFor(gid: GlobalID): LocatorLike {
     return _appLocators.get(Locator.normalizeApp(gid.app)) ?? _defaultLocator;
   }
 
-  /** @internal Mirrors: Locator.find_allowed?. */
+  /** @internal */
   static findAllowed(modelClass: LocatorModel, only?: LocateOptions["only"]): boolean {
     if (!only) return true;
     const list = Array.isArray(only) ? only : [only];
@@ -374,13 +251,7 @@ export class Locator {
     });
   }
 
-  /**
-   * @internal Mirrors: Locator.parse_allowed. Extends Rails behavior by also
-   * filtering modelId-arity mismatches here (Rails defers that to
-   * BaseLocator#model_id_is_valid? at dispatch time). We filter early so the
-   * locateMany first-GID-app selection isn't anchored on a doomed entry,
-   * which would drop otherwise-valid same-app GIDs.
-   */
+  /** @internal */
   static parseAllowed(gids: Array<string | GlobalID>, only?: LocateOptions["only"]): GlobalID[] {
     const result: GlobalID[] = [];
     for (const gid of gids) {
@@ -395,30 +266,25 @@ export class Locator {
     return result;
   }
 
-  /** @internal Mirrors: Locator.normalize_app — case-insensitive app keying. */
+  /** @internal */
   static normalizeApp(app: string): string {
     return String(app).toLowerCase();
   }
 }
 
-/** @internal — test use only: clear app-scoped locators between tests. */
+/** @internal */
 export function _resetLocators(): void {
   _appLocators.clear();
   _defaultLocator = new UnscopedLocator();
 }
 
-// ─── Helpers (module-private) ─────────────────────────────────────────────
-
 type Ctor = new (...args: never[]) => unknown;
 
-/** Property name to read the PK value from a record. Takes the PK shape
- *  (string for scalar, array for composite). Composite PKs read through
- *  AR's `.id` aggregate accessor; scalars use the PK column name. */
 function recordIdProp(pk: string | string[]): string {
   return Array.isArray(pk) ? "id" : pk;
 }
 
-/** True iff `modelId`'s arity matches `klass.primaryKey`'s arity. @internal */
+/** @internal */
 function modelIdArityMatches(
   klass: LocatorModel,
   modelId: unknown,

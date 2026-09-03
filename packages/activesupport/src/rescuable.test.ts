@@ -46,7 +46,6 @@ describe("RescuableTest", () => {
   it("unhandled exceptions", () => {
     const target = {};
     rescueFrom.call(target, TypeError, { with: () => {} });
-    // A RangeError should not be handled
     expect(handleRescue(target, new RangeError("range"))).toBe(false);
   });
 });

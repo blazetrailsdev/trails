@@ -3,9 +3,7 @@ import { SilenceRequest } from "./silence-request.js";
 import type { RackApp, RackBody } from "@blazetrails/rack";
 
 const emptyBody = (): RackBody => ({
-  async *[Symbol.asyncIterator]() {
-    /* empty */
-  },
+  async *[Symbol.asyncIterator]() {},
 });
 
 describe("Rack::SilenceRequest", () => {

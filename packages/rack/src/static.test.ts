@@ -242,7 +242,6 @@ it("prioritizes header rules over fixed cache-control setting (legacy option)", 
 
 it("expands the root path upon the middleware initialization", async () => {
   const app = new Static(fallbackApp, { urls: ["/static"], root: tmpDir });
-  // Just verifying it initializes without error and can serve
   const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt");
   expect(res.status).toBe(200);
 });

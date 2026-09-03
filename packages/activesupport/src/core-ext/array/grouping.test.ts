@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { inGroups, inGroupsOf, split } from "../../index.js";
 
-// Ruby's `("a".."i").to_a` / `(1..9).to_a`.
 function toA(first: string, last: string): string[];
 function toA(first: number, last: number): number[];
 function toA(first: string | number, last: string | number): (string | number)[] {

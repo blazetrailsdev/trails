@@ -1,17 +1,3 @@
-/**
- * The routing DSL, mirroring ActionDispatch::Routing::Mapper.
- *
- * Usage:
- *   routeSet.draw((r) => {
- *     r.root("pages#home");
- *     r.get("/about", { to: "pages#about", as: "about" });
- *     r.resources("posts");
- *     r.namespace("admin", (r) => {
- *       r.resources("users");
- *     });
- *   });
- */
-
 import {
   Route,
   type RouteOptions,
@@ -45,7 +31,6 @@ interface ResourceLike {
   shallow?: () => boolean;
 }
 
-/** Resource-DSL options stripped before falling back to `scope()`. */
 const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
   "as",
   "controller",
@@ -56,23 +41,15 @@ const RESOURCE_OPTIONS: ReadonlySet<string> = new Set([
   "concerns",
 ]);
 
-/** @internal Subset of `RouteSet` consumed by the {@link Mapper} constructor. */
+/** @internal */
 interface RouteSetLike {
   resourcesPathNames?: Record<string, string>;
   drawPaths?: string[];
   defaultUrlOptions?: Record<string, unknown>;
 }
 
-/**
- * Port of `ActionDispatch::Routing::Mapper::Constraints`
- * (`actionpack/lib/action_dispatch/routing/mapper.rb:29-81`) — the endpoint
- * wrapper `Mapping#app` puts around a route's target so the Journey router can
- * `serve` something that only answers `call(env)`.
- *
- * @internal
- */
+/** @internal */
 export class Constraints extends Endpoint {
-  /** Rails: `attr_reader :app` (`mapper.rb:30`). */
   override app(): unknown {
     return this._app;
   }
@@ -80,9 +57,6 @@ export class Constraints extends Endpoint {
 
   static readonly SERVE: ConstraintsStrategy = (app, req) =>
     (app as { serve(req: ConstraintsRequest): unknown }).serve(req);
-  // Ruby's `app.call req.env` reaches a lambda through `Proc#call`; a JS
-  // function carries its own `Function.prototype.call`, so a callable app is
-  // invoked directly.
   static readonly CALL: ConstraintsStrategy = (app, req) =>
     typeof app === "function"
       ? (app as (env: Record<string, unknown>) => unknown)(req.env)
@@ -164,13 +138,7 @@ export class Mapper {
   readonly routes: Route[] = [];
   private scopeStack: ScopeFrame[] = [];
   private concerns: Map<string, ConcernCallback> = new Map();
-  /**
-   * Stores {@link Redirect} endpoints built by {@link Mapper.redirect}, keyed
-   * by an opaque token returned to the DSL as the `to:` value. {@link addRoute}
-   * resolves the token back to the instance and threads it onto the
-   * {@link Route} via `redirectEndpoint:`.
-   * @internal
-   */
+  /** @internal */
   private redirectInstances: Map<string, Redirect> = new Map();
   /** @internal */
   private redirectCounter = 0;
@@ -182,10 +150,9 @@ export class Mapper {
   _scope: Scope;
   /** @internal */
   _apiOnly = false;
-  /** @internal Local fallback when no RouteSet is attached. */
+  /** @internal */
   private _defaultUrlOptions: Record<string, unknown> = {};
 
-  /** Mirrors Rails `Mapper#initialize(set)`. The `set` is optional in trails. */
   constructor(set?: RouteSetLike) {
     this._set = set;
     this._drawPaths = set?.drawPaths ?? [];
@@ -193,18 +160,14 @@ export class Mapper {
     this._scope = new Scope({ pathNames }, Scope.ROOT, null);
   }
 
-  /** Rails: `default_url_options=(options)`. */
   set defaultUrlOptions(options: Record<string, unknown>) {
     if (this._set) this._set.defaultUrlOptions = options;
     else this._defaultUrlOptions = options;
   }
 
-  /** Rails: `alias_method :default_url_options, :default_url_options=`. */
   get defaultUrlOptions(): Record<string, unknown> {
     return this._set?.defaultUrlOptions ?? this._defaultUrlOptions;
   }
-
-  // --- HTTP verb methods ---
 
   get(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
     this.addRoute("GET", path, normalizeOptions(optionsOrEndpoint));
@@ -226,8 +189,6 @@ export class Mapper {
     this.addRoute("DELETE", path, normalizeOptions(optionsOrEndpoint));
   }
 
-  // --- root ---
-
   root(to: string): void {
     const [controller, action] = parseEndpoint(to);
     this.routes.push(
@@ -236,8 +197,6 @@ export class Mapper {
       }),
     );
   }
-
-  // --- resources ---
 
   resources(
     name: string,
@@ -263,9 +222,6 @@ export class Mapper {
     const namePrefix = this.currentNamePrefix();
     const routeName = (suffix: string) => (namePrefix ? `${namePrefix}_${suffix}` : suffix);
 
-    // For shallow routes, member routes drop *parent resource* segments but
-    // keep outer scope/namespace prefixes. Rails: shallow_path = path until
-    // outermost resource; shallow_prefix preserves outer non-resource as: keys.
     const shallowPrefix = shallow
       ? ((this._scope.get("shallowPath") as string | undefined) ?? this.outerNonResourcePrefix())
       : prefix;
@@ -298,7 +254,6 @@ export class Mapper {
     const newPath = pathNames.new ?? "new";
     const editPath = pathNames.edit ?? "edit";
 
-    // Collection-level routes first (no :id param)
     if (allowed.has("index")) {
       this.routes.push(
         new Route("GET", basePath, controller, "index", {
@@ -321,10 +276,7 @@ export class Mapper {
       );
     }
 
-    // Run callback (collection/member/nested routes) before member routes
-    // so collection routes like /posts/search come before /posts/:id
     if (cb) {
-      // Rename parent constraints from :id to :singular_id for nested routes
       const nestedConstraints: RouteConstraints = {};
       if (constraints?.id) {
         nestedConstraints[`${singular}_id`] = constraints.id;
@@ -351,7 +303,6 @@ export class Mapper {
       this.scopeStack.pop();
     }
 
-    // Member routes last (they have :id which would greedily match collection paths)
     if (allowed.has("edit")) {
       this.routes.push(
         new Route("GET", `${shallowPath}/:id/${editPath}`, controller, "edit", {
@@ -385,8 +336,6 @@ export class Mapper {
       );
     }
   }
-
-  // --- resource (singular) ---
 
   resource(
     name: string,
@@ -476,8 +425,6 @@ export class Mapper {
     }
   }
 
-  // --- namespace ---
-
   namespace(
     path: string,
     options: (ScopeOptions & { path?: string }) | MapperCallback = {},
@@ -487,10 +434,6 @@ export class Mapper {
       typeof options === "function" ? {} : { ...options };
     const cb = typeof options === "function" ? options : block;
     if (!cb) throw new Error("no block given (yield)");
-    // Rails mapper.rb:1626-1632: inside a resource scope, namespace must go
-    // through nested so parent-resource path segments are included correctly.
-    // Use _scope.isResourceScope() (level-based) to avoid infinite recursion —
-    // once nested() is entered the level becomes "nested", not "resources".
     if (this._scope.isResourceScope()) {
       this.nested(() => this.namespace(path, opts, cb));
       return;
@@ -508,8 +451,6 @@ export class Mapper {
       this.scope(Object.assign(defaults, opts), cb);
     });
   }
-
-  // --- scope ---
 
   scope(
     pathOrOptions: string | ScopeOptions,
@@ -565,10 +506,7 @@ export class Mapper {
     }
   }
 
-  // --- member / collection ---
-
   member(callback: MapperCallback): void {
-    // Use the memberPath (with :id) if we're inside a resources scope
     const frame = this.scopeStack[this.scopeStack.length - 1];
     if (frame?.memberPath) {
       const saved = frame.path;
@@ -582,7 +520,6 @@ export class Mapper {
 
   collection(callback: MapperCallback): void {
     const current = this.currentPrefix();
-    // Strip /:id or /:singular_id from end to get collection path
     const collectionPath = current.replace(/\/:[^/]+$/, "");
     this.scopeStack.push({
       path: collectionPath,
@@ -593,16 +530,11 @@ export class Mapper {
     this.scopeStack.pop();
   }
 
-  /** Rails: `nested(&block)`. Wraps `block` in a nested resource scope. */
   nested(callback: MapperCallback): void {
     if (!this.isResourceScope()) {
       throw new Error("can't use nested outside resource(s) scope");
     }
     this.withScopeLevel("nested", () => {
-      // Only enter shallowScope if Rails-style shallow keys have been
-      // populated; trails resources() currently tracks path nesting via
-      // scopeStack rather than _scope.shallowPath/Prefix, so the
-      // shallowScope branch would otherwise clobber as/path with undefined.
       const shallowKeysSet =
         this._scope.get("shallowPath") !== undefined ||
         this._scope.get("shallowPrefix") !== undefined;
@@ -614,19 +546,12 @@ export class Mapper {
     });
   }
 
-  /**
-   * Rails: `new(&block)`. Scopes a block to the "new" action path of the
-   * current resource. Used by `on: "new"` dispatch in `decomposedMatch`.
-   */
   new(callback: MapperCallback): void {
     if (!this.isResourceScope()) {
       throw new Error("can't use new outside resource(s) scope");
     }
     const frame = [...this.scopeStack].reverse().find((f) => f.resource);
     const newSegment = frame?.resourcePathNames?.new ?? "new";
-    // Use frame.path (= nested-children scope, e.g. /posts/:post_id/comments/:comment_id)
-    // so that shallow resources still produce the full nested path for the new action.
-    // memberPath is the shallow path (/comments/:id) and would give the wrong base.
     const framePath = frame?.path ?? this.currentPrefix();
     const basePath = framePath.replace(/\/:[^/]+$/, "");
     const newPath = `${basePath}/${newSegment}`;
@@ -639,12 +564,6 @@ export class Mapper {
     this.scopeStack.pop();
   }
 
-  /**
-   * Rails: `shallow(&block)`. Pushes a `shallow: true` scope so nested
-   * `resources` inside use shallow path/name conventions. The current
-   * prefix is preserved — Rails clones the scope hash, which keeps `:path`
-   * unchanged.
-   */
   shallow(callback: MapperCallback): void {
     this.scopeStack.push({
       path: this.currentPrefix(),
@@ -659,15 +578,6 @@ export class Mapper {
     }
   }
 
-  /**
-   * Mirrors `Mapper::Resources#draw(name)` (`mapper.rb:1668-1682`) — finds
-   * `<name>.ts` under {@link _drawPaths} and evaluates it against this
-   * mapper. Ruby's `instance_eval(File.read(route_path))` becomes a dynamic
-   * `import()` of the module and a call to its `drawRoutes` export, the same
-   * shape `RoutesReloader` loads a `config/routes.ts` with; an ESM module
-   * body has no equivalent of `instance_eval`'s receiver rebinding, and the
-   * import makes the method async where Ruby's is not.
-   */
   async draw(name: string): Promise<void> {
     const fs = await getFsAsync();
     const p = await getPathAsync();
@@ -694,18 +604,11 @@ export class Mapper {
     mod.drawRoutes?.(this);
   }
 
-  /**
-   * Rails: `set_member_mappings_for_resource`. Inside a `member { … }` block,
-   * adds the standard member verb mappings (`edit`, `show`, `update`,
-   * `destroy`) when the parent resource's `actions` allows them.
-   *
-   * @internal
-   */
+  /** @internal */
   setMemberMappingsForResource(): void {
     const parent = this.parentResource();
     if (!parent) return;
     const actions = parent.actions ?? [];
-    // Find the active resource frame for the canonical member path + controller.
     const frame = [...this.scopeStack].reverse().find((f) => f.resource === parent);
     const memberPath = frame?.memberPath ?? this.currentPrefix();
     const controller = frame?.resourceController ?? "";
@@ -725,8 +628,6 @@ export class Mapper {
     }
   }
 
-  // --- constraints block ---
-
   constraints(
     constraints: RouteOptions["constraints"] | MapperCallback,
     callback?: MapperCallback,
@@ -734,13 +635,9 @@ export class Mapper {
     if (typeof constraints === "function") {
       constraints(this);
     } else {
-      // Store constraints in scope for nested routes
-      // For now, just execute the callback
       callback?.(this);
     }
   }
-
-  // --- concern / concerns ---
 
   concern(name: string, callable: ConcernCallback): void {
     this.concerns.set(name, callable);
@@ -753,16 +650,6 @@ export class Mapper {
     }
   }
 
-  // --- redirect ---
-
-  /**
-   * Mirrors `ActionDispatch::Routing::Mapper::Redirection#redirect` — builds
-   * a {@link Redirect}/{@link PathRedirect}/{@link OptionRedirect} endpoint
-   * via the {@link redirectFactory} factory and stashes it under an opaque
-   * token returned for use as the route's `to:` value. {@link addRoute}
-   * resolves the token back to the instance so dispatch goes through the
-   * same `Redirect` endpoint Rails uses.
-   */
   redirect(args: string | RedirectOptions | RedirectFunction): string {
     let endpoint: Redirect;
     if (typeof args === "string") {
@@ -778,8 +665,6 @@ export class Mapper {
     return id;
   }
 
-  // --- match (low-level) ---
-
   match(path: string, options: RouteOptions & { via?: string | string[] } = {}): void {
     const methods = options.via
       ? Array.isArray(options.via)
@@ -791,8 +676,6 @@ export class Mapper {
       this.addRoute(method, path, options);
     }
   }
-
-  // --- HTTP helper extras ---
 
   options(path: string, optionsOrEndpoint: RouteOptions | string = {}): void {
     this.mapMethod("OPTIONS", path, normalizeOptions(optionsOrEndpoint));
@@ -807,12 +690,6 @@ export class Mapper {
     this.match(path, { ...options, via: method });
   }
 
-  /**
-   * Mirrors Rails `Scoping#controller(controller)` — pushes a `_scope` frame
-   * setting the controller name. Does NOT push onto `scopeStack`: that stack's
-   * `controller` field is a *module/namespace prefix* (used by `namespace`),
-   * whereas `controller(...)` overrides the controller name directly.
-   */
   controller(controller: string, callback: MapperCallback): void {
     const previous = this._scope;
     this._scope = this._scope.newChild({ controller });
@@ -837,8 +714,6 @@ export class Mapper {
     }
   }
 
-  // --- mount ---
-
   mount(app: MountableApp, options: MountOptions = {}): void {
     const path = options.at;
     if (typeof app !== "function" && typeof (app as { call?: unknown })?.call !== "function") {
@@ -849,8 +724,6 @@ export class Mapper {
     }
     const railsApp = this.isRailsApp(app);
     const asName = options.as ?? this.appName(app, railsApp);
-    // Rails: `{ to: app, anchor: false, format: false }.merge(options)` — options
-    // override the anchor/format defaults but not the mounted app.
     const matchOpts: RouteOptions & { via?: string | string[]; at?: string } = {
       anchor: false,
       format: false,
@@ -881,22 +754,12 @@ export class Mapper {
     if (typeof app === "function") {
       const name = (app as { name?: string }).name;
       if (!name) return undefined;
-      // Rails: ActiveSupport::Inflector.underscore(class_name).tr("/", "_")
       return underscore(name).replace(/\//g, "_");
     }
     return undefined;
   }
 
-  /**
-   * Records a `scriptNamer` for a mounted Rails engine so the engine's URL
-   * helpers can prefix generated paths with the mount point. Mirrors Rails'
-   * `define_generate_prefix(app, name)` registration step. Option keys
-   * (`scriptName`, `originalScriptName`) follow the project-wide camelCase
-   * convention (see CLAUDE.md); Rails' `:script_name` / `:original_script_name`
-   * are the same value under their Ruby-side names.
-   *
-   * @internal
-   */
+  /** @internal */
   defineGeneratePrefix(app: MountableApp, name: string, mountPath: string): void {
     const scriptNamer = (options: Record<string, unknown>): string => {
       if (options.originalScriptName) return mountPath;
@@ -911,8 +774,6 @@ export class Mapper {
     string,
     { app: MountableApp; scriptNamer: (options: Record<string, unknown>) => string }
   > = new Map();
-
-  // --- match privates (decomposition pipeline) ---
 
   /** @internal */
   mapMatch(
@@ -1043,8 +904,6 @@ export class Mapper {
     this.match("/", { as: "root", via: "GET", ...options });
   }
 
-  // --- direct / resolve ---
-
   direct(
     name: string,
     options: Record<string, unknown> | ((...a: unknown[]) => unknown) = {},
@@ -1094,15 +953,9 @@ export class Mapper {
     { options: Record<string, unknown>; block?: (...args: unknown[]) => unknown }
   > = new Map();
 
-  // --- internals ---
-
   private addRoute(verb: string, path: string, options: RouteOptions): void {
-    // TODO: valid on: values (member/collection/new) should dispatch through the corresponding
-    // scope helper as Rails does (mapper.rb:2024-2025). Currently accepted but not applied.
     if (options.on !== undefined) assertValidOnOption(options.on);
     const fullPath = this.currentPrefix() + "/" + path.replace(/^\/+/, "");
-    // Apply _scope controller/action/to defaults set via controller(...)/defaults(...)/scope(...).
-    // Mirrors mapper.rb:1972-1980: scope[:to] and scope[:controller]+scope[:action] feed options[:to].
     const scopeTo = this._scope.get("to") as string | undefined;
     const scopeController = this._scope.get("controller") as string | undefined;
     const scopeAction = this._scope.get("action") as string | undefined;
@@ -1113,12 +966,8 @@ export class Mapper {
     const effectiveController = options.controller ?? scopeController;
     const endpoint =
       effectiveTo ?? `${effectiveController ?? ""}#${options.action ?? scopeAction ?? ""}`;
-    // Prepend controller module from scope stack (namespace support)
     const scopeModulePrefix = this.currentControllerPrefix();
 
-    // Check if endpoint is a redirect: tokens minted by Mapper#redirect map
-    // back to a real Redirect endpoint, mirroring Rails' `to: redirect(...)`
-    // where the DSL stashes a Redirect instance directly on the route.
     let redirectEndpoint: Redirect | undefined;
     let redirectTarget: string | RedirectOptions | RedirectFunction | undefined;
     if (typeof endpoint === "string" && endpoint.startsWith("__redirect__:")) {
@@ -1126,10 +975,6 @@ export class Mapper {
       if (!redirectEndpoint) {
         throw new Error(`Mapper#redirect token ${endpoint} has no registered Redirect endpoint`);
       }
-      // Keep the entry: Rails' `redirect(...)` returns a Redirect instance
-      // the caller can reuse across multiple route definitions, so the token
-      // has to stay resolvable for subsequent addRoute calls. Route sets are
-      // built once at boot, so the working-set is bounded by the DSL.
     }
     if (options.redirect) {
       redirectTarget = options.redirect;
@@ -1144,9 +989,6 @@ export class Mapper {
       controller = scopeModulePrefix + "/" + controller;
     }
     const explicitName = options.as !== undefined ? options.as : options.name;
-    // Mirrors Rails normalize_name: tr("/","_") on the path, but only for
-    // purely static paths — skip segments containing ":" (dynamic) or "()"
-    // (optional) so we don't produce names like "photos_:id".
     const inferredName =
       options.as === undefined && options.name === undefined && !isRedirect
         ? (() => {
@@ -1165,7 +1007,6 @@ export class Mapper {
     const namePrefix = this.currentNamePrefix();
     const fullName = name ? (namePrefix ? `${namePrefix}_${name}` : name) : undefined;
 
-    // Merge scope defaults (set via the `defaults(...)` DSL) under per-call defaults.
     const scopeDefaults = this._scope.get("defaults") as Record<string, string> | undefined;
     const mergedDefaults =
       scopeDefaults || options.defaults
@@ -1188,21 +1029,8 @@ export class Mapper {
     return this.scopeStack[this.scopeStack.length - 1].path;
   }
 
-  /**
-   * Path contributed by the outermost non-resource scope frames (namespaces,
-   * scopes) — used to compute the shallow base path so it preserves
-   * `/admin` etc. but drops parent-resource `/:user_id` segments.
-   *
-   * @internal
-   */
+  /** @internal */
   private outerNonResourcePrefix(): string {
-    // Walk bottom-up to find the deepest non-resource frame that comes
-    // *before* the outermost resource frame. A `scope(...)` opened
-    // inside a resource (e.g. `resources('posts') { scope('/foo') {…} }`)
-    // is NOT outer — its path already contains the parent-resource
-    // segments shallow routing is meant to drop. Shallow-marker frames
-    // carry no real path contribution; they snapshot currentPrefix()
-    // only to keep `member()` from resetting it.
     let last = "";
     for (const f of this.scopeStack) {
       if (f.resource) return last;
@@ -1212,13 +1040,7 @@ export class Mapper {
     return last;
   }
 
-  /**
-   * Name prefix from the outermost non-resource scope frames — mirrors
-   * `@scope[:shallow_prefix]` in Rails. Collects `as:` / `namePrefix` parts
-   * up to (but not including) the outermost resource frame.
-   *
-   * @internal
-   */
+  /** @internal */
   private outerNonResourceNamePrefix(): string | undefined {
     const parts: string[] = [];
     for (const f of this.scopeStack) {
@@ -1260,13 +1082,7 @@ export class Mapper {
     return any ? merged : undefined;
   }
 
-  /**
-   * Normalize a path by collapsing duplicate slashes and re-ordering optional
-   * segments so a fully optional path evaluates to `/` when all options are
-   * absent.
-   *
-   * @internal
-   */
+  /** @internal */
   static normalizePath(path: string): string {
     let result = "/" + path.replace(/\/+/g, "/").replace(/^\/+|\/+$/g, "");
     result = result.replace(/\/(\(+)\/?/g, "$1/");
@@ -1280,10 +1096,6 @@ export class Mapper {
   static normalizeName(name: string): string {
     return Mapper.normalizePath(name).slice(1).replace(/\//g, "_");
   }
-
-  // --- Rails-private scope merge helpers ---
-  // These mirror ActionDispatch::Routing::Mapper::Scoping private methods.
-  // Each one combines a parent scope value with a child scope value.
 
   /** @internal */
   mergePathScope(parent: string | undefined, child: string): string {
@@ -1376,8 +1188,6 @@ export class Mapper {
     return child;
   }
 
-  // --- Rails-private scope/action predicates ---
-
   /** @internal */
   isActionOptions(options: RouteOptions): boolean {
     return Boolean(options.only || options.except);
@@ -1460,8 +1270,6 @@ export class Mapper {
     return this.routes.some((r) => r.name === name);
   }
 
-  // --- Rails-private scope-chain helpers (mapper.rb privates) ---
-
   /** @internal */
   withScopeLevel<T>(kind: ScopeLevel, fn: () => T): T {
     const previous = this._scope;
@@ -1491,13 +1299,7 @@ export class Mapper {
     }
   }
 
-  /**
-   * Mirrors `resource_scope(resource, &block)`: pushes `scopeLevelResource`,
-   * then wraps in `controller(resource.resourceScope, &block)` (which Rails
-   * implements as a `{controller: …}` scope).
-   *
-   * @internal
-   */
+  /** @internal */
   resourceScope<T>(resource: ResourceLike, fn: () => T): T {
     const before = this._scope;
     this._scope = this._scope.newChild({ scopeLevelResource: resource });
@@ -1601,13 +1403,7 @@ export class Mapper {
     return { ...options, ...this.scopeActionOptions(method) };
   }
 
-  /**
-   * Mirrors `apply_common_behavior_for`: short-circuits multi-resource
-   * splat, shallow unwrap, nested resource-scope, and scope-options unwrap.
-   * Returns `true` if handled, `false` otherwise.
-   *
-   * @internal
-   */
+  /** @internal */
   applyCommonBehaviorFor(
     method: "resource" | "resources",
     resources: string[],
@@ -1623,9 +1419,6 @@ export class Mapper {
     }
     if (options.shallow) {
       delete options.shallow;
-      // Rails calls the public `shallow do…end` DSL here, which just sets
-      // `shallow: true` on the scope (mapper.rb:1635). The private
-      // `shallow_scope` (path/as swap) runs later during resource emission.
       const beforeShallow = this._scope;
       this._scope = this._scope.newChild({ shallow: true });
       try {
@@ -1671,7 +1464,6 @@ export class Mapper {
 
 const CANONICAL_ACTIONS = ["index", "create", "new", "show", "update", "destroy"];
 
-/** Rails `VALID_ON_OPTIONS = [:new, :collection, :member]` (mapper.rb:1160). */
 const VALID_ON_OPTIONS: ReadonlySet<string> = new Set(["new", "collection", "member"]);
 
 /** @internal */
@@ -1686,20 +1478,12 @@ interface ScopeFrame {
   shallow?: boolean;
   constraints?: RouteConstraints;
   memberPath?: string;
-  /** Snapshot of the active resource (Rails: `@scope[:scope_level_resource]`). */
   resource?: ResourceLike;
-  /** Controller for member-route emission (Rails: resource_scope controller). */
   resourceController?: string;
-  /** Merged pathNames (scope + options) for this resource frame. */
   resourcePathNames?: Record<string, string>;
 }
 
-/**
- * Ruby's `Hash#delete(key) { default }` — removes the key and returns its
- * value, or the block's result when it was absent.
- *
- * @noRailsEquivalent PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 function deleteWithDefault<T>(hash: Record<string, unknown>, key: string, defaultValue: T): T {
   if (!(key in hash)) return defaultValue;
   const value = hash[key] as T;
@@ -1731,7 +1515,6 @@ function allowedActions(options: RouteOptions, all: ResourceAction[]): Set<Resou
   return new Set(all);
 }
 
-/** Normalize a string shorthand ("controller#action") to RouteOptions. */
 function normalizeOptions(optionsOrEndpoint: RouteOptions | string): RouteOptions {
   if (typeof optionsOrEndpoint === "string") {
     return { to: optionsOrEndpoint };
@@ -1744,7 +1527,6 @@ function parseEndpoint(endpoint: string): [string, string] {
   return [parts[0] || "", parts[1] || ""];
 }
 
-/** Naive singularize — handles common English plurals. */
 function singularize(word: string): string {
   if (word.endsWith("ies")) return word.slice(0, -3) + "y";
   if (word.endsWith("ses") || word.endsWith("xes") || word.endsWith("zes"))
@@ -1753,7 +1535,6 @@ function singularize(word: string): string {
   return word;
 }
 
-/** Naive pluralize. */
 function pluralize(word: string): string {
   if (word.endsWith("y") && !/[aeiou]y$/.test(word)) return word.slice(0, -1) + "ies";
   if (word.endsWith("s") || word.endsWith("x") || word.endsWith("z")) return word + "es";

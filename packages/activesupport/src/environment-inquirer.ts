@@ -2,12 +2,6 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { StringInquirer } from "./string-inquirer.js";
 import { isIn } from "./enumerable-utils.js";
 
-/**
- * Environments that'll respond true for #local?
- *
- * Mirrors: `EnvironmentInquirer::LOCAL_ENVIRONMENTS`
- * (`environment_inquirer.rb:13`).
- */
 const LOCAL_ENVIRONMENTS = ["development", "test"];
 
 export class EnvironmentInquirer extends StringInquirer {
@@ -21,7 +15,6 @@ export class EnvironmentInquirer extends StringInquirer {
     this.#local = isIn(env, LOCAL_ENVIRONMENTS);
   }
 
-  /** Returns true if we're in the development or test environment. */
   isLocal(): boolean {
     return this.#local;
   }

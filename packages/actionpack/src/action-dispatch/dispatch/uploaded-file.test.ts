@@ -17,9 +17,6 @@ afterAll(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-// ==========================================================================
-// dispatch/uploaded_file_test.rb
-// ==========================================================================
 describe("UploadedFileTest", () => {
   it("constructor with argument error", () => {
     expect(() => new UploadedFile({})).toThrow();

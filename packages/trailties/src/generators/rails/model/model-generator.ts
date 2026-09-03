@@ -3,8 +3,6 @@ import { tsClass, tsField, tsImport, tsModule } from "../../../template-builder/
 import { NamedBase, type NamedBaseOptions } from "../../named-base.js";
 import { normalizeModelName, type ModelHelpersOptions } from "../../model-helpers.js";
 
-// Mirrors railties/lib/rails/generators/rails/model/model_generator.rb.
-// hook_for :orm → direct Base emit; Admin::User flattens to AdminUser for TS.
 export interface ModelGeneratorOptions extends NamedBaseOptions, ModelHelpersOptions {}
 
 // prettier-ignore

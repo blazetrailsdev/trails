@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { Object } from "./instance-variables.js";
 
 describe("ObjectInstanceVariableTest", () => {
-  /** Rails' `setup` (instance_variables_test.rb:7-11). */
   function source(): object {
     return { bar: "bar", baz: "baz" };
   }

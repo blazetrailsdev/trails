@@ -1,10 +1,3 @@
-/**
- * ActionController exceptions
- *
- * All error classes referenced throughout ActionController modules.
- * @see https://api.rubyonrails.org/classes/ActionController.html
- */
-
 import { SpellChecker } from "@blazetrails/did-you-mean";
 
 import type { RouteSetLike } from "../../abstract-controller/url-for.js";
@@ -59,12 +52,6 @@ export class UrlGenerationError extends ActionControllerError {
     this.methodName = methodName;
   }
 
-  /**
-   * Rails parity: grep `helper_names` for substrings of `route_name`,
-   * drop the exact `method_name`, then run `SpellChecker` against the
-   * filtered dictionary.
-   * @see vendor/rails/actionpack/lib/action_controller/metal/exceptions.rb
-   */
   get corrections(): string[] {
     if (this.#cachedCorrections !== null) return this.#cachedCorrections;
     if (!this.routeName || !this.routes) {
@@ -136,7 +123,6 @@ export class RespondToMismatchError extends ActionControllerError {
 }
 
 export class MissingExactTemplate extends UnknownFormat {
-  /** Rails: `attr_reader :controller` — the controller CLASS, not its name. */
   readonly controller: { name: string };
   readonly actionName: string;
 

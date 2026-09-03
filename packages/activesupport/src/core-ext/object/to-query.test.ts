@@ -12,13 +12,11 @@ describe("ToQueryTest", () => {
   });
 
   it("html safe parameter key", () => {
-    // HTML-safe keys should be treated as regular strings in URL params
     const result = toQuery({ "data-value": "test" });
     expect(result).toContain("data-value=test");
   });
 
   it("html safe parameter value", () => {
-    // HTML-safe values should be included without escaping
     const result = toQuery({ key: "hello world" });
     expect(result).toContain("key=");
     expect(result).toContain("hello");
@@ -64,7 +62,6 @@ describe("ToQueryTest", () => {
   });
 
   it("hash not sorted lexicographically for nested structure", () => {
-    // Nested arrays preserve order
     const result = toQuery({ b: [3, 1, 2] });
     expect(result.indexOf("3")).toBeLessThan(result.indexOf("1"));
   });

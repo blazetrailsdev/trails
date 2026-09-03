@@ -39,20 +39,6 @@ export const clock = {
   },
 };
 
-/**
- * `Temporal.Now.instant()` is `Date.now()` scaled to nanoseconds plus a
- * sub-millisecond term itself derived from `Date.now()`, so two reads inside
- * one millisecond are all but always the same instant (measured: 9 of 979
- * pairs differed, and then only by 1ns); Ruby's `Time.now` reads
- * `CLOCK_REALTIME` and does not collide. A record created and updated inside
- * one millisecond would otherwise keep its `updated_at` and drop the column
- * from `saved_changes`.
- *
- * The floor is a microsecond, not the nanosecond the return type can carry: an
- * epoch millisecond is ~1.8e12, so a double runs out of integer precision well
- * before `* 1e6`. That matches the precision Rails' own `datetime` columns
- * default to, and is finer than any collision this guards against.
- */
 function systemEpochNs(): bigint {
   return BigInt(Math.round((performance.timeOrigin + performance.now()) * 1_000)) * 1_000n;
 }
@@ -82,18 +68,10 @@ export function setTimeOffsetNs(offsetNs: bigint): void {
   _timeOffsetNs = offsetNs;
 }
 
-/**
- * Returns the current time as a `Temporal.Instant`, respecting any active
- * time travel. Preserves nanosecond precision for both the frozen-time and
- * offset paths.
- */
 export function currentTimeInstant(): Temporal.Instant {
   return clock.now();
 }
 
-/**
- * Returns the current time, respecting any active time travel.
- */
 export function currentTime(): Date {
   return new Date(currentTimeInstant().epochMilliseconds);
 }

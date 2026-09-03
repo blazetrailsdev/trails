@@ -91,9 +91,6 @@ export function mergeImports(imports: Import[]): Import[] {
       e.named = merged;
     }
   }
-  // Reconcile value vs type-only entries for the same `from`: any binding
-  // present on the value side should be dropped from the type-only side
-  // (TS treats the duplicate as conflicting; value subsumes type).
   for (const [key, imp] of map) {
     if (!imp.typeOnly) continue;
     const valueTwin = map.get(imp.from);

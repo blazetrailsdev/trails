@@ -1,13 +1,6 @@
-/**
- * Enumerable utilities mirroring Rails ActiveSupport enumerable extensions.
- */
-
 import { valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
 
-/**
- * Sum the collection, optionally mapping each element first.
- */
 export function sum<T>(collection: T[], fn?: (item: T) => number): number;
 export function sum<T>(collection: T[], initialValue: number, fn?: (item: T) => number): number;
 export function sum<T>(
@@ -23,9 +16,6 @@ export function sum<T>(
   return collection.reduce((acc, item) => acc + (item as unknown as number), initialValue);
 }
 
-/**
- * Index a collection by a key function. Last value wins for duplicate keys.
- */
 export function indexBy<T, K extends string | number>(
   collection: T[],
   fn: (item: T) => K,
@@ -37,17 +27,6 @@ export function indexBy<T, K extends string | number>(
   return result;
 }
 
-/**
- * Convert an enumerable to a hash keyed by its elements, with the value
- * produced by the block (or the given `default` when there is no block).
- *
- * Mirrors: Enumerable#index_with (core_ext/enumerable.rb:75-87). Ruby's
- * no-block/no-default arm returns an Enumerator; there is no trails analogue,
- * so `indexWith` requires one of the two. The result is a `Map` for the same
- * reason `groupBy` below returns one: Ruby keys the Hash by the ELEMENT, which
- * is an arbitrary object (a callable, in `assert_difference`'s case) that a JS
- * object would collapse by string coercion.
- */
 export function indexWith<T, V>(collection: T[], defaultOrBlock: V | ((elem: T) => V)): Map<T, V> {
   const result = new Map<T, V>();
   if (typeof defaultOrBlock === "function") {
@@ -59,11 +38,6 @@ export function indexWith<T, V>(collection: T[], defaultOrBlock: V | ((elem: T) 
   return result;
 }
 
-/**
- * Group a collection by a key function. The result is a `Map` because Ruby's
- * `group_by` returns a Hash keyed by VALUE — the keys are arbitrary objects
- * (Integer, String, nil), which a JS object would collapse by string coercion.
- */
 export function groupBy<T, K>(collection: T[], fn: (item: T) => K): Map<K, T[]> {
   const result = new Map<K, T[]>();
   for (const item of collection) {
@@ -74,9 +48,6 @@ export function groupBy<T, K>(collection: T[], fn: (item: T) => K): Map<K, T[]> 
   return result;
 }
 
-/**
- * Extract the given key from each element in the enumerable.
- */
 export function pluck<T, K extends keyof T>(collection: T[], ...keys: K[]): T[K][] | T[K][][] {
   if (keys.length > 1) {
     return collection.map((element) => keys.map((key) => element[key]));
@@ -86,25 +57,16 @@ export function pluck<T, K extends keyof T>(collection: T[], ...keys: K[]): T[K]
   }
 }
 
-/**
- * Find the maximum value in a collection using a mapper function.
- */
 export function maximum<T>(collection: T[], key: (item: T) => number): number | undefined {
   if (collection.length === 0) return undefined;
   return Math.max(...collection.map(key));
 }
 
-/**
- * Find the minimum value in a collection using a mapper function.
- */
 export function minimum<T>(collection: T[], key: (item: T) => number): number | undefined {
   if (collection.length === 0) return undefined;
   return Math.min(...collection.map(key));
 }
 
-/**
- * Yield chunks of the given size.
- */
 export function inBatchesOf<T>(collection: T[], size: number): T[][] {
   const result: T[][] = [];
   for (let i = 0; i < collection.length; i += size) {
@@ -113,17 +75,10 @@ export function inBatchesOf<T>(collection: T[], size: number): T[][] {
   return result;
 }
 
-/**
- * Remove blank values from a collection (using ActiveSupport's isBlank).
- */
 export function compactBlank<T>(collection: T[]): T[] {
   return collection.filter((item) => !isBlank(item));
 }
 
-/**
- * any? — true if any element is truthy (Ruby truthiness: neither nil nor
- * false), or, with a block, if the block returns truthy for some element.
- */
 export function any<T>(collection: readonly T[], fn?: (item: T) => unknown): boolean {
   for (const item of collection) {
     const value = fn ? fn(item) : item;
@@ -132,9 +87,6 @@ export function any<T>(collection: readonly T[], fn?: (item: T) => unknown): boo
   return false;
 }
 
-/**
- * many? — true if more than one element (optionally matching a predicate).
- */
 export function many<T>(collection: T[], fn?: (item: T) => boolean): boolean {
   if (!fn) return collection.length > 1;
   let count = 0;
@@ -147,9 +99,6 @@ export function many<T>(collection: T[], fn?: (item: T) => boolean): boolean {
   return false;
 }
 
-/**
- * tally — count occurrences of each element.
- */
 export function tally<T extends string | number>(collection: T[]): Record<string, number> {
   const result: Record<string, number> = {};
   for (const item of collection) {
@@ -159,9 +108,6 @@ export function tally<T extends string | number>(collection: T[]): Record<string
   return result;
 }
 
-/**
- * filterMap — map and remove null/undefined results.
- */
 export function filterMap<T, U>(collection: T[], fn: (item: T) => U | null | undefined): U[] {
   const result: U[] = [];
   for (const item of collection) {
@@ -173,40 +119,25 @@ export function filterMap<T, U>(collection: T[], fn: (item: T) => U | null | und
   return result;
 }
 
-/**
- * excluding — remove elements from collection (alias for without).
- */
 export function excluding<T>(collection: T[], ...elements: T[]): T[] {
   const set = new Set(elements);
   return collection.filter((item) => !set.has(item));
 }
 
-/**
- * including — append elements to collection.
- */
 export function including<T>(collection: T[], ...elements: T[]): T[] {
   return [...collection, ...elements];
 }
 
-/**
- * minBy — find element with minimum mapped value.
- */
 export function minBy<T>(collection: T[], fn: (item: T) => number): T | undefined {
   if (collection.length === 0) return undefined;
   return collection.reduce((best, item) => (fn(item) < fn(best) ? item : best));
 }
 
-/**
- * maxBy — find element with maximum mapped value.
- */
 export function maxBy<T>(collection: T[], fn: (item: T) => number): T | undefined {
   if (collection.length === 0) return undefined;
   return collection.reduce((best, item) => (fn(item) > fn(best) ? item : best));
 }
 
-/**
- * eachCons — sliding window of size n.
- */
 export function eachCons<T>(collection: T[], n: number): T[][] {
   const result: T[][] = [];
   for (let i = 0; i <= collection.length - n; i++) {
@@ -215,9 +146,6 @@ export function eachCons<T>(collection: T[], n: number): T[][] {
   return result;
 }
 
-/**
- * eachSlice — split into chunks of size n.
- */
 export function eachSlice<T>(collection: T[], n: number): T[][] {
   const result: T[][] = [];
   for (let i = 0; i < collection.length; i += n) {
@@ -226,12 +154,6 @@ export function eachSlice<T>(collection: T[], n: number): T[][] {
   return result;
 }
 
-/**
- * inOrderOf — reorder collection by a series of key values.
- * Elements not in the series are dropped by default (filter: true).
- * With filter: false, elements are sorted by their position in the series and
- * unmatched elements sort last (enumerable.rb:197-203).
- */
 export function inOrderOf<T>(
   collection: T[],
   key: (item: T) => unknown,
@@ -252,25 +174,14 @@ export function inOrderOf<T>(
   }
 }
 
-/**
- * exclude? — true if the element is NOT in the collection.
- * Mirrors Enumerable#exclude? from Rails.
- */
 export function exclude<T>(collection: T[], object: T): boolean {
   return !collection.includes(object);
 }
 
-/**
- * without — alias for excluding (Rails uses both names).
- */
 export function without<T>(collection: T[], ...elements: T[]): T[] {
   return excluding(collection, ...elements);
 }
 
-/**
- * pick — returns the value of the given key from the first element.
- * Mirrors Enumerable#pick: `payments.pick(:price)` → first price value.
- */
 export function pick<T, K extends keyof T>(
   collection: T[],
   ...keys: K[]
@@ -284,10 +195,6 @@ export function pick<T, K extends keyof T>(
   }
 }
 
-/**
- * sole — returns the only element; raises if count is not exactly one.
- * Mirrors Enumerable#sole.
- */
 export function sole<T>(collection: T[], fn?: (item: T) => boolean): T {
   const filtered = fn ? collection.filter(fn) : collection;
   if (filtered.length === 0) throw new Error("no matching element found");
@@ -295,10 +202,6 @@ export function sole<T>(collection: T[], fn?: (item: T) => boolean): T {
   return filtered[0];
 }
 
-/**
- * isIn — checks if a value is contained in a collection.
- * Mirrors Ruby's Object#in?.
- */
 export function isIn<T>(
   value: T,
   collection: T[] | Set<T> | string | Record<string, unknown>,
@@ -312,10 +215,6 @@ export function isIn<T>(
   return false;
 }
 
-/**
- * presenceIn — returns the value if it is in the collection, otherwise null.
- * Mirrors Ruby's Object#presence_in.
- */
 export function presenceIn<T>(
   value: T,
   collection: T[] | Set<T> | string | Record<string, unknown>,

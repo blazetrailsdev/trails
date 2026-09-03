@@ -1,27 +1,3 @@
-/**
- * Mirrors Rails `ActiveSupport::Messages::SerializerWithFallback`
- * (messages/serializer_with_fallback.rb).
- *
- * Five serializers (marshal, json, json_allow_marshal, message_pack,
- * message_pack_allow_marshal) that share a `load` which sniffs the dumped
- * payload's format and, when it isn't the serializer's own, deserializes it
- * through the matching serializer while instrumenting
- * `message_serializer_fallback.active_support`.
- *
- * trails has no Ruby Marshal runtime, so the `:marshal` format is backed by the
- * fidelity `coder` (`cache/coder.ts`) — the same trails Marshal-equivalent the
- * cache serializers use — behind Rails' `\x04\x08` Marshal signature so
- * cross-format detection still works. That signature is the only thing the
- * `:marshal` format shares with Ruby's wire format: a payload produced by
- * Ruby's `Marshal.dump` is NOT readable here, and by decision it never will be
- * — Marshal is a Ruby-only wire format, excluded project-wide in
- * `scripts/api-compare/unported-files.ts` (marshalling.rb,
- * marshal_serialization_test.rb, and the legacy-ciphertext case in
- * message_encryptor_test.rb). `MessagePackWithFallback#available?` is
- * likewise constant-true: message_pack is a bundled dep here, with no dynamic
- * require to rescue.
- */
-
 import { ArgumentError, KeyError, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Notifications } from "../notifications.js";
@@ -29,7 +5,7 @@ import { ActiveSupportJSON } from "../json.js";
 import { coder } from "../cache/coder.js";
 import { MessagePack } from "../message-pack/index.js";
 
-/** Format names keyed in {@link SERIALIZERS}. @internal */
+/** @internal */
 export type Format =
   | "marshal"
   | "json"
@@ -51,21 +27,10 @@ export class Thrown extends Error {
 }
 
 /**
- * The surface every serializer in {@link SERIALIZERS} exposes. In Ruby they
- * are anonymous modules inside `SERIALIZERS`, so the shared shape has no
- * constant.
- *
  * @internal
- * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Serializer`
- * (`ActiveSupport::MessagePack::Serializer`) is one concrete MessagePack
- * serializer, not the shape the fallback table's members share.
+ * @noRailsEquivalent PERMANENT
  */
 export interface Serializer {
-  /**
-   * The serializer's own key in {@link SERIALIZERS}. Rails recovers this with
-   * `SERIALIZERS.key(self)`; the `*_allow_marshal` variants inherit `format`
-   * from the serializer they wrap, so the key is a separate field here.
-   */
   key: Format;
   format(): Format;
   dump(object: unknown): string;
@@ -218,11 +183,10 @@ export const SERIALIZERS: Record<Format, Serializer> = {
   message_pack_allow_marshal: messagePackWithFallbackAllowMarshal,
 };
 
-/** Mirrors Rails `ActiveSupport::Messages::SerializerWithFallback`. @internal */
+/** @internal */
 export const SerializerWithFallback = {
   SERIALIZERS,
 
-  /** Mirrors Rails' `SerializerWithFallback[format]`. */
   get(format: string): Serializer {
     const serializer = SERIALIZERS[format as Format];
     if (!serializer) throw new KeyError(`key not found: ${JSON.stringify(format)}`);

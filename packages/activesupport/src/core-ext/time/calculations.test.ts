@@ -4,11 +4,6 @@ import { Rational } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import "./calculations.js";
 
-/**
- * `TimeZoneTestHelpers#with_env_tz` (`test/time_zone_test_helpers.rb:20-25`).
- * `Time`'s local-zone memo is MRI's `tzset` cache, so `TZ` moving under it has
- * to drop it, exactly as `tzset` does.
- */
 function withEnvTz<T>(tz: string, fn: () => T): T {
   const orig = process.env.TZ;
   process.env.TZ = tz;
@@ -35,14 +30,12 @@ afterEach(() => {
   resetLocalTimeZoneId();
 });
 
-/** `assert_equal` over two `Time`s is `Time#==`, which trails spells as the instant. */
 function expectSameTime(actual: RubyTime, expected: RubyTime): void {
   expect(actual.toTime().toInstant().epochNanoseconds).toBe(
     expected.toTime().toInstant().epochNanoseconds,
   );
 }
 
-/** `assert_in_delta` over two `Time`s, in seconds. */
 function expectWithinDelta(actual: RubyTime, expected: RubyTime, delta: number): void {
   expect(Math.abs(actual.toI() - expected.toI())).toBeLessThanOrEqual(delta);
 }

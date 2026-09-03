@@ -1,10 +1,3 @@
-/**
- * Rails::Rack::SilenceRequest — silences requests to a specific path
- * (e.g. `/up` health checks) so they don't clog the log.
- *
- * Port of `railties/lib/rails/rack/silence_request.rb`.
- */
-
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Logger as ASLogger } from "@blazetrails/activesupport";
 
@@ -13,8 +6,6 @@ export interface Silencer {
   silenceAsync?<T>(level: number | string, fn: () => Promise<T>): Promise<T>;
 }
 
-// Rails' Rack::SilenceRequest calls `Rails.logger.silence { ... }` with no
-// argument, which defaults to ActiveSupport::Logger::ERROR.
 const ERROR_LEVEL = ASLogger.ERROR;
 
 export interface SilenceRequestOptions {

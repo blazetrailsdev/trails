@@ -1,6 +1,3 @@
-// Mirrors rails-html-sanitizer test/sanitizer_test.rb -> LinkSanitizerTest.
-// Test names track Rails' test_* methods for parity:test alignment.
-
 import { describe, expect, test } from "vitest";
 import { LinkSanitizer } from "./link-sanitizer.js";
 
@@ -56,8 +53,6 @@ describe("LinkSanitizer", () => {
   });
 
   test("strip_href_from_non_anchor_elements", () => {
-    // LinkSanitizer's TargetScrubber also strips bare 'href' attributes
-    // from non-<a> elements (Loofah parity).
     expect(linkSanitize("<div href='oops'>hi</div>")).toBe("<div>hi</div>");
   });
 });

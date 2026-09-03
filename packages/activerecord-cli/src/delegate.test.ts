@@ -1,12 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { run } from "./cli.js";
 
-// Spy on delegateBin to avoid actually spawning child processes.
 vi.mock("./delegate.js", () => ({
   delegateBin: vi.fn((_pkg: string, _bin: string, _args: string[]) => 0),
 }));
 
-// Spy on the in-process bin run() functions so tests don't need a real DB.
 vi.mock("./bin/trails-models-dump.js", () => ({
   run: vi.fn((_argv: string[]) => Promise.resolve(0)),
 }));

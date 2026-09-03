@@ -25,9 +25,6 @@ function makeEnv(overrides: Partial<RackEnv> = {}): RackEnv {
   return { REQUEST_METHOD: "GET", PATH_INFO: "/test", ...overrides };
 }
 
-// ==========================================================================
-// dispatch/debug_exceptions_test.rb
-// ==========================================================================
 describe("DebugExceptionsTest", () => {
   it("skip diagnosis if not showing detailed exceptions", async () => {
     const mw = new DebugExceptions(errorApp, { showDetailedExceptions: false });
@@ -146,7 +143,6 @@ describe("DebugExceptionsTest", () => {
   it("skips logging when rescued and log_rescued_responses is false", async () => {
     const messages: string[] = [];
     const logger: Logger = { error: (msg) => messages.push(msg) };
-    // RoutingError maps to 404 (non-500), so it's "rescued"
     const mw = new DebugExceptions(routingErrorApp, {
       logger,
       logRescuedResponses: false,
@@ -212,7 +208,6 @@ describe("DebugExceptionsTest", () => {
         },
       ],
     });
-    // Should not throw despite bad interceptor
     const [status] = await mw.call(makeEnv());
     expect(status).toBe(500);
   });
@@ -291,7 +286,6 @@ describe("DebugExceptionsTest", () => {
     expect(json.exception).toBeDefined();
     expect(json.traces["Application Trace"]).toBeDefined();
     expect(json.traces["Framework Trace"]).toBeDefined();
-    // The api path goes through render(), which sets content-length.
     expect(headers["content-length"]).toBe(String(Buffer.byteLength(JSON.stringify(json), "utf8")));
   });
 

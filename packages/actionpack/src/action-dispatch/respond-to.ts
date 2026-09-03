@@ -1,10 +1,3 @@
-/**
- * ActionController::MimeResponds
- *
- * Content negotiation helper that matches request format to response handlers.
- * Mirrors Rails' respond_to block DSL.
- */
-
 import { MimeType } from "./http/mime-type.js";
 
 export class UnknownFormat extends Error {
@@ -24,7 +17,6 @@ export class Collector {
   private variantHandlers: Map<string, Map<string, FormatHandler>> = new Map();
   private anyVariantHandler: FormatHandler | null = null;
 
-  /** Register a handler for a specific format. */
   html(handler?: FormatHandler): this {
     return this.on("html", handler);
   }
@@ -56,29 +48,24 @@ export class Collector {
     return this.on("pdf", handler);
   }
 
-  /** Register a handler for a named format. */
   on(format: string, handler?: FormatHandler): this {
     this.handlers.set(format, handler ?? (() => undefined));
     return this;
   }
 
-  /** Register a catch-all handler. */
   any(handler?: FormatHandler): this {
     this.anyHandler = handler ?? (() => undefined);
     return this;
   }
 
-  /** The handler registered for `format`, if any. */
   protected handlerFor(format: string | null): FormatHandler | undefined {
     return format === null ? undefined : this.handlers.get(format);
   }
 
-  /** Whether a catch-all (`any`) handler has been registered. */
   protected get hasAnyHandler(): boolean {
     return this.anyHandler !== null;
   }
 
-  /** Register a variant handler within the current format. */
   variant(name: string | string[], handler?: FormatHandler): this {
     const names = Array.isArray(name) ? name : [name];
     for (const n of names) {
@@ -88,24 +75,20 @@ export class Collector {
         if (!this.variantHandlers.has(n)) {
           this.variantHandlers.set(n, new Map());
         }
-        // Store for current format context
         this.variantHandlers.get(n)!.set("_handler", handler ?? (() => undefined));
       }
     }
     return this;
   }
 
-  /** Get all registered format names. */
   get formats(): string[] {
     return [...this.handlers.keys()];
   }
 
-  /** Check if a format has a handler. */
   hasFormat(format: string): boolean {
     return this.handlers.has(format) || this.anyHandler !== null;
   }
 
-  /** Negotiate the best format from an Accept header or explicit format. */
   negotiate(
     options: {
       accept?: string;
@@ -116,43 +99,36 @@ export class Collector {
     const { accept, format, variant } = options;
     this._variant = variant ?? null;
 
-    // Explicit format takes priority
     if (format) {
       return this.resolveFormat(format);
     }
 
-    // Parse Accept header
     if (accept) {
       const types = this.parseAccept(accept);
       for (const type of types) {
-        // Check for wildcard
         if (type === "*/*") {
-          // Return first registered format
           const first = this.handlers.entries().next();
           if (!first.done) {
             this._format = first.value[0];
             return { format: first.value[0], handler: first.value[1] };
           }
           if (this.anyHandler) {
-            this._format = "html"; // Default to html for */*
+            this._format = "html";
             return { format: "html", handler: this.anyHandler };
           }
         }
 
-        // Look up by MIME type string → symbol (e.g., "text/html" → "html")
         if (MimeType.isRegistered(type)) {
           const mimeType = MimeType.lookup(type);
           const result = this.resolveFormat(mimeType.symbol!);
           if (result) return result;
         }
 
-        // Try the type string directly as a format name
         const result = this.resolveFormat(type);
         if (result) return result;
       }
     }
 
-    // No accept header — return first handler
     if (!accept) {
       const first = this.handlers.entries().next();
       if (!first.done) {
@@ -161,7 +137,6 @@ export class Collector {
       }
     }
 
-    // Try any handler
     if (this.anyHandler) {
       const fmt = format ?? "html";
       this._format = fmt;
@@ -171,7 +146,6 @@ export class Collector {
     return null;
   }
 
-  /** Get the resolved format after negotiation. */
   get resolvedFormat(): string | null {
     return this._format;
   }
@@ -203,16 +177,6 @@ export class Collector {
   }
 }
 
-/**
- * Perform content negotiation. Mirrors Rails' respond_to.
- *
- * ```ts
- * const result = respondTo((format) => {
- *   format.html(() => renderHtml());
- *   format.json(() => renderJson());
- * }, { accept: req.headers.accept });
- * ```
- */
 export function respondTo(
   block: (collector: Collector) => void,
   options: { accept?: string; format?: string; variant?: string } = {},

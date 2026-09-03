@@ -27,7 +27,6 @@ import {
   runSafeConstantizeTestsOn,
 } from "./constantize-test-cases.js";
 
-// Rails inflector_test_cases.rb — SingularToPlural
 const SingularToPlural: Record<string, string> = {
   search: "searches",
   switch: "switches",
@@ -217,7 +216,6 @@ describe("InflectorTest", () => {
   });
 
   it("camelize with nil downcases the first letter", () => {
-    // Ruby nil maps to false in TS (both downcase the first letter)
     expect(camelize("Capital", null as unknown as boolean)).toBe("capital");
     expect(camelize("capital", null as unknown as boolean)).toBe("capital");
   });
@@ -264,7 +262,6 @@ describe("InflectorTest", () => {
         ["HTTP::RESTful", "http/restful", "HTTP/RESTful", "HTTP/RESTful"],
         ["HTTP::RESTfulAPI", "http/restful_api", "HTTP/RESTful API", "HTTP/RESTful API"],
         ["APIRESTful", "api_restful", "API RESTful", "API RESTful"],
-        // misdirection
         ["Capistrano", "capistrano", "Capistrano", "Capistrano"],
         ["CapiController", "capi_controller", "Capi controller", "Capi Controller"],
         ["HttpsApis", "https_apis", "Https apis", "Https Apis"],
@@ -603,7 +600,6 @@ describe("InflectorTest", () => {
     expect(result).toBe("words");
   });
 
-  // Dynamic tests from SingularToPlural
   describe("pluralize singular", () => {
     for (const [singular, plural] of Object.entries(SingularToPlural)) {
       it(`pluralize singular ${singular}`, () => {
@@ -638,8 +634,6 @@ describe("InflectorTest", () => {
     expect(humanize("ü_user")).toBe("Ü user");
   });
 
-  // Self-built: Rails has no test for `const_regexp`, whose documented
-  // examples (inflector/methods.rb:353-356) are the assertions here.
   it("const regexp", () => {
     expect(constRegexp("Foo::Bar::Baz")).toBe("Foo(::Bar(::Baz)?)?");
     expect(constRegexp("::")).toBe("::");

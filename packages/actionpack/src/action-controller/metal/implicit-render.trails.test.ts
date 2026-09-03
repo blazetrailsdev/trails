@@ -1,7 +1,3 @@
-// `ActionController::ImplicitRender` wired into `ActionController::Base`.
-// Mirrors `ImplicitRenderTest` (`actionpack/test/controller/render_test.rb:817-847`)
-// and `RenderImplicitActionTest`
-// (`actionpack/test/controller/new_base/render_implicit_action_test.rb:16-43`).
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";

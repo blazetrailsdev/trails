@@ -1,12 +1,3 @@
-/**
- * Mirrors: i18n/test/backend/chain_test.rb
- *
- * The gem guards `I18nBackendChainWithKeyValueTest` with
- * `if I18n::TestCase.key_value?`, which asks whether ActiveSupport is loaded —
- * the gem needs it for `ActiveSupport::JSON` (key_value.rb:20). JS has `JSON`
- * in the language, so there is nothing to probe and the cases always run.
- */
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Chain } from "./chain.js";
 import { KeyValue, type Store } from "./key-value.js";
@@ -20,7 +11,6 @@ describe("I18nBackendChainTest", () => {
   let second: Simple;
   let chain: Chain;
 
-  /** Mirrors: the `backend` helper in chain_test.rb:170-174. */
   function backend(translations: TranslationData): Simple {
     const backend = new Simple();
     for (const [locale, data] of Object.entries(translations)) {
@@ -29,7 +19,6 @@ describe("I18nBackendChainTest", () => {
     return backend;
   }
 
-  /** Stands in for Ruby's `send`, which the gem's tests use for these. */
   function send(
     target: Simple | Chain,
     name: "translations" | "initTranslations",
@@ -82,7 +71,7 @@ describe("I18nBackendChainTest", () => {
   it("defaults only apply to lookups on the last backend in the chain", () => {
     expect(t("foo", { default: "Bah" })).toBe("Foo");
     expect(t("bar", { default: "Bah" })).toBe("Bar");
-    expect(t("bah", { default: "Bah" })).toBe("Bah"); // default kicks in only here
+    expect(t("bah", { default: "Bah" })).toBe("Bah");
   });
 
   it("default", () => {

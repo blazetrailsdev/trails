@@ -37,7 +37,6 @@ export class Lock {
     const [status, headers, body] = response;
     const mutex = this.mutex;
 
-    // Wrap body to unlock on close
     const proxy: any = {
       close() {
         if (body && typeof body.close === "function") body.close();
@@ -45,7 +44,6 @@ export class Lock {
       },
     };
 
-    // Delegate each if available
     if (body && typeof body.each === "function") {
       proxy.each = (fn: (x: string) => void) => body.each(fn);
     }
@@ -56,7 +54,6 @@ export class Lock {
       for (let i = 0; i < body.length; i++) proxy[i] = body[i];
     }
 
-    // Delegate to_path if body has it
     if (body && typeof body.toPath === "function") {
       proxy.toPath = () => body.toPath();
     }

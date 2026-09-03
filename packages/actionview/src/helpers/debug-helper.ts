@@ -2,13 +2,6 @@ import { SafeBuffer, htmlEscape } from "@blazetrails/activesupport";
 import { stringify } from "@blazetrails/activesupport/yaml";
 import { contentTag } from "./tag-helper.js";
 
-/**
- * debug — returns a YAML representation of `object` wrapped with `<pre>`.
- * Falls back to a recursive inspect-style rendering (objects as
- * `{ key: value, … }`, arrays as `[v, …]`, cycles as `[Circular]`) inside
- * `<code>` if YAML serialization throws. Mirrors
- * `ActionView::Helpers::DebugHelper#debug`'s Marshal/YAML rescue path.
- */
 export function debug(object: unknown): SafeBuffer {
   try {
     const yaml = stringify(object);

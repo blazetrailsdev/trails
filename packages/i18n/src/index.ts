@@ -76,10 +76,6 @@ export type { Store } from "./backend/key-value.js";
 export { Simple } from "./backend/simple.js";
 export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";
-// `I18n::Locale::Fallbacks` and `I18n::Backend::Fallbacks` are two classes of
-// the same name; this barrel is flat, and the `Locale` namespace spelling is
-// taken by the `Locale` type above, so the locale one is qualified here. Both
-// keep the gem's name in their own file.
 export { Fallbacks as LocaleFallbacks, Tag } from "./locale.js";
 export type { FallbackMappings } from "./locale.js";
 export { ThrownException, catchException, throwException } from "./throw-catch.js";

@@ -10,7 +10,6 @@ export function consoleCommand(): Command {
   cmd.description("Start an interactive console with the application loaded").action(async () => {
     const repl = await import("node:repl");
 
-    // Connect to database
     let dbAdapter: any;
     try {
       const { loadDatabaseConfig, connectAdapter } = await import("../database.js");
@@ -30,12 +29,7 @@ export function consoleCommand(): Command {
 
     console.log("Loading trails console...");
 
-    // Custom eval that supports top-level await.
-    // Expressions (e.g., `await User.all()`) are wrapped as return values.
-    // Note: `const`/`let` declarations inside the async IIFE don't persist
-    // across inputs — use plain assignment (`x = await ...`) for that.
     const asyncEval = (code: string, context: any, _filename: string, callback: any) => {
-      // Strip trailing whitespace/semicolons so `return (expr)` wrapper is valid
       const trimmed = code.replace(/[\s;]+$/, "");
       (async () => {
         try {
@@ -46,8 +40,6 @@ export function consoleCommand(): Command {
           );
           callback(null, result);
         } catch (exprErr: any) {
-          // Only fall back to statement mode for syntax errors (expression wrapper failed to parse).
-          // Runtime errors should not trigger a re-execution.
           if (!(exprErr instanceof SyntaxError)) {
             callback(exprErr);
             return;
@@ -73,7 +65,6 @@ export function consoleCommand(): Command {
       eval: asyncEval,
     });
 
-    // Copy globals into the REPL context
     r.context.console = console;
     r.context.process = process;
     r.context.require = createRequire(File.join(Dir.pwd(), "package.json"));
@@ -84,16 +75,14 @@ export function consoleCommand(): Command {
       }
     });
 
-    // Make activerecord Base available
     try {
       const ar = await import("@blazetrails/activerecord");
       r.context.Base = ar.Base;
       r.context.Migration = ar.Migration;
     } catch {
-      // activerecord not available
+      /** @empty */
     }
 
-    // Load models from the current project
     const modelsDir = File.join(Dir.pwd(), "app", "models");
     let loadedCount = 0;
     if (File.isExist(modelsDir)) {
@@ -110,7 +99,7 @@ export function consoleCommand(): Command {
           }
           loadedCount++;
         } catch {
-          // Skip files that fail to import
+          /** @empty */
         }
       }
       if (loadedCount > 0) {

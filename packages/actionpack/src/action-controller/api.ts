@@ -1,10 +1,3 @@
-/**
- * ActionController::API
- *
- * JSON-only variant of Base. No template rendering, no cookies/flash.
- * @see https://api.rubyonrails.org/classes/ActionController/API.html
- */
-
 import { Metal } from "./metal.js";
 import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
@@ -16,18 +9,11 @@ export class API extends Metal {
     return this;
   }
 
-  /**
-   * Apply a rate limit to all actions (or those selected by `only:`/`except:`).
-   * Mirrors Rails `rate_limit` class DSL — Rails includes `RateLimiting` in
-   * both `ActionController::Base` and `ActionController::API`
-   * (actionpack/lib/action_controller/api.rb:125).
-   */
   static rateLimit = rateLimit;
 
-  /** Rails: `include Logging` (base.rb:302) — `log_at` (metal/logging.rb:17). */
   static logAt = logAt;
 
-  /** @internal Private in Rails; prototype slot enables subclass overrides. */
+  /** @internal */
   async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
     return rateLimiting.call(this, args);
   }

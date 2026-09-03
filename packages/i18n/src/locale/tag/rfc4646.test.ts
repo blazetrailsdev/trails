@@ -1,5 +1,3 @@
-/** Mirrors: i18n/test/locale/tag/rfc4646_test.rb */
-
 import { describe, expect, it, beforeEach } from "vitest";
 
 import { Rfc4646, Parser } from "./rfc4646.js";
@@ -46,8 +44,6 @@ describe("I18nLocaleTagRfc4646ParserTest", () => {
   });
 });
 
-// Tag for the locale 'de-Latn-DE-Variant-a-ext-x-phonebk-i-klingon'
-
 describe("I18nLocaleTagSubtagsTest", () => {
   let tag: Rfc4646;
 
@@ -92,8 +88,6 @@ describe("I18nLocaleTagSubtagsTest", () => {
     expect(tag.toA()).toEqual(["de", "Latn", "DE", "variant", "a-ext", "x-phonebk", "i-klingon"]);
   });
 
-  // Tag inheritance
-
   it("#parent returns 'de-Latn-DE-variant-a-ext-x-phonebk' as the parent of 'de-Latn-DE-variant-a-ext-x-phonebk-i-klingon'", () => {
     const tag = new Rfc4646("de", "Latn", "DE", "variant", "a-ext", "x-phonebk", "i-klingon");
     expect(tag.parent()!.toString()).toBe("de-Latn-DE-variant-a-ext-x-phonebk");
@@ -123,9 +117,6 @@ describe("I18nLocaleTagSubtagsTest", () => {
     const tag = new Rfc4646("de", "Latn");
     expect(tag.parent()!.toString()).toBe("de");
   });
-
-  // TODO RFC4647 says: "If no language tag matches the request, the "default" value is returned."
-  // where should we set the default language?
 
   it("#parent returns an array of 5 parents for 'de-Latn-DE-variant-a-ext-x-phonebk-i-klingon'", () => {
     const parents = [

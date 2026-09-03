@@ -81,7 +81,6 @@ describe("ExecutionContextTest", () => {
   });
 
   it("#after_change does not fire when #clear is called", () => {
-    // Matches Rails: ExecutionContext#clear is `store.clear` with no callback.
     let calls = 0;
     ExecutionContext.afterChange(() => {
       calls += 1;

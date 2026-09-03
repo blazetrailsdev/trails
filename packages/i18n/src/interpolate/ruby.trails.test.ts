@@ -1,10 +1,3 @@
-/**
- * The gem covers `I18n.interpolate` through `test/i18n/interpolate_test.rb`, which
- * `interpolate.test.ts` now ports. What is pinned here is the `%<name>fmt` branch: Ruby
- * delegates it to `sprintf`, JS has no such builtin, so every expectation below
- * is the literal output of the matching `sprintf` call in Ruby.
- */
-
 import { beforeEach, describe, expect, it } from "vitest";
 import { interpolate } from "./ruby.js";
 import { resetConfig } from "../i18n.js";
@@ -59,14 +52,6 @@ describe("I18n.interpolate", () => {
   });
 });
 
-/**
- * The `%<name>fmt` grammar `sprintf` reimplements, checked against real
- * `ruby -e 'sprintf(...)'` output. The gem has no such test — it delegates to
- * Ruby's builtin (i18n/lib/i18n/interpolate/ruby.rb:45) — so the table below is
- * the reimplementation's conformance bound: the conversion set the
- * interpolation pattern admits (`bBdiouxXeEfgGcps`, ruby.rb:9) crossed with the
- * `-+ #0` flags, width and precision.
- */
 const SPRINTF_CASES: [format: string, value: unknown, expected: string][] = [
   ["%<v>b", 42, "101010"],
   ["%<v>b", -42, "..1010110"],

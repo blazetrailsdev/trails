@@ -79,7 +79,6 @@ describe("Flash::RequestMethods", () => {
 
   it("commitFlash deletes session['flash'] when the projected hash is empty", () => {
     const host = makeHost({ flash: { flashes: { gone: "x" } } });
-    // Mark gone for discard so toSessionValue returns null
     const f = flash.call(host)!;
     f.discard("gone");
 

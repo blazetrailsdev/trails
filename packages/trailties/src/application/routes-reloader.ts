@@ -1,7 +1,3 @@
-// Port of `Rails::Application::RoutesReloader` from
-// `railties/lib/rails/application/routes_reloader.rb`. Rails' watcher half
-// (FileUpdateChecker + Ruby `load`) ships with autoloading later; this is
-// the protocol the framework calls.
 import { runLoadHooks } from "@blazetrails/activesupport";
 import { getPathAsync } from "@blazetrails/ruby-compat";
 import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
@@ -20,17 +16,12 @@ export class RoutesReloader {
   externalRoutes: string[] = [];
   eagerLoad = false;
   loaded = false;
-  /**
-   * Mirrors: Rails `attr_writer :run_after_load_paths` (routes_reloader.rb:12).
-   *
-   * @internal
-   */
+  /** @internal */
   runAfterLoadPaths: () => void | Promise<void> = () => {};
 
   async reload(
     loader: (this: RoutesReloader, path: string) => void | Promise<void> = loadRoutesFile,
   ): Promise<void> {
-    // Rails' `ensure revert` in `def reload!` covers `clear!` too.
     try {
       for (const s of this.routeSets) {
         s.disableClearAndFinalize = true;
@@ -61,15 +52,6 @@ export class RoutesReloader {
   }
 }
 
-/**
- * Stands in for Ruby's `load(path)` in `RoutesReloader#reload!`
- * (`routes_reloader.rb:20`). A Rails `config/routes.rb` body is
- * `Rails.application.routes.draw { ... }`, so `load` both evaluates the file
- * and draws it; a trails routes file exports `drawRoutes(mapper)` instead —
- * an ESM module body cannot depend on the app being reachable at import time
- * — so the draw is performed here, against the route sets the reloader was
- * given by `add_routing_paths`.
- */
 async function loadRoutesFile(this: RoutesReloader, path: string): Promise<void> {
   const p = await getPathAsync();
   if (!p.pathToFileURL) {

@@ -1,11 +1,3 @@
-/**
- * NumberHelper — formatting numbers into currencies, percentages, phone numbers, and more.
- * Mirrors ActiveSupport::NumberHelper.
- *
- * Each helper function delegates to a converter class that contains the actual logic,
- * matching Rails' architecture where NumberHelper methods call Converter.convert().
- */
-
 import { NumberToPhoneConverter } from "./number-helper/number-to-phone-converter.js";
 import { NumberToDelimitedConverter } from "./number-helper/number-to-delimited-converter.js";
 import { NumberToRoundedConverter } from "./number-helper/number-to-rounded-converter.js";
@@ -86,12 +78,6 @@ export function numberToPhone(number: unknown, options: NumberToPhoneOptions = {
   return NumberToPhoneConverter.convert(number, options);
 }
 
-/**
- * Formats a `number` with grouped thousands using `delimiter`.
- *
- * Mirrors: `NumberHelper#number_to_delimited` (`number_helper.rb:264-266`) —
- * `NumberToDelimitedConverter.convert(number, options)`.
- */
 export function numberToDelimited(
   number: unknown,
   options: NumberWithDelimiterOptions = {},
@@ -99,11 +85,6 @@ export function numberToDelimited(
   return NumberToDelimitedConverter.convert(number, options);
 }
 
-/**
- * ActionView's helper of the same name
- * (`actionview/lib/action_view/helpers/number_helper.rb:75-77`), which is
- * `delegate_number_helper_method(:number_to_delimited, number, options)`.
- */
 export function numberWithDelimiter(
   number: unknown,
   options: NumberWithDelimiterOptions = {},

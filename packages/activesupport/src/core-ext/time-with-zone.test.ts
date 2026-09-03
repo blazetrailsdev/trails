@@ -34,7 +34,6 @@ describe("TimeWithZoneTest", () => {
     setPreserveTimezone(null);
   });
 
-  // @twz = 2000-01-01 00:00:00 UTC in Eastern = 1999-12-31 19:00:00 EST
   const maketwz = () =>
     new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
 
@@ -84,7 +83,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("in time zone with ambiguous time", () => {
-    // 2014-10-26 01:00:00 Moscow time was ambiguous due to DST change
     const moscow = TimeZone.find("Moscow")!;
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
     expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
@@ -97,8 +95,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("localtime with offset", () => {
-    // @twz UTC instant = 2000-01-01 00:00:00 UTC.
-    // -7h offset → wall-clock 1999-12-31 17:00:00.
     const twz = maketwz();
     const local = twz.localtime(-7 * 3600);
     expect(local).toBeInstanceOf(RubyTime);
@@ -107,7 +103,6 @@ describe("TimeWithZoneTest", () => {
     expect(local.day).toBe(31);
     expect(local.hour).toBe(17);
     expect(local.min).toBe(0);
-    // getlocal alias mirrors localtime
     const aliased = twz.getlocal(-7 * 3600);
     expect(aliased.toString()).toBe(local.toString());
   });
@@ -237,7 +232,6 @@ describe("TimeWithZoneTest", () => {
 
   it("compare with datetime", () => {
     const twz = maketwz();
-    // DateTime in Rails is equivalent to Date in JS — compare by UTC instant
     expect(twz.compareTo(new Date(Date.UTC(1999, 11, 31, 23, 59, 59)))).toBe(1);
     expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 0)))).toBe(0);
     expect(twz.compareTo(new Date(Date.UTC(2000, 0, 1, 0, 0, 1)))).toBe(-1);
@@ -424,7 +418,6 @@ describe("TimeWithZoneTest", () => {
   it("plus with duration", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.plus(Duration.days(5));
-    // 1999-12-31 + 5 days = 2000-01-05, local time stays 19:00
     expect(result.day).toBe(5);
     expect(result.month).toBe(1);
     expect(result.year).toBe(2000);
@@ -459,7 +452,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("plus and minus enforce spring dst rules", () => {
-    // 2006-04-02 06:59:59 UTC = 2006-04-02 01:59:59 EST (1 sec before DST)
     const utc = new Date(Date.UTC(2006, 3, 2, 6, 59, 59));
     let twz = new TimeWithZone(instantFromDate(utc), eastern);
     expect(twz.hour).toBe(1);
@@ -468,7 +460,6 @@ describe("TimeWithZoneTest", () => {
     expect(twz.dst()).toBe(false);
     expect(twz.zone).toBe("EST");
 
-    // Adding 1 second springs forward to 3:00 AM EDT
     twz = twz.plus(1);
     expect(twz.hour).toBe(3);
     expect(twz.min).toBe(0);
@@ -476,7 +467,6 @@ describe("TimeWithZoneTest", () => {
     expect(twz.dst()).toBe(true);
     expect(twz.zone).toBe("EDT");
 
-    // Subtracting 1 second goes back to 1:59:59 AM EST
     twz = twz.minus(1);
     expect(twz.hour).toBe(1);
     expect(twz.min).toBe(59);
@@ -486,7 +476,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("plus and minus enforce fall dst rules", () => {
-    // 2006-10-29 05:59:59 UTC = 2006-10-29 01:59:59 EDT (1 sec before DST end)
     const utc = new Date(Date.UTC(2006, 9, 29, 5, 59, 59));
     let twz = new TimeWithZone(instantFromDate(utc), eastern);
     expect(twz.hour).toBe(1);
@@ -495,7 +484,6 @@ describe("TimeWithZoneTest", () => {
     expect(twz.dst()).toBe(true);
     expect(twz.zone).toBe("EDT");
 
-    // Adding 1 second falls back from 1:59:59 EDT to 1:00:00 EST
     twz = twz.plus(1);
     expect(twz.hour).toBe(1);
     expect(twz.min).toBe(0);
@@ -503,7 +491,6 @@ describe("TimeWithZoneTest", () => {
     expect(twz.dst()).toBe(false);
     expect(twz.zone).toBe("EST");
 
-    // Subtracting 1 second goes back to 1:59:59 EDT
     twz = twz.minus(1);
     expect(twz.hour).toBe(1);
     expect(twz.min).toBe(59);
@@ -513,7 +500,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("to a", () => {
-    // Rails: [45, 30, 5, 1, 2, 2000, 2, 32, false, "HST"]
     const hawaii = TimeZone.find("Hawaii")!;
     const twzH = new TimeWithZone(
       instantFromDate(new Date(Date.UTC(2000, 1, 1, 15, 30, 45))),
@@ -525,7 +511,7 @@ describe("TimeWithZoneTest", () => {
     expect(twzH.day).toBe(1);
     expect(twzH.month).toBe(2);
     expect(twzH.year).toBe(2000);
-    expect(twzH.wday).toBe(2); // Tuesday
+    expect(twzH.wday).toBe(2);
     expect(twzH.yday).toBe(32);
     expect(twzH.dst()).toBe(false);
     expect(twzH.zone).toBe("HST");
@@ -544,7 +530,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("to date", () => {
-    // 1 sec before midnight Jan 1 EST
     const beforeMidnight = new TimeWithZone(
       instantFromDate(new Date(Date.UTC(2000, 0, 1, 4, 59, 59))),
       eastern,
@@ -553,7 +538,6 @@ describe("TimeWithZoneTest", () => {
     expect(beforeMidnight.month).toBe(12);
     expect(beforeMidnight.day).toBe(31);
 
-    // midnight Jan 1 EST
     const atMidnight = new TimeWithZone(
       instantFromDate(new Date(Date.UTC(2000, 0, 1, 5, 0, 0))),
       eastern,
@@ -562,7 +546,6 @@ describe("TimeWithZoneTest", () => {
     expect(atMidnight.month).toBe(1);
     expect(atMidnight.day).toBe(1);
 
-    // 1 sec before midnight Jan 2 EST
     const beforeMidnight2 = new TimeWithZone(
       instantFromDate(new Date(Date.UTC(2000, 0, 2, 4, 59, 59))),
       eastern,
@@ -571,7 +554,6 @@ describe("TimeWithZoneTest", () => {
     expect(beforeMidnight2.month).toBe(1);
     expect(beforeMidnight2.day).toBe(1);
 
-    // midnight Jan 2 EST
     const atMidnight2 = new TimeWithZone(
       instantFromDate(new Date(Date.UTC(2000, 0, 2, 5, 0, 0))),
       eastern,
@@ -597,7 +579,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("utc to local conversion with far future datetime", () => {
-    // 2050-01-01 00:00:00 UTC → 2049-12-31 19:00:00 EST
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2050, 0, 1, 0, 0, 0))), eastern);
     expect(twz.year).toBe(2049);
     expect(twz.month).toBe(12);
@@ -643,7 +624,7 @@ describe("TimeWithZoneTest", () => {
     const result = twz.advance({ years: 1 });
     expect(result.year).toBe(2005);
     expect(result.month).toBe(2);
-    expect(result.day).toBe(28); // clamped
+    expect(result.day).toBe(28);
   });
 
   it("advance 1 month from last day of january", () => {
@@ -663,9 +644,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance 1 day across spring dst transition", () => {
-    // 2006-04-01 10:30 EST, spring DST transition on Apr 2 at 2AM
     const twz = eastern.local(2006, 4, 1, 10, 30);
-    // Advance 1 day should preserve wall clock time
     const result = twz.advance({ days: 1 });
     expect(result.day).toBe(2);
     expect(result.hour).toBe(10);
@@ -683,7 +662,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance 1 day across fall dst transition", () => {
-    // 2006-10-28 10:30 EDT, fall DST transition on Oct 29 at 2AM
     const twz = eastern.local(2006, 10, 28, 10, 30);
     const result = twz.advance({ days: 1 });
     expect(result.day).toBe(29);
@@ -1060,7 +1038,7 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("ruby 19 weekday name query methods", () => {
-    const twz = maketwz(); // Friday 1999-12-31
+    const twz = maketwz();
     expect(twz.isFriday()).toBe(true);
     expect(twz.isSunday()).toBe(false);
     expect(twz.isMonday()).toBe(false);
@@ -1071,7 +1049,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("change at dst boundary", () => {
-    // Time.at(1319936400) = 2011-10-30 02:00:00 UTC
     const twz = new TimeWithZone(
       instantFromDate(new Date(1319936400 * 1000)),
       TimeZone.find("Madrid")!,
@@ -1107,8 +1084,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("advance 1 month into spring dst gap", () => {
-    // `TimeWithZone.new(nil, @time_zone, Time.utc(2006, 3, 2, 2))`
-    // (time_with_zone_test.rb:918) — the LOCAL-time constructor arm.
     const twz = new TimeWithZone(null, eastern, Temporal.PlainDateTime.from("2006-03-02T02:00:00"));
     const result = twz.advance({ months: 1 });
     expect(result.hour).toBe(3);
@@ -1128,7 +1103,6 @@ describe("TimeWithZoneTest", () => {
 
   it("advance 1 day expressed as number of seconds minutes or hours across spring dst transition", () => {
     const twz = eastern.local(2006, 4, 1, 10, 30);
-    // 86400 seconds = exactly 24 hours, but spring DST day is only 23 hours
     expect(twz.plus(86400).inspect()).toContain("2006-04-02 11:30:00");
     expect(twz.advance({ seconds: 86400 }).inspect()).toContain("2006-04-02 11:30:00");
     expect(twz.advance({ minutes: 1440 }).inspect()).toContain("2006-04-02 11:30:00");
@@ -1145,7 +1119,6 @@ describe("TimeWithZoneTest", () => {
 
   it("advance 1 day expressed as number of seconds minutes or hours across fall dst transition", () => {
     const twz = eastern.local(2006, 10, 28, 10, 30);
-    // 86400 seconds across fall DST (25 hour day) = 9:30 next day
     expect(twz.plus(86400).inspect()).toContain("2006-10-29 09:30:00");
     expect(twz.advance({ seconds: 86400 }).inspect()).toContain("2006-10-29 09:30:00");
     expect(twz.advance({ minutes: 1440 }).inspect()).toContain("2006-10-29 09:30:00");
@@ -1215,7 +1188,7 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   });
 
   it("in time zone with time local instance", () => {
-    const time = new Date(Date.UTC(2000, 0, 1, 0, 0, 0)); // UTC midnight
+    const time = new Date(Date.UTC(2000, 0, 1, 0, 0, 0));
     const result = new TimeWithZone(instantFromDate(time), TimeZone.find("Alaska")!);
     expect(result.inspect()).toBe("1999-12-31 15:00:00.000000000 AKST -09:00");
   });
@@ -1279,10 +1252,8 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
   });
 
   it("time zone setter is thread safe", () => {
-    // In JS single-threaded, just verify use_zone scoping works
     useZone("Paris", () => {
       expect(timeZone()!.name).toBe("Paris");
-      // Simulate what threads would do — nested useZone
       useZone("Alaska", () => {
         expect(timeZone()!.name).toBe("Alaska");
       });
@@ -1363,7 +1334,6 @@ describe("TimeWithZoneMethodsForTimeAndDateTimeTest", () => {
       TimeZone.find("Eastern Time (US & Canada)")!,
     );
     expect(twz.utc().toTime().epochMilliseconds).toBe(time.getTime());
-    // Original Date should not be modified
     expect(time.getTime()).toBe(Date.UTC(2000, 6, 1));
   });
 });
@@ -1449,10 +1419,8 @@ describe("TimeWithZoneMethodsForString", () => {
   });
 
   it("in time zone with ambiguous time", () => {
-    // 2014-10-26 01:00:00 Moscow time is ambiguous due to DST change
     const moscow = TimeZone.find("Moscow")!;
     const twz = moscow.local(2014, 10, 26, 1, 0, 0);
-    // Should resolve to the UTC equivalent
     expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 });

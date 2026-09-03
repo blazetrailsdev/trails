@@ -1,6 +1,3 @@
-// Smoke tests for the `Engine` shell. Full Rails-mirrored
-// `railties/test/engine_test.rb` cases land in PR 2.2b alongside the
-// `Configuration` defaults and route mounting.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import {
@@ -187,8 +184,6 @@ describe("Engine", () => {
     });
 
     it("autoload_paths, autoload_once_paths, eager_load_paths are independently writable", async () => {
-      // Non-existent root: paths().eagerLoad() contributes nothing, so the
-      // custom eager_load_paths entries come back alone.
       const cfg = new EngineConfiguration("/nonexistent-engine-root");
       cfg.autoloadPaths.push("/x/auto");
       cfg.autoloadOncePaths.push("/x/once");

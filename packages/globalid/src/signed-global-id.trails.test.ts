@@ -58,9 +58,6 @@ describe("SignedGlobalID implicit string coercion", () => {
   beforeEach(() => setApp("bcx"));
   afterEach(() => _resetApp());
 
-  // Ruby reaches `to_s` whenever an SGID is interpolated. JS already routes
-  // string coercion to `toString()` for a plain class, so no explicit
-  // `Symbol.toPrimitive` hook is needed to match — this pins that.
   it("interpolation and String() reach toString without a toPrimitive hook", () => {
     const sgid = SignedGlobalID.create(person, { verifier });
     expect(`${sgid}`).toBe(sgid.toString());

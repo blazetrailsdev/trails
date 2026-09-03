@@ -1,8 +1,3 @@
-/**
- * ERB::Util — the escaping utilities Rails defines in
- * `active_support/core_ext/erb/util.rb`.
- */
-
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
 import { NotImplementedError } from "../../cache/store.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
@@ -19,36 +14,18 @@ const HTML_ESCAPE_PATTERN = /[&<>"']/g;
 
 const HTML_ESCAPE_ONCE_REGEXP = /["><']|&(?!([a-zA-Z]+|(#\d+)|(#[xX][\dA-Fa-f]+));)/g;
 
-/**
- * HTML escapes strings but doesn't wrap them with an ActiveSupport::SafeBuffer.
- * This method is not for public consumption! Seriously!
- *
- * Mirrors: ActiveSupport::CoreExt::ERBUtil#html_escape, aliased
- * `unwrapped_html_escape` (`core_ext/erb/util.rb:11-18`). Rails' escape arm is
- * `super(ActiveSupport::Multibyte::Unicode.tidy_bytes(s))`; `tidy_bytes`
- * repairs invalid UTF-8 byte sequences, which a JS string cannot hold, so the
- * escape runs on `s` directly.
- */
 export function unwrappedHtmlEscape(s: unknown): string | SafeBuffer {
   if (s instanceof SafeBuffer && s.htmlSafe) return s;
   return String(s ?? "").replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
 }
 
-/**
- * A utility method for escaping HTML tag characters.
- * This method is also aliased as `h`.
- *
- * Mirrors: ActiveSupport::CoreExt::ERBUtil#html_escape (`core_ext/erb/util.rb:25-27`).
- */
 export function htmlEscape(s: unknown): SafeBuffer {
   const escaped = unwrappedHtmlEscape(s);
   return escaped instanceof SafeBuffer ? escaped : htmlSafe(escaped);
 }
 
-/** Mirrors: `alias h html_escape` (`core_ext/erb/util.rb:28`). */
 export const h = htmlEscape;
 
-// Following XML requirements: https://www.w3.org/TR/REC-xml/#NT-Name
 /* eslint-disable no-misleading-character-class -- XML spec character ranges */
 const TAG_NAME_START_CODEPOINTS =
   "@:A-Z_a-z\\xC0-\\xD6\\xD8-\\xF6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\u{10000}-\\u{EFFFF}";
@@ -62,28 +39,12 @@ const SAFE_XML_TAG_NAME_REGEXP = new RegExp(
 /* eslint-enable no-misleading-character-class */
 const TAG_NAME_REPLACEMENT_CHAR = "_";
 
-/**
- * A utility method for escaping HTML without affecting existing escaped entities.
- *
- * Mirrors: ERB::Util#html_escape_once (`core_ext/erb/util.rb:63-65`), whose
- * `tidy_bytes` reach is dropped for the reason given on
- * {@link unwrappedHtmlEscape}.
- */
 export function htmlEscapeOnce(s: unknown): SafeBuffer {
   return htmlSafe(
     String(s ?? "").replace(HTML_ESCAPE_ONCE_REGEXP, (c) => (c === "&" ? "&amp;" : HTML_ESCAPE[c])),
   );
 }
 
-/**
- * A utility method for escaping HTML entities in JSON strings. Specifically, the
- * &, > and < characters are replaced with their equivalent unicode escaped form —
- * \\u0026, \\u003e, and \\u003c. The Unicode sequences \\u2028 and \\u2029 are
- * also escaped as they are treated as newline characters in some JavaScript
- * engines.
- *
- * Mirrors: ERB::Util#json_escape (`core_ext/erb/util.rb:134-142`).
- */
 export function jsonEscape(s: unknown): string | SafeBuffer {
   let result = String(s ?? "");
   result = result.replace(/>/g, "\\u003e");
@@ -94,13 +55,6 @@ export function jsonEscape(s: unknown): string | SafeBuffer {
   return s instanceof SafeBuffer && s.htmlSafe ? htmlSafe(result) : result;
 }
 
-/**
- * A utility method for escaping XML names of tags and names of attributes.
- *
- * It follows the requirements of the specification: https://www.w3.org/TR/REC-xml/#NT-Name
- *
- * Mirrors: ERB::Util#xml_name_escape (`core_ext/erb/util.rb:157-171`).
- */
 export function xmlNameEscape(name: unknown): string {
   const s = String(name ?? "");
   if (s.trim() === "") return "";
@@ -122,47 +76,32 @@ export function xmlNameEscape(name: unknown): string {
   return startingChar + followingChars;
 }
 
-/**
- * The slice of Ruby's `StringScanner` that `tokenize` uses: a cursor over the
- * source with `scan` / `scan_until` / `matched` / `eos?` / `exist?` / `rest` /
- * `terminate`. Ruby's stdlib class has no JS counterpart, so it is ported here
- * at its Ruby names. `pos` counts UTF-16 code units rather than bytes; every
- * offset `tokenize` computes is a difference of two `pos` values from this same
- * scanner, so the arithmetic is self-consistent and a multibyte source slices
- * at the same boundaries Ruby's `byteslice` reaches.
- */
 class StringScanner {
   pos = 0;
   matched: string | null = null;
 
   constructor(readonly string: string) {}
 
-  /** Ruby: `StringScanner#eos?` */
   isEos(): boolean {
     return this.pos >= this.string.length;
   }
 
-  /** Ruby: `StringScanner#rest` */
   get rest(): string {
     return this.string.slice(this.pos);
   }
 
-  /** Ruby: `StringScanner#terminate` */
   terminate(): void {
     this.pos = this.string.length;
   }
 
-  /** Ruby: `StringScanner#scan` — match anchored at `pos`, advancing on a hit. */
   scan(re: RegExp): string | null {
     return this._match(new RegExp(re.source, `${re.flags.replace(/[gy]/g, "")}y`));
   }
 
-  /** Ruby: `StringScanner#scan_until` — advance past the next match anywhere ahead. */
   scanUntil(re: RegExp): string | null {
     return this._match(new RegExp(re.source, `${re.flags.replace(/[gy]/g, "")}g`));
   }
 
-  /** Ruby: `StringScanner#exist?` — is there a match ahead, without advancing? */
   exist(re: RegExp): boolean {
     const search = new RegExp(re.source, `${re.flags.replace(/[gy]/g, "")}g`);
     search.lastIndex = this.pos;
@@ -183,13 +122,6 @@ const FINISH_RE = /(?:[-=])?%>/s;
 const START_OR_FINISH_RE = new RegExp(`(?:${START_RE.source}|${FINISH_RE.source})`, "s");
 const CODE_RE = new RegExp(`.*?(?=(?:${FINISH_RE.source})|$)`, "s");
 
-/**
- * Tokenizes a line of ERB. This is really just for error reporting and
- * nobody should use it.
- *
- * Mirrors: ERB::Util.tokenize (`core_ext/erb/util.rb:159-207`). Ruby Symbol
- * token kinds keep their leading colon, per the trails Symbol convention.
- */
 export function tokenize(source: string): [string, string][] {
   const scanner = new StringScanner(source.replace(/\r\n$|[\r\n]$/, ""));
   const tokens: [string, string][] = [];

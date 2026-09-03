@@ -1,8 +1,3 @@
-/**
- * Port of minitest's Rails plugin from
- * `railties/lib/minitest/rails_plugin.rb`.
- */
-
 import { Minitest } from "@blazetrails/activesupport";
 import { env } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";

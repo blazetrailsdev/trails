@@ -6,13 +6,6 @@ export const MULTIPART_BOUNDARY = "AaB03x";
 
 type Params = Record<string, unknown>;
 
-/**
- * Rack::Multipart::Generator
- *
- * Symmetrical to `Rack::Multipart::Parser`. Used by mock requests to
- * serialise a hash of params (including {@link UploadedFile} values)
- * into a multipart/form-data body keyed off {@link MULTIPART_BOUNDARY}.
- */
 export class Generator {
   private _params: Params;
 

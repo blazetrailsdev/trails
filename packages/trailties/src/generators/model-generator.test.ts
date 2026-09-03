@@ -32,9 +32,7 @@ function findMigration(files: string[]): string {
 }
 
 describe("ModelGeneratorTest", () => {
-  it.skip("help shows invoked generators options", () => {
-    // Needs --help support
-  });
+  it.skip("help shows invoked generators options", () => {});
 
   it("model with missing attribute type", () => {
     const gen = makeGen();
@@ -45,9 +43,7 @@ describe("ModelGeneratorTest", () => {
     expect(content).toContain('t.string("author")');
   });
 
-  it.skip("migration source paths", () => {
-    // Needs custom template support
-  });
+  it.skip("migration source paths", () => {});
 
   it("invokes default orm", () => {
     const gen = makeGen();
@@ -64,17 +60,11 @@ describe("ModelGeneratorTest", () => {
     expect(files.find((f) => f.startsWith("db/migrate/"))).toBeUndefined();
   });
 
-  it.skip("model with database option", () => {
-    // Needs --database option
-  });
+  it.skip("model with database option", () => {});
 
-  it.skip("model with parent and database option", () => {
-    // Needs --database option
-  });
+  it.skip("model with parent and database option", () => {});
 
-  it.skip("model with no migration and database option", () => {
-    // Needs --database option
-  });
+  it.skip("model with no migration and database option", () => {});
 
   it("model with no migration option", () => {
     const gen = makeGen();
@@ -83,33 +73,19 @@ describe("ModelGeneratorTest", () => {
     expect(files.find((f) => f.startsWith("db/migrate/"))).toBeUndefined();
   });
 
-  it.skip("model with parent option database option and no migration option", () => {
-    // Needs --database option
-  });
+  it.skip("model with parent option database option and no migration option", () => {});
 
-  it.skip("model with underscored database option", () => {
-    // Needs --database option
-  });
+  it.skip("model with underscored database option", () => {});
 
-  it.skip("plural names are singularized", () => {
-    // Needs warning output and singularization
-  });
+  it.skip("plural names are singularized", () => {});
 
-  it.skip("unknown inflection rule are warned", () => {
-    // Needs inflection rule warnings
-  });
+  it.skip("unknown inflection rule are warned", () => {});
 
-  it.skip("impossible inflection rules raises an error", () => {
-    // Needs camelcase recovery check
-  });
+  it.skip("impossible inflection rules raises an error", () => {});
 
-  it.skip("model with underscored parent option", () => {
-    // Needs underscored parent conversion (admin/account -> Admin::Account)
-  });
+  it.skip("model with underscored parent option", () => {});
 
-  it.skip("model with namespace", () => {
-    // Needs namespace support (admin/account)
-  });
+  it.skip("model with namespace", () => {});
 
   it("migration", () => {
     const gen = makeGen();
@@ -120,25 +96,15 @@ describe("ModelGeneratorTest", () => {
     expect(content).toContain("class CreateAccounts extends Migration");
   });
 
-  it.skip("migration with namespace", () => {
-    // Needs namespace support
-  });
+  it.skip("migration with namespace", () => {});
 
-  it.skip("migration with nested namespace", () => {
-    // Needs namespace support
-  });
+  it.skip("migration with nested namespace", () => {});
 
-  it.skip("migration with nested namespace without pluralization", () => {
-    // Needs namespace and singular table config
-  });
+  it.skip("migration with nested namespace without pluralization", () => {});
 
-  it.skip("migration with namespaces in model name without pluralization", () => {
-    // Needs namespace and singular table config
-  });
+  it.skip("migration with namespaces in model name without pluralization", () => {});
 
-  it.skip("migration without pluralization", () => {
-    // Needs singular table name config
-  });
+  it.skip("migration without pluralization", () => {});
 
   it("migration is skipped", () => {
     const gen = makeGen();
@@ -207,13 +173,9 @@ describe("ModelGeneratorTest", () => {
     expect(content).toMatch(/addIndex\("products", "discount", \{ unique: true \}/);
   });
 
-  it.skip("migration without timestamps", () => {
-    // Needs ActiveRecord.timestamped_migrations = false support
-  });
+  it.skip("migration without timestamps", () => {});
 
-  it.skip("migration with configured path", () => {
-    // Needs configurable migration path
-  });
+  it.skip("migration with configured path", () => {});
 
   it("migration with timestamps", () => {
     const gen = makeGen();
@@ -229,29 +191,17 @@ describe("ModelGeneratorTest", () => {
     expect(content).not.toContain("timestamps");
   });
 
-  it.skip("migration is skipped with skip option", () => {
-    // Needs --skip behavior
-  });
+  it.skip("migration is skipped with skip option", () => {});
 
-  it.skip("migration is ignored as identical with skip option", () => {
-    // Needs --skip behavior
-  });
+  it.skip("migration is ignored as identical with skip option", () => {});
 
-  it.skip("migration is skipped on skip behavior", () => {
-    // Needs skip behavior mode
-  });
+  it.skip("migration is skipped on skip behavior", () => {});
 
-  it.skip("migration error is not shown on revoke", () => {
-    // Needs revoke behavior
-  });
+  it.skip("migration error is not shown on revoke", () => {});
 
-  it.skip("migration is removed on revoke", () => {
-    // Needs revoke behavior
-  });
+  it.skip("migration is removed on revoke", () => {});
 
-  it.skip("existing migration is removed on force", () => {
-    // Needs --force behavior
-  });
+  it.skip("existing migration is removed on force", () => {});
 
   it("invokes default test framework", () => {
     const gen = makeGen();
@@ -261,33 +211,19 @@ describe("ModelGeneratorTest", () => {
     expect(content).toContain('describe("Account"');
   });
 
-  it.skip("fixtures use the references ids", () => {
-    // Needs fixture generation
-  });
+  it.skip("fixtures use the references ids", () => {});
 
-  it.skip("fixtures use the references ids and type", () => {
-    // Needs fixture generation
-  });
+  it.skip("fixtures use the references ids and type", () => {});
 
-  it.skip("fixtures respect reserved yml keywords", () => {
-    // Needs fixture generation
-  });
+  it.skip("fixtures respect reserved yml keywords", () => {});
 
-  it.skip("fixture is skipped", () => {
-    // Needs --skip-fixture flag
-  });
+  it.skip("fixture is skipped", () => {});
 
-  it.skip("fixture is skipped if fixture replacement is given", () => {
-    // Needs -r option
-  });
+  it.skip("fixture is skipped if fixture replacement is given", () => {});
 
-  it.skip("fixture without pluralization", () => {
-    // Needs singular table name config
-  });
+  it.skip("fixture without pluralization", () => {});
 
-  it.skip("check class collision", () => {
-    // Needs class collision detection
-  });
+  it.skip("check class collision", () => {});
 
   it("index is skipped for belongs to association", () => {
     const gen = makeGen();
@@ -310,13 +246,9 @@ describe("ModelGeneratorTest", () => {
     expect(content).toMatch(/createTable\("accounts", \{ id: "uuid" \}/);
   });
 
-  it.skip("database puts migrations in configured folder", () => {
-    // Needs --database option
-  });
+  it.skip("database puts migrations in configured folder", () => {});
 
-  it.skip("database puts migrations in configured folder with aliases", () => {
-    // Needs --db alias
-  });
+  it.skip("database puts migrations in configured folder with aliases", () => {});
 
   it("model with references attribute generates belongs to associations", () => {
     const gen = makeGen();
@@ -353,17 +285,11 @@ describe("ModelGeneratorTest", () => {
     expect(content).toContain('this.belongsTo("supplier", { polymorphic: true })');
   });
 
-  it.skip("null false is added for references by default", () => {
-    // Needs belongs_to_required_by_default config
-  });
+  it.skip("null false is added for references by default", () => {});
 
-  it.skip("null false is added for belongs to by default", () => {
-    // Needs belongs_to_required_by_default config
-  });
+  it.skip("null false is added for belongs to by default", () => {});
 
-  it.skip("null false is not added when belongs to required by default global config is false", () => {
-    // Needs belongs_to_required_by_default config
-  });
+  it.skip("null false is not added when belongs to required by default global config is false", () => {});
 
   it("foreign key is not added for non references", () => {
     const gen = makeGen();
@@ -416,9 +342,7 @@ describe("ModelGeneratorTest", () => {
     expect(content).toContain('this.hasManyAttached("photos")');
   });
 
-  it.skip("skip virtual fields in fixtures", () => {
-    // Needs fixture generation
-  });
+  it.skip("skip virtual fields in fixtures", () => {});
 });
 
 describe("ModelGenerator (JavaScript project)", () => {

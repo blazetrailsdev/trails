@@ -3,13 +3,6 @@ import { getFormatVersion, setFormatVersion } from "../format-version-slot.js";
 import { UnserializableObjectError } from "../../message-pack/extensions.js";
 import type { Store, StoreOptions } from "../store.js";
 
-// Mirrors Rails `CacheStoreSerializerBehavior`
-// (activesupport/test/cache/behaviors/cache_store_serializer_behavior.rb).
-// Ruby's `include CacheStoreSerializerBehavior` is spelled here as a function
-// the store test file calls inside its own describe, the trails spelling of a
-// test-behavior mixin (see cache-store-compression-behavior.ts).
-
-// Ruby writes `Object.new`, which MessagePack has no extension for.
 class UnserializableObject {}
 
 /** @internal */
@@ -22,8 +15,6 @@ export function cacheStoreSerializerBehavior(host: CacheStoreSerializerBehaviorH
     setFormatVersion(7.0);
   });
 
-  // Ruby `ActiveSupport::Cache.with(format_version:)` (Object#with), which
-  // restores the previous value once the block returns.
   function withFormat<T>(formatVersion: number, block: () => T): T {
     const previous = getFormatVersion();
     setFormatVersion(formatVersion);

@@ -52,7 +52,6 @@ describe("LazyLoadHooksTest", () => {
     runLoadHooks("test_base", "B");
     onLoad("test_base", { runOnce: true }, cb);
     onLoad("test_base", { runOnce: true }, cb);
-    // runOnce: true prevents duplicate registration; still runs for both bases
     expect(log.length).toBeGreaterThan(0);
   });
 
@@ -108,7 +107,6 @@ describe("LazyLoadHooksTest", () => {
   });
 
   it("hook uses class eval when base is a class", () => {
-    // In TS, hook always calls callback with base as argument
     let received: any = null;
     class MyClass {}
     onLoad("test_base", (base) => {

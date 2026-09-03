@@ -24,13 +24,9 @@ describe("createTsePlugin", () => {
 
   it("emits an error shim instead of throwing when virtualization fails", () => {
     const plugin = createTsePlugin();
-    // Unbalanced brackets in the locals signature would otherwise raise
-    // and crash the host's `tsc` invocation.
     const out = plugin.virtualize("/x/bad.tse", "<%# locals: (a: (1, 2) %>");
     expect(out?.ts).toContain("/x/bad.tse");
     expect(out?.ts).toContain(".tse virtualization failed");
-    // The shim is itself a valid TS source that produces a clear
-    // diagnostic when tsc compiles it.
     const diags = diagnose(out!.ts);
     expect(diags.length).toBeGreaterThan(0);
   });
@@ -41,14 +37,12 @@ describe("virtualizeTse", () => {
     const ts = virtualizeTse("<p>hi</p>");
     expect(ts).toContain("locals: Record<string, unknown>");
     expect(ts).not.toContain("const {");
-    // NoExtraKeys is not imported when unused — avoids noUnusedLocals diagnostics.
     expect(ts).not.toContain("NoExtraKeys");
   });
 
   it("types empty `<%# locals: () %>` as NoExtraKeys<Record<string, never>> (Rails **nil parity)", () => {
     const out = virtualizeTse("<%# locals: () %><p>hi</p>");
     expect(out).toContain("locals: NoExtraKeys<Record<string, never>>");
-    // Confirm via tsc: passing `{ extra: 1 }` is a type error.
     const probe = out + "\nrender({} as RenderContext, { extra: 1 });";
     expect(diagnose(probe).join("\n")).toMatch(/not assignable|extra/i);
   });
@@ -94,9 +88,6 @@ describe("virtualizeTse", () => {
     expect(head?.insertedAtLine).toBe(-1);
     const lines = ts.split("\n");
     expect(lines[head.lineCount - 1]).toContain("const _ob");
-    // Footer delta marks the line BEFORE the trailing `return _ob;`
-    // (remapLine treats `injectedStart` as exclusive); the footer
-    // block then spans `lineCount` lines starting at injectedStart+1.
     expect(lines[foot.insertedAtLine + 1]).toContain("return _ob");
   });
 
@@ -104,8 +95,6 @@ describe("virtualizeTse", () => {
     const { ts, deltas } = virtualizeTseWithDeltas("<% const x = 1;\nconst y = 2; %>hi");
     const [, foot] = deltas;
     const lines = ts.split("\n");
-    // The footer's `return _ob;` should sit immediately after the
-    // body, regardless of how many node-array entries the body has.
     expect(lines[foot.insertedAtLine + 1]).toContain("return _ob");
   });
 
@@ -118,8 +107,6 @@ describe("virtualizeTse", () => {
   });
 
   it("throws on mismatched bracket types", () => {
-    // Outer parens are required by the locals regex; the mismatch is
-    // inside (a square closer for a curly opener).
     expect(() => virtualizeTse("<%# locals: (a: {1, 2]) %>")).toThrow(/mismatched/);
   });
 
@@ -143,13 +130,11 @@ describe("virtualizeTse", () => {
   it("rejects TS reserved words as local names", () => {
     expect(() => virtualizeTse("<%# locals: (default: 1) %>")).toThrow(/invalid local name/);
     expect(() => virtualizeTse("<%# locals: (await: 1) %>")).toThrow(/invalid local name/);
-    // eval/arguments are restricted in strict mode — `const { eval } = x;` is a syntax error in ESM.
     expect(() => virtualizeTse("<%# locals: (eval:) %>")).toThrow(/invalid local name/);
     expect(() => virtualizeTse("<%# locals: (arguments:) %>")).toThrow(/invalid local name/);
   });
 
   it("rejects emitter-reserved names that would produce duplicate-declaration SyntaxErrors", () => {
-    // These are render() parameters or internal bindings in the emitted output.
     expect(() => virtualizeTse("<%# locals: (context:) %>")).toThrow(/invalid local name/);
     expect(() => virtualizeTse("<%# locals: (locals:) %>")).toThrow(/invalid local name/);
     expect(() => virtualizeTse("<%# locals: (_ob:) %>")).toThrow(/invalid local name/);
@@ -199,10 +184,8 @@ describe("virtualizeTse", () => {
   });
 
   it("wraps named locals type in NoExtraKeys so variable-typed excess keys are rejected", () => {
-    // Without NoExtraKeys, a pre-built variable with excess keys would pass tsc.
     const out = virtualizeTse("<%# locals: (count:) %><%= count %>");
     expect(out).toContain("locals: NoExtraKeys<{ count: unknown }>");
-    // Variable with excess key — without NoExtraKeys this would pass tsc.
     const probe =
       out +
       "\nconst l: { count: number; extra: string } = { count: 1, extra: 'x' };" +

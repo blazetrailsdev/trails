@@ -17,9 +17,6 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// action_controller/base_test.rb — Rendering
-// ==========================================================================
 describe("ControllerInstanceTests", () => {
   it("render json", async () => {
     class JsonController extends Base {
@@ -179,9 +176,6 @@ describe("ControllerInstanceTests", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/base_test.rb — Redirecting
-// ==========================================================================
 describe("ActionController::Base redirecting", () => {
   it("redirectTo sets location and 302", async () => {
     class RedirectController extends Base {
@@ -255,15 +249,10 @@ describe("ActionController::Base redirecting", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/base_test.rb — Flash
-// ==========================================================================
 describe("ActionController::Base flash", () => {
   it("notice sets flash notice", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
-    // Rails' `notice=` writes `flash[:notice]`, and `flash` delegates to the
-    // request (`metal/flash.rb:12`), so the controller needs one.
     c.setRequestBang(new Request({}));
     c.notice = "Success!";
     expect(c.flash.notice).toBe("Success!");
@@ -280,9 +269,6 @@ describe("ActionController::Base flash", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/base_test.rb — Rescue
-// ==========================================================================
 describe("ActionController::Base rescue_from", () => {
   it("rescues from a specific error class", async () => {
     class CustomError extends Error {
@@ -348,9 +334,6 @@ describe("ActionController::Base rescue_from", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/base_test.rb — Caching / Conditional GET
-// ==========================================================================
 describe("ActionController::Base conditional GET", () => {
   it("freshWhen sets etag header", async () => {
     class FreshController extends Base {
@@ -390,12 +373,10 @@ describe("ActionController::Base conditional GET", () => {
         }
       }
     }
-    // First, get the etag
     const c1 = new Match304Controller();
     await c1.dispatch("index", makeRequest(), makeResponse());
     const etag = c1.getHeader("etag")!;
 
-    // Second request with If-None-Match
     const c2 = new Match304Controller();
     const req = new Request({
       REQUEST_METHOD: "GET",
@@ -437,9 +418,6 @@ describe("ActionController::Base conditional GET", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/base_test.rb — Send Data
-// ==========================================================================
 describe("ActionController::Base sendData", () => {
   it("sends data with filename", () => {
     const c = new (class extends Base {})();
@@ -471,9 +449,6 @@ describe("ActionController::Base sendData", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/api_test.rb
-// ==========================================================================
 describe("ActionController::API", () => {
   it("renders json", async () => {
     class ApiController extends API {
@@ -571,9 +546,6 @@ describe("ActionController::API", () => {
   });
 });
 
-// ==========================================================================
-// DoubleRenderError
-// ==========================================================================
 describe("DoubleRenderError", () => {
   it("has correct name", () => {
     const err = new DoubleRenderError();
@@ -591,9 +563,6 @@ describe("DoubleRenderError", () => {
   });
 });
 
-// ==========================================================================
-// controller/base_test.rb — ControllerClassTests
-// ==========================================================================
 describe("ControllerClassTests", () => {
   it("controller path", () => {
     class EmptyController extends Base {}
@@ -614,13 +583,9 @@ describe("ControllerClassTests", () => {
     expect(new SuperAdminController().controllerName()).toBe("super_admin");
   });
 
-  // pending: ActionView::RecordIdentifier (dom_id / dom_class) not yet ported.
   it.skip("no deprecation when action view record identifier is included", () => {});
 });
 
-// ==========================================================================
-// controller/base_test.rb — ControllerInstanceTests
-// ==========================================================================
 describe("ControllerInstanceTests", () => {
   it("performed?", async () => {
     class EmptyController extends Base {
@@ -648,31 +613,13 @@ describe("ControllerInstanceTests", () => {
     expect(c.inspect()).toMatch(/^#<EmptyController>$/);
   });
 
-  // pending: In Rails, SimpleController defines `def status` which shadows
-  // ActionController::Base's internal `status` method, and action_methods
-  // returns Set["status", "hello"]. In TS, `status` is a getter/setter
-  // accessor on Metal — TypeScript (TS2416/TS2426) disallows overriding an
-  // accessor with a regular method in a subclass, so the Rails pattern is
-  // not representable directly. Tracked as a TS accessor-shadowing gap.
   it.skip("action methods with inherited shadowed internal method", () => {});
 
-  // pending: JS class naming does not support Object.const_set semantics.
-  // In Ruby, `Object.const_set("ExamplesController", klass)` gives the
-  // anonymous class a name; JS engines derive class names from variable
-  // bindings at parse time, so assigning to globalThis does not rename
-  // an already-created anonymous class.
   it.skip("temporary anonymous controllers", () => {});
 
-  // pending: default headers are not yet applied inside dispatch().
-  // Rails wires DefaultHeaders via merge_default_headers in
-  // ActionDispatch::Response.create; our dispatch() commits _headers
-  // but does not call applyDefaultHeaders(). Tracked separately.
   it.skip("response has default headers", () => {});
 });
 
-// ==========================================================================
-// controller/base_test.rb — PerformActionTest
-// ==========================================================================
 describe("PerformActionTest", () => {
   it("process should be precise", async () => {
     class EmptyController extends Base {}
@@ -693,9 +640,6 @@ describe("PerformActionTest", () => {
     expect(c.body).toBe("Response for arbitrary_action");
   });
 
-  // pending: did_you_mean suggestions not implemented for ActionNotFound.
-  // Rails delegates to the did_you_mean gem via detailed_message; our
-  // AbstractController::ActionNotFound does not carry spelling suggestions.
   it.skip("exceptions have suggestions for fix", () => {});
 });
 
@@ -717,11 +661,6 @@ describe("withoutModules", () => {
   });
 });
 
-// ==========================================================================
-// controller/base_test.rb — UrlOptionsTest / DefaultUrlOptionsTest /
-//   OptionalDefaultUrlOptionsControllerTest / EmptyUrlOptionsTest
-// (all pending — full RouteSet wiring to controller not yet ported)
-// ==========================================================================
 describe("UrlOptionsTest", () => {
   it.skip("url for query params included", () => {});
   it.skip("url options override", () => {});
@@ -742,14 +681,7 @@ describe("EmptyUrlOptionsTest", () => {
   it.skip("named routes with path without doing a request first", () => {});
 });
 
-// ==========================================================================
-// controller/base_test.rb — BaseTest
-// ==========================================================================
 describe("BaseTest", () => {
-  // Rails reads action_controller/base.rb, scans every `include X` line,
-  // and asserts MODULES matches exactly (order included). We can't scan
-  // the TS source at runtime, so we assert the full expected array directly —
-  // equivalent coverage: any addition/removal/reorder in MODULES will fail.
   it("included modules are tracked", () => {
     expect(MODULES).toEqual([
       "AbstractController::Rendering",

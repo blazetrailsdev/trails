@@ -94,8 +94,6 @@ describe("MemoryStoreTest", () => {
   });
 
   it("increment creates a missing key set to amount", () => {
-    // Rails MemoryStore#modify_value creates the key set to Integer(amount) and
-    // returns amount on a missing entry (memory_store.rb:136).
     expect(store.increment("missing")).toBe(1);
     expect(store.read("missing")).toBe(1);
     expect(store.increment("other", 100)).toBe(100);
@@ -111,7 +109,6 @@ describe("MemoryStoreTest", () => {
     const ns = new MemoryStore({ namespace: "ns1" });
     ns.write("key", "val");
     expect(ns.read("key")).toBe("val");
-    // Key without namespace should be absent
     expect(store.read("key")).toBeNull();
   });
 
@@ -172,10 +169,6 @@ describe("MemoryStoreTest", () => {
   });
 });
 
-// =============================================================================
-// MemoryStorePruningTest
-// =============================================================================
-
 describe("MemoryStorePruningTest", () => {
   let recordSize: number;
   let store: MemoryStore;
@@ -208,10 +201,6 @@ describe("MemoryStorePruningTest", () => {
     expect(store.exist("1")).toBe(false);
   });
 });
-
-// =============================================================================
-// NullStoreTest
-// =============================================================================
 
 describe("NullStoreTest", () => {
   let store: NullStore;
@@ -268,22 +257,16 @@ describe("NullStoreTest", () => {
   });
 
   it("local store strategy", () => {
-    // NullStore always returns null regardless of local store strategy
     expect(store.read("foo")).toBeNull();
     store.write("foo", "bar");
     expect(store.read("foo")).toBeNull();
   });
 
   it("local store repeated reads", () => {
-    // NullStore returns null on repeated reads
     expect(store.read("foo")).toBeNull();
     expect(store.read("foo")).toBeNull();
   });
 });
-
-// =============================================================================
-// FileStoreTest
-// =============================================================================
 
 describe("FileStoreTest", () => {
   let cacheDir: string;
@@ -339,8 +322,6 @@ describe("FileStoreTest", () => {
   });
 
   it("increment creates a missing key set to amount", () => {
-    // Rails FileStore#modify_value creates the key set to amount and returns
-    // amount on a missing entry (file_store.rb:230-231).
     expect(store.increment("missing")).toBe(1);
     expect(store.read("missing")).toBe(1);
     expect(store.increment("other", 100)).toBe(100);

@@ -10,13 +10,6 @@ import {
   Dot as DotVisitor,
 } from "./visitors.js";
 
-// ==========================================================================
-// Rails has no visitors_test.rb — these tests lock down the contracts that
-// upstream Visitors::String, Visitors::FormatBuilder, Visitors::Each, and
-// Visitors::Dot rely on, so PR 5+ (Path::Pattern) and beyond can use them
-// without surprises.
-// ==========================================================================
-
 describe("ActionDispatch::Journey::Visitors::String", () => {
   const roundTrip = (str: string) =>
     expect(StringVisitor.INSTANCE.accept(new Parser().parse(str), "")).toBe(str);
@@ -32,7 +25,6 @@ describe("ActionDispatch::Journey::Visitors::String", () => {
   it("round-trips complex", () => roundTrip("/sprockets.js(.:format)"));
 
   it("Or separators are positional, not identity-based", () => {
-    // Same Literal instance used twice — separator must still be emitted.
     const lit = new Literal("a");
     const tree = new Or([lit, lit]);
     expect(StringVisitor.INSTANCE.accept(tree, "")).toBe("a|a");
@@ -41,7 +33,6 @@ describe("ActionDispatch::Journey::Visitors::String", () => {
 
 describe("ActionDispatch::Journey::Visitors::Each", () => {
   it("visits every node in pre-order", () => {
-    // `/:foo` parses as Cat(Slash, Symbol). Pre-order = CAT, SLASH, SYMBOL.
     const tree = new Parser().parse("/:foo");
     const seen: string[] = [];
     Each.INSTANCE.accept(tree, (n) => seen.push(n.type));
@@ -66,7 +57,6 @@ describe("ActionDispatch::Journey::Visitors::FormatBuilder", () => {
   it("uses required_path escaping for controller", () => {
     const tree = new Parser().parse("/:controller");
     const format = new FormatBuilder().accept(tree);
-    // ESCAPE_PATH keeps `/` literal, while ESCAPE_SEGMENT would encode it.
     expect(format.evaluate({ controller: "admin/posts" })).toBe("/admin/posts");
   });
 
@@ -85,7 +75,6 @@ describe("ActionDispatch::Journey::Visitors::FormatBuilder", () => {
   it("ignores Object.prototype keys when checking for parameter presence", () => {
     const tree = new Parser().parse("/posts/:toString");
     const format = new FormatBuilder().accept(tree);
-    // `toString` exists on Object.prototype but wasn't supplied: should return "".
     expect(format.evaluate({})).toBe("");
   });
 
@@ -129,9 +118,9 @@ describe("ActionDispatch::Journey::Visitors::Dot", () => {
     const tree = new Cat(new SymbolNode(":a"), new SymbolNode(":b"));
     const dot = DotVisitor.INSTANCE.render(tree);
     expect(dot).toContain("digraph parse_tree");
-    expect(dot).toContain('label="○"'); // CAT marker
+    expect(dot).toContain('label="○"');
     expect(dot).toContain('label=":a"');
     expect(dot).toContain('label=":b"');
-    expect(dot).toMatch(/-> /); // an edge
+    expect(dot).toMatch(/-> /);
   });
 });

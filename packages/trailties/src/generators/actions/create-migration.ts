@@ -1,12 +1,6 @@
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
 
-// Mirrors railties/lib/rails/generators/actions/create_migration.rb. Rails
-// inherits from Thor::Actions::CreateFile; we don't have Thor, so the
-// invoke/revoke and conflict behaviors are ported directly. Status output
-// goes through `host.output` (Rails uses shell.say_status). Filesystem and
-// path access go through Ruby `File` / `FileUtils`.
-
 export interface CreateMigrationHost {
   output: (msg: string) => void;
   options: { force?: boolean; skip?: boolean; pretend?: boolean };
@@ -44,10 +38,6 @@ export class CreateMigration {
 
   private _existingMigration?: string;
 
-  // Mirrors Rails' `@existing_migration ||= ...` memoization in
-  // create_migration.rb. Ruby's `||=` only caches truthy values, so an
-  // "absent" lookup re-scans on the next call (the destination may now
-  // exist after a successful invoke!).
   existingMigration(): string | undefined {
     if (this._existingMigration) return this._existingMigration;
     const found = migrationExists(this.migrationDir, this.migrationFileName);
@@ -56,8 +46,6 @@ export class CreateMigration {
     return value;
   }
 
-  // Force-path / revoke remove the cached file; reset so subsequent reads
-  // see the new filesystem state.
   private invalidateExistingMigration(): void {
     this._existingMigration = undefined;
   }
@@ -92,10 +80,6 @@ export class CreateMigration {
       if (!this.pretend()) await this.writeRendered();
       this.sayStatus("create", "green");
     }
-    // Mirrors Rails' invoke! tail: pretend always returns the destination
-    // (Thor short-circuits); otherwise return the new destination when it
-    // got written (force / no-conflict) and fall back to the relative path
-    // of the existing migration (identical / skip).
     if (this.pretend()) return this.destination;
     if (File.isExist(this.destination)) return this.destination;
     return this.relativeExistingMigration();

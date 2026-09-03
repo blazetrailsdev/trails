@@ -1,38 +1,9 @@
-/**
- * BigDecimal — arbitrary-precision decimal value.
- *
- * JS has no native arbitrary-precision decimal, so values are kept as
- * normalized digit strings (no float round-trip) to preserve precision.
- *
- * Mirrors: Ruby's `BigDecimal` together with the ActiveSupport core-ext that
- * defaults `#to_s` to the `"F"` (non-scientific, fixed) format. Both the
- * fixed (`"F"`) and engineering/scientific (`"E"`) forms are implemented.
- * (activesupport/lib/active_support/core_ext/big_decimal/conversions.rb)
- */
-
 const MAX_EXPONENT_EXPANSION = 4000;
 
-/**
- * The two non-finite literals `Kernel#BigDecimal` and `String#to_d` both
- * answer, case-sensitively and only as the whole (whitespace-trimmed) string:
- * `"Infinity degrees".to_d` is `0.0` where `"Infinity".to_d` is
- * `BigDecimal::INFINITY`. A sign is `Infinity`'s alone — `"-NaN".to_d` is
- * `-0.0` and `BigDecimal("-NaN")` raises (verified on MRI 3.4).
- */
 const NON_FINITE_REGEX = /^\s*(?:(NaN)|([+-]?)Infinity)\s*$/;
 
-/**
- * The shape of a Ruby `Rational`, which `Kernel#BigDecimal` accepts as its
- * first argument. Structural and unexported rather than an import:
- * `Rational` lives in `@blazetrails/date`, which depends on this package.
- */
 type RationalLike = { numerator: bigint; denominator: bigint };
 
-/**
- * The digit-shape {@link parse} answers, plus the `nonFinite` tag that carries
- * Ruby's two special values (`BigDecimal::NAN` / `BigDecimal::INFINITY`),
- * which have no digits of their own.
- */
 type Parsed = {
   sign: "" | "-";
   intDigits: string;
@@ -41,34 +12,11 @@ type Parsed = {
 };
 
 export class BigDecimal {
-  /** "-" for negative values, "" otherwise. Zero is non-negative. */
   readonly sign: "" | "-";
-  /** Integer-part digits, leading zeros stripped (at least "0"). */
   readonly intDigits: string;
-  /** Fractional-part digits, trailing zeros stripped (possibly ""). */
   readonly fracDigits: string;
-  /**
-   * `"NaN"` / `"Infinity"` for Ruby's two non-finite values, `null` otherwise.
-   * A non-finite carries `"0"` / `""` digits so the digit-shaped internals
-   * stay well-formed; every method that means something different for one
-   * answers it before reaching them.
-   */
   private readonly nonFinite: "NaN" | "Infinity" | null;
 
-  /**
-   * Ruby `Kernel#BigDecimal(value, ndigits)`. `ndigits` is a count of
-   * SIGNIFICANT decimal digits, not a fractional scale, and it only rounds
-   * for the two arguments that carry more digits than a decimal can hold: a
-   * Float and a Rational. For a String, an Integer or another BigDecimal it
-   * is a minimum-precision hint and every digit survives — `BigDecimal(1234.5,
-   * 3)` is `0.123e4` where `BigDecimal("1234.5", 3)` is `0.12345e4`
-   * (verified on MRI 3.3).
-   *
-   * A Rational is expanded by exact long division over `bigint`s — never
-   * through a float, which would lose digits well before the default
-   * precision of 18 — and Ruby raises without a precision for one, since the
-   * expansion is otherwise unbounded.
-   */
   constructor(
     value: string | number | bigint | BigDecimal | { numerator: bigint; denominator: bigint },
     ndigits = 0,
@@ -85,9 +33,6 @@ export class BigDecimal {
     this.fracDigits = parsed.fracDigits;
     this.nonFinite = parsed.nonFinite;
     if (parsed.nonFinite === null && ndigits > 0 && (isRational || typeof value === "number")) {
-      // Significant-digit rounding IS a fractional-scale round, offset by the
-      // value's decimal exponent: 1234.5 at 3 digits rounds at scale -1, and
-      // 0.00123456 at 3 digits rounds at scale 5.
       const rounded = this.round(ndigits - this.exponent());
       this.sign = rounded.sign;
       this.intDigits = rounded.intDigits;
@@ -95,63 +40,23 @@ export class BigDecimal {
     }
   }
 
-  /**
-   * Ruby `BigDecimal::NAN`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static readonly NAN = new BigDecimal("NaN");
 
-  /**
-   * Ruby `BigDecimal::INFINITY`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static readonly INFINITY = new BigDecimal("Infinity");
 
-  /**
-   * Ruby `BigDecimal#nan?`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships.
-   */
+  /** @noRailsEquivalent PERMANENT */
   isNan(): boolean {
     return this.nonFinite === "NaN";
   }
 
-  /**
-   * Ruby `BigDecimal#infinite?` — `1` for `Infinity`, `-1` for `-Infinity`,
-   * and `nil` (here `null`) for everything else, NaN included.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships.
-   */
+  /** @noRailsEquivalent PERMANENT */
   isInfinite(): number | null {
     if (this.nonFinite !== "Infinity") return null;
     return this.sign === "-" ? -1 : 1;
   }
 
-  /**
-   * Render the value. The default `"F"` format produces fixed (non-scientific)
-   * notation with a trailing `.0` for whole numbers, matching ActiveSupport's
-   * defaulted `BigDecimal#to_s`.
-   *
-   * Format flags (subset of Ruby's): a leading `+` prints a sign on
-   * non-negative values, a leading space prints a space instead; an integer
-   * `n` inserts a space every `n` digits counting outward from the decimal
-   * point; a trailing `F`/`f` selects fixed notation.
-   *
-   * The engineering/scientific `"E"`/`"e"` form normalizes the value to
-   * `0.<digits>e<exp>` (mantissa in `[0.1, 1)`, exponent the power of ten),
-   * matching Ruby's `BigDecimal#to_s`. The output exponent marker is always a
-   * lowercase `e`; the grouping flag spaces the mantissa digits from the left.
-   */
   toString(format = "F"): string {
     const { signFlag, group, scientific } = parseFormat(format);
     let prefix = "";
@@ -168,35 +73,11 @@ export class BigDecimal {
     return `${prefix}${intPart}.${fracPart}`;
   }
 
-  /**
-   * Encode as a JSON string in fixed ("F") form, mirroring ActiveSupport's
-   * `BigDecimal#as_json` (which returns the value, encoded as a string by the
-   * JSON encoder to avoid the float precision loss a bare JSON number would
-   * incur). Without this, `JSON.stringify` would emit the internal
-   * `{sign, intDigits, fracDigits}` shape.
-   */
   toJSON(): string {
     return this.toString("F");
   }
 
-  /**
-   * Ruby `BigDecimal#to_i` — the integer part, truncated toward zero
-   * (`BigDecimal("7.9").to_i == 7`, `BigDecimal("-7.9").to_i == -7`,
-   * `BigDecimal("-0.4").to_i == 0`, verified on MRI 3.3).
-   *
-   * A BigDecimal is a `::Numeric`, so this is the conversion
-   * `ActiveModel::Type::Integer#cast_value`'s `value.to_i` (integer.rb:90)
-   * performs when a decimal aggregate is cast to an integer column's type —
-   * without it that cast has nothing to call and answers nil.
-   *
-   * Digits beyond float64's safe-integer range keep their exact value as a
-   * `bigint` carried under a `number` cast, the convention the numeric type
-   * primitives already use (see `IntegerType#narrowBigInt`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships.
-   */
+  /** @noRailsEquivalent PERMANENT */
   toI(): number {
     const magnitude = BigInt(this.intDigits === "" ? "0" : this.intDigits);
     const signed = this.sign === "-" ? -magnitude : magnitude;
@@ -204,54 +85,23 @@ export class BigDecimal {
     return Number.isSafeInteger(num) ? num : (signed as unknown as number);
   }
 
-  /**
-   * Ruby `BigDecimal#to_f`, which the number helpers reach through
-   * `Kernel.Float` (`number_to_human_size_converter.rb:12`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships.
-   */
+  /** @noRailsEquivalent PERMANENT */
   toF(): number {
     return Number(this.toString("F"));
   }
 
-  /**
-   * Ruby `BigDecimal#zero?`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships; the arithmetic Rails' own number helpers call on it
-   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
-   * and `>=`) has to exist here for those ports to have anything to call.
-   */
+  /** @noRailsEquivalent PERMANENT */
   isZero(): boolean {
     if (this.nonFinite !== null) return false;
     return !/[1-9]/.test(this.intDigits + this.fracDigits);
   }
 
-  /**
-   * Ruby `BigDecimal#negative?` — zero is neither positive nor negative.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships; the arithmetic Rails' own number helpers call on it
-   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
-   * and `>=`) has to exist here for those ports to have anything to call.
-   */
+  /** @noRailsEquivalent PERMANENT */
   isNegative(): boolean {
     return this.sign === "-" && !this.isZero();
   }
 
-  /**
-   * Ruby `BigDecimal#abs`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships; the arithmetic Rails' own number helpers call on it
-   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
-   * and `>=`) has to exist here for those ports to have anything to call.
-   */
+  /** @noRailsEquivalent PERMANENT */
   abs(): BigDecimal {
     if (this.isNan()) return this;
     if (this.nonFinite !== null) return BigDecimal.INFINITY;
@@ -260,15 +110,7 @@ export class BigDecimal {
       : this;
   }
 
-  /**
-   * Ruby `BigDecimal#mult` (and `*`); the product is exact.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships; the arithmetic Rails' own number helpers call on it
-   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
-   * and `>=`) has to exist here for those ports to have anything to call.
-   */
+  /** @noRailsEquivalent PERMANENT */
   mult(other: BigDecimal): BigDecimal {
     if (this.nonFinite !== null || other.nonFinite !== null) {
       if (this.isNan() || other.isNan() || this.isZero() || other.isZero()) return BigDecimal.NAN;
@@ -282,15 +124,7 @@ export class BigDecimal {
     );
   }
 
-  /**
-   * Ruby `BigDecimal#<=>`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships; the arithmetic Rails' own number helpers call on it
-   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
-   * and `>=`) has to exist here for those ports to have anything to call.
-   */
+  /** @noRailsEquivalent PERMANENT */
   compare(other: BigDecimal): number | null {
     if (this.isNan() || other.isNan()) return null;
     if (this.nonFinite !== null || other.nonFinite !== null) {
@@ -304,21 +138,7 @@ export class BigDecimal {
     return left < right ? -1 : left > right ? 1 : 0;
   }
 
-  /**
-   * Ruby `BigDecimal#round(n, mode)`. `mode` is the rounding mode Symbol
-   * `RoundingHelper#round` forwards (`rounding_helper.rb:16`); it defaults to
-   * `:default`, i.e. ROUND_HALF_UP — ties away from zero. A negative `n`
-   * rounds to a multiple of `10 ** -n`, which is how the significant-digit
-   * path of `RoundingHelper#absolute_precision` uses it. Ruby answers an
-   * Integer for `n <= 0`; there is no separate Integer here, so the value
-   * comes back as a `BigDecimal` with no fractional digits.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
-   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
-   * already ships; the arithmetic Rails' own number helpers call on it
-   * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
-   * and `>=`) has to exist here for those ports to have anything to call.
-   */
+  /** @noRailsEquivalent PERMANENT */
   round(n = 0, mode = ":default"): BigDecimal {
     if (this.nonFinite !== null) return this;
     if (n >= this.fracDigits.length) return this;
@@ -332,11 +152,6 @@ export class BigDecimal {
     return BigDecimal.fromUnscaled(this.sign === "-" ? -value : value, Math.max(n, 0));
   }
 
-  /**
-   * Ruby `BigDecimal#exponent` — the power of ten of the value's leading
-   * significant digit under the `0.<digits>e<exp>` normalization, and `0` for
-   * zero.
-   */
   private exponent(): number {
     const allDigits = this.intDigits + this.fracDigits;
     const stripped = allDigits.replace(/^0+/, "");
@@ -344,13 +159,11 @@ export class BigDecimal {
     return this.intDigits.length - (allDigits.length - stripped.length);
   }
 
-  /** Digits as one integer, scaled by `10 ** fracDigits.length`. */
   private unscaled(signum = 1): bigint {
     const magnitude = BigInt(this.intDigits + this.fracDigits);
     return this.sign === "-" && signum > 0 ? -magnitude : magnitude;
   }
 
-  /** {@link unscaled}, re-scaled to `10 ** scale`. */
   private unscaledAt(scale: number): bigint {
     return this.unscaled() * 10n ** BigInt(scale - this.fracDigits.length);
   }
@@ -363,24 +176,13 @@ export class BigDecimal {
     return new BigDecimal(`${negative ? "-" : ""}${intPart}.${fracPart}`);
   }
 
-  /**
-   * Ruby `BigDecimal.interpret_loosely` — the lenient parse `String#to_d`
-   * dispatches to (`bigdecimal/util.rb:73-75`). It reads the leading numeric
-   * prefix and discards the rest instead of raising the way
-   * `Kernel#BigDecimal` does, so `"45.67 degrees"` is `0.4567e2` and a string
-   * with no numeric prefix is zero (verified on MRI 3.3).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core (`bigdecimal`), a C method Rails
-   * reaches through `require "bigdecimal/util"` (`xml_mini.rb:5`) without
-   * defining, so there is no `.rb` in the vendored corpus to mirror.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static interpretLoosely(value: string): BigDecimal {
     if (NON_FINITE_REGEX.test(value)) return new BigDecimal(value);
     const match = INTERPRET_LOOSELY_REGEX.exec(value);
     return new BigDecimal(match === null ? "0" : match[0].replace(/_/g, "").trim());
   }
 
-  /** Render as `0.<digits>e<exp>` (Ruby's `"E"` form, sans sign prefix). */
   private toScientific(group: number): string {
     const allDigits = this.intDigits + this.fracDigits;
     const mantissa = allDigits.replace(/^0+/, "").replace(/0+$/, "");
@@ -390,14 +192,6 @@ export class BigDecimal {
   }
 }
 
-/**
- * Whether the digits `rest` dropped by {@link BigDecimal.round} push the kept
- * magnitude one unit further from zero under `mode`.
- *
- * A Ruby Symbol option value is a `":name"` string in trails, and the
- * camelCased spelling is accepted alongside the Ruby one. `:up` is
- * BigDecimal's ROUND_UP — away from zero — not "half up".
- */
 function roundsAway(rest: string, kept: string, negative: boolean, mode: string): boolean {
   const nonZero = /[1-9]/.test(rest);
   if (!nonZero) return false;
@@ -441,7 +235,6 @@ function parseFormat(format: string): {
   return { signFlag, group, scientific };
 }
 
-/** Group digits with a space every `n`, counting from the right. */
 function groupFromRight(s: string, n: number): string {
   let out = "";
   let count = 0;
@@ -453,7 +246,6 @@ function groupFromRight(s: string, n: number): string {
   return out;
 }
 
-/** Group digits with a space every `n`, counting from the left. */
 function groupFromLeft(s: string, n: number): string {
   let out = "";
   for (let i = 0; i < s.length; i += 1) {
@@ -463,17 +255,8 @@ function groupFromLeft(s: string, n: number): string {
   return out;
 }
 
-/**
- * Expand a `Rational` to a decimal string by exact long division, carrying
- * two guard digits past the requested significant-digit count so the
- * constructor's rounding step sees a correctly-rounded tail.
- */
 function parseRational(value: RationalLike, ndigits: number): Parsed | null {
   if (ndigits <= 0) {
-    // Ruby raises `ArgumentError` here. This module has no runtime imports by
-    // construction, and ActiveSupport's `ArgumentError` would drag the
-    // `time-with-zone` graph in behind it, so it reuses the `TypeError` this
-    // file already throws for an unparseable value — the message is Ruby's.
     throw new TypeError("can't omit precision for a Rational.");
   }
   const negative = value.numerator < 0n !== value.denominator < 0n;
@@ -488,8 +271,6 @@ function parseRational(value: RationalLike, ndigits: number): Parsed | null {
   if (intPartDigits > 0n) {
     fracNeeded = Math.max(ndigits - intPartDigits.toString().length, 0) + 2;
   } else {
-    // Leading fractional zeros are not significant digits, so expand past
-    // them before asking for `ndigits` more.
     let leadingZeros = 0;
     for (let x = n * 10n; x < d && leadingZeros < MAX_EXPONENT_EXPANSION; x *= 10n) leadingZeros++;
     fracNeeded = leadingZeros + ndigits + 2;
@@ -542,9 +323,6 @@ function parse(value: string | number | bigint): Parsed | null {
   let intPart = m[1] || "0";
   let fracPart = m[2] ?? "";
   const exp = m[3] ? Number(m[3]) : 0;
-  // Ruby BigDecimal accepts arbitrarily large exponents; this cap is a
-  // TS-specific guard so adversarial input (e.g. "1e10000000") can't drive
-  // the digit-expansion below into multi-gigabyte string allocation.
   if (Math.abs(exp) > MAX_EXPONENT_EXPANSION) {
     throw new RangeError(
       `BigDecimal: exponent magnitude exceeds the ${MAX_EXPONENT_EXPANSION}-digit expansion limit (TS-specific guard against unbounded allocation)`,
@@ -574,22 +352,10 @@ function parse(value: string | number | bigint): Parsed | null {
   return { sign, intDigits: intPart, fracDigits: fracPart, nonFinite: null };
 }
 
-/**
- * The leading numeric prefix {@link BigDecimal.interpretLoosely} reads, which
- * is `String#to_f`'s grammar (see `core-ext/string/conversions.ts`) — Ruby
- * accepts single underscores between digits and takes an optional fractional
- * part and exponent only where a digit follows.
- */
 const INTERPRET_LOOSELY_REGEX =
   /^\s*[+-]?(?:\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?|\.\d(?:_?\d)*)(?:[eE][+-]?\d(?:_?\d)*)?/;
 
-/**
- * Ruby `String#to_d` (`bigdecimal/util.rb:73-75`).
- *
- * @noRailsEquivalent PERMANENT — Ruby core (`bigdecimal/util`), which Rails
- * calls without defining (`xml_mini.rb:75`); the gem is not part of the
- * vendored Rails corpus the port mirrors.
- */
+/** @noRailsEquivalent PERMANENT */
 export function toD(str: string): BigDecimal {
   return BigDecimal.interpretLoosely(str);
 }

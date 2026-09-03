@@ -1,9 +1,3 @@
-// Default safe lists, ported verbatim from rails-html-sanitizer
-// (lib/rails/html/sanitizer.rb, module SafeList).
-//
-// Keep these in sync with the upstream Ruby source. A parity test pins the
-// sets against the Rails fixture so drift is caught.
-
 export const DEFAULT_ALLOWED_TAGS: ReadonlySet<string> = new Set([
   "a",
   "abbr",

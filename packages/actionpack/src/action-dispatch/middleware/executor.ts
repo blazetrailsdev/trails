@@ -1,10 +1,3 @@
-/**
- * ActionDispatch::Executor
- *
- * Wraps the request in an ActiveSupport::Executor#run! / state.complete! cycle,
- * reporting unhandled exceptions through the executor's error reporter.
- */
-
 import { BodyProxy } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";

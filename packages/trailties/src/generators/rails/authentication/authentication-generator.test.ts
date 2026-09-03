@@ -91,7 +91,6 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("partial pre-existing config: missing pieces filled, no duplicates", () => {
-    // Pre-existing token-less passwords route, session route, extensionless import.
     write(
       "config/routes.ts",
       `// routes\n  router.resources("passwords");\n  router.resource("session");\n`,
@@ -135,7 +134,6 @@ describe("AuthenticationGenerator", () => {
 
   it("emits working method bodies, not comment stubs", () => {
     makeGen().run({ skipMailer: false, skipActionCable: false });
-    // A body whose only statement is a comment is the shape this used to emit.
     for (const rel of TS_EMIT) expect(read(rel), rel).not.toMatch(/\{\s*\/\/[^\n]*\n\s*\}/);
     expect(read("app/controllers/sessions-controller.ts")).toContain("User.authenticateBy(");
     expect(read("app/controllers/concerns/authentication.ts")).toContain("Session.findBy(");

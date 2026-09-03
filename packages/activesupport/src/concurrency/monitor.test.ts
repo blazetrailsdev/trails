@@ -42,9 +42,6 @@ describe("MonitorMixin", () => {
     });
     let detached!: Promise<void>;
 
-    // The detached task inherits the holder's AsyncContext, but the holder has
-    // released by the time it runs — so its owner token no longer matches and
-    // it must take the lock like any other chain rather than walking in.
     await host.synchronize(async () => {
       detached = (async () => {
         await gate;
@@ -94,10 +91,6 @@ describe("MonitorMixin", () => {
       log.push("queued");
     });
 
-    // The late arrival lands in the release window: the holder has already
-    // dropped the lock, but the parked waiter's continuation has not drained
-    // yet. A check-then-set lock lets it barge through there; the extra `then`
-    // is what places the arrival inside that window.
     const late = held.then(() => {}).then(() => host.synchronize(() => log.push("late")));
     releaseHolder();
 

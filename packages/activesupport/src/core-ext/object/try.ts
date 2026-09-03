@@ -1,8 +1,3 @@
-/**
- * Tryable — safe method invocation on objects that may be nil.
- * Mirrors ActiveSupport's Object#try, Object#try!, and Delegator#try.
- */
-
 export interface Tryable {
   try(method: string, ...args: unknown[]): unknown;
   tryBang(method: string, ...args: unknown[]): unknown;

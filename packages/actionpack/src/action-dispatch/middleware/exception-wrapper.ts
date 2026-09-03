@@ -1,9 +1,4 @@
 import { hasKey } from "@blazetrails/ruby-compat";
-/**
- * ActionDispatch::ExceptionWrapper
- *
- * Wraps exceptions to provide consistent error metadata for error pages.
- */
 
 import { ActionableError, type BacktraceCleaner } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
@@ -15,22 +10,9 @@ import {
 } from "@blazetrails/actionview";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
-/**
- * A built backtrace entry: a raw V8 frame, or one remapped onto the template
- * it was compiled from. Ruby's `build_backtrace` produces the same union of
- * `Thread::Backtrace::Location` and `SourceMapLocation`.
- *
- * @noRailsEquivalent PERMANENT — the union Ruby expresses by duck typing.
- */
+/** @noRailsEquivalent PERMANENT */
 export type BacktraceLine = string | SourceMapLocation;
 
-/**
- * Mirrors `ExceptionWrapper::SourceMapLocation` (`exception_wrapper.rb:232-250`).
- *
- * Ruby delegates a `Thread::Backtrace::Location`; a trails backtrace entry IS
- * its own string form, so the delegated object is that string and `String` is
- * the DelegateClass.
- */
 class SourceMapLocation extends String {
   private template: Template;
 
@@ -39,15 +21,7 @@ class SourceMapLocation extends String {
     this.template = template;
   }
 
-  /**
-   * Mirrors `SourceMapLocation#spot(exc)` (`exception_wrapper.rb:239-248`).
-   *
-   * Ruby's `else location = super` arm asks `ErrorHighlight` for the spot when
-   * the AST cannot answer; V8 has no ErrorHighlight, so `exc` has nothing to be
-   * handed to and a frame that carries no line/column yields no location.
-   *
-   * @missingRailsCall super — PERMANENT
-   */
+  /** @missingRailsCall super — PERMANENT */
   spot(exc: Error): Spot | null {
     const getobj = backtraceLocationFor(String(this));
     if (!getobj) return null;
@@ -60,14 +34,7 @@ class SourceMapLocation extends String {
   }
 }
 
-/**
- * `loc.label` (`exception_wrapper.rb:264`) — the name of the method a frame is
- * inside. V8 spells it between `at ` and the opening paren, qualified by the
- * receiver, which Ruby's bare `label` is not.
- *
- * @noRailsEquivalent PERMANENT — Ruby reads `label` off a backtrace location
- * object; V8's frame is a formatted string, so the read has no counterpart.
- */
+/** @noRailsEquivalent PERMANENT */
 function labelFor(trace: string): string | null {
   const match = /^at\s+([^\s(]+)\s*\(/.exec(trace.trim());
   if (!match) return null;
@@ -75,13 +42,7 @@ function labelFor(trace: string): string | null {
   return qualified.slice(qualified.lastIndexOf(".") + 1);
 }
 
-/**
- * The line/column half of `__getobj__` — Ruby reads them off a
- * `Thread::Backtrace::Location`, a V8 stack entry carries them in its text.
- *
- * @noRailsEquivalent PERMANENT — Ruby's backtrace location is a parsed object;
- * V8's is a formatted string, so the parse has no Ruby counterpart.
- */
+/** @noRailsEquivalent PERMANENT */
 function backtraceLocationFor(trace: string): BacktraceLocation | null {
   const match = /:(\d+):(\d+)\)?$/.exec(trace.trim());
   if (!match) return null;
@@ -107,9 +68,6 @@ const STATUS_MAP: Record<string, number> = {
   InvalidParameterError: 400,
   ParamsTooDeepError: 400,
   UnpermittedParameters: 400,
-  // ActionDispatch ParseError/ParamError family — Rails' rescue_responses uses
-  // the fully-qualified class names that param-error.ts and parameters.ts
-  // assign via `this.name`. All map to 400 Bad Request.
   "ActionDispatch::Http::Parameters::ParseError": 400,
   "ActionDispatch::ParamError": 400,
   "ActionDispatch::ParameterTypeError": 400,
@@ -117,11 +75,6 @@ const STATUS_MAP: Record<string, number> = {
   "ActionDispatch::ParamsTooDeepError": 400,
 };
 
-// Rails keys these by fully-qualified class names. trails error classes set
-// `.name` inconsistently (TemplateError uses the Rails-qualified form;
-// MissingTemplate/RoutingError/ActionNotFound/MissingExactTemplate use the
-// short form), so both spellings live here until the short ones are
-// promoted to Rails-qualified names.
 /** @internal */
 const RESCUE_TEMPLATES: Record<string, string> = {
   "ActionView::MissingTemplate": "missing_template",
@@ -146,13 +99,6 @@ const SILENT_EXCEPTIONS = new Set<string>([
   "ActionDispatch::Http::MimeNegotiation::InvalidType",
 ]);
 
-// JS closest analog to Ruby's exception.class.name. Prefer `e.name` first
-// since trails error classes set it to the Rails-qualified constant (e.g.
-// "ActionDispatch::Http::Parameters::ParseError") that STATUS_MAP /
-// SILENT_EXCEPTIONS key off. Fall back to the constructor name so custom
-// subclasses that forget to assign `name` don't collapse into the generic
-// "Error" bucket. The default inherited "Error" on either side is treated
-// as unset.
 function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;
   const ctor = e.constructor?.name;
@@ -173,12 +119,6 @@ function _idFor(err: object): number {
 
 export type TraceEntry = { file: string; line: number };
 export type TraceWithId = { exceptionObjectId: number; id: number; trace: string };
-/**
- * A source fragment keyed by line number. Rails' `extract_source` replaces the
- * offending line with the `[before, spot, after]` triple `extract_source`
- * splits at the spot's columns (`exception_wrapper.rb:301-307`), which is why
- * a value is a string OR that triple.
- */
 export type SourceExtract = TraceEntry & {
   code?: Record<number, string | [string, string, string]>;
 };
@@ -224,10 +164,6 @@ export class ExceptionWrapper {
     return this.exception instanceof RoutingError || this.exceptionClassName === "RoutingError";
   }
 
-  // ActionView::Template::Error is ported (actionview/src/template/error.ts
-  // sets name = "ActionView::Template::Error") but we deliberately avoid
-  // importing actionview from actionpack — name match keeps the dependency
-  // direction one-way.
   isTemplateError(): boolean {
     return (
       this.exceptionClassName === "TemplateError" ||
@@ -401,10 +337,7 @@ export class ExceptionWrapper {
     return this.buildBacktrace();
   }
 
-  /**
-   * Mirrors `ExceptionWrapper#build_backtrace` (`exception_wrapper.rb:254-275`).
-   * @internal
-   */
+  /** @internal */
   buildBacktrace(): BacktraceLine[] {
     const builtMethods = new Map<string, Template>();
 
@@ -452,13 +385,7 @@ export class ExceptionWrapper {
     return out;
   }
 
-  /**
-   * Rails passes `kind` straight into BacktraceCleaner#clean (which supports
-   * :silent/:noise/:all via its silencer chain). Our cleaner doesn't yet take
-   * a kind, so we always apply the local node_modules partition so the three
-   * trace getters stay distinct, then let the cleaner post-process the slice.
-   * @internal
-   */
+  /** @internal */
   cleanBacktrace(args: "silent" | "noise" | "all"): BacktraceLine[] {
     const lines = this.backtrace();
     const partitioned =
@@ -472,10 +399,7 @@ export class ExceptionWrapper {
       : partitioned;
   }
 
-  /**
-   * Mirrors `ExceptionWrapper#extract_source(trace)` (`exception_wrapper.rb:294-320`).
-   * @internal
-   */
+  /** @internal */
   extractSource(trace: BacktraceLine): SourceExtract {
     const spot = trace instanceof SourceMapLocation ? trace.spot(this.exception) : null;
 

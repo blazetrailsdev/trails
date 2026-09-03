@@ -1,10 +1,3 @@
-/**
- * ActionDispatch::DebugExceptions
- *
- * Middleware that catches exceptions and renders debug error pages
- * in development mode.
- */
-
 import { stderr } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
@@ -12,14 +5,7 @@ import { ExceptionWrapper } from "./exception-wrapper.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
-/**
- * The duck type this middleware needs from `env["action_dispatch.logger"]`.
- * Rails names no constant for it — `logger` is called bare.
- *
- * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Logger`
- * constants (`AbstractController::Logger`, the `ActiveSupport::Logger` class)
- * are a controller mixin and a concrete logger; neither is this receiver shape.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface Logger {
   error(message: string): void;
   warn?(message: string): void;
@@ -27,37 +13,21 @@ export interface Logger {
 }
 
 export interface DebugExceptionsOptions {
-  /** Show detailed error pages (default: true) */
   showDetailedExceptions?: boolean;
-  /** Show exceptions at all (default: true) */
   showExceptions?: boolean;
-  /** Log level for exceptions (default: "error") */
   logLevel?: "error" | "warn" | "info";
-  /** Logger instance */
   logger?: Logger;
-  /** Log rescued responses (default: true) */
   logRescuedResponses?: boolean;
-  /** Interceptors called before rendering error page */
   interceptors?: Interceptor[];
-  /** Response shape (default: "default"; "api" disables template rendering) */
   responseFormat?: "default" | "api";
 }
 
 export type Interceptor = (env: RackEnv, exception: Error) => void;
 
 export class DebugExceptions {
-  /**
-   * Class-level interceptor registry. Mirrors Rails'
-   * `cattr_reader :interceptors`.
-   *
-   * @internal
-   */
+  /** @internal */
   static readonly interceptors: Interceptor[] = [];
 
-  /**
-   * Append an interceptor to the class-level registry. Mirrors Rails'
-   * `DebugExceptions.register_interceptor`.
-   */
   static registerInterceptor(object: Interceptor): void {
     DebugExceptions.interceptors.push(object);
   }
@@ -83,13 +53,7 @@ export class DebugExceptions {
     this.responseFormat = options.responseFormat ?? "default";
   }
 
-  /**
-   * Iterate registered interceptors, swallowing per-interceptor errors
-   * and logging them via {@link logError}. Mirrors Rails'
-   * `invoke_interceptors`.
-   *
-   * @internal
-   */
+  /** @internal */
   invokeInterceptors(request: RackEnv, exception: Error, wrapper: ExceptionWrapper): void {
     for (const interceptor of this.interceptors) {
       try {
@@ -100,12 +64,7 @@ export class DebugExceptions {
     }
   }
 
-  /**
-   * Render the API JSON error body for an exception. Mirrors Rails'
-   * `render_for_api_request`.
-   *
-   * @internal
-   */
+  /** @internal */
   renderForApiRequest(wrapper: ExceptionWrapper): RackResponse {
     const body = JSON.stringify({
       status: wrapper.statusCode,
@@ -116,15 +75,7 @@ export class DebugExceptions {
     return this.render(wrapper.statusCode, body, "application/json");
   }
 
-  /**
-   * Rack response builder used by {@link renderForApiRequest}. Mirrors
-   * Rails' private `DebugExceptions#render(status, body, format)`. The
-   * legacy `renderJsonError` / `renderXmlError` / `renderHtmlError` /
-   * `renderTextError` paths predate this helper and build their own
-   * tuples directly; they should migrate to `render` over time.
-   *
-   * @internal
-   */
+  /** @internal */
   render(status: number, body: string, format: string): RackResponse {
     const charset = "utf-8";
     return [
@@ -137,18 +88,8 @@ export class DebugExceptions {
     ];
   }
 
-  /**
-   * Format and log a rescued exception. Mirrors Rails' `log_error` —
-   * walks `cause` chain, then dispatches to {@link logArray}.
-   *
-   * @internal
-   */
+  /** @internal */
   logError(request: RackEnv, wrapper: ExceptionWrapper): void {
-    // Rails: `request.logger || ActionView::Base.logger || stderr_logger`.
-    // trails' `request.logger` reads `action_dispatch.logger` then
-    // `rack.logger` (http/request.ts:480) — mirror that here, then fall
-    // back to the constructor option, then the stderr logger so errors
-    // are never silently swallowed.
     const logger =
       (request["action_dispatch.logger"] as Logger | undefined) ??
       (request["rack.logger"] as Logger | undefined) ??
@@ -178,12 +119,7 @@ export class DebugExceptions {
     this.logArray(logger, lines, request);
   }
 
-  /**
-   * Newline-join `lines` and emit them via `logger.add(level, ...)`.
-   * Mirrors Rails' `log_array`.
-   *
-   * @internal
-   */
+  /** @internal */
   logArray(logger: Logger, lines: string[], request: RackEnv): void {
     if (lines.length === 0) return;
     const level =
@@ -199,12 +135,7 @@ export class DebugExceptions {
     fn.call(logger, message);
   }
 
-  /**
-   * Lazily-initialized fallback logger writing to `stderr`. Mirrors
-   * Rails' `stderr_logger`.
-   *
-   * @internal
-   */
+  /** @internal */
   stderrLogger(): Logger {
     if (this._stderrLogger) return this._stderrLogger;
     this._stderrLogger = {
@@ -215,27 +146,12 @@ export class DebugExceptions {
     return this._stderrLogger;
   }
 
-  /**
-   * Builds a routes inspector for routing/template errors. Mirrors Rails'
-   * `routes_inspector(exception)` — only returns an inspector when the
-   * wrapper marks the exception as a routing or template error.
-   *
-   * @internal
-   */
+  /** @internal */
   routesInspector(_exception: ExceptionWrapper): unknown {
-    // The `@routes_app` constructor argument from Rails isn't plumbed
-    // through trails' DebugExceptions yet — there is no routes_app to
-    // ask for `.routes`. Return null until the wiring lands.
     return null;
   }
 
-  /**
-   * Whether the response should be rendered as an API response. Mirrors
-   * Rails' `api_request?` — true when `responseFormat: "api"` was passed
-   * to the constructor and the resolved content type is not HTML.
-   *
-   * @internal
-   */
+  /** @internal */
   isApiRequest(contentType: string | null | undefined): boolean {
     if (this.responseFormat !== "api") return false;
     return !contentType || !contentType.includes("text/html");
@@ -262,7 +178,6 @@ export class DebugExceptions {
 
     this.invokeInterceptors(env, exception, wrapper);
 
-    // Log the exception
     this.logError(env, wrapper);
 
     if (!this.showExceptions) {
@@ -273,14 +188,10 @@ export class DebugExceptions {
       return this.renderMinimalError(wrapper);
     }
 
-    // Determine response format
     const accept = (env["HTTP_ACCEPT"] as string) ?? "";
     const xhr = env["HTTP_X_REQUESTED_WITH"] === "XMLHttpRequest";
     const contentType = (env["CONTENT_TYPE"] as string) ?? "";
 
-    // When configured for the api response format, route any non-HTML
-    // request through the Rails-shaped JSON body. Mirrors Rails'
-    // `api_request?(content_type) ? render_for_api_request(...) : ...`.
     const negotiated = accept || contentType;
     if (this.isApiRequest(negotiated)) {
       return this.renderForApiRequest(wrapper);
@@ -298,7 +209,6 @@ export class DebugExceptions {
       return this.renderXmlError(wrapper);
     }
 
-    // Default to HTML
     return this.renderHtmlError(wrapper, env);
   }
 

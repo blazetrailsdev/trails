@@ -1,6 +1,3 @@
-// Ported from Ruby's did_you_mean/jaro_winkler.rb
-// (https://github.com/ruby/did_you_mean), MIT License.
-
 /** @internal */
 function codepoints(s: string): number[] {
   const out: number[] = [];
@@ -8,9 +5,7 @@ function codepoints(s: string): number[] {
   return out;
 }
 
-/** Mirrors Ruby `DidYouMean::Jaro.distance`. */
 export class Jaro {
-  /** Jaro distance over Unicode codepoints. */
   static distance(str1: string, str2: string): number {
     let cp1 = codepoints(str1);
     let cp2 = codepoints(str2);
@@ -50,8 +45,6 @@ export class Jaro {
     let k = 0;
     for (let i = 0; i < length1; i++) {
       if (flags1[i] !== 0) {
-        // flags1 and flags2 carry the same number of set bits (m matches),
-        // so this scan always finds one.
         let j = k;
         let index = k;
         while (j < length2) {
@@ -74,9 +67,7 @@ export class Jaro {
 const JW_WEIGHT = 0.1;
 const JW_THRESHOLD = 0.7;
 
-/** Mirrors Ruby `DidYouMean::JaroWinkler.distance`. */
 export class JaroWinkler {
-  /** Jaro-Winkler distance (boost for shared prefixes up to length 4). */
   static distance(str1: string, str2: string): number {
     const j = Jaro.distance(str1, str2);
     if (j <= JW_THRESHOLD) return j;

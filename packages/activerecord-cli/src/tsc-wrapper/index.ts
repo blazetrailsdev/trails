@@ -1,8 +1,3 @@
-// AR-wired convenience helpers — use these from AR-aware code so the
-// `ar-models` plugin (declares + auto-import) is registered for you.
-// For raw plugin control, import the neutral
-// `createTrailsProgram` / `createTrailsSolutionBuilder` from
-// `@blazetrails/trails-tsc` directly.
 export {
   createArTrailsProgram,
   createArSolutionBuilder,
@@ -16,14 +11,6 @@ export {
   type SchemaColumnsByTable,
 } from "./schema-ts-parser.js";
 
-// Re-export plugin types and remap helpers (no behavioral surprise:
-// these are pure / framework-agnostic). The plugin-host primitives
-// (`createTrailsProgram`, `createTrailsSolutionBuilder`,
-// `buildCompilerHost`) are intentionally NOT re-exported from this
-// barrel — re-exporting them under `@blazetrails/activerecord-cli/tsc`
-// would silently drop AR virtualization for callers expecting the
-// pre-extraction behavior. Import them from `@blazetrails/trails-tsc`
-// explicitly when raw access is needed.
 export type {
   LineDelta,
   PluginFactory,

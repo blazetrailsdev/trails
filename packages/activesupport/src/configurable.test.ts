@@ -14,10 +14,6 @@ Parent.configAccessor("baz", { instanceAccessor: false });
 
 class Child extends Parent {}
 
-/**
- * Mirrors minitest's `assert_not_respond_to`. Ruby's `foo=` writer is a JS
- * setter on the property itself, so a trailing `=` asks about the setter half.
- */
 function assertNotRespondTo(object: any, method: string): void {
   expect(respondTo(object, method)).toBe(false);
 }
@@ -32,19 +28,16 @@ function respondTo(object: any, method: string): boolean {
   return false;
 }
 
-/** Mirrors `assert_method_defined` (configurable_test.rb:130-133). */
 function assertMethodDefined(object: any, method: string): void {
   const methods = publicMethods(object);
   expect(methods).toContain(method);
 }
 
-/** Mirrors `assert_method_not_defined` (configurable_test.rb:135-138). */
 function assertMethodNotDefined(object: any, method: string): void {
   const methods = publicMethods(object);
   expect(methods).not.toContain(method);
 }
 
-/** Ruby's `Object#public_methods`, which spans the whole ancestor chain. */
 function publicMethods(object: any): string[] {
   const methods: string[] = [];
   for (let proto = object; proto != null; proto = Object.getPrototypeOf(proto)) {

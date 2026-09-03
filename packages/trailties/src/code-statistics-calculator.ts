@@ -1,12 +1,3 @@
-/**
- * Port of railties/lib/rails/code_statistics_calculator.rb.
- *
- * Counts lines/codeLines/classes/methods in source text by file type.
- * Patterns mirror Rails' for rb/erb (spelled tse here)/css/scss/js/coffee; ts/tsx add TS
- * equivalents (function, arrow, class method shorthand with leading
- * keyword, get/set accessors).
- */
-
 export type FileType =
   | "rb"
   | "tse"

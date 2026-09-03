@@ -1,5 +1,3 @@
-/** Mirrors: i18n/test/backend/simple_test.rb */
-
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
@@ -16,7 +14,6 @@ import {
 import { en } from "../test-data/locales/en.js";
 import type { TranslationData } from "../utils.js";
 
-/** Mirrors: `locales_dir` in i18n/test/test_helper.rb:44. */
 function localesDir(): string {
   return new URL("../test-data/locales", import.meta.url).pathname;
 }
@@ -28,8 +25,6 @@ describe("I18nBackendSimpleTest", () => {
     resetConfig();
     resetClassConfig();
     registerFileReader((filename) => readFile(filename, "utf8"));
-    // The gem reads files synchronously inside `load_translations`; here the
-    // I/O is awaited up front so every ported body below stays synchronous.
     await preloadTranslationFiles(
       ["en.yml", "en.yaml", "en.json", "fr.yml", "invalid/empty.yml", "invalid/syntax.yml"].map(
         (name) => `${localesDir()}/${name}`,
@@ -41,14 +36,10 @@ describe("I18nBackendSimpleTest", () => {
     config().enforceAvailableLocales = false;
   });
 
-  // Minitest's `assert_predicate`, which i18n cannot import (no activesupport
-  // dependency). Ruby names the predicate with a Symbol; JS has no such
-  // protocol to send, so it is a function applied to `actual`.
   function assertPredicate<T>(actual: T, predicate: (value: T) => unknown): void {
     expect(predicate(actual)).toBe(true);
   }
 
-  /** Stands in for Ruby's `send`, which the gem's tests use for these. */
   function send(
     target: Simple,
     name: "loadJs" | "loadYml" | "loadJson",
@@ -63,18 +54,14 @@ describe("I18nBackendSimpleTest", () => {
     return backend.storeTranslations(locale, data);
   }
 
-  /** Mirrors `translations` in i18n/test/test_helper.rb:36-38, which reads the
-   * raw `@translations` ivar rather than going through the lazy reader. */
   function translations(): TranslationData {
     return (backend as unknown as { translationsStore: TranslationData }).translationsStore;
   }
 
-  /** Stands in for `I18n.t`, which the facade story ports. */
   function t(key: TranslationKey | null, options: TranslateOptions = {}): unknown {
     return catchException(() => backend.translate("en", key, options));
   }
 
-  // useful because this way we can use the backend with no key for interpolation/pluralization
   it("simple backend translate: given nil as a key it still interpolations the default value", () => {
     expect(t(null, { default: "Hi %{name}", name: "David" })).toBe("Hi David");
   });
@@ -132,8 +119,6 @@ describe("I18nBackendSimpleTest", () => {
     }
   });
 
-  // loading translations
-
   it("simple load_translations: given an unknown file type it raises I18n::UnknownFileType", () => {
     expect(() => backend.loadTranslations(`${localesDir()}/en.xml`)).toThrow(UnknownFileType);
   });
@@ -164,8 +149,6 @@ describe("I18nBackendSimpleTest", () => {
   it("simple load_yml: loads data from a YAML file", () => {
     const [data] = send(backend, "loadYml", `${localesDir()}/en.yml`);
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    // The gem's `else` arm asserts the same tree with String keys, which is the
-    // same assertion here.
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
     assertPredicate((data as TranslationData)["en"], (en) =>
       Object.isFrozen(((en as TranslationData)["foo"] as TranslationData)["bar"]),
@@ -175,9 +158,6 @@ describe("I18nBackendSimpleTest", () => {
   it("simple load_json: loads data from a JSON file", () => {
     const [data] = send(backend, "loadJson", `${localesDir()}/en.json`);
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
-    // The gem's `else` arm (for a loader without `unsafe_load_file`/`load_file`)
-    // asserts the same tree with String keys; a Ruby Symbol is a JS string, so
-    // it is the same assertion here.
     expect(data).toEqual({ en: { foo: { bar: "baz" } } });
     assertPredicate((data as TranslationData)["en"], (en) =>
       Object.isFrozen(((en as TranslationData)["foo"] as TranslationData)["bar"]),
@@ -197,8 +177,6 @@ describe("I18nBackendSimpleTest", () => {
       backend.loadTranslations([`${localesDir()}/en.js`, `${localesDir()}/en.yml`]),
     ).not.toThrow();
   });
-
-  // storing translations
 
   it("simple store_translations: stores translations, ... no, really :-)", () => {
     storeTranslations("en", { foo: "bar" });
@@ -244,7 +222,6 @@ describe("I18nBackendSimpleTest", () => {
     storeTranslations("en", { 1: "foo" });
     expect(t("1")).toBe("foo");
     expect(t(1)).toBe("foo");
-    // The gem's third arm passes the Symbol `:'1'`, the same key here.
     expect(t("1")).toBe("foo");
   });
 
@@ -257,12 +234,8 @@ describe("I18nBackendSimpleTest", () => {
     await backend.reloadBang();
 
     backend.storeTranslations("fr", data, { skipSymbolizeKeys: true });
-    // JS object keys are already strings, so the only observable difference is
-    // that the stored subtree is the caller's object rather than a deep copy.
     expect(translations()["fr"]).toEqual({ foo: { bar: "barfr", baz: "bazfr" } });
   });
-
-  // reloading translations
 
   it("simple reload_translations: unloads translations", async () => {
     storeTranslations("en", { foo: "bar" });

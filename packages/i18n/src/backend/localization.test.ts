@@ -1,11 +1,3 @@
-/**
- * Mirrors: i18n/lib/i18n/tests/localization/date.rb,
- * i18n/lib/i18n/tests/localization/time.rb,
- * i18n/lib/i18n/tests/localization/date_time.rb and
- * i18n/lib/i18n/tests/localization/procs.rb — the conformance mixins the gem
- * runs against the Simple backend in i18n/test/api/simple_test.rb.
- */
-
 import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
 import { config, l, resetConfig } from "../i18n.js";
@@ -73,7 +65,6 @@ function setupTimeTranslations(): void {
 }
 
 function setupDatetimeTranslations(): void {
-  // time translations might have been set up in Tests::Api::Localization::Time
   config().backend.storeTranslations("de", {
     time: {
       formats: {
@@ -87,10 +78,6 @@ function setupDatetimeTranslations(): void {
   });
 }
 
-/**
- * Ruby's lambda takes `|*args, **kwargs|`; `resolve` calls it with the object
- * and the options hash, which is the two-parameter shape here.
- */
 function inspectArgs(args: unknown[], kwargs: Record<string, unknown>): string {
   args.push(kwargs);
   args = args.map((arg) => {

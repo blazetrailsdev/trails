@@ -4,14 +4,6 @@ import { coder } from "../coder.js";
 import type { Store, StoreOptions } from "../store.js";
 import { assertSame } from "../../testing/assertions.js";
 
-// Mirrors Rails `CacheStoreCoderBehavior`
-// (activesupport/test/cache/behaviors/cache_store_coder_behavior.rb).
-// Ruby's `include CacheStoreCoderBehavior` is spelled here as a function the
-// store test file calls inside its own describe, which is the trails spelling
-// of a test-behavior mixin.
-
-// Ruby names `Marshal` directly; trails' equivalent is the fidelity coder
-// (cache/coder.ts), so a dumped entry is its packed members.
 class SpyCoder {
   dumpedEntries: Entry[] = [];
   loadedEntries: Entry[] = [];
@@ -38,8 +30,6 @@ class SpyCoder {
   }
 }
 
-// Rails calls the private `serialize_entry` through `send`
-// (cache_store_coder_behavior.rb:90).
 function serializeEntry(store: Store, entry: Entry): unknown {
   return (store as unknown as { serializeEntry(entry: Entry): unknown }).serializeEntry(entry);
 }
@@ -116,8 +106,6 @@ export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void
   it("coder is used during handle expired entry when expired", async () => {
     const coder = new SpyCoder();
     const store = host.lookupStore({ coder });
-    // Ruby writes a 1-second entry and `travel_to(2.seconds.from_now)`; there
-    // is no time-travel helper here, so the entry expires on the real clock.
     store.write("foo", "bar", { expiresIn: 0.05 });
     expect(coder.loadedEntries.length).toBe(0);
     expect(coder.dumpedEntries.length).toBe(1);
@@ -130,10 +118,9 @@ export function cacheStoreCoderBehavior(host: CacheStoreCoderBehaviorHost): void
       () => "baz",
     );
     expect(val).toBe("baz");
-    expect(coder.loadedEntries.length).toBe(1); // 1 read in fetch
+    expect(coder.loadedEntries.length).toBe(1);
     expect(coder.loadedEntries[0].value).toBe("bar");
-    expect(coder.dumpedEntries.length).toBe(1); // did not change from original write
-    // 1 write the expired entry handler, 1 in fetch
+    expect(coder.dumpedEntries.length).toBe(1);
     expect(coder.dumpCompressedEntries.length).toBe(2);
     expect(coder.dumpCompressedEntries[0].value).toBe("bar");
     expect(coder.dumpCompressedEntries[coder.dumpCompressedEntries.length - 1].value).toBe("baz");

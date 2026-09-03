@@ -38,13 +38,9 @@ export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions
   }
 
   protected convert(): string {
-    // Rails keeps the rounded BigDecimal through `number / (10**exponent)`
-    // (number_to_human_converter.rb:12-14); BigDecimal division is unported,
-    // so the value drops to a float for the exponent scaling.
     this.number = new RoundingHelper(this.options).round(this.number) as BigDecimal;
     this.number = kernelFloat(this.number);
 
-    // For backwards compatibility with those that didn't add stripInsignificantZeros to their locale files.
     const options = this.options;
     if (!hasKey(options, "stripInsignificantZeros")) {
       options.stripInsignificantZeros = true;

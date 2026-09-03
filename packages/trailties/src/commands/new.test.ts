@@ -10,7 +10,6 @@ describe("NewCommand", () => {
   it("accepts a name argument", () => {
     const program = createProgram();
     const cmd = program.commands.find((c) => c.name() === "new");
-    // Commander stores arguments as registeredArguments
     expect(cmd?.registeredArguments?.length).toBeGreaterThan(0);
   });
 

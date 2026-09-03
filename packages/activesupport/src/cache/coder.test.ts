@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import { coder } from "./coder.js";
 import { Temporal } from "@blazetrails/date";
 
-// Fidelity guarantees of the trails Marshal-equivalent serializer: the cases
-// where plain JSON would lose or mangle a value. These are not Rails tests —
-// they pin the type-round-trip property documented in coder.ts.
 describe("cache coder fidelity", () => {
   function roundtrip(value: unknown): unknown {
     return coder.load(coder.dump(value));
@@ -57,8 +54,6 @@ describe("cache coder fidelity", () => {
   });
 
   it("escapes arrays whose head collides with a type tag", () => {
-    // A genuine user array that happens to start with a sentinel-looking string
-    // must not be mistaken for a Date/bigint/etc. tag.
     const value = ["~#d", 1750000000000];
     const result = roundtrip(value);
     expect(result).toEqual(value);
@@ -66,7 +61,6 @@ describe("cache coder fidelity", () => {
   });
 
   it("leaves objects carrying a tag-like key untouched", () => {
-    // Tags are arrays, so objects never collide regardless of their keys.
     const value = { "~#d": "not really a date", value: 1 };
     expect(roundtrip(value)).toEqual(value);
   });
@@ -77,7 +71,6 @@ describe("cache coder fidelity", () => {
   });
 
   it("dumps control characters raw so a binary-ish payload keeps its byte size", () => {
-    // Ruby's `[*0..127].pack("C*")`, whose Marshal payload tracks its 128 bytes.
     const value = Array.from({ length: 128 }, (_, i) => String.fromCharCode(i)).join("");
     expect(coder.dump(value).length).toBeLessThan(value.length + 16);
     expect(roundtrip(value)).toBe(value);

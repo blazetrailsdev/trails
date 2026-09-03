@@ -3,11 +3,6 @@ import * as path from "node:path";
 import type { LineDelta } from "./plugin.js";
 import type { TrailsCompilerHost } from "./host.js";
 
-/**
- * Translate a 0-indexed line in the virtualized text back to the
- * original source line, walking deltas in reverse. Returns `null`
- * when the position falls inside an injected block.
- */
 export function remapLine(virtualLine: number, deltas: readonly LineDelta[]): number | null {
   let line = virtualLine;
   for (let i = deltas.length - 1; i >= 0; i--) {
@@ -21,13 +16,6 @@ export function remapLine(virtualLine: number, deltas: readonly LineDelta[]): nu
   return line;
 }
 
-/**
- * Remap diagnostics from virtualized-source coordinates back to the
- * user's original source. For each diagnostic in a virtualized file,
- * creates a SourceFile from the original (non-virtualized) text and
- * computes the correct position, so ts.formatDiagnostics shows the
- * user's real line numbers.
- */
 export function remapDiagnostics(
   diagnostics: readonly ts.Diagnostic[],
   host: TrailsCompilerHost,
@@ -55,8 +43,6 @@ function remapOneDiagnostic(
   host: TrailsCompilerHost,
   originalSfCache: Map<string, ts.SourceFile>,
 ): ts.Diagnostic {
-  // Always remap relatedInformation entries — they may point into
-  // virtualized files even when the parent diagnostic doesn't.
   const remappedRelated = d.relatedInformation?.map(
     (ri) =>
       remapOneDiagnostic(

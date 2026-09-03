@@ -102,10 +102,8 @@ describe("Callbacks", () => {
         seen.push({ self: this, args });
       };
 
-      // InstanceExec0/1: instance_exec(&block) / instance_exec(target, &block).
       new CallTemplate.InstanceExec0(record).makeLambda()(target, "v");
       new CallTemplate.InstanceExec1(record).makeLambda()(target, "v");
-      // InstanceExec2 is the around template: instance_exec(target, block, &block).
       new CallTemplate.InstanceExec2(record).makeLambda()(target, "v", block);
 
       expect(seen[0]).toEqual({ self: target, args: [] });
@@ -124,8 +122,6 @@ describe("Callbacks", () => {
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
       setCallback(target, "save", "before", (t: any) => t.log.push("before"));
-      // Register the after before the around so it wraps outside it (Rails
-      // compiles afters registered earlier onto the outer sequence).
       setCallback(target, "save", "after", (t: any) => t.log.push("after"));
       setCallback(target, "save", "around", (t: any, next: () => void) => {
         t.log.push("around-pre");
@@ -139,9 +135,6 @@ describe("Callbacks", () => {
     });
 
     it("after registered after an around runs inside it", () => {
-      // Rails compiles an after registered later onto the inner (final) sequence,
-      // so it runs right after the block — before the around's post — rather than
-      // outside the around. Mirrors CallbackChain#compile's reverse fold.
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
       setCallback(target, "save", "around", (t: any, next: () => void) => {
@@ -158,9 +151,6 @@ describe("Callbacks", () => {
   });
 
   describe("around dispatch shapes (method-name & object)", () => {
-    // Rails covers a Symbol-filter around callback via AroundPersonResult#tweedle_dum
-    // (`@result = yield`), which compiles to CallTemplate::MethodCall and dispatches
-    // `target.send(method, &block)` — the continuation is threaded as the block.
     it("test_save_around", () => {
       const tweedleDum = Symbol("tweedleDum");
       const target: any = { history: [] as string[], result: null };
@@ -170,8 +160,6 @@ describe("Callbacks", () => {
         this.history.push("tweedle dum post");
       };
       defineCallbacks(target, "save");
-      // A Symbol filter is the method-name branch; a function would compile to
-      // InstanceExec instead. Cast past the AnyCallback type as tests do elsewhere.
       setCallback(target, "save", "around", tweedleDum as any);
 
       runCallbacks(target, "save", () => {
@@ -180,7 +168,6 @@ describe("Callbacks", () => {
       });
 
       expect(target.history).toEqual(["tweedle dum pre", "running", "tweedle dum post"]);
-      // next() surfaces the block's return (Rails' `yield` inside the around).
       expect(target.result).toBe("running");
     });
   });
@@ -258,8 +245,6 @@ describe("Callbacks", () => {
     });
 
     it("does not swallow the abort sentinel when terminator is disabled", () => {
-      // Rails scopes `catch(:abort)` to the default terminator; with the
-      // terminator disabled the sentinel must propagate, not halt the chain.
       const target = {};
       defineCallbacks(target, "save", { terminator: false });
       setCallback(target, "save", "before", () => throwAbort());
@@ -268,8 +253,6 @@ describe("Callbacks", () => {
     });
 
     it("does not swallow the abort sentinel for a custom terminator", () => {
-      // A custom terminator owns the halt decision; unless it catches the
-      // sentinel itself, throwAbort() propagates past it.
       const target = {};
       defineCallbacks(target, "save", {
         terminator: (_t, fn) => fn() === false,
@@ -298,7 +281,6 @@ describe("Callbacks", () => {
       defineCallbacks(target, "save");
       setCallback(target, "save", "around", (t: any) => {
         t.log.push("halted");
-        // not calling next
       });
 
       runCallbacks(target, "save", () => {
@@ -320,8 +302,6 @@ describe("Callbacks", () => {
       const result = runCallbacks(target, "save", () => {
         target.log.push("block");
       });
-      // Rails: an around that never yields leaves env.value unset, and
-      // run_callbacks returns env.value — nil, not false.
       expect(result).toBeUndefined();
       expect(target.log).toEqual(["around"]);
     });
@@ -330,7 +310,6 @@ describe("Callbacks", () => {
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
       setCallback(target, "save", "around", (_t: any, next: any) => {
-        // intentionally not awaiting / returning next()
         next();
       });
       await expect(
@@ -431,13 +410,6 @@ describe("Callbacks", () => {
     });
 
     it("forwards the block's return value (env.value) to after-callback conditions", () => {
-      // Mirrors ActiveModel's after-model-callback guard (`value != false`,
-      // activemodel/lib/active_model/callbacks.rb:147-149): the condition reads
-      // the run_callbacks block's return, so an after callback is skipped when
-      // the block returned false and runs otherwise. `Conditionals::Value` is
-      // the only filter arm handed that value — `CallTemplate.build` routes a
-      // Proc by arity, and the 2-arity arm is InstanceExec2, which demands a
-      // block (callbacks.rb:494-508).
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
       setCallback(target, "save", "after", (t: any) => t.log.push("after"), {
@@ -521,16 +493,12 @@ describe("Callbacks", () => {
     });
   });
 
-  // === Tests matching Rails callbacks_test.rb ===
-
   describe("save around", () => {
     it("save around", () => {
-      // AroundCallbacksTest#test_save_around
       const history: string[] = [];
       const target = { history, yes: true, no: false };
       defineCallbacks(target, "save");
 
-      // before callbacks (conditional)
       setCallback(target, "save", "before", (t: any) => {
         t.history.push("yup");
       });
@@ -543,12 +511,9 @@ describe("Callbacks", () => {
         },
         { if: () => true },
       );
-      // after callback — registered before the arounds (as Rails' AroundPerson
-      // does) so it wraps outside them and runs last.
       setCallback(target, "save", "after", (t: any) => {
         t.history.push("tweedle");
       });
-      // around callbacks
       setCallback(target, "save", "around", (t: any, next: () => void) => {
         t.history.push("tweedle dum pre");
         next();
@@ -592,9 +557,6 @@ describe("Callbacks", () => {
 
   describe("around callback result", () => {
     it("save around", () => {
-      // AroundCallbackResultTest#test_save_around — an around callback can capture
-      // the event return value via `@result = yield` (Rails invoke_sequence breaks
-      // with env.value, so next() returns the block result).
       const target = { result: null as unknown };
       defineCallbacks(target, "save");
       setCallback(target, "save", "after", () => "tweedle_1");
@@ -611,12 +573,10 @@ describe("Callbacks", () => {
 
   describe("save conditional person", () => {
     it("save conditional person", () => {
-      // ConditionalCallbackTest#test_save_conditional_person
       const history: string[] = [];
       const target = { history, yes: true, no: false };
       defineCallbacks(target, "save");
 
-      // if: proc true → runs
       setCallback(
         target,
         "save",
@@ -626,7 +586,6 @@ describe("Callbacks", () => {
         },
         { if: () => true },
       );
-      // if: proc false → skips
       setCallback(
         target,
         "save",
@@ -636,7 +595,6 @@ describe("Callbacks", () => {
         },
         { if: () => false },
       );
-      // unless: proc false → runs
       setCallback(
         target,
         "save",
@@ -646,7 +604,6 @@ describe("Callbacks", () => {
         },
         { unless: () => false },
       );
-      // unless: proc true → skips
       setCallback(
         target,
         "save",
@@ -656,7 +613,6 @@ describe("Callbacks", () => {
         },
         { unless: () => true },
       );
-      // if: symbol true → runs
       setCallback(
         target,
         "save",
@@ -666,7 +622,6 @@ describe("Callbacks", () => {
         },
         { if: (t) => t.yes },
       );
-      // if: symbol false → skips
       setCallback(
         target,
         "save",
@@ -676,7 +631,6 @@ describe("Callbacks", () => {
         },
         { if: (t) => t.no },
       );
-      // unless: symbol false → runs
       setCallback(
         target,
         "save",
@@ -686,7 +640,6 @@ describe("Callbacks", () => {
         },
         { unless: (t) => t.no },
       );
-      // unless: symbol true → skips
       setCallback(
         target,
         "save",
@@ -696,7 +649,6 @@ describe("Callbacks", () => {
         },
         { unless: (t) => t.yes },
       );
-      // combined if: yes, unless: no → runs
       setCallback(
         target,
         "save",
@@ -706,7 +658,6 @@ describe("Callbacks", () => {
         },
         { if: (t) => t.yes, unless: (t) => t.no },
       );
-      // combined if: yes, unless: yes → skips
       setCallback(
         target,
         "save",
@@ -730,7 +681,6 @@ describe("Callbacks", () => {
 
   describe("reset callbacks", () => {
     it("save conditional person after reset has empty history", () => {
-      // ResetCallbackTest#test_save_conditional_person
       const target = { history: [] as string[], yes: true, no: false };
       defineCallbacks(target, "save");
       setCallback(
@@ -748,7 +698,6 @@ describe("Callbacks", () => {
     });
 
     it("reset callbacks", () => {
-      // ResetCallbackTest (second group)#test_reset_callbacks
       const events: string[] = [];
       const target = { events };
       defineCallbacks(target, "foo");
@@ -760,14 +709,12 @@ describe("Callbacks", () => {
 
       resetCallbacks(target, "foo");
       runCallbacks(target, "foo");
-      expect(events.length).toBe(1); // still 1, callback was cleared
+      expect(events.length).toBe(1);
     });
   });
 
   describe("termination skips following before and around callbacks", () => {
     it("termination skips following before and around callbacks", () => {
-      // CallbackTerminatorTest#test_termination_skips_following_before_and_around_callbacks
-      // Rails uses a custom terminator: result == :halt stops the chain.
       const history: string[] = [];
       const target = { history, saved: false as boolean | undefined };
       defineCallbacks(target, "save", {
@@ -779,7 +726,7 @@ describe("Callbacks", () => {
       setCallback(target, "save", "before", (t: any) => {
         t.history.push("second");
         return "halt";
-      }); // halts
+      });
       setCallback(target, "save", "around", (t: any, next: () => void) => {
         t.history.push("around1");
         next();
@@ -800,19 +747,17 @@ describe("Callbacks", () => {
       });
       expect(result).toBe(false);
       expect(target.saved).toBeFalsy();
-      // first ran, second ran and halted, rest skipped
       expect(target.history).toContain("first");
       expect(target.history).toContain("second");
       expect(target.history).not.toContain("third");
     });
 
     it("block never called if terminated", () => {
-      // CallbackTerminatorTest#test_block_never_called_if_terminated
       const target = { saved: false as boolean };
       defineCallbacks(target, "save", {
         terminator: (_t: object, fn: () => unknown) => fn() === "halt",
       });
-      setCallback(target, "save", "before", () => "halt"); // halts
+      setCallback(target, "save", "before", () => "halt");
       runCallbacks(target, "save", () => {
         target.saved = true;
       });
@@ -820,13 +765,10 @@ describe("Callbacks", () => {
     });
 
     it("returning false does not halt callback when terminator disabled", () => {
-      // CallbackFalseTerminatorTest#test_returning_false_does_not_halt_callback
       const target = { saved: false as boolean, halted: null as any };
       defineCallbacks(target, "save", { terminator: false });
-      setCallback(target, "save", "before", () => false); // returns false but no halt
-      setCallback(target, "save", "before", (t: any) => {
-        /* nothing */
-      });
+      setCallback(target, "save", "before", () => false);
+      setCallback(target, "save", "before", (t: any) => {});
       runCallbacks(target, "save", () => {
         target.saved = true;
       });
@@ -837,7 +779,6 @@ describe("Callbacks", () => {
 
   describe("skip callback", () => {
     it("skip person — removes specific callbacks conditionally", () => {
-      // SkipCallbacksTest#test_skip_person (simplified version)
       const history: string[] = [];
       const target = { history };
       defineCallbacks(target, "save");
@@ -854,7 +795,6 @@ describe("Callbacks", () => {
         t.history.push("before_proc");
       });
 
-      // skip the symbol-based before callback
       skipCallback(target, "save", "before", beforeCb);
 
       runCallbacks(target, "save");
@@ -866,9 +806,6 @@ describe("Callbacks", () => {
 
   describe("excludes duplicates in separate calls", () => {
     it("excludes duplicates in separate calls", () => {
-      // ExcludingDuplicatesCallbackTest#test_excludes_duplicates_in_separate_calls
-      // Rails deduplicates by symbol name; our system uses callback reference.
-      // We test that adding the same function ref twice only runs it once.
       const record: string[] = [];
       const target = { record };
       defineCallbacks(target, "save");
@@ -885,7 +822,6 @@ describe("Callbacks", () => {
 
       setCallback(target, "save", "before", first);
       setCallback(target, "save", "before", second);
-      // adding first again (duplicate ref) — our system keeps both, Rails deduplicates
       setCallback(target, "save", "before", third);
 
       runCallbacks(target, "save", () => {
@@ -900,8 +836,6 @@ describe("Callbacks", () => {
 
   describe("run callbacks only before", () => {
     it("run callbacks only before", () => {
-      // RunSpecificCallbackTest#test_run_callbacks_only_before
-      // Our runCallbacks runs all kinds. We test that before callbacks run in order.
       const history: string[] = [];
       const target = { history };
       defineCallbacks(target, "save");
@@ -915,7 +849,6 @@ describe("Callbacks", () => {
         t.history.push("after_save_1");
       });
 
-      // Run and check before callbacks are in order
       runCallbacks(target, "save");
       expect(target.history.indexOf("before_save_1")).toBeLessThan(
         target.history.indexOf("before_save_2"),
@@ -925,7 +858,6 @@ describe("Callbacks", () => {
 
   describe("run callbacks only after", () => {
     it("run callbacks only after", () => {
-      // RunSpecificCallbackTest#test_run_callbacks_only_after
       const history: string[] = [];
       const target = { history };
       defineCallbacks(target, "save");
@@ -937,14 +869,12 @@ describe("Callbacks", () => {
       });
 
       runCallbacks(target, "save");
-      // after callbacks run in reverse order (Rails behavior)
       expect(target.history).toEqual(["after_save_2", "after_save_1"]);
     });
   });
 
   describe("run callbacks only around", () => {
     it("run callbacks only around", () => {
-      // RunSpecificCallbackTest#test_run_callbacks_only_around
       const history: string[] = [];
       const target = { history };
       defineCallbacks(target, "save");
@@ -971,7 +901,6 @@ describe("Callbacks", () => {
 
   describe("hyphenated key", () => {
     it("save with conditional before callback", () => {
-      // HyphenatedKeyTest#test_save
       const target = { stuff: null as string | null, yes: true };
       defineCallbacks(target, "save");
       setCallback(
@@ -983,9 +912,7 @@ describe("Callbacks", () => {
         },
         { if: (t) => t.yes },
       );
-      runCallbacks(target, "save", () => {
-        /* noop */
-      });
+      runCallbacks(target, "save", () => {});
       expect(target.stuff).toBe("ACTION");
     });
   });
@@ -1154,7 +1081,6 @@ describe("OneTimeCompileTest", () => {
     });
     runCallbacks(target, "save");
     runCallbacks(target, "save");
-    // Callback runs each time (once per runCallbacks call)
     expect(target.count).toBe(2);
   });
 });
@@ -1166,7 +1092,6 @@ describe("DoubleYieldTest", () => {
     setCallback(target, "save", "around", (t: any, next: () => void) => {
       next();
     });
-    // Should not throw when yielding once
     expect(() => runCallbacks(target, "save", () => target.log.push("saved"))).not.toThrow();
     expect(target.log).toEqual(["saved"]);
   });
@@ -1217,8 +1142,6 @@ describe("HyphenatedKeyTest", () => {
 
 describe("CallbackFalseTerminatorTest", () => {
   it("returning false does not halt callback", () => {
-    // By default, false DOES halt the chain (terminator: true is default)
-    // But with terminator: false, it doesn't halt
     const target = { log: [] as string[] };
     defineCallbacks(target, "save", { terminator: false });
     setCallback(target, "save", "before", () => false);
@@ -1466,9 +1389,6 @@ describe("RunSpecificCallbackTest", () => {
 });
 
 describe("UsingObjectTest", () => {
-  // Rails' CallbackObject (callbacks_test.rb:707): the method dispatched depends
-  // on the chain scope. Default scope [:kind] calls `before`/`around`;
-  // scope [:kind, :name] calls `beforeSave`.
   const callbackObject = () => ({
     before(caller: { record: string[] }): void {
       caller.record.push("before");
@@ -1516,8 +1436,6 @@ describe("UsingObjectTest", () => {
     save(u);
     expect(u.record).toEqual(["around before", "yielded", "around after"]);
   });
-  // Mirrors Rails CustomScopeObject#save, whose run_callbacks block ends in
-  // "CallbackResult" — run_callbacks returns env.value, i.e. the block's value.
   const customScopeSave = (u: { record: string[] }) =>
     runCallbacks(u, "save", () => {
       u.record.push("yielded");
@@ -1539,9 +1457,6 @@ describe("NotPermittedStringCallbackTest", () => {
   it("passing string callback is not permitted", () => {
     const target = {};
     defineCallbacks(target, "save");
-    // Rails raises ArgumentError eagerly at registration (`before_save "tweedle"`),
-    // because Callback#initialize builds `compiled`. A String filter is rejected
-    // there, not lazily on the first runCallbacks.
     expect(() => setCallback(target, "save", "before", "not-a-function" as any)).toThrow();
   });
 });
@@ -1551,7 +1466,7 @@ describe("CallbackTerminatorTest", () => {
   it("termination skips following before and around callbacks", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save", { terminator: haltTerminator });
-    setCallback(target, "save", "before", () => "halt"); // halts
+    setCallback(target, "save", "before", () => "halt");
     setCallback(target, "save", "before", (t: any) => t.log.push("after-halt"));
     runCallbacks(target, "save", () => target.log.push("body"));
     expect(target.log).not.toContain("after-halt");
@@ -1614,8 +1529,6 @@ describe("CallbackDefaultTerminatorTest", () => {
     expect(target.halted).toBe(second);
   });
   it("default termination invokes hook through around chain", () => {
-    // Chains with around callbacks route through the bespoke `_invoke` engine
-    // rather than the compiled Before#call path; the hook must fire there too.
     const second = () => throwAbort();
     const target = {
       log: [] as string[],
@@ -1721,9 +1634,6 @@ describe("CallbackTerminatorSkippingAfterCallbacksTest", () => {
     setCallback(target, "save", "before", () => false);
     setCallback(target, "save", "after", (t: any) => t.log.push("after"));
     runCallbacks(target, "save");
-    // After callbacks should still run even when before halts (Rails behavior)
-    // Actually in Rails, termination in before DOES skip the body but after callbacks still run
-    // Our implementation may differ — just test what we implement
     expect(Array.isArray(target.log)).toBe(true);
   });
 });
@@ -1820,8 +1730,6 @@ describe("NotSupportedStringConditionalTest", () => {
   it("string conditional options", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
-    // String conditionals (like `if: "method_name"` in Ruby) are not supported in TS
-    // Using a function conditional instead
     setCallback(target, "save", "before", (t: any) => t.log.push("cb"), { if: () => true });
     runCallbacks(target, "save");
     expect(target.log).toEqual(["cb"]);
@@ -1829,7 +1737,6 @@ describe("NotSupportedStringConditionalTest", () => {
 });
 
 describe("AfterSaveConditionalPersonCallbackTest", () => {
-  // AfterSaveConditionalPersonCallbackTest#test_after_save_runs_in_the_reverse_order
   it("after save runs in the reverse order", () => {
     const history: string[] = [];
     const target = { history };
@@ -1890,12 +1797,12 @@ describe("skipAfterCallbacksIfTerminated", () => {
   it("after callbacks run by default even when halted", () => {
     const log: string[] = [];
     const target = { log };
-    defineCallbacks(target, "save"); // no skipAfterCallbacksIfTerminated
+    defineCallbacks(target, "save");
     setCallback(target, "save", "before", () => throwAbort());
     setCallback(target, "save", "after", (t: any) => t.log.push("after"));
     const result = runCallbacks(target, "save");
-    expect(result).toBe(false); // halted
-    expect(log).toContain("after"); // after callbacks still run
+    expect(result).toBe(false);
+    expect(log).toContain("after");
   });
 
   it("skips after callbacks when halted and option is set", () => {
@@ -1960,7 +1867,6 @@ describe("Callbacks — async propagation", () => {
   it("async around callback propagates Promise and runs after callbacks when complete", async () => {
     const t = { log: [] as string[] };
     defineCallbacks(t, "save");
-    // after registered before the around so it wraps outside it and runs last.
     setCallback(t, "save", "after", (x: any) => x.log.push("after"));
     setCallback(t, "save", "around", async (x: any, next) => {
       x.log.push("ao");
@@ -1974,8 +1880,6 @@ describe("Callbacks — async propagation", () => {
   });
 
   it("awaited next() resolves to the async block result", async () => {
-    // Rails invoke_sequence breaks with env.value, so `await next()` sees the
-    // block's return even when the block is async.
     const t = { result: null as unknown };
     defineCallbacks(t, "save");
     setCallback(t, "save", "around", async (x: any, next: any) => {
@@ -2037,9 +1941,6 @@ describe("CallbackObject dispatch", () => {
   });
 
   it("missing scoped method raises when the chain runs", () => {
-    // Rails ObjectCall dispatches `receiver.send(method, target)`, which raises
-    // NoMethodError when the scoped method is absent — no silent no-op. Default
-    // scope calls `before`, so an object providing only `beforeSave` has no match.
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", { beforeSave: () => {} });
@@ -2061,10 +1962,6 @@ describe("CallbackObject dispatch", () => {
   });
 
   it("around object method reads object state via this", () => {
-    // Rails dispatches the around ObjectCall as `receiver.send(method, target, &block)`,
-    // binding `self` to the callback object. A JS member invocation
-    // (`receiver[method](...)`) binds `this === receiver` the same way, so a
-    // method-style around can read its own object state.
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
     const obj = {
@@ -2143,7 +2040,6 @@ describe("CallbackObject dispatch", () => {
     const obj = { before: (t: typeof parent) => t.log.push("obj") };
     setCallback(parent, "save", "before", obj);
 
-    // simulate inheritance: getCallbackChains copies the chain when a child prototype is used
     const child = Object.create(parent) as typeof parent;
     skipCallback(child, "save", "before", obj);
     runCallbacks(child, "save");

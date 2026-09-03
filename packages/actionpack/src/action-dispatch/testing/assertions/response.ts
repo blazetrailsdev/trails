@@ -74,9 +74,6 @@ export function assertRedirectedTo(
   const redirectExpected = normalizeArgumentToRedirection.call(this, urlOptions);
 
   if (redirectExpected instanceof RegExp) {
-    // Ruby's `Regexp#===` is stateless (match?-equivalent). Clone the
-    // pattern so a /g or /y caller doesn't carry `lastIndex` between
-    // assertions.
     const probe = new RegExp(redirectExpected.source, redirectExpected.flags);
     if (probe.test(String(redirectIs))) return;
   } else if (redirectExpected === redirectIs) {
@@ -105,10 +102,6 @@ export function normalizeArgumentToRedirection(
   fragment: unknown,
 ): unknown {
   if (fragment instanceof RegExp) return fragment;
-  // Rails routes non-Regexp fragments through
-  // `(@controller || ActionController::Redirecting)._compute_redirect_to_location(@request, fragment)`.
-  // Until Redirecting is ported, fall back to the controller hook if present
-  // and otherwise return the fragment unchanged.
   const handle = this.controller as
     | { _computeRedirectToLocation?: (req: unknown, frag: unknown) => unknown }
     | undefined;

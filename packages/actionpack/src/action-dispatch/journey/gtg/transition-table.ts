@@ -11,8 +11,6 @@ import type { GtgState, TransitionTableLike } from "./simulator.js";
 
 export type Edge = string | RegExp;
 
-// Default segment regex — reuse the canonical Symbol.DEFAULT_EXP so this
-// table and the parser stay in lockstep if the segment pattern ever shifts.
 const DEFAULT_EXP_SOURCE = SymbolNode.DEFAULT_EXP.source;
 const DEFAULT_EXP_ANCHORED = new RegExp(`^${DEFAULT_EXP_SOURCE}$`);
 
@@ -20,22 +18,6 @@ function isDefaultExp(re: RegExp): boolean {
   return re.source === DEFAULT_EXP_SOURCE;
 }
 
-/**
- * Anchor a per-symbol regex while preserving the original's flags (Rails'
- * `/\A#{sym}\Z/` interpolation wraps with inline flag scopes that we can't
- * emit in JS; the closest equivalent is hoisting flags to the outer regex).
- *
- * Wraps the source in `(?:…)` so anchoring binds around an alternation
- * (`/^foo|bar$/` parses as `(^foo)|(bar$)` — wrong).
- *
- * Filters:
- * - `g`/`y` are dropped — they change matching semantics in ways that
- *   break a single-shot anchored test.
- * - `m` is dropped — it changes `^`/`$` to match line boundaries, which
- *   would break the strict-string anchoring we want (Rails' `\A…\Z` is
- *   immune to `/m`).
- * - `u` and `v` are mutually exclusive; `v` supersedes.
- */
 function anchorPreservingFlags(re: RegExp): RegExp {
   const flags = [...re.flags].filter((f) => "isd".includes(f));
   if (re.flags.includes("v")) flags.push("v");
@@ -45,15 +27,9 @@ function anchorPreservingFlags(re: RegExp): RegExp {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface TransitionTable {
-  /** `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json` (json.rb:35-43). */
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
 }
 
-/**
- * Generalized Transition table — the DFA produced by Builder. Implements the
- * `TransitionTableLike` shape that `Simulator` consumes. Mirrors Rails'
- * `ActionDispatch::Journey::GTG::TransitionTable`.
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TransitionTable implements TransitionTableLike, DotHost {
   /** @internal */
@@ -67,7 +43,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
 
   readonly memos = new Map<number, unknown[]>();
 
-  // Rails-style Dot mixin via assigned function (CLAUDE.md "this-typed function" pattern).
   toDot = toDot;
 
   constructor() {}
@@ -97,7 +72,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     return this.memos.get(idx) ?? [];
   }
 
-  /** Rails alias for the identity closure: just wraps a state. */
   eclosure(t: number | readonly number[]): readonly number[] {
     return Array.isArray(t) ? t : [t as number];
   }
@@ -111,7 +85,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
 
     for (const [s, previousStart] of t) {
       if (previousStart === null) {
-        // Fast path for standard `:param` segments.
         if (tokenMatchesDefault) {
           const stds = this._stdparamStates.get(s);
           if (stds) {
@@ -120,15 +93,12 @@ export class TransitionTable implements TransitionTableLike, DotHost {
             }
           }
         }
-        // Literal string transitions.
         const strs = this._stringStates.get(s);
         if (strs && strs.has(tok)) {
           nextStates.push([strs.get(tok)!, null] as const);
         }
       }
 
-      // Non-default regex transitions: a single token may not satisfy the
-      // regex; carry forward with a wider slice on subsequent moves.
       const regs = this._regexpStates.get(s);
       if (regs) {
         const sliceStart = previousStart ?? startIndex;
@@ -136,7 +106,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
         for (const [re, v] of regs) {
           if (v != null && re.test(curr)) nextStates.push([v, null] as const);
         }
-        // Continue accepting tokens; remember slice origin for the next move.
         nextStates.push([s, sliceStart] as const);
       }
     }
@@ -164,7 +133,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     }
   }
 
-  /** All unique state ids referenced by any transition map. */
   states(): readonly number[] {
     const seen = new Set<number>();
     const collect = (m: Map<number, Map<unknown, number>>) => {
@@ -179,7 +147,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     return [...seen];
   }
 
-  /** Yields [from, sym, to] triples — feeds NFA::Dot.to_dot. */
   transitions(): readonly DotTransition[] {
     const out: DotTransition[] = [];
     for (const [from, inner] of this._stringStates) {
@@ -195,11 +162,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     return out;
   }
 
-  /**
-   * Rails `as_json` — JSON-able snapshot of the table. Regex edges are keyed
-   * by `re.source` (matching Rails' `re.source`); duplicate sources from
-   * different flag sets collapse the same way Ruby's `Hash#[]=` does.
-   */
   asJson(): Record<string, unknown> {
     const stringStates: Record<number, Record<string, number>> = {};
     for (const [from, inner] of this._stringStates) {
@@ -223,12 +185,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
     };
   }
 
-  /**
-   * Render the DFA as SVG by shelling out to the Graphviz `dot` binary, the
-   * same way Rails does. Returns an empty string when `dot` is unavailable
-   * so the visualizer still produces a usable HTML page in dev sandboxes
-   * without Graphviz installed.
-   */
   toSvg(): string {
     let res;
     try {
@@ -248,11 +204,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
       .replace(/height="[^"]*"/, "");
   }
 
-  /**
-   * Rails `visualizer(paths, title="FSM")` — returns an HTML page embedding
-   * the FSM JSON and a d3 visualization for debugging. Mirrors
-   * `action_dispatch/journey/gtg/transition_table.rb#visualizer`.
-   */
   visualizer(paths: readonly Node[], title = "FSM"): string {
     const sampled = sample(paths, 3);
     const funRoutes = sampled.map((ast) => {
@@ -284,7 +235,6 @@ export class TransitionTable implements TransitionTableLike, DotHost {
   }
 }
 
-/** Rails `Array#sample(n)` — pick up to n unique elements (random order). */
 function sample<T>(xs: readonly T[], n: number): T[] {
   const pool = [...xs];
   const out: T[] = [];

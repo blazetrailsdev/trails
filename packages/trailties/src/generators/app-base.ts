@@ -1,19 +1,7 @@
-// Mirrors railties/lib/rails/generators/app_base.rb. Ports the option
-// surface, predicate helpers, and option-implication propagation. The
-// Ruby gemfile/bundler workflow is intentionally omitted — trailties
-// uses npm/pnpm — and the corresponding Rails methods (bundle_command,
-// run_bundle, run_javascript, run_hotwire, run_kamal,
-// generate_bundler_binstub, target_rails_prerelease, dockerfile_*,
-// rails_gemfile_entry, etc.) are tracked as PR 1.14d follow-ups.
-
 import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
 
-// Skip flags consumed by AppBase predicates and OPTION_IMPLICATIONS. The
-// app-generator may pass additional flags (skipDocker, skipGit, etc.);
-// `skip(...)` reads any `skip<X>` field, the union just type-checks the
-// names used here.
 type Skip =
   | "ActiveRecord"
   | "ActiveStorage"
@@ -31,7 +19,6 @@ type Skip =
 
 export type AppBaseOptions = GeneratorOptions & {
   appPath: string;
-  /** `class_option :name, type: :string, aliases: "-n"` (`app_base.rb:33`). */
   name?: string;
   database?: DatabaseName;
   api?: boolean;
@@ -46,8 +33,6 @@ const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
   skipActiveStorage: true,
 };
 
-// Mirrors AppBase::OPTION_IMPLICATIONS: meta options activate their
-// implications unless explicitly revoked with `false`.
 export const OPTION_IMPLICATIONS: Record<string, ReadonlyArray<keyof AppBaseOptions>> = {
   skipActiveJob: ["skipActionMailer", "skipActiveStorage"],
   skipActiveRecord: ["skipActiveStorage", "skipSolid"],
@@ -64,9 +49,6 @@ export abstract class AppBase extends GeneratorBase {
   constructor(options: AppBaseOptions) {
     super(options);
     this.appPath = options.appPath;
-    // Mirrors AppBase#set_default_accessors!: destination_root resolves
-    // app_path against the parent destination_root. Subclasses generate
-    // into this directory, not the parent cwd.
     this.destinationRoot = File.expandPath(options.appPath, options.cwd);
     this.cwd = this.destinationRoot;
     this.options = this.deduceImpliedOptions({ ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...options });

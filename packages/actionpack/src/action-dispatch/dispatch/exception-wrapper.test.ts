@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ExceptionWrapper } from "../exception-wrapper.js";
 
-// ==========================================================================
-// dispatch/exception_wrapper_test.rb
-// ==========================================================================
 describe("ExceptionWrapperTest", () => {
   it("#source_extracts fetches source fragments for every backtrace entry", () => {
     const err = new Error("test");

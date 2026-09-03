@@ -11,7 +11,6 @@ import {
 import { Rational } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 
-/** Mirrors: number_helper_test.rb:18-25's `NumberWithToD`. */
 class NumberWithToD {
   readonly #number: number;
 
@@ -236,7 +235,6 @@ describe("NumberHelperTest", () => {
     expect(numberToHumanSize(1234567, { precision: 2 })).toBe("1.2 MB");
     expect(numberToHumanSize(1234567, { precision: 2, roundMode: ":down" })).toBe("1.1 MB");
     expect(numberToHumanSize(41100, { precision: 1, roundMode: ":up" })).toBe("50 KB");
-    // 123000 / 1024 = 120.117... KB
     expect(numberToHumanSize(123000, { precision: 4, stripInsignificantZeros: true })).toBe(
       "120.1 KB",
     );
@@ -246,9 +244,7 @@ describe("NumberHelperTest", () => {
   });
 
   it("number to human size with custom delimiter and separator", () => {
-    // 1_000_000 / 1024 = 976.5625 KB, precision=3 significant → "977 KB" with separator ","
     expect(numberToHumanSize(1_000_000, { separator: "," })).toBe("977 KB");
-    // 1_073_741_824 = 1 GiB exactly
     expect(numberToHumanSize(1_073_741_824, { delimiter: ".", separator: "," })).toBe("1 GB");
   });
 
@@ -264,8 +260,6 @@ describe("NumberHelperTest", () => {
     expect(numberToHuman(1234567890)).toBe("1.23 Billion");
     expect(numberToHuman(1234567890123)).toBe("1.23 Trillion");
     expect(numberToHuman(1234567890123456)).toBe("1.23 Quadrillion");
-    // Rails' literal exceeds Number.MAX_SAFE_INTEGER; the nearest double still
-    // rounds to the same significant digits, so the assertion holds verbatim.
     // eslint-disable-next-line no-loss-of-precision
     expect(numberToHuman(1234567890123456789)).toBe("1230 Quadrillion");
     expect(numberToHuman(489939, { precision: 2 })).toBe("490 Thousand");
@@ -279,7 +273,6 @@ describe("NumberHelperTest", () => {
     expect(numberToHuman(1234567, { precision: 1, significant: false, separator: "," })).toBe(
       "1,2 Million",
     );
-    // significant forced to false
     expect(numberToHuman(1234567, { precision: 0, significant: true, separator: "," })).toBe(
       "1 Million",
     );
@@ -289,7 +282,6 @@ describe("NumberHelperTest", () => {
 
   it("number to human with custom units that are missing the needed key", () => {
     const units = { million: "M" };
-    // Thousand is missing, falls through to smaller unit
     const result = numberToHuman(1234, { units });
     expect(typeof result).toBe("string");
   });

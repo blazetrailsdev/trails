@@ -1,10 +1,3 @@
-/**
- * String utilities mirroring Rails ActiveSupport string extensions.
- */
-
-// `blank?` / `present?` are `core_ext/object/blank.rb`'s, not a string
-// extension — they live at the Rails path and are re-exported here so this
-// file's long-standing importers keep reaching them.
 export { isBlank, isPresent } from "./core-ext/object/blank.js";
 
 export function squish(str: string): string {
@@ -20,8 +13,6 @@ export function truncate(
   if (str.length <= length) return str;
   const truncateAt = Math.max(0, length - omission.length);
   if (separator) {
-    // Mirrors Rails' String#rindex(separator, truncateAt): find the last
-    // occurrence of the separator at or before position truncateAt (inclusive).
     const searchStr = str.slice(0, truncateAt + 1);
     const sepPattern =
       typeof separator === "string"
@@ -98,10 +89,6 @@ export function remove(str: string, ...patterns: (string | RegExp)[]): string {
   return result;
 }
 
-/**
- * Strips indentation by removing the amount of leading whitespace of the least
- * indented non-empty line from every line.
- */
 export function stripHeredoc(str: string): string {
   const lines = str.split("\n");
   const nonEmptyLines = lines.filter((l) => l.trim().length > 0);
@@ -110,10 +97,6 @@ export function stripHeredoc(str: string): string {
   return lines.map((l) => l.slice(minIndent)).join("\n");
 }
 
-/**
- * Returns the character at the given position (supports negative indexing).
- * Returns undefined if out of range.
- */
 export function at(str: string, pos: number | [number, number] | RegExp): string | undefined {
   if (pos instanceof RegExp) {
     const m = str.match(pos);
@@ -131,25 +114,16 @@ export function at(str: string, pos: number | [number, number] | RegExp): string
   return str[idx];
 }
 
-/** Rails String#exclude? — returns true if the string does not include the substring */
 export function exclude(str: string, search: string): boolean {
   return !str.includes(search);
 }
 
-/**
- * Returns the first n characters of the string (default 1).
- * Raises if n is negative (mirrors Rails behaviour).
- */
 export function first(str: string, n?: number): string {
   if (n === undefined) return str.slice(0, 1);
   if (n < 0) throw new Error("negative length");
   return str.slice(0, n);
 }
 
-/**
- * Returns the last n characters of the string (default 1).
- * Raises if n is negative (mirrors Rails behaviour).
- */
 export function last(str: string, n?: number): string {
   if (n === undefined) return str.slice(-1);
   if (n < 0) throw new Error("negative length");
@@ -157,26 +131,17 @@ export function last(str: string, n?: number): string {
   return str.slice(-n);
 }
 
-/** Returns the substring from position pos to the end (supports negative). */
 export function from(str: string, pos: number): string {
   const idx = pos < 0 ? Math.max(0, str.length + pos) : pos;
   return str.slice(idx);
 }
 
-/**
- * Returns the substring from the beginning up to and including position pos
- * (supports negative indexing). Returns "" if pos is out of range on the left.
- */
 export function to(str: string, pos: number): string {
   const idx = pos < 0 ? str.length + pos : pos;
   if (idx < 0) return "";
   return str.slice(0, idx + 1);
 }
 
-/**
- * Indents every non-empty line (and optionally blank lines) by n repetitions
- * of char (default " "). Mirrors Rails String#indent.
- */
 export function indent(
   str: string,
   n: number,

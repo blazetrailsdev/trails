@@ -51,12 +51,8 @@ describe("_normalizeOptions", () => {
   });
 
   test("Ruby-truthy gate: '' and 0 are processed, null/false skip", () => {
-    // `html: ""` is Ruby-truthy → html-escape runs and returns a SafeBuffer
-    // wrapping "" (still truthy / present, just escaped).
     expect(String(_normalizeOptions({ html: "" }).html)).toBe("");
-    // `status: 0` is Ruby-truthy → resolveStatus passes the number through.
     expect(_normalizeOptions({ status: 0 }).status).toBe(0);
-    // `null`/`false` skip → fields untouched.
     expect(_normalizeOptions({ html: null }).html).toBeNull();
     expect(_normalizeOptions({ status: false }).status).toBe(false);
   });
@@ -203,12 +199,8 @@ describe("Metal wiring", () => {
   test("renderToBody preserves '' / 0 (Ruby-truthy) and falls through on false/null", async () => {
     const { Metal } = await import("../metal.js");
     const instance = Object.create(Metal.prototype) as InstanceType<typeof Metal>;
-    // Ruby `""` and `0` are truthy; Rails `super || _render_in_priorities || " "`
-    // returns them as-is rather than falling through.
     expect(instance.renderToBody({ body: "" })).toBe("");
     expect(instance.renderToBody({ plain: 0 })).toBe(0);
-    // Ruby `false`/`nil` fall through; `_renderInPriorities` returns null
-    // when no key matches, so the " " fallback wins.
     expect(instance.renderToBody({ body: false })).toBe(" ");
     expect(instance.renderToBody({ body: null })).toBe(" ");
   });

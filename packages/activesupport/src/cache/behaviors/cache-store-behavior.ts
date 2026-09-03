@@ -3,13 +3,6 @@ import { ArgumentError, Store as CacheStore, type Store, type StoreOptions } fro
 import { assertErrorReported } from "../../testing/error-reporter-assertions.js";
 import { assert, assertNot, assertRaises, assertSame } from "../../testing/assertions.js";
 
-// Mirrors Rails `CacheStoreBehavior`
-// (activesupport/test/cache/behaviors/cache_store_behavior.rb) — "the base
-// functionality that should be identical across all cache stores". Ruby's
-// `include CacheStoreBehavior` is spelled here as a function the store test
-// file calls inside its own describe, the trails spelling of a test-behavior
-// mixin (see cache-store-compression-behavior.ts).
-
 /** @internal */
 export interface CacheStoreBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
@@ -18,8 +11,6 @@ export interface CacheStoreBehaviorHost {
 export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   let cache: Store;
 
-  // Stands in for the including test class's `setup` (`@cache = lookup_store`,
-  // e.g. memory_store_test.rb:27-29).
   beforeEach(() => {
     cache = host.lookupStore();
   });
@@ -40,7 +31,6 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   it("fetch without cache miss", () => {
     const key = crypto.randomUUID();
     cache.write(key, "bar");
-    // Ruby `assert_not_called(@cache, :write)`.
     const write = vi.spyOn(cache, "write");
     try {
       expect(cache.fetch(key, () => "baz")).toBe("bar");
@@ -52,7 +42,6 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
 
   it("fetch with cache miss", () => {
     const key = crypto.randomUUID();
-    // Ruby `assert_called_with(@cache, :write, [key, "baz", @cache.options])`.
     const write = vi.spyOn(cache, "write");
     try {
       expect(cache.fetch(key, () => "baz")).toBe("baz");
@@ -266,8 +255,6 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   });
 }
 
-/** Mirrors Rails' private `with_raise_on_invalid_cache_expiration_time`
- * (cache_store_behavior.rb:746-753). */
 function withRaiseOnInvalidCacheExpirationTime<T>(newValue: boolean, block: () => T): T {
   const oldValue = CacheStore.raiseOnInvalidCacheExpirationTime;
   CacheStore.raiseOnInvalidCacheExpirationTime = newValue;
@@ -278,10 +265,6 @@ function withRaiseOnInvalidCacheExpirationTime<T>(newValue: boolean, block: () =
   }
 }
 
-/** Mirrors Rails' private `capture_logs` (cache_store_behavior.rb:755-765).
- * Ruby writes an `ActiveSupport::Logger` into a `StringIO` and answers its
- * contents; the JS logger is a plain object, so the lines are collected and
- * joined. */
 function captureLogs(block: () => void): string {
   const oldLogger = CacheStore.logger;
   const log: string[] = [];

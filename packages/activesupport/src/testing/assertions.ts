@@ -1,61 +1,14 @@
-/**
- * Mirrors: active_support/testing/assertions.rb
- *
- * Rails accepts a String expression and `eval`s it against the block's binding
- * (assertions.rb:110-111, 186), and `assert_changes` also accepts a Symbol,
- * `to_s`-ed before that eval (assertions.rb:186). TypeScript has no binding to
- * eval against and no `eval` at all under the repo's rules, so the String and
- * Symbol arms are transcribed mechanically into the callable arm Rails
- * documents alongside them (`-> { Article.count }`):
- *
- *   assert_difference 'Article.count'      ->  assertDifference(() => Article.count())
- *   assert_difference 'Post.last.size', -1 ->  assertDifference(() => (await …).size, -1)
- *   assert_changes :@object, from: nil     ->  assertChanges(() => object, null, { from: null })
- *
- * The expression text survives the rewrite: `_callableToSourceString` quotes
- * the arrow's BODY, so an enrolled test's failure message reads
- * ``` `Article.count()` didn't change by 1 ``` — Rails' message with Rails'
- * expression in it. That also collapses Rails' `expression.respond_to?(:call)`
- * ternaries (assertions.rb:129, 199, 220): every expression here is a callable.
- *
- * Blocks may be async (trails' `count` is), so each assertion returns a Promise
- * and awaits both the expression and the block.
- */
 import { indexWith } from "../enumerable-utils.js";
 
 import { Dir, env } from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
-/**
- * Mirrors `Minitest::Assertion` — the error a failed assertion raises.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails raises it
- * (assertions.rb, error_reporter_assertions.rb:45) but the class is defined in
- * the minitest gem, which has no vendored Rails file for the comparator to map
- * onto. Exported so `testing/error-reporter-assertions.ts` raises the same one.
- */
+/** @noRailsEquivalent PERMANENT */
 export class Assertion extends Error {
   override name = "Assertion";
 }
 
-/**
- * Mirrors `Minitest::UnexpectedError` (minitest.rb:1074-1108) — the wrapper
- * `assert_nothing_raised` re-raises an unexpected error in, and the class
- * {@link _assertNothingRaisedOrWarn} rescues to warn about it.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails names the class
- * (assertions.rb:52, 283) but defines it in the minitest gem
- * (minitest.rb:1074-1108), which is a test-framework dependency with no
- * vendored Rails file for the comparator to map onto. Porting it here is what
- * lets `assert_nothing_raised` raise, and `_assert_nothing_raised_or_warn`
- * rescue, the class Rails names.
- *
- * `message` and `backtrace` are METHODS in minitest (minitest.rb:1093-1103),
- * reading the wrapped error when called. TypeScript cannot declare an accessor
- * over a base-class data property (`Error#message`/`#stack`, TS2611), so they
- * are installed on the prototype below — and the constructor deletes the own
- * properties `Error` installs, which would otherwise shadow them.
- */
+/** @noRailsEquivalent PERMANENT */
 export class UnexpectedError extends Assertion {
   override name = "UnexpectedError";
   error: Error;
@@ -72,13 +25,6 @@ export class UnexpectedError extends Assertion {
   }
 }
 
-/**
- * Rails' `e.class` rendered as a name (minitest.rb:1102, assertions.rb:285).
- * trails carries the namespaced Rails name on `name` where it has been ported
- * (`ActionDispatch::ParamError`, param-error.ts:28), which `constructor.name`
- * truncates — so prefer it and fall back to the constructor, mirroring
- * ExceptionWrapper's `classNameOf` (exception-wrapper.ts:75).
- */
 function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;
   const ctor = e.constructor?.name;
@@ -86,24 +32,9 @@ function classNameOf(e: Error): string {
   return e.name || ctor || "Error";
 }
 
-/**
- * Mirrors `Minitest::BacktraceFilter` (minitest.rb:1190-1218).
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails reassigns
- * `Minitest.backtrace_filter` but the class lives in the minitest gem, which
- * has no vendored Rails file for the comparator to map onto. Ported here for
- * the same reason {@link UnexpectedError} is.
- */
+/** @noRailsEquivalent PERMANENT */
 export class BacktraceFilter {
-  /**
-   * Mirrors `Minitest::BacktraceFilter::MT_RE` (minitest.rb:1192),
-   * `%r%lib/minitest|internal:warning%`. The frames trails filters are
-   * vitest's and node's, not minitest's, so the pattern names those instead —
-   * the only part of this class that cannot be transcribed literally.
-   *
-   * @noRailsEquivalent PERMANENT — minitest's constant, not Rails'; see
-   * {@link BacktraceFilter}.
-   */
+  /** @noRailsEquivalent PERMANENT */
   static MT_RE = /node_modules[/\\]@?vitest|node:internal/;
 
   regexp: RegExp;
@@ -112,17 +43,6 @@ export class BacktraceFilter {
     this.regexp = regexp;
   }
 
-  /**
-   * Mirrors `Minitest::BacktraceFilter#filter` (minitest.rb:1207-1217): the
-   * whole trace under debug, else the frames before the first framework frame,
-   * else every non-framework frame, else the whole trace.
-   *
-   * Ruby's `$DEBUG` half of the minitest.rb:1210 guard has no JS analogue —
-   * there is no interpreter-wide debug global to read — so only the
-   * `ENV["MT_DEBUG"]` half is ported, through `process-adapter`. Ruby
-   * truthiness makes a set-but-empty `MT_DEBUG` count, hence the `!= null`
-   * rather than a bare truthiness test.
-   */
   filter(bt: string[] | null): string[] {
     if (!bt) return ["No backtrace"];
 
@@ -137,18 +57,7 @@ export class BacktraceFilter {
   }
 }
 
-/**
- * Mirrors the `Minitest` module's `backtrace_filter` accessor (minitest.rb:44,
- * assigned at :1220) and `Minitest.filter_backtrace` (minitest.rb:350-354).
- * Held on an object so the accessor is reassignable at the Ruby spelling
- * (`Minitest.backtraceFilter = ...`), which `filterBacktrace` reads on every
- * call the way the `cattr_accessor` does. The seat is typed by the `filter`
- * method alone because Ruby's is duck-typed: `rails_plugin.rb:118` assigns a
- * `BacktraceFilterWithFallback`, which is not a `BacktraceFilter`.
- *
- * @noRailsEquivalent PERMANENT — minitest's module surface; see
- * {@link BacktraceFilter}.
- */
+/** @noRailsEquivalent PERMANENT */
 export const Minitest: {
   backtraceFilter: { filter(bt: string[] | null): string[] };
   filterBacktrace(bt: string[] | null): string[];
@@ -162,7 +71,6 @@ export const Minitest: {
   },
 };
 
-/** Mirrors `Minitest::UnexpectedError::BASE_RE` (minitest.rb:1097). */
 function baseRe(): RegExp {
   let pwd: string;
   try {
@@ -191,11 +99,6 @@ Object.defineProperties(UnexpectedError.prototype, {
   },
 });
 
-/**
- * Ruby's `Exception#backtrace` is the frame list alone, unindented; a JS
- * `stack` prepends a `"Name: message"` header line and indents each frame,
- * both of which are dropped here so the two carry the same thing.
- */
 function backtrace(error: Error): string[] | null {
   if (error.stack == null) return null;
   return error.stack
@@ -204,35 +107,15 @@ function backtrace(error: Error): string[] | null {
     .map((line) => line.trim());
 }
 
-/** :nodoc: */
 export const UNTRACKED: unique symbol = Symbol("UNTRACKED");
 
 type Expression<T> = () => T | Promise<T>;
 
-/**
- * Asserts that an expression is not truthy. Passes if `object` is `nil` or
- * `false`.
- *
- *   assert_not nil    # => true
- *   assert_not false  # => true
- *   assert_not 'foo'  # => Expected "foo" to be nil or false
- */
 export function assertNot(object: unknown, message?: string | null): void {
   message ||= `Expected ${inspect(object)} to be nil or false`;
   assert(!(object != null && object !== false), message);
 }
 
-/**
- * Asserts that a block raises one of `exp`. This is an enhancement of the
- * standard assertion method with the ability to test error messages.
- *
- *   assert_raises(ArgumentError, match: /incorrect param/i) do
- *     perform_service(param: 'exception')
- *   end
- *
- * Ruby's `*exp` splat is an array here: a TS rest parameter cannot precede the
- * `match` kwarg and the block, which Ruby takes after it.
- */
 export async function assertRaises(
   exp: (new (...args: any[]) => Error)[],
   { match }: { match?: RegExp | string | null } = {},
@@ -253,7 +136,6 @@ export async function assertRaises(
   return error;
 }
 
-/** Alias of {@link assertRaises}. */
 export async function assertRaise(
   exp: (new (...args: any[]) => Error)[],
   options: { match?: RegExp | string | null } = {},
@@ -262,11 +144,6 @@ export async function assertRaise(
   return assertRaises(exp, options, block);
 }
 
-/**
- * Assertion that the block should not raise an exception.
- *
- * Passes if evaluated code in the yielded block raises no exception.
- */
 export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promise<T> {
   try {
     const retval = await block();
@@ -277,28 +154,7 @@ export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promi
   }
 }
 
-/**
- * Test numeric difference between the return value of an expression as a
- * result of what is evaluated in the yielded block.
- *
- *   assert_difference ->{ Article.count } do
- *     post :create, params: { article: {...} }
- *   end
- *
- * An arbitrary positive or negative difference can be specified. The default
- * is +1+. A list of expressions, or a Map of expression => difference, can be
- * passed in place of a single expression.
- *
- * Ruby reads `*args` positionally: `args[0]` is the message when `expression`
- * is a Hash, and the difference (with `args[1]` the message) otherwise. The
- * rest parameter here carries the same positions, with the block last — Ruby
- * takes it as a block rather than in `*args`.
- *
- * @missingRailsCall map — PERMANENT: `expressions.keys.map` (assertions.rb:112-114) exists
- * only to turn a String expression into `lambda { eval(e, block.binding) }`.
- * Every expression here is already a callable (see this file's header), so the
- * block is the identity and Rails' `map` has nothing left to do.
- */
+/** @missingRailsCall map — PERMANENT */
 export async function assertDifference<T>(
   expression: Map<Expression<number>, number>,
   ...args: [message?: string | null, block?: () => T | Promise<T>]
@@ -346,10 +202,6 @@ export async function assertDifference<T>(
   return retval;
 }
 
-/**
- * Assertion that the numeric result of evaluating an expression is not
- * changed before and after invoking the passed in block.
- */
 export async function assertNoDifference<T>(
   expression: Expression<number> | Expression<number>[] | Map<Expression<number>, number>,
   message: string | null = null,
@@ -363,14 +215,6 @@ export async function assertNoDifference<T>(
   );
 }
 
-/**
- * Assertion that the result of evaluating an expression is changed before
- * and after invoking the passed in block.
- *
- *   assert_changes -> { Status.all_good? } do
- *     post :create, params: { status: { ok: false } }
- *   end
- */
 export async function assertChanges<T>(
   expression: Expression<unknown>,
   message: string | null = null,
@@ -413,10 +257,6 @@ export async function assertChanges<T>(
   return retval;
 }
 
-/**
- * Assertion that the result of evaluating an expression is not changed before
- * and after invoking the passed in block.
- */
 export async function assertNoChanges<T>(
   expression: Expression<unknown>,
   message: string | null = null,
@@ -478,18 +318,7 @@ export async function _assertNothingRaisedOrWarn<T>(
   }
 }
 
-/**
- * Ruby reads the callable's source through `RubyVM::InstructionSequence` and
- * returns the lambda's BODY — `assert_difference -> { Article.count }` quotes
- * `Article.count` (assertions.rb:296-330). `Function#toString` is the JS
- * equivalent of the iseq source slice; the trimming below is Ruby's, in JS
- * spelling: only a zero-parameter arrow has a body worth quoting (Ruby returns
- * the callable itself otherwise), the braces and a `do`/`end`-style multi-line
- * body are stripped, and the trimmed body is kept only when it reads nice — a
- * single line, and not one taking arguments.
- *
- * @internal
- */
+/** @internal */
 function _callableToSourceString(callable: unknown): string {
   const source = String(callable);
   const match = /^(?:async\s+)?\(\s*\)\s*=>\s*([\s\S]+)$/.exec(source.trim());
@@ -508,27 +337,12 @@ function _callableToSourceString(callable: unknown): string {
   return source;
 }
 
-/**
- * @noRailsEquivalent PERMANENT — Minitest's `assert`, which every assertion in
- * `testing/assertions.rb` and `testing/deprecation.rb` calls. Rails inherits it
- * from Minitest, so there is no Ruby counterpart in a mapped file; exported so
- * both testing modules raise the same `Assertion`.
- */
+/** @noRailsEquivalent PERMANENT */
 export function assert(value: boolean, message: string | (() => string) = ""): void {
   if (!value) throw new Assertion(typeof message === "function" ? message() : message);
 }
 
-/**
- * @noRailsEquivalent PERMANENT — Minitest's `assert_predicate` (minitest/assertions.rb).
- * Rails inherits it from Minitest, so there is no Ruby counterpart in a mapped
- * file. Ported tests call it where the Rails test does; a vitest matcher can
- * express the underlying check but not that it is a *predicate* assertion, which
- * is what `parity:test --assertions` compares.
- *
- * Ruby names the predicate with a method Symbol (`assert_predicate x, :nil?`);
- * JS has no universal `nil?`/`empty?` protocol to send, so the predicate is a
- * function applied to `actual`.
- */
+/** @noRailsEquivalent PERMANENT */
 export function assertPredicate<T>(
   actual: T,
   predicate: (value: T) => unknown,
@@ -541,7 +355,7 @@ export function assertPredicate<T>(
   );
 }
 
-/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_predicate` / `refute_predicate`. */
+/** @noRailsEquivalent PERMANENT */
 export function assertNotPredicate<T>(
   actual: T,
   predicate: (value: T) => unknown,
@@ -554,21 +368,12 @@ export function assertNotPredicate<T>(
   );
 }
 
-/**
- * @noRailsEquivalent PERMANENT — Minitest's `assert_respond_to`
- * (minitest/assertions.rb), which sends `respond_to?(name)`. Rails inherits it
- * from Minitest, so there is no Ruby counterpart in a mapped file.
- *
- * JS has no `respond_to?`; the analogue of Ruby's method lookup (own members,
- * ancestors, and `respond_to_missing?`) is the `in` operator, which walks the
- * prototype chain and routes through a `Proxy`'s `has` trap — the trap
- * `methodMissingProxy` and the inquirers implement `respond_to_missing?` with.
- */
+/** @noRailsEquivalent PERMANENT */
 export function assertRespondTo(actual: unknown, name: string, message?: string): void {
   assert(name in Object(actual), message ?? `Expected ${inspect(actual)} to respond to ${name}`);
 }
 
-/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_respond_to` / `refute_respond_to`. */
+/** @noRailsEquivalent PERMANENT */
 export function assertNotRespondTo(actual: unknown, name: string, message?: string): void {
   assert(
     !(name in Object(actual)),
@@ -576,17 +381,12 @@ export function assertNotRespondTo(actual: unknown, name: string, message?: stri
   );
 }
 
-/**
- * @noRailsEquivalent PERMANENT — Minitest's `assert_empty` (minitest/assertions.rb),
- * which sends `empty?` to the collection. Rails inherits it from Minitest, so
- * there is no Ruby counterpart in a mapped file. JS has no `empty?` protocol, so
- * the check is `length`/`size`, whichever the collection carries.
- */
+/** @noRailsEquivalent PERMANENT */
 export function assertEmpty(actual: unknown, message?: string): void {
   assert(collectionSize(actual) === 0, message ?? `Expected ${inspect(actual)} to be empty`);
 }
 
-/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_empty` / `refute_empty`. */
+/** @noRailsEquivalent PERMANENT */
 export function assertNotEmpty(actual: unknown, message?: string): void {
   assert(collectionSize(actual) !== 0, message ?? `Expected ${inspect(actual)} to not be empty`);
 }
@@ -598,10 +398,7 @@ function collectionSize(actual: unknown): number {
   return Object.keys(actual as object).length;
 }
 
-/**
- * @noRailsEquivalent PERMANENT — Minitest's `assert_same`
- * (minitest/assertions.rb), object identity rather than value equality.
- */
+/** @noRailsEquivalent PERMANENT */
 export function assertSame(expected: unknown, actual: unknown, message?: string): void {
   assert(
     Object.is(expected, actual),
@@ -609,7 +406,7 @@ export function assertSame(expected: unknown, actual: unknown, message?: string)
   );
 }
 
-/** @noRailsEquivalent PERMANENT — Minitest's `assert_not_same` / `refute_same`. */
+/** @noRailsEquivalent PERMANENT */
 export function assertNotSame(expected: unknown, actual: unknown, message?: string): void {
   assert(
     !Object.is(expected, actual),
@@ -634,7 +431,6 @@ function assertMatch(match: RegExp | string, actual: string): void {
   assert(matched, `Expected ${inspect(actual)} to match ${String(match)}`);
 }
 
-/** Ruby's `===`: a RegExp matches, a class is an instanceof, anything else `==`. */
 function caseEqual(expected: unknown, actual: unknown): boolean {
   if (expected instanceof RegExp) return typeof actual === "string" && expected.test(actual);
   if (typeof expected === "function") return actual instanceof (expected as new () => unknown);

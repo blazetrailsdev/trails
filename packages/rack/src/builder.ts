@@ -17,8 +17,7 @@ export class Builder {
 
   constructor(appOrBlock?: RackApp | ((builder: Builder) => void)) {
     if (typeof appOrBlock === "function" && appOrBlock.length === 1) {
-      // Check if it's a builder block (takes builder arg) vs an app (takes env)
-      // Heuristic: if it looks like it's configuring a builder, treat as block
+      /** @empty */
     }
   }
 
@@ -46,8 +45,6 @@ export class Builder {
     return Builder.newFromString(content, path);
   }
 
-  // Mirrors Rack::Builder.new_from_string which uses eval. Input must be trusted
-  // config content (from files on disk), not user-supplied strings.
   static newFromString(content: string, file?: string): RackApp {
     const builder = new Builder();
     let source = `"use strict";\n${content}`;

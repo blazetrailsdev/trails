@@ -4,8 +4,6 @@ import { init } from "./init.js";
 
 export type Driver = "better-sqlite3" | "node-sqlite" | "pg" | "mysql2";
 
-// Pinned versions match the trailties generator and root package.json.
-// node-sqlite has no npm package — it's built into Node 22.5+.
 const DRIVER_VERSIONS: Record<Driver, Record<string, string>> = {
   "better-sqlite3": { "better-sqlite3": "^12.6.2" },
   "node-sqlite": {},
@@ -104,9 +102,6 @@ export async function arNew(
   const force = opts.force ?? false;
   const appDir = join(parentDir, appName);
 
-  // No pre-flight existence check: mkdir is idempotent with recursive:true,
-  // and each writeFile uses "wx" (or "w" with force), so per-file conflicts
-  // are handled atomically without a TOCTOU window.
   await mkdir(appDir, { recursive: true });
 
   const flag = force ? "w" : "wx";

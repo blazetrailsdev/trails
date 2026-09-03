@@ -53,9 +53,7 @@ describe("WithTest", () => {
     expect(object.mixedAttr).toBe("mixed");
 
     expect(() => {
-      objectWith(object as any, { publicAttr: "changed", mixedAttr: "changed_too" }, () => {
-        // block should not execute when setter raises
-      });
+      objectWith(object as any, { publicAttr: "changed", mixedAttr: "changed_too" }, () => {});
     }).toThrow();
 
     expect(object.publicAttr).toBe("public");
@@ -63,8 +61,6 @@ describe("WithTest", () => {
   });
 
   it("only works with public attributes", () => {
-    // In TS, all properties on a plain object are accessible,
-    // but we can test that read-only properties throw
     const readOnly = Object.freeze({ x: 1 });
     expect(() => {
       objectWith(readOnly as any, { x: 2 }, () => {});
@@ -77,7 +73,6 @@ describe("WithTest", () => {
   });
 
   it("basic immediates don't respond to #with", () => {
-    // In TS, primitives don't have a `with` method
     expect(typeof (null as any)?.with).toBe("undefined");
     expect(typeof (true as any).with).toBe("undefined");
     expect(typeof (false as any).with).toBe("undefined");

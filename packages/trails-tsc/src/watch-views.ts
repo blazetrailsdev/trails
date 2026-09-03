@@ -1,6 +1,3 @@
-/** `trails-tsc-views dev` core — Phase 2c-b (plan §2). Full rebuild on each
- * `.tse` event keeps deletes + renames working without per-file bookkeeping. */
-
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { buildViews, type BuildViewsOptions, type BuildViewsResult } from "./build-views.js";
@@ -12,7 +9,6 @@ export interface WatchViewsOptions extends BuildViewsOptions {
     result: BuildViewsResult;
   }) => void;
   onError?: (err: Error, trigger?: string) => void;
-  /** Coalesce-window in ms for bursts of fs events. Default 50. */
   debounceMs?: number;
 }
 
@@ -35,26 +31,15 @@ export function watchViews(opts: WatchViewsOptions = {}): WatchHandle {
   };
 
   runBuild(undefined, "initial");
-  // fs.watch needs an extant dir; create so `dev` works before any templates exist.
   fs.mkdirSync(viewsDir, { recursive: true });
 
   let pending: NodeJS.Timeout | null = null;
   let lastTrigger: string | undefined;
 
-  // Node 20+ supports `recursive` on Linux/macOS/Windows, but some
-  // FUSE / network mounts still reject it. Fall back to a non-recursive
-  // watch on the views root rather than failing the whole `dev` command;
-  // top-level edits still trigger rebuilds, just not nested subdirs.
   const tryWatch = (recursive: boolean): fs.FSWatcher =>
     fs.watch(viewsDir, { recursive }, (_event, filename) => onEvent(filename));
   const onEvent = (filename: string | Buffer | null): void => {
-    // Some platforms/filesystems (older Windows, certain network mounts)
-    // emit a null filename. We can't filter by extension, but the cheap
-    // full rebuild remains correct — schedule with an unknown trigger so
-    // deletes/renames on those hosts still propagate.
     if (filename === null) {
-      // Unknown trigger — overwrite any stale value from a prior event
-      // so the rebuild message doesn't misattribute the source.
       lastTrigger = undefined;
     } else {
       const name = typeof filename === "string" ? filename : String(filename);
@@ -76,9 +61,6 @@ export function watchViews(opts: WatchViewsOptions = {}): WatchHandle {
   } catch {
     watcher = tryWatch(false);
   }
-  // `fs.watch` can emit `error` after creation (dir removed, perms
-  // revoked, EMFILE). Without a listener it becomes an unhandled
-  // exception that crashes `dev`. Surface it through `onError`.
   watcher.on("error", (err) => opts.onError?.(err instanceof Error ? err : new Error(String(err))));
 
   return {

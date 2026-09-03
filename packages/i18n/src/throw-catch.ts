@@ -1,15 +1,4 @@
-/**
- * Ruby's `throw`/`catch` has no JS analogue. `I18n::Backend::Base#translate`
- * signals a missing translation with `throw(:exception, ...)`, which callers
- * intercept with `catch(:exception)`; the pair below is that mechanism, not a
- * port of any gem file.
- */
-
-/**
- * @noRailsEquivalent PERMANENT — Ruby's `throw`/`catch` is a language-level
- * non-local exit with no JS counterpart, so the value Ruby throws has to travel
- * as a carrier error.
- */
+/** @noRailsEquivalent PERMANENT */
 export class ThrownException extends Error {
   readonly value: unknown;
 
@@ -20,20 +9,12 @@ export class ThrownException extends Error {
   }
 }
 
-/**
- * Mirrors Ruby's `throw(:exception, value)`.
- *
- * @noRailsEquivalent PERMANENT — `throw` is a Ruby keyword, not a method.
- */
+/** @noRailsEquivalent PERMANENT */
 export function throwException(value: unknown): never {
   throw new ThrownException(value);
 }
 
-/**
- * Mirrors Ruby's `catch(:exception) { ... }`.
- *
- * @noRailsEquivalent PERMANENT — `catch` is a Ruby keyword, not a method.
- */
+/** @noRailsEquivalent PERMANENT */
 export function catchException<T>(block: () => T): T | unknown {
   try {
     return block();

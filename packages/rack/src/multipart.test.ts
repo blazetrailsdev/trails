@@ -115,8 +115,7 @@ it("builds multipart body from StringIO", () => {
 
 it("can parse fields that end at the end of the buffer", () => {
   const boundary = "AaB03x";
-  // Create a body where the field value ends right at the buffer boundary
-  const valueLen = 16384 - 100; // approximate to land near buffer end
+  const valueLen = 16384 - 100;
   const value = "x".repeat(valueLen);
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n${value}\r\n--${boundary}--\r\n`;
   const params = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)!;
@@ -125,7 +124,6 @@ it("can parse fields that end at the end of the buffer", () => {
 
 it("builds complete params with the chunk size of 16384 slicing exactly on boundary", () => {
   const boundary = "AaB03x";
-  // Pad so boundary falls exactly at 16384 byte offset
   const padding = "x".repeat(
     16384 - `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n`.length - 2,
   );
@@ -252,20 +250,17 @@ it("parses quoted chars in name parameter", () => {
 
 it("supports mixed case metadata", () => {
   const params = parseFixture("filename_multi")!;
-  // filename is preferred over filename*
   expect(params["files"].filename).toBe("foo");
 });
 
 it("falls back to content-type for the name", () => {
   const params = parseFixture("content_type_and_no_disposition")!;
-  // When no disposition, name falls back to content-type[]
   expect(params["text/plain; charset=US-ASCII"]).toBeDefined();
 });
 
 it("supports ISO-2022-JP-encoded part", () => {
   const params = parseFixture("multiple_encodings")!;
   expect(params["us-ascii"]).toBe("Alice");
-  // The ISO-2022-JP encoded part should parse (value depends on encoding handling)
   expect(params["iso-2022-jp"]).toBeDefined();
 });
 
@@ -340,7 +335,6 @@ it("prefers filename over filename* when both are present", () => {
 });
 
 it("sets US_ASCII encoding based on charset", () => {
-  // In JS we don't have encoding objects, but we can verify the content is correct
   const params = parseFixture("content_type_and_no_filename")!;
   expect(params["text"]).toBe("contents");
 });
@@ -385,7 +379,6 @@ it("rejects insanely long boundaries", () => {
 
 it("rejects excessive data before boundary", () => {
   const boundary = "AaB03x";
-  // 128KB of junk before the boundary
   const junk = "x".repeat(128 * 1024);
   const body = `${junk}--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\nval\r\n--${boundary}--\r\n`;
   expect(() => {
@@ -397,14 +390,12 @@ it("rejects excessive mime header size", () => {
   const boundary = "AaB03x";
   const longHeader = "X-Custom: " + "a".repeat(32 * 1024);
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n${longHeader}\r\n\r\nval\r\n--${boundary}--\r\n`;
-  // Should still parse (we don't currently limit header size, but the body is valid)
   const params = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)!;
   expect(params["a"]).toBe("val");
 });
 
 it("parses when the MIME head terminator straddles the BUFSIZE boundary", () => {
   const boundary = "AaB03x";
-  // Create a header that's close to 16384 bytes so the \r\n\r\n separator straddles a buffer boundary
   const padding = "X-Padding: " + "a".repeat(16370) + "\r\n";
   const body = `--${boundary}\r\n${padding}content-disposition: form-data; name="a"\r\n\r\nval\r\n--${boundary}--\r\n`;
   const params = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)!;
@@ -413,7 +404,7 @@ it("parses when the MIME head terminator straddles the BUFSIZE boundary", () => 
 
 it("rejects excessive buffered mime data size in a single parameter", () => {
   const boundary = "AaB03x";
-  const hugeValue = "x".repeat(128 * 1024); // 128KB, exceeds 64KB default
+  const hugeValue = "x".repeat(128 * 1024);
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n${hugeValue}\r\n--${boundary}--\r\n`;
   expect(() => MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)).toThrow(
     MultipartBufferedMimeDataError,
@@ -422,8 +413,7 @@ it("rejects excessive buffered mime data size in a single parameter", () => {
 
 it("rejects excessive buffered mime data size when split into multiple parameters", () => {
   const boundary = "AaB03x";
-  // Each param is under the single-param limit, but total exceeds 64KB
-  const chunk = "x".repeat(40 * 1024); // 40KB each, two = 80KB > 64KB
+  const chunk = "x".repeat(40 * 1024);
   const body = `--${boundary}\r\ncontent-disposition: form-data; name="a"\r\n\r\n${chunk}\r\n--${boundary}\r\ncontent-disposition: form-data; name="b"\r\n\r\n${chunk}\r\n--${boundary}--\r\n`;
   expect(() => MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)).toThrow(
     MultipartBufferedMimeDataError,
@@ -482,7 +472,6 @@ it("parses content-disposition with backslash escaped parameter values", () => {
   const boundary = "---------------------------932620571087722842402766118";
   const body = `--${boundary}\r\nContent-Disposition: form-data;filename="foo\\"bar"; name=file\r\ncontent-type:application/pdf\r\n\r\n\r\n--${boundary}--\r\n`;
   const params = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)!;
-  // For filename, backslash before non-quote keeps both chars per Ruby Rack
   expect(params["file"].filename).toBe('foo"bar');
 });
 
@@ -523,7 +512,6 @@ it("stops parsing content-disposition after 16 params", () => {
   const extraParams = Array.from({ length: 15 }, (_, i) => `a${i}=b`).join(";");
   const body = `--${boundary}\r\nContent-Disposition: form-data;${extraParams}; filename="bar"; name="file"\r\ncontent-type:application/pdf\r\n\r\n\r\n--${boundary}--\r\n`;
   const params = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)!;
-  // After 16 params, name/filename stop being read - filename becomes the name
   expect(params["bar"]).toBeDefined();
   expect(params["bar"].filename).toBe("bar");
 });
@@ -541,10 +529,7 @@ it("ignores content-disposition values over to 1536 bytes", () => {
   const filler = "a".repeat(1510);
   const body = `--${boundary}\r\nContent-Disposition: form-data;a=${filler}; filename="bar"; name="file"\r\ncontent-type:application/pdf\r\n\r\n\r\n--${boundary}--\r\n`;
   const params = MultipartParser.parse(body, `multipart/form-data; boundary=${boundary}`)!;
-  // Disposition ignored, falls back to content-type as name
-  // console.log("KEYS:", JSON.stringify(Object.keys(params)));
   expect(Object.keys(params).length).toBeGreaterThan(0);
-  // Ruby returns {"application/pdf"=>[""]}, our fallback uses content-type[] as name
   const key = Object.keys(params)[0];
   expect(key).toContain("application/pdf");
 });
@@ -573,16 +558,12 @@ it("parses multipart upload with text file", () => {
 });
 
 it("accepts the params hash class to use for multipart parsing", () => {
-  // The params returned by parse should contain the expected keys regardless of internal storage
   const params = parseFixture("text")!;
-  // Verify standard parsing works — the "params hash class" concept in Ruby
-  // maps to our standard Record<string, any> in TS
   expect(params["files"].type).toBe("text/plain");
   expect(params["submit-name"]).toBe("Larry");
 });
 it("preserves extension in the created tempfile", () => {
   const params = parseFixture("text")!;
-  // The filename should have the .txt extension preserved
   expect(params["files"].filename).toBe("file1.txt");
   expect(params["files"].filename.endsWith(".txt")).toBe(true);
 });
@@ -671,7 +652,6 @@ it("parses multipart form with a single quote in the filename", () => {
 
 it("parses multipart form with a null byte in the filename", () => {
   const params = parseFixture("filename_with_null_byte")!;
-  // Percent-encoded null byte gets decoded
   expect(params["files"].filename).toContain("flowers.exe");
 });
 
@@ -690,7 +670,6 @@ it("does not include file params if no file was selected", () => {
 it("parses multipart/mixed", () => {
   const params = parseFixture("mixed_files")!;
   expect(params["foo"]).toBe("bar");
-  // multipart/mixed sub-parts are stored as a string (the raw sub-body)
   expect(typeof params["files"]).toBe("string");
 });
 
@@ -760,7 +739,6 @@ it("buildMultipart returns null when no UploadedFile present and first=true", ()
 
 it("buildMultipart returns flattened params hash when first=false", () => {
   const result = buildMultipart({ name: "Larry" }, false) as Record<string, unknown>;
-  // Generator.flattenedParams() brackets keys when first=false: "[name]" => "Larry"
   expect(result).toEqual({ "[name]": "Larry" });
 });
 

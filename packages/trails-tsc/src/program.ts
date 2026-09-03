@@ -10,22 +10,9 @@ export interface TrailsProgram {
 }
 
 export interface CreateTrailsProgramOptions {
-  /**
-   * Plugins to register with the compiler host. Some plugins (notably
-   * AR's `ar-models`) need a TypeScript checker to resolve symbol
-   * references before they can virtualize, so callers typically run
-   * `createPlainProgram` first, build the plugin, then call
-   * `createTrailsProgram` with the plugin attached.
-   */
   plugins?: readonly TscPlugin[];
 }
 
-/**
- * Parse `tsconfig.json` and create a `ts.Program` backed by a
- * plugin-driven compiler host. Returns `configDiagnostics` instead of
- * throwing so callers can format them with the same formatter they
- * use for program diagnostics.
- */
 export function createTrailsProgram(
   configPath: string,
   extra: CreateTrailsProgramOptions = {},
@@ -41,11 +28,6 @@ export function createTrailsProgram(
   return { program, host, configDiagnostics: [] };
 }
 
-/**
- * Create a plain (non-virtualizing) `ts.Program` for the given
- * tsconfig. Useful as a preliminary pass when a plugin needs to walk
- * the checker before it can construct itself.
- */
 export function createPlainProgram(configPath: string): TrailsProgram {
   const parsed = readAndParseConfig(configPath);
   if ("configDiagnostics" in parsed) return parsed;
@@ -63,9 +45,6 @@ export function createPlainProgram(configPath: string): TrailsProgram {
 type ParsedConfig = { options: ts.CompilerOptions; fileNames: string[] } | TrailsProgram;
 
 function readAndParseConfig(configPath: string): ParsedConfig {
-  // Resolve config path the same way tsc does: accept either a file
-  // or a directory (appends /tsconfig.json). Unlike `ts.findConfigFile`
-  // we don't search upward — `tsc -p <dir>` expects `<dir>/tsconfig.json`.
   const resolved = ts.sys.directoryExists(configPath)
     ? path.join(configPath, "tsconfig.json")
     : configPath;

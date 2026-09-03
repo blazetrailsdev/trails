@@ -1,12 +1,3 @@
-/**
- * ActionController::MimeResponds
- *
- * Content negotiation via respond_to blocks. Exposes an ActionController
- * Collector that wraps ActionDispatch's implementation for API compatibility
- * and future extensions.
- * @see https://api.rubyonrails.org/classes/ActionController/MimeResponds.html
- */
-
 import {
   Collector as DispatchCollector,
   type FormatHandler,
@@ -15,13 +6,8 @@ import { UnknownFormat } from "./exceptions.js";
 export { type FormatHandler };
 
 export class Collector extends DispatchCollector {
-  /** Rails' `@variant` (`metal/mime_responds.rb:255-257`). */
   private _requestVariant: string | string[] | null;
 
-  /**
-   * Mirrors: `Collector#initialize` (`metal/mime_responds.rb:255-260`), which
-   * seeds a response slot for each mime `respond_to` was called with.
-   */
   constructor(mimes: string[] = [], variant: string | string[] | null = null) {
     super();
     this._requestVariant = variant;
@@ -32,11 +18,6 @@ export class Collector extends DispatchCollector {
     return this.resolvedFormat;
   }
 
-  /**
-   * With format arguments, register `handler` for each named format; with none,
-   * register the catch-all. Mirrors Rails' `send(type, &block)` dispatch, which
-   * routes every named format through `custom`.
-   */
   override any(...args: (string | FormatHandler | undefined)[]): this {
     const last = args[args.length - 1];
     const handler = typeof last === "function" ? (args.pop() as FormatHandler) : undefined;
@@ -51,7 +32,6 @@ export class Collector extends DispatchCollector {
     return super.any(handler);
   }
 
-  /** Alias of {@link any}, mirroring Rails' `alias :all :any`. */
   all(...args: (string | FormatHandler | undefined)[]): this {
     return this.any(...args);
   }
@@ -60,12 +40,6 @@ export class Collector extends DispatchCollector {
     return this.on(mimeType, handler);
   }
 
-  /**
-   * First registration wins, mirroring Rails' `@responses[mime_type] ||= ...`
-   * in `custom` (mime_responds.rb:271). Every format method funnels through
-   * `custom` in Rails (abstract_controller/collector.rb:9-15), so the
-   * first-wins rule covers `format.html` as well as explicit `custom` calls.
-   */
   override on(format: string, handler?: FormatHandler): this {
     if (this.handlerFor(format)) return this;
     return super.on(format, handler);

@@ -14,12 +14,9 @@ function makeVerifier(secret = "test-secret"): MessageVerifier {
   return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
 }
 
-// Synthetic GlobalIDModel — both real instances and these literals satisfy
-// GlobalIDModel's `readonly constructor: { readonly name: string }`.
 const person = (id: unknown = 5) => ({ id, constructor: { name: "Person" } });
 const TEST_APP = "bcx";
 
-// Minimal Person class used by `model class` test below.
 class Person {
   static primaryKey = "id";
   constructor(public id: string) {}
@@ -41,9 +38,6 @@ describe("SignedGlobalIDTest", () => {
   it("as string", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(), { verifier });
-    // Rails asserts the exact signed token produced by the vendored test
-    // verifier secret. Trails builds a verifier per test, so the token bytes
-    // differ; assert the round-trip instead.
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })!.uri).toEqual(sgid.uri);
   });
 
@@ -87,8 +81,6 @@ describe("SignedGlobalIDPurposeTest", () => {
     const verifier = makeVerifier();
     const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
     const likeSgid = SignedGlobalID.create(person(5), { verifier, for: "like-button" });
-    // Rails asserts the exact signed token; trails' per-test verifier secret
-    // differs, so assert the round-trip URI instead.
     expect(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "login" })!.uri).toEqual(
       loginSgid.uri,
     );
@@ -104,8 +96,6 @@ describe("SignedGlobalIDPurposeTest", () => {
   });
 
   it("new accepts a :for", () => {
-    // Rails: SignedGlobalID.new(Person.new(5).to_gid.uri, for: 'login') —
-    // the URI-first initializer form.
     const verifier = makeVerifier();
     const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
     const expected = new SignedGlobalID(`gid://${TEST_APP}/Person/5`, {
@@ -125,7 +115,6 @@ describe("SignedGlobalIDPurposeTest", () => {
   it("parse returns nil when purpose mismatch", () => {
     const verifier = makeVerifier();
     const loginSgid = SignedGlobalID.create(person(5), { verifier, for: "login" });
-    // Default `for` defaults to "default" — mismatches "login".
     expect(SignedGlobalID.parse(loginSgid.toString(), { verifier })).toBeNull();
     expect(SignedGlobalID.parse(loginSgid.toString(), { verifier, for: "like_button" })).toBeNull();
   });
@@ -147,8 +136,6 @@ describe("SignedGlobalIDExpirationTest", () => {
   afterEach(() => _resetApp());
 
   it("passing expires_in less than a second is not expired", () => {
-    // Rails parity: with expires_in: 1.second, the token is not expired at
-    // 0.5 seconds elapsed but is expired at 2 seconds.
     try {
       travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
@@ -228,8 +215,6 @@ describe("SignedGlobalIDExpirationTest", () => {
   });
 
   it("expires_at: undefined falls through to expires_in (spread-defaults case)", () => {
-    // `{ ...defaults, expiresIn: 60 }` where defaults has expiresAt: undefined
-    // should still use expiresIn — undefined means 'omitted', not 'disable'.
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), {
       verifier,
@@ -240,14 +225,11 @@ describe("SignedGlobalIDExpirationTest", () => {
   });
 
   it("explicit expires_at: null disables expiration even with expires_in present", () => {
-    // Rails: pick_expiration uses options.key?(:expires_at), so an explicit
-    // expires_at: nil wins over expires_in — even past expires_in values
-    // produce a non-expiring SGID.
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), {
       verifier,
       expiresAt: null,
-      expiresIn: -1, // would expire instantly if it won precedence
+      expiresIn: -1,
     });
     expect(sgid.expiresAt).toBeUndefined();
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
@@ -262,10 +244,6 @@ describe("SignedGlobalIDExpirationTest", () => {
 
   it("returns null for token expired via expires_in (already-elapsed)", () => {
     const verifier = makeVerifier();
-    // Negative expiresIn produces an expiresAt in the past — guarantees the
-    // expiresIn codepath actually drives expiration enforcement (without this
-    // test, every other expires_in test would pass even if expiresIn were
-    // silently ignored).
     const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: -1 });
     expect(SignedGlobalID.parse(sgid.toString(), { verifier })).toBeNull();
   });
@@ -274,7 +252,7 @@ describe("SignedGlobalIDExpirationTest", () => {
     try {
       travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
-      SignedGlobalID.expiresIn = 3600; // 1 hour class-level default
+      SignedGlobalID.expiresIn = 3600;
       const sgid = SignedGlobalID.create(person(5), { verifier });
       travelTo("2024-01-01T00:59:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
@@ -291,7 +269,6 @@ describe("SignedGlobalIDExpirationTest", () => {
       travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       SignedGlobalID.expiresIn = 3600;
-      // Per-call expiresIn: 2 hours wins over class-level 1 hour
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresIn: 7200 });
       travelTo("2024-01-01T01:00:00.000Z", { withUsec: true });
       expect(SignedGlobalID.parse(sgid.toString(), { verifier })).not.toBeNull();
@@ -308,7 +285,6 @@ describe("SignedGlobalIDExpirationTest", () => {
       travelTo("2024-01-01T00:00:00.000Z", { withUsec: true });
       const verifier = makeVerifier();
       SignedGlobalID.expiresIn = 3600;
-      // Per-call expiresAt: tomorrow wins over class-level 1 hour
       const date = Temporal.Instant.from("2024-01-02T23:59:59.999Z");
       const sgid = SignedGlobalID.create(person(5), { verifier, expiresAt: date });
       expect(sgid.expiresAt!.epochMilliseconds).toBe(date.epochMilliseconds);
@@ -340,9 +316,6 @@ describe("SignedGlobalIDCustomParamsTest", () => {
   });
 
   it("purpose key flows through as a URI param (not reserved)", () => {
-    // Rails GlobalID.create strips only (:app, :verifier, :for); any other
-    // key — including :purpose — flows through to URI params. The internal
-    // @purpose attr is set via pick_purpose(:for), not from this URI param.
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(person(5), { verifier, purpose: "vip" });
     expect(sgid.params["purpose"]).toBe("vip");
@@ -363,9 +336,6 @@ describe("SignedGlobalID (non-Rails coverage)", () => {
   });
 
   it("parse returns null for a signed-but-malformed URI", () => {
-    // Hand-craft a payload with a gid:// prefix but no model id. The
-    // verifier would happily sign it, but parse() must reject so that
-    // modelId / modelName accessors never throw on a returned SGID.
     const verifier = makeVerifier();
     const malformedToken = verifier.generate(
       { gid: "gid://app/Person", purpose: "default", expires_at: null },
@@ -424,7 +394,6 @@ describe("SignedGlobalID (non-Rails coverage)", () => {
       const v = makeVerifier();
       SignedGlobalID.verifier = v;
       const sgid = SignedGlobalID.create(person(5));
-      // Token verifies with the class-level verifier (no option needed).
       const parsed = SignedGlobalID.parse(sgid.toString());
       expect(parsed).not.toBeNull();
       expect(parsed!.uri.toString()).toBe("gid://bcx/Person/5");
@@ -441,7 +410,6 @@ describe("SignedGlobalID (non-Rails coverage)", () => {
       const callV = makeVerifier("call-secret");
       SignedGlobalID.verifier = classV;
       const sgid = SignedGlobalID.create(person(5), { verifier: callV });
-      // Class-level verifier can't verify a token signed with a different one.
       expect(SignedGlobalID.parse(sgid.toString())).toBeNull();
       expect(SignedGlobalID.parse(sgid.toString(), { verifier: callV })).not.toBeNull();
     });

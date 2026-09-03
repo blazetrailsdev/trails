@@ -1,6 +1,5 @@
 import type { Mapper } from "@blazetrails/actionpack";
 
-/** `/boom` raises inside the action — exercises the `DebugExceptions` path. */
 export function drawRoutes(mapper: Mapper): void {
   mapper.get("/posts", { to: "posts#index", as: "posts" });
   mapper.get("/admin/sessions", { to: "admin/sessions#index" });

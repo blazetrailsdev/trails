@@ -1,17 +1,3 @@
-/** Mirrors: i18n/lib/i18n.rb */
-
-/**
- * Ruby's `send(handler, ...)` in `handle_exception` dispatches on the `I18n`
- * module itself; this self-import is that receiver. A Symbol handler therefore
- * names an export of this module, which is what `I18n.custom_exception_handler`
- * is in the gem (i18n.rb:415-416).
- *
- * A Ruby module is open and a module namespace object is not: ECMA-262 makes it
- * a non-extensible exotic object, so a handler method installed after load —
- * Ruby's `module I18n; def self.custom_exception_handler` reopening, or mocha's
- * `I18n.expects` — has no representable form outside a test transform. Every
- * handler that names a real export dispatches exactly as the gem's does.
- */
 import * as I18n from "./i18n.js";
 import type { ExceptionHandlerLike } from "./config.js";
 import type { Base } from "./backend/base.js";
@@ -20,19 +6,11 @@ import { ArgumentError, Disabled, InvalidLocale, MissingTranslation } from "./ex
 import type { TranslateOptions } from "./backend/base.js";
 import { throwException, catchException } from "./throw-catch.js";
 
-/** Ruby models locales as Symbols; the JS analogue is a plain string. */
 export type Locale = string;
-/** A translation key: a dotted string, or a normalized key segment. */
 export type TranslationKey = string | number | boolean;
 
 export const EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
 
-/**
- * The gem spells these as snake_case Symbols because they double as option
- * keys; trails option keys are camelCase, so these follow suit.
- * `reservedKeysPattern` still recognizes the snake_case spellings, since those
- * are what appears inside translation data written for Ruby.
- */
 export const RESERVED_KEYS: string[] = [
   "cascade",
   "deepInterpolation",
@@ -51,13 +29,6 @@ export const RESERVED_KEYS: string[] = [
   "throw",
 ];
 
-/**
- * Mirrors: I18n.new_double_nested_cache (i18n.rb:38-40). Ruby uses
- * `Concurrent::Map`; the JS analogue is a plain `Map` of `Map`s, since the
- * process-wide config singleton already stands in for `Thread.current`. Ruby's
- * default block (`{ |h, k| h[k] = Concurrent::Map.new }`) has no `Map`
- * equivalent, so the outer read installs the inner map at the call site.
- */
 export function newDoubleNestedCache<K = unknown, V = TranslationKey[]>(): Map<string, Map<K, V>> {
   return new Map();
 }
@@ -68,16 +39,11 @@ function underscore(key: string): string {
 
 let reservedKeysPatternCache: RegExp | undefined;
 
-/**
- * Mirrors: I18n.reserve_key. Reserved keys are used internally and can't also
- * be used for interpolation.
- */
 export function reserveKey(key: string): void {
   RESERVED_KEYS.push(key);
   reservedKeysPatternCache = undefined;
 }
 
-/** Mirrors: I18n.reserved_keys_pattern */
 export function reservedKeysPattern(): RegExp {
   if (!reservedKeysPatternCache) {
     const spellings = new Set(RESERVED_KEYS.flatMap((key) => [key, underscore(key)]));
@@ -88,16 +54,11 @@ export function reservedKeysPattern(): RegExp {
 
 let currentConfig: Config | undefined;
 
-/**
- * Mirrors: I18n::Base#config. Ruby scopes the config to `Thread.current`; JS
- * has no threads, so the singleton below is the whole-process equivalent.
- */
 export function config(): Config {
   currentConfig ??= new Config();
   return currentConfig;
 }
 
-/** Sets I18n configuration object. */
 export function setConfig(value: Config): void {
   currentConfig = value;
 }
@@ -115,11 +76,6 @@ export function resetConfig(): void {
   normalizedKeyCache.clear();
 }
 
-/**
- * Write methods which delegate to the configuration object. Ruby generates a
- * reader and a `name=` writer for each; a module-level binding can't carry a
- * setter, so the writers take the sanctioned `set*` spelling.
- */
 export function locale(): Locale | false {
   return config().locale;
 }
@@ -184,52 +140,17 @@ export function setEnforceAvailableLocales(value: boolean): void {
   config().enforceAvailableLocales = value;
 }
 
-/**
- * Tells the backend to reload translations. Used in situations like the
- * Rails development environment. Backends can implement whatever strategy
- * is useful.
- *
- * Async because the re-read of `I18n.load_path` that the gem does lazily inside
- * `init_translations` (simple.rb:83-86, base.rb:246) is a Promise here, and so
- * sits inside `Backend::Base#reload!` (base.rb:101-103). The four lazy call
- * sites below it stay verbatim and synchronous.
- */
 export async function reloadBang(): Promise<void> {
   config().clearAvailableLocalesSet();
   await config().backend.reloadBang();
 }
 
-/**
- * Tells the backend to load translations now. Used in situations like the
- * Rails production environment. Backends can implement whatever strategy
- * is useful.
- *
- * Async because `Backend::Base#eager_load!` is: it runs under
- * `Backend::Base#reload!`'s re-read (base.rb:101-103), which is a Promise here.
- * The bytes it initializes from are the ones already in memory — from the boot
- * preload, or from that `reload!` — so `eager_load!` reads nothing of its own,
- * as the gem's does not either: `Simple#eager_load!` reaches `init_translations`
- * (simple.rb:64), which loads only while the backend is uninitialized.
- */
 export async function eagerLoadBang(): Promise<void> {
   await config().backend.eagerLoadBang();
 }
 
-/**
- * A key accepted by `translate`. Ruby accepts a Symbol or a String and treats
- * them the same — `normalize_keys` sends both through `to_sym` — so the JS
- * spelling of both is the plain string.
- */
 export type TranslateKey = TranslationKey | null;
 
-/**
- * Translates, pluralizes and interpolates a given key using a given locale,
- * scope, and default, as well as interpolation values.
- *
- * Ruby takes `throw:`, `raise:` and `locale:` as keyword arguments alongside
- * `**options`; the destructured rest below is that split. `throw` can't be a
- * binding name in JS, so the local reads `throwOption`.
- */
 export function translate(
   key: TranslateKey | TranslateKey[] = null,
   {
@@ -254,10 +175,6 @@ export function translate(
 
 export const t = translate;
 
-/**
- * Wrapper for `translate` that adds `raise: true`. With this option, if no
- * translation is found, it will raise `I18n::MissingTranslationData`.
- */
 export function translateBang(
   key: TranslateKey | TranslateKey[],
   options: TranslateOptions = EMPTY_HASH,
@@ -267,7 +184,6 @@ export function translateBang(
 
 export const tBang = translateBang;
 
-/** Returns an array of interpolation keys for the given translation key. */
 export function interpolationKeys(key: unknown, options: TranslateOptions = EMPTY_HASH): string[] {
   if (typeof key !== "string" || key.length === 0) throw new ArgumentError();
 
@@ -279,7 +195,6 @@ export function interpolationKeys(key: unknown, options: TranslateOptions = EMPT
     .filter((value): value is string => value != null);
 }
 
-/** Returns true if a translation exists for a given key, otherwise returns false. */
 export function exists(
   key: unknown,
   _locale: Locale | false | null = null,
@@ -292,13 +207,6 @@ export function exists(
   return config().backend.exists(locale as Locale, key as TranslationKey, options);
 }
 
-/**
- * Transliterates UTF-8 characters to ASCII.
- *
- * Ruby takes `throw:`, `raise:`, `locale:` and `replacement:` as keyword
- * arguments alongside `**options`; the destructured rest below is that split.
- * `throw` can't be a binding name in JS, so the local reads `throwOption`.
- */
 export function transliterate(
   key: string,
   {
@@ -327,9 +235,6 @@ export function transliterate(
   }
 }
 
-/**
- * Localizes certain objects, such as dates and numbers to local formatting.
- */
 export function localize(
   object: unknown,
   { locale = null, format = null, ...options }: TranslateOptions = EMPTY_HASH,
@@ -344,7 +249,6 @@ export function localize(
 
 export const l = localize;
 
-/** Executes block with given I18n.locale set. */
 export function withLocale<T>(tmpLocale: Locale | false | null | undefined, block: () => T): T {
   if (tmpLocale == null) {
     return block();
@@ -390,22 +294,7 @@ function normalizeKey(key: unknown, separator: string): TranslationKey[] {
   return normalized;
 }
 
-/**
- * Ruby `String#to_sym` / `Symbol#to_sym`, which the gem calls wherever a locale
- * or a key has to reach a Symbol-keyed hash in its canonical spelling —
- * `store_translations` (simple.rb:42), `lookup`'s retry (simple.rb:99),
- * `flatten_keys` (flatten.rb:62), and the reserved-key raises in `translate`
- * (base.rb:66) and `interpolate` (interpolate/ruby.rb:24, :39).
- *
- * A Ruby Symbol is a JS string that keeps its leading colon (`":en"`), so this
- * answers that spelling; a caller that wants the Symbol's *name* — which is
- * what trails' translation hashes are keyed by — takes `.slice(1)` off it, as
- * the colon convention prescribes.
- *
- * @noRailsEquivalent PERMANENT — Ruby core, not `I18n`: `to_sym` is a method on String and
- * Symbol, and TypeScript cannot reopen either, so the gem's five `to_sym` call
- * sites share one function here rather than N inline conditionals.
- */
+/** @noRailsEquivalent PERMANENT */
 export function toSym(value: unknown): string {
   return typeof value === "string" && value.startsWith(":") ? value : `:${String(value)}`;
 }
@@ -424,27 +313,20 @@ export function normalizeKeys(
   ];
 }
 
-/**
- * Mirrors: I18n.locale_available?. Returns true when the passed locale is in
- * the list of available locales.
- */
 export function localeAvailable(locale: Locale | null | undefined): boolean {
   return config().availableLocalesSet.has(locale as Locale);
 }
 
-/** Mirrors: I18n.enforce_available_locales! */
 export function enforceAvailableLocalesBang(locale: Locale | false | null | undefined): void {
   if (locale !== false && config().enforceAvailableLocales) {
     if (!localeAvailable(locale)) throw new InvalidLocale(locale);
   }
 }
 
-/** Mirrors: I18n.available_locales_initialized? */
 export function availableLocalesInitialized(): boolean {
   return config().availableLocalesInitialized;
 }
 
-/** Ruby truthiness: everything but `nil` and `false`. */
 function truthy(value: unknown): boolean {
   return value != null && value !== false;
 }
@@ -473,28 +355,7 @@ function translateKey(
   }
 }
 
-/**
- * Any exceptions thrown in translate will be sent to the exception_handler
- * which can be a Symbol, a Proc or any other Object unless they're forced to
- * be raised or thrown (MissingTranslation).
- *
- * If exception_handler is a Symbol then it will simply be sent to I18n as
- * a method call. A Proc will simply be called. In any other case the
- * method #call will be called on the exception_handler object.
- *
- * Examples:
- *
- *   I18n.setExceptionHandler(":customExceptionHandler")
- *   I18n.customExceptionHandler(exception, locale, key, options)  // will be called like this
- *
- *   I18n.setExceptionHandler((...args) => { ... })                // a lambda
- *   I18n.exceptionHandler()(exception, locale, key, options)      // will be called like this
- *
- *   I18n.setExceptionHandler(new I18nExceptionHandler())          // an object
- *   I18n.exceptionHandler().call(exception, locale, key, options) // will be called like this
- *
- * @internal
- */
+/** @internal */
 function handleException(
   handling: "raise" | "throw" | false,
   exception: MissingTranslation | ArgumentError,
@@ -524,7 +385,6 @@ function handleException(
   }
 }
 
-/** Ruby's `Hash#slice`. */
 function slice(hash: TranslateOptions, ...keys: string[]): TranslateOptions {
   const result: TranslateOptions = {};
   for (const key of keys) {
@@ -533,13 +393,7 @@ function slice(hash: TranslateOptions, ...keys: string[]): TranslateOptions {
   return result;
 }
 
-/**
- * The `RegExp` below is Ruby's `Regexp.union(I18n.config.interpolation_patterns)`,
- * and `matchAll` its `String#scan`, which on a pattern carrying groups yields
- * one array of captures per match.
- *
- * @internal
- */
+/** @internal */
 function interpolationKeysFromTranslation(translation: unknown): unknown[] {
   if (typeof translation === "string") {
     const pattern = new RegExp(

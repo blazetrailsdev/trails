@@ -1,9 +1,3 @@
-/**
- * ActionDispatch::Callbacks
- *
- * Provides callbacks to be executed before and after dispatching the request.
- */
-
 import {
   CallbacksMixin,
   type BeforeCallback,

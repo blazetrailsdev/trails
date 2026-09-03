@@ -57,7 +57,7 @@ export class Lint {
     this.checkContentLength(status, headers);
 
     if (env[REQUEST_METHOD] === HEAD) {
-      // Body should be empty for HEAD
+      /** @empty */
     }
 
     if (env[RACK_EARLY_HINTS]) {
@@ -119,16 +119,14 @@ export class Lint {
       }
       const method = env[REQUEST_METHOD];
       if (method === OPTIONS && pathInfo === "*") {
-        // asterisk form OK
+        /** @empty */
       } else if (method === CONNECT) {
-        // authority form: host:port
         if (!pathInfo.includes(":")) {
           throw new LintError("CONNECT request PATH_INFO must be authority form (host:port)");
         }
       } else if (pathInfo.startsWith("http://") || pathInfo.startsWith("https://")) {
-        // absolute form OK
+        /** @empty */
       } else {
-        // origin form must start with / or be empty
         if (pathInfo !== "" && !pathInfo.startsWith("/")) {
           throw new LintError("PATH_INFO must start with / (origin form)");
         }
@@ -151,7 +149,6 @@ export class Lint {
       throw new LintError("rack.url_scheme must be 'http' or 'https'");
     }
 
-    // Validate rack.input
     const input = env[RACK_INPUT];
     if (input !== null && input !== undefined) {
       if (typeof input.read !== "function") {
@@ -159,17 +156,14 @@ export class Lint {
       }
     }
 
-    // Validate rack.errors
     this.checkErrorStream(env[RACK_ERRORS]);
 
-    // Validate rack.hijack
     if (env[RACK_IS_HIJACK]) {
       if (!env[RACK_HIJACK] || typeof env[RACK_HIJACK] !== "function") {
         throw new LintError("rack.hijack must be callable when rack.hijack? is true");
       }
     }
 
-    // Header keys must be strings
     for (const key of Object.keys(env)) {
       if (typeof key !== "string") {
         throw new LintError("env keys must be strings");

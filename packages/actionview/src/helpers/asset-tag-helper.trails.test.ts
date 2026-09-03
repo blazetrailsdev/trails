@@ -1,7 +1,3 @@
-// Trails-only: Rails has no unit test for the private `send_preload_links_header`,
-// but its response contract is spelled differently here — `sending?` is the
-// `isSending` getter and `headers` is a `Rack::Headers` with `get`/`set`, not a
-// subscriptable Hash. These pin that shape.
 import { describe, it, expect } from "vitest";
 import { sendPreloadLinksHeader } from "./asset-tag-helper.js";
 

@@ -214,7 +214,6 @@ describe("BroadcastLoggerTest", () => {
   });
 
   it("calling a method that no logger in the broadcast have implemented", () => {
-    // Calling an unknown method should not throw on BroadcastLogger
     expect(() => (logger as any).nonExistentMethod?.()).not.toThrow();
   });
 
@@ -250,7 +249,6 @@ describe("BroadcastLoggerTest", () => {
   });
 
   it("#dup duplicates the broadcasts", () => {
-    // Verify BroadcastLogger works normally - no native dup in JS
     const out3 = makeBuffer();
     const log3 = new Logger(out3);
     const logger2 = new BroadcastLogger(log1, log3);

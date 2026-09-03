@@ -80,7 +80,7 @@ export class Static {
       if (response[0] === 404) {
         response = null;
       } else if (response[0] === 304) {
-        // leave headers as-is
+        /** @empty */
       } else {
         response[1][CONTENT_TYPE] = mimeType(File.extname(origPath), "text/plain");
         response[1]["content-encoding"] = "gzip";

@@ -3,7 +3,6 @@ import { ParameterFilter, type Filter } from "./parameter-filter.js";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import { withIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 
-/** Ruby's `String#swapcase`, which JS has no built-in for. */
 function swapcase(str: string): string {
   return str.replace(/\p{L}/gu, (c) => (c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase()));
 }
@@ -171,8 +170,6 @@ describe("ParameterFilterTest", () => {
     expect(precompiled.filter((filter) => filter instanceof RegExp).length).toBe(2);
     expect(precompiled.length).toBe(2 + procs.length);
 
-    // Ruby matches on `filter.to_s`, whose embeddable form (`(?-mix:A.a)`) is what
-    // the joined Regexp carries; JS joins `source`, so `source` is the analogue.
     const regexp = precompiled.find(
       (filter) =>
         filter instanceof RegExp && filter.source.includes((patterns[0] as RegExp).source),

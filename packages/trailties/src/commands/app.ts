@@ -3,8 +3,6 @@ import { Command } from "commander";
 import { AppGenerator } from "../generators/app-generator.js";
 import { generateCommand } from "./generate.js";
 
-// Mirror of `bin/rails app:template`. Rails source:
-// railties/lib/rails/tasks/framework.rake.
 export function appTemplateCommand(): Command {
   return new Command("app:template")
     .description("Apply the template supplied by <location>")

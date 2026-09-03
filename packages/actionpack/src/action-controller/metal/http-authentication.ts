@@ -1,8 +1,3 @@
-/**
- * ActionController::HttpAuthentication — Basic, Digest, and Token auth helpers
- * ported from `actionpack/lib/action_controller/metal/http_authentication.rb`.
- */
-
 import { getCrypto } from "@blazetrails/ruby-compat";
 import type { Headers } from "@blazetrails/rack";
 
@@ -15,24 +10,16 @@ export {
   type DigestAuthParams,
 } from "../../action-dispatch/http-authentication.js";
 
-// ============================================================================
-// HttpAuthentication::Basic
-// ============================================================================
-
-/** Mirrors Rails `request.authorization`. */
 export interface BasicAuthRequestLike {
   authorization?: string | null;
 }
 
-/** Controller slice mutated by `authenticationRequest`. */
 export interface BasicAuthControllerLike {
   headers: Headers;
   status: number | string;
   responseBody: string | string[] | Buffer | null | undefined;
 }
 
-// Ruby `String#split(" ", 2)`: split on the first whitespace run, ignoring
-// leading whitespace. Returns up to two pieces.
 function splitOnFirstWhitespace(s: string): [string, string?] {
   const trimmed = s.replace(/^\s+/, "");
   const m = /\s+/.exec(trimmed);
@@ -42,7 +29,6 @@ function splitOnFirstWhitespace(s: string): [string, string?] {
 const reqAuth = (request: BasicAuthRequestLike): string =>
   request.authorization == null ? "" : String(request.authorization);
 
-/** Mirrors `Basic#authenticate`. */
 export function authenticate<T>(
   request: BasicAuthRequestLike,
   loginProcedure: (userName: string, password: string) => T,
@@ -52,19 +38,16 @@ export function authenticate<T>(
   return loginProcedure(user, pass);
 }
 
-/** Mirrors `Basic#has_basic_credentials?`. */
 export function hasBasicCredentials(request: BasicAuthRequestLike): boolean {
   return reqAuth(request).trim().length > 0 && authScheme(request).toLowerCase() === "basic";
 }
 
-/** Mirrors `Basic#user_name_and_password`. */
 export function userNameAndPassword(request: BasicAuthRequestLike): [string, string] {
   const decoded = decodeCredentials(request);
   const idx = decoded.indexOf(":");
   return idx === -1 ? [decoded, ""] : [decoded.slice(0, idx), decoded.slice(idx + 1)];
 }
 
-/** Mirrors `Basic#decode_credentials`. */
 export function decodeCredentials(request: BasicAuthRequestLike): string {
   try {
     return Buffer.from(authParam(request) ?? "", "base64").toString("utf-8");
@@ -73,23 +56,18 @@ export function decodeCredentials(request: BasicAuthRequestLike): string {
   }
 }
 
-/** Mirrors `Basic#auth_scheme`. */
 export function authScheme(request: BasicAuthRequestLike): string {
   return splitOnFirstWhitespace(reqAuth(request))[0];
 }
 
-/** Mirrors `Basic#auth_param`. `Array#second` returns `nil` when there's no
- *  whitespace separator; we return `undefined`. */
 export function authParam(request: BasicAuthRequestLike): string | undefined {
   return splitOnFirstWhitespace(reqAuth(request))[1];
 }
 
-/** Mirrors `Basic#encode_credentials`. */
 export function encodeCredentials(userName: string, password: string): string {
   return `Basic ${Buffer.from(`${userName}:${password}`).toString("base64")}`;
 }
 
-/** Mirrors `Basic#authentication_request`. Mutates the controller in place. */
 export function authenticationRequest(
   controller: BasicAuthControllerLike,
   realm: string,
@@ -100,17 +78,10 @@ export function authenticationRequest(
   controller.responseBody = message ?? "HTTP Basic: Access denied.\n";
 }
 
-// ============================================================================
-// HttpAuthentication::Basic::ControllerMethods
-// ============================================================================
-
 export interface BasicControllerHost extends BasicAuthControllerLike {
   request: BasicAuthRequestLike;
 }
 
-/** Mirrors `Basic::ControllerMethods#http_basic_authenticate_or_request_with`.
- *  Bitwise `&` ensures both `secureCompare` calls always run — Rails' length-
- *  leak protection. */
 export function httpBasicAuthenticateOrRequestWith(
   this: BasicControllerHost,
   options: { name: string; password: string; realm?: string | null; message?: string | null },
@@ -128,7 +99,6 @@ export function httpBasicAuthenticateOrRequestWith(
   ) as boolean;
 }
 
-/** Mirrors `Basic::ControllerMethods#authenticate_or_request_with_http_basic`. */
 export function authenticateOrRequestWithHttpBasic<T>(
   this: BasicControllerHost,
   realm: string | null | undefined,
@@ -145,7 +115,6 @@ export function authenticateOrRequestWithHttpBasic<T>(
   return false;
 }
 
-/** Mirrors `Basic::ControllerMethods#authenticate_with_http_basic`. */
 export function authenticateWithHttpBasic<T>(
   this: BasicControllerHost,
   loginProcedure: (userName: string, password: string) => T,
@@ -153,7 +122,6 @@ export function authenticateWithHttpBasic<T>(
   return authenticate(this.request, loginProcedure);
 }
 
-/** Mirrors `Basic::ControllerMethods#request_http_basic_authentication`. */
 export function requestHttpBasicAuthentication(
   this: BasicControllerHost,
   realm: string = "Application",
@@ -162,15 +130,10 @@ export function requestHttpBasicAuthentication(
   authenticationRequest(this, realm, message);
 }
 
-// ============================================================================
-// HttpAuthentication::Basic::ControllerMethods::ClassMethods
-// ============================================================================
-
 export interface BasicClassDSLHost {
   beforeAction(cb: (controller: BasicControllerHost) => unknown, options?: unknown): unknown;
 }
 
-/** Mirrors `Basic::ControllerMethods::ClassMethods#http_basic_authenticate_with`. */
 export function httpBasicAuthenticateWith(
   this: BasicClassDSLHost,
   options: { name: string; password: string; realm?: string | null; [filter: string]: unknown },
@@ -187,18 +150,12 @@ export function httpBasicAuthenticateWith(
   }, rest);
 }
 
-// Constant-time compare returning 0/1 — mirrors `SecurityUtils.secure_compare`.
-// Returns 0/1 so callers can `&` results without short-circuit.
 function secureCompare(a: string, b: string): 0 | 1 {
   if (a.length !== b.length) return 0;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return diff === 0 ? 1 : 0;
 }
-
-// ============================================================================
-// HttpAuthentication::Digest
-// ============================================================================
 
 export interface DigestRequestLike {
   authorization?: string | null;

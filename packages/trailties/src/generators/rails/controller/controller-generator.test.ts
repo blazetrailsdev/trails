@@ -32,9 +32,7 @@ function readFile(relativePath: string): string {
 }
 
 describe("ControllerGeneratorTest", () => {
-  it.skip("help does not show invoked generators options if they already exist", () => {
-    // Needs --help support
-  });
+  it.skip("help does not show invoked generators options if they already exist", () => {});
 
   it("controller skeleton is created", () => {
     const gen = makeGen();
@@ -43,9 +41,7 @@ describe("ControllerGeneratorTest", () => {
     expect(content).toContain("class AccountController");
   });
 
-  it.skip("check class collision", () => {
-    // Needs class collision detection
-  });
+  it.skip("check class collision", () => {});
 
   it("invokes helper", () => {
     const gen = makeGen();

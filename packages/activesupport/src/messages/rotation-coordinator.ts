@@ -1,18 +1,8 @@
 import { extractBang } from "../core-ext/hash/slice.js";
 import { isPlainObject } from "../hash-utils.js";
 import type { OnRotation } from "./rotator.js";
-// The `messages/` ports raise through the Ruby builtins declared in
-// serializer-with-fallback.ts; activesupport has no separate errors module, and
-// hash-utils' ArgumentError is the core-ext hash extensions' own copy.
 import { ArgumentError, RuntimeError } from "./serializer-with-fallback.js";
 
-/**
- * Ruby's secret generator block, `->(salt, **kwargs) { ... }`. Ruby reads the
- * block's keyword parameters with `Method#parameters` to decide which of the
- * `rotate` options belong to the generator; TypeScript has no parameter
- * reflection, so a generator that takes options declares their names on
- * `parameters` instead.
- */
 export interface SecretGenerator {
   (salt: string, options: Record<string, unknown>): unknown;
   parameters?: readonly string[];
@@ -22,14 +12,8 @@ export interface RotateOptions extends Record<string, unknown> {
   secretGenerator?: SecretGenerator;
 }
 
-/**
- * A codec key. Ruby salts are usually Symbols but any object works, and the
- * coordinator stringifies only when it builds, so `rotate` blocks see the salt
- * in its original form.
- */
 export type Salt = string | symbol;
 
-/** Ruby's `rotate { |salt| ... }` block, which may return nil to skip a salt. */
 export type RotateBlock = (salt: Salt) => RotateOptions | null | undefined;
 
 export interface BuildOptions extends Record<string, unknown> {
@@ -38,7 +22,6 @@ export interface BuildOptions extends Record<string, unknown> {
   onRotation: OnRotation | null;
 }
 
-/** The codec surface `build_with_rotations` reduces over. */
 export interface FallsBack<C> {
   fallBackTo(fallback: C): C;
 }
@@ -86,10 +69,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
     return this.rotate();
   }
 
-  /**
-   * @missingRailsCall clear — PERMANENT: Equivalent: JS arrays have no `clear`; the
-   *   rotate-options array is emptied by assignment instead.
-   */
+  /** @missingRailsCall clear — PERMANENT */
   clearRotations(): this {
     this.changingConfigurationBang();
     this.#rotateOptions = [];
@@ -104,9 +84,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
 
   /**
    * @internal
-   *
-   * @missingRailsCall any? — PERMANENT: Equivalent: `@codecs.any?` over a Hash is
-   *   `this.#codecs.size > 0` on a Map, which has no `any?`.
+   * @missingRailsCall any? — PERMANENT
    */
   private changingConfigurationBang(): void {
     if (this.#codecs.size > 0) {
@@ -120,10 +98,7 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
 
   /**
    * @internal
-   *
-   * @missingRailsCall filter_map — PERMANENT: No JS analogue: Ruby filter_maps
-   *   `Method#parameters` for the generator's keyword names; TS has no parameter
-   *   reflection, so a generator declares them on `parameters`.
+   * @missingRailsCall filter_map — PERMANENT
    */
   private normalizeOptions(options: RotateOptions): BuildOptions {
     const normalized = { ...options } as Record<string, unknown>;
@@ -163,17 +138,14 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
   protected abstract build(salt: string, options: BuildOptions): C;
 }
 
-/** Ruby's `Symbol#to_s` / `String#to_s` over a salt. */
 function saltToS(salt: Salt): string {
   return typeof salt === "symbol" ? (salt.description ?? "") : salt;
 }
 
-/** Ruby's `Symbol#inspect` / `String#inspect` over a salt. */
 function inspect(salt: Salt): string {
   return typeof salt === "symbol" ? `:${salt.description ?? ""}` : JSON.stringify(salt);
 }
 
-/** Ruby's `Array#uniq` over option hashes, which compares them by value. */
 function uniq(optionsList: BuildOptions[]): BuildOptions[] {
   const unique: BuildOptions[] = [];
   for (const options of optionsList) {

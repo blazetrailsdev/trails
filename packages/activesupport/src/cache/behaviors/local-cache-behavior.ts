@@ -1,17 +1,5 @@
 import { it } from "vitest";
 
-// Mirrors Rails `LocalCacheBehavior`
-// (activesupport/test/cache/behaviors/local_cache_behavior.rb). Ruby's
-// `include LocalCacheBehavior` is spelled here as a function the store test
-// file calls inside its own describe, the trails spelling of a test-behavior
-// mixin (see cache-store-compression-behavior.ts).
-//
-// `ActiveSupport::Cache::Strategy::LocalCache` — the module every case here
-// drives through `@cache.with_local_cache` — is not ported, so the whole
-// module is carried as the permanent-skip stubs the including store tests used
-// to hold. They name the Rails cases in one place, against the Rails module,
-// rather than crediting whichever store test happened to list them.
-
 export function localCacheBehavior(): void {
   it.skip("instrumentation with local cache");
   it.skip("local writes are persistent on the remote cache");

@@ -48,8 +48,8 @@ describe("ActionDispatch::Journey::Scanner", () => {
   it("lastString and lastLiteral expose the last scanned text", () => {
     const s = new Scanner();
     s.scanSetup("/page\\:foo");
-    s.nextToken(); // SLASH
-    s.nextToken(); // LITERAL (page\:foo)
+    s.nextToken();
+    s.nextToken();
     expect(s.lastString()).toBe("page\\:foo");
     expect(s.lastLiteral()).toBe("page:foo");
   });

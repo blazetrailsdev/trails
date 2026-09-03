@@ -41,8 +41,7 @@ describe("EnumerableTests", () => {
   });
 
   it("range sums", () => {
-    // Simulate a range as array
-    const range = Array.from({ length: 5 }, (_, i) => i + 1); // [1,2,3,4,5]
+    const range = Array.from({ length: 5 }, (_, i) => i + 1);
     expect(sum(range)).toBe(15);
   });
 
@@ -73,7 +72,6 @@ describe("EnumerableTests", () => {
       count++;
       return x > 3;
     });
-    // many stops after finding 2 matches
     expect(count).toBeLessThanOrEqual(arr.length);
   });
 
@@ -104,7 +102,6 @@ describe("EnumerableTests", () => {
   });
 
   it("compact blank", () => {
-    // false and 0 are not blank in JS (only null, undefined, "", [], {} are blank)
     expect(compactBlank([1, null, "", undefined, 0, "hello"])).toEqual([1, 0, "hello"]);
   });
 
@@ -159,7 +156,6 @@ describe("EnumerableTests", () => {
 
   it("in order of with filter false", () => {
     const items = [{ id: 1 }, { id: 2 }, { id: 99 }];
-    // without filter: returns only matched
     const result = inOrderOf(items, (x) => x.id, [1, 2]);
     expect(result.map((x) => x.id)).not.toContain(99);
   });
@@ -193,7 +189,6 @@ describe("EnumerableTests", () => {
   });
 
   it("doesnt bust constant cache", () => {
-    // Verifies that collection methods don't break when called multiple times
     const items = [1, 2, 3];
     expect(sum(items)).toBe(6);
     expect(sum(items)).toBe(6);

@@ -1,6 +1,3 @@
-// Smoke tests for the `Application` shell (PR 2.5a). Full Rails-mirrored
-// `railties/test/application/*` cases land in PR 2.5b alongside
-// `Configuration` defaults and the default middleware stack.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   NullLogger,
@@ -204,9 +201,6 @@ describe("Application", () => {
   });
 
   describe("initialize!", () => {
-    // A LazyRouteSet routing op reads `Trails.application`, which memoizes
-    // `@application ||= app_class.instance` (`rails.rb`); clear it so the next
-    // registration is what the following test sees.
     afterEach(() => {
       Trails.application = null;
     });
@@ -223,9 +217,7 @@ describe("Application", () => {
       const app = IApp2.instance();
       await app.initialize();
       expect(app.initialized()).toBe(true);
-      // Bootstrap.initialize_logger wired a default NullLogger.
       expect(app.logger).toBeInstanceOf(NullLogger);
-      // Bootstrap.initialize_cache wired a default NullStore.
       expect(app.cache).toBeInstanceOf(NullStore);
     });
 
@@ -285,7 +277,6 @@ describe("Application", () => {
       app.config.setRoot("rel");
       try {
         await app.initialize();
-        // Rails: `root= -> Pathname.new(value).expand_path` against cwd (/cwd).
         expect(trailsRoot()).toBe("/cwd/rel");
       } finally {
         setTrailsRoot(null);
@@ -302,7 +293,6 @@ describe("Application", () => {
       try {
         await app.initialize();
         expect(trailsRoot()).toBe("/app");
-        // Rails reads Rails.root live from application.config.root.
         app.config.setRoot("/later");
         expect(trailsRoot()).toBe("/later");
       } finally {
@@ -396,9 +386,6 @@ describe("Trails.application integration (boot-app fixture)", () => {
     await Trails.initialize();
 
     expect(app).toBeInstanceOf(BootApp);
-    // `make_routes_lazy` (`engine.rb:591-593`) selects `LazyRouteSet` in a
-    // local env, so `set_routes_reloader_hook` skips the eager load
-    // (`application/finisher.rb:164-177`) and the first request draws them.
     expect(app.routesReloader().loaded).toBe(false);
     const [status, , body] = await app.app()({
       REQUEST_METHOD: "GET",
@@ -420,19 +407,12 @@ describe("Trails.application integration (boot-app fixture)", () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
     class BootAppRoutes extends BootApp {}
     Application.register(BootAppRoutes);
-    // The file-wide `resetLoadHooks()` drops the `:action_controller` hook
-    // fired at import, so replay it or the `on_load` block never runs.
     runLoadHooks("action_controller", ActionController.Base);
     const app = Trails.application!;
     app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
 
     await Trails.initialize();
 
-    // `action_controller.set_configs` (`action_controller/railtie.rb:69-71`)
-    // includes `app.routes.url_helpers`, whose `included` block is
-    // `redefine_singleton_method(:_routes) { routes }` (`route_set.rb:610-612`);
-    // `build_view_context_class` (`action_view/rendering.rb:61-64`) then reads
-    // it, so a template calls a named route helper as a bare identifier.
     expect(ActionController.Base._routes).toBe(app.routes());
     const [status, , body] = await app.app()({
       REQUEST_METHOD: "GET",
@@ -558,9 +538,6 @@ describe("Application::Configuration", () => {
   it("config.load_defaults skips a framework that has not registered its config", () => {
     const c = new Configuration();
     expect(() => c.loadDefaults("8.0")).not.toThrow();
-    // `assets` is the one framework slot no loaded trailtie seeds — Rails'
-    // `config.assets` comes from Sprockets/Propshaft, which trails has no port
-    // of, so `respond_to?(:assets)` is false and `load_defaults` skips it.
     expect(c.get("assets")).toBeUndefined();
   });
 
@@ -633,8 +610,6 @@ describe("Application::Configuration", () => {
   });
 
   it("paths() appends the application-only 'public' entry on top of EngineConfiguration", () => {
-    // Rails: application/configuration.rb#paths adds public, tmp, log, etc.
-    // Trails only ports `public` today (the rest follow in PR 2.7-followups).
     const c = new Configuration();
     expect(c.paths().get("public")).toBeDefined();
   });

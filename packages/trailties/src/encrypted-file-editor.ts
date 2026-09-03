@@ -1,6 +1,3 @@
-// Shared edit/show for `credentials`/`encrypted`. Ports Editor helper.
-// Divergences: no .gitignore append, no validate! (needs EncryptedConfiguration),
-// editor split is whitespace not Shellwords, no parent-dir mkdir (follow-up).
 import {
   EncryptedFile,
   MissingContentError,
@@ -18,8 +15,6 @@ function displayEditorHint(invocation: string): void {
   );
 }
 
-// Direct fs check: `file.isKey()` memoizes a miss and would hide the
-// freshly-written key from `file.change()` later in the same edit pass.
 async function ensureKeyFile(file: EncryptedFile): Promise<void> {
   const fs = await getFsAsync();
   if (await fs.exists(file.keyPath)) return;

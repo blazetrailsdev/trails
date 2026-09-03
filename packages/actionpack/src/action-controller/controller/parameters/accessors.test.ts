@@ -63,7 +63,6 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("each without a block returns an enumerator", () => {
-    // In TS, each always requires a callback. We verify each returns self when called.
     const params = new Parameters({ a: "1" });
     const result = params.each(() => {});
     expect(result).toBe(params);
@@ -277,7 +276,6 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("transform_keys without a block returns an enumerator", () => {
-    // In TS, transformKeys always requires a callback — verify it works
     const params = new Parameters({ a: "1" });
     const result = params.transformKeys((k) => k.toUpperCase());
     expect(result.has("A")).toBe(true);

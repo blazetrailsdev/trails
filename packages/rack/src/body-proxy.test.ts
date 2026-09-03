@@ -97,7 +97,6 @@ it("respond to :to_ary if body does responds to it, and have to_ary call close",
 });
 
 it("not respond to :to_ary if body does not respond to it", () => {
-  // An iterator (non-array) body
   const body = {
     [Symbol.iterator]: function* () {
       yield 1;
@@ -105,7 +104,7 @@ it("not respond to :to_ary if body does not respond to it", () => {
   };
   const proxy = new BodyProxy(body, () => {});
   expect(proxy.respondTo("to_ary")).toBe(false);
-  expect(() => proxy.delegate("to_ary")).not.toThrow(); // toArray still works via iteration + close
+  expect(() => proxy.delegate("to_ary")).not.toThrow();
 });
 
 it("not respond to :to_str", () => {

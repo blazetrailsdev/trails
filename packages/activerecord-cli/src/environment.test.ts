@@ -30,7 +30,7 @@ describe("ArEnvironmentTest", () => {
     try {
       Base.removeConnection();
     } catch {
-      /* empty */
+      /** @empty */
     }
     DatabaseTasks.databaseConfiguration = null;
   });

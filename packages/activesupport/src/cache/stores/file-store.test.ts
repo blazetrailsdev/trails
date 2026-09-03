@@ -24,14 +24,10 @@ import { cacheStoreCoderBehavior } from "../behaviors/cache-store-coder-behavior
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../store.js";
-// Rails reaches the private path helper with `@cache.send(:normalize_key, key, {})`
-// (file_store_test.rb:63).
 function pathFor(store: FileStore, key: string): string {
   return (store as unknown as { normalizeKey(k: string, o: object): string }).normalizeKey(key, {});
 }
 
-// Rails reaches the private key helper with `@cache.send(:file_path_key, key)`
-// (file_store_test.rb:64).
 function filePathKey(store: FileStore, path: string): string {
   return (store as unknown as { filePathKey(p: string): string }).filePathKey(path);
 }
@@ -64,10 +60,6 @@ describe("FileStoreTest", () => {
     expect(filePathKey(store, key)).toEqual("views/index?id=1");
   });
 
-  // Rails builds `@cache_with_pathname` from `Pathname.new(cache_dir)`
-  // (file_store_test.rb:21); Ruby's Pathname is stdlib with no trails
-  // counterpart, so the store is built from the same directory as a String and
-  // the round-trip through `file_path_key` is what the test pins.
   it("key transformation with pathname", () => {
     writeFileSync(join(cacheDir, "foo"), "");
     const cacheWithPathname = new FileStore(cacheDir, { expiresIn: 60 });
@@ -75,13 +67,8 @@ describe("FileStoreTest", () => {
     expect(filePathKey(cacheWithPathname, key)).toEqual("views/index?id=1");
   });
 
-  // Test that generated cache keys are short enough to have Tempfile stuff added to them and
-  // remain valid
   it("filename max size", () => {
     const key = "A".repeat(FILENAME_MAX_SIZE);
-    // Ruby reads the name Tempfile would pick out of `Dir::Tmpname.create`
-    // (file_store_test.rb:80); trails' atomicWrite picks its own, so the name
-    // under test is the one Tempfile hands to its exclusive `File.open`.
     const open = vi.spyOn(File, "open");
     let tmpname: string;
     try {
@@ -96,8 +83,6 @@ describe("FileStoreTest", () => {
     );
   });
 
-  // Because file systems have a maximum filename size, filenames > max size should be split in to directories
-  // If filename is 'AAAAB', where max size is 4, the returned path should be AAAA/B
   it("key transformation max filename size", () => {
     const key = `${"A".repeat(FILENAME_MAX_SIZE)}B`;
     const path = pathFor(store, key);
@@ -144,10 +129,6 @@ describe("FileStoreTest", () => {
   });
 
   it("delete prunes empty directories up to a symlinked cache dir", () => {
-    // Rails delete_empty_directories compares File.realpath(dir) ==
-    // File.realpath(cache_path) (file_store.rb:195) so a symlinked cacheDir
-    // still stops the recursion at the real cache dir. A lexical resolve would
-    // mis-compare the symlink path against its target and recurse past it.
     const realRoot = mkdtempSync(join(tmpdir(), "file-store-real-"));
     const linkRoot = join(mkdtempSync(join(tmpdir(), "file-store-link-")), "cache");
     symlinkSync(realRoot, linkRoot, "dir");
@@ -158,7 +139,6 @@ describe("FileStoreTest", () => {
       expect(existsSync(entryDir)).toBe(true);
       linkStore.delete("a/b");
       expect(existsSync(entryDir)).toBe(false);
-      // The real cache dir (reached through the symlink) survives the recursion.
       expect(existsSync(realRoot)).toBe(true);
       expect(existsSync(linkRoot)).toBe(true);
     } finally {
@@ -168,16 +148,12 @@ describe("FileStoreTest", () => {
   });
 
   it("log exception when cache read fails", () => {
-    // Rails' `@buffer = StringIO.new` + `@cache.logger = Logger.new(@buffer)`
-    // (file_store_test.rb:23-24); the logger is class-level in trails.
     const buffer = { string: "" };
     const previousLogger = Store.logger;
     Store.logger = {
       warn: (message: string) => (buffer.string += message),
       error: (message: string) => (buffer.string += message),
     };
-    // Rails' `File.stub(:exist?, -> { raise StandardError.new("failed") })`
-    // (file_store_test.rb:127).
     const isExist = vi.spyOn(File, "isExist").mockImplementation(() => {
       throw new Error("failed");
     });
@@ -233,10 +209,6 @@ describe("FileStoreTest", () => {
     assert(existsSync(keep));
   });
 
-  // Inherited Store#fetch_multi routes through the readEntry hook, which must
-  // reconstruct the stored expiry so an expired entry is a miss + regenerate
-  // (cache.rb read_multi_entries -> read_entry). Without expiry round-trip the
-  // reconstructed Entry would look fresh and serve stale data.
   it("fetch_multi honors entry expiration", async () => {
     store.write("foo", "old", { expiresIn: 0.01 });
     await new Promise((r) => setTimeout(r, 20));
@@ -245,44 +217,34 @@ describe("FileStoreTest", () => {
     expect(store.read("foo")).toBe("foo-generated");
   });
 
-  // The persisted version must round-trip through readEntry so the inherited
-  // readMultiEntries' isMismatched check fires (cache.rb), making a version
-  // mismatch a miss + regenerate.
   it("fetch_multi honors version mismatch", () => {
     store.write("foo", "old", { version: "v1" });
     const result = store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);
     expect(result).toEqual({ foo: "foo-generated" });
   });
 
-  // Mirrors `include CacheStoreBehavior` (file_store_test.rb:32).
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options) });
 
-  // Mirrors `include CacheStoreCoderBehavior` (file_store_test.rb:34).
   cacheStoreCoderBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 
-  // Mirrors `include CacheStoreCompressionBehavior` (file_store_test.rb:35).
   cacheStoreCompressionBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 
-  // Mirrors `include CacheStoreSerializerBehavior` (file_store_test.rb:36).
   cacheStoreSerializerBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 
-  // Mirrors `include CacheDeleteMatchedBehavior` (file_store_test.rb:38).
   cacheDeleteMatchedBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 
-  // Mirrors `include CacheIncrementDecrementBehavior` (file_store_test.rb:39).
   cacheIncrementDecrementBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 
-  // Mirrors `include CacheInstrumentationBehavior` (file_store_test.rb:40).
   cacheInstrumentationBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
     storeName: "FileStore",
@@ -347,8 +309,6 @@ describe("FileStore increment/decrement amount coercion", () => {
     } catch {}
   });
 
-  // Rails coerces `amount = Integer(amount)` (file_store.rb:226), which raises
-  // FloatDomainError on NaN/Infinity rather than seeding a non-integer entry.
   it("increment raises on a non-integer amount when seeding a missing key", () => {
     expect(() => cache.increment("foo", NaN)).toThrow();
     expect(() => cache.increment("foo", Infinity)).toThrow();
@@ -362,8 +322,6 @@ describe("FileStore increment/decrement amount coercion", () => {
     expect(cache.read("foo")).toBeNull();
   });
 
-  // Rails coerces once, so the seed write, the return value, and the hit-path
-  // addition all use `Integer(amount)` — a finite float truncates toward zero.
   it("increment truncates a finite float amount toward zero", () => {
     expect(cache.increment("frac", 1.9)).toBe(1);
     expect(Number(cache.read("frac"))).toBe(1);

@@ -1,10 +1,3 @@
-/**
- * ActionController::Live
- *
- * Mix this module into your controller to stream data to the client.
- * @see https://api.rubyonrails.org/classes/ActionController/Live.html
- */
-
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Request } from "../../action-dispatch/http/request.js";
@@ -29,27 +22,9 @@ interface LiveResponseLike {
 
 type ErrorCallback = () => void;
 
-/**
- * Action Controller Live Buffer.
- *
- * A producer/consumer queue that backs `response.stream` for live streaming
- * controllers. Writes push chunks onto an internal queue; `eachChunk` drains
- * it on the consumer side. Closing the stream pushes a sentinel `null`.
- *
- * Mirrors `ActionController::Live::Buffer`.
- */
 export class Buffer {
-  /**
-   * Class-level cap on queued chunks. Rails defaults to 10; `null` means
-   * unbounded. We don't enforce backpressure (no SizedQueue in JS), but
-   * preserve the accessor so `Buffer.queueSize = n` is observable.
-   */
   static queueSize: number | null = 10;
 
-  /**
-   * If `true`, writes after the client disconnects are silently dropped.
-   * If `false` (default), they raise {@link ClientDisconnected}.
-   */
   ignoreDisconnect = false;
 
   /** @internal */
@@ -88,17 +63,10 @@ export class Buffer {
     }
   }
 
-  /** Same as `write` but appends a newline if one isn't already present. */
   writeln(string: string): void {
     this.write(string.endsWith("\n") ? string : `${string}\n`);
   }
 
-  /**
-   * Write a 'close' event to the buffer; the producer thread uses this to
-   * notify the consumer it's finished supplying content.
-   *
-   * @see {@link abort}
-   */
   close(): void {
     if (typeof (this._response as { close?: () => void }).close === "function") {
       (this._response as { close: () => void }).close();
@@ -111,21 +79,15 @@ export class Buffer {
     return this._closed;
   }
 
-  /**
-   * Inform the producer that the client has disconnected; the consumer is no
-   * longer interested in any further content.
-   */
   abort(): void {
     this._aborted = true;
     this._buf.length = 0;
   }
 
-  /** Is the client still connected and waiting for content? */
   get isConnected(): boolean {
     return !this._aborted;
   }
 
-  /** Register a callback invoked if an error is raised while streaming. */
   onError(block: ErrorCallback): void {
     this._errorCallback = block;
   }
@@ -134,21 +96,11 @@ export class Buffer {
     this._errorCallback();
   }
 
-  /**
-   * Public iterator invoked by `DispatchResponse#each` / `bodyParts` /
-   * `rackResponse`. Mirrors Rails' `ActionDispatch::Response::Buffer#each`
-   * (Live::Buffer extends Response::Buffer in Rails, inheriting `each`).
-   */
   *each(): IterableIterator<string> {
     yield* this.eachChunk();
   }
 
-  /**
-   * Drain the queue, yielding each non-null chunk in order. Stops at the
-   * sentinel `null` pushed by {@link close}.
-   *
-   * @internal
-   */
+  /** @internal */
   *eachChunk(): IterableIterator<string> {
     while (this._buf.length > 0) {
       const str = this._buf.shift();
@@ -157,25 +109,12 @@ export class Buffer {
     }
   }
 
-  /**
-   * Build the backing queue. Rails uses a SizedQueue when `queueSize` is set;
-   * we approximate with a plain array since JS has no thread-blocking queues.
-   *
-   * @internal
-   */
+  /** @internal */
   protected buildQueue(_queueSize: number | null): Array<string | null> {
     return [];
   }
 }
 
-/**
- * Action Controller Live Server Sent Events.
- *
- * Writes Server-Sent Events to a {@link Buffer}-like stream. Accepts either a
- * pre-encoded string or any value JSON-serializable via `JSON.stringify`.
- *
- * Mirrors `ActionController::Live::SSE`.
- */
 export class SSE {
   static readonly PERMITTED_OPTIONS = ["retry", "event", "id"] as const;
 
@@ -216,8 +155,6 @@ export class SSE {
 
     for (const name of SSE.PERMITTED_OPTIONS) {
       const optionValue = currentOptions[name];
-      // Match Ruby truthiness: `if option_value` is true for "" — an empty
-      // `id:` line resets the browser's Last-Event-ID, which is valid SSE.
       if (optionValue !== undefined && optionValue !== null) {
         this._stream.write(`${name}: ${optionValue}\n`);
       }
@@ -228,10 +165,6 @@ export class SSE {
   }
 }
 
-/**
- * Live::Response — an {@link DispatchResponse} whose `stream` is a live
- * {@link Buffer}. Mirrors `ActionController::Live::Response`.
- */
 export class Response extends DispatchResponse {
   declare stream: Buffer;
 
@@ -245,15 +178,7 @@ export class Response extends DispatchResponse {
     super.close();
   }
 
-  /**
-   * Hook invoked before the response is committed. Mirrors Rails'
-   * `before_committed`, which flushes the request's cookie jar onto the
-   * response. We don't yet carry a `request.cookie_jar` collaborator, but
-   * any cookies set directly via `setCookie` on this response are flattened
-   * into a single `set-cookie` header here so they aren't lost.
-   *
-   * @internal
-   */
+  /** @internal */
   protected beforeCommitted(): void {
     if (this.committed) return;
     const cookies = this.cookies;
@@ -263,23 +188,13 @@ export class Response extends DispatchResponse {
     this.setHeader("set-cookie", names.map((n) => `${n}=${cookies[n]}`).join("\n"));
   }
 
-  /**
-   * Wrap a synchronous body into a live Buffer by pushing each part. Mirrors
-   * Rails' `build_buffer`, used when assigning `response_body=` directly.
-   *
-   * @internal
-   */
+  /** @internal */
   buildBuffer(response: LiveResponseLike, body: unknown[]): Buffer {
     const buf = new Buffer(response);
     for (const part of body) buf.write(String(part));
     return buf;
   }
 }
-
-// === ActionController::Live mixin ===
-// JS has no threads, so newControllerThread runs the block on the next
-// microtask. Pre-commit errors propagate; post-commit errors route through
-// Buffer.callOnError + logError, matching Rails' control flow.
 
 interface LoggerLike {
   fatal(message: string | (() => string)): void;
@@ -291,8 +206,6 @@ export interface LiveControllerHost {
   logger?: LoggerLike;
 }
 
-/** Mirrors `ActionController::Live#process`. `runAction` stands in for
- *  Rails' `super(name)`, since TS has no super for assigned methods. */
 export async function process(
   this: LiveControllerHost,
   name: string,
@@ -315,7 +228,7 @@ export async function process(
           try {
             resp.stream.close();
           } catch {
-            /* already closed */
+            /** @empty */
           }
         }
       } else {
@@ -330,7 +243,6 @@ export async function process(
   if (errorSet) throw error;
 }
 
-/** Mirrors `ActionController::Live#response_body=`. */
 export function responseBody(this: LiveControllerHost, body: string): void {
   this.response.body = body;
   this.response.close();
@@ -342,7 +254,6 @@ export interface SendStreamOptions {
   type?: string | symbol | null;
 }
 
-/** Mirrors `ActionController::Live#send_stream`. */
 export async function sendStream(
   this: LiveControllerHost,
   options: SendStreamOptions,
@@ -385,15 +296,13 @@ export async function newControllerThread(
   await liveThreadPoolExecutor().post(block);
 }
 
-/** @internal No-op — Ruby clears copied thread-locals; JS shares one context. */
+/** @internal */
 export function cleanUpThreadLocals(
   this: LiveControllerHost,
   _locals: unknown,
   _thread: unknown,
 ): void {}
 
-/** Pre-test-override alias; Rails' test_case.rb re-aliases the public method
- *  to run inline, so the originals stay available for parity. */
 export const originalNewControllerThread = newControllerThread;
 export const originalCleanUpThreadLocals = cleanUpThreadLocals;
 
@@ -412,8 +321,6 @@ export function liveThreadPoolExecutor(): LiveExecutor {
   });
 }
 
-/** Mirrors `ActionController::Live::ClassMethods#make_response!`. HTTP/1.0
- *  has no chunked transfer encoding, so streaming defers to the parent factory. */
 export function makeResponseBang(
   request: Request,
   superFactory: () => DispatchResponse,
@@ -425,7 +332,7 @@ export function makeResponseBang(
   return res;
 }
 
-/** @internal Mirrors `ActionController::Live#log_error`. */
+/** @internal */
 export function logError(this: { logger?: LoggerLike }, exception: unknown): void {
   const logger = this.logger;
   if (!logger) return;

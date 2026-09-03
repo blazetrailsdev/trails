@@ -78,8 +78,6 @@ describe("TestCase class helpers", () => {
     class Sub1 extends Base1 {}
     Base1.tests(PostsController);
     expect(Base1.controllerClass).toBe(PostsController);
-    // Sub1 never set its own controllerClass; it should infer (returns
-    // null here since no matching constant), not pick up Base1's value.
     expect(Sub1.controllerClass).toBeNull();
   });
 
@@ -181,7 +179,6 @@ describe("ActionController::TestRequest helpers", () => {
     req.setHeader("REQUEST_METHOD", "POST");
     req.setHeader("CONTENT_TYPE", "application/vnd.custom+json");
     req.assignParameters(null, "api", "create", { x: "1" }, "/api", ["x"]);
-    // Custom parser returns the non-path-parameters hash directly
     const parsed = req.requestParameters;
     expect(parsed).toMatchObject({ x: "1" });
   });

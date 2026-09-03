@@ -1,7 +1,3 @@
-/**
- * Mirrors actionpack/test/dispatch/actionable_exceptions_test.rb.
- */
-
 import { describe, it, expect, beforeEach } from "vitest";
 import { ActionableError, NonActionable } from "@blazetrails/activesupport";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";

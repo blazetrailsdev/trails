@@ -1,10 +1,3 @@
-/**
- * ActionDispatch::Request
- *
- * Wraps a Rack environment hash and provides convenience accessors
- * mirroring the Rails Request API.
- */
-
 import { camelize, NameError, toSentence, underscore } from "@blazetrails/activesupport";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
@@ -143,8 +136,6 @@ const HTTP_METHODS = [
   "MKCALENDAR",
   "PATCH",
 ] as const;
-// Null-prototype lookup so `__proto__` / `constructor` can't shadow
-// prototype-chain lookups into apparent membership in `checkMethod`.
 const HTTP_METHOD_LOOKUP: Record<string, string> = Object.assign(
   Object.create(null) as Record<string, string>,
   Object.fromEntries(HTTP_METHODS.map((m) => [m, m.toLowerCase().replace(/-/g, "_")])),
@@ -172,7 +163,6 @@ const CGI_VARIABLES: ReadonlySet<string> = new Set([
   "SERVER_SOFTWARE",
 ]);
 
-/** Rails: `TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING"` (request.rb:58). */
 const TRANSFER_ENCODING = "HTTP_TRANSFER_ENCODING";
 
 function envName(key: string): string {
@@ -190,24 +180,10 @@ export class Request {
   #method?: string;
   #requestMethod?: string;
 
-  /**
-   * Mirrors: `Request#initialize` (`request.rb:64-73`), whose `super` reaches
-   * `Rack::Request::Env#initialize` (`rack/request.rb:62-65`)
-   * and keeps `env` by reference — the semantics `set_header` writes through, so a write made on
-   * one `Request` is visible to the middleware downstream of it.
-   */
   constructor(env: RackEnv = {}) {
     this.env = env;
   }
 
-  // --- HTTP method ---
-
-  /**
-   * Returns the original value of the environment's REQUEST_METHOD, even if it
-   * was overridden by middleware. See {@link requestMethod}. Mirrors
-   * `Request#method` (request.rb:212-221); the `*args` arm delegating to
-   * `Object#method` has no spelling on a TS getter.
-   */
   get method(): string {
     this.#method ??= this.checkMethod(
       this.getHeader("rack.methodoverride.original_method") ?? this.getHeader("REQUEST_METHOD"),
@@ -215,36 +191,22 @@ export class Request {
     return this.#method as string;
   }
 
-  /**
-   * Returns the HTTP method that the application should see — the overridden
-   * value where a middleware rewrote it. Mirrors `Request#request_method`
-   * (request.rb:145-152).
-   */
   get requestMethod(): string {
     this.#requestMethod ??= this.checkMethod(this.rawRequestMethod);
     return this.#requestMethod as string;
   }
 
-  /** @internal Mirrors `Request#request_method=` (request.rb:184-188). */
+  /** @internal */
   set requestMethod(requestMethod: string) {
     if (this.checkMethod(requestMethod)) {
       this.#requestMethod = this.setHeader("REQUEST_METHOD", requestMethod) as string;
     }
   }
 
-  /** Mirrors: `alias raw_request_method request_method` (request.rb:145) — the
-   * unchecked `Rack::Request::Helpers#request_method`. */
   get rawRequestMethod(): string {
     return this.getHeader("REQUEST_METHOD") as string;
   }
 
-  // --- URL components ---
-
-  /**
-   * Returns the host for this request, such as "example.com".
-   *
-   * Mirrors: `ActionDispatch::Http::URL#host` (`url.rb:228-230`).
-   */
   get host(): string {
     return this.rawHostWithPort.replace(/:\d+$/, "");
   }
@@ -253,15 +215,10 @@ export class Request {
     return this.rawHostWithPort;
   }
 
-  /** Returns 'https://' if this is an SSL request and 'http://' otherwise. */
   get protocol(): string {
     return this.ssl ? "https://" : "http://";
   }
 
-  /**
-   * Returns the host and port for this request, such as "example.com:8080".
-   * Mirrors Rails' `raw_host_with_port`: honors X-Forwarded-Host (last entry).
-   */
   get rawHostWithPort(): string {
     const forwarded = (this.env["HTTP_X_FORWARDED_HOST"] as string | undefined)?.trim();
     if (forwarded) {
@@ -307,8 +264,6 @@ export class Request {
     return parseInt((this.getHeader("SERVER_PORT") as string) || "80", 10);
   }
 
-  // --- Path ---
-
   get fullpath(): string {
     const qs = this.queryString;
     return qs ? `${this.path}?${qs}` : this.path;
@@ -326,14 +281,6 @@ export class Request {
     return `${this.scheme}://${this.hostWithPort}${this.fullpath}`;
   }
 
-  // --- Domain / subdomains ---
-
-  // Rails: `Request#{domain,subdomains,subdomain}` delegate to
-  // `ActionDispatch::Http::URL.extract_*` (`url.rb:320-340`) and default the
-  // `tld_length` arg to the class-level `@@tld_length` so railtie config
-  // (`URL.tldLength = N`) flows through. `domain` returns `nil` for IP /
-  // unnamed hosts; we mirror that with `string | null`.
-
   domain(tldLength: number = HttpURL.tldLength): string | null {
     return HttpURL.extractDomain(this.host, tldLength);
   }
@@ -346,20 +293,10 @@ export class Request {
     return HttpURL.extractSubdomain(this.host, tldLength);
   }
 
-  // --- Headers ---
-
-  /**
-   * The `String` MIME type of the request. Mirrors `Request#media_type`
-   * (request.rb:287-290) — `content_mime_type&.to_s`.
-   */
   get mediaType(): string | undefined {
     return this.contentMimeType?.toString();
   }
 
-  /**
-   * Rails: `content_length` (request.rb:292-295). A chunked body carries no
-   * `CONTENT_LENGTH`, so the drained body is measured instead.
-   */
   get contentLength(): number | undefined {
     if (this.hasHeader(TRANSFER_ENCODING)) return new TextEncoder().encode(this.rawPost).length;
     const cl = this.getHeader("CONTENT_LENGTH") as string | undefined;
@@ -372,8 +309,6 @@ export class Request {
     return (this.env["HTTP_ACCEPT"] as string) || "";
   }
 
-  // --- Conditional-GET (ActionDispatch::Http::Cache::Request) ---
-  // Mixed in onto Request.prototype below; declared here for typing.
   declare readonly ifModifiedSince: Date | undefined;
   declare readonly ifNoneMatch: string | undefined;
   declare readonly ifNoneMatchEtags: string[];
@@ -381,8 +316,6 @@ export class Request {
   declare etagMatches: (etag: string | undefined) => boolean;
   declare fresh: (response: CacheResponseLike) => boolean;
 
-  // --- MIME negotiation (ActionDispatch::Http::MimeNegotiation) ---
-  // Mixed in onto Request.prototype below; declared here for typing.
   declare readonly contentMimeType: MimeType | null;
   declare readonly accepts: MimeType[];
   declare hasContentType: () => boolean;
@@ -391,12 +324,6 @@ export class Request {
   get format(): MimeType | NullType {
     return _format.call(mimeHost(this));
   }
-  /**
-   * Rails' `format=` (`http/mime_negotiation.rb:115`). Spelled `setFormat` so
-   * the reader stays a 0-arg property mirroring `format(_view_path = nil)`
-   * (`mime_negotiation.rb:63`) — a TS accessor pair cannot carry both Ruby
-   * signatures.
-   */
   setFormat(extension: unknown): void {
     mimeHost(this).format = extension;
   }
@@ -413,9 +340,6 @@ export class Request {
     mimeHost(this).variant = value;
   }
 
-  // Class-level attribute mirroring Rails' `mattr_accessor :ignore_accept_header`.
-  // Exposed as a static getter/setter so call sites read as `Request.ignoreAcceptHeader`
-  // / `Request.ignoreAcceptHeader = true`.
   static get ignoreAcceptHeader(): boolean {
     return _MimeNegotiation.ignoreAcceptHeader;
   }
@@ -423,7 +347,6 @@ export class Request {
     _MimeNegotiation.ignoreAcceptHeader = value;
   }
 
-  // --- Filter Parameters (ActionDispatch::Http::FilterParameters) ---
   declare filteredParameters: () => Record<string, unknown>;
   declare filteredEnv: () => Record<string, unknown>;
   declare filteredPath: () => string;
@@ -435,8 +358,6 @@ export class Request {
   /** @internal */
   declare parameterFilterFor: (filters: Array<string | RegExp>) => ParameterFilter;
 
-  // --- Permissions Policy (ActionDispatch::PermissionsPolicy::Request) ---
-
   get permissionsPolicy(): PermissionsPolicy | null | undefined {
     return this.getHeader("action_dispatch.permissions_policy") as
       | PermissionsPolicy
@@ -447,8 +368,6 @@ export class Request {
     this.setHeader("action_dispatch.permissions_policy", policy);
   }
 
-  // --- Request type checks ---
-
   get isXmlHttpRequest(): boolean {
     return (this.getHeader("HTTP_X_REQUESTED_WITH") as string)?.toLowerCase() === "xmlhttprequest";
   }
@@ -456,8 +375,6 @@ export class Request {
   get xhr(): boolean {
     return this.isXmlHttpRequest;
   }
-
-  // --- IP addresses ---
 
   get remoteIp(): string | null {
     const v = this.getHeader("action_dispatch.remote_ip");
@@ -478,28 +395,18 @@ export class Request {
     return this.remoteIp;
   }
 
-  // --- Body ---
-
-  /** Rails: `body` (request.rb:357-364) — a cached `RAW_POST_DATA` wins over the live stream. */
   get body(): string {
     const rawPost = this.getHeader("RAW_POST_DATA");
     if (rawPost != null) return String(rawPost);
     return this.readBodyStream();
   }
 
-  /**
-   * Rails: `raw_post` (request.rb:348-353). The body is cached under
-   * `RAW_POST_DATA` so repeated reads of a stream-backed `rack.input` don't
-   * yield "" after the first drain.
-   */
   get rawPost(): string {
     if (!this.hasHeader("RAW_POST_DATA")) {
       this.setHeader("RAW_POST_DATA", this.readBodyStream());
     }
     return String(this.getHeader("RAW_POST_DATA"));
   }
-
-  // --- Parameters ---
 
   get params(): Record<string, unknown> {
     return _parameters.call(this._paramsHost);
@@ -541,7 +448,6 @@ export class Request {
     this._paramsHost.pathParameters = params;
   }
 
-  /** Class-level parameter parser registry. Mirrors Rails `Request.parameter_parsers`. */
   static get parameterParsers(): ParameterParsers {
     return _Parameters.parameterParsers;
   }
@@ -552,11 +458,7 @@ export class Request {
     _Parameters.parameterParsers = parsers;
   }
 
-  /**
-   * Prototyped on `Parameters.prototype` so the mixin's `path_parameters=`
-   * writer applies by plain assignment.
-   * @internal
-   */
+  /** @internal */
   private get _paramsHost(): ParametersHost & _Parameters {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const req = this;
@@ -598,50 +500,23 @@ export class Request {
     return {};
   }
 
-  // --- Server software ---
-
   get serverSoftware(): string {
     return ((this.getHeader("SERVER_SOFTWARE") as string) || "").split("/")[0] || "";
   }
 
-  // --- Header access ---
-
-  /**
-   * Returns the value for the given key mapped to the env. HTTP-header-style
-   * names (alphanumerics + dashes) are converted to their CGI/Rack env name —
-   * `"Content-Type" → "CONTENT_TYPE"`, `"If-None-Match" → "HTTP_IF_NONE_MATCH"`
-   * — to mirror `ActionDispatch::Http::Headers#[]`. Keys that don't match the
-   * pattern (e.g. `"action_dispatch.parameter_filter"`) pass through to the
-   * env unchanged, mirroring `Request#get_header`.
-   *
-   * Untyped, as `@env[name]` (rack/lib/rack/request.rb:100-102) is in Ruby: an
-   * env slot holds a String as often as a routes set, a logger or a RemoteIp.
-   */
   getHeader(name: string): any {
     return this.env[envName(name)];
   }
 
-  /**
-   * Returns true if the env has a value for `key`. Mirrors Rails'
-   * `Rack::Request::Env#has_header?` — raw env access, no HTTP-name
-   * conversion. Callers passing HTTP-style names (e.g. `"Content-Type"`)
-   * should reach for `headers[]` (or `getHeader`, which applies the
-   * `Headers#env_name` mapping).
-   */
   hasHeader(key: string): boolean {
     return Object.prototype.hasOwnProperty.call(this.env, key);
   }
 
-  /** Sets `key` on the env. Returns the assigned value. Mirrors `set_header`. */
   setHeader(key: string, value: unknown): unknown {
     this.env[key] = value;
     return value;
   }
 
-  /**
-   * Adds `v` to a multivalued env slot, comma-joining an existing value.
-   * Mirrors `Rack::Request::Env#add_header` (`rack/request.rb:129-137`).
-   */
   addHeader(key: string, v: unknown): unknown {
     if (v == null) {
       return this.getHeader(key);
@@ -652,30 +527,24 @@ export class Request {
     }
   }
 
-  /** Mirrors `Rack::Request::Env#each_header` (`rack/request.rb:111-113`). */
   eachHeader(block: (key: string, value: unknown) => void): void {
     for (const [key, value] of Object.entries(this.env)) block(key, value);
   }
 
-  /** @internal Rails: `request.controller_instance` (request.rb:190-192). */
+  /** @internal */
   get controllerInstance(): unknown {
     return this.getHeader("action_controller.instance");
   }
 
-  /** @internal Rails: `request.controller_instance=` (request.rb:194-196). */
+  /** @internal */
   set controllerInstance(controller: unknown) {
     this.setHeader("action_controller.instance", controller);
   }
 
-  /** Deletes `key` from the env. Mirrors `delete_header`. */
   deleteHeader(key: string): void {
     delete this.env[key];
   }
 
-  /**
-   * Returns the value for `key`, or invokes `fallback` with `key` when
-   * absent. Mirrors `fetch_header`, which yields the key on miss.
-   */
   fetchHeader(key: string): unknown;
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   fetchHeader<T>(key: string, fallback?: (key: string) => T): unknown | T {
@@ -684,36 +553,15 @@ export class Request {
     throw new Error(`key not found: ${key}`);
   }
 
-  // --- Inspect ---
-
   inspect(): string {
     return `#<ActionDispatch::Request ${this.method} "${this.fullpath}">`;
   }
 
-  // --- Session ---
-
-  /**
-   * Mirrors: `Rack::Request::Helpers#session` (`rack/request.rb:207-211`) —
-   * `fetch_header(RACK_SESSION) { |k| set_header RACK_SESSION, default_session }`.
-   * ActionDispatch supplies `default_session` (`request.rb:505-507`) as
-   * `Session.disabled(self)`, so a request with no session middleware answers a
-   * disabled `Session` and seeds `Session::Options` as a side effect. Rails
-   * overrides only `session=` (`request.rb:386-388`) and inherits this reader,
-   * but a JS property takes both halves from one descriptor, so the inherited
-   * half is restated here.
-   */
   get session(): Session {
     return this.fetchHeader(RACK_SESSION, (k) =>
       this.setHeader(k, this.defaultSession()),
     ) as Session;
   }
-
-  // --- Flash ---
-  //
-  // Rails prepends `ActionDispatch::Flash::RequestMethods` onto Request
-  // (`middleware/flash.rb:14`); `ActionDispatch::Flash` itself is a pure
-  // passthrough (`flash.rb:312`), so the middleware stack is not where the
-  // flash lives. These read the ported functions in `middleware/flash.ts`.
 
   get flash(): FlashHash | null {
     return flash.call(this as never);
@@ -723,19 +571,10 @@ export class Request {
     flash.call(this as never, value);
   }
 
-  /** @internal Rails: `Flash::RequestMethods#flash_hash` (`flash.rb:288-290`). */
+  /** @internal */
   flashHash(): FlashHash | null {
     return flashHash.call(this as never);
   }
-
-  // --- Cookies (app-wide options) ---
-  //
-  // `cookiesAppOptions` is the bridge the `ActionDispatch::Cookies` middleware
-  // uses to pass the app-wide secret/serializer/etc. configuration into the
-  // signed/encrypted cookie jars. Rails stores each option in its own env
-  // header (`action_dispatch.signed_cookie_salt` and friends); trails
-  // collapses them into a single `CookieJarOptions` object stored under
-  // `COOKIES_APP_OPTIONS_KEY` until the full middleware lands.
 
   get cookiesAppOptions(): CookieJarOptions | undefined {
     return this.env[COOKIES_APP_OPTIONS_KEY] as CookieJarOptions | undefined;
@@ -749,25 +588,19 @@ export class Request {
     }
   }
 
-  // --- Headers wrapper ---
-
   get headers(): HttpHeaders {
     return new HttpHeaders(this);
   }
 
-  // --- Method symbol ---
-
-  /** Returns the lowercase symbol form of {@link method} (RFC method name). */
   get methodSymbol(): string | undefined {
     return HTTP_METHOD_LOOKUP[this.method];
   }
 
-  /** Returns the lowercase symbol form of {@link requestMethod}. */
   get requestMethodSymbol(): string | undefined {
     return HTTP_METHOD_LOOKUP[this.requestMethod];
   }
 
-  /** @internal Mirrors `Request#check_method` (request.rb:497-503). */
+  /** @internal */
   protected checkMethod(name: string | undefined): string | undefined {
     if (name != null) {
       if (!Object.hasOwn(HTTP_METHOD_LOOKUP, name)) {
@@ -780,9 +613,6 @@ export class Request {
     return name;
   }
 
-  // --- Env-header passthroughs ---
-
-  /** Rails: `request.route_uri_pattern` (env: `action_dispatch.route_uri_pattern`). */
   get routeUriPattern(): string | undefined {
     return this.getHeader("action_dispatch.route_uri_pattern") as string | undefined;
   }
@@ -790,7 +620,7 @@ export class Request {
     this.env["action_dispatch.route_uri_pattern"] = pattern;
   }
 
-  /** @internal Rails: `request.routes` (env: `action_dispatch.routes`). */
+  /** @internal */
   get routes(): unknown {
     return this.getHeader("action_dispatch.routes");
   }
@@ -799,24 +629,21 @@ export class Request {
     this.env["action_dispatch.routes"] = routes;
   }
 
-  /** @internal Rails: `engine_script_name(_routes)` — env key from `_routes.env_key`. */
+  /** @internal */
   engineScriptName(routes: { envKey: string }): unknown {
     return this.getHeader(routes.envKey);
   }
 
-  /** Rails: `key_generator` — reads `action_dispatch.key_generator` from env. */
   get keyGenerator(): { generateKey(salt: string, keySize?: number): Buffer | string } | undefined {
     return this.env["action_dispatch.key_generator"] as
       | { generateKey(salt: string, keySize?: number): Buffer | string }
       | undefined;
   }
 
-  /** Rails: `http_auth_salt` env getter. */
   get httpAuthSalt(): unknown {
     return this.getHeader("action_dispatch.http_auth_salt");
   }
 
-  /** Rails: `request_id` — set by `ActionDispatch::RequestId` middleware. */
   get requestId(): string | undefined {
     return this.getHeader(ACTION_DISPATCH_REQUEST_ID) as string | undefined;
   }
@@ -824,42 +651,29 @@ export class Request {
     this.env[ACTION_DISPATCH_REQUEST_ID] = id;
   }
 
-  /** Alias of {@link requestId}. */
   get uuid(): string | undefined {
     return this.requestId;
   }
 
-  /** Rails: `logger` — `action_dispatch.logger` env entry. */
   get logger(): unknown {
     return this.getHeader("action_dispatch.logger");
   }
 
-  // --- Predicates / utility ---
-
-  /** Rails: `request.key?(name)` — alias of {@link hasHeader}. */
   isKey(key: string): boolean {
     return this.hasHeader(key);
   }
 
-  /**
-   * Rails: `form_data?` (request.rb:373-375) — content-type is form-data.
-   * Spelled as `Rack::Request::Helpers#form_data?` is
-   * (`packages/rack/src/request.ts`), so that this override outranks the
-   * mixin's, which also treats a POST with no Content-Type as form data.
-   */
   get formData(): boolean {
     const mt = this.mediaType;
     return mt != null && (FORM_DATA_MEDIA_TYPES as readonly string[]).includes(mt);
   }
 
-  /** Rails: `local?` — REMOTE_ADDR and remoteIp both match localhost. */
   get isLocal(): boolean {
     const addr = (this.env["REMOTE_ADDR"] as string | undefined) ?? "";
     const ip = this.remoteIp ?? "";
     return LOCALHOST_RE.test(addr) && LOCALHOST_RE.test(ip);
   }
 
-  /** Rails: `authorization` — checks 4 env keys in order. */
   get authorization(): string | undefined {
     return (this.getHeader("HTTP_AUTHORIZATION") ??
       this.getHeader("X-HTTP_AUTHORIZATION") ??
@@ -867,14 +681,11 @@ export class Request {
       this.getHeader("REDIRECT_X_HTTP_AUTHORIZATION")) as string | undefined;
   }
 
-  // --- Body ---
-
-  /** Rails: `body_stream` — raw `rack.input`. */
   get bodyStream(): unknown {
     return this.getHeader("rack.input");
   }
 
-  /** @internal Rails: `read_body_stream` — drain `rack.input` with rewind guard. */
+  /** @internal */
   protected readBodyStream(): string {
     const input = this.bodyStream;
     if (typeof input === "string") return input;
@@ -885,7 +696,7 @@ export class Request {
     );
   }
 
-  /** @internal Rails: `reset_stream` — rewind before+after yielding. */
+  /** @internal */
   protected resetStream<T>(bodyStream: { rewind?: () => void }, fn: () => T): T {
     if (typeof bodyStream.rewind === "function") {
       bodyStream.rewind();
@@ -896,38 +707,21 @@ export class Request {
     return fn();
   }
 
-  /** @internal Rails: `fallback_request_parameters` — parses raw post as form-urlencoded. */
+  /** @internal */
   protected fallbackRequestParameters(): Record<string, unknown> {
     return this._fallbackRequestParameters();
   }
 
-  // --- Session ---
-
-  /**
-   * Rails: `reset_session` (request.rb:381-384) — `session.destroy;
-   * reset_csrf_token` — with `Flash::RequestMethods#reset_session`
-   * (`flash.rb:307-310`) prepended on top, which clears the flash after
-   * `super`.
-   */
   resetSession(): void {
     this.session.destroy();
     this.resetCsrfToken();
     resetFlashSession.call(this as never);
   }
 
-  /** Rails: `session=` (request.rb:385-387) — `Session.set self, session`. */
   set session(session: Session) {
     Session.set(this, session);
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#session_options` (`rack/request.rb:213-217`),
-   * which `ActionDispatch::Request` inherits through the mixin
-   * (`request.rb:21`) while overriding only the writer below. A JS property
-   * takes both halves from one descriptor, so the reader cannot fall through
-   * the mixin while the writer overrides it, and the inherited half is
-   * restated here.
-   */
   get sessionOptions(): Record<string, unknown> {
     return this.fetchHeader(RACK_SESSION_OPTIONS, (k: string) => this.setHeader(k, {})) as Record<
       string,
@@ -935,61 +729,41 @@ export class Request {
     >;
   }
 
-  /**
-   * Rails: `session_options=` (request.rb:390-392) —
-   * `Session::Options.set self, options`.
-   */
   set sessionOptions(options: Record<string, unknown>) {
     Session.Options.set(this, options);
   }
 
-  /** @internal Rails: `default_session` — returns a disabled-session sentinel. */
+  /** @internal */
   protected defaultSession(): Session {
     return Session.disabled(this);
   }
 
-  // --- CSRF ---
-
-  /** Rails: `reset_csrf_token` — forwards to `controller_instance` when supported. */
   resetCsrfToken(): void {
     const c = this.controllerInstance as { resetCsrfToken?: (req: unknown) => void } | undefined;
     if (c && typeof c.resetCsrfToken === "function") c.resetCsrfToken(this);
   }
 
-  /** Rails: `commit_csrf_token` — forwards to `controller_instance` when supported. */
   commitCsrfToken(): void {
     const c = this.controllerInstance as { commitCsrfToken?: (req: unknown) => void } | undefined;
     if (c && typeof c.commitCsrfToken === "function") c.commitCsrfToken(this);
   }
 
-  // --- Flash / cookie-jar lifecycle hooks (no-ops; Rails uses these as mixin overrides) ---
-
-  /** Rails: `Flash::RequestMethods#commit_flash` (`flash.rb:292-305`). */
   commitFlash(): void {
     commitFlash.call(this as never);
   }
 
-  /**
-   * Rails: `RequestCookieMethods`' prepended `commit_cookie_jar!`
-   * (`middleware/cookies.rb:20-24`) — `cookie_jar.commit!`.
-   */
   commitCookieJarBang(): void {
     this.cookieJar().commitBang();
   }
 
-  // --- Aliases ---
-
-  /** Rails: `GET` alias of `query_parameters`. */
   GET(): Record<string, unknown> {
     return this.queryParameters;
   }
 
-  /** Rails: `POST` alias of `request_parameters`. */
   POST(): Record<string, unknown> {
     return this.requestParameters;
   }
 
-  /** Rails: `parameters` alias of `params`. */
   get parameters(): Record<string, unknown> {
     const override = this.env["action_dispatch.request.parameters_override"];
     if (override) return override as Record<string, unknown>;
@@ -999,15 +773,10 @@ export class Request {
     this.env["action_dispatch.request.parameters_override"] = value;
   }
 
-  // --- Early hints ---
-
-  /** Rails: `send_early_hints(links)` — invokes the `rack.early_hints` callable. */
   sendEarlyHints(links: Record<string, string>): void {
     const cb = this.env["rack.early_hints"] as ((l: Record<string, string>) => void) | undefined;
     if (typeof cb === "function") cb(links);
   }
-
-  // --- Rack request wrapper (env-backed minimal shim) ---
 
   get rackRequest(): RackRequest {
     const cached = this.env["action_dispatch.rack_request"] as RackRequest | undefined;
@@ -1016,8 +785,6 @@ export class Request {
     this.env["action_dispatch.rack_request"] = r;
     return r;
   }
-
-  // --- Mime-negotiation privates (declared; bound below via prototype) ---
 
   /** @internal */
   declare validAcceptHeader: () => boolean;
@@ -1028,35 +795,15 @@ export class Request {
   /** @internal */
   declare isParamsReadable: () => boolean;
 
-  // --- Controller dispatch ---
-
-  /**
-   * Rails: `request.controller_class` (request.rb:88-92). Defaults the
-   * `action` path-parameter to `"index"` and resolves the controller class
-   * via {@link controllerClassFor}.
-   */
   controllerClass(): DispatchableControllerClass | typeof PassNotFound {
     const params = this.pathParameters;
     if (params["action"] == null) params["action"] = "index";
     return this.controllerClassFor(params["controller"] as string | undefined);
   }
 
-  /**
-   * Rails: `request.controller_class_for(name)` (request.rb:94-110).
-   * `"#{controller_param.camelize}Controller"` is looked up in
-   * {@link controllerConstants} rather than `constantize`d, so the miss
-   * arrives as the absence of a map entry rather than as the `NameError`
-   * `constantize` raises; the `missing_name` guard that distinguishes that
-   * `NameError` from one thrown by the controller file itself has nothing
-   * left to discriminate and collapses into raising {@link MissingController}
-   * (`request.rb:102`) directly.
-   */
   controllerClassFor(
     name: string | undefined | null,
   ): DispatchableControllerClass | typeof PassNotFound {
-    // Ruby `if name` is truthy for empty strings; only nil/false fall through
-    // to the PASS_NOT_FOUND branch. Mirror with explicit null-check so `""`
-    // takes the resolution path.
     if (name != null) {
       const controllerParam = underscore(name);
       const constName = `${camelize(controllerParam)}Controller`;
@@ -1067,20 +814,9 @@ export class Request {
     return PassNotFound;
   }
 
-  // --- Request parameters (Rack form pairs / vars) ---
-
-  /**
-   * Rails: `request_parameters_list` (request.rb:437-456). Drives the
-   * `from_pairs` builder by surfacing whichever flat form list Rack has
-   * populated under `rack.request.form_pairs` / `rack.request.form_vars`.
-   * Returns `[]` when the body is empty and `null` when Rack parsed
-   * multipart but did not preserve a pair list.
-   */
   requestParametersList(): Array<[string, unknown]> | null {
     const rackPost = this.rackRequest.POST;
     const formPairs = this.env["rack.request.form_pairs"];
-    // Multipart form_pairs values may be UploadedFile-like objects, not just
-    // strings; surface as `unknown` rather than narrowing to QueryPair.
     if (formPairs != null) return formPairs as Array<[string, unknown]>;
     const formVars = this.env["rack.request.form_vars"];
     if (formVars != null) return Array.from(QueryParser.eachPair(formVars as string));
@@ -1089,8 +825,6 @@ export class Request {
     }
     return [];
   }
-
-  // --- Parameters mixin privates (Rails: private instance methods on Request) ---
 
   /** @internal */
   paramsParsers(): ParameterParsers {
@@ -1108,8 +842,6 @@ export class Request {
     _logParseErrorOnce.call(this._paramsHost);
   }
 
-  // --- Static factory ---
-
   static create(env: RackEnv = {}): Request {
     return new Request(env);
   }
@@ -1119,9 +851,6 @@ export class Request {
   }
 }
 
-// Mix in ActionDispatch::Http::Cache::Request. Property-style helpers
-// (Rails: no-arg methods) are wired as getters for parity with the existing
-// Request surface; methods that take arguments are wired as prototype methods.
 Object.defineProperty(Request.prototype, "ifModifiedSince", {
   get(this: Request) {
     return _ifModifiedSince.call(this);
@@ -1145,36 +874,6 @@ Request.prototype.etagMatches = _etagMatches;
 Request.prototype.fresh = _fresh;
 
 include(Request, RequestHelpers);
-/**
- * `ActionDispatch::Request` includes `Rack::Request::Helpers`
- * (`action_dispatch/http/request.rb:21`), so every helper arrives unless the
- * class body overrides it — a Ruby class body outranks an included module.
- * Each name omitted here is the Rails definition that does the overriding:
- *
- * - `env`, `getHeader`, `setHeader`, `fetchHeader` — `Rack::Request::Env`'s,
- *   the host contract the mixin is written against.
- * - `body` — `Request#body` (request.rb:357-371).
- * - `requestMethod` — `Request#request_method` (request.rb:152-158).
- * - `host`, `port`, `hostWithPort`, `serverPort`, `url` —
- *   `ActionDispatch::Http::URL#host` (url.rb:228-230), `#port` (url.rb:255-265),
- *   `#host_with_port` (url.rb:244-246), `#server_port` (url.rb:317-319) and
- *   `#url` (url.rb:191-193).
- * - `fullpath` — `Request#fullpath` (request.rb:271-277).
- * - `mediaType` — `Request#media_type` (request.rb:287-290).
- * - `contentLength` — `Request#content_length` (request.rb:292-295).
- * - `xhr` — `alias :xhr? :xml_http_request?` (request.rb:303).
- * - `ip` — `Request#ip` (request.rb:306-310).
- * - `params` — `alias :params :parameters` (parameters.rb:65).
- * - `session`, `sessionOptions` — `Request#session=` (request.rb:386-388) and
- *   `#session_options=` (request.rb:390-392). Rails overrides only the writers
- *   and inherits both readers, but a JS property takes both halves from one
- *   descriptor, so the inherited half is restated in the class body.
- * - `logger` — `Request#logger` (request.rb:477-479).
- * - `GET`, `POST` — `Request#GET` (request.rb:395-403) and `#POST`
- *   (request.rb:408-433).
- * - `formData` — `Request#form_data?` (request.rb:373-375).
- * - `defaultSession` — `Request#default_session` (request.rb:505-507).
- */
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request extends Omit<
   RequestHelpers,
@@ -1208,16 +907,6 @@ export interface Request extends Omit<
 export interface Request extends CspRequest {}
 include(Request, CspRequest);
 
-// --- ActionDispatch::Http::MimeNegotiation wiring ---
-// The mixin's host shape (getHeader/setHeader) reads env keys directly,
-// while Request#getHeader normalizes to `HTTP_*` for case-insensitive HTTP
-// header lookup. We adapt via a per-Request host stored in a WeakMap so the
-// mixin's `_variant` slot persists across calls. The mixin's getHeader/
-// setHeader semantics treat `undefined` as "not cached" (calls fall through
-// to compute and `setHeader` writes the value, including `null`). The host
-// derives from `MimeNegotiation.prototype` so the module's writers (`variant=`
-// / `format=` / `formats=`, which TypeScript can only spell as `set`
-// accessors) apply to it by plain assignment.
 type MimeHost = MimeNegotiationHost & _MimeNegotiation;
 const MIME_HOSTS = new WeakMap<Request, MimeHost>();
 function mimeHost(req: Request): MimeHost {
@@ -1264,12 +953,9 @@ Request.prototype.shouldApplyVaryHeader = function (this: Request) {
   return _shouldApplyVaryHeader.call(mimeHost(this));
 };
 
-// Mix in ActionDispatch::RequestCookieMethods (`middleware/cookies.rb:12-94`).
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include RequestCookieMethods`; the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request {
-  /** Rails: `cookie_jar` / `cookie_jar=` (`cookies.rb:13-17,30-32`). */
   cookieJar(jar?: CookieJar): CookieJar;
-  /** Rails: `have_cookie_jar?` (`cookies.rb:26-28`). */
   isHaveCookieJar(): boolean;
   signedCookieSalt(): string | undefined;
   encryptedCookieSalt(): string | undefined;
@@ -1301,8 +987,6 @@ Request.prototype.cookiesDigest = _cookiesDigest;
 Request.prototype.cookiesRotations = _cookiesRotations;
 Request.prototype.useCookiesWithMetadata = _useCookiesWithMetadata;
 
-// Mix in ActionDispatch::Http::FilterParameters. The mixin reads the merged
-// param hash via the host's `params` getter (already defined on `Request`).
 Request.prototype.filteredParameters = _filteredParameters;
 Request.prototype.filteredEnv = _filteredEnv;
 Request.prototype.filteredPath = _filteredPath;
@@ -1314,30 +998,10 @@ Request.prototype.parameterFilterFor = _parameterFilterFor as (
   filters: Array<string | RegExp>,
 ) => ParameterFilter;
 
-/**
- * Sentinel controller used when {@link Request.controllerClassFor} is called
- * without a controller name. Mirrors Rails' `PASS_NOT_FOUND` anonymous class
- * (request.rb:82-86): every dispatch path returns the sentinel itself, and
- * `call` short-circuits to a `404` with the `X-Cascade: pass` header so the
- * router falls through to the next matching route.
- */
-/**
- * Ruby's empty array body (`[]`) — a body that yields no chunks at all, not
- * one empty chunk.
- *
- * @internal
- */
+/** @internal */
 export async function* emptyRackBody(): RackBody {}
 
-/**
- * Rails: `ActionDispatch::MissingController < NameError`
- * (`action_dispatch.rb:50`).
- *
- * @noRailsEquivalent PERMANENT — declared beside its only raise site rather
- * than in the `action_dispatch` module file, whose TS counterpart is the
- * package barrel: importing the barrel from here closes an ESM cycle
- * (barrel → http/request → barrel) that a Ruby autoload never has.
- */
+/** @noRailsEquivalent PERMANENT */
 export class MissingController extends NameError {
   constructor(message: string, constantName?: string) {
     super(message, constantName);
@@ -1345,17 +1009,7 @@ export class MissingController extends NameError {
   }
 }
 
-/**
- * The constant table `controller_class_for` resolves against, keyed by the
- * Rails controller path `path_parameters[:controller]` carries (`posts`,
- * `admin/posts`). Rails looks the `"#{name.camelize}Controller"` constant up
- * in the global Ruby namespace, which Zeitwerk autoloads on demand; ESM has
- * no `const_missing` seam, so railties' `setup_main_autoloader` populates
- * this map eagerly instead. The map itself is convergeable onto the
- * Inflector's constant table `constantize` already reads.
- *
- * @noRailsEquivalent CONVERGEABLE controller-constant-resolution-throws-instead-of-constantize
- */
+/** @noRailsEquivalent CONVERGEABLE controller-constant-resolution-throws-instead-of-constantize */
 export const controllerConstants = new Map<string, DispatchableControllerClass>();
 
 export class PassNotFound {
@@ -1372,8 +1026,6 @@ export class PassNotFound {
     return false;
   }
 }
-// Mime-negotiation privates wired via prototype; declared on the class for
-// typing. These mirror Rails' private predicates / lookup helpers.
 Request.prototype.validAcceptHeader = function (this: Request) {
   return _validAcceptHeader.call(mimeHost(this));
 };

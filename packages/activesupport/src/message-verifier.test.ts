@@ -23,12 +23,6 @@ const JSONSerializer: MessageSerializer = {
 
 describe("MessageVerifierTest", () => {
   const verifier = new MessageVerifier("Hey, I'm a secret!");
-  /**
-   * Rails' `@data` also carries a `Time.utc(2010)` under `"now"`; a temporal
-   * value does not survive the `:json` serializer as a temporal (it decodes
-   * back as a string), so it is dropped here — same reason the shared
-   * `messages/message-metadata-tests.ts` `DATA` drops its `Time.local(2004)`.
-   */
   const data = { some: "data" };
   const secret = Buffer.from(getCrypto().randomBytes(32));
 
@@ -36,7 +30,7 @@ describe("MessageVerifierTest", () => {
     const [encoded, hash] = verifier.generate(data).split("--") as [string, string];
     assertNot(verifier.validMessage(null as unknown as string));
     assertNot(verifier.validMessage(""));
-    assertNot(verifier.validMessage("\xff")); // invalid encoding
+    assertNot(verifier.validMessage("\xff"));
     assertNot(verifier.validMessage(`${[...encoded].reverse().join("")}--${hash}`));
     assertNot(verifier.validMessage(`${encoded}--${[...hash].reverse().join("")}`));
     assertNot(verifier.validMessage("purejunk"));
@@ -65,18 +59,6 @@ describe("MessageVerifierTest", () => {
   it("supports URL-safe encoding", () => {
     const urlSafeVerifier = new MessageVerifier(secret, { url_safe: true, serializer: "json" });
 
-    // To verify that the message payload uses a URL-safe encoding (i.e. does not
-    // use "+" or "/"), the unencoded bytes should have a 6-bit aligned
-    // occurrence of `0b111110` or `0b111111`.  Also, to verify that the message
-    // payload is unpadded, the number of unencoded bytes should not be a
-    // multiple of 3.
-    //
-    // The JSON serializer adds quotes around strings, adding 1 byte before and
-    // 1 byte after the input string.  So we choose an input string of "??",
-    // which is serialized as:
-    //   00100010 00111111 00111111 00100010
-    // Which is 6-bit aligned as:
-    //   001000 100011 111100 111111 001000 10xxxx
     const payload = "??";
     const message = urlSafeVerifier.generate(payload);
 
@@ -127,9 +109,6 @@ describe("MessageVerifierTest", () => {
   });
 
   it("verify with parse json times", () => {
-    // Rails brackets this with `ActiveSupport.parse_json_times = true` and
-    // `Time.zone = "UTC"`; trails has neither knob — `parseExpiry` always
-    // parses the metadata timestamp itself, in UTC.
     expect(
       verifier.verify(
         verifier.generate("hi", { expiresAt: currentTimeInstant().add({ seconds: 10 }) }),
@@ -145,7 +124,5 @@ describe("MessageVerifierTest", () => {
     expect(exception.message).toEqual("Secret should not be nil.");
   });
 
-  // Ruby's `inspect` is a core value-protocol method with no TypeScript
-  // analogue — see SKIP_GROUPS in scripts/api-compare/conventions.ts.
   it.skip("inspect does not show secrets");
 });

@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { RouteSet } from "../routing/route-set.js";
 import { URL as DispatchURL, type UrlOptions } from "../http/url.js";
 
-// dispatch/url_generation_test.rb
-
 describe("TestUrlGeneration::WithMountPoint", () => {
   let routes: RouteSet;
 
@@ -76,16 +74,11 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     expect(fooPath({ scriptName: "/bar" })).toBe("/bar/foo");
   });
 
-  it.skip("the request's SCRIPT_NAME takes precedence over the route", () => {
-    // needs controller dispatch with SCRIPT_NAME header propagation to controller url_for
-  });
+  it.skip("the request's SCRIPT_NAME takes precedence over the route", () => {});
 
-  it.skip("the request's SCRIPT_NAME wraps the mounted app's", () => {
-    // needs mounted app dispatch infrastructure
-  });
+  it.skip("the request's SCRIPT_NAME wraps the mounted app's", () => {});
 
   it("handling http protocol with https set", () => {
-    // Rails calls https! first; we pass protocol: "http" which overrides regardless
     expect(fooUrl({ protocol: "http" })).toBe("http://www.example.com/foo");
   });
 
@@ -163,9 +156,7 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     );
   });
 
-  it.skip("port option disables the host when set to false", () => {
-    // UrlOptions.port typed as number|string|null — false not accepted; Rails uses port: false
-  });
+  it.skip("port option disables the host when set to false", () => {});
 
   it("keep subdomain when key is true", () => {
     expect(fooUrl({ subdomain: true })).toBe("http://www.example.com/foo");
@@ -175,17 +166,11 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     expect(fooUrl()).toBe("http://www.example.com/foo");
   });
 
-  it.skip("omit subdomain when key is nil", () => {
-    // normalizeHost defaults nil/undefined subdomain to true instead of stripping it
-  });
+  it.skip("omit subdomain when key is nil", () => {});
 
-  it.skip("omit subdomain when key is false", () => {
-    // normalizeHost subdomain removal gap — false not treated as "strip subdomain"
-  });
+  it.skip("omit subdomain when key is false", () => {});
 
-  it.skip("omit subdomain when key is blank", () => {
-    // normalizeHost subdomain removal gap — empty string not treated as "strip subdomain"
-  });
+  it.skip("omit subdomain when key is blank", () => {});
 
   it("keep optional path parameter when given", () => {
     expect(bazUrl({ optional_id: 123 })).toBe("http://www.example.com/optional/123/baz");
@@ -215,48 +200,25 @@ describe("TestUrlGeneration::WithMountPoint", () => {
     expect(bazUrl("")).toBe("http://www.example.com/baz");
   });
 
-  it.skip("generating the current URL with a trailing slashes", () => {
-    // needs controller dispatch with url_for(trailing_slash: true, params: request.query_parameters)
-  });
+  it.skip("generating the current URL with a trailing slashes", () => {});
 
-  it.skip("generating the current URL with a trailing slashes and query string", () => {
-    // needs controller dispatch with url_for trailing_slash + query_parameters
-  });
+  it.skip("generating the current URL with a trailing slashes and query string", () => {});
 
-  it.skip("generating the current URL with a trailing slashes and format indicator", () => {
-    // needs controller dispatch with url_for trailing_slash + format
-  });
+  it.skip("generating the current URL with a trailing slashes and format indicator", () => {});
 
-  it.skip("generating the path with `trailing_slashes: true` default options", () => {
-    // needs route-level trailing_slash default option propagation to path helpers
-  });
+  it.skip("generating the path with `trailing_slashes: true` default options", () => {});
 
-  it.skip("generating the path with `trailing_slashes: true` default options and format", () => {
-    // needs route-level trailing_slash default option propagation
-  });
+  it.skip("generating the path with `trailing_slashes: true` default options and format", () => {});
 
-  it.skip("generating URLs with trailing slashes", () => {
-    // URL.pathFor trailingSlash only appends "/" on blank paths; /bars stays /bars
-    // expect(barsPath({ trailingSlash: true })).toBe("/bars/");
-  });
+  it.skip("generating URLs with trailing slashes", () => {});
 
-  it.skip("generating URLs with trailing slashes and dot including param", () => {
-    // URL.pathFor trailingSlash gap + RouteSet.pathFor doesn't propagate trailingSlash
-  });
+  it.skip("generating URLs with trailing slashes and dot including param", () => {});
 
-  it.skip("generating URLs with trailing slashes and query string", () => {
-    // URL.pathFor trailingSlash gap
-  });
+  it.skip("generating URLs with trailing slashes and query string", () => {});
 
-  it.skip("generating URLs with trailing slashes and format", () => {
-    // RouteSet.pathFor ignores format param — route pattern lacks (.:format) segment
-  });
+  it.skip("generating URLs with trailing slashes and format", () => {});
 
-  it.skip("generating URLS with querystring and trailing slashes", () => {
-    // trailingSlash + format gaps combine
-  });
+  it.skip("generating URLS with querystring and trailing slashes", () => {});
 
-  it.skip("generating URLS with empty querystring", () => {
-    // RouteSet.pathFor ignores format param
-  });
+  it.skip("generating URLS with empty querystring", () => {});
 });

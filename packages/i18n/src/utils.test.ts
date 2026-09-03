@@ -1,5 +1,3 @@
-/** Mirrors: i18n/test/utils_test.rb */
-
 import { describe, expect, it } from "vitest";
 
 import { deepMergeBang, deepSymbolizeKeys, except } from "./utils.js";

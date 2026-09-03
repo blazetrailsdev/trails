@@ -5,8 +5,6 @@ import { TimeZone } from "./values/time-zone.js";
 import { Date as RubyDate, Temporal, strftime } from "@blazetrails/date";
 import type { TimeWithZone } from "./time-with-zone.js";
 
-// Rails' activesupport/test/abstract_unit.rb:35 turns the check off for the
-// whole suite.
 I18n.setEnforceAvailableLocales(false);
 
 describe("I18nTest", () => {

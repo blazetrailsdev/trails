@@ -19,13 +19,6 @@ import { resetClassConfig } from "./config.js";
 import { resetConfig } from "./i18n.js";
 import { Simple } from "./backend/simple.js";
 
-/**
- * Trails-only: the cases i18n/test/i18n/exceptions_test.rb drives through
- * `I18n.translate` live in exceptions.test.ts. These have no Rails counterpart
- * — they assert the ported classes directly, including the message and
- * accessor shapes the upstream cases never reach because the default
- * ExceptionHandler swallows MissingTranslation.
- */
 describe("exceptions", () => {
   beforeEach(() => {
     resetConfig();

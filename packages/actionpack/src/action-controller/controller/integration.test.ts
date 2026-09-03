@@ -2,9 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
 
-// ==========================================================================
-// SessionTest
-// ==========================================================================
 afterEach(() => vi.restoreAllMocks());
 
 describe("SessionTest", () => {
@@ -151,9 +148,6 @@ describe("SessionTest", () => {
   });
 });
 
-// ==========================================================================
-// IntegrationTestTest
-// ==========================================================================
 describe("IntegrationTestTest", () => {
   let test: IntegrationTest;
 
@@ -173,23 +167,13 @@ describe("IntegrationTestTest", () => {
     expect(test.assertions - assertionsBefore).toBe(1);
   });
 
-  it.skip("does not prevent method missing passing up to ancestors", () => {
-    // Ruby-specific: method_missing has no TypeScript equivalent.
-  });
+  it.skip("does not prevent method missing passing up to ancestors", () => {});
 });
 
-// ==========================================================================
-// RackLintIntegrationTest
-// ==========================================================================
 describe("RackLintIntegrationTest", () => {
-  it.skip("integration test follows rack SPEC", () => {
-    // Requires Rack::Lint middleware — no TS equivalent yet.
-  });
+  it.skip("integration test follows rack SPEC", () => {});
 });
 
-// ==========================================================================
-// MetalIntegrationTest
-// ==========================================================================
 class PollerController extends Base {
   async call() {
     const path = this.request?.env?.PATH_INFO as string;
@@ -228,9 +212,7 @@ describe("MetalIntegrationTest", () => {
     expect(t.responseBody).toBe("");
   });
 
-  it.skip("generate url without controller", () => {
-    // Requires url_for with SharedTestRoutes wired — not yet ported.
-  });
+  it.skip("generate url without controller", () => {});
 
   it("pass headers", async () => {
     await t.get("/success", {

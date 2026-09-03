@@ -1,43 +1,3 @@
-/**
- * Port of ruby/date's `test/date/test_date_strptime.rb` — the low-level
- * `Date._strptime` frags API (lines 70-305: the directive table, the width
- * prefixes, and the arms that fail) and the public `Date.strptime` /
- * `DateTime.strptime` above it (lines 306-end).
- *
- * The public half calls `Date.strptime` / `DateTime.strptime` themselves, as
- * the Ruby does. Those answer RFC 0088's `Temporal` seat rather than a
- * `Date`/`DateTime`, so `assert_equal(d, Date.strptime(...))` is spelled as an
- * equality between two seats and each reader is the seat's name for the same
- * value: `mon` is `month`, `mday` is `day`, `min` is `minute`, `sec` is
- * `second`, `yday` is `dayOfYear`, and the commercial triple `cwyear` /
- * `cweek` / `cwday` is `yearOfWeek` / `weekOfYear` / `dayOfWeek`. Two have no
- * seat reader and are read one step out: `sec_fraction` as the `millisecond`
- * the same moment carries, and `d.strftime('%U')` through the exported
- * {@link strftime}, which takes a `Temporal` subject. The gem's own `to_s` —
- * the INPUT `Date.strptime(d.to_s)` parses — is the one thing built from a
- * gem-shaped receiver, since it is a spelling no `Temporal` `toString`
- * produces.
- *
- * `_strptime` answers the frag Hash itself rather than a date, so RFC 0088's
- * `Temporal`-by-default mapping does not reach these tests — the values below
- * are the ones `date__strptime` (`date_strptime.c:159-663`) writes, under the
- * camelCased key names `DateParts` gives them (`:sec_fraction` is
- * `secFraction`, `:cwyear` is `cwyear`). Two values are trails' own spelling of
- * a Ruby Integer/Rational: `%s` answers a `bigint`, because MRI's is a Bignum
- * of arbitrary precision (`date_strptime.c:415-426`), and `%Q` a `Rational`
- * over 1000 (`date_strptime.c:428-442`).
- *
- * Ruby's `assert_equal(s[1], Date._strptime(...))` compares a Hash whose absent
- * keys are absent; `toEqual` treats an absent key and an `undefined` one alike,
- * which is the same question.
- *
- * `test__strptime` asserts inside two `case f[-1,1]` branches — the `%E` and
- * `%O` prefixes are accepted for some directives and rejected for the rest, and
- * which arm a directive takes is what the test is about — so the assertions sit
- * inside a `switch` in the Ruby too, hence the `no-conditional-expect` disable
- * below. Splitting the walk into two tests would rename them.
- */
-
 /* eslint-disable vitest/no-conditional-expect */
 
 import { Temporal } from "@js-temporal/polyfill";
@@ -111,24 +71,18 @@ const STRFTIME_2001_02_03_GNUext: Record<string, [string, DateParts]> = {
 Object.assign(STRFTIME_2001_02_03, STRFTIME_2001_02_03_CVS19);
 Object.assign(STRFTIME_2001_02_03, STRFTIME_2001_02_03_GNUext);
 
-/** Ruby's `h.values_at(:year, :mon, …)`, whose answer is `nil` for a key the
- *  Hash does not carry. */
 function valuesAt(h: DateParts | null, ...keys: (keyof DateParts)[]): unknown[] {
   return keys.map((key) => (h?.[key] === undefined ? null : h[key]));
 }
 
-/** Ruby's `[d.year, d.mon, d.mday, d.hour, d.min, d.sec]` off the `Temporal` seat. */
 function ymdhms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime): number[] {
   return [d.year, d.month, d.day, d.hour, d.minute, d.second];
 }
 
-/** Ruby's `[d.cwyear, d.cweek, d.cwday, d.hour, d.min, d.sec]`; the seat spells
- *  the ISO week date `yearOfWeek` / `weekOfYear` / `dayOfWeek`. */
 function cwymdhms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime): (number | undefined)[] {
   return [d.yearOfWeek, d.weekOfYear, d.dayOfWeek, d.hour, d.minute, d.second];
 }
 
-/** Ruby's `[d.year, d.strftime(fmt).to_i, d.wday, d.hour, d.min, d.sec]`. */
 function wnumWdayHms(d: Temporal.PlainDateTime | Temporal.ZonedDateTime, fmt: string): number[] {
   return [d.year, Number(strftime(d, fmt)), d.dayOfWeek % 7, d.hour, d.minute, d.second];
 }
@@ -137,7 +91,6 @@ describe("TestDateStrptime", () => {
   it(" strptime", () => {
     for (const [f, s] of Object.entries(STRFTIME_2001_02_03)) {
       if ((f === "%I" && s[0] === "12") || (f === "%l" && s[0] === "12")) {
-        // hour w/o merid
         s[1].hour = 12;
       }
       expect(Date._strptime(s[0], f)).toEqual(s[1]);
@@ -195,7 +148,7 @@ describe("TestDateStrptime", () => {
     expect(Date._strptime(" ".repeat(3), " ".repeat(3))).toEqual({});
     expect(Date._strptime("\tfoo\n\0\r", "\tfoo\n\0\r")).toEqual({});
     expect(Date._strptime("foo\n\nbar", "foo bar")).toEqual({});
-    expect(Date._strptime("%\n", "%\n")).toEqual({}); // gnu
+    expect(Date._strptime("%\n", "%\n")).toEqual({});
     expect(Date._strptime("%%", "%%%")).toEqual({});
     expect(Date._strptime("Saturday".repeat(1024) + ",", "%A".repeat(1024) + ",")).toEqual({
       wday: 6,
@@ -208,7 +161,6 @@ describe("TestDateStrptime", () => {
 
   it(" strptime  3", () => {
     const table: [[string, string], unknown[]][] = [
-      // iso8601
       [
         ["2001-02-03", "%Y-%m-%d"],
         [2001, 2, 3, null, null, null, null, null, null],
@@ -234,7 +186,6 @@ describe("TestDateStrptime", () => {
         [-12345, 2, 3, 23, 59, 60, "+09:00", 9 * 3600, null],
       ],
 
-      // ctime(3), asctime(3)
       [
         ["Thu Jul 29 14:47:19 1999", "%c"],
         [1999, 7, 29, 14, 47, 19, null, null, 4],
@@ -244,7 +195,6 @@ describe("TestDateStrptime", () => {
         [-1999, 7, 29, 14, 47, 19, null, null, 4],
       ],
 
-      // date(1)
       [
         ["Thu Jul 29 16:39:41 EST 1999", "%a %b %d %H:%M:%S %Z %Y"],
         [1999, 7, 29, 16, 39, 41, "EST", -5 * 3600, 4],
@@ -302,7 +252,6 @@ describe("TestDateStrptime", () => {
         [1999, 7, 29, 16, 39, 41, "E. Australia Standard Time", 10 * 3600, 4],
       ],
 
-      // rfc822
       [
         ["Thu, 29 Jul 1999 09:54:21 UT", "%a, %d %b %Y %H:%M:%S %Z"],
         [1999, 7, 29, 9, 54, 21, "UT", 0, 4],
@@ -336,7 +285,6 @@ describe("TestDateStrptime", () => {
         [-1999, 7, 29, 9, 54, 21, "-0430", -4 * 3600 - 30 * 60, 4],
       ],
 
-      // etc
       [
         ["06-DEC-99", "%d-%b-%y"],
         [1999, 12, 6, null, null, null, null, null, null],
@@ -414,7 +362,6 @@ describe("TestDateStrptime", () => {
         [null, null, null, null, null, null, "E.  Australia Standard Time", 10 * 3600, null],
       ],
 
-      // out of range
       [
         ["+0.9999999999999999999999", "%Z"],
         [null, null, null, null, null, null, "+0.9999999999999999999999", +1 * 3600, null],
@@ -658,8 +605,6 @@ describe("TestDateStrptime", () => {
     expect(DateTime.strptime("2002-03-14T11:22:33-09:00", "%FT%T%Z").toString()).toBe(
       DateTime.civil(2002, 3, 14, 11, 22, 33, new Rational(-9, 24)).toString(),
     );
-    // `+ 123456789.to_r/1000000000/86400` is a nanosecond added to the same
-    // moment, which the seat carries as its own sub-second.
     expect(DateTime.strptime("2002-03-14T11:22:33.123456789-09:00", "%FT%T.%N%Z").toString()).toBe(
       new DateTime(2002, 3, 14, 11, 22, 33, new Rational(-9, 24))
         .plus(new Rational(123456789, 1000000000 * 86400))
@@ -725,8 +670,6 @@ describe("TestDateStrptime", () => {
     d = DateTime.strptime("-86400", "%s");
     expect(ymdhms(d)).toEqual([1969, 12, 31, 0, 0, 0]);
 
-    // `sec_fraction` has no seat, so `Rational(1, 10**3)` is read as the
-    // millisecond the same moment carries; `(0/1)` is a whole second.
     d = DateTime.strptime("-999", "%Q");
     expect([...ymdhms(d), d.millisecond]).toEqual([1969, 12, 31, 23, 59, 59, 1]);
     d = DateTime.strptime("-1000", "%Q");
@@ -830,7 +773,6 @@ describe("TestDateStrptime", () => {
   });
 });
 
-/** minitest `assert_nothing_raised`, which vitest has no matcher for. */
 function assertNothingRaised<T>(block: () => T): T {
   return block();
 }

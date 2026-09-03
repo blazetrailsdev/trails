@@ -76,8 +76,6 @@ function zoned(
 function withEnvTz<T>(tz: string, fn: () => T): T {
   const orig = process.env.TZ;
   process.env.TZ = tz;
-  // `Time`'s local-zone memo is MRI's `tzset` cache; `TZ` moving under it has
-  // to drop it, exactly as `tzset` does.
   resetLocalTimeZoneId();
   try {
     return fn();
@@ -149,34 +147,30 @@ describe("TimeExtCalculationsTest", () => {
 
   it("daylight savings time crossings backward start", () => {
     withEnvTz("America/New_York", () => {
-      // dt: US: 2005 April 3rd 4:18am
-      // ago(86400) = subtract 86400 seconds (simple time arithmetic)
-      const dt = new Date(2005, 3, 3, 4, 18, 0); // April 3 EDT
+      const dt = new Date(2005, 3, 3, 4, 18, 0);
       const result = asDate(ago(dt, 86400));
       expect(result.getFullYear()).toBe(2005);
-      expect(result.getMonth()).toBe(3); // April
+      expect(result.getMonth()).toBe(3);
       expect(result.getDate()).toBe(2);
-      expect(result.getHours()).toBe(3); // 3:18 EST (lost 1 hour crossing DST boundary)
+      expect(result.getHours()).toBe(3);
       expect(result.getMinutes()).toBe(18);
     });
   });
 
   it("daylight savings time crossings backward end", () => {
     withEnvTz("America/New_York", () => {
-      // st: US: 2005 October 30th 4:03am
-      const st = new Date(2005, 9, 30, 4, 3, 0); // Oct 30 EST
+      const st = new Date(2005, 9, 30, 4, 3, 0);
       const result = asDate(ago(st, 86400));
       expect(result.getFullYear()).toBe(2005);
       expect(result.getMonth()).toBe(9);
       expect(result.getDate()).toBe(29);
-      expect(result.getHours()).toBe(5); // 5:03 EDT (gained 1 hour crossing DST boundary)
+      expect(result.getHours()).toBe(5);
       expect(result.getMinutes()).toBe(3);
     });
   });
 
   it("daylight savings time crossings backward start 1day", () => {
     withEnvTz("America/New_York", () => {
-      // advance(days: -1) uses calendar arithmetic
       const dt = new Date(2005, 3, 3, 4, 18, 0);
       const result = asDate(advance(dt, { days: -1 }));
       expect(result.getDate()).toBe(2);
@@ -202,12 +196,11 @@ describe("TimeExtCalculationsTest", () => {
 
   it("daylight savings time crossings forward start", () => {
     withEnvTz("America/New_York", () => {
-      // st: US: 2005 April 2nd 7:27pm
       const st = new Date(2005, 3, 2, 19, 27, 0);
       const result = asDate(since(st, 86400));
-      expect(result.getMonth()).toBe(3); // April
+      expect(result.getMonth()).toBe(3);
       expect(result.getDate()).toBe(3);
-      expect(result.getHours()).toBe(20); // 8:27pm EDT (gained 1 hour)
+      expect(result.getHours()).toBe(20);
       expect(result.getMinutes()).toBe(27);
     });
   });
@@ -244,7 +237,6 @@ describe("TimeExtCalculationsTest", () => {
 
   it("daylight savings time crossings forward end", () => {
     withEnvTz("America/New_York", () => {
-      // dt: US: 2005 October 30th 12:45am
       const dt = new Date(2005, 9, 30, 0, 45, 0);
       const result = asDate(since(dt, 86400));
       expect(result.getDate()).toBe(30);
@@ -356,15 +348,10 @@ describe("TimeExtCalculationsTest", () => {
 
   it("change preserves offset for local times around end of dst", () => {
     withEnvTz("US/Eastern", () => {
-      // DST ended just before 2005-10-30 2:00:00 AM in US/Eastern, and clocks
-      // were rolled back 1 hour.
-      const midnight = RubyTime.local(2005, 10, 30, 0, 0, 0); // 2005-10-30 00:00:00 -0400
-      // Rails reaches the first occurrence as `Time.local(..., 0, 59, 59) + 1`;
-      // trails' `Time` has no `#+`, so the same instant is named by the `isdst`
-      // argument `change`'s own `elsif zone` arm passes.
-      const oneAm1 = RubyTime.local(0, 0, 1, 30, 10, 2005, null, null, true, null); // -0400
-      const oneAm2 = RubyTime.local(2005, 10, 30, 1, 0, 0); // 2005-10-30 01:00:00 -0500
-      const twoAm = RubyTime.local(2005, 10, 30, 2, 0, 0); // 2005-10-30 02:00:00 -0500
+      const midnight = RubyTime.local(2005, 10, 30, 0, 0, 0);
+      const oneAm1 = RubyTime.local(0, 0, 1, 30, 10, 2005, null, null, true, null);
+      const oneAm2 = RubyTime.local(2005, 10, 30, 1, 0, 0);
+      const twoAm = RubyTime.local(2005, 10, 30, 2, 0, 0);
       expect(oneAm1.toTime().epochNanoseconds).toBeLessThan(oneAm2.toTime().epochNanoseconds);
 
       const at = (time: RubyTime): bigint => time.toTime().epochNanoseconds;
@@ -389,12 +376,10 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("change preserves offset for zoned times around end of dst", () => {
-    // DST ended just before 2005-10-30 2:00:00 AM in US/Eastern, and clocks
-    // were rolled back 1 hour.
-    const midnight = zoned("US/Eastern", 2005, 10, 30, 0, 0, 0); // 2005-10-30 00:00:00 -0400
-    const oneAm1 = zoned("US/Eastern", 2005, 10, 30, 1, 0, 0); // 2005-10-30 01:00:00 -0400
-    const oneAm2 = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0).subtract({ seconds: 3600 }); // -0500
-    const twoAm = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0); // 2005-10-30 02:00:00 -0500
+    const midnight = zoned("US/Eastern", 2005, 10, 30, 0, 0, 0);
+    const oneAm1 = zoned("US/Eastern", 2005, 10, 30, 1, 0, 0);
+    const oneAm2 = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0).subtract({ seconds: 3600 });
+    const twoAm = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0);
     expect(Temporal.ZonedDateTime.compare(oneAm1, oneAm2)).toBe(-1);
 
     expect(change(midnight, { hour: 1 }).equals(oneAm1)).toBe(true);
@@ -418,8 +403,6 @@ describe("TimeExtCalculationsTest", () => {
     const time = zoned("US/Eastern", 2005, 10, 30, 0, 0, 0).add({ milliseconds: 990 });
     const time2 = change(time, { month: 1 });
 
-    // Rails asserts on `inspect`: "2005-10-30 00:00:00.99 -0400" and
-    // "2005-01-30 00:00:00.99 -0500".
     expect(time.offset).toBe("-04:00");
     expect(time.millisecond).toBe(990);
     expect(time2.offset).toBe("-05:00");
@@ -429,12 +412,10 @@ describe("TimeExtCalculationsTest", () => {
 
   it("change preserves fractional hour offset for local times around end of dst", () => {
     withEnvTz("Australia/Lord_Howe", () => {
-      // DST ended just before 2005-03-27 2:00:00 AM in Australia/Lord_Howe, and
-      // clocks were rolled back 30 minutes.
-      const oneAm = RubyTime.local(2005, 3, 27, 1, 0, 0); // 2005-03-27 01:00:00 +1100
-      const one30Am1 = RubyTime.local(0, 30, 1, 27, 3, 2005, null, null, true, null); // +1100
-      const one30Am2 = RubyTime.local(2005, 3, 27, 1, 30, 0); // 2005-03-27 01:30:00 +1030
-      const twoAm = RubyTime.local(2005, 3, 27, 2, 0, 0); // 2005-03-27 02:00:00 +1030
+      const oneAm = RubyTime.local(2005, 3, 27, 1, 0, 0);
+      const one30Am1 = RubyTime.local(0, 30, 1, 27, 3, 2005, null, null, true, null);
+      const one30Am2 = RubyTime.local(2005, 3, 27, 1, 30, 0);
+      const twoAm = RubyTime.local(2005, 3, 27, 2, 0, 0);
       expect(one30Am1.toTime().epochNanoseconds).toBeLessThan(one30Am2.toTime().epochNanoseconds);
 
       const at = (time: RubyTime): bigint => time.toTime().epochNanoseconds;
@@ -459,13 +440,11 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("change preserves fractional hour offset for zoned times around end of dst", () => {
-    // DST ended just before 2005-03-27 2:00:00 AM in Australia/Lord_Howe, and
-    // clocks were rolled back 30 minutes.
     const tz = "Australia/Lord_Howe";
-    const oneAm = zoned(tz, 2005, 3, 27, 1, 0, 0); // 2005-03-27 01:00:00 +1100
-    const one30Am1 = zoned(tz, 2005, 3, 27, 1, 30, 0); // 2005-03-27 01:30:00 +1100
-    const one30Am2 = zoned(tz, 2005, 3, 27, 2, 0, 0).subtract({ seconds: 1800 }); // +1030
-    const twoAm = zoned(tz, 2005, 3, 27, 2, 0, 0); // 2005-03-27 02:00:00 +1030
+    const oneAm = zoned(tz, 2005, 3, 27, 1, 0, 0);
+    const one30Am1 = zoned(tz, 2005, 3, 27, 1, 30, 0);
+    const one30Am2 = zoned(tz, 2005, 3, 27, 2, 0, 0).subtract({ seconds: 1800 });
+    const twoAm = zoned(tz, 2005, 3, 27, 2, 0, 0);
     expect(Temporal.ZonedDateTime.compare(one30Am1, one30Am2)).toBe(-1);
 
     expect(change(oneAm, { min: 30 }).equals(one30Am1)).toBe(true);
@@ -488,7 +467,7 @@ describe("TimeExtCalculationsTest", () => {
   it("utc advance", () => {
     const t = utc(2005, 2, 22, 15, 15, 10);
     expect(asDate(advance(t, { years: 1 })).getUTCFullYear()).toBe(2006);
-    expect(asDate(advance(t, { months: 4 })).getUTCMonth()).toBe(5); // June
+    expect(asDate(advance(t, { months: 4 })).getUTCMonth()).toBe(5);
     expect(asDate(advance(t, { hours: 5 })).getUTCHours()).toBe(20);
     expect(asDate(advance(t, { minutes: 7 })).getUTCMinutes()).toBe(22);
     expect(asDate(advance(t, { seconds: 9 })).getUTCSeconds()).toBe(19);
@@ -497,7 +476,7 @@ describe("TimeExtCalculationsTest", () => {
   it("offset advance", () => {
     const t = d(2005, 2, 22, 15, 15, 10);
     expect(asDate(advance(t, { years: 1 })).getFullYear()).toBe(2006);
-    expect(asDate(advance(t, { months: 4 })).getMonth()).toBe(5); // June
+    expect(asDate(advance(t, { months: 4 })).getMonth()).toBe(5);
     expect(asDate(advance(t, { hours: 5 })).getHours()).toBe(20);
     expect(asDate(advance(t, { minutes: 7 })).getMinutes()).toBe(22);
     expect(asDate(advance(t, { seconds: 9 })).getSeconds()).toBe(19);
@@ -522,7 +501,7 @@ describe("TimeExtCalculationsTest", () => {
   it("last week", () => {
     withEnvTz("America/New_York", () => {
       const result = asDate(lastWeek(new Date(2005, 2, 1, 15, 15, 10), "monday"));
-      expect(result.getDay()).toBe(1); // Monday
+      expect(result.getDay()).toBe(1);
       expect(result.getDate()).toBe(21);
     });
   });
@@ -531,7 +510,7 @@ describe("TimeExtCalculationsTest", () => {
     withEnvTz("America/New_York", () => {
       const result = asDate(nextWeek(new Date(2006, 3, 2, 23, 1, 0), "monday"));
       expect(result.getDate()).toBe(3);
-      expect(result.getMonth()).toBe(3); // April
+      expect(result.getMonth()).toBe(3);
     });
   });
 
@@ -539,13 +518,12 @@ describe("TimeExtCalculationsTest", () => {
     withEnvTz("America/New_York", () => {
       const result = asDate(nextWeek(new Date(2006, 9, 29, 23, 1, 0), "monday"));
       expect(result.getDate()).toBe(30);
-      expect(result.getMonth()).toBe(9); // October
+      expect(result.getMonth()).toBe(9);
     });
   });
 
   it("to fs", () => {
     // boundary: a JS `Date` is Rails' `Time.utc` receiver here, and carries
-    // milliseconds where Ruby's `30.12345678901` carries nanoseconds.
     const time = utc(2005, 2, 21, 17, 44, 30, 123);
     expect(toFs(time, "doesnt_exist")).toBe("2005-02-21 17:44:30 UTC");
     expect(toFs(time, "db")).toBe("2005-02-21 17:44:30");
@@ -732,9 +710,9 @@ describe("TimeExtCalculationsTest", () => {
 
   it("formatted offset with local", () => {
     withEnvTz("America/New_York", () => {
-      const t = new Date(2000, 0, 1); // January = EST
+      const t = new Date(2000, 0, 1);
       expect(formattedOffset(t)).toBe("-05:00");
-      const t2 = new Date(2000, 6, 1); // July = EDT
+      const t2 = new Date(2000, 6, 1);
       expect(formattedOffset(t2)).toBe("-04:00");
     });
   });
@@ -778,7 +756,6 @@ describe("TimeExtCalculationsTest", () => {
         .toString(),
     ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
 
-    // Only test this if the underlying Time.at raises a TypeError
     expect(() => RubyTime.at(RubyTime.now() as never, 0)).toThrow(TypeError);
     expect(() => RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0) as never, 0)).toThrow(
       TypeError,
@@ -796,7 +773,6 @@ describe("TimeExtCalculationsTest", () => {
       expect(RubyTime.at(dt as never).zone).toBe("EST");
       expect(RubyTime.at(dt as never).utcOffset).toBe(-18000);
 
-      // Daylight savings
       dt = RubyDateTime.civil(2000, 7, 1, 1, 0, 0, new Rational(1, 24));
       expect(
         RubyTime.at(dt as never)
@@ -816,7 +792,6 @@ describe("TimeExtCalculationsTest", () => {
         .toString(),
     ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
 
-    // Only test this if the underlying Time.at raises a TypeError
     expect(() => RubyTime.at(RubyTime.now() as never, 0)).toThrow(TypeError);
     expect(() => RubyTime.at(twz as never, 0)).toThrow(TypeError);
   });
@@ -839,7 +814,6 @@ describe("TimeExtCalculationsTest", () => {
       expect(RubyTime.at(twz as never).zone).toBe("EST");
       expect(RubyTime.at(twz as never).utcOffset).toBe(-18000);
 
-      // Daylight savings
       twz = new TimeWithZone(RubyTime.utc(2000, 7, 1, 0, 0, 0), TimeZone.find("London")!);
       expect(
         RubyTime.at(twz as never)
@@ -868,7 +842,7 @@ describe("TimeExtCalculationsTest", () => {
     withEnvTz("America/New_York", () => {
       const t = new Date(2000, 0, 1);
       expect(t.getFullYear()).toBe(2000);
-      expect(t.getTimezoneOffset()).toBe(300); // EST = -5h = 300min
+      expect(t.getTimezoneOffset()).toBe(300);
     });
   });
 
@@ -896,8 +870,6 @@ describe("TimeExtCalculationsTest", () => {
 
   it("time created with local constructor cannot represent times during hour skipped by dst", () => {
     withEnvTz("America/New_York", () => {
-      // On Apr 2 2006 at 2:00AM EST, clocks moved to 3:00AM EDT
-      // Creating 2:00AM on that day should give 3:00AM EDT
       const t = new Date(2006, 3, 2, 2, 0, 0);
       expect(t.getHours()).toBe(3);
     });
@@ -922,7 +894,7 @@ describe("TimeExtCalculationsTest", () => {
     const str = "1999-12-31T19:00:00.125-05:00";
     const t = new Date(str);
     expect(t.getUTCFullYear()).toBe(2000);
-    expect(t.getUTCMonth()).toBe(0); // January in UTC
+    expect(t.getUTCMonth()).toBe(0);
     expect(t.getUTCDate()).toBe(1);
     expect(t.getUTCHours()).toBe(0);
     expect(t.getUTCMinutes()).toBe(0);

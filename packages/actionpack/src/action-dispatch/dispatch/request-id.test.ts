@@ -9,9 +9,6 @@ const echoApp = async (env: RackEnv): Promise<RackResponse> => [
   bodyFromString(String(env["action_dispatch.request_id"] ?? "")),
 ];
 
-// ==========================================================================
-// dispatch/request_id_test.rb
-// ==========================================================================
 describe("RequestIdTest", () => {
   it("passing on the request id from the outside", async () => {
     const mw = new RequestId(echoApp);

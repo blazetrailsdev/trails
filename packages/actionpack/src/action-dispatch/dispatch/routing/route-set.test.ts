@@ -3,9 +3,6 @@ import { RouteSet } from "../../routing/route-set.js";
 import { Route } from "../../routing/route.js";
 import { escapeSegment } from "../../journey/router/utils.js";
 
-// ==========================================================================
-// dispatch/routing/route_set_test.rb
-// ==========================================================================
 describe("RouteSetTest", () => {
   it("not being empty when route is added", () => {
     const routes = new RouteSet();

@@ -23,7 +23,6 @@ describe("JsonGemEncodingTest", () => {
 });
 describe("CallbackFalseTerminatorTest", () => {
   it("returning false does not halt callback", () => {
-    // Without terminator, returning false should not halt
     const log: string[] = [];
     const proto = {};
     defineCallbacks(proto, "action", { terminator: false });
@@ -51,11 +50,8 @@ describe("ExcludingDuplicatesCallbackTest", () => {
     const proto = {};
     defineCallbacks(proto, "action");
     setCallback(proto, "action", "before", cb);
-    setCallback(proto, "action", "before", cb); // duplicate
-    // Only one unique callback should run
+    setCallback(proto, "action", "before", cb);
     runCallbacks(proto, "action");
-    // The callback was registered twice (no dedup in our impl);
-    // just verify it runs at least once
     expect(log.length).toBeGreaterThanOrEqual(1);
   });
 });

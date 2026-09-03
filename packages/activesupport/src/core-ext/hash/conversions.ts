@@ -1,9 +1,3 @@
-/**
- * `ActiveSupport::XMLConverter` — the `Hash.from_xml` half of
- * `core_ext/hash/conversions.rb:138-262`. The four `Hash` members themselves
- * live at the trails seat for Hash core extensions, `hash-utils.ts`.
- */
-
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import * as XmlMini from "../../xml-mini.js";
 import { StringIO } from "@blazetrails/ruby-compat";
@@ -13,12 +7,6 @@ import { wrap } from "../../array-utils.js";
 import { isPlainObject } from "../../hash-utils.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 
-/**
- * Raised if the XML contains attributes with type="yaml" or
- * type="symbol". Read Hash#from_xml for more details.
- *
- * Mirrors: ActiveSupport::XMLConverter::DisallowedType (conversions.rb:142-147)
- */
 export class DisallowedType extends Error {
   override name = "DisallowedType";
 
@@ -27,21 +15,17 @@ export class DisallowedType extends Error {
   }
 }
 
-/** Mirrors: ActiveSupport::XMLConverter::DISALLOWED_TYPES (conversions.rb:149) */
 export const DISALLOWED_TYPES = ["symbol", "yaml"];
 
-/** Mirrors: ActiveSupport::XMLConverter (conversions.rb:140-262). */
 export class XMLConverter {
   private xml: unknown;
   private disallowedTypes: string[];
 
-  /** Mirrors: ActiveSupport::XMLConverter#initialize (conversions.rb:151-154). */
   constructor(xml: string | StringIO | null | undefined, disallowedTypes?: string[] | null) {
     this.xml = this.normalizeKeys(XmlMini.parse(xml));
     this.disallowedTypes = disallowedTypes ?? DISALLOWED_TYPES;
   }
 
-  /** Mirrors: ActiveSupport::XMLConverter#to_h (conversions.rb:156-158) */
   toH(): unknown {
     return this.deepToH(this.xml);
   }
@@ -75,13 +59,7 @@ export class XMLConverter {
     }
   }
 
-  /**
-   * @missingRailsCall try — PERMANENT: Language shortcoming: Rails writes
-   * `value["__content__"].try(:empty?)` (conversions.rb:192), but `empty?` is a
-   * real method on every Ruby receiver where trails' `isEmpty` is a free
-   * function — a JS string has no `isEmpty` for `tryCall` to dispatch. The
-   * nil-guard `try` supplies is spelled inline instead.
-   */
+  /** @missingRailsCall try — PERMANENT */
   private processHash(value: Record<string, unknown>): unknown {
     if (
       Object.hasOwn(value, "type") &&
@@ -117,8 +95,6 @@ export class XMLConverter {
         Object.entries(value).map(([k, v]) => [k, this.deepToH(v)]),
       );
 
-      // Turn { files: { file: StringIO } } into { files: StringIO } so it is compatible with
-      // how multipart uploaded files from HTML appear
       return xmlValue["file"] instanceof StringIO ? xmlValue["file"] : xmlValue;
     }
     return null;
@@ -138,8 +114,6 @@ export class XMLConverter {
   }
 
   private isBecomeEmptyString(value: Record<string, unknown>): boolean {
-    // { "string" => true }
-    // No tests fail when the second term is removed.
     return value["type"] === "string" && value["nil"] !== "true";
   }
 
@@ -148,14 +122,10 @@ export class XMLConverter {
   }
 
   private isNothing(value: Record<string, unknown>): boolean {
-    // blank or nil parsed values are represented by nil
     return isBlank(value) || value["nil"] === "true";
   }
 
   private isGarbage(value: Record<string, unknown>): boolean {
-    // If the type is the only element which makes it then
-    // this still makes the value nil, except if type is
-    // an XML node(where type['value'] is a Hash)
     return (
       value["type"] != null &&
       value["type"] !== false &&

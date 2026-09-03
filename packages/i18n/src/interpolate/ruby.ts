@@ -1,11 +1,3 @@
-/**
- * Mirrors: i18n/lib/i18n/interpolate/ruby.rb
- *
- * The Ruby patterns are anchored on Ruby's `%{}` / `%<>` sprintf syntax and
- * carry no flags; the JS equivalents keep the same source, with the capture
- * groups in the same positions.
- */
-
 import { ArgumentError, ReservedInterpolationKey, inspect } from "../exceptions.js";
 import { config, reservedKeysPattern, toSym } from "../i18n.js";
 
@@ -27,11 +19,6 @@ function unionPattern(patterns: readonly RegExp[]): RegExp {
   return union;
 }
 
-/**
- * Mirrors: I18n.interpolate. Returns a String or raises
- * `MissingInterpolationArgument`; the missing-argument logic is handled by
- * `config().missingInterpolationArgumentHandler`.
- */
 export function interpolate(string: string, values: unknown): string {
   const reserved = reservedKeysPattern().exec(string);
   if (reserved) throw new ReservedInterpolationKey(toSym(reserved[1]), string);
@@ -41,11 +28,7 @@ export function interpolate(string: string, values: unknown): string {
   return interpolateHash(string, values as Record<string, unknown>);
 }
 
-/**
- * @missingRailsCall call — PERMANENT: Ruby's `value.call(values)` on a `respond_to?(:call)`
- * value is plain invocation in JS; `Function#call` there takes a receiver, not
- * the argument list.
- */
+/** @missingRailsCall call — PERMANENT */
 export function interpolateHash(string: string, values: Record<string, unknown>): string {
   const pattern = unionPattern(config().interpolationPatterns);
   let interpolated = false;
@@ -74,24 +57,6 @@ const FORMAT_SPEC = /^([-+ #0]*)(\d*)(?:\.(\d+))?([a-zA-Z])$/;
 const RADIX: Record<string, number> = { b: 2, B: 2, o: 8, x: 16, X: 16 };
 const ALTERNATE_PREFIX: Record<string, string> = { b: "0b", B: "0B", o: "0", x: "0x", X: "0X" };
 
-/**
- * Ruby hands `%<name>fmt` to `sprintf`; JS has no equivalent, so the
- * conversions the interpolation pattern admits (`bBdiouxXeEfgGcps`, `p`
- * included) are
- * reimplemented here, along with the `-+ #0` flags, width and precision that
- * `sprintf` applies to them. A spec outside that grammar raises `ArgumentError`
- * with `sprintf`'s message, as Ruby's does for `%<num>,d`.
- *
- * That whole grammar — every conversion crossed with the flags, a width and a
- * precision — is pinned against real `ruby -e 'sprintf(...)'` output in
- * `ruby.trails.test.ts`, including the forms that are easy to miss: an integer
- * precision as a minimum digit count, the `..` two's-complement form of a
- * negative `%b`/`%o`/`%x`, and `Integer()`/`Float()` raising on an argument
- * that does not convert, booleans and other objects among them. What is NOT
- * covered is anything the interpolation pattern cannot deliver here: argument
- * indexes (`%1$d`), `*` widths, and the conversions outside
- * `[bBdiouxXeEfgGcps]`.
- */
 function sprintf(spec: string, value: unknown): string {
   const parsed = FORMAT_SPEC.exec(spec);
   if (!parsed) throw new ArgumentError(`malformed format string - %${spec.charAt(0)}`);
@@ -148,17 +113,6 @@ function sprintf(spec: string, value: unknown): string {
   return (sign + body).padStart(target);
 }
 
-/**
- * Ruby applies `Integer()` / `Float()` to a numeric conversion's argument, so a
- * value that does not convert raises rather than formatting as `NaN`. Only a
- * Numeric or a String converts: `nil`, `true`/`false` and any other object
- * raise `TypeError` naming what was given, and a String that does not parse
- * raises `ArgumentError`.
- *
- * The `TypeError` is JS's own rather than a ported class because Ruby's is
- * `Kernel`'s, and the gem raises none of its own here — `sprintf` is a builtin.
- * `ArgumentError` is ported because `interpolate` already raises it (ruby.rb:8).
- */
 function numericArgument(value: unknown, integer: boolean): number {
   const kind = integer ? "Integer" : "Float";
   if (value == null) throw new TypeError(`can't convert nil into ${kind}`);
@@ -173,19 +127,12 @@ function numericArgument(value: unknown, integer: boolean): number {
   return number;
 }
 
-/** The Ruby class name `Integer()` / `Float()` name in their TypeError. */
 function rubyClassName(value: unknown): string {
   if (Array.isArray(value)) return "Array";
   const name = (value as object).constructor?.name;
   return name === undefined || name === "Object" ? "Hash" : name;
 }
 
-/**
- * Ruby prints a negative `%b`/`%B`/`%o`/`%x`/`%X` with no sign flag as the
- * infinite two's-complement form — `..` followed by the digits whose leading
- * one, the base's largest, repeats leftward forever. The dots count toward both
- * the precision and a zero-padded width, so both reduce by two here.
- */
 function twosComplement(
   value: number,
   conversion: string,
@@ -217,16 +164,10 @@ function twosComplement(
   return flags.includes("-") ? out.padEnd(target) : out.padStart(target);
 }
 
-/** Ruby pads the exponent to at least two digits; `toExponential` does not. */
 function exponential(magnitude: number, digits: number): string {
   return magnitude.toExponential(digits).replace(/e([+-])(\d)$/, "e$10$2");
 }
 
-/**
- * `%g`: fixed notation when the exponent sits in `[-4, precision)`, otherwise
- * exponential; trailing zeros are dropped unless the `#` flag is set.
- * `Number#toPrecision` picks a different cutover, so the choice is made here.
- */
 function generalFormat(magnitude: number, digits: number, alternate: boolean): string {
   const exponent = magnitude === 0 ? 0 : Math.floor(Math.log10(magnitude));
   const body =

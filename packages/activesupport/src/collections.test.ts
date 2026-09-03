@@ -33,8 +33,6 @@ import {
 import { except } from "@blazetrails/ruby-compat";
 import { extractBang } from "./core-ext/hash/slice.js";
 
-// ── Hash utilities ──────────────────────────────────────────────────
-
 describe("deepMerge", () => {
   it("merges flat objects", () => {
     expect(deepMerge({ a: 1 }, { b: 2 })).toEqual({ a: 1, b: 2 });
@@ -315,8 +313,6 @@ describe("extractOptionsBang", () => {
   });
 });
 
-// ── Array utilities ─────────────────────────────────────────────────
-
 describe("wrap", () => {
   it("wraps null to empty array", () => {
     expect(wrap(null)).toEqual([]);
@@ -411,8 +407,6 @@ describe("excluding", () => {
     expect(excluding([1, 2], 3)).toEqual([1, 2]);
   });
 });
-
-// ── Enumerable utilities ────────────────────────────────────────────
 
 describe("sum", () => {
   it("sums numbers directly", () => {
@@ -519,8 +513,6 @@ describe("compactBlank", () => {
     expect(compactBlank([1, 2, 3])).toEqual([1, 2, 3]);
   });
 });
-
-// ── HashWithIndifferentAccess ───────────────────────────────────────
 
 describe("HashWithIndifferentAccess", () => {
   it("creates from plain object", () => {
@@ -646,7 +638,6 @@ describe("ToSentenceTest", () => {
   });
 
   it("one non string element", () => {
-    // toSentence accepts any array; non-strings are returned as-is for single elements
     expect(String(toSentence([1 as unknown as string]))).toBe("1");
     expect(toSentence([1, 2] as unknown as string[])).toBe("1 and 2");
   });
@@ -663,7 +654,6 @@ describe("ToSentenceTest", () => {
   });
 
   it("with invalid options", () => {
-    // Invalid options are ignored in our implementation
     expect(() => toSentence(["a", "b"], { wordsConnector: ", " })).not.toThrow();
   });
 
@@ -767,7 +757,6 @@ describe("ToXmlTest", () => {
   it("to xml dups options", () => {
     const options = { skipInstruct: true };
     toXmlArray([], options);
-    // :builder, etc, shouldn't be added to options
     expect(options).toEqual({ skipInstruct: true });
   });
 });

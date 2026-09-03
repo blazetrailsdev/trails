@@ -34,6 +34,7 @@ tester.run("no-freeform-comments", rule, {
     { code: `// @ts-expect-error deliberate\nconst x = 1;\n` },
     { code: `// prettier-ignore\nconst x = 1;\n` },
     { code: `// v8 ignore next\nconst x = 1;\n` },
+    { code: `#!/usr/bin/env node\nconst x = 1;\n` },
     { code: `// boundary: legacy Date value\nconst x = 1;\n` },
     {
       code: `// @nie disposition=keep-as-strategy-hook rails=arel/visitors/to_sql.rb:194 cluster=arel-visitor-strategy\nconst x = 1;\n`,
@@ -42,6 +43,11 @@ tester.run("no-freeform-comments", rule, {
     { code: `// a licence header, and nothing else\n` },
   ],
   invalid: [
+    {
+      code: `#!/usr/bin/env node\n// narration\nconst x = 1;\n`,
+      errors: freeform,
+      output: `#!/usr/bin/env node\nconst x = 1;\n`,
+    },
     // Narration goes, with no opt-out marker.
     {
       code: `// keep: still narration\nconst x = 1;\n`,

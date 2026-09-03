@@ -1,12 +1,3 @@
-/**
- * Rails design rationale: ActionDispatch::SSL is a Rack middleware that
- * enforces HTTPS at the edge. It operates on raw Rack env/response tuples
- * and needs no routing or controller infrastructure. The three test classes
- * mirror Rails' own grouping — redirect behavior, HSTS header generation,
- * and secure-cookie flagging — each exercised by instantiating SSL directly
- * with an inline inner app, which is idiomatic for middleware-level tests.
- */
-
 import { describe, it, expect } from "vitest";
 import { SSL, type SSLOptions } from "../middleware/ssl.js";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -30,10 +21,6 @@ function makeEnv(url: string, method = "GET", extra: Record<string, string> = {}
     ...extra,
   };
 }
-
-// ---------------------------------------------------------------------------
-// RedirectSSLTest
-// ---------------------------------------------------------------------------
 
 describe("RedirectSSLTest", () => {
   it("exclude can avoid redirect", async () => {
@@ -151,10 +138,6 @@ describe("RedirectSSLTest", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// StrictTransportSecurityTest
-// ---------------------------------------------------------------------------
-
 const EXPECTED = "max-age=63072000";
 const EXPECTED_WITH_SUBDOMAINS = "max-age=63072000; includeSubDomains";
 
@@ -207,9 +190,7 @@ describe("StrictTransportSecurityTest", () => {
     await assertHsts("max-age=500; includeSubDomains", { hsts: { expires: 500 } });
   });
 
-  it.skip(":expires supports AS::Duration arguments", () => {
-    // pending: ActiveSupport::Duration not ported; use plain seconds (31556952) instead
-  });
+  it.skip(":expires supports AS::Duration arguments", () => {});
 
   it("include subdomains", async () => {
     await assertHsts(`${EXPECTED}; includeSubDomains`, { hsts: { subdomains: true } });
@@ -228,11 +209,6 @@ describe("StrictTransportSecurityTest", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// SecureCookiesTest
-// ---------------------------------------------------------------------------
-
-// Rack 2 newline-joined format (our current implementation)
 const DEFAULT_COOKIES = "id=1; path=/\ntoken=abc; path=/; secure; HttpOnly";
 
 describe("SecureCookiesTest", () => {
@@ -309,11 +285,7 @@ describe("SecureCookiesTest", () => {
     expect(headers.connection).toBe("close");
   });
 
-  it.skip("flag cookies as secure with single cookie in array", () => {
-    // pending: array-based set-cookie headers require Rack 3 semantics not yet ported
-  });
+  it.skip("flag cookies as secure with single cookie in array", () => {});
 
-  it.skip("flag cookies as secure with multiple cookies in array", () => {
-    // pending: array-based set-cookie headers require Rack 3 semantics not yet ported
-  });
+  it.skip("flag cookies as secure with multiple cookies in array", () => {});
 });

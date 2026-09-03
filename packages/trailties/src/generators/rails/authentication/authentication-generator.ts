@@ -9,18 +9,11 @@ export interface AuthenticationRunOptions {
   skipActionCable?: boolean;
 }
 
-// Mirrors railties/lib/rails/generators/rails/authentication/authentication_generator.rb.
 export class AuthenticationGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
     super(options);
   }
 
-  /**
-   * `run` takes an options object, so the generic `start` would hand it the
-   * name string. Rails fills it from `class_option :api`
-   * (`authentication_generator.rb:6-7`) — story
-   * `wire-generator-class-options-through-trails-generate`.
-   */
   static override async start(args: string[], config: GeneratorOptions): Promise<string[]> {
     const generator = new AuthenticationGenerator(config);
     generator.run({});
@@ -38,7 +31,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     return this.getCreatedFiles();
   }
 
-  /** `authentication_generator.rb:14-30`. */
   private createAuthenticationFiles(options: AuthenticationRunOptions): void {
     const { api = false, skipMailer = false, skipActionCable = true } = options;
 
@@ -62,10 +54,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     }
   }
 
-  /**
-   * Rails' `template` asks on a conflict; trails' generators are
-   * non-interactive, so an existing file is left alone and reported.
-   */
   private template(file: string): void {
     const destination = file
       .replace(/\.rb$/, ".ts")
@@ -78,7 +66,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.createFile(destination, TEMPLATES[file]);
   }
 
-  /** `authentication_generator.rb:32-34`. Anchored on the class declaration. */
   private configureApplicationController(): void {
     const file = "app/controllers/application-controller.ts";
     if (!this.fileExists(file)) return;
@@ -96,10 +83,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     File.write(full, src);
   }
 
-  /**
-   * `authentication_generator.rb:36-39`. Each route is checked independently
-   * so a partly-configured routes file converges.
-   */
   private configureAuthenticationRoutes(): void {
     for (const f of ["config/routes.ts", "config/routes.js"]) {
       if (!this.fileExists(f)) continue;
@@ -113,11 +96,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     }
   }
 
-  /**
-   * `authentication_generator.rb:41-47`, onto `package.json` — the trails
-   * analogue of the Gemfile. Rails' already-listed arm installs, its missing
-   * arm adds then installs; `bin/bundle` becomes the app's package manager.
-   */
   private enableBcrypt(): void {
     if (!this.fileExists("package.json")) return;
     const full = File.join(this.cwd, "package.json");
@@ -129,7 +107,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.executeCommand(json.packageManager?.split("@")[0] ?? "pnpm", "install --silent");
   }
 
-  /** `authentication_generator.rb:52-55`. */
   private addMigrations(): void {
     this.generate(
       "migration CreateUsers email_address:string!:uniq password_digest:string! --force",
@@ -140,11 +117,6 @@ export class AuthenticationGenerator extends GeneratorBase {
     this.runPendingGenerators();
   }
 
-  /**
-   * Rails' `generate` shells out, so the migrations exist when it returns;
-   * trails' only queues (`generators/actions.ts:22-29`). Converges with story
-   * `drain-queued-generators-in-generators-invoke`.
-   */
   private runPendingGenerators(): void {
     for (const { what, args } of this.pendingGenerators.splice(0)) {
       const words = [...what.split(/\s+/), ...args].filter(Boolean);

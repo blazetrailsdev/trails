@@ -1,5 +1,3 @@
-// Mirrors railties/test/railties/railtie_test.rb. Block-runner and
-// lifecycle-hook cases land alongside PR 2.1b.
 import { describe, it, expect } from "vitest";
 import { Trailtie } from "./trailtie.js";
 import { Configuration } from "./trailtie/configuration.js";

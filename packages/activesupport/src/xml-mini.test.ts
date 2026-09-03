@@ -19,17 +19,6 @@ import { ArgumentError } from "./hash-utils.js";
 describe("ParsingTest", () => {
   const parsing = PARSING;
 
-  // `symbol`, `integer`, `float`, `decimal` and `string` each close in Rails
-  // with `assert_raises(ArgumentError) { parser.call(Date.new(2013, 11, 12,
-  // 02, 11)) }`. That assertion is vacuous: MRI raises from `Date.new` itself
-  // — "wrong number of arguments (given 5, expected 0..4)", verified against
-  // the `ruby` on PATH — before the parser is ever called, so it pins
-  // `Date.new`'s arity rather than anything about PARSING. trails spells
-  // `Date.new` as `Date.civil` (date.ts:6037) with four parameters, where a
-  // fifth argument is a compile error and not a runtime raise, so the
-  // assertion has no faithful counterpart and is dropped rather than restated
-  // against a stand-in Rails never exercised.
-
   it("symbol", () => {
     const parser = parsing["symbol"];
     expect(parser("symbol")).toBe(":symbol");
@@ -215,7 +204,6 @@ describe("ToTagTest", () => {
   let builder: XmlStringBuilder;
   let options: ToTagOptions;
 
-  /** Mirrors `assert_xml` (xml_mini_test.rb:64-66). */
   function assertXml(xml: string): void {
     expect(builder.target()).toBe(xml);
   }
@@ -291,9 +279,6 @@ describe("ToTagTest", () => {
   });
 
   it("#to_tag accepts ActiveSupport::TimeWithZone types", () => {
-    // A zoned wall-clock exposing #xmlschema (the TimeWithZone contract): its
-    // local offset is preserved, matching Rails' `time.xmlschema`. Modeled as a
-    // class instance (like the real TimeWithZone), so it is a leaf, not a hash.
     class TimeWithZone {
       xmlschema() {
         return "1993-02-24T13:00:00+01:00";
@@ -333,15 +318,10 @@ describe("ToTagTest", () => {
   });
 
   it("#to_tag should dasherize the space when passed a symbol with spaces as a key", () => {
-    // Rails passes the Symbol `:"New   York"` (xml_mini_test.rb:172); a Ruby
-    // Symbol is a JS string in trails, and a Symbol KEY renders as its bare
-    // name (`key.to_s`, xml_mini.rb:118) — no leading colon.
     toTag("New   York", 33, options);
     assertXml('<New---York type="integer">33</New---York>');
   });
 
-  // trails coverage beyond Rails' ToTagTest, exercising the XmlMini `binary`
-  // formatter/encoding and the empty-array self-closing form.
   it("#to_tag base64-encodes binary types and sets the encoding attribute", () => {
     toTag("b", "hello", { ...options, type: "binary" });
     assertXml('<b type="binary" encoding="base64">aGVsbG8=\n</b>');
@@ -353,8 +333,6 @@ describe("ToTagTest", () => {
   });
 });
 
-// Rails' `module REXML end` stand-ins: a backend is anything answering #parse,
-// and these are only ever compared by identity.
 const REXML: XmlMiniBackend = { parse: () => ({}) };
 const LibXML: XmlMiniBackend = { parse: () => ({}) };
 const Nokogiri: XmlMiniBackend = { parse: () => ({}) };
@@ -402,12 +380,6 @@ describe("ThreadSafetyTest", () => {
     await setBackend(defaultBackend);
   });
 
-  /**
-   * The Rails tests spawn a Thread and `sleep 0.1 while t.status != "sleep"`.
-   * The trails analog of a thread is an isolated execution state
-   * (AsyncLocalStorage), and the analog of waiting for it to park is awaiting
-   * the signal it sends from inside the block.
-   */
   function spawn(name: XmlMiniBackend): { entered: Promise<void>; join: () => Promise<void> } {
     let signalEntered!: () => void;
     let release!: () => void;
@@ -433,8 +405,6 @@ describe("ThreadSafetyTest", () => {
     const t = spawn(LibXML);
     await t.entered;
 
-    // We should get `old_backend` here even while another
-    // execution state is using `new_backend`.
     expect(backend()).toBe(REXML);
     await t.join();
   });

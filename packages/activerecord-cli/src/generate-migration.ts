@@ -18,7 +18,6 @@ export interface GenerateMigrationResult {
   skipped: boolean;
 }
 
-/** Rails-style YYYYMMDDHHMMSS migration version prefix. */
 export function migrationTimestamp(): string {
   const now = new Date();
   const y = now.getFullYear().toString();
@@ -36,17 +35,12 @@ export function parseFields(tokens: string[]): FieldSpec[] {
     .map((t) => {
       const [name, rawType = "string"] = t.split(":");
       if (!name) return null;
-      // Strip Rails-style attribute option suffixes: title:string{40}, name:string{index}
       const type = (rawType || "string").replace(/\{[^}]*\}.*$/, "");
       return { name, type };
     })
     .filter((f): f is FieldSpec => f !== null);
 }
 
-/**
- * Normalize a user-supplied migration/model name: convert to snake_case and
- * replace path separators (/ and \\ from namespace notation) with underscores.
- */
 export function normalizeSnakeName(name: string): string {
   return underscore(name).replace(/[/\\]/g, "_");
 }
@@ -66,12 +60,10 @@ export function validateMigrationName(snakeName: string): void {
   }
 }
 
-/** Strip a trailing `_id` suffix so `author_id:references` generates `author_id`, not `author_id_id`. */
 export function normalizeRefName(name: string): string {
   return name.endsWith("_id") ? name.slice(0, -3) : name;
 }
 
-/** pluralize(underscore(x)) — mirrors Rails' `tableize`. */
 function tableize(name: string): string {
   return pluralize(underscore(name));
 }
@@ -92,7 +84,6 @@ async function fileExists(path: string): Promise<boolean> {
 function renderBody(snakeName: string, fields: FieldSpec[]): string {
   let m: RegExpExecArray | null;
 
-  // add_*_to_* — tableize the captured segment so "add_email_to_user" → table "users"
   m = /^add_.*_to_(.+)$/.exec(snakeName);
   if (m) {
     const tbl = tableize(m[1]);
@@ -106,7 +97,6 @@ function renderBody(snakeName: string, fields: FieldSpec[]): string {
     return cols || `    // TODO: add columns to ${tbl}`;
   }
 
-  // remove_*_from_* — same tableize treatment
   m = /^remove_.*_from_(.+)$/.exec(snakeName);
   if (m) {
     const tbl = tableize(m[1]);
@@ -120,7 +110,6 @@ function renderBody(snakeName: string, fields: FieldSpec[]): string {
     return cols || `    // TODO: remove columns from ${tbl}`;
   }
 
-  // create_* — use t.column(name, type) to keep type as a string literal (no injection risk)
   m = /^create_(.+)$/.exec(snakeName);
   if (m) {
     const tbl = pluralize(m[1]);
@@ -161,14 +150,12 @@ export async function generateMigration(
   validateMigrationName(snakeName);
   const migrateDir = join(root, "db", "migrate");
   const path = join(migrateDir, `${ts}_${snakeName}.ts`);
-  // Check existence upfront so dry-run reflects what a real run would do.
   if (!options.force && (await fileExists(path))) {
     return { path, written: false, skipped: true };
   }
   if (!options.dryRun) {
     await mkdir(migrateDir, { recursive: true });
     try {
-      // Atomic create: "wx" fails with EEXIST if a concurrent write beat the check above.
       await writeFile(path, renderMigration(snakeName, fields), {
         encoding: "utf8",
         flag: options.force ? "w" : "wx",

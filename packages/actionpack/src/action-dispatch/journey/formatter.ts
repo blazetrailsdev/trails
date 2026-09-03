@@ -4,14 +4,6 @@ import type { Route } from "./route.js";
 
 export { UrlGenerationError };
 
-/**
- * Host shape the Formatter needs from the higher-level RouteSet.
- *
- * Rails: `routes.named_routes` is the RouteSet's NamedRouteCollection and
- * `routes.routes` is the underlying Journey::Routes collection. Until
- * NamedRouteCollection lands in a later wave, callers pass any object
- * conforming to this shape.
- */
 export interface FormatterHost {
   routes: { routes: readonly Route[] };
   namedRoutes: { has(name: string): boolean; get(name: string): Route | undefined };
@@ -24,7 +16,6 @@ export class RouteWithParams {
     readonly params: Record<string, unknown>,
   ) {}
 
-  /** Rails `path(_)` — argument unused, kept for parity with MissingRoute. */
   path(_?: string): string {
     return this._route.format(this._parameterizedParts);
   }
@@ -62,10 +53,6 @@ export class MissingRoute {
   }
 }
 
-/**
- * Generates URLs given a name + options + path_parameters. Mirrors Rails'
- * `ActionDispatch::Journey::Formatter`.
- */
 export class Formatter {
   readonly routes: FormatterHost;
   /** @internal */
@@ -95,9 +82,6 @@ export class Formatter {
     for (const route of this.matchRoute(name, constraints)) {
       const parameterizedParts = this.extractParameterizedParts(route, options, pathParameters);
 
-      // Skip this route unless a name has been provided or it is a standard Rails
-      // route since we can't determine whether an options hash passed to url_for
-      // matches a Rack application or a redirect.
       if (!name && !route.isDispatcher()) continue;
 
       missingKeys = this.missingKeys(route, parameterizedParts);
@@ -195,8 +179,6 @@ export class Formatter {
 
     const routes = this.nonRecursive(this.cache, options);
 
-    // Rails: `h[k.to_s] = true if v` — Ruby truthiness only excludes nil/false,
-    // so `0` and `""` are considered supplied.
     const suppliedSet = new Set<string>();
     for (const [k, v] of Object.entries(options)) {
       if (v != null && v !== false) suppliedSet.add(String(k));
@@ -242,7 +224,6 @@ export class Formatter {
     for (const key of route.requiredParts) {
       const test = tests[key];
       if (test == null) {
-        // Ruby `unless parts[key]` — only nil/false count as missing.
         const v = parts[key];
         if (v == null || v === false) {
           (missing ??= []).push(key);
@@ -298,10 +279,6 @@ export class Formatter {
     return (this._cache ??= this.buildCache());
   }
 }
-
-// =========================================================================
-// Helpers
-// =========================================================================
 
 interface CacheNode {
   children: Map<string, CacheNode>;

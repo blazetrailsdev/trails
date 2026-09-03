@@ -64,23 +64,12 @@ function normalizeRawConfig(raw: RawConfig): RawConfig {
         }
       }
     } catch {
-      // leave unparsed url as-is; adapters will surface the error
+      /** @empty */
     }
   }
   return normalized as RawConfig;
 }
 
-/**
- * Resolve the migrations directories for a named database config.
- * Mirrors Rails' per-DB migrations_paths: the user can set `migrationsPaths`
- * (string or string[]) in config/database.ts (`HashConfig#migrations_paths`,
- * `database_configurations/hash_config.rb:50-53`); otherwise every config,
- * primary or named, falls back to `Migrator.migrations_paths` — `db/migrate`
- * (`migration.rb:1419`) — which is the fallback a pool applies when its config
- * names none (`connection_adapters/abstract/connection_pool.rb:299`). Rails has
- * no per-name default. Returns an array because Rails supports multiple
- * directories per config.
- */
 async function migrationsDirsForConfig(config: RawConfig): Promise<string[]> {
   const [fs, path] = await Promise.all([getFsAsync(), getPathAsync()]);
   const cwd = fs.cwd();
@@ -97,11 +86,6 @@ interface DatabaseOpts {
   database?: string;
 }
 
-/**
- * Presence-based validation for --database. Rejects empty strings so
- * `--database=""` doesn't silently fan out across all DBs (which
- * would be destructive for `drop`).
- */
 function validateDatabaseFlag(opts: DatabaseOpts): string | undefined {
   if (opts.database === undefined) return undefined;
   const trimmed = opts.database.trim();
@@ -117,31 +101,12 @@ interface DatabaseEntry {
   hashConfig: HashConfig;
 }
 
-/**
- * Every named config in the current env, optionally filtered to one name
- * via `--database`. The set of per-database names is chosen by
- * `DatabaseTasks.forEach` (`tasks/database_tasks.rb:141-154`), which is what
- * `databases.rake:35,54,105,120` uses to generate the namespaced
- * `db:<task>:<name>` tasks — so replicas and `databaseTasks: false` configs
- * are skipped here for exactly the reason they get no rake task there
- * (`database_tasks.rb:150`).
- *
- * `for_each` yields nothing for a single-database application
- * (`database_tasks.rb:147`): there are no namespaced tasks to generate, and the
- * un-namespaced command is that application's only task. Rails reaches that
- * lone config through `each_current_configuration`, which applies the same
- * `database_tasks?` filter — hence the second arm.
- */
 async function taskableDatabaseEntries(
   opts: DatabaseOpts,
   envName: string = resolveEnv(),
 ): Promise<DatabaseEntry[]> {
   const dbName = validateDatabaseFlag(opts);
   const allConfigs = await loadAllDatabaseConfigs(envName);
-  // Rails reads discovery paths off the configuration hash
-  // (`hash_config.rb:52`), and the pool's `migration_context` is built from
-  // them (`connection_pool.rb:294-299`) — so the resolved defaults belong in
-  // the hash the HashConfig is built from, not in a side registry.
   const all = await Promise.all(
     allConfigs.map(async ({ name, config: rawConfig }) => {
       const raw = normalizeRawConfig(rawConfig);
@@ -181,16 +146,6 @@ async function taskableDatabaseEntries(
   return filtered;
 }
 
-/**
- * Adds the adapter checkout `DatabaseTasks.forEach` has no counterpart for:
- * the name fan-out itself lives in `taskableDatabaseEntries`, which runs
- * `forEach`. Commander can't generate dynamic subcommands, so the namespaced
- * `db:<task>:<name>` task is spelled as a `--database` flag instead.
- *
- * For each config: connects an adapter, runs `fn`, closes the adapter.
- * `fn` receives the adapter, the raw config, the HashConfig, and the
- * config name.
- */
 async function forEachDatabase(
   opts: DatabaseOpts,
   fn: (ctx: {
@@ -198,8 +153,6 @@ async function forEachDatabase(
     raw: RawConfig;
     config: HashConfig;
     name: string;
-    /** Prefix for log output — empty string for single-DB apps so
-     *  the output stays clean; "[name] " for multi-DB. */
     prefix: string;
   }) => Promise<void>,
 ): Promise<void> {
@@ -214,11 +167,6 @@ async function forEachDatabase(
   }
 }
 
-/**
- * Like forEachDatabase but doesn't connect an adapter — for commands
- * like `create` and `drop` that need to operate BEFORE the DB exists.
- * Same `taskableDatabaseEntries` / `DatabaseTasks.forEach` fan-out.
- */
 async function forEachDatabaseConfig(
   opts: DatabaseOpts,
   fn: (ctx: { raw: RawConfig; config: HashConfig; name: string; prefix: string }) => Promise<void>,
@@ -242,9 +190,6 @@ function databaseFromUrl(url: string, adapter?: string): string | undefined {
       protocol === "sqlite3:" ||
       protocol === "file:";
     if (isSqlite) {
-      // SQLite URLs carry a filesystem path (often absolute). Preserve the
-      // leading slash and host prefix if any: `sqlite3:///tmp/app.sqlite3`
-      // -> `/tmp/app.sqlite3`; `sqlite3://./rel.sqlite3` -> `./rel.sqlite3`.
       const host = parsed.host;
       const pathname = decodeURIComponent(parsed.pathname);
       return host ? `${host}${pathname}` : pathname;
@@ -278,22 +223,10 @@ function inferAdapterFromUrl(url: string): string | undefined {
 }
 
 function toDbConfig(raw: RawConfig, envName: string = resolveEnv()): HashConfig {
-  // `withAdapter` normalizes the config before handing it to callers, so
-  // this wrapper is a thin adapter from RawConfig to HashConfig. Re-run
-  // normalization defensively so external callers that build a
-  // HashConfig out-of-band still get adapter/database inference from a
-  // url-only config.
   const normalized = normalizeRawConfig(raw);
   return new HashConfig(envName, "primary", normalized as Record<string, unknown>);
 }
 
-/**
- * Run `fn` with `DatabaseTasks.databaseConfiguration` and `DatabaseTasks.env`
- * temporarily aligned with `config`. Captures/restores both so
- * callers can safely invoke methods like `DatabaseTasks.truncateAll(env)`
- * that resolve the env via `_normalizeEnv()` (reads DatabaseTasks.env by
- * default) and then call `configsFor` against it.
- */
 async function withRegisteredConfiguration<T>(
   config: HashConfig,
   fn: () => Promise<T>,
@@ -301,14 +234,6 @@ async function withRegisteredConfiguration<T>(
   return withRegisteredConfigurations([config], config.envName, fn);
 }
 
-/**
- * Multi-config variant: register every HashConfig for the env so
- * `DatabaseTasks.configsFor({ envName })` fans out across them. Used by
- * commands that mirror Rails' `with_temporary_pool_for_each` /
- * `configs_for(env_name:).each` — schema:cache:dump, schema:cache:clear
- * — which need to hit every named DB (primary + animals + ...) in a
- * multi-DB app.
- */
 async function withRegisteredConfigurations<T>(
   configs: HashConfig[],
   envName: string,
@@ -327,13 +252,6 @@ async function withRegisteredConfigurations<T>(
   }
 }
 
-/**
- * Run Rails' `check_protected_environments!` guard with a temporarily-
- * registered `DatabaseTasks.databaseConfiguration` so it actually consults
- * the stored env in `ar_internal_metadata`. Without the registration the
- * guard has no configs to loop over and silently checks nothing, which
- * misses `EnvironmentMismatchError` and the protected-stamp case.
- */
 async function runProtectedEnvCheck(config: HashConfig, envName: string): Promise<void> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
   const previousTasksConfig = DatabaseTasks.databaseConfiguration;
@@ -345,18 +263,6 @@ async function runProtectedEnvCheck(config: HashConfig, envName: string): Promis
   }
 }
 
-/**
- * Dump the schema to disk after a migration-writing task. Mirrors Rails'
- * `db:_dump`: gated on `DatabaseTasks.dumpSchemaAfterMigration`, and
- * delegates to `DatabaseTasks.dumpSchema(config)` so ts / js / sql formats
- * route through the same code path the standalone `trails db schema:dump`
- * subcommand uses.
- *
- * Respects the same schema-format precedence as the standalone command —
- * SCHEMA_FORMAT env / config.schemaFormat / existence inference — so an
- * app that commits a structure.sql stays on sql through the whole
- * migrate → dump cycle.
- */
 async function dumpSchemaAfterMigrate(raw: RawConfig, hashConfig?: HashConfig): Promise<void> {
   if (!DatabaseTasks.dumpSchemaAfterMigration) return;
   const config = hashConfig ?? toDbConfig(raw);
@@ -370,21 +276,9 @@ async function dumpSchemaAfterMigrate(raw: RawConfig, hashConfig?: HashConfig): 
 }
 
 interface RunOptions {
-  /**
-   * When true, skip the post-task schema dump. Used by composite
-   * commands (e.g. `migrate:redo`) that want to dump once at the end
-   * instead of twice.
-   */
   skipDump?: boolean;
 }
 
-/**
- * The `pool.migration_context` every `databases.rake` task reaches through
- * (`connection_adapters/abstract/connection_pool.rb:298-300`): a
- * `MigrationContext` over this config's migration directories, seated with the
- * pool's own `schema_migration` / `internal_metadata` so each CLI command
- * stamps ar_internal_metadata.environment with the resolved TRAILS_ENV.
- */
 function migrationContextFor(adapter: DatabaseAdapter, dirs: string[]): MigrationContext {
   return new MigrationContext(
     dirs,
@@ -408,13 +302,6 @@ async function runMigrate(
   if (!options.skipDump) await dumpSchemaAfterMigrate(raw);
 }
 
-/**
- * Run a seed-running callback with `Base.adapter` temporarily set so
- * seed files that touch ActiveRecord models work. Restores the previous
- * `Base.adapter` on exit (including when the outer caller is about to
- * close the provided adapter) so we don't leave `Base` pointing at a
- * closed connection.
- */
 async function withSeedAdapter(adapter: DatabaseAdapter, fn: () => Promise<void>): Promise<void> {
   const { Base } = await import("@blazetrails/activerecord");
   const previous = Base._adapter;
@@ -422,10 +309,6 @@ async function withSeedAdapter(adapter: DatabaseAdapter, fn: () => Promise<void>
   try {
     await fn();
   } finally {
-    // Preserve setter side effects (schema reset, arel-visitor wiring)
-    // when restoring a non-null adapter. Fall back to the backing field
-    // for a previous null because the public setter is typed as
-    // DatabaseAdapter, not DatabaseAdapter | null.
     if (previous === null) {
       Base._adapter = previous;
     } else {
@@ -434,18 +317,6 @@ async function withSeedAdapter(adapter: DatabaseAdapter, fn: () => Promise<void>
   }
 }
 
-/**
- * Purge the test DB and load the schema file. Shared implementation
- * behind `trails db test:load_schema` and `trails db test:prepare` —
- * Rails' `db:test:prepare` task just invokes `db:test:load_schema`, so
- * keeping the flow in one helper prevents the two commands from
- * drifting.
- *
- * Rails' chain: `test:load_schema → test:purge → DatabaseTasks.purge`
- * (disconnect → drop → create → reconnect). We delegate to
- * DatabaseTasks.purge to preserve the disconnect/reconnect semantics
- * instead of hand-rolling drop+create.
- */
 async function runTestLoadSchema(options: {
   successMessage: (displayName: string, filename: string) => string;
 }): Promise<void> {
@@ -477,17 +348,6 @@ async function runTestLoadSchema(options: {
   console.log(options.successMessage(displayNameFor(config, raw), filename));
 }
 
-/**
- * True when a `--format=sql` load would actually reach the database this
- * config names. Rails' `SQLiteDatabaseTasks#structure_load`
- * (activerecord/lib/active_record/tasks/sqlite_database_tasks.rb:60-63) shells
- * out to `sqlite3 <database> < dump.sql`; for an in-memory database the child
- * opens its own throwaway database and exits, so the load reaches nothing.
- * `supports_concurrent_connections?` is the connection's own answer to
- * "can another process see this database" — SQLite3Adapter returns
- * `!@memory_database` (sqlite3_adapter.rb) — so it is the seam the CLI asks
- * rather than re-deriving the in-memory predicate here.
- */
 async function structureLoadReachesDatabase(
   config: Parameters<typeof DatabaseTasks.withTemporaryConnection>[0],
 ): Promise<boolean> {
@@ -514,11 +374,6 @@ async function runSeed(prefix = ""): Promise<void> {
   }
 
   console.log(`${prefix}Running seeds...`);
-  // Cache-bust the import so the seed file is re-evaluated for each
-  // database in a multi-DB fan-out. Node caches dynamic imports by URL;
-  // without the query string, the second iteration sees a cached module
-  // and skips execution entirely. Mirrors Rails' `load` semantics
-  // (which always re-evaluates the file).
   const pathToFileURL = path.pathToFileURL;
   if (!pathToFileURL) {
     throw new Error("Seed loading requires a path adapter with pathToFileURL support.");
@@ -529,13 +384,12 @@ async function runSeed(prefix = ""): Promise<void> {
   console.log(`${prefix}Seeds completed.`);
 }
 
-/** Strip credentials from a DB URL before we log it. */
 function sanitizeUrl(url: string): string {
   try {
     const parsed = new URL(url);
     if (parsed.password) parsed.password = "***";
     if (parsed.username && parsed.password === "***") {
-      // Keep username visible so operators can still identify the connection.
+      /** @empty */
     }
     return parsed.toString();
   } catch {
@@ -565,14 +419,6 @@ async function runDrop(opts: DatabaseOpts = {}): Promise<void> {
   });
 }
 
-/**
- * Migration output goes to stdout (Rails' Migration#write is `puts`), so the
- * per-database prefix is applied by swapping in a stdout-wrapping process
- * adapter for the duration of the run.
- *
- * A callback prefix is resolved per write, for runs like `migrate_all` that
- * interleave databases within one wrapped block and so have no single prefix.
- */
 async function withPrefixedStdout(
   prefix: string | (() => string),
   fn: () => Promise<void>,
@@ -624,10 +470,6 @@ async function withMigrationTasksForDb(
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
 
-/**
- * Runs `fn` with `VERSION` set to `targetVersion`, the env var
- * `DatabaseTasks.targetVersion` reads (`tasks/database_tasks.rb:268`, `:323`).
- */
 async function withTargetVersionEnv(
   targetVersion: string | null,
   fn: () => Promise<void>,
@@ -642,14 +484,6 @@ async function withTargetVersionEnv(
   }
 }
 
-/**
- * `db:migrate` — `DatabaseTasks.migrate_all` followed by `db:_dump`
- * (`railties/databases.rake:88-92`). `migrate_all` owns the multi-database
- * routing (single-primary fast path, then `db_configs_with_versions` sorted so
- * one timestamp runs across every config before the next), so the migrations
- * for each config are registered up front and the whole run happens inside a
- * single `configs_for` registration rather than a per-database loop.
- */
 async function runMigrateAll(): Promise<void> {
   const envName = resolveEnv();
   const entries = await taskableDatabaseEntries({}, envName);
@@ -658,16 +492,9 @@ async function runMigrateAll(): Promise<void> {
     migrationsDirsFor.set(name, await migrationsDirsForConfig(raw));
   }
 
-  // Rails' `load_config` leaves the primary connection established, which is
-  // what `migrate_all`'s single-primary fast path migrates directly. The dump
-  // stays inside that same scope so a `:memory:` database — whose data dies
-  // with its pool — is dumped from the connection that was just migrated.
   const primary = entries.find((e) => e.name === "primary") ?? entries[0];
   const configs = entries.map((e) => e.hashConfig);
   const multiDb = entries.length > 1;
-  // migrate_all interleaves databases by version, so the prefix has to follow
-  // whichever config it currently has established rather than being fixed for
-  // the whole run.
   const { Base } = await import("@blazetrails/activerecord");
   const currentDbPrefix = (): string => {
     if (!multiDb) return "";
@@ -696,23 +523,6 @@ async function runMigrateAll(): Promise<void> {
   );
 }
 
-/**
- * Every task in `railties/lib/.../databases.rake` is declared
- * `task <name>: :load_config`, and `load_config` itself depends on
- * `:environment` (databases.rake:22) — so by the time any of them runs, the
- * app has booted and `ActiveRecord::Base` holds a pool. `with_temporary_pool`
- * relies on it: its first line is `migration_class.connection_db_config`
- * (`tasks/database_tasks.rb:542`), which raises on a class with no pool in
- * Ruby too. This hook is the `:environment` prerequisite for the `db` command
- * group.
- *
- * `establish_connection` only builds the pool, it does not connect, so this is
- * safe ahead of `db create` on a database that does not exist yet. An absent
- * config file, or one with nothing for this environment, is left to the
- * subcommand, which reports it with the message written for that command;
- * everything else — a malformed config, an unresolvable adapter — raises here,
- * as `load_config` does.
- */
 async function establishTaskConnection(): Promise<void> {
   const envName = resolveEnv();
   const loaded = await loadDatabaseConfigModule();
@@ -732,14 +542,8 @@ export function dbCommand(): Command {
     .option("--version <version>", "Migrate to a specific version (also reads VERSION env)")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
-      // Rails: ENV["VERSION"] is an alternative to the --version flag
-      // for CI scripts that set VERSION=20260101000000. Normalize blank
-      // to null so an empty VERSION="" doesn't fail BigInt parsing.
       const rawVersion = opts.version != null ? String(opts.version).trim() : env.VERSION?.trim();
       const targetVersion = rawVersion && rawVersion.length > 0 ? rawVersion : null;
-      // Rails has no `--version` flag: the target version IS the env var
-      // `target_version` reads (`database_tasks.rb:268`), so bridge it there
-      // rather than threading an argument Rails does not have.
       await withTargetVersionEnv(targetVersion, async () => {
         if (opts.database === undefined) {
           await runMigrateAll();
@@ -801,8 +605,6 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
       await forEachDatabase(opts, async ({ adapter, config, prefix }) => {
-        // `pool.migration_context.current_version` (`databases.rake:311`),
-        // whose nil — a NoDatabaseError — interpolates to nothing.
         const version = (await migrationContextFor(adapter, []).currentVersion()) ?? "";
         console.log(`\n${prefix}database: ${config.database}`);
         console.log(`${prefix}Current version: ${version}`);
@@ -833,12 +635,6 @@ export function dbCommand(): Command {
       "Abort if the stored schema environment is protected or does not match the current environment",
     )
     .action(async () => {
-      // Don't go through withAdapter — we don't want to open a connection
-      // here. The guard itself connects per-config (and swallows
-      // NoDatabaseError) so a missing DB shouldn't crash this command.
-      // Pass resolveEnv() explicitly so the check runs against the
-      // environment the CLI is currently operating as (RawConfig doesn't
-      // carry envName).
       const envName = resolveEnv();
       const raw = normalizeRawConfig(await loadDatabaseConfig(envName));
       const config = toDbConfig(raw, envName);
@@ -860,15 +656,6 @@ export function dbCommand(): Command {
         const migrationContext = migrationContextFor(adapter, mDirs);
         const pending = await migrationContext.open().pendingMigrations();
         if (pending.length > 0) {
-          // Match Rails' output format (from activerecord/lib/active_record/
-          // railties/databases.rake), with the command name swapped for
-          // trails:
-          //   "You have N pending migration[s]:"
-          //   "  %4d %s" per pending
-          //   "Run `trails db migrate` to resolve this issue."
-          // Rails prints `bin/rails db:migrate`; the trails CLI is
-          // commander-style (`trails db migrate`, space-separated), not
-          // rake-style colon namespaces.
           console.error(
             `${prefix}You have ${pending.length} pending migration${pending.length === 1 ? "" : "s"}:`,
           );
@@ -882,18 +669,6 @@ export function dbCommand(): Command {
       });
     });
 
-  /**
-   * `db:migrate:up` / `db:migrate:down` — `check_target_version` then
-   * `migration_context.run(:up | :down, target_version)`
-   * (`railties/databases.rake:165-208`). Both of those read `ENV["VERSION"]`
-   * themselves (`database_tasks.rb:317-325`), so the `--version` flag is
-   * published as the env var rather than threaded through the predicate, and
-   * `migration_context.run` is handed `target_version` read back off it — one
-   * source, as in the rake task.
-   *
-   * Commander's `requiredOption` is the CLI form of the rake task's
-   * `raise "VERSION is required"` guard (`databases.rake:169`, `:198`).
-   */
   cmd
     .command("migrate:up")
     .description("Run a specific migration up (by version)")
@@ -946,8 +721,6 @@ export function dbCommand(): Command {
     .command("seed:replant")
     .description("Truncate all tables in the current environment and re-run seeds")
     .action(async () => {
-      // Open the seed adapter only after the protected-env guard has
-      // passed and the truncate has completed, so we don't double-connect.
       const raw = normalizeRawConfig(await loadDatabaseConfig());
       const config = toDbConfig(raw);
       await runProtectedEnvCheck(config, config.envName);
@@ -967,10 +740,6 @@ export function dbCommand(): Command {
     .command("truncate_all")
     .description("Truncate all tables in the current environment")
     .action(async () => {
-      // No need for withAdapter — DatabaseTasks.truncateAll opens its
-      // own per-config connection. Connecting here first would create
-      // sqlite files as a side effect before the protected-env guard
-      // can abort.
       const raw = normalizeRawConfig(await loadDatabaseConfig());
       const config = toDbConfig(raw);
       await runProtectedEnvCheck(config, config.envName);
@@ -986,9 +755,6 @@ export function dbCommand(): Command {
     )
     .action(async () => {
       const envName = resolveEnv();
-      // prepare_all walks each_current_environment, which appends "test" to a
-      // development run (`database_tasks.rb:592-595`), so the test databases
-      // must be registered too or prepareAll finds no configs for them.
       const entriesByEnv = await Promise.all(
         eachCurrentEnvironment(envName).map((environment) =>
           taskableDatabaseEntries({}, environment),
@@ -1004,8 +770,6 @@ export function dbCommand(): Command {
         0,
       );
 
-      // Rails' load_seed runs against the established connection, which is
-      // the primary's; Base has no connection here, so lend it one.
       const seedTarget = entries[primaryIndex].hashConfig;
       const previousSeedLoader = DatabaseTasks.seedLoader;
       const previousFormat = DatabaseTasks.schemaFormat;
@@ -1040,10 +804,6 @@ export function dbCommand(): Command {
     .command("test:prepare")
     .description("Prepare the test database (Rails parallel to db:test:prepare)")
     .action(async () => {
-      // Rails db:test:prepare → db:test:load_schema. The two commands
-      // run the same flow — test:prepare exists as a semantically-named
-      // entry point for dev/CI scripts; the implementation delegates to
-      // the shared runTestLoadSchema helper.
       await runTestLoadSchema({ successMessage: (_d, f) => `Test database prepared (${f})` });
     });
 
@@ -1155,8 +915,6 @@ export function dbCommand(): Command {
     .action(async (opts) => {
       const fs = await getFsAsync();
       await forEachDatabase(opts, async ({ config, prefix }) => {
-        // schema:load is destructive — Rails gates on
-        // check_protected_environments.
         await runProtectedEnvCheck(config, config.envName);
         const previousFormat = DatabaseTasks.schemaFormat;
         try {
@@ -1208,10 +966,6 @@ export function dbCommand(): Command {
       "Dump db/schema_cache.json for every database configuration in the current environment",
     )
     .action(async () => {
-      // Rails: `with_temporary_pool_for_each { |pool| dump_schema_cache(pool, filename) }`.
-      // Fans out across every named DB in the env for multi-DB apps
-      // (primary + animals + ...) — each gets its own
-      // `db/<name>_schema_cache.json` per HashConfig.defaultSchemaCachePath.
       const envName = resolveEnv();
       const named = await loadAllDatabaseConfigs(envName);
       const configs = named.map(
@@ -1236,7 +990,6 @@ export function dbCommand(): Command {
       "Delete db/schema_cache.json for every database configuration in the current environment",
     )
     .action(async () => {
-      // Rails: `configurations.configs_for(env_name: env).each { |c| clear_schema_cache(cache_dump_filename(c)) }`.
       const fs = await getFsAsync();
       const envName = resolveEnv();
       const named = await loadAllDatabaseConfigs(envName);
@@ -1247,8 +1000,6 @@ export function dbCommand(): Command {
       await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor({ envName })) {
           const filename = DatabaseTasks.cacheDumpFilename(config);
-          // clearSchemaCache is a no-op on ENOENT; don't log "Cleared"
-          // unless we actually removed something.
           if (!(await fs.exists(filename))) continue;
           DatabaseTasks.clearSchemaCache(filename);
           console.log(`Cleared schema cache at ${filename}`);

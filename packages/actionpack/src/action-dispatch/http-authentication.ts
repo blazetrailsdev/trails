@@ -1,14 +1,4 @@
-/**
- * ActionController::HttpAuthentication
- *
- * HTTP Basic, Digest, and Token authentication helpers.
- */
-
 import { getCrypto } from "@blazetrails/ruby-compat";
-
-// =============================================================================
-// Basic Authentication
-// =============================================================================
 
 export interface BasicAuthCredentials {
   username: string;
@@ -16,7 +6,6 @@ export interface BasicAuthCredentials {
 }
 
 export const BasicAuth = {
-  /** Decode a Basic auth header value. */
   decode(authHeader: string): BasicAuthCredentials | null {
     const match = authHeader.match(/^Basic\s+(.+)$/i);
     if (!match) return null;
@@ -33,17 +22,14 @@ export const BasicAuth = {
     }
   },
 
-  /** Encode credentials into a Basic auth header value. */
   encode(username: string, password: string): string {
     return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
   },
 
-  /** Check if the authorization header contains Basic credentials. */
   hasBasicCredentials(authHeader: string | undefined): boolean {
     return !!authHeader && /^Basic\s/i.test(authHeader);
   },
 
-  /** Authenticate using a callback. Returns true if authenticated. */
   authenticate(
     authHeader: string | undefined,
     verify: (username: string, password: string) => boolean,
@@ -54,7 +40,6 @@ export const BasicAuth = {
     return verify(creds.username, creds.password);
   },
 
-  /** Build a 401 response with WWW-Authenticate header. */
   challengeResponse(realm = "Application"): [number, Record<string, string>, string] {
     return [
       401,
@@ -67,17 +52,12 @@ export const BasicAuth = {
   },
 };
 
-// =============================================================================
-// Token Authentication
-// =============================================================================
-
 export interface TokenAuthCredentials {
   token: string;
   options: Record<string, string>;
 }
 
 export const TokenAuth = {
-  /** Parse a Token auth header value. */
   decode(authHeader: string): TokenAuthCredentials | null {
     const match = authHeader.match(/^Token\s+(.+)$/i);
     if (!match) return null;
@@ -86,14 +66,12 @@ export const TokenAuth = {
     const options: Record<string, string> = {};
     let token = "";
 
-    // Parse key=value pairs
     const parts = params.split(",").map((s) => s.trim());
     for (const part of parts) {
       const eqIdx = part.indexOf("=");
       if (eqIdx === -1) continue;
       const key = part.slice(0, eqIdx).trim();
       let value = part.slice(eqIdx + 1).trim();
-      // Remove surrounding quotes
       if (value.startsWith('"') && value.endsWith('"')) {
         value = value.slice(1, -1);
       }
@@ -108,7 +86,6 @@ export const TokenAuth = {
     return { token, options };
   },
 
-  /** Encode a token into a Token auth header value. */
   encode(token: string, options: Record<string, string> = {}): string {
     const parts = [`token="${token}"`];
     for (const [key, value] of Object.entries(options)) {
@@ -117,12 +94,10 @@ export const TokenAuth = {
     return `Token ${parts.join(", ")}`;
   },
 
-  /** Check if the authorization header contains Token credentials. */
   hasTokenCredentials(authHeader: string | undefined): boolean {
     return !!authHeader && /^Token\s/i.test(authHeader);
   },
 
-  /** Authenticate using a callback. Returns true if authenticated. */
   authenticate(
     authHeader: string | undefined,
     verify: (token: string, options: Record<string, string>) => boolean,
@@ -133,7 +108,6 @@ export const TokenAuth = {
     return verify(creds.token, creds.options);
   },
 
-  /** Build a 401 response with WWW-Authenticate header. */
   challengeResponse(realm = "Application"): [number, Record<string, string>, string] {
     return [
       401,
@@ -145,10 +119,6 @@ export const TokenAuth = {
     ];
   },
 };
-
-// =============================================================================
-// Digest Authentication
-// =============================================================================
 
 export interface DigestAuthParams {
   realm: string;
@@ -163,14 +133,12 @@ export interface DigestAuthParams {
 }
 
 export const DigestAuth = {
-  /** Parse a Digest auth header value. */
   decode(authHeader: string): DigestAuthParams | null {
     const match = authHeader.match(/^Digest\s+(.+)$/i);
     if (!match) return null;
 
     const params: Record<string, string> = {};
     const paramStr = match[1];
-    // Match key=value or key="value" pairs
     const regex = /(\w+)=(?:"([^"]*)"|([\w]+))/g;
     let m: RegExpExecArray | null;
     while ((m = regex.exec(paramStr)) !== null) {
@@ -191,7 +159,6 @@ export const DigestAuth = {
     };
   },
 
-  /** Generate a nonce for digest auth. */
   generateNonce(secret: string): string {
     const crypto = getCrypto();
     const timestamp = Date.now().toString();
@@ -199,7 +166,6 @@ export const DigestAuth = {
     return Buffer.from(`${timestamp}:${hash}`).toString("base64");
   },
 
-  /** Validate a nonce. */
   validateNonce(nonce: string, secret: string, maxAge = 300000): boolean {
     try {
       const decoded = Buffer.from(nonce, "base64").toString("utf-8");
@@ -215,7 +181,6 @@ export const DigestAuth = {
     }
   },
 
-  /** Calculate the expected digest response. */
   expectedResponse(
     method: string,
     uri: string,
@@ -233,17 +198,14 @@ export const DigestAuth = {
     return crypto.createHash("md5").update(responseStr).digest("hex");
   },
 
-  /** Calculate HA1 for a user. */
   ha1(username: string, realm: string, password: string): string {
     return getCrypto().createHash("md5").update(`${username}:${realm}:${password}`).digest("hex");
   },
 
-  /** Check if the authorization header contains Digest credentials. */
   hasDigestCredentials(authHeader: string | undefined): boolean {
     return !!authHeader && /^Digest\s/i.test(authHeader);
   },
 
-  /** Build a 401 Digest challenge response. */
   challengeResponse(
     realm: string,
     secret: string,

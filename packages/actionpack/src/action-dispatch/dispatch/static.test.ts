@@ -16,7 +16,6 @@ let tmpDir: string;
 
 beforeAll(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "static-test-"));
-  // Create test files
   fs.writeFileSync(path.join(tmpDir, "index.html"), "<html>root</html>");
   fs.mkdirSync(path.join(tmpDir, "subdir"));
   fs.writeFileSync(path.join(tmpDir, "subdir", "index.html"), "<html>subdir</html>");
@@ -26,11 +25,9 @@ beforeAll(() => {
   fs.writeFileSync(path.join(tmpDir, "style.css"), "body { color: red; }");
   fs.writeFileSync(path.join(tmpDir, "data.json"), '{"key":"value"}');
   fs.writeFileSync(path.join(tmpDir, "image.svg"), "<svg></svg>");
-  // Compressed versions
   fs.writeFileSync(path.join(tmpDir, "hello.txt.gz"), "gzipped content");
   fs.writeFileSync(path.join(tmpDir, "hello.txt.br"), "brotli content");
   fs.writeFileSync(path.join(tmpDir, "image.svg.gz"), "gzipped svg");
-  // Special filenames
   fs.writeFileSync(path.join(tmpDir, "file with spaces.txt"), "spaces");
   fs.writeFileSync(path.join(tmpDir, "file!bang.txt"), "bang");
   fs.writeFileSync(path.join(tmpDir, "file$dollar.txt"), "dollar");
@@ -60,7 +57,6 @@ describe("StaticTest", () => {
   it("handles urls with null byte", async () => {
     const mw = new Static(dynamicApp, tmpDir);
     const [status] = await mw.call({ PATH_INFO: "/hello\0.txt", REQUEST_METHOD: "GET" });
-    // Falls through to dynamic app
     expect(status).toBe(200);
   });
 
@@ -229,13 +225,12 @@ describe("StaticTest", () => {
   it("ignores unknown http methods", async () => {
     const mw = new Static(dynamicApp, tmpDir);
     const [status] = await mw.call({ PATH_INFO: "/hello.txt", REQUEST_METHOD: "POST" });
-    expect(status).toBe(200); // falls through to dynamic app
+    expect(status).toBe(200);
   });
 
   it("custom handler called when file is outside root", async () => {
     const mw = new Static(dynamicApp, tmpDir);
     const [status] = await mw.call({ PATH_INFO: "/../etc/passwd", REQUEST_METHOD: "GET" });
-    // Path traversal is blocked, falls through to dynamic app
     expect(status).toBe(200);
   });
 

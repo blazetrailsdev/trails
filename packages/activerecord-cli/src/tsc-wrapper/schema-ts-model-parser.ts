@@ -1,14 +1,3 @@
-/**
- * Parses a committed `db/schema.ts` into `IntrospectedTable[]` for the
- * `ar models:dump` codegen path.
- *
- * Why a sibling file (not `schema-ts-parser.ts`): that file is on the
- * `trails-tsc` typecheck barrel and must stay free of any
- * `@blazetrails/activerecord` value import. This file needs the real
- * `ForeignKeyDefinition` class (object literals are not assignable to the
- * class type), so the AR-runtime coupling is confined here.
- */
-
 import ts from "typescript";
 import { singularize } from "@blazetrails/activesupport";
 import { getCrypto } from "@blazetrails/ruby-compat";
@@ -25,20 +14,13 @@ import {
   walkBody,
 } from "./schema-ts-parser.js";
 
-// Rails default PK is bigint (Rails 5.1+).
 const DEFAULT_PK_TYPE = "bigint";
 
 function isFalse(node: ts.Expression | undefined): boolean {
   return !!node && node.kind === ts.SyntaxKind.FalseKeyword;
 }
 
-/**
- * Recover the primary-key column name(s) and any synthesized `id` column
- * from a `createTable` options literal. The dumper emits no option for a
- * default/uuid PK (synthesized here) and `primaryKey: [...]` for composite
- * PKs — whose member columns appear as ordinary column lines in the block.
- * @internal
- */
+/** @internal */
 function synthesizePk(opts: ts.ObjectLiteralExpression | undefined): {
   primaryKey: string | string[] | null;
   idColumn: { name: string; type: string } | null;
@@ -80,30 +62,13 @@ function buildColumns(
   return columns;
 }
 
-/**
- * The dumper writes `deferrable: ${JSON.stringify(fk.deferrable)}` only when
- * the value is neither `false` nor `undefined` (schema-dumper.ts:1172), and by
- * then it has been normalised to `"immediate"` / `"deferred"` — never a bare
- * boolean — across every adapter that emits FKs: PG's `assertValidDeferrable`
- * rejects bare `true` (postgresql-adapter.ts:3591) and SQLite's
- * `_parseFkDeferrable` is typed `Map<string, "immediate" | "deferred">`
- * (sqlite3-adapter.ts:1151). So only the two string forms can appear in a
- * dumped schema.ts.
- * @internal
- */
+/** @internal */
 function parseDeferrable(opts: ts.ObjectLiteralExpression): "immediate" | "deferred" | undefined {
   const str = strLiteral(objPropValue(opts, "deferrable"));
   return str === "immediate" || str === "deferred" ? str : undefined;
 }
 
-/**
- * Build a `ForeignKeyDefinition` from one `addForeignKey(from, to, opts?)`
- * call. The `column` option is conditionally emitted by the dumper, so it
- * defaults to the Rails convention `${singularize(toTable)}_id`; `primaryKey`
- * defaults to `"id"`; an absent `name` is synthesized using Rails' SHA-256
- * hash algorithm so it round-trips through SchemaDumper.
- * @internal
- */
+/** @internal */
 function parseAddForeignKey(call: ts.CallExpression): ForeignKeyDefinition | undefined {
   const args = call.arguments;
   const fromTable = strLiteral(args[0]);
@@ -112,18 +77,8 @@ function parseAddForeignKey(call: ts.CallExpression): ForeignKeyDefinition | und
 
   const opts = args.length >= 3 && ts.isObjectLiteralExpression(args[2]) ? args[2] : undefined;
 
-  // Rails' foreign_key_column_for strips the configured table_name_prefix/suffix
-  // before singularizing (schema_statements.rb:1241,1246); the offline parser has
-  // no access to that config, so the inference can diverge under a non-empty
-  // prefix/suffix. Near-dead in practice: the dumper always emits an explicit
-  // `column:` for introspected FKs (schema-dumper.ts:1161), so this default only
-  // fires on a hand-written schema.ts.
   const column = (opts && strLiteral(objPropValue(opts, "column"))) ?? `${singularize(toTable)}_id`;
   const primaryKey = (opts && strLiteral(objPropValue(opts, "primaryKey"))) ?? "id";
-  // Synthesize a name following Rails' foreign_key_name algorithm (mirrored by
-  // schema-statements.ts:foreignKeyName) so the result matches fk_rails_[0-9a-f]{10}
-  // and isExportNameOnSchemaDump returns false, letting SchemaDumper suppress
-  // name: on a subsequent dump (round-trip).
   const synthesizeName = (table: string, col: string): string => {
     const cols = col.split(",").map((c) => c.trim());
     const identifier = `${table}_${cols.join("_and_")}_fk`;
@@ -197,12 +152,6 @@ function visitTables(
   ts.forEachChild(node, (child) => visitTables(child, tables, byTable));
 }
 
-/**
- * Parse a `db/schema.ts` source into the `IntrospectedTable[]` shape consumed
- * by `generateModels`, without touching a database. One entry per
- * `createTable` call, annotated with the FK constraints recovered from
- * top-level `addForeignKey` calls.
- */
 export function parseSchemaForModels(source: string, filePath: string): IntrospectedTable[] {
   const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true);
   const byTable = new Map<string, ForeignKeyDefinition[]>();

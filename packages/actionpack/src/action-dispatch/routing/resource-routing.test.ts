@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RouteSet } from "./route-set.js";
 
-// ==========================================================================
-// action_dispatch/routing/resource_routing_test.rb
-// ==========================================================================
 describe("Resource routing", () => {
   describe("resources()", () => {
     it("generates index route", () => {

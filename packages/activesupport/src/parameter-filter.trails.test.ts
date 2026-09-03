@@ -3,14 +3,6 @@ import { ParameterFilter } from "./parameter-filter.js";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import { withIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
 
-/**
- * Behaviour Rails asserts inside its own `test "process parameter filter"`
- * table (parameter_filter_test.rb:8-44) — deep dot-notation keys and block
- * filters — kept here so the enrolled test names stay Rails' own, plus cases
- * with no Rails counterpart at all: JS value shapes (`Date`, class instances,
- * null-prototype objects) that Ruby's `Hash#each` walk never meets, and the
- * `HashWithIndifferentAccess` recursion Rails covers from ActionDispatch.
- */
 describe("ParameterFilter (trails)", () => {
   it("filters a deep key only under its parent", () => {
     const f = new ParameterFilter(["credit_card.code"]);
@@ -38,10 +30,6 @@ describe("ParameterFilter (trails)", () => {
   });
 
   it("folds a case-insensitive pattern the flag expansion must rewrite into the one group Regexp", () => {
-    // Ruby folds every pattern of a group into ONE Regexp with an inline
-    // `(?i:...)` group (parameter_filter.rb:58-65), which V8 also spells — so a
-    // case-insensitive member keeps its own flag inside the joined Regexp, down
-    // to case-folding a `\p{Lu}` property escape.
     for (const pattern of [/[xy]z/i, /\p{Lu}q/iu, /(?<tail>vw)/i, /[a-c]z/i]) {
       const precompiled = ParameterFilter.precompileFilters([/plain/, pattern]);
       expect(precompiled.length).toBe(1);
@@ -58,8 +46,6 @@ describe("ParameterFilter (trails)", () => {
     expect(filter.filterParam("zzz", "v")).toBe("v");
     expect(filter.filterParam("dq", "v")).toBe("v");
 
-    // The property escape only means a property under `u`, so the joined
-    // Regexp carries the flag its members were written with.
     const unicode = new ParameterFilter(ParameterFilter.precompileFilters([/\p{Lu}q/iu]));
     expect(unicode.filterParam("aQ", "v")).toBe("[FILTERED]");
     expect(unicode.filterParam("1q", "v")).toBe("v");

@@ -40,7 +40,6 @@ describe("MessagePackCacheSerializerTest", () => {
   const dump = (object: unknown) => MessagePackCacheSerializer.dump(object);
   const load = (dumped: Buffer) => MessagePackCacheSerializer.load(dumped);
 
-  /** `assert_roundtrip` (message_pack/shared_serializer_tests.rb:169-176). */
   const assertRoundtrip = (object: HasValue) => {
     const serialized = dump(object);
     expect(serialized).toBeInstanceOf(Buffer);

@@ -6,13 +6,6 @@ import { requireApplicationBang } from "../command/actions.js";
 import { Trails } from "../rails.js";
 import { DevServer } from "../server/dev-server.js";
 
-/**
- * Rails' `rails server` (`commands/server/server_command.rb`). Loading
- * `config/application` is Rails' `require APP_PATH` — it is what registers
- * the Application subclass, so `Trails.application` is nil until it has been
- * imported — and handing `app.app()` to the dev server is `config.ru`'s
- * `run Rails.application`.
- */
 export function serverCommand(): Command {
   const cmd = new Command("server");
   cmd.alias("s");
@@ -26,7 +19,6 @@ export function serverCommand(): Command {
       const app = await Trails.initialize();
       const port = parseInt(options.port, 10);
       if (!(await hasViteConfig(root))) {
-        // `Rackup::Server#start` — `server.run(wrapped_app, **options)`.
         const server = await Handler.Node.run(app.app(), { Port: port, Host: options.binding });
         const address = server.address();
         const boundPort = address && typeof address === "object" ? address.port : port;
@@ -49,12 +41,6 @@ export function serverCommand(): Command {
   return cmd;
 }
 
-/**
- * A trails app with a `vite.config` wants Vite's asset pipeline in front of
- * Rack, which is what {@link DevServer} mounts. Without one there is nothing
- * for Vite to serve, so the Rack handler runs on its own — the plain
- * `Rackup::Server` path.
- */
 async function hasViteConfig(root: string): Promise<boolean> {
   const fs = await getFsAsync();
   const p = await getPathAsync();

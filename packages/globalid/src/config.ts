@@ -13,7 +13,7 @@ export function getApp(): string | undefined {
   return _app;
 }
 
-/** @internal — test use only */
+/** @internal */
 export function _resetApp(): void {
   _app = undefined;
 }

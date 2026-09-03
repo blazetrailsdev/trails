@@ -3,12 +3,6 @@ import { Notifications } from "./notifications.js";
 import { Event as EventClass } from "./notifications/instrumenter.js";
 import type { Event } from "./notifications/instrumenter.js";
 
-/**
- * trails-only coverage for the static Notifications surface: the
- * `notifier.listening?(name)` short-circuit (Rails has no dedicated test for
- * it) and `instrumentAsync`, which is a trails extension with no Rails
- * analogue.
- */
 describe("Notifications (trails)", () => {
   afterEach(() => {
     Notifications.unsubscribeAll();
@@ -91,8 +85,6 @@ describe("Notifications (trails)", () => {
         }),
       ).rejects.toBe("bare string");
       expect(events[0].payload.exception_object).toBe("bare string");
-      // Ruby cannot raise a non-Exception, so there is no Rails analogue; name
-      // the class the way Rails would name it rather than leaking `typeof`.
       expect(events[0].payload.exception).toEqual(["String", "bare string"]);
     });
 
@@ -110,8 +102,6 @@ describe("Notifications (trails)", () => {
           throw new ParamError("bad param");
         }),
       ).rejects.toThrow("bad param");
-      // Rails' e.class.name is fully qualified; trails carries that on `name`,
-      // and it is what rescue_responses keys off (log_subscriber.rb:32).
       expect(events[0].payload.exception).toEqual(["ActionDispatch::ParamError", "bad param"]);
     });
 
@@ -124,8 +114,6 @@ describe("Notifications (trails)", () => {
     });
   });
 
-  // Mirrors ActiveSupport::Notifications.instrumenter.build_handle — the
-  // low-level primitive TransactionInstrumenter spans a transaction with.
   describe("buildHandle", () => {
     it("publishes one event spanning start→finish, off the mutated payload", () => {
       const events: Event[] = [];
@@ -134,7 +122,6 @@ describe("Notifications (trails)", () => {
       const payload: Record<string, unknown> = { a: 1 };
       const handle = Notifications.instrumenter.buildHandle("span", payload);
       handle.start();
-      // Subscribers must see mutations made between start and finish.
       payload.outcome = "done";
       handle.finish();
 
@@ -153,8 +140,6 @@ describe("Notifications (trails)", () => {
     });
 
     it("snapshots the subscribers at build time, not at finish", () => {
-      // Rails' Fanout::Handle captures groups_for(name) in initialize
-      // (fanout.rb:230): a subscriber added after build_handle sees nothing.
       const early: Event[] = [];
       const late: Event[] = [];
       Notifications.subscribe("span", (e) => early.push(e));
@@ -169,9 +154,6 @@ describe("Notifications (trails)", () => {
     });
 
     it("runs every snapshot subscriber even when one throws, then re-raises", () => {
-      // Rails' Handle#finish_with_values guards each group
-      // (iterate_guarding_exceptions, fanout.rb:20-39): a throwing subscriber
-      // must not stop the ones after it.
       const ran: string[] = [];
       Notifications.subscribe("span", () => ran.push("a"));
       Notifications.subscribe("span", () => {
@@ -195,9 +177,6 @@ describe("Notifications (trails)", () => {
     });
   });
 
-  // Rails' EventObjectGroup#finish assigns `@event.payload = payload` after
-  // Event#initialize dup'd it (fanout.rb:166-178), so the published event
-  // reflects the final payload object exactly — including keys the block deleted.
   describe("payload is replaced at finish, not merged", () => {
     it("reflects a key the block deleted", () => {
       const events: Event[] = [];

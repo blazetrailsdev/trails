@@ -33,8 +33,6 @@ export function tsModule(src: ModuleSource): string {
         break;
     }
   }
-  // Aliases used in value position, grouped by source module — feeds the
-  // type-only → value promotion pass below.
   const valueAliasesByFrom = new Map<string, Set<string>>();
   for (const r of valueRefs) {
     const m = refMeta(r);
@@ -46,9 +44,6 @@ export function tsModule(src: ModuleSource): string {
     }
     s.add(m.name);
   }
-  // Clone explicit imports; for any type-only entry whose binding is used
-  // as a value, split that binding out into a sibling value Import that
-  // preserves the original (renamed) mapping.
   const explicit: Import[] = [];
   const promoted: Import[] = [];
   for (const imp of src.imports ?? []) {
@@ -83,7 +78,6 @@ export function tsModule(src: ModuleSource): string {
     const stillHasType = cloned.default || (cloned.named && Object.keys(cloned.named).length);
     if (stillHasType) explicit.push(cloned);
   }
-  // Coverage from final (post-promotion) explicit + promoted entries.
   const valueCovered = new Set<string>();
   const typeCovered = new Set<string>();
   for (const imp of [...explicit, ...promoted]) {
@@ -91,8 +85,6 @@ export function tsModule(src: ModuleSource): string {
     if (imp.default) set.add(`${imp.from}|${imp.default}`);
     for (const alias of Object.keys(imp.named ?? {})) set.add(`${imp.from}|${alias}`);
   }
-  // Auto-collect: value refs → value imports; type refs → type imports,
-  // but only when the binding isn't covered or used as a value elsewhere.
   const fromRefs: Import[] = [];
   const usedAsValue = new Set<string>();
   for (const r of valueRefs) {

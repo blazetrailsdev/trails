@@ -1,28 +1,13 @@
-/**
- * ActionDispatch::Http::FilterRedirect
- *
- * Port of `actionpack/lib/action_dispatch/http/filter_redirect.rb`. Rails
- * mixes this into `ActionDispatch::Response`; the redirect filter list
- * lives at `env["action_dispatch.redirect_filter"]`.
- *
- * Exposed as `this`-typed mixin functions per CLAUDE.md.
- */
-
 import type { ParameterFilter } from "@blazetrails/activesupport";
 
 /** @internal */
 export const FILTERED = "[FILTERED]";
 
-/**
- * Minimal host surface required by the {@link FilterRedirect} mixin.
- * Mirrors the methods Rails' `Http::FilterRedirect` calls on `self`.
- */
 export interface FilterRedirectHost {
   location: string;
   request: FilterRedirectRequest | null | undefined;
 }
 
-/** Subset of the Request surface needed by {@link FilterRedirect}. */
 export interface FilterRedirectRequest {
   getHeader(key: string): unknown;
   parameterFilter(): ParameterFilter;
@@ -58,8 +43,6 @@ export function locationFilterMatch(this: FilterRedirectHost): boolean {
 /** @internal */
 export function parameterFilteredLocation(this: FilterRedirectHost): string {
   try {
-    // Rails' URI.parse accepts both absolute and relative URLs; the
-    // WHATWG URL constructor requires a base for relative URLs.
     const PLACEHOLDER_BASE = "http://__filter_redirect_placeholder__/";
     const isAbsolute = /^[a-z][a-z0-9+.-]*:/i.test(this.location);
     const url = isAbsolute ? new URL(this.location) : new URL(this.location, PLACEHOLDER_BASE);
@@ -81,7 +64,6 @@ export function parameterFilteredLocation(this: FilterRedirectHost): string {
       url.search = `?${filteredParts.join("")}`;
     }
     if (!isAbsolute) {
-      // Strip the placeholder origin to mirror Rails relative-URL round-trip.
       return `${url.pathname}${url.search}${url.hash}`;
     }
     return url.toString();

@@ -1,11 +1,3 @@
-/**
- * ActionController::Instrumentation
- *
- * Adds instrumentation to process_action, render, and send_file.
- * Accepts a Notifications-compatible interface for publishing events.
- * @see https://api.rubyonrails.org/classes/ActionController/Instrumentation.html
- */
-
 import { ExecutionContext, Notifications } from "@blazetrails/activesupport";
 import { ExceptionWrapper } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
@@ -20,12 +12,7 @@ interface InstrumentationHost {
   appendInfoToPayload(payload: Record<string, unknown>): void;
 }
 
-/**
- * `ActionController::Instrumentation#process_action`
- * (`actionpack/lib/action_controller/metal/instrumentation.rb:60-84`).
- *
- * @internal
- */
+/** @internal */
 export async function processAction(
   this: InstrumentationHost,
   block: () => Promise<void>,
@@ -81,34 +68,17 @@ export function instrumentRender(
   return { result, viewRuntime };
 }
 
-/**
- * Rails `Instrumentation#halted_callback_hook` — emitted by AS::Callbacks
- * whenever a before-action halts the chain.
- *
- * @internal
- */
+/** @internal */
 export function haltedCallbackHook(filter: unknown, _name?: unknown, notifier?: Notifier): void {
   notifier?.instrument("halted_callback.action_controller", { filter });
 }
 
-/**
- * Rails `Instrumentation#cleanup_view_runtime` — wrapper hook for
- * subclasses (e.g. AR's ControllerRuntime) to subtract DB time from
- * view runtime. The default just yields.
- *
- * @internal
- */
+/** @internal */
 export function cleanupViewRuntime<T>(block: () => T): T {
   return block();
 }
 
-/**
- * Rails `Instrumentation#append_info_to_payload` — extension hook for
- * subclasses to enrich the `process_action` payload. Default copies
- * `viewRuntime` onto the payload.
- *
- * @internal
- */
+/** @internal */
 export function appendInfoToPayload(
   this: { viewRuntime?: number } | undefined,
   payload: Record<string, unknown>,

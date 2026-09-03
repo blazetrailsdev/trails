@@ -62,7 +62,7 @@ export async function arRunner(cwd: string, args: string[]): Promise<number> {
     try {
       Base.removeConnection();
     } catch {
-      // pool may already be gone
+      /** @empty */
     }
     delete (globalThis as unknown as Record<string, unknown>)["__ARGV__"];
   }

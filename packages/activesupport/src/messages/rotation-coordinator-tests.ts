@@ -2,18 +2,11 @@ import { beforeEach, expect, it } from "vitest";
 
 import type { FallsBack, RotationCoordinator } from "./rotation-coordinator.js";
 
-/**
- * Rails' `make_coordinator` / `roundtrip`, which each including test supplies.
- */
 export interface CoordinatorHooks<C extends FallsBack<C>> {
   makeCoordinator(): RotationCoordinator<C>;
   roundtrip(message: string, codec: C, otherCodec?: C): unknown;
 }
 
-/**
- * Rails' `RotationCoordinatorTests`, the module both `MessageVerifiersTest`
- * and `MessageEncryptorsTest` `include`.
- */
 export function rotationCoordinatorTests<C extends FallsBack<C>>(hooks: CoordinatorHooks<C>): void {
   const { makeCoordinator, roundtrip } = hooks;
 
@@ -153,16 +146,14 @@ export function rotationCoordinatorTests<C extends FallsBack<C>>(hooks: Coordina
 
   it("#transitional treats a nil first rotation as a new rotation", () => {
     const transitionalCoordinator = makeCoordinator();
-    // (3) Finally, one salt upgraded to SHA1
     transitionalCoordinator.rotate((salt) => (salt === "salt" ? { digest: "SHA1" } : null));
-    transitionalCoordinator.rotate({ digest: "MD5" }); // (2) Then, everything upgraded to MD5
-    transitionalCoordinator.rotate({ digest: "SHA256" }); // (1) Originally, everything used SHA256
+    transitionalCoordinator.rotate({ digest: "MD5" });
+    transitionalCoordinator.rotate({ digest: "SHA256" });
     transitionalCoordinator.transitional = true;
 
     const sha1Coordinator = makeCoordinator().rotate({ digest: "SHA1" });
     const md5Coordinator = makeCoordinator().rotate({ digest: "MD5" });
 
-    // "salt" encodes with MD5 and can decode SHA1 (i.e. [SHA1, MD5, SHA256] => [MD5, SHA1, SHA256])
     expect(
       roundtrip("message", transitionalCoordinator.get("salt"), md5Coordinator.get("salt")),
     ).toEqual("message");
@@ -170,7 +161,6 @@ export function rotationCoordinatorTests<C extends FallsBack<C>>(hooks: Coordina
       roundtrip("message", sha1Coordinator.get("salt"), transitionalCoordinator.get("salt")),
     ).toEqual("message");
 
-    // "other salt" encodes with MD5 and cannot decode SHA1 (i.e. [nil, MD5, SHA256] => [MD5, SHA256])
     expect(
       roundtrip(
         "message",
@@ -189,17 +179,14 @@ export function rotationCoordinatorTests<C extends FallsBack<C>>(hooks: Coordina
 
   it("#transitional swaps the first rotation with the next non-nil rotation", () => {
     const transitionalCoordinator = makeCoordinator();
-    // (3) Finally, everything upgraded to SHA1
     transitionalCoordinator.rotate({ digest: "SHA1" });
-    // (2) Then, one salt upgraded to SHA1
     transitionalCoordinator.rotate((salt) => (salt === "salt" ? { digest: "SHA1" } : null));
-    transitionalCoordinator.rotate({ digest: "MD5" }); // (1) Originally, everything used MD5
+    transitionalCoordinator.rotate({ digest: "MD5" });
     transitionalCoordinator.transitional = true;
 
     const sha1Coordinator = makeCoordinator().rotate({ digest: "SHA1" });
     const md5Coordinator = makeCoordinator().rotate({ digest: "MD5" });
 
-    // "salt" encodes with SHA1 and can decode SHA1 (i.e. [SHA1, SHA1, MD5] => [SHA1, MD5])
     expect(
       roundtrip("message", transitionalCoordinator.get("salt"), sha1Coordinator.get("salt")),
     ).toEqual("message");
@@ -207,7 +194,6 @@ export function rotationCoordinatorTests<C extends FallsBack<C>>(hooks: Coordina
       roundtrip("message", sha1Coordinator.get("salt"), transitionalCoordinator.get("salt")),
     ).toEqual("message");
 
-    // "other salt" encodes with MD5 and can decode SHA1 (i.e. [SHA1, nil, MD5] => [MD5, SHA1])
     expect(
       roundtrip(
         "message",
@@ -247,11 +233,9 @@ export function rotationCoordinatorTests<C extends FallsBack<C>>(hooks: Coordina
 
   it("rotation options are deduped", () => {
     const dedupedCoordinator = makeCoordinator();
-    // (3) Finally, everything upgraded to SHA1
     dedupedCoordinator.rotate({ digest: "SHA1" });
-    // (2) Then, one salt upgraded to SHA1
     dedupedCoordinator.rotate((salt) => (salt === "salt" ? { digest: "SHA1" } : null));
-    dedupedCoordinator.rotate({ digest: "MD5" }); // (1) Originally, everything used MD5
+    dedupedCoordinator.rotate({ digest: "MD5" });
 
     let rotated = 0;
     dedupedCoordinator.onRotation(() => {
@@ -262,7 +246,7 @@ export function rotationCoordinatorTests<C extends FallsBack<C>>(hooks: Coordina
     const md5Codec = makeCoordinator().rotate({ digest: "MD5" }).get("salt");
 
     expect(roundtrip("message", md5Codec, codec)).toEqual("message");
-    expect(rotated).toEqual(1); // SHA1 tried only once
+    expect(rotated).toEqual(1);
   });
 
   it("prevents adding a rotation after rotations have been applied", () => {

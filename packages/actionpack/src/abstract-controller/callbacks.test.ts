@@ -10,14 +10,6 @@ import {
   type CallbackOptions,
 } from "./callbacks.js";
 
-// ==========================================================================
-// abstract/callbacks_test.rb
-// ==========================================================================
-
-// Rails: `set_callback :process_action, :before, :first` registers an
-// instance-method-by-name. trails' beforeAction takes a function — we
-// pass a closure that calls the named method, which exercises the same
-// behavior even though the registration shape differs.
 class Callback1 extends AbstractController {
   text?: string;
   first() {
@@ -381,11 +373,6 @@ describe("TestCallbacksWithMissingConditions", () => {
       k.beforeAction(function callback2() {}, { only: "showw" });
       k.beforeAction(() => {}, { only: "showw" });
     });
-    // trails' beforeAction takes one callback at a time, so each
-    // registration gets its own ActionFilter and the first one to fail
-    // surfaces in the message. We assert on that one + the shared bits
-    // (`only`, `showw`) — Rails groups all callbacks into one filter
-    // because `before_action :a, :b, :c, only: :showw` shares a list.
     const err = await runAndCatch(C);
     for (const s of [":callback1", "only", "showw"]) expect(err.message).toContain(s);
   });
@@ -404,12 +391,6 @@ describe("TestCallbacksWithMissingConditions", () => {
   });
 });
 
-// ==========================================================================
-// trails-only coverage — not in Rails callbacks_test.rb but exercises
-// real behavior worth keeping. Kept in this file (rather than a separate
-// one) so it stays alongside the API under test; parity:test ignores
-// these because no Rails counterpart references them.
-// ==========================================================================
 describe("AbstractController::Base — trails-only", () => {
   it("action name is set", async () => {
     class TestController extends AbstractController {
@@ -458,10 +439,6 @@ describe("AbstractController::Base — trails-only", () => {
   });
 });
 
-// ==========================================================================
-// trails-only coverage for ActionFilter + normalization helpers (Rails has
-// no public test for these; they're :nodoc: in callbacks.rb).
-// ==========================================================================
 describe("ActionFilter", () => {
   it("matches when the controller's actionName is in the configured set", () => {
     class C extends AbstractController {}
@@ -535,7 +512,6 @@ describe("_insertCallbacks", () => {
     expect(seen.map(([c]) => c)).toEqual([cb1, cb2]);
     expect(opts.only).toBeUndefined();
     expect((opts.if as unknown[])[0]).toBeInstanceOf(ActionFilter);
-    // `filters` is a transient bookkeeping key; should be removed post-yield.
     expect((opts as Record<string, unknown>).filters).toBeUndefined();
   });
 
@@ -560,9 +536,6 @@ describe("AbstractController callback statics", () => {
     expect(AbstractController.afterAction).toBe(afterAction);
   });
 
-  // The macros are mixed in as static fields, so `this` inside them is the
-  // receiving class. If that ever resolved to AbstractController instead,
-  // every controller in the process would share one callback chain.
   it("registers on the receiving subclass, not on a sibling or the base", async () => {
     class Left extends AbstractController {
       seen: string[] = [];

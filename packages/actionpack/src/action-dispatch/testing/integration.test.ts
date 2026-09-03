@@ -2,10 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { IntegrationTest } from "./integration.js";
 import { Base } from "../../action-controller/base.js";
 
-// ==========================================================================
-// Test controllers
-// ==========================================================================
-
 class PostsController extends Base {
   async index() {
     this.render({ json: [{ id: 1 }, { id: 2 }] });
@@ -131,16 +127,12 @@ class SessionsController extends Base {
   }
 }
 
-// ==========================================================================
-// action_dispatch/integration_test.rb
-// ==========================================================================
 describe("ActionDispatch::IntegrationTest", () => {
   let app: IntegrationTest;
 
   beforeEach(() => {
     app = new IntegrationTest();
     app.routes.draw((r) => {
-      // Custom routes before resources so they match before :id
       r.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
       r.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
       r.get("/posts/html", { to: "posts#renderHtml", as: "posts_html" });
@@ -310,15 +302,12 @@ describe("ActionDispatch::IntegrationTest", () => {
     });
 
     it("login flow with session", async () => {
-      // Log in
       await app.post("/session");
       app.assertResponse("redirect");
 
-      // Check session
       await app.get("/session");
       expect((app.parsedBody as any).userId).toBe(42);
 
-      // Log out
       await app.delete("/session");
       app.assertResponse("no_content");
     });
@@ -361,8 +350,6 @@ describe("ActionDispatch::IntegrationTest", () => {
       await app.followRedirect();
       expect(app.responseBody).toBe("Post created!");
 
-      // `commit_flash` sweeps what was only read this request
-      // (`flash.rb:292-305`), so the next one starts clean.
       await app.get("/posts/flash");
       expect(app.responseBody).toBe("none");
     });
@@ -503,11 +490,9 @@ describe("ActionDispatch::IntegrationTest", () => {
       const sess = app.createSession();
       expect(sess.routes).toBe(app.routes);
       expect(sess.app).toBe(sentinel);
-      // Dispatch works on the new session without re-registering controllers.
       await sess.get("/posts");
       sess.assertResponse("success");
 
-      // Falls back to class-level default when no instance override is set.
       const fresh = new IntegrationTest();
       expect(fresh.app).toBe(null);
       const Stub = class extends IntegrationTest {};
@@ -521,45 +506,31 @@ describe("ActionDispatch::IntegrationTest", () => {
       expect(app.requestCount).toBe(1);
 
       const child = app.openSession();
-      // Routes/controllers carry over (Rails dup is shallow on object refs).
       expect(child.routes).toBe(app.routes);
-      // Per-request state is reset on the child.
       expect(child.requestCount).toBe(0);
-      // rootSession threads through to the top-level instance.
       expect(child.rootSession).toBe(app);
-      // Dispatch on the child works without re-registering controllers.
       await child.get("/posts");
       child.assertResponse("success");
-      // Parent's per-request state is independent.
       expect(app.requestCount).toBe(1);
-      // assertions counter is forwarded to the root.
       child.assertions = 5;
       expect(app.assertions).toBe(5);
     });
 
     it("CRUD lifecycle", async () => {
-      // Create
       await app.post("/posts", { params: { title: "CRUD" } });
       app.assertResponse("created");
 
-      // Read
       await app.get("/posts");
       app.assertResponse("success");
 
-      // Update
       await app.put("/posts/1", { params: { title: "Updated" } });
       app.assertResponse("success");
 
-      // Delete
       await app.delete("/posts/1");
       app.assertResponse("no_content");
     });
   });
 
-  // =========================================================================
-  // html_document / document_root_element / _mock_session
-  // (ActionDispatch::Assertions#html_document, Integration::Runner)
-  // =========================================================================
   describe("html_document", () => {
     afterEach(() => {
       app.reset();

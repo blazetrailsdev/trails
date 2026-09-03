@@ -48,7 +48,6 @@ it("let the app provide additional information with non-String details", async (
   expect(res.headers["content-type"]).toBe("text/html");
   expect(res.bodyString).toContain("404");
   expect(res.bodyString).toContain("Not Found");
-  // JS toString of array: "gone too meta."
   expect(res.bodyString).toContain("gone too meta.");
 });
 

@@ -1,36 +1,3 @@
-/**
- * Port of `Rails::Application::Finisher` from
- * `railties/lib/rails/application/finisher.rb`. Defines the finisher
- * initializers that run after the Trailtie + bootstrap initializers.
- *
- * `Application#initializers` splices these in after the Bootstrap and
- * Trailtie/Engine initializers, mirroring `application.rb:445-449`.
- *
- * Rails blocks of the form `initializer :foo do |app|` get the
- * Application instance both as `self` and as the block argument. In our
- * port, `Initializable` binds each initializer to its host via
- * `bind(context)` before calling `block.apply(context, args)`, so `this`
- * is already the host. The blocks here use `this: FinisherHost` and
- * skip the redundant argument.
- *
- * `Rails.env.development?` in `add_internal_routes` reads through a cast:
- * `Trails.env` is an `EnvironmentInquirer` whose per-environment predicates
- * are Proxy-generated (`string-inquirer.ts:12-28`) and so are absent from its
- * static type.
- *
- * Three of Rails' fourteen finisher initializers have no declaration here,
- * each because the subsystem it drives is unported:
- *
- * - `configure_executor_for_concurrency` (`finisher.rb:118-135`), with its
- *   `MonitorHook` / `InterlockHook` — `ActiveSupport::Executor#register_hook`
- *   and `ActiveSupport::Dependencies.interlock` are both unported, so there is
- *   no hook registry to register against.
- * - `set_clear_dependencies_hook` (`finisher.rb:182-228`) — clears
- *   `ActiveSupport::Dependencies` and `DescendantsTracker` around a reload.
- *   ESM has no constant unloading, so there is nothing to clear.
- * - `enable_yjit` (`finisher.rb:230-234`) — YJIT is a MRI JIT with no JS
- *   analogue.
- */
 import { runLoadHooks, underscore } from "@blazetrails/activesupport";
 import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
@@ -91,20 +58,6 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
   await this.ensureGeneratorTemplatesAdded();
 });
 
-/**
- * Mirrors `Finisher`'s `setup_main_autoloader` initializer
- * (`finisher.rb:17-46`). Rails pushes every autoload path into
- * `Rails.autoloaders.main` and calls `autoloader.setup`, which is what makes
- * `"#{name.camelize}Controller"` resolvable when
- * `Request#controller_class_for` (`http/request.rb:94-110`) constantizes it
- * at dispatch time.
- *
- * ESM has no `const_missing` seam, so a constant cannot be materialised
- * lazily from a name; {@link loadControllers} imports the modules under the
- * autoload paths instead and seeds `ActionDispatch`'s
- * {@link controllerConstants} table — the stand-in for the Ruby namespace
- * `Request#controller_class_for` constantizes against.
- */
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   for (const [name, klass] of await loadControllers(await this.paths())) {
     controllerConstants.set(name, klass);
@@ -141,8 +94,6 @@ Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
 });
 
 /**
- * Mirrors `Finisher`'s `eager_load!` initializer (`finisher.rb:75-88`).
- *
  * @missingRailsCall eager_load_all — CONVERGEABLE port-eager-load-autoloader-arms
  * @missingRailsCall eager_load! — CONVERGEABLE port-eager-load-autoloader-arms
  * @missingRailsCall after_class_unload — CONVERGEABLE port-eager-load-autoloader-arms
@@ -156,10 +107,6 @@ Finisher.initializer("eager_load!", function (this: FinisherHost) {
   }
 });
 
-/**
- * Mirrors `Finisher`'s `finisher_hook` initializer (`finisher.rb:90-93`) —
- * "all initialization is done, including eager loading in production".
- */
 Finisher.initializer("finisher_hook", function (this: FinisherHost) {
   runLoadHooks("after_initialize", this);
 });
@@ -180,14 +127,6 @@ Finisher.initializer("add_internal_routes", function (this: FinisherHost) {
   };
 });
 
-/**
- * Mirrors `Finisher`'s `set_routes_reloader_hook` initializer
- * (`finisher.rb:158-179`).
- *
- * `RoutesReloader#execute` is async in trails while `Reloader`'s `run`
- * callbacks are synchronous, so the `to_run` block returns the promise it
- * starts rather than blocking on it the way the Ruby block does.
- */
 Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherHost) {
   const reloader = this.routesReloader();
   reloader.eagerLoad = this.config.eagerLoad === true;
@@ -205,14 +144,7 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
   }
 });
 
-/**
- * @noRailsEquivalent PERMANENT — Zeitwerk's directory scan. Rails' `push_dir` hands a
- * directory to Zeitwerk, which maps `app/controllers/posts_controller.rb` to
- * the `PostsController` constant on demand; ESM resolves nothing from a name,
- * so the same mapping is computed eagerly here. Keyed by Rails' controller
- * path (`posts`, `admin/posts`) — the value `path_parameters[:controller]`
- * carries.
- */
+/** @noRailsEquivalent PERMANENT */
 async function loadControllers(paths: Root): Promise<Map<string, DispatchableControllerClass>> {
   const out = new Map<string, DispatchableControllerClass>();
   const node = paths.get("app/controllers");
@@ -224,14 +156,7 @@ async function loadControllers(paths: Root): Promise<Map<string, DispatchableCon
   return out;
 }
 
-/**
- * Walks one autoload root, keying each controller class by the Rails
- * controller path its file spells — `posts`, `admin/posts` — which is the
- * value `path_parameters[:controller]` carries. Zeitwerk derives the same
- * mapping from the directory tree, so nested directories recurse.
- *
- * @internal
- */
+/** @internal */
 async function collectControllers(
   dir: string,
   prefix: string,

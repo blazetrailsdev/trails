@@ -187,7 +187,6 @@ describe("parseSchemaTs", () => {
   });
 
   it("skips createTable with concise (non-block) arrow body without crashing", () => {
-    // Concise arrow bodies are not emitted by SchemaDumper but must not crash.
     const source = `
       export default async function defineSchema(ctx: MigrationContext) {
         await ctx.createTable("weird", { force: "cascade" }, (t) => void t);

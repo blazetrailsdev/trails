@@ -1,23 +1,3 @@
-/**
- * Mirrors: i18n/lib/i18n/backend/fallbacks.rb
- *
- * I18n locale fallbacks are useful when you want your application to use
- * translations from other locales when translations for the current locale are
- * missing. E.g. you might want to use "en" translations when translations in
- * your applications main locale "de" are missing.
- *
- * To enable locale fallbacks you mix the Fallbacks module into the Simple
- * backend — or whatever other backend you are using:
- *
- *     class Backend extends Fallbacks(Simple) {}
- *
- * Ruby `include`s the module into an existing class and calls `super` from
- * every method it overwrites. `include()` from `@blazetrails/activesupport`
- * copies members onto a prototype and so has no `super` to call; the class
- * factory below is the shape that keeps `super` — every body under it is the
- * gem's, line for line.
- */
-
 import { isSymbol } from "@blazetrails/ruby-compat";
 
 import { MissingTranslation, InvalidLocale } from "../exceptions.js";
@@ -26,53 +6,30 @@ import { Fallbacks as LocaleFallbacks } from "../locale/fallbacks.js";
 import { catchException, throwException } from "../throw-catch.js";
 import type { Base, TranslateOptions } from "./base.js";
 
-/**
- * Anything that answers the gem's `I18n.fallbacks[locale]` — the gem's own
- * `I18n::Locale::Fallbacks`, or the duck type Issue #536 allows.
- */
 export interface FallbacksLike {
   get(locale: Locale): Locale[];
 }
 
-/**
- * Ruby stores the fallbacks in a class variable and reads a thread-local over
- * the top of it (`Thread.current[:i18n_fallbacks] || @@fallbacks`). JS has no
- * threads, so the module-level binding below is both, exactly as `I18n.config`
- * is in `i18n.ts`.
- */
 let fallbacksStore: FallbacksLike | null | undefined;
 
-/** Returns the current fallbacks implementation. Defaults to `Locale::Fallbacks`. */
 export function fallbacks(): FallbacksLike {
   fallbacksStore ??= new LocaleFallbacks();
   return fallbacksStore;
 }
 
-/**
- * Sets the current fallbacks implementation. Use this to set a different
- * fallbacks implementation.
- */
 export function setFallbacks(fallbacks: FallbacksLike | Locale[] | null): void {
   fallbacksStore = Array.isArray(fallbacks) ? new LocaleFallbacks(...fallbacks) : fallbacks;
 }
 
-/** Ruby truthiness: only `nil` and `false` are falsy — `0` and `""` are not. */
 function truthy(value: unknown): boolean {
   return value !== undefined && value !== null && value !== false;
 }
 
-// TS requires exactly `any[]` here: a mixin base must be `new (...args: any[])`.
 type BackendConstructor = abstract new (
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ...args: any[]
 ) => Base;
 
-/**
- * The public member `Fallbacks` adds on top of the backend it is mixed into.
- * TypeScript cannot name the anonymous class below in a declaration file, so
- * the factory states its return type; the intersection with `T` is Ruby's
- * `include`, which leaves every member of the including class in place.
- */
 export interface FallbacksMethods {
   extractNonSymbolDefaultBang(options: TranslateOptions): unknown;
 }
@@ -85,23 +42,6 @@ export function Fallbacks<T extends BackendConstructor>(
     ...args: any[]
   ) => FallbacksMethods) {
   abstract class Fallbacks extends Superclass {
-    /**
-     * Overwrites the Base backend translate method so that it will try each
-     * locale given by I18n.fallbacks for the given locale. E.g. for the
-     * locale "de-DE" it might try the locales "de-DE", "de" and "en"
-     * (depends on the fallbacks implementation) until it finds a result with
-     * the given options. If it does not find any result for any of the
-     * locales it will then throw MissingTranslation as usual.
-     *
-     * The default option takes precedence over fallback locales only when
-     * it's a Symbol. When the default contains a String, Proc or Hash
-     * it is evaluated last after all the fallback locales have been tried.
-     *
-     * Ruby's `return result` inside `catch(:exception)` returns from this
-     * method, not from the block; the value therefore has to come back out of
-     * `catchException` and be told apart both from the thrown exception and
-     * from a nil result.
-     */
     override translate(
       locale: Locale | null | undefined,
       key: TranslationKey | null | undefined,
@@ -134,7 +74,6 @@ export function Fallbacks<T extends BackendConstructor>(
           });
           if (result != null && !(result instanceof MissingTranslation)) return result;
         } catch (exception) {
-          // we do nothing when the locale is invalid, as this is a fallback anyways.
           if (!(exception instanceof InvalidLocale)) throw exception;
         }
       }
@@ -203,7 +142,6 @@ export function Fallbacks<T extends BackendConstructor>(
         try {
           if (super.exists(fallback, key, options)) return true;
         } catch (exception) {
-          // we do nothing when the locale is invalid, as this is a fallback anyways.
           if (!(exception instanceof InvalidLocale)) throw exception;
         }
       }
@@ -211,7 +149,6 @@ export function Fallbacks<T extends BackendConstructor>(
       return false;
     }
 
-    /** Overwrite onFallback to add specified logic when the fallback succeeds. */
     protected onFallback(
       _originalLocale: Locale,
       _fallbackLocale: Locale,

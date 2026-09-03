@@ -16,10 +16,6 @@ export const HtmlSafeTranslation = {
 
       const exceptionHandler = (...args: unknown[]): unknown => {
         exception = true;
-        // Ruby's `I18n.exception_handler.call(*args)` is uniform over a Proc
-        // and a callable object (html_safe_translation.rb:15). JS
-        // `Function.prototype.call` is not — it would bind args[0] as `this` —
-        // so the two arms are split here exactly as i18n.ts:508-511 splits them.
         const handler = I18n.exceptionHandler();
         return typeof handler === "function"
           ? (handler as (...a: unknown[]) => unknown)(...args)

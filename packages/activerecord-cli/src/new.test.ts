@@ -80,7 +80,6 @@ describe("ArNewTest", () => {
 
   it("--force overwrites all generated files including init-owned ones", async () => {
     await arNew(parentDir, "myapp", "better-sqlite3");
-    // Mutate one arNew-owned file and one init-owned file
     await writeFile(join(parentDir, "myapp", "package.json"), '{"name":"stale"}\n', "utf8");
     await writeFile(join(parentDir, "myapp", "db.ts"), "// stale\n", "utf8");
 

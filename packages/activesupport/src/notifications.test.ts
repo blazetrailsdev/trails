@@ -14,9 +14,6 @@ beforeEach(() => {
   Notifications.unsubscribeAll();
 });
 
-// ---------------------------------------------------------------------------
-// Rails-matching describe blocks for test comparison pipeline
-// ---------------------------------------------------------------------------
 describe("SubscribeEventObjectsTest", () => {
   it("subscribe events", () => {
     const events: Event[] = [];
@@ -30,8 +27,6 @@ describe("SubscribeEventObjectsTest", () => {
   it("subscribe to events where payload is changed during instrumentation", () => {
     const events: Event[] = [];
     Notifications.subscribe("foo", (e) => events.push(e));
-    // Rails passes no payload here, so the block mutates the default one the
-    // event was built with — the subscriber must observe that same object.
     Notifications.instrument("foo", undefined, (payload) => {
       payload.my_key = "success!";
     });
@@ -145,7 +140,6 @@ describe("SubscribedTest", () => {
   });
 
   it("subscribing to instrumentation while inside it", () => {
-    // Subscribe during an instrumented block — new subscriber fires on next event
     let innerFired = false;
     Notifications.instrument("outer", {}, () => {
       Notifications.subscribe("inner", () => {
@@ -185,7 +179,6 @@ describe("SubscribedTest", () => {
 describe("InspectTest", () => {
   it("inspect output is small", () => {
     const e = new Event("test.inspect", null, null, randomId(), { key: "val" });
-    // inspect equivalent is just checking the object has basic info
     expect(e.name).toBe("test.inspect");
     expect(e.payload).toEqual({ key: "val" });
   });
@@ -252,9 +245,9 @@ describe("SyncPubSubTest", () => {
 
   it("publishing after a new subscribe works", () => {
     const events: Event[] = [];
-    Notifications.instrument("new.sub"); // before subscribe
+    Notifications.instrument("new.sub");
     Notifications.subscribe("new.sub", (e) => events.push(e));
-    Notifications.instrument("new.sub"); // after subscribe
+    Notifications.instrument("new.sub");
     expect(events).toHaveLength(1);
   });
 
@@ -319,8 +312,6 @@ describe("InstrumentationTest", () => {
   });
 
   it("instrumenter exposes its id", () => {
-    // Our implementation uses Notifications directly rather than a separate Instrumenter class
-    // Verify instrument works and assigns event IDs
     const events: Event[] = [];
     Notifications.subscribe("id.test", (e) => events.push(e));
     Notifications.instrument("id.test");
@@ -376,8 +367,6 @@ describe("EventTest", () => {
   });
 
   it("subscribe raises error on non supported arguments", () => {
-    // Rails raises an error when subscribing with non-callable; JS doesn't have the same type system
-    // but we can verify that valid subscribing works
     expect(() => Notifications.subscribe("valid.event", () => {})).not.toThrow();
   });
 });
@@ -459,9 +448,7 @@ describe("ActiveSupport::Notifications", () => {
         event = e;
       });
       await new Promise<void>((resolve) => {
-        Notifications.instrument("slow", {}, () => {
-          // just do synchronous work; duration > 0 after finish
-        });
+        Notifications.instrument("slow", {}, () => {});
         resolve();
       });
       expect(event.duration).toBeGreaterThanOrEqual(0);

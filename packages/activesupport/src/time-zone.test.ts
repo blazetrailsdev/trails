@@ -9,8 +9,6 @@ import { TimeWithZone } from "./time-with-zone.js";
 import { Temporal, Time } from "@blazetrails/date";
 import { travelTo, travelBack } from "./testing/time-helpers.js";
 
-/** Mirrors `TimeZoneTestHelpers#with_utc_to_local_returns_utc_offset_times`
- * (time_zone_test_helpers.rb:46-52). */
 function withUtcToLocalReturnsUtcOffsetTimes(value: boolean, block: () => void): void {
   const oldTzinfo2Format = utcToLocalReturnsUtcOffsetTimes();
   setUtcToLocalReturnsUtcOffsetTimes(value);
@@ -22,18 +20,13 @@ function withUtcToLocalReturnsUtcOffsetTimes(value: boolean, block: () => void):
 }
 
 describe("TimeZoneTest", () => {
-  // ---------------------------------------------------------------------------
-  // utc/local conversion
-  // ---------------------------------------------------------------------------
   it("utc to local", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
 
     withUtcToLocalReturnsUtcOffsetTimes(false, () => {
-      // standard offset -0500
       expect((zone.utcToLocal(Time.utc(2000, 1)) as Time).toS()).toBe(
         Time.utc(1999, 12, 31, 19).toS(),
       );
-      // dst offset -0400
       expect((zone.utcToLocal(Time.utc(2000, 7)) as Time).toS()).toBe(
         Time.utc(2000, 6, 30, 20).toS(),
       );
@@ -76,9 +69,7 @@ describe("TimeZoneTest", () => {
 
   it("local to utc", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    // standard offset -0500
     expect(zone.localToUtc(Time.utc(2000, 1, 1)).toS()).toBe(Time.utc(2000, 1, 1, 5).toS());
-    // dst offset -0400
     expect(zone.localToUtc(Time.utc(2000, 7, 1)).toS()).toBe(Time.utc(2000, 7, 1, 4).toS());
   });
 
@@ -93,15 +84,12 @@ describe("TimeZoneTest", () => {
     expect(zone.periodForLocal(Time.utc(2014, 10, 26, 1, 0, 0))).toEqual(period);
   });
 
-  // ---------------------------------------------------------------------------
-  // mapping
-  // ---------------------------------------------------------------------------
   it("from integer to map", () => {
-    expect(TimeZone.find(-28800)!).toBeInstanceOf(TimeZone); // PST
+    expect(TimeZone.find(-28800)!).toBeInstanceOf(TimeZone);
   });
 
   it("from duration to map", () => {
-    expect(TimeZone.find(Duration.minutes(-480))!).toBeInstanceOf(TimeZone); // PST
+    expect(TimeZone.find(Duration.minutes(-480))!).toBeInstanceOf(TimeZone);
   });
 
   it("from tzinfo to map", () => {
@@ -109,9 +97,6 @@ describe("TimeZoneTest", () => {
     expect(zone.tzinfo.identifier).toBe("America/New_York");
   });
 
-  // ---------------------------------------------------------------------------
-  // now / today / tomorrow / yesterday
-  // ---------------------------------------------------------------------------
   it("now", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = zone.now();
@@ -121,10 +106,8 @@ describe("TimeZoneTest", () => {
   });
 
   it("now enforces spring dst rules", () => {
-    // Verify that now() in a timezone returns correct DST status
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = zone.now();
-    // Can't test specific DST without controlling time, just verify it works
     expect(typeof twz.dst()).toBe("boolean");
   });
 
@@ -142,13 +125,13 @@ describe("TimeZoneTest", () => {
 
   it("today", () => {
     try {
-      travelTo(Time.utc(2000, 1, 1, 4, 59, 59)); // 1 sec before midnight Jan 1 EST
+      travelTo(Time.utc(2000, 1, 1, 4, 59, 59));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.today().toString()).toEqual("1999-12-31");
-      travelTo(Time.utc(2000, 1, 1, 5)); // midnight Jan 1 EST
+      travelTo(Time.utc(2000, 1, 1, 5));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.today().toString()).toEqual("2000-01-01");
-      travelTo(Time.utc(2000, 1, 2, 4, 59, 59)); // 1 sec before midnight Jan 2 EST
+      travelTo(Time.utc(2000, 1, 2, 4, 59, 59));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.today().toString()).toEqual("2000-01-01");
-      travelTo(Time.utc(2000, 1, 2, 5)); // midnight Jan 2 EST
+      travelTo(Time.utc(2000, 1, 2, 5));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.today().toString()).toEqual("2000-01-02");
     } finally {
       travelBack();
@@ -157,19 +140,19 @@ describe("TimeZoneTest", () => {
 
   it("tomorrow", () => {
     try {
-      travelTo(Time.utc(2000, 1, 1, 4, 59, 59)); // 1 sec before midnight Jan 1 EST
+      travelTo(Time.utc(2000, 1, 1, 4, 59, 59));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.tomorrow().toString()).toEqual(
         "2000-01-01",
       );
-      travelTo(Time.utc(2000, 1, 1, 5)); // midnight Jan 1 EST
+      travelTo(Time.utc(2000, 1, 1, 5));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.tomorrow().toString()).toEqual(
         "2000-01-02",
       );
-      travelTo(Time.utc(2000, 1, 2, 4, 59, 59)); // 1 sec before midnight Jan 2 EST
+      travelTo(Time.utc(2000, 1, 2, 4, 59, 59));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.tomorrow().toString()).toEqual(
         "2000-01-02",
       );
-      travelTo(Time.utc(2000, 1, 2, 5)); // midnight Jan 2 EST
+      travelTo(Time.utc(2000, 1, 2, 5));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.tomorrow().toString()).toEqual(
         "2000-01-03",
       );
@@ -180,19 +163,19 @@ describe("TimeZoneTest", () => {
 
   it("yesterday", () => {
     try {
-      travelTo(Time.utc(2000, 1, 1, 4, 59, 59)); // 1 sec before midnight Jan 1 EST
+      travelTo(Time.utc(2000, 1, 1, 4, 59, 59));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.yesterday().toString()).toEqual(
         "1999-12-30",
       );
-      travelTo(Time.utc(2000, 1, 1, 5)); // midnight Jan 1 EST
+      travelTo(Time.utc(2000, 1, 1, 5));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.yesterday().toString()).toEqual(
         "1999-12-31",
       );
-      travelTo(Time.utc(2000, 1, 2, 4, 59, 59)); // 1 sec before midnight Jan 2 EST
+      travelTo(Time.utc(2000, 1, 2, 4, 59, 59));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.yesterday().toString()).toEqual(
         "1999-12-31",
       );
-      travelTo(Time.utc(2000, 1, 2, 5)); // midnight Jan 2 EST
+      travelTo(Time.utc(2000, 1, 2, 5));
       expect(TimeZone.find("Eastern Time (US & Canada)")!.yesterday().toString()).toEqual(
         "2000-01-01",
       );
@@ -204,9 +187,6 @@ describe("TimeZoneTest", () => {
   it.skip("travel to a date");
   it.skip("travel to travels back and reraises if the block raises");
 
-  // ---------------------------------------------------------------------------
-  // local
-  // ---------------------------------------------------------------------------
   it("local", () => {
     const hawaii = TimeZone.find("Hawaii")!;
     const time = hawaii.local(2007, 2, 5, 15, 30, 45);
@@ -259,9 +239,6 @@ describe("TimeZoneTest", () => {
     expect(twz.hour).toBe(1);
   });
 
-  // ---------------------------------------------------------------------------
-  // at
-  // ---------------------------------------------------------------------------
   it("at", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const secs = 946684800.0;
@@ -277,7 +254,7 @@ describe("TimeZoneTest", () => {
 
   it("at with old date", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    const twz = zone.at(-2208988800); // 1900-01-01 00:00:00 UTC
+    const twz = zone.at(-2208988800);
     expect(twz).toBeInstanceOf(TimeWithZone);
   });
 
@@ -291,9 +268,6 @@ describe("TimeZoneTest", () => {
     expect(twz.nsec).toBe(123456789);
   });
 
-  // ---------------------------------------------------------------------------
-  // iso8601
-  // ---------------------------------------------------------------------------
   it("iso8601", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = zone.iso8601("2024-01-15T12:00:00-05:00");
@@ -379,7 +353,7 @@ describe("TimeZoneTest", () => {
   it("iso8601 handles dst jump", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = zone.iso8601("2006-04-02T02:00:00");
-    expect(twz.hour).toBe(3); // 2AM doesn't exist, springs forward to 3AM
+    expect(twz.hour).toBe(3);
   });
 
   it("iso8601 with ambiguous time", () => {
@@ -402,9 +376,6 @@ describe("TimeZoneTest", () => {
     expect(() => zone.iso8601("21367")).toThrow("invalid date");
   });
 
-  // ---------------------------------------------------------------------------
-  // parse
-  // ---------------------------------------------------------------------------
   it("parse", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = zone.parse("1999-12-31 19:00:00")!;
@@ -512,9 +483,6 @@ describe("TimeZoneTest", () => {
     expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 
-  // ---------------------------------------------------------------------------
-  // rfc3339
-  // ---------------------------------------------------------------------------
   it("rfc3339", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = zone.rfc3339("1999-12-31T14:00:00-10:00");
@@ -581,9 +549,6 @@ describe("TimeZoneTest", () => {
     expect(twz.hour).toBe(3);
   });
 
-  // ---------------------------------------------------------------------------
-  // strptime
-  // ---------------------------------------------------------------------------
   it("strptime", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = zone.strptime("1999-12-31 12:00:00", "%Y-%m-%d %H:%M:%S")!;
@@ -675,9 +640,6 @@ describe("TimeZoneTest", () => {
     expect(twz.utc().toTime().epochMilliseconds).toBe(Date.UTC(2014, 9, 25, 22, 0, 0));
   });
 
-  // ---------------------------------------------------------------------------
-  // utc_offset / formatted_offset
-  // ---------------------------------------------------------------------------
   it("utc offset lazy loaded from tzinfo when not passed in to initialize", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     expect(typeof zone.utcOffset).toBe("number");
@@ -691,7 +653,6 @@ describe("TimeZoneTest", () => {
   });
 
   it("seconds to utc offset with colon", () => {
-    // Use Arizona which doesn't observe DST
     const zone = TimeZone.find("Arizona")!;
     expect(zone.formattedOffset(true)).toBe("-07:00");
   });
@@ -729,13 +690,9 @@ describe("TimeZoneTest", () => {
     expect(zone.formattedOffset()).toBe("+00:00");
   });
 
-  // ---------------------------------------------------------------------------
-  // comparison / matching
-  // ---------------------------------------------------------------------------
   it("zone compare", () => {
     const a = TimeZone.find("Eastern Time (US & Canada)")!;
     const b = TimeZone.find("Pacific Time (US & Canada)")!;
-    // Eastern is ahead of Pacific (less negative offset)
     expect(a.utcOffset).toBeGreaterThan(b.utcOffset);
   });
 
@@ -753,9 +710,6 @@ describe("TimeZoneTest", () => {
     expect(zone.isMatch(/Nonexistent_Place/)).toBe(false);
   });
 
-  // ---------------------------------------------------------------------------
-  // to_s / all / index
-  // ---------------------------------------------------------------------------
   it("to s", () => {
     const tz = TimeZone.find("UTC")!;
     expect(tz.toString()).toBe("(GMT+00:00) UTC");
@@ -769,7 +723,6 @@ describe("TimeZoneTest", () => {
       expect(previous.compareTo(current)).toBe(-1);
     }
     expect(zones.length).toBeGreaterThan(100);
-    // Verify we get a reasonable set of zones
     expect(zones.some((z) => z.name === "UTC")).toBe(true);
     expect(zones.some((z) => z.name === "Eastern Time (US & Canada)")).toBe(true);
   });
@@ -792,8 +745,6 @@ describe("TimeZoneTest", () => {
   });
 
   it("unknown zone raises exception", () => {
-    // Rails asserts the class: `assert_raise TZInfo::InvalidTimezoneIdentifier`
-    // (time_zone_test.rb:831-835).
     expect(() => TimeZone.create("bogus")).toThrow(InvalidTimezoneIdentifier);
   });
 

@@ -177,13 +177,11 @@ describe("ActionDispatch::Routing::UrlFor", () => {
   });
 
   it("class instance with toH() but not a Parameters falls through to HelperMethodBuilder", () => {
-    // Guards against the previous duck-type check accepting any toH().
     class FakeParams {
       toH() {
         return { id: 1 };
       }
     }
-    // No toModel() → handleModelCall TypeErrors on record.toModel().
     expect(() => fullUrlFor.call(makeHost(), new FakeParams())).toThrow(TypeError);
   });
 

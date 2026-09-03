@@ -1,9 +1,3 @@
-/**
- * Rack::Logger
- *
- * Sets up rack.logger to write to rack.errors (or a provided stream).
- */
-
 import type { RackApp, RackEnv, RackResponse } from "./index.js";
 
 export interface LoggerStream {

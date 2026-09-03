@@ -1,10 +1,4 @@
-/**
- * AbstractController::Error
- *
- * Base error class for AbstractController errors.
- * @internal
- * @see https://api.rubyonrails.org/classes/AbstractController/Error.html
- */
+/** @internal */
 
 export class AbstractControllerError extends Error {
   constructor(message?: string) {

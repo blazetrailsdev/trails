@@ -3,7 +3,6 @@ import { describe, it, expect } from "vitest";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
 
 describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
-  // Simulate the BacktraceCleaner used in key-generator tests
   function makeBacktraceCleaner() {
     const filters: Array<(line: string) => string> = [];
     const silencers: Array<(line: string) => boolean> = [];
@@ -59,7 +58,6 @@ describe("BacktraceCleanerDefaultFilterAndSilencerTest", () => {
 
   it("should preserve lines that have a subpath matching a gem path", () => {
     const cleaner = makeBacktraceCleaner();
-    // Only silence exact gem paths, not subpaths in app code
     cleaner.addSilencer((line) => /\/gems\/[^/]+\//.test(line) && !line.startsWith("/app/"));
     const bt = ["/gems/rack-1.0/lib/rack.rb", "/app/lib/uses_gems/code.rb"];
     expect(cleaner.clean(bt)).toEqual(["/app/lib/uses_gems/code.rb"]);
@@ -127,7 +125,6 @@ describe("BacktraceCleanerSilencerTest", () => {
 
 describe("BacktraceCleanerMultipleSilencersTest", () => {
   it("backtrace should not contain lines that match the silencers", () => {
-    // BacktraceCleaner imported at top
     const cleaner = new BacktraceCleaner();
     cleaner.addSilencer((line: string) => line.includes("vendor"));
     const bt = ["/app/user.rb", "/vendor/gems/foo.rb", "/app/post.rb"];
@@ -137,7 +134,6 @@ describe("BacktraceCleanerMultipleSilencersTest", () => {
   });
 
   it("backtrace should only contain lines that match the silencers", () => {
-    // BacktraceCleaner imported at top
     const cleaner = new BacktraceCleaner();
     cleaner.addFilter((line: string) => line.replace("/app", ""));
     const bt = ["/app/user.rb", "/app/post.rb"];
@@ -204,7 +200,6 @@ describe("BacktraceCleanerKindTest", () => {
 
 describe("BacktraceCleanerFilterAndSilencerTest", () => {
   it("backtrace should not silence lines that has first had their silence hook filtered out", () => {
-    // A filter runs before silencers. If filter transforms line so it no longer matches silencer, it's kept.
     const filters: Array<(line: string) => string> = [];
     const silencers: Array<(line: string) => boolean> = [];
     function clean(lines: string[]) {
@@ -213,13 +208,10 @@ describe("BacktraceCleanerFilterAndSilencerTest", () => {
         .filter((line) => !silencers.some((s) => s(line)));
     }
 
-    // Filter strips the gem path prefix
     filters.push((line) => line.replace("/gems/rack-1.0", ""));
-    // Silencer would silence lines with /gems/ — but after filter, the prefix is gone
     silencers.push((line) => line.includes("/gems/"));
 
     const bt = ["/gems/rack-1.0/lib/rack.rb"];
-    // After filter: "/lib/rack.rb" → does not include "/gems/" → NOT silenced
     expect(clean(bt)).toEqual(["/lib/rack.rb"]);
   });
 });

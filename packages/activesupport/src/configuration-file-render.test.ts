@@ -4,13 +4,6 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { ConfigurationFile } from "./configuration-file.js";
 
-/**
- * trails-only coverage for `ConfigurationFile#render` (configuration_file.rb:54-58)
- * and `parse`'s `@content.include?("<%")` branch (:22). Rails' own
- * `ConfigurationFileTest` only exercises render through the two backtrace tests,
- * which assert on a template that raises; nothing there covers a template that
- * renders successfully before the YAML parse.
- */
 describe("ConfigurationFile render", () => {
   let dir: string | undefined;
 
@@ -49,12 +42,6 @@ describe("ConfigurationFile render", () => {
   });
 });
 
-/**
- * trails-only coverage for `parse`'s `**options` passthrough
- * (configuration_file.rb:17-34). Rails' own `ConfigurationFileTest` never
- * passes a loader option; `Rails::Application::Configuration#database_configuration`
- * does (`aliases: true`).
- */
 describe("ConfigurationFile loader options", () => {
   let dir: string | undefined;
 

@@ -1,8 +1,3 @@
-/**
- * Mirrors: i18n/lib/i18n/utils.rb
- */
-
-/** A translation subtree: Ruby's Symbol-keyed Hash. */
 export type TranslationData = { [key: string]: unknown };
 
 function isHash(value: unknown): value is TranslationData {
@@ -23,7 +18,6 @@ export function deepMerge(
   return deepMergeBang({ ...hash }, otherHash, block);
 }
 
-/** Mirrors: I18n::Utils.deep_merge! — mutates and returns `hash`. */
 export function deepMergeBang(
   hash: TranslationData,
   otherHash: TranslationData,
@@ -46,12 +40,6 @@ export function deepMergeBang(
   return hash;
 }
 
-/**
- * Mirrors: I18n::Utils.deep_symbolize_keys. JS object keys are already
- * strings, so the Symbol conversion is inherent to the language; what remains
- * observable is the deep copy (and the coercion of numeric/boolean keys to
- * their string form), which this reproduces.
- */
 export function deepSymbolizeKeys(hash: TranslationData): TranslationData {
   const result: TranslationData = {};
   for (const [key, value] of Object.entries(hash)) {

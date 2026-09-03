@@ -33,9 +33,6 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// controller/send_file_test.rb — SendFileTest
-// ==========================================================================
 describe("SendFileTest", () => {
   it("file nostream", async () => {
     class C extends Base {
@@ -264,9 +261,6 @@ describe("SendFileTest", () => {
   });
 });
 
-// ==========================================================================
-// SendFileController tests (test actions that call send_data)
-// ==========================================================================
 describe("SendFileController", () => {
   it("send file headers bang", async () => {
     class C extends Base {
@@ -344,8 +338,6 @@ describe("SendFileController", () => {
     expect(c.contentType).toBe("image/png");
   });
 
-  // Guards the Base.prototype.sendFileHeadersBang wiring so a refactor
-  // that drops the prototype assignment trips this test.
   it("sendFileHeadersBang is reachable on controllers and mutates response", async () => {
     class C extends Base {
       async action() {

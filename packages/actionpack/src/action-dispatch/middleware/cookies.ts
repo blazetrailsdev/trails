@@ -14,7 +14,6 @@ import { getCrypto, KeyError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 
-/** Cookie expiry — accept either a Date or a Temporal.Instant from AR/AM. */
 export type CookieExpires = Date | Temporal.Instant;
 
 function toUTCString(expires: CookieExpires): string {
@@ -23,13 +22,7 @@ function toUTCString(expires: CookieExpires): string {
     : expires.toUTCString();
 }
 
-/**
- * Rack env key under which {@link CookieJar.build} reads the app-wide
- * {@link CookieJarOptions}. The `ActionDispatch::Cookies` middleware sets
- * this so signed/encrypted cookie accessors can find their secrets.
- *
- * @internal
- */
+/** @internal */
 export const COOKIES_APP_OPTIONS_KEY = "action_dispatch.cookies_app_options";
 
 export interface CookieJarOptions {
@@ -55,13 +48,7 @@ export interface SetCookieOptions {
   sameSite?: "strict" | "lax" | "none" | null;
 }
 
-/**
- * The `Rack::Response` shape {@link CookieJar.write} writes onto. Ruby passes
- * the response itself; TS names the structural minimum.
- *
- * @noRailsEquivalent PERMANENT — structural stand-in for `Rack::Response`,
- * whose `set_cookie` / `delete_cookie` are the only members `write` calls.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface CookieResponse {
   setCookie(name: string, value: SetCookieOptions): void;
   deleteCookie(name: string, options: { path?: string; domain?: string }): void;
@@ -73,58 +60,29 @@ export class CookieJar implements Iterable<[string, string]> {
   private _deletedCookies: Map<string, { path?: string; domain?: string }> = new Map();
   private _options: CookieJarOptions;
   private _committed = false;
-  /**
-   * Backing request reference for the serialized signed/encrypted jars'
-   * `cookies_serializer` lookup and the {@link CookieJar.signedOrEncrypted}
-   * dispatch. Populated by {@link CookieJar.build}; `undefined` when the
-   * jar is constructed standalone (e.g. unit tests of the plain API).
-   *
-   * @internal
-   */
+  /** @internal */
   _request?: RequestCookieMethodsHost;
 
   constructor(options: CookieJarOptions = {}) {
     this._options = options;
   }
 
-  /**
-   * Mirror of Rails `CookieJar#committed?` — true once the jar has been
-   * written to a response and further mutations have no effect.
-   *
-   * @internal
-   */
+  /** @internal */
   isCommitted(): boolean {
     return this._committed;
   }
 
-  /**
-   * Mirror of Rails `CookieJar#commit!` — freezes the set/delete sets so
-   * subsequent writes from downstream middleware are ignored.
-   *
-   * @internal
-   */
+  /** @internal */
   commitBang(): void {
     this._committed = true;
   }
 
-  /**
-   * Build a CookieJar seeded with `cookies` from a request. Mirrors
-   * `Cookies::CookieJar.build(request, cookies)` used by
-   * `ActionDispatch::TestProcess#cookies`. Ruby's `new` inside a class method
-   * resolves to the receiving subclass, so `NullCookieJar.build` builds a
-   * `NullCookieJar`.
-   *
-   * @internal
-   */
+  /** @internal */
   static build<T extends CookieJar>(
     this: new (options?: CookieJarOptions) => T,
     req: RequestCookieMethodsHost | { cookiesAppOptions?: CookieJarOptions } | null | undefined,
     cookies: Record<string, string>,
   ): T {
-    // Rails: `jar = new(req); jar.update(cookies); jar` — the request stores
-    // the options used by signed/encrypted jars. We forward
-    // `req.cookiesAppOptions` if the host exposes it so signed/encrypted
-    // accessors can find their secrets in test setups.
     const jar = new this(req?.cookiesAppOptions ?? {});
     if (req && "env" in req) jar._request = req;
     for (const [k, v] of Object.entries(cookies ?? {})) {
@@ -132,8 +90,6 @@ export class CookieJar implements Iterable<[string, string]> {
     }
     return jar;
   }
-
-  // --- Read ---
 
   get(key: string): string | undefined {
     return this._cookies.get(key);
@@ -174,8 +130,6 @@ export class CookieJar implements Iterable<[string, string]> {
     return result;
   }
 
-  // --- Write ---
-
   set(key: string, valueOrOptions: string | SetCookieOptions): void {
     if (this._committed) return;
     if (typeof valueOrOptions === "string") {
@@ -208,8 +162,6 @@ export class CookieJar implements Iterable<[string, string]> {
     return true;
   }
 
-  // --- Iteration ---
-
   each(fn: (key: string, value: string) => void): this {
     for (const [k, v] of this._cookies) {
       fn(k, v);
@@ -217,23 +169,14 @@ export class CookieJar implements Iterable<[string, string]> {
     return this;
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`use-site:vendor/rails/actionpack/lib/action_dispatch/middleware/cookies.rb:314, :340` — `include
-   *   Enumerable` plus `def each`).
-   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
-   */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): Iterator<[string, string]> {
     return this._cookies[Symbol.iterator]();
   }
 
-  // --- Permanent ---
-
   get permanent(): PermanentCookieJar {
     return new PermanentCookieJar(this);
   }
-
-  // --- Signed ---
 
   get signed(): SignedCookieJar {
     const secret = this._options.signedSecret ?? this._options.secret;
@@ -241,39 +184,17 @@ export class CookieJar implements Iterable<[string, string]> {
     return new SignedCookieJar(this, secret, this._request);
   }
 
-  // --- Encrypted ---
-
   get encrypted(): EncryptedCookieJar {
     const secret = this._options.encryptedSecret ?? this._options.secret;
     if (!secret) throw new Error("No secret configured for encrypted cookies");
     return new EncryptedCookieJar(this, secret, this._request);
   }
 
-  /**
-   * Returns the `encrypted` jar when `secret_key_base` is configured on the
-   * request, otherwise falls back to `signed`. Mirrors Rails'
-   * `ChainedCookieJars#signed_or_encrypted`, used by
-   * `ActionDispatch::Session::CookieStore` to avoid the need to introduce
-   * new cookie stores.
-   */
   get signedOrEncrypted(): SignedCookieJar | EncryptedCookieJar {
     const skb = this._request ? secretKeyBase.call(this._request) : undefined;
     return skb ? this.encrypted : this.signed;
   }
 
-  // --- Response headers ---
-
-  /**
-   * Mirrors `CookieJar#write` (cookies.rb:429-439) — flushes the accumulated
-   * set/delete sets onto a `Rack::Response`.
-   *
-   * trails' `Cookies` middleware still flushes through
-   * {@link CookieJar.getSetCookieHeaders} (it merges into a header tuple rather
-   * than a `Rack::Response`), so this is the Rails seam
-   * {@link NullCookieJar} overrides rather than the only writer; converging the
-   * middleware onto it is story
-   * `converge-cookies-middleware-onto-cookie-jar-write`.
-   */
   write(response: CookieResponse): void {
     for (const [name, value] of this._setCookies) {
       if (this.isWriteCookie(value)) {
@@ -286,13 +207,9 @@ export class CookieJar implements Iterable<[string, string]> {
     }
   }
 
-  /**
-   * Mirrors `mattr_accessor :always_write_cookie, default: false`
-   * (cookies.rb:441).
-   */
   static alwaysWriteCookie = false;
 
-  /** Mirrors `CookieJar#write_cookie?` (cookies.rb:448-450). @internal */
+  /** @internal */
   private isWriteCookie(cookie: SetCookieOptions): boolean {
     const request = this._request as unknown as { ssl?: boolean; host?: string } | undefined;
     return (
@@ -313,8 +230,6 @@ export class CookieJar implements Iterable<[string, string]> {
     }
     return headers;
   }
-
-  // --- Parse from request ---
 
   /** @internal */
   static parse(cookieHeader: string, options: CookieJarOptions = {}): CookieJar {
@@ -352,11 +267,6 @@ export class PermanentCookieJar {
   }
 }
 
-/**
- * Options accepted by the signed/encrypted jars' `set` — mirror of
- * `AbstractCookieJar#[]=` accepting either a bare value or a `Hash` carrying
- * `:value` alongside cookie metadata.
- */
 export type SerializedSetOptions = Omit<SetCookieOptions, "value"> & { value: unknown };
 
 /** @internal */
@@ -399,11 +309,6 @@ export class SignedCookieJar {
     this.host = makeSerializedHost(request);
   }
 
-  /**
-   * Mirror of Rails `AbstractCookieJar#[]=` for the signed jar: accept a
-   * bare value or a hash with `:value`, JSON-serialize via the
-   * SerializedCookieJars layer, then sign and write to the parent jar.
-   */
   set(key: string, valueOrOptions: unknown): void {
     const options = normalizeSerializedInput(valueOrOptions);
     commit.call(this.host, key, options);
@@ -412,10 +317,6 @@ export class SignedCookieJar {
     this.jar.set(key, { ...(options as SetCookieOptions), value: signed });
   }
 
-  /**
-   * Rails' `ChainedCookieJars#permanent`, which every `AbstractCookieJar`
-   * carries (cookies.rb:234, 507), so `cookies.signed.permanent[...]` chains.
-   */
   get permanent(): PermanentCookieJar {
     return new PermanentCookieJar(this as unknown as CookieJar);
   }
@@ -444,7 +345,6 @@ export class SignedCookieJar {
     const sig = signedValue.slice(idx + 2);
     const expected = getCrypto().createHmac(this.digest, this.secret).update(value).digest("hex");
     if (sig.length !== expected.length) return undefined;
-    // Constant-time comparison
     let match = true;
     for (let i = 0; i < sig.length; i++) {
       if (sig[i] !== expected[i]) match = false;
@@ -464,11 +364,6 @@ export class EncryptedCookieJar {
     this.host = makeSerializedHost(request);
   }
 
-  /**
-   * Mirror of Rails `AbstractCookieJar#[]=` for the encrypted jar: accept a
-   * bare value or a hash with `:value`, JSON-serialize via the
-   * SerializedCookieJars layer, then encrypt and write to the parent jar.
-   */
   set(key: string, valueOrOptions: unknown): void {
     const options = normalizeSerializedInput(valueOrOptions);
     commit.call(this.host, key, options);
@@ -539,24 +434,9 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-// ===========================================================================
-// ActionDispatch::Cookies — middleware
-// ===========================================================================
-
-/**
- * Rack env key under which the constructed {@link CookieJar} is cached for
- * the duration of the request. Mirrors `ActionDispatch::Cookies::COOKIES_KEY`.
- *
- * @internal
- */
+/** @internal */
 export const COOKIES_KEY = "action_dispatch.cookies";
 
-/**
- * `ActionDispatch::Cookies` middleware. Mirrors Rails' shape: the jar is
- * built lazily by downstream code via `request.cookie_jar`; this middleware
- * only flushes accumulated cookies on the way out if the jar was touched
- * and not yet committed.
- */
 export class Cookies {
   private app: RackApp;
 
@@ -573,28 +453,14 @@ export class Cookies {
     const outHeaders: Record<string, string> = { ...headers };
     const setHeaders = jar.getSetCookieHeaders();
     if (setHeaders.length > 0) {
-      // Rack 3 standardizes on lowercase header keys, but Rails-shaped
-      // middleware can still emit `Set-Cookie` (or stranger casings).
-      // Accumulate values from *every* set-cookie variant the response
-      // carries so nothing is dropped when more than one casing is
-      // present (e.g. both "Set-Cookie" and "set-cookie"), then
-      // canonicalize on lowercase `set-cookie`.
       const existingList: string[] = [];
       for (const key of Object.keys(outHeaders)) {
         if (key.toLowerCase() !== "set-cookie") continue;
-        // Although the RackResponse tuple types headers as
-        // Record<string, string>, downstream apps backed by
-        // `Rack::Response` (Record<string, string | string[]>) can
-        // hand back set-cookie as an array — splatting it into a
-        // string template would stringify with commas and corrupt the
-        // header. Normalize both shapes to a flat string[].
         const v = outHeaders[key] as unknown as string | string[];
         if (Array.isArray(v)) existingList.push(...v);
         else existingList.push(v);
         if (key !== "set-cookie") delete outHeaders[key];
       }
-      // Rack's wire convention is newline-joined values within a
-      // single set-cookie header.
       outHeaders["set-cookie"] = [...existingList, ...setHeaders].join("\n");
     }
     jar.commitBang();
@@ -602,21 +468,9 @@ export class Cookies {
   }
 }
 
-// ===========================================================================
-// ActionDispatch::RequestCookieMethods — Request mixin
-// ===========================================================================
-
-/**
- * Host shape used by {@link cookieJar}, {@link isHaveCookieJar}, and
- * the `action_dispatch.*` env-key accessors below ({@link keyGenerator}
- * et al.). The `env` is the underlying Rack env on the request; trails
- * reads/writes Rails `action_dispatch.*` keys there.
- *
- * @internal
- */
+/** @internal */
 export interface RequestCookieMethodsHost {
   env: RackEnv;
-  /** Untyped, as `@env[name]` (rack/lib/rack/request.rb:100-102) is in Ruby. */
   getHeader(name: string): any;
   hasHeader(name: string): boolean;
   cookiesAppOptions?: CookieJarOptions;
@@ -625,7 +479,6 @@ export interface RequestCookieMethodsHost {
 
 const COOKIE_JAR_ENV = COOKIES_KEY;
 
-/** Returns the {@link CookieJar} for this request, building it on demand. */
 export function cookieJar(this: RequestCookieMethodsHost, jar?: CookieJar): CookieJar {
   if (jar !== undefined) {
     this.env[COOKIE_JAR_ENV] = jar;
@@ -638,7 +491,6 @@ export function cookieJar(this: RequestCookieMethodsHost, jar?: CookieJar): Cook
   return built;
 }
 
-/** True iff a cookie jar has already been built for this request. */
 export function isHaveCookieJar(this: RequestCookieMethodsHost): boolean {
   return this.hasHeader("action_dispatch.cookies");
 }
@@ -648,7 +500,7 @@ const requestEnvAccessor = <T>(key: string) =>
     return this.env[key] as T | undefined;
   };
 
-/** Rails: `request.key_generator` — the app key generator. @internal */
+/** @internal */
 export const keyGenerator = requestEnvAccessor<unknown>("action_dispatch.key_generator");
 /** @internal */
 export const signedCookieSalt = requestEnvAccessor<string>("action_dispatch.signed_cookie_salt");
@@ -693,42 +545,20 @@ export const useCookiesWithMetadata = requestEnvAccessor<boolean>(
   "action_dispatch.use_cookies_with_metadata",
 );
 
-// ===========================================================================
-// ActionDispatch::Cookies::ChainedCookieJars
-// ===========================================================================
-
-/**
- * Host shape for {@link signedOrEncrypted} and the upgrade-path predicates.
- * Matches the `request: RequestCookieMethods` view Rails' ChainedCookieJars
- * relies on.
- *
- * @internal
- */
+/** @internal */
 export interface ChainedCookieJarsHost {
   request: RequestCookieMethodsHost;
   signed: SignedCookieJar;
   encrypted: EncryptedCookieJar;
 }
 
-/**
- * Returns the `encrypted` jar when `secret_key_base` is configured on the
- * request, otherwise falls back to `signed`. Mirrors Rails'
- * `signed_or_encrypted`, used by `ActionDispatch::Session::CookieStore`.
- */
 export function signedOrEncrypted(
   this: ChainedCookieJarsHost,
 ): SignedCookieJar | EncryptedCookieJar {
   return secretKeyBase.call(this.request) ? this.encrypted : this.signed;
 }
 
-/**
- * Rails: true while the deprecated HMAC-AES-CBC cookie format is still
- * being decoded alongside the newer AEAD format. Faithful predicate:
- * secret_key_base present, both legacy salts present, and the
- * authenticated-encryption flag set.
- *
- * @internal
- */
+/** @internal */
 export function isUpgradeLegacyHmacAesCbcCookies(this: ChainedCookieJarsHost): boolean {
   const req = this.request;
   return Boolean(
@@ -739,13 +569,7 @@ export function isUpgradeLegacyHmacAesCbcCookies(this: ChainedCookieJarsHost): b
   );
 }
 
-/**
- * Rails: rewriter predicate — true when the legacy CBC salt is configured
- * but authenticated encryption is *off*, signalling we should rewrite
- * authenticated-encrypted cookies back into the legacy format.
- *
- * @internal
- */
+/** @internal */
 export function isPrepareUpgradeLegacyHmacAesCbcCookies(this: ChainedCookieJarsHost): boolean {
   const req = this.request;
   return Boolean(
@@ -755,29 +579,15 @@ export function isPrepareUpgradeLegacyHmacAesCbcCookies(this: ChainedCookieJarsH
   );
 }
 
-// ===========================================================================
-// ActionDispatch::Cookies::SerializedCookieJars
-// ===========================================================================
-
 const MAX_COOKIE_SIZE = 4096;
 
-/**
- * Serializer protocol mirroring `ActiveSupport::Messages::SerializerWithFallback`.
- * `dumped` lets the jar detect cookies written by a different serializer
- * so {@link isReserialize} can flag them for rewrite.
- */
 export interface CookieSerializer {
   dump(value: unknown): string;
   load(dumped: string): unknown;
   dumped(payload: string): boolean;
 }
 
-/**
- * Host shape for the SerializedCookieJars module. Carries the request
- * (for `cookies_serializer` lookup) and a memoization slot.
- *
- * @internal
- */
+/** @internal */
 export interface SerializedCookieJarsHost {
   request: RequestCookieMethodsHost;
   _serializer?: CookieSerializer;
@@ -785,10 +595,6 @@ export interface SerializedCookieJarsHost {
 
 const JSON_SERIALIZER: CookieSerializer = {
   dump: (v) => {
-    // JSON.stringify returns `undefined` for `undefined`/functions/symbols.
-    // Rails' JSON serializer raises on those; do the same so
-    // unserializable values aren't silently dropped by CookieJar#set's
-    // `value === undefined` guard.
     const out = JSON.stringify(v);
     if (out === undefined) {
       throw new TypeError(`cannot serialize ${typeof v} as a cookie value`);
@@ -806,21 +612,9 @@ const JSON_SERIALIZER: CookieSerializer = {
   },
 };
 
-/**
- * Selects and memoizes the cookie value serializer. Rails dispatches on
- * `request.cookies_serializer` (`:json`, `:hybrid`, `:marshal`, a custom
- * serializer object, or `nil`); trails ports `:json` / `:hybrid` to the
- * JSON serializer (Marshal isn't a portable on-disk format in JS) and
- * honors a caller-supplied custom serializer object verbatim. Anything
- * else falls back to JSON.
- *
- * @internal
- */
+/** @internal */
 export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
   if (this._serializer) return this._serializer;
-  // Read the env slot directly so a caller-supplied object serializer
-  // is visible (the public `cookiesSerializer` accessor narrows to
-  // string for the common Symbol-name case).
   const configured = this.request.env["action_dispatch.cookies_serializer"];
   if (
     configured &&
@@ -830,30 +624,17 @@ export function serializer(this: SerializedCookieJarsHost): CookieSerializer {
   ) {
     this._serializer = configured as CookieSerializer;
   } else {
-    // `:json`, `:hybrid`, `nil`, unknown symbol → JSON.
     this._serializer = JSON_SERIALIZER;
   }
   return this._serializer;
 }
 
-/**
- * Returns true when `dumped` was produced by a serializer that differs
- * from the currently-configured one, so the jar should rewrite it next
- * commit. Mirrors Rails' `reserialize?`.
- *
- * @internal
- */
+/** @internal */
 export function isReserialize(this: SerializedCookieJarsHost, dumped: string): boolean {
   return !serializer.call(this).dumped(dumped);
 }
 
-/**
- * Rails: `commit(name, options)` — final transformation applied to a
- * cookie's `:value` before it is written. The serialized cookie jars use
- * this to call `serializer.dump`. Mutates `options.value` in place.
- *
- * @internal
- */
+/** @internal */
 export function commit(
   this: SerializedCookieJarsHost,
   _name: string,
@@ -862,13 +643,7 @@ export function commit(
   options.value = serializer.call(this).dump(options.value);
 }
 
-/**
- * Rails raises `CookieOverflow` when a serialized value exceeds 4096
- * bytes (the browser-imposed cookie ceiling). Faithful port: checks
- * `options.value.bytesize` post-serialization.
- *
- * @internal
- */
+/** @internal */
 export function checkForOverflowBang(name: string, options: { value: string }): void {
   const size = Buffer.byteLength(options.value, "utf8");
   if (size > MAX_COOKIE_SIZE) {

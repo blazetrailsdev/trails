@@ -906,22 +906,10 @@ export default defineConfig(
       // This row never shrinks; there is nothing to sweep.
       "scripts/test-compare/output/**",
 
-      // story enroll-remaining-packages-in-no-freeform-comments — the packages
-      // and tooling trees with no sweep of their own yet.
-      "packages/actionpack/**",
-      "packages/actionview/**",
-      "packages/activerecord-cli/**",
-      "packages/activesupport/**",
-      "packages/date/**",
-      "packages/did-you-mean/**",
-      "packages/globalid/**",
-      "packages/html-sanitizer/**",
-      "packages/i18n/**",
-      "packages/nokogiri/**",
-      "packages/rack/**",
-      "packages/trails-tsc/**",
-      "packages/trailties/**",
-      "packages/tse-compiler/**",
+      // story sweep-the-tooling-trees-in-no-freeform-comments — the tooling
+      // and site trees with no sweep of their own yet. Every `packages/*`
+      // row left this list with the package sweep in story
+      // enroll-remaining-packages-in-no-freeform-comments.
       "packages/website/**",
       "examples/**",
       "eslint/**",
@@ -936,7 +924,7 @@ export default defineConfig(
   },
   // ── no-freeform-comments, individually-clean files inside an excluded tree.
   //    An exclusion row above is a tree, so it would otherwise hand a pass to
-  //    the files under it that carry no comment today. These 476 do, measured
+  //    the files under it that carry no comment today. These 65 do, measured
   //    with the rest of the list, and they are re-enrolled here so the flip
   //    costs no coverage. The list shrinks with its exclusion row; a file is
   //    never removed from it to turn a run green. ──

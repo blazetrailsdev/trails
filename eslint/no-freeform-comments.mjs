@@ -166,7 +166,7 @@ function groupLineComments(comments, sourceCode) {
   const groups = [];
   let current = null;
   for (const comment of comments) {
-    if (comment.type !== "Line") {
+    if (comment.type !== "Line" || isHashbang(comment, sourceCode)) {
       if (current) {
         groups.push(current);
         current = null;
@@ -189,6 +189,10 @@ function groupLineComments(comments, sourceCode) {
   }
   if (current) groups.push(current);
   return groups;
+}
+
+function isHashbang(comment, sourceCode) {
+  return sourceCode.getText(comment).startsWith("#!");
 }
 
 /** True when nothing but whitespace precedes the comment on its own line. */
@@ -368,7 +372,7 @@ const rule = {
           // A directive comment is machine input: rewriting it is how the
           // first fix pass turned `/* eslint-disable */` into `/** ... */`,
           // which the second pass no longer recognised and deleted.
-          if (group.some(hasDirective)) continue;
+          if (group.some(hasDirective) || group.some((c) => isHashbang(c, sourceCode))) continue;
           const rewrites = group.map((comment) => [comment, keptLines(comment)]);
           if (rewrites.some(([, kept]) => kept === null)) continue;
           const anyKept = rewrites.some(([, kept]) => kept.length > 0);

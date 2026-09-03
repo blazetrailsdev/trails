@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { tokenize as erbTokenize } from "./tse/util.js";
 
-/** Mirrors the test's own `tokenize` helper (erb_util_test.rb:156-158). */
 function tokenize(source: string): [string, string][] {
   return erbTokenize(source);
 }

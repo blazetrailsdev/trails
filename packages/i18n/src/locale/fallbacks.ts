@@ -1,53 +1,9 @@
-/**
- * Mirrors: i18n/lib/i18n/locale/fallbacks.rb
- *
- * Locale fallbacks will compute a number of fallback locales for a given
- * locale. For example:
- *
- *     I18n.fallbacks().get("es-MX") // => ["es-MX", "es", "en"]
- *
- * Locale fallbacks always fall back to
- *
- *   * all parent locales of a given locale (e.g. "es" for "es-MX") first,
- *   * the current default locales and all of their parents second
- *
- * The default locales are set to [] by default but can be set to something
- * else.
- *
- * One can additionally add any number of additional fallback locales manually.
- * These will be added before the default locales to the fallback chain. For
- * example:
- *
- *     // using a custom locale as default fallback locale
- *
- *     I18n.setFallbacks(new Fallbacks("en-GB", { "de-AT": "de", "de-CH": "de" }));
- *     I18n.fallbacks().get("de-AT"); // => ["de-AT", "de", "en-GB", "en"]
- *     I18n.fallbacks().get("de-CH"); // => ["de-CH", "de", "en-GB", "en"]
- *
- *     // mapping fallbacks to an existing instance
- *
- *     // people speaking Catalan also speak Spanish as spoken in Spain
- *     const fallbacks = I18n.fallbacks();
- *     fallbacks.map({ ca: "es-ES" });
- *     fallbacks.get("ca"); // => ["ca", "es-ES", "es", "en-US", "en"]
- *
- * Ruby subclasses `Hash`; the JS analogue of a Hash is a `Map`, so `[]` — which
- * `docs/ruby-ts-conventions.md` maps to `get()` — lands on `Map#get` and its
- * `super` call is the gem's `super`.
- */
-
 import { InvalidLocale, Disabled } from "../exceptions.js";
 import type { Locale } from "../i18n.js";
 import { tag as tagFor } from "./tag.js";
 
-/** A mapping argument: `{ "de-AT": "de-DE" }` or `{ sms: ["se-FI", "fi-FI"] }`. */
 export type FallbackMappings = Record<Locale, Locale | Locale[]>;
 
-/**
- * Ruby's `Symbol#inspect`, which quotes any symbol that is not a plain
- * identifier — `:"de-AT"`, but `:de`. `inspect` in `../exceptions.js` renders
- * translation values, not locales.
- */
 function inspectSymbol(value: Locale): string {
   return /^[a-zA-Z_][a-zA-Z0-9_]*[?!=]?$/.test(value) ? `:${value}` : `:"${value}"`;
 }
@@ -57,13 +13,6 @@ function inspectLocales(locales: Locale[]): string {
 }
 
 export class Fallbacks extends Map<Locale, Locale[]> {
-  /**
-   * Ruby's `Class#name` carries the module nesting the class was defined in, so
-   * `self.class.name` renders `I18n::Locale::Fallbacks` rather than the bare
-   * constant. A TS class has no nesting to read, so it declares the Ruby name
-   * over `Function.name` — `this.constructor.name` is then the same string
-   * Ruby's is, and any sibling ported class carries its own the same way.
-   */
   static override name = "I18n::Locale::Fallbacks";
 
   private mapStore: Record<Locale, Locale[]> = {};
@@ -148,7 +97,6 @@ export class Fallbacks extends Map<Locale, Locale[]> {
     return [...new Set(result)].filter((locale) => locale != null);
   }
 
-  /** Ruby's `Hash#store`, which `[]` calls for its return value. */
   private store(locale: Locale, value: Locale[]): Locale[] {
     this.set(locale, value);
     return value;

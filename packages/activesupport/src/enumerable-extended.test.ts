@@ -24,7 +24,6 @@ import {
   pluck,
 } from "./enumerable-utils.js";
 
-// Helpers mirroring Rails test structs
 interface Payment {
   price: number;
 }
@@ -230,10 +229,6 @@ describe("EnumerableTests", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Ruby-named describe block — matches Rails core_ext/enumerable_test.rb
-// ---------------------------------------------------------------------------
-
 describe("EnumerableTests", () => {
   it("minimum with empty enumerable", () => {
     expect(minimum([], (n: number) => n)).toBeUndefined();
@@ -249,7 +244,6 @@ describe("EnumerableTests", () => {
   });
 
   it("nil sums", () => {
-    // null/undefined values are treated as 0
     const payments = [pay(5), null as any, pay(10)];
     const total = payments.reduce((acc, p) => acc + (p?.price ?? 0), 0);
     expect(total).toBe(15);
@@ -260,7 +254,6 @@ describe("EnumerableTests", () => {
   });
 
   it("range sums", () => {
-    // Simulate range [1..5] sum
     const range = [1, 2, 3, 4, 5];
     expect(sum(range, (n) => n)).toBe(15);
   });
@@ -288,7 +281,6 @@ describe("EnumerableTests", () => {
       count++;
       return x > 0;
     });
-    // stops early once 2 matches found
     expect(count).toBeLessThanOrEqual(3);
   });
 
@@ -380,7 +372,6 @@ describe("EnumerableTests", () => {
   });
 
   it("doesnt bust constant cache", () => {
-    // Trivial — JS doesn't have Ruby's constant cache concern
     const arr = [1, 2, 3];
     expect(excluding(arr, 2)).toEqual([1, 3]);
   });

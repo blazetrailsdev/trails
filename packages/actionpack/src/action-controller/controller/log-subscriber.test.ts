@@ -89,7 +89,6 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("process action without parameters", () => {
-    // Parameters line is emitted by dispatch middleware, not the subscriber itself.
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 200 }, 5));
     expect(logger.messages.every((m) => !/Parameters/.test(m))).toBe(true);
   });

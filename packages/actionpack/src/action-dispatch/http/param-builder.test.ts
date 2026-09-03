@@ -14,12 +14,6 @@ function plain(v: unknown): unknown {
 }
 
 describe("ParamBuilder", () => {
-  // Much of the behavioral details are covered by long-standing
-  // integration tests in test/request/query_string_parsing_test.rb
-  //
-  // This test doesn't need to duplicate all of that: it just
-  // offers a simple baseline of unit tests.
-
   const previous = ParamBuilder.ignoreLeadingBrackets;
   afterEach(() => {
     ParamBuilder.ignoreLeadingBrackets = previous;

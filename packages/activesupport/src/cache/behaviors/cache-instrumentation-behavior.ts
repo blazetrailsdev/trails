@@ -4,16 +4,9 @@ import type { Event } from "../../notifications/instrumenter.js";
 import type { Store, StoreOptions } from "../store.js";
 import { assertSame } from "../../testing/assertions.js";
 
-// Mirrors Rails `CacheInstrumentationBehavior`
-// (activesupport/test/cache/behaviors/cache_instrumentation_behavior.rb).
-// Ruby's `include CacheInstrumentationBehavior` is spelled here as a function
-// the store test file calls inside its own describe, the trails spelling of a
-// test-behavior mixin (see cache-store-compression-behavior.ts).
-
 /** @internal */
 export interface CacheInstrumentationBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
-  /** Ruby reads the store name off `@cache.class.name`. */
   storeName: string;
 }
 
@@ -38,7 +31,6 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
   }
 
   function normalizedKey(key: string, options?: StoreOptions): string {
-    // Ruby `@cache.send(:normalize_key, key, options)`.
     return (
       cache as unknown as { normalizeKey(key: string, options?: StoreOptions): string }
     ).normalizeKey(key, options);

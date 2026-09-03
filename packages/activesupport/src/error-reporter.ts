@@ -7,16 +7,7 @@ export interface ErrorContext {
   [key: string]: unknown;
 }
 
-/**
- * The duck type `ErrorReporter#subscribe` requires — Rails asserts
- * `subscriber.respond_to?(:report)` and names no constant for the shape. The
- * method's signature is `error_reporter.rb:158`'s documented one, with Ruby's
- * kwargs as the trailing options object.
- *
- * @noRailsEquivalent PERMANENT — name collision only. Ruby's
- * `ErrorSubscriber` (`error_reporter/test_helper.rb`) is a concrete
- * recording subscriber for tests, not the protocol itself.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface ErrorSubscriber {
   report(
     error: Error,
@@ -29,36 +20,17 @@ export interface ErrorSubscriber {
   ): void;
 }
 
-/**
- * The subset of {@link Logger} `report`'s subscriber rescue reaches
- * (`error_reporter.rb:231-235`). Rails' `attr_accessor :logger` names no type.
- */
 type ErrorReporterLogger = { fatal(message?: string | (() => string)): unknown };
 
-/** A `rescue`-able error class, as `handle`/`record`'s `*error_classes` splat holds. */
 type ErrorClass = abstract new (...args: any[]) => Error;
 
-/** The class form `unsubscribe` and `disable` accept alongside a subscriber itself. */
 type ErrorSubscriberClass = abstract new (...args: any[]) => ErrorSubscriber;
 
-/**
- * `ActiveSupport::ErrorReporter` is a common interface for error reporting
- * services.
- *
- * Mirrors: `activesupport/lib/active_support/error_reporter.rb`.
- */
 export class ErrorReporter {
   static readonly SEVERITIES: ErrorSeverity[] = ["error", "warning", "info"];
   static readonly DEFAULT_SOURCE = "application";
-  /** Ruby's `[StandardError].freeze`; JS' nearest rescuable root is `Error`. */
   static readonly DEFAULT_RESCUE: readonly ErrorClass[] = Object.freeze([Error]);
 
-  /**
-   * Ruby's `Class.new(Exception)` — deliberately outside `StandardError` so a
-   * `rescue` higher in the stack does not swallow it. JS has no class below
-   * `Error` to express that with, so `handle`'s `DEFAULT_RESCUE` does catch it;
-   * the intent survives in the name.
-   */
   static readonly UnexpectedError = class UnexpectedError extends Error {
     constructor(message: string, options?: { cause?: unknown }) {
       super(message, options);
@@ -87,12 +59,6 @@ export class ErrorReporter {
     this.debugMode = false;
   }
 
-  /**
-   * Evaluates the given block, reporting and swallowing any unhandled error.
-   * If no error is raised, returns the return value of the block. Otherwise,
-   * returns the result of `fallback.call`, or `null` if `fallback` is not
-   * specified.
-   */
   handle<T>(...args: [fn: () => T]): T | null;
   handle<T>(...args: [opts: HandleOptions, fn: () => T]): T | null;
   handle<T>(...args: [...errorClasses: ErrorClass[], fn: () => T]): T | null;
@@ -115,10 +81,6 @@ export class ErrorReporter {
     }
   }
 
-  /**
-   * Evaluates the given block, reporting and re-raising any unhandled error.
-   * If no error is raised, returns the return value of the block.
-   */
   record<T>(...args: [fn: () => T]): T;
   record<T>(...args: [opts: RecordOptions, fn: () => T]): T;
   record<T>(...args: [...errorClasses: ErrorClass[], fn: () => T]): T;
@@ -136,11 +98,6 @@ export class ErrorReporter {
     }
   }
 
-  /**
-   * Either report the given error when in production, or raise it when in
-   * development or test. The error can be either an exception instance or a
-   * String.
-   */
   unexpected(
     error: Error | string,
     {
@@ -156,8 +113,6 @@ export class ErrorReporter {
       const unexpected = new ErrorReporter.UnexpectedError(`${error.name}: ${error.message}`, {
         cause: error,
       });
-      // Ruby's third `raise` argument — the new error carries the original's
-      // backtrace, so its first frame is the caller's, not this file's.
       unexpected.stack = error.stack;
       throw unexpected;
     } else {
@@ -165,13 +120,6 @@ export class ErrorReporter {
     }
   }
 
-  /**
-   * Register a new error subscriber. The subscriber must respond to
-   *
-   *   report(error, { handled, severity, context, source })
-   *
-   * The `report` method **should never** raise an error.
-   */
   subscribe(subscriber: ErrorSubscriber): void {
     if (typeof (subscriber as { report?: unknown })?.report !== "function") {
       throw new ArgumentError("Error subscribers must respond to #report");
@@ -179,15 +127,10 @@ export class ErrorReporter {
     this.subscribers.push(subscriber);
   }
 
-  /** Unregister an error subscriber. Accepts either a subscriber or a class. */
   unsubscribe(subscriber: ErrorSubscriber | ErrorSubscriberClass): void {
     deleteIf(this.subscribers, (s) => caseEquals(subscriber, s));
   }
 
-  /**
-   * Prevent a subscriber from being notified of errors for the duration of the
-   * block. You may pass in the subscriber itself, or its class.
-   */
   disable<T>(subscriber: ErrorSubscriber | ErrorSubscriberClass, fn: () => T): T {
     const disabledSubscribers = IsolatedExecutionState.fetch<
       Array<ErrorSubscriber | ErrorSubscriberClass>
@@ -200,25 +143,11 @@ export class ErrorReporter {
     }
   }
 
-  /**
-   * Update the execution context that is accessible to error subscribers. Any
-   * context passed to #handle, #record, or #report will be merged with the
-   * context set here.
-   */
   setContext(attrs: Record<string, unknown>): void {
     ExecutionContext.set(attrs);
   }
 
-  /**
-   * Report an error directly to subscribers. You can use this method when the
-   * block-based #handle and #record methods are not suitable.
-   *
-   * @missingRailsCall merge — PERMANENT: error_reporter.rb:263
-   *   `ActiveSupport::ExecutionContext.to_h.merge(context)` — Ruby Hash#merge
-   *   returning a new hash is JS object spread (`{ ...ExecutionContext.toH(),
-   *   ...context }`); there is no Hash object to call `merge` on. Same
-   *   substitution as the `cache.ts merged_options -> merge` row.
-   */
+  /** @missingRailsCall merge — PERMANENT */
   report(
     error: Error,
     {
@@ -274,15 +203,9 @@ export class ErrorReporter {
     return null;
   }
 
-  /**
-   * @missingRailsCall first — PERMANENT: Ruby walks `error.backtrace_locations.first&.path`
-   * to shift this file's frames off the backtrace its `raise` just manufactured.
-   * JS' `throw`/`catch` manufactures nothing, so there is no list to walk;
-   * `Error.captureStackTrace`'s `constructorOpt` elides the same frames at
-   * capture time, which is why no `first` survives here.
-   */
+  /** @missingRailsCall first — PERMANENT */
   private ensureBacktrace(error: Error): void {
-    if (Object.isFrozen(error)) return; // re-raising won't add a backtrace
+    if (Object.isFrozen(error)) return;
     if (error?.stack != null) return;
 
     Error.captureStackTrace?.(error as object, this.ensureBacktrace);
@@ -302,48 +225,27 @@ export interface RecordOptions {
   source?: string;
 }
 
-/**
- * Ruby's `@__rails_error_reported` instance variable (`error_reporter.rb:217`),
- * as the JS property that plays an ivar's part: hidden from enumeration and
- * shared across every copy of this module.
- */
 const RAILS_ERROR_REPORTED = Symbol.for("__rails_error_reported");
 
-/**
- * Ruby's `subscriber === s`, whose meaning depends on the receiver: a Module
- * tests membership, anything else tests equality.
- */
 function caseEquals(subscriber: unknown, s: unknown): boolean {
   if (typeof subscriber === "function") return s instanceof (subscriber as ErrorSubscriberClass);
   return subscriber === s;
 }
 
-/** Ruby's `Array#delete`, which removes every equal element in place. */
 function deleteFrom<T>(array: T[], value: T): void {
   deleteIf(array, (element) => element === value);
 }
 
-/** Ruby's `Array#delete_if`, which filters in place rather than returning a new array. */
 function deleteIf<T>(array: T[], predicate: (element: T) => boolean): void {
   for (let i = array.length - 1; i >= 0; i--) {
     if (predicate(array[i])) array.splice(i, 1);
   }
 }
 
-/** Ruby's `rescue *error_classes`, which binds `error` to an Exception by construction. */
 function rescues(errorClasses: readonly ErrorClass[], error: unknown): error is Error {
   return errorClasses.some((cls) => error instanceof cls);
 }
 
-/**
- * Ruby's trailing-`**kwargs` binding: the last argument is the kwargs Hash when
- * it is a plain object, and is otherwise absent. TS has no kwargs, so the splat
- * has to be unpicked from the end by hand.
- *
- * `isPositional` vetoes that: Ruby's parser tells a kwargs Hash from a trailing
- * positional argument, and where TS cannot, the caller supplies the same duck
- * type Rails itself dispatches on.
- */
 function splitKwargs<O>(
   args: readonly unknown[],
   isPositional: (value: unknown) => boolean = () => false,
@@ -353,15 +255,6 @@ function splitKwargs<O>(
   return [args, {} as O];
 }
 
-/**
- * Ruby's `def handle(*error_classes, **kwargs, &block)` binding. The block is
- * always last, the kwargs Hash sits before it when present, and everything
- * ahead of them is the `*error_classes` splat — so `handle(NameError,
- * ArgumentError) { }` (`error_reporter.rb:82`) and `handle(fallback: -> { })
- * { }` (`:104`) both land where Rails puts them. `error_classes =
- * DEFAULT_RESCUE if error_classes.empty?` is the same line in both `handle` and
- * `record` (`:79`, `:115`).
- */
 function splitBlockArgs<O, T>(args: readonly unknown[]): [readonly ErrorClass[], O, () => T] {
   const rest = args.slice();
   const fn = rest.pop() as () => T;
@@ -372,19 +265,10 @@ function splitBlockArgs<O, T>(args: readonly unknown[]): [readonly ErrorClass[],
   return [errorClasses, opts, fn];
 }
 
-/**
- * `subscribe`'s duck type (`error_reporter.rb:162`), which is what tells a plain
- * object subscriber from the constructor's `logger:` kwargs Hash.
- */
 function respondsToReport(value: unknown): boolean {
   return typeof (value as { report?: unknown })?.report === "function";
 }
 
-/**
- * Whether a trailing argument is Ruby's kwargs Hash rather than a positional
- * one. A subscriber, an error class and a block are all callable or
- * class-shaped; only the kwargs Hash is a plain object.
- */
 function isKwargs(value: unknown): boolean {
   return (
     typeof value === "object" &&
@@ -394,24 +278,10 @@ function isKwargs(value: unknown): boolean {
   );
 }
 
-/**
- * The process-wide reporter behind `ActiveSupport.error_reporter`
- * (activesupport/lib/active_support.rb:104-105 — `@error_reporter =
- * ActiveSupport::ErrorReporter.new` plus `singleton_class.attr_accessor
- * :error_reporter`). It lives here rather than as a data property on the
- * `ActiveSupport` barrel object so that a caller inside the package can read
- * the CURRENT reporter without importing the barrel: that import is eager in
- * ESM, and from `deprecation.ts` it closed a cycle through `index.ts` into
- * `message-pack` that left `Serializer` in TDZ. `ActiveSupport.errorReporter`
- * is an accessor pair over this binding — the same shape `fsAdapter` and
- * `cryptoAdapter` already use — so the two can never disagree and assigning
- * through the barrel still works.
- *
- * @internal
- */
+/** @internal */
 export let currentErrorReporter = new ErrorReporter();
 
-/** @internal Writer behind `ActiveSupport.errorReporter =`. */
+/** @internal */
 export function _setErrorReporter(reporter: ErrorReporter): void {
   currentErrorReporter = reporter;
 }

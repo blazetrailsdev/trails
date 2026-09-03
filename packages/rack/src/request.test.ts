@@ -77,7 +77,6 @@ describe("RackRequestTest", () => {
     });
     expect(capturedKey).toBe("FOO");
     expect(req.get("FOO")).toBe("bar");
-    // raises when key is absent and no block given (mirrors Hash#fetch / env.fetch)
     const err = (() => {
       try {
         req.fetchHeader("MISSING");
@@ -213,7 +212,6 @@ describe("RackRequestTest", () => {
     }
 
     try {
-      // default priority: [:forwarded, :x_forwarded]
       expect(
         req({ HTTP_FORWARDED: "for=1.2.3.4", HTTP_X_FORWARDED_FOR: "2.3.4.5" }).forwardedFor,
       ).toEqual(["1.2.3.4"]);
@@ -239,7 +237,6 @@ describe("RackRequestTest", () => {
 
       expect(req({ HTTP_X_FORWARDED_SCHEME: "http" }).forwardedScheme).toBe("http");
 
-      // priority: [nil, :x_forwarded, :forwarded]
       Request.forwardedPriority = [null, "x_forwarded", "forwarded"];
 
       expect(
@@ -271,7 +268,6 @@ describe("RackRequestTest", () => {
 
       expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBe("https");
 
-      // x_forwarded_proto_priority: [nil, :scheme, :proto]
       Request.xForwardedProtoPriority = [null, "scheme", "proto"];
 
       expect(
@@ -288,7 +284,6 @@ describe("RackRequestTest", () => {
 
       expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBe("https");
 
-      // forwarded_priority: [:x_forwarded]
       Request.forwardedPriority = ["x_forwarded"];
 
       expect(
@@ -305,7 +300,6 @@ describe("RackRequestTest", () => {
 
       expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
 
-      // x_forwarded_proto_priority: [:scheme]
       Request.xForwardedProtoPriority = ["scheme"];
 
       expect(
@@ -322,7 +316,6 @@ describe("RackRequestTest", () => {
 
       expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
 
-      // x_forwarded_proto_priority: [:proto]
       Request.xForwardedProtoPriority = ["proto"];
 
       expect(
@@ -339,7 +332,6 @@ describe("RackRequestTest", () => {
 
       expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
 
-      // x_forwarded_proto_priority: []
       Request.xForwardedProtoPriority = [];
 
       expect(
@@ -356,7 +348,6 @@ describe("RackRequestTest", () => {
 
       expect(req({ HTTP_FORWARDED: "proto=https" }).forwardedScheme).toBeNull();
 
-      // forwarded_priority: [:forwarded], x_forwarded_proto_priority: default
       Request.xForwardedProtoPriority = defaultProtoPriority;
       Request.forwardedPriority = ["forwarded"];
 
@@ -374,7 +365,6 @@ describe("RackRequestTest", () => {
 
       expect(req({ HTTP_X_FORWARDED_PROTO: "ws" }).forwardedScheme).toBeNull();
 
-      // forwarded_priority: []
       Request.forwardedPriority = [];
 
       expect(
@@ -438,8 +428,6 @@ describe("RackRequestTest", () => {
   it("handles invalid unicode in query string value", () => {
     const req = makeReq("/?foo=%81E");
     expect(req.queryString).toBe("foo=%81E");
-    // Our decodeURIComponent throws on invalid %-encoding; Ruby keeps raw bytes
-    // Verify the query string is accessible even if GET throws
     expect(() => req.GET).toThrow();
   });
 
@@ -451,7 +439,6 @@ describe("RackRequestTest", () => {
 
   it("not truncate query strings containing semi-colons #543 only in POST", () => {
     const req = makeReq("/?foo=bar;baz=qux");
-    // Semicolons are NOT separators in GET
     expect(req.GET["foo"]).toBe("bar;baz=qux");
   });
 
@@ -467,7 +454,6 @@ describe("RackRequestTest", () => {
   });
 
   it("limit the allowed parameter depth when parsing parameters", () => {
-    // Deeply nested params should still parse up to reasonable depth
     const req = makeReq("/?a[a][a]=b");
     expect(req.GET["a"]["a"]["a"]).toBe("b");
   });
@@ -480,12 +466,10 @@ describe("RackRequestTest", () => {
     });
     expect(req.GET["foo"]).toBe("get");
     expect(req.POST["foo"]).toBe("post");
-    // params merges POST over GET
     expect(req.params["foo"]).toBe("post");
   });
 
   it("use the query_parser's params_class for multipart params", () => {
-    // In TS we use plain objects for params. Verify multipart POST returns an object.
     const boundary = "AaB03x";
     const body = `--${boundary}\r\ncontent-disposition: form-data; name="reply"\r\n\r\nyes\r\n--${boundary}--\r\n`;
     const env = {
@@ -508,8 +492,6 @@ describe("RackRequestTest", () => {
       ":input": "a%=1",
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     });
-    // Invalid %-encoding should either throw or handle gracefully
-    // Our parseNestedQuery uses decodeURIComponent which throws on invalid sequences
     expect(() => req.POST).toThrow();
   });
 
@@ -594,7 +576,6 @@ describe("RackRequestTest", () => {
   });
 
   it("truncate POST body at bytesize_limit when parsing url-encoded data", () => {
-    // Very large body - should still parse (we don't enforce byte limit currently)
     const largeBody = "a=1&".repeat(1000);
     const req = makeReq("/", {
       ":method": "POST",
@@ -617,7 +598,6 @@ describe("RackRequestTest", () => {
       "rack.input": mockInput,
     };
     const req = new Request(env);
-    // The \0 at the end should not affect parsing
     expect(req.POST["foo"]).toBeDefined();
   });
 
@@ -717,10 +697,7 @@ describe("RackRequestTest", () => {
       },
     };
     const req = new Request(env);
-    // Note: our multipart parser merges duplicate keys, so the POST hash has only the last value
-    // but form_pairs should still show both via POST entries
     const _post = req.POST;
-    // With merged keys, formPairs reflects the final merged state
     expect(req.formPairs.length).toBeGreaterThan(0);
   });
 
@@ -898,7 +875,6 @@ describe("RackRequestTest", () => {
     const req = makeReq("/?foo=bar");
     const p1 = req.params;
     const p2 = req.params;
-    // params creates a new merged object each time
     expect(p1).not.toBe(p2);
   });
 
@@ -973,7 +949,6 @@ describe("RackRequestTest", () => {
 
   it("parse cookies according to RFC 2109", () => {
     const req = makeReq("/", { HTTP_COOKIE: "foo=bar; foo=baz" });
-    // First value wins per RFC 2109
     expect(req.cookies["foo"]).toBe("bar");
   });
 
@@ -1030,7 +1005,6 @@ describe("RackRequestTest", () => {
       },
       CONTENT_TYPE: "application/x-www-form-urlencoded",
     };
-    // Conflicting param types (string vs hash) should throw TypeError
     expect(() => new Request(env).POST).toThrow();
     expect(() => new Request(env).POST).toThrow();
   });
@@ -1048,13 +1022,11 @@ describe("RackRequestTest", () => {
       },
     };
     const req = new Request(env);
-    // Junk before boundary should cause an error
     expect(() => req.POST).toThrow();
   });
 
   it("not infinite loop with a malformed HTTP request", () => {
     const boundary = "AaB03x";
-    // Malformed: uses \n instead of \r\n
     const input = `--${boundary}\ncontent-disposition: form-data; name="reply"\n\nyes\n--${boundary}\ncontent-disposition: form-data; name="fileupload"; filename="dj.jpg"\ncontent-type: image/jpeg\n\n/9j/4AAQ\n--${boundary}--\n`;
     const env = {
       ...makeEnv(),
@@ -1066,11 +1038,10 @@ describe("RackRequestTest", () => {
       },
     };
     const req = new Request(env);
-    // Should either throw or return without infinite loop
     try {
       void req.POST;
     } catch {
-      // Expected - malformed data
+      /** @empty */
     }
   });
 
@@ -1182,7 +1153,6 @@ describe("RackRequestTest", () => {
     };
     const req = new Request(env);
     expect(() => req.POST).toThrow(MultipartPartLimitError);
-    // In JS, tempfiles are just in-memory buffers, so no cleanup needed
   });
 
   it("parse big multipart form data", () => {
@@ -1218,15 +1188,12 @@ describe("RackRequestTest", () => {
     };
     const req = new Request(env);
     void req.POST;
-    // Our implementation stores file info objects in POST, not env rack.tempfiles
-    // Verify files were parsed
     expect(req.POST["f1"].filename).toBe("foo.jpg");
     expect(req.POST["f2"].filename).toBe("bar.jpg");
   });
 
   it("detect invalid multipart form data", () => {
     const boundary = "AaB03x";
-    // Missing header/body separator and closing boundary
     const input = `--${boundary}\r\ncontent-disposition: form-data; name="huge"; filename="huge"\r\n`;
     const env = {
       ...makeEnv(),
@@ -1387,14 +1354,12 @@ describe("RackRequestTest", () => {
     expect(ip({ HTTP_X_FORWARDED_FOR: "10.0.0.1, 10.0.0.1, 3.4.5.6" })).toBe("3.4.5.6");
     expect(ip({ HTTP_X_FORWARDED_FOR: "127.0.0.1, 3.4.5.6" })).toBe("3.4.5.6");
 
-    // IPv6 format with optional port: "[2001:db8:cafe::17]:47011"
     expect(ip({ HTTP_X_FORWARDED_FOR: "[2001:db8:cafe::17]:47011" })).toBe("2001:db8:cafe::17");
     expect(ip({ HTTP_FORWARDED: 'for="[2001:db8:cafe::17]:47011"' })).toBe("2001:db8:cafe::17");
     expect(ip({ HTTP_X_FORWARDED_FOR: "1.2.3.4, [2001:db8:cafe::17]:47011" })).toBe(
       "2001:db8:cafe::17",
     );
 
-    // IPv4 format with optional port: "192.0.2.43:47011"
     expect(ip({ HTTP_X_FORWARDED_FOR: "192.0.2.43:47011" })).toBe("192.0.2.43");
     expect(ip({ HTTP_X_FORWARDED_FOR: "1.2.3.4, 192.0.2.43:47011" })).toBe("192.0.2.43");
 
@@ -1414,16 +1379,11 @@ describe("RackRequestTest", () => {
       "fe80::202:b3ff:fe1e:8329",
     );
 
-    // Unix Sockets
     expect(ip({ REMOTE_ADDR: "unix", HTTP_X_FORWARDED_FOR: "3.4.5.6" })).toBe("3.4.5.6");
     expect(ip({ REMOTE_ADDR: "unix:/tmp/foo", HTTP_X_FORWARDED_FOR: "3.4.5.6" })).toBe("3.4.5.6");
   });
 
   it("not allow IP spoofing via Client-IP and X-Forwarded-For headers", () => {
-    // IP Spoofing attempt:
-    // Client sends          X-Forwarded-For: 6.6.6.6
-    //                       Client-IP: 6.6.6.6
-    // Load balancer adds    X-Forwarded-For: 2.2.2.3, 192.168.0.7
     expect(
       ip({ HTTP_X_FORWARDED_FOR: "6.6.6.6, 2.2.2.3, 192.168.0.7", HTTP_CLIENT_IP: "6.6.6.6" }),
     ).toBe("2.2.2.3");
@@ -1515,13 +1475,11 @@ describe("RackRequestTest", () => {
   });
 
   it("raise TypeError every time if request parameters are broken", () => {
-    // foo[]=0 and foo[bar]=1 conflict (array vs hash)
     const req = makeReq("/?foo%5B%5D=0&foo%5Bbar%5D=1");
     expect(() => req.GET).toThrow();
   });
 
   it("not strip '' => '' => '' escaped character from parameters when accessed as string", () => {
-    // Test that percent-encoded characters are decoded correctly
     const req = makeReq("/?foo=%22bar%22");
     expect(req.GET["foo"]).toBe('"bar"');
   });
@@ -1535,7 +1493,6 @@ describe("RackRequestTest", () => {
     });
     const keys = Object.keys(req.POST);
     expect(keys.length).toBe(1);
-    // The NUL bytes are parsed as a single key (URL-encoded parsing treats them as chars)
     expect(keys[0]).toContain("\0");
   });
 

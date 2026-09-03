@@ -206,19 +206,12 @@ app/models/index.ts is imported (side-effect: models registered for AR queries).
 Options:
   --env <name>   Override TRAILS_ENV for this invocation.`;
 
-/** Commands recognized but deferred to a later slice (see proposal §5). */
 const NOT_IMPLEMENTED = new Set<string>();
 
 function wantsHelp(args: string[]): boolean {
   return args.includes("--help") || args.includes("-h");
 }
 
-/**
- * Read the directory after `--root`. Returns `{ value }` (undefined when the
- * flag is absent → caller's default applies), or `null` when `--root` is given
- * without a usable value (missing, or another flag) — an input error the caller
- * surfaces rather than silently scanning the wrong tree.
- */
 function readRootFlag(args: string[]): { value: string | undefined } | null {
   const i = args.indexOf("--root");
   if (i < 0) return { value: undefined };
@@ -227,10 +220,6 @@ function readRootFlag(args: string[]): { value: string | undefined } | null {
   return { value };
 }
 
-/**
- * Dispatch a parsed argv (the args after the `ar` binary name). Returns a
- * process exit code; never touches `process` itself so it stays unit-testable.
- */
 export async function run(argv: string[], cwd: string): Promise<number> {
   const [command, ...rest] = argv;
   if (!command || command === "help" || command === "--help" || command === "-h") {
@@ -252,8 +241,6 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       }
       rawDriver = next;
     }
-    // Exclude flag tokens and the --driver value so `ar new --driver pg myapp`
-    // correctly resolves appName to "myapp" rather than "pg".
     const appName = rest.find(
       (a, i) => !a.startsWith("-") && (driverIdx < 0 || i !== driverIdx + 1),
     );
@@ -371,16 +358,11 @@ export async function run(argv: string[], cwd: string): Promise<number> {
       console.error("ar: --root requires a directory argument.");
       return 1;
     }
-    // Resolve `--root` (and the default) against the caller's `cwd`, not the
-    // process's — keeps `run(argv, cwd)` self-consistent; absolute roots pass
-    // through unchanged.
     const modelsDir = File.expandPath(root.value ?? "app/models", cwd);
     const check = rest.includes("--check");
     const { path, changed } = await generateManifest(modelsDir, { check });
     if (check) {
       if (changed) {
-        // Echo back `--root` so the suggested fix regenerates the directory
-        // that was actually checked, not the default `app/models`.
         const fix = root.value
           ? `ar generate:manifest --root ${root.value}`
           : "ar generate:manifest";

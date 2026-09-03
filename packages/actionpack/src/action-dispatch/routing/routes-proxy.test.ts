@@ -37,7 +37,6 @@ describe("RoutesProxy", () => {
 
     const opts = proxy.urlOptions();
     expect(opts.routesRef).toBe(proxyRoutes);
-    // restored after the call
     expect(scope._routes).toBe(scopeRoutes);
     expect(opts.host).toBe("example.com");
   });
@@ -114,19 +113,14 @@ describe("mergeScriptNames", () => {
   });
 
   it("keeps context parts of previous and appends new", () => {
-    // previous "/ctx/old" has 2 slashes; new "/mounted" has 1; context = 2-1+1 = 2
-    // split("/").slice(0, 2) = ["", "ctx"] → "/ctx" + "/mounted"
     expect(mergeScriptNames("/ctx/old", "/mounted")).toBe("/ctx/mounted");
   });
 
   it("handles deeper context", () => {
-    // previous "/a/b/old" (3 slashes), new "/mounted" (1) → context 3
-    // ["", "a", "b"] → "/a/b" + "/mounted"
     expect(mergeScriptNames("/a/b/old", "/mounted")).toBe("/a/b/mounted");
   });
 
   it("handles new with multiple parts", () => {
-    // previous "/ctx/old" (2), new "/m/n" (2) → context 1 → [""] → "" + "/m/n"
     expect(mergeScriptNames("/ctx/old", "/m/n")).toBe("/m/n");
   });
 });

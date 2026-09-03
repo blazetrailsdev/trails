@@ -1,21 +1,3 @@
-/**
- * ActionDispatch::PublicExceptions
- *
- * When called, this middleware renders an error page. By default if an HTML
- * response is expected it will render static error pages from the `/public`
- * directory. For example when this middleware receives a 500 response it will
- * render the template found in `/public/500.html`. If an internationalized
- * locale is set, this middleware will attempt to render the template in
- * `/public/500.<locale>.html`. If an internationalized template is not found
- * it will fall back on `/public/500.html`.
- *
- * When a request with a content type other than HTML is made, this middleware
- * will attempt to convert error information into the appropriate response
- * type.
- *
- * Port of `actionpack/lib/action_dispatch/middleware/public_exceptions.rb`.
- */
-
 import { I18n } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
@@ -45,11 +27,6 @@ export class PublicExceptions {
     const pathInfo = String(env["PATH_INFO"] ?? "");
     const status = parseInt(pathInfo.slice(1), 10) || 0;
 
-    // Rails wraps this in a `rescue ActionDispatch::Http::MimeNegotiation::InvalidType`
-    // and falls back to `Mime[:text]`. Our `MimeType.parse` is forgiving (creates
-    // ad-hoc types for unknown ranges and never raises), so the rescue is a no-op
-    // until `Request.formats` lands and surfaces `InvalidType` for malformed
-    // Accept headers. See PR follow-ups.
     const contentType = this.firstFormat(env);
 
     const body: ErrorBody = {
@@ -80,9 +57,6 @@ export class PublicExceptions {
 
   private renderFormat(status: number, contentType: MimeType, body: string): RackResponse {
     const charset = Response.defaultCharset;
-    // Encode the body into bytes that match the negotiated charset so the
-    // `content-type` header, `content-length`, and wire bytes all agree.
-    // Unknown tokens fall back to utf-8 with the header rewritten to match.
     const enc = normalizeCharset(charset);
     const effectiveCharset =
       enc === "utf-8" && charset.toLowerCase() !== "utf-8" ? "utf-8" : charset;
@@ -98,8 +72,6 @@ export class PublicExceptions {
   }
 
   private renderHtml(status: number): RackResponse {
-    // Sanitize locale before string-interpolating into a file path so a
-    // misconfigured `I18n.locale` can never escape `publicPath`.
     const currentLocale = I18n.locale();
     const locale =
       typeof currentLocale === "string" && LOCALE_RE.test(currentLocale) ? currentLocale : null;

@@ -32,12 +32,6 @@ const INCLUDED_CONCERNS = Symbol("includedConcerns");
 const INCLUDED_BLOCK = Symbol("includedBlock");
 const PREPENDED_BLOCK = Symbol("prependedBlock");
 
-/**
- * Prepend instance methods onto klass.prototype, saving originals as
- * _super_<name> so the prepending method can call through.
- * This is the one path Concern handles directly — Ruby's prepend
- * semantics have no equivalent in the plain include() helper.
- */
 function prependMethods(klass: any, methods: Record<string, (...args: any[]) => any>): void {
   const descriptor = {
     value: undefined as any,
@@ -83,10 +77,6 @@ export namespace Concern {
       if (def.prepend) {
         prependMethods(klass, def.instanceMethods);
       } else {
-        // Concerns overwrite existing methods (TS has no MRO, so this is the
-        // only way to simulate Ruby's ancestor chain insertion). `extend()`
-        // honours Ruby's class-body-over-module precedence, so the copy is
-        // spelled out here rather than routed through it.
         for (const [name, method] of Object.entries(def.instanceMethods)) {
           Object.defineProperty(klass.prototype, name, {
             value: method,

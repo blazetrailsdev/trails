@@ -1,10 +1,3 @@
-/**
- * ActionDispatch::HostAuthorization
- *
- * Middleware that guards against DNS rebinding attacks by
- * only allowing requests to specified hosts.
- */
-
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { Request } from "../http/request.js";
@@ -28,11 +21,6 @@ export const VALID_IP_HOSTNAME: RegExp[] = [
   new RegExp(`^${IPV6_HOSTNAME_WITH_PORT}$`, "i"),
 ];
 
-/**
- * Minimal IPAddr-style host matcher. Supports literal IPv4/IPv6 addresses
- * and CIDR notation. Used so allowlists can contain entries like
- * `IPAddr.new("0.0.0.0/0")` from Rails' ALLOWED_HOSTS_IN_DEVELOPMENT.
- */
 export class IPAddr {
   readonly family: "v4" | "v6";
   private readonly network: bigint;
@@ -55,7 +43,6 @@ export class IPAddr {
     }
   }
 
-  /** Returns true when `host` is an IP literal of the same family within this network. */
   includes(host: string): boolean {
     try {
       if (this.family === "v4") {
@@ -118,8 +105,6 @@ function parseIpv6(addr: string): bigint {
   }
   const headParts = head ? head.split(":") : [];
   const tailParts = tail ? tail.split(":") : [];
-  // IPv4-embedded IPv6 (e.g. ::ffff:127.0.0.1): convert the final IPv4
-  // dotted-quad into two hextets before counting groups.
   const last =
     tailParts.length > 0 ? tailParts[tailParts.length - 1] : headParts[headParts.length - 1];
   if (last && last.includes(".")) {
@@ -157,14 +142,7 @@ export const ALLOWED_HOSTS_IN_DEVELOPMENT: (string | RegExp | IPAddr)[] = [
 
 export type HostPermission = string | RegExp | IPAddr;
 
-/**
- * Rails: ActionDispatch::HostAuthorization::Permissions.
- *
- * Normalizes the configured host allowlist into anchored regexes (with
- * optional trailing port) and matches incoming hosts against them.
- *
- * @internal
- */
+/** @internal */
 export class Permissions {
   private readonly hosts: (RegExp | IPAddr)[];
 
@@ -275,29 +253,17 @@ export class HostAuthorization {
     return out;
   }
 
-  /**
-   * @internal Mirrors: `HostAuthorization#excluded?`
-   * (`host_authorization.rb:163-165`). `@exclude.call(request)` invokes a Proc,
-   * which carries no receiver, hence the `null` thisArg.
-   */
+  /** @internal */
   private isExcluded(request: Request): boolean {
     return Boolean(this.exclude && this.exclude.call(null, request));
   }
 
-  /** @internal Mirrors: `HostAuthorization#mark_as_authorized` (`host_authorization.rb:167-169`). */
+  /** @internal */
   private markAsAuthorized(request: Request): void {
     request.setHeader("action_dispatch.authorized_host", request.host);
   }
 }
 
-/**
- * Default Rack app invoked when {@link HostAuthorization} blocks a request.
- *
- * Mirrors Rails `ActionDispatch::HostAuthorization::DefaultResponseApp`:
- * picks `text/plain` for XHR requests and `text/html` otherwise, logs the
- * blocked hosts via the request's logger, and renders a DebugView-style
- * body when `action_dispatch.show_detailed_exceptions` is set.
- */
 export class DefaultResponseApp {
   static readonly RESPONSE_STATUS = 403;
 
@@ -350,13 +316,7 @@ export class DefaultResponseApp {
   }
 }
 
-/**
- * Render the blocked-host HTML body. Mirrors Rails'
- * `templates/rescues/blocked_host.html.erb` line-for-line — the ActionView
- * template stack isn't ported yet, so the .erb is reproduced inline.
- *
- * @internal
- */
+/** @internal */
 function renderBlockedHostHtml(hosts: string[]): string {
   const joined = escapeHtml(hosts.join(", "));
   const lines = hosts.map((host) => `    config.hosts << "${escapeHtml(host)}"`).join("\n");
@@ -374,12 +334,7 @@ function renderBlockedHostHtml(hosts: string[]): string {
   ].join("\n");
 }
 
-/**
- * Render the blocked-host plain-text body. Mirrors Rails'
- * `templates/rescues/blocked_host.text.erb`.
- *
- * @internal
- */
+/** @internal */
 function renderBlockedHostText(hosts: string[]): string {
   const lines = hosts.map((host) => `  config.hosts << "${host}"`).join("\n");
   return [

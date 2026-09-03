@@ -1,4 +1,3 @@
-// Mirrors railties/test/generators_test.rb.
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";

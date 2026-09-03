@@ -13,13 +13,6 @@ import {
   allYear,
 } from "./calculations.js";
 
-/**
- * Rails covers `today?` / `tomorrow?` / `yesterday?` / `past?` / `future?`
- * from `DateExtCalculationsTest` and `TimeExtCalculationsTest`, whose ported
- * names already live in `date-ext.test.ts`. These are the trails-side cases for
- * the mixin's own arm, kept out of the mirrored files so no ported test name is
- * duplicated.
- */
 describe("DateAndTime::Calculations predicates (trails)", () => {
   const today = Temporal.Now.plainDateISO();
 

@@ -1,19 +1,6 @@
-/**
- * ActionController::Redirecting
- *
- * UnsafeRedirectError raised when a redirect URL is not considered safe.
- * The redirect_to/redirect_back methods live in Base.
- * @see https://api.rubyonrails.org/classes/ActionController/Redirecting.html
- */
-
 import { Metal } from "../metal.js";
 import { urlOptions as _urlOptions, type UrlForHost } from "./url-for.js";
 
-/**
- * Re-export of {@link UrlFor#urlOptions}; Rails' `Redirecting` module
- * includes `UrlFor`, so this method is part of the Redirecting host
- * surface.
- */
 export function urlOptions(this: UrlForHost): Record<string, unknown> {
   return _urlOptions.call(this);
 }
@@ -59,11 +46,7 @@ export function urlFrom(this: RedirectingHost, location: string | null | undefin
   return _urlHostAllowed.call(this, location) ? location : null;
 }
 
-/**
- * @internal Rails-private. Compute the redirect URL from `redirect_to`'s polymorphic options.
- * Mirrors `_compute_redirect_to_location(request, options)` in
- * `actionpack/lib/action_controller/metal/redirecting.rb`.
- */
+/** @internal */
 export function _computeRedirectToLocation(
   this: RedirectingHost | void,
   request: { protocol?: string; hostWithPort?: string },
@@ -93,18 +76,12 @@ export function _computeRedirectToLocation(
   return result.replace(/[\0\r\n]/g, "");
 }
 
-/**
- * @internal Rails-private. Default for the `allow_other_host` keyword on `redirect_to` —
- * inverse of `raise_on_open_redirects`.
- */
+/** @internal */
 export function _allowOtherHost(this: PrivateHost): boolean {
   return !this.raiseOnOpenRedirects;
 }
 
-/**
- * @internal Rails-private. Resolve the redirect status, draining `:status` from `options`
- * (when a Hash) then `responseOptions`, defaulting to 302.
- */
+/** @internal */
 export function _extractRedirectToStatus(
   this: unknown,
   options: unknown,
@@ -127,10 +104,7 @@ export function _extractRedirectToStatus(
   return 302;
 }
 
-/**
- * @internal Rails-private. Returns `location` when allowed; otherwise raises
- * `UnsafeRedirectError` describing the blocked URL.
- */
+/** @internal */
 export function _enforceOpenRedirectProtection(
   this: RedirectingHost,
   location: string,
@@ -145,18 +119,9 @@ export function _enforceOpenRedirectProtection(
   );
 }
 
-/**
- * @internal Rails-private. Mirrors `_url_host_allowed?`. Internal URLs must share the
- * request host or be a same-origin path (single leading slash).
- */
+/** @internal */
 export function _urlHostAllowed(this: RedirectingHost, url: unknown): boolean {
   const raw = url == null ? "" : String(url);
-  // Mirrors Ruby's `URI(url).host`, which is nil for any input without an
-  // explicit scheme — protocol-relative `//foo` URLs included. That's the
-  // load-bearing piece of the open-redirect guard: every `//`-prefixed URL
-  // falls through to the trailing `!raw.startsWith("//")` rejection,
-  // regardless of whether the post-`//` authority happens to match
-  // `request.host`.
   let host: string | null = null;
   if (/^[a-z][a-z\d\-+.]*:/i.test(raw)) {
     try {
@@ -170,10 +135,7 @@ export function _urlHostAllowed(this: RedirectingHost, url: unknown): boolean {
   return !raw.startsWith("//");
 }
 
-/**
- * @internal Rails-private. Raises if `url` contains any character forbidden in an HTTP
- * header value per RFC 7230 §3.2.6.
- */
+/** @internal */
 export function _ensureUrlIsHttpHeaderSafe(this: unknown, url: string): void {
   if (ILLEGAL_HEADER_VALUE_REGEX.test(url)) {
     throw new UnsafeRedirectError(

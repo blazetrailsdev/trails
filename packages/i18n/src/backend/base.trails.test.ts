@@ -1,10 +1,3 @@
-/**
- * Base-backend semantics the gem covers through `I18n::Tests::Basics` /
- * `Defaults` / `Pluralization` rather than `simple_test.rb`; those suites are
- * ported with their own story, so the throw/raise/default resolution order is
- * pinned here in the meantime.
- */
-
 import { beforeEach, describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { Simple } from "./simple.js";
@@ -146,12 +139,6 @@ describe("I18n::Backend::Base", () => {
   });
 });
 
-/**
- * Ruby's `::Date`/`::Time` answer `strftime`, `wday`, `mon`, `hour` and `sec`
- * natively, so the gem's `localize` (base.rb:83-107) needs no seam for them and
- * has no test for one. RFC 0088 makes the date gem answer `Temporal` values,
- * which answer none of those readers.
- */
 describe("I18n::Backend::Base#localize over a Temporal subject", () => {
   let backend: Simple;
 

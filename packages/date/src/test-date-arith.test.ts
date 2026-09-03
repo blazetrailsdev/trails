@@ -1,16 +1,7 @@
-/**
- * Port of `vendor/date/test/date/test_date_arith.rb` — the gem's own suite,
- * which RFC 0088 makes the measure of the date port. Ruby's `+`, `-`, `<=>`,
- * `<<` and `>>` have no TS syntax that dispatches to a method, so they are the
- * named methods `docs/ruby-ts-conventions.md` ("Operators") calls for: `plus`,
- * `minus`, `cmp`, `lshift`, `rshift`.
- */
 import { describe, it, expect } from "vitest";
 import { ArgumentError, Date, DateTime, Time } from "./index.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
-/** `test_date_arith.rb:6-8` — a `Numeric` whose `to_r` answers itself, so the C's
- *  `f_to_r` retry makes no progress and the arm raises. */
 class Rat {}
 
 describe("TestDateArith", () => {
@@ -38,7 +29,6 @@ describe("TestDateArith", () => {
     const e = TypeError;
     expect(() => new Date(2000, 2, 29).plus("foo" as never)).toThrow(e);
     expect(() => new DateTime(2000, 2, 29).plus("foo" as never)).toThrow(e);
-    // Ruby's `Time.mktime` is `Time.local` — a Time in the local zone.
     expect(() => new Date(2000, 2, 29).plus(new Time(2000, 2, 29) as never)).toThrow(e);
     expect(() => new DateTime(2000, 2, 29).plus(new Time(2000, 2, 29) as never)).toThrow(e);
     const n = new Rat();
@@ -54,7 +44,6 @@ describe("TestDateArith", () => {
     d = new Date(2000, 3, 1).minus(1) as Date;
     expect([d.year, d.mon, d.mday]).toEqual([2000, 2, 29]);
 
-    // Ruby's `Date#-` of a Date answers a Rational of days.
     expect(new Date(2000, 3, 1).minus(new Date(2000, 2, 29))).toEqual(new Rational(1, 1));
     expect(new Date(2000, 2, 29).minus(new Date(2000, 3, 1))).toEqual(new Rational(-1, 1));
 
@@ -84,8 +73,6 @@ describe("TestDateArith", () => {
 
   it("prev", () => {
     const d = new Date(2000, 1, 1);
-    // Ruby raises NoMethodError for the method `Date` does not define; calling
-    // an absent member in JS is a TypeError.
     expect(() => (d as unknown as { prev(): void }).prev()).toThrow(TypeError);
   });
 
@@ -140,9 +127,6 @@ describe("TestDateArith", () => {
     d = new Date(2000, 12, 31).succ();
     expect([d.year, d.mon, d.mday]).toEqual([2001, 1, 1]);
 
-    // `Date.today` / `DateTime.now` answer the `Temporal` seat (RFC 0088), so
-    // Ruby's receiver is fed back through the `Temporal` constructor overload —
-    // `d_simple_new_internal`'s other entry point, `date_core.c:3036`.
     d = new Date(Date.today());
     let d2 = d.next();
     expect(d.equals(d2.minus(1))).toBe(true);
@@ -278,7 +262,6 @@ describe("TestDateArith", () => {
   });
 });
 
-/** minitest `assert_empty`, which vitest has no matcher for. */
 function assertEmpty(collection: { length: number }): void {
   expect(collection.length).toBe(0);
 }

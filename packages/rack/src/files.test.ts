@@ -259,11 +259,9 @@ it("return correct byte range in body", async () => {
 });
 
 it("handle case where file is truncated during request", async () => {
-  // If a file shrinks between stat and read, the server should handle gracefully
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).get("/test.txt");
   expect(res.status).toBe(200);
-  // File content should still be served correctly
   expect(res.bodyString).toBe("Hello World");
 });
 

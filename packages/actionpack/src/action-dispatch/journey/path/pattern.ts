@@ -6,11 +6,6 @@ import { FormatBuilder, Format, Visitor } from "../visitors.js";
 
 type Matchers = Record<string, RegExp | RegExp[]>;
 
-/**
- * Escape characters that would be significant inside a `[…]` character class.
- * Distinct from `regexpEscape` because the metacharacter set is different
- * (e.g. `.` and `+` are literals inside a class, but `]` and `-` are not).
- */
 function escapeCharClass(s: string): string {
   return s.replace(/[\]\\^-]/g, "\\$&");
 }
@@ -20,25 +15,6 @@ function regexUnion(re: RegExp | RegExp[]): string {
   return arr.map((r) => r.source).join("|");
 }
 
-/**
- * Collect the union of regex flags across a list of requirement regexes.
- * Rails' `Regexp.union` produces inline flag scopes (`(?i-mx:…)`); JS lacks
- * inline flag groups, so we apply the combined flag set at the outer
- * `RegExp` level.
- *
- * - `g`/`y` are filtered: they change matching semantics in ways that
- *   would break Pattern's anchored regex.
- * - `m` is filtered for the outer Pattern regex (`outer: true`, default):
- *   it changes `^`/`$` to match line boundaries, which would break our
- *   `^…$` anchoring (Rails' `\A…\Z` is unaffected by `/m`). Pass
- *   `outer: false` only when building a non-anchored regex from the
- *   same sources (e.g. the offset-computation `(?:src)|` regex), where
- *   preserving the requirement's `m` semantics is safe.
- * - `u` and `v` are mutually exclusive. If any source uses `v`, `v` wins
- *   (it's the superset); otherwise `u` is preserved so Unicode property
- *   escapes (`\p{…}`) remain valid.
- * - `i`/`s`/`d` are passed through.
- */
 function combinedFlagsFor(
   values: ReadonlyArray<RegExp | RegExp[]>,
   opts: { outer?: boolean } = {},
@@ -57,11 +33,6 @@ function combinedFlagsFor(
   return out.join("");
 }
 
-/**
- * Union flags only across matchers actually referenced by a list of names.
- * Avoids leaking flags from extra `requirements` entries (e.g. `{ ignored: /x/i }`)
- * onto the compiled Pattern regex when the AST never references `:ignored`.
- */
 function combinedFlagsUsed(
   matchers: Record<string, RegExp | RegExp[]>,
   names: readonly string[],
@@ -70,10 +41,6 @@ function combinedFlagsUsed(
   for (const n of names) if (Object.hasOwn(matchers, n)) values.push(matchers[n]);
   return combinedFlagsFor(values);
 }
-
-// =========================================================================
-// AnchoredRegexp visitor — builds the `\A...\Z` regex source for a Pattern.
-// =========================================================================
 
 export class AnchoredRegexp extends Visitor {
   protected readonly _separator: string;
@@ -133,25 +100,14 @@ export class AnchoredRegexp extends Visitor {
   }
 }
 
-// =========================================================================
-// UnanchoredRegexp — like AnchoredRegexp but with `(?:\b|$|/)` suffix.
-// =========================================================================
-
 export class UnanchoredRegexp extends AnchoredRegexp {
   override accept(node: Node): RegExp {
     const path = this.visit(node) as string;
     const flags = combinedFlagsUsed(this._matchers, this._names);
     if (path === "/") return new RegExp(`^/`, flags);
-    // Rails uses `(?:\b|\Z|/)` — `\Z` is "end of string or before trailing
-    // newline"; in JS `$` (in default mode) is end-of-string. `\b` is the
-    // same word-boundary semantic.
     return new RegExp(`^${path}(?:\\b|$|/)`, flags);
   }
 }
-
-// =========================================================================
-// MatchData — wraps a RegExp match with offset-aware indexed access.
-// =========================================================================
 
 export class MatchData {
   readonly names: readonly string[];
@@ -171,7 +127,6 @@ export class MatchData {
     this._input = input;
   }
 
-  /** Captures, 1-indexed in Rails — here returned as a 0-indexed array. */
   get captures(): readonly (string | undefined)[] {
     return Array.from({ length: this.length - 1 }, (_, i) => this.at(i + 1));
   }
@@ -185,12 +140,6 @@ export class MatchData {
     return out;
   }
 
-  /**
-   * Rails `match[i]` — adjusts by offset before indexing into the underlying match.
-   *
-   * `at(0)` returns the full match (Rails `match[0]`); positive indices apply
-   * the per-symbol offset adjustment. Negative indices return undefined.
-   */
   at(x: number): string | undefined {
     if (x === 0) return this._match[0];
     if (x < 0 || x >= this.length) return undefined;
@@ -213,10 +162,6 @@ export class MatchData {
   }
 }
 
-// =========================================================================
-// Pattern — the main class.
-// =========================================================================
-
 export class Pattern {
   ast: Ast | null;
   readonly spec: Node;
@@ -232,9 +177,6 @@ export class Pattern {
   private _requirementsAnchoredCache?: Record<string, RegExp>;
 
   constructor(ast: Ast, requirements: Matchers, separators: string, anchored: boolean) {
-    // Apply the leading-optional normalization at the Ast level so that
-    // downstream consumers reading `path.ast.tree` (e.g. the GTG builder
-    // in `journey/routes.ts`) see the same tree as the regex/formatter.
     const normalizedTree = normalizeLeadingOptionalSpec(ast.root);
     if (normalizedTree !== ast.root) {
       ast = new Ast(normalizedTree, true);
@@ -245,11 +187,6 @@ export class Pattern {
     this._separators = separators;
     this.anchored = anchored;
     this.names = ast.names;
-    // Mirror Rails `ast.requirements = …`: push single-RegExp requirements
-    // onto each symbol (and `*name` star) node's `.regexp` so the GTG sees
-    // the user's char-class (e.g. `:filename` with `/(.+)/` matches dotted
-    // segments). Skip array-form (regex union) requirements — those are
-    // pattern-level only.
     const flat: Record<string, RegExp> = {};
     for (const [k, v] of Object.entries(requirements)) {
       if (v instanceof RegExp) flat[k] = v;
@@ -276,9 +213,6 @@ export class Pattern {
       if (s.type === "DOT" || s.type === "SLASH") continue;
       const back = terminals[i - 1];
       const fwd = terminals[i + 1];
-      // Rails consults the SymbolNode's regexp after `ast.requirements=`
-      // wires it in; trails-side Pattern stores requirements separately,
-      // so consult the requirements map directly.
       if (s.isSymbol() && Array.isArray(this.requirements[s.toSym()])) return false;
       if (back.isLiteral()) return false;
       if (fwd && fwd.isLiteral()) return false;
@@ -335,9 +269,6 @@ export class Pattern {
     if (this._requirementsAnchoredCache) return this._requirementsAnchoredCache;
     this._requirementsAnchoredCache = transformValues(
       this.requirements,
-      // Wrap the union in `(?:…)` so the anchors bind around the whole
-      // alternation: `^a|b$` parses as `(^a)|(b$)`, which isn't what we
-      // want for a missing-keys equality check.
       (regex) => new RegExp(`^(?:${regexUnion(regex)})$`, combinedFlagsFor([regex])),
     );
     return this._requirementsAnchoredCache;
@@ -376,37 +307,12 @@ export class Pattern {
   }
 }
 
-/**
- * Normalize a spec whose first top-level node is a SLASH followed by a
- * GROUP whose first descendant is also a SLASH. Mirrors Rails'
- * `Mapper.normalize_path` — when a route is written as `(/:locale)/foo`
- * and a caller has already prefixed `/`, the naive concatenation produces
- * `^/(?:/(...))?/foo$` which matches neither `/foo` nor `/en/foo`. Two
- * shapes need handling, both replicating the Mapper `gsub!`/restore pair:
- *
- *   1. Mixed (some non-optional top-level node, e.g. `/(/:locale)/foo`):
- *      drop the duplicate top-level SLASH entirely so the optional group's
- *      own SLASH provides the separator when the group fires.
- *
- *   2. All-optional (every top-level non-Slash is a Group, e.g.
- *      `/(/:a)(/:b)`): keep the top-level SLASH (so `/` matches the
- *      root-style empty case) and drop the leading SLASH inside the FIRST
- *      group only (so `/en` matches with the leading `/` serving as the
- *      separator for the first capture).
- *
- * Centralizing this in Pattern means any caller building a Pattern from a
- * journey-normalized path string gets the right regex, without having to
- * re-implement the Mapper-level workaround.
- *
- * @internal
- */
+/** @internal */
 function normalizeLeadingOptionalSpec(spec: Node): Node {
   const parts = flattenCat(spec);
   if (parts.length < 2 || parts[0].type !== "SLASH") return spec;
   const second = parts[1];
   if (!second.isGroup()) return spec;
-  // The second top-level node must be a Group whose body starts with a
-  // SLASH terminal — otherwise there's no slash-doubling to undo.
   const innerParts = flattenCat((second as Group).left as Node);
   if (innerParts.length < 2 || innerParts[0].type !== "SLASH") return spec;
   const allOptional = parts.slice(1).every((p) => p.isGroup());
@@ -416,7 +322,7 @@ function normalizeLeadingOptionalSpec(spec: Node): Node {
   return buildCat(newParts);
 }
 
-/** @internal Flatten a right-leaning Cat chain into an array of nodes. */
+/** @internal */
 function flattenCat(node: Node): Node[] {
   const out: Node[] = [];
   const walk = (n: Node): void => {
@@ -431,7 +337,7 @@ function flattenCat(node: Node): Node[] {
   return out;
 }
 
-/** @internal Rebuild a right-leaning Cat chain from a non-empty node list. */
+/** @internal */
 function buildCat(parts: readonly Node[]): Node {
   return parts.slice(1).reduce((acc, n) => new Cat(acc, n), parts[0]);
 }

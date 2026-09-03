@@ -200,7 +200,6 @@ describe("TaggedLoggingTest", () => {
   });
 
   it("keeps each tag in their own thread", () => {
-    // JS is single-threaded; verify tags are isolated per logger
     const out2 = makeBuffer();
     const base2 = new Logger(out2);
     const logger2 = taggedLogging(base2);
@@ -223,7 +222,6 @@ describe("TaggedLoggingTest", () => {
     const outer = logger.tagged("BCX");
     const inner = outer.tagged("Jason");
     inner.info("Funky time");
-    // After inner tag, outer should still have BCX
     outer.info("Junky time!");
     expect(output.string).toContain("[BCX] [Jason] Funky time");
     expect(output.string).toContain("[BCX] Junky time!");
@@ -242,9 +240,7 @@ describe("TaggedLoggingTest", () => {
       logger.tagged("ERR", () => {
         throw new Error("boom");
       });
-    } catch {
-      // expected
-    }
+    } catch {}
     expect(logger.currentTags).toEqual([]);
   });
 
@@ -355,7 +351,6 @@ describe("TagStack", () => {
   it("pushTags filters null and undefined after stringification", () => {
     const stack = new TagStack();
     stack.pushTags([null, undefined, 0, false] as unknown[]);
-    // "0" and "false" are non-blank strings; null/undefined become "" and are filtered
     expect(stack.tags).toEqual(["0", "false"]);
   });
 
@@ -394,9 +389,7 @@ describe("Formatter", () => {
       Formatter.tagged(stack, ["X"], () => {
         throw new Error("boom");
       });
-    } catch {
-      /* expected */
-    }
+    } catch {}
     expect(stack.tags).toEqual([]);
   });
 });

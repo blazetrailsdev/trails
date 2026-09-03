@@ -19,15 +19,7 @@ describe("VerifierTest", () => {
   });
 
   it("verifies non-URL-safe messages", () => {
-    // Older callers may have issued tokens with standard base64 encoding
-    // (containing +, /, = chars). Build one via a non-urlsafe
-    // MessageVerifier with the same secret, then verify it via our
-    // URL-safe Verifier — the shared decode path normalizes both forms
-    // before validating the signature.
     const verifier = new Verifier(SECRET);
-    // Same digest as Verifier — which declares none, inheriting
-    // ActiveSupport::MessageVerifier's default exactly as Rails'
-    // GlobalID::Verifier does — so only the encoding differs.
     const nonUrlSafe = new MessageVerifier(SECRET, { url_safe: false });
     const payload = { gid: "gid://bcx/Person/115186?expires_in", expires_at: null };
     const stdToken = nonUrlSafe.generate(payload);

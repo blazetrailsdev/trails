@@ -5,12 +5,6 @@ function makeReq(): { env: Record<string, unknown> } {
   return { env: {} };
 }
 
-// ==========================================================================
-// No Rails counterpart: session_test.rb exercises `Session` only through a
-// store-backed session, so the `enabled?` arms of `destroy` / `load_for_write!`
-// (request/session.rb:97-108, :257-263) and `Session.delete` (:43-45) have no
-// Rails test of their own.
-// ==========================================================================
 describe("Session::Options", () => {
   it("answers the Hash-shaped reads Rack::Session::Abstract::Persisted makes", () => {
     const options = new Options(null, { skip: true, expireAfter: 60 });

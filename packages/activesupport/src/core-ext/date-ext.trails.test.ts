@@ -1,10 +1,3 @@
-/**
- * trails-only cover for the arms of `core_ext/date/calculations.rb` that Rails'
- * own `date_ext_test.rb` never names: the ten `alias`es (`:70-72`, `:78-82`,
- * `:88`) and the two coercion arms `compare_with_coercion` (`:152-158`) and
- * `plus_without_duration`/`minus_without_duration` (`:97`, `:107`).
- */
-
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import * as DateExt from "./date/calculations.js";
@@ -59,8 +52,6 @@ describe("date calculations coercion arms", () => {
   });
 
   it("plus_with_duration widens for a zero sub-day part and not for a zero day part", () => {
-    // `@parts.reject! { |k, v| v.zero? } unless value == 0` (duration.rb:228)
-    // keeps `0.seconds`, which `sum` routes through `Date#since`.
     expect(DateExt.plusWithDuration(pd(2017, 1, 1), Duration.seconds(0))).toBeInstanceOf(
       TimeWithZone,
     );
@@ -75,16 +66,12 @@ describe("date calculations coercion arms", () => {
   });
 
   it("plus_with_duration drops the zeroes of a non-zero duration", () => {
-    // `1.day + 0.seconds` has a non-zero value, so `@parts` rejects the zero
-    // and the result stays a calendar day.
     expect(
       DateExt.plusWithDuration(pd(2017, 1, 1), Duration.days(1).plus(Duration.seconds(0))),
     ).toEqual(pd(2017, 1, 2));
   });
 
   it("plus_with_duration applies the parts in merge order", () => {
-    // `@parts.merge(other._parts)` (duration.rb:270) keeps the receiver's keys
-    // first, and `sum` applies them in that order.
     expect(
       DateExt.plusWithDuration(pd(2017, 1, 30), Duration.months(1).plus(Duration.days(1))),
     ).toEqual(pd(2017, 3, 1));
@@ -94,9 +81,6 @@ describe("date calculations coercion arms", () => {
   });
 
   it("plus_with_duration appends new keys in the other duration's own order", () => {
-    // `1.day + 1.month` merges into `1.second`'s parts as {seconds, days,
-    // months}, so the widened Time advances by a day and then a month rather
-    // than in a canonical order.
     const dayThenMonth = Duration.days(1).plus(Duration.months(1));
     const monthThenDay = Duration.months(1).plus(Duration.days(1));
     expect(DateExt.plusWithDuration(pd(2017, 1, 30), dayThenMonth)).toEqual(pd(2017, 2, 28));

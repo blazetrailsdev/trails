@@ -1,6 +1,3 @@
-// Port of `Rails::Application::Configuration` from
-// `railties/lib/rails/application/configuration.rb`. PR 2.5b: scalar/state
-// defaults only — credentials + `databaseConfiguration` are 2.5c or later.
 import { Session } from "@blazetrails/actionpack";
 import { File } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
@@ -21,7 +18,6 @@ export type SslOptions = {
 type WeekDay = "sunday" | "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday";
 type LogLevel = "debug" | "info" | "warn" | "error" | "fatal" | "unknown";
 
-/** Mirrors Rails' `Rails::Application::Configuration`. */
 export class Configuration extends EngineConfiguration {
   allowConcurrency: boolean | null = null;
   considerAllRequestsLocal = false;
@@ -68,34 +64,13 @@ export class Configuration extends EngineConfiguration {
   domTestingDefaultHtmlVersion = ":html4";
   yjit = false;
 
-  /** @internal `@loaded_config_version` (`application/configuration.rb:76`). */
+  /** @internal */
   private _loadedConfigVersion: string | number | null = null;
 
-  /** Mirrors the `attr_reader :loaded_config_version` (`application/configuration.rb:28`). */
   get loadedConfigVersion(): string | number | null {
     return this._loadedConfigVersion;
   }
 
-  /**
-   * Loads default configuration values for a target version. This includes
-   * defaults for versions prior to the target version. Mirrors
-   * `Configuration#load_defaults` (`application/configuration.rb:70-355`).
-   *
-   * Every `respond_to?(:framework)` arm reads the framework's option bag
-   * through `Railtie::Configuration`'s `method_missing` port
-   * (`respondTo` / `get`), so an arm whose framework has not registered its
-   * bag is skipped exactly as it is in Ruby.
-   *
-   * Four assignments inside otherwise line-for-line arms have no trails
-   * receiver yet and are omitted, each in place so the arm keeps Rails' shape:
-   * `ActiveSupport.utc_to_local_returns_utc_offset_times` (`:220`), the
-   * `Nokogiri::HTML5` probe behind `dom_testing_default_html_version`
-   * (`:276`), `Regexp.timeout ||= 1` (`:344`), and
-   * `Rails::HTML::Sanitizer.best_supported_vendor` (`:313-323`) — the last
-   * emptying the `action_view` and `action_text` guards of 7.1, since
-   * `Rails::HTML::Sanitizer` has no trails counterpart and
-   * `sanitizer_vendor` has no other value to take.
-   */
   loadDefaults(targetVersion: string | number): void {
     switch (String(targetVersion)) {
       case "5.0": {
@@ -400,14 +375,6 @@ export class Configuration extends EngineConfiguration {
     this._loadedConfigVersion = targetVersion;
   }
 
-  /**
-   * Mirrors `Configuration#autoload_lib` (`application/configuration.rb:471-481`).
-   *
-   * Rails' last line, `Rails.autoloaders.main.ignore(ignored_abspaths)`
-   * (`:480`), has no trails receiver — there is no `Trails.autoloaders` — and
-   * `ignored_abspaths` has no other reader, so the two path pushes are the
-   * whole ported body. Story `port-trails-autoloaders` converges it.
-   */
   autoloadLib({ ignore }: { ignore: string | string[] }): void {
     const lib = File.join(this.root as string, "lib");
 
@@ -415,17 +382,11 @@ export class Configuration extends EngineConfiguration {
     this.eagerLoadPaths.push(lib);
   }
 
-  /** @internal `@session_store` (`application/configuration.rb:545`). */
+  /** @internal */
   private _sessionStore: unknown = null;
-  /** @internal `@session_options` (`application/configuration.rb:546`). */
+  /** @internal */
   private _sessionOptions: Record<string, unknown> = {};
 
-  /**
-   * Mirrors `Configuration#session_store`
-   * (`application/configuration.rb:543-557`). Ruby's one method both writes
-   * (with an argument) and reads (without); the reader resolves a Symbol
-   * through `ActionDispatch::Session.resolve_store`.
-   */
   sessionStore(newSessionStore?: unknown, options?: Record<string, unknown>): unknown {
     if (newSessionStore != null && newSessionStore !== false) {
       this._sessionStore = newSessionStore;
@@ -438,12 +399,10 @@ export class Configuration extends EngineConfiguration {
     return this._sessionStore;
   }
 
-  /** Mirrors `Configuration#session_store?` (`application/configuration.rb:559-561`). */
   sessionStoreQ(): unknown {
     return this._sessionStore;
   }
 
-  /** Mirrors the `attr_accessor :session_options` (`application/configuration.rb:32`). */
   get sessionOptions(): Record<string, unknown> {
     return this._sessionOptions;
   }
@@ -461,13 +420,6 @@ export class Configuration extends EngineConfiguration {
     return this.enableReloading;
   }
 
-  /**
-   * Mirrors `Rails::Application::Configuration#paths`: appends the app-only
-   * path entries (`public`, `tmp`, `log`, …) on top of `EngineConfiguration#paths`.
-   * Only `public` and `lib/templates` are added today; the remaining Rails entries land with their
-   * respective consumers (PR 2.7-followups). See
-   * `vendor/rails/railties/lib/rails/application/configuration.rb:396`.
-   */
   override paths(): Root {
     const paths = super.paths();
     if (!paths.get("public")) paths.add("public");

@@ -1,26 +1,6 @@
 import { DeepMergeable } from "./deep-mergeable.js";
 import { isPlainObject } from "./hash-utils.js";
 
-/**
- * Mirrors: ActiveSupport::OptionMerger
- * (activesupport/lib/active_support/option_merger.rb)
- *
- * Ruby undefines every instance method so `method_missing` sees the whole
- * surface. JavaScript has no `method_missing`, so the merger *is* a Proxy over
- * the context returned from the constructor, whose `get` trap routes every
- * forwarded function through {@link OptionMerger#methodMissing}. Its
- * `getPrototypeOf` trap keeps the merger an `OptionMerger` rather than an
- * instance of the context's class, which is what Ruby gets for free from
- * `OptionMerger.new` being a real object.
- *
- * `methodMissing` deviates from `option_merger.rb:16` on one point, forced by
- * the language: Ruby's block travels outside `arguments`, while TypeScript
- * passes it as a trailing positional argument, so a trailing function argument
- * is held aside before Rails' argument rules run — except when it is the lone
- * argument, which is Ruby's `arguments.first.is_a?(Proc)` branch. Ruby's
- * `**options` splat materializes a fresh Hash, so the forwarded options object
- * is a copy and never `@options` itself.
- */
 export class OptionMerger {
   private context: any;
   private options: Record<string, unknown>;

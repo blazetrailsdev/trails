@@ -8,12 +8,7 @@ import type {
 import type { LookupContext } from "../lookup-context.js";
 import { PartialRenderer } from "./partial-renderer.js";
 
-/**
- * ActionView::PartialIteration
- *
- * Iteration metadata exposed as `${as}_iteration` inside collection partials.
- * @internal
- */
+/** @internal */
 export class PartialIteration {
   index = 0;
 
@@ -33,20 +28,14 @@ export class PartialIteration {
   }
 }
 
-/**
- * ActionView::CollectionRenderer
- *
- * Renders a partial once per element in a collection. Exposes
- * `${as}_counter` and `${as}_iteration` locals per Rails contract.
- * @internal
- */
+/** @internal */
 export class CollectionRenderer extends PartialRenderer implements ObjectRenderingHost {
-  /** `include ObjectRendering` (`collection_renderer.rb:34`). @internal */
+  /** @internal */
   localVariable = localVariable;
-  /** `include ObjectRendering` (`collection_renderer.rb:34`). @internal */
+  /** @internal */
   partialPath = partialPath;
 
-  /** Mirrors `@context_prefix` (`abstract_renderer.rb:39`). @internal */
+  /** @internal */
   contextPrefix: string;
 
   constructor(lookupContext: LookupContext, options: RenderOptions = {}) {
@@ -126,7 +115,6 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
     if (paths.every((p) => p === firstPath)) {
       return this.renderCollectionWithPartial(collection, firstPath, context, block);
     }
-    // Heterogeneous collection — render each item with its own derived partial.
     const baseLocals = { ...this.locals };
     const iteration = new PartialIteration(collection.length);
     const parts: string[] = [];
@@ -147,7 +135,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
     return this.buildRenderedTemplate(parts.join(""), lastTemplate);
   }
 
-  /** Mirrors `retrieve_variable` (`collection_renderer.rb:146-149`). @internal */
+  /** @internal */
   protected retrieveVariable(path: string): [string, string, string] {
     const variable = this.localVariable(path);
     return [variable, `${variable}_counter`, `${variable}_iteration`];

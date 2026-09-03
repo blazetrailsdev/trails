@@ -10,7 +10,6 @@ import { ModelGenerator } from "../../model-generator.js";
 import { tsBody, tsMethod, type Method } from "../../../template-builder/index.js";
 import { emitControllerClass } from "../controller/controller-paths.js";
 
-// Mirrors railties/lib/rails/generators/rails/scaffold/scaffold_generator.rb.
 export class ScaffoldGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
     super(options);

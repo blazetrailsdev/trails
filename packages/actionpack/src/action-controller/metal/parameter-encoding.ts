@@ -1,10 +1,3 @@
-/**
- * ActionController::ParameterEncoding
- *
- * Specify binary encoding for parameters for a given action.
- * @see https://api.rubyonrails.org/classes/ActionController/ParameterEncoding.html
- */
-
 export class ParameterEncodingRegistry {
   private _encodings = new Map<string, Map<string, string>>();
 

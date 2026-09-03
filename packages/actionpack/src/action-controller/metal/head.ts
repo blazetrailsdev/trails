@@ -1,10 +1,3 @@
-/**
- * ActionController::Head
- *
- * Returns a response that has no content (merely headers).
- * @see https://api.rubyonrails.org/classes/ActionController/Head.html
- */
-
 import { Metal } from "../metal.js";
 
 /** @internal */

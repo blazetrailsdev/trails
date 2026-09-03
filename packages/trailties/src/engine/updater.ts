@@ -1,15 +1,3 @@
-// Port of `Rails::Engine::Updater` from
-// `railties/lib/rails/engine/updater.rb`. Wraps a `PluginGenerator` so
-// `bin/rails app:update`-style hooks can dispatch generator actions at the
-// engine root.
-//
-// Rails resolves the generator inline via
-// `Rails::Generators::PluginGenerator.new ["plugin"], { engine: true },
-// { destination_root: ENGINE_ROOT }`. Trails has no `PluginGenerator` /
-// `ENGINE_ROOT` yet, so the factory is injected via
-// {@link setGeneratorFactory}. The PR 1.x `PluginGenerator` port will call
-// `setGeneratorFactory` at module load.
-
 export type UpdaterGenerator = Record<string, unknown>;
 export type UpdaterGeneratorFactory = () => UpdaterGenerator;
 
@@ -54,7 +42,6 @@ export class Updater {
     this._factory = undefined;
   }
 
-  /** Rails: `def self.generator` — memoised PluginGenerator instance. */
   static generator(): UpdaterGenerator {
     if (this._generator) return this._generator;
     if (!this._factory) {
@@ -65,7 +52,6 @@ export class Updater {
     return (this._generator = this._factory());
   }
 
-  /** Rails: `def self.run(action)` — `generator.public_send(action)`. */
   static run(action: string): unknown {
     const gen = this.generator();
     const fn = gen[action];

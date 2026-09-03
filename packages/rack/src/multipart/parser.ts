@@ -2,8 +2,6 @@ import { ArgumentError, Encoding, forceEncoding } from "@blazetrails/ruby-compat
 import { QueryParser } from "../query-parser.js";
 import { getMultipartFileLimit, getMultipartTotalPartLimit, unescapePath } from "../utils.js";
 
-// ── Error classes ─────────────────────────────────────────────────────────────
-
 export class MultipartPartLimitError extends Error {
   constructor(message = "Maximum file multiparts in content reached") {
     super(message);
@@ -29,8 +27,6 @@ export class BoundaryTooLongError extends Error {
   }
 }
 
-// ── Module-level constants ────────────────────────────────────────────────────
-
 export const EOL = "\r\n";
 export const MULTIPART = /^multipart\/.*boundary="?([^";,]+)"?/i;
 export const MULTIPART_CONTENT_TYPE = new RegExp(`Content-Type: (.*)${EOL}`, "i");
@@ -40,8 +36,6 @@ export const MULTIPART_CONTENT_DISPOSITION = new RegExp(
 );
 export const MULTIPART_CONTENT_ID = new RegExp(`Content-ID:\\s*([^${EOL}]*)`, "i");
 
-// ── Result type ───────────────────────────────────────────────────────────────
-
 export interface MultipartInfo {
   params: Record<string, any> | null;
   tmpFiles: any[];
@@ -49,8 +43,6 @@ export interface MultipartInfo {
 const EMPTY: MultipartInfo = { params: null, tmpFiles: [] };
 Object.freeze(EMPTY.tmpFiles);
 Object.freeze(EMPTY);
-
-// ── BoundedIO ─────────────────────────────────────────────────────────────────
 
 /** @internal */
 export class BoundedIO {
@@ -74,8 +66,6 @@ export class BoundedIO {
     return str;
   }
 }
-
-// ── StringScanner equivalent ──────────────────────────────────────────────────
 
 class SBuf {
   private s: string;
@@ -139,8 +129,6 @@ class SBuf {
   }
 }
 
-// ── Collector ─────────────────────────────────────────────────────────────────
-
 /** @internal */
 export abstract class MimePart {
   constructor(
@@ -158,15 +146,10 @@ export abstract class MimePart {
   getData(cb: (data: any) => void): void {
     let data: any = this.body;
     if (this.filename === "") {
-      // filename is blank which means no file has been selected
       return;
     } else if (this.filename != null) {
       if (typeof this.body?.rewind === "function") this.body.rewind();
 
-      // Take the basename of the upload's original filename.
-      // This handles the full Windows paths given by Internet Explorer
-      // (and perhaps other broken user agents) without affecting
-      // those which give the lone filename.
       const fn = this.filename.split(/[/\\]/).at(-1) ?? "";
 
       data = {
@@ -267,8 +250,6 @@ export class Collector {
   }
 }
 
-// ── Parser ────────────────────────────────────────────────────────────────────
-
 type State = "FAST_FORWARD" | "CONSUME_TOKEN" | "MIME_HEAD" | "MIME_BODY" | "DONE";
 const CONTENT_DISPOSITION_MAX_PARAMS = 16;
 const CONTENT_DISPOSITION_MAX_BYTES = 1536;
@@ -308,8 +289,6 @@ export class Parser {
     const boundary = Parser.parseBoundary(contentType);
     if (!boundary) return EMPTY;
     if (boundary.length > 70)
-      // RFC 1521 Section 7.2.1 imposes a 70 character maximum for the boundary.
-      // Most clients use no more than 55 characters.
       throw new BoundaryTooLongError(
         `multipart boundary size too large (${boundary.length} characters)`,
       );
@@ -370,7 +349,7 @@ export class Parser {
     };
   }
 
-  /** @internal From WEBrick::HTTPUtils */
+  /** @internal */
   dequote(str: string): string {
     const m = /^"(.*)"$/.exec(str);
     return (m ? m[1] : str).replace(/\\(.)/g, "$1");
@@ -458,20 +437,12 @@ export class Parser {
       try {
         filename = unescapePath(filename);
       } catch {
-        /* keep as-is for malformed UTF-8 sequences */
+        /** @empty */
       }
     }
     return filename.split(/[/\\]/).at(-1) ?? "";
   }
-  /**
-   * Mirrors `Rack::Multipart::Parser#tag_multipart_encoding`
-   * (`rack/multipart/parser.rb:456-483`). Ruby re-tags `name` and `body` in
-   * place; a JS string is immutable, so the re-encoded pair is returned and the
-   * caller passes it on. `filename` and `content_type` are a String or nil, so
-   * Ruby's `if` on them is `!= null` — `""` is a filename Ruby returns early on.
-   *
-   * @internal
-   */
+  /** @internal */
   private tagMultipartEncoding(
     filename: string | null | undefined,
     contentType: string | null | undefined,
@@ -503,12 +474,7 @@ export class Parser {
     name = forceEncoding(name, encoding);
     return [name, typeof body === "string" ? forceEncoding(body, encoding) : body];
   }
-  /**
-   * Mirrors `find_encoding` (`rack/multipart/parser.rb:489-493`): the charset
-   * is submitted by the user, so an unknown one is binary rather than an error.
-   *
-   * @internal
-   */
+  /** @internal */
   private findEncoding(enc: string | null | undefined): Encoding {
     try {
       return Encoding.find(enc!);

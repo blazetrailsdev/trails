@@ -33,13 +33,11 @@ export function renderModel(className: string, fields: FieldSpec[]): string {
   const refs = fields.filter((f) => f.type === "references" || f.type === "belongs_to");
   const cols = fields.filter((f) => f.type !== "references" && f.type !== "belongs_to");
 
-  // Foreign-key declarations for reference fields (e.g. post_id: number)
   const fkAttrs = refs.map((f) => `  declare ${normalizeRefName(f.name)}_id: number;`).join("\n");
   const colAttrs = cols
     .map((f) => `  declare ${f.name}: ${TS_TYPES[f.type] ?? "string"};`)
     .join("\n");
 
-  // Single static {} block for all associations — matches the codebase convention
   const assocCalls = refs
     .map((f) => `    this.belongsTo(${JSON.stringify(normalizeRefName(f.name))});`)
     .join("\n");
@@ -68,13 +66,11 @@ export async function generateModel(
   ts: string,
   options: GenerateMigrationOptions = {},
 ): Promise<GenerateModelResult> {
-  // Normalize namespace separators (Admin::User → admin_user) before building paths.
   const snakeName = normalizeSnakeName(name);
   validateMigrationName(snakeName);
   const className = camelize(snakeName);
   const modelPath = join(root, "app", "models", `${snakeName}.ts`);
   const migrationPath = join(root, "db", "migrate", `${ts}_create_${pluralize(snakeName)}.ts`);
-  // Existence check runs even in dry-run so the output reflects what a real run would do.
   if (!options.force && ((await fileExists(modelPath)) || (await fileExists(migrationPath)))) {
     return { modelPath, migrationPath, written: false, skipped: true };
   }
@@ -82,7 +78,6 @@ export async function generateModel(
     await mkdir(join(root, "app", "models"), { recursive: true });
     await mkdir(join(root, "db", "migrate"), { recursive: true });
     const writeFlag = { encoding: "utf8" as const, flag: options.force ? "w" : "wx" };
-    // Atomic create: "wx" fails with EEXIST if a concurrent write beat the upfront check.
     let modelWritten = false;
     try {
       await writeFile(modelPath, renderModel(className, fields), writeFlag);
@@ -94,7 +89,6 @@ export async function generateModel(
       );
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "EEXIST") {
-        // Clean up the model file if we created it in this run to avoid partial state.
         if (modelWritten) await unlink(modelPath).catch(() => undefined);
         return { modelPath, migrationPath, written: false, skipped: true };
       }

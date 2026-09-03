@@ -10,46 +10,19 @@ export type ExtensionBuilder = (tagPattern: string) => RegExp;
 const DEFAULT_DIRECTORIES = ["app", "config", "db", "lib", "test"];
 const DEFAULT_TAGS = ["OPTIMIZE", "FIXME", "TODO"];
 
-/**
- * Mirrors: Rails::SourceAnnotationExtractor::Annotation
- * (`source_annotation_extractor.rb:71-101`) — the registers and the three
- * registrars that mutate them are class-level state on this class, not on the
- * enclosing extractor.
- */
 export class Annotation {
   static directories: string[] = [...DEFAULT_DIRECTORIES];
   static tags: string[] = [...DEFAULT_TAGS];
   static extensions: Array<{ test: RegExp; builder: ExtensionBuilder }> = [];
 
-  /**
-   * Registers additional directories to be included
-   *   Annotation.registerDirectories("spec", "another")
-   *
-   * Mirrors: `self.register_directories` (`source_annotation_extractor.rb:78`).
-   */
   static registerDirectories(...dirs: string[]): void {
     this.directories.push(...dirs);
   }
 
-  /**
-   * Registers additional tags
-   *   Annotation.registerTags("TESTME", "DEPRECATEME")
-   *
-   * Mirrors: `self.register_tags` (`source_annotation_extractor.rb:88`).
-   */
   static registerTags(...additionalTags: string[]): void {
     this.tags.push(...additionalTags);
   }
 
-  /**
-   * Registers new Annotations File Extensions
-   *   Annotation.registerExtensions("css", "scss", "sass", "less", "js", (tag) =>
-   *     new RegExp(`//\\s*(${tag}):?\\s*(.*)$`))
-   *
-   * Mirrors: `self.register_extensions` (`source_annotation_extractor.rb:98-99`).
-   * Ruby's trailing `&block` is the `ExtensionBuilder` argument — the settled
-   * trails spelling for a block — so it rides the splat's last slot.
-   */
   static registerExtensions(...exts: [...string[], ExtensionBuilder]): void {
     const block = exts.pop() as ExtensionBuilder;
     this.extensions.push({
@@ -72,11 +45,7 @@ export class Annotation {
   }
 }
 
-/**
- * Test-only convenience: reset the directories/tags/extensions registries.
- *
- * @noRailsEquivalent PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 export function resetAnnotationRegistry(): void {
   Annotation.directories = [...DEFAULT_DIRECTORIES];
   Annotation.tags = [...DEFAULT_TAGS];
@@ -98,10 +67,6 @@ function registerDefaults(): void {
 
 registerDefaults();
 
-/**
- * Ports Rails::SourceAnnotationExtractor. Regex-based PatternExtractor only;
- * a string-literal-aware AST extractor is left for a follow-up.
- */
 export class SourceAnnotationExtractor {
   static enumerate(
     tag: string | null = null,

@@ -1,9 +1,3 @@
-/**
- * Smoke tests for ActionDispatch::DebugView. Full Rails-mirrored cases
- * (actionpack/test/dispatch/debug_exceptions_test.rb) follow up once
- * ActionView::Base is ported.
- */
-
 import { describe, it, expect } from "vitest";
 import { DebugView } from "./debug-view.js";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";

@@ -3,13 +3,6 @@ import { describe, expect, it } from "vitest";
 import { CodeGenerator } from "./code-generator.js";
 import { include, Module } from "@blazetrails/ruby-compat/include";
 
-/**
- * Rails has no `code_generator_test.rb` — CodeGenerator is exercised through
- * `AttributeMethods`. These cover the batching contract the attribute-method
- * callers depend on: definitions land on the owner only once `execute` runs, a
- * nested batch joins the enclosing one, and a namespace's method cache is
- * consulted before a body is built a second time.
- */
 describe("CodeGenerator (trails)", () => {
   it("applies the batched definitions to the owner when the batch ends", () => {
     const owner = new Module();

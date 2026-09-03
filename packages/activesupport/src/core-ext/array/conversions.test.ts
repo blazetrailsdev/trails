@@ -35,7 +35,6 @@ describe("ToSentenceTest", () => {
   });
 
   it("one non string element", () => {
-    // All elements are strings in TS, but numbers work too
     expect(toSentence([String(42)])).toBe("42");
   });
 

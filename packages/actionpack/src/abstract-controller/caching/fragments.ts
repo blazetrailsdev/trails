@@ -1,26 +1,8 @@
-/**
- * `AbstractController::Caching::Fragments` — fragment-level cache reads,
- * writes, existence checks, and expiry, plus the `combinedFragmentCacheKey`
- * helper that controllers use to namespace keys. Hosts may override
- * `instrumentName` / `instrumentPayload` (abstract in Rails, supplied by
- * `ActionController::Caching`); defaults are namespace `"abstract_controller"`
- * and payload `{ key }`. Rails' `.html_safe` step on `readFragment` results
- * is a no-op here — trails has no html-safe marker.
- *
- * Ported from `vendor/rails/actionpack/lib/abstract_controller/caching/fragments.rb`.
- *
- * @internal
- */
+/** @internal */
 
 import { NameError, Notifications } from "@blazetrails/activesupport";
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
-// `cacheConfigured` is duplicated here (it also lives in `caching.ts`) so
-// the module graph stays acyclic: `caching.ts` now imports fragment wrappers
-// from this file to republish them on the `Caching` surface (per Rails'
-// `include AbstractController::Caching::Fragments`), and an import in the
-// other direction would create a cycle. The predicate is a trivial two-property
-// check — the duplication is cheaper than threading it through a third file.
 function cacheConfigured(host: FragmentsHost): boolean {
   const cls = host.constructor;
   return Boolean(cls.performCaching && cls.cacheStore);
@@ -36,9 +18,6 @@ export interface FragmentsClassMethods {
 
 export interface FragmentsHost {
   constructor: FragmentsClassMethods;
-  // Widened to `unknown` so hosts with a string-form `urlFor` (e.g.
-  // `ActionController::Metal`) still satisfy the host interface. Rails'
-  // `url_for` likewise accepts strings, hashes, arrays, or nil.
   urlFor?(options: unknown): string;
   instrumentName?(): string;
   instrumentPayload?(key: unknown): Record<string, unknown>;
@@ -61,8 +40,6 @@ export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unk
   const heads = (this.constructor.fragmentCacheKeys ?? []).map((k) => k.call(this));
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
-  // Rails uses `||` here (`ENV["RAILS_CACHE_ID"] || ENV["RAILS_APP_VERSION"]`),
-  // so empty strings fall through — not `??`.
   const version = env?.RAILS_CACHE_ID || env?.RAILS_APP_VERSION || null;
 
   let tail: unknown;
@@ -99,7 +76,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-/** Ruby's `NoMethodError`, raised when a receiver does not answer `to_str`. */
 class NoMethodError extends NameError {
   constructor(message: string) {
     super(message);
@@ -107,12 +83,6 @@ class NoMethodError extends NameError {
   }
 }
 
-/**
- * Ruby's implicit string conversion (`Object#to_str`), which only String — and
- * objects that opt in by defining `to_str`, such as `ActionView::OutputBuffer`
- * (`toStr()` here) — answer. `write_fragment` relies on it to reject a
- * non-string-like body (fragments.rb:85).
- */
 function toStr(content: unknown): string {
   if (typeof content === "string") return content;
   const toStrMethod = (content as { toStr?: unknown } | null)?.toStr;

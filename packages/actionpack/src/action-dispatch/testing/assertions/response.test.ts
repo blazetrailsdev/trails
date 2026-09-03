@@ -1,7 +1,3 @@
-// Behavioral coverage for the exported assertRedirectedTo helper that
-// isn't covered by the Rails-mirrored response_assertions_test port —
-// Rails' redirect tests live in action_pack_assertions_test.rb and
-// depend on controller infra not yet ported.
 import { describe, expect, it } from "vitest";
 import { assertRedirectedTo, type AssertionResponseHost } from "./response.js";
 
@@ -49,7 +45,6 @@ describe("assertRedirectedTo", () => {
       }),
     ).not.toThrow();
 
-    // status override that doesn't match the actual response still fails
     expect(() =>
       assertRedirectedTo.call(host(302, { location: "/foo" }), "/foo", {
         status: "moved_permanently",

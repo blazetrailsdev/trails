@@ -2,12 +2,6 @@ import { spawnSync } from "child_process";
 import { createRequire } from "module";
 import { dirname, join } from "path";
 
-/**
- * Resolves the absolute path of a bin entry from a package using Node's module
- * resolution, then spawns it synchronously, forwarding all extra args and the
- * calling process's stdio. Returns the child's exit code (defaults to 1 on
- * signal termination).
- */
 export function delegateBin(pkg: string, binName: string, args: string[]): number {
   const req = createRequire(import.meta.url);
   const pkgJson = req(`${pkg}/package.json`) as { bin?: Record<string, string> };

@@ -3,12 +3,7 @@ import type { Pattern } from "./path/pattern.js";
 import type { Node } from "./nodes/node.js";
 import type { Format } from "./visitors.js";
 
-// =========================================================================
-// VerbMatchers — one class per HTTP method, with `verb` and `call(req)`.
-// =========================================================================
-
 export interface VerbRequest {
-  /** Uppercase method name (`GET`, `POST`, …). */
   requestMethod: string;
 }
 
@@ -70,10 +65,6 @@ export const VerbMatchers = {
   },
 };
 
-// =========================================================================
-// Route
-// =========================================================================
-
 export interface RouteOptions {
   name: string;
   app?: unknown;
@@ -117,7 +108,6 @@ export class Route {
   /** @internal */
   private _requiredDefaultsCache: Record<string, unknown> | null = null;
 
-  /** Rails `Route.verb_matcher(verb)` — `:all` / "GET" / etc. */
   static verbMatcher(verb: string | symbol): VerbMatcher {
     return VerbMatchers.for(verb);
   }
@@ -139,7 +129,6 @@ export class Route {
     this.path.ast!.route = this;
   }
 
-  /** Rails alias :conditions :constraints */
   get conditions(): Record<string, unknown> {
     return this.constraints;
   }
@@ -150,12 +139,7 @@ export class Route {
     void this.requiredDefaults;
   }
 
-  /**
-   * Defaults minus path-known requirements that match the default star regex.
-   * Mirrors Rails: `defaults.merge(path.requirements).delete_if { |_,v| /.+?/m == v }`.
-   *
-   * @missingRailsArgs delete_if — PERMANENT
-   */
+  /** @missingRailsArgs delete_if — PERMANENT */
   get requirements(): Record<string, unknown> {
     return deleteIf(
       merge(this.defaults, this.path.requirements),
@@ -180,7 +164,6 @@ export class Route {
     return Object.keys(this.requiredDefaults).length * 2 + nameMatches;
   }
 
-  /** Rails alias :segment_keys :parts */
   get parts(): readonly string[] {
     if (!this._parts) this._parts = [...this.segments];
     return this._parts;
@@ -202,9 +185,7 @@ export class Route {
     return this._requiredDefaults.includes(key);
   }
 
-  /**
-   * @missingRailsArgs delete_if — PERMANENT
-   */
+  /** @missingRailsArgs delete_if — PERMANENT */
   get requiredDefaults(): Record<string, unknown> {
     if (this._requiredDefaultsCache) return this._requiredDefaultsCache;
     this._requiredDefaultsCache = deleteIf(
@@ -243,11 +224,6 @@ export class Route {
     return true;
   }
 
-  /**
-   * Rails: `constraints[:ip] || //`. Returns whatever was supplied in
-   * constraints (typically a String for an exact match or a RegExp);
-   * default is `//` (empty regex — matches anything).
-   */
   get ip(): string | RegExp {
     const v = this.constraints["ip"];
     if (v instanceof RegExp || typeof v === "string") return v;

@@ -21,15 +21,9 @@ export function destroyCommand(): Command {
       removeFile(cwd, `app/models/${fileName}.ts`);
       removeFile(cwd, `test/models/${fileName}.test.ts`);
 
-      // Find and remove migration
       const migrationsDir = File.join(cwd, "db", "migrate");
       if (File.isExist(migrationsDir)) {
-        // Escape the user-derived tableName so regex metacharacters can't
-        // widen the match.
         const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        // Anchor to the start of the filename and require the timestamp
-        // + separator so names like `..._recreate_posts.ts` cannot match
-        // `create_posts.ts`.
         const pattern = new RegExp(`^\\d+_create_${escaped}\\.(ts|js)$`);
         for (const f of Dir.children(migrationsDir)) {
           if (pattern.test(f)) {
@@ -59,10 +53,6 @@ export function destroyCommand(): Command {
       const migrationsDir = File.join(cwd, "db", "migrate");
       if (!File.isExist(migrationsDir)) return;
 
-      // Anchor on `^<timestamp>_<name>\.(ts|js)$` so a name like
-      // `create_posts` does not also match `..._add_create_posts_flag.ts`.
-      // Escape first so regex metacharacters in the user-supplied name
-      // can't widen the match.
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const underscored = dasherize(escaped).replace(/-/g, "_");
       const pattern = new RegExp(`^\\d+_${underscored}\\.(ts|js)$`);
@@ -83,15 +73,12 @@ export function destroyCommand(): Command {
       const className = classify(name);
       const tableName = tableize(className);
 
-      // Model
       removeFile(cwd, `app/models/${fileName}.ts`);
       removeFile(cwd, `test/models/${fileName}.test.ts`);
 
-      // Controller
       removeFile(cwd, `app/controllers/${tableName}-controller.ts`);
       removeFile(cwd, `test/controllers/${tableName}-controller.test.ts`);
 
-      // Migration
       const migrationsDir = File.join(cwd, "db", "migrate");
       if (File.isExist(migrationsDir)) {
         const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

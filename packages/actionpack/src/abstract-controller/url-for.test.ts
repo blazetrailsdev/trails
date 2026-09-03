@@ -21,10 +21,6 @@ describe("AbstractController::UrlFor", () => {
     });
 
     it("removes any action name that collides with a route helper name", () => {
-      // Trails route-helpers.ts generates `${name}_path` / `${name}_url`
-      // in Rails-shape, so the collision surface is snake_case helper
-      // names plus the bare action names that an app might also expose
-      // as routes (e.g. `show` here).
       const routes: RouteSetLike = {
         namedRoutes: { helperNames: () => ["posts_url", "post_path", "show"] },
       };
@@ -39,8 +35,6 @@ describe("AbstractController::UrlFor", () => {
     });
 
     it("ignores a defaultEnv on the route set when filtering", () => {
-      // defaultEnv is part of RouteSetLike (consumed by the renderer),
-      // but actionMethods shouldn't care about it.
       const routes: RouteSetLike = {
         namedRoutes: { helperNames: () => ["posts_path", "show"] },
         defaultEnv: { HTTP_HOST: "example.com" },

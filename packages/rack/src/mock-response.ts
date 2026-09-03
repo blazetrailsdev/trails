@@ -58,7 +58,6 @@ export class MockResponse extends Response {
     return this._bodyString;
   }
 
-  // Alias for bodyString for compat
   getBody(): string {
     return this.bodyString;
   }

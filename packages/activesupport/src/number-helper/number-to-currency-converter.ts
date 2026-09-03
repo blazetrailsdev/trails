@@ -3,10 +3,8 @@ import { NumberToRoundedConverter } from "./number-to-rounded-converter.js";
 import { BigDecimal } from "../core-ext/big-decimal/conversions.js";
 import type { NumberToCurrencyOptions } from "../number-helper.js";
 
-/** Ruby's `0.5` literal in `number_to_currency_converter.rb:16`. */
 const HALF = new BigDecimal("0.5");
 
-/** Ruby's exact `10**options[:precision]`, which outruns a JS number by 1e21. */
 function powerOfTen(precision: number): BigDecimal {
   return new BigDecimal(`1${"0".repeat(Math.max(precision, 0))}`);
 }

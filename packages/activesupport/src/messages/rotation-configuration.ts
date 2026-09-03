@@ -9,12 +9,6 @@ export class RotationConfiguration {
     this.encrypted = [];
   }
 
-  /**
-   * Ruby collects trailing keyword arguments into an options hash and appends
-   * it to `args` only when non-empty. JavaScript has no implicit keyword
-   * collection, so callers pass the options object as the final argument and
-   * it is stored verbatim.
-   */
   rotate(kind: RotationKind, ...args: unknown[]): void {
     switch (kind) {
       case "signed":

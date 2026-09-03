@@ -1,5 +1,3 @@
-// Oracle values computed via Ruby 3.3 did_you_mean's
-// DidYouMean::Levenshtein.distance.
 import { describe, it, expect } from "vitest";
 import { Levenshtein } from "./levenshtein.js";
 
@@ -31,14 +29,12 @@ describe("Levenshtein.distance", () => {
   });
 
   it("counts a non-BMP codepoint as one edit (codepoint iteration)", () => {
-    // Ruby's Levenshtein.distance("𝐀", "") == 1
     expect(Levenshtein.distance("\u{1D400}", "")).toBe(1);
     expect(Levenshtein.distance("\u{1D400}", "\u{1D400}")).toBe(0);
     expect(Levenshtein.distance("a\u{1D400}", "a")).toBe(1);
   });
 
   it("treats accented characters as single codepoints", () => {
-    // "café" → "cafe" differs in one codepoint
     expect(Levenshtein.distance("café", "cafe")).toBe(1);
     expect(Levenshtein.distance("café", "café")).toBe(0);
   });

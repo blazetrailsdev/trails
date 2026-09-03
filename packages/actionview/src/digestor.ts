@@ -1,10 +1,4 @@
-/**
- * Computes a stable digest of a template for cache keys (used by
- * `etag_with_template_digest`). This stub digests the resolved source
- * only; the transitive `render`-call dependency walk lands in Phase 6.
- *
- * @internal stub - real impl in Phase 6
- */
+/** @internal */
 
 import type { LookupContext } from "./lookup-context.js";
 
@@ -16,7 +10,7 @@ export interface DigestorOptions {
 }
 
 export class Digestor {
-  /** @internal stub - real impl in Phase 6 */
+  /** @internal */
   static digest({ name, format, finder }: DigestorOptions): string {
     const slash = name.lastIndexOf("/");
     const prefix = slash >= 0 ? name.slice(0, slash) : "";

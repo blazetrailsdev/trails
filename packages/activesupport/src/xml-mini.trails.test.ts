@@ -9,9 +9,6 @@ import {
 import * as XmlMini_REXML from "./xml-mini/rexml.js";
 import * as XmlMini_Nokogiri from "./xml-mini/nokogiri.js";
 
-// Rails exercises these through `XmlMini::PARSING` (xml_mini_test.rb:248) and
-// `Hash.from_xml` (xml_mini_engine_test.rb:36), neither of which is ported yet,
-// so the helpers are covered directly here.
 describe("XmlMini", () => {
   it("_parse_hex_binary decodes hex to bytes", () => {
     expect(_parseHexBinary("48656C6C6F2C20576F726C6421")).toBe("Hello, World!");
@@ -49,11 +46,6 @@ describe("XmlMini", () => {
     expect(f.originalFilename).toBe("avatar.gif");
   });
 
-  // Rails' own engine suites set the backend by NAME
-  // (`XmlMini.backend = engine`, `xml_mini_engine_test.rb:25-27`), so the name
-  // arm of `cast_backend_name_to_module` (`xml_mini.rb:200-206`) is the one
-  // Rails exercises; it is covered directly here because it must resolve both
-  // under vitest and in the built package.
   it("cast_backend_name_to_module resolves a backend by name", async () => {
     expect(await castBackendNameToModule("REXML")).toBe(XmlMini_REXML);
     expect(await castBackendNameToModule("Nokogiri")).toBe(XmlMini_Nokogiri);

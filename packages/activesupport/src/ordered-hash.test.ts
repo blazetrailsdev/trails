@@ -1,9 +1,3 @@
-/**
- * OrderedHashTest — tests for OrderedHash, which mirrors Rails ActiveSupport::OrderedHash.
- * In Rails, OrderedHash is a deprecated Hash subclass that guarantees insertion order.
- * In modern JS, plain objects and Map both preserve insertion order.
- * We implement OrderedHash as a thin wrapper around Map.
- */
 import { describe, it, expect } from "vitest";
 import { OrderedHash } from "./ordered-hash.js";
 
@@ -157,7 +151,6 @@ describe("OrderedHashTest", () => {
     h.set("a", 1);
     h.set("b", 2);
     h.reject((k, v) => v > 1);
-    // reject! modifies in place
     h.deleteIf((k, v) => v > 1);
     expect(h.size).toBe(1);
     expect(h.has("a")).toBe(true);
@@ -255,7 +248,6 @@ describe("OrderedHashTest", () => {
   });
 
   it("alternate initialization raises exception on odd length args", () => {
-    // In JS, this isn't directly applicable; we validate pairs instead
     expect(() => OrderedHash.from([["a", 1], ["b"]] as any)).toThrow();
   });
 

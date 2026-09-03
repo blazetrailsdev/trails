@@ -92,9 +92,6 @@ describe("_urlHostAllowed", () => {
     expect(_urlHostAllowed.call(host(), "//evil.test/x")).toBe(false);
   });
 
-  // Open-redirect guard: Rails' `URI("//foo").host` is nil, so the bare
-  // `//`-prefix is unconditionally rejected even when the post-`//`
-  // authority happens to match `request.host`.
   it("rejects protocol-relative URLs even when the authority matches request.host", () => {
     expect(_urlHostAllowed.call(host(), "//example.com/x")).toBe(false);
   });

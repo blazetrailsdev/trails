@@ -135,7 +135,7 @@ describe("MiddlewareStackTest", () => {
   it("delete ignores middleware not in the stack", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
-    stack.delete(BarMiddleware); // Not in stack — no error
+    stack.delete(BarMiddleware);
     expect(stack.length).toBe(1);
   });
 

@@ -23,7 +23,7 @@ export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOpt
       if (options.significant != null && options.significant !== false && precision > 0) {
         const digits = helper.digitCount(roundedNumber);
         precision -= digits;
-        if (precision < 0) precision = 0; // don't let it be negative
+        if (precision < 0) precision = 0;
       }
 
       const s = (roundedNumber as BigDecimal).toString("F");

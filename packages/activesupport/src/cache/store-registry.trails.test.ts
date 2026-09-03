@@ -1,11 +1,3 @@
-/**
- * Trails-only: Ruby resolves a cache store class by requiring
- * `active_support/cache/#{store}` at call time (cache.rb:135-144), so a store
- * shipped by another gem resolves with no change to Rails. ESM cannot build an
- * import specifier from a runtime name, so trails keeps a registry that stands
- * in for the `ActiveSupport::Cache` namespace `const_get` reads. Rails has no
- * counterpart test because Ruby needs none.
- */
 import { describe, it, expect } from "vitest";
 import { lookupStore } from "../cache.js";
 import { registerStoreClass } from "./store-registry.js";

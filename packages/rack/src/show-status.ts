@@ -18,7 +18,6 @@ export class ShowStatus {
       const bodyEmpty =
         (Array.isArray(body) && body.join("").length === 0) || headers[CONTENT_LENGTH] === "0";
       if (bodyEmpty || detail) {
-        // Close original body if it has a close method
         if (body && typeof body.close === "function") body.close();
 
         const detailStr = detail != null ? String(detail) : "";

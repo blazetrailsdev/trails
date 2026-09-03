@@ -1,11 +1,3 @@
-/**
- * The `InvalidLocaleData` arms of `load_yml` / `load_file`, and the Psych input
- * surface `load_yml` accepts by handing the file straight to a YAML parser
- * (base.rb:261-270) — pinned here because the gem gets both from Psych, so
- * anchors, aliases, tags, block scalars and mapping entries inside a block
- * sequence all load rather than raising.
- */
-
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Simple } from "./simple.js";
@@ -148,10 +140,6 @@ describe("I18n::Backend::Base file loading", () => {
     expect(backend.initialized()).toBe(false);
   });
 
-  // `registerLocaleModule` / `loadJs` stand in for the gem's `load_rb`
-  // (base.rb:254-256, dispatched by `load_file`'s extension arms at :240-247).
-  // Every test here names its own `bundled/*` entry: the registry is a module
-  // singleton with no reset, so a shared name would leak into its siblings.
   describe("the locale-module registry", () => {
     it("serves a registered module without reaching import()", () => {
       registerLocaleModule("bundled/registered.js", { en: { bundled: { greeting: "hi" } } });

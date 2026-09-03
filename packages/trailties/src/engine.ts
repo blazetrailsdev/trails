@@ -1,19 +1,3 @@
-// Port of `Rails::Engine` from `railties/lib/rails/engine.rb`. Shell +
-// EngineConfiguration + railties() collection. `lazy_route_set` + `updater`
-// → 2.2c. `env_config`/`call`/`helpers` → blocked on PR 2.5.
-//
-// Initializers deliberately not declared here, because the subsystem each one
-// drives is unported:
-//   - `:set_load_path` (`engine.rb:571`), `:set_autoload_paths` (`:578`),
-//     `:set_eager_load_paths` (`:586`) — `$LOAD_PATH` and
-//     `ActiveSupport::Dependencies` have no ESM analogue; module resolution is
-//     the bundler's job in trails.
-//   - `:add_locales` (`:610`) — `config.i18n.railties_load_path`; no `config.i18n`.
-//   - `:add_mailer_preview_paths` (`:622`) — ActionMailer is not ported.
-//   - `:add_fixture_paths` (`:629`) — `on_load(:active_record_fixtures)` and
-//     `fixtures_in_root_and_not_in_vendor_or_dot_dir?` are not ported.
-//   - `:wrap_reloader_around_load_seed` (`:650`) — `Engine#load_seed` and its
-//     `:load_seed` callback chain are not ported.
 import { Notifications, onLoad } from "@blazetrails/activesupport";
 import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
@@ -39,11 +23,6 @@ export class Engine extends Trailtie {
     if (value !== undefined) writeOwnState(this, "_calledFrom", value);
     return readOwnState<string>(this, "_calledFrom");
   }
-  /**
-   * Mirrors `Engine.endpoint(endpoint = nil)` (`engine.rb:379-383`) — a
-   * plain `@endpoint` ivar on the singleton, so it is own-state per class
-   * and never inherited.
-   */
   static endpoint(endpoint?: RackApp | RackAppObject): RackApp | RackAppObject | undefined {
     if (endpoint) writeOwnState(this, "_endpoint", endpoint);
     return readOwnState<RackApp | RackAppObject>(this, "_endpoint");
@@ -54,7 +33,6 @@ export class Engine extends Trailtie {
     return readOwnState<boolean>(this, "_isolated") === true;
   }
 
-  /** Mirrors Rails' `alias :engine_name :railtie_name`. */
   static engineName(name?: string): string {
     return this.railtieName(name);
   }
@@ -75,13 +53,7 @@ export class Engine extends Trailtie {
     return undefined;
   }
 
-  /**
-   * `def self.find_root_with_flag` sits in Engine's `private` section and
-   * carries `# :nodoc:` (`engine.rb:701`) — Ruby's `private` does not reach a
-   * singleton method, but the `:nodoc:` keeps it out of the API reference all
-   * the same.
-   * @internal
-   */
+  /** @internal */
   static async findRootWithFlag(
     flag: string,
     rootPath: string | undefined,
@@ -113,21 +85,11 @@ export class Engine extends Trailtie {
     return (this.constructor as typeof Engine).isolated();
   }
 
-  /** Rails delegates `root` to `config` (`engine.rb:437`), whose root is
-   * seeded from `find_root(called_from)` when the configuration is built
-   * (`engine.rb:553`). Resolution is async here, so it happens on read — an
-   * unset `calledFrom` reaches `find_root_with_flag` exactly as Ruby's nil
-   * `called_from` does, and raises for an Engine (no default) while
-   * `Application.findRoot`'s `cwd` default answers for an Application
-   * (`application.rb:88-90`). */
   async root(): Promise<string> {
     const klass = this.constructor as typeof Engine;
     return await klass.findRoot(klass.calledFrom() as string);
   }
 
-  /** Mirrors `Engine#config` — overrides `Trailtie#config` to return
-   * an `EngineConfiguration` so `middleware`, `paths`, `tableNamePrefix`,
-   * etc. are reachable through the single `config` surface. */
   override get config(): EngineConfiguration {
     const cfg = this._config;
     if (cfg instanceof EngineConfiguration) return cfg;
@@ -140,14 +102,10 @@ export class Engine extends Trailtie {
     return this.config.tableNamePrefix ?? this.defaultTableNamePrefix();
   }
 
-  /** Implicit fallback when `tableNamePrefix` is unset but `isolated` is on. */
   private defaultTableNamePrefix(): string | null {
     return this.isolated() ? `${this.engineName()}_` : null;
   }
 
-  /** Mirrors `Engine#paths`. Resolves root before delegating to
-   * `EngineConfiguration#paths` so the `Root` instance carries the
-   * expanded root for subsequent `expanded`/`existent` calls. */
   async paths(): Promise<Root> {
     const cfg = this.config;
     if (cfg.root === null) cfg.setRoot(await this.root());
@@ -164,7 +122,6 @@ export class Engine extends Trailtie {
     return this._railtiesCollection;
   }
 
-  /** Mirrors `Engine#routes(&block)` (`engine.rb:462-466`). */
   routes(block?: DrawCallback): RouteSet {
     this._routes ??= this.config.routeSetClass.newWithConfig(this.config);
     if (block) this._routes.append(block);
@@ -174,39 +131,15 @@ export class Engine extends Trailtie {
     return this._routes !== undefined;
   }
 
-  /**
-   * Invoke the server registered hooks.
-   * Check {@link Trailtie.server} for more info.
-   *
-   * Mirrors `Engine#load_server(app = self)` (`engine.rb:485-488`).
-   */
   loadServer(app: unknown = this): this {
     this.runServerBlocks(app);
     return this;
   }
 
-  /**
-   * Returns the endpoint for this engine. If none is registered,
-   * defaults to an `ActionDispatch::Routing::RouteSet`.
-   *
-   * Mirrors `Engine#endpoint` (`engine.rb:527-529`).
-   */
   endpoint(): RackApp | RackAppObject {
     return (this.constructor as typeof Engine).endpoint() ?? this.routes();
   }
 
-  /**
-   * Mirrors `Engine#load_config_initializer(initializer)` (`engine.rb:691-695`).
-   * Ruby's `load` is `import()` here, so the body is async and the
-   * instrumentation goes through `Notifications.instrumentAsync`.
-   *
-   * Deliberately carries no internal-visibility tag: the method sits in Engine's
-   * `private` section but has Rails' `# :doc:` directive (`engine.rb:691`),
-   * which republishes it as public API. `extract-ruby-api.rb:402-412` honours
-   * that directive and keeps the name out of the privates manifest, so
-   * `rails-private-jsdoc` does not ask for the tag and
-   * `unbacked-internal-needs-receipt` rejects it.
-   */
   async loadConfigInitializer(initializer: string): Promise<void> {
     const { pathToFileURL } = await getPathAsync();
     await Notifications.instrumentAsync(
@@ -218,11 +151,7 @@ export class Engine extends Trailtie {
     );
   }
 
-  /**
-   * Mirrors: Rails `_all_load_paths(add_autoload_paths_to_load_path)` (engine.rb:730).
-   *
-   * @internal
-   */
+  /** @internal */
   async _allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
     if (this._allLoadPathsCache) return this._allLoadPathsCache;
     const paths = await this.paths();
@@ -237,12 +166,6 @@ export class Engine extends Trailtie {
   }
 }
 
-/**
- * The slice of `Rails::Application` the engine initializers below reach for
- * through their block argument (`initializer :add_routing_paths do |app|`).
- * Declared structurally so `engine.ts` keeps no import edge on
- * `application.ts`, which imports this file.
- */
 export interface EngineInitializerApp {
   config: { helpersPaths: string[] };
   routes(): { drawPaths: string[] };
@@ -253,10 +176,6 @@ export interface EngineInitializerApp {
   };
 }
 
-/**
- * Mirrors `Engine`'s `load_environment_config` initializer (`engine.rb:565-569`).
- * Ruby's `require environment` is a dynamic `import()` of the module URL.
- */
 Engine.initializer(
   "load_environment_config",
   { before: "load_environment_hook", group: "all" },
@@ -269,22 +188,10 @@ Engine.initializer(
   },
 );
 
-/**
- * Mirrors `Engine`'s `make_routes_lazy` initializer (`engine.rb:591-593`).
- * Declared between `set_eager_load_paths` and `add_routing_paths`, as Rails
- * declares it; `set_eager_load_paths` itself is one of the unported
- * initializers listed at the top of this file.
- */
 Engine.initializer("make_routes_lazy", { before: "bootstrap_hook" }, function (this: Engine) {
   if (_Trails!.env.isLocal()) this.config.routeSetClass = LazyRouteSet;
 });
 
-/**
- * Mirrors `Engine`'s `add_routing_paths` initializer (`engine.rb:595-606`).
- *
- * Rails reads `paths["config/routes.rb"]`; the trails path set declares the
- * same entry under its TypeScript name (`engine/configuration.ts:84`).
- */
 Engine.initializer("add_routing_paths", async function (this: Engine, ...args: unknown[]) {
   const app = args[0] as EngineInitializerApp;
   const paths = await this.paths();
@@ -300,10 +207,6 @@ Engine.initializer("add_routing_paths", async function (this: Engine, ...args: u
   }
 });
 
-/**
- * Mirrors `Engine`'s `add_view_paths` initializer (`engine.rb:614-620`).
- * The `action_mailer` arm is dropped — ActionMailer is not ported.
- */
 Engine.initializer("add_view_paths", async function (this: Engine) {
   const views = (await (await this.paths()).get("app/views")?.existent()) ?? [];
   if (views.length === 0) return;
@@ -312,7 +215,6 @@ Engine.initializer("add_view_paths", async function (this: Engine) {
   });
 });
 
-/** Mirrors `Engine`'s `prepend_helpers_path` initializer (`engine.rb:638-642`). */
 Engine.initializer("prepend_helpers_path", async function (this: Engine, ...args: unknown[]) {
   const app = args[0] as EngineInitializerApp;
   if (!this.isolated() || (app as unknown) === this) {
@@ -321,7 +223,6 @@ Engine.initializer("prepend_helpers_path", async function (this: Engine, ...args
   }
 });
 
-/** Mirrors `Engine`'s `load_config_initializers` initializer (`engine.rb:644-648`). */
 Engine.initializer("load_config_initializers", async function (this: Engine) {
   const existent = (await (await this.paths()).get("config/initializers")?.existent()) ?? [];
   for (const initializer of existent.sort()) {
@@ -329,13 +230,9 @@ Engine.initializer("load_config_initializers", async function (this: Engine) {
   }
 });
 
-/** Mirrors `Engine`'s `engines_blank_point` initializer (`engine.rb:656-659`). */
-Engine.initializer("engines_blank_point", function () {
-  // We need this initializer so all extra initializers added in engines are
-  // consistently executed after all the initializers above across all engines.
-});
+Engine.initializer("engines_blank_point", function () {});
 
-/** @internal The `on_load(:action_controller)` receiver — see `add_view_paths`. */
+/** @internal */
 interface ActionControllerBaseLike {
   prependViewPath?: (views: string[]) => void;
 }

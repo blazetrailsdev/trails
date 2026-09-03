@@ -26,10 +26,6 @@ class FakeBackend extends Base {
   }
 }
 
-/**
- * Trails-only: the gem has no config_test.rb — Config is covered indirectly by
- * test/i18n_test.rb through the translate API, which is not ported yet.
- */
 describe("Config", () => {
   let config: Config;
 

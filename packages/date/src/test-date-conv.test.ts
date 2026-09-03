@@ -1,38 +1,9 @@
-/**
- * Port of ruby/date's `test/date/test_date_conv.rb`.
- *
- * RFC 0088 answers `Temporal` where MRI answers `Date`/`DateTime`/`Time`
- * (`vendor/sources.ts`'s `date` entry), so every assertion below reads the
- * Temporal counterpart of the value Ruby asserts on: `Time` is
- * `Temporal.ZonedDateTime`, `Date` is `Temporal.PlainDate`, and `DateTime` is
- * `Temporal.PlainDateTime` — or a `ZonedDateTime`, once an offset is carried.
- *
- * Ruby's `with_tz` helper is not ported: it swaps `ENV["TZ"]`, and this repo
- * forbids `process.*`. The offset assertion it wraps is made directly instead —
- * a `ZonedDateTime` carries its own offset, so the host zone cannot change it.
- *
- * The five tests that build their subject with `Date#+` read the day fraction
- * off the gem-shaped receiver rather than off the converted value: MRI's
- * `to_date` answers `self`, so `d2.day_fraction` there *is* `d.day_fraction`,
- * while a `Temporal.PlainDate` has no time of day to carry one.
- *
- * `test_to_time__from_datetime`'s last block asserts
- * `t.subsec == Rational(456789123456789123, 10**18)`. `Temporal` holds
- * nanoseconds, so the sub-nanosecond tail truncates in the seat the way
- * `Time#nsec` truncates it in MRI (see `DateTime#toDatetime`); that block reads
- * the nanosecond here.
- */
 import { describe, it, expect } from "vitest";
 import { Temporal, Date, DateTime, Time } from "./index.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
 describe("TestDateConv", () => {
   it("to class", () => {
-    // RFC 0088 splits Ruby's one `DateTime` value across two Temporal classes —
-    // a carried offset answers `ZonedDateTime`, a zero offset `PlainDateTime` —
-    // so each subject names the class its own offset selects. The subjects fix
-    // their offsets rather than reading `now`/`today` so that selection does not
-    // depend on the host zone (Ruby's `Date.today` has no gem-shaped twin here).
     const subjects: [Time | Date | DateTime, new (...args: never[]) => object][] = [
       [new Time(2004, 9, 19, 1, 2, 3, "+03:00"), Temporal.ZonedDateTime],
       [new Date(2004, 9, 19), Temporal.PlainDateTime],
@@ -190,9 +161,6 @@ describe("TestDateConv", () => {
 
     t = Time.now();
     d = t.toDatetime();
-    // Ruby asks both sides for `iso8601(10)`. `Temporal` holds nanoseconds, so
-    // its formatter caps `fractionalSecondDigits` at 9 — the tenth digit Ruby
-    // prints there is always a zero — and 9 is the widest both sides can spell.
     expect(t.iso8601(9)).toEqual(iso8601(d, 9));
   });
 
@@ -242,23 +210,14 @@ describe("TestDateConv", () => {
   });
 });
 
-/** Ruby `Time#usec` / `DateTime#sec_fraction`, off a Temporal value. */
 function usec(t: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
   return t.millisecond * 1000 + t.microsecond;
 }
 
-/** Ruby `Time#nsec`, off a Temporal value. */
 function nsec(t: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
   return t.millisecond * 1_000_000 + t.microsecond * 1_000 + t.nanosecond;
 }
 
-/**
- * Ruby `DateTime#iso8601(n)`, off the Temporal value `toDatetime` answers. A
- * `PlainDateTime` is that mapping's spelling of an `of` of `0` — the same
- * reading {@link offsetSeconds} takes below — and `DateTime#iso8601` prints
- * that offset as `+00:00` (`date_core.c` `of2str`, `:1973-1980`), never bare
- * and never `Z`.
- */
 function iso8601(
   d: Temporal.ZonedDateTime | Temporal.PlainDateTime,
   fractionDigits: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9,
@@ -268,17 +227,10 @@ function iso8601(
     : `${d.toString({ fractionalSecondDigits: fractionDigits })}+00:00`;
 }
 
-/** Ruby `DateTime#offset`, in seconds rather than as a fraction of a day. */
 function offsetSeconds(d: Temporal.ZonedDateTime | Temporal.PlainDateTime): number {
   return d instanceof Temporal.ZonedDateTime ? d.offsetNanoseconds / 1_000_000_000 : 0;
 }
 
-/**
- * Ruby `Time#to_date`, as the gem-shaped `Date` rather than the `PlainDate`
- * {@link Time#toDate} answers — the roundtrip tests assert on `jd`, which only
- * the gem object carries. The receiver is the `Temporal.ZonedDateTime` that is
- * trails' `::Time` value, so it goes back through `Time` first.
- */
 function timeToDate(t: Temporal.ZonedDateTime): Date {
   const time = new Time(t.year, t.month, t.day, t.hour, t.minute, t.second);
   return new Date(time.year, time.mon, time.day, Date.GREGORIAN).newStart();

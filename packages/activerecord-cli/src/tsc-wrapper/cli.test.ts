@@ -7,8 +7,6 @@ import { fileURLToPath } from "node:url";
 import { remapDiagnostics } from "@blazetrails/trails-tsc";
 import { createArSolutionBuilder, createArTrailsProgram } from "./ar-program.js";
 
-// Short aliases so the test bodies stay close to their pre-extraction
-// form (only the `createTrails*` → `createAr*` rename changes).
 const createProgramWithArPlugin = createArTrailsProgram;
 const createBuilderWithArPlugin = createArSolutionBuilder;
 
@@ -16,8 +14,6 @@ const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_DIR = path.resolve(CURRENT_DIR, "__fixtures__");
 const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../bin/trails-tsc.js");
 const CLI_DIST_PATH = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
-// CLI-binary tests skip when dist isn't built (CI jobs that skip
-// `pnpm build`). Probed at module load so test bodies stay conditional-free.
 const itIfCliBin = fs.existsSync(CLI_DIST_PATH) ? it : it.skip;
 
 describe("trails-tsc CLI — Phase 1b.1", () => {
@@ -58,8 +54,6 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
 
     const modelFile = program.getSourceFile(path.join(FIXTURES_DIR, "model.ts"));
     expect(modelFile).toBeDefined();
-    // model.ts has no static block with `this.attribute(...)` calls
-    // on a class that extends Base — it IS the Base. No declares injected.
     expect(modelFile!.text).not.toContain("get title()");
   });
 
@@ -82,7 +76,6 @@ describe("trails-tsc CLI — Phase 1b.1", () => {
           stdio: ["pipe", "pipe", "pipe"],
         },
       );
-      // Clean exit — no output expected on success.
       expect(result).toBe("");
     },
     30_000,
@@ -119,29 +112,21 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
     const { program, host } = createProgramWithArPlugin(configPath);
     const diagnostics = [...ts.getPreEmitDiagnostics(program)];
 
-    // The error is TS2322 (Type 'string' is not assignable to type 'number')
-    // on the line `const x: number = "not a number";`.
-    // In the ORIGINAL file, that's line 9 (0-indexed: 8).
-    // The virtualizer injects declares after the class `{`, shifting lines.
     expect(diagnostics.length).toBeGreaterThan(0);
 
     const errorDiag = diagnostics.find((d) => d.code === 2322);
     expect(errorDiag).toBeDefined();
     expect(errorDiag!.file).toBeDefined();
 
-    // Virtualized line (shifted by injected declares)
     const virtualLine = errorDiag!.file!.getLineAndCharacterOfPosition(errorDiag!.start!).line;
 
-    // Read the original source to find the real line
     const originalText = fs.readFileSync(path.join(FIXTURES_DIR, "post-with-error.ts"), "utf8");
     const originalLines = originalText.split("\n");
     const errorLineIdx = originalLines.findIndex((l) => l.includes('"not a number"'));
     expect(errorLineIdx).toBeGreaterThan(-1);
 
-    // The virtualized line should be HIGHER than the original (shifted down)
     expect(virtualLine).toBeGreaterThan(errorLineIdx);
 
-    // After remap, the reported line should match the original
     const remapped = remapDiagnostics(diagnostics, host);
     const remappedDiag = remapped.find((d) => d.code === 2322);
     expect(remappedDiag).toBeDefined();
@@ -156,7 +141,6 @@ describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
     const { program, host } = createProgramWithArPlugin(configPath);
     const diagnostics = [...ts.getPreEmitDiagnostics(program)];
     const remapped = remapDiagnostics(diagnostics, host);
-    // Every diagnostic without deltas should have the same start position
     for (let i = 0; i < diagnostics.length; i++) {
       const d = diagnostics[i];
       if (!d.file) continue;
@@ -247,9 +231,6 @@ describe("trails-tsc auto-import — Phase 1b.4", () => {
   });
 
   it("user-written import for Author prevents duplicate auto-import", () => {
-    // Create a temp copy of the fixture with an explicit Author import
-    // already in post.ts, then verify the virtualizer doesn't inject
-    // a second one.
     const tempDir = fs.mkdtempSync(path.join(AUTO_IMPORT_DIR, ".dup-test-"));
     try {
       for (const f of fs.readdirSync(AUTO_IMPORT_DIR)) {
@@ -281,8 +262,6 @@ describe("trails-tsc auto-import — Phase 1b.4", () => {
 describe("trails-tsc --build composite projects — Phase 1b.5", () => {
   const COMPOSITE_DIR = path.resolve(FIXTURES_DIR, "composite");
 
-  // Each test copies the fixture into a temp dir so .tsbuildinfo /
-  // dist/ outputs don't leak across runs or into the repo.
   function withTempComposite(fn: (dir: string) => void): void {
     const tempDir = fs.mkdtempSync(path.join(FIXTURES_DIR, ".composite-"));
     try {
@@ -313,21 +292,14 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
       expect(diagnostics).toHaveLength(0);
       expect(status).toBe(ts.ExitStatus.Success);
 
-      // Emitted .d.ts artifacts land under the per-project outDir.
       expect(fs.existsSync(path.join(dir, "models", "dist", "author.d.ts"))).toBe(true);
       expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
 
-      // Per-project tsbuildinfo is written (proves incremental build
-      // cache was engaged through the custom host).
       expect(fs.existsSync(path.join(dir, "models", "dist", "tsconfig.tsbuildinfo"))).toBe(true);
       expect(fs.existsSync(path.join(dir, "app", "dist", "tsconfig.tsbuildinfo"))).toBe(true);
     });
   });
 
-  // Subprocess spawn + full tsc solution build + composite fixture setup
-  // routinely takes ~3–5s on warm machines and longer under load; the
-  // Vitest default 5000ms timeout makes this flaky. Bump the per-test
-  // timeout rather than leaving false-negatives in CI.
   itIfCliBin(
     "CLI binary --build exits 0 on the composite fixture",
     async () => {
@@ -341,7 +313,6 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
             stdio: ["pipe", "pipe", "pipe"],
           },
         );
-        // Solution builder prints no output on a clean build.
         expect(result).toBe("");
         expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
       });
@@ -358,9 +329,6 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
       expect(first.build()).toBe(ts.ExitStatus.Success);
       expect(firstDiags).toHaveLength(0);
 
-      // Add a new attribute on Author; consumer.ts should still
-      // typecheck and the new field should appear on the emitted
-      // .d.ts after rebuild.
       const authorPath = path.join(dir, "models", "author.ts");
       const authorSrc = fs.readFileSync(authorPath, "utf8");
       fs.writeFileSync(
@@ -387,8 +355,6 @@ describe("trails-tsc --build composite projects — Phase 1b.5", () => {
 describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
   const SCHEMA_DIR = path.join(FIXTURES_DIR, "schema");
 
-  // Track per-test tmp dirs + mocks so cleanup happens even when an
-  // assertion throws. Matches the pattern used elsewhere in this file.
   const tmpDirs: string[] = [];
   afterEach(() => {
     for (const dir of tmpDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
@@ -538,7 +504,6 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
 
   it(".ts schema drives the same virtualized declares as equivalent .json schema end-to-end", async () => {
     const { loadSchemaColumns } = await import("./cli.js");
-    // null: false on all columns so the schema fixture consumer.ts type-checks (no | null widening).
     const schemaSrc = [
       'schema.createTable("users", { id: false }, (t) => {',
       '  t.string("name", { null: false });',
@@ -562,12 +527,7 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
         },
       }),
     ]);
-    // Both paths produce identical SchemaColumnsByTable values.
     expect(fromTs).toEqual(fromJson);
-    // The loaded schema drives correct type virtualization end-to-end.
-    // Probe types directly rather than checking zero-diagnostics (the schema
-    // fixture has a pre-existing `static override tableName` diagnostic that
-    // is unrelated to schema loading and is not checked by the sibling tests).
     const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
     const { program } = createProgramWithArPlugin(configPath, { schemaColumnsByTable: fromTs });
     const checker = program.getTypeChecker();
@@ -601,8 +561,6 @@ describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
     }
     consumer!.forEachChild(visit);
 
-    // Without the schema option, consumer.ts's explicit `: string` etc. would
-    // be assigning `unknown` → a type error. Diagnostics should surface.
     const diags = [
       ...program.getSemanticDiagnostics(consumer),
       ...program.getSyntacticDiagnostics(consumer),

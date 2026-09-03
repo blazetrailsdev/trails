@@ -5,12 +5,7 @@ import { GlobalID } from "./global-id.js";
 import { GID } from "./uri/gid.js";
 import { type LocatorModel } from "./locator.js";
 
-// Synthetic GlobalIDModel — overrides `constructor.name` without building
-// a real class. Both real instances and these literals satisfy
-// GlobalIDModel's `readonly constructor: { readonly name: string }`.
 const fakeModel = (id: unknown, name = "Person") => ({ id, constructor: { name } });
-
-// ─── Fixture models — vendor/globalid/test/models/*.rb ─────────────────────
 
 class Person {
   static HARDCODED_ID_FOR_MISSING_PERSON = "1000";
@@ -28,9 +23,6 @@ class Person {
 class PersonUuid extends Person {
   static primaryKey = "uuid";
 }
-// Rails' `Person::Child`. A TS class name can't contain `::`, so the Rails
-// spelling is stamped on `name` — that is what GlobalID#model_name renders
-// and what the constant registry resolves.
 class PersonChild extends Person {}
 Object.defineProperty(PersonChild, "name", { value: "Person::Child" });
 
@@ -83,9 +75,6 @@ const FIXTURE_REGISTRY: Record<string, LocatorModel> = {
   CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
 };
 
-// Ruby's `Array#uniq` folds on the hash/eql? protocol; a JS Set folds on
-// identity. This mirrors GlobalID#hash / #eql?
-// (vendor/globalid/lib/global_id/global_id.rb:88-94): same class, same URI.
 function uniq<T>(items: T[]): T[] {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -124,9 +113,6 @@ describe("GlobalIDParamEncodedTest", () => {
   });
 
   it("finding", async () => {
-    // Rails: GlobalID.find(@gid.to_param) — class-level convenience that
-    // parses and locates in one step. Trails has Locator.locate(gid) for
-    // the same flow.
     const gid = GlobalID.create(new Person("id"));
     const parsed = GlobalID.parse(gid.toParam())!;
     const found = (await parsed.find()) as Person;
@@ -185,9 +171,6 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("find with class no match", async () => {
-    // Rails' Hash is `Map` here, not `Object`: every JS class extends Object,
-    // so `only: Object` would match where Ruby's Hash rejects. Ruby's Integer /
-    // Float / Numeric all collapse onto `Number`, which JS has only one of.
     expect(await personGid.find({ only: Map as unknown as LocatorModel })).toBeNull();
     expect(await personUuidGid.find({ only: Array as unknown as LocatorModel })).toBeNull();
     expect(await personNamespacedGid.find({ only: String as unknown as LocatorModel })).toBeNull();
@@ -297,7 +280,6 @@ describe("GlobalIDCreationTest", () => {
   });
 
   it("as JSON", () => {
-    // Rails' `to_json`; here JSON.stringify routes through toJSON().
     expect(personGid.asJson()).toBe("gid://bcx/Person/5");
     expect(JSON.stringify(personGid)).toBe('"gid://bcx/Person/5"');
 
@@ -340,8 +322,6 @@ describe("GlobalIDCreationTest", () => {
     expect(personNamespacedGid.modelClass).toBe(PersonChild);
     expect(personModelGid.modelClass).toBe(PersonModel);
     expect(cpkModelGid.modelClass).toBe(CompositePrimaryKeyModel);
-    // Rails: `GlobalID.find 'gid://bcx/SignedGlobalID/5'` — the raise comes
-    // from #model_class, which trails reaches through the parsed GID.
     expect(() => GlobalID.parse("gid://bcx/SignedGlobalID/5")!.modelClass).toThrow();
   });
 
@@ -365,16 +345,11 @@ describe("GlobalIDCreationTest", () => {
     expect(gid1).toEqual(gid2);
     expect(gid2).not.toEqual(gid3);
 
-    // hash and eql? to match for two GlobalID's pointing to the same object
     expect([gid1]).toEqual(uniq([gid1, gid2]));
     expect([gid1, gid3]).toEqual(uniq([gid1, gid2, gid3]));
 
-    // Rails asserts GlobalID#hash differs from its URI's hash. JS has no hash
-    // protocol, so assert what that difference encodes: a GlobalID is never
-    // equal to its bare URI.
     expect(gid1).not.toEqual(gid1.uri);
 
-    // verify that URI and GlobalID do not pass the uniq test
     expect([gid1, gid1.uri]).toEqual(uniq([gid1, gid1.uri]));
   });
 });

@@ -4,7 +4,6 @@ import { bodyFromString } from "../index.js";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { Node } from "./node.js";
 
-/** Serve `app` on an ephemeral port, run `body` against it, then shut down. */
 async function serving(app: RackApp, body: (url: string) => Promise<void>): Promise<void> {
   const server = await Node.run(app, { Port: 0, Host: "127.0.0.1" });
   const address = server.address();
@@ -16,7 +15,6 @@ async function serving(app: RackApp, body: (url: string) => Promise<void>): Prom
   }
 }
 
-/** The env one real request builds, as the app saw it. */
 async function envFor(path: string, init?: RequestInit): Promise<RackEnv> {
   let env: RackEnv = {};
   await serving(
@@ -29,7 +27,6 @@ async function envFor(path: string, init?: RequestInit): Promise<RackEnv> {
   return env;
 }
 
-/** For the shapes a real socket cannot produce, the request is built by hand. */
 async function mockReq(req: Partial<HttpRequest>): Promise<HttpRequest> {
   const listeners: Record<string, ((...args: never[]) => void)[]> = {};
   const built = {
@@ -177,9 +174,6 @@ describe("Rack::Handler::Node", () => {
 
   it("closes the body when the response cannot be written", async () => {
     let closed = false;
-    // A body that carries its own cleanup, the way `Rack::BodyProxy#close`
-    // does; an async generator that never started has nothing to release, so
-    // its `return()` is a no-op by spec and would prove nothing here.
     const body = {
       async *[Symbol.asyncIterator]() {
         yield "never";

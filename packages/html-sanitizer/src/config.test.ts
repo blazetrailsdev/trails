@@ -1,7 +1,3 @@
-// Parity test: pin DEFAULT_ALLOWED_TAGS / ATTRIBUTES against the upstream
-// rails-html-sanitizer Ruby source. If Rails adds or removes an entry,
-// this test fails and we must update config.ts deliberately.
-
 import { describe, expect, test } from "vitest";
 import { DEFAULT_ALLOWED_ATTRIBUTES, DEFAULT_ALLOWED_TAGS } from "./config.js";
 

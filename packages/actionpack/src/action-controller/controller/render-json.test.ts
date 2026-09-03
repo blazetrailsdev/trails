@@ -16,9 +16,6 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// controller/render_json_test.rb
-// ==========================================================================
 describe("RenderJsonTest", () => {
   it("render json nil", async () => {
     class C extends Base {

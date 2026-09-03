@@ -1,5 +1,3 @@
-/** Mirrors: i18n/test/i18n_test.rb */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Disabled, InvalidLocale, NoMethodError } from "./exceptions.js";
 import * as I18n from "./i18n.js";
@@ -42,12 +40,6 @@ describe("I18nTest", () => {
     config().backend.storeTranslations(locale, data);
   }
 
-  /**
-   * Mocha's `I18n.expects(:custom_exception_handler)`: defines the method on
-   * `I18n` for the duration of the test. A native module namespace is
-   * non-extensible; Vitest's transformed one is not, so the method installs on
-   * the same object `handleException` sends to.
-   */
   function expectsCustomExceptionHandler(): ReturnType<typeof vi.fn> {
     const customExceptionHandler = vi.fn();
     (I18n as unknown as Record<string, unknown>).customExceptionHandler = customExceptionHandler;
@@ -326,11 +318,6 @@ describe("I18nTest", () => {
     expect(locale()).toBe(defaultLocale());
   });
 
-  /**
-   * The gem stubs `I18n::Backend::Transliterator.get` to raise; ESM exports
-   * can't be stubbed in place, so these two store a rule that is neither a
-   * Proc nor a Hash, which is what makes `get` raise (transliterator.rb:26).
-   */
   it("I18n.transliterate handles I18n::ArgumentError exception", () => {
     storeTranslations("en", { i18n: { transliterate: { rule: "not a rule" } } });
     const exceptionHandler = vi.fn(() => {
@@ -339,8 +326,6 @@ describe("I18nTest", () => {
     setExceptionHandler(exceptionHandler);
 
     expect(() => transliterate("ąćó")).toThrow(ArgumentError);
-    // Rails writes this first as `I18n.exception_handler.expects(:call)`; mocha
-    // verifies the expectation at teardown, so the port asserts it at the end.
     expect(exceptionHandler).toHaveBeenCalled();
   });
 
@@ -350,7 +335,6 @@ describe("I18nTest", () => {
     setExceptionHandler(exceptionHandler);
 
     expect(() => transliterate("ąćó", { raise: true })).toThrow(ArgumentError);
-    // `I18n.exception_handler.expects(:call).never`, verified at teardown by mocha.
     expect(exceptionHandler).not.toHaveBeenCalled();
   });
 
@@ -412,10 +396,6 @@ describe("I18nTest", () => {
     const other = new Config();
     setConfig(other);
     expect(config()).toBe(other);
-    // Rails' second assertion reads the object back off
-    // `Thread.current.thread_variable_get(:i18n_config)`; trails keeps one
-    // process-wide config (see `config` in i18n.ts), so the thread-local copy
-    // it reads is the same object `config()` returns.
     expect(config()).toBe(other);
   });
 
@@ -450,8 +430,6 @@ describe("I18nTest", () => {
   it("normalize_keys normalizes given locale, keys and scope to an array of single-key symbols", () => {
     expect(normalizeKeys("en", "bar", "foo")).toEqual(["en", "foo", "bar"]);
     expect(normalizeKeys("en", "baz.buz", "foo.bar")).toEqual(["en", "foo", "bar", "baz", "buz"]);
-    // The gem asserts the dotted keys and the array arm twice each, once as
-    // Symbols and once as Strings; each pair is one call here.
     expect(normalizeKeys("en", "baz.buz", "foo.bar")).toEqual(["en", "foo", "bar", "baz", "buz"]);
     expect(normalizeKeys("en", ["baz", "buz"], ["foo", "bar"])).toEqual([
       "en",
@@ -503,8 +481,6 @@ describe("I18nTest", () => {
 
   it("available_locales_set should return a set", () => {
     expect(config().availableLocalesSet.constructor).toBe(Set);
-    // The gem stores each locale as a Symbol and as a String, so its set is
-    // `size * 2`; both spellings are one JS string, so it holds one per locale.
     expect(config().availableLocalesSet.size).toBe(config().availableLocales.length);
   });
 

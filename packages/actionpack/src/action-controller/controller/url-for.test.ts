@@ -1,9 +1,3 @@
-/**
- * Rails-design rationale (mirrors AbstractController::Testing::UrlForTest):
- * Most option processing lives in ActionDispatch::Http::URL (host/subdomain/domain/tld
- * rewriting, protocol normalisation, anchor encoding) and is exercised here without a
- * full RouteSet. Tests requiring a live RouteSet are marked pending.
- */
 import { describe, it, expect } from "vitest";
 import { URL } from "../../action-dispatch/http/url.js";
 
@@ -62,7 +56,6 @@ describe("UrlForTest", () => {
   });
 
   it("subdomain may be object", () => {
-    // Rails: `Class.new { def self.to_param; "api"; end }` (url_for_test.rb:119).
     const model = { toParam: () => "api" };
     expect(URL.urlFor({ host: "www.basecamphq.com", subdomain: model, path: "/c/a/i" })).toBe(
       "http://api.basecamphq.com/c/a/i",
@@ -112,7 +105,6 @@ describe("UrlForTest", () => {
   });
 
   it("default port", () => {
-    // Port 80 for http should not appear
     expect(URL.urlFor({ host: "example.com", port: 80, path: "/" })).toBe("http://example.com/");
   });
 
@@ -159,35 +151,15 @@ describe("UrlForTest", () => {
     ).toBe("http://openid.aol.com%2Fnextangler:one+two%3F@www.basecamphq.com/c/a/i");
   });
 
-  it.skip("trailing slash", () => {
-    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
-    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
-    // fills a blank path (url.rb:76).
-  });
+  it.skip("trailing slash", () => {});
 
-  it.skip("trailing slash with protocol", () => {
-    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
-    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
-    // fills a blank path (url.rb:76).
-  });
+  it.skip("trailing slash with protocol", () => {});
 
-  it.skip("trailing slash with only path", () => {
-    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
-    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
-    // fills a blank path (url.rb:76).
-  });
+  it.skip("trailing slash with only path", () => {});
 
-  it.skip("trailing slash with anchor", () => {
-    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
-    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
-    // fills a blank path (url.rb:76).
-  });
+  it.skip("trailing slash with anchor", () => {});
 
-  it.skip("trailing slash with params", () => {
-    // needs RouteSet trailing_slash propagation. `:trailing_slash` on a non-blank
-    // path is applied by the route set (route_set.rb:882); Http::URL's own arm only
-    // fills a blank path (url.rb:76).
-  });
+  it.skip("trailing slash with params", () => {});
 
   it("relative url root is respected", () => {
     const url = URL.urlFor({ host: "example.com", path: "/posts", scriptName: "/app" });
@@ -195,8 +167,6 @@ describe("UrlForTest", () => {
   });
 
   it("relative url root is respected with environment variable", () => {
-    // pending: needs RouteSet::Config with relative_url_root
-    // Rails: ActionDispatch::Routing::RouteSet::Config.new("/subdir")
     expect(
       URL.urlFor({
         host: "www.basecamphq.com",
@@ -208,27 +178,22 @@ describe("UrlForTest", () => {
   });
 
   it("named routes", () => {
-    expect(true).toBe(true); // pending: needs live RouteSet + with_routing
+    expect(true).toBe(true);
   });
 
   it("relative url root is respected for named routes", () => {
-    expect(true).toBe(true); // pending: needs RouteSet + named routes
+    expect(true).toBe(true);
   });
 
   it("path params with default url options", () => {
-    expect(true).toBe(true); // pending: needs RouteSet scoped :account_id
+    expect(true).toBe(true);
   });
 
   it("path params without default url options", () => {
-    expect(true).toBe(true); // pending: needs RouteSet scoped :account_id
+    expect(true).toBe(true);
   });
 
-  it.skip("using nil script name properly concats with original script name", () => {
-    // needs RouteSet `:original_script_name` handling. The concatenation under test
-    // is `script_name = original_script_name + script_name` (route_set.rb:869-873);
-    // ActionDispatch::Http::URL only ever sees the already-concatenated
-    // `:script_name`, so there is nothing at this layer to assert.
-  });
+  it.skip("using nil script name properly concats with original script name", () => {});
 
   it("only path", () => {
     expect(URL.urlFor({ path: "/posts", onlyPath: true })).toBe("/posts");
@@ -258,11 +223,10 @@ describe("UrlForTest", () => {
   });
 
   it("params option strong parameters", () => {
-    expect(true).toBe(true); // pending: needs RouteSet + Parameters.permit
+    expect(true).toBe(true);
   });
 
   it("non hash params option", () => {
-    // Non-hash params value is treated as a scalar and appended under a "params" key
     const url = URL.urlFor({ path: "/c/a", onlyPath: true, params: { params: "p" } });
     expect(url).toBe("/c/a?params=p");
   });
@@ -312,27 +276,27 @@ describe("UrlForTest", () => {
   });
 
   it("url action controller parameters", () => {
-    expect(true).toBe(true); // pending: needs RouteSet + UnfilteredParameters at url_for boundary
+    expect(true).toBe(true);
   });
 
   it("path generation for symbol parameter keys", () => {
-    expect(true).toBe(true); // pending: needs assert_generates / RouteSet
+    expect(true).toBe(true);
   });
 
   it("named routes with nil keys", () => {
-    expect(true).toBe(true); // pending: needs RouteSet with posts.:format route
+    expect(true).toBe(true);
   });
 
   it("multiple includes maintain distinct options", () => {
-    expect(true).toBe(true); // pending: needs ActionController::UrlFor class-level defaultUrlOptions
+    expect(true).toBe(true);
   });
 
   it("with stringified keys", () => {
-    expect(true).toBe(true); // pending: needs RouteSet for controller/action path generation
+    expect(true).toBe(true);
   });
 
   it("with hash with indifferent access", () => {
-    expect(true).toBe(true); // pending: needs RouteSet + HashWithIndifferentAccess
+    expect(true).toBe(true);
   });
 
   it("url params with nil to param are not in url", () => {
@@ -347,24 +311,22 @@ describe("UrlForTest", () => {
   });
 
   it("url generation with array and hash", () => {
-    expect(true).toBe(true); // pending: needs RouteSet + polymorphicUrl
+    expect(true).toBe(true);
   });
 
   it("url for with array is unmodified", () => {
-    expect(true).toBe(true); // pending: needs RouteSet + polymorphicUrl
+    expect(true).toBe(true);
   });
 
   it("default params first empty", () => {
-    expect(true).toBe(true); // pending: needs RouteSet with defaults/constraints
+    expect(true).toBe(true);
   });
 
   it("nested optional", () => {
-    // Just test that url generation works with basic path
     expect(URL.urlFor({ host: "example.com", path: "/posts" })).toBe("http://example.com/posts");
   });
 
   it("https default port", () => {
-    // Port 443 for https should not appear
     expect(URL.urlFor({ host: "example.com", protocol: "https", port: 443, path: "/" })).toBe(
       "https://example.com/",
     );

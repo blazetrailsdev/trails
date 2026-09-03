@@ -1,12 +1,3 @@
-/**
- * ActionView::TemplatePath
- *
- * Represents a template path within ActionView's lookup and rendering system,
- * like "users/show".
- *
- * Converts between separate (name, prefix, partial) arguments and the virtual
- * path string form.
- */
 export class TemplatePath {
   readonly name: string;
   readonly prefix: string;
@@ -20,7 +11,6 @@ export class TemplatePath {
     this.virtual = virtual;
   }
 
-  /** Convert name, prefix, and partial into a virtual path string. */
   static virtual(name: string, prefix: string, partial: boolean): string {
     if (prefix === "") {
       return `${partial ? "_" : ""}${name}`;
@@ -31,7 +21,6 @@ export class TemplatePath {
     return `${prefix}/${name}`;
   }
 
-  /** Build a TemplatePath from a virtual path. */
   static parse(virtual: string): TemplatePath {
     const nameidx = virtual.lastIndexOf("/");
     let prefix: string;
@@ -49,7 +38,6 @@ export class TemplatePath {
     return new TemplatePath(name, prefix, partial, virtual);
   }
 
-  /** Convert name, prefix, and partial into a TemplatePath. */
   static build(name: string, prefix: string, partial: boolean): TemplatePath {
     return new TemplatePath(name, prefix, partial, TemplatePath.virtual(name, prefix, partial));
   }
@@ -68,11 +56,7 @@ export class TemplatePath {
     return this.virtual;
   }
 
-  /**
-   * @internal
-   * String hash code used by `LookupContext`'s details-cache keying. Mirrors
-   * Ruby `Object#hash` for `TemplatePath` (delegates to the virtual path).
-   */
+  /** @internal */
   hash(): number {
     let h = 0;
     for (let i = 0; i < this.virtual.length; i++) {

@@ -209,7 +209,6 @@ it("check for content-length via :if", async () => {
     },
   });
   const res = await getDeflated(app);
-  // No content-length set by default in our test app, so condition may vary
   expect(res.status).toBe(200);
 });
 
@@ -241,8 +240,6 @@ it("does not close the response body prematurely", async () => {
 });
 
 it("uses custom deflater when provided", async () => {
-  // Custom deflaters option - our Deflater doesn't support custom deflaters,
-  // but we can verify the default encoding selection still works
   const app = deflaterApp(["Hello World"]);
   const res = await getDeflated(app, "deflate");
   expect(res.headers["content-encoding"]).toBe("deflate");

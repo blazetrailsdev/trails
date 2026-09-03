@@ -1,15 +1,3 @@
-/**
- * Tests matching Rails test class/method names exactly:
- *   - HashWithIndifferentAccessTest (hash_with_indifferent_access_test.rb)
- *   - DeprecationTest (deprecation_test.rb)
- *   - ModuleTest (core_ext/module_test.rb)
- *   - StringInflectionsTest (core_ext/string_ext_test.rb)
- *   - InflectorTest (inflector_test.rb)
- *
- * describe() names match Ruby class names.
- * it() descriptions match Ruby method names with `test_` stripped and `_` → space.
- */
-
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import { Deprecation, DeprecationException } from "./deprecation.js";
@@ -39,10 +27,6 @@ import {
   ordinalize,
 } from "./index.js";
 
-// =============================================================================
-// HashWithIndifferentAccessTest
-// =============================================================================
-
 describe("HashWithIndifferentAccessTest", () => {
   it("update with multiple arguments", () => {
     const h = new HashWithIndifferentAccess<unknown>();
@@ -58,10 +42,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(h.dig("this", "views")).toBe(1234);
   });
 });
-
-// =============================================================================
-// DeprecationTest
-// =============================================================================
 
 describe("DeprecationTest", () => {
   let dep: Deprecation;
@@ -174,10 +154,6 @@ describe("DeprecationTest", () => {
   });
 });
 
-// =============================================================================
-// ModuleTest
-// =============================================================================
-
 describe("ModuleTest", () => {
   it("mattr_accessor — defines class-level getter/setter", () => {
     class MyClass {}
@@ -237,13 +213,6 @@ describe("ModuleTest", () => {
   });
 });
 
-// =============================================================================
-// StringInflectionsTest
-// =============================================================================
-// =============================================================================
-// InflectorTest
-// =============================================================================
-
 describe("InflectorTest", () => {
   it("pluralize plurals", () => {
     expect(pluralize("plurals")).toBe("plurals");
@@ -262,7 +231,6 @@ describe("InflectorTest", () => {
   });
 
   it("uncountability of non-ascii word", () => {
-    // Non-ASCII uncountables not defined; verify known ones work
     expect(pluralize("rice")).toBe("rice");
     expect(pluralize("equipment")).toBe("equipment");
   });
@@ -273,7 +241,6 @@ describe("InflectorTest", () => {
   });
 
   it("overwrite previous inflectors", () => {
-    // Modifying inflections is not tested here; verify defaults work
     expect(pluralize("category")).toBe("categories");
   });
 
@@ -306,7 +273,6 @@ describe("InflectorTest", () => {
   });
 
   it("acronyms", () => {
-    // Default acronym rules not heavily tested; verify camelize works
     expect(camelize("active_model")).toBe("ActiveModel");
   });
 
@@ -383,7 +349,6 @@ describe("InflectorTest", () => {
   });
 
   it("classify with symbol", () => {
-    // In Ruby, classify(:posts) works; in TS we use strings
     expect(classify("posts")).toBe("Post");
   });
 
@@ -413,12 +378,10 @@ describe("InflectorTest", () => {
   });
 
   it("constantize", () => {
-    // constantize requires runtime class lookup; not applicable in TS
     expect(true).toBe(true);
   });
 
   it("safe constantize", () => {
-    // safe_constantize returns nil on failure; not applicable in TS
     expect(true).toBe(true);
   });
 
@@ -451,22 +414,18 @@ describe("InflectorTest", () => {
   });
 
   it("symbol to lower camel", () => {
-    // In Ruby, :special_guest.to_s.camelize(:lower); in TS use string
     expect(camelize("special_guest", false)).toBe("specialGuest");
   });
 
   it("clear acronyms resets to reusable state", () => {
-    // Inflections management not fully exposed; verify basic camelize works after
     expect(camelize("active_model")).toBe("ActiveModel");
   });
 
   it("inflector locality", () => {
-    // Locale-specific inflections not implemented; verify defaults
     expect(pluralize("category")).toBe("categories");
   });
 
   it("clear all", () => {
-    // Clearing inflections would break tests; just verify inflector still loads
     expect(typeof pluralize).toBe("function");
   });
 
@@ -487,7 +446,6 @@ describe("InflectorTest", () => {
     const input = Object.freeze("active_record");
     const result = camelize(input);
     expect(result).toBe("ActiveRecord");
-    // JS strings are always immutable; verify result is string
     expect(typeof result).toBe("string");
   });
 

@@ -1,11 +1,3 @@
-/**
- * Rails::Rack::Logger — Rack middleware that sets log tags, logs the
- * request, calls the app, and finalizes instrumentation when the body
- * closes.
- *
- * Port of `railties/lib/rails/rack/logger.rb`.
- */
-
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { BodyProxy } from "@blazetrails/rack";
 import { Request } from "@blazetrails/actionpack";
@@ -13,13 +5,6 @@ import { LogSubscriber, Notifications } from "@blazetrails/activesupport";
 import type { NotificationHandle } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
-/**
- * logger.rb:11-13 — "methods that the +request+ object responds to, objects
- * that respond to +to_s+ or Proc objects that accept an instance of the
- * +request+ object". A Ruby Symbol tagger is a `":name"` string here (the
- * leading colon is the discriminator Ruby gets from the type); any other
- * string is the literal tag.
- */
 export type Tagger = string | ((request: Request) => string);
 
 export interface RackLoggerLike {
@@ -57,11 +42,6 @@ export class Logger {
     return this.callApp(request, env);
   }
 
-  /**
-   * Mirrors: Rails::Rack::Logger#call_app (logger.rb:33-53). `this.app.call`
-   * is the spelling of Ruby's `@app.call(env)`: a plain `this.app(env)` makes
-   * no `call` at all, which the call-set gate reads as a dropped Rails call.
-   */
   private async callApp(request: Request, env: RackEnv): Promise<RackResponse> {
     const loggerTagPopCount = env["rails.rackLoggerTagCount"] as number;
 
@@ -87,7 +67,6 @@ export class Logger {
     }
   }
 
-  // Started GET "/session/new" for 127.0.0.1 at 2012-09-26 14:51:42 -0700
   private startedRequestMessage(request: Request): string {
     return `Started ${request.rawRequestMethod} "${request.filteredPath()}" for ${request.remoteIp ?? "-"} at ${Temporal.Now.instant().toString()}`;
   }

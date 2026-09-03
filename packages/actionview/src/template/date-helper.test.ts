@@ -18,7 +18,6 @@ const from = new Date(Date.UTC(2004, 5, 6, 21, 45, 0));
 
 describe("DateHelperTest", () => {
   it("distance in words", () => {
-    // include_seconds: true — sub-minute distances bucketed by seconds
     expect(distanceOfTimeInWords(from, add(from, 0 * SECOND), { includeSeconds: true })).toBe(
       "less than 5 seconds",
     );
@@ -53,7 +52,6 @@ describe("DateHelperTest", () => {
       "1 minute",
     );
 
-    // include_seconds: false (default) — sub-30s rounds to 0 min
     expect(distanceOfTimeInWords(from, add(from, 0 * SECOND))).toBe("less than a minute");
     expect(distanceOfTimeInWords(from, add(from, 29 * SECOND))).toBe("less than a minute");
     expect(distanceOfTimeInWords(from, add(from, 30 * SECOND))).toBe("1 minute");
@@ -122,8 +120,6 @@ describe("DateHelperTest", () => {
   });
 
   it("supports custom scope via I18n lookup", () => {
-    // unknown scope falls back to defaults; non-default scope without
-    // backing translations still produces a sensible English result.
     expect(distanceOfTimeInWords(0, 60, { scope: "datetime.distance_in_words" })).toBe("1 minute");
   });
 });

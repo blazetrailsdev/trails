@@ -1,29 +1,11 @@
-/**
- * ActionDispatch::Flash
- *
- * Flash message store that persists for one request.
- */
-
 import type { RackEnv } from "@blazetrails/rack";
 
-/**
- * Rack env key under which the request's {@link FlashHash} is stored.
- * Mirrors `ActionDispatch::Flash::KEY`.
- *
- * @internal
- */
+/** @internal */
 export const KEY = "action_dispatch.request.flash_hash";
 
-/**
- * Host shape used by {@link flash} / {@link flashHash} / {@link commitFlash}
- * / {@link resetSession}. Matches the Request surface Rails'
- * `Flash::RequestMethods` reads from.
- *
- * @internal
- */
+/** @internal */
 export interface FlashRequestHost {
   env: RackEnv;
-  /** Untyped, as `@env[name]` (rack/lib/rack/request.rb:100-102) is in Ruby. */
   getHeader(name: string): any;
   session: {
     isEnabled?(): boolean;
@@ -35,15 +17,8 @@ export interface FlashRequestHost {
   };
 }
 
-/**
- * Access the contents of the flash. Returns the request's
- * {@link FlashHash}, building it from the session on first access.
- * Mirrors `ActionDispatch::Flash::RequestMethods#flash`.
- */
 export function flash(this: FlashRequestHost, value?: FlashHash | null): FlashHash | null {
   if (arguments.length > 0) {
-    // Normalize `undefined` to `null` so the env key is never left in
-    // a non-Railsy "absent vs cleared" limbo state.
     const normalized = value ?? null;
     this.env[KEY] = normalized;
     return normalized;
@@ -55,23 +30,12 @@ export function flash(this: FlashRequestHost, value?: FlashHash | null): FlashHa
   return built;
 }
 
-/**
- * Returns the cached {@link FlashHash} for this request without falling
- * back to the session, or `null` if {@link flash} has not been called yet.
- *
- * @internal
- */
+/** @internal */
 export function flashHash(this: FlashRequestHost): FlashHash | null {
   return (this.getHeader(KEY) as FlashHash | null | undefined) ?? null;
 }
 
-/**
- * Persist this request's {@link FlashHash} back into the session, copying
- * the live hash so the next request starts with a fresh dup. Mirrors
- * Rails' `commit_flash`.
- *
- * @internal
- */
+/** @internal */
 export function commitFlash(this: FlashRequestHost): void {
   const session = this.session;
   if (session.isEnabled && !session.isEnabled()) return;
@@ -79,13 +43,9 @@ export function commitFlash(this: FlashRequestHost): void {
   const hash = flashHash.call(this);
   if (hash && (!hash.empty || session.isKey("flash"))) {
     session.set("flash", hash.toSessionValue());
-    // Rails: `self.flash = flash_hash.dup` so further mutations don't
-    // bleed into the just-stored session value.
     this.env[KEY] = hash.dup();
   }
 
-  // Rails guards this with `session.loaded?` to avoid forcing a session
-  // load just to clean up a nil flash entry.
   if (session.isLoaded()) {
     if (session.isKey("flash") && session.get("flash") == null) {
       session.delete("flash");
@@ -93,15 +53,7 @@ export function commitFlash(this: FlashRequestHost): void {
   }
 }
 
-/**
- * The flash side of `Request#reset_session`. Rails prepends this onto
- * Request and uses `super` to chain to the original implementation; in
- * trails-mixin style, the chain is the responsibility of the wiring
- * code, so this function only owns the post-`super` "clear the flash"
- * step. Callers must invoke the underlying `Request#resetSession` first.
- *
- * @internal
- */
+/** @internal */
 export function resetSession(this: FlashRequestHost): void {
   this.env[KEY] = null;
 }
@@ -118,8 +70,6 @@ export class FlashHash {
       this._flashes.set(k, v);
     }
   }
-
-  // --- Read/Write ---
 
   get(key: string): unknown {
     return this._now.get(key) ?? this._flashes.get(key);
@@ -164,8 +114,6 @@ export class FlashHash {
     return result;
   }
 
-  // --- Convenience ---
-
   get alert(): unknown {
     return this.get("alert");
   }
@@ -179,8 +127,6 @@ export class FlashHash {
   set notice(value: unknown) {
     this.set("notice", value);
   }
-
-  // --- Lifecycle ---
 
   now(key: string, value: unknown): void {
     this._now.set(key, value);
@@ -212,7 +158,6 @@ export class FlashHash {
   }
 
   sweep(): void {
-    // Remove discarded keys (unless kept this cycle)
     for (const k of this._discard) {
       if (!this._keep.has(k)) {
         this._flashes.delete(k);
@@ -221,7 +166,6 @@ export class FlashHash {
     this._discard.clear();
     this._keep.clear();
 
-    // Mark all remaining keys for discard on next sweep
     for (const k of this._flashes.keys()) {
       this._discard.add(k);
     }
@@ -248,16 +192,7 @@ export class FlashHash {
     }
   }
 
-  // --- Session serialization ---
-
-  /**
-   * Builds a hash containing the flashes to keep for the next request. If
-   * there are none to keep, returns `null`. Mirrors `to_session_value`
-   * (`flash.rb:143-147`); `flash.now` entries live in `@now` and so never
-   * reach the session.
-   *
-   * @internal
-   */
+  /** @internal */
   toSessionValue(): { discard: string[]; flashes: Record<string, unknown> } | null {
     const flashesToKeep: Record<string, unknown> = {};
     for (const [k, v] of this._flashes) {
@@ -267,7 +202,6 @@ export class FlashHash {
     return { discard: [], flashes: flashesToKeep };
   }
 
-  /** Shallow copy mirroring Ruby's `FlashHash#dup`. */
   dup(): FlashHash {
     const copy = new FlashHash();
     for (const [k, v] of this._flashes) copy._flashes.set(k, v);
@@ -281,11 +215,6 @@ export class FlashHash {
     if (value === null || value === undefined) return new FlashHash();
     if (value instanceof FlashHash) return value.dup();
     if (typeof value !== "object") return new FlashHash();
-    // Rails 4.0+ session shape: `{ "flashes" => Hash, "discard" => Array }`.
-    // Rails' `flashes.except!(*discard)` removes the keys the prior request
-    // marked for discard, then `new(flashes, flashes.keys)` marks every
-    // remaining key for sweep — they live through this request and are
-    // dropped on the next one.
     const obj = value as Record<string, unknown>;
     const flashesRaw = obj["flashes"];
     const flashes = (flashesRaw && typeof flashesRaw === "object" ? flashesRaw : obj) as Record<

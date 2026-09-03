@@ -1,38 +1,3 @@
-/**
- * ActionController::TestCase
- *
- * Provides a Rails-like testing harness for controllers that works
- * naturally with Vitest. Instead of manually creating Request/Response
- * objects and calling dispatch(), you use HTTP verb methods (get, post,
- * put, patch, delete) and inspect the results via controller, request,
- * response, flash, session, and cookies.
- *
- * Usage with Vitest:
- *
- *   import { TestCase } from "@blazetrails/actionpack/action-controller/test-case";
- *
- *   class PostsController extends Base {
- *     async index() { this.render({ json: [{ id: 1 }] }); }
- *     async show() { this.render({ json: { id: this.params.get("id") } }); }
- *   }
- *
- *   describe("PostsController", () => {
- *     const tc = new TestCase(PostsController);
- *
- *     it("lists posts", async () => {
- *       await tc.get("index");
- *       tc.assertResponse("success");
- *       expect(tc.responseBody).toContain("id");
- *     });
- *
- *     it("shows a post", async () => {
- *       await tc.get("show", { params: { id: "42" } });
- *       tc.assertResponse(200);
- *       expect(JSON.parse(tc.responseBody).id).toBe("42");
- *     });
- *   });
- */
-
 import { camelize } from "@blazetrails/activesupport";
 import { KeyError, merge, SecureRandom } from "@blazetrails/ruby-compat";
 import {
@@ -77,19 +42,11 @@ const STATUS_RANGES: Record<string, [number, number]> = {
 };
 
 export class TestCase {
-  /** @internal Backing slot for the `controllerClass` static accessor. */
+  /** @internal */
   private static _controllerClass: ControllerClass | null = null;
 
-  /** Mirrors Rails `executor_around_each_request`. JS has no executor; defaults to false. */
   static executorAroundEachRequest = false;
 
-  /**
-   * Mirrors Rails `TestCase.tests(controller_class)`. Accepts a
-   * controller class or a string name; the string is camelized + suffixed
-   * with `Controller` and looked up on `globalThis` (the closest JS
-   * analogue to Ruby's `constantize`). Rails also accepts symbols; JS
-   * has no symbol/constant lookup, so the string form covers that case.
-   */
   static tests(controllerClass: ControllerClass | string): void {
     if (typeof controllerClass === "string") {
       const constantName = `${camelize(controllerClass)}Controller`;
@@ -106,13 +63,6 @@ export class TestCase {
     this._controllerClass = controllerClass;
   }
 
-  /**
-   * Mirrors Rails `TestCase.controller_class` / `controller_class=`.
-   * Reading lazily falls back to `determineDefaultControllerClass(name)`.
-   * Per-class (not inherited): Rails class ivars don't walk the
-   * superclass chain, so we gate on `Object.hasOwn` to keep subclasses
-   * from picking up the base class's controller.
-   */
   static get controllerClass(): ControllerClass | null {
     if (Object.hasOwn(this, "_controllerClass") && this._controllerClass) {
       return this._controllerClass;
@@ -125,11 +75,6 @@ export class TestCase {
     this._controllerClass = v;
   }
 
-  /**
-   * Mirrors Rails `determine_default_controller_class(name)` — strips
-   * a trailing `Test` from the class name and looks the result up on
-   * `globalThis`. Returns `null` when no controller class can be found.
-   */
   static determineDefaultControllerClass(name: string): ControllerClass | null {
     if (!name) return null;
     const stripped = name.replace(/Test$/, "");
@@ -137,41 +82,32 @@ export class TestCase {
     return typeof candidate === "function" ? (candidate as ControllerClass) : null;
   }
 
-  /** Mirrors Rails `controller_class_name` — the class's `controllerClass.name`. */
   controllerClassName(): string {
     return (this.constructor as typeof TestCase).controllerClass?.name ?? "";
   }
 
   private _controllerClass: ControllerClass;
 
-  /** The controller instance from the last request. */
   controller!: Metal;
 
-  /** The Request object from the last request. */
   request!: Request;
 
-  /** The Response object from the last request. */
   response!: Response;
 
-  /** Session hash — persists across requests within the same TestCase. */
   session: Record<string, unknown> = {};
 
-  /** Flash messages from the last request. */
   get flash(): FlashHash {
     return (this.controller as any).flash ?? new FlashHash();
   }
 
-  /** Cookies jar from the response. */
   get cookies(): Record<string, string | undefined> {
     return this.response?.cookies ?? {};
   }
 
-  /** The response body as a string. */
   get responseBody(): string {
     return this.response?.body ?? this.controller?.body ?? "";
   }
 
-  /** Parsed JSON response body. */
   get parsedBody(): unknown {
     return JSON.parse(this.responseBody);
   }
@@ -179,8 +115,6 @@ export class TestCase {
   constructor(controllerClass: ControllerClass) {
     this._controllerClass = controllerClass;
   }
-
-  // --- HTTP verb methods ---
 
   async get(action: string, options: RequestOptions = {}): Promise<void> {
     await this.process(action, { method: "GET", ...options });
@@ -206,14 +140,6 @@ export class TestCase {
     await this.process(action, { method: "HEAD", ...options });
   }
 
-  // --- Assertions ---
-
-  /**
-   * Assert the response status. Accepts:
-   * - A number (exact status code)
-   * - A string symbol ("success", "redirect", "missing", "error",
-   *   or a Rails status symbol like "ok", "not_found")
-   */
   assertResponse(expected: number | string): void {
     const actual = this.response?.statusCode ?? this.controller?.status;
     if (typeof expected === "number") {
@@ -223,7 +149,6 @@ export class TestCase {
       return;
     }
 
-    // Check range aliases
     const range = STATUS_RANGES[expected];
     if (range) {
       if (actual < range[0] || actual > range[1]) {
@@ -234,7 +159,6 @@ export class TestCase {
       return;
     }
 
-    // Check Rails status symbols
     const SYMBOLS: Record<string, number> = {
       ok: 200,
       created: 201,
@@ -264,9 +188,6 @@ export class TestCase {
     throw new Error(`Unknown response assertion: "${expected}"`);
   }
 
-  /**
-   * Assert the response redirected to a given URL or path.
-   */
   assertRedirectedTo(expected: string | RegExp): void {
     const location = this.response?.getHeader("location") ?? this.controller?.getHeader("location");
     if (!location) {
@@ -283,9 +204,6 @@ export class TestCase {
     }
   }
 
-  /**
-   * Assert the response content type.
-   */
   assertContentType(expected: string): void {
     const actual = this.response?.getHeader("content-type") ?? this.controller?.contentType ?? "";
     if (!actual.includes(expected)) {
@@ -293,9 +211,6 @@ export class TestCase {
     }
   }
 
-  /**
-   * Assert a response header value.
-   */
   assertHeader(name: string, expected: string | RegExp): void {
     const actual = this.response?.getHeader(name) ?? this.controller?.getHeader(name);
     if (actual === undefined) {
@@ -312,9 +227,6 @@ export class TestCase {
     }
   }
 
-  /**
-   * Assert a flash message was set.
-   */
   assertFlash(key: string, expected?: string | RegExp): void {
     const flash = this.flash;
     const value = flash.get(key);
@@ -334,9 +246,6 @@ export class TestCase {
     }
   }
 
-  /**
-   * Assert no flash message for a key.
-   */
   assertNoFlash(key: string): void {
     const flash = this.flash;
     if (flash.has(key)) {
@@ -344,7 +253,7 @@ export class TestCase {
     }
   }
 
-  /** @internal Extracted to rails-controller-testing gem; always raises. */
+  /** @internal */
   assertTemplate(_options: unknown = {}, _message?: string): never {
     throw new Error(
       "assert_template has been extracted to a gem. To continue using it, " +
@@ -422,32 +331,31 @@ export class TestCase {
       action,
     };
 
-    // Rails: `@request.flash.update(flash || {})` (`test_case.rb:613`).
     this.request.flash!.update(flash ?? {});
 
     await this.processControllerResponse(action, xhr);
   }
 
-  /** @internal Mirrors Rails `TestCase::Behavior#generated_path`. */
+  /** @internal */
   generatedPath(generatedExtras: [string, string[]]): string {
     return generatedExtras[0];
   }
 
-  /** @internal Mirrors Rails `TestCase::Behavior#query_parameter_names`. */
+  /** @internal */
   queryParameterNames(generatedExtras: [string, string[]]): string[] {
     return [...generatedExtras[1], "controller", "action"];
   }
 
-  /** @internal Mirrors Rails `TestCase::Behavior#build_response`. */
+  /** @internal */
   buildResponse(): Response {
     return new Response();
   }
 
-  /** @internal Mirrors Rails `TestCase::Behavior#wrap_execution`. */
+  /** @internal */
   wrapExecution(fn: () => Promise<void>): Promise<void> {
     return fn();
   }
-  /** @internal Mirrors Rails `TestCase::Behavior#process_controller_response`. */
+  /** @internal */
   private async processControllerResponse(action: string, _xhr: boolean): Promise<void> {
     await this.wrapExecution(() =>
       this.controller.dispatch(action, this.request, this.response).then(() => {}),
@@ -455,7 +363,7 @@ export class TestCase {
     Object.assign(this.session, (this.request.session as unknown as TestSession).toHash());
   }
 
-  /** @internal Mirrors Rails `TestCase::Behavior#scrub_env!`. */
+  /** @internal */
   private scrubEnvBang(env: Record<string, unknown>): Record<string, unknown> {
     for (const key of Object.keys(env)) {
       if (
@@ -472,32 +380,20 @@ export class TestCase {
   }
 }
 
-/**
- * ActionController::TestRequest — a controller-test-flavored TestRequest
- * that mirrors `ActionDispatch::TestRequest`. Most behavior is inherited
- * from the dispatch layer; controller-specific helpers (`newSession`) live
- * here so test harnesses can synthesize a request without reaching across
- * packages.
- */
 export class TestRequest extends AbstractTestRequest {
-  /** @internal Custom param parsers keyed by MIME type symbol. */
+  /** @internal */
   private _customParamParsers: Record<string, (raw: string) => unknown> = {
-    // Rails: Hash.from_xml(raw_post)["hash"] — no XML parser available; return empty hash.
     xml: (_raw) => ({}),
   };
 
-  /** @internal Mirrors Rails `ActionController::TestRequest.new_session`. */
+  /** @internal */
   static newSession(): TestSession {
     return new TestSession();
   }
 
-  /** @internal Mirrors Rails `@controller_class` ivar. */
+  /** @internal */
   private _testControllerClass: unknown = null;
 
-  /**
-   * Mirrors Rails `ActionController::TestRequest.create(controller_class)`.
-   * Builds a fresh request with default env and a new session.
-   */
   static create(controllerClass?: unknown): TestRequest {
     const env: Record<string, unknown> = {};
     env["rack.request.cookie_hash"] = {};
@@ -508,10 +404,7 @@ export class TestRequest extends AbstractTestRequest {
     return req;
   }
 
-  /**
-   * @internal Mirrors Rails `ActionController::TestRequest.default_env` (private class method).
-   * Extends the dispatch-layer DEFAULT_ENV and strips PATH_INFO.
-   */
+  /** @internal */
   static override defaultEnv(): Record<string, unknown> {
     const base = AbstractTestRequest.defaultEnv();
     const env = { ...base };
@@ -535,12 +428,6 @@ export class TestRequest extends AbstractTestRequest {
     this.setHeader("CONTENT_TYPE", type);
   }
 
-  /**
-   * Mirrors Rails `TestRequest#assign_parameters`.
-   * Splits parameters into path parameters and query/body parameters, then
-   * encodes the body (or query string) based on the request method and
-   * content type.
-   */
   assignParameters(
     _routes: unknown,
     controllerPath: string,
@@ -550,8 +437,6 @@ export class TestRequest extends AbstractTestRequest {
     queryStringKeys: string[],
   ): void {
     const nonPathParameters: Record<string, unknown> = {};
-    // Rails path_parameters uses symbol keys; we mirror with string keys.
-    // Array values are preserved as-is (Rails: value.map(&:to_param)).
     const pathParameters: Record<string, string | string[]> = {};
 
     for (const [key, value] of Object.entries(parameters)) {
@@ -564,7 +449,6 @@ export class TestRequest extends AbstractTestRequest {
       }
     }
 
-    // Clear any request-parameters cache established before the body was wired in.
     delete this.env["action_dispatch.request.request_parameters"];
 
     if (this.requestMethod === "GET") {
@@ -577,8 +461,6 @@ export class TestRequest extends AbstractTestRequest {
         this.setHeader("CONTENT_TYPE", `multipart/form-data; boundary=${boundary}`);
         this.setHeader("CONTENT_LENGTH", String(Buffer.byteLength(body, "binary")));
         this.setHeader("rack.input", body);
-        // Multipart isn't parsed by the formatted-parameter path; pre-populate the
-        // cache so params/requestParameters expose the uploaded files directly.
         this.env["action_dispatch.request.request_parameters"] = nonPathParameters;
       } else {
         this.fetchHeader("CONTENT_TYPE", (k) => {
@@ -587,10 +469,6 @@ export class TestRequest extends AbstractTestRequest {
 
         const ct = this.getHeader("CONTENT_TYPE") ?? "";
         let data: string;
-        // The key `parseFormattedParameters` will look the parser up under:
-        // `contentMimeType` is `Mime::Type.lookup` of the stripped, lowercased
-        // media type (`mime-negotiation.ts` / `mime_type.rb:167-173`), so a raw
-        // header carrying parameters or non-canonical case would never match.
         const mediaType = ct.split(";")[0].trim().toLowerCase();
         const mimeSymbol = MimeType.lookup(mediaType).symbol ?? mediaType;
 
@@ -603,7 +481,6 @@ export class TestRequest extends AbstractTestRequest {
         ) {
           data = buildNestedQuery(nonPathParameters);
         } else {
-          // Rails: registers a custom parser so the controller sees the raw params hash
           this._customParamParsers[mimeSymbol] = () => nonPathParameters;
           data = buildNestedQuery(nonPathParameters);
         }
@@ -618,7 +495,6 @@ export class TestRequest extends AbstractTestRequest {
       this.setHeader(k, generatedPath);
     });
     this.fetchHeader("ORIGINAL_FULLPATH", (k) => {
-      // Rails uses fullpath here (path + query string) not just the generated path
       this.setHeader(k, this.fullpath);
     });
 
@@ -628,7 +504,7 @@ export class TestRequest extends AbstractTestRequest {
   }
 
   /**
-   * @internal Mirrors Rails `TestRequest#params_parsers` (private).
+   * @internal
    * @missingRailsArgs merge — PERMANENT
    */
   override paramsParsers(): ParameterParsers {
@@ -636,11 +512,7 @@ export class TestRequest extends AbstractTestRequest {
     return merge<unknown>(base, this._customParamParsers) as ParameterParsers;
   }
 
-  /**
-   * @internal Wires custom param parsers into the request parameter parsing path.
-   * The base `Request#requestParameters` calls `_paramsParsers` directly (bypassing
-   * instance dispatch), so we override to use `this.paramsParsers()` instead.
-   */
+  /** @internal */
   override get requestParameters(): Record<string, unknown> {
     const cached = this.env["action_dispatch.request.request_parameters"];
     if (cached && typeof cached === "object") return cached as Record<string, unknown>;
@@ -654,16 +526,13 @@ export class TestRequest extends AbstractTestRequest {
     return normalized;
   }
 
-  /**
-   * @internal Mirrors Rails `ENCODER#should_multipart?` — `true` if any
-   * value in `params` (recursively) is an `UploadedFile`.
-   */
+  /** @internal */
   static shouldMultipart(params: Record<string, unknown>): boolean {
     return shouldMultipart(params);
   }
 }
 
-/** @internal Mirrors Rails Rack::Test::Utils.build_multipart — encodes params with file uploads. */
+/** @internal */
 function buildMultipartBody(params: Record<string, unknown>): { body: string; boundary: string } {
   const boundary = "AaB03x";
   const parts: string[] = [];
@@ -690,7 +559,7 @@ function buildMultipartBody(params: Record<string, unknown>): { body: string; bo
   return { body: parts.join("") + `--${boundary}--\r\n`, boundary };
 }
 
-/** @internal Mirrors Rails ENCODER#should_multipart? — true if any param is an UploadedFile. */
+/** @internal */
 function shouldMultipart(params: Record<string, unknown>): boolean {
   const check = (value: unknown): boolean => {
     if (Array.isArray(value)) return value.some(check);
@@ -704,38 +573,25 @@ function shouldMultipart(params: Record<string, unknown>): boolean {
 }
 
 export class LiveTestResponse extends Response {
-  /** Mirrors Rails `LiveTestResponse#success?` (alias of `successful?`). */
   get isSuccess(): boolean {
     return this.successful;
   }
 
-  /** Mirrors Rails `LiveTestResponse#missing?` (alias of `not_found?`). */
   get isMissing(): boolean {
     return this.notFound;
   }
 
-  /** Mirrors Rails `LiveTestResponse#error?` (alias of `server_error?`). */
   get isError(): boolean {
     return this.serverError;
   }
 }
 
-/**
- * Mirrors `ActionController::TestSession` (`test_case.rb:196-260`). Methods
- * `destroy` and `load!` are overridden to avoid calling methods on the
- * `@store` object, which does not exist for the TestSession class.
- */
 export class TestSession extends SecureSessionHash {
   static DEFAULT_OPTIONS = DEFAULT_OPTIONS;
 
-  /** @internal Mirrors Rails `@initially_empty`. */
+  /** @internal */
   protected initiallyEmpty: boolean;
 
-  /**
-   * Mirrors `TestSession#initialize` (`test_case.rb:198-206`). Ruby's
-   * `super(nil, nil)` passes the store and request a TestSession does not
-   * have; TS has no untyped `nil`, so the two `nil`s are cast at this call.
-   */
   constructor(
     session: Record<string, unknown> = {},
     id: SessionId = new SessionId(SecureRandom.hex(16)),
@@ -747,27 +603,22 @@ export class TestSession extends SecureSessionHash {
     this.initiallyEmpty = Object.keys(this.data).length === 0;
   }
 
-  /** Mirrors `TestSession#exists?` (`test_case.rb:208-210`). */
   override isExists(): boolean {
     return true;
   }
 
-  /** Mirrors `TestSession#keys` (`test_case.rb:212-214`). */
   override keys(): string[] {
     return Object.keys(this.data);
   }
 
-  /** Mirrors `TestSession#values` (`test_case.rb:216-218`). */
   override values(): unknown[] {
     return Object.values(this.data);
   }
 
-  /** Mirrors `TestSession#destroy` (`test_case.rb:220-222`). */
   override destroy(): void {
     this.clear();
   }
 
-  /** Mirrors `TestSession#dig(*keys)` (`test_case.rb:224-227`). */
   override dig(key: unknown, ...keys: unknown[]): unknown {
     let value: unknown = this.data[String(key)];
     for (const k of keys) {
@@ -780,7 +631,6 @@ export class TestSession extends SecureSessionHash {
     return value;
   }
 
-  /** Mirrors `TestSession#fetch(key, *args, &block)` (`test_case.rb:229-231`). */
   override fetch(key: unknown, args?: unknown, block?: (key: string) => unknown): unknown {
     const k = String(key);
     if (Object.hasOwn(this.data, k)) return this.data[k];
@@ -789,17 +639,15 @@ export class TestSession extends SecureSessionHash {
     return args;
   }
 
-  /** Mirrors `TestSession#enabled?` (`test_case.rb:233-235`). */
   isEnabled(): boolean {
     return true;
   }
 
-  /** Mirrors `TestSession#id_was` (`test_case.rb:237-239`). */
   idWas(): unknown {
     return this._id;
   }
 
-  /** @internal Mirrors private `TestSession#load!` (`test_case.rb:242-244`). */
+  /** @internal */
   override loadBang(): unknown {
     return this._id;
   }

@@ -1,11 +1,3 @@
-/**
- * ActionController::AllowBrowser
- *
- * Minimum browser version enforcement using `ua-parser-js` for
- * user agent parsing (matching Rails' use of the `useragent` gem).
- * @see https://api.rubyonrails.org/classes/ActionController/AllowBrowser.html
- */
-
 import { UAParser } from "ua-parser-js";
 
 import type { Request } from "../../action-dispatch/http/request.js";
@@ -22,13 +14,11 @@ export class BrowserBlocker {
   private _parsed?: UAParser;
   private _expanded?: Record<string, string | false>;
 
-  /** Mirrors: `BrowserBlocker#initialize` (`metal/allow_browser.rb:80-82`). */
   constructor(request: Request, versions: BrowserVersions) {
     this._request = request;
     this._versions = versions;
   }
 
-  /** Mirrors: `attr_reader :request` (`metal/allow_browser.rb:78`). */
   get request(): Request {
     return this._request;
   }

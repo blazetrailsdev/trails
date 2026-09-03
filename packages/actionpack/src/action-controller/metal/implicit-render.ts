@@ -1,11 +1,3 @@
-/**
- * ActionController::ImplicitRender
- *
- * Handles implicit rendering for a controller action that does not
- * explicitly respond with render, respond_to, redirect, or head.
- * @see https://api.rubyonrails.org/classes/ActionController/ImplicitRender.html
- */
-
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
@@ -15,12 +7,7 @@ import {
   sendAction as _sendAction,
 } from "./basic-implicit-render.js";
 
-/**
- * Rails `BasicImplicitRender#send_action` — re-exposed because
- * `ImplicitRender` includes `BasicImplicitRender`.
- *
- * @internal
- */
+/** @internal */
 export function sendAction(
   this: { performed: boolean; head(status: number | string): void },
   method: () => unknown,
@@ -31,17 +18,11 @@ export function sendAction(
 export interface ImplicitRenderHost {
   performed: boolean;
   actionName: string;
-  /** Rails' messages read `self.class.name`, not `controller_name`. */
   constructor: { name: string };
   request?: {
-    /** Rails `request.get?` — `Rack::Request::Helpers#get?`. */
     isGet?(): boolean;
-    /** Rails compares `request.format == Mime[:html]`; `symbol` is the trails
-     *  spelling, answered by both `MimeType` and `NullType`. */
     format?: { symbol?: string | null };
-    /** Rails `request.xhr?` — a boolean getter on trails' `Request`. */
     xhr?: boolean;
-    /** Rails `request.formats` — `Mime::Type`s, rendered by `to_s`. */
     formats?: ReadonlyArray<{ toString(): string }>;
     variant?: unknown;
   };
@@ -60,14 +41,7 @@ export interface ImplicitRenderHost {
 }
 
 /**
- * Rails `ImplicitRender#default_render` — picks a template, raises with
- * UnknownFormat / MissingExactTemplate, or falls back to `head :no_content`.
- *
  * @missingRailsArgs inspect — PERMANENT
- *   Ruby's `x.inspect` is a method on the receiver; TypeScript cannot reopen
- *   `Array`, so trails spells it as the free `inspect(x)` ActiveSupport
- *   re-exports from `@blazetrails/ruby-compat`'s `rbInspect`, and the receiver
- *   moves into the argument list.
  * @internal
  */
 export function defaultRender(this: ImplicitRenderHost): void {
@@ -97,28 +71,13 @@ export function defaultRender(this: ImplicitRenderHost): void {
   _defaultRender.call(this);
 }
 
-/**
- * `request.variant` is an `ActionController::RequestVariant` — an Array
- * subclass — so Rails' `variants: request.variant` kwarg already carries a
- * list (`action_controller/metal/implicit_render.rb:37`). trails' `variant` is
- * an `ArrayInquirer`, a Proxy over an array, so the values are copied out: the
- * lookup context's details key walks the value as a plain array.
- *
- * @internal
- */
+/** @internal */
 function variantsFor(variant: unknown): readonly (string | symbol)[] {
   if (variant == null) return [];
   return Array.isArray(variant) ? [...(variant as readonly string[])] : [String(variant)];
 }
 
-/**
- * Rails `ImplicitRender#method_for_action` — Rails returns the string
- * `"default_render"`; trails uses camelCase identifiers per CLAUDE.md
- * so we return `"defaultRender"`, matching the export name on this
- * module.
- *
- * @internal
- */
+/** @internal */
 export function methodForAction(
   this: ImplicitRenderHost & { _superMethodForAction?(name: string): string | undefined },
   actionName: string,
@@ -129,12 +88,7 @@ export function methodForAction(
   return undefined;
 }
 
-/**
- * Rails `ImplicitRender#interactive_browser_request?` — GET request for
- * HTML content that isn't an XHR.
- *
- * @internal
- */
+/** @internal */
 export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   const req = this.request;
   if (!req) return false;

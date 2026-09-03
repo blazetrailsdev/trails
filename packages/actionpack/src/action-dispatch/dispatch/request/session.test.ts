@@ -24,9 +24,6 @@ function makeReq(): { env: Record<string, unknown> } {
   return { env: {} };
 }
 
-// ==========================================================================
-// dispatch/request/session_test.rb
-// ==========================================================================
 describe("Request", () => {
   describe("SessionTest", () => {
     it("create adds itself to env", () => {
@@ -193,12 +190,6 @@ describe("Request", () => {
   });
 });
 
-// ==========================================================================
-// No Rails counterpart: `Session::Options` (request/session.rb:47-73) has no
-// test of its own in session_test.rb. request_test.rb's `RequestSession#session`
-// covers `Options.find(req)` being an `Options` instance; what is left here is
-// the reader behaviour it does not reach.
-// ==========================================================================
 describe("Options", () => {
   it("create stores an Options instance", () => {
     const req = makeReq();

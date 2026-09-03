@@ -1,15 +1,6 @@
-/**
- * Mime::Type — MIME type registry and parsing.
- */
-
 import { registerDefaultMimeTypes } from "./mime-types.js";
 import { KeyError } from "@blazetrails/ruby-compat";
 
-/**
- * Ordered set of registered MIME types. Mirrors `Mime::Mimes` — Rails uses
- * this as `Mime::SET`. Iteration order follows registration order; symbol
- * membership is tracked separately for `validSymbols` checks.
- */
 export class Mimes {
   /** @internal */
   private _mimes: MimeType[] = [];
@@ -26,11 +17,9 @@ export class Mimes {
     for (const m of this._mimes) callback(m);
   }
 
-  /** @internal Mirrors Ruby `<<`. */
+  /** @internal */
   push(type: MimeType): void {
     this._mimes.push(type);
-    // `to_sym` is nil only for the throwaway types `lookup` fabricates
-    // (`mime_type.rb:172`), which never reach `SET`.
     const sym = type.toSym()!;
     this._symbols.push(sym);
     this._symbolsSet.add(sym);
@@ -62,12 +51,7 @@ export class Mimes {
   }
 }
 
-/**
- * A simple helper used in parsing the Accept header. Mirrors
- * `Mime::Type::AcceptItem`.
- *
- * @internal
- */
+/** @internal */
 export class AcceptItem {
   index: number;
   name: string;
@@ -86,7 +70,7 @@ export class AcceptItem {
     this.q = Math.trunc(qNum * 100);
   }
 
-  /** @internal Three-way comparator used by `AcceptList.sortBang`. */
+  /** @internal */
   compare(other: AcceptItem): number {
     const result = other.q - this.q;
     if (result !== 0) return result;
@@ -94,12 +78,7 @@ export class AcceptItem {
   }
 }
 
-/**
- * Sort helpers for the parsed Accept-header list. Mirrors
- * `Mime::Type::AcceptList`.
- *
- * @internal
- */
+/** @internal */
 export class AcceptList {
   static sortBang(list: AcceptItem[]): MimeType[] {
     list.sort((a, b) => a.compare(b));
@@ -171,7 +150,6 @@ export class MimeType {
   private static extensionMap: Map<string, MimeType> = new Map();
   private static callbacks: Array<(type: MimeType) => void> = [];
 
-  /** Ordered set of all registered MIME types. Mirrors `Mime::SET`. */
   static readonly SET: Mimes = new Mimes();
 
   constructor(string: string, symbol: string | null = null, synonyms: string[] = []) {
@@ -212,8 +190,6 @@ export class MimeType {
     return this.string === other || this.symbol === other;
   }
 
-  // --- Registry ---
-
   static register(
     string: string,
     symbol: string,
@@ -227,8 +203,6 @@ export class MimeType {
     for (const syn of synonyms) {
       MimeType.registry.set(syn, type);
     }
-    // Rails registers `[symbol.to_s] + extension_synonyms` into
-    // EXTENSION_LOOKUP, so the symbol itself is always a valid extension key.
     for (const ext of [symbol, ...extensions]) {
       MimeType.extensionMap.set(ext, type);
     }
@@ -249,16 +223,9 @@ export class MimeType {
     const type = MimeType.registry.get(symbol);
     if (!type) return;
     MimeType.SET.deleteIf((v) => v === type);
-    // Sweep every registry entry whose value is this type — captures
-    // the symbol, string, synonyms, AND any aliases added later via
-    // registerAlias(). Avoids partial removals where lookup() still
-    // resolves the type through a stale alias key.
     for (const [key, value] of MimeType.registry) {
       if (value === type) MimeType.registry.delete(key);
     }
-    // Same sweep for extensionMap — register() can install extension
-    // mappings, and leaving them behind would let lookupByExtension()
-    // resolve an unregistered type.
     for (const [ext, value] of MimeType.extensionMap) {
       if (value === type) MimeType.extensionMap.delete(ext);
     }
@@ -270,12 +237,7 @@ export class MimeType {
     return MimeType.registry.get(stripped) ?? new MimeType(stripped);
   }
 
-  /**
-   * Returns true when the symbol or string (after stripping media-type
-   * parameters) resolves to a registered type. Use this instead of `lookup`
-   * when you need to distinguish "known format" from "unknown string".
-   * @internal
-   */
+  /** @internal */
   static isRegistered(symbolOrString: string): boolean {
     if (MimeType.registry.has(symbolOrString)) return true;
     const stripped = symbolOrString.split(";")[0].trimEnd();
@@ -286,10 +248,6 @@ export class MimeType {
     return MimeType.extensionMap.get(extension.replace(/^\./, ""));
   }
 
-  /**
-   * All registered MIME types, deduplicated. Mirrors Rails `Mime::SET`.
-   * Iteration order follows registration order (Map preserves it).
-   */
   static all(): MimeType[] {
     const seen = new Set<MimeType>();
     const out: MimeType[] = [];
@@ -306,7 +264,6 @@ export class MimeType {
     MimeType.callbacks.push(callback);
   }
 
-  /** Rails-named alias of {@link onRegister}. */
   static registerCallback(callback: (type: MimeType) => void): void {
     MimeType.onRegister(callback);
   }
@@ -318,21 +275,12 @@ export class MimeType {
     return MimeType.parseDataWithTrailingStar(m[1]);
   }
 
-  /**
-   * For an input of `'text'`, returns all registered MIME types whose
-   * string or any synonym contains `'text'` as a substring (Rails uses
-   * `Regexp.new(Regexp.quote(type))` against each, so the match is
-   * substring, not prefix). Mirrors `Mime::Type.parse_data_with_trailing_star`.
-   *
-   * @internal
-   */
+  /** @internal */
   static parseDataWithTrailingStar(type: string): MimeType[] {
     return MimeType.SET.select(
       (m) => m.string.includes(type) || m.synonyms.some((s) => s.includes(type)),
     );
   }
-
-  // --- Parsing ---
 
   static parse(acceptHeader: string): MimeType[] {
     if (!acceptHeader) return [];
@@ -370,12 +318,6 @@ export class MimeType {
     }
     return AcceptList.sortBang(list);
   }
-
-  // --- Built-in types ---
-  //
-  // Default registrations live in `./mime-types.ts` (Rails: `mime_types.rb`).
-  // The constants below resolve through the registry, so each access returns
-  // the singleton registered by that file.
 
   static get HTML(): MimeType {
     return MimeType.lookup("html");
@@ -458,17 +400,7 @@ export class MimeType {
 
 registerDefaultMimeTypes(MimeType);
 
-/**
- * Module-level helpers from Ruby's `Mime` module. Rails exposes these as
- * `Mime.fetch(:html)` etc.; in TS they hang off this object so callers can
- * write `Mime.fetch("html")`.
- */
 export const Mime = {
-  /**
-   * Look up a MIME type by extension. Returns the result of `fallback` if
-   * the extension is not registered (Rails raises `KeyError`; the callback
-   * lets callers mirror that or supply a default).
-   */
   fetch(type: MimeType | string, fallback?: (key: string) => MimeType): MimeType {
     if (type instanceof MimeType) return type;
     const found = MimeType.lookupByExtension(type);

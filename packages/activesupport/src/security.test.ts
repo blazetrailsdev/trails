@@ -50,7 +50,6 @@ describe("MessageEncryptorTest", () => {
   });
 
   it("uses aes-256-cbc by default", () => {
-    // Just verify it produces output (no error thrown)
     const enc = new MessageEncryptor(secret);
     const message = enc.encryptAndSign("test");
     expect(typeof message).toBe("string");
@@ -137,7 +136,7 @@ describe("MessageVerifierTest", () => {
 
   it("expired message returns null from verified", () => {
     const v = new MessageVerifier("secret");
-    const message = v.generate("data", { expiresIn: -1 }); // expired 1s ago
+    const message = v.generate("data", { expiresIn: -1 });
     expect(v.verified(message)).toBeNull();
   });
 

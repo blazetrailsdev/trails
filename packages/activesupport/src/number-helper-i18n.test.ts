@@ -9,8 +9,6 @@ import {
   numberToHuman,
 } from "./number-helper.js";
 
-// Rails' activesupport/test/abstract_unit.rb:35 turns the check off for the
-// whole suite; these cases translate under locales they store themselves.
 I18n.setEnforceAvailableLocales(false);
 
 function setupTranslations(): void {

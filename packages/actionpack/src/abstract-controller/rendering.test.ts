@@ -104,7 +104,6 @@ describe("viewAssigns()", () => {
 
 describe("_normalizeArgs", () => {
   it("returns the second argument when the first is a string template name", () => {
-    // Rails uses Symbol but trails treats unknown literals as opaque.
     expect(_normalizeArgs("foo", { layout: "bar" })).toEqual({ layout: "bar" });
   });
 

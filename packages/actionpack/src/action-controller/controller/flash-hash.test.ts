@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FlashHash } from "../../action-dispatch/flash.js";
 
-// ==========================================================================
-// controller/flash_hash_test.rb
-// ==========================================================================
 describe("FlashHashTest", () => {
   it("set get", () => {
     const flash = new FlashHash();
@@ -106,7 +103,6 @@ describe("FlashHashTest", () => {
     flash.keep("a");
     flash.sweep();
     expect(flash.get("a")).toBe("1");
-    // Second sweep should discard
     flash.sweep();
     expect(flash.has("a")).toBe(false);
   });
@@ -145,7 +141,6 @@ describe("FlashHashTest", () => {
     const flash = new FlashHash({ old: "1" });
     flash.replace({ new: "2" });
     flash.sweep();
-    // new should survive first sweep
     expect(flash.has("new")).toBe(true);
     flash.sweep();
     expect(flash.has("new")).toBe(false);
@@ -156,7 +151,6 @@ describe("FlashHashTest", () => {
     flash.discard("a");
     flash.set("a", "2");
     flash.sweep();
-    // Re-setting after discard keeps the value
     expect(flash.get("a")).toBe("2");
   });
 
@@ -181,7 +175,6 @@ describe("FlashHashTest", () => {
       discard: ["dropped"],
     });
     expect(loaded.get("kept")).toBe("yes");
-    // Rails: flashes.except!(*discard) — `dropped` is removed at load.
     expect(loaded.has("dropped")).toBe(false);
   });
 
@@ -191,8 +184,6 @@ describe("FlashHashTest", () => {
       discard: [],
     });
     expect(loaded.get("kept")).toBe("yes");
-    // Rails: new(flashes, flashes.keys) — every surviving key is on
-    // the discard list for the next sweep.
     loaded.sweep();
     expect(loaded.has("kept")).toBe(false);
   });
@@ -207,7 +198,6 @@ describe("FlashHashTest", () => {
 
   it("dup carries over the discard set so sweep behaves identically", () => {
     const original = FlashHash.fromSessionValue({ flashes: { a: "1" }, discard: [] });
-    // After fromSessionValue, `a` is marked for discard on next sweep.
     const copy = original.dup();
     copy.sweep();
     expect(copy.has("a")).toBe(false);
