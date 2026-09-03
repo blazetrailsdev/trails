@@ -188,6 +188,7 @@ export const MANIFEST_PACKAGES = [
   "trailties",
   "rack",
   "rack-session",
+  "rack-test",
   "globalid",
   "i18n",
   "did-you-mean",

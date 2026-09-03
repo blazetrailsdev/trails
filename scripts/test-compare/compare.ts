@@ -125,6 +125,21 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
  * `-behavior.test.ts`.
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
+  if (pkg === "rack-test") {
+    // The Ruby suite root is `spec`, so every file carries the gem's
+    // `lib/rack/test` root back as a leading `rack/` (and, below the top-level
+    // `rack/test_spec.rb`, a further `test/`). Drop both, the same
+    // redundant-leading-segment case as rack-session and i18n, so both sides
+    // land on `packages/rack-test/src/<x>`. rack-test names its specs with a
+    // `_spec` SUFFIX where rack uses a `spec_` prefix.
+    let rest = rubyFile.startsWith("rack/") ? rubyFile.slice("rack/".length) : rubyFile;
+    if (rest.startsWith("test/")) rest = rest.slice("test/".length);
+    const dir = path.dirname(rest);
+    const base = path.basename(rest, ".rb").replace(/_spec$/, "");
+    const tsFile = base.replace(/_/g, "-") + ".test.ts";
+    return dir === "." ? tsFile : path.join(dir, tsFile);
+  }
+
   if (pkg === "rack" || pkg === "rack-session") {
     const dir = path.dirname(rubyFile);
     // rack-session's lib root is `lib/rack/session` while its test root is
@@ -1491,6 +1506,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   activesupport: "packages/activesupport/src/",
   rack: "packages/rack/src/",
   "rack-session": "packages/rack-session/src/",
+  "rack-test": "packages/rack-test/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
