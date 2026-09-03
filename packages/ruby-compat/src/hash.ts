@@ -264,6 +264,22 @@ export function slice<T>(hash: Record<string, T>, ...keys: string[]): Record<str
 }
 
 /**
+ * Ruby `Hash#except` (`vendor/ruby/hash.c:2683` `rb_hash_except`) — a dup
+ * with the given keys deleted, keys that are absent ignored.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/hash.c:2683`).
+ */
+export function except<T>(hash: Record<string, T>, ...keys: string[]): Record<string, T> {
+  /* `rb_hash_except` (`vendor/ruby/hash.c:2683`) deletes from a
+     `hash_dup_with_compare_by_id`, so the result is an ancestor-less Hash in
+     which `__proto__` stays an ordinary key. */
+  const result: Record<string, T> = Object.assign(Object.create(null) as Record<string, T>, hash);
+  for (const key of keys) {
+    delete result[key];
+  }
+  return result;
+}
+
+/**
  * Ruby `Hash#values_at` (`vendor/ruby/hash.c:2713` `rb_hash_values_at`) — an
  * ARRAY of the values for the given keys, in argument order, `nil` for a key
  * the hash does not hold.
@@ -286,22 +302,6 @@ export function valuesAt(
 ) {
   if (hash instanceof Map) return keys.map((key) => hash.get(key));
   return keys.map((key) => hash[key as string]);
-}
-
-/**
- * Ruby `Hash#except` (`vendor/ruby/hash.c:2683` `rb_hash_except`) — a dup
- * with the given keys deleted, keys that are absent ignored.
- * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/hash.c:2683`).
- */
-export function except<T>(hash: Record<string, T>, ...keys: string[]): Record<string, T> {
-  /* `rb_hash_except` (`vendor/ruby/hash.c:2683`) deletes from a
-     `hash_dup_with_compare_by_id`, so the result is an ancestor-less Hash in
-     which `__proto__` stays an ordinary key. */
-  const result: Record<string, T> = Object.assign(Object.create(null) as Record<string, T>, hash);
-  for (const key of keys) {
-    delete result[key];
-  }
-  return result;
 }
 
 /**
