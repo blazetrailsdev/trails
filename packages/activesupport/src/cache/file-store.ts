@@ -285,13 +285,7 @@ export class FileStore extends Store implements CacheStore {
   // up to — but never including — cachePath.
   private deleteEmptyDirectories(dir: string): void {
     if (File.realpath(dir) === File.realpath(this.cachePath)) return;
-    let children: string[];
-    try {
-      children = Dir.children(dir);
-    } catch {
-      return;
-    }
-    if (isEmpty(children)) {
+    if (isEmpty(Dir.children(dir))) {
       // Rails: `Dir.delete(dir) rescue nil` — a failed delete is swallowed and
       // we still recurse toward the parent (file_store.rb:197-199).
       try {
@@ -310,22 +304,14 @@ export class FileStore extends Store implements CacheStore {
   // of the cache directory, yielding every file path.
   protected searchDir(dir: string, callback: (path: string) => void): void {
     if (!File.isExist(dir)) return;
-    let children: string[];
-    try {
-      children = Dir.children(dir);
-    } catch {
-      return;
-    }
-    for (const d of children) {
+    Dir.eachChild(dir, (d) => {
       const name = File.join(dir, d);
-      try {
-        if (File.isDirectory(name)) {
-          this.searchDir(name, callback);
-        } else {
-          callback(name);
-        }
-      } catch {}
-    }
+      if (File.isDirectory(name)) {
+        this.searchDir(name, callback);
+      } else {
+        callback(name);
+      }
+    });
   }
 
   // Mirrors Rails FileStore#modify_value (file_store.rb:218-241): on a missing,

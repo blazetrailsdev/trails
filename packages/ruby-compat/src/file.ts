@@ -1,5 +1,4 @@
 import { getFs, getPath } from "./fs-adapter.js";
-import type { FsStatResult } from "./fs-adapter.js";
 
 /**
  * `File` (`vendor/ruby/file.c:7354` `rb_cFile`), the sliver of it trails calls.
@@ -68,16 +67,6 @@ export class File {
     } catch {
       return false;
     }
-  }
-
-  /**
-   * `vendor/ruby/file.c:1329` `rb_file_s_stat`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `File.stat`
-   * (`vendor/ruby/file.c:1329`).
-   */
-  static stat(fileName: string): FsStatResult {
-    return getFs().statSync(fileName);
   }
 
   /**
