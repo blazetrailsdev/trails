@@ -1,6 +1,7 @@
 import { Attribute, Uninitialized } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
 import { typeRegistry, type TypeRegistry } from "../type/registry.js";
+import { defaultValue } from "../type.js";
 import type { Type } from "../type/value.js";
 import { jsonCodec } from "./codecs/json.js";
 import {
@@ -79,7 +80,7 @@ export class YAMLEncoder {
                 `YAMLEncoder: unknown type key "${typeKey}" — falling back to "value" type`,
               );
             }
-            type = this.registry.lookup("value");
+            type = defaultValue();
           }
         }
         return [name, Attribute.fromUser(name, envelope.values[name], type)];

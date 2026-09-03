@@ -14,6 +14,7 @@ import {
 import { Model } from "../index.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { ValueType } from "../type/value.js";
 
 class Topic extends Model {
   declare approved: any;
@@ -25,7 +26,7 @@ class Topic extends Model {
     include(this, Attributes);
     this.attribute("title", "string");
     this.attribute("content", "string");
-    this.attribute("approved", "value");
+    this.attribute("approved", new ValueType());
     this.attributeMethodSuffix("BeforeTypeCast", { parameters: false });
     this.defineAttributeMethod("price");
   }
@@ -61,7 +62,7 @@ class Person extends Model {
 
   static {
     include(this, Attributes);
-    this.attribute("karma", "value");
+    this.attribute("karma", new ValueType());
   }
 }
 interface Person extends Attributes {}

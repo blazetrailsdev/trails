@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 import {
   typeRegistry,
+  ValueType,
   StringType,
   IntegerType,
   UserProvidedDefault,
@@ -247,7 +248,7 @@ describe("CustomPropertiesTest", () => {
     expect(Object.keys(Klass.attributeTypes())).not.toContain("wibble");
     expect(Klass.attributeNames()).not.toContain("wibble");
 
-    Klass.attribute("wibble", typeRegistry.lookup("value"));
+    Klass.attribute("wibble", new ValueType());
 
     expect(Object.keys(Klass.attributeTypes()).length).toBe(columnCount + 2);
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 2);
@@ -257,7 +258,6 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("the given default value is cast from user", () => {
-    const ValueType = typeRegistry.lookup("value").constructor as new () => any;
     class CustomType extends ValueType {
       cast(): unknown {
         return "from user";
@@ -370,7 +370,7 @@ describe("CustomPropertiesTest", () => {
     class Child extends Parent {}
     new Child();
 
-    Parent.attribute("foo", typeRegistry.lookup("value"));
+    Parent.attribute("foo", new ValueType());
 
     expect((new Child({ foo: "bar" } as any) as any).foo).toBe("bar");
   });
@@ -446,7 +446,7 @@ describe("CustomPropertiesTest", () => {
   it("attributes do not require a type", () => {
     class Klass extends OverloadedType {
       static {
-        this.attribute("no_type", typeRegistry.lookup("value"));
+        this.attribute("no_type", new ValueType());
       }
     }
     expect((new Klass({ no_type: 1 } as any) as any).no_type).toBe(1);

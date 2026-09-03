@@ -9,7 +9,7 @@ import {
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { Type } from "./type/value.js";
-import { typeRegistry } from "./type/registry.js";
+import { defaultValue } from "./type.js";
 
 export class AttributeSet {
   protected _attributes: Record<string, Attribute>;
@@ -89,7 +89,7 @@ export class AttributeSet {
     if (existing) {
       this._attributes[name] = existing.withValueFromDatabase(value);
     } else {
-      const colType = (type as Type) ?? typeRegistry.lookup("value");
+      const colType = (type as Type) ?? defaultValue();
       this._attributes[name] = Attribute.fromDatabase(name, value, colType);
     }
   }

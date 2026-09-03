@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { Types } from "../index.js";
 
 describe("FloatTest", () => {
@@ -26,6 +27,6 @@ describe("FloatTest", () => {
     expect(type.isChanged(500.0, 500.0, "0.5E+4")).toBeFalsy();
     expect(type.isChanged(null, null, null)).toBeFalsy();
     expect(type.isChanged(NaN, NaN, NaN)).toBeFalsy();
-    expect(type.isChanged(NaN, "NaN", "NaN")).toBeTruthy();
+    expect(type.isChanged(NaN, BigDecimal.NAN, BigDecimal.NAN)).toBeTruthy();
   });
 });

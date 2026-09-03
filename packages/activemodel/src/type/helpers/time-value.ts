@@ -18,6 +18,7 @@ interface TimeValueHost {
   applySecondsPrecision<T>(value: T): T;
 }
 
+/** @missingRailsCall acts_like? — CONVERGEABLE time-cast-result-cannot-model-a-zoned-ruby-time */
 export function serializeCastValue<T>(this: TimeValueHost, value: T): T {
   return this.applySecondsPrecision(value);
 }

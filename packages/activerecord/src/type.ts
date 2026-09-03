@@ -72,7 +72,6 @@ _registry.register("json", Json, { override: false });
 _registry.register("string", StringType, { override: false });
 _registry.register("text", Text, { override: false });
 _registry.register("time", Time, { override: false });
-_registry.register("value", ValueType, { override: false });
 
 export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
   if (r !== undefined) {
