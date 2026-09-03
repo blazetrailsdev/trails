@@ -21,7 +21,7 @@ class PostsController extends Base {
   async create() {
     const title = this.params.get("title");
     this.flash.set("notice", "Post created!");
-    this.session.lastCreated = title;
+    this.session.set("lastCreated", title);
     this.status = 201;
     this.render({ json: { title } });
   }
@@ -62,8 +62,8 @@ class PostsController extends Base {
   }
 
   async useSession() {
-    const count = ((this.session.count as number) ?? 0) + 1;
-    this.session.count = count;
+    const count = ((this.session.get("count") as number) ?? 0) + 1;
+    this.session.set("count", count);
     this.render({ json: { count } });
   }
 
@@ -351,7 +351,7 @@ describe("TestCaseTest", () => {
 
     it("session set by controller is available", async () => {
       await tc.post("create", { params: { title: "My Post" } });
-      expect(tc.session.lastCreated).toBe("My Post");
+      expect(tc.session["lastCreated"]).toBe("My Post");
     });
 
     it("reset clears session", async () => {
@@ -532,8 +532,8 @@ class TestController extends Base {
   }
 
   async setSession() {
-    this.session["string"] = "A wonder";
-    this.session["symbol"] = "it works";
+    this.session.set("string", "A wonder");
+    this.session.set("symbol", "it works");
     this.render({ plain: "Success" });
   }
 

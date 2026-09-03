@@ -1,12 +1,32 @@
 import { describe, it, expect } from "vitest";
 import { RequestForgeryProtection } from "../../action-dispatch/request-forgery-protection.js";
 import { assertRaises } from "@blazetrails/activesupport";
+import { Session } from "../../action-dispatch/request/session.js";
+
 import {
   Exception,
   handleUnverifiedRequest,
   InvalidAuthenticityToken as MetalInvalidAuthenticityToken,
   type CsrfController,
 } from "../metal/request-forgery-protection.js";
+
+/**
+ * An in-memory `ActionDispatch::Request::Session` for the CSRF token store —
+ * Rails' tests reach `@request.session`, which the controller stack builds.
+ */
+function newSession(): Session {
+  const req = { env: {} };
+  return Session.create(
+    {
+      loadSession: () => [null, {}],
+      sessionExists: () => true,
+      deleteSession: () => null,
+      extractSessionId: () => null,
+    },
+    req,
+    {},
+  );
+}
 
 // ==========================================================================
 // controller/request_forgery_protection_test.rb
@@ -60,7 +80,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should not allow post without token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session); // Initialize token
     const result = csrf.verifyRequest({
       method: "POST",
@@ -73,7 +93,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should not allow post without token irrespective of format", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     const result = csrf.verifyRequest({
       method: "POST",
@@ -101,7 +121,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should not allow xhr post without token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     const result = csrf.verifyRequest({
       method: "POST",
@@ -116,7 +136,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow post with token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const masked = csrf.maskToken(realToken);
     const result = csrf.verifyRequest({
@@ -130,7 +150,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow patch with token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const masked = csrf.maskToken(realToken);
     expect(csrf.verifyToken(session, masked)).toBe(true);
@@ -138,7 +158,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow put with token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const masked = csrf.maskToken(realToken);
     expect(csrf.verifyToken(session, masked)).toBe(true);
@@ -146,7 +166,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow delete with token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const masked = csrf.maskToken(realToken);
     expect(csrf.verifyToken(session, masked)).toBe(true);
@@ -154,7 +174,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow post with token in header", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const headerToken = csrf.maskToken(realToken);
     const result = csrf.verifyRequest({
@@ -168,7 +188,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow delete with token in header", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const headerToken = csrf.maskToken(realToken);
     const result = csrf.verifyRequest({
@@ -182,7 +202,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow patch with token in header", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const headerToken = csrf.maskToken(realToken);
     const result = csrf.verifyRequest({
@@ -196,7 +216,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow put with token in header", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const headerToken = csrf.maskToken(realToken);
     const result = csrf.verifyRequest({
@@ -212,7 +232,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow post with origin checking and correct origin", () => {
     const csrf = new RequestForgeryProtection({ originCheck: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const masked = csrf.maskToken(realToken);
     const result = csrf.verifyRequest({
@@ -227,7 +247,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow post with origin checking and no origin", () => {
     const csrf = new RequestForgeryProtection({ originCheck: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const masked = csrf.maskToken(realToken);
     const result = csrf.verifyRequest({
@@ -242,7 +262,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should raise for post with null origin", () => {
     const csrf = new RequestForgeryProtection({ originCheck: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     const result = csrf.verifyRequest({
       method: "POST",
@@ -256,7 +276,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should block post with origin checking and wrong origin", () => {
     const csrf = new RequestForgeryProtection({ originCheck: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     const result = csrf.verifyRequest({
       method: "POST",
@@ -270,7 +290,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should warn on missing csrf token", () => {
     const csrf = new RequestForgeryProtection({ logging: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     const result = csrf.verifyRequest({
       method: "POST",
@@ -283,7 +303,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should not warn if csrf logging disabled", () => {
     const csrf = new RequestForgeryProtection({ logging: false });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     const result = csrf.verifyRequest({
       method: "POST",
@@ -296,15 +316,15 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("csrf token is not saved if it is nil", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     expect(csrf.verifyToken(session, null)).toBe(false);
     // Token should not have been created
-    expect(session["_csrf_token"]).toBeUndefined();
+    expect(session.get("_csrf_token")).toBeUndefined();
   });
 
   it("should not raise error if token is not a string", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     // Should not throw
     expect(csrf.verifyToken(session, "")).toBe(false);
@@ -315,7 +335,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("reset csrf token generates new token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const t1 = csrf.getRealToken(session);
     const t2 = csrf.resetToken(session);
     expect(t2).not.toBe(t1);
@@ -338,9 +358,9 @@ describe("ActionController::RequestForgeryProtection", () => {
   it("custom csrf session key", () => {
     const csrf = new RequestForgeryProtection({ sessionKey: "my_token" });
     expect(csrf.tokenSessionKey).toBe("my_token");
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
-    expect(session["my_token"]).toBeTruthy();
+    expect(session.get("my_token")).toBeTruthy();
   });
 
   // --- Allowed origins ---
@@ -365,7 +385,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("full verification flow with valid token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const real = csrf.getRealToken(session);
     const masked = csrf.maskToken(real);
     const result = csrf.verifyRequest({
@@ -380,7 +400,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("full verification flow with invalid token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     const result = csrf.verifyRequest({
       method: "POST",
@@ -393,7 +413,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("GET requests always pass verification", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const result = csrf.verifyRequest({
       method: "GET",
       session,
@@ -406,7 +426,7 @@ describe("ActionController::RequestForgeryProtection", () => {
 
   it("should allow post with strict encoded token", () => {
     const csrf = new RequestForgeryProtection();
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     // URL-encode the masked token (as browser might do)
     const masked = csrf.maskToken(realToken);
@@ -420,7 +440,7 @@ describe("ActionController::RequestForgeryProtection", () => {
     });
     const result = csrf.verifyRequest({
       method: "POST",
-      session: {},
+      session: newSession(),
       host: "example.com",
     });
     expect(result.verified).toBe(true);
@@ -513,7 +533,7 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
 describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
   it("should emit a csrf-param meta tag and a csrf-token meta tag", () => {
     const csrf = new RequestForgeryProtection({ strategy: "reset_session" });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const meta = csrf.csrfMetaTag(session);
     expect(meta.param).toBe("authenticity_token");
     expect(meta.token).toBeTruthy();
@@ -524,9 +544,11 @@ describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
 describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
   it("should allow reset_session", () => {
     const csrf = new RequestForgeryProtection({ strategy: "null_session" });
-    const session: Record<string, unknown> = { user_id: 1, _csrf_token: "abc" };
+    const session = newSession();
+    session.set("user_id", 1);
+    session.set("_csrf_token", "abc");
     csrf.handleUnverified(session);
-    expect(session.user_id).toBe(1);
+    expect(session.get("user_id")).toBe(1);
   });
 
   it.skip("should allow to set signed cookies", () => {
@@ -541,7 +563,7 @@ describe("CustomAuthenticityParamControllerTest", () => {
   it("should not warn if form authenticity param matches form authenticity token", () => {
     const csrf = new RequestForgeryProtection({ paramName: "custom_token" });
     expect(csrf.formParamName).toBe("custom_token");
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const real = csrf.getRealToken(session);
     const masked = csrf.maskToken(real);
     expect(csrf.verifyToken(session, masked)).toBe(true);
@@ -549,7 +571,7 @@ describe("CustomAuthenticityParamControllerTest", () => {
 
   it("should warn if form authenticity param does not match form authenticity token", () => {
     const csrf = new RequestForgeryProtection({ paramName: "custom_token" });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     csrf.getRealToken(session);
     expect(csrf.verifyToken(session, "wrong")).toBe(false);
   });
@@ -558,7 +580,7 @@ describe("CustomAuthenticityParamControllerTest", () => {
 describe("PerFormTokensControllerTest", () => {
   it("per form token is same size as global token", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const globalMasked = csrf.maskToken(realToken);
     const perFormMasked = csrf.generatePerFormToken(session, "/posts", "POST");
@@ -569,7 +591,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("accepts token for correct path and method", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
     expect(csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "POST" })).toBe(
       true,
@@ -578,7 +600,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("accepts token with path with query params", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const perFormToken = csrf.generatePerFormToken(session, "/posts?page=1", "POST");
     expect(csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "POST" })).toBe(
       true,
@@ -587,7 +609,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("rejects token for incorrect path", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
     expect(
       csrf.verifyToken(session, perFormToken, { actionPath: "/comments", method: "POST" }),
@@ -596,7 +618,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("rejects token for incorrect method", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
     expect(
       csrf.verifyToken(session, perFormToken, { actionPath: "/posts", method: "DELETE" }),
@@ -605,7 +627,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("accepts global csrf token", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const masked = csrf.maskToken(realToken);
     expect(csrf.verifyToken(session, masked)).toBe(true);
@@ -613,7 +635,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("returns hmacd token", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const perFormToken = csrf.generatePerFormToken(session, "/posts", "POST");
     const realToken = csrf.getRealToken(session);
     const unmasked = csrf.unmaskToken(perFormToken);
@@ -622,14 +644,14 @@ describe("PerFormTokensControllerTest", () => {
 
   it("chomps slashes", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const t1 = csrf.generatePerFormToken(session, "/posts/", "POST");
     expect(csrf.verifyToken(session, t1, { actionPath: "/posts", method: "POST" })).toBe(true);
   });
 
   it("ignores trailing slash during generation", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const t1 = csrf.generatePerFormToken(session, "/posts/", "POST");
     const t2 = csrf.generatePerFormToken(session, "/posts", "POST");
     expect(csrf.unmaskToken(t1)).toBe(csrf.unmaskToken(t2));
@@ -637,14 +659,14 @@ describe("PerFormTokensControllerTest", () => {
 
   it("handles empty path as request path", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const token = csrf.generatePerFormToken(session, "", "POST");
     expect(csrf.verifyToken(session, token, { actionPath: "/", method: "POST" })).toBe(true);
   });
 
   it("handles query string", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const token = csrf.generatePerFormToken(session, "/posts?sort=name", "POST");
     expect(
       csrf.verifyToken(session, token, { actionPath: "/posts?sort=date", method: "POST" }),
@@ -653,21 +675,21 @@ describe("PerFormTokensControllerTest", () => {
 
   it("handles fragment", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const token = csrf.generatePerFormToken(session, "/posts#top", "POST");
     expect(csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })).toBe(true);
   });
 
   it("ignores trailing slash during validation", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const token = csrf.generatePerFormToken(session, "/posts", "POST");
     expect(csrf.verifyToken(session, token, { actionPath: "/posts/", method: "POST" })).toBe(true);
   });
 
   it("method is case insensitive", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const token = csrf.generatePerFormToken(session, "/posts", "post");
     expect(csrf.verifyToken(session, token, { actionPath: "/posts", method: "POST" })).toBe(true);
   });
@@ -692,7 +714,7 @@ describe("PerFormTokensControllerTest", () => {
   });
   it("does not return old csrf token", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const perFormToken = csrf.generatePerFormToken(session, "/per_form_tokens/post_one", "POST");
     const unmasked = csrf.unmaskToken(perFormToken);
@@ -701,7 +723,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("accepts old csrf token", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const realToken = csrf.getRealToken(session);
     const nonHmacToken = csrf.maskToken(realToken);
     expect(
@@ -721,7 +743,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("ignores origin during generation", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const tokenWithOrigin = csrf.generatePerFormToken(
       session,
       "https://example.com/per_form_tokens/post_one/",
@@ -737,7 +759,7 @@ describe("PerFormTokensControllerTest", () => {
 
   it("ignores origin during generation with protocol-relative url", () => {
     const csrf = new RequestForgeryProtection({ perFormTokens: true });
-    const session: Record<string, unknown> = {};
+    const session = newSession();
     const tokenWithOrigin = csrf.generatePerFormToken(
       session,
       "//example.com/per_form_tokens/post_one/",

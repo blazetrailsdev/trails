@@ -103,9 +103,9 @@ describe("ActionDispatch::Session::AbstractStore", () => {
 
     it("setCookie writes to the request cookie jar at @key", () => {
       const store = new AbstractStore();
-      const req = Object.assign(new Request({}), { cookieJar: {} as Record<string, unknown> });
+      const req = new Request({});
       store.setCookie(req, null, "abc");
-      expect(req.cookieJar._session_id).toBe("abc");
+      expect(req.cookieJar().get("_session_id")).toBe("abc");
     });
 
     it("commitSession invokes commitCsrfToken on the request", () => {

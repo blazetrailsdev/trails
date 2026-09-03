@@ -97,7 +97,7 @@ describe("LookupContext allCandidatePaths wiring", () => {
 
     let caught: MissingTemplate | undefined;
     try {
-      await ctx.render("posts", "indx", "html");
+      await ctx.render(["posts"], "indx", ["html"]);
     } catch (e) {
       if (e instanceof MissingTemplate) caught = e;
     }
@@ -222,9 +222,16 @@ describe("LookupContext#render with a layout", () => {
       "posts/index": "<p>body</p>",
       "layouts/application": "<main><%= yield %></main>",
     });
-    expect(await ctx.render("posts", "index", "html", {}, { layout: "application" })).toBe(
+    expect(await ctx.render(["posts"], "index", ["html"], {}, { layout: "application" })).toBe(
       "<main><p>body</p></main>",
     );
+  });
+
+  it("finds a template through an inherited prefix", async () => {
+    const ctx = contextWith({ "application/show": "<p>inherited</p>" });
+    expect(
+      await ctx.render(["posts", "application"], "show", ["html"], {}, { layout: false }),
+    ).toBe("<p>inherited</p>");
   });
 
   it("carries a named contentFor section from the content template to the layout", async () => {
@@ -232,7 +239,7 @@ describe("LookupContext#render with a layout", () => {
       "posts/index": '<% contentFor("title", () => { %>Home<% }) %><p>body</p>',
       "layouts/application": '<title><%= _layoutFor("title") %></title><%= yield %>',
     });
-    expect(await ctx.render("posts", "index", "html", {}, { layout: "application" })).toBe(
+    expect(await ctx.render(["posts"], "index", ["html"], {}, { layout: "application" })).toBe(
       "<title>Home</title><p>body</p>",
     );
   });

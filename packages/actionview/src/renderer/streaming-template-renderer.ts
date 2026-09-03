@@ -47,8 +47,8 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
         ? found[0]
         : (this.lookupContext.findTemplate(
             options.template as string,
-            (options.prefixes ?? [])[0] ?? "",
-            (this.formats[0] as string) ?? "html",
+            options.prefixes ?? [],
+            this.formats,
           ) as unknown as RenderableTemplate | null);
 
     if (!template) {
@@ -139,8 +139,11 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
         detailsWithFormats,
       ) as RenderableTemplate[];
       if (found.length > 0) return found[0];
-      const format = formats[0] ?? "html";
-      return this.lookupContext.findLayout(layout, format) as unknown as RenderableTemplate | null;
+      return this.lookupContext.findLayout(
+        layout,
+        ["layouts"],
+        formats,
+      ) as unknown as RenderableTemplate | null;
     }
     if (typeof layout === "function") {
       const resolved = layout(this.lookupContext, this.formats as readonly string[], keys);

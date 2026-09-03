@@ -168,12 +168,12 @@ export class DebugExceptions {
     }
     lines.push(...wrapper.annotatedSourceCode());
     lines.push("  ");
-    lines.push(...wrapper.exceptionTrace());
+    lines.push(...wrapper.exceptionTrace().map(String));
     for (const cause of wrapper.hasCause() ? wrapper.wrappedCauses : []) {
       lines.push(`\nInformation for cause: ${cause.exceptionClassName} (${cause.message}):`);
       lines.push(...cause.annotatedSourceCode());
       lines.push("  ");
-      lines.push(...cause.exceptionTrace());
+      lines.push(...cause.exceptionTrace().map(String));
     }
     this.logArray(logger, lines, request);
   }
@@ -368,7 +368,7 @@ export class DebugExceptions {
 
     const traceHtml = wrapper.applicationTrace
       .slice(0, 20)
-      .map((line) => `  <li>${this.escapeHtml(line)}</li>`)
+      .map((line) => `  <li>${this.escapeHtml(String(line))}</li>`)
       .join("\n");
 
     const html = [

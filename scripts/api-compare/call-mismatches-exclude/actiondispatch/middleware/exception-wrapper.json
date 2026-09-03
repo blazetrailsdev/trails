@@ -2,13 +2,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/exception-wrapper.ts",
-    "rubyName": "build_backtrace",
-    "call": "new",
-    "reason": "Missing construction, not a constructor idiom: Rails' `build_backtrace` (actionpack/lib/action_dispatch/middleware/exception_wrapper.rb:254-275) maps template frames onto `SourceMapLocation.new(...)`. The port splits the raw `exception.stack` into frame strings — `ActionView::PathRegistry` and `SourceMapLocation` are unported, as the call-site comment already records. Not tracked by a story: actionpack is outside the project's stated focus (activerecord and its dependencies), which is why the convergence story filed for this row was closed as out of scope."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "source_fragment",
     "call": "root",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

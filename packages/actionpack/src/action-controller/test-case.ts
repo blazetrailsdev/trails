@@ -415,10 +415,6 @@ export class TestCase {
 
     this.controller = new this._controllerClass();
 
-    if ("session" in this.controller) {
-      (this.controller as any).session = { ...this.session, ...(session ?? {}) };
-    }
-
     (this.request as any).env["action_dispatch.request.path_parameters"] = {
       controller: (
         this._controllerClass as unknown as typeof import("./metal.js").Metal
@@ -456,7 +452,7 @@ export class TestCase {
     await this.wrapExecution(() =>
       this.controller.dispatch(action, this.request, this.response).then(() => {}),
     );
-    if ("session" in this.controller) Object.assign(this.session, (this.controller as any).session);
+    Object.assign(this.session, (this.request.session as unknown as TestSession).toHash());
   }
 
   /** @internal Mirrors Rails `TestCase::Behavior#scrub_env!`. */

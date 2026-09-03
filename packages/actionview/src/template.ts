@@ -14,7 +14,11 @@ import { SyntaxErrorInTemplate, TemplateError } from "./template/error.js";
 import { TemplateHandlers, type TemplateHandler } from "./template/handlers.js";
 import { Raw } from "./template/handlers/raw.js";
 import { Tse } from "./template/handlers/tse.js";
-import type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-location.js";
+import {
+  sourceLines,
+  type BacktraceLocation,
+  type Spot,
+} from "./template/handlers/tse-translate-location.js";
 
 type LocationTranslatingHandler = TemplateHandler & {
   translateLocation?: (
@@ -192,6 +196,33 @@ export class Template {
     return Boolean(
       h && (h as { supportsStreaming?: () => boolean }).supportsStreaming?.() === true,
     );
+  }
+
+  /**
+   * Mirrors `Template#spot(location)` (`template.rb:231-246`).
+   *
+   * Ruby resolves the backtrace location to an AST node id and hands the node
+   * to `ErrorHighlight.spot`, which reports the exact sub-expression that
+   * raised. V8 has no node ids and no ErrorHighlight: a `CallSite` carries a
+   * line and a column into the compiled source and nothing finer, so the spot
+   * spans from that column to the end of the compiled line.
+   *
+   * @missingRailsCall compile — PERMANENT
+   * @missingRailsCall parse — PERMANENT
+   */
+  spot(location: BacktraceLocation): Spot | null {
+    const scriptLines = sourceLines(this.compiledSource());
+    const found = scriptLines[location.lineno - 1];
+    if (found === undefined) return null;
+
+    return {
+      snippet: found,
+      firstLineno: location.lineno,
+      lastLineno: location.lineno,
+      firstColumn: (location.column ?? 1) - 1,
+      lastColumn: found.replace(/\n$/, "").length,
+      scriptLines,
+    };
   }
 
   /**

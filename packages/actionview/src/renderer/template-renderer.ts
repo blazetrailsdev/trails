@@ -128,9 +128,8 @@ export class TemplateRenderer extends AbstractRenderer {
         detailsWithFormats,
       ) as RenderableTemplate[];
       if (found.length > 0) return found[0];
-      // Fall back to 3-arg findLayout (TemplateResolver chain).
-      const format = formats[0] ?? "html";
-      const fromResolver = this.lookupContext.findLayout(layout, format);
+      // Fall back to findLayout (TemplateResolver chain).
+      const fromResolver = this.lookupContext.findLayout(layout, ["layouts"], formats);
       return fromResolver as unknown as RenderableTemplate | null;
     }
     if (typeof layout === "function") {
@@ -162,7 +161,7 @@ export class TemplateRenderer extends AbstractRenderer {
     const baseName = lastSlash >= 0 ? name.slice(lastSlash + 1) : name;
     const prefix = lastSlash >= 0 ? name.slice(0, lastSlash) : (prefixes[0] ?? "");
     const format = (this.formats[0] as string | undefined) ?? "html";
-    const template = this.lookupContext.findTemplate(baseName, prefix, format);
+    const template = this.lookupContext.findTemplate(baseName, [prefix], [format]);
     if (template) return template as unknown as RenderableTemplate;
 
     throw new MissingTemplate(prefix, baseName, format, [], []);

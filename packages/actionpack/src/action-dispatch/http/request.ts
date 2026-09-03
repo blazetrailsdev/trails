@@ -72,7 +72,26 @@ import { X_CASCADE } from "../constants.js";
 import type { PermissionsPolicy } from "../permissions-policy.js";
 import type { ParameterFilter } from "@blazetrails/activesupport";
 import { RequestUtils, type ParamValue } from "../request/utils.js";
-import { COOKIES_APP_OPTIONS_KEY, type CookieJarOptions } from "../middleware/cookies.js";
+import {
+  COOKIES_APP_OPTIONS_KEY,
+  authenticatedEncryptedCookieSalt as _authenticatedEncryptedCookieSalt,
+  cookieJar as _cookieJar,
+  cookiesDigest as _cookiesDigest,
+  cookiesRotations as _cookiesRotations,
+  cookiesSameSiteProtection as _cookiesSameSiteProtection,
+  cookiesSerializer as _cookiesSerializer,
+  encryptedCookieCipher as _encryptedCookieCipher,
+  encryptedCookieSalt as _encryptedCookieSalt,
+  encryptedSignedCookieSalt as _encryptedSignedCookieSalt,
+  isHaveCookieJar as _isHaveCookieJar,
+  secretKeyBase as _secretKeyBase,
+  signedCookieDigest as _signedCookieDigest,
+  signedCookieSalt as _signedCookieSalt,
+  useAuthenticatedCookieEncryption as _useAuthenticatedCookieEncryption,
+  useCookiesWithMetadata as _useCookiesWithMetadata,
+  type CookieJar,
+  type CookieJarOptions,
+} from "../middleware/cookies.js";
 import {
   parameters as _parameters,
   Parameters as _Parameters,
@@ -950,8 +969,13 @@ export class Request {
     commitFlash.call(this as never);
   }
 
-  /** @internal Rails: `commit_cookie_jar!` — no-op on the bare Request. */
-  commitCookieJarBang(): void {}
+  /**
+   * Rails: `RequestCookieMethods`' prepended `commit_cookie_jar!`
+   * (`middleware/cookies.rb:20-24`) — `cookie_jar.commit!`.
+   */
+  commitCookieJarBang(): void {
+    this.cookieJar().commitBang();
+  }
 
   // --- Aliases ---
 
@@ -1239,6 +1263,43 @@ Request.prototype.negotiateMime = function (this: Request, order: MimeType[]) {
 Request.prototype.shouldApplyVaryHeader = function (this: Request) {
   return _shouldApplyVaryHeader.call(mimeHost(this));
 };
+
+// Mix in ActionDispatch::RequestCookieMethods (`middleware/cookies.rb:12-94`).
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include RequestCookieMethods`; the class/interface merge is how a mixin surfaces on the type side. */
+export interface Request {
+  /** Rails: `cookie_jar` / `cookie_jar=` (`cookies.rb:13-17,30-32`). */
+  cookieJar(jar?: CookieJar): CookieJar;
+  /** Rails: `have_cookie_jar?` (`cookies.rb:26-28`). */
+  isHaveCookieJar(): boolean;
+  signedCookieSalt(): string | undefined;
+  encryptedCookieSalt(): string | undefined;
+  encryptedSignedCookieSalt(): string | undefined;
+  authenticatedEncryptedCookieSalt(): string | undefined;
+  useAuthenticatedCookieEncryption(): boolean | undefined;
+  encryptedCookieCipher(): string | undefined;
+  signedCookieDigest(): string | undefined;
+  secretKeyBase(): string | undefined;
+  cookiesSerializer(): string | undefined;
+  cookiesSameSiteProtection(): unknown;
+  cookiesDigest(): string | undefined;
+  cookiesRotations(): unknown;
+  useCookiesWithMetadata(): boolean | undefined;
+}
+Request.prototype.cookieJar = _cookieJar;
+Request.prototype.isHaveCookieJar = _isHaveCookieJar;
+Request.prototype.signedCookieSalt = _signedCookieSalt;
+Request.prototype.encryptedCookieSalt = _encryptedCookieSalt;
+Request.prototype.encryptedSignedCookieSalt = _encryptedSignedCookieSalt;
+Request.prototype.authenticatedEncryptedCookieSalt = _authenticatedEncryptedCookieSalt;
+Request.prototype.useAuthenticatedCookieEncryption = _useAuthenticatedCookieEncryption;
+Request.prototype.encryptedCookieCipher = _encryptedCookieCipher;
+Request.prototype.signedCookieDigest = _signedCookieDigest;
+Request.prototype.secretKeyBase = _secretKeyBase;
+Request.prototype.cookiesSerializer = _cookiesSerializer;
+Request.prototype.cookiesSameSiteProtection = _cookiesSameSiteProtection;
+Request.prototype.cookiesDigest = _cookiesDigest;
+Request.prototype.cookiesRotations = _cookiesRotations;
+Request.prototype.useCookiesWithMetadata = _useCookiesWithMetadata;
 
 // Mix in ActionDispatch::Http::FilterParameters. The mixin reads the merged
 // param hash via the host's `params` getter (already defined on `Request`).

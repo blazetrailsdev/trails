@@ -101,6 +101,51 @@ describe("ActionView::Template (smoke)", () => {
     );
   });
 
+  it("annotated_source_code numbers the offending code string", () => {
+    const t = new Template({
+      source: "one\ntwo",
+      identifier: "posts/show",
+      extension: "txt",
+      handler: { extensions: ["txt"], call: () => "((((" },
+    });
+    let raised: unknown;
+    try {
+      t.render(view());
+    } catch (e) {
+      raised = e;
+    }
+    expect((raised as SyntaxErrorInTemplate).annotatedSourceCode()).toEqual([
+      "1:    one",
+      "2:    two",
+    ]);
+  });
+
+  it("line_number and annotated_source_code report the template line", () => {
+    const t = new Template({
+      source: "one\ntwo\nthree",
+      identifier: "posts/show.html.tse",
+      extension: "txt",
+    });
+    const original = new Error("boom");
+    original.message = "posts/show.html.tse:2: boom";
+    const error = new TemplateError({ original, template: t });
+    expect(error.lineNumber()).toBe(2);
+    expect(error.annotatedSourceCode()).toEqual(["    1: one", "    2: two", "    3: three"]);
+  });
+
+  it("spot reports a location inside the compiled source", () => {
+    const t = new Template({
+      source: "<%= boom() %>",
+      identifier: "posts/show",
+      extension: "tse",
+      handler: new Tse(),
+    });
+    const spot = t.spot({ lineno: 1, column: 1 });
+    expect(spot).not.toBeNull();
+    expect(spot!.firstLineno).toBe(1);
+    expect(spot!.scriptLines!.length).toBeGreaterThan(0);
+  });
+
   it("asLayout returns a copy with isLayout flipped on", () => {
     const t = new Template({ source: "<html/>", identifier: "layouts/app", extension: "tse" });
     const wrapped = t.asLayout();

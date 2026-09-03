@@ -37,6 +37,8 @@ export class LocationParsingError extends Error {
  */
 export interface BacktraceLocation {
   lineno: number;
+  /** V8 hands a column alongside the line; Ruby's node id carries it instead. */
+  column?: number;
 }
 
 /** Mirrors the `ErrorHighlight::Spot` hash Rails mutates in place. Field

@@ -26,13 +26,10 @@ class FakeJar {
   signedOrEncrypted: CookieJarLike;
   constructor() {
     const store = this.store;
-    this.signedOrEncrypted = new Proxy({} as CookieJarLike, {
-      get: (_t, key: string) => store.get(key),
-      set: (_t, key: string, value) => {
-        store.set(key, value);
-        return true;
-      },
-    });
+    this.signedOrEncrypted = {
+      get: (key: string) => store.get(key),
+      set: (key: string, value: unknown) => void store.set(key, value),
+    };
   }
 }
 
@@ -45,7 +42,7 @@ function makeReq(initial: Record<string, unknown> = {}): CookieStoreRequest & {
   return {
     headers,
     jar,
-    cookieJar: jar as unknown as CookieStoreRequest["cookieJar"],
+    cookieJar: () => jar as unknown as ReturnType<CookieStoreRequest["cookieJar"]>,
     fetchHeader<T>(key: string, fallback: (key: string) => T) {
       if (Object.prototype.hasOwnProperty.call(headers, key)) return headers[key];
       return fallback(key);
@@ -255,7 +252,7 @@ describe("CookieStoreTest", () => {
     const opts: Record<string, unknown> = {};
     makeStore(opts);
     expect(opts.sameSite).toBe(DEFAULT_SAME_SITE);
-    expect(DEFAULT_SAME_SITE({ cookiesSameSiteProtection: "Lax" })).toBe("Lax");
+    expect(DEFAULT_SAME_SITE({ cookiesSameSiteProtection: () => "Lax" })).toBe("Lax");
   });
 
   it("explicit same_site sets SameSite", () => {
