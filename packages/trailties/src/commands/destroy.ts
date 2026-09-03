@@ -1,7 +1,5 @@
-import { Dir } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import * as fs from "node:fs";
-import * as path from "node:path";
 import { classify, dasherize } from "../generators/base.js";
 import { tableize } from "@blazetrails/activesupport";
 
@@ -24,8 +22,8 @@ export function destroyCommand(): Command {
       removeFile(cwd, `test/models/${fileName}.test.ts`);
 
       // Find and remove migration
-      const migrationsDir = path.join(cwd, "db", "migrate");
-      if (fs.existsSync(migrationsDir)) {
+      const migrationsDir = File.join(cwd, "db", "migrate");
+      if (File.isExist(migrationsDir)) {
         // Escape the user-derived tableName so regex metacharacters can't
         // widen the match.
         const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -33,7 +31,7 @@ export function destroyCommand(): Command {
         // + separator so names like `..._recreate_posts.ts` cannot match
         // `create_posts.ts`.
         const pattern = new RegExp(`^\\d+_create_${escaped}\\.(ts|js)$`);
-        for (const f of fs.readdirSync(migrationsDir)) {
+        for (const f of Dir.children(migrationsDir)) {
           if (pattern.test(f)) {
             removeFile(cwd, `db/migrate/${f}`);
           }
@@ -58,8 +56,8 @@ export function destroyCommand(): Command {
     .argument("<name>", "Migration name")
     .action((name: string) => {
       const cwd = Dir.pwd();
-      const migrationsDir = path.join(cwd, "db", "migrate");
-      if (!fs.existsSync(migrationsDir)) return;
+      const migrationsDir = File.join(cwd, "db", "migrate");
+      if (!File.isExist(migrationsDir)) return;
 
       // Anchor on `^<timestamp>_<name>\.(ts|js)$` so a name like
       // `create_posts` does not also match `..._add_create_posts_flag.ts`.
@@ -68,7 +66,7 @@ export function destroyCommand(): Command {
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const underscored = dasherize(escaped).replace(/-/g, "_");
       const pattern = new RegExp(`^\\d+_${underscored}\\.(ts|js)$`);
-      for (const f of fs.readdirSync(migrationsDir)) {
+      for (const f of Dir.children(migrationsDir)) {
         if (pattern.test(f)) {
           removeFile(cwd, `db/migrate/${f}`);
         }
@@ -94,11 +92,11 @@ export function destroyCommand(): Command {
       removeFile(cwd, `test/controllers/${tableName}-controller.test.ts`);
 
       // Migration
-      const migrationsDir = path.join(cwd, "db", "migrate");
-      if (fs.existsSync(migrationsDir)) {
+      const migrationsDir = File.join(cwd, "db", "migrate");
+      if (File.isExist(migrationsDir)) {
         const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const pattern = new RegExp(`^\\d+_create_${escaped}\\.(ts|js)$`);
-        for (const f of fs.readdirSync(migrationsDir)) {
+        for (const f of Dir.children(migrationsDir)) {
           if (pattern.test(f)) {
             removeFile(cwd, `db/migrate/${f}`);
           }
@@ -110,9 +108,9 @@ export function destroyCommand(): Command {
 }
 
 function removeFile(cwd: string, relativePath: string): void {
-  const fullPath = path.join(cwd, relativePath);
-  if (fs.existsSync(fullPath)) {
-    fs.unlinkSync(fullPath);
+  const fullPath = File.join(cwd, relativePath);
+  if (File.isExist(fullPath)) {
+    File.delete(fullPath);
     console.log(`      remove  ${relativePath}`);
   }
 }

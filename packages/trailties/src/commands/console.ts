@@ -1,7 +1,5 @@
-import { Dir } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import * as path from "node:path";
-import * as fs from "node:fs";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import * as vm from "node:vm";
@@ -78,7 +76,7 @@ export function consoleCommand(): Command {
     // Copy globals into the REPL context
     r.context.console = console;
     r.context.process = process;
-    r.context.require = createRequire(path.join(Dir.pwd(), "package.json"));
+    r.context.require = createRequire(File.join(Dir.pwd(), "package.json"));
 
     r.on("exit", async () => {
       if (dbAdapter && typeof dbAdapter.close === "function") {
@@ -96,15 +94,15 @@ export function consoleCommand(): Command {
     }
 
     // Load models from the current project
-    const modelsDir = path.join(Dir.pwd(), "app", "models");
+    const modelsDir = File.join(Dir.pwd(), "app", "models");
     let loadedCount = 0;
-    if (fs.existsSync(modelsDir)) {
-      const files = fs
-        .readdirSync(modelsDir)
-        .filter((f: string) => f.endsWith(".ts") || f.endsWith(".js"));
+    if (File.isExist(modelsDir)) {
+      const files = Dir.children(modelsDir).filter(
+        (f: string) => f.endsWith(".ts") || f.endsWith(".js"),
+      );
       for (const file of files) {
         try {
-          const mod = await import(pathToFileURL(path.join(modelsDir, file)).href);
+          const mod = await import(pathToFileURL(File.join(modelsDir, file)).href);
           for (const [name, value] of Object.entries(mod)) {
             if (typeof value === "function") {
               (r.context as any)[name] = value;
