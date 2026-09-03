@@ -1,43 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
+   The trails-only models below spell `include ActiveModel::Attributes` in their class body; the empty
+   class/interface merge beside them is how `include()` surfaces those members on the type side. */
 import { assertPredicate, include } from "@blazetrails/activesupport";
 import { Model, StrictValidationFailed } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
-
-class Topic extends Model {
-  declare content: string | null;
-  declare title: string | null;
-  declare static attribute: AttributesClassHalf["attribute"];
-
-  static {
-    include(this, Attributes);
-    this.attribute("title", "string");
-    this.attribute("content", "string");
-  }
-}
-interface Topic extends Attributes {}
-
-class Person extends Model {
-  declare karma: string | null;
-  declare static attribute: AttributesClassHalf["attribute"];
-
-  static {
-    include(this, Attributes);
-    this.attribute("karma", "string");
-  }
-}
-interface Person extends Attributes {}
-
-class CustomReader extends Model {
-  data: Record<string, unknown> = {};
-
-  override readAttributeForValidation(attribute: string): unknown {
-    return this.data[attribute];
-  }
-}
+import { Topic } from "../test-helpers/models/topic.js";
+import { Person } from "../test-helpers/models/person.js";
+import { CustomReader } from "../test-helpers/models/custom-reader.js";
 
 describe("PresenceValidationTest", () => {
   afterEach(() => {

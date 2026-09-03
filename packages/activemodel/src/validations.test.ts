@@ -13,6 +13,7 @@ import {
   assertPredicate,
   assertRaises,
   include,
+  ActiveSupportJSON,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
@@ -393,7 +394,7 @@ describe("ValidationsTest", () => {
     const hash: Record<string, string[]> = {};
     hash.title = ["can't be blank"];
     hash.content = ["can't be blank"];
-    expect(JSON.stringify(t.errors.asJson())).toEqual(JSON.stringify(hash));
+    expect(ActiveSupportJSON.encode(t.errors)).toEqual(ActiveSupportJSON.encode(hash));
   });
 
   it("does not modify options argument", () => {
