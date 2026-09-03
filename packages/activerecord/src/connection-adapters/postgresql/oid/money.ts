@@ -16,7 +16,7 @@ export class Money extends DecimalType {
     return 2;
   }
 
-  override castValue(value: unknown): BigDecimal | string | null {
+  override castValue(value: unknown): BigDecimal | null {
     if (value === null || value === undefined) return null;
     if (typeof value !== "string") return super.castValue(value);
 

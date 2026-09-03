@@ -27,7 +27,7 @@ describe("DecimalTypeTrails", () => {
 
   it("apply_scale does not OOM on adversarial exponents", () => {
     const type = new Types.DecimalType({ scale: 2 });
-    expect(type.cast("1e10000000")).toBe("1e10000000");
+    expect(type.cast("1e10000000")).toEqual(bd("0"));
   });
 
   it("apply_scale rounds to a multiple of ten for a negative scale", () => {
@@ -121,16 +121,16 @@ describe("DecimalType cast and serialize coverage", () => {
 
   it("casts NaN (BigDecimal NaN sentinel) — number and string forms", () => {
     const type = new Types.DecimalType();
-    expect(type.cast(NaN)).toBe("NaN");
-    expect(type.cast("NaN")).toBe("NaN");
+    expect(type.cast(NaN)!.isNan()).toBe(true);
+    expect(type.cast("NaN")!.isNan()).toBe(true);
   });
 
   it("casts ±Infinity (BigDecimal Infinity sentinel) — number and string forms", () => {
     const type = new Types.DecimalType();
-    expect(type.cast(Infinity)).toBe("Infinity");
-    expect(type.cast(-Infinity)).toBe("-Infinity");
-    expect(type.cast("Infinity")).toBe("Infinity");
-    expect(type.cast("-Infinity")).toBe("-Infinity");
+    expect(type.cast(Infinity)!.isInfinite()).toBe(1);
+    expect(type.cast(-Infinity)!.isInfinite()).toBe(-1);
+    expect(type.cast("Infinity")!.isInfinite()).toBe(1);
+    expect(type.cast("-Infinity")!.isInfinite()).toBe(-1);
   });
 
   it("serialize bridges to BigDecimal F-form for quoting", () => {
@@ -142,23 +142,23 @@ describe("DecimalType cast and serialize coverage", () => {
 
   it("serialize keeps the NaN sentinel as a string (BigDecimal has no NaN)", () => {
     const type = new Types.DecimalType();
-    expect(type.serialize(NaN)).toBe("NaN");
+    expect((type.serialize(NaN) as BigDecimal).isNan()).toBe(true);
   });
 
   it("serialize leaves adversarial exponents as the raw cast string", () => {
     const type = new Types.DecimalType({ scale: 2 });
-    expect(type.serialize("1e10000000")).toBe("1e10000000");
+    expect(type.serialize("1e10000000")).toEqual(bd("0"));
   });
 
   it("applyScale leaves the NaN sentinel untouched", () => {
     const type = new Types.DecimalType({ precision: 10, scale: 2 });
-    expect(type.cast(NaN)).toBe("NaN");
-    expect(type.cast("NaN")).toBe("NaN");
+    expect(type.cast(NaN)!.isNan()).toBe(true);
+    expect(type.cast("NaN")!.isNan()).toBe(true);
   });
 
   it("applyScale leaves the Infinity sentinel untouched", () => {
     const type = new Types.DecimalType({ precision: 10, scale: 2 });
-    expect(type.cast(Infinity)).toBe("Infinity");
-    expect(type.cast(-Infinity)).toBe("-Infinity");
+    expect(type.cast(Infinity)!.isInfinite()).toBe(1);
+    expect(type.cast(-Infinity)!.isInfinite()).toBe(-1);
   });
 });

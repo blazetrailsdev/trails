@@ -8,7 +8,12 @@ export function isEqualNan(oldValue: unknown, newValue: unknown): boolean {
   if (typeof oldValue === "number") {
     return Number.isNaN(oldValue) && typeof newValue === "number" && Number.isNaN(newValue);
   }
-  return oldValue === "NaN" && newValue === "NaN";
+  return (
+    oldValue instanceof BigDecimal &&
+    oldValue.isNan() &&
+    newValue instanceof BigDecimal &&
+    newValue.isNan()
+  );
 }
 
 /** @internal */

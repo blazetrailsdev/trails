@@ -66,7 +66,6 @@ export class DateType extends ValueType<DateCastResult> {
 
   /** @internal */
   protected fastStringToDate(string: string): Temporal.PlainDate | null {
-    if (string.includes("\n")) return null;
     const m = ISO_DATE.exec(string);
     if (!m) return null;
     return this.newDate(parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10));

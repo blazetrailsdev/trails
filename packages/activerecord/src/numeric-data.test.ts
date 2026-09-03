@@ -90,21 +90,21 @@ describe("NumericDataTest", () => {
 
   it.skipIf(adapterType !== "postgres")("numeric fields with nan", async () => {
     const m = NumericData.new({
-      bank_balance: NaN,
-      big_bank_balance: NaN,
+      bank_balance: BigDecimal.NAN,
+      big_bank_balance: BigDecimal.NAN,
       world_population: 2n ** 62n,
       my_house_population: 3,
     });
-    expect(m.bank_balance).toBe("NaN");
-    expect(m.big_bank_balance).toBe("NaN");
+    expect(m.bank_balance!.isNan()).toBe(true);
+    expect(m.big_bank_balance!.isNan()).toBe(true);
     expect(await m.save()).toBe(true);
 
     const m1 = await NumericData.findBy({
-      bank_balance: NaN,
-      big_bank_balance: NaN,
+      bank_balance: BigDecimal.NAN,
+      big_bank_balance: BigDecimal.NAN,
     });
 
-    expect(m1!.bank_balance).toBe("NaN");
-    expect(m1!.big_bank_balance).toBe("NaN");
+    expect(m1!.bank_balance!.isNan()).toBe(true);
+    expect(m1!.big_bank_balance!.isNan()).toBe(true);
   });
 });

@@ -1,0 +1,60 @@
+import { describe, expect, it } from "vitest";
+import { BigDecimal, toD } from "./big-decimal/conversions.js";
+
+describe("BigDecimalTrails", () => {
+  it("NAN and INFINITY answer nan? and infinite?", () => {
+    expect(BigDecimal.NAN.isNan()).toBe(true);
+    expect(BigDecimal.NAN.isInfinite()).toBeNull();
+    expect(BigDecimal.INFINITY.isNan()).toBe(false);
+    expect(BigDecimal.INFINITY.isInfinite()).toBe(1);
+    expect(new BigDecimal("-Infinity").isInfinite()).toBe(-1);
+    expect(new BigDecimal("1").isNan()).toBe(false);
+    expect(new BigDecimal("1").isInfinite()).toBeNull();
+  });
+
+  it("parses the non-finite literals the JS and Ruby spellings both use", () => {
+    expect(new BigDecimal(NaN).isNan()).toBe(true);
+    expect(new BigDecimal(Infinity).isInfinite()).toBe(1);
+    expect(new BigDecimal(-Infinity).isInfinite()).toBe(-1);
+    expect(new BigDecimal("+Infinity").isInfinite()).toBe(1);
+    expect(new BigDecimal("NaN ").isNan()).toBe(true);
+    expect(toD("NaN").isNan()).toBe(true);
+    expect(toD("Infinity").isInfinite()).toBe(1);
+    expect(toD("nan")).toEqual(new BigDecimal("0"));
+    expect(toD("-NaN")).toEqual(new BigDecimal("0"));
+    expect(toD("Infinity degrees")).toEqual(new BigDecimal("0"));
+  });
+
+  it("to s answers the Ruby spellings", () => {
+    expect(BigDecimal.NAN.toString("F")).toBe("NaN");
+    expect(BigDecimal.INFINITY.toString("F")).toBe("Infinity");
+    expect(new BigDecimal("-Infinity").toString("F")).toBe("-Infinity");
+    expect(BigDecimal.INFINITY.toString("E")).toBe("Infinity");
+  });
+
+  it("round is identity, zero? and negative? follow MRI", () => {
+    expect(BigDecimal.INFINITY.round(2).toString("F")).toBe("Infinity");
+    expect(BigDecimal.NAN.round(2).isNan()).toBe(true);
+    expect(BigDecimal.INFINITY.isZero()).toBe(false);
+    expect(BigDecimal.NAN.isZero()).toBe(false);
+    expect(BigDecimal.INFINITY.isNegative()).toBe(false);
+    expect(new BigDecimal("-Infinity").isNegative()).toBe(true);
+    expect(BigDecimal.NAN.isNegative()).toBe(false);
+    expect(new BigDecimal("-Infinity").abs().toString("F")).toBe("Infinity");
+  });
+
+  it("compare answers nil against NaN and orders the infinities", () => {
+    expect(BigDecimal.NAN.compare(BigDecimal.NAN)).toBeNull();
+    expect(BigDecimal.NAN.compare(new BigDecimal("1"))).toBeNull();
+    expect(BigDecimal.INFINITY.compare(new BigDecimal("1"))).toBe(1);
+    expect(new BigDecimal("-Infinity").compare(BigDecimal.INFINITY)).toBe(-1);
+    expect(BigDecimal.INFINITY.compare(BigDecimal.INFINITY)).toBe(0);
+  });
+
+  it("mult propagates the non-finite forms", () => {
+    expect(BigDecimal.INFINITY.mult(new BigDecimal("2")).toString("F")).toBe("Infinity");
+    expect(BigDecimal.INFINITY.mult(new BigDecimal("-2")).toString("F")).toBe("-Infinity");
+    expect(BigDecimal.INFINITY.mult(new BigDecimal("0")).isNan()).toBe(true);
+    expect(BigDecimal.NAN.mult(new BigDecimal("2")).isNan()).toBe(true);
+  });
+});
