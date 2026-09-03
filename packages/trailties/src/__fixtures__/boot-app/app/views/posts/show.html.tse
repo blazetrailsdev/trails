@@ -1,2 +1,3 @@
 <h1>Posts</h1>
 <p><%= title %></p>
+<a href="<%= postsPath() %>">All posts</a>
