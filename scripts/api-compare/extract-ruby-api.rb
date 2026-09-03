@@ -353,6 +353,7 @@ class ApiExtractor
   attr_reader :classes, :modules, :file_constants, :file_hash_keys
 
   def initialize
+    @in_on_load = 0
     @classes = {}
     @modules = {}
     # rel_path → { CONST_NAME => literal_value }. Non-literal RHSs (hashes with
@@ -593,7 +594,9 @@ class ApiExtractor
       # define_method arm and record the same method a second time.
       consumed_call = process_define_method_block(node)
       unless process_each_codegen(node)
+        @in_on_load += 1 if on_load_block?(node)
         (consumed_call ? [node[2]] : node).each { |child| walk(child) if child.is_a?(Array) }
+        @in_on_load -= 1 if on_load_block?(node)
       end
     when :sclass
       process_sclass(node)
@@ -1061,7 +1064,26 @@ class ApiExtractor
     end
   end
 
+  # `ActiveSupport.on_load(:active_job) { include ActiveRecord::Railties::JobRuntime }`
+  # (railtie.rb:271-273) includes the module into ActiveJob::Base when that
+  # framework loads — NOT into the lexically enclosing Railtie. Attributing it
+  # to `current_fqn` credits the module's methods to a class Rails never puts
+  # them on, so `include`/`extend` inside an on_load block records nothing.
+  def on_load_block?(node)
+    return false unless node.is_a?(Array) && node[0] == :method_add_block
+    call = node[1]
+    found = false
+    walker = lambda do |n|
+      return if found || !n.is_a?(Array)
+      found = true if n[0] == :@ident && n[1] == "on_load"
+      n.each { |c| walker.call(c) if c.is_a?(Array) }
+    end
+    walker.call(call)
+    found
+  end
+
   def process_include(args)
+    return if @in_on_load.positive?
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
     return unless target
@@ -1072,6 +1094,7 @@ class ApiExtractor
   end
 
   def process_include_from_arg_paren(args)
+    return if @in_on_load.positive?
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
     return unless target
@@ -1082,6 +1105,7 @@ class ApiExtractor
   end
 
   def process_extend(args)
+    return if @in_on_load.positive?
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
     return unless target

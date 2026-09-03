@@ -1,7 +1,4 @@
 import { describe, it, expect } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import { fileURLToPath } from "url";
 import {
   snakeToCamel,
   rubyMethodToTs,
@@ -11,9 +8,6 @@ import {
   RUBY_FILE_TS_OVERRIDES,
   hasRubyFileTsOverride,
   rubyFileTsOverride,
-  RUBY_FILE_CROSS_PACKAGE_OVERRIDES,
-  rubyFileCrossPackageOverride,
-  crossPackageRubyFiles,
   SKIP,
   SKIP_GROUPS,
   ARITY_OVERRIDE_GROUPS,
@@ -540,36 +534,6 @@ describe("RUBY_FILE_TS_OVERRIDES", () => {
     expect(rubyFileToTs("core_ext/date_time/acts_like.rb", "activesupport")).toBe(
       "core-ext/date-and-time/compatibility.ts",
     );
-  });
-});
-
-describe("RUBY_FILE_CROSS_PACKAGE_OVERRIDES", () => {
-  it("maps activerecord's railtie.rb onto the trailties package's port", () => {
-    expect(rubyFileCrossPackageOverride("railtie.rb", "activerecord")).toEqual({
-      pkg: "trailties",
-      tsFile: "trailties/active-record.ts",
-    });
-  });
-
-  it("is keyed by package, and answers undefined without one", () => {
-    expect(rubyFileCrossPackageOverride("railtie.rb", "activemodel")).toBeUndefined();
-    expect(rubyFileCrossPackageOverride("railtie.rb")).toBeUndefined();
-  });
-
-  it("leaves rubyFileToTs returning the in-package path", () => {
-    expect(rubyFileToTs("railtie.rb", "activerecord")).toBe("trailtie.ts");
-  });
-
-  it("lists a package's cross-package Ruby files", () => {
-    expect(crossPackageRubyFiles("activerecord")).toEqual(["railtie.rb"]);
-    expect(crossPackageRubyFiles("activemodel")).toEqual([]);
-  });
-
-  it("names a TS file that exists on disk", () => {
-    const root = path.resolve(fileURLToPath(import.meta.url), "../../..");
-    for (const { pkg, tsFile } of Object.values(RUBY_FILE_CROSS_PACKAGE_OVERRIDES)) {
-      expect(fs.existsSync(path.join(root, "packages", pkg, "src", tsFile))).toBe(true);
-    }
   });
 });
 

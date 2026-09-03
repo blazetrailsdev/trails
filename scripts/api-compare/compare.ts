@@ -110,8 +110,6 @@ import {
   isRubyOnlyClass,
   isScopedSkip,
   rubyFileToTs,
-  rubyFileCrossPackageOverride,
-  crossPackageRubyFiles,
   rubyMethodToTs,
 } from "@blazetrails/parity/conventions";
 import {
@@ -3460,31 +3458,6 @@ export function main() {
       }
     }
 
-    for (const rubyFile of crossPackageRubyFiles(pkg)) {
-      const cross = rubyFileCrossPackageOverride(rubyFile, pkg);
-      if (!cross) continue;
-      const foreign = ts.packages[cross.pkg];
-      if (!foreign) continue;
-      const key = rubyFileToTs(rubyFile, pkg);
-      const methods = tsMethodsByFile.get(key) || new Set<string>();
-      for (const ent of [...Object.values(foreign.classes), ...Object.values(foreign.modules)]) {
-        if (ent.file !== cross.tsFile) continue;
-        for (const m of [...ent.instanceMethods, ...ent.classMethods]) {
-          if (tsShouldInclude(m)) {
-            methods.add(m.name);
-            recordTsParams(m, key, "package", ent.name);
-          }
-        }
-      }
-      for (const fn of foreign.fileFunctions?.[cross.tsFile] ?? []) {
-        if (tsShouldInclude(fn)) {
-          methods.add(fn.name);
-          recordTsParams(fn, key);
-        }
-      }
-      tsMethodsByFile.set(key, methods);
-    }
-
     // Also pool signatures from dep packages: the inherited-method walk below
     // adds dep-parent method NAMES to tsMethodsByFile (so a Ruby method can
     // match an inherited dep method), and without the signature here its arity
@@ -3665,10 +3638,6 @@ export function main() {
 
     // Resolve package src directory for file existence checks
     const pkgSrcDir = packageSrcDir(pkg);
-    const crossPackageSrcPath = (rubyFile: string): string | undefined => {
-      const cross = rubyFileCrossPackageOverride(rubyFile, pkg);
-      return cross ? path.join(packageSrcDir(cross.pkg), cross.tsFile) : undefined;
-    };
 
     // Reverse index: TS method name → list of TS files defining it.
     // Used as a last-resort fallback when a Ruby file's expected TS path
@@ -3725,9 +3694,7 @@ export function main() {
     for (const [rubyFile, items] of [...byFile.entries()].sort(([a], [b]) => a.localeCompare(b))) {
       const expectedTs = rubyFileToTs(rubyFile, pkg);
       const tsMethods = tsMethodsByFile.get(expectedTs) || new Set<string>();
-      const tsFileExists = fs.existsSync(
-        crossPackageSrcPath(rubyFile) ?? path.join(pkgSrcDir, expectedTs),
-      );
+      const tsFileExists = fs.existsSync(path.join(pkgSrcDir, expectedTs));
       const missingMethods: MethodResult[] = [];
       const moves: MoveResult[] = [];
       let fileMatched = 0;

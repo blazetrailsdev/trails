@@ -331,53 +331,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:inflector/transliterate.rb": "transliterate.ts",
 };
 
-/**
- * A Ruby file whose port lives in ANOTHER trails package, keyed by
- * `<package>:<ruby path>`.
- *
- * `RUBY_FILE_TS_OVERRIDES` can only name a TS file inside the same package's
- * `src`, which cannot describe the trailties. Rails ships one `railtie.rb` per
- * framework; trails settled every framework's trailtie into the `trailties`
- * package (`packages/trailties/src/trailties/active-record.ts` and its six
- * siblings), so `activerecord:railtie.rb` has no counterpart under
- * `packages/activerecord/src` and never will — a second `ActiveRecord::Railtie`
- * carrier next door to the real one is the duplication that layout removed.
- *
- * `rubyFileToTs` still returns the in-package path (`trailtie.ts`) so every
- * file-keyed report keeps one key per Ruby file; this table is what tells
- * api-compare which package's manifest to read the members out of.
- */
-export interface CrossPackageTsOverride {
-  /** The api-compare package whose manifest holds the port. */
-  pkg: string;
-  /** The port's path relative to that package's src dir. */
-  tsFile: string;
-}
-
-export const RUBY_FILE_CROSS_PACKAGE_OVERRIDES: Record<string, CrossPackageTsOverride> = {
-  "activerecord:railtie.rb": { pkg: "trailties", tsFile: "trailties/active-record.ts" },
-};
-
-/** Every Ruby file in `pkg` whose port lives in a sibling package. */
-export function crossPackageRubyFiles(pkg: string): string[] {
-  const prefix = `${pkg}:`;
-  return Object.keys(RUBY_FILE_CROSS_PACKAGE_OVERRIDES)
-    .filter((key) => key.startsWith(prefix))
-    .map((key) => key.slice(prefix.length));
-}
-
-/** The cross-package TS mapping for `rubyFile` in `pkg`, or undefined. */
-export function rubyFileCrossPackageOverride(
-  rubyFile: string,
-  pkg?: string,
-): CrossPackageTsOverride | undefined {
-  if (pkg === undefined) return undefined;
-  const key = `${pkg}:${rubyFile}`;
-  return Object.hasOwn(RUBY_FILE_CROSS_PACKAGE_OVERRIDES, key)
-    ? RUBY_FILE_CROSS_PACKAGE_OVERRIDES[key]
-    : undefined;
-}
-
 /** The explicit TS mapping for `rubyFile` in `pkg`, or undefined when unmapped. */
 export function rubyFileTsOverride(rubyFile: string, pkg?: string): string | undefined {
   if (pkg === undefined) return undefined;
@@ -1717,9 +1670,6 @@ export function explainConventions(): string {
     .map(([from, to]) => `| \`${from}\` | \`${to}\` |`)
     .join("\n");
 
-  const crossPackageRows = Object.entries(RUBY_FILE_CROSS_PACKAGE_OVERRIDES)
-    .map(([key, { pkg, tsFile }]) => `| \`${key}\` | \`packages/${pkg}/src/${tsFile}\` |`)
-    .join("\n");
   const pathAliasRows = Object.entries(PATH_SEGMENT_ALIASES)
     .map(([from, to]) => `| \`${from}\` | \`${to}\` |`)
     .join("\n");
@@ -1896,17 +1846,6 @@ flattens both segments onto one file, so
 (\`commands/unused_routes/unused_routes_command.rb\` →
 \`commands/unused-routes.ts\`). The directory and the file's stem must agree;
 anything else takes the plain kebab-case rule.
-
-### Ports in a sibling package
-
-Rails ships one \`railtie.rb\` per framework; trails settled every framework's
-trailtie into the \`trailties\` package, so a framework package has no
-\`trailtie.ts\` of its own. These Ruby files are scored against a port in
-another package:
-
-| Ruby file | trails port |
-| --------- | ----------- |
-${crossPackageRows}
 
 ## Skipped methods
 
