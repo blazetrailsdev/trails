@@ -15,14 +15,10 @@ describe("Process", () => {
     expect(milliseconds / 1000).toBeCloseTo(seconds, 1);
   });
 
-  it("clock_gettime truncates on the Integer units and does not on the Float ones", () => {
-    expect(Process.clockGettime(Process.CLOCK_MONOTONIC, ":millisecond")).toBe(
-      Math.floor(Process.clockGettime(Process.CLOCK_MONOTONIC, ":millisecond")),
-    );
-    expect(Number.isInteger(Process.clockGettime(Process.CLOCK_MONOTONIC, ":second"))).toBe(true);
-    expect(Number.isInteger(Process.clockGettime(Process.CLOCK_MONOTONIC, ":nanosecond"))).toBe(
-      true,
-    );
+  it("clock_gettime truncates on every Integer unit", () => {
+    for (const unit of [":nanosecond", ":microsecond", ":millisecond", ":second"]) {
+      expect(Number.isInteger(Process.clockGettime(Process.CLOCK_MONOTONIC, unit))).toBe(true);
+    }
   });
 
   it("clock_gettime raises ArgumentError for an unexpected unit", () => {
