@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { forceEncoding } from "./force-encoding.js";
+import { ArgumentError } from "../argument-error.js";
 
 describe("forceEncoding", () => {
   it("returns the buffer unchanged for a binary encoding", () => {
@@ -12,10 +13,6 @@ describe("forceEncoding", () => {
   it("reads the buffer's bytes back under the named encoding", () => {
     expect(forceEncoding("cafÃ©", "UTF-8")).toBe("café");
     expect(forceEncoding("é", "ISO-8859-1")).toBe("é");
-  });
-
-  it("leaves the buffer alone when the encoding has no decoder", () => {
-    expect(forceEncoding("cafÃ©", "nope-8")).toBe("cafÃ©");
   });
 
   it("masks each character to its low byte", () => {
@@ -31,7 +28,7 @@ describe("forceEncoding resolves its argument through the Ruby registry", () => 
     expect(forceEncoding(sjis, "Windows-31J")).toBe("あ");
   });
 
-  it("leaves the bytes alone for a name outside the registry", () => {
-    expect(forceEncoding("abc", "no-such-encoding")).toBe("abc");
+  it("raises ArgumentError for a name outside the registry, as rb_to_encoding does", () => {
+    expect(() => forceEncoding("abc", "no-such-encoding")).toThrow(ArgumentError);
   });
 });

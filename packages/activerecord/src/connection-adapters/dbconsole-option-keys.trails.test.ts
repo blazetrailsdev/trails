@@ -38,6 +38,40 @@ describe("AbstractMysqlAdapter.dbconsole option keys", () => {
     expect(args).toContain("--socket=");
   });
 
+  it("emits every flag rb:59-72 maps, in that order", () => {
+    const args = AbstractMysqlAdapter.dbconsole(
+      dbConfig({
+        host: "h",
+        port: 3307,
+        socket: "s",
+        username: "u",
+        encoding: "utf8mb4",
+        sslca: "ca",
+        sslcert: "cert",
+        sslcapath: "capath",
+        sslcipher: "cipher",
+        sslkey: "key",
+        sslMode: "VERIFY_CA",
+        database: "blog",
+      }),
+    );
+    expect(args).toEqual([
+      "mysql",
+      "--host=h",
+      "--port=3307",
+      "--socket=s",
+      "--user=u",
+      "--default-character-set=utf8mb4",
+      "--ssl-ca=ca",
+      "--ssl-cert=cert",
+      "--ssl-capath=capath",
+      "--ssl-cipher=cipher",
+      "--ssl-key=key",
+      "--ssl-mode=VERIFY_CA",
+      "blog",
+    ]);
+  });
+
   it("pushes an empty-string database, as Rails' unconditional args << config.database does", () => {
     expect(AbstractMysqlAdapter.dbconsole(dbConfig({ database: "" }))).toEqual(["mysql", ""]);
   });

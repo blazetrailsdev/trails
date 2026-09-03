@@ -931,16 +931,24 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     const mysqlConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
       .configurationHash;
 
-    const args: string[] = [];
-    if (isRubyTruthy(mysqlConfig.host)) args.push(`--host=${mysqlConfig.host}`);
-    if (isRubyTruthy(mysqlConfig.port)) args.push(`--port=${mysqlConfig.port}`);
-    if (isRubyTruthy(mysqlConfig.socket)) args.push(`--socket=${mysqlConfig.socket}`);
-    if (isRubyTruthy(mysqlConfig.username)) args.push(`--user=${mysqlConfig.username}`);
-    if (isRubyTruthy(mysqlConfig.sslCa)) args.push(`--ssl-ca=${mysqlConfig.sslCa}`);
-    if (isRubyTruthy(mysqlConfig.sslCert)) args.push(`--ssl-cert=${mysqlConfig.sslCert}`);
-    if (isRubyTruthy(mysqlConfig.sslKey)) args.push(`--ssl-key=${mysqlConfig.sslKey}`);
+    const args = Object.entries({
+      host: "--host",
+      port: "--port",
+      socket: "--socket",
+      username: "--user",
+      encoding: "--default-character-set",
+      sslca: "--ssl-ca",
+      sslcert: "--ssl-cert",
+      sslcapath: "--ssl-capath",
+      sslcipher: "--ssl-cipher",
+      sslkey: "--ssl-key",
+      sslMode: "--ssl-mode",
+    }).flatMap(([opt, arg]) =>
+      isRubyTruthy(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
+    );
+
     if (isRubyTruthy(mysqlConfig.password) && options.includePassword) {
-      args.push(`--password=${mysqlConfig.password}`);
+      args.push(`--password=${String(mysqlConfig.password)}`);
     } else if (isRubyTruthy(mysqlConfig.password) && String(mysqlConfig.password) !== "") {
       args.push("-p");
     }

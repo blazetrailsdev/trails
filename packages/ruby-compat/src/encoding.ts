@@ -134,9 +134,9 @@ export class Encoding {
 
   /**
    * `Encoding::ASCII_8BIT` and its `BINARY` alias, `Encoding::UTF_8` and
-   * `Encoding::US_ASCII` — the four registry constants trails' callers name
-   * (`rb_define_const` per entry, `vendor/ruby/encoding.c:1544`
-   * `rb_enc_set_base`/`enc_register`).
+   * `Encoding::US_ASCII` — the four registry constants trails' callers name.
+   * MRI defines one per registered name and alias, from `set_encoding_const`
+   * (`rb_define_const`, `vendor/ruby/encoding.c:1753`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Encoding::ASCII_8BIT`.
    */
