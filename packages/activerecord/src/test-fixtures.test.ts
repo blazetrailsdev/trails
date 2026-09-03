@@ -5,7 +5,7 @@ import { registerModel } from "./associations.js";
 import { FixtureSet } from "./fixtures.js";
 import { Base } from "./base.js";
 import "./relation.js";
-import { fixtureId, defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
+import { defineFixtures, defineJoinTableFixtures, isFixtureRef } from "./fixtures.js";
 import { fixtures } from "./test-fixtures.js";
 import { withTransactionalFixtures } from "./test-fixtures/with-transactional-fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
@@ -71,7 +71,7 @@ async function setupScopedEncryption(): Promise<() => void> {
 
 describe("useFixtures", () => {
   const adapter = makeAdapter();
-  const topicId = fixtureId("rails");
+  const topicId = FixtureSet.identify("rails");
   const rows = new Map([[topicId, { id: topicId, title: "Rails" }]]);
   const Topic = makeModel("topics", rows);
 
@@ -94,8 +94,8 @@ describe("useFixtures", () => {
 
 describe("useFixtures multi-set", () => {
   const adapter = makeAdapter();
-  const topicId = fixtureId("rails");
-  const postId = fixtureId("hello");
+  const topicId = FixtureSet.identify("rails");
+  const postId = FixtureSet.identify("hello");
   const topicRows = new Map([[topicId, { id: topicId, title: "Rails" }]]);
   const postRows = new Map([[postId, { id: postId, title: "Hello" }]]);
   const Topic = makeModel("topics", topicRows);
@@ -117,7 +117,7 @@ describe("useFixtures multi-set", () => {
 
 describe("useFixtures slash-keyed fixture sets", () => {
   const adapter = makeAdapter();
-  const rowId = fixtureId("david");
+  const rowId = FixtureSet.identify("david");
   const rows = new Map([[rowId, { id: rowId, name: "David" }]]);
   const AccountModel = makeModel("accounts", rows);
 
@@ -138,7 +138,7 @@ describe("useFixtures slash-keyed fixture sets", () => {
 
 describe("all/ fixture sets — explicit enumeration", () => {
   const adapter = makeAdapter();
-  const rowId = fixtureId("signals37");
+  const rowId = FixtureSet.identify("signals37");
   const rows = new Map([[rowId, { id: rowId, name: "37signals" }]]);
   const AccountModel = makeModel("accounts", rows);
   const DevModel = makeModel("developers", new Map());
@@ -731,8 +731,8 @@ describe("useFixtures encryption add-on is opt-in", () => {
 describe("FixtureSet.createFixtures", () => {
   it("returns keyed instances for all declared labels", async () => {
     const adapter = makeAdapter();
-    const id1 = fixtureId("first");
-    const id2 = fixtureId("second");
+    const id1 = FixtureSet.identify("first");
+    const id2 = FixtureSet.identify("second");
     const rows = new Map([
       [id1, { id: id1, title: "First" }],
       [id2, { id: id2, title: "Second" }],
@@ -750,7 +750,7 @@ describe("FixtureSet.createFixtures", () => {
 
   it("emits DELETE before INSERT so rows are replaced (cross-test isolation)", async () => {
     const adapter = makeAdapter();
-    const id = fixtureId("rails");
+    const id = FixtureSet.identify("rails");
     const rows = new Map([[id, { id, title: "Rails" }]]);
     const Topic = makeModel("topics", rows);
 

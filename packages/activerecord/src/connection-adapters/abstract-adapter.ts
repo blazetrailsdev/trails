@@ -564,6 +564,12 @@ export interface AbstractAdapter {
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<unknown[]>;
+  query(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<unknown[][]>;
   execQuery(
     sql: string,
     name?: string | null,

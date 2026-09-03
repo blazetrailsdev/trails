@@ -1741,6 +1741,130 @@ export class PostgreSQLAdapter
     await this.reloadTypeMap();
   }
 
+  async enumTypes(): Promise<[string, string[]][]> {
+    const query = `
+      SELECT
+        type.typname AS name,
+        type.OID AS oid,
+        n.nspname AS schema,
+        array_agg(enum.enumlabel ORDER BY enum.enumsortorder) AS value
+      FROM pg_enum AS enum
+      JOIN pg_type AS type ON (type.oid = enum.enumtypid)
+      JOIN pg_namespace n ON type.typnamespace = n.oid
+      WHERE n.nspname = ANY (current_schemas(false))
+      GROUP BY type.OID, n.nspname, type.typname;
+    `;
+    const currentSchema = await this.currentSchema();
+    const result = await this.internalExecQuery(query, "SCHEMA", [], {
+      allowRetry: true,
+      materializeTransactions: false,
+    });
+    const memo = new Map<string, string[]>();
+    for (const row of result.castValues() as unknown[][]) {
+      const name = row[0] as string;
+      const schema = row[2] === currentSchema ? null : (row[2] as string);
+      const fullName = [schema, name].filter((part) => part != null).join(".");
+      memo.set(fullName, row.at(-1) as string[]);
+    }
+    return Array.from(memo);
+  }
+
+  async createEnum(
+    name: string,
+    values: string[],
+    _options?: Record<string, unknown>,
+  ): Promise<void> {
+    const sqlValues = values.map((s) => this.quote(s)).join(", ");
+    const scope = this.quotedScope(name);
+    const query = `
+      DO $$
+      BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_type t
+            JOIN pg_namespace n ON t.typnamespace = n.oid
+            WHERE t.typname = ${scope.name}
+              AND n.nspname = ${scope.schema}
+          ) THEN
+              CREATE TYPE ${this.quoteTableName(name)} AS ENUM (${sqlValues});
+          END IF;
+      END
+      $$;
+    `;
+    await this.internalExecQuery(query);
+    await this.reloadTypeMap();
+  }
+
+  async dropEnum(
+    name: string,
+    values?: string[] | { ifExists?: boolean },
+    options: { ifExists?: boolean } = {},
+  ): Promise<void> {
+    if (values !== null && values !== undefined && !Array.isArray(values)) {
+      options = values;
+    }
+    const query = `
+      DROP TYPE${options.ifExists ? " IF EXISTS" : ""} ${this.quoteTableName(name)};
+    `;
+    await this.internalExecQuery(query);
+    await this.reloadTypeMap();
+  }
+
+  async renameEnum(name: string, newName?: string | { to: string }): Promise<void> {
+    const options: { to?: string } = typeof newName === "object" && newName !== null ? newName : {};
+    if (typeof newName !== "string") {
+      if (options.to == null) {
+        throw new ArgumentError("rename_enum requires two from/to name positional arguments.");
+      }
+      newName = options.to;
+    }
+    await this.execQuery(
+      `ALTER TYPE ${this.quoteTableName(name)} RENAME TO ${this.quoteTableName(newName)}`,
+    );
+    await this.reloadTypeMap();
+  }
+
+  async addEnumValue(
+    typeName: string,
+    value: string,
+    options: { before?: string; after?: string; ifNotExists?: boolean } = {},
+  ): Promise<void> {
+    const { before, after } = options;
+    let sql = `ALTER TYPE ${this.quoteTableName(typeName)} ADD VALUE`;
+    if (options.ifNotExists) sql += " IF NOT EXISTS";
+    sql += ` ${this.quote(value)}`;
+
+    if (before != null && after != null) {
+      throw new ArgumentError("Cannot have both :before and :after at the same time");
+    } else if (before != null) {
+      sql += ` BEFORE ${this.quote(before)}`;
+    } else if (after != null) {
+      sql += ` AFTER ${this.quote(after)}`;
+    }
+
+    await this.execute(sql);
+    await this.reloadTypeMap();
+  }
+
+  async renameEnumValue(
+    typeName: string,
+    options: { from?: string; to?: string } = {},
+  ): Promise<void> {
+    if (!((await this.databaseVersion) >= 10_00_00)) {
+      throw new ArgumentError("Renaming enum values is only supported in PostgreSQL 10 or later");
+    }
+
+    const from = options.from;
+    if (from == null) throw new ArgumentError(":from is required");
+    const to = options.to;
+    if (to == null) throw new ArgumentError(":to is required");
+
+    await this.execute(
+      `ALTER TYPE ${this.quoteTableName(typeName)} RENAME VALUE ${this.quote(from)} TO ${this.quote(to)}`,
+    );
+    await this.reloadTypeMap();
+  }
+
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     this.validateIndexLengthBang(tableName, newName);
     const [schema] = this.extractSchemaQualifiedName(tableName);
@@ -2319,6 +2443,27 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
+  async columnDefinitions(tableName: string): Promise<unknown[][]> {
+    const identity = (await this.supportsIdentityColumns()) ? "attidentity" : this.quote("");
+    const attgenerated = (await this.supportsVirtualColumns()) ? "attgenerated" : this.quote("");
+    return this.query(
+      `  SELECT a.attname, format_type(a.atttypid, a.atttypmod),
+             pg_get_expr(d.adbin, d.adrelid), a.attnotnull, a.atttypid, a.atttypmod,
+             c.collname, col_description(a.attrelid, a.attnum) AS comment,
+             ${identity} AS identity,
+             ${attgenerated} as attgenerated
+        FROM pg_attribute a
+        LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+        LEFT JOIN pg_type t ON a.atttypid = t.oid
+        LEFT JOIN pg_collation c ON a.attcollation = c.oid AND a.attcollation <> t.typcollation
+       WHERE a.attrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
+         AND a.attnum > 0 AND NOT a.attisdropped
+       ORDER BY a.attnum`,
+      "SCHEMA",
+    );
+  }
+
+  /** @internal */
   buildStatementPool(): StatementPool {
     return new StatementPool(
       this,
@@ -2396,8 +2541,6 @@ export interface PostgreSQLAdapter {
 
   /** @internal */
   validateIndexLengthBang(tableName: string, newName: string, internal?: boolean): void;
-
-  enumTypes(): Promise<[string, string[]][]>;
 
   schemaNames(): Promise<string[]>;
 
@@ -2540,29 +2683,11 @@ export interface PostgreSQLAdapter {
 
   createDatabase(name: string, options?: CreateDatabaseOptions): Promise<void>;
 
-  createEnum(name: string, values: string[], options?: Record<string, unknown>): Promise<void>;
-
-  dropEnum(
-    name: string,
-    valuesOrOptions?: string[] | { ifExists?: boolean },
-    options?: { ifExists?: boolean },
-  ): Promise<void>;
-
   /** @noRailsEquivalent PERMANENT */
   createRange(name: string, options: { subtype: string; subtypeDiff?: string }): Promise<void>;
 
   /** @noRailsEquivalent PERMANENT */
   dropRange(name: string, options?: { ifExists?: boolean }): Promise<void>;
-
-  renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void>;
-
-  addEnumValue(
-    name: string,
-    value: string,
-    options?: { before?: string; after?: string; ifNotExists?: boolean },
-  ): Promise<void>;
-
-  renameEnumValue(name: string, options: { from: string; to: string }): Promise<void>;
 
   dropDatabase(name: string): Promise<void>;
 
@@ -2681,22 +2806,6 @@ export interface PostgreSQLAdapter {
     tableName: string,
     { column, ...options }: Record<string, unknown>,
   ): Promise<UniqueConstraintDefinition>;
-
-  /** @internal */
-  columnDefinitions(tableName: string): Promise<
-    {
-      attname: string;
-      format_type: string;
-      pg_get_expr: string | null;
-      attnotnull: boolean;
-      atttypid: number;
-      atttypmod: number;
-      collname: string | null;
-      comment: string | null;
-      identity: string | null;
-      attgenerated: string | null;
-    }[]
-  >;
 }
 
 export type IndexDefinition = AbstractIndexDefinition;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../../connection-adapters/abstract-adapter.js";
-import { defineFixtures, fixtureId, isFixtureRef } from "../../fixtures.js";
+import { defineFixtures, FixtureSet, isFixtureRef } from "../../fixtures.js";
 import { adminAccountsFixtureData } from "./admin/accounts.js";
 import { adminUsersFixtureData } from "./admin/users.js";
 import { adminRandomlyNamedA9FixtureData } from "./admin/randomly-named-a9.js";
@@ -61,7 +61,7 @@ function makeModel(tableName: string, pk = "id") {
 }
 
 function idOf(data: Record<string, { id?: number }>, label: string): number {
-  return data[label]?.id ?? fixtureId(label);
+  return data[label]?.id ?? FixtureSet.identify(label);
 }
 
 function findInsertWithPk(sqls: string[], pk: number): string | undefined {
@@ -175,7 +175,7 @@ describe("commentFixtureData", () => {
     const greetingsInsert = findInsertWithPk(insertSqls, commentFixtureData.greetings.id);
     expect(greetingsInsert).toBeTruthy();
     expectValueInRow(greetingsInsert, postFixtureData.welcome.id);
-    expect(greetingsInsert).not.toContain(String(fixtureId("welcome")));
+    expect(greetingsInsert).not.toContain(String(FixtureSet.identify("welcome")));
   });
 });
 
@@ -213,7 +213,7 @@ describe("authorFixtureData", () => {
     const davidInsert = findInsertWithPk(insertSqls, authorFixtureData.david.id);
     expect(davidInsert).toBeTruthy();
     expectValueInRow(davidInsert, authorAddressFixtureData.david_address.id);
-    expect(davidInsert).not.toContain(String(fixtureId("david_address")));
+    expect(davidInsert).not.toContain(String(FixtureSet.identify("david_address")));
   });
 });
 
@@ -249,7 +249,7 @@ describe("bookFixtureData", () => {
     const awdrInsert = findInsertWithPk(insertSqls, bookFixtureData.awdr.id);
     expect(awdrInsert).toBeTruthy();
     expectValueInRow(awdrInsert, authorFixtureData.david.id);
-    expect(awdrInsert).not.toContain(String(fixtureId("david")));
+    expect(awdrInsert).not.toContain(String(FixtureSet.identify("david")));
   });
 
   it("ref() resolves cross-table to declared id once target fixture set is loaded", async () => {
@@ -272,7 +272,7 @@ describe("bookFixtureData", () => {
     const awdrInsert = findInsertWithPk(bookInserts, bookFixtureData.awdr.id);
     expect(awdrInsert).toBeTruthy();
     expectValueInRow(awdrInsert, authorFixtureData.david.id);
-    expect(authorFixtureData.david.id).not.toBe(fixtureId("david"));
+    expect(authorFixtureData.david.id).not.toBe(FixtureSet.identify("david"));
   });
 });
 
@@ -391,7 +391,7 @@ describe("accountFixtureData", () => {
     const signals37Insert = findInsertWithPk(insertSqls, accountFixtureData.signals37.id);
     expect(signals37Insert).toBeTruthy();
     expectValueInRow(signals37Insert, companyFixtureData.first_firm.id);
-    expect(signals37Insert).not.toContain(String(fixtureId("first_firm")));
+    expect(signals37Insert).not.toContain(String(FixtureSet.identify("first_firm")));
   });
 });
 
