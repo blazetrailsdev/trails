@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { cwd, env, setEnv } from "../process-adapter.js";
+import { Dir, env, setEnv } from "@blazetrails/ruby-compat";
 import { BacktraceFilter, Minitest, UnexpectedError } from "./assertions.js";
 
 describe("UnexpectedErrorTest", () => {
@@ -32,9 +32,9 @@ describe("UnexpectedErrorTest", () => {
     const raised = new Error("boom");
     raised.stack = [
       "Error: boom",
-      `    at doThing (${cwd()}/packages/activesupport/src/thing.ts:1:1)`,
+      `    at doThing (${Dir.pwd()}/packages/activesupport/src/thing.ts:1:1)`,
       "    at runTest (/somewhere/node_modules/vitest/dist/runner.js:2:2)",
-      `    at afterFramework (${cwd()}/packages/activesupport/src/other.ts:3:3)`,
+      `    at afterFramework (${Dir.pwd()}/packages/activesupport/src/other.ts:3:3)`,
     ].join("\n");
 
     expect(new UnexpectedError(raised).message).toBe(
@@ -63,8 +63,8 @@ describe("UnexpectedErrorTest", () => {
     const raised = new Error("boom");
     raised.stack = [
       "Error: boom",
-      `    at doThing (${cwd()}/packages/activesupport/src/thing.ts:1:1)`,
-      `    at inThePlugin (${cwd()}/packages/activesupport/src/plugin.ts:2:2)`,
+      `    at doThing (${Dir.pwd()}/packages/activesupport/src/thing.ts:1:1)`,
+      `    at inThePlugin (${Dir.pwd()}/packages/activesupport/src/plugin.ts:2:2)`,
     ].join("\n");
 
     const original = Minitest.backtraceFilter;

@@ -1,5 +1,4 @@
-/** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/io.c:8880`) is called through. */
-const putsAryInFlight = new Set<unknown[]>();
+import { puts as ioPuts } from "./io.js";
 
 /**
  * Ruby's `StringIO` (stdlib), the readable/writable in-memory IO that
@@ -55,53 +54,15 @@ export class StringIO {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO` mixes in
-   * `IO#puts` (`vendor/ruby/ext/stringio/stringio.c:1530,1958` aliases it to
-   * `rb_io_puts`, `vendor/ruby/io.c:8947`), which is how
-   * `Rack::Session::Abstract::Persisted#commit_session` writes to `rack.errors`.
+   * `IO::generic_writable#puts` (`vendor/ruby/ext/stringio/stringio.c:1530`
+   * aliases it to `rb_io_puts`, `vendor/ruby/io.c:8947`), which is how
+   * `Rack::Session::Abstract::Persisted#commit_session` writes to
+   * `rack.errors`. One body, shared with `IO#puts` — see `./io.js`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
+   * `IO::generic_writable#puts` (`vendor/ruby/ext/stringio/stringio.c:1530`).
    */
-  puts(...args: unknown[]): null {
-    if (args.length === 0) {
-      this.write("\n");
-      return null;
-    }
-    for (let i = 0; i < args.length; i++) {
-      let line: string;
-      if (typeof args[i] === "string") {
-        line = args[i] as string;
-      } else if (Array.isArray(args[i])) {
-        this.ioPutsAry(args[i] as unknown[]);
-        continue;
-      } else {
-        line = args[i] == null ? "" : String(args[i]);
-      }
-
-      if (line.length === 0) {
-        this.write("\n");
-      } else {
-        this.write(line);
-        if (!line.endsWith("\n")) this.write("\n");
-      }
-    }
-
-    return null;
-  }
-
-  /** `io_puts_ary` (`vendor/ruby/io.c:8880`). */
-  private ioPutsAry(ary: unknown[]): void {
-    if (putsAryInFlight.has(ary)) {
-      this.puts("[...]");
-      return;
-    }
-    putsAryInFlight.add(ary);
-    try {
-      for (let i = 0; i < ary.length; i++) {
-        this.puts(ary[i]);
-      }
-    } finally {
-      putsAryInFlight.delete(ary);
-    }
-  }
+  puts = ioPuts;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `strio_flush`

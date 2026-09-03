@@ -98,7 +98,11 @@ export default [
   // eslint.config.mjs.
   {
     files: ["packages/ruby-compat/src/**/*.ts"],
-    ignores: ["**/*.test.ts", "packages/ruby-compat/src/fs-adapter.ts"],
+    ignores: [
+      "**/*.test.ts",
+      "packages/ruby-compat/src/fs-adapter.ts",
+      "packages/ruby-compat/src/process-adapter.ts",
+    ],
     languageOptions: {
       parser: tseslint.parser,
       parserOptions: { ecmaVersion: "latest", sourceType: "module" },

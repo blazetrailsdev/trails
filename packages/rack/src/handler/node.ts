@@ -9,7 +9,8 @@
  * (`webrick-1.9.1/lib/webrick/httprequest.rb:407-440`) too.
  */
 
-import { getHttpAsync, StringIO, stderr } from "@blazetrails/activesupport";
+import { getHttpAsync, StringIO } from "@blazetrails/activesupport";
+import { stderr } from "@blazetrails/ruby-compat";
 import type { HttpRequest, HttpResponse, HttpServer } from "@blazetrails/activesupport";
 import {
   HTTPS,

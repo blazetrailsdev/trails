@@ -1,20 +1,3 @@
-/**
- * Process adapter — routes `process.*` operations through a swappable
- * adapter so trailties and other packages can run under non-Node hosts
- * (browser, sandboxed test envs).
- *
- * The exported `env` and `argv` are populated by copying the registered
- * adapter's snapshot at registration time. They are typed as readonly to
- * prevent compile-time mutation; runtime mutation outside `setEnv` is
- * unsupported and may diverge from the adapter's view.
- *
- * Streams (`stdout`, `stderr`, `stdin`) delegate to the registered
- * adapter at call time so a swap takes effect immediately.
- *
- * This module uses structural types only — no `NodeJS.Process` /
- * `Buffer` references — so it typechecks without `@types/node`.
- */
-
 export interface WriteStream {
   write(chunk: string): boolean;
   readonly isTTY: boolean;
@@ -44,9 +27,6 @@ export interface ProcessAdapter {
   readonly stdin: ReadStream;
 }
 
-// Use a null-prototype object to avoid prototype-pollution semantics if
-// an adapter snapshot or `setEnv` call passes `__proto__`/`constructor`
-// as a key (env keys can come from dotenv shims).
 const envInternal: Record<string, string | undefined> = Object.create(null) as Record<
   string,
   string | undefined
@@ -67,71 +47,78 @@ function requireAdapter(): ProcessAdapter {
   return currentAdapter!;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const stdout: WriteStream = {
+  /** @noRailsEquivalent PERMANENT */
   write: (chunk) => requireAdapter().stdout.write(chunk),
+  /** @noRailsEquivalent PERMANENT */
   get isTTY() {
     return requireAdapter().stdout.isTTY;
   },
+  /** @noRailsEquivalent PERMANENT */
   get columns() {
     return requireAdapter().stdout.columns;
   },
+  /** @noRailsEquivalent PERMANENT */
   get rows() {
     return requireAdapter().stdout.rows;
   },
 };
 
+/** @noRailsEquivalent PERMANENT */
 export const stderr: WriteStream = {
+  /** @noRailsEquivalent PERMANENT */
   write: (chunk) => requireAdapter().stderr.write(chunk),
+  /** @noRailsEquivalent PERMANENT */
   get isTTY() {
     return requireAdapter().stderr.isTTY;
   },
+  /** @noRailsEquivalent PERMANENT */
   get columns() {
     return requireAdapter().stderr.columns;
   },
+  /** @noRailsEquivalent PERMANENT */
   get rows() {
     return requireAdapter().stderr.rows;
   },
 };
 
+/** @noRailsEquivalent PERMANENT */
 export const stdin: ReadStream = {
+  /** @noRailsEquivalent PERMANENT */
   get isTTY() {
     return requireAdapter().stdin.isTTY;
   },
+  /** @noRailsEquivalent PERMANENT */
   read: () => requireAdapter().stdin.read(),
 };
 
-export function cwd(): string {
-  return requireAdapter().cwd();
-}
-
+/** @noRailsEquivalent PERMANENT */
 export function chdir(dir: string): void {
   requireAdapter().chdir(dir);
 }
 
-export function platform(): string {
-  return requireAdapter().platform();
-}
-
+/** @noRailsEquivalent PERMANENT */
 export function exit(code?: number): never {
   return requireAdapter().exit(code);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function setExitCode(code: number): void {
   requireAdapter().setExitCode(code);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function onSignal(name: SignalName, handler: () => void): () => void {
   return requireAdapter().onSignal(name, handler);
 }
 
-/**
- * Ruby's `SystemExit` — the exception `Kernel#abort` raises. Its `status` is
- * the exit status the host would leave with, and its message is the string
- * `abort` was given (`"exit"` when it was given none).
- */
+/** @noRailsEquivalent PERMANENT */
 export class SystemExit extends Error {
+  /** @noRailsEquivalent PERMANENT */
   readonly status: number;
 
+  /** @noRailsEquivalent PERMANENT */
   constructor(status: number, message = "exit") {
     super(message);
     this.name = "SystemExit";
@@ -139,25 +126,14 @@ export class SystemExit extends Error {
   }
 }
 
-/**
- * Ruby's `Kernel#abort`: write `message` to stderr, then raise `SystemExit`
- * with status 1. MRI does raise — `rescue SystemExit` catches it — so the
- * unwind is faithful; what makes it an abort rather than an ordinary error is
- * that the process is left with a non-zero status, which is set here through
- * the process adapter so a test host can observe it without exiting.
- */
+/** @noRailsEquivalent PERMANENT */
 export function abort(message?: string): never {
   if (message !== undefined) stderr.write(`${message}\n`);
   setExitCode(1);
   throw new SystemExit(1, message);
 }
 
-/**
- * Mutate the `env` snapshot. Use sparingly — `env` is intended to be
- * immutable after registration. Legitimate uses: test setup, dotenv
- * shims at boot. Updates both the underlying adapter and the exported
- * `env` object's contents.
- */
+/** @noRailsEquivalent PERMANENT */
 export function setEnv(key: string, value: string | undefined): void {
   requireAdapter().setEnv(key, value);
   if (value === undefined) {
@@ -167,16 +143,13 @@ export function setEnv(key: string, value: string | undefined): void {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function registerProcessAdapter(adapter: ProcessAdapter): void {
-  // Take both snapshots before mutating module state so a throw from
-  // either method leaves the registry untouched (atomic registration).
   const envSnapshot = adapter.envSnapshot();
   const argvSnapshot = adapter.argvSnapshot();
 
   currentAdapter = adapter;
   for (const k of Object.keys(envInternal)) delete envInternal[k];
-  // Skip `undefined` values so `key in env` stays consistent with
-  // `setEnv(key, undefined)` semantics (both mean "absent").
   for (const [key, value] of Object.entries(envSnapshot)) {
     if (value !== undefined) envInternal[key] = value;
   }
@@ -184,23 +157,14 @@ export function registerProcessAdapter(adapter: ProcessAdapter): void {
   argvInternal.push(...argvSnapshot);
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function getProcessAdapter(): ProcessAdapter {
   return requireAdapter();
 }
 
-/**
- * Discoverability hook — symmetry with `fsAdapterConfig`,
- * `cryptoAdapterConfig`, etc.
- *
- * processAdapter intentionally diverges from the named-registry pattern
- * used by fs/crypto/os/child-process: there is only one "process" the
- * program runs in, and the exported `env` / `argv` snapshots require a
- * single source of truth. So `processAdapterConfig.adapter` returns
- * `"node"` when the auto-registered Node adapter is active, `"custom"`
- * when a user-supplied adapter is registered, or `null` when none is.
- * It is read-only — the way to switch is `registerProcessAdapter()`.
- */
+/** @noRailsEquivalent PERMANENT */
 export const processAdapterConfig = {
+  /** @noRailsEquivalent PERMANENT */
   get adapter(): string | null {
     if (!currentAdapter) return null;
     return currentAdapter === nodeAutoRegistered ? "node" : "custom";
@@ -209,8 +173,6 @@ export const processAdapterConfig = {
 
 let nodeAutoRegistered: ProcessAdapter | null = null;
 
-// Structural shape of `node:process` we use. Avoids `NodeJS.Process` so
-// this module typechecks without `@types/node`.
 interface NodeStream {
   write(chunk: string): boolean;
   isTTY?: boolean;
@@ -303,7 +265,6 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       },
       read: () =>
         new Promise<string | null>((resolve, reject) => {
-          // Bail early if the stream is already terminal.
           if (proc.stdin.readableEnded || proc.stdin.destroyed) {
             resolve(null);
             return;
@@ -311,9 +272,6 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
           const onData = (...args: unknown[]) => {
             cleanup();
             const data = args[0];
-            // Node passes Buffer or string depending on encoding. Accept
-            // either — coerce to string structurally without referencing
-            // the `Buffer` type.
             resolve(
               typeof data === "string"
                 ? data
@@ -338,9 +296,6 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
             proc.stdin.off("error", onError);
           };
           proc.stdin.once("data", onData);
-          // Listen to both `end` and `close` — some streams emit only
-          // `close` (e.g. on destroy without prior end), which previously
-          // could leave the Promise pending and leak the data listener.
           proc.stdin.once("end", onTerminal);
           proc.stdin.once("close", onTerminal);
           proc.stdin.once("error", onError);
@@ -349,19 +304,7 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
   };
 }
 
-/**
- * @internal
- *
- * Test-only helper — NOT part of the public API. Resets the adapter
- * registry and clears `env`/`argv` snapshots so a subsequent
- * `registerProcessAdapter` call (or auto-register) starts fresh.
- *
- * Although this function is reachable via the package's `./*` subpath
- * export, calling it from production code is unsupported and may break
- * without notice. To switch adapters in a host, call
- * `registerProcessAdapter()` with the new adapter — that overwrites
- * the active one.
- */
+/** @internal */
 export function __INTERNAL_resetProcessAdapter_TEST_ONLY(): void {
   currentAdapter = null;
   nodeAutoRegistered = null;
@@ -370,24 +313,4 @@ export function __INTERNAL_resetProcessAdapter_TEST_ONLY(): void {
   argvInternal.length = 0;
 }
 
-// Eagerly register the Node default at module load.
-//
-// Why eager rather than lazy/first-access:
-//
-// 1. The exported `env` and `argv` are plain frozen objects populated by
-//    *copying* the adapter's snapshot at registration time. Direct reads
-//    like `env.FOO` and `argv[0]` cannot trigger auto-registration —
-//    they bypass any function call. A lazy approach would require a
-//    Proxy or getters, but the trailties build-out plan explicitly
-//    chose plain frozen objects ("No Proxy") to keep the surface
-//    simple and serializable.
-// 2. `child-process-adapter`'s default `env` for `spawnSync` spreads
-//    the exported `env`. Without eager registration, that would be
-//    empty under Node and strip PATH from spawned processes.
-// 3. Standard env shims (dotenv etc.) run at the entry-point's very
-//    top, before activesupport is imported, so they're already in
-//    `process.env` by the time this snapshot runs.
-//
-// In non-Node hosts this is a no-op; the host registers its own
-// adapter before any consumer reads the snapshots.
 tryAutoRegisterNode();

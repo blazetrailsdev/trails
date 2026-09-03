@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Process } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { Event } from "./instrumenter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
@@ -190,7 +190,7 @@ export class BaseTimeGroup extends BaseGroup<TimedCallback> {
 
 export class MonotonicTimedGroup extends BaseTimeGroup {
   protected override now(): number {
-    return performance.now();
+    return Process.clockGettime(Process.CLOCK_MONOTONIC);
   }
 }
 

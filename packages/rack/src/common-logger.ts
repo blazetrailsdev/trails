@@ -6,11 +6,12 @@ import {
   SERVER_PROTOCOL,
   CONTENT_LENGTH,
 } from "./constants.js";
+import { Process } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { forwardedValues } from "./utils.js";
 
 function clockTime(): number {
-  return performance.now() / 1000;
+  return Process.clockGettime(Process.CLOCK_MONOTONIC);
 }
 
 function escapeNonPrintable(str: string): string {

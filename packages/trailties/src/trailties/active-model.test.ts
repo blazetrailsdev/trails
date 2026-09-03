@@ -1,6 +1,6 @@
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { env as processEnv, setEnv } from "@blazetrails/activesupport/process-adapter";
+import { env as processEnv, setEnv } from "@blazetrails/ruby-compat";
 import { Trailtie } from "./active-model.js";
 import { Deprecators } from "@blazetrails/activesupport";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";

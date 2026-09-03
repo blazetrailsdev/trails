@@ -2,7 +2,7 @@
  * Logger and TaggedLogging — mirroring ActiveSupport's logging API.
  */
 
-import { stdout } from "./process-adapter.js";
+import { stdout } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { getFs } from "@blazetrails/ruby-compat";
 import { BroadcastLoggerClass } from "./broadcast-logger-slot.js";

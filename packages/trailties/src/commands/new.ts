@@ -1,4 +1,4 @@
-import { cwd as getCwd, exit } from "@blazetrails/activesupport/process-adapter";
+import { Dir, exit } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import path from "node:path";
 import { execSync } from "node:child_process";
@@ -45,7 +45,7 @@ export function newCommand(): Command {
         exit(1);
       }
 
-      const cwd = getCwd();
+      const cwd = Dir.pwd();
       const gen = new AppGenerator({
         cwd,
         output: console.log,

@@ -63,34 +63,12 @@ export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
 export type { OsAdapter } from "./os-adapter.js";
 
-export {
-  registerProcessAdapter,
-  getProcessAdapter,
-  processAdapterConfig,
-  env,
-  argv,
-  stdout,
-  stderr,
-  stdin,
-  cwd,
-  chdir,
-  platform,
-  exit,
-  setExitCode,
-  onSignal,
-  setEnv,
-  abort,
-  SystemExit,
-} from "./process-adapter.js";
-export type { ProcessAdapter, WriteStream, ReadStream, SignalName } from "./process-adapter.js";
-
-import { fsAdapterConfig } from "@blazetrails/ruby-compat";
+import { fsAdapterConfig, processAdapterConfig } from "@blazetrails/ruby-compat";
 import { cryptoAdapterConfig } from "./crypto-adapter.js";
 import { asyncContextAdapterConfig } from "./async-context-adapter.js";
 import { childProcessAdapterConfig } from "./child-process-adapter.js";
 import { httpAdapterConfig } from "./http-adapter.js";
 import { osAdapterConfig } from "./os-adapter.js";
-import { processAdapterConfig } from "./process-adapter.js";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
 
 /**

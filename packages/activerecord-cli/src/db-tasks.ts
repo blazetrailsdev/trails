@@ -1,5 +1,6 @@
 import { join, resolve } from "path";
-import { getEnv, setEnv } from "@blazetrails/activesupport";
+import { getEnv } from "@blazetrails/activesupport";
+import { setEnv } from "@blazetrails/ruby-compat";
 import { getFsAsync } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseConfigurations } from "@blazetrails/activerecord";
 import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";

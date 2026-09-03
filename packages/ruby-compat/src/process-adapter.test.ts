@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { RUBY_PLATFORM } from "./ruby-platform.js";
 import {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   argv,
-  cwd,
   env,
   getProcessAdapter,
   onSignal,
-  platform,
   processAdapterConfig,
   registerProcessAdapter,
   setEnv,
@@ -20,10 +19,6 @@ import {
   type WriteStream,
 } from "./process-adapter.js";
 
-// Capture the eager module-load auto-register snapshot before any test
-// runs `__INTERNAL_resetProcessAdapter_TEST_ONLY()`. Used to regression-test that direct
-// `env.FOO` / `argv[0]` reads see populated values without any prior
-// function call going through the adapter.
 const moduleLoadArgv: readonly string[] = [...argv];
 const moduleLoadEnv: Record<string, string | undefined> = { ...env };
 
@@ -73,7 +68,6 @@ function makeFakeAdapter(overrides: Partial<ProcessAdapter> = {}): ProcessAdapte
       isTTY: false,
       read: () => Promise.resolve(null),
     },
-    // exposed via getProcessAdapter for assertion purposes
     ...(overrides as object),
     // @ts-expect-error test-only
     __exitCode: () => exitCode,
@@ -141,14 +135,9 @@ describe("processAdapter", () => {
   });
 
   describe("delegated reads", () => {
-    it("cwd returns the adapter's cwd", () => {
-      registerProcessAdapter(makeFakeAdapter());
-      expect(cwd()).toBe("/fake/cwd");
-    });
-
     it("platform returns the adapter's platform", () => {
       registerProcessAdapter(makeFakeAdapter());
-      expect(platform()).toBe("browser");
+      expect(RUBY_PLATFORM()).toBe("browser");
     });
   });
 
@@ -176,7 +165,6 @@ describe("processAdapter", () => {
 
     it("stdin.read() delegates to the adapter and resolves with the adapter's value", async () => {
       const adapter = makeFakeAdapter();
-      // Override stdin to return a known value.
       const fakeStdin = {
         isTTY: true,
         read: () => Promise.resolve("hello from stdin"),
@@ -224,21 +212,11 @@ describe("processAdapter", () => {
   describe("auto-register node", () => {
     it("auto-registers when running in node and no adapter is set", () => {
       __INTERNAL_resetProcessAdapter_TEST_ONLY();
-      // First access triggers auto-register; cwd() should not throw.
-      expect(typeof cwd()).toBe("string");
-      // Node's process.argv has at least the executable.
+      expect(typeof getProcessAdapter().cwd()).toBe("string");
       expect(argv.length).toBeGreaterThan(0);
     });
 
     it("env/argv are populated on direct read without a prior function call", () => {
-      // Regression: reading env.FOO or argv[0] directly used to return
-      // empty snapshots because auto-register only fired through
-      // requireAdapter(). Module load now eagerly auto-registers under
-      // Node so direct reads work.
-      //
-      // Assert structural alignment with process.env keys rather than
-      // hard-coding PATH so this passes in hermetic envs where PATH
-      // may be unset.
       expect(moduleLoadArgv.length).toBeGreaterThan(0);
       const procEnv = (globalThis as { process: { env: Record<string, string | undefined> } })
         .process.env;
@@ -255,7 +233,6 @@ describe("processAdapter", () => {
         throw new Error("snapshot boom");
       };
       expect(() => registerProcessAdapter(broken)).toThrow(/snapshot boom/);
-      // Prior adapter's snapshot must still be present.
       expect(env.FAKE_FLAG).toBe("1");
       expect(getProcessAdapter()).not.toBe(broken);
     });
@@ -268,7 +245,6 @@ describe("processAdapter", () => {
         throw new Error("argv boom");
       };
       expect(() => registerProcessAdapter(broken)).toThrow(/argv boom/);
-      // env should not have been wiped (argv runs before mutation).
       expect(env.FAKE_FLAG).toBe("1");
       expect(argv).toEqual(["fake-node", "fake-script"]);
       expect(getProcessAdapter()).not.toBe(broken);
@@ -283,8 +259,7 @@ describe("processAdapter", () => {
 
     it("reports 'node' when the auto-registered Node adapter is active", () => {
       __INTERNAL_resetProcessAdapter_TEST_ONLY();
-      // Trigger auto-register.
-      cwd();
+      getProcessAdapter();
       expect(processAdapterConfig.adapter).toBe("node");
     });
 
@@ -326,12 +301,10 @@ describe("processAdapter", () => {
   describe("missing adapter", () => {
     it("throws a helpful error when no adapter is configured and node is unavailable", () => {
       __INTERNAL_resetProcessAdapter_TEST_ONLY();
-      // Save the full property descriptor so we restore writability/
-      // configurability/getter semantics — not just the value.
       const originalProcessDescriptor = Object.getOwnPropertyDescriptor(globalThis, "process");
       Object.defineProperty(globalThis, "process", { value: undefined, configurable: true });
       try {
-        expect(() => cwd()).toThrow(/No process adapter configured/);
+        expect(() => getProcessAdapter()).toThrow(/No process adapter configured/);
       } finally {
         if (originalProcessDescriptor) {
           Object.defineProperty(globalThis, "process", originalProcessDescriptor);

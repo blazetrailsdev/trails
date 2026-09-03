@@ -1,6 +1,7 @@
 export { ArgumentError } from "./argument-error.js";
 export { Dir } from "./dir.js";
 export { File } from "./file.js";
+export { IO } from "./io.js";
 export {
   cmp,
   cmpint,
@@ -69,10 +70,31 @@ export { NameError } from "./name-error.js";
 export { NoMethodError } from "./no-method-error.js";
 export { NotImplementedError } from "./not-implemented-error.js";
 export { prepend } from "./prepend.js";
+export { Process } from "./process.js";
+export {
+  SystemExit,
+  __INTERNAL_resetProcessAdapter_TEST_ONLY,
+  abort,
+  argv,
+  chdir,
+  env,
+  exit,
+  getProcessAdapter,
+  onSignal,
+  processAdapterConfig,
+  registerProcessAdapter,
+  setEnv,
+  setExitCode,
+  stderr,
+  stdin,
+  stdout,
+} from "./process-adapter.js";
+export type { ProcessAdapter, ReadStream, SignalName, WriteStream } from "./process-adapter.js";
 export type { PrependMethod, PrependModule } from "./prepend.js";
 export { regexpEscape } from "./regexp.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";
+export { RUBY_PLATFORM } from "./ruby-platform.js";
 export { rbEqual } from "./rb-equal.js";
 export { rbHash } from "./rb-hash.js";
 export { isEmpty } from "./ruby-empty.js";

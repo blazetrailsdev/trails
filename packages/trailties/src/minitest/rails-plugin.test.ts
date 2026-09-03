@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { BacktraceFilter, Minitest, env, setEnv } from "@blazetrails/activesupport";
+import { BacktraceFilter, Minitest } from "@blazetrails/activesupport";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 import { pluginRailsInit } from "./rails-plugin.js";
 
 /**

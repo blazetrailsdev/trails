@@ -12,7 +12,7 @@ const tester = new RuleTester({
   },
 });
 
-const SOURCE = "@blazetrails/activesupport/process-adapter";
+const SOURCE = "@blazetrails/ruby-compat";
 
 tester.run("no-process-bypass", rule, {
   valid: [

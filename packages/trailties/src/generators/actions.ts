@@ -7,7 +7,8 @@
 //   gem, gem_group, github, add_source — trails uses package.json
 //   route, environment, application      — trails uses config/*.ts
 
-import { getChildProcess, env as processEnv } from "@blazetrails/activesupport";
+import { getChildProcess } from "@blazetrails/activesupport";
+import { env as processEnv } from "@blazetrails/ruby-compat";
 
 export interface ActionsHost {
   cwd: string;

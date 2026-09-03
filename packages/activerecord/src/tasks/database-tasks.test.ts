@@ -11,13 +11,8 @@ import {
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import {
-  stdout,
-  stderr,
-  setEnv,
-  getProcessAdapter,
-  setTrailsRoot,
-} from "@blazetrails/activesupport";
+import { setTrailsRoot } from "@blazetrails/activesupport";
+import { stdout, stderr, setEnv, getProcessAdapter } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";

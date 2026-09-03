@@ -7,7 +7,7 @@ import {
   QueryLimitError,
   ParamsTooDeepError,
 } from "./query-parser.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Process } from "@blazetrails/ruby-compat";
 
 export { ArgumentError };
 
@@ -78,7 +78,7 @@ export function multipartFileLimit(v?: number): number | void {
 }
 
 export function clockTime(): number {
-  return performance.now() / 1000;
+  return Process.clockGettime(Process.CLOCK_MONOTONIC);
 }
 
 export function escape(s: string | { toString(): string }): string {

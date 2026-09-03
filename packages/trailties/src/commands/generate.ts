@@ -1,4 +1,4 @@
-import { cwd } from "@blazetrails/activesupport/process-adapter";
+import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { ModelGenerator } from "../generators/model-generator.js";
 import { MigrationGenerator } from "../generators/migration-generator.js";
@@ -25,7 +25,7 @@ export function generateCommand(): Command {
         attributes: string[],
         opts: { migration: boolean; test: boolean; timestamps: boolean },
       ) => {
-        const gen = new ModelGenerator({ cwd: cwd(), output: console.log });
+        const gen = new ModelGenerator({ cwd: Dir.pwd(), output: console.log });
         gen.run(name, attributes, {
           migration: opts.migration,
           test: opts.test,
@@ -40,7 +40,7 @@ export function generateCommand(): Command {
     .argument("<name>", "Migration name (e.g. AddEmailToUsers)")
     .argument("[columns...]", "Columns as name:type pairs")
     .action((name: string, columns: string[]) => {
-      const gen = new MigrationGenerator({ cwd: cwd(), output: console.log });
+      const gen = new MigrationGenerator({ cwd: Dir.pwd(), output: console.log });
       gen.run(name, columns);
     });
 
@@ -50,7 +50,7 @@ export function generateCommand(): Command {
     .argument("<name>", "Controller name (e.g. Posts)")
     .argument("[actions...]", "Action names (e.g. index show create)")
     .action((name: string, actions: string[]) => {
-      const gen = new ControllerGenerator({ cwd: cwd(), output: console.log });
+      const gen = new ControllerGenerator({ cwd: Dir.pwd(), output: console.log });
       gen.run(name, actions);
     });
 
@@ -60,7 +60,7 @@ export function generateCommand(): Command {
     .argument("<name>", "Resource name (e.g. Post)")
     .argument("[attributes...]", "Attributes as name:type pairs")
     .action((name: string, attributes: string[]) => {
-      const gen = new ScaffoldGenerator({ cwd: cwd(), output: console.log });
+      const gen = new ScaffoldGenerator({ cwd: Dir.pwd(), output: console.log });
       gen.run(name, attributes);
     });
 
@@ -72,7 +72,7 @@ export function generateCommand(): Command {
       .description(`Run the ${name} generator`)
       .argument("[args...]", "Generator arguments")
       .action(async (args: string[]) => {
-        await Generators.invoke(namespace, args, { cwd: cwd(), output: console.log });
+        await Generators.invoke(namespace, args, { cwd: Dir.pwd(), output: console.log });
       });
   }
 

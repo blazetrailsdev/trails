@@ -105,6 +105,17 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
  */
 export class Dir {
   /**
+   * `vendor/ruby/dir.c:1413` `dir_s_getwd`, registered under both `getwd` and
+   * `pwd` (`dir.c:3661-3662`) — the path to the current working directory.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.pwd`
+   * (`vendor/ruby/dir.c:1413`).
+   */
+  static pwd(): string {
+    return getFs().cwd();
+  }
+
+  /**
    * `vendor/ruby/dir.c:3421` `dir_s_children`: every entry EXCEPT `"."` and
    * `".."`, and it raises rather than answering `[]` when the directory is
    * missing.

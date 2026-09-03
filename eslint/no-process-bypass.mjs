@@ -17,7 +17,7 @@
  * adapter contract (e.g. `packages/trailties/src/**`).
  */
 
-const SOURCE = "@blazetrails/activesupport/process-adapter";
+const SOURCE = "@blazetrails/ruby-compat";
 
 // Each entry describes one disallowed property. `fixable` controls
 // whether autofix runs; `rewrite(node, fixer, localName)` returns the
@@ -180,7 +180,7 @@ function getAccessedProp(node) {
 }
 
 /**
- * Find an existing `import ... from "@blazetrails/activesupport/process-adapter"`
+ * Find an existing `import ... from "@blazetrails/ruby-compat"`
  * statement in the file. Returns the ImportDeclaration node or null.
  */
 function findAdapterImport(programBody) {
@@ -216,12 +216,12 @@ const rule = {
     fixable: "code",
     docs: {
       description:
-        "Forbid direct process.<prop> access in favor of @blazetrails/activesupport/process-adapter exports",
+        "Forbid direct process.<prop> access in favor of @blazetrails/ruby-compat exports",
     },
     schema: [],
     messages: {
       bypass:
-        "Direct `process.{{prop}}` is not allowed here. Import `{{importName}}` from `@blazetrails/activesupport/process-adapter` and {{note}}.",
+        "Direct `process.{{prop}}` is not allowed here. Import `{{importName}}` from `@blazetrails/ruby-compat` and {{note}}.",
     },
   },
   create(context) {

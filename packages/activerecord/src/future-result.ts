@@ -7,6 +7,7 @@ import {
   type EventPayload,
   type Instrumenter,
 } from "@blazetrails/activesupport";
+import { Process } from "@blazetrails/ruby-compat";
 import { Result } from "./result.js";
 
 /** @internal */
@@ -218,10 +219,10 @@ export class FutureResult {
 
   private async executeOrWait(): Promise<void> {
     if (this.pending()) {
-      const start = performance.now();
+      const start = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond");
       if (this.#executing) {
         await this.#executing;
-        this.lockWait = performance.now() - start;
+        this.lockWait = Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond") - start;
       } else {
         await this.pool.withConnection((connection) => this.executeQuery(connection));
       }

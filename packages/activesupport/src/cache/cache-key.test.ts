@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { expandCacheKey } from "../cache.js";
 import { Entry } from "./entry.js";
-import { setEnv, env } from "../process-adapter.js";
+import { setEnv, env } from "@blazetrails/ruby-compat";
 
 function withEnv(kv: Record<string, string>, fn: () => void) {
   const saved: Record<string, string | undefined> = {};

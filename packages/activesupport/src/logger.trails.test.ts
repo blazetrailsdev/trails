@@ -5,7 +5,7 @@ import {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   registerProcessAdapter,
   type ProcessAdapter,
-} from "./process-adapter.js";
+} from "@blazetrails/ruby-compat";
 
 function makeCapturingAdapter(): { adapter: ProcessAdapter; written: string[] } {
   const written: string[] = [];

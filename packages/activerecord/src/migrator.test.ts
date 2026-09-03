@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { stdout } from "@blazetrails/activesupport";
+import { stdout } from "@blazetrails/ruby-compat";
 import {
   Migration,
   Migrator,

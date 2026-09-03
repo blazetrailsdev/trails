@@ -1,6 +1,6 @@
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { extractOptionsBang, toParam } from "./hash-utils.js";
-import { env } from "./process-adapter.js";
+import { env } from "@blazetrails/ruby-compat";
 import { MemoryStore } from "./cache/memory-store.js";
 // Imported for the registration side effect: each store module registers its
 // class under its symbol name, which is what requiring the file does in Ruby.

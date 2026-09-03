@@ -13,7 +13,7 @@
  */
 
 import { Logger } from "@blazetrails/activesupport";
-import { stderr } from "@blazetrails/activesupport/process-adapter";
+import { stderr } from "@blazetrails/ruby-compat";
 import {
   ParameterTypeError as RackParameterTypeError,
   InvalidParameterError as RackInvalidParameterError,
