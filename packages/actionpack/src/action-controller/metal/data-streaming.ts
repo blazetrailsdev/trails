@@ -6,7 +6,7 @@
  * @see https://api.rubyonrails.org/classes/ActionController/DataStreaming.html
  */
 
-import { getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { MimeType } from "../../action-dispatch/http/mime-type.js";
 
@@ -81,7 +81,7 @@ export function sendFileHeadersBang(
     contentType = MimeType.lookup(contentType).toString();
   } else if (!typeProvided && options.filename) {
     // Guess from extension when caller didn't pin a type.
-    const ext = getPath().extname(options.filename).toLowerCase().replace(/^\./, "");
+    const ext = File.extname(options.filename).toLowerCase().replace(/^\./, "");
     const guessed = MimeType.lookupByExtension(ext);
     if (guessed) contentType = guessed.toString();
   }

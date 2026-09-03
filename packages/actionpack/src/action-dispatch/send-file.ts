@@ -4,8 +4,7 @@
  * Helpers for sending files and raw data as downloads.
  */
 
-import { getPath } from "@blazetrails/ruby-compat";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 
 export interface SendFileOptions {
   /** Content type (auto-detected from filename if not provided) */
@@ -71,15 +70,16 @@ export function lookupMimeType(typeOrExt: string): string {
  * Mirrors Rails' send_file.
  */
 export function sendFile(path: string, options: SendFileOptions = {}): SendResult {
-  const resolvedPath = getPath().resolve(path);
+  const resolvedPath = File.expandPath(path);
 
-  if (!getFs().existsSync(resolvedPath)) {
+  // `data_streaming.rb:77` — `File.file?(path) && File.readable?(path)`.
+  if (!File.isFile(resolvedPath) || !File.isReadable(resolvedPath)) {
     throw new Error(`Cannot read file: ${path}`);
   }
 
-  const stat = getFs().statSync(resolvedPath);
-  const filename = options.filename ?? getPath().basename(resolvedPath);
-  const ext = getPath().extname(filename);
+  const stat = File.stat(resolvedPath);
+  const filename = options.filename ?? File.basename(resolvedPath);
+  const ext = File.extname(filename);
   const type = options.type
     ? lookupMimeType(options.type)
     : (MIME_TYPES[ext.toLowerCase()] ?? "application/octet-stream");
@@ -100,7 +100,7 @@ export function sendFile(path: string, options: SendFileOptions = {}): SendResul
     headers["content-disposition"] = buildContentDisposition("attachment", filename);
   }
 
-  const body = getFs().readFileSync(resolvedPath) as Buffer;
+  const body = File.binread(resolvedPath);
 
   return { status: 200, headers, body };
 }

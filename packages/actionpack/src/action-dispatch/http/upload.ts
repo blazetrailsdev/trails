@@ -4,8 +4,7 @@
  * Represents a file uploaded via multipart form data.
  */
 
-import { getPath } from "@blazetrails/ruby-compat";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 
 export interface UploadedFileOptions {
   filename?: string;
@@ -41,7 +40,7 @@ export class UploadedFile {
 
   /** The file extension (including dot). */
   get extname(): string {
-    return getPath().extname(this.originalFilename);
+    return File.extname(this.originalFilename);
   }
 
   /** The file size in bytes. */
@@ -49,7 +48,7 @@ export class UploadedFile {
     if (this._content) return this._content.length;
     if (this._tempfile) {
       try {
-        return getFs().statSync(this._tempfile).size;
+        return File.stat(this._tempfile).size;
       } catch {
         return 0;
       }
@@ -57,11 +56,20 @@ export class UploadedFile {
     return 0;
   }
 
-  /** Read the file content. */
+  /**
+   * Read the file content.
+   *
+   * @missingRailsArgs read — CONVERGEABLE uploaded-file-read-drops-rails-length-and-buffer-arguments
+   */
   read(): Buffer {
     if (this._content) return this._content;
     if (this._tempfile) {
-      return getFs().readFileSync(this._tempfile) as Buffer;
+      // `File.open(path, "rb")` reads a binary String — one character per
+      // byte — which is the encoding node's "latin1" decodes back verbatim.
+      return Buffer.from(
+        File.open(this._tempfile, "rb", (file) => file.read()),
+        "latin1",
+      );
     }
     return Buffer.alloc(0);
   }
@@ -91,11 +99,11 @@ export class UploadedFile {
     if (unlinkNow && this._tempfile) {
       const tempPath = this._tempfile;
       try {
-        getFs().unlinkSync(tempPath);
+        File.delete(tempPath);
         this._tempfile = null;
       } catch {
         try {
-          if (!getFs().existsSync(tempPath)) {
+          if (!File.isExist(tempPath)) {
             this._tempfile = null;
           }
         } catch {

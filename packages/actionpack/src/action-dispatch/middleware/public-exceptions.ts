@@ -17,7 +17,7 @@
  */
 
 import { I18n } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";
@@ -104,16 +104,16 @@ export class PublicExceptions {
     const locale =
       typeof currentLocale === "string" && LOCALE_RE.test(currentLocale) ? currentLocale : null;
     let file: string | null = locale
-      ? getPath().join(this.publicPath, `${status}.${locale}.html`)
+      ? File.join(this.publicPath, `${status}.${locale}.html`)
       : null;
-    let found = file != null && getFs().existsSync(file);
+    let found = file != null && File.isExist(file);
     if (!found) {
-      file = getPath().join(this.publicPath, `${status}.html`);
-      found = getFs().existsSync(file);
+      file = File.join(this.publicPath, `${status}.html`);
+      found = File.isExist(file);
     }
 
     if (found && file != null) {
-      const html = getFs().readFileSync(file, "utf8");
+      const html = File.read(file);
       const htmlType = MimeType.lookupByExtension("html") ?? MimeType.lookup("text/html");
       return this.renderFormat(status, htmlType, html);
     }

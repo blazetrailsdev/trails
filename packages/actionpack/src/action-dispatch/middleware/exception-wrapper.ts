@@ -6,7 +6,7 @@ import { hasKey } from "@blazetrails/ruby-compat";
  */
 
 import { ActionableError, type BacktraceCleaner } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 export interface ShowExceptionsRequest {
@@ -386,10 +386,10 @@ export class ExceptionWrapper {
 
   /** @internal */
   sourceFragment(path: string, line: number): Record<number, string> | null {
-    const full = getPath().resolve(getFs().cwd(), path);
-    if (!getFs().existsSync(full)) return null;
+    const full = File.expandPath(path);
+    if (!File.isExist(full)) return null;
     try {
-      const lines = getFs().readFileSync(full, "utf8").split(/\r?\n/);
+      const lines = File.read(full).split(/\r?\n/);
       return this.extractSourceFragmentLines(lines, line);
     } catch {
       return null;

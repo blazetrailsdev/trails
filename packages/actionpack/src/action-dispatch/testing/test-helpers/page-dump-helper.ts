@@ -1,5 +1,5 @@
 import { getChildProcessAsync } from "@blazetrails/activesupport";
-import { getFsAsync, getPath } from "@blazetrails/ruby-compat";
+import { File, getFsAsync } from "@blazetrails/ruby-compat";
 
 export class InvalidResponse extends Error {}
 
@@ -24,9 +24,8 @@ export async function savePage(this: PageDumpHelperHost, path?: string): Promise
     throw new InvalidResponse("Response is a redirection!");
   }
   const target = path ?? htmlDumpDefaultPath.call(this);
-  const { dirname } = getPath();
   const fs = await getFsAsync();
-  await fs.mkdir!(dirname(target), { recursive: true });
+  await fs.mkdir!(File.dirname(target), { recursive: true });
   await fs.writeFile!(target, this.response.body);
   return target;
 }
@@ -53,6 +52,5 @@ export async function openFile(path: string): Promise<void> {
 export function htmlDumpDefaultPath(this: PageDumpHelperHost): string {
   const name = this._testName ?? "test";
   const timestamp = Date.now();
-  const { join } = getPath();
-  return join(projectRoot(), "tmp/html_dump", `${name}_${timestamp}.html`);
+  return File.join(projectRoot(), "tmp/html_dump", `${name}_${timestamp}.html`);
 }

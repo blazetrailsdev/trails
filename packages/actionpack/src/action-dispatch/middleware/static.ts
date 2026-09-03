@@ -5,7 +5,7 @@
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Files, Mime, Request, Utils } from "@blazetrails/rack";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 
@@ -192,17 +192,11 @@ export class FileHandler {
   /**
    * @internal
    *
-   * static.rb:142 is `File.file?(file_path) && File.readable?(file_path)`.
-   * The `getFs()` adapter interface exposes no readability probe, so an
-   * unreadable file reads as readable here.
+   * static.rb:141-142.
    */
   private isFileReadable(path: string): boolean {
-    const filePath = getPath().join(this.root, path);
-    try {
-      return getFs().statSync(filePath).isFile();
-    } catch {
-      return false;
-    }
+    const filePath = File.join(this.root, path);
+    return File.isFile(filePath) && File.isReadable(filePath);
   }
 
   /** @internal */
@@ -236,7 +230,7 @@ export class FileHandler {
     const path = this.cleanPath(pathInfo);
     if (path == null) return;
 
-    const ext = getPath().extname(path);
+    const ext = File.extname(path);
     const contentType = Mime.mimeType(ext, null);
     if (block(path, contentType ?? "text/plain")) return;
 

@@ -9,7 +9,7 @@
  * type-check against a host interface.
  */
 
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 
 import { CookieJar, type CookieJarOptions } from "../middleware/cookies.js";
 import type { FlashHash } from "../middleware/flash.js";
@@ -74,10 +74,9 @@ export function fileFixtureUpload(
   mimeType?: string | null,
   binary: boolean = false,
 ): UploadedFile {
-  const fs = getFs();
   const fixturePath = this.fileFixturePath ?? this.constructor.fileFixturePath;
   let resolved = path;
-  if (fixturePath && !fs.existsSync(path)) {
+  if (fixturePath && !File.isExist(path)) {
     if (!this.fileFixture) {
       throw new Error(
         "TestProcess#fileFixtureUpload: host does not implement fileFixture(); include ActiveSupport::Testing::FileFixtures.",
@@ -90,7 +89,7 @@ export function fileFixtureUpload(
   // UploadedFile, whose read path already returns a Buffer (binary by
   // default), so the flag is reflected in the part headers only.
   return new UploadedFile({
-    filename: getPath().basename(resolved),
+    filename: File.basename(resolved),
     type: mimeType ?? undefined,
     tempfile: resolved,
     head: binary ? "Content-Transfer-Encoding: binary" : undefined,
