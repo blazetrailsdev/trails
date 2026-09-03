@@ -152,33 +152,27 @@ function carrierOf(mod: Module): Record<string, unknown> {
  * (vendor/ruby/eval.c:1160). Using a symbol avoids collisions with real method
  * names.
  *
- * The `@blazetrails/activesupport:` prefix is KEPT deliberately across the move
- * to this package. `Symbol.for` reads from the cross-realm global registry, so
- * the string IS the identity: renaming it would silently stop every already-
- * built module's hook from firing. It is a compatibility key, not a namespace
- * claim.
- *
  * @noRailsEquivalent PERMANENT — Ruby names the hook with an ordinary method
  * definition on the module; TypeScript has no such lifecycle hook, so the key
  * carries the name instead.
  */
-export const included = Symbol.for("@blazetrails/activesupport:included");
+export const included = Symbol.for("@blazetrails/ruby-compat:included");
 
 /**
  * Symbol key for Ruby's Module#extended callback, which `rb_obj_extend` fires
  * on the module after `extend_object` has copied its methods onto the object
- * (vendor/ruby/eval.c:1795). Prefix kept for the same reason as `included`.
+ * (vendor/ruby/eval.c:1795).
  *
  * @noRailsEquivalent PERMANENT — the TypeScript spelling of a Ruby lifecycle
  * hook, which the language has no equivalent of.
  */
-export const extended = Symbol.for("@blazetrails/activesupport:extended");
+export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
 
-const includedKeys = Symbol.for("@blazetrails/activesupport:includedKeys");
+const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 
-const extendedKeys = Symbol.for("@blazetrails/activesupport:extendedKeys");
+const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
-const includedModules = Symbol.for("@blazetrails/activesupport:includedModules");
+const includedModules = Symbol.for("@blazetrails/ruby-compat:includedModules");
 
 const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
@@ -263,7 +257,7 @@ export function isModuleIncluded(
  * @noRailsEquivalent PERMANENT — Ruby carries visibility on the method entry
  * itself; a TS object literal has nowhere to put it but a side table.
  */
-export const moduleVisibility = Symbol.for("@blazetrails/activesupport:moduleVisibility");
+export const moduleVisibility = Symbol.for("@blazetrails/ruby-compat:moduleVisibility");
 
 export interface ModuleVisibility {
   public: string[];

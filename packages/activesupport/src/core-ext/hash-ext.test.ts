@@ -21,7 +21,6 @@ import {
   deepStringifyKeys,
   reverseMerge,
   assertValidKeys,
-  slice,
   toParam,
   toXml,
   fromTrustedXml,
@@ -251,9 +250,17 @@ describe("HashExtTest", () => {
   });
 
   it("slice inplace with an array key", () => {
-    const h = { a: 1, b: 2, c: 3 };
-    const result = slice(h, "a", "b");
-    expect(Object.keys(result)).toHaveLength(2);
+    const arrayKey = ["a", "b"];
+    const original = new Hash<unknown, unknown>();
+    original.set("a", "x");
+    original.set("b", "y");
+    original.set("c", 10);
+    original.set(arrayKey, "an array key");
+    const expected = new Hash<unknown, unknown>();
+    expected.set("a", "x");
+    expected.set("b", "y");
+
+    expect(sliceBang(original, arrayKey, "c")).toEqual(expected);
   });
 
   it("slice bang does not override default", () => {

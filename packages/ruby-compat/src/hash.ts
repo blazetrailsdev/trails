@@ -117,7 +117,7 @@ export function merge<T>(
   hash: Record<string, T>,
   ...others: (Record<string, T> | ConflictBlock<T>)[]
 ): Record<string, T> {
-  return update({ ...hash }, ...others);
+  return update(dup(hash), ...others);
 }
 
 /**
@@ -172,7 +172,7 @@ export function deleteIf<T>(hash: Record<string, T>, block: PairBlock<T>): Recor
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#reject` (`vendor/ruby/hash.c:2626`).
  */
 export function reject<T>(hash: Record<string, T>, block: PairBlock<T>): Record<string, T> {
-  return deleteIf({ ...hash }, block);
+  return deleteIf(dup(hash), block);
 }
 
 /**
