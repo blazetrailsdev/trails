@@ -405,7 +405,7 @@ export { LogSubscriber } from "./log-subscriber.js";
 export { MemoryStore } from "./cache/memory-store.js";
 export { DupCoder } from "./cache/memory-store.js";
 export { NullStore } from "./cache/null-store.js";
-// FileStore uses getFs()/getPath() adapters but is kept as a subpath import for tree-shaking
+// FileStore reaches the filesystem through `File` / `Dir` but is kept as a subpath import for tree-shaking
 export type { CacheOptions, CacheStore } from "./cache/index.js";
 
 export { Deprecation, DeprecationException, DEFAULT_BEHAVIORS } from "./deprecation.js";

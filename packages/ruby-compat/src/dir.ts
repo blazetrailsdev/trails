@@ -12,6 +12,10 @@ function braceExpand(pattern: string): string[] {
   let start = open + 1;
   for (let i = open; i < pattern.length; i++) {
     const char = pattern[i];
+    if (char === "\\") {
+      i++;
+      continue;
+    }
     if (char === "{") depth++;
     else if (char === "}") {
       depth--;
@@ -35,7 +39,9 @@ function fnmatch(segment: string, name: string): boolean {
   let source = "";
   for (let i = 0; i < segment.length; i++) {
     const char = segment[i];
-    if (char === "*") source += "[^/]*";
+    if (char === "\\" && i + 1 < segment.length) {
+      source += segment[++i].replace(/[.*+?^${}()|[\]\\]/, "\\$&");
+    } else if (char === "*") source += "[^/]*";
     else if (char === "?") source += "[^/]";
     else if (char === "[") {
       const close = segment.indexOf("]", i + 1);
@@ -60,8 +66,16 @@ function children(dirname: string): string[] {
   }
 }
 
+/**
+ * `vendor/ruby/dir.c:329` — a backslash escapes the character after it, so
+ * `Dir.glob("a\\,b/*")` walks the single directory named `a,b`.
+ */
+function unescape(segment: string): string {
+  return segment.replace(/\\(.)/g, "$1");
+}
+
 function segmentMatches(segment: string, name: string): boolean {
-  return MAGIC.test(segment) ? fnmatch(segment, name) : segment === name;
+  return MAGIC.test(segment) ? fnmatch(segment, name) : unescape(segment) === name;
 }
 
 function globHelper(base: string, segments: string[], found: string[], enumerated: boolean): void {
@@ -81,7 +95,7 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
     return;
   }
   if (!MAGIC.test(segment)) {
-    globHelper(join(segment), rest, found, false);
+    globHelper(join(unescape(segment)), rest, found, false);
     return;
   }
   for (const name of children(base)) {

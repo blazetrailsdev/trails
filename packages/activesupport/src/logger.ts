@@ -4,7 +4,7 @@
 
 import { stdout } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { BroadcastLoggerClass } from "./broadcast-logger-slot.js";
 import { include } from "@blazetrails/ruby-compat/include";
 import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";
@@ -234,13 +234,10 @@ export class Logger {
   /** `logger.rb:46` — private. */
   private static normalizeSources(sources: unknown[]): unknown[] {
     return sources.map((source) => {
-      const fs = getFs();
       if (typeof (source as { path?: unknown })?.path === "string") {
         source = (source as { path: string }).path;
       }
-      if (typeof source === "string" && fs.existsSync(source)) {
-        source = fs.realpathSync ? fs.realpathSync(source) : source;
-      }
+      if (typeof source === "string" && File.isExist(source)) source = File.realpath(source);
       return source;
     });
   }

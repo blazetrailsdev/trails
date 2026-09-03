@@ -14,7 +14,7 @@ import { basename, dirname, join } from "node:path";
 import { FileStore, FILENAME_MAX_SIZE } from "../file-store.js";
 import { assert, assertEmpty, assertNot, assertPredicate } from "../../testing/assertions.js";
 import { Store } from "../store.js";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { isPresent } from "../../core-ext/object/blank.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
@@ -81,14 +81,14 @@ describe("FileStoreTest", () => {
     const key = "A".repeat(FILENAME_MAX_SIZE);
     // Ruby reads the name Tempfile would pick out of `Dir::Tmpname.create`
     // (file_store_test.rb:80); trails' atomicWrite picks its own, so the name
-    // under test is the one the real write hands to writeFileSync.
-    const writeFileSync = vi.spyOn(getFs(), "writeFileSync");
+    // under test is the one the real write hands to `File.binwrite`.
+    const binwrite = vi.spyOn(File, "binwrite");
     let tmpname: string;
     try {
       store.write(key, "v");
-      tmpname = basename(String(writeFileSync.mock.calls[0][0]));
+      tmpname = basename(String(binwrite.mock.calls[0][0]));
     } finally {
-      writeFileSync.mockRestore();
+      binwrite.mockRestore();
     }
     assert(
       basename(`${tmpname}.lock`).length <= 255,
@@ -178,14 +178,14 @@ describe("FileStoreTest", () => {
     };
     // Rails' `File.stub(:exist?, -> { raise StandardError.new("failed") })`
     // (file_store_test.rb:127).
-    const existsSync = vi.spyOn(getFs(), "existsSync").mockImplementation(() => {
+    const isExist = vi.spyOn(File, "isExist").mockImplementation(() => {
       throw new Error("failed");
     });
     try {
       (store as unknown as { readEntry(k: string, o: object): unknown }).readEntry("winston", {});
       assertPredicate(buffer.string, isPresent);
     } finally {
-      existsSync.mockRestore();
+      isExist.mockRestore();
       Store.logger = previousLogger;
     }
   });

@@ -1,4 +1,4 @@
-import { Dir, File, FileUtils, getFs } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store.js";
@@ -210,22 +210,17 @@ export class FileStore extends Store implements CacheStore {
   }
 
   // Lock a file for a block so only one process can modify it at a time
-  // (file_store.rb:140-153). An adapter without `flockSync` — Node's `fs`
-  // exposes no flock — still opens and closes the file, and the block runs
-  // unlocked, which is the missing-file arm's behaviour anyway.
+  // (file_store.rb:140-153).
   protected lockFile<T>(fileName: string, block: () => T): T {
     if (File.isExist(fileName)) {
-      const f = getFs().openSync(fileName, "r+");
-      try {
-        getFs().flockSync?.(f, "ex");
-        return block();
-      } finally {
+      return File.open(fileName, "r+", (f) => {
         try {
-          getFs().flockSync?.(f, "un");
+          f.flock(File.LOCK_EX);
+          return block();
         } finally {
-          getFs().closeSync(f);
+          f.flock(File.LOCK_UN);
         }
-      }
+      });
     } else {
       return block();
     }

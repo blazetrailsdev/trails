@@ -1,5 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { ArgumentError, Dir, File } from "@blazetrails/ruby-compat";
 
 /**
  * = File Update Checker
@@ -32,11 +31,7 @@ import { getFs, getPath } from "@blazetrails/ruby-compat";
  * So `execute` / `executeIfUpdated` answer a Promise; `updated` stays
  * synchronous exactly as Ruby's `updated?` is.
  *
- * And Ruby's `Dir[@glob]` (`:104`) has no JS counterpart, so the private
- * `dirGlob` expands the `{dir/**\/*.{ext,ext},…}` shape `compileGlob` itself
- * emits with the same sync directory walk
- * `ActiveRecord::MigrationContext#migration_files` already does by hand.
- * Ruby's `@watched` / `@updated_at` memos are spelled `watchedMemo` /
+ * And Ruby's `@watched` / `@updated_at` memos are spelled `watchedMemo` /
  * `updatedAtMemo` only because a JS class cannot carry a field and a method of
  * the same name.
  */
@@ -129,15 +124,14 @@ export class FileUpdateChecker {
 
   private watched(): string[] {
     if (this.watchedMemo) return this.watchedMemo;
-    const { existsSync } = getFs();
-    const all = this.files.filter((f) => existsSync(f));
-    if (this.glob) all.push(...this.dirGlob(this.glob));
+    const all = this.files.filter((f) => File.isExist(f));
+    if (this.glob) all.push(...Dir.glob(this.glob));
     return [...new Set(all)];
   }
 
   private updatedAt(paths: string[]): Date {
-    // boundary: `Time.at(0)` (`:107`), compared against `FsStatResult#mtime`,
-    // which the fs adapter hands back as a JS `Date`.
+    // boundary: `Time.at(0)` (`:107`), compared against `File.mtime`, which
+    // the fs adapter hands back as a JS `Date`.
     return this.updatedAtMemo ?? this.maxMtime(paths) ?? new Date(0);
   }
 
@@ -151,13 +145,12 @@ export class FileUpdateChecker {
    * reloading is not triggered.
    */
   private maxMtime(paths: string[]): Date | null {
-    const { statSync } = getFs();
-    // boundary: `Time.now` (`:119`), compared against `FsStatResult#mtime`.
+    // boundary: `Time.now` (`:119`), compared against `File.mtime`.
     const timeNow = new Date();
     let maxMtime: Date | null = null;
 
     for (const path of paths) {
-      const mtime = statSync(path).mtime;
+      const mtime = File.mtime(path);
 
       if (timeNow.getTime() < mtime.getTime()) continue;
 
@@ -186,33 +179,5 @@ export class FileUpdateChecker {
     array = Array.isArray(array) ? array : [array];
     if (array.length === 0) return undefined;
     return `.{${array.join(",")}}`;
-  }
-
-  private dirGlob(glob: string): string[] {
-    const { readdirSync, existsSync } = getFs();
-    const { join } = getPath();
-    const results: string[] = [];
-
-    for (const segment of glob.slice(1, -1).split(/(?<!\\),(?![^{]*\})/)) {
-      const match = /^(.*)\/\*\*\/\*(?:\.\{(.*)\})?$/.exec(segment);
-      if (!match) continue;
-      const dir = match[1].replaceAll("\\,", ",");
-      const exts = match[2] === undefined ? null : match[2].split(",");
-
-      const collect = (current: string): void => {
-        if (!existsSync(current)) return;
-        for (const entry of readdirSync(current, { withFileTypes: true })) {
-          const full = join(current, entry.name);
-          if (entry.isDirectory()) {
-            collect(full);
-          } else if (exts === null || exts.some((ext) => entry.name.endsWith(`.${ext}`))) {
-            results.push(full);
-          }
-        }
-      };
-      collect(dir);
-    }
-
-    return results;
   }
 }

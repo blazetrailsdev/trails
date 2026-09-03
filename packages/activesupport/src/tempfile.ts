@@ -1,5 +1,5 @@
 import { getCrypto } from "./crypto-adapter.js";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { getOs } from "./os-adapter.js";
 
 /** The `basename` of `Dir::Tmpname.create`: a String, or a `[prefix, suffix]` pair. */
@@ -48,7 +48,7 @@ function createTmpname(
     // boundary: `Time.now.strftime("%Y%m%d")` (`tmpdir.rb:152`) — the stamp is
     // a filename component, not a modelled instant.
     const t = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const path = getPath().join(
+    const path = File.join(
       tmpdir,
       `${prefix}${t}-${random()}-${random()}${n != null ? `-${n}` : ""}${suffix ?? ""}`,
     );
@@ -97,15 +97,15 @@ export class Tempfile {
   /**
    * `Tempfile.new(basename = "", tmpdir = nil)` (`tempfile.rb:150-166`).
    *
-   * `File.open(tmpname, RDWR|CREAT|EXCL, perm: 0600)` is `openSync(path, "wx")`
+   * `File.open(tmpname, RDWR|CREAT|EXCL, perm: 0600)` is `File.open(path, "wx")`
    * — the exclusive create whose `EEXIST` is what {@link createTmpname} retries
-   * on — followed by `chmodSync`, since the adapter's `openSync` takes no mode.
+   * on — followed by `File.chmod`, since the mode is not a `File.open` argument
+   * the `FsAdapter` contract carries.
    */
   static new(basename: TempfileBasename = "", tmpdir?: string): Tempfile {
-    const fs = getFs();
     const tmpname = createTmpname(basename, tmpdir, (path) => {
-      fs.closeSync(fs.openSync(path, "wx"));
-      fs.chmodSync?.(path, 0o600);
+      File.open(path, "wx").close();
+      File.chmod(0o600, path);
     });
     return new Tempfile(tmpname);
   }
@@ -188,13 +188,13 @@ export class Tempfile {
   /** `IO#read` — the whole file. */
   read(): Buffer {
     this.flush();
-    return getFs().readFileSync(this.tmpname) as Buffer;
+    return Buffer.from(File.binread(this.tmpname), "utf8");
   }
 
   /** `IO#flush` — writes the buffered bytes through to the file. */
   private flush(): void {
     if (this.flushed) return;
-    getFs().writeFileSync(this.tmpname, this.buffer, { mode: 0o600 });
+    File.binwrite(this.tmpname, this.buffer.toString("utf8"));
     this.flushed = true;
   }
 
@@ -216,7 +216,7 @@ export class Tempfile {
   unlink(): void {
     if (this.unlinked) return;
     try {
-      getFs().unlinkSync(this.tmpname);
+      File.delete(this.tmpname);
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === "EACCES") return;

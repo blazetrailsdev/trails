@@ -1,4 +1,4 @@
-import { FileUtils, getFs, getPath, type FsStatResult } from "@blazetrails/ruby-compat";
+import { File, FileUtils, type FsStatResult } from "@blazetrails/ruby-compat";
 import { Tempfile } from "../../tempfile.js";
 
 /**
@@ -25,27 +25,27 @@ export function atomicWrite<T>(
   tempDir: string | undefined,
   block: (tempFile: Tempfile) => T,
 ): T {
-  tempDir ??= getPath().dirname(fileName);
+  tempDir ??= File.dirname(fileName);
 
-  return Tempfile.open(`.${getPath().basename(fileName)}`, tempDir, (tempFile) => {
+  return Tempfile.open(`.${File.basename(fileName)}`, tempDir, (tempFile) => {
     const returnVal = block(tempFile);
     tempFile.close();
 
-    const oldStat = getFs().existsSync(fileName)
+    const oldStat = File.isExist(fileName)
       ? // Get original file permissions
-        getFs().statSync(fileName)
+        File.stat(fileName)
       : // If not possible, probe which are the default permissions in the
         // destination directory.
-        probeStatIn(getPath().dirname(fileName));
+        probeStatIn(File.dirname(fileName));
 
     if (oldStat) {
       // Set correct permissions on new file
       try {
         if (oldStat.uid != null && oldStat.gid != null) {
-          getFs().chownSync?.(tempFile.path!, oldStat.uid, oldStat.gid);
+          File.chown(oldStat.uid, oldStat.gid, tempFile.path!);
         }
         // This operation will affect filesystem ACL's
-        if (oldStat.mode != null) getFs().chmodSync?.(tempFile.path!, oldStat.mode);
+        if (oldStat.mode != null) File.chmod(oldStat.mode, tempFile.path!);
       } catch (error) {
         // Changing file ownership failed, moving on.
         const code = (error as { code?: string }).code;
@@ -54,7 +54,7 @@ export function atomicWrite<T>(
     }
 
     // Overwrite original file with temp file
-    getFs().renameSync(tempFile.path!, fileName);
+    File.rename(tempFile.path!, fileName);
     return returnVal;
   });
 }
@@ -77,10 +77,10 @@ export function probeStatIn(dir: string): FsStatResult | null {
     Math.floor(Math.random() * 1000000),
   ].join(".");
 
-  let fileName: string | null = getPath().join(dir, basename);
+  let fileName: string | null = File.join(dir, basename);
   try {
-    getFs().appendFileSync(fileName, "");
-    return getFs().statSync(fileName);
+    FileUtils.touch(fileName);
+    return File.stat(fileName);
   } catch (error) {
     if ((error as { code?: string }).code !== "ENOENT") throw error;
     fileName = null;

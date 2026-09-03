@@ -129,6 +129,17 @@ export class IO {
   }
 
   /**
+   * `vendor/ruby/io.c:2858` `rb_io_fileno` — the integer descriptor the
+   * stream was opened on.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#fileno`
+   * (`vendor/ruby/io.c:2858`).
+   */
+  fileno(): number {
+    return this.fd;
+  }
+
+  /**
    * `vendor/ruby/io.c:2495` `rb_io_seek_m` in its one-argument form, where
    * `whence` is `IO::SEEK_SET` — the absolute offset the next read starts at.
    * It answers `0`.

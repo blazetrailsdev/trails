@@ -32,6 +32,14 @@ describe("Dir", () => {
     ]);
   });
 
+  it("glob reads a backslash as an escape rather than a brace separator", () => {
+    // vendor/ruby/dir.c:329, verified against ruby 3.3.11.
+    const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
+    mkdirSync(join(root, "a,b"));
+    writeFileSync(join(root, "a,b", "x.rb"), "");
+    expect(Dir.glob(`{${root}/a\\,b/**/*.rb}`)).toEqual([`${root}/a,b/x.rb`]);
+  });
+
   it("glob sorts each directory and leaves a dotfile to a literal dot", () => {
     // vendor/ruby/dir.c:325, and the sort: true default at dir.c:3210.
     const root = fixture();
