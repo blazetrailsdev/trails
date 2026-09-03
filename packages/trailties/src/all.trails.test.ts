@@ -1,7 +1,6 @@
-// Cover for `all.ts`, the port of `railties/lib/rails/all.rb`: an application
-// whose only trailties import is `all.ts` still boots every framework
-// trailtie. Trails-only — Rails proves the same thing by `require "rails/all"`
-// in a generated app, not by a unit test.
+// Cover for `all.ts`, the port of `railties/lib/rails/all.rb`: an app whose
+// only trailties import is `all.ts` still boots every framework trailtie.
+// Trails-only — Rails proves this by `require "rails/all"` in a generated app.
 import { describe, expect, it } from "vitest";
 import "./all.js";
 import { Application } from "./application.js";
@@ -13,14 +12,10 @@ describe("rails/all", () => {
     const app = AllBootApp.instance();
     await app.initialize();
 
-    for (const framework of [
-      "activeSupport",
-      "activeModel",
-      "activeRecord",
-      "actionDispatch",
-      "actionController",
-      "actionView",
-    ]) {
+    const frameworks = ["Support", "Model", "Record"]
+      .map((f) => `active${f}`)
+      .concat(["actionDispatch", "actionController", "actionView"]);
+    for (const framework of frameworks) {
       expect(app.deprecators.get(framework), framework).toBeDefined();
     }
   });

@@ -420,9 +420,8 @@ describe("Trails.application integration (boot-app fixture)", () => {
     const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
     class BootAppRoutes extends BootApp {}
     Application.register(BootAppRoutes);
-    // The file-wide `resetLoadHooks()` above drops the `:action_controller`
-    // hook `action_controller/base.ts:1115` fired at import, so replay it —
-    // otherwise the `on_load` block below never runs.
+    // The file-wide `resetLoadHooks()` drops the `:action_controller` hook
+    // fired at import, so replay it or the `on_load` block never runs.
     runLoadHooks("action_controller", ActionController.Base);
     const app = Trails.application!;
     app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
@@ -431,11 +430,10 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
     // `action_controller.set_configs` (`action_controller/railtie.rb:69-71`)
     // includes `app.routes.url_helpers`, whose `included` block is
-    // `redefine_singleton_method(:_routes) { routes }` (`route_set.rb:610-612`).
+    // `redefine_singleton_method(:_routes) { routes }` (`route_set.rb:610-612`);
+    // `build_view_context_class` (`action_view/rendering.rb:61-64`) then reads
+    // it, so a template calls a named route helper as a bare identifier.
     expect(ActionController.Base._routes).toBe(app.routes());
-    // `build_view_context_class` (`action_view/rendering.rb:61-64`) reads that
-    // `_routes` to mix the same helpers into the view context, so a template
-    // calls a named route helper as a bare identifier.
     const [status, , body] = await app.app()({
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/show",
