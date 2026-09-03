@@ -8,9 +8,10 @@ import type { RawConfigurations } from "../database-configurations.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import { getOs, getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
+import { getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
 import {
   getCryptoAsync,
+  getOs,
   stdout,
   stderr,
   abort,

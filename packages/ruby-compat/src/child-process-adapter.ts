@@ -1,9 +1,9 @@
-import { env as processEnv } from "@blazetrails/ruby-compat";
-import { File } from "@blazetrails/ruby-compat";
+import { env as processEnv } from "./process-adapter.js";
+import { File } from "./file.js";
 
 export interface SpawnSyncOptions {
   input?: string | Uint8Array;
-  env?: NodeJS.ProcessEnv;
+  env?: Record<string, string | undefined>;
   encoding?: "utf8" | "utf-8";
   cwd?: string;
   out?: string;
@@ -12,7 +12,7 @@ export interface SpawnSyncOptions {
 
 export interface SpawnSyncResult {
   status: number | null;
-  signal: NodeJS.Signals | null;
+  signal: string | null;
   stdout: string;
   stderr: string;
   error?: Error;
@@ -26,17 +26,41 @@ const registry = new Map<string, ChildProcessAdapter>();
 let currentAdapterName: string | null = null;
 let resolved: ChildProcessAdapter | null = null;
 
+/** @noRailsEquivalent PERMANENT */
 export function registerChildProcessAdapter(name: string, adapter: ChildProcessAdapter): void {
   registry.set(name, adapter);
   if (name === currentAdapterName) resolved = null;
 }
 
 let nodeAttempted = false;
-let nodeAsyncPromise: Promise<boolean> | null = null;
+
+/** @noRailsEquivalent PERMANENT */
+interface NodeProcess {
+  versions?: { node?: string };
+  getBuiltinModule?(id: string): unknown;
+}
+
+function nodeProcess(): NodeProcess | undefined {
+  return (globalThis as { process?: NodeProcess }).process;
+}
+
+/** @noRailsEquivalent PERMANENT */
+declare const require: ((id: string) => unknown) | undefined;
+
+function syncBuiltinLoader(): ((id: string) => unknown) | null {
+  const proc = nodeProcess();
+  const getBuiltinModule = proc?.getBuiltinModule;
+  if (typeof getBuiltinModule === "function") return (id) => getBuiltinModule.call(proc, id);
+  if (typeof require === "undefined") return null;
+  const nodeModule = require("node:module") as {
+    createRequire(p: string): (id: string) => unknown;
+  };
+  return nodeModule.createRequire("file:///ruby-compat");
+}
 
 type NodeSpawnSyncResult = {
   status: number | null;
-  signal: NodeJS.Signals | null;
+  signal: string | null;
   stdout: unknown;
   stderr: unknown;
   error?: Error;
@@ -55,7 +79,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
       try {
         result = cp.spawnSync(cmd, args, {
           input: options?.input,
-          env: options?.env ?? ({ ...processEnv } as NodeJS.ProcessEnv),
+          env: options?.env ?? { ...processEnv },
           encoding: options?.encoding ?? "utf8",
           cwd: options?.cwd,
           ...(outFile !== null || inFile !== null
@@ -82,40 +106,17 @@ function tryAutoRegisterNode(): boolean {
   if (nodeAttempted) return false;
   nodeAttempted = true;
   try {
-    if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
+    const proc = nodeProcess();
+    if (proc === undefined || !proc.versions?.node) {
       return false;
     }
-    if (typeof require === "undefined") return false;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const nodeModule = require("node:module") as {
-      createRequire: (from: string | URL) => NodeRequire;
-    };
-    const req = nodeModule.createRequire("file:///activesupport");
-    const cp = req("node:child_process") as unknown as NodeChildProcess;
-    registry.set("node", wrap(cp));
+    const req = syncBuiltinLoader();
+    if (!req) return false;
+    registry.set("node", wrap(req("node:child_process") as NodeChildProcess));
     return true;
   } catch {
     return false;
   }
-}
-
-function tryAutoRegisterNodeAsync(): Promise<boolean> {
-  if (registry.has("node")) return Promise.resolve(true);
-  if (!nodeAsyncPromise) {
-    nodeAsyncPromise = (async () => {
-      try {
-        if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
-          return false;
-        }
-        const cp = (await import("node:child_process")) as unknown as NodeChildProcess;
-        registry.set("node", wrap(cp));
-        return true;
-      } catch {
-        return false;
-      }
-    })();
-  }
-  return nodeAsyncPromise;
 }
 
 function resolve(): ChildProcessAdapter {
@@ -136,32 +137,23 @@ function resolve(): ChildProcessAdapter {
   );
 }
 
-async function resolveAsync(): Promise<ChildProcessAdapter> {
-  const name = currentAdapterName;
-  try {
-    return resolve();
-  } catch (error) {
-    if (name) throw error;
-    if (await tryAutoRegisterNodeAsync()) {
-      resolved = registry.get("node")!;
-      return resolved;
-    }
-    throw error;
-  }
-}
-
+/** @noRailsEquivalent PERMANENT */
 export function getChildProcess(): ChildProcessAdapter {
   return resolve();
 }
 
+/** @noRailsEquivalent PERMANENT */
 export async function getChildProcessAsync(): Promise<ChildProcessAdapter> {
-  return resolveAsync();
+  return resolve();
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const childProcessAdapterConfig = {
+  /** @noRailsEquivalent PERMANENT */
   get adapter(): string | null {
     return currentAdapterName;
   },
+  /** @noRailsEquivalent PERMANENT */
   set adapter(name: string | null) {
     currentAdapterName = name;
     resolved = null;

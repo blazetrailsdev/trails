@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/activesupport";
+import type { StringIO } from "@blazetrails/activesupport";
+import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
 import { bodyFromString } from "../index.js";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { Node } from "./node.js";

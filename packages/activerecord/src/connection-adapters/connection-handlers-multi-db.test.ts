@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
-import { getOsAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, getOsAsync } from "@blazetrails/ruby-compat";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";

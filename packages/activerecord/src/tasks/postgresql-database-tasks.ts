@@ -1,11 +1,11 @@
+import { isBlank, Tempfile } from "@blazetrails/activesupport";
 import {
-  getOsAsync,
+  File,
+  FileUtils,
   getChildProcessAsync,
-  isBlank,
-  Tempfile,
+  getOsAsync,
   type SpawnSyncResult,
-} from "@blazetrails/activesupport";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";

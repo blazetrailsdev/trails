@@ -1,6 +1,6 @@
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
-import { getEnv, getOsAsync } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { getEnv } from "@blazetrails/activesupport";
+import { getOsAsync, File } from "@blazetrails/ruby-compat";
 import type { Schema, ColumnSpec, TableSchema, IndexSpec, ForeignKeySpec } from "./schema-types.js";
 
 const SCHEMA_TO_AR: Record<string, string> = { big_integer: "bigint" };

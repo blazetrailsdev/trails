@@ -149,14 +149,6 @@ const alias = {
   ),
   "@blazetrails/activesupport/yaml": path.resolve(__dirname, "packages/activesupport/src/yaml.ts"),
   "@blazetrails/activesupport/gzip": path.resolve(__dirname, "packages/activesupport/src/gzip.ts"),
-  "@blazetrails/activesupport/child-process-adapter": path.resolve(
-    __dirname,
-    "packages/activesupport/src/child-process-adapter.ts",
-  ),
-  "@blazetrails/activesupport/os-adapter": path.resolve(
-    __dirname,
-    "packages/activesupport/src/os-adapter.ts",
-  ),
   "@blazetrails/activesupport/encrypted-file": path.resolve(
     __dirname,
     "packages/activesupport/src/encrypted-file.ts",

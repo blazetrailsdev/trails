@@ -104,7 +104,6 @@ export class SchemaCache {
     }
   }
 
-  /** @missingRailsCall open — PERMANENT */
   static read<T>(filename: string, callback: (data: string) => T): T {
     if (File.extname(filename) === ".gz") {
       const raw = File.open(filename, "rb", (f) => f.read());

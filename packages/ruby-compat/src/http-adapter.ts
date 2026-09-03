@@ -29,60 +29,87 @@ const registry = new Map<string, HttpAdapter>();
 let currentAdapterName: string | null = null;
 let resolved: HttpAdapter | null = null;
 
+/** @noRailsEquivalent PERMANENT */
 export function registerHttpAdapter(name: string, adapter: HttpAdapter): void {
   registry.set(name, adapter);
   if (name === currentAdapterName) resolved = null;
 }
 
-let nodeAsyncPromise: Promise<boolean> | null = null;
+let nodeAttempted = false;
+
+/** @noRailsEquivalent PERMANENT */
+interface NodeProcess {
+  versions?: { node?: string };
+  getBuiltinModule?(id: string): unknown;
+}
+
+function nodeProcess(): NodeProcess | undefined {
+  return (globalThis as { process?: NodeProcess }).process;
+}
+
+/** @noRailsEquivalent PERMANENT */
+declare const require: ((id: string) => unknown) | undefined;
+
+function syncBuiltinLoader(): ((id: string) => unknown) | null {
+  const proc = nodeProcess();
+  const getBuiltinModule = proc?.getBuiltinModule;
+  if (typeof getBuiltinModule === "function") return (id) => getBuiltinModule.call(proc, id);
+  if (typeof require === "undefined") return null;
+  const nodeModule = require("node:module") as {
+    createRequire(p: string): (id: string) => unknown;
+  };
+  return nodeModule.createRequire("file:///ruby-compat");
+}
 
 type NodeHttp = {
   createServer: (handler: (req: HttpRequest, res: HttpResponse) => void) => HttpServer;
 };
 
-function tryAutoRegisterNodeAsync(): Promise<boolean> {
-  if (registry.has("node")) return Promise.resolve(true);
-  if (!nodeAsyncPromise) {
-    nodeAsyncPromise = (async () => {
-      try {
-        if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
-          return false;
-        }
-        const http = (await import("node:http")) as unknown as NodeHttp;
-        registry.set("node", { createServer: (handler) => http.createServer(handler) });
-        return true;
-      } catch {
-        return false;
-      }
-    })();
+function tryAutoRegisterNode(): boolean {
+  if (registry.has("node")) return true;
+  if (nodeAttempted) return false;
+  nodeAttempted = true;
+  try {
+    const proc = nodeProcess();
+    if (proc === undefined || !proc.versions?.node) {
+      return false;
+    }
+    const req = syncBuiltinLoader();
+    if (!req) return false;
+    const http = req("node:http") as NodeHttp;
+    registry.set("node", { createServer: (handler) => http.createServer(handler) });
+    return true;
+  } catch {
+    return false;
   }
-  return nodeAsyncPromise;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export async function getHttpAsync(): Promise<HttpAdapter> {
   if (resolved) return resolved;
   const name = currentAdapterName;
   if (name) {
     const reg = registry.get(name);
-    // eslint-disable-next-line blazetrails/rails-error-parity
     if (!reg) throw new Error(`HTTP adapter "${name}" is not registered.`);
     resolved = reg;
     return reg;
   }
-  if (await tryAutoRegisterNodeAsync()) {
+  if (tryAutoRegisterNode()) {
     resolved = registry.get("node")!;
     return resolved;
   }
-  // eslint-disable-next-line blazetrails/rails-error-parity
   throw new Error(
     "No HTTP adapter configured. Under ESM, import '@blazetrails/activesupport/node' from your entry point; otherwise set ActiveSupport.httpAdapter or register a custom adapter.",
   );
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const httpAdapterConfig = {
+  /** @noRailsEquivalent PERMANENT */
   get adapter(): string | null {
     return currentAdapterName;
   },
+  /** @noRailsEquivalent PERMANENT */
   set adapter(name: string | null) {
     currentAdapterName = name;
     resolved = null;

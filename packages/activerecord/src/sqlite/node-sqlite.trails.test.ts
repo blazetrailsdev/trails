@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { SqliteConnection } from "../sqlite-adapter.js";
-import { File } from "@blazetrails/ruby-compat";
-import { getOs } from "@blazetrails/activesupport/os-adapter";
+import { File, getOs } from "@blazetrails/ruby-compat";
 import { isNodeSqliteAvailable, nodeSqliteDriver } from "./node-sqlite.js";
 
 describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip", () => {

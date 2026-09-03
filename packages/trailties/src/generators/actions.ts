@@ -1,5 +1,4 @@
-import { getChildProcess } from "@blazetrails/activesupport";
-import { env as processEnv } from "@blazetrails/ruby-compat";
+import { getChildProcess, env as processEnv } from "@blazetrails/ruby-compat";
 
 export interface ActionsHost {
   cwd: string;

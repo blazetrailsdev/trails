@@ -9,13 +9,37 @@ const registry = new Map<string, OsAdapter>();
 let currentAdapterName: string | null = null;
 let resolved: OsAdapter | null = null;
 
+/** @noRailsEquivalent PERMANENT */
 export function registerOsAdapter(name: string, adapter: OsAdapter): void {
   registry.set(name, adapter);
   if (name === currentAdapterName) resolved = null;
 }
 
 let nodeAttempted = false;
-let nodeAsyncPromise: Promise<boolean> | null = null;
+
+/** @noRailsEquivalent PERMANENT */
+interface NodeProcess {
+  versions?: { node?: string };
+  getBuiltinModule?(id: string): unknown;
+}
+
+function nodeProcess(): NodeProcess | undefined {
+  return (globalThis as { process?: NodeProcess }).process;
+}
+
+/** @noRailsEquivalent PERMANENT */
+declare const require: ((id: string) => unknown) | undefined;
+
+function syncBuiltinLoader(): ((id: string) => unknown) | null {
+  const proc = nodeProcess();
+  const getBuiltinModule = proc?.getBuiltinModule;
+  if (typeof getBuiltinModule === "function") return (id) => getBuiltinModule.call(proc, id);
+  if (typeof require === "undefined") return null;
+  const nodeModule = require("node:module") as {
+    createRequire(p: string): (id: string) => unknown;
+  };
+  return nodeModule.createRequire("file:///ruby-compat");
+}
 
 type NodeOs = {
   tmpdir: () => string;
@@ -41,40 +65,17 @@ function tryAutoRegisterNode(): boolean {
   if (nodeAttempted) return false;
   nodeAttempted = true;
   try {
-    if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
+    const proc = nodeProcess();
+    if (proc === undefined || !proc.versions?.node) {
       return false;
     }
-    if (typeof require === "undefined") return false;
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const nodeModule = require("node:module") as {
-      createRequire: (from: string | URL) => NodeRequire;
-    };
-    const req = nodeModule.createRequire("file:///activesupport");
-    const os = req("node:os") as NodeOs;
-    registry.set("node", wrap(os));
+    const req = syncBuiltinLoader();
+    if (!req) return false;
+    registry.set("node", wrap(req("node:os") as NodeOs));
     return true;
   } catch {
     return false;
   }
-}
-
-function tryAutoRegisterNodeAsync(): Promise<boolean> {
-  if (registry.has("node")) return Promise.resolve(true);
-  if (!nodeAsyncPromise) {
-    nodeAsyncPromise = (async () => {
-      try {
-        if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
-          return false;
-        }
-        const os = (await import("node:os")) as unknown as NodeOs;
-        registry.set("node", wrap(os));
-        return true;
-      } catch {
-        return false;
-      }
-    })();
-  }
-  return nodeAsyncPromise;
 }
 
 function resolve(): OsAdapter {
@@ -95,32 +96,23 @@ function resolve(): OsAdapter {
   );
 }
 
-async function resolveAsync(): Promise<OsAdapter> {
-  const name = currentAdapterName;
-  try {
-    return resolve();
-  } catch (error) {
-    if (name) throw error;
-    if (await tryAutoRegisterNodeAsync()) {
-      resolved = registry.get("node")!;
-      return resolved;
-    }
-    throw error;
-  }
-}
-
+/** @noRailsEquivalent PERMANENT */
 export function getOs(): OsAdapter {
   return resolve();
 }
 
+/** @noRailsEquivalent PERMANENT */
 export async function getOsAsync(): Promise<OsAdapter> {
-  return resolveAsync();
+  return resolve();
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const osAdapterConfig = {
+  /** @noRailsEquivalent PERMANENT */
   get adapter(): string | null {
     return currentAdapterName;
   },
+  /** @noRailsEquivalent PERMANENT */
   set adapter(name: string | null) {
     currentAdapterName = name;
     resolved = null;

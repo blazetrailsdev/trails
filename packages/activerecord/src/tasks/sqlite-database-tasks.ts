@@ -1,5 +1,9 @@
-import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import {
+  getChildProcessAsync,
+  type SpawnSyncResult,
+  File,
+  FileUtils,
+} from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";

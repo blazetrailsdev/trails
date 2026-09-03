@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
-import { File } from "@blazetrails/ruby-compat";
-import { getOs } from "@blazetrails/activesupport/os-adapter";
+import { File, getOs } from "@blazetrails/ruby-compat";
 import {
   libsqlDriver,
   libsqlRemoteDriver,

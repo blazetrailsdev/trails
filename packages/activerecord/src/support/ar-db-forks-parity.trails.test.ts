@@ -1,5 +1,4 @@
-import { osAdapterConfig, registerOsAdapter } from "@blazetrails/activesupport";
-import { getFsAsync } from "@blazetrails/ruby-compat";
+import { osAdapterConfig, registerOsAdapter, getFsAsync } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, resolveForkCount } from "./ar-db-forks-default.js";
 import { workerForkCount } from "./ar-db-slots.js";

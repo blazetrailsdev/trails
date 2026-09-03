@@ -2,7 +2,7 @@ import {
   getAsyncContext,
   type AsyncContext,
   type AsyncContextAdapter,
-} from "../async-context-adapter.js";
+} from "@blazetrails/ruby-compat";
 
 interface MonData {
   owner: symbol | null;

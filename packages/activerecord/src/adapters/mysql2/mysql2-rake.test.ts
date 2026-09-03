@@ -1,6 +1,5 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
-import * as activesupport from "@blazetrails/activesupport";
-import { stdout, stderr } from "@blazetrails/ruby-compat";
+import { getChildProcessAsync, stdout, stderr } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import { MySQLDatabaseTasks } from "../../tasks/mysql-database-tasks.js";
@@ -301,7 +300,7 @@ describeIfMysqlAdapter("MySQLStructureDumpTest", () => {
   beforeEach(async () => {
     MySQLDatabaseTasks.register();
     previousFlags = DatabaseTasks.structureDumpFlags;
-    const childProcess = await activesupport.getChildProcessAsync();
+    const childProcess = await getChildProcessAsync();
     spawnSync = vi
       .spyOn(childProcess, "spawnSync")
       .mockReturnValue({ status: 0, signal: null, stdout: "", stderr: "" }) as ReturnType<
@@ -485,7 +484,7 @@ describeIfMysqlAdapter("MySQLStructureLoadTest", () => {
   beforeEach(async () => {
     MySQLDatabaseTasks.register();
     previousFlags = DatabaseTasks.structureLoadFlags;
-    const childProcess = await activesupport.getChildProcessAsync();
+    const childProcess = await getChildProcessAsync();
     spawnSync = vi
       .spyOn(childProcess, "spawnSync")
       .mockReturnValue({ status: 0, signal: null, stdout: "", stderr: "" }) as ReturnType<

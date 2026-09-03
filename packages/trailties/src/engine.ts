@@ -65,7 +65,7 @@ export class Engine extends Trailtie {
     }
     const root = rootPath && File.isExist(`${rootPath}/${flag}`) ? rootPath : defaultValue;
     if (!root) throw new Error(`Could not find root path for ${this.name}`);
-    return await realpathOr(await getFsAsync(), root);
+    return File.realpath(root);
   }
 
   static findRoot(from: string): Promise<string> {

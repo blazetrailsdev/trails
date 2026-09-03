@@ -36,8 +36,6 @@ const stat = (d: boolean) => ({
 });
 
 function installFs(dirs: Set<string>, files: Set<string>): void {
-  // The OS collapses the "//lib" that Rails' `"#{root_path}/#{flag}"`
-  // (engine.rb:702) produces at a root of "/"; a Set lookup does not.
   const norm = (p: string) => p.replace(/\/+/g, "/");
   registerFsAdapter(
     "engine-test",

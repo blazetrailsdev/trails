@@ -7,10 +7,14 @@ export interface AsyncContextAdapter {
   create<T>(): AsyncContext<T>;
 }
 
-function wrapNodeAsyncHooks(asyncHooks: typeof import("async_hooks")): AsyncContextAdapter {
+type NodeAsyncHooks = {
+  AsyncLocalStorage?: new <T>() => AsyncContext<T>;
+};
+
+function wrapNodeAsyncHooks(asyncHooks: NodeAsyncHooks): AsyncContextAdapter {
   return {
     create<T>(): AsyncContext<T> {
-      return new asyncHooks.AsyncLocalStorage<T>();
+      return new asyncHooks.AsyncLocalStorage!<T>();
     },
   };
 }
@@ -56,6 +60,7 @@ const registry = new Map<string, AsyncContextAdapter>();
 let currentAdapterName: string | null = null;
 let resolved: AsyncContextAdapter | null = null;
 
+/** @noRailsEquivalent PERMANENT */
 export function registerAsyncContextAdapter(name: string, adapter: AsyncContextAdapter): void {
   registry.set(name, adapter);
   if (name === currentAdapterName) resolved = null;
@@ -63,23 +68,42 @@ export function registerAsyncContextAdapter(name: string, adapter: AsyncContextA
 
 let nodeAttempted = false;
 
+/** @noRailsEquivalent PERMANENT */
+interface NodeProcess {
+  versions?: { node?: string };
+  getBuiltinModule?(id: string): unknown;
+}
+
+function nodeProcess(): NodeProcess | undefined {
+  return (globalThis as { process?: NodeProcess }).process;
+}
+
+/** @noRailsEquivalent PERMANENT */
+declare const require: ((id: string) => unknown) | undefined;
+
+function syncBuiltinLoader(): ((id: string) => unknown) | null {
+  const proc = nodeProcess();
+  const getBuiltinModule = proc?.getBuiltinModule;
+  if (typeof getBuiltinModule === "function") return (id) => getBuiltinModule.call(proc, id);
+  if (typeof require === "undefined") return null;
+  const nodeModule = require("node:module") as {
+    createRequire(p: string): (id: string) => unknown;
+  };
+  return nodeModule.createRequire("file:///ruby-compat");
+}
+
 function tryAutoRegisterNode(): boolean {
   if (registry.has("node")) return true;
   if (nodeAttempted) return false;
   nodeAttempted = true;
   try {
-    if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
+    const proc = nodeProcess();
+    if (proc === undefined || !proc.versions?.node) {
       return false;
     }
-
-    const nodeModule =
-      typeof require !== "undefined"
-        ? // eslint-disable-next-line @typescript-eslint/no-require-imports
-          require("node:module")
-        : null;
-    if (!nodeModule) return false;
-    const req = nodeModule.createRequire("file:///activesupport");
-    const asyncHooks = req("async_hooks") as typeof import("async_hooks");
+    const req = syncBuiltinLoader();
+    if (!req) return false;
+    const asyncHooks = req("node:async_hooks") as NodeAsyncHooks;
     if (asyncHooks.AsyncLocalStorage) {
       registry.set("node", wrapNodeAsyncHooks(asyncHooks));
       return true;
@@ -110,14 +134,18 @@ function resolve(): AsyncContextAdapter {
   return resolved;
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function getAsyncContext(): AsyncContextAdapter {
   return resolve();
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const asyncContextAdapterConfig = {
+  /** @noRailsEquivalent PERMANENT */
   get adapter(): string | null {
     return currentAdapterName;
   },
+  /** @noRailsEquivalent PERMANENT */
   set adapter(name: string | null) {
     currentAdapterName = name;
     resolved = null;
