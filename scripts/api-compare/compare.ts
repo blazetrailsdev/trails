@@ -3460,14 +3460,9 @@ export function main() {
       }
     }
 
-    // A Ruby file whose port lives in a SIBLING package
-    // (`RUBY_FILE_CROSS_PACKAGE_OVERRIDES` — trails' one `railtie.rb` per
-    // framework ports to `packages/trailties/src/trailties/<framework>.ts`).
-    // Index that file's members under this package's key for the Ruby file, so
-    // the row is scored against the real port rather than a file that will
-    // never exist here.
     for (const rubyFile of crossPackageRubyFiles(pkg)) {
-      const cross = rubyFileCrossPackageOverride(rubyFile, pkg)!;
+      const cross = rubyFileCrossPackageOverride(rubyFile, pkg);
+      if (!cross) continue;
       const foreign = ts.packages[cross.pkg];
       if (!foreign) continue;
       const key = rubyFileToTs(rubyFile, pkg);
@@ -3670,7 +3665,6 @@ export function main() {
 
     // Resolve package src directory for file existence checks
     const pkgSrcDir = packageSrcDir(pkg);
-    // A cross-package port's file lives under the SIBLING package's src dir.
     const crossPackageSrcPath = (rubyFile: string): string | undefined => {
       const cross = rubyFileCrossPackageOverride(rubyFile, pkg);
       return cross ? path.join(packageSrcDir(cross.pkg), cross.tsFile) : undefined;
