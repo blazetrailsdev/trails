@@ -60,5 +60,12 @@
     "kind": "args",
     "rubyArgs": [],
     "reason": "rack multipart/parser.rb:161 seeds the buffer part's body with `String.new` (a mutable String buffer); JS strings are immutable and have no such constructor, so the port seeds it with the empty string literal — the 5-argument `klass.new` beside it (parser.rb:164) is ported as-is."
+  },
+  {
+    "package": "rack",
+    "tsFile": "multipart/parser.ts",
+    "rubyName": "result",
+    "call": "new",
+    "reason": "multipart/parser.rb:247 is `MultipartInfo.new params, tmp_files`; trails' MultipartInfo (parser.ts:45) is an interface, so the same two fields are returned as an object literal. Surfaced by find_encoding dropping its `new TextDecoder`, which had been standing in for this `new`."
   }
 ]

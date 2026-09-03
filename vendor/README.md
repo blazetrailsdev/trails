@@ -5,7 +5,8 @@ schema-parity tooling.
 
 - `sources.ts` — declarative registry. Single source of truth for which
   gems we mirror and at what version.
-- Per-source subdirs (`rails/`, `rack/`, `rack-session/`, `globalid/`, …) are
+- Per-source subdirs (`rails/`, `rack/`, `rack-session/`, `rack-test/`,
+  `globalid/`, …) are
   gitignored
   shallow clones of the upstream repo at the pinned tag. They land here
   via the unified fetcher (wave 2).
@@ -83,6 +84,39 @@ reports 19 classes, 3 modules, 78 public methods, and
 `packages/rack-session/src` exists, because both compares key a package onto a
 TS workspace dir. RFC 0133's `enroll-rack-session-in-compare-tooling` creates
 the package and flips both on.
+
+## `vendor/rack-test/` — the Rack::Test anchor
+
+`rack-test` is a declared runtime dependency of actionpack — `add_dependency
+"rack-test", ">= 0.6.3"`
+(`vendor/rails/actionpack/actionpack.gemspec:41`), resolved to **2.2.0** by
+`vendor/rails/Gemfile.lock:443` — and the `Rack::Test` citations in
+`packages/actionpack/src/action-dispatch/testing/integration.ts:1065-1070`,
+`.../action-controller/test-case.ts:670` and
+`.../action-dispatch/testing/test-process.ts:63,88` resolve against this clone:
+`Session` at `lib/rack/test.rb:53`, `Error` `:45`, `Cookie`
+`test/cookie_jar.rb:10`, `CookieJar` `:134`, `Utils` `test/utils.rb:5`,
+`UploadedFile` `test/uploaded_file.rb:14`, `Methods` `test/methods.rb:24`.
+
+Its `libEntryFile` is the one thing that differs from `rack` / `rack-session`.
+Those two point `libPath` at the module root specifically to _exclude_ the
+entrypoint shim beside it; rack-test's `lib/rack/test.rb` is not a shim but 382
+lines defining the gem's central `Session` class, so the module root stays the
+`libPath` for path mapping and the entry file is recovered through
+`libEntryFile` — the mechanism `arel` uses for `activerecord/lib/arel.rb`.
+`testPath` is `spec`, not `test`.
+
+`compareTests` is **on**: test-compare tolerates a package with no
+`packages/<name>/src`, so the gem's 8 spec files / 234 tests are read and simply
+match nothing yet, and `parity:test`'s totals are unmoved.
+
+`compareApi` is off, and unlike rack-session's that is a hard mechanical block
+rather than a policy: `extract-ts-api.ts` refuses to measure a package whose
+`dist` is absent (`packages/rack-test — NotBuilt`, `build-freshness.ts:168-185`),
+so turning it on fails `pnpm parity:api` outright rather than printing a 0% row.
+The Ruby half is ready — `extract-ruby-api.rb` reports 5 classes, 4 modules, 90
+public methods over this clone — so the blocker is only the missing TS
+workspace, which RFC 0137's `enroll-rack-test-in-compare-tooling` creates.
 
 ## Scoping a Rails bump (drift report)
 

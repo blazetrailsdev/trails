@@ -178,6 +178,43 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rack-test",
+    origin: {
+      type: "git",
+      url: "https://github.com/rack/rack-test.git",
+      // vendor/rails/actionpack/actionpack.gemspec:41 declares
+      // `add_dependency "rack-test", ">= 0.6.3"`, resolved to 2.2.0 by
+      // vendor/rails/Gemfile.lock:443.
+      ref: "v2.2.0",
+    },
+    packages: [
+      {
+        name: "rack-test",
+        // `lib/rack/test/` (the Rack::Test module root), the same shape as
+        // `rack` and `rack-session` above.
+        libPath: "lib/rack/test",
+        // Unlike those two, the file beside that root is NOT an entrypoint
+        // shim to be excluded: `lib/rack/test.rb` is 382 lines defining
+        // `Session` (:53), `Error` (:45), `DEFAULT_HOST` (:33) and
+        // `MULTIPART_BOUNDARY` (:36) — the gem's central class. The module
+        // root stays the `libPath` for path mapping and the entry file is
+        // recovered here, as `arel` does for `activerecord/lib/arel.rb`.
+        libEntryFile: "lib/rack/test.rb",
+        // rack-test's suite is `spec/`, not `test/`.
+        testPath: "spec",
+        // test-compare tolerates a package with no `packages/<name>/src` — its
+        // Ruby tests are read and simply match nothing — but api-compare does
+        // not: `extract-ts-api.ts` refuses to measure a package whose `dist` is
+        // absent (`NotBuilt`), so leaving this on fails `parity:api` outright.
+        // The Ruby half is ready — `extract-ruby-api.rb` reports 5 classes, 4
+        // modules, 90 public methods over this clone — so the blocker is the
+        // missing TS workspace, which RFC 0137's
+        // `enroll-rack-test-in-compare-tooling` creates.
+        compareApi: false,
+      },
+    ],
+  },
+  {
     name: "did_you_mean",
     origin: {
       type: "git",

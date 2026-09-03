@@ -28,6 +28,10 @@
       "ref": "v2.1.0",
       "sha": "8a021430d2238cc7a0a3b5dfcc8fe44c43b984ce"
     },
+    "rack-test": {
+      "ref": "v2.2.0",
+      "sha": "8c0cfbac2b9874322d942428498a32c0489603f5"
+    },
     "rails": {
       "ref": "v8.0.2",
       "sha": "3235827585d87661942c91bc81f64f56d710f0b2"

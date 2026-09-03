@@ -59,9 +59,9 @@ interface CmpSpelling {
  *
  * @boundary: a Temporal value carrying an instant is trails' seat for a Ruby
  * `Time`, whose `<=>` (`vendor/ruby/time.c:3951` `time_cmp`) orders by that
- * instant, so it is ordered on `epochNanoseconds` — read off the value, and
- * only behind Temporal's own `Symbol.toStringTag` brand, rather than through
- * `@blazetrails/date`, which this package does not depend on. The receiver's
+ * instant, so it is ordered on `epochNanoseconds` — reached through
+ * {@link rbObjClass}'s `Time` arm, which seats that reading, rather than
+ * through `@blazetrails/date`, which this package does not depend on. The receiver's
  * own `<=>` still wins, as it does in Ruby. A Temporal value carrying no
  * instant still reaches `rb_obj_cmp`;
  * `calculations.ts`'s `compare` — the one caller that orders those — hands
@@ -84,9 +84,9 @@ export function cmp(a: unknown, b: unknown): number | null {
   if (b instanceof Date) b = b.getTime();
   if (isComparable(a)) return a.compareTo(b) ?? null;
   if (isCmpSpelling(a)) return a.cmp(b) ?? null;
-  if (hasEpochNanoseconds(a) && hasEpochNanoseconds(b)) {
-    const x = a.epochNanoseconds;
-    const y = b.epochNanoseconds;
+  if (rbObjClass(a) === "Time" && rbObjClass(b) === "Time") {
+    const x = (a as { epochNanoseconds: bigint }).epochNanoseconds;
+    const y = (b as { epochNanoseconds: bigint }).epochNanoseconds;
     return x < y ? -1 : x > y ? 1 : 0;
   }
   if (temporalTag(a) !== null && temporalTag(b) !== null) {
@@ -132,18 +132,6 @@ function temporalTag(value: unknown): string | null {
 function widenPlainDate(value: unknown): unknown {
   const toPlainDateTime = (value as { toPlainDateTime?: unknown }).toPlainDateTime;
   return typeof toPlainDateTime === "function" ? toPlainDateTime.call(value) : value;
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-export function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
-  return (
-    typeof (value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag] === "string" &&
-    (value as { [Symbol.toStringTag]: string })[Symbol.toStringTag].startsWith("Temporal.") &&
-    typeof (value as { epochNanoseconds?: unknown }).epochNanoseconds === "bigint"
-  );
 }
 
 function isComparable(value: unknown): value is Comparable {

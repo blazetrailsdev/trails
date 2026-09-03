@@ -1,4 +1,4 @@
-import { forceEncoding } from "@blazetrails/ruby-compat";
+import { ArgumentError, Encoding, forceEncoding } from "@blazetrails/ruby-compat";
 import { QueryParser } from "../query-parser.js";
 import { getMultipartFileLimit, getMultipartTotalPartLimit, unescapePath } from "../utils.js";
 
@@ -479,7 +479,7 @@ export class Parser {
     body: any,
   ): [string, any] {
     name = String(name);
-    let encoding = "UTF-8";
+    let encoding = Encoding.UTF_8;
 
     name = forceEncoding(name, encoding);
 
@@ -507,20 +507,14 @@ export class Parser {
    * Mirrors `find_encoding` (`rack/multipart/parser.rb:489-493`): the charset
    * is submitted by the user, so an unknown one is binary rather than an error.
    *
-   * The validity criterion differs. Ruby asks `Encoding.find`, whose registry
-   * carries Ruby-specific names and aliases (`Shift_JIS`, `EUC-JP`); this asks
-   * `TextDecoder`, which takes WHATWG labels. The two sets overlap but are not
-   * equal, so a charset one accepts the other can reject, in both directions.
-   * There is no Ruby encoding registry to consult from TS.
-   *
    * @internal
    */
-  private findEncoding(enc: string | null | undefined): string {
+  private findEncoding(enc: string | null | undefined): Encoding {
     try {
-      new TextDecoder(enc ?? "");
-      return enc!;
-    } catch {
-      return "BINARY";
+      return Encoding.find(enc!);
+    } catch (error) {
+      if (!(error instanceof ArgumentError)) throw error;
+      return Encoding.BINARY;
     }
   }
   /** @internal */ private handleEmptyContentBang(content: string | null | undefined) {

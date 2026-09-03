@@ -1,3 +1,7 @@
+import type {
+  DatabaseConfig,
+  DatabaseConfigOptions,
+} from "../database-configurations/database-config.js";
 import {
   isWriteQuery as mysqlIsWriteQuery,
   maxAllowedPacket as mysqlMaxAllowedPacket,
@@ -923,24 +927,34 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   /** @missingRailsCall empty? — PERMANENT */
-  static dbconsole(
-    config: Record<string, unknown>,
-    options: Record<string, unknown> = {},
-  ): string[] {
-    const args: string[] = [];
-    if (isRubyTruthy(config.host)) args.push(`--host=${config.host}`);
-    if (isRubyTruthy(config.port)) args.push(`--port=${config.port}`);
-    if (isRubyTruthy(config.socket)) args.push(`--socket=${config.socket}`);
-    if (isRubyTruthy(config.username)) args.push(`--user=${config.username}`);
-    if (isRubyTruthy(config.sslCa)) args.push(`--ssl-ca=${config.sslCa}`);
-    if (isRubyTruthy(config.sslCert)) args.push(`--ssl-cert=${config.sslCert}`);
-    if (isRubyTruthy(config.sslKey)) args.push(`--ssl-key=${config.sslKey}`);
-    if (isRubyTruthy(config.password) && options.includePassword) {
-      args.push(`--password=${config.password}`);
-    } else if (isRubyTruthy(config.password) && String(config.password) !== "") {
+  static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): string[] {
+    const mysqlConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
+      .configurationHash;
+
+    const args = Object.entries({
+      host: "--host",
+      port: "--port",
+      socket: "--socket",
+      username: "--user",
+      encoding: "--default-character-set",
+      sslca: "--ssl-ca",
+      sslcert: "--ssl-cert",
+      sslcapath: "--ssl-capath",
+      sslcipher: "--ssl-cipher",
+      sslkey: "--ssl-key",
+      ssl_mode: "--ssl-mode",
+    }).flatMap(([opt, arg]) =>
+      isRubyTruthy(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
+    );
+
+    if (isRubyTruthy(mysqlConfig.password) && options.includePassword) {
+      args.push(`--password=${String(mysqlConfig.password)}`);
+    } else if (isRubyTruthy(mysqlConfig.password) && String(mysqlConfig.password) !== "") {
       args.push("-p");
     }
-    if (config.database !== undefined) args.push(config.database as string);
+
+    args.push(config.database as string);
+
     return this.findCmdAndExec(ActiveRecord.databaseCli["mysql"], ...args);
   }
 
