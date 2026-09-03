@@ -6,7 +6,65 @@
  * @see https://api.rubyonrails.org/classes/ActionController/Instrumentation.html
  */
 
+import { ExecutionContext, Notifications } from "@blazetrails/activesupport";
+import { ExceptionWrapper } from "../../action-dispatch/middleware/exception-wrapper.js";
+import type { Request } from "../../action-dispatch/http/request.js";
+import type { Response } from "../../action-dispatch/http/response.js";
+
 const now = (): number => globalThis.performance?.now() ?? Date.now();
+
+interface InstrumentationHost {
+  actionName?: string;
+  request: Request;
+  response: Response;
+  appendInfoToPayload(payload: Record<string, unknown>): void;
+}
+
+/**
+ * `ActionController::Instrumentation#process_action`
+ * (`actionpack/lib/action_controller/metal/instrumentation.rb:60-84`).
+ *
+ * @internal
+ */
+export async function processAction(
+  this: InstrumentationHost,
+  block: () => Promise<void>,
+): Promise<void> {
+  ExecutionContext.setKey("controller", this);
+
+  const rawPayload: Record<string, unknown> = {
+    controller: this.constructor.name,
+    action: this.actionName,
+    request: this.request,
+    params: this.request.filteredParameters(),
+    headers: this.request.headers,
+    format: this.request.format.ref(),
+    method: this.request.requestMethod,
+    path: this.request.filteredPath(),
+  };
+
+  Notifications.instrument("start_processing.action_controller", rawPayload);
+
+  await Notifications.instrumentAsync(
+    "process_action.action_controller",
+    rawPayload,
+    async (payload) => {
+      try {
+        const result = await block();
+        payload.response = this.response;
+        payload.status = this.response.status;
+        return result;
+      } catch (error) {
+        payload.status = ExceptionWrapper.statusCodeForException(
+          (error as Error)?.constructor?.name ?? String(error),
+        );
+        throw error;
+      } finally {
+        this.appendInfoToPayload(payload as Record<string, unknown>);
+      }
+    },
+  );
+}
 
 export interface Notifier {
   instrument(event: string, payload: Record<string, unknown>, block?: () => unknown): void;
