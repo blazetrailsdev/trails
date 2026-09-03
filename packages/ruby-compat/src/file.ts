@@ -1,4 +1,6 @@
 import { getFs, getPath } from "./fs-adapter.js";
+import type { FsStatResult } from "./fs-adapter.js";
+import { IO } from "./io.js";
 
 /**
  * `File` (`vendor/ruby/file.c:7354` `rb_cFile`), the sliver of it trails calls.
@@ -20,7 +22,7 @@ import { getFs, getPath } from "./fs-adapter.js";
  * which Rails calls without defining, so no Rails or gem file declares the
  * class this file's single export lives in.
  */
-export class File {
+export class File extends IO {
   /**
    * `vendor/ruby/file.c:7427` — `File::SEPARATOR`, `"/"` on every platform.
    *
@@ -66,6 +68,76 @@ export class File {
       return getFs().statSync(fileName).isFile();
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * `vendor/ruby/file.c:1826` `rb_file_readable_p`, which is
+   * `rb_eaccess(fname, R_OK) >= 0` and so is `false` both for a file that is
+   * not there and for one the effective user cannot read. `R_OK` is POSIX's
+   * `4` rather than a Ruby constant. A backend with no access check has no
+   * `accessSync`, and there existence is all that can be answered.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.readable?`
+   * (`vendor/ruby/file.c:1826`).
+   */
+  static isReadable(fileName: string): boolean {
+    const fs = getFs();
+    if (!fs.accessSync) return fs.existsSync(fileName);
+    try {
+      fs.accessSync(fileName, 4);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * `vendor/ruby/file.c:1329` `rb_file_s_stat`, which RAISES `Errno::ENOENT`
+   * rather than answering `nil` when the path is not there — the predicates
+   * above are the arms that swallow it.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.stat`
+   * (`vendor/ruby/file.c:1329`).
+   */
+  static stat(fileName: string): FsStatResult {
+    return getFs().statSync(fileName);
+  }
+
+  /**
+   * `vendor/ruby/file.c:2047` `rb_file_size_p` — `File.size?`, `nil` both when
+   * the file is missing AND when it is empty, which is what makes it a
+   * three-state answer rather than a size.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.size?`
+   * (`vendor/ruby/file.c:2047`).
+   */
+  static sizeQ(fileName: string): number | null {
+    let size: number;
+    try {
+      size = File.stat(fileName).size;
+    } catch {
+      return null;
+    }
+    return size === 0 ? null : size;
+  }
+
+  /**
+   * `vendor/ruby/io.c:15418`, where `rb_cFile` registers `rb_io_s_open`
+   * (`io.c:8148`): with a block the stream is closed once the block returns
+   * and the block's value is the answer. Ruby's mode string carries the
+   * binary flag node's `flags` has no letter for — a JS string read back
+   * one character per byte is already that encoding — so `b` is dropped.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.open`
+   * (`vendor/ruby/io.c:8148`).
+   */
+  static open<T>(fileName: string, mode: string, block: (file: File) => T): T {
+    const file = new File(getFs().openSync(fileName, mode.replace(/b/g, "")));
+    try {
+      return block(file);
+    } finally {
+      file.close();
     }
   }
 

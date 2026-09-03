@@ -1,6 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
-import { getPath } from "@blazetrails/ruby-compat";
-import { Dir } from "@blazetrails/ruby-compat";
+import { Dir, File, hasKey } from "@blazetrails/ruby-compat";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
@@ -31,7 +29,7 @@ export class Static {
     this.index = options.index;
     this.cascade = options.cascade ?? false;
     this.gzip = options.gzip ?? false;
-    const root = options.root ? getPath().resolve(options.root) : Dir.pwd();
+    const root = options.root ? File.expandPath(options.root) : Dir.pwd();
     this.headerRules = options.header_rules ? [...options.header_rules] : [];
     if (options.cache_control) {
       this.headerRules.unshift(["all", { [CACHE_CONTROL]: options.cache_control }]);
@@ -84,7 +82,7 @@ export class Static {
       } else if (response[0] === 304) {
         // leave headers as-is
       } else {
-        response[1][CONTENT_TYPE] = mimeType(getPath().extname(origPath), "text/plain");
+        response[1][CONTENT_TYPE] = mimeType(File.extname(origPath), "text/plain");
         response[1]["content-encoding"] = "gzip";
       }
     }

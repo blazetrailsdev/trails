@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { File } from "./file.js";
@@ -72,5 +79,38 @@ describe("File", () => {
     // vendor/ruby/file.c:1622.
     expect(File.isDirectory("/nope/nope")).toBe(false);
     expect(File.isFile("/nope/nope")).toBe(false);
+  });
+
+  it("size? is nil both for a missing file and for an empty one", () => {
+    // vendor/ruby/file.c:2047 answers nil in BOTH cases, not 0.
+    const root = fixture();
+    writeFileSync(join(root, "empty.rb"), "");
+    expect(File.sizeQ(join(root, "a.rb"))).toBe(7);
+    expect(File.sizeQ(join(root, "empty.rb"))).toBe(null);
+    expect(File.sizeQ(join(root, "nonexistent"))).toBe(null);
+  });
+
+  it("stat raises where the predicates swallow, and mtime reads through it", () => {
+    // vendor/ruby/file.c:1329 raises Errno::ENOENT rather than answering nil.
+    const root = fixture();
+    expect(File.stat(join(root, "a.rb")).size).toBe(7);
+    expect(File.mtime(join(root, "a.rb"))).toBeInstanceOf(Date);
+    expect(() => File.stat(join(root, "nonexistent"))).toThrow();
+  });
+
+  it("readable? is an access check, not the existence check exist? is", () => {
+    // vendor/ruby/file.c:1826 is eaccess(R_OK), not the stat exist? does.
+    const root = fixture();
+    const path = join(root, "a.rb");
+    chmodSync(path, 0o000);
+    let accessible = true;
+    try {
+      readFileSync(path);
+    } catch {
+      accessible = false;
+    }
+
+    expect(File.isExist(path)).toBe(true);
+    expect(File.isReadable(path)).toBe(accessible);
   });
 });

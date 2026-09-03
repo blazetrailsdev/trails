@@ -1,4 +1,4 @@
-import { getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { escapePath } from "./utils.js";
@@ -21,7 +21,7 @@ export class Sendfile {
     if (body && typeof body.toPath === "function") {
       const type = this.variation || env["sendfile.type"] || null;
       if (type != null && /x-accel-redirect/i.test(type)) {
-        const path = getPath().resolve(body.toPath());
+        const path = File.expandPath(body.toPath());
         const url = this.mapAccelPath(env, path);
         if (url != null) {
           headers["content-length"] = "0";
@@ -34,7 +34,7 @@ export class Sendfile {
           env[RACK_ERRORS].puts("x-accel-mapping header missing");
         }
       } else if (type != null && /x-sendfile|x-lighttpd-send-file/i.test(type)) {
-        const path = getPath().resolve(body.toPath());
+        const path = File.expandPath(body.toPath());
         headers["content-length"] = "0";
         headers[type.toLowerCase()] = path;
         const obody = body;

@@ -14,27 +14,9 @@
   {
     "package": "rack",
     "tsFile": "files.ts",
-    "rubyName": "filesize",
-    "call": "read",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "files.ts",
     "rubyName": "get",
     "call": "clean_path_info",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "files.ts",
-    "rubyName": "get",
-    "call": "file?",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:path"
-    ],
-    "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
   },
   {
     "package": "rack",
@@ -76,12 +58,5 @@
       "kwargs{mimeType=ref:mimeType,size=ref:size}"
     ],
     "reason": "Baseline (RFC 0095): call-ARGUMENT shape divergence seeded when the argument ratchet landed — the port makes the call Rails makes with a different argument count, order, literal value or kwarg key; pending per-body convergence review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "files.ts",
-    "rubyName": "serving",
-    "call": "order:fail,mimeType",
-    "reason": "Baseline (RFC 0084): ORDER-only divergence seeded when the call-sequence comparison landed — the port makes every call Rails makes, in a different sequence; pending per-body control-flow convergence review."
   }
 ]

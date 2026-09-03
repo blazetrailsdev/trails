@@ -74,4 +74,12 @@ describe("Dir", () => {
     expect(Dir.delete(join(root, "made"))).toBe(0);
     expect(() => Dir.delete(join(root, "a"))).toThrow();
   });
+  it('foreach yields "." and ".." ahead of the children', () => {
+    // vendor/ruby/dir.c:3288 reads the directory stream unfiltered.
+    const root = fixture();
+    const yielded: string[] = [];
+    expect(Dir.foreach(root, (filename) => yielded.push(filename))).toBe(null);
+    expect(yielded.slice(0, 2)).toEqual([".", ".."]);
+    expect(yielded.slice(2).sort()).toEqual(Dir.children(root).sort());
+  });
 });

@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 import type { FsStatResult } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { mimeType } from "./mime.js";
@@ -91,20 +91,12 @@ export class DirectoryBody {
       if (parent) cb(formatDirRow(...parent));
     }
 
-    let entries: string[];
-    try {
-      entries = getFs()
-        .readdirSync(this.path, { withFileTypes: true })
-        .map((e: { name: string }) => e.name)
-        .filter((n: string) => !n.startsWith("."));
-    } catch {
-      entries = [];
-    }
-
-    for (const basename of entries) {
+    Dir.foreach(this.path, (basename) => {
+      if (basename.startsWith(".")) return;
       const f = this.files(basename);
-      if (f) cb(formatDirRow(...f));
-    }
+      if (!f) return;
+      cb(formatDirRow(...f));
+    });
 
     cb(DIR_PAGE_FOOTER);
   }
@@ -115,7 +107,7 @@ export class Directory {
   private app: any;
 
   constructor(root: string, app?: any) {
-    this.root = getPath().resolve(root);
+    this.root = File.expandPath(root);
     this.app = app || new Files(this.root);
   }
 
@@ -137,7 +129,7 @@ export class Directory {
     const clientError = this.checkBadRequest(pathInfo) || this.checkForbidden(pathInfo);
     if (clientError) return clientError;
 
-    const path = getPath().join(this.root, pathInfo);
+    const path = File.join(this.root, pathInfo);
     return this.listPath(env, path, pathInfo, scriptName);
   }
 
@@ -157,8 +149,7 @@ export class Directory {
 
   checkForbidden(pathInfo: string): [number, Record<string, any>, any] | null {
     if (!pathInfo.includes("..")) return null;
-    const resolved = getPath().resolve(getPath().join(this.root, pathInfo));
-    if (resolved === this.root || resolved.startsWith(this.root + getPath().sep)) return null;
+    if (File.expandPath(File.join(this.root, pathInfo)).startsWith(this.root)) return null;
     return this.entityNotFound(pathInfo);
   }
 
@@ -173,7 +164,7 @@ export class Directory {
     );
 
     const filesCallback = (basename: string): [string, string, string, string, string] | null => {
-      const fullEntry = getPath().join(path, basename);
+      const fullEntry = File.join(path, basename);
       const s = this.stat(fullEntry);
       if (!s) return null;
 
@@ -186,7 +177,7 @@ export class Directory {
         return [url, displayName, "-", "directory", mtime];
       }
 
-      const type = mimeType(getPath().extname(basename), null) || "text/plain";
+      const type = mimeType(File.extname(basename), null) || "text/plain";
       return [url, basename, this.filesizeFormat(s.size), type, mtime];
     };
 
@@ -196,7 +187,7 @@ export class Directory {
 
   stat(path: string): FsStatResult | null {
     try {
-      return getFs().statSync(path);
+      return File.stat(path);
     } catch {
       return null;
     }

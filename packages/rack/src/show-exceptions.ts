@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { chomp } from "@blazetrails/ruby-compat";
 
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";
@@ -146,7 +146,7 @@ export class ShowExceptions {
 
           try {
             const lineno = frame.lineno! - 1;
-            const lines = readlines(frame.filename!);
+            const lines = File.readlines(frame.filename!);
             frame.setPreContextLineno(Math.max(lineno - ShowExceptions.CONTEXT, 0));
             frame.setPreContext(lines.slice(frame.preContextLineno!, lineno));
             frame.setContextLine(chomp(lines[lineno]));
@@ -272,10 +272,4 @@ export class ShowExceptions {
       return "Invalid POST data";
     }
   }
-}
-
-function readlines(filename: string): string[] {
-  return getFs()
-    .readFileSync(filename, "utf-8")
-    .split(/(?<=\n)/);
 }

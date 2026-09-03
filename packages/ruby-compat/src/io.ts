@@ -80,6 +80,40 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
  */
 export class IO {
   /**
+   * The descriptor `rb_io_s_open` (`vendor/ruby/io.c:8148`) opened the stream
+   * on, and the offset `rb_io_seek_m` (`io.c:2495`) moves — Ruby's `rb_io_t`
+   * holds both.
+   */
+  protected fd: number;
+
+  /** @internal */
+  private pos = 0;
+
+  /**
+   * `rb_io_initialize` (`vendor/ruby/io.c:9207`), reached as `IO.new(fd)`. It
+   * is protected because `File.open` (`io.c:8148`) is the only way trails
+   * opens a stream, and a public TS constructor is measured surface.
+   */
+  protected constructor(fd: number) {
+    this.fd = fd;
+  }
+
+  /**
+   * `vendor/ruby/io.c:12121` `rb_io_s_readlines`, in its whole-file form:
+   * every line of the file, each keeping its trailing separator.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO.readlines`
+   * (`vendor/ruby/io.c:12121`).
+   */
+  static readlines(name: string): string[] {
+    const lines = getFs()
+      .readFileSync(name, "utf-8")
+      .split(/(?<=\n)/);
+    if (lines[lines.length - 1] === "") lines.pop();
+    return lines;
+  }
+
+  /**
    * `vendor/ruby/io.c:12396` `rb_io_s_binwrite`, which is `IO.write`
    * (`io.c:12377`) with the stream opened in binary mode. The trails buffer is
    * already a binary String — one character per byte — so the two differ only
@@ -92,5 +126,57 @@ export class IO {
   static binwrite(name: string, string: string): number {
     getFs().writeFileSync(name, string);
     return string.length;
+  }
+
+  /**
+   * `vendor/ruby/io.c:2495` `rb_io_seek_m` in its one-argument form, where
+   * `whence` is `IO::SEEK_SET` — the absolute offset the next read starts at.
+   * It answers `0`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#seek`
+   * (`vendor/ruby/io.c:2495`).
+   */
+  seek(amount: number): number {
+    this.pos = amount;
+    return 0;
+  }
+
+  /**
+   * `vendor/ruby/io.c:3774` `io_read`, which behaves like C's `fread` and so
+   * retries `read(2)` until `length` bytes are in hand or the stream hits EOF
+   * (`io.c:3760-3763`) — a short read is not an answer. It answers `nil` —
+   * never `""` — once the stream is at EOF and `length` is positive. The bytes
+   * come back as a binary String, one character per byte, which is the
+   * ASCII-8BIT `File.open(path, "rb")` reads in — assembled a character at a
+   * time because no `TextDecoder` encoding gives it: its "latin1" is
+   * windows-1252, and that remaps 0x80-0x9F.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
+   * (`vendor/ruby/io.c:3774`).
+   */
+  read(length: number): string | null {
+    const buffer = new Uint8Array(length);
+    let n = 0;
+    while (n < length) {
+      const read = getFs().readSync(this.fd, buffer, n, length - n, this.pos + n);
+      if (read === 0) break;
+      n += read;
+    }
+    if (n === 0) return length === 0 ? "" : null;
+    this.pos += n;
+    let part = "";
+    for (let i = 0; i < n; i++) part += String.fromCharCode(buffer[i]);
+    return part;
+  }
+
+  /**
+   * `vendor/ruby/io.c:5777` `rb_io_close_m`, which answers `nil`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#close`
+   * (`vendor/ruby/io.c:5777`).
+   */
+  close(): null {
+    getFs().closeSync(this.fd);
+    return null;
   }
 }
