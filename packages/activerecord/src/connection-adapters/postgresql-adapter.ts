@@ -776,7 +776,7 @@ export class PostgreSQLAdapter
       }
 
       await this.initializeTypeMap();
-      this._statements.reset();
+      void this._statements.reset();
     });
   }
 
@@ -849,7 +849,7 @@ export class PostgreSQLAdapter
         this._rawConnection = null;
         this._connectionConfigured = false;
         this._typeMapEagerLoaded = false;
-        this._statements.reset();
+        void this._statements.reset();
       }
       this._teardownRacedClient(client, acquireGen);
       throw error;
@@ -1323,7 +1323,7 @@ export class PostgreSQLAdapter
   }
 
   async close(): Promise<void> {
-    this._statements.reset();
+    void this._statements.reset();
     this._client = null;
     this._inTransaction = false;
     this._connectionConfigured = false;
@@ -1348,7 +1348,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statements.reset();
+    void this._statements.reset();
     this._inTransaction = false;
     this._closed = false;
     conn?.end().catch(() => {});
@@ -1382,13 +1382,13 @@ export class PostgreSQLAdapter
             this._rawConnection = null;
             this._connectionConfigured = false;
             this._typeMapEagerLoaded = false;
-            this._statements.reset();
+            void this._statements.reset();
           }
           live.end().catch(() => {});
           throw error;
         });
       }
-      this._statements.reset();
+      void this._statements.reset();
       await super.resetBang();
     });
   }
@@ -1409,7 +1409,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statements.reset();
+    void this._statements.reset();
     this._inTransaction = false;
     if (this._acquiring) this._acquireGeneration++;
     this._closingDriver = conn?.end().catch(() => {}) ?? null;
@@ -1428,7 +1428,7 @@ export class PostgreSQLAdapter
     this._client = null;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
-    this._statements.reset();
+    void this._statements.reset();
     this._inTransaction = false;
     this._closed = true;
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);

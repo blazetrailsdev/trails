@@ -59,7 +59,7 @@ describe("StatementPoolTest", () => {
     const pool = new TestPool();
     await pool.set("a", "stmt_a");
     await pool.set("b", "stmt_b");
-    pool.reset();
+    await pool.reset();
     expect(dealloced).toHaveLength(0);
     expect(pool.length).toBe(0);
   });
