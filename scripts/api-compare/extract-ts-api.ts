@@ -4376,9 +4376,21 @@ function describeObjectLiteral(node: ts.ObjectLiteralExpression, flags: string[]
   return `kwargs{${pairs.join(",")}}`;
 }
 
-/** The port's spelling of a Ruby block: an inline callback argument. */
+/**
+ * The port's spelling of a Ruby block: an inline callback argument, bare or
+ * wrapped in `@blazetrails/ruby-compat`'s `block(...)` brand — the one shape a
+ * `Hash#fetch` / `Hash#dig` port can pass its `do … end` in, since the brand is
+ * how the arm is dispatched at runtime.
+ */
 function isFunctionArgument(node: ts.Node): boolean {
-  return ts.isArrowFunction(node) || ts.isFunctionExpression(node);
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return true;
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === "block" &&
+    node.arguments.length === 1 &&
+    isFunctionArgument(node.arguments[0])
+  );
 }
 
 function collectCalls(

@@ -6,7 +6,7 @@ import { block, fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
-import { columnType, Result, type ColumnType, type ColumnTypes } from "../result.js";
+import { Result, type ColumnType, type ColumnTypes } from "../result.js";
 import { EnumType } from "../enum.js";
 import { defaultValue } from "../type.js";
 import {
@@ -1038,7 +1038,9 @@ export async function typeCastPluckValues(
             return (
               (lookupCastTypeFromJoinDependencies(this, name, joinDependencies) as
                 | ColumnType
-                | undefined) ?? columnType(result, name, i, {})
+                | undefined) ??
+              result.columnTypes[i] ??
+              defaultValue()
             );
           }),
         )) as ColumnType;
