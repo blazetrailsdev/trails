@@ -7,7 +7,7 @@
 // at the boundary, hardcoded only at registration time.
 
 import { getChildProcess } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 
 export interface PackageManagerAdapter {
   /** CLI binary name (`pnpm`, `npm`, `yarn`, `bun`). */
@@ -76,11 +76,9 @@ export interface DetectOptions {
 }
 
 export function detectPackageManager(cwd: string, opts: DetectOptions = {}): PackageManagerAdapter {
-  const fs = getFs();
-  const path = getPath();
-  if (fs.existsSync(path.join(cwd, "pnpm-lock.yaml"))) return registry.get("pnpm")!;
-  if (fs.existsSync(path.join(cwd, "yarn.lock"))) return registry.get("yarn")!;
-  if (fs.existsSync(path.join(cwd, "bun.lockb"))) return registry.get("bun")!;
+  if (File.isExist(File.join(cwd, "pnpm-lock.yaml"))) return registry.get("pnpm")!;
+  if (File.isExist(File.join(cwd, "yarn.lock"))) return registry.get("yarn")!;
+  if (File.isExist(File.join(cwd, "bun.lockb"))) return registry.get("bun")!;
   const fallback = opts.fallback ?? "npm";
   const adapter = registry.get(fallback);
   if (!adapter) throw new Error(`Package manager "${fallback}" is not registered.`);

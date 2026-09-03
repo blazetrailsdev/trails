@@ -1,3 +1,4 @@
+import { File } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 
@@ -32,7 +33,7 @@ export class EncryptionKeyFileGenerator extends GeneratorBase {
       this.output(`IMPORTANT: Don't commit ${keyPath}. Add this to your ignore file:${ignore}`);
       return;
     }
-    const existing = this.fs.readFileSync(this.path.join(this.cwd, ".gitignore"), "utf-8");
+    const existing = File.read(File.join(this.cwd, ".gitignore"));
     if (existing.includes(ignore)) return;
     this.output(`Ignoring ${keyPath} so it won't end up in Git history:`);
     this.appendToFile(".gitignore", ignore);

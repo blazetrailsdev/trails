@@ -1,4 +1,5 @@
 // Mirrors railties/lib/rails/generators/rails/devcontainer/devcontainer_generator.rb.
+import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";
 export const TRAILS_DEV_PATH = "/workspaces/trails";
@@ -66,8 +67,8 @@ export class DevcontainerGenerator extends GeneratorBase {
 
   private gsubFile(rel: string, re: RegExp, replacement: string, enabled: boolean): void {
     if (!enabled || !this.fileExists(rel)) return;
-    const full = this.path.join(this.cwd, rel);
-    this.fs.writeFileSync(full, this.fs.readFileSync(full, "utf-8").replace(re, replacement));
+    const full = File.join(this.cwd, rel);
+    File.write(full, File.read(full).replace(re, replacement));
     this.output(`      update  ${rel}`);
   }
 

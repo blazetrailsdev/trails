@@ -1,55 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  fsAdapterConfig,
-  registerFsAdapter,
-  type FsAdapter,
-  type PathAdapter,
-} from "@blazetrails/ruby-compat";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import { CreateMigration, type MigrationRenderer } from "./create-migration.js";
 
-const path: PathAdapter = {
-  join: (...p) => p.join("/"),
-  dirname: (p) => p.split("/").slice(0, -1).join("/") || "/",
-  basename: (p) => p.split("/").pop()!,
-  resolve: (...p) => p.join("/"),
-  extname: (p) => {
-    const i = p.lastIndexOf(".");
-    return i >= 0 ? p.slice(i) : "";
-  },
-  isAbsolute: (p) => p.startsWith("/"),
-  sep: "/",
-};
-
-const ROOT = "/app";
 const DEFAULT = "db/migrate/create_articles.rb";
 
+let ROOT: string;
+
 interface Store {
-  files: Map<string, string>;
   log: string[];
 }
 
 function install(): Store {
-  const files = new Map<string, string>();
-  const dirs = new Set<string>([ROOT, `${ROOT}/db`, `${ROOT}/db/migrate`]);
-  const dirOf = (p: string) => p.split("/").slice(0, -1).join("/") || "/";
-  const fs = {
-    exists: async (p: string) => files.has(p) || dirs.has(p),
-    readFile: (async (p: string) => files.get(p)!) as unknown as FsAdapter["readFile"],
-    writeFile: async (p: string, c: string) => {
-      files.set(p, c);
-    },
-    unlink: async (p: string) => {
-      files.delete(p);
-    },
-    mkdir: async (p: string) => {
-      dirs.add(p);
-    },
-    readdir: async (p: string) =>
-      [...files.keys()].filter((f) => dirOf(f) === p).map((f) => f.slice(p.length + 1)),
-  } as unknown as FsAdapter;
-  registerFsAdapter("create-migration-test", fs, path);
-  fsAdapterConfig.adapter = "create-migration-test";
-  return { files, log: [] };
+  ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "trails-create-migration-"));
+  fs.mkdirSync(path.join(ROOT, "db/migrate"), { recursive: true });
+  return { log: [] };
+}
+
+function migrations(dir: string): string[] {
+  return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
 }
 
 function makeMigration(
@@ -60,7 +30,7 @@ function makeMigration(
   data: MigrationRenderer = "contents",
 ): CreateMigration {
   const dir = path.dirname(`${ROOT}/${destinationPath}`);
-  const next = [...s.files.keys()].filter((f) => path.dirname(f) === dir).length + 1;
+  const next = migrations(dir).length + 1;
   const numbered = `${dir}/${next}_${path.basename(destinationPath)}`;
   const fileName = path.basename(destinationPath).replace(/\.rb$/, "");
   const host = {
@@ -74,13 +44,12 @@ function makeMigration(
 }
 
 describe("CreateMigration", () => {
-  const PREV = fsAdapterConfig.adapter;
   let s: Store;
   beforeEach(() => {
     s = install();
   });
   afterEach(() => {
-    fsAdapterConfig.adapter = PREV;
+    fs.rmSync(ROOT, { recursive: true, force: true });
   });
 
   const migrationExists = async (
@@ -97,19 +66,19 @@ describe("CreateMigration", () => {
     const m = makeMigration(s);
     await m.invoke();
     expect(s.log.join("\n")).toMatch(/create {2}db\/migrate\/1_create_articles\.rb/);
-    expect(s.files.has(m.destination)).toBe(true);
+    expect(fs.existsSync(m.destination)).toBe(true);
   });
 
   it("test_invoke_pretended", async () => {
     const m = makeMigration(s, DEFAULT, {}, { pretend: true });
     await m.invoke();
     expect(s.log.join("\n")).toMatch(/create {2}db\/migrate\/1_create_articles\.rb/);
-    expect(s.files.has(m.destination)).toBe(false);
+    expect(fs.existsSync(m.destination)).toBe(false);
   });
 
   it("test_invoke_when_exists", async () => {
     const existing = await migrationExists();
-    expect(await makeMigration(s).existingMigration()).toBe(existing.destination);
+    expect(makeMigration(s).existingMigration()).toBe(existing.destination);
   });
 
   it("test_invoke_when_exists_identical", async () => {
@@ -122,7 +91,7 @@ describe("CreateMigration", () => {
 
   it("test_invoke_return_existing_file_when_exists_identical", async () => {
     const existing = await migrationExists();
-    expect(await makeMigration(s).invoke()).toBe(await existing.relativeExistingMigration());
+    expect(await makeMigration(s).invoke()).toBe(existing.relativeExistingMigration());
   });
 
   it("test_invoke_when_exists_not_identical", async () => {
@@ -140,8 +109,8 @@ describe("CreateMigration", () => {
     const out = s.log.join("\n");
     expect(out).toMatch(/remove {2}db\/migrate\/1_migration\.rb/);
     expect(out).toMatch(/create {2}db\/migrate\/2_migration\.rb/);
-    expect(s.files.has(m.destination)).toBe(true);
-    expect(s.files.has(existing.destination)).toBe(false);
+    expect(fs.existsSync(m.destination)).toBe(true);
+    expect(fs.existsSync(existing.destination)).toBe(false);
   });
 
   it("test_invoke_forced_pretended_when_exists_not_identical", async () => {
@@ -151,7 +120,7 @@ describe("CreateMigration", () => {
     const out = s.log.join("\n");
     expect(out).toMatch(/remove {2}db\/migrate\/1_create_articles\.rb/);
     expect(out).toMatch(/create {2}db\/migrate\/2_create_articles\.rb/);
-    expect(s.files.has(m.destination)).toBe(false);
+    expect(fs.existsSync(m.destination)).toBe(false);
   });
 
   it("test_invoke_skipped_when_exists_not_identical", async () => {
@@ -159,25 +128,25 @@ describe("CreateMigration", () => {
     const m = makeMigration(s, DEFAULT, { skip: true }, {}, "different");
     await m.invoke();
     expect(s.log.join("\n")).toMatch(/skip {2}db\/migrate\/2_create_articles\.rb/);
-    expect(s.files.has(m.destination)).toBe(false);
+    expect(fs.existsSync(m.destination)).toBe(false);
   });
 
   it("test_revoke", async () => {
     const existing = await migrationExists();
-    await makeMigration(s).revoke();
+    makeMigration(s).revoke();
     expect(s.log.join("\n")).toMatch(/remove {2}db\/migrate\/1_create_articles\.rb/);
-    expect(s.files.has(existing.destination)).toBe(false);
+    expect(fs.existsSync(existing.destination)).toBe(false);
   });
 
   it("test_revoke_pretended", async () => {
     const existing = await migrationExists();
-    await makeMigration(s, DEFAULT, {}, { pretend: true }).revoke();
+    makeMigration(s, DEFAULT, {}, { pretend: true }).revoke();
     expect(s.log.join("\n")).toMatch(/remove {2}db\/migrate\/1_create_articles\.rb/);
-    expect(s.files.has(existing.destination)).toBe(true);
+    expect(fs.existsSync(existing.destination)).toBe(true);
   });
 
   it("test_revoke_when_no_exists", async () => {
-    await makeMigration(s).revoke();
+    makeMigration(s).revoke();
     expect(s.log.join("\n")).toMatch(/remove {2}db\/migrate\/1_create_articles\.rb/);
   });
 });

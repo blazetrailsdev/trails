@@ -9,7 +9,7 @@
  *   root via `setRoot()` once known.
  */
 import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
 import { resolveEnv } from "../database.js";
@@ -53,10 +53,14 @@ export class EngineConfiguration extends RailtieConfiguration {
    * @missingRailsCall new — PERMANENT: the dropped call is `Pathname.new`
    * (`engine/configuration.rb:115-117`). `Pathname` is a Ruby stdlib class with
    * no trails counterpart — no package defines one — so there is no receiver to
-   * construct; `getPath().resolve` against the working directory is what
-   * `Pathname#expand_path` answers. */
+   * construct; `File.expand_path` against the working directory is what
+   * `Pathname#expand_path` answers.
+   *
+   * @missingRailsArgs expand_path — PERMANENT: with `Pathname.new` dropped the
+   * path is no longer a receiver, so the argument Ruby carries in the receiver
+   * moves into `File.expand_path`'s first parameter. */
   setRoot(value: string | null): void {
-    const expanded = value === null ? null : getPath().resolve(getFs().cwd(), value);
+    const expanded = value === null ? null : File.expandPath(value);
     this._root = expanded;
     if (this._paths) this._paths.path = expanded;
   }

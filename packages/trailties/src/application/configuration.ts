@@ -2,7 +2,7 @@
 // `railties/lib/rails/application/configuration.rb`. PR 2.5b: scalar/state
 // defaults only — credentials + `databaseConfiguration` are 2.5c or later.
 import { Session } from "@blazetrails/actionpack";
-import { getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Trails } from "../rails.js";
@@ -409,7 +409,7 @@ export class Configuration extends EngineConfiguration {
    * whole ported body. Story `port-trails-autoloaders` converges it.
    */
   autoloadLib({ ignore }: { ignore: string | string[] }): void {
-    const lib = getPath().join(this.root as string, "lib");
+    const lib = File.join(this.root as string, "lib");
 
     this.autoloadPaths.push(lib);
     this.eagerLoadPaths.push(lib);

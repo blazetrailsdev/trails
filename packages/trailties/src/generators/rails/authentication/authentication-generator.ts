@@ -1,3 +1,4 @@
+import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { MigrationGenerator } from "../../migration-generator.js";
 import { TEMPLATES } from "./templates.js";
@@ -81,8 +82,8 @@ export class AuthenticationGenerator extends GeneratorBase {
   private configureApplicationController(): void {
     const file = "app/controllers/application-controller.ts";
     if (!this.fileExists(file)) return;
-    const full = this.path.join(this.cwd, file);
-    let src = this.fs.readFileSync(full, "utf-8");
+    const full = File.join(this.cwd, file);
+    let src = File.read(full);
     const mixin = src.includes("include(this, Authentication)") ? "" : STATIC_INIT;
     const hasAuth = /import\s*\{[^}]*\bAuthentication\b[^}]*\}\s*from\s*["'][^"']+["']/.test(src);
     const hasInclude = /import\s*\{[^}]*\binclude\b[^}]*\}\s*from\s*["'][^"']+["']/.test(src);
@@ -92,7 +93,7 @@ export class AuthenticationGenerator extends GeneratorBase {
     if (!m || m.index === undefined) return;
     const at = m.index + m[0].length;
     src = imp + src.slice(0, at) + mixin + src.slice(at);
-    this.fs.writeFileSync(full, src);
+    File.write(full, src);
   }
 
   /**
@@ -102,7 +103,7 @@ export class AuthenticationGenerator extends GeneratorBase {
   private configureAuthenticationRoutes(): void {
     for (const f of ["config/routes.ts", "config/routes.js"]) {
       if (!this.fileExists(f)) continue;
-      const src = this.fs.readFileSync(this.path.join(this.cwd, f), "utf-8");
+      const src = File.read(File.join(this.cwd, f));
       const lines: string[] = [];
       if (!src.includes('router.resources("passwords"'))
         lines.push(`  router.resources("passwords", { param: "token" });`);
@@ -119,11 +120,11 @@ export class AuthenticationGenerator extends GeneratorBase {
    */
   private enableBcrypt(): void {
     if (!this.fileExists("package.json")) return;
-    const full = this.path.join(this.cwd, "package.json");
-    const json = JSON.parse(this.fs.readFileSync(full, "utf-8"));
+    const full = File.join(this.cwd, "package.json");
+    const json = JSON.parse(File.read(full));
     if (!json.dependencies?.["bcryptjs"]) {
       json.dependencies = { ...json.dependencies, bcryptjs: "*" };
-      this.fs.writeFileSync(full, JSON.stringify(json, null, 2) + "\n");
+      File.write(full, JSON.stringify(json, null, 2) + "\n");
     }
     this.executeCommand(json.packageManager?.split("@")[0] ?? "pnpm", "install --silent");
   }
