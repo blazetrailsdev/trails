@@ -1,6 +1,6 @@
 import { stringInspect } from "./string/inspect.js";
 import { isSymbol } from "./symbol.js";
-import { rubyClass, hasEpochNanoseconds, type Comparable } from "./comparable.js";
+import { rubyClass, type Comparable } from "./comparable.js";
 
 /**
  * `rb_obj_class` (`vendor/ruby/object.c:296`) over the values trails carries:
@@ -23,6 +23,14 @@ export function rbObjClass(x: unknown): string {
   if (branded != null) return branded;
   if (hasEpochNanoseconds(x)) return "Time";
   return (x as object).constructor?.name ?? typeof x;
+}
+
+function hasEpochNanoseconds(value: unknown): value is { epochNanoseconds: bigint } {
+  return (
+    typeof (value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag] === "string" &&
+    (value as { [Symbol.toStringTag]: string })[Symbol.toStringTag].startsWith("Temporal.") &&
+    typeof (value as { epochNanoseconds?: unknown }).epochNanoseconds === "bigint"
+  );
 }
 
 /**

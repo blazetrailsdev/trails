@@ -23,3 +23,15 @@ describe("forceEncoding", () => {
     expect(forceEncoding("Ã©", "UTF-8")).toBe("é");
   });
 });
+
+describe("forceEncoding resolves its argument through the Ruby registry", () => {
+  it("decodes under a Ruby name TextDecoder does not take", () => {
+    const sjis = String.fromCharCode(0x82, 0xa0);
+    expect(forceEncoding(sjis, "CP932")).toBe("あ");
+    expect(forceEncoding(sjis, "Windows-31J")).toBe("あ");
+  });
+
+  it("leaves the bytes alone for a name outside the registry", () => {
+    expect(forceEncoding("abc", "no-such-encoding")).toBe("abc");
+  });
+});

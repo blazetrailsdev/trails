@@ -1,3 +1,7 @@
+import type {
+  DatabaseConfig,
+  DatabaseConfigOptions,
+} from "../database-configurations/database-config.js";
 import pg from "pg";
 import { fetch } from "@blazetrails/ruby-compat";
 import {
@@ -213,21 +217,24 @@ export class PostgreSQLAdapter
   }
 
   static override dbconsole(
-    config: Record<string, unknown> = {},
+    config: DatabaseConfig,
     options: { includePassword?: boolean } = {},
   ): { env: Record<string, string>; argv: string[] } {
+    const pgConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
+      .configurationHash;
+
     const env: Record<string, string> = {};
-    if (isRubyTruthy(config.username)) env.PGUSER = String(config.username);
-    if (isRubyTruthy(config.host)) env.PGHOST = String(config.host);
-    if (isRubyTruthy(config.port)) env.PGPORT = String(config.port);
-    if (isRubyTruthy(config.password) && options.includePassword) {
-      env.PGPASSWORD = String(config.password);
+    if (isRubyTruthy(pgConfig.username)) env.PGUSER = String(pgConfig.username);
+    if (isRubyTruthy(pgConfig.host)) env.PGHOST = String(pgConfig.host);
+    if (isRubyTruthy(pgConfig.port)) env.PGPORT = String(pgConfig.port);
+    if (isRubyTruthy(pgConfig.password) && options.includePassword) {
+      env.PGPASSWORD = String(pgConfig.password);
     }
-    if (isRubyTruthy(config.sslmode)) env.PGSSLMODE = String(config.sslmode);
-    if (isRubyTruthy(config.sslcert)) env.PGSSLCERT = String(config.sslcert);
-    if (isRubyTruthy(config.sslkey)) env.PGSSLKEY = String(config.sslkey);
-    if (isRubyTruthy(config.sslrootcert)) env.PGSSLROOTCERT = String(config.sslrootcert);
-    const variables = config.variables as Record<string, unknown> | undefined;
+    if (isRubyTruthy(pgConfig.sslmode)) env.PGSSLMODE = String(pgConfig.sslmode);
+    if (isRubyTruthy(pgConfig.sslcert)) env.PGSSLCERT = String(pgConfig.sslcert);
+    if (isRubyTruthy(pgConfig.sslkey)) env.PGSSLKEY = String(pgConfig.sslkey);
+    if (isRubyTruthy(pgConfig.sslrootcert)) env.PGSSLROOTCERT = String(pgConfig.sslrootcert);
+    const variables = pgConfig.variables as Record<string, unknown> | undefined;
     if (variables) {
       const pgOptions = Object.entries(variables)
         .filter(([, v]) => v !== ":default")
@@ -235,10 +242,7 @@ export class PostgreSQLAdapter
         .join(" ");
       if (pgOptions) env.PGOPTIONS = pgOptions;
     }
-    const argv = this.findCmdAndExec(
-      ActiveRecord.databaseCli["postgresql"],
-      config.database as string,
-    );
+    const argv = this.findCmdAndExec(ActiveRecord.databaseCli["postgresql"], config.database!);
     return { env, argv };
   }
 

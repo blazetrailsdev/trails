@@ -75,6 +75,38 @@ describe("vendor/sources.ts", () => {
     expect(vendoredRoot("rack-session").endsWith("vendor/rack-session")).toBe(true);
   });
 
+  it("declares the rack-test source, vendored ahead of its TS package", () => {
+    // actionpack declares `add_dependency "rack-test", ">= 0.6.3"`
+    // (vendor/rails/actionpack/actionpack.gemspec:41); v2.2.0 is what
+    // vendor/rails/Gemfile.lock:443 resolves.
+    const rackTest = SOURCES.find((s) => s.name === "rack-test");
+    expect(rackTest).toBeDefined();
+    expect(rackTest!.origin).toEqual({
+      type: "git",
+      url: "https://github.com/rack/rack-test.git",
+      ref: "v2.2.0",
+    });
+    expect(rackTest!.packages).toEqual([
+      {
+        name: "rack-test",
+        libPath: "lib/rack/test",
+        libEntryFile: "lib/rack/test.rb",
+        testPath: "spec",
+        compareApi: false,
+        compareTests: false,
+      },
+    ]);
+    // Both compares key a package onto packages/<name>/src, which does not
+    // exist yet; enroll-rack-test-in-compare-tooling creates it and flips
+    // these on.
+    expect(apiComparePackages()).not.toContain("rack-test");
+    expect(Object.keys(libPathsManifest())).not.toContain("rack-test");
+    expect(Object.keys(testPathsManifest())).not.toContain("rack-test");
+    expect(resolvePath("rack-test").endsWith("vendor/rack-test/lib/rack/test")).toBe(true);
+    expect(resolvePath("rack-test", "test").endsWith("vendor/rack-test/spec")).toBe(true);
+    expect(vendoredRoot("rack-test").endsWith("vendor/rack-test")).toBe(true);
+  });
+
   it("declares the globalid source (wave 3)", () => {
     const gid = SOURCES.find((s) => s.name === "globalid");
     expect(gid).toBeDefined();

@@ -106,6 +106,7 @@ export { SecureRandom } from "./secure-random.js";
 export { StringIO } from "./string-io.js";
 export { chomp } from "./string/chomp.js";
 export { forceEncoding } from "./string/force-encoding.js";
+export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
 export { succ } from "./string/succ.js";
 export { isSymbol, symbolToS } from "./symbol.js";

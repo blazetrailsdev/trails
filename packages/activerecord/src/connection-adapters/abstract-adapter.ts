@@ -1,3 +1,4 @@
+import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { type Nodes, Visitors, Collectors } from "@blazetrails/arel";
@@ -1710,7 +1711,7 @@ export class AbstractAdapter implements Quoting {
     return [cmds[0], ...args];
   }
 
-  static dbconsole(_config?: unknown, _options?: unknown): unknown {
+  static dbconsole(_config?: DatabaseConfig, _options?: Record<string, unknown>): unknown {
     // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:121
     throw new NotImplementedError("dbconsole");
   }

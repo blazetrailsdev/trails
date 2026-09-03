@@ -1,3 +1,4 @@
+import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { fetch, hasKey } from "@blazetrails/ruby-compat";
 import type {
   SqliteBinds,
@@ -849,13 +850,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   static override dbconsole(
-    config?: { database?: string },
+    config: DatabaseConfig,
     options: { mode?: string; header?: boolean } = {},
   ): string[] {
     const args: string[] = [];
     if (isRubyTruthy(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");
-    args.push(config?.database ?? ":memory:");
+    args.push(config.database!);
     return this.findCmdAndExec(ActiveRecord.databaseCli["sqlite"], ...args);
   }
 

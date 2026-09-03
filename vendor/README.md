@@ -5,7 +5,8 @@ schema-parity tooling.
 
 - `sources.ts` — declarative registry. Single source of truth for which
   gems we mirror and at what version.
-- Per-source subdirs (`rails/`, `rack/`, `rack-session/`, `globalid/`, …) are
+- Per-source subdirs (`rails/`, `rack/`, `rack-session/`, `rack-test/`,
+  `globalid/`, …) are
   gitignored
   shallow clones of the upstream repo at the pinned tag. They land here
   via the unified fetcher (wave 2).
@@ -83,6 +84,35 @@ reports 19 classes, 3 modules, 78 public methods, and
 `packages/rack-session/src` exists, because both compares key a package onto a
 TS workspace dir. RFC 0133's `enroll-rack-session-in-compare-tooling` creates
 the package and flips both on.
+
+## `vendor/rack-test/` — the Rack::Test anchor
+
+`rack-test` is a declared runtime dependency of actionpack — `add_dependency
+"rack-test", ">= 0.6.3"`
+(`vendor/rails/actionpack/actionpack.gemspec:41`), resolved to **2.2.0** by
+`vendor/rails/Gemfile.lock:443` — and the `Rack::Test` citations in
+`packages/actionpack/src/action-dispatch/testing/integration.ts:1065-1070`,
+`.../action-controller/test-case.ts:670` and
+`.../action-dispatch/testing/test-process.ts:63,88` resolve against this clone:
+`Session` at `lib/rack/test.rb:53`, `Error` `:45`, `Cookie`
+`test/cookie_jar.rb:10`, `CookieJar` `:134`, `Utils` `test/utils.rb:5`,
+`UploadedFile` `test/uploaded_file.rb:14`, `Methods` `test/methods.rb:24`.
+
+Its `libEntryFile` is the one thing that differs from `rack` / `rack-session`.
+Those two point `libPath` at the module root specifically to _exclude_ the
+entrypoint shim beside it; rack-test's `lib/rack/test.rb` is not a shim but 382
+lines defining the gem's central `Session` class, so the module root stays the
+`libPath` for path mapping and the entry file is recovered through
+`libEntryFile` — the mechanism `arel` uses for `activerecord/lib/arel.rb`.
+`testPath` is `spec`, not `test`.
+
+`compareApi` / `compareTests` are off for the same temporary reason
+rack-session's were: both compares key a package onto a TS workspace dir and
+`packages/rack-test/src` does not exist yet. The Ruby half of both extractors
+already runs over this clone unmodified — `extract-ruby-api.rb` reports 5
+classes, 4 modules, 90 public methods and `extract-ruby-tests.rb` 8 files, 234
+tests. RFC 0137's `enroll-rack-test-in-compare-tooling` creates the package and
+flips both on.
 
 ## Scoping a Rails bump (drift report)
 

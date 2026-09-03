@@ -56,4 +56,19 @@ describe("Rack::Multipart::Parser encodings", () => {
 
     expect(parseBody(body).params!["text"]).toBe("cafÃ©");
   });
+
+  it("decodes a text part declaring a Ruby-only charset name", () => {
+    // `TextDecoder` rejects "CP932" outright; `Encoding.find` resolves it to
+    // Windows-31J, so the part decodes rather than falling back to binary.
+    const body =
+      "--AaB03x\r\n" +
+      'content-disposition: form-data; name="text"\r\n' +
+      "content-type: text/plain; charset=CP932\r\n" +
+      "\r\n" +
+      String.fromCharCode(0x82, 0xa0) +
+      "\r\n" +
+      "--AaB03x--\r\n";
+
+    expect(parseBody(body).params!["text"]).toBe("\u3042");
+  });
 });
