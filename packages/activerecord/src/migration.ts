@@ -9,6 +9,7 @@ import {
   stdout,
   FileUpdateChecker,
   Monitor,
+  NameError,
 } from "@blazetrails/activesupport";
 import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -1424,7 +1425,7 @@ export class MigrationProxy {
     const mod = (await import(pathToFileURL(this.filename).href)) as Record<string, unknown>;
     const klass = mod[this.name];
     if (typeof klass !== "function") {
-      throw new Error(`Migration ${this.name} must export a Migration class named "${this.name}"`);
+      throw new NameError(`uninitialized constant ${this.name}`, this.name);
     }
     return new (klass as new (name?: string, version?: number) => Migration)(
       this.name,
