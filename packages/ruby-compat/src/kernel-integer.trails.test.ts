@@ -134,6 +134,12 @@ describe("kernelInteger", () => {
     expect(kernelInteger({ toInt: () => 3.5, toI: () => 9 })).toBe(9);
   });
 
+  it("takes a BigInt from to_int / to_i, as RB_INTEGER_TYPE_P covers bignums", () => {
+    expect(kernelInteger({ toInt: () => 7n })).toBe(7);
+    expect(kernelInteger({ toI: () => 9n })).toBe(9);
+    expect(kernelInteger("1f", { toInt: () => 16n })).toBe(31);
+  });
+
   it("raises the conversion mismatch when to_str answers a non-String", () => {
     expect(() => kernelInteger({ toStr: () => 1 })).toThrow(
       "can't convert Object to String (Object#to_str gives Integer)",

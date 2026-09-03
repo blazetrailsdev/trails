@@ -73,12 +73,16 @@ function rbNum2Int(val: unknown): number {
     throw new TypeError(`no implicit conversion of ${klass} into Integer`);
   }
   const tmp = (toInt as () => unknown).call(val);
-  if (typeof tmp !== "number" || !Number.isInteger(tmp)) {
+  if (!rbIntegerTypeP(tmp)) {
     throw new TypeError(
       `can't convert ${klass} to Integer (${klass}#to_int gives ${rbBuiltinClassName(tmp)})`,
     );
   }
-  return checkIntRange(tmp);
+  return checkIntRange(Number(tmp));
+}
+
+function rbIntegerTypeP(val: unknown): val is number | bigint {
+  return (typeof val === "number" && Number.isInteger(val)) || typeof val === "bigint";
 }
 
 function checkIntRange(int: number): number {
@@ -109,7 +113,7 @@ function rbCheckToInt(val: unknown): number | null {
   const toInt = (val as { toInt?: unknown }).toInt;
   if (typeof toInt !== "function") return null;
   const tmp = (toInt as () => unknown).call(val);
-  return typeof tmp === "number" && Number.isInteger(tmp) ? tmp : null;
+  return rbIntegerTypeP(tmp) ? Number(tmp) : null;
 }
 
 /** `rb_to_integer(val, "to_i", idTo_i)` (`vendor/ruby/object.c:3213`). */
@@ -120,7 +124,7 @@ function rbToInteger(val: unknown): number {
     throw new TypeError(`can't convert ${klass} into Integer`);
   }
   const tmp = (toI as () => unknown).call(val);
-  if (typeof tmp === "number" && Number.isInteger(tmp)) return tmp;
+  if (rbIntegerTypeP(tmp)) return Number(tmp);
   throw new TypeError(
     `can't convert ${klass} to Integer (${klass}#to_i gives ${rbBuiltinClassName(tmp)})`,
   );
