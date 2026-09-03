@@ -1,4 +1,5 @@
-import { getFs, getOs, getPath } from "@blazetrails/activesupport";
+import { getOs } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { FlashHash } from "../middleware/flash.js";

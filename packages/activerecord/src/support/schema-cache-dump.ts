@@ -1,6 +1,6 @@
 /** @internal */
 import { getEnv, getOsAsync, hexdigest } from "@blazetrails/activesupport";
-import { getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getPathAsync } from "@blazetrails/ruby-compat";
 import type {
   AbstractAdapter as DatabaseAdapter,
   AdapterName,

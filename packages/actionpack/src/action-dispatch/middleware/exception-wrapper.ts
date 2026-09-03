@@ -5,7 +5,8 @@ import { hasKey } from "@blazetrails/ruby-compat";
  * Wraps exceptions to provide consistent error metadata for error pages.
  */
 
-import { ActionableError, type BacktraceCleaner, getFs, getPath } from "@blazetrails/activesupport";
+import { ActionableError, type BacktraceCleaner } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 export interface ShowExceptionsRequest {

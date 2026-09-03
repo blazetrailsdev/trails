@@ -1,5 +1,5 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
-import type { FsAdapter } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import type { FsAdapter } from "@blazetrails/ruby-compat";
 import ts from "typescript";
 
 // A class is a model worth registering when its `extends` chain reaches the

@@ -37,6 +37,15 @@ export type { DefaultProc } from "./hash.js";
 export { FloatDomainError } from "./float-domain-error.js";
 export { FrozenError } from "./frozen-error.js";
 export {
+  fsAdapterConfig,
+  getFs,
+  getFsAsync,
+  getPath,
+  getPathAsync,
+  registerFsAdapter,
+} from "./fs-adapter.js";
+export type { FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs-adapter.js";
+export {
   Module,
   defineModule,
   extend,

@@ -1,5 +1,6 @@
 import { Command } from "commander";
-import { getFsAsync, getPathAsync, setEnv } from "@blazetrails/activesupport";
+import { setEnv } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import {
   env,
   setExitCode,

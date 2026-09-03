@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
 
 // Mirrors railties/lib/rails/generators/actions/create_migration.rb. Rails

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { SqliteConnection } from "../sqlite-adapter.js";
-import { getFs } from "@blazetrails/activesupport/fs-adapter";
+import { getFs } from "@blazetrails/ruby-compat";
 import { getOs } from "@blazetrails/activesupport/os-adapter";
 import { isNodeSqliteAvailable, nodeSqliteDriver } from "./node-sqlite.js";
 

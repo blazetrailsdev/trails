@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 
 // Shared migration-file lookup helpers. Lives in its own module so that
 // `actions/create-migration.ts` can use `migrationExists` without pulling

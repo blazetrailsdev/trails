@@ -6,7 +6,8 @@
 // any single one in generator code locks users out of the others. Adapter
 // at the boundary, hardcoded only at registration time.
 
-import { getChildProcess, getFs, getPath } from "@blazetrails/activesupport";
+import { getChildProcess } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 
 export interface PackageManagerAdapter {
   /** CLI binary name (`pnpm`, `npm`, `yarn`, `bun`). */

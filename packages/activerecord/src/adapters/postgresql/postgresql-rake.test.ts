@@ -1,13 +1,12 @@
 import { it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest";
 import {
-  getFs,
   getOsAsync,
-  getPath,
   getChildProcessAsync,
   type ChildProcessAdapter,
   stdout,
   stderr,
 } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import { PostgreSQLDatabaseTasks } from "../../tasks/postgresql-database-tasks.js";

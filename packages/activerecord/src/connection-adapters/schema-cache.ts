@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
 import { deduplicate } from "./deduplicable.js";

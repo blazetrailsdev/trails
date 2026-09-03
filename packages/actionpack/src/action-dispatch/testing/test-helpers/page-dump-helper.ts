@@ -1,4 +1,5 @@
-import { getFsAsync, getPath, getChildProcessAsync } from "@blazetrails/activesupport";
+import { getChildProcessAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPath } from "@blazetrails/ruby-compat";
 
 export class InvalidResponse extends Error {}
 

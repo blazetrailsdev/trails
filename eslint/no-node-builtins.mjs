@@ -8,16 +8,16 @@
 
 const ACTIVESUPPORT_REPLACEMENTS = {
   fs: {
-    importSource: "@blazetrails/activesupport",
+    importSource: "@blazetrails/ruby-compat",
     importName: "getFs",
     message:
-      'Use getFs() from @blazetrails/activesupport instead of importing "{{module}}" directly.',
+      'Use getFs() from @blazetrails/ruby-compat instead of importing "{{module}}" directly.',
   },
   path: {
-    importSource: "@blazetrails/activesupport",
+    importSource: "@blazetrails/ruby-compat",
     importName: "getPath",
     message:
-      'Use getPath() from @blazetrails/activesupport instead of importing "{{module}}" directly.',
+      'Use getPath() from @blazetrails/ruby-compat instead of importing "{{module}}" directly.',
   },
   crypto: {
     importSource: "@blazetrails/activesupport",
@@ -33,8 +33,8 @@ import { builtinModules } from "node:module";
 const NODE_BUILTINS = new Set(builtinModules.filter((m) => !m.startsWith("_")));
 
 // `@blazetrails/ruby-compat` is a leaf package with no workspace dependencies
-// (RFC 0129), so the activesupport adapter the replacement table points at is
-// itself a violation there — report the plain message and offer no autofix.
+// (RFC 0129), so the activesupport adapter the crypto row points at is itself a
+// violation there — report the plain message and offer no autofix.
 const LEAF_PACKAGE_PATH = "packages/ruby-compat/";
 
 function isLeafPackageFile(filename) {

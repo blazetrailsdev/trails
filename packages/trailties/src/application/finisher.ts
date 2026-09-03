@@ -31,7 +31,8 @@
  * - `enable_yjit` (`finisher.rb:230-234`) — YJIT is a MRI JIT with no JS
  *   analogue.
  */
-import { getFsAsync, getPathAsync, runLoadHooks, underscore } from "@blazetrails/activesupport";
+import { runLoadHooks, underscore } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 import { Trails } from "../rails.js";
 import { LazyRouteSet } from "../engine/lazy-route-set.js";

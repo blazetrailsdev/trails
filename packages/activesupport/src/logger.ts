@@ -4,7 +4,7 @@
 
 import { stdout } from "./process-adapter.js";
 import { Temporal } from "@blazetrails/date";
-import { getFs } from "./fs-adapter.js";
+import { getFs } from "@blazetrails/ruby-compat";
 import { BroadcastLoggerClass } from "./broadcast-logger-slot.js";
 import { include } from "@blazetrails/ruby-compat/include";
 import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";

@@ -1,12 +1,9 @@
 import {
-  getFs,
-  getPath,
-  type FsAdapter,
-  type PathAdapter,
   underscore as _underscore,
   camelize as _camelize,
   dasherize as _dasherize,
 } from "@blazetrails/activesupport";
+import { getFs, getPath, type FsAdapter, type PathAdapter } from "@blazetrails/ruby-compat";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";

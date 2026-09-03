@@ -1,4 +1,4 @@
-import { getFsAsync, getPath } from "@blazetrails/activesupport";
+import { getFsAsync, getPath } from "@blazetrails/ruby-compat";
 
 export interface ScreenshotPage {
   screenshot(options: { path: string }): Promise<Buffer>;

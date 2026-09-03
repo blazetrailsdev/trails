@@ -133,7 +133,6 @@
   "packages/activesupport/src/duration.ts",
   "packages/activesupport/src/enumerable-utils.ts",
   "packages/activesupport/src/environment-inquirer.ts",
-  "packages/activesupport/src/fs-adapter.ts",
   "packages/activesupport/src/hash-utils.ts",
   "packages/activesupport/src/inflector.ts",
   "packages/activesupport/src/log-subscriber.ts",

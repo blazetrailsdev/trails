@@ -161,10 +161,6 @@ const alias = {
     __dirname,
     "packages/activesupport/src/child-process-adapter.ts",
   ),
-  "@blazetrails/activesupport/fs-adapter": path.resolve(
-    __dirname,
-    "packages/activesupport/src/fs-adapter.ts",
-  ),
   "@blazetrails/activesupport/os-adapter": path.resolve(
     __dirname,
     "packages/activesupport/src/os-adapter.ts",

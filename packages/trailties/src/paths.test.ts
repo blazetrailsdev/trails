@@ -4,7 +4,7 @@ import {
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/ruby-compat";
 import { Root } from "./paths.js";
 
 const posixPath: PathAdapter = {

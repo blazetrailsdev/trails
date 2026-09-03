@@ -4,7 +4,8 @@
  * Represents an HTTP response with status, headers, and body.
  */
 
-import { getFs, presence } from "@blazetrails/activesupport";
+import { presence } from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,

@@ -4,12 +4,8 @@ import {
   MigrationGenerator,
 } from "@blazetrails/trailties/generators";
 import type { AppDatabase } from "@blazetrails/trailties/generators";
-import {
-  registerFsAdapter,
-  ActiveSupport,
-  type FsAdapter,
-  type PathAdapter,
-} from "@blazetrails/activesupport";
+import { ActiveSupport } from "@blazetrails/activesupport";
+import { registerFsAdapter, type FsAdapter, type PathAdapter } from "@blazetrails/ruby-compat";
 import type { VirtualFS } from "./virtual-fs.js";
 
 const posixPath: PathAdapter = {

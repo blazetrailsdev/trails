@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { glob as fsGlob } from "@blazetrails/activesupport/glob";
 
 export interface PathOptions {

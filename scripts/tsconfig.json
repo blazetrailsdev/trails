@@ -13,6 +13,9 @@
       "path": "../packages/activesupport"
     },
     {
+      "path": "../packages/ruby-compat"
+    },
+    {
       "path": "../packages/tse-compiler"
     },
     {

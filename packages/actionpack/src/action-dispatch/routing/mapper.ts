@@ -26,7 +26,8 @@ import { Endpoint } from "./endpoint.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { Scope, type ScopeFrameHash, type ScopeLevel } from "./scope.js";
-import { getFsAsync, getPathAsync, underscore } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fetch } from "@blazetrails/ruby-compat";
 

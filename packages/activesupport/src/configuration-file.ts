@@ -1,4 +1,4 @@
-import { getFs } from "./fs-adapter.js";
+import { getFs } from "@blazetrails/ruby-compat";
 import { parse as yamlParse } from "yaml";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
 

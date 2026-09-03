@@ -8,7 +8,7 @@
  * invalidate resolver caches.
  */
 
-import { getPath } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
 import { PathSet } from "./path-set.js";
 import { FileSystemResolver } from "./template/resolver.js";
 import type { PathSetResolver } from "./path-set.js";

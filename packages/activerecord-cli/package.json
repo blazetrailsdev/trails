@@ -30,6 +30,7 @@
   "dependencies": {
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "typescript": "^5.9.3"
   }

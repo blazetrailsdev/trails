@@ -7,7 +7,7 @@ import * as nodePath from "node:path";
 import * as os from "node:os";
 import { Generators } from "./generators.js";
 import { createProgram } from "./cli.js";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 
 beforeAll(async () => {
   await Generators.lookupBang();

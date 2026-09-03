@@ -1,4 +1,4 @@
-import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getFsAsync } from "@blazetrails/ruby-compat";
 import {
   computeAssetPath as defaultComputeAssetPath,
   type AssetPathOptions,

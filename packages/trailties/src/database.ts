@@ -1,4 +1,5 @@
-import { getFsAsync, getPathAsync, reverseMerge, trailsRoot } from "@blazetrails/activesupport";
+import { reverseMerge, trailsRoot } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { env } from "@blazetrails/activesupport/process-adapter";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 

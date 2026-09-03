@@ -6,7 +6,7 @@
  * @see https://api.rubyonrails.org/classes/ActionController/DataStreaming.html
  */
 
-import { getPath } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { MimeType } from "../../action-dispatch/http/mime-type.js";
 

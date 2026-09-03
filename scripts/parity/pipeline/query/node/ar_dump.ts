@@ -118,7 +118,7 @@ async function main(): Promise<void> {
   // (and fail) at module load, replacing the "missing dist/" hint with a bare
   // module-not-found. Specifiers are package names, not dist paths, so Node ESM
   // dedupes them with the fixture models' own imports to one module instance.
-  const { getFsAsync, getPathAsync } = await import("@blazetrails/activesupport");
+  const { getFsAsync, getPathAsync } = await import("@blazetrails/ruby-compat");
   const { Base, modelRegistry } = await import("@blazetrails/activerecord");
 
   try {

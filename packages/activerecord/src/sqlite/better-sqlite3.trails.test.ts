@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
-import { getFs } from "@blazetrails/activesupport/fs-adapter";
+import { getFs } from "@blazetrails/ruby-compat";
 import { getOs } from "@blazetrails/activesupport/os-adapter";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
 

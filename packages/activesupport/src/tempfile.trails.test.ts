@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getFs } from "./fs-adapter.js";
+import { getFs } from "@blazetrails/ruby-compat";
 import { Tempfile } from "./tempfile.js";
 
 // Trails-only coverage: `Tempfile` is Ruby stdlib, so it has no Rails test to

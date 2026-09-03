@@ -225,7 +225,7 @@ export default defineConfig(
     ignores: [
       "**/*.test.ts",
       // Adapter implementations — these ARE the abstraction layer
-      "packages/activesupport/src/fs-adapter.ts",
+      "packages/ruby-compat/src/fs-adapter.ts",
       "packages/activesupport/src/crypto-adapter.ts",
       "packages/activesupport/src/async-context-adapter.ts",
       "packages/activesupport/src/child-process-adapter.ts",
@@ -706,9 +706,16 @@ export default defineConfig(
   //    ruby-compat (MRI's surface is C), so its anchor is a RESOLVED
   //    `vendor/ruby/<file>:<line>` citation plus a `@noRailsEquivalent
   //    PERMANENT` receipt on every export. ──
+  //    The platform adapters (RFC 0135) are the one shape in the package that
+  //    is NOT an MRI primitive: `fs-adapter.ts` is the backend contract the
+  //    Ruby classes register against, so `registerFsAdapter` and friends have
+  //    no `vendor/ruby/` line to cite. They still carry their receipts; only
+  //    the citation half is out of scope for them. This ignores list must stay
+  //    in sync with the same block in eslint/rails-private-jsdoc.config.mjs,
+  //    which is the enforcing run (it is the CI job that fetches vendor/ruby).
   {
     files: ["packages/ruby-compat/src/**/*.ts"],
-    ignores: ["**/*.test.ts"],
+    ignores: ["**/*.test.ts", "packages/ruby-compat/src/fs-adapter.ts"],
     rules: {
       "blazetrails/ruby-compat-needs-mri-citation": "error",
     },

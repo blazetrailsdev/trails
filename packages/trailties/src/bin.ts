@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import "@blazetrails/activesupport/node";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { argv, cwd } from "@blazetrails/activesupport/process-adapter";
 import { setAppPath } from "./app-path.js";
 import { createProgram } from "./cli.js";

@@ -16,7 +16,8 @@
  * Port of `actionpack/lib/action_dispatch/middleware/public_exceptions.rb`.
  */
 
-import { I18n, getFs, getPath } from "@blazetrails/activesupport";
+import { I18n } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { X_CASCADE } from "../constants.js";

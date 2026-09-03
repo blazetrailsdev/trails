@@ -3,19 +3,21 @@
 // `Configuration` defaults and the default middleware stack.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  fsAdapterConfig,
   NullLogger,
   Executor,
   NullStore,
   onLoad,
   Reloader,
-  registerFsAdapter,
   resetLoadHooks,
   setTrailsRoot,
   trailsRoot,
+} from "@blazetrails/activesupport";
+import {
+  fsAdapterConfig,
+  registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Configuration } from "./application/configuration.js";
 import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";

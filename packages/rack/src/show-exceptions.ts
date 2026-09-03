@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/ruby-compat";
 import { chomp } from "@blazetrails/ruby-compat";
 
 import { CONTENT_TYPE, CONTENT_LENGTH, RACK_ERRORS } from "./constants.js";

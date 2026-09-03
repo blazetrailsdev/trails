@@ -1,5 +1,5 @@
 import { it, expect, afterEach } from "vitest";
-import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getFsAsync } from "@blazetrails/ruby-compat";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";

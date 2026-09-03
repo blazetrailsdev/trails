@@ -6,7 +6,8 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { getPathAsync, underscore } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
+import { getPathAsync } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";

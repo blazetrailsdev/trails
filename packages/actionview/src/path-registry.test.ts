@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
-import { getPathAsync } from "@blazetrails/activesupport";
+import { getPathAsync } from "@blazetrails/ruby-compat";
 import { FileSystemResolver } from "./template/resolver.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 import { PathRegistry } from "./path-registry.js";

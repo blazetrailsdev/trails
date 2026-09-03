@@ -209,7 +209,6 @@ export const sweptFilesInsideUnsweptTrees = [
   "packages/activesupport/src/evented-file-update-checker.test.ts",
   "packages/activesupport/src/executor.test.ts",
   "packages/activesupport/src/fork-tracker.test.ts",
-  "packages/activesupport/src/fs-adapter.test.ts",
   "packages/activesupport/src/json/encoding.trails.test.ts",
   "packages/activesupport/src/log-subscriber.test.ts",
   "packages/activesupport/src/logger.trails.test.ts",

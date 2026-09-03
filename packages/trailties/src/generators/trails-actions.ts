@@ -5,7 +5,7 @@
 // stays clean. These actions mutate `package.json` and `config/*.ts`
 // files in a trails app; they have no Ruby counterpart.
 
-import { getFsAsync, getPathAsync, type FsAdapter } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync, type FsAdapter } from "@blazetrails/ruby-compat";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { assertNoRubySource } from "../template-builder/no-ruby-source.js";
 
