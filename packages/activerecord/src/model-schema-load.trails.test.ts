@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ValueType, typeRegistry } from "@blazetrails/activemodel";
+import { ValueType } from "@blazetrails/activemodel";
 type Type = ValueType;
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
@@ -149,9 +149,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model.typeForAttribute("mystery")).toBeInstanceOf(
-      typeRegistry.lookup("value").constructor,
-    );
+    expect(Model.typeForAttribute("mystery")).toBeInstanceOf(ValueType);
   });
 
   it("invalidates the _attributesBuilder cache", async () => {

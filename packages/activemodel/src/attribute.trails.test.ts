@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "./attribute.js";
 import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./index.js";
 import { typeRegistry } from "./type/registry.js";
+import { ValueType } from "./type/value.js";
 import "./attribute/user-provided-default.js";
 
 describe("Attribute — trails-only coverage", () => {
@@ -186,8 +187,7 @@ describe("Attribute — trails-only coverage", () => {
     });
 
     it("recomputes when in-place object mutation is detected via isChangedInPlace", () => {
-      const Types = typeRegistry;
-      const baseType = Types.lookup("value");
+      const baseType = new ValueType();
       const mutableType = Object.create(baseType);
       mutableType.deserialize = (v: unknown) =>
         typeof v === "string" ? JSON.parse(v) : (v ?? null);
@@ -217,7 +217,7 @@ describe("Attribute — trails-only coverage", () => {
     });
 
     it("dups the memoized cast value so an in-place mutation does not bleed back", () => {
-      const type = Object.create(typeRegistry.lookup("value")) as {
+      const type = Object.create(new ValueType()) as {
         deserialize(v: unknown): unknown;
       };
       type.deserialize = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);

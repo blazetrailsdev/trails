@@ -1,5 +1,5 @@
 import { ArgumentError } from "../attribute-assignment.js";
-import { Type, ValueType } from "./value.js";
+import { Type } from "./value.js";
 import { StringType } from "./string.js";
 import { IntegerType } from "./integer.js";
 import { FloatType } from "./float.js";
@@ -33,7 +33,6 @@ export class TypeRegistry {
     this.register("decimal", DecimalType);
     this.register("big_integer", BigIntegerType);
     this.register("immutable_string", ImmutableStringType);
-    this.register("value", ValueType);
     this.register("binary", BinaryType);
     this.register("time", TimeType);
   }

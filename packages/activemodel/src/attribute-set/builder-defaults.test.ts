@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Builder, LazyAttributeHash } from "./builder.js";
 import { Attribute } from "../attribute.js";
 import { typeRegistry } from "../type/registry.js";
+import { ValueType } from "../type/value.js";
 
 describe("LazyAttributeHash defaultAttributes", () => {
   const strType = typeRegistry.lookup("string");
@@ -25,7 +26,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
   });
 
   it("materializing a mutable schema default twice does not share the value", () => {
-    const arrayType = Object.create(typeRegistry.lookup("value")) as typeof strType;
+    const arrayType = Object.create(new ValueType()) as typeof strType;
     const types = new Map([["tags", arrayType]]);
     const prototype = Attribute.withCastValue("tags", ["a"], arrayType);
     void prototype.value;
