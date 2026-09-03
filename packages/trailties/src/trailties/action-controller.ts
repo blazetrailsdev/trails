@@ -17,10 +17,16 @@
  * those frameworks gain the matching surface — see docs/trailties-plan.md
  * PR 2.7 follow-ups.
  *
+ * `set_configs` declares only the routing arms of its `on_load` block
+ * (`railtie.rb:69-71`); the rest of that body configures
+ * `config.action_controller` options whose receivers
+ * (`ActionController::Parameters`, the assets paths) are unported.
+ *
+ * The two side-effect imports are `require "action_dispatch/railtie"`
+ * (`railtie.rb:7`) and `require "action_view/railtie"` (`:10`).
+ *
  * @see https://api.rubyonrails.org/classes/ActionController/Railtie.html
  */
-// `require "action_dispatch/railtie"` (`actionpack/lib/action_controller/railtie.rb:7`)
-// and `require "action_view/railtie"` (`:10`).
 import "./action-dispatch.js";
 import "./action-view.js";
 import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
@@ -62,14 +68,9 @@ export class Trailtie extends BaseTrailtie {
 
     this.config.set("actionController", defaultActionControllerConfig());
 
-    // Mirrors the routing arms of `action_controller.set_configs`
-    // (`actionpack/lib/action_controller/railtie.rb:69-71`). The rest of that
-    // initializer's body configures `config.action_controller` options whose
-    // receivers (`ActionController::Parameters`, the assets paths) are
-    // unported, so only the two `app.routes` lines are declared here.
     this.initializer("action_controller.set_configs", (app) => {
-      const routes = (app as TrailtieApp).routes();
       onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {
+        const routes = (app as TrailtieApp).routes();
         include(base as unknown as new (...args: never[]) => unknown, routes.mountedHelpers());
         AbstractController.withRoutesHelpers(routes)(base);
       });

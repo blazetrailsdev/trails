@@ -14,9 +14,10 @@ import { _setBase } from "./base-slot.js";
 import { OutputBuffer } from "./buffers.js";
 import { OutputFlow } from "./flows.js";
 import * as Helpers from "./helpers/index.js";
-import { LookupContext, MissingTemplate } from "./lookup-context.js";
+import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import type { RenderOptions } from "./renderer/abstract-renderer.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 /**
  * The compiled form of one template: the function `Template#compile!` defines
@@ -363,13 +364,20 @@ export class Base {
   /**
    * Mirrors `Helpers::RenderingHelper#render(options, locals, &block)`
    * (`actionview/lib/action_view/helpers/rendering_helper.rb:138-153`) — the
-   * dispatch on the shape of `options`: a Hash renders through the renderer
-   * (with a block, the `:layout` is rendered as a partial around it), and
-   * anything else is a bare partial name.
+   * dispatch on the shape of `options`: a Hash goes to the renderer, and with
+   * a block the `:layout` is rendered as a partial around it; anything else is
+   * a bare partial name.
    *
    * trails' `Renderer#render` is async by design where Rails' is synchronous,
    * and a compiled template method is synchronous, so each arm reaches the
-   * lookup context's synchronous entry point instead of `view_renderer`.
+   * lookup context's synchronous entry points. `Renderer#render_to_object`'s
+   * `options.key?(:partial)` branch (`renderer/renderer.rb:27-33`) is inlined
+   * into the arm for the same reason — there is no synchronous `Renderer`
+   * to hold it.
+   *
+   * The block is Rails' layout content, handed to `render_partial` as `&block`
+   * and reached from the layout through `yield`; trails publishes its value on
+   * `viewFlow`, which is where `_layout_for` reads it (`context.rb:27-30`).
    *
    * @missingRailsCall view_renderer.render — PERMANENT
    * @missingRailsCall view_renderer.render_partial — PERMANENT
@@ -379,23 +387,70 @@ export class Base {
     locals: Record<string, unknown> = {},
     block?: () => unknown,
   ): SafeBuffer {
-    if (typeof options === "object" && options !== null) {
-      return this.inRenderingContext(options, () => {
-        if (block) {
-          // Rails: `render_partial(self, options.merge(partial: options[:layout]), &block)`.
-          return this.renderPartialSync({ ...options, partial: String(options.layout) }, block);
-        }
-        return this.renderSync(options);
-      });
+    const lookupContext = this.lookupContext;
+    if (!lookupContext) {
+      throw new Error(
+        `Cannot render ${JSON.stringify(options)} — this view has no ` +
+          "lookup context. Render through LookupContext so nested partials resolve.",
+      );
     }
-    return this.renderPartialSync({ partial: options, locals }, block);
+    const prefix = this.virtualPathPrefix();
+    const format = this.currentFormat();
+
+    if ((options as object | null)?.constructor !== Object) {
+      return htmlSafe(
+        lookupContext.renderPartialSync(String(options), prefix, format, { ...locals }, this),
+      );
+    }
+
+    const hash = options as RenderOptions;
+    return this.inRenderingContext(hash, () => {
+      if (block) {
+        this.viewFlow.set("layout", String(block() ?? ""));
+        return htmlSafe(
+          lookupContext.renderPartialSync(
+            String(hash.layout),
+            prefix,
+            format,
+            { ...(hash.locals ?? {}) },
+            this,
+          ),
+        );
+      }
+      if (Object.hasOwn(hash, "partial")) {
+        return htmlSafe(
+          lookupContext.renderPartialSync(
+            String(hash.partial),
+            prefix,
+            format,
+            { ...(hash.locals ?? {}) },
+            this,
+          ),
+        );
+      }
+      if (!Object.hasOwn(hash, "template")) {
+        throw new ArgumentError(
+          "You invoked render but did not give any of :body, :file, :html, :inline, " +
+            ":partial, :plain, :renderable, or :template option.",
+        );
+      }
+      return htmlSafe(
+        lookupContext.renderTemplateSync(
+          String(hash.template),
+          prefix,
+          format,
+          { ...(hash.locals ?? {}) },
+          this,
+        ),
+      );
+    });
   }
 
   /**
    * Mirrors `Base#in_rendering_context(options)` (`base.rb:292-309`). Rails
    * yields `@view_renderer` and rebuilds it from the prepended-formats lookup
-   * context; trails' render arms read `lookupContext` directly, so the block
-   * takes no argument.
+   * context; trails' arms read `lookupContext` directly, so the block takes no
+   * argument and there is no renderer to rebuild.
    *
    * @missingRailsCall new — PERMANENT
    */
@@ -403,7 +458,7 @@ export class Base {
     const oldLookupContext = this.lookupContext;
 
     if (!this.lookupContext?.htmlFallbackForJs && options.formats) {
-      const formats = [...options.formats];
+      const formats = Array.isArray(options.formats) ? [...options.formats] : [options.formats];
       if (formats.length === 1 && formats[0] === "js") {
         formats.push("html");
       }
@@ -415,73 +470,6 @@ export class Base {
     } finally {
       this.lookupContext = oldLookupContext;
     }
-  }
-
-  /**
-   * The synchronous stand-in for `Renderer#render(context, options)`
-   * (`renderer/renderer.rb:23-33`) — the `options.key?(:partial)` branch over
-   * the lookup context's synchronous entry points.
-   *
-   * @internal
-   */
-  private renderSync(options: RenderOptions): SafeBuffer {
-    if (Object.hasOwn(options, "partial")) {
-      return this.renderPartialSync(options);
-    }
-    const lookupContext = this.requireLookupContext(String(options.template));
-    const name = String(options.template);
-    const slash = name.lastIndexOf("/");
-    const template = lookupContext.findTemplate(
-      slash === -1 ? name : name.slice(slash + 1),
-      slash === -1 ? this.virtualPathPrefix() : name.slice(0, slash),
-      this.currentFormat(),
-    );
-    if (!template) {
-      throw new MissingTemplate(
-        slash === -1 ? this.virtualPathPrefix() : name.slice(0, slash),
-        slash === -1 ? name : name.slice(slash + 1),
-        this.currentFormat(),
-        [],
-        [],
-      );
-    }
-    return htmlSafe(template.render(this, { ...(options.locals ?? {}) }));
-  }
-
-  /**
-   * The synchronous stand-in for `Renderer#render_partial(context, options, &block)`
-   * (`renderer/renderer.rb:48-50`). A block is Rails' layout content: its
-   * value is what `yield` answers inside the rendered partial, which trails
-   * publishes through `viewFlow` the way `_layout_for` reads it
-   * (`context.rb:27-30`).
-   *
-   * @internal
-   */
-  private renderPartialSync(options: RenderOptions, block?: () => unknown): SafeBuffer {
-    const partial = String(options.partial);
-    const lookupContext = this.requireLookupContext(partial);
-    if (block) this.viewFlow.set("layout", String(block() ?? ""));
-    return htmlSafe(
-      lookupContext.renderPartialSync(
-        partial,
-        this.virtualPathPrefix(),
-        this.currentFormat(),
-        { ...(options.locals ?? {}) },
-        this,
-      ),
-    );
-  }
-
-  /** @internal */
-  private requireLookupContext(name: string): LookupContext {
-    const lookupContext = this.lookupContext;
-    if (!lookupContext) {
-      throw new Error(
-        `Cannot render ${JSON.stringify(name)} — this view has no ` +
-          "lookup context. Render through LookupContext so nested partials resolve.",
-      );
-    }
-    return lookupContext;
   }
 
   /** @internal */

@@ -9,8 +9,6 @@
 // `harvestObjectLiteralMethods` ignores accessors on object literals, but
 // the class extractor walks `ts.isGetAccessorDeclaration` for static
 // members. `Trails` is never instantiated.
-// `require "active_support/railtie"` (`railties/lib/rails.rb:16`) and
-// `require "action_dispatch/railtie"` (`:17`).
 import "./trailties/active-support.js";
 import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";

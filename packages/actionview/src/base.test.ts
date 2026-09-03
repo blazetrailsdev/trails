@@ -358,6 +358,13 @@ describe("ActionView::Base#render", () => {
     );
   });
 
+  it("raises when given none of the render options", () => {
+    expect(() => buildView().render({})).toThrow(
+      "You invoked render but did not give any of :body, :file, :html, :inline, " +
+        ":partial, :plain, :renderable, or :template option.",
+    );
+  });
+
   it("restores the lookup context after in_rendering_context prepends formats", () => {
     const view = buildView();
     const before = view.lookupContext;
