@@ -12,10 +12,14 @@ describe("rails/all", () => {
     const app = AllBootApp.instance();
     await app.initialize();
 
-    const frameworks = ["Support", "Model", "Record"]
-      .map((f) => `active${f}`)
-      .concat(["actionDispatch", "actionController", "actionView"]);
-    for (const framework of frameworks) {
+    for (const framework of [
+      "activeSupport",
+      "activeModel",
+      "activeRecord",
+      "actionDispatch",
+      "actionController",
+      "actionView",
+    ]) {
       expect(app.deprecators.get(framework), framework).toBeDefined();
     }
   });
