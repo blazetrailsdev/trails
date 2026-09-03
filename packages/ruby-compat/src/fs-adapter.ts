@@ -35,6 +35,7 @@ export interface FsAdapter {
   flockSync?(fd: number, operation: "ex" | "un"): void;
   statSync(path: string): FsStatResult;
   chmodSync?(path: string, mode: number): void;
+  utimesSync?(path: string, atime: Date, mtime: Date): void;
   chownSync?(path: string, uid: number, gid: number): void;
   realpathSync?(path: string): string;
   openSync(path: string, flags: string): number;

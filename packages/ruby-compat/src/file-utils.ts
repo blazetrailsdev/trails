@@ -1,7 +1,8 @@
+import { ArgumentError } from "./argument-error.js";
 import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
 
-/** `File.directory?` (`vendor/ruby/file.c:1866`). */
-function directoryQ(path: string): boolean {
+/** `File.directory?` (`vendor/ruby/file.c:1615`). */
+function isDirectory(path: string): boolean {
   try {
     return getFs().statSync(path).isDirectory();
   } catch {
@@ -9,7 +10,7 @@ function directoryQ(path: string): boolean {
   }
 }
 
-/** `Entry_#exist?` / `#directory?` (`vendor/ruby/lib/fileutils.rb:2109,2129`). */
+/** `Entry_#exist?` / `#directory?` (`vendor/ruby/lib/fileutils.rb:2109,2123`). */
 function statOrNull(path: string): FsStatResult | null {
   try {
     return getFs().statSync(path);
@@ -28,7 +29,11 @@ function fuList(arg: string | string[]): string[] {
   return Array.isArray(arg) ? [...arg] : [arg];
 }
 
-/** `fu_mkdir` (`vendor/ruby/lib/fileutils.rb:396-404`). */
+/**
+ * `fu_mkdir` (`vendor/ruby/lib/fileutils.rb:396-404`). Ruby's `Dir.mkdir path,
+ * mode` takes the mode in the create call; the backend contract's `mkdirSync`
+ * does not, so the mode arrives through the `File.chmod` half alone.
+ */
 function fuMkdir(path: string, mode: number | undefined): void {
   path = removeTrailingSlash(path);
   if (mode != null) {
@@ -62,7 +67,7 @@ function fuEachSrcDest0(
       yieldFn(s, targetDirectory ? getPath().join(dest, getPath().basename(s)) : dest);
     }
   } else {
-    if (targetDirectory && directoryQ(dest)) {
+    if (targetDirectory && isDirectory(dest)) {
       yieldFn(src, getPath().join(dest, getPath().basename(src)));
     } else {
       yieldFn(src, dest);
@@ -77,7 +82,7 @@ function fuEachSrcDest(
   yieldFn: (s: string, d: string) => void,
 ): void {
   fuEachSrcDest0(src, dest, (s, d) => {
-    if (fuSame(s, d)) throw new Error(`same file: ${s} and ${d}`);
+    if (fuSame(s, d)) throw new ArgumentError(`same file: ${s} and ${d}`);
     yieldFn(s, d);
   });
 }
@@ -88,6 +93,39 @@ function fuEachSrcDest(
 function copyFile(src: string, dest: string, preserve = false): void {
   getFs().copyFileSync(src, dest);
   if (preserve) getFs().chmodSync?.(dest, getFs().statSync(src).mode ?? 0o644);
+}
+
+/**
+ * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
+ * walks a directory tree and copies each entry, then its metadata under
+ * `preserve`.
+ */
+function copyEntry(src: string, dest: string, preserve = false): void {
+  const ent = getFs().statSync(src);
+  if (ent.isDirectory()) {
+    FileUtils.mkdirP(dest);
+    for (const name of getFs().readdirSync(src)) {
+      copyEntry(getPath().join(src, name), getPath().join(dest, name), preserve);
+    }
+    if (preserve) getFs().chmodSync?.(dest, ent.mode ?? 0o755);
+  } else {
+    copyFile(src, dest, preserve);
+  }
+}
+
+/**
+ * `File.utime` (`vendor/ruby/file.c:2983`). The backend contract carries no
+ * `utimesSync` of its own, and an adapter without one still has to raise
+ * `ENOENT` for a missing path — which is the branch `touch` reads — so the
+ * fallback stats the path for exactly that.
+ */
+function fileUtime(atime: Date, mtime: Date, path: string): void {
+  const utimesSync = getFs().utimesSync;
+  if (utimesSync) {
+    utimesSync(path, atime, mtime);
+    return;
+  }
+  getFs().statSync(path);
 }
 
 /**
@@ -126,7 +164,7 @@ export class FileUtils {
       let path = removeTrailingSlash(item);
 
       const stack: string[] = [];
-      while (!directoryQ(path) && getPath().dirname(path) !== path) {
+      while (!isDirectory(path) && getPath().dirname(path) !== path) {
         stack.push(path);
         path = getPath().dirname(path);
       }
@@ -134,7 +172,7 @@ export class FileUtils {
         try {
           fuMkdir(dir, mode);
         } catch (error) {
-          if (!directoryQ(dir)) throw error;
+          if (!isDirectory(dir)) throw error;
         }
       }
     }
@@ -180,14 +218,14 @@ export class FileUtils {
       try {
         const destent = statOrNull(d);
         if (destent) {
-          if (destent.isDirectory()) throw new Error(`File exists @ rb_file_s_rename - ${d}`);
+          if (destent.isDirectory()) throw new Error(`File exists - ${d}`);
         }
         try {
           getFs().renameSync(s, d);
         } catch (error) {
           const code = (error as { code?: string }).code;
           if (code !== "EXDEV" && code !== "EPERM") throw error;
-          copyFile(s, d, true);
+          copyEntry(s, d, true);
           FileUtils.removeEntry(s, force);
         }
       } catch (error) {
@@ -204,13 +242,14 @@ export class FileUtils {
   static rm(
     list: string | string[],
     { force, noop }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
-  ): void {
+  ): string[] | undefined {
     list = fuList(list);
     if (noop === true) return;
 
     for (const path of list) {
       FileUtils.removeFile(path, force);
     }
+    return list;
   }
 
   /** `FileUtils.rm_f` (`vendor/ruby/lib/fileutils.rb:1241-1243`).
@@ -221,8 +260,8 @@ export class FileUtils {
   static rmF(
     list: string | string[],
     { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
-  ): void {
-    FileUtils.rm(list, { force: true, noop, verbose });
+  ): string[] | undefined {
+    return FileUtils.rm(list, { force: true, noop, verbose });
   }
 
   /** `FileUtils.rm_r` (`vendor/ruby/lib/fileutils.rb:1299-1310`).
@@ -233,12 +272,13 @@ export class FileUtils {
   static rmR(
     list: string | string[],
     { force, noop }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
-  ): void {
+  ): string[] | undefined {
     list = fuList(list);
     if (noop === true) return;
     for (const path of list) {
       FileUtils.removeEntry(path, force);
     }
+    return list;
   }
 
   /** `FileUtils.remove_entry` (`vendor/ruby/lib/fileutils.rb:1449-1456`), whose
@@ -275,12 +315,29 @@ export class FileUtils {
    */
   static touch(
     list: string | string[],
-    { noop }: { noop?: boolean; verbose?: boolean } = {},
+    {
+      noop,
+      mtime,
+      nocreate,
+    }: { noop?: boolean; verbose?: boolean; mtime?: Date; nocreate?: boolean } = {},
   ): void {
     list = fuList(list);
+    const t = mtime;
     if (noop === true) return;
     for (const path of list) {
-      getFs().appendFileSync(path, "");
+      let created = nocreate;
+      for (;;) {
+        try {
+          fileUtime(t ?? new Date(), t ?? new Date(), path);
+        } catch (error) {
+          if ((error as { code?: string }).code !== "ENOENT") throw error;
+          if (created === true) throw error;
+          getFs().appendFileSync(path, "");
+          created = true;
+          if (t != null) continue;
+        }
+        break;
+      }
     }
   }
 }

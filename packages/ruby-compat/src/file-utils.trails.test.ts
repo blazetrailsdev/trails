@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
+import { ArgumentError } from "./argument-error.js";
 import { FileUtils } from "./file-utils.js";
 
 describe("FileUtils", () => {
@@ -38,6 +39,23 @@ describe("FileUtils", () => {
     FileUtils.touch(file);
 
     expect(nodeFs.existsSync(file)).toBe(true);
+  });
+
+  it("touch updates the mtime of an existing file", () => {
+    const file = nodePath.join(root, "stamp");
+    nodeFs.writeFileSync(file, "");
+    const mtime = new Date(Date.UTC(2001, 1, 3, 4, 5, 6));
+
+    FileUtils.touch(file, { mtime });
+
+    expect(nodeFs.statSync(file).mtime.getTime()).toEqual(mtime.getTime());
+  });
+
+  it("touch with nocreate raises rather than creating the file", () => {
+    const file = nodePath.join(root, "absent");
+
+    expect(() => FileUtils.touch(file, { nocreate: true })).toThrow();
+    expect(nodeFs.existsSync(file)).toBe(false);
   });
 
   it("rm removes each path in the list and raises on a missing one", () => {
@@ -79,7 +97,7 @@ describe("FileUtils", () => {
     const src = nodePath.join(root, "src");
     nodeFs.writeFileSync(src, "contents");
 
-    expect(() => FileUtils.cp(src, src)).toThrow(`same file: ${src} and ${src}`);
+    expect(() => FileUtils.cp(src, src)).toThrow(ArgumentError);
   });
 
   it("mv renames the file", () => {
