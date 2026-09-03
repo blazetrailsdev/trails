@@ -453,7 +453,7 @@ function instrumentedDeferredPool(outcome: Result) {
             ACTIVE_RECORD_INSTRUMENTER,
             () => Notifications.instrumenter,
           );
-          return instrumenter.instrumentAsync(
+          return instrumenter.instrument(
             "sql.active_record",
             { sql, name, binds, async: true },
             async () => {

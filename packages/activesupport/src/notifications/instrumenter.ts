@@ -48,38 +48,44 @@ export class Event {
     return this._end != null ? this._end / 1000.0 : null;
   }
 
-  /** Mirrors: Notifications::Event#record (notifications/instrumenter.rb:132-143). */
+  /**
+   * Mirrors: Notifications::Event#record (notifications/instrumenter.rb:132-143).
+   *
+   * One method covers a synchronous and an awaited block. When the block hands
+   * back a Promise the `ensure` and `rescue` arms land on the settled promise
+   * instead of running synchronously; otherwise they run exactly as Ruby's do.
+   * The discriminator is `instanceof Promise`, not a duck-typed `then` — an
+   * `async` function always returns a native Promise, so that covers every case
+   * the deviation exists for, and it keeps Ruby's semantics for a block that
+   * merely RETURNS a thenable (`Relation`, `FutureResult::Complete`, the
+   * `thenableHash` proxy): Ruby's `ensure` fires as soon as the block returns,
+   * and so does this one.
+   */
   record<T = void>(fn?: (payload: EventPayload) => T): T {
     this.startBang();
+    let result: T;
     try {
-      return fn ? fn(this.payload) : (undefined as unknown as T);
+      result = fn ? fn(this.payload) : (undefined as unknown as T);
     } catch (e) {
       _recordException(this.payload, e);
-      throw e;
-    } finally {
       this.finishBang();
-    }
-  }
-
-  /**
-   * trails splits Ruby's one blocking `Event#record` into a sync and an awaiting
-   * form, as it does for `Notifications.instrument` / `instrumentAsync`
-   * (instrumenter.rb:59-67).
-   *
-   * @internal
-   * @noRailsEquivalent PERMANENT Ruby's `Event#record` (instrumenter.rb:132-143) is
-   * blocking, so one method covers both cases; an awaited block needs its own arm.
-   */
-  async recordAsync<T = void>(fn?: (payload: EventPayload) => Promise<T>): Promise<T> {
-    this.startBang();
-    try {
-      return fn ? await fn(this.payload) : (undefined as unknown as T);
-    } catch (e) {
-      _recordException(this.payload, e);
       throw e;
-    } finally {
-      this.finishBang();
     }
+    if (result instanceof Promise) {
+      return result.then(
+        (value) => {
+          this.finishBang();
+          return value;
+        },
+        (e) => {
+          _recordException(this.payload, e);
+          this.finishBang();
+          throw e;
+        },
+      ) as T;
+    }
+    this.finishBang();
+    return result;
   }
 
   /** Record information at the time this event starts */
@@ -222,6 +228,16 @@ export class Instrumenter {
    * (the rescue arm records the exception on it), then finish the handle in the
    * `ensure`. Routing through `build_handle` is what lets a Fanout notifier's
    * groups drive the event, rather than open-coding an Event/publish here.
+   *
+   * One method covers a synchronous and an awaited block. When the block hands
+   * back a Promise the `ensure` and `rescue` arms land on the settled promise
+   * instead of running synchronously; otherwise they run exactly as Ruby's do.
+   * The discriminator is `instanceof Promise`, not a duck-typed `then` — an
+   * `async` function always returns a native Promise, so that covers every case
+   * the deviation exists for, and it keeps Ruby's semantics for a block that
+   * merely RETURNS a thenable (`Relation`, `FutureResult::Complete`, the
+   * `thenableHash` proxy): Ruby's `ensure` fires as soon as the block returns,
+   * and so does this one.
    */
   instrument<T = void>(
     name: string,
@@ -231,32 +247,29 @@ export class Instrumenter {
     const handle = this.buildHandle(name, payload);
     handle.start();
 
+    let result: T;
     try {
-      return fn ? fn(payload) : (undefined as unknown as T);
+      result = fn ? fn(payload) : (undefined as unknown as T);
     } catch (e) {
       _recordException(payload, e);
-      throw e;
-    } finally {
       handle.finish();
-    }
-  }
-
-  async instrumentAsync<T = void>(
-    name: string,
-    payload: EventPayload = {},
-    fn?: (payload: EventPayload) => Promise<T>,
-  ): Promise<T> {
-    const handle = this.buildHandle(name, payload);
-    handle.start();
-
-    try {
-      return await (fn ? fn(payload) : Promise.resolve(undefined as unknown as T));
-    } catch (e) {
-      _recordException(payload, e);
       throw e;
-    } finally {
-      handle.finish();
     }
+    if (result instanceof Promise) {
+      return result.then(
+        (value) => {
+          handle.finish();
+          return value;
+        },
+        (e) => {
+          _recordException(payload, e);
+          handle.finish();
+          throw e;
+        },
+      ) as T;
+    }
+    handle.finish();
+    return result;
   }
 
   /**

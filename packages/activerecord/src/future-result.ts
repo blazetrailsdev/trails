@@ -79,15 +79,14 @@ export class EventBuffer {
     this.#events = [];
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  async instrumentAsync<T>(
+  async instrument<T>(
     name: string,
     payload: EventPayload = {},
     block?: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
     const event = this.#instrumenter.newEvent(name, payload);
     try {
-      return await event.recordAsync(block);
+      return await event.record(block);
     } finally {
       this.#events.push(event);
     }

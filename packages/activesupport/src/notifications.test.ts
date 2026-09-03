@@ -585,7 +585,7 @@ describe("Instrumenter", () => {
     expect(published).toHaveLength(1);
   });
 
-  it("instrumentAsync publishes after promise resolves", async () => {
+  it("instrument publishes after promise resolves", async () => {
     const published: Event[] = [];
     const notifier = {
       publish(_name: string, event: Event) {
@@ -593,7 +593,7 @@ describe("Instrumenter", () => {
       },
     };
     const inst = new Instrumenter(notifier);
-    const result = await inst.instrumentAsync("async.event", {}, async () => {
+    const result = await inst.instrument("async.event", {}, async () => {
       return 99;
     });
     expect(result).toBe(99);
@@ -601,7 +601,7 @@ describe("Instrumenter", () => {
     expect(published[0].end).not.toBeNull();
   });
 
-  it("instrumentAsync publishes on rejection", async () => {
+  it("instrument publishes on rejection", async () => {
     const published: Event[] = [];
     const notifier = {
       publish(_name: string, event: Event) {
@@ -610,7 +610,7 @@ describe("Instrumenter", () => {
     };
     const inst = new Instrumenter(notifier);
     await expect(
-      inst.instrumentAsync("async.fail", {}, async () => {
+      inst.instrument("async.fail", {}, async () => {
         throw new Error("async boom");
       }),
     ).rejects.toThrow("async boom");

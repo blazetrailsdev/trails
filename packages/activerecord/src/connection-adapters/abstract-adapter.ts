@@ -28,7 +28,7 @@ import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
 
 /** @internal */
 type AdapterInstrumenter = {
-  instrumentAsync<T>(
+  instrument<T>(
     name: string,
     payload: EventPayload,
     block: (payload: EventPayload) => Promise<T>,
@@ -1983,7 +1983,6 @@ export class AbstractAdapter implements Quoting {
     return arError;
   }
 
-  /** @missingRailsCall instrument — PERMANENT */
   async log<T>(
     sql: string,
     name: string | null = "SQL",
@@ -1995,7 +1994,7 @@ export class AbstractAdapter implements Quoting {
     try {
       const userTx = this.currentTransaction().userTransaction;
       const presentTx = userTx.isBlank() ? null : userTx;
-      return (await this.instrumenter.instrumentAsync(
+      return (await this.instrumenter.instrument(
         "sql.active_record",
         {
           sql,
