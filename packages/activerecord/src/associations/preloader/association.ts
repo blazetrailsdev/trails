@@ -427,40 +427,53 @@ export class LoaderQuery {
 }
 
 export class LoaderRecords {
+  readonly loaderQuery: LoaderQuery;
   /** @internal */
   readonly loaders: Association[];
-  readonly loaderQuery: LoaderQuery;
+  /** @internal */
+  readonly keysToLoad: Set<unknown>;
+  /** @internal */
+  readonly alreadyLoadedRecordsByKey: Map<unknown, Base[]>;
 
   constructor(loaders: Association[], loaderQuery: LoaderQuery) {
-    this.loaders = loaders;
     this.loaderQuery = loaderQuery;
+    this.loaders = loaders;
+    this.keysToLoad = new Set();
+    this.alreadyLoadedRecordsByKey = new Map();
+
+    this.populateKeysToLoadAndAlreadyLoadedRecords();
   }
 
   async records(): Promise<Base[]> {
-    const keysToLoad = new Set<unknown>();
-    const alreadyLoadedByKey = new Map<unknown, Base[]>();
+    return [...(await this.loadRecords()), ...this.alreadyLoadedRecords()];
+  }
 
+  /** @internal */
+  populateKeysToLoadAndAlreadyLoadedRecords(): void {
     for (const loader of this.loaders) {
       for (const [key, owners] of loader.ownersByKey) {
         const loadedOwner = owners.find((owner) => loader.isLoaded(owner));
         if (loadedOwner) {
-          alreadyLoadedByKey.set(key, loader.targetFor(loadedOwner));
+          this.alreadyLoadedRecordsByKey.set(key, loader.targetFor(loadedOwner));
         } else {
-          keysToLoad.add(key);
+          this.keysToLoad.add(key);
         }
       }
     }
 
-    for (const key of alreadyLoadedByKey.keys()) {
-      keysToLoad.delete(key);
+    for (const key of this.alreadyLoadedRecordsByKey.keys()) {
+      this.keysToLoad.delete(key);
     }
+  }
 
-    const loaded = await this.loaderQuery.loadRecordsForKeys([...keysToLoad], (record) => {
-      for (const loader of this.loaders) {
-        loader.setInverse(record);
-      }
+  loadRecords(): Promise<Base[]> {
+    return this.loaderQuery.loadRecordsForKeys([...this.keysToLoad], (record) => {
+      for (const l of this.loaders) l.setInverse(record);
     });
+  }
 
-    return [...loaded, ...Array.from(alreadyLoadedByKey.values()).flat()];
+  /** @internal */
+  alreadyLoadedRecords(): Base[] {
+    return [...this.alreadyLoadedRecordsByKey.values()].flat();
   }
 }
