@@ -1,5 +1,9 @@
 import { ArgumentError } from "./argument-error.js";
 
+interface SystemCallError extends Error {
+  code?: string;
+}
+
 /**
  * `Process` (`vendor/ruby/process.c:9129` `rb_mProcess`), the sliver of it
  * trails calls.
@@ -50,9 +54,7 @@ export class Process {
    */
   static clockGettime(clockId: string, unit = ":float_second"): number {
     if (clockId !== Process.CLOCK_MONOTONIC && clockId !== Process.CLOCK_THREAD_CPUTIME_ID) {
-      const error: NodeJS.ErrnoException = new Error(
-        `Invalid argument - clock_gettime(${clockId})`,
-      );
+      const error: SystemCallError = new Error(`Invalid argument - clock_gettime(${clockId})`);
       error.code = "EINVAL";
       throw error;
     }

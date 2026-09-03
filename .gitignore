@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-test/
 *.tsbuildinfo
 scripts/test-compare/output/
 scripts/api-compare/output/

@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,
@@ -172,7 +172,7 @@ export const nodeSqliteDriver: SqliteDriver = {
     const path = resolveUriDatabasePath(config.database);
     if (path === null) return true;
     try {
-      return getFs().existsSync(path);
+      return File.isExist(path);
     } catch {
       return false;
     }

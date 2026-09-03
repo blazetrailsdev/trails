@@ -11,7 +11,7 @@ import {
   NameError,
 } from "@blazetrails/activesupport";
 import { stdout } from "@blazetrails/ruby-compat";
-import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rubyInspect } from "./relation/ruby-inspect.js";
 import { Zlib } from "@blazetrails/ruby-compat";
@@ -1129,10 +1129,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       onCopy?: (scope: string, migration: MigrationProxy, oldPath: string) => void;
     } = {},
   ): Promise<MigrationProxy[]> {
-    const fs = getFs();
-    const path = getPath();
-
-    if (!fs.existsSync(destination)) {
+    if (!File.isExist(destination)) {
       FileUtils.mkdirP(destination);
     }
 
@@ -1153,12 +1150,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
           `Invalid migration scope '${scope}': must match /^[a-z0-9_]+$/ to be discoverable by MigrationContext#migrations.`,
         );
       }
-      if (!fs.existsSync(sourcePath)) continue;
+      if (!File.isExist(sourcePath)) continue;
       const sourceMigrations = new MigrationContext([sourcePath], schemaMigration, internalMetadata)
         .migrations;
 
       for (const source of sourceMigrations) {
-        const body = fs.readFileSync(source.filename, "utf8");
+        const body = File.binread(source.filename);
         const inserted = `// This migration comes from ${scope} (originally ${source.version})\n`;
 
         const duplicate = destinationMigrations.find((m) => m.name === source.name);
@@ -1172,8 +1169,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         const nextNumber = last ? last.version + 1 : 0;
         source.version = toInteger(Migration.nextMigrationNumber(nextNumber));
         const fileBase = underscore(source.name);
-        const ext = path.extname(source.filename) || ".ts";
-        const newPath = path.join(destination, `${source.version}_${fileBase}.${scope}${ext}`);
+        const ext = File.extname(source.filename) || ".ts";
+        const newPath = File.join(destination, `${source.version}_${fileBase}.${scope}${ext}`);
         const oldPath = source.filename;
         source.filename = newPath;
         last = source;
@@ -1181,7 +1178,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         const magicMatch = /^((?:\/\/ @ts-(?:no)?check[^\n]*\n)+\n?)/.exec(body);
         const magic = magicMatch ? magicMatch[1] : "";
         const rest = magic.length > 0 ? body.slice(magic.length) : body;
-        fs.writeFileSync(source.filename, `${magic}${inserted}${rest}`);
+        File.binwrite(source.filename, `${magic}${inserted}${rest}`);
         copied.push(source);
         options.onCopy?.(scope, source, oldPath);
         destinationMigrations.push(source);
@@ -1388,7 +1385,7 @@ export class MigrationProxy {
   }
 
   basename(): string {
-    return getPath().basename(this.filename);
+    return File.basename(this.filename);
   }
 
   async migrate(direction: "up" | "down"): Promise<void> {
@@ -1656,21 +1653,8 @@ export class MigrationContext<
 
   /** @internal */
   protected migrationFiles(): string[] {
-    const { readdirSync, existsSync } = getFs();
-    const { join } = getPath();
-    const files: string[] = [];
-    const collect = (dir: string): void => {
-      if (!existsSync(dir)) return;
-      for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        const full = join(dir, entry.name);
-        if (entry.isDirectory()) {
-          collect(full);
-        } else if (/^\d+_.*\.(ts|js)$/.test(entry.name)) {
-          files.push(full);
-        }
-      }
-    };
-    for (const p of this.migrationsPaths) collect(p);
+    const paths = this.migrationsPaths;
+    const files = paths.flatMap((path) => Dir.glob(`${path}/**/[0-9]*_*.{ts,js}`));
 
     const isTs = (file: string): boolean => file.endsWith(".ts");
     const byBasename = new Map<string, string>();

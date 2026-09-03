@@ -142,5 +142,10 @@ export class LogSubscriber extends BaseLogSubscriber {
 // Rails snake_case naming conventions as a cross-package wire protocol.
 LogSubscriber.subscribeLogLevel("start_processing", "info");
 LogSubscriber.subscribeLogLevel("process_action", "info");
+LogSubscriber.subscribeLogLevel("halted_callback", "info");
+LogSubscriber.subscribeLogLevel("send_file", "info");
+LogSubscriber.subscribeLogLevel("redirect_to", "info");
+LogSubscriber.subscribeLogLevel("send_data", "info");
+LogSubscriber.subscribeLogLevel("unpermitted_parameters", "debug");
 
 LogSubscriber.attachTo("action_controller");

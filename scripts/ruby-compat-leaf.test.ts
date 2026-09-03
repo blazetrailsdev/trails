@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import {
   declaredDependencies,
-  isCompiledTestFile,
   moduleSpecifiers,
   nodeBuiltinImports,
   nodeBuiltinNamed,
@@ -54,11 +53,6 @@ describe("ruby-compat leaf guard", () => {
     ]);
   });
 
-  it("exempts compiled test files", () => {
-    expect(isCompiledTestFile("hash.trails.test.js")).toBe(true);
-    expect(isCompiledTestFile("hash.js")).toBe(false);
-  });
-
   it("flags a static Node import and allows a guarded require of the same builtin", async () => {
     const dir = await mkdtemp(path.join(tmpdir(), "ruby-compat-leaf-"));
     await mkdir(path.join(dir, "dist"), { recursive: true });
@@ -81,5 +75,18 @@ describe("ruby-compat leaf guard", () => {
 
   it("ruby-compat declares no dependencies or peerDependencies", async () => {
     expect(await declaredDependencies(PACKAGE_DIR)).toEqual([]);
+  });
+
+  it("ruby-compat's runtime sources compile in a program @types/node cannot reach", async () => {
+    const runtime = JSON.parse(await readFile(path.join(PACKAGE_DIR, "tsconfig.json"), "utf-8"));
+    expect(runtime.compilerOptions.types).toEqual([]);
+    expect(runtime.exclude).toContain("src/**/*.test.ts");
+
+    const tests = JSON.parse(await readFile(path.join(PACKAGE_DIR, "tsconfig.test.json"), "utf-8"));
+    expect(tests.include).toEqual(["src/**/*.test.ts"]);
+    expect(tests.references).toEqual([{ path: "./tsconfig.json" }]);
+
+    const root = JSON.parse(await readFile(path.join(HERE, "..", "tsconfig.json"), "utf-8"));
+    expect(root.references).toContainEqual({ path: "packages/ruby-compat/tsconfig.test.json" });
   });
 });

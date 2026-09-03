@@ -19,7 +19,7 @@ describe("Rack::Multipart::UploadedFile", () => {
   });
 
   it("builds a body carrying the file's bytes, counted by CONTENT_LENGTH", () => {
-    const raw = getFs().readFileSync(logo);
+    const raw = getFs().readFileSync(logo) as Buffer;
     const files = new UploadedFile(logo);
     const data = new Generator({ "submit-name": "Larry", files }).dump() as string;
 

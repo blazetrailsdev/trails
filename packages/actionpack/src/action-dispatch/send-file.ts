@@ -100,7 +100,7 @@ export function sendFile(path: string, options: SendFileOptions = {}): SendResul
     headers["content-disposition"] = buildContentDisposition("attachment", filename);
   }
 
-  const body = getFs().readFileSync(resolvedPath);
+  const body = getFs().readFileSync(resolvedPath) as Buffer;
 
   return { status: 200, headers, body };
 }

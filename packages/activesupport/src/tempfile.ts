@@ -188,7 +188,7 @@ export class Tempfile {
   /** `IO#read` — the whole file. */
   read(): Buffer {
     this.flush();
-    return getFs().readFileSync(this.tmpname);
+    return getFs().readFileSync(this.tmpname) as Buffer;
   }
 
   /** `IO#flush` — writes the buffered bytes through to the file. */

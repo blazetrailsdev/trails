@@ -29,8 +29,10 @@
  * and `packages/ruby-compat/src/**` joining the `no-node-builtins` rule only
  * closes the first for this package's own files.
  *
- * Compiled test files are the one exemption — they import `vitest`, which is a
- * devDependency of the workspace root and never ships.
+ * There is no exemption. The package's tests compile in their own project
+ * (`packages/ruby-compat/tsconfig.test.json`), which is also what fences
+ * `@types/node` out of the runtime sources' program — so `dist/` holds only
+ * runtime modules and a compiled `vitest` import cannot appear there.
  */
 
 import { readdir, readFile } from "node:fs/promises";
@@ -39,11 +41,6 @@ import path from "node:path";
 import ts from "typescript";
 
 const NODE_BUILTINS = new Set(builtinModules.filter((m) => !m.startsWith("_")));
-
-/** A compiled test file — the one exemption; it imports `vitest`. */
-export function isCompiledTestFile(rel: string): boolean {
-  return /\.test\.js$/.test(rel);
-}
 
 /** How a module specifier is written, which is what decides whether it binds. */
 export type SpecifierKind = "static" | "dynamic" | "require";
@@ -127,7 +124,6 @@ export async function nodeBuiltinImports(packageDir: string): Promise<LeafViolat
   }
   const violations: LeafViolation[] = [];
   for (const file of files.sort()) {
-    if (isCompiledTestFile(file)) continue;
     const source = await readFile(path.join(dist, file), "utf-8");
     for (const { specifier, kind } of moduleSpecifiers(source)) {
       if (kind === "require") continue;

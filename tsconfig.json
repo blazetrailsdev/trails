@@ -19,6 +19,7 @@
   "files": [],
   "references": [
     { "path": "packages/ruby-compat" },
+    { "path": "packages/ruby-compat/tsconfig.test.json" },
     { "path": "packages/date" },
     { "path": "packages/activesupport" },
     { "path": "packages/tse-compiler" },

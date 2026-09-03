@@ -107,6 +107,19 @@ export class File {
   }
 
   /**
+   * `vendor/ruby/io.c:12414` `rb_io_s_binwrite`, the binary twin of
+   * `File.write` — it opens in binary mode, so the String's bytes go through
+   * unchanged. `File.binread` decodes with the same encoding, which is what
+   * makes the pair round-trip.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.binwrite` (`IO.binwrite`,
+   * `vendor/ruby/io.c:12414`).
+   */
+  static binwrite(name: string, string: string): number {
+    return File.write(name, string);
+  }
+
+  /**
    * `vendor/ruby/file.c:3202` `rb_file_s_unlink`, which answers the number of
    * files deleted and raises on the first failure.
    *
@@ -116,6 +129,18 @@ export class File {
   static delete(...files: string[]): number {
     for (const file of files) getFs().unlinkSync(file);
     return files.length;
+  }
+
+  /**
+   * `vendor/ruby/file.c:2427` `rb_file_s_mtime`, the modification Time of a
+   * FOLLOWED symlink — it raises `ENOENT` rather than answering `nil` when the
+   * path does not exist.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.mtime`
+   * (`vendor/ruby/file.c:2427`).
+   */
+  static mtime(fileName: string): Date {
+    return getFs().statSync(fileName).mtime;
   }
 
   /**

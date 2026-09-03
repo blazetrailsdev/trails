@@ -1,4 +1,4 @@
-import { getPathAsync } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { init, detectPackageManager } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
 import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
@@ -374,7 +374,7 @@ export async function run(argv: string[], cwd: string): Promise<number> {
     // Resolve `--root` (and the default) against the caller's `cwd`, not the
     // process's — keeps `run(argv, cwd)` self-consistent; absolute roots pass
     // through unchanged.
-    const modelsDir = (await getPathAsync()).resolve(cwd, root.value ?? "app/models");
+    const modelsDir = File.expandPath(root.value ?? "app/models", cwd);
     const check = rest.includes("--check");
     const { path, changed } = await generateManifest(modelsDir, { check });
     if (check) {

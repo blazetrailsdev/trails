@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,
@@ -144,7 +144,7 @@ export const betterSqlite3Driver: SqliteDriver = {
     const path = resolveDatabasePath(config.database);
     if (path === null) return true;
     try {
-      return getFs().existsSync(path);
+      return File.isExist(path);
     } catch {
       return false;
     }

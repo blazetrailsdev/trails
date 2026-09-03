@@ -76,11 +76,23 @@ function statOrNull(path: string): FsStatResult | null {
 }
 
 /**
+ * `SystemCallError` (`vendor/ruby/error.c:3899` `rb_eSystemCallError`), whose
+ * subclass is picked by an errno — spelled here as the `code` the fs layer's
+ * own errors already carry.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `SystemCallError`, which Rails
+ * rescues without defining.
+ */
+interface SystemCallError extends Error {
+  code?: string;
+}
+
+/**
  * `Errno::EEXIST` (`vendor/ruby/lib/fileutils.rb:1163`) — a `SystemCallError`,
  * whose `.code` the fs layer's own errors carry and callers branch on.
  */
-function errnoEexist(path: string): NodeJS.ErrnoException {
-  const error: NodeJS.ErrnoException = new Error(`File exists - ${path}`);
+function errnoEexist(path: string): SystemCallError {
+  const error: SystemCallError = new Error(`File exists - ${path}`);
   error.code = "EEXIST";
   return error;
 }

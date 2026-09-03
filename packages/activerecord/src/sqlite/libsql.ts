@@ -1,6 +1,6 @@
 /** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "libsql";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { ConfigurationError } from "../errors.js";
 import {
   type ColumnInfo,
@@ -245,7 +245,7 @@ export const libsqlDriver: SqliteDriver = {
     const path = resolveUriDatabasePath(config.database);
     if (path === null) return true;
     try {
-      return getFs().existsSync(path);
+      return File.isExist(path);
     } catch {
       return false;
     }
@@ -268,14 +268,6 @@ export const libsqlDriver: SqliteDriver = {
           "primitive is required for memory-backed restores.",
       );
     }
-    const fs = getFs();
-    if (fs.readFile === undefined || fs.writeFile === undefined) {
-      throw new ConfigurationError(
-        "libsql restoreFromPath fallback requires async fs.readFile/fs.writeFile; " +
-          "the configured fs adapter provides neither.",
-      );
-    }
-    const bytes = await fs.readFile(resolveUriDatabasePath(sourcePath) ?? sourcePath);
-    await fs.writeFile(destPath, bytes);
+    FileUtils.cp(resolveUriDatabasePath(sourcePath) ?? sourcePath, destPath);
   },
 };

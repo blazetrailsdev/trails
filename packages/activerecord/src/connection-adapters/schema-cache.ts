@@ -1,4 +1,4 @@
-import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
+import { File, FileUtils, getFs } from "@blazetrails/ruby-compat";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
 import { deduplicate } from "./deduplicable.js";
@@ -93,8 +93,7 @@ export class SchemaCache {
   /** @missingRailsCall load — PERMANENT */
   static _loadFrom(filename: string): SchemaCache | null {
     try {
-      const fs = getFs();
-      if (!fs.existsSync(filename)) return null;
+      if (!File.isFile(filename)) return null;
       const data = SchemaCache.read(filename, (content) => content);
       const parsed = JSON.parse(data);
       const cache = new SchemaCache();
@@ -107,12 +106,11 @@ export class SchemaCache {
 
   /** @missingRailsCall open — PERMANENT */
   static read<T>(filename: string, callback: (data: string) => T): T {
-    const fs = getFs();
-    if (filename.endsWith(".gz")) {
-      const raw = fs.readFileSync(filename, "latin1");
+    if (File.extname(filename) === ".gz") {
+      const raw = getFs().readFileSync(filename, "latin1");
       return callback(Gzip.decompress(raw));
     }
-    return callback(fs.readFileSync(filename, "utf-8"));
+    return callback(File.read(filename));
   }
 
   initializeDup(): SchemaCache {
@@ -382,16 +380,14 @@ export class SchemaCache {
   }
 
   dumpTo(filename: string): void {
-    const fs = getFs();
-    const path = getPath();
-    FileUtils.mkdirP(path.dirname(filename));
+    FileUtils.mkdirP(File.dirname(filename));
     const coder: Record<string, unknown> = {};
     this.encodeWith(coder);
     const payload = JSON.stringify(coder, null, 2);
-    if (filename.endsWith(".gz")) {
-      fs.writeFileSync(filename, Gzip.compress(payload), "latin1");
+    if (File.extname(filename) === ".gz") {
+      getFs().writeFileSync(filename, Gzip.compress(payload), "latin1");
     } else {
-      fs.writeFileSync(filename, payload, "utf-8");
+      File.write(filename, payload);
     }
   }
 
@@ -621,8 +617,7 @@ export class SchemaReflection {
     if (!SchemaReflection.useSchemaCacheDump) return false;
     if (!this._cachePath) return false;
     try {
-      const fs = getFs();
-      return fs.existsSync(this._cachePath);
+      return File.isFile(this._cachePath);
     } catch {
       return false;
     }
@@ -792,14 +787,12 @@ export function open(
   filename: string,
   callback: (file: { write(data: string): void }) => void,
 ): void {
-  const fs = getFs();
-  const path = getPath();
-  FileUtils.mkdirP(path.dirname(filename));
+  FileUtils.mkdirP(File.dirname(filename));
   let content = "";
   callback({
     write: (data: string) => {
       content += data;
     },
   });
-  fs.writeFileSync(filename, content, "utf-8");
+  File.write(filename, content);
 }

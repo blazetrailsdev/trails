@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 
 export type DdlOp =
@@ -216,9 +216,8 @@ function dumpSummary(): void {
     sqlSamples,
   };
   try {
-    const fs = getFs();
-    if (dir) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(out, JSON.stringify(payload, null, 2));
+    if (dir) FileUtils.mkdirP(dir);
+    File.write(out, JSON.stringify(payload, null, 2));
     if (process.env.DDL_PROFILE_DEBUG === "1") {
       console.error(
         `[DDL_PROFILE] ${agg.totalCount} DDL ops, ${agg.totalMs.toFixed(1)}ms → ${out}`,
