@@ -30,6 +30,9 @@ importers:
       '@blazetrails/parity':
         specifier: workspace:*
         version: link:scripts/parity
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:packages/ruby-compat
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.3(jiti@2.6.1))

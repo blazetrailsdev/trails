@@ -127,7 +127,7 @@ async function main(): Promise<void> {
   // so Node ESM dedupes them with the fixture's own `@blazetrails/arel` import
   // to one module instance — that is what makes `Arel::Table.engine` visible to
   // the fixture's nodes.
-  const { getFsAsync, getPathAsync } = await import("@blazetrails/activesupport");
+  const { getFsAsync, getPathAsync } = await import("@blazetrails/ruby-compat");
   const { Base } = await import("@blazetrails/activerecord");
 
   try {

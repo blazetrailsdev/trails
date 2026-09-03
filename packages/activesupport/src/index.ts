@@ -1,16 +1,7 @@
 export { NameError } from "./core-ext/name-error.js";
 export { KeyError } from "@blazetrails/ruby-compat";
 export { regexpEscape } from "@blazetrails/ruby-compat";
-export {
-  registerFsAdapter,
-  getFs,
-  getPath,
-  getFsAsync,
-  getPathAsync,
-  fsAdapterConfig,
-} from "@blazetrails/ruby-compat";
 export { FileUpdateChecker } from "./file-update-checker.js";
-export type { FsAdapter, FsStatResult, FsDirent, PathAdapter } from "@blazetrails/ruby-compat";
 
 export { trailsRoot, setTrailsRoot } from "./trails-root.js";
 // Note: glob is intentionally kept as a subpath import

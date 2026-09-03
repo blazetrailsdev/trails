@@ -176,7 +176,7 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   const nodeModule = require("node:module") as {
     createRequire(p: string): (id: string) => unknown;
   };
-  return nodeModule.createRequire("file:///activesupport");
+  return nodeModule.createRequire("file:///ruby-compat");
 }
 
 function tryAutoRegisterNode(): boolean {
