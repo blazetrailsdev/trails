@@ -757,7 +757,7 @@ export abstract class SchemaDumper {
         ? JSON.stringify(index.columns)
         : `[${index.columns.map((c) => JSON.stringify(c)).join(", ")}]`;
     const parts: string[] = [cols];
-    if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
+    parts.push(`name: ${JSON.stringify(index.name)}`);
     if (index.unique) parts.push("unique: true");
     const lengths = conciseOptions(index.columns, index.lengths);
     if (lengths !== undefined) parts.push(`length: ${this.formatIndexParts(lengths)}`);
