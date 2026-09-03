@@ -1,35 +1,38 @@
 import { describe, it, expect } from "vitest";
-import { Notifications } from "@blazetrails/activesupport";
 import { registerModel } from "../../index.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Preloader } from "../preloader.js";
-import { SQLCounter } from "../../testing/query-assertions.js";
+import { LoaderRecords } from "./association.js";
+import type { Association } from "./association.js";
+import type { Base } from "../../base.js";
 import { Author } from "../../test-helpers/models/author.js";
-import { Post } from "../../test-helpers/models/post.js";
 
 registerModel(Author);
-registerModel(Post);
 
 describe("Preloader::Association::LoaderRecords", () => {
   const { authors } = fixtures(["authors", "posts"]);
 
-  it("does not query for a key whose owner is already loaded", async () => {
+  const keyFor = (loader: Association, owner: Base): unknown =>
+    [...loader.ownersByKey.entries()].find(([, owners]) => owners.includes(owner))![0];
+
+  it("keeps a key whose owner is already loaded out of keys_to_load", async () => {
     const david = authors("david");
     const mary = authors("mary");
 
     const davidPosts = await david.posts;
     expect(davidPosts.length).toBeGreaterThan(0);
 
-    const counter = new SQLCounter();
-    await Notifications.subscribed(counter, "sql.active_record", async () => {
-      await new Preloader({ records: [david, mary], associations: ["posts"] }).call();
-    });
+    const [loader] = await new Preloader({
+      records: [david, mary],
+      associations: ["posts"],
+      associateByDefault: false,
+    }).loaders();
 
-    const boundValues = counter.logFull.flatMap(([, binds]) => binds);
-    expect(boundValues).toContain(mary.id);
-    expect(boundValues).not.toContain(david.id);
+    const loaderRecords = new LoaderRecords([loader], loader.loaderQuery());
 
-    expect((await mary.posts).every((post) => post instanceof Post)).toBe(true);
+    expect(loaderRecords.keysToLoad.has(keyFor(loader, mary))).toBe(true);
+    expect(loaderRecords.keysToLoad.has(keyFor(loader, david))).toBe(false);
+    expect(loaderRecords.alreadyLoadedRecordsByKey.get(keyFor(loader, david))).toEqual(davidPosts);
   });
 
   it("returns the already loaded records alongside the loaded ones", async () => {
@@ -44,10 +47,11 @@ describe("Preloader::Association::LoaderRecords", () => {
       associateByDefault: false,
     }).loaders();
 
-    const records = await loader.loaderQuery().recordsFor([loader]);
+    const records = await new LoaderRecords([loader], loader.loaderQuery()).records();
 
     for (const post of davidPosts) {
       expect(records).toContain(post);
     }
+    expect(records.length).toBeGreaterThan(davidPosts.length);
   });
 });
