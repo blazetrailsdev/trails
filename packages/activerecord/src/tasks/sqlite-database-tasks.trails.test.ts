@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import * as activesupport from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/ruby-compat";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -147,7 +147,7 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
   });
 
   const assertNoFsWrites = () => {
-    const fsObj = activesupport.getFs();
+    const fsObj = getFs();
     const mkdirSpy = vi.spyOn(fsObj, "mkdirSync").mockImplementation(() => undefined);
     const writeSpy = vi.spyOn(fsObj, "writeFileSync").mockImplementation(() => undefined as any);
     const unlinkSpy = vi.spyOn(fsObj, "unlinkSync").mockImplementation(() => undefined);
