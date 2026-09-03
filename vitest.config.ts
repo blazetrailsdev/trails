@@ -248,6 +248,8 @@ const alias = {
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
   "@blazetrails/rack-session/": path.resolve(__dirname, "packages/rack-session/src") + "/",
   "@blazetrails/rack-session": path.resolve(__dirname, "packages/rack-session/src/index.ts"),
+  "@blazetrails/rack-test/": path.resolve(__dirname, "packages/rack-test/src") + "/",
+  "@blazetrails/rack-test": path.resolve(__dirname, "packages/rack-test/src/index.ts"),
   "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
   "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
   "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/src/index.ts"),

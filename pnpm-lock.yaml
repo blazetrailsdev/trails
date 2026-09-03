@@ -157,6 +157,9 @@ importers:
       '@blazetrails/rack-session':
         specifier: workspace:*
         version: link:../rack-session
+      '@blazetrails/rack-test':
+        specifier: workspace:*
+        version: link:../rack-test
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
@@ -367,6 +370,18 @@ importers:
         version: link:../ruby-compat
 
   packages/rack-session:
+    dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
+  packages/rack-test:
     dependencies:
       '@blazetrails/activesupport':
         specifier: workspace:*

@@ -1,0 +1,20 @@
+{
+  "name": "@blazetrails/rack-test",
+  "version": "0.1.0",
+  "description": "Simple testing API built on Rack, mirroring Ruby's rack-test",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  }
+}
