@@ -71,4 +71,19 @@ describe("ACLogSubscriberTest", () => {
       "Processing by Another::LogSubscribersController#show as text/plain",
     ]);
   });
+
+  it("every logging method registers the level its subscribe_log_level names", () => {
+    const belowLevel = { "info?": false, "debug?": false, "error?": false };
+    const levels = LogSubscriber.logLevels;
+    const registered = [...levels].map(([method, check]) => [method, check(belowLevel as never)]);
+    expect(registered).toEqual([
+      ["start_processing", true],
+      ["process_action", true],
+      ["halted_callback", true],
+      ["send_file", true],
+      ["redirect_to", true],
+      ["send_data", true],
+      ["unpermitted_parameters", true],
+    ]);
+  });
 });
