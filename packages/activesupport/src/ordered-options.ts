@@ -104,7 +104,9 @@ export class OrderedOptions {
    * (`vendor/ruby/hash.c:4627`): `rb_hash_aref` for the first key — which is
    * `get`, so the default block runs — and `rb_obj_dig`
    * (`vendor/ruby/object.c:3906`) for the rest. That loop ends on `nil`,
-   * indexes a Hash through `rb_hash_aref` and an Array through `rb_ary_at`,
+   * indexes a Hash through `rb_hash_aref` and an Array through `rb_ary_at`
+   * — whose index goes through `NUM2LONG` (`vendor/ruby/array.c:1881-1883`),
+   * so a String identifier is a TypeError there and not an index —
    * hands the remaining identifiers to an object that answers `dig`, and
    * otherwise raises `no_dig_method`'s TypeError (`object.c:3897-3900`). A
    * Ruby Hash is a plain object or a `Map` in trails, so both take the
@@ -120,8 +122,10 @@ export class OrderedOptions {
         continue;
       }
       if (Array.isArray(obj)) {
-        const index = Number(identifier);
-        obj = obj[index < 0 ? obj.length + index : index];
+        if (typeof identifier !== "number") {
+          throw new TypeError(`no implicit conversion of ${rbObjClass(identifier)} into Integer`);
+        }
+        obj = obj[identifier < 0 ? obj.length + identifier : identifier];
         continue;
       }
       const proto: unknown = Object.getPrototypeOf(obj);

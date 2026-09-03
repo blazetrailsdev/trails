@@ -21,6 +21,12 @@ describe("OrderedOptions", () => {
     expect(() => a.dig("testKey", "a")).toThrow("Integer does not have #dig method");
   });
 
+  it("dig raises TypeError for a non-Integer Array index", () => {
+    const a = new OrderedOptions();
+    a.set("testKey", [{ a: 1 }]);
+    expect(() => a.dig("testKey", "0")).toThrow("no implicit conversion of String into Integer");
+  });
+
   it("dig indexes a Map intermediate through rb_hash_aref", () => {
     const a = new OrderedOptions();
     a.set("testKey", new Map([["a", 1]]));
