@@ -238,7 +238,7 @@ export function messageMetadataTests<T>(hooks: MetadataCodecHooks<T>): void {
   });
 
   it("metadata works with NullSerializer", () => {
-    const codec = makeCodec(NullSerializer as MessageSerializer);
+    const codec = makeCodec(NullSerializer);
     assertRoundtrip(
       "a string",
       codec,

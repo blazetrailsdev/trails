@@ -102,7 +102,7 @@ export class MessageEncryptor extends Codec {
     this.verifier = !this.aeadMode
       ? new MessageVerifier(resolvedSignSecret ?? secret, {
           ...opts,
-          serializer: NullSerializer as MessageSerializer,
+          serializer: NullSerializer,
         })
       : undefined;
 
@@ -126,7 +126,7 @@ export class MessageEncryptor extends Codec {
   }
 
   createMessage(value: unknown, options: MetadataOptions = {}): string {
-    return this.sign(this.encrypt(this.serializeWithMetadata(value, options)));
+    return this.sign(this.encrypt(this.serializeWithMetadata(value, options) as string));
   }
 
   readMessage(message: string, options: ExpectedMetadataOptions = {}): unknown {

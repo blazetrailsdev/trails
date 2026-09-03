@@ -5,6 +5,14 @@ export type { PrettyPrinter, PPSink } from "./pretty-print.js";
 export { Result, IndexedRow } from "./result.js";
 export { FutureResult } from "./future-result.js";
 export { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
+export { UniquenessValidator } from "./validations.js";
+export { ExtendedDeterministicUniquenessValidator } from "./encryption/extended-deterministic-uniqueness-validator.js";
+export { deprecator, Deprecator } from "./deprecator.js";
+export { SchemaReflection } from "./connection-adapters/schema-cache.js";
+export {
+  AutoFilteredParameters,
+  type AutoFilteredParametersApp,
+} from "./encryption/auto-filtered-parameters.js";
 export type { ColumnType as ResultColumnType, ColumnTypes as ResultColumnTypes } from "./result.js";
 export * as Type from "./type.js";
 
@@ -283,7 +291,6 @@ export { isDestroyable } from "./autosave-association.js";
 export { Connection as TypeCasterConnection } from "./type-caster/connection.js";
 export { Map as TypeCasterMap } from "./type-caster/map.js";
 
-export { Trailtie } from "./trailtie.js";
 export { JobRuntime } from "./trailties/job-runtime.js";
 export { Resolver as DatabaseSelectorResolver } from "./middleware/database-selector/resolver.js";
 export { Session as DatabaseSelectorSession } from "./middleware/database-selector/resolver/session.js";

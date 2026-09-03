@@ -5,8 +5,7 @@ export { GlobalID } from "./global-id.js";
 export type { GlobalIDModel, GlobalIDOptions } from "./global-id.js";
 export { SignedGlobalID, ExpiredMessage } from "./signed-global-id.js";
 export { Verifier } from "./verifier.js";
-export { Trailtie } from "./trailtie.js";
-export type { GlobalIdConfig, TrailtieApp } from "./trailtie.js";
+export { FixtureSet, type FixtureSetHost } from "./fixture-set.js";
 /** @internal */
 export { _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
 export type { SignedGlobalIDOptions, ParseOptions } from "./signed-global-id.js";

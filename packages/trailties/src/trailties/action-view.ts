@@ -4,8 +4,7 @@
  * Mirrors: ActionView::Railtie < ::Rails::Engine
  * (actionview/lib/action_view/railtie.rb)
  *
- * Extends the base Railtie exported from `@blazetrails/activesupport` and
- * registers itself in the global initialization pipeline. Seeds the
+ * Registers itself in the global initialization pipeline. Seeds the
  * `actionView` config slot with the same defaults Rails establishes at the
  * top of `railtie.rb`.
  *
@@ -17,13 +16,9 @@
  * ContentExfiltrationPreventionHelper / Resolver. The matching helper
  * setters either don't exist yet or live in unported namespaces.
  */
-import {
-  Trailtie as BaseTrailtie,
-  registerTrailtie,
-  type Deprecators,
-} from "@blazetrails/activesupport";
-import { Base } from "./base.js";
-import { deprecator } from "./deprecator.js";
+import { type Deprecators } from "@blazetrails/activesupport";
+import { Base, deprecator } from "@blazetrails/actionview";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionViewConfig {
   embedAuthenticityTokenInRemoteForms: boolean | null;
@@ -56,16 +51,16 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.config["actionView"] = defaultActionViewConfig();
+    this.config.set("actionView", defaultActionViewConfig());
 
-    this.initializer("action_view.deprecator", (app) => {
+    this.initializer("action_view.deprecator", { before: ":load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionView", deprecator());
     });
 
     this.initializer("action_view.annotate_rendered_view_with_filenames", () => {
-      const cfg = this.config["actionView"] as ActionViewConfig;
+      const cfg = this.config.get("actionView") as ActionViewConfig;
       Base.annotateRenderedViewWithFilenames = cfg.annotateRenderedViewWithFilenames;
     });
   }

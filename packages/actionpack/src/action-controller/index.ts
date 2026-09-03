@@ -72,7 +72,6 @@ export { Deprecator, deprecator, addRenderer, removeRenderer } from "./deprecato
 export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 export { fragmentCacheKey } from "./caching.js";
 export { defaultFormBuilder } from "./form-builder.js";
-export { Trailtie } from "./trailtie.js";
 export { assertTemplate } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { renderForApi } from "./api/api-rendering.js";

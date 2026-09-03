@@ -19,7 +19,7 @@ import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
-import { Trailtie } from "./trailtie.js";
+import { Trailtie, abstractRailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
 import { LazyRouteSet } from "./engine/lazy-route-set.js";
@@ -27,6 +27,10 @@ import { _Trails } from "./trails-slot.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
 export class Engine extends Trailtie {
+  static {
+    abstractRailtie(this);
+  }
+
   private _railtiesCollection?: Trailties;
   private _allLoadPathsCache?: string[];
   private _routes?: RouteSet;

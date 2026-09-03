@@ -529,7 +529,10 @@ describe("Application::Configuration", () => {
   it("config.load_defaults skips a framework that has not registered its config", () => {
     const c = new Configuration();
     expect(() => c.loadDefaults("8.0")).not.toThrow();
-    expect(c.get("activeRecord")).toBeUndefined();
+    // `assets` is the one framework slot no loaded trailtie seeds — Rails'
+    // `config.assets` comes from Sprockets/Propshaft, which trails has no port
+    // of, so `respond_to?(:assets)` is false and `load_defaults` skips it.
+    expect(c.get("assets")).toBeUndefined();
   });
 
   it("config.load_defaults raises on an unknown version", () => {

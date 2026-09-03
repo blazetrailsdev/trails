@@ -7,7 +7,9 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Executor as ActionDispatchExecutor } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { Base, Trailtie } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
+import { Trailtie } from "../trailties/active-record.js";
+import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Deprecators } from "@blazetrails/activesupport";
 import { Application } from "../application.js";
 import { Configuration } from "./configuration.js";
@@ -28,8 +30,11 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
 
   // The initializers register the executor hooks on `ActiveSupport::Executor`
   // itself, so running them per-test would stack a second copy of every hook.
-  beforeAll(() => {
-    Trailtie.runInitializers({ deprecators: new Deprecators(), config: { filterParameters: [] } });
+  beforeAll(async () => {
+    await runTrailtieInitializers(Trailtie, {
+      deprecators: new Deprecators(),
+      config: { filterParameters: [] },
+    });
   });
 
   beforeEach(async () => {

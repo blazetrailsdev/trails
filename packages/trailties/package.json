@@ -26,12 +26,14 @@
     "bin"
   ],
   "dependencies": {
-    "@blazetrails/ruby-compat": "workspace:*",
-    "@blazetrails/activerecord": "workspace:*",
-    "@blazetrails/activesupport": "workspace:*",
-    "@blazetrails/rack": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
     "commander": "^14.0.0",
     "vite": "^7.0.0"
   },

@@ -1,6 +1,7 @@
 export { Model } from "./model.js";
 export { I18n } from "./i18n.js";
 export { Error } from "./error.js";
+export { deprecator, Deprecator } from "./deprecator.js";
 export { Errors, StrictValidationFailed, UnknownAttributeError, RangeError } from "./errors.js";
 export { NestedError } from "./nested-error.js";
 export { ValidationError, ValidationContext } from "./validations.js";
@@ -50,7 +51,6 @@ export { YAMLEncoder } from "./attribute-set/yaml-encoder.js";
 export { AttributeSetCodecError } from "./attribute-set/codecs/codec.js";
 export type { AttributeSetCodec, AttributeSetEnvelope } from "./attribute-set/codecs/codec.js";
 export { jsonCodec } from "./attribute-set/codecs/json.js";
-export { Trailtie } from "./trailtie.js";
 export { WithValidator } from "./validations/with.js";
 export { AbsenceValidator } from "./validations/absence.js";
 export type { AttrNameArg } from "./validations/helper-methods.js";

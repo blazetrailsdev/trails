@@ -1,12 +1,7 @@
-import {
-  Trailtie as BaseTrailtie,
-  registerTrailtie,
-  type Deprecators,
-} from "@blazetrails/activesupport";
+import { type Deprecators } from "@blazetrails/activesupport";
 import { env as processEnv } from "@blazetrails/activesupport/process-adapter";
-import { SecurePassword } from "./secure-password.js";
-import { Error as ActiveModelError } from "./error.js";
-import { deprecator } from "./deprecator.js";
+import { SecurePassword, Error as ActiveModelError, deprecator } from "@blazetrails/activemodel";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActiveModelConfig {
   i18nCustomizeFullMessage?: boolean;
@@ -26,9 +21,9 @@ interface TrailtieApp {
 
 export class Trailtie extends BaseTrailtie {
   static {
-    registerTrailtie(this);
+    BaseTrailtie.register(this);
 
-    this.initializer("active_model.deprecator", (app) => {
+    this.initializer("active_model.deprecator", { before: ":load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeModel", deprecator());
     });
 
@@ -37,9 +32,12 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("active_model.i18n_customize_full_message", () => {
-      ActiveModelError.i18nCustomizeFullMessage = Trailtie.resolveI18nCustomizeFullMessage(
-        Trailtie.config as TrailtieConfig,
-      );
+      ActiveModelError.i18nCustomizeFullMessage = Trailtie.resolveI18nCustomizeFullMessage({
+        i18nCustomizeFullMessage: Trailtie.config.get("i18nCustomizeFullMessage") as
+          | boolean
+          | undefined,
+        activeModel: Trailtie.config.get("activeModel") as ActiveModelConfig | undefined,
+      });
     });
   }
 

@@ -15,7 +15,7 @@ import {
  * serializes encryption messages and lives in a different framework.
  */
 export interface MessageSerializer {
-  dump(value: unknown): string;
+  dump(value: unknown): unknown;
   load(dumped: string): unknown;
 }
 
@@ -70,7 +70,7 @@ export class Codec extends Metadata {
     }
   }
 
-  protected override serialize(data: unknown): string {
+  protected override serialize(data: unknown): unknown {
     return this.serializer.dump(data);
   }
 

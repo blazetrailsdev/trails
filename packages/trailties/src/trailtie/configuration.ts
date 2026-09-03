@@ -7,7 +7,6 @@
  * behavior without coupling to a hook surface that doesn't expose that
  * semantic yet.
  */
-import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/ruby-compat";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
@@ -22,13 +21,8 @@ const LIFECYCLE_HOOKS = [
 export type LifecycleHook = (typeof LIFECYCLE_HOOKS)[number];
 
 export class Configuration {
-  /** @internal Rails `@@eager_load_namespaces` (`railtie/configuration.rb:17-20`).
-   * One array, shared with `Railtie.config` in activesupport: a railtie that
-   * cannot import trailties — globalid, whose package trailties depends on
-   * transitively — still runs `config.eager_load_namespaces << GlobalID`
-   * against this list. */
-  static readonly _eagerLoadNamespaces: unknown[] = (BaseTrailtie.config["eagerLoadNamespaces"] ??=
-    []) as unknown[];
+  /** @internal Rails `@@eager_load_namespaces` (`railtie/configuration.rb:17-20`). */
+  static readonly _eagerLoadNamespaces: unknown[] = [];
   /** @internal */
   static readonly _watchableFiles: string[] = [];
   /** @internal */
@@ -44,7 +38,12 @@ export class Configuration {
     afterRoutesLoaded: [],
   };
 
-  private readonly _options: Record<string, unknown> = {};
+  /** @internal Rails' `@@options` (`railtie/configuration.rb:96-108`) — a class
+   * variable, so every `Railtie::Configuration` instance reads and writes the
+   * same hash. That sharing is what lets a framework railtie seed
+   * `config.active_record` in its class body and the application read it back
+   * off its own `config`. */
+  private static readonly _options: Record<string, unknown> = {};
 
   get eagerLoadNamespaces(): unknown[] {
     return Configuration._eagerLoadNamespaces;
@@ -116,7 +115,7 @@ export class Configuration {
 
   /** Free-form option bag (mirrors Ruby `method_missing` get/set). */
   get(key: string): unknown {
-    return this._options[key];
+    return Configuration._options[key];
   }
 
   /**
@@ -127,7 +126,7 @@ export class Configuration {
     if (this._actualMethod(key)) {
       throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
     }
-    this._options[key] = value;
+    Configuration._options[key] = value;
   }
 
   /**
@@ -144,11 +143,13 @@ export class Configuration {
         if (Object.prototype.hasOwnProperty.call(proto, key)) return true;
       }
     }
-    return Object.prototype.hasOwnProperty.call(this._options, key);
+    return Object.prototype.hasOwnProperty.call(Configuration._options, key);
   }
 
   /** Mirrors the private `actual_method?` (`railtie/configuration.rb:95-97`). */
   private _actualMethod(key: string): boolean {
-    return !Object.prototype.hasOwnProperty.call(this._options, key) && this.respondTo(key);
+    return (
+      !Object.prototype.hasOwnProperty.call(Configuration._options, key) && this.respondTo(key)
+    );
   }
 }

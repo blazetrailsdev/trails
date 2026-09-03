@@ -1,20 +1,14 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { Trailtie as BaseTrailtie, registerTrailtie } from "@blazetrails/activesupport";
-import { Trailtie as ActiveRecordTrailtie } from "@blazetrails/activerecord";
+import { describe, expect, it } from "vitest";
+import { Trailtie as BaseTrailtie } from "./trailtie.js";
+import { Trailtie as ActiveRecordTrailtie } from "./trailties/active-record.js";
 import { Application } from "./application.js";
 
-class FrameworkTrailtie extends BaseTrailtie {}
-
 describe("Application framework railtie initializers", () => {
-  afterEach(() => {
-    const index = BaseTrailtie.subclasses.indexOf(FrameworkTrailtie);
-    if (index !== -1) BaseTrailtie.subclasses.splice(index, 1);
-  });
-
   it("runs a framework railtie initializer with the application as its argument", async () => {
     const seen: unknown[] = [];
-    registerTrailtie(FrameworkTrailtie);
-    FrameworkTrailtie.initializer("framework.record_app", (app) => {
+    class RecordAppTrailtie extends BaseTrailtie {}
+    BaseTrailtie.register(RecordAppTrailtie);
+    RecordAppTrailtie.initializer("framework.record_app", (app: unknown) => {
       seen.push(app);
     });
 
@@ -28,8 +22,9 @@ describe("Application framework railtie initializers", () => {
 
   it("runs the app's own initializers first when railtiesOrder is [:all, :main_app]", async () => {
     const ran: string[] = [];
-    registerTrailtie(FrameworkTrailtie);
-    FrameworkTrailtie.initializer("framework.record_order", () => {
+    class RecordOrderTrailtie extends BaseTrailtie {}
+    BaseTrailtie.register(RecordOrderTrailtie);
+    RecordOrderTrailtie.initializer("framework.record_order", () => {
       ran.push("framework");
     });
 
@@ -49,7 +44,7 @@ describe("Application framework railtie initializers", () => {
   });
 
   it("runs the ActiveRecord railtie initializers on boot", async () => {
-    expect(BaseTrailtie.subclasses).toContain(ActiveRecordTrailtie);
+    expect(BaseTrailtie.subclasses()).toContain(ActiveRecordTrailtie);
 
     class ActiveRecordBootApp extends Application {}
     Application.register(ActiveRecordBootApp);

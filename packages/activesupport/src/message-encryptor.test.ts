@@ -35,7 +35,7 @@ function encode64(value: string): string {
 
 describe("MessageEncryptorTest", () => {
   const secret = getCrypto().randomBytes(32);
-  const verifier = new MessageVerifier(secret, { serializer: NullSerializer as MessageSerializer });
+  const verifier = new MessageVerifier(secret, { serializer: NullSerializer });
   const encryptor = new MessageEncryptor(secret);
   /**
    * Rails' `@data` also carries a `Time.local(2010)` under `"now"`; a temporal
