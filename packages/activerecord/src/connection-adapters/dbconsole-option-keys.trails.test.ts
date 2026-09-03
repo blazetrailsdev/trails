@@ -51,7 +51,7 @@ describe("AbstractMysqlAdapter.dbconsole option keys", () => {
         sslcapath: "capath",
         sslcipher: "cipher",
         sslkey: "key",
-        sslMode: "VERIFY_CA",
+        ssl_mode: "VERIFY_CA",
         database: "blog",
       }),
     );

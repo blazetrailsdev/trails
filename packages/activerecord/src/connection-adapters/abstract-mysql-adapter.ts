@@ -942,7 +942,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
       sslcapath: "--ssl-capath",
       sslcipher: "--ssl-cipher",
       sslkey: "--ssl-key",
-      sslMode: "--ssl-mode",
+      ssl_mode: "--ssl-mode",
     }).flatMap(([opt, arg]) =>
       isRubyTruthy(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
     );
