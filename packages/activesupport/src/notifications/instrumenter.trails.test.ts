@@ -90,6 +90,18 @@ describe("Instrumenter (trails)", () => {
     expect(notifier.finishes).toHaveLength(1);
   });
 
+  // trails has thenable-but-not-Promise types — `Relation`, `FutureResult::Complete`,
+  // the `thenableHash` proxy. Ruby's `ensure` fires as soon as the block returns,
+  // so a block that merely RETURNS one must finish the handle immediately and hand
+  // the object back unresolved, not await it.
+  it("instrument returns a thenable block result without awaiting it", () => {
+    const notifier = buildNotifier();
+    const thenable = { then: (onFulfilled: (v: number) => void) => onFulfilled(1) };
+    const returned = new Instrumenter(notifier).instrument("sync", {}, () => thenable);
+    expect(returned).toBe(thenable);
+    expect(notifier.finishes).toHaveLength(1);
+  });
+
   // build_handle is the low-level primitive TransactionInstrumenter spans a
   // transaction with; it publishes one event carrying payload mutations made
   // between start and finish.
