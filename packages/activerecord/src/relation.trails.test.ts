@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
-import { performMerge, SpawnMethods } from "./relation/spawn-methods.js";
+import { merge, SpawnMethods } from "./relation/spawn-methods.js";
 import { reverseSqlOrder, QueryMethods } from "./relation/query-methods.js";
 import { Relation } from "./relation.js";
 import { FinderMethods } from "./relation/finder-methods.js";
@@ -84,7 +84,7 @@ describe("RelationTest", () => {
     expect(intersection.map((p: any) => Number(p.id))).toEqual([Number(a.id)]);
 
     const dupReceiver = { toArray: async () => [a, a] };
-    const deduped = await (performMerge as (this: unknown, o: unknown) => Promise<any[]>).call(
+    const deduped = await (merge as (this: unknown, o: unknown) => Promise<any[]>).call(
       dupReceiver,
       [a],
     );

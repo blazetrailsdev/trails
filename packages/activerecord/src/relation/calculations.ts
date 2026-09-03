@@ -231,7 +231,7 @@ function isBigintColumn(
   return table.typeForAttribute?.(String(column)) instanceof BigIntegerType;
 }
 
-export async function performCount(
+export async function count(
   this: CalculationRelation,
   columnName?: string | Nodes.Node,
   ...rest: unknown[]
@@ -249,7 +249,7 @@ export function asyncCount(
   return this.count(columnName);
 }
 
-export async function performAverage(
+export async function average(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
@@ -263,7 +263,7 @@ export function asyncAverage(
   return this.average(columnName);
 }
 
-export async function performMinimum(
+export async function minimum(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
@@ -277,7 +277,7 @@ export function asyncMinimum(
   return this.minimum(columnName);
 }
 
-export async function performMaximum(
+export async function maximum(
   this: CalculationRelation,
   column: string | Nodes.Node,
 ): Promise<unknown | null | Map<unknown, unknown>> {
@@ -308,7 +308,7 @@ function sumAdd(memo: number | bigint, value: number | bigint): number | bigint 
   return BigInt(n) + (b as bigint);
 }
 
-export async function performSum(
+export async function sum(
   this: CalculationRelation,
   initialValueOrColumn: string | Nodes.Node | number | null | SumBlock = 0,
   block?: SumBlock,
@@ -592,15 +592,15 @@ function withDeferredDistinctPkPredicates<
 }
 
 export const Calculations = {
-  count: inQueryConnection(performCount),
+  count: inQueryConnection(count),
   asyncCount,
-  average: inQueryConnection(performAverage),
+  average: inQueryConnection(average),
   asyncAverage,
-  minimum: inQueryConnection(performMinimum),
+  minimum: inQueryConnection(minimum),
   asyncMinimum,
-  maximum: inQueryConnection(performMaximum),
+  maximum: inQueryConnection(maximum),
   asyncMaximum,
-  sum: inQueryConnection(performSum),
+  sum: inQueryConnection(sum),
   asyncSum,
   calculate: inQueryConnection(calculate),
   pluck: withDeferredDistinctPkPredicates(pluck),

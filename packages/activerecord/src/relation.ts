@@ -803,6 +803,15 @@ export class Relation<T extends Base> {
     return this.createOrFindBy(attributes, extra);
   }
 
+  async findOrCreateByBang(
+    attributes: Record<string, unknown>,
+    extra?: Record<string, unknown>,
+  ): Promise<T> {
+    const existing = await this.findBy(attributes);
+    if (existing) return existing;
+    return this.createOrFindByBang(attributes, extra);
+  }
+
   async findOrInitializeBy(
     attributes: Record<string, unknown>,
     extra?: Record<string, unknown>,
@@ -833,6 +842,37 @@ export class Relation<T extends Base> {
         );
         if (result === undefined) {
           throw new RecordNotSaved(`${this._model.name}.createOrFindBy rolled back before persist`);
+        }
+        return result;
+      } catch (e) {
+        if (!(e instanceof RecordNotUnique)) throw e;
+        if (connection.isTransactionOpen()) {
+          return this.where(attributes).lock().findByBang(attributes);
+        }
+        return this.findByBang(attributes);
+      }
+    });
+  }
+
+  async createOrFindByBang(
+    attributes: Record<string, unknown>,
+    extra?: Record<string, unknown>,
+  ): Promise<T> {
+    return this.withConnection(async (connection) => {
+      try {
+        const result = await this._model.transaction(
+          () =>
+            this._model.createBang({
+              ...this.scopeForCreate(),
+              ...attributes,
+              ...extra,
+            }) as Promise<T>,
+          { requiresNew: true },
+        );
+        if (result === undefined) {
+          throw new RecordNotSaved(
+            `${this._model.name}.createOrFindByBang rolled back before persist`,
+          );
         }
         return result;
       } catch (e) {
@@ -1927,14 +1967,6 @@ export interface Relation<T extends Base>
   exists(conditions?: Record<string, unknown> | unknown): Promise<boolean>;
   include(record: T): Promise<boolean>;
   member(record: T): Promise<boolean>;
-  findOrCreateByBang(
-    conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<T>;
-  createOrFindByBang(
-    conditions: Record<string, unknown>,
-    extra?: Record<string, unknown>,
-  ): Promise<T>;
   raiseRecordNotFoundExceptionBang(
     ids?: unknown,
     resultSize?: number,
