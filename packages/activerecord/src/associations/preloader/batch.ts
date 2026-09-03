@@ -92,6 +92,13 @@ export class Batch {
     }
   }
 
+  /** @internal */
+  get loaders(): Association[] | undefined {
+    return this._loaders;
+  }
+
+  private _loaders: Association[] | undefined;
+
   private async groupAndLoadSimilar(loaders: Association[]): Promise<void> {
     const nonThroughLoaders = loaders.filter((l) => !(l instanceof ThroughAssociation));
     const groups = groupBy(nonThroughLoaders, (loader) => loader.loaderQuery().hashKey());
