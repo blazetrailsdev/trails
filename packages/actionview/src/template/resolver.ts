@@ -10,7 +10,7 @@
  * Mirrors `actionview/lib/action_view/template/resolver.rb:11-84`.
  */
 
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
@@ -109,28 +109,12 @@ export abstract class Resolver implements PathSetResolver {
 
   /**
    * @internal
-   * Ruby `File.fnmatch`, which JS has no equivalent of and no admissible
-   * third-party one. `pathname` selects the flag Ruby's two call sites use:
-   * `Dir.glob` (`resolver.rb:205`) matches path-wise, so `*` stops at a
-   * separator and `**` spans them, while `FixtureResolver`'s bare
-   * `File.fnmatch` (`testing/resolvers.rb:27`) passes no `FNM_PATHNAME` and
-   * lets `*` match `/` too — verified against MRI.
+   * Ruby `File.fnmatch` (`testing/resolvers.rb:27`), which JS has no
+   * equivalent of and no admissible third-party one. `FixtureResolver` passes
+   * no `FNM_PATHNAME`, so `*` matches `/` too — verified against MRI.
    */
-  protected fnmatch(glob: string, pathname = true): RegExp {
-    if (!pathname) return new RegExp(`^${fnmatchChars(glob, ".*", ".")}$`);
-
-    const segments = glob.split("/");
-    let pattern = "";
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i];
-      if (segment === "**") {
-        pattern += "(?:[^/]+/)*";
-        continue;
-      }
-      pattern += fnmatchChars(segment, "[^/]*", "[^/]");
-      if (i < segments.length - 1) pattern += "/";
-    }
-    return new RegExp(`^${pattern}$`);
+  protected fnmatch(glob: string): RegExp {
+    return new RegExp(`^${fnmatchChars(glob, ".*", ".")}$`);
   }
 
   /**
@@ -165,12 +149,6 @@ export abstract class Resolver implements PathSetResolver {
  * comparison is spelled out.
  */
 /**
- * The directory `Dir.glob` would descend into before the pattern's first
- * wildcard — the leading run of literal segments, with `escape_entry`'s
- * backslash quoting undone, since those segments name a real directory rather
- * than a pattern to match.
- */
-/**
  * One `File.fnmatch` pattern segment as a regular expression: a backslash
  * quotes the character after it (`escape_entry`'s output), `*` and `?` are the
  * wildcards, everything else is literal.
@@ -185,15 +163,6 @@ function fnmatchChars(text: string, star: string, question: string): string {
     else pattern += regexpEscape(char);
   }
   return pattern;
-}
-
-function globWalkRoot(glob: string): string {
-  const root: string[] = [];
-  for (const segment of glob.split("/").slice(0, -1)) {
-    if (/(?:^|[^\\])(?:\\\\)*[*?[{]/.test(segment)) break;
-    root.push(segment.replace(/\\(.)/g, "$1"));
-  }
-  return root.join("/");
 }
 
 function compareSortKeys(
@@ -215,7 +184,7 @@ export class FileSystemResolver extends Resolver {
     super();
     if ((path as unknown) instanceof Resolver)
       throw new TypeError("path already is a Resolver class");
-    this._path = getPath().resolve(path);
+    this._path = File.expandPath(path);
   }
 
   /** Rails' `attr_reader :path`. */
@@ -302,7 +271,7 @@ export class FileSystemResolver extends Resolver {
    * @missingRailsCall new — CONVERGEABLE port-template-sources-file-for-lazy-resolver-sources
    */
   protected sourceForTemplate(template: string): string {
-    return getFs().readFileSync(template, "utf-8");
+    return File.read(template);
   }
 
   /**
@@ -352,40 +321,23 @@ export class FileSystemResolver extends Resolver {
   /**
    * @internal
    * Safe glob within the resolver root (`resolver.rb:202-207`), yielding
-   * expanded paths. `Dir.glob` walks the tree itself; here the walk is
-   * {@link globWalkRoot} and the pattern is matched against what it finds.
+   * expanded paths.
    */
   protected templateGlob(glob: string): string[] {
-    const query = getPath().join(this.escapeEntry(this._path), glob);
-    const regex = this.fnmatch(query);
-    const pathWithSlash = getPath().join(this._path, "");
+    const query = File.join(this.escapeEntry(this._path), glob);
+    const pathWithSlash = File.join(this._path, "");
 
-    return this.entriesUnder(globWalkRoot(glob))
-      .map((relative) => getPath().join(this._path, relative))
-      .filter((filename) => regex.test(filename) && filename.startsWith(pathWithSlash));
+    return Dir.glob(query).flatMap((filename) => {
+      filename = File.expandPath(filename);
+      if (File.isDirectory(filename)) return [];
+      if (!filename.startsWith(pathWithSlash)) return [];
+      return [filename];
+    });
   }
 
   /** @internal `resolver.rb:208-209`. */
   protected escapeEntry(entry: string): string {
     return entry.replace(/[*?{}[\]]/g, "\\$&");
-  }
-
-  /** @internal Every file under `prefix`, as a path relative to the root. */
-  private entriesUnder(prefix: string): string[] {
-    const dir = prefix === "" ? this._path : getPath().join(this._path, prefix);
-    let entries: Array<{ name: string; isFile(): boolean; isDirectory(): boolean }>;
-    try {
-      entries = getFs().readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return [];
-    }
-    const out: string[] = [];
-    for (const entry of entries) {
-      const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
-      if (entry.isDirectory()) out.push(...this.entriesUnder(relative));
-      else out.push(relative);
-    }
-    return out;
   }
 }
 

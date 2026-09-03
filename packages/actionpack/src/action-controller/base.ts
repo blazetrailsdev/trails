@@ -6,7 +6,7 @@
  */
 
 import { ArgumentError, getCrypto, Notifications, runLoadHooks } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -1033,8 +1033,11 @@ export class Base extends Metal {
 
   /** Send file content. */
   sendFile(path: string, options: SendFileHeadersOptions = {}): void {
-    const content = getFs().readFileSync(path);
-    const filename = options.filename ?? getPath().basename(path);
+    const content = Buffer.from(
+      File.open(path, "rb", (file) => file.read()),
+      "latin1",
+    );
+    const filename = options.filename ?? File.basename(path);
 
     this.sendFileHeadersBang({ ...options, filename });
     this.body = content.toString();

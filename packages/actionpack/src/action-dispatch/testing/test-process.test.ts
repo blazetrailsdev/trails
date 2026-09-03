@@ -1,5 +1,6 @@
-import { getOs } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { File } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { FlashHash } from "../middleware/flash.js";
@@ -59,9 +60,9 @@ describe("TestProcess", () => {
   });
 
   it("fileFixtureUpload returns an UploadedFile with the given mime type", () => {
-    const dir = getFs().mkdtempSync!(getPath().join(getOs().tmpdir(), "trails-tp-"));
-    const file = getPath().join(dir, "david.png");
-    getFs().writeFileSync(file, "x");
+    const dir = mkdtempSync(File.join(tmpdir(), "trails-tp-"));
+    const file = File.join(dir, "david.png");
+    File.write(file, "x");
     const host = makeHost();
     const upload = fileFixtureUpload.call(host, file, "image/png");
     expect(upload.contentType).toBe("image/png");

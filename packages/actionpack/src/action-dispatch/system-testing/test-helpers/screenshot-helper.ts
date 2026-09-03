@@ -1,4 +1,4 @@
-import { getFsAsync, getPath } from "@blazetrails/ruby-compat";
+import { File, getFsAsync } from "@blazetrails/ruby-compat";
 
 export interface ScreenshotPage {
   screenshot(options: { path: string }): Promise<Buffer>;
@@ -89,8 +89,7 @@ export function screenshotsDir(): string {
 
 /** @internal */
 function absolutePath(this: ScreenshotHelperHost): string {
-  const { join } = getPath();
-  return join(projectRoot(), screenshotsDir(), imageName.call(this));
+  return File.join(projectRoot(), screenshotsDir(), imageName.call(this));
 }
 
 /** @internal */
@@ -100,10 +99,7 @@ function absoluteImagePath(this: ScreenshotHelperHost): string {
 
 /** @internal */
 function relativeImagePath(this: ScreenshotHelperHost): string {
-  const { relative } = getPath();
-  const abs = absolutePath.call(this);
-  const root = projectRoot();
-  return `${relative!(root, abs)}.png`;
+  return `${File.join(screenshotsDir(), imageName.call(this))}.png`;
 }
 
 /** @internal */
@@ -115,9 +111,8 @@ function absoluteHtmlPath(this: ScreenshotHelperHost): string {
 export async function saveHtml(this: ScreenshotHelperHost): Promise<void> {
   if (!this._page) return;
   const path = absoluteHtmlPath.call(this);
-  const { join } = getPath();
   const fs = await getFsAsync();
-  await fs.mkdir!(join(projectRoot(), screenshotsDir()), { recursive: true });
+  await fs.mkdir!(File.join(projectRoot(), screenshotsDir()), { recursive: true });
   const content = await this._page.content();
   await fs.writeFile!(path, content);
 }
@@ -126,9 +121,8 @@ export async function saveHtml(this: ScreenshotHelperHost): Promise<void> {
 export async function saveImage(this: ScreenshotHelperHost): Promise<Buffer | undefined> {
   if (!this._page) return;
   const path = absoluteImagePath.call(this);
-  const { join } = getPath();
   const fs = await getFsAsync();
-  await fs.mkdir!(join(projectRoot(), screenshotsDir()), { recursive: true });
+  await fs.mkdir!(File.join(projectRoot(), screenshotsDir()), { recursive: true });
   return this._page.screenshot({ path });
 }
 
@@ -159,8 +153,7 @@ export function displayImage(
   if (mode === "artifact") {
     message += `\x1b]1338;url=artifact://${imgPath}\x07\n`;
   } else if (mode === "inline") {
-    const { basename } = getPath();
-    const name = inlineBase64(basename(imgPath));
+    const name = inlineBase64(File.basename(imgPath));
     const image = imageData ? imageData.toString("base64") : "";
     message += `\x1b]1337;File=name=${name};height=400px;inline=1:${image}\x07\n`;
   }

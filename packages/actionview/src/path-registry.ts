@@ -8,7 +8,7 @@
  * invalidate resolver caches.
  */
 
-import { getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { PathSet } from "./path-set.js";
 import { FileSystemResolver } from "./template/resolver.js";
 import type { PathSetResolver } from "./path-set.js";
@@ -47,7 +47,7 @@ export class PathRegistry {
     let builtNew = false;
     const result = paths.map((p) => {
       if (typeof p === "string") {
-        const abs = getPath().resolve(p);
+        const abs = File.expandPath(p);
         if (!this._fileSystemResolvers.has(abs)) {
           this._fileSystemResolvers.set(abs, new FileSystemResolver(abs));
           builtNew = true;
