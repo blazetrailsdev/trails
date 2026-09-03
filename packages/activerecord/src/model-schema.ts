@@ -9,6 +9,7 @@ import {
   type Type,
 } from "@blazetrails/activemodel";
 import { Hash } from "@blazetrails/ruby-compat";
+import { classAttribute, included } from "@blazetrails/activesupport";
 import {
   isBaseClass,
   baseClass,
@@ -284,8 +285,8 @@ export interface SchemaHost {
   tableName: string;
   primaryKey: string | string[];
   _tableName: string | null;
-  _tableNamePrefix: string;
-  _tableNameSuffix: string;
+  tableNamePrefix: string;
+  tableNameSuffix: string;
   _sequenceName: string | null;
   _inheritanceColumn?: string | null;
   _abstractClass?: boolean;
@@ -358,12 +359,12 @@ export function resetTableName(this: SchemaHost): string {
 
 export function fullTableNamePrefix(this: SchemaHost): string {
   const moduleName = (this as any).moduleName as string | undefined;
-  return lookupModuleTableNamePrefix(moduleName) ?? this._tableNamePrefix ?? "";
+  return lookupModuleTableNamePrefix(moduleName) ?? this.tableNamePrefix ?? "";
 }
 
 export function fullTableNameSuffix(this: SchemaHost): string {
   const moduleName = (this as any).moduleName as string | undefined;
-  return lookupModuleTableNameSuffix(moduleName) ?? this._tableNameSuffix ?? "";
+  return lookupModuleTableNameSuffix(moduleName) ?? this.tableNameSuffix ?? "";
 }
 
 export function realInheritanceColumn(this: SchemaHost, value: string | null): void {
@@ -828,6 +829,18 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
 export async function tableExists(this: SchemaHost): Promise<boolean> {
   return (await reflectionAdapter(this).schemaCache.dataSourceExists(this.tableName)) ?? false;
 }
+
+export interface ModelSchema {
+  tableNamePrefix: string;
+  tableNameSuffix: string;
+}
+
+export const ModelSchema = {
+  [included](base: object): void {
+    classAttribute.call(base, "tableNamePrefix", { instanceWriter: false, default: "" });
+    classAttribute.call(base, "tableNameSuffix", { instanceWriter: false, default: "" });
+  },
+};
 
 export const ClassMethods = {
   columnNames,

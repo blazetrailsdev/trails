@@ -4884,6 +4884,33 @@ describe("extractFromProgram — a bodied object literal beside a bodyless decla
   });
 });
 
+describe("extractFromProgram — alias bindings", () => {
+  const SRC = `
+    export function buildWhereClause(opts: unknown, rest: unknown[] = []): unknown {
+      return [opts, rest];
+    }
+    export const QueryMethods = {
+      buildWhereClause,
+      buildHavingClause: buildWhereClause,
+    };
+  `;
+
+  it("records aliasOf for a bare reference to another function the file declares", () => {
+    const info = extractFromFiles("/p", { "query-methods.ts": SRC });
+    const mod = info.modules["query-methods.ts:QueryMethods"];
+    const alias = mod.instanceMethods.find((m) => m.name === "buildHavingClause")!;
+    expect(alias.bodyless).toBe(true);
+    expect(alias.aliasOf).toBe("buildWhereClause");
+  });
+
+  it("records no aliasOf for a shorthand binding of the same name", () => {
+    const info = extractFromFiles("/p", { "query-methods.ts": SRC });
+    const mod = info.modules["query-methods.ts:QueryMethods"];
+    const own = mod.instanceMethods.find((m) => m.name === "buildWhereClause")!;
+    expect(own.aliasOf).toBeUndefined();
+  });
+});
+
 describe("extractFromProgram — classAttribute() generated accessors", () => {
   const TZ = `
     import { classAttribute } from "@blazetrails/activesupport";
@@ -4939,7 +4966,7 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(mod.instanceMethods.map((m) => m.name)).not.toContain("normalizedAttributes");
   });
 
-  it("credits nothing for a name the file never declares", () => {
+  it("credits a name the file never declares", () => {
     const info = extractFromFiles("/p", {
       "undeclared.ts": `
         import { classAttribute } from "@blazetrails/activesupport";
@@ -4951,7 +4978,7 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
       `,
     });
     const mod = info.modules["undeclared.ts:Normalization"];
-    expect(mod.classMethods.map((m) => m.name)).not.toContain("normalizedAttributes");
+    expect(mod.classMethods.map((m) => m.name)).toContain("normalizedAttributes");
   });
 
   it("credits nothing when neither the enclosing scope nor the receiver resolves", () => {

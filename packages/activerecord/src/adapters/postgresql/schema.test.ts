@@ -558,7 +558,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("prepared statements with multiple schemas", async () => {
       const Thing5 = makeThing5Model();
       try {
-        await adapter.beginTransaction();
+        await adapter.beginTransaction({ _lazy: false });
         await adapter.setSchemaSearchPath(SCHEMA_NAME);
         await (Thing5 as any).loadSchema();
         await adapter.commitTransaction();

@@ -1075,7 +1075,7 @@ describe("MigrationTest", () => {
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter.pool);
 
-    await adapter.beginTransaction();
+    await adapter.beginTransaction({ _lazy: false });
     try {
       await im.createTable();
       expect(await im.tableExists()).toBe(true);
@@ -1087,7 +1087,7 @@ describe("MigrationTest", () => {
       throw e;
     }
 
-    await adapter.beginTransaction();
+    await adapter.beginTransaction({ _lazy: false });
     try {
       await im.createTable();
       expect(await im.tableExists()).toBe(true);
@@ -1104,7 +1104,7 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     const sm = new SchemaMigration(adapter.pool);
 
-    await adapter.beginTransaction();
+    await adapter.beginTransaction({ _lazy: false });
     try {
       await sm.createTable();
       expect(await sm.tableExists()).toBeTruthy();
@@ -1118,7 +1118,7 @@ describe("MigrationTest", () => {
     const versionsAfterFirst = await sm.allVersions();
     expect(versionsAfterFirst).toContain("foo");
 
-    await adapter.beginTransaction();
+    await adapter.beginTransaction({ _lazy: false });
     try {
       await sm.createTable();
       expect(await sm.tableExists()).toBeTruthy();

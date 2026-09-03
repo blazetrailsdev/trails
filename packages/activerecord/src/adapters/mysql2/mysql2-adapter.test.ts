@@ -323,7 +323,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
-    await adapter.beginTransaction();
+    await adapter.beginTransaction({ _lazy: false });
     try {
       await adapter.executeMutation(
         `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,
@@ -349,7 +349,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts_d`);
-    await adapter.beginTransaction();
+    await adapter.beginTransaction({ _lazy: false });
     try {
       await adapter.executeMutation(
         `CREATE TABLE warn_posts_d (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,

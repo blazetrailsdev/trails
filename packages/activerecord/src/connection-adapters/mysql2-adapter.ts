@@ -524,10 +524,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
   }
 
-  async beginTransaction(): Promise<void> {
-    await this._transactionManager.beginTransaction({ _lazy: false });
-  }
-
   async beginDbTransaction(): Promise<void> {
     await this.internalExecute("BEGIN", "TRANSACTION", [], {
       materializeTransactions: false,

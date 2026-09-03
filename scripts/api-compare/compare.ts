@@ -1495,13 +1495,28 @@ export function misplacedClusterVerdict(
     : { kind: "match", tsName };
 }
 
+/**
+ * Is the only declaration of `name` in `tsFile` a bodyless one?
+ *
+ * `rubyNotes` and `aliasNamesByFile` are the alias arm: Ruby's
+ * `alias :build_having_clause :build_where_clause`
+ * (`relation/query_methods.rb:1654`) synthesizes an entry with no body of its
+ * own, and TS spells it as a second binding to the same function
+ * (`buildHavingClause: buildWhereClause`). The bodyless marker exists to stop a
+ * real declaration from silently retiring its method's call-parity rows; an
+ * alias entry has no calls to retire, so the faithful alias IS the port. See
+ * `MethodInfo.aliasOf`.
+ */
 export function declarationOnlyInFile(
   tsFile: string,
   name: string,
   bodylessOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
   bodiedOwnersByFile: ReadonlyMap<string, Map<string, Set<string>>>,
+  rubyNotes?: string,
+  aliasNamesByFile?: ReadonlyMap<string, ReadonlySet<string>>,
 ): boolean {
   if (bodylessOwnersByFile.get(tsFile)?.has(name) !== true) return false;
+  if (rubyNotes === "alias" && aliasNamesByFile?.get(tsFile)?.has(name) === true) return false;
   return bodiedOwnersByFile.get(tsFile)?.has(name) !== true;
 }
 
@@ -3238,6 +3253,7 @@ export function main() {
     // and `ownersWithBodies`.
     const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
+    const tsAliasNamesByFileName = new Map<string, Set<string>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency
     // gate (see effectiveTsCalls), never as the primary population — the
@@ -3313,6 +3329,11 @@ export function main() {
           byOwner.set(owner, m.file);
           byName.set(m.name, byOwner);
           tsDeclFileByFileNameOwner.set(file, byName);
+        }
+        if (m.aliasOf !== undefined) {
+          const aliasNames = tsAliasNamesByFileName.get(file) ?? new Set<string>();
+          aliasNames.add(m.name);
+          tsAliasNamesByFileName.set(file, aliasNames);
         }
         const byShape = m.bodyless === true ? tsBodylessOwnersByFileName : tsBodiedOwnersByFileName;
         const shapeOwners = byShape.get(file) ?? new Map<string, Set<string>>();
@@ -4379,6 +4400,8 @@ export function main() {
             directMatch,
             tsBodylessOwnersByFileName,
             tsBodiedOwnersByFileName,
+            notes,
+            tsAliasNamesByFileName,
           );
         // The bodyless name to report, which for the misplaced-cluster arm
         // below is not `directMatch` (that arm runs because the expected file

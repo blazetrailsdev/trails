@@ -172,7 +172,7 @@ export function lookupModuleTableNamePrefix(moduleName: string | undefined): str
   return lookupModuleDecoration(
     moduleName,
     moduleTableNamePrefixes,
-    (model) => (model as typeof Base & { _tableNamePrefix?: string })._tableNamePrefix ?? "",
+    (model) => (model as typeof Base & { tableNamePrefix?: string }).tableNamePrefix ?? "",
   );
 }
 
@@ -184,7 +184,7 @@ export function lookupModuleTableNameSuffix(moduleName: string | undefined): str
   return lookupModuleDecoration(
     moduleName,
     moduleTableNameSuffixes,
-    (model) => (model as typeof Base & { _tableNameSuffix?: string })._tableNameSuffix ?? "",
+    (model) => (model as typeof Base & { tableNameSuffix?: string }).tableNameSuffix ?? "",
   );
 }
 

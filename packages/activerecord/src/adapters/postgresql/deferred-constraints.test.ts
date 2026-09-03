@@ -24,7 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           name: "dc_ch_fk",
           deferrable: "immediate",
         });
-        await adapter.beginTransaction();
+        await adapter.beginTransaction({ _lazy: false });
         try {
           await adapter.setConstraints("deferred");
           await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
@@ -50,7 +50,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           deferrable: "immediate",
         });
         const fkName = (await adapter.foreignKeys("dc_ch"))[0].name!;
-        await adapter.beginTransaction();
+        await adapter.beginTransaction({ _lazy: false });
         try {
           await adapter.setConstraints("deferred", fkName);
           await adapter.execute(`INSERT INTO dc_ch (par_id) VALUES (-1)`);
@@ -86,7 +86,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           name: "dc_m_fk2",
           deferrable: "immediate",
         });
-        await adapter.beginTransaction();
+        await adapter.beginTransaction({ _lazy: false });
         try {
           await adapter.setConstraints("deferred", "dc_m_fk1", "dc_m_fk2");
           await adapter.execute(`INSERT INTO dc_m_ch (p1_id, p2_id) VALUES (-1, -1)`);
@@ -123,7 +123,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           name: "dc_s_fk2",
           deferrable: "immediate",
         });
-        await adapter.beginTransaction();
+        await adapter.beginTransaction({ _lazy: false });
         try {
           await adapter.setConstraints("deferred", "dc_s_fk2");
           await expect(

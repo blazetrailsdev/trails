@@ -437,8 +437,8 @@ export function currentTransaction(this: DatabaseStatementsHost): Transaction | 
 export async function beginTransaction(
   this: DatabaseStatementsHost,
   options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
-): Promise<void> {
-  await transactionManager.call(this)!.beginTransaction(options);
+): Promise<Transaction> {
+  return await transactionManager.call(this)!.beginTransaction(options);
 }
 
 export async function commitTransaction(this: DatabaseStatementsHost): Promise<void> {

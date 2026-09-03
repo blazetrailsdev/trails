@@ -732,8 +732,6 @@ export class Base extends Model {
   static cacheVersioning = false;
   static cacheTimestampFormat: "usec" | "number" = "usec";
   static collectionCacheVersioning = false;
-  static _tableNamePrefix = "";
-  static _tableNameSuffix = "";
   static _protectedEnvironments: string[] = ["production"];
   static _lockingColumn: string = "lock_version";
 
@@ -815,21 +813,9 @@ export class Base extends Model {
     return Base;
   }
 
-  static get tableNamePrefix(): string {
-    return this._tableNamePrefix;
-  }
+  declare static tableNamePrefix: string;
 
-  static set tableNamePrefix(prefix: string) {
-    this._tableNamePrefix = prefix;
-  }
-
-  static get tableNameSuffix(): string {
-    return this._tableNameSuffix;
-  }
-
-  static set tableNameSuffix(suffix: string) {
-    this._tableNameSuffix = suffix;
-  }
+  declare static tableNameSuffix: string;
 
   static get tableName(): string {
     return ModelSchema.tableName.call(this);
@@ -3027,6 +3013,7 @@ include(Base, _BeforeTypeCast);
 include(Base, _Query);
 include(Base, _PrimaryKey);
 include(Base, _CompositePrimaryKey);
+include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
 include(Base, AMDirty);
 include(Base, _Dirty);
@@ -3229,10 +3216,10 @@ _setSuperIsValid(Model.prototype.isValid);
 
 registerTableNameOptions({
   get tableNamePrefix() {
-    return Base._tableNamePrefix;
+    return Base.tableNamePrefix;
   },
   get tableNameSuffix() {
-    return Base._tableNameSuffix;
+    return Base.tableNameSuffix;
   },
   get pluralizeTableNames() {
     return Base.pluralizeTableNames;
@@ -3244,10 +3231,10 @@ registerTableNameOptions({
 
 registerMigrationArConfig({
   get tableNamePrefix() {
-    return Base._tableNamePrefix;
+    return Base.tableNamePrefix;
   },
   get tableNameSuffix() {
-    return Base._tableNameSuffix;
+    return Base.tableNameSuffix;
   },
   configurations: () => Base.configurations(),
   connectionHandler: () => Base.connectionHandler,

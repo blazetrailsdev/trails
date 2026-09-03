@@ -981,10 +981,6 @@ export class PostgreSQLAdapter
     });
   }
 
-  async beginTransaction(): Promise<void> {
-    await this._transactionManager.beginTransaction({ _lazy: false });
-  }
-
   async beginDeferredTransaction(): Promise<void> {
     return this.beginDbTransaction();
   }
