@@ -1377,8 +1377,7 @@ export class MigrationProxy {
   filename: string;
   scope: string;
 
-  private _migration: Migration | null = null;
-  private _migrationPromise: Promise<Migration> | null = null;
+  private _migration: Promise<Migration> | null = null;
 
   constructor(name: string, version: number, filename: string, scope: string) {
     this.name = name;
@@ -1404,16 +1403,14 @@ export class MigrationProxy {
     (await this.migration()).write(text);
   }
 
-  get disableDdlTransaction(): boolean {
-    if (!this._migration)
-      throw new Error("MigrationProxy: await migration() before reading disableDdlTransaction");
-    return !!this._migration.disableDdlTransaction;
+  async disableDdlTransaction(): Promise<boolean> {
+    return (await this.migration()).disableDdlTransaction;
   }
 
   /** @internal */
   migration(): Promise<Migration> {
-    this._migrationPromise ??= this.loadMigration().then((m) => (this._migration = m));
-    return this._migrationPromise;
+    this._migration ??= this.loadMigration();
+    return this._migration;
   }
 
   /**

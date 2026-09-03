@@ -9,7 +9,7 @@ class MigrationStruct extends MigrationProxy {
     super(name, version, "", "");
   }
 
-  override get disableDdlTransaction(): boolean {
+  override async disableDdlTransaction(): Promise<boolean> {
     return false;
   }
 

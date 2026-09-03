@@ -30,13 +30,6 @@ describe("MigrationProxy", () => {
     expect(proxy.basename()).toBe("20240101000000_create_users.ts");
   });
 
-  it("disableDdlTransaction throws before migration() is awaited", () => {
-    const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
-    expect(() => proxy.disableDdlTransaction).toThrow(
-      "MigrationProxy: await migration() before reading disableDdlTransaction",
-    );
-  });
-
   it("delegates migrate, announce, write, and disableDdlTransaction to the loaded migration", async () => {
     class NoTransaction extends Migration {
       async up(): Promise<void> {}
@@ -56,7 +49,7 @@ describe("MigrationProxy", () => {
     expect(migrate).toHaveBeenCalledWith("up");
     expect(announce).toHaveBeenCalledWith("hello");
     expect(write).toHaveBeenCalledWith("text");
-    expect(proxy.disableDdlTransaction).toBe(true);
+    await expect(proxy.disableDdlTransaction()).resolves.toBe(true);
   });
 
   it("migration() caches the result of loadMigration()", async () => {
