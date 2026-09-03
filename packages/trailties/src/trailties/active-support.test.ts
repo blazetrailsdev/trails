@@ -1,6 +1,7 @@
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { Collection, Initializer } from "../initializable.js";
 import {
   Deprecation,
   Deprecators,
@@ -44,6 +45,17 @@ describe("RailtieTest", () => {
 
   it("seeds config.activeSupport on load", () => {
     expect(Trailtie.config.get("activeSupport")).toBeDefined();
+  });
+
+  it("registers the deprecator before load_environment_config", () => {
+    const collection = new Collection(
+      new Initializer<unknown>("load_environment_config", null, {}, () => undefined),
+      ...Trailtie.initializers,
+    );
+    const names = collection.tsort().map((i) => i.name);
+    expect(names.indexOf("active_support.deprecator")).toBeLessThan(
+      names.indexOf("load_environment_config"),
+    );
   });
 
   it("runInitializers registers the ActiveSupport deprecator", async () => {

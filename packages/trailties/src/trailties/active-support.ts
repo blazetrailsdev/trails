@@ -71,7 +71,7 @@ export class Trailtie extends BaseTrailtie {
     // Mirrors `config.active_support = ActiveSupport::OrderedOptions.new`.
     if (this.config.get("activeSupport") === undefined) this.config.set("activeSupport", {});
 
-    this.initializer("active_support.deprecator", { before: ":load_environment_config" }, (app) => {
+    this.initializer("active_support.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeSupport", deprecator());
     });
 

@@ -4207,6 +4207,14 @@ function dispatchedCallName(call: ts.CallExpression): string | undefined {
   return name;
 }
 
+function isMarkedBlockArg(expr: ts.Expression): boolean {
+  if (!ts.isCallExpression(expr)) return false;
+  if (!ts.isIdentifier(expr.expression) || expr.expression.text !== "block") return false;
+  if (expr.arguments.length !== 1) return false;
+  const inner = expr.arguments[0];
+  return ts.isArrowFunction(inner) || ts.isFunctionExpression(inner);
+}
+
 function describeArgs(args: ts.NodeArray<ts.Expression> | undefined, flags: string[]): string[] {
   if (!args) return [];
   const out: string[] = [];
@@ -4216,6 +4224,13 @@ function describeArgs(args: ts.NodeArray<ts.Expression> | undefined, flags: stri
     // argument list and flags the site instead; the port's callback argument is
     // the same thing, so it is flagged and dropped here too.
     if (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) {
+      flags.push("block");
+      continue;
+    }
+    // `block(fn)` is ruby-compat's brand for a block passed into a
+    // value-or-block argument position (`rb_block_given_p`,
+    // `vendor/ruby/eval.c:866`). It IS the block, so it drops like one.
+    if (isMarkedBlockArg(expr)) {
       flags.push("block");
       continue;
     }

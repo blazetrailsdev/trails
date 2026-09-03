@@ -4239,6 +4239,21 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("drops a `block(fn)` marked block-pass from the list, like a bare callback", () => {
+    expect(
+      site(
+        `class Foo {
+          create(other: unknown) {
+            mergeBang(this.data, other, block((_key: string, left: unknown) => left));
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "mergeBang", args: ["id:data", "id:other"], flags: ["block"] },
+      { name: "block", args: [], flags: ["block"] },
+    ]);
+  });
+
   it("records `new Foo(...)` as constructor, matching the Ruby `new` mapping", () => {
     expect(
       site(

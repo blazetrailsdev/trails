@@ -150,13 +150,9 @@ export class Trailtie extends BaseTrailtie {
     this.config.set("actionDispatch", defaultActionDispatchConfig());
     this.config.set("contentSecurityPolicy", defaultContentSecurityPolicyConfig());
 
-    this.initializer(
-      "action_dispatch.deprecator",
-      { before: ":load_environment_config" },
-      (app) => {
-        (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
-      },
-    );
+    this.initializer("action_dispatch.deprecator", { before: "load_environment_config" }, (app) => {
+      (app as TrailtieApp).deprecators.set("actionDispatch", deprecator());
+    });
 
     this.initializer("action_dispatch.configure", () => {
       const cfg = this.config.get("actionDispatch") as ActionDispatchConfig;

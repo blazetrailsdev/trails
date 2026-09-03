@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Builder } from "./insert-all.js";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
@@ -85,4 +86,23 @@ describe("InsertAll configure_on_duplicate_update_logic", () => {
       expect(book.isbn).toBe("111111");
     },
   );
+});
+
+describe("InsertAll::Builder format_columns", () => {
+  const builder = Object.create(Builder.prototype) as Builder;
+  (builder as unknown as { _connection: { quoteColumnName(column: string): string } })._connection =
+    { quoteColumnName: (column: string): string => `"${column}"` };
+  const formatColumns = (columns: string | Iterable<string>): string =>
+    (
+      builder as unknown as { formatColumns(columns: string | Iterable<string>): string }
+    ).formatColumns(columns);
+
+  it("quotes each column and joins them", () => {
+    expect(formatColumns(["author_id", "name"])).toBe('"author_id","name"');
+    expect(formatColumns(new Set(["isbn"]))).toBe('"isbn"');
+  });
+
+  it("passes a non-collection through unchanged", () => {
+    expect(formatColumns("lower(external_id)")).toBe("lower(external_id)");
+  });
 });

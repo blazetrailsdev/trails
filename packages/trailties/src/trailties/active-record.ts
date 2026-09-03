@@ -123,7 +123,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.config.set("activeRecord", defaultActiveRecordConfig());
 
-    this.initializer("active_record.deprecator", { before: ":load_environment_config" }, (app) => {
+    this.initializer("active_record.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeRecord", deprecator());
     });
 
