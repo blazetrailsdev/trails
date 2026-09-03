@@ -1,5 +1,10 @@
+import { ArgumentError } from "./argument-error.js";
 import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
+import { env, stderr } from "./process-adapter.js";
+
+/** `Dir::SYSTMPDIR` (`vendor/ruby/lib/tmpdir.rb:20`). */
+const SYSTMPDIR = "/tmp";
 
 const MAGIC = /[*?[{]/;
 
@@ -123,6 +128,58 @@ export class Dir {
    */
   static pwd(): string {
     return getFs().cwd();
+  }
+
+  /**
+   * `Dir.tmpdir` (`vendor/ruby/lib/tmpdir.rb:26`) — the first of `TMPDIR`,
+   * `TMP`, `TEMP`, `SYSTMPDIR` (`tmpdir.rb:20`, `/tmp` off a build without
+   * `Etc.systmpdir`), `/tmp` and `.` that names a writable directory, and
+   * `ArgumentError` when none does (`tmpdir.rb:43`).
+   *
+   * `File.stat(dir).writable?` is `mode & 0o200` here rather than an
+   * effective-uid `access(2)`, and `world_writable?` / `sticky?` are the
+   * `0o002` and `0o1000` bits (`tmpdir.rb:33-39`); a stat that carries no
+   * `mode` is taken as writable, which is what a non-POSIX `FsAdapter`
+   * reports.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir.tmpdir`
+   * (`vendor/ruby/lib/tmpdir.rb:26`), which Rails calls without defining.
+   */
+  static tmpdir(): string {
+    const candidates: [string, string | undefined][] = [
+      ["TMPDIR", undefined],
+      ["TMP", undefined],
+      ["TEMP", undefined],
+      ["system temporary path", SYSTMPDIR],
+      ["/tmp", "/tmp"],
+      [".", "."],
+    ];
+
+    for (const [name, fixed] of candidates) {
+      let dir = fixed;
+      if (dir == null) {
+        dir = env[name];
+        if (dir == null || dir === "") continue;
+      }
+      dir = File.expandPath(dir);
+      let stat;
+      try {
+        stat = File.stat(dir);
+      } catch {
+        continue;
+      }
+      const mode = stat.mode;
+      if (!stat.isDirectory()) {
+        stderr.write(`${name} is not a directory: ${dir}\n`);
+      } else if (mode != null && (mode & 0o200) === 0) {
+        stderr.write(`${name} is not writable: ${dir}\n`);
+      } else if (mode != null && (mode & 0o002) !== 0 && (mode & 0o1000) === 0) {
+        stderr.write(`${name} is world-writable: ${dir}\n`);
+      } else {
+        return dir;
+      }
+    }
+    throw new ArgumentError("could not find a temporary directory");
   }
 
   /**

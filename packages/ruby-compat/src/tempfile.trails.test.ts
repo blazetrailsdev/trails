@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "./file.js";
 import { Tempfile } from "./tempfile.js";
 
 describe("Tempfile", () => {
@@ -44,7 +44,7 @@ describe("Tempfile", () => {
       tmpfile.write("hello");
       await Promise.resolve();
       expect(exists(path)).toBe(true);
-      return tmpfile.read().toString("utf8");
+      return new TextDecoder().decode(tmpfile.read());
     });
     expect(value).toBe("hello");
     expect(exists(path)).toBe(false);
@@ -91,7 +91,7 @@ describe("Tempfile", () => {
 
   it("read gives back the bytes write was handed", () => {
     // `Tempfile#write` is Ruby's binary `IO#write` (`vendor/ruby/io.c:2263`),
-    const bytes = Buffer.from([0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe]);
+    const bytes = new Uint8Array([0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe]);
     const tempfile = Tempfile.new("bin");
     tempfile.write(bytes);
     expect([...tempfile.read()]).toEqual([...bytes]);
