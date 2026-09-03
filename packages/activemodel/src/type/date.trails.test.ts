@@ -133,4 +133,10 @@ describe("DateType cast and serialize coverage", () => {
     expect(result).toBeInstanceOf(Temporal.PlainDate);
     expect((result as Temporal.PlainDate).toString()).toBe("2025-07-04");
   });
+  it("ISO_DATE alone rejects a trailing newline, so fastStringToDate needs no guard", () => {
+    expect((type as any).fastStringToDate("2024-01-01\n")).toBeNull();
+    const result = type.cast("2024-01-01\n");
+    expect(result).toBeInstanceOf(Temporal.PlainDate);
+    expect((result as Temporal.PlainDate).toString()).toBe("2024-01-01");
+  });
 });

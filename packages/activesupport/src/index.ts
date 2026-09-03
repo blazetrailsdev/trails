@@ -363,7 +363,7 @@ export {
 
 export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
-export { BigDecimal } from "./core-ext/big-decimal/conversions.js";
+export { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 
 export {
   delegate,

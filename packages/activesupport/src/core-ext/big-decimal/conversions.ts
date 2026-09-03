@@ -13,11 +13,32 @@
 const MAX_EXPONENT_EXPANSION = 4000;
 
 /**
+ * The two non-finite literals `Kernel#BigDecimal` and `String#to_d` both
+ * answer, case-sensitively and only as the whole (whitespace-trimmed) string:
+ * `"Infinity degrees".to_d` is `0.0` where `"Infinity".to_d` is
+ * `BigDecimal::INFINITY`. A sign is `Infinity`'s alone — `"-NaN".to_d` is
+ * `-0.0` and `BigDecimal("-NaN")` raises (verified on MRI 3.4).
+ */
+const NON_FINITE_REGEX = /^\s*(?:(NaN)|([+-]?)Infinity)\s*$/;
+
+/**
  * The shape of a Ruby `Rational`, which `Kernel#BigDecimal` accepts as its
  * first argument. Structural and unexported rather than an import:
  * `Rational` lives in `@blazetrails/date`, which depends on this package.
  */
 type RationalLike = { numerator: bigint; denominator: bigint };
+
+/**
+ * The digit-shape {@link parse} answers, plus the `nonFinite` tag that carries
+ * Ruby's two special values (`BigDecimal::NAN` / `BigDecimal::INFINITY`),
+ * which have no digits of their own.
+ */
+type Parsed = {
+  sign: "" | "-";
+  intDigits: string;
+  fracDigits: string;
+  nonFinite: "NaN" | "Infinity" | null;
+};
 
 export class BigDecimal {
   /** "-" for negative values, "" otherwise. Zero is non-negative. */
@@ -26,6 +47,13 @@ export class BigDecimal {
   readonly intDigits: string;
   /** Fractional-part digits, trailing zeros stripped (possibly ""). */
   readonly fracDigits: string;
+  /**
+   * `"NaN"` / `"Infinity"` for Ruby's two non-finite values, `null` otherwise.
+   * A non-finite carries `"0"` / `""` digits so the digit-shaped internals
+   * stay well-formed; every method that means something different for one
+   * answers it before reaching them.
+   */
+  private readonly nonFinite: "NaN" | "Infinity" | null;
 
   /**
    * Ruby `Kernel#BigDecimal(value, ndigits)`. `ndigits` is a count of
@@ -55,7 +83,8 @@ export class BigDecimal {
     this.sign = parsed.sign;
     this.intDigits = parsed.intDigits;
     this.fracDigits = parsed.fracDigits;
-    if (ndigits > 0 && (isRational || typeof value === "number")) {
+    this.nonFinite = parsed.nonFinite;
+    if (parsed.nonFinite === null && ndigits > 0 && (isRational || typeof value === "number")) {
       // Significant-digit rounding IS a fractional-scale round, offset by the
       // value's decimal exponent: 1234.5 at 3 digits rounds at scale -1, and
       // 0.00123456 at 3 digits rounds at scale 5.
@@ -64,6 +93,48 @@ export class BigDecimal {
       this.intDigits = rounded.intDigits;
       this.fracDigits = rounded.fracDigits;
     }
+  }
+
+  /**
+   * Ruby `BigDecimal::NAN`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships.
+   */
+  static readonly NAN = new BigDecimal("NaN");
+
+  /**
+   * Ruby `BigDecimal::INFINITY`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships.
+   */
+  static readonly INFINITY = new BigDecimal("Infinity");
+
+  /**
+   * Ruby `BigDecimal#nan?`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships.
+   */
+  isNan(): boolean {
+    return this.nonFinite === "NaN";
+  }
+
+  /**
+   * Ruby `BigDecimal#infinite?` — `1` for `Infinity`, `-1` for `-Infinity`,
+   * and `nil` (here `null`) for everything else, NaN included.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `BigDecimal`, not Rails.
+   * `conversions.rb` only adds `to_s`/`to_formatted_s`/`as_json` to a class MRI
+   * already ships.
+   */
+  isInfinite(): number | null {
+    if (this.nonFinite !== "Infinity") return null;
+    return this.sign === "-" ? -1 : 1;
   }
 
   /**
@@ -87,6 +158,9 @@ export class BigDecimal {
     if (this.sign === "-") prefix = "-";
     else if (signFlag === "+") prefix = "+";
     else if (signFlag === " ") prefix = " ";
+    if (this.nonFinite !== null) {
+      return this.nonFinite === "NaN" ? "NaN" : `${prefix}Infinity`;
+    }
     if (scientific) return `${prefix}${this.toScientific(group)}`;
     const frac = this.fracDigits === "" ? "0" : this.fracDigits;
     const intPart = group > 0 ? groupFromRight(this.intDigits, group) : this.intDigits;
@@ -152,6 +226,7 @@ export class BigDecimal {
    * and `>=`) has to exist here for those ports to have anything to call.
    */
   isZero(): boolean {
+    if (this.nonFinite !== null) return false;
     return !/[1-9]/.test(this.intDigits + this.fracDigits);
   }
 
@@ -178,6 +253,8 @@ export class BigDecimal {
    * and `>=`) has to exist here for those ports to have anything to call.
    */
   abs(): BigDecimal {
+    if (this.isNan()) return this;
+    if (this.nonFinite !== null) return BigDecimal.INFINITY;
     return this.sign === "-"
       ? BigDecimal.fromUnscaled(this.unscaled(-1), this.fracDigits.length)
       : this;
@@ -193,6 +270,12 @@ export class BigDecimal {
    * and `>=`) has to exist here for those ports to have anything to call.
    */
   mult(other: BigDecimal): BigDecimal {
+    if (this.nonFinite !== null || other.nonFinite !== null) {
+      if (this.isNan() || other.isNan() || this.isZero() || other.isZero()) return BigDecimal.NAN;
+      return this.isNegative() !== other.isNegative()
+        ? new BigDecimal("-Infinity")
+        : BigDecimal.INFINITY;
+    }
     return BigDecimal.fromUnscaled(
       this.unscaled() * other.unscaled(),
       this.fracDigits.length + other.fracDigits.length,
@@ -208,7 +291,13 @@ export class BigDecimal {
    * (`number_to_currency_converter.rb:13-16` alone uses `negative?`, `abs`, `*`
    * and `>=`) has to exist here for those ports to have anything to call.
    */
-  compare(other: BigDecimal): number {
+  compare(other: BigDecimal): number | null {
+    if (this.isNan() || other.isNan()) return null;
+    if (this.nonFinite !== null || other.nonFinite !== null) {
+      const thisRank = this.isInfinite() ?? 0;
+      const otherRank = other.isInfinite() ?? 0;
+      return thisRank < otherRank ? -1 : thisRank > otherRank ? 1 : 0;
+    }
     const scale = Math.max(this.fracDigits.length, other.fracDigits.length);
     const left = this.unscaledAt(scale);
     const right = other.unscaledAt(scale);
@@ -231,6 +320,7 @@ export class BigDecimal {
    * and `>=`) has to exist here for those ports to have anything to call.
    */
   round(n = 0, mode = ":default"): BigDecimal {
+    if (this.nonFinite !== null) return this;
     if (n >= this.fracDigits.length) return this;
     const digits = this.intDigits + this.fracDigits;
     const keepCount = this.intDigits.length + n;
@@ -285,6 +375,7 @@ export class BigDecimal {
    * defining, so there is no `.rb` in the vendored corpus to mirror.
    */
   static interpretLoosely(value: string): BigDecimal {
+    if (NON_FINITE_REGEX.test(value)) return new BigDecimal(value);
     const match = INTERPRET_LOOSELY_REGEX.exec(value);
     return new BigDecimal(match === null ? "0" : match[0].replace(/_/g, "").trim());
   }
@@ -377,10 +468,7 @@ function groupFromLeft(s: string, n: number): string {
  * two guard digits past the requested significant-digit count so the
  * constructor's rounding step sees a correctly-rounded tail.
  */
-function parseRational(
-  value: RationalLike,
-  ndigits: number,
-): { sign: "" | "-"; intDigits: string; fracDigits: string } | null {
+function parseRational(value: RationalLike, ndigits: number): Parsed | null {
   if (ndigits <= 0) {
     // Ruby raises `ArgumentError` here. This module has no runtime imports by
     // construction, and ActiveSupport's `ArgumentError` would drag the
@@ -393,7 +481,7 @@ function parseRational(
   const n = value.numerator < 0n ? -value.numerator : value.numerator;
   const d = value.denominator < 0n ? -value.denominator : value.denominator;
   if (d === 0n) return null;
-  if (n === 0n) return { sign: "", intDigits: "0", fracDigits: "" };
+  if (n === 0n) return { sign: "", intDigits: "0", fracDigits: "", nonFinite: null };
 
   let fracNeeded: number;
   const intPartDigits = n / d;
@@ -412,19 +500,34 @@ function parseRational(
   );
 }
 
-function parse(
-  value: string | number | bigint,
-): { sign: "" | "-"; intDigits: string; fracDigits: string } | null {
+function parse(value: string | number | bigint): Parsed | null {
   if (typeof value === "bigint") {
     const negative = value < 0n;
     return {
       sign: negative ? "-" : "",
       intDigits: (negative ? -value : value).toString(),
       fracDigits: "",
+      nonFinite: null,
     };
+  }
+  if (typeof value === "number" && !Number.isFinite(value)) {
+    return Number.isNaN(value)
+      ? { sign: "", intDigits: "0", fracDigits: "", nonFinite: "NaN" }
+      : { sign: value < 0 ? "-" : "", intDigits: "0", fracDigits: "", nonFinite: "Infinity" };
   }
   const raw = String(value).trim();
   if (raw === "") return null;
+  const special = NON_FINITE_REGEX.exec(raw);
+  if (special !== null) {
+    return special[1] !== undefined
+      ? { sign: "", intDigits: "0", fracDigits: "", nonFinite: "NaN" }
+      : {
+          sign: special[2] === "-" ? "-" : "",
+          intDigits: "0",
+          fracDigits: "",
+          nonFinite: "Infinity",
+        };
+  }
   let s = raw;
   let sign: "" | "-" = "";
   if (s.startsWith("-")) {
@@ -468,7 +571,7 @@ function parse(
   intPart = intPart.replace(/^0+(?=\d)/, "") || "0";
   fracPart = fracPart.replace(/0+$/, "");
   if (intPart === "0" && fracPart === "") sign = "";
-  return { sign, intDigits: intPart, fracDigits: fracPart };
+  return { sign, intDigits: intPart, fracDigits: fracPart, nonFinite: null };
 }
 
 /**

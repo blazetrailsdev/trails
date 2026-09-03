@@ -68,8 +68,8 @@ describe("DecimalTest", () => {
     expect(type.isChanged(5.0, 5.0, "5.0")).toBeFalsy();
     expect(type.isChanged(-5.0, -5.0, "-5.0")).toBeFalsy();
     expect(type.isChanged(5.0, 5.0, "0.5e+1")).toBeFalsy();
-    expect(type.isChanged("NaN", "NaN", "NaN")).toBeFalsy();
-    expect(type.isChanged("NaN", NaN, NaN)).toBeTruthy();
+    expect(type.isChanged(BigDecimal.NAN, BigDecimal.NAN, BigDecimal.NAN)).toBeFalsy();
+    expect(type.isChanged(BigDecimal.NAN, NaN, NaN)).toBeTruthy();
   });
 
   it("scale is applied before precision to prevent rounding errors", () => {

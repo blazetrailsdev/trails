@@ -36,7 +36,7 @@ export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyO
     if (numberD !== null) {
       if (numberD.isNegative()) {
         numberD = numberD.abs();
-        if (numberD.mult(powerOfTen(options.precision as number)).compare(HALF) >= 0) {
+        if (numberD.mult(powerOfTen(options.precision as number)).compare(HALF)! >= 0) {
           format = options.negativeFormat as string;
         }
       }

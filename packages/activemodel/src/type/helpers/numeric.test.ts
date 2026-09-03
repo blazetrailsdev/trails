@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
 import {
   isNonNumericString,
   isNumberToNonNumber,
@@ -74,7 +75,7 @@ describe("Helpers::Numeric private predicates", () => {
     });
 
     it('treats the decimal "NaN" sentinel as BigDecimal NaN on both sides', () => {
-      expect(isEqualNan("NaN", "NaN")).toBe(true);
+      expect(isEqualNan(BigDecimal.NAN, BigDecimal.NAN)).toBe(true);
     });
   });
 });
