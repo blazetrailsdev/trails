@@ -83,6 +83,35 @@ describe("FileUtils", () => {
     expect(nodeFs.existsSync(nodePath.join(root, "tree"))).toBe(false);
   });
 
+  it("rm_r under force removes the rest of the tree past an unremovable entry", () => {
+    const tree = nodePath.join(root, "tree");
+    const stuck = nodePath.join(tree, "stuck");
+    const sibling = nodePath.join(tree, "sibling");
+    FileUtils.mkdirP(stuck);
+    FileUtils.touch(nodePath.join(stuck, "child"));
+    FileUtils.touch(sibling);
+    nodeFs.chmodSync(stuck, 0o500);
+
+    FileUtils.rmR(tree, { force: true });
+
+    nodeFs.chmodSync(stuck, 0o700);
+    expect(nodeFs.existsSync(sibling)).toBe(false);
+  });
+
+  it("rm_r does not descend through a symlink to a directory", () => {
+    const outside = nodePath.join(root, "outside");
+    FileUtils.mkdirP(outside);
+    FileUtils.touch(nodePath.join(outside, "keep"));
+    const tree = nodePath.join(root, "tree");
+    FileUtils.mkdirP(tree);
+    nodeFs.symlinkSync(outside, nodePath.join(tree, "link"));
+
+    FileUtils.rmR(tree);
+
+    expect(nodeFs.existsSync(tree)).toBe(false);
+    expect(nodeFs.existsSync(nodePath.join(outside, "keep"))).toBe(true);
+  });
+
   it("cp copies the file's contents", () => {
     const src = nodePath.join(root, "src");
     const dest = nodePath.join(root, "dest");

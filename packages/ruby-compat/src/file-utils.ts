@@ -10,6 +10,62 @@ function isDirectory(path: string): boolean {
   }
 }
 
+/**
+ * `SystemCallError` (`vendor/ruby/error.c:3380`), the parent of the `Errno`
+ * classes — which is what the fs backend's own errors are: they carry a
+ * `.code`. Anything else propagates, as it does past Ruby's
+ * `rescue SystemCallError`.
+ */
+function isSystemCallError(error: unknown): boolean {
+  return typeof (error as { code?: unknown } | null | undefined)?.code === "string";
+}
+
+/**
+ * `Entry_#directory?` (`vendor/ruby/lib/fileutils.rb:2123-2126`), which
+ * `lstat!`s — a symlink to a directory is an entry to unlink, not a tree to
+ * descend. An adapter with no `lstatSync` falls back to `statSync`, which
+ * follows the link and cannot draw that distinction.
+ */
+function isDirectoryEntry(path: string): boolean {
+  const fs = getFs();
+  try {
+    return (fs.lstatSync ? fs.lstatSync(path) : fs.statSync(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** `Entry_#postorder_traverse` (`vendor/ruby/lib/fileutils.rb:2364-2382`). */
+function* postorderTraverse(path: string): Generator<string> {
+  if (isDirectoryEntry(path)) {
+    let children: string[];
+    try {
+      children = getFs().readdirSync(path);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "EACCES") throw error;
+      yield path;
+      return;
+    }
+
+    for (const ent of children) {
+      yield* postorderTraverse(getPath().join(path, ent));
+    }
+  }
+  yield path;
+}
+
+/**
+ * `Entry_#remove` (`vendor/ruby/lib/fileutils.rb:2314-2320`), whose
+ * `remove_dir1` and `remove_file` are `Dir.rmdir` and `File.unlink`.
+ */
+function entryRemove(path: string): void {
+  if (isDirectoryEntry(path)) {
+    getFs().rmdirSync(removeTrailingSlash(path));
+  } else {
+    getFs().unlinkSync(path);
+  }
+}
+
 /** `Entry_#exist?` / `#directory?` (`vendor/ruby/lib/fileutils.rb:2109,2123`). */
 function statOrNull(path: string): FsStatResult | null {
   try {
@@ -145,10 +201,12 @@ function copyEntry(src: string, dest: string, preserve = false): void {
 }
 
 /**
- * `File.utime` (`vendor/ruby/file.c:2983`). The backend contract carries no
- * `utimesSync` of its own, and an adapter without one still has to raise
- * `ENOENT` for a missing path — which is the branch `touch` reads — so the
- * fallback stats the path for exactly that.
+ * `File.utime` (`vendor/ruby/file.c:2983`). `utimesSync` is optional on the
+ * backend contract, and an adapter without one still has to raise `ENOENT` for
+ * a missing path — which is the branch `touch` reads — so the fallback stats
+ * the path for exactly that, and no-ops the timestamp update itself: against
+ * such an adapter `touch` creates a missing file but does not move an existing
+ * one's mtime.
  */
 function fileUtime(atime: Date, mtime: Date, path: string): void {
   const utimesSync = getFs().utimesSync;
@@ -203,7 +261,7 @@ export class FileUtils {
         try {
           fuMkdir(dir, mode);
         } catch (error) {
-          if (!isDirectory(dir)) throw error;
+          if (!isSystemCallError(error) || !isDirectory(dir)) throw error;
         }
       }
     }
@@ -264,7 +322,7 @@ export class FileUtils {
           FileUtils.removeEntry(s, force);
         }
       } catch (error) {
-        if (force !== true) throw error;
+        if (!isSystemCallError(error) || force !== true) throw error;
       }
     });
   }
@@ -316,15 +374,20 @@ export class FileUtils {
     return list;
   }
 
-  /** `FileUtils.remove_entry` (`vendor/ruby/lib/fileutils.rb:1449-1456`), whose
-   * postorder traversal the backend's recursive remove performs.
+  /** `FileUtils.remove_entry` (`vendor/ruby/lib/fileutils.rb:1449-1456`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
    * module function the interpreter defines and Rails bodies send.
    */
   static removeEntry(path: string, force = false): void {
     try {
-      getFs().rmSync(path, { recursive: true });
+      for (const ent of postorderTraverse(path)) {
+        try {
+          entryRemove(ent);
+        } catch (error) {
+          if (force !== true) throw error;
+        }
+      }
     } catch (error) {
       if (force !== true) throw error;
     }
