@@ -218,11 +218,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("translate exception lock wait timeout", async () => {
       await adapter.exec(`CREATE TABLE "ex_lock" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.executeMutation(`INSERT INTO "ex_lock" ("val") VALUES (1)`);
-      await adapter.beginTransaction();
+      await adapter.beginTransaction({ _lazy: false });
       try {
         await adapter.execute(`SELECT * FROM "ex_lock" WHERE id = 1 FOR UPDATE`);
         await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
-          await adapter2.beginTransaction();
+          await adapter2.beginTransaction({ _lazy: false });
           try {
             await adapter2.execute(`SET LOCAL lock_timeout = '100ms'`);
             await expect(
@@ -242,8 +242,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.executeMutation(`INSERT INTO "ex_dl" ("val") VALUES (2)`);
 
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
-        await adapter.beginTransaction();
-        await adapter2.beginTransaction();
+        await adapter.beginTransaction({ _lazy: false });
+        await adapter2.beginTransaction({ _lazy: false });
         try {
           await adapter.execute(`SELECT * FROM "ex_dl" WHERE id = 1 FOR UPDATE`);
           await adapter2.execute(`SELECT * FROM "ex_dl" WHERE id = 2 FOR UPDATE`);
@@ -277,7 +277,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("translate exception query cancelled", async () => {
-      await adapter.beginTransaction();
+      await adapter.beginTransaction({ _lazy: false });
       try {
         const pidRows = await adapter.execute(`SELECT pg_backend_pid() AS pid`);
         const pid = (pidRows[0] as { pid: number }).pid;
@@ -852,7 +852,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("Transactions", () => {
     it("commit persists data", async () => {
       await adapter.exec(`CREATE TABLE "ex_txn" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
-      await adapter.beginTransaction();
+      await adapter.beginTransaction({ _lazy: false });
       await adapter.executeMutation(`INSERT INTO "ex_txn" ("val") VALUES ('committed')`);
       await adapter.commit();
       const rows = await adapter.execute(`SELECT "val" FROM "ex_txn"`);
@@ -863,7 +863,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("rollback discards data", async () => {
       await adapter.exec(`CREATE TABLE "ex_txn_rb" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
       await adapter.executeMutation(`INSERT INTO "ex_txn_rb" ("val") VALUES ('before')`);
-      await adapter.beginTransaction();
+      await adapter.beginTransaction({ _lazy: false });
       await adapter.executeMutation(`INSERT INTO "ex_txn_rb" ("val") VALUES ('during')`);
       await adapter.rollback();
       const rows = await adapter.execute(`SELECT "val" FROM "ex_txn_rb"`);
@@ -873,7 +873,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("savepoint allows partial rollback", async () => {
       await adapter.exec(`CREATE TABLE "ex_txn_sp" ("id" SERIAL PRIMARY KEY, "val" TEXT)`);
-      await adapter.beginTransaction();
+      await adapter.beginTransaction({ _lazy: false });
       await adapter.executeMutation(`INSERT INTO "ex_txn_sp" ("val") VALUES ('a')`);
       await adapter.createSavepoint("sp1");
       await adapter.executeMutation(`INSERT INTO "ex_txn_sp" ("val") VALUES ('b')`);
@@ -1039,7 +1039,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("setConstraints ALL DEFERRED executes without error", async () => {
-      await adapter.beginTransaction();
+      await adapter.beginTransaction({ _lazy: false });
       try {
         await expect(adapter.setConstraints("deferred")).resolves.toBeUndefined();
       } finally {

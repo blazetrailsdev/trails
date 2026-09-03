@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { singularize, getCrypto } from "@blazetrails/activesupport";
 import { rubyInspectHash } from "../../relation/ruby-inspect.js";
@@ -15,6 +15,7 @@ import {
   type ColumnType,
 } from "../abstract/schema-definitions.js";
 import type { PostgreSQLAdapter } from "../postgresql-adapter.js";
+import { Column } from "./column.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { Name, Utils } from "./utils.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
@@ -479,6 +480,84 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   private quoteSchemaName(name: string): string {
     return pgQuoteColumnName(name);
+  }
+
+  override async columns(tableName: string): Promise<Column[]> {
+    const [schema, table] = this.extractSchemaQualifiedName(tableName);
+
+    let tableCondition: string;
+    const binds: unknown[] = [];
+
+    if (schema) {
+      binds.push(table, schema);
+      tableCondition = `t.relname = $1 AND n.nspname = $2`;
+    } else {
+      binds.push(tableName);
+      tableCondition = `t.oid = to_regclass($1)`;
+    }
+
+    const rows = (
+      await this.internalExecQuery(
+        `SELECT a.attname AS name,
+              pg_catalog.format_type(a.atttypid, a.atttypmod) AS type,
+              pg_get_expr(d.adbin, d.adrelid) AS "default",
+              a.attnotnull AS notnull,
+              a.atttypid AS oid,
+              a.atttypmod AS fmod,
+              a.attidentity AS identity,
+              a.attgenerated AS attgenerated,
+              col.collname AS collation,
+              pgd.description AS col_comment
+       FROM pg_attribute a
+       JOIN pg_class t ON t.oid = a.attrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+       LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+       LEFT JOIN pg_type pt ON a.atttypid = pt.oid
+       LEFT JOIN pg_collation col ON a.attcollation = col.oid AND a.attcollation <> pt.typcollation
+       LEFT JOIN pg_description pgd
+         ON pgd.objoid = a.attrelid
+        AND pgd.classoid = 'pg_class'::regclass
+        AND pgd.objsubid = a.attnum
+       WHERE ${tableCondition}
+         AND a.attnum > 0
+         AND NOT a.attisdropped
+       ORDER BY a.attnum`,
+        "SCHEMA",
+        binds,
+      )
+    ).toArray();
+
+    const typeMap = this.typeMap;
+    const missingOids = [
+      ...new Set(rows.map((r) => Number(r.oid)).filter((oid) => !typeMap.isKey(oid))),
+    ];
+    if (missingOids.length > 0) {
+      await this.loadAdditionalTypes(missingOids);
+      for (const oid of missingOids) {
+        if (!typeMap.isKey(oid)) {
+          console.warn(`unknown OID ${oid}: unrecognized column type, treating as generic value.`);
+          typeMap.registerType(oid, new ValueType());
+        }
+      }
+    }
+
+    const columns: Column[] = [];
+    for (const r of rows) {
+      const field = [
+        r.name,
+        r.type,
+        r.default,
+        r.notnull,
+        r.oid,
+        r.fmod,
+        r.collation,
+        r.col_comment,
+        r.identity,
+        r.attgenerated,
+      ];
+      columns.push(await this.newColumnFromField(tableName, field, rows));
+    }
+    return columns;
   }
 
   /** @internal */

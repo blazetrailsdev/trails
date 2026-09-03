@@ -186,7 +186,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
 
     it("translates ER_DATA_TOO_LONG to ValueTooLong", async () => {
       const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
-      await adapter.beginTransaction();
+      await adapter.beginTransaction({ _lazy: false });
       try {
         await adapter.executeMutation(
           `SET SESSION sql_mode = CONCAT_WS(',', @@SESSION.sql_mode, 'STRICT_TRANS_TABLES')`,
@@ -248,7 +248,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
     const previousLogger = Base.logger;
     const oldSqlMode = await adapter.queryValue("SELECT @@SESSION.sql_mode");
     await adapter.executeMutation(`DROP TABLE IF EXISTS warn_posts`);
-    await adapter.beginTransaction();
+    await adapter.beginTransaction({ _lazy: false });
     try {
       await adapter.executeMutation(
         `CREATE TABLE warn_posts (id INT AUTO_INCREMENT PRIMARY KEY, title VARCHAR(20))`,

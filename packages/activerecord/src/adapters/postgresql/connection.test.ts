@@ -67,7 +67,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
     const before = await adapter.execute("SHOW geqo");
     expect(before[0]?.geqo).toBe("off");
 
-    await adapter.beginTransaction();
+    await adapter.beginTransaction({ _lazy: false });
     await adapter.resetBang();
 
     const after = await adapter.execute("SHOW geqo");

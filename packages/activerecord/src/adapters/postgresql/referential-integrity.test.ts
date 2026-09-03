@@ -184,7 +184,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
         await expect(adapter.checkAllForeignKeysValidBang()).rejects.toThrow();
 
-        await adapter.beginTransaction();
+        await adapter.beginTransaction({ _lazy: false });
         try {
           await expect(adapter.checkAllForeignKeysValidBang()).rejects.toThrow();
           const result = await adapter.execute("SELECT 1 AS n");
@@ -205,7 +205,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           `CREATE TABLE referential_integrity_tx_test.nodes (id BIGSERIAL PRIMARY KEY)`,
         );
 
-        await adapter.beginTransaction();
+        await adapter.beginTransaction({ _lazy: false });
         try {
           await expect(adapter.checkAllForeignKeysValidBang()).resolves.toBeUndefined();
 

@@ -423,7 +423,7 @@ describe("SchemaAdapter TM delegation", () => {
       NullTransaction,
     );
 
-    await testAdapter.beginTransaction();
+    await testAdapter.beginTransaction({ _lazy: false });
     expect(testAdapter.isTransactionOpen()).toBe(true);
     expect(testAdapter.openTransactions()).toBeGreaterThan(0);
 
@@ -431,7 +431,7 @@ describe("SchemaAdapter TM delegation", () => {
     expect(testAdapter.isTransactionOpen()).toBe(false);
     expect(testAdapter.openTransactions()).toBe(0);
 
-    await testAdapter.beginTransaction();
+    await testAdapter.beginTransaction({ _lazy: false });
     expect(testAdapter.isTransactionOpen()).toBe(true);
     await testAdapter.rollback();
     expect(testAdapter.isTransactionOpen()).toBe(false);
