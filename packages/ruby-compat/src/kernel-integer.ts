@@ -2,24 +2,19 @@ import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { rbBuiltinClassName, rbInspect } from "./object.js";
 
-const DIGITS_BY_BASE: Record<number, string> = {
-  2: "[01]",
-  8: "[0-7]",
-  10: "[0-9]",
-  16: "[0-9a-fA-F]",
-};
-
 const BASE_BY_PREFIX: Record<string, number> = { x: 16, b: 2, o: 8, d: 10 };
+
+const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
 
 /**
  * `rb_convert_to_integer` (`vendor/ruby/object.c:3257`) with `raise_exception`
- * true — the arm every `Kernel#Integer` call site reaches. A Float answers its
- * truncation and raises `FloatDomainError` when it is not finite, a String is
- * parsed by `rb_str_to_inum(str, base, TRUE)` (`vendor/ruby/bignum.c:4302`),
- * and anything else is converted through `to_int` / `to_i`, raising
- * `TypeError` when the value defines neither.
+ * true — the arm every `Kernel#Integer` call site reaches. An explicit base is
+ * only meaningful for a String, a Float answers its truncation and raises
+ * `FloatDomainError` when it is not finite, a String is parsed by
+ * `rb_str_convert_to_inum` (`vendor/ruby/bignum.c:4302`), and anything else is
+ * converted through `to_int`, then `to_str`, then `to_i`.
  *
- * `rb_cstr_to_inum` (`vendor/ruby/bignum.c:4045`) is why the String arm is a
+ * `rb_int_parse_cstr` (`vendor/ruby/bignum.c:4045`) is why the String arm is a
  * grammar rather than a `Number.parseInt`: it strips surrounding whitespace,
  * reads an optional sign and a radix prefix (`0x`/`0b`/`0o`/`0d`, plus bare
  * `0` for octal when the base is unspecified), allows a single `_` BETWEEN
@@ -32,39 +27,93 @@ const BASE_BY_PREFIX: Record<string, number> = { x: 16, b: 2, o: 8, d: 10 };
  * is no Ruby file in any gem for the port to mirror.
  */
 export function kernelInteger(val: unknown, base = 0): number {
+  if (base !== 0) {
+    const tmp = rbCheckStringType(val);
+    if (tmp !== null) val = tmp;
+    else throw new ArgumentError("base specified for non string value");
+  }
   if (typeof val === "number") {
     if (!Number.isFinite(val)) throw new FloatDomainError(String(val));
     return Math.trunc(val);
   }
   if (typeof val === "bigint") return Number(val);
-  if (typeof val === "string") return rbStrToInum(val, base);
-  if (val !== null && val !== undefined && typeof val === "object") {
-    const toInt = (val as { toInt?: unknown }).toInt ?? (val as { toI?: unknown }).toI;
-    if (typeof toInt === "function") return (toInt as () => number).call(val);
+  if (typeof val === "string") return rbStrConvertToInum(val, base);
+  if (val === null || val === undefined) {
+    throw new TypeError("can't convert nil into Integer");
   }
-  throw new TypeError(`can't convert ${rbBuiltinClassName(val)} into Integer`);
+
+  const tmp = rbCheckToInt(val);
+  if (tmp !== null) return tmp;
+  const str = rbCheckStringType(val);
+  if (str !== null) return rbStrConvertToInum(str, base);
+  return rbToInteger(val);
 }
 
-function rbStrToInum(str: string, base: number): number {
+function rbCheckStringType(val: unknown): string | null {
+  if (typeof val === "string") return val;
+  const toStr = (val as { toStr?: unknown } | null | undefined)?.toStr;
+  if (typeof toStr !== "function") return null;
+  const tmp = (toStr as () => unknown).call(val);
+  return typeof tmp === "string" ? tmp : null;
+}
+
+/**
+ * `rb_check_to_int` (`vendor/ruby/object.c:3239`): `to_int` counts only when it
+ * answers an Integer, so a receiver whose `to_int` answers anything else falls
+ * through to the `to_str` and `to_i` arms rather than being accepted.
+ */
+function rbCheckToInt(val: unknown): number | null {
+  const toInt = (val as { toInt?: unknown }).toInt;
+  if (typeof toInt !== "function") return null;
+  const tmp = (toInt as () => unknown).call(val);
+  return typeof tmp === "number" && Number.isInteger(tmp) ? tmp : null;
+}
+
+/** `rb_to_integer(val, "to_i", idTo_i)` (`vendor/ruby/object.c:3213`). */
+function rbToInteger(val: unknown): number {
+  const klass = rbBuiltinClassName(val);
+  const toI = (val as { toI?: unknown }).toI;
+  if (typeof toI !== "function") {
+    throw new TypeError(`can't convert ${klass} into Integer`);
+  }
+  const tmp = (toI as () => unknown).call(val);
+  if (typeof tmp === "number" && Number.isInteger(tmp)) return tmp;
+  throw new TypeError(
+    `can't convert ${klass} to Integer (${klass}#to_i gives ${rbBuiltinClassName(tmp)})`,
+  );
+}
+
+/**
+ * `rb_int_parse_cstr` (`vendor/ruby/bignum.c:4045`) under `rb_str_convert_to_inum`'s
+ * `badcheck` — a base at or below zero reads the radix off the literal's own
+ * prefix (falling back to `-base` below -1, then to 10), and any base outside
+ * `valid_radix_p`'s 2..36 raises.
+ */
+function rbStrConvertToInum(str: string, base: number): number {
   const signMatch = /^([+-]?)(.*)$/s.exec(str.trim())!;
   const sign = signMatch[1];
   let body = signMatch[2];
 
   const prefix = /^0([xbod])/i.exec(body);
-  if (prefix && (base === 0 || base === BASE_BY_PREFIX[prefix[1].toLowerCase()])) {
-    base = BASE_BY_PREFIX[prefix[1].toLowerCase()]!;
-    body = body.slice(2);
-  } else if (base === 0) {
-    if (/^0./.test(body)) {
+  if (base <= 0) {
+    if (prefix) {
+      base = BASE_BY_PREFIX[prefix[1].toLowerCase()]!;
+      body = body.slice(2);
+    } else if (/^0./.test(body)) {
       base = 8;
-      body = body.slice(1).replace(/^_/, "");
+    } else if (base < -1) {
+      base = -base;
     } else {
       base = 10;
     }
+  } else if (prefix && base === BASE_BY_PREFIX[prefix[1].toLowerCase()]) {
+    body = body.slice(2);
   }
 
-  const digits = DIGITS_BY_BASE[base];
-  if (digits === undefined || !new RegExp(`^${digits}(?:_?${digits})*$`).test(body)) {
+  if (base < 2 || base > 36) throw new ArgumentError(`invalid radix ${base}`);
+
+  const digits = `[${DIGITS.slice(0, base)}${base > 10 ? DIGITS.slice(10, base).toUpperCase() : ""}]`;
+  if (!new RegExp(`^${digits}(?:_?${digits})*$`).test(body)) {
     throw new ArgumentError(`invalid value for Integer(): ${rbInspect(str)}`);
   }
   return (sign === "-" ? -1 : 1) * Number.parseInt(body.replace(/_/g, ""), base);
