@@ -88,38 +88,6 @@ export function normalizeFindArgs(
   return { ids, wantArray, tuples: null };
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function raiseNotFoundAll(
-  modelName: string,
-  pk: string | string[],
-  normalized: NormalizedFindIds,
-  resultSize: number,
-  expectedSize: number,
-  conditions = "",
-  notFoundIds?: unknown[],
-): never {
-  const { ids, tuples } = normalized;
-  const messageIds = tuples ? String(tuples) : ids.join(", ");
-  const payload = tuples ?? ids;
-  throw new RecordNotFound(
-    formatNotFoundAllMessage(
-      modelName,
-      String(pk),
-      messageIds,
-      conditions,
-      resultSize,
-      expectedSize,
-      notFoundIds,
-    ),
-    modelName,
-    String(pk),
-    payload,
-  );
-}
-
 function formatNotFoundAllMessage(
   name: string,
   key: string,
@@ -137,24 +105,6 @@ function formatNotFoundAllMessage(
       ` with ${pluralize(key, notFoundIds.length)} ${notFoundIds.join(", ")}.`;
   }
   return error;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE inline-ruby-bodies-extracted-as-named-helpers
- */
-export function raiseNotFoundSingle(
-  modelName: string,
-  pk: string,
-  id: unknown,
-  conditions = "",
-): never {
-  throw new RecordNotFound(
-    `Couldn't find ${modelName} with '${pk}'=${String(id)}${conditions}`,
-    modelName,
-    pk,
-    id,
-  );
 }
 
 interface FinderRelation {
@@ -479,6 +429,7 @@ export async function include(this: FinderRelation, record: any): Promise<boolea
 
 export const member = include;
 
+/** @noRailsEquivalent PERMANENT */
 function whereCompositePrimaryKeyIn(relation: any, pk: string[], ids: unknown[]): any {
   const tuples = ids as unknown[][];
   let rel = relation.where(buildPkWhere(pk, tuples[0]));

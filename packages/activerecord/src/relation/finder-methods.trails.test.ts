@@ -1,8 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   normalizeFindArgs,
-  raiseNotFoundAll,
-  raiseNotFoundSingle,
   findOne,
   findSome,
   findSomeOrdered,
@@ -252,64 +250,6 @@ describe("normalizeFindArgs — composite primary key", () => {
 
   it("find() → without-an-ID shape, same as simple PK", () => {
     expect(() => normalizeFindArgs("Order", pk, [])).toThrow(/without an ID/);
-  });
-});
-
-describe("raiseNotFoundAll", () => {
-  it("simple PK: pluralized name + found/expected suffix + flatIds payload", () => {
-    const normalized = { ids: [1, 2, 3], wantArray: true, tuples: null };
-    try {
-      raiseNotFoundAll("Post", "id", normalized, 2, 3);
-      expect.fail("should have thrown");
-    } catch (e) {
-      const err = e as RecordNotFound;
-      expect(err.message).toBe(
-        "Couldn't find all Posts with 'id': (1, 2, 3) (found 2 results, but was looking for 3).",
-      );
-      expect(err.id).toEqual([1, 2, 3]);
-    }
-  });
-
-  it("composite: String(tuples) (comma, no space) + suffix + tuples payload", () => {
-    const normalized = {
-      ids: [
-        [1, 2],
-        [3, 4],
-      ],
-      wantArray: true,
-      tuples: [
-        [1, 2],
-        [3, 4],
-      ],
-    };
-    try {
-      raiseNotFoundAll("Order", ["shop_id", "id"], normalized, 1, 2);
-      expect.fail("should have thrown");
-    } catch (e) {
-      const err = e as RecordNotFound;
-      expect(err.message).toBe(
-        "Couldn't find all Orders with 'shop_id,id': (1,2,3,4) (found 1 results, but was looking for 2).",
-      );
-      expect(err.id).toEqual([
-        [1, 2],
-        [3, 4],
-      ]);
-    }
-  });
-});
-
-describe("raiseNotFoundSingle", () => {
-  it("matches Relation.performFind's single-id message", () => {
-    try {
-      raiseNotFoundSingle("Post", "id", 42);
-      expect.fail("should have thrown");
-    } catch (e) {
-      const err = e as RecordNotFound;
-      expect(err.message).toBe("Couldn't find Post with 'id'=42");
-      expect(err.model).toBe("Post");
-      expect(err.primaryKey).toBe("id");
-      expect(err.id).toBe(42);
-    }
   });
 });
 
