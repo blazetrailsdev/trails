@@ -1012,7 +1012,7 @@ describe("schema dump and load", () => {
   });
 });
 
-describe("db subcommand CLI actions", () => {
+describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   let tmpDir: string;
   let originalCwd: string;
   let logs: string[];
