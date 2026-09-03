@@ -144,6 +144,17 @@ flattens both segments onto one file, so
 `commands/unused-routes.ts`). The directory and the file's stem must agree;
 anything else takes the plain kebab-case rule.
 
+### Ports in a sibling package
+
+Rails ships one `railtie.rb` per framework; trails settled every framework's
+trailtie into the `trailties` package, so a framework package has no
+`trailtie.ts` of its own. These Ruby files are scored against a port in
+another package:
+
+| Ruby file                 | trails port                                         |
+| ------------------------- | --------------------------------------------------- |
+| `activerecord:railtie.rb` | `packages/trailties/src/trailties/active-record.ts` |
+
 ## Skipped methods
 
 parity:api never expects a TS counterpart for these Ruby methods:

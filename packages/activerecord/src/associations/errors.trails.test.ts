@@ -90,7 +90,7 @@ describe("AssociationErrors", () => {
     const reflection = {
       activeRecord: "CpkBrokenBook",
       name: "order",
-      primaryKey: ["id"],
+      associationPrimaryKey: () => ["id"],
       foreignKey: ["shop_id", "order_id"],
     };
     const err = new CompositePrimaryKeyMismatchError(reflection);

@@ -45,7 +45,6 @@ import {
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
   CompositePrimaryKeyMismatchError,
-  type CompositePrimaryKeyMismatchReflection,
 } from "./associations/errors.js";
 import { polymorphicName, typeCondition } from "./inheritance.js";
 import { Relation } from "./relation.js";
@@ -932,15 +931,11 @@ export class AssociationReflection extends MacroReflection {
       const fk = this.foreignKey;
       if (this.hasOne() || this.isCollection()) {
         if (arrayLen(this.activeRecordPrimaryKey) !== arrayLen(fk)) {
-          throw new CompositePrimaryKeyMismatchError(
-            this as unknown as CompositePrimaryKeyMismatchReflection,
-          );
+          throw new CompositePrimaryKeyMismatchError(this);
         }
       } else if (this.belongsTo()) {
         if (arrayLen(this.associationPrimaryKey()) !== arrayLen(fk)) {
-          throw new CompositePrimaryKeyMismatchError(
-            this as unknown as CompositePrimaryKeyMismatchReflection,
-          );
+          throw new CompositePrimaryKeyMismatchError(this);
         }
       }
     }

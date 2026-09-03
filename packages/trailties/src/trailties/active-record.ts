@@ -17,6 +17,7 @@ import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-ada
 import { Configurable as EncryptionConfigurable } from "@blazetrails/activerecord/encryption";
 import { installExtendedQueriesIfConfigured } from "@blazetrails/activerecord/encryption/install";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { JobRuntime } from "@blazetrails/activerecord";
 
 type FrameworkDefaultsEntry = {
   partialInserts?: boolean;
@@ -120,6 +121,8 @@ interface TrailtieApp {
 }
 
 export class Trailtie extends BaseTrailtie {
+  instrument = JobRuntime.instrument;
+
   static {
     BaseTrailtie.register(this);
 
