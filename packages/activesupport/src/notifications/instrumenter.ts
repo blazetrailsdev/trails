@@ -48,38 +48,20 @@ export class Event {
     return this._end != null ? this._end / 1000.0 : null;
   }
 
-  /** Mirrors: Notifications::Event#record (notifications/instrumenter.rb:132-143). */
+  /**
+   * Mirrors: Notifications::Event#record (notifications/instrumenter.rb:132-143).
+   *
+   * One method covers a synchronous and an awaited block: when the block hands
+   * back a thenable, the `ensure` arm lands in a `finally` on it instead of the
+   * synchronous one, and the `rescue` arm records the exception on both.
+   */
   record<T = void>(fn?: (payload: EventPayload) => T): T {
     this.startBang();
-    try {
-      return fn ? fn(this.payload) : (undefined as unknown as T);
-    } catch (e) {
-      _recordException(this.payload, e);
-      throw e;
-    } finally {
-      this.finishBang();
-    }
-  }
-
-  /**
-   * trails splits Ruby's one blocking `Event#record` into a sync and an awaiting
-   * form, as it does for `Notifications.instrument` / `instrumentAsync`
-   * (instrumenter.rb:59-67).
-   *
-   * @internal
-   * @noRailsEquivalent PERMANENT Ruby's `Event#record` (instrumenter.rb:132-143) is
-   * blocking, so one method covers both cases; an awaited block needs its own arm.
-   */
-  async recordAsync<T = void>(fn?: (payload: EventPayload) => Promise<T>): Promise<T> {
-    this.startBang();
-    try {
-      return fn ? await fn(this.payload) : (undefined as unknown as T);
-    } catch (e) {
-      _recordException(this.payload, e);
-      throw e;
-    } finally {
-      this.finishBang();
-    }
+    return _withEnsure<T>(
+      () => (fn ? fn(this.payload) : (undefined as unknown as T)),
+      (e) => _recordException(this.payload, e),
+      () => this.finishBang(),
+    );
   }
 
   /** Record information at the time this event starts */
@@ -188,6 +170,43 @@ function _recordException(payload: EventPayload, e: unknown): void {
 }
 
 /**
+ * Ruby's `begin/rescue/ensure` around a `yield`, over a block that may hand
+ * back a thenable: the rescue and ensure arms run synchronously for a plain
+ * value and on the settled promise for a thenable, so one body covers both.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT JS has no synchronous await, so a single Ruby
+ * body wrapping a block that may be async needs both arms spelled once here.
+ */
+function _withEnsure<T>(body: () => T, rescue: (e: unknown) => void, ensure: () => void): T {
+  let result: T;
+  try {
+    result = body();
+  } catch (e) {
+    rescue(e);
+    ensure();
+    throw e;
+  }
+
+  if (result != null && typeof (result as { then?: unknown }).then === "function") {
+    return Promise.resolve(result).then(
+      (value) => {
+        ensure();
+        return value;
+      },
+      (e) => {
+        rescue(e);
+        ensure();
+        throw e;
+      },
+    ) as unknown as T;
+  }
+
+  ensure();
+  return result;
+}
+
+/**
  * The notifier an Instrumenter publishes through. A full notifier (Fanout)
  * additionally exposes `buildHandle`, which snapshots the listener groups;
  * a legacy publish-only notifier does not, and gets wrapped (see below).
@@ -222,6 +241,10 @@ export class Instrumenter {
    * (the rescue arm records the exception on it), then finish the handle in the
    * `ensure`. Routing through `build_handle` is what lets a Fanout notifier's
    * groups drive the event, rather than open-coding an Event/publish here.
+   *
+   * One method covers a synchronous and an awaited block: when the block hands
+   * back a thenable, the `ensure` arm lands in a `finally` on it instead of the
+   * synchronous one, and the `rescue` arm records the exception on both.
    */
   instrument<T = void>(
     name: string,
@@ -231,32 +254,11 @@ export class Instrumenter {
     const handle = this.buildHandle(name, payload);
     handle.start();
 
-    try {
-      return fn ? fn(payload) : (undefined as unknown as T);
-    } catch (e) {
-      _recordException(payload, e);
-      throw e;
-    } finally {
-      handle.finish();
-    }
-  }
-
-  async instrumentAsync<T = void>(
-    name: string,
-    payload: EventPayload = {},
-    fn?: (payload: EventPayload) => Promise<T>,
-  ): Promise<T> {
-    const handle = this.buildHandle(name, payload);
-    handle.start();
-
-    try {
-      return await (fn ? fn(payload) : Promise.resolve(undefined as unknown as T));
-    } catch (e) {
-      _recordException(payload, e);
-      throw e;
-    } finally {
-      handle.finish();
-    }
+    return _withEnsure<T>(
+      () => (fn ? fn(payload) : (undefined as unknown as T)),
+      (e) => _recordException(payload, e),
+      () => handle.finish(),
+    );
   }
 
   /**

@@ -60,32 +60,25 @@ export class Resolver {
     );
   }
 
-  /** @missingRailsCall instrument — PERMANENT */
   private async readFromPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: Base.writingRole, preventWrites: true }, () =>
-      this.instrumenter.instrumentAsync(
-        "database_selector.active_record.read_from_primary",
-        {},
-        () => Promise.resolve(blk()),
+      this.instrumenter.instrument("database_selector.active_record.read_from_primary", {}, () =>
+        Promise.resolve(blk()),
       ),
     ) as Promise<T>;
   }
 
-  /** @missingRailsCall instrument — PERMANENT */
   private async readFromReplica<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: Base.readingRole, preventWrites: true }, () =>
-      this.instrumenter.instrumentAsync(
-        "database_selector.active_record.read_from_replica",
-        {},
-        () => Promise.resolve(blk()),
+      this.instrumenter.instrument("database_selector.active_record.read_from_replica", {}, () =>
+        Promise.resolve(blk()),
       ),
-    ) as Promise<T>;
+    );
   }
 
-  /** @missingRailsCall instrument — PERMANENT */
   private async writeToPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: Base.writingRole, preventWrites: false }, () =>
-      this.instrumenter.instrumentAsync(
+      this.instrumenter.instrument(
         "database_selector.active_record.wrote_to_primary",
         {},
         async () => {
@@ -96,7 +89,7 @@ export class Resolver {
           }
         },
       ),
-    ) as Promise<T>;
+    );
   }
 }
 

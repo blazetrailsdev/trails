@@ -1195,6 +1195,11 @@ export function extractFromProgram(
       }
     }
 
+    for (const credited of creditMixinObjectLiteralKeys(sourceFile, checker, relPath)) {
+      if (fileFunctions.some((f) => f.name === credited.name)) continue;
+      fileFunctions.push(credited);
+    }
+
     // Always record file-level functions so compare.ts can match methods
     // against the file regardless of whether a class/interface wrapper exists.
     if (fileFunctions.length > 0) {
@@ -3187,6 +3192,108 @@ export function harvestObjectLiteralMethods(
     });
   }
   return out;
+}
+
+/**
+ * Credit a mixin object-literal PROPERTY by its key.
+ *
+ * The `include(Host, Mod)` mixin shape (CLAUDE.md, _Module mixins_) lists the
+ * ported bodies in an exported object literal, and the file-function walker
+ * harvests `function` DECLARATIONS — so a member whose Rails name can only be
+ * spelled as a property key scores declaration-only even though its body ships:
+ *
+ * - `with: withCte` (relation/query-methods.ts) — `def with(*args)`
+ *   (query_methods.rb:493). `function with()` is not writable: `with` is a
+ *   reserved word in strict mode, and every module is strict.
+ * - `excluding,` / `without,` — `def excluding(*records)` with
+ *   `alias without excluding` (query_methods.rb:1574). trails ports the shared
+ *   Ruby body once as `excludingWithCallee(callee)` and binds both names from
+ *   it, which is why neither name is a `function` declaration.
+ *
+ * Narrow by construction, the same way the other credit arms are: the property
+ * value must be an identifier resolving IN THIS FILE to something the checker
+ * says is callable. An imported binding, a non-function const, or any other
+ * expression credits nothing, and the caller drops a key the file-function
+ * walker already credited so nothing can be counted twice.
+ */
+export function creditMixinObjectLiteralKeys(
+  sourceFile: ts.SourceFile,
+  checker: ts.TypeChecker,
+  relPath: string,
+): MethodInfo[] {
+  const out: MethodInfo[] = [];
+  for (const node of sourceFile.statements) {
+    if (!ts.isVariableStatement(node) || !isExported(node)) continue;
+    for (const decl of node.declarationList.declarations) {
+      if (!decl.name || !ts.isIdentifier(decl.name)) continue;
+      if (isConstantCaseName(decl.name.text)) continue;
+      if (!decl.initializer) continue;
+      const init = unwrapAssertions(decl.initializer);
+      if (!ts.isObjectLiteralExpression(init)) continue;
+      for (const prop of init.properties) {
+        let name: string;
+        let value: ts.Identifier;
+        // A shorthand's own name symbol is the PROPERTY, not what it binds, so
+        // the value symbol has to come off the checker's shorthand accessor.
+        let valueSymbol: ts.Symbol | undefined;
+        if (ts.isShorthandPropertyAssignment(prop)) {
+          name = prop.name.text;
+          value = prop.name;
+          valueSymbol = checker.getShorthandAssignmentValueSymbol(prop);
+        } else if (
+          ts.isPropertyAssignment(prop) &&
+          ts.isIdentifier(prop.name) &&
+          ts.isIdentifier(prop.initializer)
+        ) {
+          name = prop.name.text;
+          value = prop.initializer;
+          valueSymbol = checker.getSymbolAtLocation(prop.initializer);
+        } else {
+          continue;
+        }
+        const target = localCallableDeclaration(valueSymbol, value, checker, sourceFile);
+        if (!target) continue;
+        const line = prop.getSourceFile().getLineAndCharacterOfPosition(prop.getStart()).line + 1;
+        const body = ts.isFunctionDeclaration(target) ? target.body : undefined;
+        const calls = body && extractCalls(body);
+        const callSeq = body && extractCallSeq(body);
+        const callArgs = body && extractCallArgs(body);
+        out.push({
+          name,
+          visibility: "public",
+          params: paramsOfCallableRef(value, checker) ?? [],
+          isStatic: false,
+          line,
+          file: relPath,
+          ...(value.text !== name ? { aliasOf: value.text } : {}),
+          ...(calls !== undefined ? { calls } : {}),
+          ...(callSeq !== undefined ? { callSeq } : {}),
+          ...(callArgs !== undefined ? { callArgs } : {}),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The declaration `sym` names, when it lives in `sourceFile` and the checker
+ * says it is callable — a `function` declaration, or a `const` bound to a
+ * function-valued expression (an arrow, a function expression, or a call to a
+ * factory such as `excludingWithCallee("without")`). Anything else, an import
+ * included, returns undefined so the caller credits nothing.
+ */
+function localCallableDeclaration(
+  sym: ts.Symbol | undefined,
+  id: ts.Identifier,
+  checker: ts.TypeChecker,
+  sourceFile: ts.SourceFile,
+): ts.FunctionDeclaration | ts.VariableDeclaration | undefined {
+  const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
+  if (!decl || decl.getSourceFile() !== sourceFile) return undefined;
+  if (!ts.isFunctionDeclaration(decl) && !ts.isVariableDeclaration(decl)) return undefined;
+  if (checker.getTypeAtLocation(id).getCallSignatures().length === 0) return undefined;
+  return decl;
 }
 
 export function extractFileLocalHelpers(

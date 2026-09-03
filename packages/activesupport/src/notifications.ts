@@ -246,7 +246,7 @@ export class Notifications {
    *
    * Rails has no async analogue; this is a trails extension that delegates the
    * same way as `instrument` (listening? short-circuit, then the Instrumenter's
-   * async path) across an awaited block.
+   * unified `instrument`) across an awaited block.
    *
    * The block receives the event payload — the same object passed in, which
    * subscribers read after the block returns. Mutating it (e.g. `row_count`)
@@ -262,7 +262,7 @@ export class Notifications {
     if (!this.notifier.listening(name)) {
       return (block ? await block(resolved) : undefined) as any;
     }
-    return (await this.instrumenter.instrumentAsync(name, resolved, block)) as any;
+    return (await this.instrumenter.instrument(name, resolved, block)) as any;
   }
 
   /**

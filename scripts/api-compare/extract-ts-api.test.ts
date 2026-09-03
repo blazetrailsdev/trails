@@ -19,6 +19,7 @@ import {
   extractInternalFileConstants,
   extractFileLocalHelpers,
   extractFromProgram,
+  creditMixinObjectLiteralKeys,
   harvestObjectLiteralMethods,
   packageFingerprint,
   tsLiteralValue,
@@ -5012,5 +5013,72 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(info.classes["reloader.ts:Reloader"].classMethods.map((m) => m.name)).toContain(
       "executor",
     );
+  });
+});
+
+describe("creditMixinObjectLiteralKeys", () => {
+  const credited = (source: string): MethodInfo[] => {
+    const { sourceFile, checker } = compile(source);
+    return creditMixinObjectLiteralKeys(sourceFile, checker, VIRTUAL);
+  };
+
+  // `with: withCte` (relation/query-methods.ts:1797) — Rails' `def with(*args)`
+  // (query_methods.rb:493). `function with()` is unwritable: `with` is a
+  // reserved word in strict mode, so the property key is the only place the
+  // Rails name can appear.
+  it("credits a renamed property key whose value is a local function declaration", () => {
+    const methods = credited(
+      `function withCte(a: number): void {}
+       export const Mixin = { with: withCte } as const;`,
+    );
+    expect(methods.map((m) => m.name)).toEqual(["with"]);
+    expect(methods[0].aliasOf).toBe("withCte");
+    expect(methods[0].params.map((p) => p.name)).toEqual(["a"]);
+  });
+
+  // `excluding,` / `without,` (query_methods.rb:1574, `alias without excluding`)
+  // — one shared Ruby body ported once as a factory and bound to both names.
+  it("credits shorthand keys bound from a factory call", () => {
+    const methods = credited(
+      `function excludingWithCallee(callee: string) {
+         return function (records: unknown[]): void {};
+       }
+       const excluding = excludingWithCallee("excluding");
+       const without = excludingWithCallee("without");
+       export const Mixin = { excluding, without } as const;`,
+    );
+    expect(methods.map((m) => m.name)).toEqual(["excluding", "without"]);
+  });
+
+  it("credits nothing for a non-function const", () => {
+    const methods = credited(
+      `const notAFunction = 42;
+       export const Mixin = { notAFunction } as const;`,
+    );
+    expect(methods).toEqual([]);
+  });
+
+  it("credits nothing for an imported binding", () => {
+    const methods = credited(
+      `import { elsewhere } from "./elsewhere.js";
+       export const Mixin = { here: elsewhere } as const;`,
+    );
+    expect(methods).toEqual([]);
+  });
+
+  it("credits nothing for a non-identifier value or an unexported literal", () => {
+    expect(credited(`export const Mixin = { inline() {} } as const;`)).toEqual([]);
+    expect(
+      credited(`function body(): void {}
+                const Mixin = { alias: body } as const;`),
+    ).toEqual([]);
+  });
+
+  it("credits nothing off a SCREAMING_SNAKE constant table", () => {
+    const methods = credited(
+      `function raise(): void {}
+       export const DEFAULT_BEHAVIORS = { raise } as const;`,
+    );
+    expect(methods).toEqual([]);
   });
 });

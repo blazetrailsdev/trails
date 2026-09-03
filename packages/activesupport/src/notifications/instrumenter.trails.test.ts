@@ -1,6 +1,6 @@
-// TS-only surface: Rails has no async instrument, and no test for
-// Instrumenter#instrument's rescue arm (its test_record_with_exception covers
-// Event#record, which trails' Event does not implement).
+// TS-only surface: Rails' Instrumenter#instrument has no test for its rescue
+// arm (test_record_with_exception covers Event#record), and Ruby's one blocking
+// body has no awaited-block arm to cover at all.
 import { describe, expect, it } from "vitest";
 import { Event, Instrumenter } from "./instrumenter.js";
 
@@ -49,26 +49,45 @@ describe("Instrumenter (trails)", () => {
     expect(payload.exception_object).toBeNull();
   });
 
-  it("instrumentAsync yields the payload for further modification", async () => {
+  it("instrument yields the payload for further modification", async () => {
     const notifier = buildNotifier();
     const payload: Record<string, unknown> = {};
-    await new Instrumenter(notifier).instrumentAsync("awesome", payload, async (p) => {
+    await new Instrumenter(notifier).instrument("awesome", payload, async (p) => {
       p.result = 1 + 1;
     });
     expect(payload.result).toBe(2);
     expect(notifier.finishes[0].payload).toEqual({ result: 2 });
   });
 
-  it("instrumentAsync records the exception on the payload and re-raises", async () => {
+  it("instrument records the exception on the payload of an awaited block and re-raises", async () => {
     const notifier = buildNotifier();
     const payload: Record<string, unknown> = {};
     await expect(
-      new Instrumenter(notifier).instrumentAsync("crash", payload, async () => {
+      new Instrumenter(notifier).instrument("crash", payload, async () => {
         throw new RangeError("Oopsies");
       }),
     ).rejects.toThrow("Oopsies");
     expect(payload.exception).toEqual(["RangeError", "Oopsies"]);
     expect(payload.exception_object).toBeInstanceOf(RangeError);
+  });
+
+  // The whole point of the unified body: a thenable block moves the `ensure`
+  // arm onto the settled promise, so the handle must NOT be finished while the
+  // block is still in flight.
+  it("instrument finishes the handle only once an awaited block settles", async () => {
+    const notifier = buildNotifier();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const pending = new Instrumenter(notifier).instrument("slow", {}, async () => {
+      await gate;
+      return 42;
+    });
+    expect(notifier.finishes).toHaveLength(0);
+    release();
+    expect(await pending).toBe(42);
+    expect(notifier.finishes).toHaveLength(1);
   });
 
   // build_handle is the low-level primitive TransactionInstrumenter spans a
