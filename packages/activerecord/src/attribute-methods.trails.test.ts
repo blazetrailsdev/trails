@@ -41,7 +41,7 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(new Legacy({ title: "t" }).heading).toBe("t");
   });
 
-  it("initializeGeneratedModules replaces a module ActiveModel built first", async () => {
+  it("initializeGeneratedModules replaces a module ActiveModel built first", () => {
     class Legacy extends Base {
       declare heading: unknown;
       static {
