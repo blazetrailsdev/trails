@@ -65,6 +65,9 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
   }
 }
 
+/** `vendor/ruby/io.c:160` `IO_RBUF_CAPA_MIN`, the read buffer Ruby fills. */
+const READ_CHUNK = 8192;
+
 /**
  * `IO` (`vendor/ruby/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
@@ -129,6 +132,17 @@ export class IO {
   }
 
   /**
+   * `vendor/ruby/io.c:2858` `rb_io_fileno` — the integer descriptor the
+   * stream was opened on.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#fileno`
+   * (`vendor/ruby/io.c:2858`).
+   */
+  fileno(): number {
+    return this.fd;
+  }
+
+  /**
    * `vendor/ruby/io.c:2495` `rb_io_seek_m` in its one-argument form, where
    * `whence` is `IO::SEEK_SET` — the absolute offset the next read starts at.
    * It answers `0`.
@@ -154,7 +168,11 @@ export class IO {
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
    * (`vendor/ruby/io.c:3774`).
    */
-  read(length: number): string | null {
+  read(): string;
+  read(length: number): string | null;
+  read(length?: number): string | null {
+    if (length === undefined) return this.readAll();
+
     const buffer = new Uint8Array(length);
     let n = 0;
     while (n < length) {
@@ -167,6 +185,43 @@ export class IO {
     let part = "";
     for (let i = 0; i < n; i++) part += String.fromCharCode(buffer[i]);
     return part;
+  }
+
+  /**
+   * `vendor/ruby/io.c:3317` `read_all`, which `io_read` (`io.c:3774`) takes
+   * when `length` is `nil`: the rest of the stream, and `""` rather than `nil`
+   * at EOF. Ruby sizes the read from `remain_size(fptr)`, an `fstat` the
+   * `FsAdapter` contract has no member for, so the bytes come in chunks.
+   */
+  private readAll(): string {
+    const buffer = new Uint8Array(READ_CHUNK);
+    let part = "";
+    for (;;) {
+      const read = getFs().readSync(this.fd, buffer, 0, buffer.length, this.pos);
+      if (read === 0) return part;
+      this.pos += read;
+      for (let i = 0; i < read; i++) part += String.fromCharCode(buffer[i]);
+    }
+  }
+
+  /**
+   * `vendor/ruby/io.c:2263` `io_write_m` in its one-argument form, which
+   * answers the number of bytes written. `string` is a binary String — one
+   * character per byte, the encoding {@link IO#read} answers in — so its
+   * characters go to the stream as bytes.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
+   * (`vendor/ruby/io.c:2263`).
+   */
+  write(string: string): number {
+    const buffer = new Uint8Array(string.length);
+    for (let i = 0; i < string.length; i++) buffer[i] = string.charCodeAt(i) & 0xff;
+    let n = 0;
+    while (n < buffer.length) {
+      n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this.pos + n);
+    }
+    this.pos += n;
+    return n;
   }
 
   /**

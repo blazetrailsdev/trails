@@ -7,7 +7,7 @@
  */
 
 import { env as processEnv } from "@blazetrails/ruby-compat";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 
 export interface SpawnSyncOptions {
   input?: string | Uint8Array;
@@ -77,8 +77,8 @@ type NodeChildProcess = {
 function wrap(cp: NodeChildProcess): ChildProcessAdapter {
   return {
     spawnSync(cmd, args, options) {
-      const outFd = options?.out != null ? getFs().openSync(options.out, "w") : null;
-      const inFd = options?.in != null ? getFs().openSync(options.in, "r") : null;
+      const outFile = options?.out != null ? File.open(options.out, "w") : null;
+      const inFile = options?.in != null ? File.open(options.in, "r") : null;
       let result: NodeSpawnSyncResult;
       try {
         result = cp.spawnSync(cmd, args, {
@@ -89,13 +89,13 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
           env: options?.env ?? ({ ...processEnv } as NodeJS.ProcessEnv),
           encoding: options?.encoding ?? "utf8",
           cwd: options?.cwd,
-          ...(outFd !== null || inFd !== null
-            ? { stdio: [inFd ?? "pipe", outFd ?? "pipe", "pipe"] }
+          ...(outFile !== null || inFile !== null
+            ? { stdio: [inFile?.fileno() ?? "pipe", outFile?.fileno() ?? "pipe", "pipe"] }
             : {}),
         });
       } finally {
-        if (outFd !== null) getFs().closeSync(outFd);
-        if (inFd !== null) getFs().closeSync(inFd);
+        outFile?.close();
+        inFile?.close();
       }
       return {
         status: result.status,

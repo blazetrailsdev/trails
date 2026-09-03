@@ -62,6 +62,13 @@ export interface FsAdapter {
     length: number,
     position: number | null,
   ): number;
+  writeSync(
+    fd: number,
+    buffer: Uint8Array,
+    offset: number,
+    length: number,
+    position: number | null,
+  ): number;
   closeSync(fd: number): void;
   copyFileSync(src: string, dest: string): void;
   cwd(): string;

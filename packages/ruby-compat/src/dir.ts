@@ -12,6 +12,10 @@ function braceExpand(pattern: string): string[] {
   let start = open + 1;
   for (let i = open; i < pattern.length; i++) {
     const char = pattern[i];
+    if (char === "\\") {
+      i++;
+      continue;
+    }
     if (char === "{") depth++;
     else if (char === "}") {
       depth--;
@@ -35,7 +39,9 @@ function fnmatch(segment: string, name: string): boolean {
   let source = "";
   for (let i = 0; i < segment.length; i++) {
     const char = segment[i];
-    if (char === "*") source += "[^/]*";
+    if (char === "\\" && i + 1 < segment.length) {
+      source += segment[++i].replace(/[.*+?^${}()|[\]\\]/, "\\$&");
+    } else if (char === "*") source += "[^/]*";
     else if (char === "?") source += "[^/]";
     else if (char === "[") {
       const close = segment.indexOf("]", i + 1);
@@ -60,8 +66,12 @@ function children(dirname: string): string[] {
   }
 }
 
+function unescape(segment: string): string {
+  return segment.replace(/\\(.)/g, "$1");
+}
+
 function segmentMatches(segment: string, name: string): boolean {
-  return MAGIC.test(segment) ? fnmatch(segment, name) : segment === name;
+  return MAGIC.test(segment) ? fnmatch(segment, name) : unescape(segment) === name;
 }
 
 function globHelper(base: string, segments: string[], found: string[], enumerated: boolean): void {
@@ -81,7 +91,7 @@ function globHelper(base: string, segments: string[], found: string[], enumerate
     return;
   }
   if (!MAGIC.test(segment)) {
-    globHelper(join(segment), rest, found, false);
+    globHelper(join(unescape(segment)), rest, found, false);
     return;
   }
   for (const name of children(base)) {
@@ -175,6 +185,11 @@ export class Dir {
    * order. A leading dot is matched only by a literal dot (`dir.c:325`).
    * And entries come out of each directory sorted, which is `sort: true`, the
    * default since Ruby 3.0 (`dir.c:3210`).
+   *
+   * A backslash escapes the character after it (`dir.c:314`), in the brace
+   * expansion (`dir.c:3019`) as well as in a segment, so
+   * `Dir.glob("{a\\,b/*}")` walks the one directory named `a,b` rather than
+   * expanding to two patterns.
    *
    * A broken symlink is answered, because it is a directory entry
    * (`dir.c:3421`) rather than something `File.exist?` is asked about — which

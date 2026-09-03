@@ -31,6 +31,22 @@ export class File extends IO {
   static readonly SEPARATOR = "/";
 
   /**
+   * `vendor/ruby/file.c:7841` — `File::LOCK_EX`, the exclusive-lock operation
+   * `File#flock` takes (`file.c:5198`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::LOCK_EX`.
+   */
+  static readonly LOCK_EX = 2;
+
+  /**
+   * `vendor/ruby/file.c:7843` — `File::LOCK_UN`, the release operation
+   * `File#flock` takes (`file.c:5204`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::LOCK_UN`.
+   */
+  static readonly LOCK_UN = 8;
+
+  /**
    * `vendor/ruby/file.c:1806` `rb_file_exist_p`, which is `rb_stat(fname)`
    * against a FOLLOWED symlink — so a broken symlink is `false` even though
    * `File.symlink?` is `true`.
@@ -132,8 +148,11 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
    * (`vendor/ruby/io.c:8148`).
    */
-  static open<T>(fileName: string, mode: string, block: (file: File) => T): T {
+  static open(fileName: string, mode: string): File;
+  static open<T>(fileName: string, mode: string, block: (file: File) => T): T;
+  static open<T>(fileName: string, mode: string, block?: (file: File) => T): T | File {
     const file = new File(getFs().openSync(fileName, mode.replace(/b/g, "")));
+    if (!block) return file;
     try {
       return block(file);
     } finally {
@@ -201,6 +220,44 @@ export class File extends IO {
   static delete(...files: string[]): number {
     for (const file of files) getFs().unlinkSync(file);
     return files.length;
+  }
+
+  /**
+   * `vendor/ruby/file.c:2575` `rb_file_s_chmod`, which answers the number of
+   * files whose mode was set. A backend with no permission bits has no
+   * `chmodSync`, and there the call is a no-op.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.chmod`
+   * (`vendor/ruby/file.c:2575`).
+   */
+  static chmod(mode: number, ...files: string[]): number {
+    for (const file of files) getFs().chmodSync?.(file, mode);
+    return files.length;
+  }
+
+  /**
+   * `vendor/ruby/file.c:2706` `rb_file_s_chown`, which answers the number of
+   * files whose owner was set. A backend with no ownership has no
+   * `chownSync`, and there the call is a no-op.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.chown`
+   * (`vendor/ruby/file.c:2706`).
+   */
+  static chown(owner: number, group: number, ...files: string[]): number {
+    for (const file of files) getFs().chownSync?.(file, owner, group);
+    return files.length;
+  }
+
+  /**
+   * `vendor/ruby/file.c:3231` `rb_file_s_rename`, which answers `0` and
+   * replaces `to` when it already exists.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.rename`
+   * (`vendor/ruby/file.c:3231`).
+   */
+  static rename(from: string, to: string): number {
+    getFs().renameSync(from, to);
+    return 0;
   }
 
   /**
@@ -312,5 +369,19 @@ export class File extends IO {
    */
   static isAbsolutePath(fileName: string): boolean {
     return getPath().isAbsolute?.(fileName) ?? fileName.startsWith(File.SEPARATOR);
+  }
+
+  /**
+   * `vendor/ruby/file.c:5301` `rb_file_flock`, which answers `0` once the lock
+   * is held. A backend with no advisory locking — node's `fs` exposes no
+   * `flock(2)` — has no `flockSync`, and there the stream is left unlocked,
+   * which is what an unlockable file already behaves like.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File#flock`
+   * (`vendor/ruby/file.c:5301`).
+   */
+  flock(operation: number): number {
+    getFs().flockSync?.(this.fd, operation === File.LOCK_UN ? "un" : "ex");
+    return 0;
   }
 }

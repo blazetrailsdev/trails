@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { Tempfile } from "./tempfile.js";
 
 // Trails-only coverage: `Tempfile` is Ruby stdlib, so it has no Rails test to
 // mirror. The expectations below were confirmed against MRI 3.3.
 describe("Tempfile", () => {
-  const exists = (path: string): boolean => getFs().existsSync(path);
+  const exists = (path: string): boolean => File.isExist(path);
 
   it("create returns a synchronous block's value without a Promise", () => {
     expect(Tempfile.create("foo", undefined, () => 42)).toBe(42);
@@ -57,7 +57,7 @@ describe("Tempfile", () => {
     expect(tempfile.write("a")).toBe(1);
     tempfile.write("b");
     tempfile.close();
-    expect(getFs().readFileSync(tempfile.path!, "utf8")).toBe("ab");
+    expect(File.read(tempfile.path!)).toBe("ab");
     tempfile.unlink();
   });
 
@@ -70,8 +70,8 @@ describe("Tempfile", () => {
     });
     expect(value).toBe(7);
     expect(exists(path)).toBe(true);
-    expect(getFs().readFileSync(path, "utf8")).toBe("hi");
-    getFs().unlinkSync(path);
+    expect(File.read(path)).toBe("hi");
+    File.delete(path);
   });
 
   it("without a block returns the open temp file", () => {
@@ -89,6 +89,16 @@ describe("Tempfile", () => {
     expect(a.path).not.toBe(b.path);
     a.unlink();
     b.unlink();
+  });
+
+  it("read gives back the bytes write was handed", () => {
+    // `Tempfile#write` is Ruby's binary `IO#write` (`vendor/ruby/io.c:2263`),
+    // so a byte that is not valid UTF-8 survives the round trip.
+    const bytes = Buffer.from([0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe]);
+    const tempfile = Tempfile.new("bin");
+    tempfile.write(bytes);
+    expect([...tempfile.read()]).toEqual([...bytes]);
+    tempfile.unlink();
   });
 
   it("create unlinks the file when an async block rejects", async () => {

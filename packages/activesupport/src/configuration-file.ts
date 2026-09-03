@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { parse as yamlParse } from "yaml";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
 
@@ -82,7 +82,7 @@ export class ConfigurationFile {
 
   /** Mirrors the private `read` (configuration_file.rb:44-52). */
   private read(contentPath: string): string {
-    const content = getFs().readFileSync(contentPath, "utf8");
+    const content = File.read(contentPath);
     if (content.includes("\u00A0")) {
       console.warn(
         `${contentPath} contains invisible non-breaking spaces, you may want to remove those`,
