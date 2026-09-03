@@ -9,7 +9,7 @@
  * type-check against a host interface.
  */
 
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 
 import { CookieJar, type CookieJarOptions } from "../middleware/cookies.js";
 import type { FlashHash } from "../middleware/flash.js";

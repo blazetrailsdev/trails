@@ -1,5 +1,5 @@
-import type { FsAdapter } from "@blazetrails/activesupport/fs-adapter";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import type { FsAdapter } from "@blazetrails/ruby-compat";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { getOsAsync } from "@blazetrails/activesupport";
 import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
 import { RUN_TOKEN_ENV, STALE_DB_AGE_MS } from "./run-token.js";

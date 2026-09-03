@@ -1,11 +1,11 @@
 import {
-  getFs,
   getOsAsync,
   getChildProcessAsync,
   isBlank,
   Tempfile,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";

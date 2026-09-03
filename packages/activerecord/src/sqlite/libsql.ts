@@ -1,6 +1,6 @@
 /** @noRailsEquivalent PERMANENT MOVED-BY-SHORT-NAME: databaseExists, open. */
 import Database from "libsql";
-import { getFs } from "@blazetrails/activesupport/fs-adapter";
+import { getFs } from "@blazetrails/ruby-compat";
 import { ConfigurationError } from "../errors.js";
 import {
   type ColumnInfo,

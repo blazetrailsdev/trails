@@ -1,4 +1,4 @@
-import { getPath } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { escapePath } from "./utils.js";

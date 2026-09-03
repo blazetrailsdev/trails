@@ -1,5 +1,5 @@
 import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
-import { getPath } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { AppGenerator } from "../generators/app-generator.js";
 import { generateCommand } from "./generate.js";

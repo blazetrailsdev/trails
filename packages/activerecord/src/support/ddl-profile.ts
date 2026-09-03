@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 
 export type DdlOp =

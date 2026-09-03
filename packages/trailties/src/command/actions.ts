@@ -1,4 +1,4 @@
-import { getPathAsync } from "@blazetrails/activesupport";
+import { getPathAsync } from "@blazetrails/ruby-compat";
 import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { APP_PATH, ENGINE_PATH } from "../app-path.js";
 import { Trails } from "../rails.js";

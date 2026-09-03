@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { createServer, type ViteDevServer } from "vite";
 import type { RackApp } from "@blazetrails/actionpack";
 import { trailsPlugin } from "./vite-plugin.js";

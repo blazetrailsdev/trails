@@ -1,5 +1,5 @@
 import { getCrypto } from "./crypto-adapter.js";
-import { getFs, getPath } from "./fs-adapter.js";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { getOs } from "./os-adapter.js";
 
 /** The `basename` of `Dir::Tmpname.create`: a String, or a `[prefix, suffix]` pair. */

@@ -1,5 +1,5 @@
 import { join, resolve } from "path";
-import { getFsAsync } from "@blazetrails/activesupport";
+import { getFsAsync } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
 import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environment.js";
 

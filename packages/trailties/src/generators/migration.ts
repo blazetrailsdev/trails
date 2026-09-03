@@ -1,5 +1,6 @@
 import { NotImplementedError } from "@blazetrails/ruby-compat";
-import { camelize, getPath } from "@blazetrails/activesupport";
+import { camelize } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
 import {
   CreateMigration,
   type CreateMigrationConfig,

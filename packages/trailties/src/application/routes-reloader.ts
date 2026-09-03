@@ -2,7 +2,8 @@
 // `railties/lib/rails/application/routes_reloader.rb`. Rails' watcher half
 // (FileUpdateChecker + Ruby `load`) ships with autoloading later; this is
 // the protocol the framework calls.
-import { getPathAsync, runLoadHooks } from "@blazetrails/activesupport";
+import { runLoadHooks } from "@blazetrails/activesupport";
+import { getPathAsync } from "@blazetrails/ruby-compat";
 import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {

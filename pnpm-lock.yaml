@@ -254,6 +254,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc

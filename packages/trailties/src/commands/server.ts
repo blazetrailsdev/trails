@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { Command } from "commander";
 import { Handler } from "@blazetrails/rack";

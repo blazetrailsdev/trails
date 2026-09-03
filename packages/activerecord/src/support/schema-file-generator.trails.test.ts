@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getPathAsync, getFsAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getPathAsync, getFsAsync } from "@blazetrails/ruby-compat";
 import { getOsAsync, getEnv } from "@blazetrails/activesupport";
 import { generateSchemaFile } from "./schema-file-generator.js";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";

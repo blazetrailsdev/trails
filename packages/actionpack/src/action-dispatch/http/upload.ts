@@ -4,8 +4,8 @@
  * Represents a file uploaded via multipart form data.
  */
 
-import { getPath } from "@blazetrails/activesupport";
-import { getFs } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat";
 
 export interface UploadedFileOptions {
   filename?: string;

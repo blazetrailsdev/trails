@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { getOsAsync } from "@blazetrails/activesupport";
 import { setEnv, setExitCode } from "@blazetrails/activesupport/process-adapter";
 import {

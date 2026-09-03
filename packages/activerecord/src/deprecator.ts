@@ -1,5 +1,6 @@
 import { createRequire } from "node:module";
-import { Deprecation, getPath } from "@blazetrails/activesupport";
+import { Deprecation } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
 import type { Migration } from "./migration.js";
 
 export { Deprecation as Deprecator };

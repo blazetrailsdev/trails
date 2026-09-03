@@ -2,7 +2,7 @@
 // `railties/lib/rails/application/configuration.rb`. PR 2.5b: scalar/state
 // defaults only — credentials + `databaseConfiguration` are 2.5c or later.
 import { Session } from "@blazetrails/actionpack";
-import { getPath } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { Trails } from "../rails.js";

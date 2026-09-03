@@ -2,14 +2,13 @@
 // `railties/test/engine_test.rb` cases land in PR 2.2b alongside the
 // `Configuration` defaults and route mounting.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import {
   fsAdapterConfig,
   registerFsAdapter,
-  resetLoadHooks,
-  runLoadHooks,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/ruby-compat";
 import { Trailtie as BaseTrailtie } from "@blazetrails/activesupport";
 import { env, setEnv } from "@blazetrails/activesupport/process-adapter";
 import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";

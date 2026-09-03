@@ -7,7 +7,7 @@
  */
 
 import { env as processEnv } from "./process-adapter.js";
-import { getFs } from "./fs-adapter.js";
+import { getFs } from "@blazetrails/ruby-compat";
 
 export interface SpawnSyncOptions {
   input?: string | Uint8Array;

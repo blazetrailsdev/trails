@@ -1,4 +1,4 @@
-import { getPathAsync } from "@blazetrails/activesupport";
+import { getPathAsync } from "@blazetrails/ruby-compat";
 import { init, detectPackageManager } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
 import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";

@@ -6,13 +6,12 @@ import {
   dasherize,
   EncryptedFile,
   getEnv,
-  getFsAsync,
-  getPathAsync,
   Trailtie as BaseTrailtie,
   runLoadHooks,
   setTrailsRoot,
   underscore,
 } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { Executor, Reloader } from "@blazetrails/activesupport";
 import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";

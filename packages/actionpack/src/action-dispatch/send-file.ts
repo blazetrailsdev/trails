@@ -4,8 +4,8 @@
  * Helpers for sending files and raw data as downloads.
  */
 
-import { getPath } from "@blazetrails/activesupport";
-import { getFs } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat";
 
 export interface SendFileOptions {
   /** Content type (auto-detected from filename if not provided) */

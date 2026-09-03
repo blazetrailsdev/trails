@@ -4,7 +4,8 @@
 //
 // Modeled as a class with statics (cf. `rails.ts`) so the api-compare
 // extractor harvests the members; `Generators` is never instantiated.
-import { getFsAsync, getPathAsync, underscore } from "@blazetrails/activesupport";
+import { underscore } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./generators/base.js";
 
 /**

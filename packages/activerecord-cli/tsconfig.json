@@ -10,6 +10,7 @@
   "references": [
     { "path": "../activerecord" },
     { "path": "../activesupport" },
+    { "path": "../ruby-compat" },
     { "path": "../trails-tsc" }
   ]
 }

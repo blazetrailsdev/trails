@@ -1,5 +1,5 @@
-import { getFs, getPath } from "@blazetrails/activesupport";
-import type { FsStatResult } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
+import type { FsStatResult } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { mimeType as lookupMime } from "./mime.js";
 import { Request } from "./request.js";

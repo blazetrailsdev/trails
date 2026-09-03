@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 
 export interface UploadedFileTempfile {
   path?: string;

@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { getFs, getPath } from "./fs-adapter.js";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 
 /**
  * = File Update Checker

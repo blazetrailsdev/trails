@@ -1,5 +1,5 @@
 import { getEnv } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";

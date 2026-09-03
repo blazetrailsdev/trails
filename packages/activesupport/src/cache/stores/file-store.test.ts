@@ -14,7 +14,7 @@ import { basename, dirname, join } from "node:path";
 import { FileStore, FILENAME_MAX_SIZE } from "../file-store.js";
 import { assert, assertEmpty, assertNot, assertPredicate } from "../../testing/assertions.js";
 import { Store } from "../store.js";
-import { getFs } from "../../fs-adapter.js";
+import { getFs } from "@blazetrails/ruby-compat";
 import { isPresent } from "../../core-ext/object/blank.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";

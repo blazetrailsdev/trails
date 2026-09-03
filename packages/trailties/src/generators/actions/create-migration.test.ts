@@ -4,7 +4,7 @@ import {
   registerFsAdapter,
   type FsAdapter,
   type PathAdapter,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/ruby-compat";
 import { CreateMigration, type MigrationRenderer } from "./create-migration.js";
 
 const path: PathAdapter = {

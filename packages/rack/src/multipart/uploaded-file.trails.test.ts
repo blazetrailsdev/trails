@@ -1,7 +1,7 @@
 import * as path from "path";
 import { describe, expect, it } from "vitest";
 
-import { getFs } from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/ruby-compat";
 
 import { MockRequest } from "../mock-request.js";
 import { Generator, MULTIPART_BOUNDARY } from "./generator.js";

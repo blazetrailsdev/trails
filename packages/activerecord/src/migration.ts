@@ -1,6 +1,4 @@
 import {
-  getFs,
-  getPath,
   getEnv,
   camelize,
   groupBy,
@@ -12,6 +10,7 @@ import {
   FileUpdateChecker,
   Monitor,
 } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rubyInspect } from "./relation/ruby-inspect.js";
 import { Temporal } from "@blazetrails/date";

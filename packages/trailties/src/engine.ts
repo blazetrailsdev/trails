@@ -14,7 +14,8 @@
 //     `fixtures_in_root_and_not_in_vendor_or_dot_dir?` are not ported.
 //   - `:wrap_reloader_around_load_seed` (`:650`) — `Engine#load_seed` and its
 //     `:load_seed` callback chain are not ported.
-import { Notifications, getFsAsync, getPathAsync, onLoad } from "@blazetrails/activesupport";
+import { Notifications, onLoad } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";

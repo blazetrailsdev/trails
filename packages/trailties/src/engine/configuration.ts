@@ -9,7 +9,7 @@
  *   root via `setRoot()` once known.
  */
 import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
 import { resolveEnv } from "../database.js";

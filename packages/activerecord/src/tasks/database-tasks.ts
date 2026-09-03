@@ -9,8 +9,6 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import {
-  getFs,
-  getPath,
   getCryptoAsync,
   getOs,
   getEnv,
@@ -20,6 +18,7 @@ import {
   abort,
   trailsRoot,
 } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
 import type { Base } from "../base.js";

@@ -5,14 +5,8 @@
  * flash, CSRF, content negotiation, caching, rescue, and more.
  */
 
-import {
-  ArgumentError,
-  getFs,
-  getPath,
-  getCrypto,
-  Notifications,
-  runLoadHooks,
-} from "@blazetrails/activesupport";
+import { ArgumentError, getCrypto, Notifications, runLoadHooks } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";

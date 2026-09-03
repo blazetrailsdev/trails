@@ -69,7 +69,7 @@ export abstract class AppBase extends GeneratorBase {
     // PathAdapter.isAbsolute is optional; adapters that omit it (e.g.
     // in-memory VFS) don't model absolute paths and the contract says
     // callers should treat the path as absolute — see PathAdapter docs
-    // in activesupport/src/fs-adapter.ts.
+    // in ruby-compat/src/fs-adapter.ts.
     const isAbs = this.path.isAbsolute ? this.path.isAbsolute(options.appPath) : true;
     this.destinationRoot = isAbs ? options.appPath : this.path.join(options.cwd, options.appPath);
     this.cwd = this.destinationRoot;

@@ -2,7 +2,7 @@
  * Port of railties/lib/rails/code_statistics.rb.
  */
 
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
 export type DirectoryPair = readonly [label: string, path: string];

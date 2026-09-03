@@ -24,7 +24,7 @@
  * no round-trip merge. Re-running regenerates.
  */
 
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 
 import { generateModels } from "@blazetrails/activerecord";
 

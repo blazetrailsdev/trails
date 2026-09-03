@@ -5,8 +5,8 @@ const tester = new RuleTester({ languageOptions: { ecmaVersion: 2022, sourceType
 
 tester.run("no-node-builtins", rule, {
   valid: [
-    'import { getFs } from "@blazetrails/activesupport";',
-    'import { getPath } from "@blazetrails/activesupport";',
+    'import { getFs } from "@blazetrails/ruby-compat";',
+    'import { getPath } from "@blazetrails/ruby-compat";',
     'import { getCrypto } from "@blazetrails/activesupport";',
     'import { foo } from "./local.js";',
     'import lodash from "lodash";',
@@ -17,47 +17,47 @@ tester.run("no-node-builtins", rule, {
       code: 'import * as fs from "fs";\nfs.readFileSync("x", "utf-8");',
       errors: [{ messageId: "useAdapter" }],
       output:
-        'import { getFs } from "@blazetrails/activesupport";\ngetFs().readFileSync("x", "utf-8");',
+        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");',
     },
     // node: prefix
     {
       code: 'import * as fs from "node:fs";\nfs.existsSync("x");',
       errors: [{ messageId: "useAdapter" }],
-      output: 'import { getFs } from "@blazetrails/activesupport";\ngetFs().existsSync("x");',
+      output: 'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().existsSync("x");',
     },
     // Default import
     {
       code: 'import fs from "fs";\nfs.readFileSync("x", "utf-8");',
       errors: [{ messageId: "useAdapter" }],
       output:
-        'import { getFs } from "@blazetrails/activesupport";\ngetFs().readFileSync("x", "utf-8");',
+        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");',
     },
     // Named imports
     {
       code: 'import { readFileSync } from "fs";\nreadFileSync("x", "utf-8");',
       errors: [{ messageId: "useAdapter" }],
       output:
-        'import { getFs } from "@blazetrails/activesupport";\ngetFs().readFileSync("x", "utf-8");',
+        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");',
     },
     // Named imports — multiple
     {
       code: 'import { readFileSync, existsSync } from "fs";\nreadFileSync("x", "utf-8");\nexistsSync("y");',
       errors: [{ messageId: "useAdapter" }],
       output:
-        'import { getFs } from "@blazetrails/activesupport";\ngetFs().readFileSync("x", "utf-8");\ngetFs().existsSync("y");',
+        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");\ngetFs().existsSync("y");',
     },
     // Aliased named import — uses original (imported) name, not alias
     {
       code: 'import { readFileSync as rfs } from "fs";\nrfs("x", "utf-8");',
       errors: [{ messageId: "useAdapter" }],
       output:
-        'import { getFs } from "@blazetrails/activesupport";\ngetFs().readFileSync("x", "utf-8");',
+        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");',
     },
     // path
     {
       code: 'import * as path from "path";\npath.join("a", "b");',
       errors: [{ messageId: "useAdapter" }],
-      output: 'import { getPath } from "@blazetrails/activesupport";\ngetPath().join("a", "b");',
+      output: 'import { getPath } from "@blazetrails/ruby-compat";\ngetPath().join("a", "b");',
     },
     // crypto
     {
@@ -102,7 +102,7 @@ tester.run("no-node-builtins", rule, {
       code: 'const fs = require("fs");',
       errors: [{ messageId: "useAdapter" }],
     },
-    // Inside ruby-compat the activesupport adapter is itself a leaf violation.
+    // Inside ruby-compat the activesupport crypto adapter is itself a leaf violation.
     {
       filename: "/repo/packages/ruby-compat/src/hash.ts",
       code: 'import * as fs from "fs";\nfs.readFileSync("x", "utf-8");',

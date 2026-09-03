@@ -16,7 +16,7 @@
  */
 import { getChildProcessAsync } from "./child-process-adapter.js";
 import { getCryptoAsync } from "./crypto-adapter.js";
-import { getFsAsync, getPathAsync } from "./fs-adapter.js";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { getHttpAsync } from "./http-adapter.js";
 import { getOsAsync } from "./os-adapter.js";
 

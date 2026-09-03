@@ -10,6 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  */
 export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/activesupport", "../activesupport/src/index.ts"],
+  ["@blazetrails/ruby-compat", "../ruby-compat/src/index.ts"],
   ["@blazetrails/arel", "../arel/src/index.ts"],
   ["@blazetrails/activemodel", "../activemodel/src/index.ts"],
   ["@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"],

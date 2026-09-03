@@ -8,9 +8,9 @@ export {
   getFsAsync,
   getPathAsync,
   fsAdapterConfig,
-} from "./fs-adapter.js";
+} from "@blazetrails/ruby-compat";
 export { FileUpdateChecker } from "./file-update-checker.js";
-export type { FsAdapter, FsStatResult, FsDirent, PathAdapter } from "./fs-adapter.js";
+export type { FsAdapter, FsStatResult, FsDirent, PathAdapter } from "@blazetrails/ruby-compat";
 
 export { trailsRoot, setTrailsRoot } from "./trails-root.js";
 // Note: glob is intentionally kept as a subpath import
@@ -93,7 +93,7 @@ export {
 } from "./process-adapter.js";
 export type { ProcessAdapter, WriteStream, ReadStream, SignalName } from "./process-adapter.js";
 
-import { fsAdapterConfig } from "./fs-adapter.js";
+import { fsAdapterConfig } from "@blazetrails/ruby-compat";
 import { cryptoAdapterConfig } from "./crypto-adapter.js";
 import { asyncContextAdapterConfig } from "./async-context-adapter.js";
 import { childProcessAdapterConfig } from "./child-process-adapter.js";

@@ -6,7 +6,7 @@ import {
   MissingContentError,
   MissingKeyError,
 } from "@blazetrails/activesupport/encrypted-file";
-import { getFsAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getFsAsync } from "@blazetrails/ruby-compat";
 import { getChildProcessAsync } from "@blazetrails/activesupport/child-process-adapter";
 import { env, stdout, setExitCode } from "@blazetrails/activesupport/process-adapter";
 

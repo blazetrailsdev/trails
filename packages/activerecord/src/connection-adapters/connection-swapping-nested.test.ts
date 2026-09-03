@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { getOsAsync } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";

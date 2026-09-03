@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  EnvironmentInquirer,
-  getFsAsync,
-  NullLogger,
-  setEnv,
-  trailsRoot,
-} from "@blazetrails/activesupport";
+import { EnvironmentInquirer, NullLogger, setEnv, trailsRoot } from "@blazetrails/activesupport";
+import { getFsAsync } from "@blazetrails/ruby-compat";
 import { Trails, _resetTrailsEnv } from "./rails.js";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";

@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/ruby-compat";
 import { ArgumentError, escapePath } from "../utils.js";
 import { UploadedFile } from "./uploaded-file.js";
 

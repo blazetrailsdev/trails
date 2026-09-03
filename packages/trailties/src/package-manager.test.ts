@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
-  registerFsAdapter,
-  fsAdapterConfig,
   registerChildProcessAdapter,
   childProcessAdapterConfig,
-  type FsAdapter,
-  type PathAdapter,
   type ChildProcessAdapter,
 } from "@blazetrails/activesupport";
+import {
+  registerFsAdapter,
+  fsAdapterConfig,
+  type FsAdapter,
+  type PathAdapter,
+} from "@blazetrails/ruby-compat";
 import {
   registerPackageManagerAdapter,
   packageManagerAdapterConfig,

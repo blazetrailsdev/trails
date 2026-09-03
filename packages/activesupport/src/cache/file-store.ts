@@ -1,4 +1,4 @@
-import { getFs, getPath } from "../fs-adapter.js";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store.js";

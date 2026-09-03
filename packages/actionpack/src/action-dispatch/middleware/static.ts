@@ -5,7 +5,7 @@
 
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Files, Mime, Request, Utils } from "@blazetrails/rack";
-import { getFs, getPath } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 

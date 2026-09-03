@@ -1,4 +1,4 @@
-import { getFs, getPath, type FsStatResult } from "../../fs-adapter.js";
+import { getFs, getPath, type FsStatResult } from "@blazetrails/ruby-compat";
 import { Tempfile } from "../../tempfile.js";
 
 /**

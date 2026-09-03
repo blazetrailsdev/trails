@@ -1,5 +1,5 @@
 import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
-import { getPathAsync } from "@blazetrails/activesupport";
+import { getPathAsync } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { CodeStatistics } from "../code-statistics.js";
 

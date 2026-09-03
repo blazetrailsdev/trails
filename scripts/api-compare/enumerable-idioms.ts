@@ -70,7 +70,7 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
 
 /**
  * Ruby `File` class methods whose faithful port goes through trails' fs adapter
- * (`activesupport/src/fs-adapter.ts`), whose members carry NODE's spellings —
+ * (`ruby-compat/src/fs-adapter.ts`), whose members carry NODE's spellings —
  * `File.exist?` is `getFs().existsSync`, `File.stat` is `statSync`, and so on.
  * Ruby's name is not available: the adapter is the Node `fs` surface, so the
  * port cannot spell the call `exist` without inventing a wrapper Rails does not

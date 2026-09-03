@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/activesupport";
+import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 
 export interface AnnotationOptions {
   tag?: boolean;

@@ -5,7 +5,7 @@ import {
   type FsAdapter,
   type FsDirent,
   type PathAdapter,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/ruby-compat";
 import {
   Annotation,
   SourceAnnotationExtractor,

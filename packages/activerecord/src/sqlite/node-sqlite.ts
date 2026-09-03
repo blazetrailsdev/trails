@@ -1,5 +1,5 @@
 import { createRequire } from "node:module";
-import { getFs } from "@blazetrails/activesupport/fs-adapter";
+import { getFs } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,

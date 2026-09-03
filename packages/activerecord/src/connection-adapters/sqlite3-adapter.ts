@@ -60,7 +60,8 @@ import { Temporal } from "@blazetrails/date";
 import type { DateTimeCastResult } from "@blazetrails/activemodel";
 import { defaultSqlTimezone } from "./abstract/sql-datetime.js";
 import { IntegerType, FloatType } from "@blazetrails/activemodel";
-import { getFs, getPath, isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
+import { isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,

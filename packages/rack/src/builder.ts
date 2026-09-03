@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/activesupport";
+import { getFs } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
 type RackApp = (env: Record<string, any>) => any;

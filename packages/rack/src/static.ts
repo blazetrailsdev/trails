@@ -1,5 +1,5 @@
 import { hasKey } from "@blazetrails/ruby-compat";
-import { getPath } from "@blazetrails/activesupport";
+import { getPath } from "@blazetrails/ruby-compat";
 import { cwd } from "@blazetrails/activesupport/process-adapter";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
