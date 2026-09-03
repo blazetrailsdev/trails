@@ -1495,6 +1495,18 @@ export function misplacedClusterVerdict(
     : { kind: "match", tsName };
 }
 
+/**
+ * Is the only declaration of `name` in `tsFile` a bodyless one?
+ *
+ * `rubyNotes` and `aliasNamesByFile` are the alias arm: Ruby's
+ * `alias :build_having_clause :build_where_clause`
+ * (`relation/query_methods.rb:1654`) synthesizes an entry with no body of its
+ * own, and TS spells it as a second binding to the same function
+ * (`buildHavingClause: buildWhereClause`). The bodyless marker exists to stop a
+ * real declaration from silently retiring its method's call-parity rows; an
+ * alias entry has no calls to retire, so the faithful alias IS the port. See
+ * `MethodInfo.aliasOf`.
+ */
 export function declarationOnlyInFile(
   tsFile: string,
   name: string,
@@ -1504,12 +1516,6 @@ export function declarationOnlyInFile(
   aliasNamesByFile?: ReadonlyMap<string, ReadonlySet<string>>,
 ): boolean {
   if (bodylessOwnersByFile.get(tsFile)?.has(name) !== true) return false;
-  // Ruby's `alias :build_having_clause :build_where_clause`
-  // (`relation/query_methods.rb:1654`) synthesizes an entry with no body of its
-  // own, and TS spells it as a second binding to the same function
-  // (`buildHavingClause: buildWhereClause`). The bodyless marker is what stops
-  // a real declaration from silently retiring its method's call-parity rows;
-  // an alias entry has no calls to retire, so the faithful alias IS the port.
   if (rubyNotes === "alias" && aliasNamesByFile?.get(tsFile)?.has(name) === true) return false;
   return bodiedOwnersByFile.get(tsFile)?.has(name) !== true;
 }
@@ -3247,9 +3253,6 @@ export function main() {
     // and `ownersWithBodies`.
     const tsBodylessOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsBodiedOwnersByFileName = new Map<string, Map<string, Set<string>>>();
-    // (file → names) whose only declaration is a bare reference to another
-    // function the file declares — the TS spelling of a Ruby `alias`. See
-    // `MethodInfo.aliasOf` and `declarationOnlyInFile`.
     const tsAliasNamesByFileName = new Map<string, Set<string>>();
     // Same call-sets unioned by NAME across this package and its deps (the same
     // scope tsParamsByName uses). Consulted ONLY by the delegation-transparency

@@ -1037,9 +1037,6 @@ export function extractFromProgram(
       for (const name of attr.names) {
         const seats: boolean[] = [true];
         if (attr.instanceReader || attr.instanceWriter) seats.push(false);
-        // Ruby's macro defines `foo`, `foo=` AND `foo?`; conventions.ts spells
-        // the predicate `isFoo`, and class-attribute.ts installs it on the
-        // class, plus on the prototype when there is an instance reader.
         const predicate = attr.instancePredicate
           ? `is${name.charAt(0).toUpperCase()}${name.slice(1)}`
           : undefined;
@@ -2945,7 +2942,9 @@ export function isConstantCaseName(name: string): boolean {
  *
  * `instanceReader` / `instanceWriter` each fall back to `instanceAccessor`,
  * which defaults to true, exactly as Ruby's do
- * (core_ext/class/attribute.rb:80-84).
+ * (core_ext/class/attribute.rb:80-84). `instancePredicate` drives the `foo?`
+ * seat, which conventions.ts spells `isFoo` and class-attribute.ts installs on
+ * the class, plus on the prototype when there is an instance reader.
  */
 interface ClassAttributeCall {
   enclosing?: string;
@@ -3091,8 +3090,6 @@ export function harvestObjectLiteralMethods(
     let writer = false;
     // `{ qux }` / `{ foo: NS.bar }` — see MethodInfo.bodyless.
     let bodyless = false;
-    // `{ foo: bar }` where `bar` is another function THIS file declares — see
-    // MethodInfo.aliasOf.
     let aliasOf: string | undefined;
     let internal = internalJsDocTagApplies(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
