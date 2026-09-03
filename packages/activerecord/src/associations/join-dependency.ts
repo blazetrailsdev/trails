@@ -57,11 +57,11 @@ function getModelColumns(modelClass: any): string[] {
 }
 
 export class Aliases {
-  private _tables: Table[];
+  private _tables: Aliases.Table[];
   private _aliasCache: Map<JoinPart | null, Map<string, string>>;
-  private _columnsCache: Map<JoinPart | null, Column[]>;
+  private _columnsCache: Map<JoinPart | null, Aliases.Column[]>;
 
-  constructor(tables: Table[]) {
+  constructor(tables: Aliases.Table[]) {
     this._tables = tables;
     this._aliasCache = new Map();
     for (const table of tables) {
@@ -77,7 +77,7 @@ export class Aliases {
     return this._tables.flatMap((table) => table.columnAliases());
   }
 
-  columnAliases(node: JoinPart | null): Column[] | undefined {
+  columnAliases(node: JoinPart | null): Aliases.Column[] | undefined {
     return this._columnsCache.get(node);
   }
 
@@ -86,28 +86,31 @@ export class Aliases {
   }
 }
 
-export class Table {
-  node: JoinPart | null;
-  columns: Column[];
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace Aliases {
+  export class Table {
+    node: JoinPart | null;
+    columns: Column[];
 
-  constructor(node: JoinPart | null, columns: Column[]) {
-    this.node = node;
-    this.columns = columns;
+    constructor(node: JoinPart | null, columns: Column[]) {
+      this.node = node;
+      this.columns = columns;
+    }
+
+    columnAliases(): Nodes.As[] {
+      const t = this.node!.arelTable as ArelTable | Nodes.TableAlias;
+      return this.columns.map((column) => t.get(column.name).as(column.alias));
+    }
   }
 
-  columnAliases(): Nodes.As[] {
-    const t = this.node!.arelTable as ArelTable | Nodes.TableAlias;
-    return this.columns.map((column) => t.get(column.name).as(column.alias));
-  }
-}
+  export class Column {
+    name: string;
+    alias: string;
 
-export class Column {
-  name: string;
-  alias: string;
-
-  constructor(name: string, alias: string) {
-    this.name = name;
-    this.alias = alias;
+    constructor(name: string, alias: string) {
+      this.name = name;
+      this.alias = alias;
+    }
   }
 }
 
@@ -681,8 +684,10 @@ export class JoinDependency {
           columnNames = isJoinRoot ? getModelColumns(this._baseModel) : joinPart.columns;
         }
         const i = isJoinRoot ? 0 : joinPart.tableIndex;
-        const columns = columnNames.map((columnName, j) => new Column(columnName, `t${i}_r${j}`));
-        return new Table(joinPart, columns);
+        const columns = columnNames.map(
+          (columnName, j) => new Aliases.Column(columnName, `t${i}_r${j}`),
+        );
+        return new Aliases.Table(joinPart, columns);
       }),
     ));
   }

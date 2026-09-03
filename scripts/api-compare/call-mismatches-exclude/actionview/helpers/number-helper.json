@@ -2,20 +2,6 @@
   {
     "package": "actionview",
     "tsFile": "helpers/number-helper.ts",
-    "rubyName": "escape_units",
-    "call": "html_escape",
-    "reason": "Baseline (story converge-number-helper-escape-unsafe-options): the port routes every escape through the module-local `escape()` helper instead of calling htmlEscape per Rails line; surfaced when base.ts's `include TSE::Util` loop became credited surface."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/number-helper.ts",
-    "rubyName": "escape_unsafe_options",
-    "call": "html_escape",
-    "reason": "Baseline (story converge-number-helper-escape-unsafe-options): the port routes every escape through the module-local `escape()` helper instead of calling htmlEscape per Rails line; surfaced when base.ts's `include TSE::Util` loop became credited surface."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "helpers/number-helper.ts",
     "rubyName": "number_to_currency",
     "call": "delegate_number_helper_method",
     "kind": "args",
