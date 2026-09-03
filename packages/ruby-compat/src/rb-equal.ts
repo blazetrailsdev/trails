@@ -1,13 +1,4 @@
 /**
- * Ruby's `rb_equal` (`vendor/ruby/object.c:147`), the C primitive behind every
- * `==` send. It has no Ruby-level counterpart file for the port to mirror.
- *
- * @noRailsEquivalent PERMANENT — `rb_equal` is a C primitive
- * (`vendor/ruby/object.c:147`), not a Ruby method, so no Rails file declares
- * the module this file's single export lives in.
- */
-
-/**
  * Ruby's `rb_equal` (`vendor/ruby/object.c:147`) — the C primitive behind every `==` send: identity first,
  * then the receiver's own `==`. Ported callers (`Range#==`'s endpoint
  * comparison, `Duration#==`'s non-Duration arm) all need the same dispatch,

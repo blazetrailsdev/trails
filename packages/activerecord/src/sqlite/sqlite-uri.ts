@@ -1,5 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
-
 /**
  * @internal
  * @noRailsEquivalent PERMANENT

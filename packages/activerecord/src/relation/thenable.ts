@@ -1,3 +1,5 @@
+/** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
+
 const thenlessViews = new WeakMap<object, object>();
 const thenlessViewSet = new WeakSet<object>();
 

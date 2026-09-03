@@ -2,7 +2,6 @@ import type { Base } from "../base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
-  Delegation as ASDelegation,
   renameKey,
   type RenameKeyOptions,
   IndentedXmlStringBuilder,
@@ -55,32 +54,21 @@ export class GeneratedRelationMethods {
    * @missingRailsCall match? — PERMANENT
    * @missingRailsCall scoping — PERMANENT
    */
-  generateMethod(name: string, fn: AnyCallable): void {
-    if (this._methods.has(name)) return;
-    this._methods.set(name, fn);
+  generateMethod(method: string, fn: AnyCallable): void {
+    if (this._methods.has(method)) return;
+    this._methods.set(method, fn);
     for (const { carrier, priority } of this._carriers) {
-      installOnCarrier(carrier, name, fn, priority);
+      installOnCarrier(carrier, method, fn, priority);
     }
   }
 
+  /** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
   includeInto(carrier: object, priority: number): void {
     if (this._carriers.some((entry) => entry.carrier === carrier)) return;
     this._carriers.push({ carrier, priority });
     for (const [name, fn] of this._methods) {
       installOnCarrier(carrier, name, fn, priority);
     }
-  }
-
-  get(name: string): AnyCallable | undefined {
-    return this._methods.get(name);
-  }
-
-  has(name: string): boolean {
-    return this._methods.has(name);
-  }
-
-  entries(): IterableIterator<[string, AnyCallable]> {
-    return this._methods.entries();
   }
 }
 
@@ -89,19 +77,11 @@ export class DelegateCache {
 
   private _cache: Map<typeof Base, Set<string>> = new Map();
 
+  /** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
   initialize(modelClass: typeof Base): void {
     if (!this._cache.has(modelClass)) {
       this._cache.set(modelClass, new Set());
     }
-  }
-
-  hasDelegated(modelClass: typeof Base, method: string): boolean {
-    return this._cache.get(modelClass)?.has(method) ?? false;
-  }
-
-  register(modelClass: typeof Base, method: string): void {
-    this.initialize(modelClass);
-    this._cache.get(modelClass)!.add(method);
   }
 }
 
@@ -146,6 +126,7 @@ export function uncacheableMethods(): Set<string> {
   return _uncacheableMethodsCache;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function guardBaseMethodDelegation(modelClass: typeof Base, prop: string): void {
   if (DelegateCache.delegateBaseMethods) return;
   let base: unknown = modelClass;
@@ -263,6 +244,7 @@ export function create(
 
 const _associationRelationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function associationRelationClassFor(modelClass: typeof Base): FamilyCtor {
   return perModelCarrier(
     _associationRelationClassByModel,
@@ -273,6 +255,7 @@ export function associationRelationClassFor(modelClass: typeof Base): FamilyCtor
 
 const _disableJoinsAssociationRelationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function disableJoinsAssociationRelationClassFor(modelClass: typeof Base): FamilyCtor {
   return perModelCarrier(
     _disableJoinsAssociationRelationClassByModel,
@@ -283,6 +266,7 @@ export function disableJoinsAssociationRelationClassFor(modelClass: typeof Base)
 
 const _collectionProxyClassByModel = new WeakMap<typeof Base, FamilyCtor>();
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function collectionProxyClassFor(modelClass: typeof Base): FamilyCtor {
   return perModelCarrier(
     _collectionProxyClassByModel,
@@ -299,6 +283,7 @@ export function generateRelationMethod(
   modelClass.generatedRelationMethods().generateMethod(method, fn);
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function classMethodDelegator(prop: string): AnyCallable {
   return function (this: any, ...args: any[]) {
     const modelClass = this._model as typeof Base;
@@ -319,19 +304,6 @@ export function classMethodDelegator(prop: string): AnyCallable {
     (modelClass as any).setCurrentScope(prev);
     return result;
   };
-}
-
-export function generateMethod(method: string): AnyCallable {
-  const holder = { model: null } as any;
-  ASDelegation.generate(holder, [method], { to: "model", allowNil: true });
-  if (typeof holder[method] === "function") return holder[method];
-  return function (this: any, ...args: any[]) {
-    return this.model?.[method]?.(...args);
-  };
-}
-
-export function name(): string {
-  return "Delegation";
 }
 
 /**
@@ -397,6 +369,7 @@ function uniqRecords(records: unknown[]): unknown[] {
   return uniq;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function delegateArrayMethod(
   prop: string,
   records: () => unknown[],
@@ -409,7 +382,7 @@ export function delegateArrayMethod(
   return (...args: any[]) => (arrayMethod as (...a: any[]) => unknown).apply([...records()], args);
 }
 
-export function delegateArrayMethodAsync(
+function delegateArrayMethodAsync(
   prop: string,
   loadRecords: () => Promise<unknown[]>,
 ): ((...args: any[]) => Promise<unknown>) | undefined {
@@ -424,6 +397,7 @@ export function delegateArrayMethodAsync(
   };
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function delegateEnumerableMethod(
   prop: string,
   loadRecords: () => Promise<unknown[]>,
@@ -441,6 +415,7 @@ export function delegateEnumerableMethod(
   return delegateArrayMethodAsync(prop, loadRecords);
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function wrapWithScopeProxy<T extends object>(rel: T): T {
   return new Proxy(rel, {
     get(target: any, prop: string | symbol, receiver: any) {
@@ -583,6 +558,7 @@ export const DELEGATION_RECORD_METHOD_NAMES: ReadonlySet<string> = new Set(
   Object.keys(RECORD_DELEGATES),
 );
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export function delegateRecordMethodSync(
   prop: string,
   records: () => Base[],
@@ -610,6 +586,7 @@ function refuseImplicitCount<F extends (...args: any[]) => unknown>(fn: F): F {
   return fn;
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-delegation-helper-layer */
 export class DelegationMethods {
   async length(this: DelegationHost): Promise<number> {
     return RECORD_DELEGATES.length(await this.records()) as number;

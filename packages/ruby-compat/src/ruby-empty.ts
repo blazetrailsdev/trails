@@ -1,15 +1,4 @@
 /**
- * Ruby's `empty?` (`vendor/ruby/array.c:2686`, `hash.c:3023`,
- * `string.c:2243`), the C primitive behind every `empty?` send. It has no
- * Ruby-level counterpart file for the port to mirror.
- *
- * @noRailsEquivalent PERMANENT `empty?` is Ruby core, not Rails — its three
- * receivers are C primitives (`vendor/ruby/array.c:2686`, `hash.c:3023`,
- * `string.c:2243`), so no Rails file declares the module this file's single
- * export lives in.
- */
-
-/**
  * Ruby's `empty?` — `Array#empty?` (`vendor/ruby/array.c:2686`
  * `rb_ary_empty_p`), `Hash#empty?` (`vendor/ruby/hash.c:3023`
  * `rb_hash_empty_p`) and `String#empty?` (`vendor/ruby/string.c:2243`

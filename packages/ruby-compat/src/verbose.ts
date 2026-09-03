@@ -1,9 +1,3 @@
-/**
- * @noRailsEquivalent PERMANENT — `$VERBOSE` (`vendor/ruby/ruby.c:2910`) is an
- * interpreter global, not a Ruby method, so no Rails file declares the module
- * this file's exports live in.
- */
-
 let verboseGlobal: unknown = false;
 
 /**

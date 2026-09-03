@@ -3224,7 +3224,10 @@ describe("@noRailsEquivalent — extractor to report", () => {
       `,
       "sqlite-adapter.ts": `export interface SqliteDriver { open(): void }`,
     });
-    expect(report.packages[0].totalAllowlisted).toBe(3);
+    // Two, not three: the synthesized `Libsql` container is exempt by kind
+    // before the tag is consulted (RFC 0130 — a name minted from the file path
+    // is never scored), so only the two real functions ride the file tag.
+    expect(report.packages[0].totalAllowlisted).toBe(2);
     expect(report.packages[0].extraFiles.map((f) => f.tsFile)).not.toContain("sqlite/libsql.ts");
     expect(report.fileTagRejections).toEqual([]);
   });

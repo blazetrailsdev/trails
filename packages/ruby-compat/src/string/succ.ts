@@ -1,14 +1,3 @@
-/**
- * `String#succ` — a Ruby *core* method, not a Rails extension, so it has no
- * `core_ext/string/*.rb` counterpart. It lives beside `range.ts`, which
- * consumes it (`Range#include?` enumerates a string range by repeatedly
- * applying it).
- *
- * @noRailsEquivalent PERMANENT — Ruby core `String#succ`
- * (`vendor/ruby/string.c:4868` `rb_str_succ`), which Rails inherits rather
- * than defines.
- */
-
 const isAsciiAlnum = (c: number): boolean =>
   (c >= 48 && c <= 57) || (c >= 65 && c <= 90) || (c >= 97 && c <= 122);
 

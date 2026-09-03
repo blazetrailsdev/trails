@@ -1,3 +1,4 @@
+/** @noRailsEquivalent CONVERGEABLE move-ruby-inspect-and-compact-uniq-to-ruby-compat */
 import { Nodes } from "@blazetrails/arel";
 
 export function rubyInspect(value: unknown): string {

@@ -942,6 +942,8 @@ class ApiExtractor
       process_mattr(args, reader: false, writer: true, predicate: false, class_attr: false)
     when "scope"
       process_scope(args)
+    when "define_model_callbacks"
+      process_define_model_callbacks(args)
     when "delegate"
       process_delegate(args)
     when "def_delegators", "def_delegator"
@@ -1000,6 +1002,8 @@ class ApiExtractor
         process_extend_from_arg_paren(node[2])
       when "scope"
         process_scope_from_arg_paren(node[2])
+      when "define_model_callbacks"
+        process_define_model_callbacks(node[2])
       when "class_attribute"
         process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
       when "cattr_accessor", "mattr_accessor"
@@ -1552,6 +1556,82 @@ class ApiExtractor
           return v[1][1] == "true"
         end
         return nil
+      end
+    end
+    nil
+  end
+
+  # `define_model_callbacks :save, :create` (activemodel/lib/active_model/callbacks.rb:109-126)
+  # metaprograms one singleton method per (type, callback) pair —
+  # `before_save`, `around_save`, `after_save`, … — via
+  # `_define_<type>_model_callback`'s `klass.define_singleton_method`
+  # (callbacks.rb:129-152). There is no `def before_save` anywhere in the `.rb`
+  # for the `def` walker to find, so the faithful TS port of every one of them
+  # reads as invented surface without this.
+  #
+  # The generated NAMES come from the leading positional symbols only
+  # (`leading_symbol_args` stops at the options hash, so `only: :after` is never
+  # a callback name), and the TYPES from `Array(options.delete(:only))`
+  # (callbacks.rb:117), defaulting to `[:before, :around, :after]`
+  # (callbacks.rb:114). A `only:` that is not a literal symbol or literal array
+  # of symbols records nothing, so an unresolvable port stays novel.
+  #
+  # All three are singleton methods on the caller, so they land in
+  # `classMethods` — and the caller is the class/module lexically enclosing the
+  # macro, including the `included do` block AR calls it from
+  # (activerecord/lib/active_record/callbacks.rb:412-416), which is the same
+  # bucketing `class_attribute` already gets there.
+  CALLBACK_TYPES = %w[before around after].freeze
+
+  def process_define_model_callbacks(args)
+    fqn = current_fqn
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+
+    only = option_symbols(args, "only")
+    types = only.nil? ? CALLBACK_TYPES : only & CALLBACK_TYPES
+    return if types.empty?
+
+    leading_symbol_args(args).each do |callback|
+      types.each do |type|
+        target[:classMethods] << {
+          name: "#{type}_#{callback}",
+          visibility: "public",
+          params: [
+            { name: "args", kind: "rest" },
+            { name: "options", kind: "keyword_rest" },
+            { name: "block", kind: "block" },
+          ],
+          file: @current_file,
+          line: @current_line,
+          notes: "define_model_callbacks",
+        }
+      end
+    end
+    maybe_update_module_file(fqn, target)
+  end
+
+  # Symbol value(s) of a trailing-options-hash key, in the two shapes Ruby's
+  # `Array(...)` coercion collapses: a bare symbol (`only: :after`) and an array
+  # literal of symbols (`only: [:before, :after]`). Nil when the key is absent;
+  # `[]` when it is present but not one of those literal shapes, so a caller
+  # cannot mistake "unreadable" for "defaulted".
+  def option_symbols(args, key)
+    list = positional_arg_list(args)
+    return nil unless list.is_a?(Array)
+    list.each do |el|
+      next unless el.is_a?(Array) && el[0] == :bare_assoc_hash
+      (el[1] || []).each do |assoc|
+        next unless assoc.is_a?(Array) && assoc[0] == :assoc_new &&
+                    assoc[1].is_a?(Array) && assoc[1][0] == :@label &&
+                    assoc[1][1] == "#{key}:"
+        v = assoc[2]
+        return [] unless v.is_a?(Array)
+        return [symbol_name(v)].compact if %i[symbol_literal dyna_symbol].include?(v[0])
+        return [] unless v[0] == :array
+        elements = v[1]
+        return [] unless elements.is_a?(Array)
+        return elements.filter_map { |e| symbol_name(e) }
       end
     end
     nil

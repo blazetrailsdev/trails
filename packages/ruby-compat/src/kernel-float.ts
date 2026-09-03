@@ -1,16 +1,3 @@
-/**
- * Ruby's `Kernel#Float` (`vendor/ruby/object.c:3648` `rb_f_float` →
- * `vendor/ruby/object.c:3605` `rb_convert_to_float`), the strict decimal parse
- * Rails reaches for directly (`activemodel/validations/numericality.rb:82`,
- * `activesupport/number_helper/number_to_human_converter.rb:17`,
- * `activerecord/connection_adapters/postgresql/oid/point.rb:64`). Ruby core,
- * so no gem file declares it.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Kernel#Float`
- * (`vendor/ruby/object.c:3648`), which Rails calls without defining, so no
- * Rails file declares the module this file's single export lives in.
- */
-
 import { ArgumentError } from "./argument-error.js";
 import { rbBuiltinClassName } from "./object.js";
 

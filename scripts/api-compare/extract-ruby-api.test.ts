@@ -3099,3 +3099,113 @@ describe("Ruby extractor Hash constant updates", { timeout: RUBY_SUBPROCESS_TIME
     expect(keys).not.toContain("other_name");
   });
 });
+
+describe(
+  "Ruby extractor define_model_callbacks names",
+  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
+  () => {
+    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+    // Returns "<fqn>" -> the class-method names the macro generated, so a case
+    // can assert both what IS credited and what is not. A too-generous credit
+    // silently disarms `parity:api:extra` for every `after*` name in the repo,
+    // so the negative cases below matter as much as the positive ones.
+    function callbackMethods(src: string): Record<string, string[]> {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "dmc-rb-"));
+      try {
+        fs.writeFileSync(path.join(dir, "callbacks.rb"), src);
+        const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "callbacks.rb"), ${JSON.stringify(dir)})
+        out = {}
+        (ex.classes.to_a + ex.modules.to_a).each do |fqn, info|
+          names = info[:classMethods]
+            .select { |m| m[:notes] == "define_model_callbacks" }
+            .map { |m| m[:name] }
+          out[fqn] = names unless names.empty?
+        end
+        puts JSON.generate(out)
+      `;
+        return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    // activemodel/lib/active_model/callbacks.rb:114 defaults `only:` to
+    // [:before, :around, :after], so a bare call generates all three types.
+    it("generates before/around/after per callback with no only: option", () => {
+      const m = callbackMethods(`
+      module Callbacks
+        extend ActiveSupport::Concern
+
+        included do
+          define_model_callbacks :save, :create
+        end
+      end
+    `);
+      expect(m["Callbacks"]).toEqual([
+        "before_save",
+        "around_save",
+        "after_save",
+        "before_create",
+        "around_create",
+        "after_create",
+      ]);
+    });
+
+    // `Array(options.delete(:only))` (callbacks.rb:117) takes a bare symbol as
+    // well as an array — activerecord/lib/active_record/callbacks.rb:415 uses
+    // the bare form, :416 the default.
+    it("honors only: in both the bare-symbol and array spellings", () => {
+      const m = callbackMethods(`
+      module Callbacks
+        define_model_callbacks :initialize, :find, only: :after
+        define_model_callbacks(:touch, only: [:before, :after])
+      end
+    `);
+      expect(m["Callbacks"]).toEqual([
+        "after_initialize",
+        "after_find",
+        "before_touch",
+        "after_touch",
+      ]);
+    });
+
+    // The names come from the LEADING positional symbols, so an option value
+    // that happens to be a symbol is never mistaken for a callback event.
+    it("does not credit a symbol option value as a callback name", () => {
+      const m = callbackMethods(`
+      module Callbacks
+        define_model_callbacks :save, scope: [:kind, :name], only: :after
+      end
+    `);
+      expect(m["Callbacks"]).toEqual(["after_save"]);
+    });
+
+    // An `only:` the extractor cannot read literally credits NOTHING rather
+    // than falling back to all three types — a guessed credit would allow
+    // `before_*`/`around_*` ports the macro never generated.
+    it("credits nothing when only: is not a literal symbol or symbol array", () => {
+      const m = callbackMethods(`
+      module Callbacks
+        define_model_callbacks :save, only: CALLBACK_TYPES
+      end
+    `);
+      expect(m["Callbacks"]).toBeUndefined();
+    });
+
+    // A type outside before/around/after is not something
+    // `_define_<type>_model_callback` (callbacks.rb:129-152) can dispatch to.
+    it("ignores an only: type the macro has no definer for", () => {
+      const m = callbackMethods(`
+      module Callbacks
+        define_model_callbacks :save, only: [:after, :instead_of]
+      end
+    `);
+      expect(m["Callbacks"]).toEqual(["after_save"]);
+    });
+  },
+);

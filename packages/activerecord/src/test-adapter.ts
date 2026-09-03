@@ -1,6 +1,3 @@
-/**
- * @noRailsEquivalent CONVERGEABLE the pool-mechanics setup of the Rails pool test (test/cases/connection_pool_test.rb:16-30), which Ruby writes inline per test.
- */
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
