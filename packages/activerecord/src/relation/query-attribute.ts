@@ -39,7 +39,7 @@ export class QueryAttribute extends Attribute {
   }
 
   override withCastValue(value: unknown): QueryAttribute {
-    return new QueryAttribute(this.name, value, this.type);
+    return new QueryAttribute(this.name, value, this.type!);
   }
 
   override get valueForDatabase(): unknown {
@@ -47,7 +47,7 @@ export class QueryAttribute extends Attribute {
   }
 
   protected override _valueForDatabase(): unknown {
-    return this.type.serialize(this.value);
+    return this.type!.serialize(this.value);
   }
 
   isNil(): boolean {

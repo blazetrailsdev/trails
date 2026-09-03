@@ -1,17 +1,17 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { YAMLEncoder } from "./yaml-encoder.js";
 import { jsonCodec } from "./codecs/json.js";
-import type { AttributeSetEnvelope } from "./codecs/codec.js";
+import type { AttributeSetCoder } from "./codecs/codec.js";
 import { AttributeSet } from "../attribute-set.js";
-import { Attribute } from "../attribute.js";
+import { Attribute, Uninitialized } from "../attribute.js";
 import { typeRegistry } from "../type/registry.js";
 
 function makeSet(attrs: Record<string, Attribute>): AttributeSet {
   return new AttributeSet(attrs);
 }
 
-function encodeInto(encoder: YAMLEncoder, set: AttributeSet): AttributeSetEnvelope {
-  const coder = {} as AttributeSetEnvelope;
+function encodeInto(encoder: YAMLEncoder, set: AttributeSet): AttributeSetCoder {
+  const coder: AttributeSetCoder = {};
   encoder.encode(set, coder);
   return coder;
 }
@@ -31,10 +31,6 @@ describe("YAMLEncoder", () => {
   const defaultTypes = { name: stringType, age: integerType };
   const encoder = new YAMLEncoder(defaultTypes);
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it("round-trips a simple set", () => {
     const attrs = {
       name: stringAttr("name", "Alice"),
@@ -46,20 +42,28 @@ describe("YAMLEncoder", () => {
     expect(decoded.fetchValue("age")).toBe(30);
   });
 
-  it("omits the type of an attribute whose type is the default type", () => {
+  it("nils out the type of an attribute whose type is the default type", () => {
     const set = makeSet({ name: stringAttr("name", "Alice") });
-    expect(encodeInto(encoder, set).types.name).toBeNull();
+    expect(encodeInto(encoder, set).conciseAttributes![0].type).toBeNull();
   });
 
-  it("writes the type of an attribute whose type is not the default type", () => {
-    const set = makeSet({ name: intAttr("name", 7) });
-    expect(encodeInto(encoder, set).types.name).toBe("integer");
+  it("keeps the attribute whose type is not the default type", () => {
+    const attr = intAttr("name", 7);
+    const set = makeSet({ name: attr });
+    expect(encodeInto(encoder, set).conciseAttributes![0]).toBe(attr);
+  });
+
+  it("returns the attributes key when the coder carries one", () => {
+    const attributes = makeSet({ name: stringAttr("name", "Alice") });
+    expect(encoder.decode({ attributes })).toBe(attributes);
   });
 
   it("restores the default type for an attribute encoded without one", () => {
     const custom = integerType;
     const localEncoder = new YAMLEncoder({ qty: custom });
-    const decoded = localEncoder.decode({ v: 1, types: { qty: null }, values: { qty: 5 } });
+    const decoded = localEncoder.decode({
+      conciseAttributes: [Attribute.fromUser("qty", 5, null)],
+    });
     expect(decoded.fetchValue("qty")).toBe(5);
     expect(decoded.castTypes().qty).toBe(custom);
   });
@@ -70,52 +74,41 @@ describe("YAMLEncoder", () => {
     const set = makeSet({ score: Attribute.uninitialized("score", intType) });
 
     const coder = encodeInto(localEncoder, set);
-    expect(coder.defaultAttributes).toContain("score");
+    expect(coder.conciseAttributes![0]).toBeInstanceOf(Uninitialized);
 
     const decoded = localEncoder.decode(coder);
     expect(decoded.isKey("score")).toBe(false);
     expect(decoded.castTypes().score).toBe(intType);
   });
 
-  it("unknown type key falls back to value type and warns once", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const localEncoder = new YAMLEncoder({});
-    const coder: AttributeSetEnvelope = {
-      v: 1,
-      types: { x: "unknown_type_xyz" },
-      values: { x: "hello" },
-    };
-    const decoded = localEncoder.decode(coder);
-    expect(decoded.fetchValue("x")).toBe("hello");
-    expect(warnSpy).toHaveBeenCalledOnce();
-    localEncoder.decode(coder);
-    expect(warnSpy).toHaveBeenCalledOnce();
-  });
-
   it("attr not among the default types is kept with its own type", () => {
     const decoded = encoder.decode({
-      v: 1,
-      types: { name: null, extra: "string" },
-      values: { name: "Bob", extra: "bonus" },
+      conciseAttributes: [
+        Attribute.fromUser("name", "Bob", null),
+        Attribute.fromUser("extra", "bonus", stringType),
+      ],
     });
     expect(decoded.fetchValue("extra")).toBe("bonus");
     expect(decoded.fetchValue("name")).toBe("Bob");
   });
 
-  it("uses attr.type.name (registry key) not type() for type storage", () => {
-    const immutableType = typeRegistry.lookup("immutable_string");
-    const attr = Attribute.fromUser("flag", "t", immutableType);
-    const set = makeSet({ flag: attr });
-    const coder = encodeInto(encoder, set);
-    expect(coder.types.flag).toBe("immutable_string");
-    const decoded = encoder.decode(coder);
-    expect(decoded.fetchValue("flag")).toBe("t");
-  });
-
   it("a codec round-trips the coder the encoder filled in", () => {
-    const set = makeSet({ x: stringAttr("x", "hi") });
+    const immutableType = typeRegistry.lookup("immutable_string");
+    const set = makeSet({
+      name: stringAttr("name", "Alice"),
+      flag: Attribute.fromUser("flag", "t", immutableType),
+      score: Attribute.uninitialized("score", integerType),
+    });
     const coder = encodeInto(encoder, set);
+
+    const envelope = JSON.parse(jsonCodec.encode(coder));
+    expect(envelope.types.name).toBeNull();
+    expect(envelope.types.flag).toBe("immutable_string");
+    expect(envelope.defaultAttributes).toContain("score");
+
     const decoded = encoder.decode(jsonCodec.decode(jsonCodec.encode(coder)));
-    expect(decoded.fetchValue("x")).toBe("hi");
+    expect(decoded.fetchValue("name")).toBe("Alice");
+    expect(decoded.fetchValue("flag")).toBe("t");
+    expect(decoded.isKey("score")).toBe(false);
   });
 });

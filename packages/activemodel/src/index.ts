@@ -49,7 +49,11 @@ export { AttributeSet } from "./attribute-set.js";
 export { LazyAttributeSet, LazyAttributeHash } from "./attribute-set/builder.js";
 export { YAMLEncoder } from "./attribute-set/yaml-encoder.js";
 export { AttributeSetCodecError } from "./attribute-set/codecs/codec.js";
-export type { AttributeSetCodec, AttributeSetEnvelope } from "./attribute-set/codecs/codec.js";
+export type {
+  AttributeSetCodec,
+  AttributeSetCoder,
+  AttributeSetEnvelope,
+} from "./attribute-set/codecs/codec.js";
 export { jsonCodec } from "./attribute-set/codecs/json.js";
 export { WithValidator } from "./validations/with.js";
 export { AbsenceValidator } from "./validations/absence.js";

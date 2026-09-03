@@ -893,7 +893,7 @@ export class Base extends Model {
       const attributeTypes = this.attributeTypes();
       return Object.hasOwn(attributeTypes, resolved) ? attributeTypes[resolved] : block();
     }
-    return this._defaultAttributes().getAttribute(resolved).type;
+    return this._defaultAttributes().getAttribute(resolved).type!;
   }
 
   static get arelTable(): Table {

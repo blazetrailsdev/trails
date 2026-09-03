@@ -1,5 +1,5 @@
-import { AttributeSetCodecError } from "./codec.js";
-import type { AttributeSetCodec, AttributeSetEnvelope } from "./codec.js";
+import { AttributeSetCodecError, fromEnvelope, toEnvelope } from "./codec.js";
+import type { AttributeSetCodec, AttributeSetCoder, AttributeSetEnvelope } from "./codec.js";
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -7,12 +7,12 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 /** @noRailsEquivalent PERMANENT */
 export const jsonCodec: AttributeSetCodec = {
-  encode(envelope: AttributeSetEnvelope): string {
-    return JSON.stringify(envelope, (_key, value) =>
+  encode(coder: AttributeSetCoder): string {
+    return JSON.stringify(toEnvelope(coder), (_key, value) =>
       typeof value === "bigint" ? String(value) : value,
     );
   },
-  decode(input: string): AttributeSetEnvelope {
+  decode(input: string): AttributeSetCoder {
     const parsed: unknown = JSON.parse(input);
     if (
       !isPlainObject(parsed) ||
@@ -25,6 +25,6 @@ export const jsonCodec: AttributeSetCodec = {
         "jsonCodec.decode: input is not a valid AttributeSetEnvelope",
       );
     }
-    return parsed as unknown as AttributeSetEnvelope;
+    return fromEnvelope(parsed as unknown as AttributeSetEnvelope);
   },
 };
