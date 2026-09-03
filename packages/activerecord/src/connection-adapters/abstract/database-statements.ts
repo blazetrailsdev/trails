@@ -25,6 +25,7 @@ import {
   RangeError as ARRangeError,
   AsynchronousQueryInsideTransactionError,
   ActiveRecordError,
+  Rollback,
 } from "../../errors.js";
 
 import type { Quoting } from "./quoting.js";
@@ -407,9 +408,9 @@ export async function transaction<T>(
     } else {
       return await this.withinNewTransaction({ isolation, joinable }, fn);
     }
-  } catch (e: any) {
-    if (e?.name === "Rollback") return undefined;
-    throw e;
+  } catch (e) {
+    if (!(e instanceof Rollback)) throw e;
+    return undefined;
   }
 }
 
