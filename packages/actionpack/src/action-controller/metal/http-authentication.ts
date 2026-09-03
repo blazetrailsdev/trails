@@ -4,7 +4,7 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
-import { Headers } from "@blazetrails/rack";
+import type { Headers } from "@blazetrails/rack";
 
 export {
   BasicAuth,
