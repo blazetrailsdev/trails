@@ -16,8 +16,7 @@ import {
   abort,
   File,
   FileUtils,
-  getFs,
-  getPath,
+  getPathAsync,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
@@ -624,7 +623,7 @@ export class DatabaseTasks {
         const migrationConnectionPool = this.migrationConnectionPool();
         const file: string[] = [];
         await SchemaDumper.dump(migrationConnectionPool, file);
-        File.write(filename, file.join("\n"));
+        File.open(filename, "w", (f) => f.write(file.join("\n")));
       } finally {
         SchemaDumper.language = languageWas;
       }
@@ -655,7 +654,7 @@ export class DatabaseTasks {
         return;
       }
 
-      const path = getPath();
+      const path = await getPathAsync();
       if (!path.pathToFileURL) {
         throw new Error(
           "DatabaseTasks.loadSchema requires PathAdapter.pathToFileURL. " +
@@ -938,7 +937,7 @@ export class DatabaseTasks {
       .map((v) => `('${String(v).replace(/'/g, "''")}')`)
       .join(",\n");
     const insertSql = `\nINSERT INTO ${quotedTable} (version) VALUES\n${quoted};\n`;
-    getFs().appendFileSync(filename, insertSql);
+    File.open(filename, "a", (f) => f.write(insertSql));
   }
 
   static setupInitialDatabaseYaml(): Record<string, unknown> {

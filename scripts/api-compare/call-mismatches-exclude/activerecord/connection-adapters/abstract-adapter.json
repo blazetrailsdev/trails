@@ -1,0 +1,14 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract-adapter.ts",
+    "rubyName": "find_cmd_and_exec",
+    "call": "join",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:path",
+      "ref:cmd"
+    ],
+    "reason": "Rails joins each $PATH directory with each candidate command to stat it (abstract_adapter.rb:104); the port does not walk $PATH at all yet, so there is no `path` to join `cmd` onto."
+  }
+]

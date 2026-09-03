@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { File, getFsAsync } from "@blazetrails/ruby-compat";
 import { glob as fsGlob } from "@blazetrails/activesupport/glob";
 
 export interface PathOptions {
@@ -141,15 +141,13 @@ export class Path {
 
   async expanded(): Promise<string[]> {
     if (this._root.path === null) throw new Error("You need to set a path root");
-    const path = await getPathAsync();
-    const fs = await getFsAsync();
     const out: string[] = [];
     for (const raw of this._paths) {
-      const abs = path.resolve(this._root.path, raw);
-      if (this.glob && (await isDir(fs, abs))) {
+      const abs = File.expandPath(raw, this._root.path);
+      if (this.glob && File.isDirectory(abs)) {
         let files = await fsGlob(this.glob, { cwd: abs });
         if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
-        out.push(...files.map((f) => path.join(abs, f)).sort());
+        out.push(...files.map((f) => File.join(abs, f)).sort());
       } else {
         out.push(abs);
       }
@@ -171,22 +169,13 @@ export class Path {
   }
 
   async existentDirectories(): Promise<string[]> {
-    const fs = await getFsAsync();
     const out: string[] = [];
-    for (const f of await this.expanded()) if (await isDir(fs, f)) out.push(f);
+    for (const f of await this.expanded()) if (File.isDirectory(f)) out.push(f);
     return out;
   }
 }
 
 type Fs = Awaited<ReturnType<typeof getFsAsync>>;
-async function isDir(fs: Fs, p: string): Promise<boolean> {
-  if (!fs.stat) throw new Error("FsAdapter.stat() is required for trailties (async-only).");
-  try {
-    return (await fs.stat(p)).isDirectory();
-  } catch {
-    return false;
-  }
-}
 async function isSymlink(fs: Fs, p: string): Promise<boolean> {
   try {
     return !!(await fs.lstat!(p)).isSymbolicLink?.();

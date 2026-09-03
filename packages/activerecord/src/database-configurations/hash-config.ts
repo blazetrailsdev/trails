@@ -1,4 +1,4 @@
-import { fetch, hasKey } from "@blazetrails/ruby-compat";
+import { fetch, File, hasKey } from "@blazetrails/ruby-compat";
 import { configurationsStore as configurations } from "../database-configurations.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 
@@ -99,8 +99,11 @@ export class HashConfig extends DatabaseConfig {
   }
 
   defaultSchemaCachePath(dbDir: string = "db"): string {
-    const file = this.isPrimary() ? "schema_cache.json" : `${this.name}_schema_cache.json`;
-    return `${dbDir}/${file}`;
+    if (this.isPrimary()) {
+      return File.join(dbDir, "schema_cache.json");
+    } else {
+      return File.join(dbDir, `${this.name}_schema_cache.json`);
+    }
   }
 
   lazySchemaCachePath(): string {

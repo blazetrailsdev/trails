@@ -1,0 +1,14 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "testing/resolvers.ts",
+    "rubyName": "template_glob",
+    "call": "fnmatch",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:glob",
+      "ref:path"
+    ],
+    "reason": "Rails calls `File.fnmatch(glob, path)` per key (resolvers.rb:28); ruby-compat's File has no fnmatch, so the port compiles the glob to a RegExp once via the resolver's own fnmatch(glob) and tests each path against it."
+  }
+]

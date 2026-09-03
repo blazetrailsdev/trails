@@ -5,5 +5,16 @@
     "rubyName": "add_key_file",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/encryption-key-file/encryption-key-file-generator.ts",
+    "rubyName": "ignore_key_file",
+    "call": "read",
+    "kind": "args",
+    "rubyArgs": [
+      "str:.gitignore"
+    ],
+    "reason": "Rails reads `.gitignore` relative to the generator's cwd (encryption_key_file_generator.rb:34); the port has no per-generator chdir and reads File.join(this.cwd, \".gitignore\") instead."
   }
 ]

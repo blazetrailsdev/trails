@@ -5,5 +5,16 @@
     "rubyName": "configure_authentication_routes",
     "call": "route",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/authentication/authentication-generator.ts",
+    "rubyName": "enable_bcrypt",
+    "call": "read",
+    "kind": "args",
+    "rubyArgs": [
+      "str:Gemfile"
+    ],
+    "reason": "trails has no Gemfile: the port reads package.json (authentication_generator.rb:42) and adds bcryptjs to dependencies rather than uncommenting a `gem \"bcrypt\"` line."
   }
 ]

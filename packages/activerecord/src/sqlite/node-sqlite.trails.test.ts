@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { SqliteConnection } from "../sqlite-adapter.js";
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { getOs } from "@blazetrails/activesupport/os-adapter";
 import { isNodeSqliteAvailable, nodeSqliteDriver } from "./node-sqlite.js";
 
@@ -113,13 +113,13 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
       await conn.exec("CREATE TABLE t (x INTEGER)");
       await conn.exec("DROP TABLE IF EXISTS t");
       await conn.close();
-      expect(getFs().existsSync(relName)).toBe(true);
-      expect(getFs().existsSync(`/${relName}`)).toBe(false);
+      expect(File.isExist(relName)).toBe(true);
+      expect(File.isExist(`/${relName}`)).toBe(false);
       expect(nodeSqliteDriver.databaseExists?.({ database: `file:${relName}` })).toBe(true);
     } finally {
       for (const p of [relName, `${relName}-wal`, `${relName}-shm`]) {
         try {
-          getFs().unlinkSync(p);
+          File.delete(p);
         } catch {}
       }
     }
@@ -169,7 +169,7 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite restoreFro
   const removeTempFiles = (): void => {
     for (const p of tempFiles) {
       try {
-        getFs().unlinkSync(p);
+        File.delete(p);
       } catch {}
     }
   };

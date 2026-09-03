@@ -3082,11 +3082,17 @@ class ApiExtractor
   }.map(&:to_s).to_set.freeze
 
   # Ruby core/stdlib class constants no trails file ports as a class of its own,
-  # so `File.stat` / `Module.new` is Ruby, not a ported collaborator, wherever it
-  # appears. `Time`, `Date`, `String`, `Array`, … are deliberately absent: trails
-  # does port those concepts, so a call on that constant can be a real port call.
+  # so `Module.new` / `Marshal.load` is Ruby, not a ported collaborator, wherever
+  # it appears. `Time`, `Date`, `String`, `Array`, … are deliberately absent:
+  # trails does port those concepts, so a call on that constant can be a real
+  # port call.
+  #
+  # This list is an only-shrink burndown of the receivers trails cannot yet
+  # spell, not a permanent rule. A receiver leaves the moment ruby-compat can
+  # spell it — `IO`, `Process`, and now `File` and `Dir` already have — and
+  # nothing is ever added back to quiet a red run.
   CORE_CLASS_RECEIVERS = %w[
-    File Dir Module Class Proc Kernel Marshal ObjectSpace GC Thread
+    Module Class Proc Kernel Marshal ObjectSpace GC Thread
     Mutex Encoding Random Signal Struct Method
   ].to_set.freeze
 

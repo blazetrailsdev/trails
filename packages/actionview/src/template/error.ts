@@ -1,4 +1,4 @@
-import { getPath, regexpEscape } from "@blazetrails/ruby-compat";
+import { File, regexpEscape } from "@blazetrails/ruby-compat";
 import type { Template } from "../template.js";
 
 export interface TemplateErrorOptions {
@@ -64,7 +64,7 @@ export class TemplateError extends Error {
     this._lineNumber = null;
     const fileName = this.fileName();
     if (fileName != null) {
-      const regexp = new RegExp(`${regexpEscape(getPath().basename(fileName))}:(\\d+)`);
+      const regexp = new RegExp(`${regexpEscape(File.basename(fileName))}:(\\d+)`);
       const match =
         regexp.exec(this.message) ??
         this.backtrace()

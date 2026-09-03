@@ -5,7 +5,7 @@ import {
   Tempfile,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
-import { File, FileUtils, getFs } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
@@ -110,10 +110,8 @@ export class PostgreSQLDatabaseTasks {
     args.push(this.dbConfig.database as string);
     await this.runCmd("pg_dump", args, "dumping");
     this.removeSqlHeaderComments(filename);
-    getFs().appendFileSync(
-      filename,
-      `SET search_path TO ${await (await this.connection()).schemaSearchPath()};\n\n`,
-    );
+    const connectionSearchPath = await (await this.connection()).schemaSearchPath();
+    File.open(filename, "a", (f) => f.write(`SET search_path TO ${connectionSearchPath};\n\n`));
   }
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {

@@ -1,0 +1,16 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/generator/generator-generator.ts",
+    "rubyName": "generator_dir",
+    "call": "join",
+    "kind": "args",
+    "rubyArgs": [
+      "str:lib",
+      "str:generators",
+      "ref:regularClassPath",
+      "ref:fileName"
+    ],
+    "reason": "Rails' regular_class_path is an Array, which File.join splices away when empty (generator_generator.rb:20); trails' regularClassPath() is a String, so the port pushes it onto the segment list only when non-empty."
+  }
+]
