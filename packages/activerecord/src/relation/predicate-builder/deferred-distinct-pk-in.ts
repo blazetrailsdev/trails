@@ -1,10 +1,11 @@
-/** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery MOVED-BY-SHORT-NAME: constructor invert. */
 import { Nodes } from "@blazetrails/arel";
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
 export class DeferredDistinctPkIn extends Nodes.In {
   constructor(
     attribute: Nodes.Attribute,
     inlineSubquery: Nodes.Node,
+    /** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
     readonly innerRelation: { _materializeDistinctPkIds(): Promise<unknown[]> },
   ) {
     super(attribute, inlineSubquery);
@@ -19,10 +20,12 @@ export class DeferredDistinctPkIn extends Nodes.In {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
 export class DeferredDistinctPkNotIn extends Nodes.NotIn {
   constructor(
     attribute: Nodes.Attribute,
     inlineSubquery: Nodes.Node,
+    /** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
     readonly innerRelation: { _materializeDistinctPkIds(): Promise<unknown[]> },
   ) {
     super(attribute, inlineSubquery);
@@ -37,11 +40,14 @@ export class DeferredDistinctPkNotIn extends Nodes.NotIn {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
 export class DeferredIdsNotIn extends Nodes.NotIn {
   constructor(
     attribute: Nodes.Attribute,
     inlineSubquery: Nodes.Node,
+    /** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
     readonly literalIds: unknown[],
+    /** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
     readonly innerRelations: { ids(): Promise<unknown[]> }[],
   ) {
     super(attribute, inlineSubquery);
@@ -57,11 +63,14 @@ export class DeferredIdsNotIn extends Nodes.NotIn {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
 export class DeferredIdsIn extends Nodes.In {
   constructor(
     attribute: Nodes.Attribute,
     inlineSubquery: Nodes.Node,
+    /** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
     readonly literalIds: unknown[],
+    /** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery */
     readonly innerRelations: { ids(): Promise<unknown[]> }[],
   ) {
     super(attribute, inlineSubquery);
