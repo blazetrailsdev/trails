@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { DelegationError, InheritableOptions } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { LookupContext } from "./lookup-context.js";
@@ -6,6 +6,7 @@ import { OutputBuffer } from "./buffers.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 import { Template } from "./template.js";
+import { FixtureResolver } from "./testing/resolvers.js";
 
 /** Compile and run a `.tse` source through `Template#render`, as Rails does. */
 const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
@@ -316,5 +317,51 @@ describe("ActionView::Base attr_internal readers", () => {
     } finally {
       TemplateHandlers.clear();
     }
+  });
+});
+
+describe("ActionView::Base#render", () => {
+  beforeEach(() => {
+    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  });
+  afterEach(() => {
+    TemplateHandlers.clear();
+  });
+
+  const buildView = (): Base => {
+    const resolver = new FixtureResolver({
+      "test/hello_world.html.tse": "Hello world!",
+      "test/_partial_only.html.tse": "only partial",
+      "test/_layout.html.tse": "<div><%= yield %></div>",
+    });
+    const lookupContext = new LookupContext(null, {}, []);
+    lookupContext.addResolver(resolver);
+    return new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
+  };
+
+  it("renders a template through the template: option", () => {
+    expect(buildView().render({ template: "test/hello_world" }).toString()).toBe("Hello world!");
+  });
+
+  it("renders a partial through the partial: option", () => {
+    expect(buildView().render({ partial: "test/partial_only" }).toString()).toBe("only partial");
+  });
+
+  it("treats a non-Hash options as a partial name", () => {
+    expect(buildView().render("test/partial_only").toString()).toBe("only partial");
+  });
+
+  it("renders the layout: option around the block's content", () => {
+    const view = buildView();
+    expect(view.render({ layout: "test/layout" }, {}, () => "inside").toString()).toBe(
+      "<div>inside</div>",
+    );
+  });
+
+  it("restores the lookup context after in_rendering_context prepends formats", () => {
+    const view = buildView();
+    const before = view.lookupContext;
+    view.render({ template: "test/hello_world", formats: ["html"] });
+    expect(view.lookupContext).toBe(before);
   });
 });

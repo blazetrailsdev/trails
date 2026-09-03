@@ -19,8 +19,12 @@
  *
  * @see https://api.rubyonrails.org/classes/ActionController/Railtie.html
  */
-import { type Deprecators } from "@blazetrails/activesupport";
-import { ActionController } from "@blazetrails/actionpack";
+// `require "action_dispatch/railtie"` (`actionpack/lib/action_controller/railtie.rb:7`)
+// and `require "action_view/railtie"` (`:10`).
+import "./action-dispatch.js";
+import "./action-view.js";
+import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
+import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 /**
@@ -44,13 +48,32 @@ function defaultActionControllerConfig(): ActionControllerConfig {
 /** @noRailsEquivalent PERMANENT */
 interface TrailtieApp {
   deprecators: Deprecators;
+  routes(): AppRoutes;
 }
+
+/** The `app.routes` slice `set_configs` reads (`railtie.rb:69-70`). */
+type AppRoutes = Parameters<typeof AbstractController.withRoutesHelpers>[0] & {
+  mountedHelpers(): object;
+};
 
 export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
 
     this.config.set("actionController", defaultActionControllerConfig());
+
+    // Mirrors the routing arms of `action_controller.set_configs`
+    // (`actionpack/lib/action_controller/railtie.rb:69-71`). The rest of that
+    // initializer's body configures `config.action_controller` options whose
+    // receivers (`ActionController::Parameters`, the assets paths) are
+    // unported, so only the two `app.routes` lines are declared here.
+    this.initializer("action_controller.set_configs", (app) => {
+      const routes = (app as TrailtieApp).routes();
+      onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {
+        include(base as unknown as new (...args: never[]) => unknown, routes.mountedHelpers());
+        AbstractController.withRoutesHelpers(routes)(base);
+      });
+    });
 
     this.initializer(
       "action_controller.deprecator",

@@ -14,8 +14,9 @@ import { _setBase } from "./base-slot.js";
 import { OutputBuffer } from "./buffers.js";
 import { OutputFlow } from "./flows.js";
 import * as Helpers from "./helpers/index.js";
-import { LookupContext } from "./lookup-context.js";
+import { LookupContext, MissingTemplate } from "./lookup-context.js";
 import type { Template } from "./template.js";
+import type { RenderOptions } from "./renderer/abstract-renderer.js";
 
 /**
  * The compiled form of one template: the function `Template#compile!` defines
@@ -181,7 +182,7 @@ export class Base {
   }
 
   /** `attr_reader :lookup_context` (base.rb:217). */
-  readonly lookupContext: LookupContext | null;
+  lookupContext: LookupContext | null;
 
   /** `delegate :formats, to: :lookup_context` (base.rb:221). */
   get formats(): LookupContext["formats"] | undefined {
@@ -361,35 +362,126 @@ export class Base {
 
   /**
    * Mirrors `Helpers::RenderingHelper#render(options, locals, &block)`
-   * (`actionview/lib/action_view/helpers/rendering_helper.rb:31`), which
-   * hands the view itself to the renderer: `view_renderer.render(self, options)`.
+   * (`actionview/lib/action_view/helpers/rendering_helper.rb:138-153`) — the
+   * dispatch on the shape of `options`: a Hash renders through the renderer
+   * (with a block, the `:layout` is rendered as a partial around it), and
+   * anything else is a bare partial name.
    *
    * trails' `Renderer#render` is async by design where Rails' is synchronous,
-   * and a compiled template method is synchronous, so this reaches the lookup
-   * context's synchronous partial path instead.
+   * and a compiled template method is synchronous, so each arm reaches the
+   * lookup context's synchronous entry point instead of `view_renderer`.
    *
    * @missingRailsCall view_renderer.render — PERMANENT
+   * @missingRailsCall view_renderer.render_partial — PERMANENT
    */
   render(
-    options: { partial: string; locals?: Record<string, unknown> },
+    options: RenderOptions | string = {},
     locals: Record<string, unknown> = {},
+    block?: () => unknown,
   ): SafeBuffer {
-    const lookupContext = this.lookupContext;
-    if (!lookupContext) {
-      throw new Error(
-        `Cannot render partial ${JSON.stringify(options.partial)} — this view has no ` +
-          "lookup context. Render through LookupContext so nested partials resolve.",
+    if (typeof options === "object" && options !== null) {
+      return this.inRenderingContext(options, () => {
+        if (block) {
+          // Rails: `render_partial(self, options.merge(partial: options[:layout]), &block)`.
+          return this.renderPartialSync({ ...options, partial: String(options.layout) }, block);
+        }
+        return this.renderSync(options);
+      });
+    }
+    return this.renderPartialSync({ partial: options, locals }, block);
+  }
+
+  /**
+   * Mirrors `Base#in_rendering_context(options)` (`base.rb:292-309`). Rails
+   * yields `@view_renderer` and rebuilds it from the prepended-formats lookup
+   * context; trails' render arms read `lookupContext` directly, so the block
+   * takes no argument.
+   *
+   * @missingRailsCall new — PERMANENT
+   */
+  inRenderingContext<T>(options: RenderOptions, block: () => T): T {
+    const oldLookupContext = this.lookupContext;
+
+    if (!this.lookupContext?.htmlFallbackForJs && options.formats) {
+      const formats = [...options.formats];
+      if (formats.length === 1 && formats[0] === "js") {
+        formats.push("html");
+      }
+      this.lookupContext = this.lookupContext!.withPrependedFormats(formats);
+    }
+
+    try {
+      return block();
+    } finally {
+      this.lookupContext = oldLookupContext;
+    }
+  }
+
+  /**
+   * The synchronous stand-in for `Renderer#render(context, options)`
+   * (`renderer/renderer.rb:23-33`) — the `options.key?(:partial)` branch over
+   * the lookup context's synchronous entry points.
+   *
+   * @internal
+   */
+  private renderSync(options: RenderOptions): SafeBuffer {
+    if (Object.hasOwn(options, "partial")) {
+      return this.renderPartialSync(options);
+    }
+    const lookupContext = this.requireLookupContext(String(options.template));
+    const name = String(options.template);
+    const slash = name.lastIndexOf("/");
+    const template = lookupContext.findTemplate(
+      slash === -1 ? name : name.slice(slash + 1),
+      slash === -1 ? this.virtualPathPrefix() : name.slice(0, slash),
+      this.currentFormat(),
+    );
+    if (!template) {
+      throw new MissingTemplate(
+        slash === -1 ? this.virtualPathPrefix() : name.slice(0, slash),
+        slash === -1 ? name : name.slice(slash + 1),
+        this.currentFormat(),
+        [],
+        [],
       );
     }
+    return htmlSafe(template.render(this, { ...(options.locals ?? {}) }));
+  }
+
+  /**
+   * The synchronous stand-in for `Renderer#render_partial(context, options, &block)`
+   * (`renderer/renderer.rb:48-50`). A block is Rails' layout content: its
+   * value is what `yield` answers inside the rendered partial, which trails
+   * publishes through `viewFlow` the way `_layout_for` reads it
+   * (`context.rb:27-30`).
+   *
+   * @internal
+   */
+  private renderPartialSync(options: RenderOptions, block?: () => unknown): SafeBuffer {
+    const partial = String(options.partial);
+    const lookupContext = this.requireLookupContext(partial);
+    if (block) this.viewFlow.set("layout", String(block() ?? ""));
     return htmlSafe(
       lookupContext.renderPartialSync(
-        options.partial,
+        partial,
         this.virtualPathPrefix(),
         this.currentFormat(),
-        { ...locals, ...(options.locals ?? {}) },
+        { ...(options.locals ?? {}) },
         this,
       ),
     );
+  }
+
+  /** @internal */
+  private requireLookupContext(name: string): LookupContext {
+    const lookupContext = this.lookupContext;
+    if (!lookupContext) {
+      throw new Error(
+        `Cannot render ${JSON.stringify(name)} — this view has no ` +
+          "lookup context. Render through LookupContext so nested partials resolve.",
+      );
+    }
+    return lookupContext;
   }
 
   /** @internal */

@@ -224,7 +224,8 @@ describe("ActionView::Template (smoke)", () => {
       const seen: Array<[string, Record<string, unknown>]> = [];
       const view = new (Base.withEmptyTemplateCache())(null, {}, null);
       view.render = (options) => {
-        seen.push([options.partial, options.locals ?? {}]);
+        const hash = options as { partial: string; locals?: Record<string, unknown> };
+        seen.push([hash.partial, hash.locals ?? {}]);
         return htmlSafe("<li>Ada</li>");
       };
       const out = render(
