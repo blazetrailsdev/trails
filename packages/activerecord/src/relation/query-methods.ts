@@ -30,6 +30,7 @@ import {
   compactBlank,
   defineModule,
   foreignKey,
+  isBlank,
   rbEqual,
   rbHash,
   wrap,
@@ -791,7 +792,7 @@ function where(
   ...rest: unknown[]
 ): any {
   if (conditionsOrSql === undefined) return new WhereChain(this.spawn());
-  if (rest.length === 0 && isBlankArgument(conditionsOrSql)) {
+  if (rest.length === 0 && isBlank(conditionsOrSql)) {
     return this;
   }
   return whereBang.call(
@@ -1023,11 +1024,6 @@ function assertStructurallyCompatible(
   }
 }
 
-function areStructurallyCompatible(self: unknown, other: unknown): boolean {
-  if (!isRelationForCombining(self) || !isRelationForCombining(other)) return false;
-  return structurallyIncompatibleValuesFor.call(self, other).length === 0;
-}
-
 function structurallyCompatible(this: QueryMethodsHost, other: any): boolean {
   return structurallyIncompatibleValuesFor.call(this, other).length === 0;
 }
@@ -1065,7 +1061,7 @@ function having(
   opts: string | Record<string, unknown> | Nodes.Node,
   ...rest: unknown[]
 ): any {
-  if (opts == null || isBlankArgument(opts)) return this;
+  if (opts == null || isBlank(opts)) return this;
   return havingBang.call(this.spawn(), opts, ...rest);
 }
 
@@ -1385,15 +1381,6 @@ export function assertModifiableBang(this: QueryMethodsHost): void {
   }
 }
 
-function isBlankArgument(value: unknown): boolean {
-  if (value === null || value === undefined || value === false) return true;
-  if (typeof value === "string") return value.trim() === "";
-  if (Array.isArray(value)) return value.length === 0;
-  if (isPlainObject(value)) return Object.keys(value).length === 0;
-  if (value instanceof Map) return value.size === 0;
-  return false;
-}
-
 /** @internal */
 export function checkIfMethodHasArgumentsBang(
   this: QueryMethodsHost,
@@ -1412,7 +1399,7 @@ export function checkIfMethodHasArgumentsBang(
     const flat = args.flat(Infinity);
     args.length = 0;
     for (const a of flat) {
-      if (!isBlankArgument(a)) args.push(a);
+      if (!isBlank(a)) args.push(a);
     }
   }
 }
