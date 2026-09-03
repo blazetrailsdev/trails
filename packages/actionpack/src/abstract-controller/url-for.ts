@@ -26,7 +26,7 @@ export interface NamedRoutesLike {
    * on it. If a future `NamedRouteCollection` port wants to expose a
    * Set internally, it should still return an array here.
    */
-  helperNames: readonly string[];
+  helperNames(): readonly string[];
 }
 
 export interface RouteSetLike {
@@ -122,6 +122,6 @@ export function actionMethods(
   routes: RouteSetLike | null = _routesClassDefault,
 ): string[] {
   if (!routes) return [...baseActionMethods];
-  const helpers = new Set(routes.namedRoutes.helperNames);
+  const helpers = new Set(routes.namedRoutes.helperNames());
   return baseActionMethods.filter((name) => !helpers.has(name));
 }

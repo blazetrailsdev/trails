@@ -72,7 +72,7 @@ export class UrlGenerationError extends ActionControllerError {
       return this.#cachedCorrections;
     }
     const routes = this.routes as Partial<RouteSetLike> | undefined;
-    const helpers = routes?.namedRoutes?.helperNames ?? [];
+    const helpers = routes?.namedRoutes?.helperNames() ?? [];
     const pattern = new RegExp(this.routeName);
     const maybeThese = helpers.filter((name) => pattern.test(name) && name !== this.methodName);
     this.#cachedCorrections = new SpellChecker({ dictionary: maybeThese }).correct(this.routeName);

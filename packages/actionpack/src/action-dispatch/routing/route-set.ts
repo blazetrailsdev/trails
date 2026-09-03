@@ -319,8 +319,16 @@ class UrlHelper {
         : pathParams.length;
 
       if (args.length < pathParamsSize) {
+        // Rails: `path_params -= controller_options.keys` then
+        // `path_params -= (result[:path_params] || {}).merge(result).keys`
+        // (`route_set.rb:301-303`) — a segment already supplied through
+        // `path_params` must not take a positional arg either.
+        const supplied = {
+          ...((result["path_params"] as Record<string, unknown> | undefined) ?? {}),
+          ...result,
+        };
         pathParams = pathParams.filter(
-          (k) => !Object.hasOwn(controllerOptions, k) && !Object.hasOwn(result, k),
+          (k) => !Object.hasOwn(controllerOptions, k) && !Object.hasOwn(supplied, k),
         );
       }
       for (const key of Object.keys(innerOptions)) {
@@ -458,6 +466,34 @@ export class NamedRouteCollection {
   /** Rails: `def length` (`route_set.rb:161-163`). */
   length(): number {
     return this._routes.size;
+  }
+
+  /**
+   * Rails: `def add_url_helper(name, defaults, &block)` (`route_set.rb:165-187`)
+   * — given a `name`, defines `name_path` and `name_url` helpers. Used by the
+   * `direct`, `resolve` and `polymorphic` route helpers.
+   */
+  addUrlHelper(
+    name: string,
+    defaults: Record<string, unknown>,
+    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
+  ): this {
+    const helper = new CustomUrlHelper(name, defaults, block);
+    const pathName = `${name}Path`;
+    const urlName = `${name}Url`;
+
+    this.pathHelpersModule[pathName] = function (this: UrlHelperContext, ...args): string {
+      return helper.call(this as unknown as PolymorphicHost, args, true);
+    };
+
+    this.urlHelpersModule[urlName] = function (this: UrlHelperContext, ...args): string {
+      return helper.call(this as unknown as PolymorphicHost, args, false);
+    };
+
+    this.pathHelpers.add(pathName);
+    this.urlHelpers.add(urlName);
+
+    return this;
   }
 
   /**
@@ -662,13 +698,6 @@ export class RouteSet {
   private readonly _append: Array<(mapper: Mapper) => void> = [];
   private readonly _prepend: Array<(mapper: Mapper) => void> = [];
   private _finalized = false;
-  /**
-   * @internal Helpers registered via {@link addUrlHelper}. Rails dispatches
-   * these through NamedRouteCollection, which isn't ported yet. Renamed
-   * from `urlHelpers` so the Rails-shape `urlHelpers(supportsPath)` method
-   * can take that name.
-   */
-  readonly _customUrlHelpers: Map<string, CustomUrlHelper> = new Map();
   /**
    * Registry consulted by `polymorphicUrl` / `polymorphicPath` before falling
    * back to the standard RESTful helper. In Rails this is populated by the
@@ -957,7 +986,6 @@ export class RouteSet {
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
-    this._customUrlHelpers.clear();
     this._urlHelpersWithPaths = undefined;
     this._urlHelpersWithoutPaths = undefined;
     this._defaultEnv = undefined;
@@ -1012,21 +1040,6 @@ export class RouteSet {
   ): void {
     const key = typeof klass === "string" ? klass : klass.name;
     this.polymorphicMappings.set(key, new CustomUrlHelper(key, options, block));
-  }
-
-  /**
-   * Rails: `NamedRouteCollection#add_url_helper(name, defaults, &block)`.
-   * Stored in {@link _customUrlHelpers} (a private map) until
-   * NamedRouteCollection lands; once ported, these will be folded into
-   * the generated url-helpers module so `${name}Path` / `${name}Url`
-   * become callable on `urlHelpers()`.
-   */
-  addUrlHelper(
-    name: string,
-    options: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
-  ): void {
-    this._customUrlHelpers.set(name, new CustomUrlHelper(name, options, block));
   }
 
   /** Rails: `extra_keys(options, recall = {})`. */
@@ -1337,7 +1350,6 @@ export class RouteSet {
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
-    this._customUrlHelpers.clear();
     this._urlHelpersWithPaths = undefined;
     this._urlHelpersWithoutPaths = undefined;
     this._defaultEnv = undefined;

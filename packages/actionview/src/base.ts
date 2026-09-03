@@ -395,20 +395,26 @@ export class Base {
       );
     }
     const prefix = this.virtualPathPrefix();
-    const format = this.currentFormat();
+    const viewFormat = this.currentFormat();
 
     if ((options as object | null)?.constructor !== Object) {
       return htmlSafe(
-        lookupContext.renderPartialSync(String(options), prefix, format, { ...locals }, this),
+        lookupContext.renderPartialSync(String(options), prefix, viewFormat, { ...locals }, this),
       );
     }
 
     const hash = options as RenderOptions;
-    return this.inRenderingContext(hash, () => {
+    return this.inRenderingContext(hash, (renderer) => {
+      // Rails resolves through the (possibly formats-prepended) lookup
+      // context's own details, so a `formats:` option changes what
+      // `find_template` answers (`renderer/template_renderer.rb:36-50`).
+      // trails' synchronous entry points take the format explicitly, so it is
+      // read back off the renderer `in_rendering_context` yielded.
+      const format = hash.formats ? String([...renderer.formats][0] ?? viewFormat) : viewFormat;
       if (block) {
         this.viewFlow.set("layout", String(block() ?? ""));
         return htmlSafe(
-          lookupContext.renderPartialSync(
+          renderer.renderPartialSync(
             String(hash.layout),
             prefix,
             format,
@@ -419,7 +425,7 @@ export class Base {
       }
       if (Object.hasOwn(hash, "partial")) {
         return htmlSafe(
-          lookupContext.renderPartialSync(
+          renderer.renderPartialSync(
             String(hash.partial),
             prefix,
             format,
@@ -435,7 +441,7 @@ export class Base {
         );
       }
       return htmlSafe(
-        lookupContext.renderTemplateSync(
+        renderer.renderTemplateSync(
           String(hash.template),
           prefix,
           format,
@@ -448,13 +454,13 @@ export class Base {
 
   /**
    * Mirrors `Base#in_rendering_context(options)` (`base.rb:292-309`). Rails
-   * yields `@view_renderer` and rebuilds it from the prepended-formats lookup
-   * context; trails' arms read `lookupContext` directly, so the block takes no
-   * argument and there is no renderer to rebuild.
+   * yields `@view_renderer`, rebuilt from the prepended-formats lookup
+   * context; trails' arms render through the lookup context itself, so that is
+   * what the block is yielded.
    *
    * @missingRailsCall new — PERMANENT
    */
-  inRenderingContext<T>(options: RenderOptions, block: () => T): T {
+  inRenderingContext<T>(options: RenderOptions, block: (renderer: LookupContext) => T): T {
     const oldLookupContext = this.lookupContext;
 
     if (!this.lookupContext?.htmlFallbackForJs && options.formats) {
@@ -466,7 +472,7 @@ export class Base {
     }
 
     try {
-      return block();
+      return block(this.lookupContext!);
     } finally {
       this.lookupContext = oldLookupContext;
     }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { UrlGenerationError } from "./exceptions.js";
 
 function makeRoutes(helperNames: string[]) {
-  return { namedRoutes: { helperNames } };
+  return { namedRoutes: { helperNames: () => helperNames } };
 }
 
 describe("UrlGenerationError#corrections", () => {

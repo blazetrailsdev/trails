@@ -333,6 +333,7 @@ describe("ActionView::Base#render", () => {
       "test/hello_world.html.tse": "Hello world!",
       "test/_partial_only.html.tse": "only partial",
       "test/_layout.html.tse": "<div><%= yield %></div>",
+      "test/hello_world.json.tse": '{"hello":"world"}',
     });
     const lookupContext = new LookupContext(null, {}, []);
     lookupContext.addResolver(resolver);
@@ -363,6 +364,14 @@ describe("ActionView::Base#render", () => {
       "You invoked render but did not give any of :body, :file, :html, :inline, " +
         ":partial, :plain, :renderable, or :template option.",
     );
+  });
+
+  it("renders through the formats-prepended lookup context in_rendering_context built", () => {
+    expect(
+      buildView()
+        .render({ template: "test/hello_world", formats: ["json"] })
+        .toString(),
+    ).toBe('{"hello":"world"}');
   });
 
   it("restores the lookup context after in_rendering_context prepends formats", () => {
