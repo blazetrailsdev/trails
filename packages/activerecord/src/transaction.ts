@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import { Transaction as InternalTransaction } from "./connection-adapters/abstract/transaction.js";
 
 export class Transaction {

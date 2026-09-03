@@ -1,6 +1,6 @@
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 
 export interface CredentialsGeneratorOptions extends GeneratorOptions {

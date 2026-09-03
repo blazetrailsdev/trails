@@ -1,5 +1,5 @@
 import { ArgumentError } from "../../hash-utils.js";
-import { getCrypto } from "../../crypto-adapter.js";
+import { getCrypto } from "@blazetrails/ruby-compat";
 
 /**
  * Digest::UUID — mirrors `active_support/core_ext/digest/uuid.rb`.

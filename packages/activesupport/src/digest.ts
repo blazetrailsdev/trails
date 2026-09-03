@@ -1,4 +1,4 @@
-import { getCrypto } from "./crypto-adapter.js";
+import { getCrypto } from "@blazetrails/ruby-compat";
 
 type HashDigestClass = {
   hexdigest(data: string): string;

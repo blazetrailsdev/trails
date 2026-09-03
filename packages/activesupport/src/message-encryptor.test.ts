@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getCrypto } from "./crypto-adapter.js";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import { ActiveSupportJSON } from "./json.js";
 import { Encoding } from "./json/encoding.js";
 import { InvalidMessage, MessageEncryptor, NullSerializer } from "./message-encryptor.js";
@@ -34,7 +34,7 @@ function encode64(value: string): string {
 }
 
 describe("MessageEncryptorTest", () => {
-  const secret = getCrypto().randomBytes(32);
+  const secret = Buffer.from(getCrypto().randomBytes(32));
   const verifier = new MessageVerifier(secret, { serializer: NullSerializer });
   const encryptor = new MessageEncryptor(secret);
   /**
@@ -110,8 +110,8 @@ describe("MessageEncryptorTest", () => {
     Encoding.useStandardJsonTimeFormat = true;
     try {
       const encryptor = new MessageEncryptor(
-        getCrypto().randomBytes(32),
-        getCrypto().randomBytes(128),
+        Buffer.from(getCrypto().randomBytes(32)),
+        Buffer.from(getCrypto().randomBytes(128)),
         { serializer: JSONSerializer },
       );
       const message = encryptor.encryptAndSign({

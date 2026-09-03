@@ -4,7 +4,7 @@
  * Middleware that sets a unique X-Request-Id header on each request.
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;

@@ -15,11 +15,16 @@
  * - **Env lookup goes through `processAdapter.env`**, not `process.env`.
  */
 
-import { getCrypto } from "./crypto-adapter.js";
-import { FileUtils, IO, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import {
+  getCrypto,
+  FileUtils,
+  IO,
+  getFsAsync,
+  getPathAsync,
+  env as processEnv,
+  chomp,
+} from "@blazetrails/ruby-compat";
 import { MessageEncryptor } from "./message-encryptor.js";
-import { env as processEnv } from "@blazetrails/ruby-compat";
-import { chomp } from "@blazetrails/ruby-compat";
 import { Tempfile } from "./tempfile.js";
 
 const CIPHER = "aes-128-gcm";

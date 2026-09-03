@@ -125,7 +125,7 @@
   "packages/activesupport/src/core-ext/big-decimal/conversions.ts",
   "packages/activesupport/src/core-ext/object/try.ts",
   "packages/activesupport/src/core-ext/string/output-safety.ts",
-  "packages/activesupport/src/crypto-adapter.ts",
+  "packages/ruby-compat/src/crypto-adapter.ts",
   "packages/activesupport/src/current-attributes.ts",
   "packages/activesupport/src/delegation.ts",
   "packages/activesupport/src/descendants-tracker.ts",

@@ -6,7 +6,7 @@
  * @see https://api.rubyonrails.org/classes/ActionController/EtagWithTemplateDigest.html
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import {
   combineEtags as _combineEtags,
   httpCacheForever as _httpCacheForever,

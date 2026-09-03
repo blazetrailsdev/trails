@@ -10,7 +10,8 @@
  */
 
 import ts from "typescript";
-import { singularize, getCrypto } from "@blazetrails/activesupport";
+import { singularize } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import {
   ForeignKeyDefinition,
   type IntrospectedTable,

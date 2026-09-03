@@ -50,9 +50,6 @@ describe("Cipher", () => {
 
 describe("getCrypto", () => {
   it("auto-registers the node adapter under a pure ESM entry module", async () => {
-    // vitest enters through CJS interop, where `require` exists and the
-    // createRequire arm covers for the seam; only a real ESM entry exercises
-    // the path a `node dist/**.js` or `tsx` host takes.
     const module = JSON.stringify(
       path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "dist", "crypto-adapter.js"),
     );

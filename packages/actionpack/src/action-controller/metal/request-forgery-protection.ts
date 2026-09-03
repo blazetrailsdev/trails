@@ -5,8 +5,7 @@
  * @see https://api.rubyonrails.org/classes/ActionController/RequestForgeryProtection.html
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
-import { chomp } from "@blazetrails/ruby-compat";
+import { getCrypto, chomp } from "@blazetrails/ruby-compat";
 import {
   CookieJar,
   cookieJar,
@@ -405,7 +404,7 @@ const GLOBAL_CSRF_TOKEN_IDENTIFIER = "!real_csrf_token";
 /** @internal */
 export function generateCsrfToken(): string {
   // Rails: SecureRandom.urlsafe_base64(AUTHENTICITY_TOKEN_LENGTH).
-  return encodeCsrfToken(getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH));
+  return encodeCsrfToken(Buffer.from(getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH)));
 }
 
 /** @internal */
@@ -450,11 +449,9 @@ export function realCsrfToken(this: CsrfController, _session?: unknown): Buffer 
 
 /** @internal */
 export function csrfTokenHmac(this: CsrfController, session: unknown, identifier: string): Buffer {
-  return getCrypto()
-    .createHmac("sha256", realCsrfToken.call(this, session))
-    .update(identifier)
-    .digest()
-    .subarray(0, AUTHENTICITY_TOKEN_LENGTH);
+  return Buffer.from(
+    getCrypto().createHmac("sha256", realCsrfToken.call(this, session)).update(identifier).digest(),
+  ).subarray(0, AUTHENTICITY_TOKEN_LENGTH);
 }
 
 /** @internal */
@@ -474,7 +471,7 @@ export function perFormCsrfToken(
 
 /** @internal */
 export function maskToken(rawToken: Buffer): string {
-  const otp = getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH);
+  const otp = Buffer.from(getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH));
   return encodeCsrfToken(Buffer.concat([otp, xorByteStrings(otp, rawToken)]));
 }
 

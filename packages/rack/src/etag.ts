@@ -1,5 +1,5 @@
 import { ETAG, CACHE_CONTROL } from "./constants.js";
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 const DEFAULT_CACHE_CONTROL = "max-age=0, private, must-revalidate";

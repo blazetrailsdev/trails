@@ -1,4 +1,4 @@
-import { getCrypto } from "../crypto-adapter.js";
+import { getCrypto } from "@blazetrails/ruby-compat";
 
 /**
  * Mirrors: SecureRandom (core_ext/securerandom.rb).

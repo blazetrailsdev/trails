@@ -8,9 +8,17 @@ import type { RawConfigurations } from "../database-configurations.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
-import { getCryptoAsync, getOs, getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
-import { stdout, stderr, abort } from "@blazetrails/ruby-compat";
-import { File, FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
+import { getOs, getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
+import {
+  getCryptoAsync,
+  stdout,
+  stderr,
+  abort,
+  File,
+  FileUtils,
+  getFs,
+  getPath,
+} from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
 import type { Base } from "../base.js";

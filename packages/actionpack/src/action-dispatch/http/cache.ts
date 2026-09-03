@@ -6,7 +6,7 @@
  * `Cache-Control` normalization. Reference: rfc7232#section-6.
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 
 const HTTP_IF_MODIFIED_SINCE = "If-Modified-Since";
 const HTTP_IF_NONE_MATCH = "If-None-Match";
