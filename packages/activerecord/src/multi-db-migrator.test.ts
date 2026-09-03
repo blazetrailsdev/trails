@@ -8,6 +8,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { Base } from "./base.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
+import { migrationProxy } from "./test-helpers/migration-proxy.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 const PATH_A = [`${MIGRATIONS_ROOT}/valid`];
@@ -17,23 +18,21 @@ function sensor(
   version: number,
   name: string,
 ): MigrationProxy & { wentUp: boolean; wentDown: boolean } {
-  const proxy = {
-    version,
-    name,
+  const proxy = Object.assign(migrationProxy({ version, name }), {
     wentUp: false,
     wentDown: false,
-    migration: () =>
-      anonymousMigration(
-        name,
-        version,
-        async () => {
-          proxy.wentUp = true;
-        },
-        async () => {
-          proxy.wentDown = true;
-        },
-      ),
-  };
+  });
+  proxy.migration = async () =>
+    anonymousMigration(
+      name,
+      version,
+      async () => {
+        proxy.wentUp = true;
+      },
+      async () => {
+        proxy.wentDown = true;
+      },
+    );
   return proxy;
 }
 
@@ -72,33 +71,33 @@ describe("MultiDbMigratorTest", () => {
     await schemaMigrationB.deleteAllVersions();
 
     migrationsA = [
-      {
+      migrationProxy({
         version: 1,
         name: "ValidPeopleHaveLastNames",
         migration: () => anonymousMigration("ValidPeopleHaveLastNames", 1),
-      },
-      {
+      }),
+      migrationProxy({
         version: 2,
         name: "WeNeedReminders",
         migration: () => anonymousMigration("WeNeedReminders", 2),
-      },
-      {
+      }),
+      migrationProxy({
         version: 3,
         name: "InnocentJointable",
         migration: () => anonymousMigration("InnocentJointable", 3),
-      },
+      }),
     ];
     migrationsB = [
-      {
+      migrationProxy({
         version: 1,
         name: "PeopleHaveHobbies",
         migration: () => anonymousMigration("PeopleHaveHobbies", 1),
-      },
-      {
+      }),
+      migrationProxy({
         version: 2,
         name: "PeopleHaveDescriptions",
         migration: () => anonymousMigration("PeopleHaveDescriptions", 2),
-      },
+      }),
     ];
   });
 
@@ -199,16 +198,16 @@ describe("MultiDbMigratorTest", () => {
   it("finds pending migrations", async () => {
     await schemaMigrationA.createVersion("1");
     const listA = [
-      {
+      migrationProxy({
         version: 1,
         name: "Foo",
         migration: () => anonymousMigration("Foo", 1),
-      },
-      {
+      }),
+      migrationProxy({
         version: 3,
         name: "Bar",
         migration: () => anonymousMigration("Bar", 3),
-      },
+      }),
     ];
     const migratorA = new Migrator("up", listA, schemaMigrationA, internalMetadataA);
     const pendingA = await migratorA.pendingMigrations();
@@ -217,16 +216,16 @@ describe("MultiDbMigratorTest", () => {
 
     await schemaMigrationB.createVersion("1");
     const listB = [
-      {
+      migrationProxy({
         version: 1,
         name: "Foo",
         migration: () => anonymousMigration("Foo", 1),
-      },
-      {
+      }),
+      migrationProxy({
         version: 3,
         name: "Bar",
         migration: () => anonymousMigration("Bar", 3),
-      },
+      }),
     ];
     const migratorB = new Migrator("up", listB, schemaMigrationB, internalMetadataB);
     const pendingB = await migratorB.pendingMigrations();

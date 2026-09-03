@@ -34,6 +34,7 @@ type AdapterInstrumenter = {
   ): Promise<T>;
 };
 import { ActiveRecord } from "../ar-config.js";
+import { _Base } from "../base-slot.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool } from "./abstract/connection-pool.js";
@@ -2114,7 +2115,7 @@ export class AbstractAdapter implements Quoting {
     code?: string | number;
     [k: string]: unknown;
   }): boolean {
-    return ActiveRecord.dbWarningsIgnore.some((warningMatcher) => {
+    return _Base!.dbWarningsIgnore.some((warningMatcher) => {
       const matcher =
         typeof warningMatcher === "string" ? new RegExp(warningMatcher) : warningMatcher;
       return matcher.test(warning.message ?? "") || matcher.test(String(warning.code ?? ""));

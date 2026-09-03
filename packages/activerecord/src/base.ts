@@ -654,6 +654,8 @@ interface _ConstructorAssociationWriter {
   syncIdsWrite?: (v: unknown[]) => void;
 }
 
+let _dbWarningsIgnore: (string | RegExp)[] = [];
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   declare static includeRootInJson: boolean | string;
@@ -690,6 +692,15 @@ export class Base extends Model {
 
   /** @internal */
   declare static _registryKeys: string[];
+
+  static get dbWarningsIgnore(): (string | RegExp)[] {
+    return _dbWarningsIgnore;
+  }
+
+  static set dbWarningsIgnore(value: (string | RegExp)[]) {
+    _dbWarningsIgnore = value;
+  }
+
   static writingRole = WRITING_ROLE;
   static readingRole = READING_ROLE;
 

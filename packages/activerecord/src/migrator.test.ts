@@ -14,15 +14,16 @@ import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
+import { migrationProxy } from "./test-helpers/migration-proxy.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
 function migration(name: string, version?: number): MigrationProxy {
-  return {
+  return migrationProxy({
     version: version === undefined ? (null as unknown as number) : version,
     name,
     migration: () => anonymousMigration(name, version),
-  };
+  });
 }
 
 function sensors(count: number): { calls: Array<[string, number]>; migrations: MigrationProxy[] } {
@@ -30,21 +31,23 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
   const migrations: MigrationProxy[] = [];
   for (let i = 0; i < count; i++) {
     const version = i + 1;
-    migrations.push({
-      version,
-      name: `Sensor${version}`,
-      migration: () =>
-        anonymousMigration(
-          `Sensor${version}`,
-          version,
-          async () => {
-            calls.push(["up", version]);
-          },
-          async () => {
-            calls.push(["down", version]);
-          },
-        ),
-    });
+    migrations.push(
+      migrationProxy({
+        version,
+        name: `Sensor${version}`,
+        migration: () =>
+          anonymousMigration(
+            `Sensor${version}`,
+            version,
+            async () => {
+              calls.push(["up", version]);
+            },
+            async () => {
+              calls.push(["down", version]);
+            },
+          ),
+      }),
+    );
   }
   return { calls, migrations };
 }
@@ -665,7 +668,7 @@ function trackedSensor(
   version: number,
 ): { proxy: MigrationProxy; state: { wentUp: boolean; wentDown: boolean } } {
   const state = { wentUp: false, wentDown: false };
-  const proxy: MigrationProxy = {
+  const proxy: MigrationProxy = migrationProxy({
     version,
     name: name ?? `Sensor${version}`,
     migration: () =>
@@ -679,6 +682,6 @@ function trackedSensor(
           state.wentDown = true;
         },
       ),
-  };
+  });
   return { proxy, state };
 }

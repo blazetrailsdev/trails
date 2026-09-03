@@ -284,7 +284,7 @@ export {
 } from "./migration.js";
 export { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 export { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
-export type { MigrationProxy } from "./migration.js";
+export { MigrationProxy } from "./migration.js";
 export type { DelegatedTypeOptions } from "./delegated-type.js";
 
 export { isDestroyable } from "./autosave-association.js";

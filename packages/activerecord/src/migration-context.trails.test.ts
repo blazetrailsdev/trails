@@ -133,7 +133,7 @@ describe("MigrationContext filename spellings", () => {
   it("prefers .ts over .js when both exist for the same migration", () => {
     const migrations = found("spellings_ts_and_js");
     expect(migrations).toHaveLength(1);
-    expect(basename(migrations[0].filename!)).toBe("20260101000000_create_posts.ts");
+    expect(basename(migrations[0].filename)).toBe("20260101000000_create_posts.ts");
   });
 });
 

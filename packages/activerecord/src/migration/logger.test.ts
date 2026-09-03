@@ -40,11 +40,11 @@ describe("Migration", () => {
     it("migration should be run without logger", async () => {
       const previousLogger = Base.logger;
       Base.logger = null;
-      const migrations: MigrationProxy[] = [
+      const migrations = [
         new MigrationStruct("a", 1),
         new MigrationStruct("b", 2),
         new MigrationStruct("c", 3),
-      ];
+      ] as unknown as MigrationProxy[];
       try {
         await expect(
           new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(),

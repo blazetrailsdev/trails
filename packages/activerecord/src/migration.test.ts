@@ -34,6 +34,7 @@ import { describeIfMysqlAdapter } from "./support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
+import { migrationProxy } from "./test-helpers/migration-proxy.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
@@ -46,7 +47,7 @@ function envName(adapter: DatabaseAdapter): string {
 }
 
 function migrateProxy(version: number, body: (m: Migration) => Promise<void>): MigrationProxy {
-  return {
+  return migrationProxy({
     version,
     name: `Migration${version}`,
     migration: () =>
@@ -56,7 +57,7 @@ function migrateProxy(version: number, body: (m: Migration) => Promise<void>): M
         }
         override async down(): Promise<void> {}
       })(),
-  };
+  });
 }
 
 async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
@@ -589,11 +590,11 @@ describe("MigrationTest", () => {
     const withMigrations = new Migrator(
       "up",
       [
-        {
+        migrationProxy({
           version: 1,
           name: "First",
           migration: () => anonymousMigration("First", 1),
-        },
+        }),
       ],
       new SchemaMigration(adapter.pool),
       new InternalMetadata(adapter.pool),
@@ -612,11 +613,11 @@ describe("MigrationTest", () => {
   it("migration version", async () => {
     const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
-      {
+      migrationProxy({
         version: 20131219224947,
         name: "VersionCheck",
         migration: () => anonymousMigration("VersionCheck", 20131219224947),
-      },
+      }),
     ];
     const migrator = new Migrator(
       "up",
@@ -803,7 +804,7 @@ describe("MigrationTest", () => {
   itIfSupports("ddl_transactions", "migrator one up with exception and rollback", async () => {
     const adapter = Base.connection;
     const migrations: MigrationProxy[] = [
-      {
+      migrationProxy({
         version: 100,
         name: "Broken",
         migration: () =>
@@ -815,7 +816,7 @@ describe("MigrationTest", () => {
             },
             async () => {},
           ),
-      },
+      }),
     ];
     const migrator = new Migrator(
       "up",
@@ -834,7 +835,7 @@ describe("MigrationTest", () => {
     async () => {
       const adapter = Base.connection;
       const migrations: MigrationProxy[] = [
-        {
+        migrationProxy({
           version: 100,
           name: "Broken",
           migration: () =>
@@ -846,7 +847,7 @@ describe("MigrationTest", () => {
               },
               async () => {},
             ),
-        },
+        }),
       ];
       const migrator = new Migrator(
         "up",
@@ -880,11 +881,11 @@ describe("MigrationTest", () => {
       }
     }
 
-    const proxy: MigrationProxy = {
+    const proxy: MigrationProxy = migrationProxy({
       version: 101,
       name: "MigWithoutTx",
       migration: () => new MigWithoutTx(),
-    };
+    });
     const migrator = new Migrator(
       "up",
       [proxy],
@@ -908,11 +909,11 @@ describe("MigrationTest", () => {
   it("migration that fails to load escapes the canceled message", async () => {
     const adapter = await freshAdapter();
     const loadError = new Error("uninitialized constant MigThatFailsToLoad");
-    const proxy: MigrationProxy = {
+    const proxy: MigrationProxy = migrationProxy({
       version: 102,
       name: "MigThatFailsToLoad",
       migration: () => Promise.reject(loadError),
-    };
+    });
     const migrator = new Migrator(
       "up",
       [proxy],
@@ -966,11 +967,11 @@ describe("MigrationTest", () => {
       }
       async down(): Promise<void> {}
     }
-    const proxy: MigrationProxy = {
+    const proxy: MigrationProxy = migrationProxy({
       version: 1,
       name: "Failing",
       migration: () => new FailingMigration(),
-    };
+    });
     const migrator = new Migrator(
       "up",
       [proxy],
@@ -989,11 +990,11 @@ describe("MigrationTest", () => {
     await im.createTable();
     await im.set("custom_key", "custom_value");
 
-    const proxy: MigrationProxy = {
+    const proxy: MigrationProxy = migrationProxy({
       version: 1,
       name: "M1",
       migration: () => anonymousMigration("M1", 1),
-    };
+    });
     const migrator = new Migrator(
       "up",
       [proxy],
@@ -1024,11 +1025,11 @@ describe("MigrationTest", () => {
     expect(im.enabled).toBe(false);
     expect(await im.tableExists()).toBe(false);
 
-    const proxy: MigrationProxy = {
+    const proxy: MigrationProxy = migrationProxy({
       version: 1,
       name: "TestMigration",
       migration: () => anonymousMigration("TestMigration", 1),
-    };
+    });
     const migrator = new Migrator(
       "up",
       [proxy],
@@ -1278,7 +1279,7 @@ describe("MigrationTest", () => {
 
   itIfSupports("advisory_locks", "migrator one up with unavailable lock", async () => {
     const ran: string[] = [];
-    const proxy: MigrationProxy = {
+    const proxy: MigrationProxy = migrationProxy({
       version: 100,
       name: "Broken",
       migration: () =>
@@ -1290,7 +1291,7 @@ describe("MigrationTest", () => {
           },
           async () => {},
         ),
-    };
+    });
     const adapter = Base.connection;
     const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
     try {
@@ -1309,7 +1310,7 @@ describe("MigrationTest", () => {
 
   itIfSupports("advisory_locks", "migrator one up with unavailable lock using run", async () => {
     const ran: string[] = [];
-    const proxy: MigrationProxy = {
+    const proxy: MigrationProxy = migrationProxy({
       version: 100,
       name: "Broken",
       migration: () =>
@@ -1321,7 +1322,7 @@ describe("MigrationTest", () => {
           },
           async () => {},
         ),
-    };
+    });
     const adapter = Base.connection;
     const getSpy = vi.spyOn(adapter as any, "getAdvisoryLock").mockResolvedValue(false);
     try {
@@ -1347,11 +1348,11 @@ describe("MigrationTest", () => {
       const getSpy = vi.spyOn(realAdapter as any, "getAdvisoryLock");
       const releaseSpy = vi.spyOn(realAdapter as any, "releaseAdvisoryLock");
       try {
-        const proxy: MigrationProxy = {
+        const proxy: MigrationProxy = migrationProxy({
           version: 200,
           name: "NoOp",
           migration: () => anonymousMigration("NoOp", 200),
-        };
+        });
         const migrator = new Migrator(
           "up",
           [proxy],
@@ -1374,11 +1375,11 @@ describe("MigrationTest", () => {
     "with advisory lock raises the right error when it fails to release lock",
     async () => {
       const realAdapter = Base.connection;
-      const proxy: MigrationProxy = {
+      const proxy: MigrationProxy = migrationProxy({
         version: 100,
         name: "NoOp",
         migration: () => anonymousMigration("NoOp", 100),
-      };
+      });
       const migrator = new Migrator(
         "up",
         [proxy],
@@ -1876,7 +1877,7 @@ describe("MigrationTest", () => {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
         expect(BigInt(copied[0].version) > BigInt(futureVersion)).toBe(true);
-        expect(fs.existsSync(copied[0].filename!)).toBe(true);
+        expect(fs.existsSync(copied[0].filename)).toBe(true);
         const copied2 = await Migration.copy(dst, { bukkits: src });
         expect(copied2).toHaveLength(0);
       } finally {
@@ -1900,7 +1901,7 @@ describe("MigrationTest", () => {
       try {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
-        const body = fs.readFileSync(copied[0].filename!, "utf8");
+        const body = fs.readFileSync(copied[0].filename, "utf8");
         expect(body).toMatch(/^\/\/ @ts-nocheck\n\n\/\/ This migration comes from/);
         const copied2 = await Migration.copy(dst, { bukkits: src });
         expect(copied2).toHaveLength(0);
@@ -1952,7 +1953,7 @@ describe("MigrationTest", () => {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(1);
         expect(fs.existsSync(dst)).toBe(true);
-        expect(fs.existsSync(copied[0].filename!)).toBe(true);
+        expect(fs.existsSync(copied[0].filename)).toBe(true);
       } finally {
         fs.rmSync(root, { recursive: true, force: true });
       }
@@ -1973,8 +1974,8 @@ describe("MigrationTest", () => {
         const copied = await Migration.copy(dst, { bukkits: src });
         expect(copied).toHaveLength(2);
         for (const m of copied) {
-          expect(m.scope).toBe("bukkits");
-          expect(fs.existsSync(m.filename!)).toBe(true);
+          expect(path.basename(m.filename)).toContain(".bukkits.");
+          expect(fs.existsSync(m.filename)).toBe(true);
         }
       } finally {
         fs.rmSync(root, { recursive: true, force: true });

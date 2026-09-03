@@ -1157,7 +1157,6 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         .migrations;
 
       for (const source of sourceMigrations) {
-        if (!source.filename) continue;
         const body = fs.readFileSync(source.filename, "utf8");
         const inserted = `// This migration comes from ${scope} (originally ${source.version})\n`;
 
@@ -1170,36 +1169,21 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         }
 
         const nextNumber = last ? last.version + 1 : 0;
-        const newVersion = toInteger(Migration.nextMigrationNumber(nextNumber));
+        source.version = toInteger(Migration.nextMigrationNumber(nextNumber));
         const fileBase = underscore(source.name);
         const ext = path.extname(source.filename) || ".ts";
-        const newPath = path.join(destination, `${newVersion}_${fileBase}.${scope}${ext}`);
+        const newPath = path.join(destination, `${source.version}_${fileBase}.${scope}${ext}`);
         const oldPath = source.filename;
-        const proxyName = source.name;
-        let loaded: Promise<Migration> | undefined;
-        const copy: MigrationProxy = {
-          name: source.name,
-          version: newVersion,
-          scope,
-          filename: newPath,
-          migration: async () => {
-            loaded ??= (async () => {
-              const { pathToFileURL } = await import("node:url");
-              const mod = (await import(pathToFileURL(newPath).href)) as Record<string, unknown>;
-              return loadMigrationFrom(mod, proxyName, newVersion);
-            })();
-            return loaded;
-          },
-        };
-        last = copy;
+        source.filename = newPath;
+        last = source;
 
         const magicMatch = /^((?:\/\/ @ts-(?:no)?check[^\n]*\n)+\n?)/.exec(body);
         const magic = magicMatch ? magicMatch[1] : "";
         const rest = magic.length > 0 ? body.slice(magic.length) : body;
-        fs.writeFileSync(newPath, `${magic}${inserted}${rest}`);
-        copied.push(copy);
-        options.onCopy?.(scope, copy, oldPath);
-        destinationMigrations.push(copy);
+        fs.writeFileSync(source.filename, `${magic}${inserted}${rest}`);
+        copied.push(source);
+        options.onCopy?.(scope, source, oldPath);
+        destinationMigrations.push(source);
       }
     }
     return copied;
@@ -1386,28 +1370,67 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 }
 
-export interface MigrationProxy {
-  version: number;
+export class MigrationProxy {
   name: string;
-  filename?: string;
-  scope?: string;
-  migration: () => Migration | Promise<Migration>;
-  /** @internal */
-  basename?(): string;
-  /** @internal */
-  loadMigration?(): Promise<Migration>;
-}
+  version: number;
+  filename: string;
+  scope: string;
 
-async function loadMigrationFrom(
-  mod: Record<string, unknown>,
-  name: string,
-  version: number,
-): Promise<Migration> {
-  const exported = mod[name];
-  if (typeof exported === "function") {
-    return new (exported as new (name?: string, version?: number) => Migration)(name, version);
+  private _migration: Migration | null = null;
+  private _migrationPromise: Promise<Migration> | null = null;
+
+  constructor(name: string, version: number, filename: string, scope: string) {
+    this.name = name;
+    this.version = version;
+    this.filename = filename;
+    this.scope = scope;
+    this._migration = null;
   }
-  throw new Error(`Migration ${name} must export a Migration class named "${name}"`);
+
+  basename(): string {
+    return getPath().basename(this.filename);
+  }
+
+  async migrate(direction: "up" | "down"): Promise<void> {
+    return (await this.migration()).migrate(direction);
+  }
+
+  async announce(message: string): Promise<void> {
+    (await this.migration()).announce(message);
+  }
+
+  async write(text = ""): Promise<void> {
+    (await this.migration()).write(text);
+  }
+
+  get disableDdlTransaction(): boolean {
+    if (!this._migration)
+      throw new Error("MigrationProxy: await migration() before reading disableDdlTransaction");
+    return !!this._migration.disableDdlTransaction;
+  }
+
+  /** @internal */
+  migration(): Promise<Migration> {
+    this._migrationPromise ??= this.loadMigration().then((m) => (this._migration = m));
+    return this._migrationPromise;
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall load — PERMANENT
+   */
+  async loadMigration(): Promise<Migration> {
+    const { pathToFileURL } = await import("node:url");
+    const mod = (await import(pathToFileURL(this.filename).href)) as Record<string, unknown>;
+    const klass = mod[this.name];
+    if (typeof klass !== "function") {
+      throw new Error(`Migration ${this.name} must export a Migration class named "${this.name}"`);
+    }
+    return new (klass as new (name?: string, version?: number) => Migration)(
+      this.name,
+      this.version,
+    );
+  }
 }
 
 function toInteger(value: string): number {
@@ -1627,21 +1650,7 @@ export class MigrationContext<
       }
       version = toInteger(version);
       name = camelize(name);
-      let loaded: Promise<Migration> | undefined;
-      return {
-        version,
-        name,
-        filename: file,
-        scope: scope || undefined,
-        migration: async (): Promise<Migration> => {
-          loaded ??= (async () => {
-            const { pathToFileURL } = await import("node:url");
-            const mod = await import(pathToFileURL(file).href);
-            return loadMigrationFrom(mod, name, version);
-          })();
-          return loaded;
-        },
-      } satisfies MigrationProxy;
+      return new MigrationProxy(name, version, file, scope);
     });
 
     return migrations.sort(byVersion);

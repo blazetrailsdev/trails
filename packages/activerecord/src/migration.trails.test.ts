@@ -15,6 +15,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Table } from "./connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
+import { migrationProxy } from "./test-helpers/migration-proxy.js";
 
 describe("MigrationTest", () => {
   fixtures({}, { useTransactionalTests: false });
@@ -71,11 +72,11 @@ describe("MigrationTest", () => {
     const adapter = Base.connection;
     await new SchemaMigration(adapter.pool).dropTable();
     const migrations: MigrationProxy[] = [
-      {
+      migrationProxy({
         version: 1,
         name: "AsyncFirst",
         migration: async () => anonymousMigration("AsyncFirst", 1),
-      },
+      }),
     ];
     const migrator = new Migrator(
       "up",

@@ -21,7 +21,7 @@ import {
   NullSchemaMigration,
   SchemaMigration,
 } from "@blazetrails/activerecord";
-import type { MigrationProxy } from "@blazetrails/activerecord";
+import { MigrationProxy } from "@blazetrails/activerecord";
 
 // Discovery is `MigrationContext#migrations` (`migration.rb:1303-1315`) — the
 // one path there is — built with the null collaborators `Migration.copy` uses
@@ -1509,23 +1509,19 @@ export class CreatePosts extends Migration {
     const adapter = new BetterSQLite3Adapter(dbFile);
     await establishMigrationConnection(adapter);
     try {
-      const migrations = [
-        {
-          version: 20260101000000,
-          name: "CreateWidgets",
-          migration: () =>
-            new (class extends Migration {
-              override async up(): Promise<void> {
-                await this.connection.executeMutation(
-                  `CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`,
-                );
-              }
-              override async down(): Promise<void> {
-                await this.connection.executeMutation(`DROP TABLE widgets`);
-              }
-            })("CreateWidgets", 20260101000000),
-        },
-      ];
+      const createWidgets = new MigrationProxy("CreateWidgets", 20260101000000, "", "");
+      createWidgets.migration = async () =>
+        new (class extends Migration {
+          override async up(): Promise<void> {
+            await this.connection.executeMutation(
+              `CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT)`,
+            );
+          }
+          override async down(): Promise<void> {
+            await this.connection.executeMutation(`DROP TABLE widgets`);
+          }
+        })("CreateWidgets", 20260101000000);
+      const migrations = [createWidgets];
       await disableMetadataTable(adapter);
       const migrator = new Migrator(
         "up",

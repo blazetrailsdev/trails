@@ -171,8 +171,6 @@ export const ActiveRecord = {
     }
   },
 
-  dbWarningsIgnore: [] as (string | RegExp)[],
-
   get defaultTimezone(): "utc" | "local" {
     return _defaultTimezone;
   },

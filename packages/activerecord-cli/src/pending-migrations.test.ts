@@ -3,7 +3,13 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, Migration, Migrator, MigrationContext } from "@blazetrails/activerecord";
+import {
+  DatabaseTasks,
+  Migration,
+  Migrator,
+  MigrationContext,
+  MigrationProxy,
+} from "@blazetrails/activerecord";
 import { checkPendingMigrations } from "./pending-migrations.js";
 
 const FAKE_CONFIG = `
@@ -21,16 +27,10 @@ async function makeFakeProject(): Promise<string> {
   return dir;
 }
 
-const PROXY_A = {
-  version: 20240101000001,
-  name: "CreateUsers",
-  migration: () => new (class extends Migration {})(),
-};
-const PROXY_B = {
-  version: 20240101000002,
-  name: "AddIndex",
-  migration: () => new (class extends Migration {})(),
-};
+const PROXY_A = new MigrationProxy("CreateUsers", 20240101000001, "", "");
+PROXY_A.migration = async () => new (class extends Migration {})();
+const PROXY_B = new MigrationProxy("AddIndex", 20240101000002, "", "");
+PROXY_B.migration = async () => new (class extends Migration {})();
 
 describe("PendingMigrationsTest", () => {
   let err: string[];

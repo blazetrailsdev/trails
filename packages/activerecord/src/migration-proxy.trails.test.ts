@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { MigrationProxy } from "./deprecator.js";
-import { Migration } from "./migration.js";
+import { Migration, MigrationProxy } from "./migration.js";
 
 class CreateUsers extends Migration {
   async up(): Promise<void> {}
@@ -37,15 +36,6 @@ describe("MigrationProxy", () => {
     );
   });
 
-  it("loadMigrationAsync falls through to import() on ERR_REQUIRE_ESM", async () => {
-    const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
-    const esmError = Object.assign(new Error("ERR_REQUIRE_ESM"), { code: "ERR_REQUIRE_ESM" });
-    vi.spyOn(proxy, "loadMigration").mockImplementation(() => {
-      throw esmError;
-    });
-    await expect(proxy.loadMigrationAsync()).rejects.toThrow();
-  });
-
   it("delegates migrate, announce, write, and disableDdlTransaction to the loaded migration", async () => {
     class NoTransaction extends Migration {
       async up(): Promise<void> {}
@@ -56,7 +46,7 @@ describe("MigrationProxy", () => {
     const announce = vi.spyOn(migration, "announce").mockImplementation(() => {});
     const write = vi.spyOn(migration, "write").mockImplementation(() => {});
     const proxy = new MigrationProxy("NoTransaction", 1, "/fake/path.ts", "");
-    vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(migration);
+    vi.spyOn(proxy, "loadMigration").mockResolvedValue(migration);
 
     await proxy.migrate("up");
     await proxy.announce("hello");
@@ -71,7 +61,7 @@ describe("MigrationProxy", () => {
   it("migration() caches the result of loadMigration()", async () => {
     const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
     const sentinel = new CreateUsers("CreateUsers", 1);
-    const spy = vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(sentinel);
+    const spy = vi.spyOn(proxy, "loadMigration").mockResolvedValue(sentinel);
 
     const first = await proxy.migration();
     const second = await proxy.migration();
