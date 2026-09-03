@@ -483,7 +483,7 @@ export class Response {
   sendFile(path: string): void {
     this.commitBang();
     let cached: string | null = null;
-    const read = () => (cached ??= File.binread(path));
+    const read = () => (cached ??= File.open(path, "rb", (file) => file.read()));
     // Rack::Sendfile detects file bodies via `body.toPath()` (callable);
     // Rails' FileBody uses `attr_reader :to_path` which is also a method.
     this.stream = {

@@ -1033,7 +1033,10 @@ export class Base extends Metal {
 
   /** Send file content. */
   sendFile(path: string, options: SendFileHeadersOptions = {}): void {
-    const content = File.binread(path);
+    const content = Buffer.from(
+      File.open(path, "rb", (file) => file.read()),
+      "latin1",
+    );
     const filename = options.filename ?? File.basename(path);
 
     this.sendFileHeadersBang({ ...options, filename });
