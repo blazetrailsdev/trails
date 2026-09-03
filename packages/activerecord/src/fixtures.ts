@@ -18,6 +18,7 @@ import {
   underscore,
   uuidV5,
 } from "@blazetrails/activesupport";
+import { Zlib } from "@blazetrails/ruby-compat";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
@@ -49,40 +50,7 @@ export class FixtureSetPrimaryKeyError extends Error {
   }
 }
 
-const FIXTURE_MAX_ID = 2 ** 30 - 1;
-
 const TIMESTAMP_COLUMN_NAMES = ["created_at", "created_on", "updated_at", "updated_on"];
-
-const CRC32_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let j = 0; j < 8; j++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    table[i] = c;
-  }
-  return table;
-})();
-
-function crc32(str: string): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < str.length; i++) {
-    crc = CRC32_TABLE[(crc ^ str.charCodeAt(i)) & 0xff] ^ (crc >>> 8);
-  }
-  return ((crc ^ 0xffffffff) >>> 0) % FIXTURE_MAX_ID;
-}
-
-export function fixtureId(label: string): number {
-  return crc32(label);
-}
-
-function compositeIdentify(label: string, keyCols: readonly string[]): Record<string, number> {
-  const base = fixtureId(label);
-  const out: Record<string, number> = {};
-  keyCols.forEach((col, index) => {
-    out[col] = (base * 2 ** index) % FIXTURE_MAX_ID;
-  });
-  return out;
-}
 
 function resolveDeclaredPk(
   tableName: string,
@@ -90,7 +58,7 @@ function resolveDeclaredPk(
   label: string,
   declared: unknown,
 ): number | string {
-  if (declared === undefined) return fixtureId(label);
+  if (declared === undefined) return FixtureSet.identify(label);
   if (typeof declared === "number" && Number.isInteger(declared)) return declared;
   if (typeof declared === "string") return declared;
   throw new Error(
@@ -106,14 +74,14 @@ function resolveDeclaredPk(
  * row whose label hashes to 42). Uses the model's declared `primaryKey`, so a
  * custom-PK model (e.g. Subscriber's `nick`, Dashboard's `dashboard_id`) is keyed
  * on its real column, not a hardcoded `id`. Composite-PK models fold their key
- * columns (present values, else `compositeIdentify`) into the string.
+ * columns (present values, else `FixtureSet.compositeIdentify`) into the string.
  * @internal
  * @noRailsEquivalent CONVERGEABLE the primary-key derivation Ruby performs inline in FixtureSet#table_rows (fixtures.rb:742).
  */
 export function effectiveFixtureKey(model: BaseClass, label: string, row: FixtureAttrs): string {
   const pk = model.primaryKey;
   if (Array.isArray(pk)) {
-    const generated = compositeIdentify(label, pk);
+    const generated = FixtureSet.compositeIdentify(label, pk);
     return "c:" + JSON.stringify(pk.map((col) => row[col] ?? generated[col]));
   }
   if (typeof pk !== "string") return "l:" + label;
@@ -185,7 +153,7 @@ async function ensureStaticDeclaredIds(): Promise<void> {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE FixtureSet.identify (fixtures.rb:619) applied to a resolved reference, extracted from the row-building loop.
+ * @noRailsEquivalent CONVERGEABLE converge-fixture-row-building-onto-table-rows
  */
 export function resolveFixtureId(
   adapter: DatabaseAdapter,
@@ -195,19 +163,12 @@ export function resolveFixtureId(
   const declared = declaredIdsFor(adapter).get(tableName)?.get(fixtureName);
   if (declared !== undefined && typeof declared !== "object") return declared;
   const pinned = staticDeclaredIds?.get(tableName)?.get(fixtureName);
-  return pinned ?? fixtureId(fixtureName);
+  return pinned ?? FixtureSet.identify(fixtureName);
 }
 
 /**
- * Resolves a belongs_to `ref()` to a single key column of a composite-PK target,
- * honoring the association's `primaryKey` (e.g. `cpk_order_agreements.order_id`
- * → the referenced order's `id` column). Prefers the loaded target's registered
- * key map; when the target set hasn't been loaded yet, derives the same value the
- * target row would generate from its label via `compositeIdentify` — position of
- * `targetColumn` within `targetPkCols` matters, since `compositeIdentify` shifts
- * each successive key column (Rails' `composite_identify`).
  * @internal
- * @noRailsEquivalent CONVERGEABLE the composite arm of FixtureSet.composite_identify (fixtures.rb:633) for a belongs_to reference column.
+ * @noRailsEquivalent CONVERGEABLE converge-fixture-row-building-onto-table-rows
  */
 export function resolveCompositeRefColumn(
   adapter: DatabaseAdapter,
@@ -221,7 +182,10 @@ export function resolveCompositeRefColumn(
     const v = declared[targetColumn];
     if (v !== undefined) return v;
   }
-  return compositeIdentify(fixtureName, targetPkCols)[targetColumn] ?? fixtureId(fixtureName);
+  return (
+    FixtureSet.compositeIdentify(fixtureName, targetPkCols)[targetColumn] ??
+    FixtureSet.identify(fixtureName)
+  );
 }
 
 const tableRegistries = new WeakMap<object, Map<string, BaseClass>>();
@@ -675,7 +639,7 @@ export async function prepareModelFixtures(
               [labelAssoc.lhsKey]: ownerId,
               [labelAssoc.rhsKey]: labelAssoc.targetTable
                 ? resolveFixtureId(adapter, labelAssoc.targetTable, target)
-                : fixtureId(target),
+                : FixtureSet.identify(target),
             });
           }
           joinTableRows.set(labelAssoc.joinTable, accum);
@@ -797,7 +761,7 @@ export async function prepareModelFixtures(
     }
 
     if (Array.isArray(pkCol)) {
-      const generated = compositeIdentify(label, pkCol);
+      const generated = FixtureSet.compositeIdentify(label, pkCol);
       for (const keyCol of pkCol) {
         if (keyCol in row) continue;
         if (tableColumnNames !== null && !tableColumnNames.has(keyCol)) continue;
@@ -971,18 +935,32 @@ export async function prepareJoinTableFixtures(
 }
 
 export class FixtureSet {
+  static readonly MAX_ID = 2 ** 30 - 1;
+
   static defaultFixtureModelName(fixtureSetName: string, config: typeof Base = Base): string {
     return config.pluralizeTableNames
       ? camelize(singularize(fixtureSetName))
       : camelize(fixtureSetName);
   }
 
+  static identify(label: string): number;
+  static identify(label: string, columnType: string): number | string;
   static identify(label: string, columnType: string = ":integer"): number | string {
     if (columnType === ":uuid") {
       return uuidV5(OID_NAMESPACE, String(label));
     } else {
-      return crc32(String(label));
+      return Zlib.crc32(String(label)) % FixtureSet.MAX_ID;
     }
+  }
+
+  static compositeIdentify(label: string, key: readonly string[]): Record<string, number> {
+    const out: Record<string, number> = {};
+    key.forEach((subKey, index) => {
+      out[subKey] = Number(
+        (BigInt(FixtureSet.identify(label)) << BigInt(index)) % BigInt(FixtureSet.MAX_ID),
+      );
+    });
+    return out;
   }
 
   static async createFixtures<T extends BaseClass, K extends string>(
