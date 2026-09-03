@@ -1,0 +1,78 @@
+import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Dir } from "./dir.js";
+
+function fixture(): string {
+  const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
+  for (const dir of ["a", "b", "sub"]) mkdirSync(join(root, dir));
+  writeFileSync(join(root, "a", "x.rb"), "");
+  writeFileSync(join(root, "b", "y.rb"), "");
+  writeFileSync(join(root, "sub", "a.rb"), "");
+  writeFileSync(join(root, "B.rb"), "");
+  writeFileSync(join(root, "a.rb"), "");
+  writeFileSync(join(root, "z.rb"), "");
+  writeFileSync(join(root, ".hidden.rb"), "");
+  symlinkSync(join(root, "nonexistent"), join(root, "broken"));
+  return root;
+}
+
+describe("Dir", () => {
+  it("glob interleaves ** with the match at each level", () => {
+    // MRI (vendor/ruby/dir.c:3417): Dir.glob("g/**/*.rb") #=>
+    const root = fixture();
+    expect(Dir.glob(`${root}/**/*.rb`)).toEqual([
+      `${root}/B.rb`,
+      `${root}/a/x.rb`,
+      `${root}/a.rb`,
+      `${root}/b/y.rb`,
+      `${root}/sub/a.rb`,
+      `${root}/z.rb`,
+    ]);
+  });
+
+  it("glob sorts each directory and leaves a dotfile to a literal dot", () => {
+    // MRI vendor/ruby/dir.c:1350 and its sort: true default (dir.c:3392).
+    const root = fixture();
+    expect(Dir.glob(`${root}/*.rb`)).toEqual([`${root}/B.rb`, `${root}/a.rb`, `${root}/z.rb`]);
+    expect(Dir.glob(`${root}/.*.rb`)).toEqual([`${root}/.hidden.rb`]);
+    expect(Dir.glob(`${root}/*`)).toEqual([
+      `${root}/B.rb`,
+      `${root}/a`,
+      `${root}/a.rb`,
+      `${root}/b`,
+      `${root}/broken`,
+      `${root}/sub`,
+      `${root}/z.rb`,
+    ]);
+  });
+
+  it("glob answers an empty array for a pattern that matches nothing", () => {
+    expect(Dir.glob(`${fixture()}/nope/*`)).toEqual([]);
+  });
+
+  it("glob expands a brace and a literal pattern", () => {
+    const root = fixture();
+    expect(Dir.glob(`${root}/{a,b}/*.rb`)).toEqual([`${root}/a/x.rb`, `${root}/b/y.rb`]);
+    expect(Dir.glob(`${root}/a.rb`)).toEqual([`${root}/a.rb`]);
+  });
+
+  it("children excludes . and .., and each_child yields them", () => {
+    // MRI vendor/ruby/dir.c:1298.
+    const root = fixture();
+    expect(Dir.children(join(root, "a"))).toEqual(["x.rb"]);
+    const seen: string[] = [];
+    Dir.eachChild(join(root, "b"), (filename) => seen.push(filename));
+    expect(seen).toEqual(["y.rb"]);
+  });
+
+  it("mkdir is not recursive, delete removes an empty directory", () => {
+    const root = fixture();
+    expect(Dir.mkdir(join(root, "made"))).toBe(0);
+    expect(Dir.isExist(join(root, "made"))).toBe(true);
+    expect(Dir.delete(join(root, "made"))).toBe(0);
+    expect(Dir.isExist(join(root, "made"))).toBe(false);
+    expect(() => Dir.mkdir(join(root, "no", "deep"))).toThrow();
+  });
+});
