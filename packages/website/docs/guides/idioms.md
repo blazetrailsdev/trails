@@ -246,10 +246,10 @@ surfaces when you need runtime-typed access for generic code.
 ## Ranges are a class
 
 Ruby `Range` (`1..10`, `1...10`) has no JS equivalent. Use the `Range`
-class from `@blazetrails/activesupport`.
+class from `@blazetrails/ruby-compat`.
 
 ```ts
-import { Range } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/ruby-compat";
 
 // Rails:  Post.where(views: 100..1000)
 Post.where({ views: new Range(100, 1000) });
