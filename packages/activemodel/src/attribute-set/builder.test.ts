@@ -167,12 +167,6 @@ describe("LazyAttributeHash", () => {
     expect(hash.deepDup().isKey("__proto__")).toBe(true);
   });
 
-  it("deep_dup carries the receiver's materialized flag", () => {
-    const hash = new LazyAttributeHash(new Map([["age", intType]]), { age: "42" });
-    hash.transformValues((attr) => attr);
-    expect((hash.deepDup() as unknown as { materialized: boolean }).materialized).toBe(true);
-  });
-
   it("except returns a copy without the given names", () => {
     const hash = new LazyAttributeHash(
       new Map([

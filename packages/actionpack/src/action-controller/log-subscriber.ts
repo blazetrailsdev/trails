@@ -13,7 +13,15 @@ import {
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { Base } from "./base.js";
 import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
-import { eachPair, inspect, isEmpty, isSymbol, round, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  eachPair,
+  inspect,
+  isEmpty,
+  isSymbol,
+  rbObjAsString,
+  round,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 const INTERNAL_PARAMS = ["controller", "action", "format", "_method", "only_path"];
 
@@ -54,6 +62,9 @@ export class LogSubscriber extends BaseLogSubscriber {
    * `ActionController::LogSubscriber#process_action`
    * (`vendor/rails/actionpack/lib/action_controller/log_subscriber.rb:26-44`).
    *
+   * `defined?(Rails.env)` (`:40`) is the constant check for a booted app, which
+   * outside one is absent; its JS reading is the `Trails` global.
+   *
    * @missingRailsArgs round — PERMANENT
    */
   processAction(event: Event): void {
@@ -72,12 +83,9 @@ export class LogSubscriber extends BaseLogSubscriber {
 
       additions.push(`GC: ${round(event.gcTime, 1)}ms`);
 
-      // Ruby interpolates `nil` as the empty string, which is what a status
-      // neither the payload nor the exception supplied renders as.
       let message =
-        `Completed ${status ?? ""} ${(status != null && HTTP_STATUS_CODES[status]) || ""} in ${round(event.duration)}ms` +
+        `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status!])} in ${round(event.duration)}ms` +
         ` (${additions.join(" | ")})`;
-      // `defined?(Rails.env)` — the constant is absent outside a booted app.
       const Trails = (globalThis as { Trails?: { env?: { isDevelopment(): boolean } } }).Trails;
       if (Trails?.env != null && Trails.env.isDevelopment()) message += "\n\n";
 

@@ -106,15 +106,15 @@ export class OrderedOptions {
    * (`vendor/ruby/object.c:3906`) for the rest. That loop ends on `nil`,
    * indexes a Hash through `rb_hash_aref` and an Array through `rb_ary_at`,
    * hands the remaining identifiers to an object that answers `dig`, and
-   * otherwise raises `no_dig_method`'s TypeError (`object.c:3897-3900`).
+   * otherwise raises `no_dig_method`'s TypeError (`object.c:3897-3900`). A
+   * Ruby Hash is a plain object or a `Map` in trails, so both take the
+   * `rb_hash_aref` arm.
    */
   dig(key: string, ...identifiers: (string | number)[]): unknown {
     let obj: unknown = this.get(String(key));
     for (let i = 0; i < identifiers.length; i++) {
       const identifier = identifiers[i];
       if (obj == null) return undefined;
-      // A Ruby Hash is a plain object or a `Map` in trails; both take
-      // `rb_hash_aref`.
       if (obj instanceof Map) {
         obj = obj.get(identifier);
         continue;
