@@ -575,10 +575,20 @@ export class LookupContext {
   /**
    * Find a layout template.
    *
+   * `prefixes` defaults to `["layouts"]` rather than Rails' `nil`: Rails'
+   * `resolve_layout` (`renderer/template_renderer.rb:92-104`) passes the whole
+   * `"layouts/application"` path as the NAME and lets `normalize_name`
+   * (`lookup_context.rb:209-225`) split it, where trails' callers pass the bare
+   * layout name.
+   *
    * @internal
    */
-  findLayout(name: string, formats?: DetailValue): Template | null {
-    const template = this.findAll(name, ["layouts"], false, [], formats ? { formats } : {})[0] as
+  findLayout(
+    name: string,
+    prefixes: ReadonlyArray<string> = ["layouts"],
+    formats?: DetailValue,
+  ): Template | null {
+    const template = this.findAll(name, prefixes, false, [], formats ? { formats } : {})[0] as
       | Template
       | undefined;
     return template ? template.asLayout() : null;
@@ -634,7 +644,7 @@ export class LookupContext {
 
     const layoutName = options.layout !== undefined ? options.layout : this.layoutName;
     if (layoutName !== false && layoutName) {
-      const layoutTemplate = this.findLayout(layoutName, formats);
+      const layoutTemplate = this.findLayout(layoutName, ["layouts"], formats);
       if (layoutTemplate) {
         view.viewFlow.set("layout", output);
         output = await this.renderTemplate(layoutTemplate, locals, { ...context, view });

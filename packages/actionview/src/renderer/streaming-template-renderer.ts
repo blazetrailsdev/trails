@@ -139,7 +139,11 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
         detailsWithFormats,
       ) as RenderableTemplate[];
       if (found.length > 0) return found[0];
-      return this.lookupContext.findLayout(layout, formats) as unknown as RenderableTemplate | null;
+      return this.lookupContext.findLayout(
+        layout,
+        ["layouts"],
+        formats,
+      ) as unknown as RenderableTemplate | null;
     }
     if (typeof layout === "function") {
       const resolved = layout(this.lookupContext, this.formats as readonly string[], keys);

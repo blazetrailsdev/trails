@@ -111,11 +111,6 @@ export class Metal extends AbstractController {
     this._request = value;
   }
 
-  /** Rails: `delegate :session, to: "@_request"` (`metal.rb:176`). */
-  get session(): Session {
-    return this.request.session;
-  }
-
   get response(): Response {
     return this._response;
   }
@@ -127,6 +122,11 @@ export class Metal extends AbstractController {
     // trails' `_responseBody` is the body slot, not a flag, so the same forcing
     // is spelled through `markPerformed`.
     this.markPerformed();
+  }
+
+  /** Rails: `delegate :session, to: "@_request"` (`metal.rb:176`). */
+  get session(): Session {
+    return this.request.session;
   }
 
   static controllerPath(): string {

@@ -129,7 +129,7 @@ export class TemplateRenderer extends AbstractRenderer {
       ) as RenderableTemplate[];
       if (found.length > 0) return found[0];
       // Fall back to findLayout (TemplateResolver chain).
-      const fromResolver = this.lookupContext.findLayout(layout, formats);
+      const fromResolver = this.lookupContext.findLayout(layout, ["layouts"], formats);
       return fromResolver as unknown as RenderableTemplate | null;
     }
     if (typeof layout === "function") {
