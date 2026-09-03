@@ -7,8 +7,8 @@ import {
   BinaryData,
   TimeType,
 } from "@blazetrails/activemodel";
-import { singularize, runLoadHooks, include, KeyError } from "@blazetrails/activesupport";
-import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
+import { singularize, runLoadHooks, include } from "@blazetrails/activesupport";
+import { Nodes, Visitors } from "@blazetrails/arel";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -20,7 +20,6 @@ import {
   disableReferentialIntegrity,
 } from "./postgresql/referential-integrity.js";
 import { Column } from "./postgresql/column.js";
-import { ExplainPrettyPrinter } from "./postgresql/explain-pretty-printer.js";
 import {
   quote as pgQuote,
   typeCast as pgTypeCast,
@@ -87,11 +86,7 @@ import type {
   SchemaNamespaceStatements,
 } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
-import {
-  transactionIsolationLevels,
-  preprocessQuery,
-  extractTableRefFromInsertSql,
-} from "./abstract/database-statements.js";
+import { preprocessQuery } from "./abstract/database-statements.js";
 import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
 
 const getTemporalTypeParser = makeGetTypeParser(pg.types);
@@ -107,10 +102,8 @@ const PQTRANS_UNKNOWN = 4;
 const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
 const FEATURE_NOT_SUPPORTED = "0A000";
 import {
-  READ_QUERY,
   buildTruncateStatements as pgBuildTruncateStatements,
   executeBatch as pgExecuteBatch,
-  suppressCompositePrimaryKey,
   castResult,
   affectedRows as pgAffectedRows,
   handleWarnings,
@@ -118,6 +111,18 @@ import {
   lastInsertIdResult as pgLastInsertIdResult,
   performQuery as pgPerformQuery,
   returningColumnValues as pgReturningColumnValues,
+  explain as pgExplain,
+  isWriteQuery as pgIsWriteQuery,
+  execute as pgExecute,
+  execInsert as pgExecInsert,
+  beginDbTransaction as pgBeginDbTransaction,
+  beginIsolatedDbTransaction as pgBeginIsolatedDbTransaction,
+  commitDbTransaction as pgCommitDbTransaction,
+  execRollbackDbTransaction as pgExecRollbackDbTransaction,
+  execRestartDbTransaction as pgExecRestartDbTransaction,
+  highPrecisionCurrentTimestamp as pgHighPrecisionCurrentTimestamp,
+  buildExplainClause as pgBuildExplainClause,
+  setConstraints as pgSetConstraints,
 } from "./postgresql/database-statements.js";
 import {
   ExclusionConstraintDefinition,
@@ -867,33 +872,6 @@ export class PostgreSQLAdapter
     }
   }
 
-  async execute(
-    sql: string,
-    name: string | null = "SQL",
-    { allowRetry = false }: { allowRetry?: boolean } = {},
-  ): Promise<Record<string, unknown>[]> {
-    sql = this.preprocessQuery(sql);
-    try {
-      return await this.log(sql, name, [], [], false, async (payload) => {
-        try {
-          return await this.withRawConnection({ allowRetry }, async (conn) => {
-            const client = conn as unknown as pg.Client;
-            const result = await this._performQuery(client, sql, [], [], {
-              prepare: false,
-              notificationPayload: payload,
-            });
-            return result?.rows ?? [];
-          });
-        } catch (e: any) {
-          const translated = this._translateException(e, sql, []);
-          throw translated;
-        }
-      });
-    } finally {
-      this._noticeReceiverSqlWarnings = [];
-    }
-  }
-
   /** @internal */
   private _performQuery = pgPerformQuery;
 
@@ -1007,22 +985,6 @@ export class PostgreSQLAdapter
     await this._transactionManager.beginTransaction({ _lazy: false });
   }
 
-  async beginDbTransaction(): Promise<void> {
-    this._client = await this._acquireFreshClient();
-    try {
-      await this.internalExecute("BEGIN", "TRANSACTION", [], {
-        materializeTransactions: false,
-        allowRetry: true,
-      });
-      this._inTransaction = true;
-    } catch (error) {
-      this._client = null;
-      this._inTransaction = false;
-      if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
-      throw error;
-    }
-  }
-
   async beginDeferredTransaction(): Promise<void> {
     return this.beginDbTransaction();
   }
@@ -1041,10 +1003,6 @@ export class PostgreSQLAdapter
       this._client = null;
       this._inTransaction = false;
     }
-  }
-
-  async commitDbTransaction(): Promise<void> {
-    return this.commit();
   }
 
   async rollback(): Promise<void> {
@@ -1073,19 +1031,6 @@ export class PostgreSQLAdapter
     return this.execRollbackDbTransaction();
   }
 
-  async execRollbackDbTransaction(): Promise<void> {
-    await this._cancelAnyRunningQuery();
-    try {
-      await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
-        allowRetry: false,
-        materializeTransactions: true,
-      });
-    } finally {
-      this._client = null;
-      this._inTransaction = false;
-    }
-  }
-
   private static _isConnectionError(err: unknown): boolean {
     const e = err as { code?: string; message?: string } | null | undefined;
     if (!e) return false;
@@ -1112,14 +1057,6 @@ export class PostgreSQLAdapter
       /connection is closed/i.test(msg) ||
       /no connection to the server/i.test(msg)
     );
-  }
-
-  async execRestartDbTransaction(): Promise<void> {
-    await this._cancelAnyRunningQuery();
-    await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", [], {
-      allowRetry: false,
-      materializeTransactions: true,
-    });
   }
 
   /**
@@ -1210,46 +1147,8 @@ export class PostgreSQLAdapter
     });
   }
 
-  async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    const level = transactionIsolationLevels()[isolation];
-    if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
-    this._client = await this._acquireFreshClient();
-    try {
-      await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
-        materializeTransactions: false,
-        allowRetry: true,
-      });
-      this._inTransaction = true;
-    } catch (error) {
-      this._client = null;
-      this._inTransaction = false;
-      if (PostgreSQLAdapter._isConnectionError(error)) this._discardRawConnection();
-      throw error;
-    }
-  }
-
-  override isWriteQuery(sql: string): boolean {
-    return !READ_QUERY.test(sql);
-  }
-
   /** @internal */
   executeBatch = pgExecuteBatch;
-
-  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
-    return arelSql("CURRENT_TIMESTAMP");
-  }
-
-  async setConstraints(
-    deferred: "deferred" | "immediate",
-    ...constraints: string[]
-  ): Promise<void> {
-    if (deferred !== "deferred" && deferred !== "immediate") {
-      throw new ArgumentError(`deferred must be "deferred" or "immediate"`);
-    }
-    const list =
-      constraints.length === 0 ? "ALL" : constraints.map((c) => this.quoteTableName(c)).join(", ");
-    await this.execute(`SET CONSTRAINTS ${list} ${deferred.toUpperCase()}`);
-  }
 
   override async internalExecute(
     sql: string,
@@ -1300,25 +1199,6 @@ export class PostgreSQLAdapter
 
   async rollbackToSavepoint(name: string): Promise<void> {
     await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION");
-  }
-
-  async explain(
-    arel: string,
-    binds: unknown[] = [],
-    options: ExplainOption[] = [],
-  ): Promise<string> {
-    const explainSql = (await this.buildExplainClause(options)) + " " + this.toSql(arel, binds);
-    const result = await this.internalExecQuery(explainSql, "EXPLAIN", binds);
-    const printer = new ExplainPrettyPrinter();
-    return printer.pp(result);
-  }
-
-  async buildExplainClause(options: ExplainOption[] = []): Promise<string> {
-    if (options.length === 0) return "EXPLAIN";
-    return `EXPLAIN (${options
-      .map((option) => (option.startsWith(":") ? option.slice(1) : option))
-      .join(", ")
-      .toUpperCase()})`;
   }
 
   static nativeDatabaseTypes(): NativeDatabaseTypes {
@@ -1399,32 +1279,6 @@ export class PostgreSQLAdapter
 
   isUseInsertReturning(): boolean {
     return this._useInsertReturning;
-  }
-
-  override async execInsert(
-    sql: string,
-    name: string | null = null,
-    binds: unknown[] = [],
-    pk?: string | false | null,
-    sequenceName?: string | null,
-    returning?: string[] | null,
-  ): Promise<Result> {
-    if (this._useInsertReturning || pk === false) {
-      return super.execInsert(sql, name, binds, pk, sequenceName, returning);
-    }
-    return this.lock.synchronize(async () => {
-      const result = await this.internalExecQuery(sql, name, binds);
-      if (!sequenceName) {
-        const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
-        if (tableRef) {
-          if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
-          pk = suppressCompositePrimaryKey(typeof pk === "string" ? pk : undefined) ?? null;
-          sequenceName = pk ? await this.defaultSequenceName(tableRef, pk) : null;
-        }
-        if (!sequenceName) return result;
-      }
-      return this.lastInsertIdResult(sequenceName);
-    });
   }
 
   private lastInsertIdResult = pgLastInsertIdResult;
@@ -2505,6 +2359,41 @@ export class PostgreSQLAdapter
 export interface PostgreSQLAdapter {
   get databaseVersion(): number | Promise<number>;
 
+  explain(arel: string, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
+
+  isWriteQuery(sql: string): boolean;
+
+  execute(
+    sql: string,
+    name?: string | null,
+    options?: { allowRetry?: boolean },
+  ): Promise<Record<string, unknown>[]>;
+
+  execInsert(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    pk?: string | false | null,
+    sequenceName?: string | null,
+    returning?: string[] | null,
+  ): Promise<Result>;
+
+  beginDbTransaction(): Promise<void>;
+
+  beginIsolatedDbTransaction(isolation: string): Promise<void>;
+
+  commitDbTransaction(): Promise<void>;
+
+  execRollbackDbTransaction(): Promise<void>;
+
+  execRestartDbTransaction(): Promise<void>;
+
+  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
+
+  buildExplainClause(options?: ExplainOption[]): Promise<string>;
+
+  setConstraints(deferred: "deferred" | "immediate", ...constraints: string[]): Promise<void>;
+
   /** @internal */
   validateIndexLengthBang(tableName: string, newName: string, internal?: boolean): void;
 
@@ -2865,6 +2754,19 @@ const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAM
 
 const SERIAL_SEQUENCE_RE = /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?'::regclass\)$/;
 
+(PostgreSQLAdapter.prototype as any).explain = pgExplain;
+(PostgreSQLAdapter.prototype as any).isWriteQuery = pgIsWriteQuery;
+(PostgreSQLAdapter.prototype as any).execute = pgExecute;
+(PostgreSQLAdapter.prototype as any).execInsert = pgExecInsert;
+(PostgreSQLAdapter.prototype as any).beginDbTransaction = pgBeginDbTransaction;
+(PostgreSQLAdapter.prototype as any).beginIsolatedDbTransaction = pgBeginIsolatedDbTransaction;
+(PostgreSQLAdapter.prototype as any).commitDbTransaction = pgCommitDbTransaction;
+(PostgreSQLAdapter.prototype as any).execRollbackDbTransaction = pgExecRollbackDbTransaction;
+(PostgreSQLAdapter.prototype as any).execRestartDbTransaction = pgExecRestartDbTransaction;
+(PostgreSQLAdapter.prototype as any).highPrecisionCurrentTimestamp =
+  pgHighPrecisionCurrentTimestamp;
+(PostgreSQLAdapter.prototype as any).buildExplainClause = pgBuildExplainClause;
+(PostgreSQLAdapter.prototype as any).setConstraints = pgSetConstraints;
 (PostgreSQLAdapter.prototype as any).castResult = castResult;
 (PostgreSQLAdapter.prototype as any).handleWarnings = handleWarnings;
 (PostgreSQLAdapter.prototype as any)._abstractIsWarningIgnored =

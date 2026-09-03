@@ -1,55 +1,261 @@
 import type pg from "pg";
-import type { Type } from "@blazetrails/activemodel";
-import type { Nodes } from "@blazetrails/arel";
+import { ArgumentError, type Type } from "@blazetrails/activemodel";
+import { sql as arelSql, type Nodes } from "@blazetrails/arel";
+import { KeyError } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../ar-config.js";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
-import { combineMultiStatements, type ExplainOption } from "../abstract/database-statements.js";
+import {
+  DatabaseStatements,
+  combineMultiStatements,
+  extractTableRefFromInsertSql,
+  transactionIsolationLevels,
+  type ExplainOption,
+} from "../abstract/database-statements.js";
+import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
 import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
 import type { StatementPool } from "../statement-pool.js";
 
 export const READ_QUERY =
   /^(?:\s|\/\*.*?\*\/|--[^\n]*(?:\n|$)|\()*(?:begin|close|commit|declare|explain|fetch|move|release|rollback|savepoint|select|set|show|with)\b/is;
 
-export interface DatabaseStatements {
-  execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
-  execDelete(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  execUpdate(sql: string, name?: string | null, binds?: unknown[]): Promise<number>;
-  execInsert(
-    sql: string,
-    name?: string | null,
-    binds?: unknown[],
-    pk?: string | false | null,
-    sequenceName?: string,
-  ): Promise<unknown>;
-  explain(
-    sql: string,
-    binds?: unknown[],
-    options?: {
-      analyze?: boolean;
-      verbose?: boolean;
-      costs?: boolean;
-      buffers?: boolean;
-      format?: string;
-    },
-  ): Promise<string>;
-  query(sql: string, name?: string | null): Promise<unknown[][]>;
-  executeAndClear(sql: string, name?: string | null, binds?: unknown[]): Promise<unknown>;
-  isWriteQuery(sql: string): boolean;
-  execute(sql: string, binds?: unknown[], name?: string | null): Promise<unknown[]>;
-  beginDbTransaction(): Promise<void>;
-  beginIsolatedDbTransaction(isolation: string): Promise<void>;
-  commitDbTransaction(): Promise<void>;
-  execRollbackDbTransaction(): Promise<void>;
-  execRestartDbTransaction(): Promise<void>;
-  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
-  buildExplainClause(options?: ExplainOption[]): string;
-  setConstraints(deferred: "deferred" | "immediate", ...constraints: string[]): Promise<void>;
-}
-
 /** @internal */
 interface CastResultHost {
   getOidType(oid: number, fmod: number, columnName: string, sqlType?: string): Promise<Type>;
+}
+
+/** @internal */
+interface ExplainHost {
+  buildExplainClause(options?: ExplainOption[]): Promise<string>;
+  toSql(arel: unknown, binds?: unknown[]): string;
+  internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+}
+
+export async function explain(
+  this: ExplainHost,
+  arel: string,
+  binds: unknown[] = [],
+  options: ExplainOption[] = [],
+): Promise<string> {
+  const explainSql = (await this.buildExplainClause(options)) + " " + this.toSql(arel, binds);
+  const result = await this.internalExecQuery(explainSql, "EXPLAIN", binds);
+  const printer = new ExplainPrettyPrinter();
+  return printer.pp(result);
+}
+
+export function isWriteQuery(sql: string): boolean {
+  return !READ_QUERY.test(sql);
+}
+
+/** @internal */
+interface ExecuteHost extends PerformQueryHost {
+  preprocessQuery(sql: string): string;
+  log<T>(
+    sql: string,
+    name: string | null,
+    binds: unknown[],
+    typeCastedBinds: unknown[],
+    async: boolean,
+    block: (payload: Record<string, unknown>) => Promise<T>,
+  ): Promise<T>;
+  withRawConnection<T>(
+    options: { allowRetry?: boolean; materializeTransactions?: boolean },
+    block: (raw: unknown) => Promise<T> | T,
+  ): Promise<T>;
+  /** @internal */
+  _performQuery: typeof performQuery;
+  /** @internal */
+  _translateException(e: unknown, sql: string, binds: unknown[]): Error;
+}
+
+export async function execute(
+  this: ExecuteHost,
+  sql: string,
+  name: string | null = "SQL",
+  { allowRetry = false }: { allowRetry?: boolean } = {},
+): Promise<Record<string, unknown>[]> {
+  sql = this.preprocessQuery(sql);
+  try {
+    return await this.log(sql, name, [], [], false, async (payload) => {
+      try {
+        return await this.withRawConnection({ allowRetry }, async (conn) => {
+          const client = conn as pg.Client;
+          const result = await this._performQuery(client, sql, [], [], {
+            prepare: false,
+            notificationPayload: payload,
+          });
+          return result?.rows ?? [];
+        });
+      } catch (e) {
+        const translated = this._translateException(e, sql, []);
+        throw translated;
+      }
+    });
+  } finally {
+    this._noticeReceiverSqlWarnings = [];
+  }
+}
+
+/** @internal */
+interface ExecInsertHost extends LastInsertIdResultHost {
+  isUseInsertReturning(): boolean;
+  lock: { synchronize<T>(block: () => Promise<T>): Promise<T> };
+  primaryKey(tableName: string): unknown;
+  defaultSequenceName(tableRef: string, pk: string): Promise<string | null> | string | null;
+  /** @internal */
+  lastInsertIdResult(sequenceName: string): Promise<Result>;
+}
+
+export async function execInsert(
+  this: ExecInsertHost,
+  sql: string,
+  name: string | null = null,
+  binds: unknown[] = [],
+  pk?: string | false | null,
+  sequenceName?: string | null,
+  returning?: string[] | null,
+): Promise<Result> {
+  if (this.isUseInsertReturning() || pk === false) {
+    return DatabaseStatements.execInsert.call(
+      this as never,
+      sql,
+      name,
+      binds,
+      pk,
+      sequenceName,
+      returning,
+    );
+  }
+  return this.lock.synchronize(async () => {
+    const result = await this.internalExecQuery(sql, name, binds);
+    if (!sequenceName) {
+      const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
+      if (tableRef) {
+        if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
+        pk = suppressCompositePrimaryKey(typeof pk === "string" ? pk : undefined) ?? null;
+        sequenceName = pk ? await this.defaultSequenceName(tableRef, pk) : null;
+      }
+      if (!sequenceName) return result;
+    }
+    return this.lastInsertIdResult(sequenceName);
+  });
+}
+
+/** @internal */
+interface TransactionHost {
+  internalExecute(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { allowRetry?: boolean; materializeTransactions?: boolean },
+  ): Promise<unknown>;
+  commit(): Promise<void>;
+  /** @internal */
+  _client: pg.Client | null;
+  /** @internal */
+  _inTransaction: boolean;
+  /** @internal */
+  _acquireFreshClient(): Promise<pg.Client>;
+  /** @internal */
+  _discardRawConnection(): void;
+  /** @internal */
+  _cancelAnyRunningQuery(): Promise<void>;
+  constructor: { _isConnectionError(err: unknown): boolean };
+}
+
+export async function beginDbTransaction(this: TransactionHost): Promise<void> {
+  this._client = await this._acquireFreshClient();
+  try {
+    await this.internalExecute("BEGIN", "TRANSACTION", [], {
+      materializeTransactions: false,
+      allowRetry: true,
+    });
+    this._inTransaction = true;
+  } catch (error) {
+    this._client = null;
+    this._inTransaction = false;
+    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
+    throw error;
+  }
+}
+
+/** @missingRailsCall fetch — PERMANENT */
+export async function beginIsolatedDbTransaction(
+  this: TransactionHost,
+  isolation: string,
+): Promise<void> {
+  const level = transactionIsolationLevels()[isolation];
+  if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
+  this._client = await this._acquireFreshClient();
+  try {
+    await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
+      materializeTransactions: false,
+      allowRetry: true,
+    });
+    this._inTransaction = true;
+  } catch (error) {
+    this._client = null;
+    this._inTransaction = false;
+    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
+    throw error;
+  }
+}
+
+/** @missingRailsCall internal_execute — CONVERGEABLE commit-db-transaction-should-hold-its-own-internal-execute */
+export async function commitDbTransaction(this: TransactionHost): Promise<void> {
+  return this.commit();
+}
+
+export async function execRollbackDbTransaction(this: TransactionHost): Promise<void> {
+  await this._cancelAnyRunningQuery();
+  try {
+    await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
+      allowRetry: false,
+      materializeTransactions: true,
+    });
+  } finally {
+    this._client = null;
+    this._inTransaction = false;
+  }
+}
+
+export async function execRestartDbTransaction(this: TransactionHost): Promise<void> {
+  await this._cancelAnyRunningQuery();
+  await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", [], {
+    allowRetry: false,
+    materializeTransactions: true,
+  });
+}
+
+export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
+  return arelSql("CURRENT_TIMESTAMP");
+}
+
+export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
+  if (options.length === 0) return "EXPLAIN";
+  return `EXPLAIN (${options
+    .map((option) => (option.startsWith(":") ? option.slice(1) : option))
+    .join(", ")
+    .toUpperCase()})`;
+}
+
+/** @internal */
+interface SetConstraintsHost {
+  quoteTableName(name: unknown): string;
+  execute(sql: string, name?: string | null): Promise<unknown>;
+}
+
+export async function setConstraints(
+  this: SetConstraintsHost,
+  deferred: "deferred" | "immediate",
+  ...constraints: string[]
+): Promise<void> {
+  if (deferred !== "deferred" && deferred !== "immediate") {
+    throw new ArgumentError(`deferred must be "deferred" or "immediate"`);
+  }
+  const list =
+    constraints.length === 0 ? "ALL" : constraints.map((c) => this.quoteTableName(c)).join(", ");
+  await this.execute(`SET CONSTRAINTS ${list} ${deferred.toUpperCase()}`);
 }
 
 /** @internal */
