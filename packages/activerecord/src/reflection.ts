@@ -414,7 +414,7 @@ export class AbstractReflection {
   }
 
   /** @internal */
-  inverseName(): string | null {
+  inverseName(): string | false | null {
     return null;
   }
 
@@ -752,21 +752,20 @@ export class AssociationReflection extends MacroReflection {
     return this._inverseOfCache;
   }
 
-  private _inverseNameCache: string | null | undefined = undefined;
+  private _inverseNameCache: string | false | null | undefined = undefined;
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
   /**
    * @internal
    * @missingRailsArgs fetch — PERMANENT
    */
-  override inverseName(): string | null {
+  override inverseName(): string | false | null {
     if (this._inverseNameCache !== undefined) return this._inverseNameCache;
-    const inverseOf = fetch<string | false | null>(
+    this._inverseNameCache = fetch<string | false | null>(
       this.options,
       "inverseOf",
       block(() => this.automaticInverseOf()),
     );
-    this._inverseNameCache = inverseOf === false ? null : inverseOf;
     return this._inverseNameCache;
   }
 
@@ -1436,7 +1435,7 @@ export class ThroughReflection extends AbstractReflection {
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
 
   /** @internal */
-  override inverseName(): string | null {
+  override inverseName(): string | false | null {
     return this._delegate.inverseName();
   }
 

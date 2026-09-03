@@ -2,7 +2,17 @@ import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the `DEFAULT_PROPERTIES` generator (properties.rb:31-39) installs accessors the class body cannot declare.
 export class Properties {
+  static readonly DEFAULT_PROPERTIES = {
+    encryptedDataKey: "k",
+    encryptedDataKeyId: "i",
+    compressed: "c",
+    iv: "iv",
+    authTag: "at",
+    encoding: "e",
+  } as const;
+
   private _data = new Map<string, unknown>();
 
   constructor(initialProperties: Record<string, unknown> | Properties = {}) {
@@ -72,57 +82,6 @@ export class Properties {
     return this._data.entries();
   }
 
-  get encrypted(): boolean {
-    return this.get("e") === true;
-  }
-
-  set encrypted(value: boolean) {
-    if (this._data.has("e")) {
-      throw new EncryptedContentIntegrity("Can't override property 'e': already set");
-    }
-    this._data.set("e", value);
-  }
-
-  get encryptedDataKey(): string | undefined {
-    return this.get("k") as string | undefined;
-  }
-
-  set encryptedDataKey(value: string | undefined) {
-    this.set("k", value);
-  }
-
-  get encryptedDataKeyId(): string | undefined {
-    return this.get("i") as string | undefined;
-  }
-
-  set encryptedDataKeyId(value: string | undefined) {
-    this.set("i", value);
-  }
-
-  get compressed(): boolean | undefined {
-    return this.get("c") as boolean | undefined;
-  }
-
-  set compressed(value: boolean | undefined) {
-    this.set("c", value);
-  }
-
-  get iv(): string | undefined {
-    return this.get("iv") as string | undefined;
-  }
-
-  set iv(value: string | Buffer | undefined) {
-    this.set("iv", value);
-  }
-
-  get authTag(): string | undefined {
-    return this.get("at") as string | undefined;
-  }
-
-  set authTag(value: string | Buffer | undefined) {
-    this.set("at", value);
-  }
-
   validateValueType(value: unknown): void {
     if (value === null) return;
     if (Buffer.isBuffer(value)) return;
@@ -145,6 +104,34 @@ export class Properties {
   private get data(): Map<string, unknown> {
     return this._data;
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Properties {
+  get encryptedDataKey(): string | undefined;
+  set encryptedDataKey(value: string | undefined);
+  get encryptedDataKeyId(): string | undefined;
+  set encryptedDataKeyId(value: string | undefined);
+  get compressed(): boolean | undefined;
+  set compressed(value: boolean | undefined);
+  get iv(): string | undefined;
+  set iv(value: string | Buffer | undefined);
+  get authTag(): string | undefined;
+  set authTag(value: string | Buffer | undefined);
+  get encoding(): string | undefined;
+  set encoding(value: string | undefined);
+}
+
+for (const [name, key] of Object.entries(Properties.DEFAULT_PROPERTIES)) {
+  Object.defineProperty(Properties.prototype, name, {
+    get(this: Properties): unknown {
+      return this.get(key);
+    },
+    set(this: Properties, value: unknown) {
+      this.set(key, value);
+    },
+    configurable: true,
+  });
 }
 
 /** @internal */

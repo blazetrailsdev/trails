@@ -2,7 +2,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
-import { Nodes, Table } from "@blazetrails/arel";
+import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { isAssociationCached, _cacheSingularTarget } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
 import { JoinBase } from "./join-dependency/join-base.js";
@@ -35,11 +35,6 @@ function reflectionChainKey(chain: readonly object[]): string {
   return key;
 }
 
-export interface AliasMap {
-  column: string;
-  alias: string;
-}
-
 function getModelColumns(modelClass: any): string[] {
   let ch: Record<string, unknown> | undefined;
   if (typeof modelClass.columnsHash === "function") {
@@ -62,44 +57,57 @@ function getModelColumns(modelClass: any): string[] {
 }
 
 export class Aliases {
+  private _tables: Table[];
   private _aliasCache: Map<JoinPart | null, Map<string, string>>;
-  private _allColumns: AliasMap[];
-  private _tables: Array<{
-    node: JoinPart | null;
-    table: Table | Nodes.TableAlias;
-    columns: AliasMap[];
-  }>;
+  private _columnsCache: Map<JoinPart | null, Column[]>;
 
-  constructor(
-    tables: Array<{ node: JoinPart | null; table: Table | Nodes.TableAlias; columns: AliasMap[] }>,
-  ) {
-    this._aliasCache = new Map();
-    this._allColumns = [];
+  constructor(tables: Table[]) {
     this._tables = tables;
+    this._aliasCache = new Map();
     for (const table of tables) {
-      const colMap = new Map<string, string>();
-      for (const col of table.columns) {
-        colMap.set(col.column, col.alias);
-        this._allColumns.push(col);
-      }
-      this._aliasCache.set(table.node, colMap);
+      const i = new Map<string, string>();
+      for (const column of table.columns) i.set(column.name, column.alias);
+      this._aliasCache.set(table.node, i);
     }
+    this._columnsCache = new Map();
+    for (const table of tables) this._columnsCache.set(table.node, table.columns);
   }
 
-  columns(): AliasMap[] {
-    return this._allColumns;
+  columns(): Nodes.As[] {
+    return this._tables.flatMap((table) => table.columnAliases());
+  }
+
+  columnAliases(node: JoinPart | null): Column[] | undefined {
+    return this._columnsCache.get(node);
   }
 
   columnAlias(node: JoinPart | null, column: string): string | undefined {
     return this._aliasCache.get(node)?.get(column);
   }
+}
 
-  columnsForNode(node: JoinPart | null): AliasMap[] {
-    return this._tables.find((t) => t.node === node)?.columns ?? [];
+export class Table {
+  node: JoinPart | null;
+  columns: Column[];
+
+  constructor(node: JoinPart | null, columns: Column[]) {
+    this.node = node;
+    this.columns = columns;
   }
 
-  selectArel(): Nodes.As[] {
-    return this._tables.flatMap((t) => t.columns.map((c) => t.table.get(c.column).as(c.alias)));
+  columnAliases(): Nodes.As[] {
+    const t = this.node!.arelTable as ArelTable | Nodes.TableAlias;
+    return this.columns.map((column) => t.get(column.name).as(column.alias));
+  }
+}
+
+export class Column {
+  name: string;
+  alias: string;
+
+  constructor(name: string, alias: string) {
+    this.name = name;
+    this.alias = alias;
   }
 }
 
@@ -115,11 +123,11 @@ export class JoinDependency {
   /** @internal */
   private _joinedTables: Map<
     string,
-    { aliased: Table | Nodes.TableAlias; effectiveName: string; terminated: boolean }
+    { aliased: ArelTable | Nodes.TableAlias; effectiveName: string; terminated: boolean }
   > = new Map();
   constructor(
     base: typeof Base,
-    table: Table | Nodes.TableAlias | null,
+    table: ArelTable | Nodes.TableAlias | null,
     associations: AssociationSpec | AssociationSpec[] | null,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | null,
   ) {
@@ -129,7 +137,7 @@ export class JoinDependency {
     this._aliasTracker = new AliasTracker(this._baseTableAliasLength(), this._baseAliases());
     this._joinType = joinType ?? Nodes.OuterJoin;
     const tree = JoinDependency.makeTree(associations ?? []);
-    this._joinRoot = new JoinBase(base, table as Table, this.build(tree, base));
+    this._joinRoot = new JoinBase(base, table as ArelTable, this.build(tree, base));
     this._assignPaths(this._joinRoot, null);
   }
 
@@ -223,10 +231,6 @@ export class JoinDependency {
       if (right != null) node.children.push(...this.build(right, reflection.klass));
       return [node];
     });
-  }
-
-  private _buildSelectArelNodes(): Nodes.As[] {
-    return this.aliases().selectArel();
   }
 
   get baseKlass(): typeof Base {
@@ -325,7 +329,9 @@ export class JoinDependency {
     const joins: Nodes.Join[] = [];
 
     if (child instanceof JoinAssociation) {
-      let resolvedRoot: { aliased: Table | Nodes.TableAlias; effectiveName: string } | undefined;
+      let resolvedRoot:
+        | { aliased: ArelTable | Nodes.TableAlias; effectiveName: string }
+        | undefined;
       const built = child.joinConstraints(
         foreignTable,
         foreignKlass,
@@ -446,7 +452,7 @@ export class JoinDependency {
   applyColumnAliases(relation: any): any {
     this._joinRootAlias = (relation?.selectValues?.length ?? 0) === 0;
     this._aliasesCache = undefined;
-    return relation._selectBang(() => this._buildSelectArelNodes());
+    return relation._selectBang(() => this.aliases().columns());
   }
 
   each(callback: (part: JoinPart, index: number) => void): void {
@@ -506,7 +512,7 @@ export class JoinDependency {
     const aliases = this.aliases();
     const basePk = (this._baseModel as any).primaryKey ?? "id";
     const basePkCols: string[] = Array.isArray(basePk) ? basePk : [basePk];
-    const baseAliasCols = aliases.columnsForNode(joinRoot);
+    const columnAliases = aliases.columnAliases(joinRoot)!;
 
     const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
     const modelCache = new Map<JoinPart, Map<unknown, any>>();
@@ -515,8 +521,8 @@ export class JoinDependency {
 
     for (const row of rows) {
       const parentAttrs: Record<string, unknown> = Object.create(null);
-      for (const { column, alias } of baseAliasCols) {
-        parentAttrs[column] = row[alias];
+      for (const { name, alias } of columnAliases) {
+        parentAttrs[name] = row[alias];
       }
       for (const key of Object.keys(row)) {
         if (!/^t\d+_r\d+$/.test(key)) parentAttrs[key] = row[key];
@@ -675,11 +681,8 @@ export class JoinDependency {
           columnNames = isJoinRoot ? getModelColumns(this._baseModel) : joinPart.columns;
         }
         const i = isJoinRoot ? 0 : joinPart.tableIndex;
-        const columns: AliasMap[] = columnNames.map((columnName, j) => ({
-          column: columnName,
-          alias: `t${i}_r${j}`,
-        }));
-        return { node: joinPart, table: joinPart.arelTable as Table | Nodes.TableAlias, columns };
+        const columns = columnNames.map((columnName, j) => new Column(columnName, `t${i}_r${j}`));
+        return new Table(joinPart, columns);
       }),
     ));
   }
@@ -700,9 +703,9 @@ export class JoinDependency {
     let model = nodeCache.get(id);
     if (!model) {
       const attrs: Record<string, unknown> = {};
-      const aliases = this.aliases();
-      for (let i = 0; i < node.columns.length; i++) {
-        attrs[node.columns[i]] = row[aliases.columnAlias(node, node.columns[i])!];
+      const columnAliases = this.aliases().columnAliases(node)!;
+      for (const { name, alias } of columnAliases) {
+        attrs[name] = row[alias];
       }
       model = (node.baseKlass as any)._instantiate(attrs, (built: any) => {
         if (strictLoadingValue && typeof built.strictLoadingBang === "function") {
