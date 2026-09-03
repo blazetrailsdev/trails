@@ -1,6 +1,6 @@
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
-import { getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import {
   CreateMigration,
   type CreateMigrationConfig,
@@ -22,11 +22,10 @@ export interface MigrationAssigns {
   migrationClassName: string;
 }
 
-export async function currentMigrationNumber(dirname: string): Promise<number> {
-  const path = getPath();
+export function currentMigrationNumber(dirname: string): number {
   let max = 0;
-  for (const file of await migrationLookupAt(dirname)) {
-    const n = parseInt(path.basename(file).split("_")[0], 10);
+  for (const file of migrationLookupAt(dirname)) {
+    const n = parseInt(File.basename(file).split("_")[0], 10);
     if (!Number.isNaN(n) && n > max) max = n;
   }
   return max;
@@ -36,9 +35,7 @@ export function nextMigrationNumber(): never {
 }
 
 export function buildMigrationAssigns(destination: string, nextNumber: string): MigrationAssigns {
-  const base = getPath()
-    .basename(destination)
-    .replace(/\.(ts|js|rb)$/, "");
+  const base = File.basename(destination).replace(/\.(ts|js|rb)$/, "");
   return {
     migrationNumber: nextNumber,
     migrationFileName: base,
@@ -74,19 +71,12 @@ export async function migrationTemplate(
   destination: string,
   config: CreateMigrationConfig = {},
 ): Promise<string> {
-  const path = getPath();
-  // Per PathAdapter contract: when isAbsolute is undefined, any path is
-  // treated as already absolute; only join with destinationRoot when the
-  // adapter declares the destination is relative.
-  const resolved =
-    path.isAbsolute && !path.isAbsolute(destination)
-      ? path.join(host.destinationRoot, destination)
-      : destination;
-  const dir = path.dirname(resolved);
+  const resolved = File.expandPath(destination, host.destinationRoot);
+  const dir = File.dirname(resolved);
   const nextNumber = String(await host.nextMigrationNumber(dir));
   const assigns = buildMigrationAssigns(resolved, nextNumber);
   host.setMigrationAssigns(assigns);
-  const numbered = path.join(dir, `${nextNumber}_${path.basename(resolved)}`);
+  const numbered = File.join(dir, `${nextNumber}_${File.basename(resolved)}`);
   // assigns.migrationFileName is the single source of truth for the
   // CreateMigration action's existence checks. Wrap the host so the action
   // can't drift from the just-computed assigns even if the host's own

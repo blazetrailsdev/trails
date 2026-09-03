@@ -1,3 +1,4 @@
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { getCrypto } from "@blazetrails/activesupport";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
@@ -38,11 +39,11 @@ export class CredentialsGenerator extends GeneratorBase {
   }
 
   private encryptedFile(): EncryptedFile {
-    const contentPath = this.path.join(this.cwd, this.contentPath);
-    this.fs.mkdirSync(this.path.dirname(contentPath), { recursive: true });
+    const contentPath = File.join(this.cwd, this.contentPath);
+    FileUtils.mkdirP(File.dirname(contentPath));
     return new EncryptedFile({
       contentPath,
-      keyPath: this.path.join(this.cwd, this.keyPath),
+      keyPath: File.join(this.cwd, this.keyPath),
       envKey: "RAILS_MASTER_KEY",
       raiseIfMissingKey: true,
     });

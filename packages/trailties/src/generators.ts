@@ -5,7 +5,7 @@
 // Modeled as a class with statics (cf. `rails.ts`) so the api-compare
 // extractor harvests the members; `Generators` is never instantiated.
 import { underscore } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { Dir, File, getPathAsync } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./generators/base.js";
 
 /**
@@ -74,7 +74,6 @@ export class Generators {
    */
   static async lookupBang(): Promise<void> {
     if (_subclasses) return;
-    const fs = await getFsAsync();
     const path = await getPathAsync();
     if (!path.pathToFileURL) {
       throw new Error("PathAdapter.pathToFileURL() is required to look up generators.");
@@ -82,10 +81,10 @@ export class Generators {
     const root = urlToPath(GENERATORS_ROOT);
     const found: GeneratorClass[] = [];
     const walk = async (dir: string, namespace: string[]): Promise<void> => {
-      const entries = fs.readdir ? await fs.readdir(dir) : [];
+      const entries = Dir.children(dir);
       for (const entry of entries.slice().sort()) {
         const full = path.join(dir, entry);
-        if (await isDirectory(fs, full)) {
+        if (File.isDirectory(full)) {
           await walk(full, [...namespace, underscore(entry.replace(/-/g, "_"))]);
         } else if (/-generator\.[cm]?[tj]s$/.test(entry) && !/\.(test|d)\./.test(entry)) {
           const klass = await importGenerator(path.pathToFileURL!(full).href);
@@ -264,17 +263,6 @@ export class Generators {
     output(`${base.charAt(0).toUpperCase()}${base.slice(1)}:`);
     for (const n of namespaces) output(`  ${n}`);
     output("");
-  }
-}
-
-async function isDirectory(
-  fs: Awaited<ReturnType<typeof getFsAsync>>,
-  p: string,
-): Promise<boolean> {
-  try {
-    return fs.statSync(p).isDirectory();
-  } catch {
-    return false;
   }
 }
 

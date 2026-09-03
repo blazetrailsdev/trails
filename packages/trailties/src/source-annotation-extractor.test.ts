@@ -3,7 +3,6 @@ import {
   fsAdapterConfig,
   registerFsAdapter,
   type FsAdapter,
-  type FsDirent,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
 import {
@@ -22,30 +21,39 @@ const posix: PathAdapter = {
 };
 
 const files = new Map<string, string>();
+const norm = (p: string): string => p.replace(/^\.\//, "").replace(/\/+$/, "");
+const dirs = (): Set<string> => {
+  const out = new Set<string>();
+  for (const f of files.keys()) {
+    const parts = f.split("/");
+    for (let i = 1; i < parts.length; i++) out.add(parts.slice(0, i).join("/"));
+  }
+  return out;
+};
 const memoryFs = {
   cwd: () => "/",
-  exists: async (p: string) => {
-    if (files.has(p)) return true;
-    const pre = p.endsWith("/") ? p : `${p}/`;
-    for (const f of files.keys()) if (f.startsWith(pre)) return true;
-    return false;
+  existsSync: (p: string) => files.has(norm(p)) || dirs().has(norm(p)),
+  statSync: (p: string) => {
+    const key = norm(p);
+    if (files.has(key)) return { isDirectory: () => false, isFile: () => true };
+    if (dirs().has(key)) return { isDirectory: () => true, isFile: () => false };
+    throw new Error(`ENOENT: ${p}`);
   },
-  readFile: async (p: string) => files.get(p) ?? Promise.reject(new Error(`ENOENT: ${p}`)),
-  readdirSync: (dir: string): FsDirent[] => {
-    const pre = dir.endsWith("/") ? dir : `${dir}/`;
+  readFileSync: (p: string) => {
+    const contents = files.get(norm(p));
+    if (contents === undefined) throw new Error(`ENOENT: ${p}`);
+    return contents;
+  },
+  readdirSync: (dir: string): string[] => {
+    const pre = norm(dir) === "" ? "" : `${norm(dir)}/`;
     const seen = new Set<string>();
-    const out: FsDirent[] = [];
     for (const f of files.keys()) {
       if (!f.startsWith(pre)) continue;
       const rest = f.slice(pre.length);
       const i = rest.indexOf("/");
-      const isDir = i !== -1;
-      const name = isDir ? rest.slice(0, i) : rest;
-      if (seen.has(name)) continue;
-      seen.add(name);
-      out.push({ name, isDirectory: () => isDir, isFile: () => !isDir });
+      seen.add(i === -1 ? rest : rest.slice(0, i));
     }
-    return out;
+    return [...seen];
   },
 } as unknown as FsAdapter;
 

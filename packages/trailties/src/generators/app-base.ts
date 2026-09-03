@@ -6,6 +6,7 @@
 // generate_bundler_binstub, target_rails_prerelease, dockerfile_*,
 // rails_gemfile_entry, etc.) are tracked as PR 1.14d follow-ups.
 
+import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "./base.js";
 import { Database, type DatabaseName } from "./database.js";
 
@@ -66,12 +67,7 @@ export abstract class AppBase extends GeneratorBase {
     // Mirrors AppBase#set_default_accessors!: destination_root resolves
     // app_path against the parent destination_root. Subclasses generate
     // into this directory, not the parent cwd.
-    // PathAdapter.isAbsolute is optional; adapters that omit it (e.g.
-    // in-memory VFS) don't model absolute paths and the contract says
-    // callers should treat the path as absolute — see PathAdapter docs
-    // in ruby-compat/src/fs-adapter.ts.
-    const isAbs = this.path.isAbsolute ? this.path.isAbsolute(options.appPath) : true;
-    this.destinationRoot = isAbs ? options.appPath : this.path.join(options.cwd, options.appPath);
+    this.destinationRoot = File.expandPath(options.appPath, options.cwd);
     this.cwd = this.destinationRoot;
     this.options = this.deduceImpliedOptions({ ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...options });
   }

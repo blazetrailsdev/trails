@@ -3,7 +3,7 @@ import {
   camelize as _camelize,
   dasherize as _dasherize,
 } from "@blazetrails/activesupport";
-import { getFs, getPath, type FsAdapter, type PathAdapter } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
@@ -58,16 +58,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     return generator.getCreatedFiles();
   }
 
-  protected get fs(): FsAdapter {
-    return getFs();
-  }
-
-  protected get path(): PathAdapter {
-    return getPath();
-  }
-
   protected isTypeScript(): boolean {
-    return this.fs.existsSync(this.path.join(this.cwd, "tsconfig.json"));
+    return File.isExist(File.join(this.cwd, "tsconfig.json"));
   }
 
   protected ext(): string {
@@ -75,42 +67,43 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   protected createFile(relativePath: string, content: string, options?: { mode?: number }): void {
-    const fullPath = this.path.join(this.cwd, relativePath);
-    this.fs.mkdirSync(this.path.dirname(fullPath), { recursive: true });
-    this.fs.writeFileSync(fullPath, content, { mode: options?.mode });
+    const fullPath = File.join(this.cwd, relativePath);
+    FileUtils.mkdirP(File.dirname(fullPath));
+    File.write(fullPath, content);
+    if (options?.mode !== undefined) File.chmod(options.mode, fullPath);
     this.createdFiles.push(relativePath);
     this.output(`      create  ${relativePath}`);
   }
 
   protected appendToFile(relativePath: string, content: string): void {
-    const fullPath = this.path.join(this.cwd, relativePath);
-    if (!this.fs.existsSync(fullPath)) {
+    const fullPath = File.join(this.cwd, relativePath);
+    if (!File.isExist(fullPath)) {
       this.createFile(relativePath, content);
       return;
     }
-    this.fs.appendFileSync(fullPath, content);
+    File.open(fullPath, "a", (file) => file.write(content));
     this.output(`      append  ${relativePath}`);
   }
 
   protected insertIntoFile(relativePath: string, marker: string, content: string): void {
-    const fullPath = this.path.join(this.cwd, relativePath);
-    if (!this.fs.existsSync(fullPath)) return;
-    const existing = this.fs.readFileSync(fullPath, "utf-8");
+    const fullPath = File.join(this.cwd, relativePath);
+    if (!File.isExist(fullPath)) return;
+    const existing = File.read(fullPath);
     const idx = existing.indexOf(marker);
     if (idx === -1) return;
     const updated = existing.slice(0, idx) + content + existing.slice(idx);
-    this.fs.writeFileSync(fullPath, updated);
+    File.write(fullPath, updated);
     this.output(`      insert  ${relativePath}`);
   }
 
   protected fileExists(relativePath: string): boolean {
-    return this.fs.existsSync(this.path.join(this.cwd, relativePath));
+    return File.isExist(File.join(this.cwd, relativePath));
   }
 
   protected removeFile(relativePath: string): boolean {
-    const fullPath = this.path.join(this.cwd, relativePath);
-    if (!this.fs.existsSync(fullPath)) return false;
-    this.fs.unlinkSync(fullPath);
+    const fullPath = File.join(this.cwd, relativePath);
+    if (!File.isExist(fullPath)) return false;
+    File.delete(fullPath);
     this.output(`      remove  ${relativePath}`);
     return true;
   }

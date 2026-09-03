@@ -1,3 +1,4 @@
+import { File } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 
@@ -25,8 +26,8 @@ export class EncryptedFileGenerator extends GeneratorBase {
   ): Promise<void> {
     if (this.fileExists(filePath)) return;
     const file = new EncryptedFile({
-      contentPath: this.path.join(this.cwd, filePath),
-      keyPath: this.path.join(this.cwd, keyPath),
+      contentPath: File.join(this.cwd, filePath),
+      keyPath: File.join(this.cwd, keyPath),
       envKey: "RAILS_MASTER_KEY",
       raiseIfMissingKey: true,
     });

@@ -1,6 +1,5 @@
-import { Dir, exit } from "@blazetrails/ruby-compat";
+import { Dir, File, exit } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
-import path from "node:path";
 import { execSync } from "node:child_process";
 import {
   AppGenerator,
@@ -58,7 +57,7 @@ export function newCommand(): Command {
       });
       await gen.run();
 
-      const appDir = path.join(cwd, name);
+      const appDir = File.join(cwd, name);
 
       if (!options.skipGit) {
         try {

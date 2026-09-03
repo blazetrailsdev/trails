@@ -1,11 +1,11 @@
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { migrationExists } from "../migration-lookup.js";
 
 // Mirrors railties/lib/rails/generators/actions/create_migration.rb. Rails
 // inherits from Thor::Actions::CreateFile; we don't have Thor, so the
 // invoke/revoke and conflict behaviors are ported directly. Status output
 // goes through `host.output` (Rails uses shell.say_status). Filesystem and
-// path access come from the activesupport adapter registry.
+// path access go through Ruby `File` / `FileUtils`.
 
 export interface CreateMigrationHost {
   output: (msg: string) => void;
@@ -31,7 +31,7 @@ export class CreateMigration {
   ) {}
 
   get migrationDir(): string {
-    return getPath().dirname(this.destination);
+    return File.dirname(this.destination);
   }
 
   get migrationFileName(): string {
@@ -48,11 +48,10 @@ export class CreateMigration {
   // create_migration.rb. Ruby's `||=` only caches truthy values, so an
   // "absent" lookup re-scans on the next call (the destination may now
   // exist after a successful invoke!).
-  async existingMigration(): Promise<string | undefined> {
+  existingMigration(): string | undefined {
     if (this._existingMigration) return this._existingMigration;
-    const found = await migrationExists(this.migrationDir, this.migrationFileName);
-    const value =
-      found ?? ((await getFs().exists(this.destination)) ? this.destination : undefined);
+    const found = migrationExists(this.migrationDir, this.migrationFileName);
+    const value = found ?? (File.isExist(this.destination) ? this.destination : undefined);
     if (value) this._existingMigration = value;
     return value;
   }
@@ -63,20 +62,18 @@ export class CreateMigration {
     this._existingMigration = undefined;
   }
 
-  async exists(): Promise<boolean> {
-    return Boolean(await this.existingMigration());
+  exists(): boolean {
+    return Boolean(this.existingMigration());
   }
 
   async identical(): Promise<boolean> {
-    const existing = await this.existingMigration();
+    const existing = this.existingMigration();
     if (!existing) return false;
-    const fs = getFs();
-    if (!fs.readFile) throw new Error("FsAdapter.readFile is required");
-    return (await fs.readFile(existing, "utf-8")) === (await this.render());
+    return File.binread(existing) === (await this.render());
   }
 
-  async relativeExistingMigration(): Promise<string> {
-    const existingMigration = await this.existingMigration();
+  relativeExistingMigration(): string {
+    const existingMigration = this.existingMigration();
     return existingMigration ? this.base.relativeToOriginalDestinationRoot(existingMigration) : "";
   }
 
@@ -89,7 +86,7 @@ export class CreateMigration {
   }
 
   async invoke(): Promise<string> {
-    const existing = await this.existingMigration();
+    const existing = this.existingMigration();
     if (existing) await this.onConflictBehavior();
     else {
       if (!this.pretend()) await this.writeRendered();
@@ -100,19 +97,17 @@ export class CreateMigration {
     // got written (force / no-conflict) and fall back to the relative path
     // of the existing migration (identical / skip).
     if (this.pretend()) return this.destination;
-    if (await getFs().exists(this.destination)) return this.destination;
+    if (File.isExist(this.destination)) return this.destination;
     return this.relativeExistingMigration();
   }
 
-  async revoke(): Promise<string | undefined> {
-    const e = await this.existingMigration();
+  revoke(): string | undefined {
+    const e = this.existingMigration();
     const sayDest = e ? this.base.relativeToOriginalDestinationRoot(e) : this.relativeDestination();
     this.sayStatus("remove", "red", sayDest);
     if (!e) return undefined;
     if (!this.pretend()) {
-      const fs = getFs();
-      if (!fs.unlink) throw new Error("FsAdapter.unlink is required");
-      await fs.unlink(e);
+      FileUtils.rmR(e, { force: true });
       this.invalidateExistingMigration();
     }
     return e;
@@ -121,18 +116,16 @@ export class CreateMigration {
   private async onConflictBehavior(): Promise<string | undefined> {
     const options = { ...this.base.options, ...this.config };
     if (await this.identical()) {
-      this.sayStatus("identical", "blue", await this.relativeExistingMigration());
+      this.sayStatus("identical", "blue", this.relativeExistingMigration());
       return this.existingMigration();
     }
     if (options.force) {
-      this.sayStatus("remove", "green", await this.relativeExistingMigration());
+      this.sayStatus("remove", "green", this.relativeExistingMigration());
       this.sayStatus("create", "green");
       if (!this.pretend()) {
-        const e = await this.existingMigration();
+        const e = this.existingMigration();
         if (e) {
-          const fs = getFs();
-          if (!fs.unlink) throw new Error("FsAdapter.unlink is required");
-          await fs.unlink(e);
+          FileUtils.rmR(e, { force: true });
           this.invalidateExistingMigration();
         }
         await this.writeRendered();
@@ -146,17 +139,14 @@ export class CreateMigration {
     this.sayStatus("conflict", "red");
     throw new Error(
       `Another migration is already named ${this.migrationFileName}: ` +
-        `${await this.existingMigration()}. Use --force to replace this ` +
+        `${this.existingMigration()}. Use --force to replace this ` +
         `migration or --skip to ignore conflicted file.`,
     );
   }
 
   private async writeRendered(): Promise<void> {
-    const fs = getFs();
-    if (!fs.writeFile) throw new Error("FsAdapter.writeFile is required");
-    if (!fs.mkdir) throw new Error("FsAdapter.mkdir is required");
-    await fs.mkdir(getPath().dirname(this.destination), { recursive: true });
-    await fs.writeFile(this.destination, await this.render());
+    FileUtils.mkdirP(File.dirname(this.destination));
+    File.write(this.destination, await this.render());
   }
 
   private sayStatus(status: string, _color: string, message?: string): void {

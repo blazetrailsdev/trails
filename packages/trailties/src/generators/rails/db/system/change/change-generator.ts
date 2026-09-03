@@ -8,6 +8,7 @@
 // compose.yaml is read/written as JSON because DevcontainerGenerator serialises it
 // with JSON.stringify (JSON is valid YAML, so Docker Compose accepts it).
 
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../../../database.js";
 
@@ -34,7 +35,7 @@ export class ChangeGenerator extends GeneratorBase {
     }
     this.to = options.to as DatabaseName;
     // Mirrors railties' AppName module: derive from destination_root basename.
-    this.appName = options.appName ?? this.path.basename(this.cwd);
+    this.appName = options.appName ?? File.basename(this.cwd);
   }
 
   /** @internal */
@@ -77,8 +78,8 @@ export class ChangeGenerator extends GeneratorBase {
 
   editPackageJson(): void {
     if (!this.fileExists("package.json")) return;
-    const fullPath = this.path.join(this.cwd, "package.json");
-    const raw = this.fs.readFileSync(fullPath, "utf-8");
+    const fullPath = File.join(this.cwd, "package.json");
+    const raw = File.read(fullPath);
     let pkg: { dependencies?: unknown } & Record<string, unknown>;
     try {
       pkg = JSON.parse(raw);
@@ -115,8 +116,8 @@ export class ChangeGenerator extends GeneratorBase {
   // (tracked under PR 1.14d in docs/trailties-plan.md).
   editDockerfile(): void {
     if (!this.fileExists("Dockerfile")) return;
-    const fullPath = this.path.join(this.cwd, "Dockerfile");
-    const before = this.fs.readFileSync(fullPath, "utf-8");
+    const fullPath = File.join(this.cwd, "Dockerfile");
+    const before = File.read(fullPath);
     let after = before.replace(
       dockerPackagesRegex(BASE_PACKAGES, (d) => d.basePackage),
       dockerPackages(BASE_PACKAGES, this.database.basePackage),
@@ -130,14 +131,14 @@ export class ChangeGenerator extends GeneratorBase {
   }
 
   private writeOrUpdate(relativePath: string, content: string): void {
-    const full = this.path.join(this.cwd, relativePath);
+    const full = File.join(this.cwd, relativePath);
     const existed = this.fileExists(relativePath);
-    if (existed && this.fs.readFileSync(full, "utf-8") === content) {
+    if (existed && File.read(full) === content) {
       this.output(`   identical  ${relativePath}`);
       return;
     }
-    this.fs.mkdirSync(this.path.dirname(full), { recursive: true });
-    this.fs.writeFileSync(full, content);
+    FileUtils.mkdirP(File.dirname(full));
+    File.write(full, content);
     if (existed) {
       this.output(`      update  ${relativePath}`);
     } else {
@@ -155,10 +156,10 @@ export class ChangeGenerator extends GeneratorBase {
   private editDevcontainerJson(): void {
     const rel = ".devcontainer/devcontainer.json";
     if (!this.fileExists(rel)) return;
-    const full = this.path.join(this.cwd, rel);
+    const full = File.join(this.cwd, rel);
     let json: Record<string, unknown>;
     try {
-      json = JSON.parse(this.fs.readFileSync(full, "utf-8")) as Record<string, unknown>;
+      json = JSON.parse(File.read(full)) as Record<string, unknown>;
     } catch (e) {
       throw new Error(
         `Could not parse ${full}: ${(e as Error).message}. Fix the file and re-run.`,
@@ -198,14 +199,14 @@ export class ChangeGenerator extends GeneratorBase {
   private editComposeYaml(): void {
     const rel = ".devcontainer/compose.yaml";
     if (!this.fileExists(rel)) return;
-    const full = this.path.join(this.cwd, rel);
+    const full = File.join(this.cwd, rel);
     let compose: {
       services: Record<string, Record<string, unknown>>;
       volumes?: Record<string, unknown>;
       [k: string]: unknown;
     };
     try {
-      compose = JSON.parse(this.fs.readFileSync(full, "utf-8"));
+      compose = JSON.parse(File.read(full));
     } catch (e) {
       throw new Error(
         `Could not parse ${full}: ${(e as Error).message}. Fix the file and re-run.`,

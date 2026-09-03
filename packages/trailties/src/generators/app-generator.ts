@@ -1,3 +1,4 @@
+import { File } from "@blazetrails/ruby-compat";
 import { camelize, parameterize, underscore } from "@blazetrails/activesupport";
 import { ref, tsClass, tsField, tsModule, tsRaw } from "../template-builder/index.js";
 import { AppBase, type AppBaseOptions } from "./app-base.js";
@@ -75,7 +76,7 @@ export class AppGenerator extends AppBase {
   /** Rails' `AppName#original_app_name` (`app_name.rb:12`):
    * `options[:name] || File.basename(destination_root)`. */
   private originalAppName(): string {
-    return this.options.name ?? this.path.basename(this.destinationRoot);
+    return this.options.name ?? File.basename(this.destinationRoot);
   }
 
   /** Rails' `AppName#app_name` (`app_name.rb:9`):
@@ -140,7 +141,7 @@ export class AppGenerator extends AppBase {
 
   async run(): Promise<string[]> {
     this.isValidConst();
-    const name = this.path.basename(this.appPath);
+    const name = File.basename(this.appPath);
 
     this.output(`Creating new trails application: ${name}`);
     this.output("");

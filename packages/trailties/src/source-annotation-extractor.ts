@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 
 export interface AnnotationOptions {
   tag?: boolean;
@@ -103,40 +103,36 @@ registerDefaults();
  * a string-literal-aware AST extractor is left for a follow-up.
  */
 export class SourceAnnotationExtractor {
-  static async enumerate(
+  static enumerate(
     tag: string | null = null,
     options: AnnotationOptions & { dirs?: readonly string[] } = {},
-  ): Promise<string> {
+  ): string {
     tag ??= Annotation.tags.join("|");
     const extractor = new SourceAnnotationExtractor(tag);
     const dirs = options.dirs ?? Annotation.directories;
     delete options.dirs;
-    return extractor.display(await extractor.find(dirs), options);
+    return extractor.display(extractor.find(dirs), options);
   }
 
   constructor(public readonly tag: string) {}
 
-  async find(dirs: readonly string[]): Promise<Map<string, Annotation[]>> {
+  find(dirs: readonly string[]): Map<string, Annotation[]> {
     const merged = new Map<string, Annotation[]>();
-    for (const dir of dirs) for (const [k, v] of await this.findIn(dir)) merged.set(k, v);
+    for (const dir of dirs) for (const [k, v] of this.findIn(dir)) merged.set(k, v);
     return merged;
   }
 
-  async findIn(dir: string): Promise<Map<string, Annotation[]>> {
+  findIn(dir: string): Map<string, Annotation[]> {
     const results = new Map<string, Annotation[]>();
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
-    if (!(await fs.exists(dir))) return results;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (entry.name.startsWith(".")) continue;
-      const item = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        for (const [k, v] of await this.findIn(item)) results.set(k, v);
+    for (const item of Dir.glob(`${dir}/*`)) {
+      if (File.basename(item).startsWith(".")) continue;
+      if (File.isDirectory(item)) {
+        for (const [k, v] of this.findIn(item)) results.set(k, v);
         continue;
       }
       const ext = Annotation.extensions.find((e) => e.test.test(item));
       if (!ext) continue;
-      const annotations = await extractFromFile(item, ext.builder(this.tag));
+      const annotations = extractFromFile(item, ext.builder(this.tag));
       if (annotations.length > 0) results.set(item, annotations);
     }
     return results;
@@ -158,13 +154,10 @@ export class SourceAnnotationExtractor {
   }
 }
 
-async function extractFromFile(file: string, pattern: RegExp): Promise<Annotation[]> {
-  const fs = await getFsAsync();
-  if (!fs.readFile) throw new Error("fsAdapter.readFile (async) is required");
-  const contents = await fs.readFile(file, "utf-8");
+function extractFromFile(file: string, pattern: RegExp): Annotation[] {
   const out: Annotation[] = [];
   let lineno = 0;
-  for (const line of contents.split(/\r?\n/)) {
+  for (const line of File.readlines(file)) {
     lineno++;
     const m = line.match(pattern);
     if (m) out.push(new Annotation(lineno, m[1], m[2]));
