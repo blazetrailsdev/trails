@@ -1,8 +1,3 @@
-/**
- * Trails-only: Ruby's `::Date` is stdlib, so it has no Rails test to mirror.
- * These cover the members `I18n::Backend::Base#localize` duck-types.
- */
-
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect, vi } from "vitest";
 import {
@@ -18,18 +13,9 @@ import {
 import { Time as RubyTime } from "./time.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
-/**
- * The gem-shaped `::Date` / `::DateTime` RFC 0088's opt-in answers. The statics
- * answer `Temporal` now ({@link RubyDate#toDate} / {@link RubyDateTime#toDatetime}),
- * and these are the exported builders those statics themselves call — the way
- * back to the object for the members the `Temporal` seat cannot carry: `zone`,
- * `offset` and `secFraction` (a `Rational` past nanosecond precision), plus the
- * gem's own `to_s` spelling.
- */
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
 const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
 
-/** The `y-mm-dd` a date names, for a one-line assertion. */
 function ymd(date: RubyDate | Temporal.PlainDate): string {
   const mon = date instanceof RubyDate ? date.mon : date.month;
   return `${date.year}-${String(mon).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
@@ -392,10 +378,6 @@ describe("Date", () => {
   });
 
   it("answers a Rational sec_fraction for every argument, as ns_to_sec does", () => {
-    // ruby 3.3.11 — `sec_fraction -> rational` (date_core.c:5623), which
-    // `ns_to_sec`'s `rb_rational_new2` (:993-998) answers whatever it is handed:
-    //   DateTime.new(2008, 3, 1, 6, 0, Rational(2)).sec_fraction #=> (0/1)
-    //   DateTime.new(2001, 2, 3, 4, 5, 6.5).sec_fraction         #=> (1/2)
     expect(new RubyDateTime(2008, 3, 1, 6, 0, new Rational(2, 1)).secFraction).toEqual(
       new Rational(0, 1),
     );
@@ -403,38 +385,22 @@ describe("Date", () => {
   });
 
   it("keeps a fraction literal past Number.MAX_SAFE_INTEGER exact, as an Integer numerator does", () => {
-    // ruby 3.3.11:
-    //   DateTime.parse("2008-03-01T06:00:00." + "1" * 20).sec_fraction
-    //   #=> (11111111111111111111/100000000000000000000)
     const parsed = gemDateTime(`2008-03-01T06:00:00.${"1".repeat(20)}`);
     expect(parsed.secFraction).toEqual(new Rational(11111111111111111111n, 100000000000000000000n));
-    // The same denominator drives %N's long division, which stays exact too.
     expect(parsed.strftime("%20N")).toBe("11111111111111111111");
   });
 
   it("keeps a %N numerator past Number.MAX_SAFE_INTEGER exact, as str2num does", () => {
-    // ruby 3.3.11:
-    //   Date._strptime("2008-03-01T06:00:00." + "1" * 20, "%FT%T.%N")[:sec_fraction]
-    //   #=> (11111111111111111111/100000000000000000000)
     const str = `2008-03-01T06:00:00.${"1".repeat(20)}`;
     expect(RubyDate._strptime(str, "%FT%T.%N")?.secFraction).toEqual(
       new Rational(11111111111111111111n, 100000000000000000000n),
     );
-    //   DateTime.strptime(..., "%FT%T.%N").strftime("%FT%H:%M:%S.%20N")
-    //   #=> "2008-03-01T06:00:00.11111111111111111111"
-    // (`%T` on the way out is the separate `strftime-lacks-composite-conversions`.)
     expect(dtNewByFrags(RubyDate._strptime(str, "%FT%T.%N")).strftime("%FT%H:%M:%S.%20N")).toBe(
       `2008-03-01T06:00:00.${"1".repeat(20)}`,
     );
   });
 
   it("parses a time of day under DateTime's own default format", () => {
-    // ruby 3.3.11:
-    //   DateTime._strptime("2001-02-03T04:05:06+07:00")
-    //   #=> {:year=>2001, :mon=>2, :mday=>3, :hour=>4, :min=>5, :sec=>6,
-    //        :zone=>"+07:00", :offset=>25200}
-    //   Date._strptime("2001-02-03T04:05:06+07:00")
-    //   #=> {:year=>2001, :mon=>2, :mday=>3, :leftover=>"T04:05:06+07:00"}
     expect(RubyDateTime._strptime("2001-02-03T04:05:06+07:00")).toEqual({
       year: 2001,
       mon: 2,
@@ -508,13 +474,6 @@ describe("Date", () => {
   });
 
   it("sets the seconds frag from %s and %Q, the only producers rt_rewrite_frags has", () => {
-    // ruby 3.3.11:
-    //   Date._strptime("1000000000", "%s")     #=> {:seconds=>1000000000}
-    //   Date._strptime("-1000000000", "%s")    #=> {:seconds=>-1000000000}
-    //   Date._strptime("1000000000500", "%Q")  #=> {:seconds=>(2000000001/2)}
-    //   Date._strptime("1234567890123", "%Q")  #=> {:seconds=>(1234567890123/1000)}
-    //   Date._strptime("-1234567890123", "%Q") #=> {:seconds=>(-1234567890123/1000)}
-    //   Date._strptime("9007199254740993", "%s") #=> {:seconds=>9007199254740993}
     expect(RubyDate._strptime("1000000000", "%s")).toEqual({ seconds: 1000000000n });
     expect(RubyDate._strptime("-1000000000", "%s")).toEqual({ seconds: -1000000000n });
     expect(RubyDate._strptime("1000000000500", "%Q")).toEqual({
@@ -532,8 +491,6 @@ describe("Date", () => {
   });
 
   it("expands an exact %Q through rt_rewrite_frags, as DateTime.strptime does", () => {
-    // ruby 3.3.11:
-    //   DateTime.strptime("1234567890123", "%Q").to_s #=> "2009-02-13T23:31:30+00:00"
     expect(dtNewByFrags(RubyDate._strptime("1234567890123", "%Q")).toS()).toBe(
       "2009-02-13T23:31:30+00:00",
     );
@@ -555,9 +512,6 @@ describe("Date", () => {
   });
 
   it("reaches rt_rewrite_frags through %s and %Q, as Date.strptime does", () => {
-    // ruby 3.3.11:
-    //   Date.strptime("1000000000", "%s")    #=> #<Date: 2001-09-09>
-    //   Date.strptime("1000000000500", "%Q") #=> #<Date: 2001-09-09>
     expect(ymd(RubyDate.strptime("1000000000", "%s"))).toBe("2001-09-09");
     expect(ymd(RubyDate.strptime("1000000000500", "%Q"))).toBe("2001-09-09");
   });
@@ -716,7 +670,6 @@ describe("Date", () => {
   });
 
   it("formats the composite and week-based directives date_strftime expands", () => {
-    // Every expectation is `ruby 3.3.11 -rdate`'s answer for the same receiver.
     const date = RubyDate.parse("2008-07-02");
     const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
     expect(strftime(date, "%T|%R|%r|%X")).toBe("00:00:00|00:00|12:00:00 AM|00:00:00");
@@ -728,7 +681,6 @@ describe("Date", () => {
     expect(strftime(date, "%+")).toBe("Wed Jul  2 00:00:00 +00:00 2008");
     expect(strftime(date, "%G|%V|%U|%W")).toBe("2008|27|26|26");
     expect(dt.strftime("%G|%V|%U|%W")).toBe("2008|09|08|08");
-    // The week-based year runs back into the previous year here.
     expect(strftime(RubyDate.parse("2021-01-03"), "%U|%W|%V|%G|%g|%y")).toBe("01|00|53|2020|20|21");
     expect(strftime(date, "%Q")).toBe("1214956800000");
     expect(dt.strftime("%Q")).toBe("1204351628500");
@@ -750,7 +702,6 @@ describe("Date", () => {
   });
 
   it("honours the width prefix ahead of every directive, as date_strftime does", () => {
-    // Every expectation is `ruby 3.3.11 -rdate`'s answer for the same receiver.
     const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
     expect(dt.strftime("%12S")).toBe("000000000008");
     expect(dt.strftime("%6m")).toBe("000003");
@@ -798,8 +749,6 @@ describe("Date", () => {
   it("leaves a width-qualified unknown directive alone", () => {
     const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
     expect(dt.strftime("%9q")).toBe("%9q");
-    // `FLAG_FOUND` (date_strftime.c:90-93) — a flag AFTER a width is unknown,
-    // where the same flag before it is honoured.
     expect(dt.strftime("%3-S")).toBe("%3-S");
     expect(dt.strftime("%3_S")).toBe("%3_S");
     expect(dt.strftime("%-3S")).toBe("8");
@@ -810,7 +759,6 @@ describe("Date", () => {
   });
 
   it("accepts and ignores the E and O locale extensions, as date_strftime does", () => {
-    // Every expectation is `ruby 3.3.11 -rdate`'s.
     const dt = new RubyDateTime(2008, 3, 1, 6, 7, 8.5);
     expect(dt.strftime("%Oy")).toBe("08");
     expect(dt.strftime("%Ey")).toBe("08");
@@ -818,16 +766,11 @@ describe("Date", () => {
     expect(dt.strftime("%OH")).toBe("06");
     expect(dt.strftime("%EX")).toBe("06:07:08");
     expect(dt.strftime("%Ec")).toBe("Sat Mar  1 06:07:08 2008");
-    // Each whitelist is load-bearing in both directions: `z` is in neither, and
-    // `y` is in `O`'s but `V` is not in `E`'s.
     expect(dt.strftime("%Oz")).toBe("%Oz");
     expect(dt.strftime("%Ez")).toBe("%Ez");
     expect(dt.strftime("%EV")).toBe("%EV");
     expect(dt.strftime("%E")).toBe("%E");
     expect(dt.strftime("%O")).toBe("%O");
-    // `FLAG_FOUND` reads the LOCALE_E/LOCALE_O bits, so a width behind the
-    // extension is unknown — and a width in front of it never reaches the
-    // whitelist at all.
     expect(dt.strftime("%E3y")).toBe("%E3y");
     expect(dt.strftime("%O3S")).toBe("%O3S");
   });
@@ -838,10 +781,6 @@ describe("Date", () => {
   });
 
   it("reads wday, yday and the epoch off the Julian day, as m_wday and tmx_m_secs do", () => {
-    // Every expectation is `ruby 3.3.11 -rdate`'s. `Date.new` / `DateTime.new`
-    // default to `Date::ITALY`, so a date at or before the reform is a Julian
-    // one and runs days apart from the proleptic Gregorian reading
-    // `Temporal.PlainDate` answers — two days at year 1, eleven at -1234.
     expect(new RubyDateTime(1, 1, 1).strftime("%A|%a|%u|%w|%s")).toBe(
       "Saturday|Sat|6|6|-62135769600",
     );
@@ -851,12 +790,9 @@ describe("Date", () => {
     expect(new RubyDateTime(-1234, 3, 1).strftime("%A|%a|%u|%w|%s")).toBe(
       "Friday|Fri|5|5|-101104329600",
     );
-    // The Julian leap day the Gregorian calendar does not have: 1500 is a leap
-    // year under `Date::ITALY`, so 1 March is the 61st day of it.
     expect(new RubyDate(1500, 3, 1).yday).toBe(61);
     expect(new RubyDate(1500, 3, 1).wday).toBe(0);
     expect(new RubyDate(1500, 3, 1).jd).toBe(2268993);
-    // Post-reform is byte-identical to the proleptic reading.
     expect(new RubyDateTime(2008, 3, 1, 6, 7, 8).strftime("%A|%a|%u|%w|%s|%j")).toBe(
       "Saturday|Sat|6|6|1204351628|061",
     );
@@ -864,9 +800,6 @@ describe("Date", () => {
   });
 
   it("names a day off a Julian day, as date_s_jd does", () => {
-    // Every expectation is `ruby 3.3.11 -rdate`'s `Date.jd(jd)` — under the
-    // default `Date::ITALY`, so 2299160 is the Julian 1582-10-04 the reform
-    // deleted ten days after, not the proleptic Gregorian 1582-10-14.
     expect(strftime(RubyDate.jd(2440588), "%Y-%m-%d")).toBe("1970-01-01");
     expect(strftime(RubyDate.jd(2299161), "%Y-%m-%d")).toBe("1582-10-15");
     expect(strftime(RubyDate.jd(2299160), "%Y-%m-%d")).toBe("1582-10-04");
@@ -874,11 +807,6 @@ describe("Date", () => {
   });
 
   it("reads a Temporal subject's wday and yday off the Julian day too", () => {
-    // `temporalSubject` fills the same `StrftimeSubject` the gem-shaped path
-    // does, so the two must answer one date identically — `Temporal`'s own
-    // `dayOfWeek`/`dayOfYear` are proleptic (1500-03-01 is a Thursday and the
-    // 60th day there, a Sunday and the 61st under `Date::ITALY`), which would
-    // put `%A` days from the `%s` epochSeconds derives from the Julian day.
     for (const [y, m, d] of [
       [1, 1, 1],
       [-1234, 3, 1],
@@ -903,8 +831,6 @@ describe("Date", () => {
     expect(new RubyDate(-12345, 1, 1).toS()).toBe("-12345-01-01");
     expect(new RubyDate(12345, 1, 1).toS()).toBe("12345-01-01");
     expect(new RubyDate(1, 1, 1).strftime("%F")).toBe("0001-01-01");
-    // `%C` and `%y` go through the C's floored `div`/`mod`, so a BC year
-    // answers `ruby 3.3.11 -rdate`'s `"-1"` and `"99"`, not `"-1"` and `"-1"`.
     expect(new RubyDate(-1, 3, 1).strftime("%Y|%-Y|%6Y|%C|%y")).toBe("-0001|-1|-00001|-1|99");
   });
 
@@ -922,15 +848,10 @@ describe("Date", () => {
   };
 
   it("raises Date::Error on a civil date c_valid_civil_p rejects", () => {
-    // Every expectation is `ruby 3.3.11 -rdate`'s `Date.new(y, m, d)` under the
-    // default `Date::ITALY`, where 1582-10-10 is one of the ten days the reform
-    // deleted.
     expect(() => new RubyDate(2001, 2, 29)).toThrow(RubyDate.Error);
     expect(civilOrError(1581, 12, 31)).toEqual([1581, 12, 31]);
     expect(civilOrError(1582, 10, 10)).toBe("E");
     expect(civilOrError(1500, 2, 29)).toEqual([1500, 2, 29]);
-    // c_find_ldom's scan makes February 1500 twenty-nine days long, as the
-    // Julian calendar has it, so the negative mday counts back from the 29th.
     expect(civilOrError(1500, 2, -1)).toEqual([1500, 2, 29]);
     expect(civilOrError(1582, 10, -1)).toEqual([1582, 10, 31]);
     expect(civilOrError(1900, 2, -1)).toEqual([1900, 2, 28]);
@@ -943,12 +864,6 @@ describe("Date", () => {
   });
 
   it("builds a Julian-only civil date, as the HAVE_JD state does", () => {
-    // ruby 3.3.11 -rdate: Julian leap years have no century rule, so 1500,
-    // 1400 and 1300 are all leap under `Date::ITALY` and 29 February is a real
-    // day none of them has a proleptic Gregorian spelling for.
-    //   Date.new(1500, 2, 29) #=> "1500-02-29", jd 2268992, wday 6
-    //   Date.new(1400, 2, 29) #=> "1400-02-29", jd 2232467, wday 0
-    //   Date.new(1300, 2, 29) #=> "1300-02-29", jd 2195942, wday 1
     for (const [y, jd, wday] of [
       [1500, 2268992, 6],
       [1400, 2232467, 0],
@@ -959,52 +874,26 @@ describe("Date", () => {
       expect(date.jd).toBe(jd);
       expect(date.wday).toBe(wday);
       expect(date.yday).toBe(60);
-      // The `Temporal.PlainDate` seat is where the spelling runs out, not the
-      // gem-shaped object: `to_date` is the only thing that raises.
       expect(() => date.toDate()).toThrow(RubyDate.Error);
     }
   });
 
   it("takes guess_style's proleptic arms for an infinite start, as date_initialize does", () => {
-    // ruby 3.3.11 -rdate — `Date::GREGORIAN` is proleptic Gregorian everywhere,
-    // so 1500 has no leap day and 1582-10-10 is a real day the reform never
-    // deleted; `Date::JULIAN` is proleptic Julian everywhere, so 1900 does have
-    // one:
-    //   Date.new(1500, 2, 29, Date::GREGORIAN) #=> Date::Error: invalid date
-    //   Date.new(1500, 2, 28, Date::GREGORIAN).jd #=> 2268982
-    //   Date.new(1582, 10, 10, Date::GREGORIAN).to_s #=> "1582-10-10"
-    //   Date.new(1900, 2, 29, Date::JULIAN).to_s #=> "1900-02-29"
-    //   Date.new(2000, 1, 1, Date::JULIAN).jd #=> 2451558
     expect(() => new RubyDate(1500, 2, 29, RubyDate.GREGORIAN)).toThrow("invalid date");
     expect(new RubyDate(1500, 2, 28, RubyDate.GREGORIAN).jd).toBe(2268982);
     expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
     expect(new RubyDate(1900, 2, 29, RubyDate.JULIAN).toS()).toBe("1900-02-29");
     expect(new RubyDate(2000, 1, 1, RubyDate.JULIAN).jd).toBe(2451558);
-    // datetime_initialize takes the same two arms:
-    //   DateTime.new(1500, 2, 29, 0, 0, 0, 0, Date::GREGORIAN) #=> Date::Error
-    //   DateTime.new(1900, 2, 29, 1, 2, 3, 0, Date::JULIAN).to_s
-    //     #=> "1900-02-29T01:02:03+00:00"
     expect(() => new RubyDateTime(1500, 2, 29, 0, 0, 0, 0, RubyDate.GREGORIAN)).toThrow(
       "invalid date",
     );
     expect(new RubyDateTime(1900, 2, 29, 1, 2, 3, 0, RubyDate.JULIAN).toS()).toBe(
       "1900-02-29T01:02:03+00:00",
     );
-    // A year past REFORM_END_YEAR takes the proleptic Gregorian arm under the
-    // default start too, and answers the same day:
-    //   Date.new(600000, 1, 1).jd #=> 220866560
     expect(new RubyDate(600000, 1, 1).jd).toBe(220866560);
   });
 
   it("carries decode_year's nth, so a year past a double stays exact", () => {
-    // ruby 3.3.11 -rdate — the year and the day are Bignums, split into a
-    // `nth` and an `int` residue by decode_year/decode_jd
-    // (date_core.c:1342-1412):
-    //   Date.new(2**70, 1, 1).to_s #=> "1180591620717411303424-01-01"
-    //   Date.new(2**70, 1, 1).jd   #=> 431202235029879099711900
-    //   Date.new(2**70, 1, 1).year #=> 1180591620717411303424
-    //   Date.new(2**70, 1, 1).wday #=> 4
-    //   Date.new(2**70, 1, 1).julian? #=> false
     const d = new RubyDate(2n ** 70n, 1, 1);
     expect(d.toS()).toBe("1180591620717411303424-01-01");
     expect(d.jd).toBe(431202235029879099711900n);
@@ -1013,37 +902,16 @@ describe("Date", () => {
     expect(d.mon).toBe(1);
     expect(d.day).toBe(1);
     expect(d.isJulian).toBe(false);
-    // The residue year is validated as the real one is, so a day the residue's
-    // February does not have raises:
-    //   Date.new(2**70, 3, 1).to_s #=> "1180591620717411303424-03-01"
-    //   Date.new(2**70, 2, 30) #=> Date::Error: invalid date
     expect(new RubyDate(2n ** 70n, 3, 1).toS()).toBe("1180591620717411303424-03-01");
     expect(() => new RubyDate(2n ** 70n, 2, 30)).toThrow("invalid date");
-    // A negative nth is the mirror, and strftime spells the whole year:
-    //   Date.new(-(2**70), 1, 1).to_s #=> "-1180591620717411303424-01-01"
-    //   Date.new(2**70, 1, 1).strftime("%C|%y|%A") #=> "11805916207174113034|24|Thursday"
     expect(new RubyDate(-(2n ** 70n), 1, 1).toS()).toBe("-1180591620717411303424-01-01");
     expect(d.strftime("%C|%y|%A")).toBe("11805916207174113034|24|Thursday");
-    // date_s_jd runs decode_jd on the day it is given:
-    //   Date.jd(2**70).jd #=> 1180591620717411303424
-    // DateTime carries the same nth on ComplexDateData:
-    //   DateTime.new(2**70, 1, 1, 1, 2, 3).to_s
-    //     #=> "1180591620717411303424-01-01T01:02:03+00:00"
     expect(new RubyDateTime(2n ** 70n, 1, 1, 1, 2, 3).toS()).toBe(
       "1180591620717411303424-01-01T01:02:03+00:00",
     );
   });
 
   it("threads decode_jd through the frags builders and the jd statics", () => {
-    // ruby 3.3.11 -rdate — `d_new_by_frags` (date_core.c:4315) and
-    // `dt_new_by_frags` (:8311) decode the Julian day rt__valid_*_p answered
-    // back into the stored `nth`, which is the same object `Date.jd` /
-    // `DateTime.jd` build (date_core.c:7697):
-    //   Date.jd(2**70).to_s #=> "3232350070754114273-01-08"
-    //   Date.jd(2**70).jd   #=> 1180591620717411303424
-    //   Date.jd(2**70).wday #=> 3
-    //   DateTime.jd(2**70, 1, 2, 3).to_s
-    //     #=> "3232350070754114273-01-08T01:02:03+00:00"
     const d = dNewByFrags({ jd: 2n ** 70n });
     expect(d.toS()).toBe("3232350070754114273-01-08");
     expect(d.jd).toBe(1180591620717411303424n);
@@ -1061,13 +929,6 @@ describe("Date", () => {
   });
 
   it("truncates a fractional year through valid_civil_p, as decode_year does", () => {
-    // ruby 3.3.11 -rdate — valid_civil_p (date_core.c:2246-2277) runs
-    // decode_year before c_valid_civil_p's `int y`, and the truncation is of
-    // the 4712-SHIFTED year, so it rounds toward -4712 rather than toward zero:
-    //   Date.new(-2000.5, 1, 1).to_s #=> "-2001-01-01"
-    //   Date.new(1600.5, 1, 1).to_s  #=> "1600-01-01"
-    //   Date.new(1600.5, 1, 1).jd    #=> 2305448
-    //   Date.new(-2000.5, 1, 1, Date::JULIAN).to_s #=> "-2001-01-01"
     expect(new RubyDate(-2000.5, 1, 1).toS()).toBe("-2001-01-01");
     expect(new RubyDate(1600.5, 1, 1).toS()).toBe("1600-01-01");
     expect(new RubyDate(1600.5, 1, 1).jd).toBe(2305448);
@@ -1075,14 +936,6 @@ describe("Date", () => {
   });
 
   it("raises from every static that answers the seat for a Julian-only spelling", () => {
-    // ruby 3.3.11 -rdate answers "1500-02-29" from all six — the gem's `::Date`
-    // value is the gem object, so `date_to_date` (date_core.c:8977-8981) is
-    // `self` and never raises. trails' `::Date` value is `Temporal.PlainDate`,
-    // proleptic Gregorian, which has no 1500-02-29; RFC 0088's mapping table
-    // names this the seat's limit rather than narrowing the default return.
-    //   Date.civil(1500, 2, 29) / Date.jd(2268992) / Date.ordinal(1500, 60) /
-    //   Date.commercial(1500, 9, 6) / Date.parse("1500-02-29") /
-    //   Date.strptime("1500-02-29", "%Y-%m-%d")
     const statics: Array<() => Temporal.PlainDate> = [
       () => RubyDate.civil(1500, 2, 29),
       () => RubyDate.jd(2268992),
@@ -1096,38 +949,9 @@ describe("Date", () => {
       expect(build).toThrow("invalid date");
     }
 
-    // The gem-shaped builders the same statics run over answer it, so the
-    // spelling is reachable — only the Temporal seat cannot hold it.
     expect(dNewByFrags(RubyDate._parse("1500-02-29")).toS()).toBe("1500-02-29");
   });
 
-  /**
-   * `valid_ordinal_p` / `valid_commercial_p` (date_core.c:2199-2227, :2274-2302)
-   * wrap the int-level `c_valid_*_p` in the same `guess_style` branch
-   * `valid_civil_p` (:2246-2277) has: a year past `REFORM_END_YEAR` is
-   * proleptic Gregorian, so it is `decode_year`d into a `nth` and a residue
-   * year FIRST and validated there. One `CM_PERIOD` is `CM_PERIOD_GCY` = 584388
-   * Gregorian years (date_core.c:207-208), so year 600000 is past one.
-   *
-   * ruby 3.3.11 -rdate:
-   *   Date.ordinal(600000, 60).to_s      #=> "600000-02-29"
-   *   Date.ordinal(600000, 60).jd        #=> 220866619
-   *   Date.commercial(600000, 9, 6).to_s #=> "600000-03-04"
-   *   Date.commercial(600000, 9, 6).jd   #=> 220866623
-   *
-   * All four spellings agreeing is the point, and what they now agree on is the
-   * raise: the seat takes the WHOLE day (`encode_jd`) and no
-   * `Temporal.PlainDate` holds a year one `CM_PERIOD_GCY` past the residue.
-   * They agreed on a residue-year date until
-   * `date-seat-drops-nth-and-spells-the-residue-year` — `+015600-02-29` for all
-   * four — which is the shared-but-wrong answer that story was filed for; the
-   * provenance this test is about is unchanged, since hardcoding `nth = 0`
-   * would still make ordinal/commercial disagree with civil.
-   *
-   * The frags path over the same wrappers (`rt__valid_ordinal_p`,
-   * `rt__valid_commercial_p`, date_core.c:4125-4168) keeps MRI's whole answer,
-   * `nth` and all, since it answers the gem-shaped object.
-   */
   it("takes ordinal's and commercial's nth from valid_*_p, as civil already does", () => {
     for (const build of [
       () => RubyDate.civil(600000, 2, 29),
@@ -1146,31 +970,14 @@ describe("Date", () => {
   });
 
   it("raises from the seat for a day past Temporal's range, decoded nth and all", () => {
-    // The `nth` a Julian day past CM_PERIOD carries (date_core.c:1393-1412) is
-    // ~year 580000 at its smallest, and `Temporal.PlainDate` stops at ±271821 —
-    // so every static that answers the seat raises for one, the same way and
-    // for the same reason the Julian-only spelling above does. MRI answers a
-    // `::Date`/`::DateTime`, its own gem object:
-    //   Date.jd(2**70).to_s #=> "3232350070754114273-01-08"
-    //   DateTime.jd(2**70, 1, 2, 3).to_s
-    //     #=> "3232350070754114273-01-08T01:02:03+00:00"
     expect(() => RubyDate.jd(2n ** 70n)).toThrow(RubyDate.Error);
     expect(() => RubyDateTime.jd(2n ** 70n, 1, 2, 3)).toThrow(RubyDate.Error);
 
-    // The decode itself is intact underneath: the gem-shaped builders those
-    // statics run over answer the day, `nth` and all.
     expect(dNewByFrags({ jd: 2n ** 70n }).toS()).toBe("3232350070754114273-01-08");
     expect(dtNewByFrags({ jd: 2n ** 70n, hour: 1, min: 2, sec: 3 }).toS()).toBe(
       "3232350070754114273-01-08T01:02:03+00:00",
     );
 
-    // A year one CM_PERIOD_GCY (584388) past the residue is the smallest such
-    // day, and it is the one the residue reading answered a plausible date for
-    // — 600000 came back spelled "+015600-..." from every one of these.
-    //   Date.civil(600000, 2, 29).to_s      #=> "600000-02-29"
-    //   Date.ordinal(600000, 60).to_s       #=> "600000-02-29"
-    //   Date.commercial(600000, 9, 6).to_s  #=> "600000-03-04"
-    //   Date.civil(600000, 2, 29).jd        #=> 220866619
     for (const build of [
       () => RubyDate.civil(600000, 2, 29),
       () => RubyDate.ordinal(600000, 60),
@@ -1185,16 +992,6 @@ describe("Date", () => {
   });
 
   it("takes a start argument, and Date::JULIAN/GREGORIAN select every day", () => {
-    // ruby 3.3.11:
-    //   Date.new(1582, 10, 10, Date::GREGORIAN).to_s #=> "1582-10-10"
-    //   Date.new(1582, 10, 10, Date::GREGORIAN).jd   #=> 2299156
-    //   Date.new(1582, 10, 10)                       #=> raises Date::Error
-    //   Date.jd(2299160, Date::GREGORIAN).to_s       #=> "1582-10-14"
-    //   Date.jd(2299160).to_s                        #=> "1582-10-04"
-    //   Date.new(2001, 2, 3, Date::JULIAN).jd        #=> 2451957
-    //   Date.new(2001, 2, 3).jd                      #=> 2451944
-    //   Date.new(1500, 3, 1, Date::GREGORIAN).yday   #=> 60
-    //   Date.new(1500, 3, 1).yday                    #=> 61
     expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).toS()).toBe("1582-10-10");
     expect(new RubyDate(1582, 10, 10, RubyDate.GREGORIAN).jd).toBe(2299156);
     expect(() => new RubyDate(1582, 10, 10)).toThrow(RubyDate.Error);
@@ -1207,13 +1004,6 @@ describe("Date", () => {
   });
 
   it("takes a start argument on every static that builds a date", () => {
-    // ruby 3.3.11:
-    //   Date.ordinal(1582, 355, Date::GREGORIAN).to_s      #=> "1582-12-21"
-    //   Date.ordinal(1582, 355).to_s                       #=> "1582-12-31"
-    //   Date.commercial(1582, 41, 4, Date::GREGORIAN).to_s #=> "1582-10-14"
-    //   Date.commercial(1582, 41, 4).to_s                  #=> "1582-10-21"
-    //   Date.parse("1582-10-10", true, Date::GREGORIAN).to_s          #=> "1582-10-10"
-    //   Date.strptime("1582-10-10", "%F", Date::GREGORIAN).to_s       #=> "1582-10-10"
     expect(ymd(RubyDate.ordinal(1582, 355, RubyDate.GREGORIAN))).toBe("1582-12-21");
     expect(ymd(RubyDate.ordinal(1582, 355))).toBe("1582-12-31");
     expect(ymd(RubyDate.commercial(1582, 41, 4, RubyDate.GREGORIAN))).toBe("1582-10-14");
@@ -1224,26 +1014,10 @@ describe("Date", () => {
   });
 
   it("answers start, julian?, gregorian? and new_start off the start it carries", () => {
-    // ruby 3.3.11:
-    //   Date.new(2001, 2, 3).start                     #=> 2299161.0
-    //   Date.new(2001, 2, 3, Date::ENGLAND).start      #=> 2361222.0
-    //   Date.new(2001, 2, 3, Date::JULIAN).start       #=> Infinity
-    //   Date.new(2001, 2, 3, Date::GREGORIAN).start    #=> -Infinity
-    //   Date.new(2001, 2, 3, 0).start                  #=> 2299161.0
-    //   Date.new(1582, 10, 15).julian?                 #=> false
-    //   Date.new(1582, 10, 15).gregorian?              #=> true
-    //   Date.new(1582, 10, 4).julian?                  #=> true
-    //   Date.new(2001, 2, 3, Date::JULIAN).julian?     #=> true
-    //   Date.new(2001, 2, 3, Date::GREGORIAN).julian?  #=> false
-    //   Date.new(1752, 9, 2, Date::ENGLAND).julian?    #=> true
-    //   Date.new(1752, 9, 2, Date::ENGLAND).jd         #=> 2361221
-    //   Date.new(1752, 9, 2).jd                        #=> 2361210
     expect(new RubyDate(2001, 2, 3).start).toBe(2299161);
     expect(new RubyDate(2001, 2, 3, RubyDate.ENGLAND).start).toBe(2361222);
     expect(new RubyDate(2001, 2, 3, RubyDate.JULIAN).start).toBe(Infinity);
     expect(new RubyDate(2001, 2, 3, RubyDate.GREGORIAN).start).toBe(-Infinity);
-    // `val2sg` (date_core.c:3320-3327): a start outside the reform window is
-    // ignored and DEFAULT_SG taken, as `val2off` ignores a bad offset.
     expect(new RubyDate(2001, 2, 3, 0).start).toBe(2299161);
     expect(new RubyDate(2001, 2, 3, NaN).start).toBe(2299161);
 
@@ -1258,16 +1032,6 @@ describe("Date", () => {
   });
 
   it("re-reads the same Julian day under a new start, as new_start does", () => {
-    // ruby 3.3.11:
-    //   d0 = Date.new(2000, 2, 3)
-    //   d0.new_start(Date::JULIAN).to_s #=> "2000-01-21"
-    //   d0.new_start(Date::JULIAN).jd   #=> 2451578
-    //   d0.new_start.start              #=> 2299161.0
-    //   d0.julian.to_s                  #=> "2000-01-21"
-    //   d0.italy.to_s                   #=> "2000-02-03"
-    //   d0.england.to_s                 #=> "2000-02-03"
-    //   d0.england.start                #=> 2361222.0
-    //   d0.gregorian.to_s               #=> "2000-02-03"
     const d0 = new RubyDate(2000, 2, 3);
     expect(d0.isJulian).toBe(false);
     expect(d0.newStart(RubyDate.JULIAN).isJulian).toBe(true);
@@ -1294,13 +1058,6 @@ describe("Date", () => {
   });
 
   it("raises on a Bignum year to_time cannot narrow, where MRI's NUM2LONG raises", () => {
-    // ruby 3.3.11:
-    //   Date.new(10 ** 20).year.class #=> Integer (Bignum)
-    //   Date.new(10 ** 20).to_time    #=> RangeError: bignum too big to convert into `long'
-    // `m_real_year` (date_core.c:1746-1762) answers the Bignum, and
-    // `date_to_time`'s `f_local3` (date_core.c:8949-8971) hands it straight to
-    // `Time.local`, which cannot take it. Narrowing it through a JS `number`
-    // instead would answer some other year entirely.
     const d = new RubyDate(10n ** 20n);
     expect(typeof d.year).toBe("bigint");
     expect(() => d.toTime()).toThrow(RangeError);
@@ -1319,12 +1076,6 @@ describe("Date", () => {
 
 describe("DateTime", () => {
   it("leaves the inherited Date's day to get_s_jd on the proleptic-Gregorian arm", () => {
-    // `datetime_initialize`'s negative `guess_style` arm stores
-    // `HAVE_CIVIL | HAVE_TIME` with an `rjd` of `0` (date_core.c:7851-7870), so
-    // the inherited half must be seeded civil-only — seeding it with the day
-    // seat would leave `get_s_jd` (date_core.c:1168-1187) answering day 0
-    // rather than the date. `DateTime` overrides every reader that would
-    // notice, so the base method is reached directly here.
     const proto = Object.getPrototypeOf(RubyDateTime.prototype);
     let base = proto;
     while (base !== null && !Object.hasOwn(base, "mLocalJd")) base = Object.getPrototypeOf(base);
@@ -1334,15 +1085,11 @@ describe("DateTime", () => {
     expect(getSJd.call(proleptic)).toBe(2451944);
     expect(proleptic.jd).toBe(2451944);
 
-    // The other arm resolves the day up front, so both halves agree there too.
     const civil = new RubyDateTime(2001, 2, 3, 4, 5, 6, 0, RubyDate.ITALY);
     expect(civil.jd).toBe(2451944);
   });
 
   it("keeps decode_year's nth through the proleptic-Gregorian arm", () => {
-    // The base is handed the ORIGINAL year, not the residue `ry`
-    // `valid_gregorian_p` decoded, so it re-derives the same `nth`; the residue
-    // would have collapsed it to zero.
     const big = new RubyDateTime(2n ** 70n, 1, 1, 0, 0, 0, 0, RubyDate.GREGORIAN);
     expect(big.year).toBe(2n ** 70n);
     expect(big.jd).toBe(new RubyDateTime(2n ** 70n, 1, 1, 0, 0, 0, 0, RubyDate.ITALY).jd);
@@ -1355,13 +1102,6 @@ describe("DateTime", () => {
   });
 
   it("rolls a 24:00:00 time of day to midnight of the next day, as canon24oc does", () => {
-    // ruby 3.3.11:
-    //   DateTime.new(2008, 3, 1, 24).to_s               #=> "2008-03-02T00:00:00+00:00"
-    //   DateTime.new(2008, 3, 1, 24, 0, 0.5).to_s       #=> "2008-03-02T00:00:00+00:00"
-    //   DateTime.new(2008, 3, 1, 24, 0, 0.5).sec_fraction #=> (1/2)
-    //   DateTime.new(2008, 3, 1, 24.5).to_s             #=> "2008-03-02T00:30:00+00:00"
-    //   DateTime.new(2008, 3, 1, 24, 0, 0, "+09:00").to_s #=> "2008-03-02T00:00:00+09:00"
-    //   DateTime.new(2008, 3, 1, 23, 59, 59).to_s       #=> "2008-03-01T23:59:59+00:00"
     expect(new RubyDateTime(2008, 3, 1, 24).toS()).toBe("2008-03-02T00:00:00+00:00");
     expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).toS()).toBe("2008-03-02T00:00:00+00:00");
     expect(new RubyDateTime(2008, 3, 1, 24, 0, 0.5).secFraction).toEqual(new Rational(1, 2));
@@ -1379,20 +1119,12 @@ describe("DateTime", () => {
   });
 
   it("answers an ISO 8601 string with the time of day, as dt_lite_to_s does", () => {
-    // ruby 3.3.11:
-    //   DateTime.new(2008, 3, 1, 6, 0, 0).to_s                  #=> "2008-03-01T06:00:00+00:00"
-    //   DateTime.parse("2008-03-01T06:00:00+09:00").to_s        #=> "2008-03-01T06:00:00+09:00"
-    //   Date.new(2008, 3, 1).to_s                               #=> "2008-03-01"
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).toS()).toBe("2008-03-01T06:00:00+00:00");
     expect(gemDateTime("2008-03-01T06:00:00+09:00").toS()).toBe("2008-03-01T06:00:00+09:00");
     expect(new RubyDate(2008, 3, 1).toS()).toBe("2008-03-01");
   });
 
   it("carries the offset the parsed string named", () => {
-    // ruby 3.3.11:
-    //   DateTime.parse("2008-03-01T06:00:00+09:00").zone #=> "+09:00"
-    //   ...strftime("%Y-%m-%dT%H:%M:%S %z %:z %::z %:::z %Z")
-    //     #=> "2008-03-01T06:00:00 +0900 +09:00 +09:00:00 +09 +09:00"
     const datetime = gemDateTime("2008-03-01T06:00:00+09:00");
     expect(datetime).toBeInstanceOf(RubyDateTime);
     expect(datetime.zone).toBe("+09:00");
@@ -1402,18 +1134,11 @@ describe("DateTime", () => {
   });
 
   it("carries the offset into the default return too, not only the gem-shaped one", () => {
-    // ruby 3.3.11:
-    //   DateTime.parse("2008-03-01T06:00:00+09:00").to_s   #=> "2008-03-01T06:00:00+09:00"
-    //   DateTime.parse("2008-03-01T06:00:00").to_s         #=> "2008-03-01T06:00:00+00:00"
-    //   DateTime.strptime("2008-03-01T06:00:00+09:00").to_s
-    //     #=> "2008-03-01T06:00:00+09:00"
     const zoned = RubyDateTime.parse("2008-03-01T06:00:00+09:00");
     expect(zoned).toBeInstanceOf(Temporal.ZonedDateTime);
     expect((zoned as Temporal.ZonedDateTime).offset).toBe("+09:00");
     expect(strftime(zoned, "%Y-%m-%dT%H:%M:%S%:z")).toBe("2008-03-01T06:00:00+09:00");
 
-    // A string that named no zone leaves `of` at 0, which is the value
-    // `::DateTime` has no zone to spell — a bare PlainDateTime.
     const plain = RubyDateTime.parse("2008-03-01T06:00:00");
     expect(plain).toBeInstanceOf(Temporal.PlainDateTime);
     expect(strftime(plain, "%Y-%m-%dT%H:%M:%S%:z")).toBe("2008-03-01T06:00:00+00:00");
@@ -1424,12 +1149,6 @@ describe("DateTime", () => {
   });
 
   it("truncates a sub-minute offset in the seat, as of2str's own spelling does", () => {
-    // ruby 3.3.11:
-    //   Date._parse("2008-03-01T06:00:00-00:44:30")[:offset] #=> -2670
-    //   DateTime.parse("2008-03-01T06:00:00-00:44:30").zone  #=> "-00:44"
-    // `date_zone_to_diff` (date_parse.c:523-528) keeps the 30 seconds; a
-    // Temporal offset time zone is minute-precision and `of2str`
-    // (date_core.c:1973-1980) drops them too, so the seat agrees with `#zone`.
     expect(RubyDate._parse("2008-03-01T06:00:00-00:44:30").offset).toBe(-2670);
     expect(gemDateTime("2008-03-01T06:00:00-00:44:30").zone).toBe("-00:44");
     const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30");
@@ -1441,14 +1160,6 @@ describe("DateTime", () => {
   });
 
   it("names an instant the truncated offset moves, which the gem-shaped object still holds", () => {
-    // ruby 3.3.11:
-    //   DateTime.parse("2008-03-01T06:00:00-00:44:30").to_time.to_i #=> 1204353870
-    //   #=> 2008-03-01 06:44:30 UTC
-    // The seat's zone is minute-precision (`of2str`, date_core.c:1973-1980), so
-    // its instant is 06:44:00 UTC — 30 seconds early, the size of the seconds
-    // `date_zone_to_diff` (date_parse.c:523-528) kept and Temporal cannot. The
-    // exact offset stays reachable on the gem-shaped object, which is where a
-    // caller who needs the moment MRI names reads it from.
     const seat = RubyDateTime.parse("2008-03-01T06:00:00-00:44:30") as Temporal.ZonedDateTime;
     expect(Number(seat.epochNanoseconds / 1000000000n)).toBe(1204353870 - 30);
 
@@ -1457,10 +1168,6 @@ describe("DateTime", () => {
   });
 
   it("spells a half-hour and a named zone's offset", () => {
-    // ruby 3.3.11:
-    //   DateTime.parse("2008-03-01T06:00:00-04:30").zone #=> "-04:30"
-    //   DateTime.parse("2008-03-01T06:00:00 EST").zone   #=> "-05:00"
-    //   DateTime.parse("2008-03-01T06:00:00+05:45").offset #=> (23/96)
     expect(gemDateTime("2008-03-01T06:00:00-04:30").zone).toBe("-04:30");
     expect(gemDateTime("2008-03-01T06:00:00-04:30").strftime("%z %::z")).toBe("-0430 -04:30:00");
     expect(gemDateTime("2008-03-01T06:00:00 EST").zone).toBe("-05:00");
@@ -1468,18 +1175,12 @@ describe("DateTime", () => {
   });
 
   it("truncates a Rational offset fragment to an int, as NUM2INT does", () => {
-    // ruby 3.3.11:
-    //   Date._parse("2008-03-01T06:00:00+9.5555")[:offset] #=> (171999/5)
-    //   DateTime.parse("2008-03-01T06:00:00+9.5555").offset #=> (34399/86400)
-    //   DateTime.parse("2008-03-01T06:00:00+9.5555").zone   #=> "+09:33"
     expect(RubyDate._parse("2008-03-01T06:00:00+9.5555").offset).toEqual(new Rational(171999, 5));
     expect(gemDateTime("2008-03-01T06:00:00+9.5555").offset).toEqual(new Rational(34399, 86400));
     expect(gemDateTime("2008-03-01T06:00:00+9.5555").zone).toBe("+09:33");
   });
 
   it("defaults to +00:00 when the source named no zone", () => {
-    // ruby 3.3.11: DateTime.parse("2008-07-02").strftime("%Y-%m-%dT%H:%M:%S %z")
-    //   #=> "2008-07-02T00:00:00 +0000"
     expect(strftime(RubyDateTime.parse("2008-07-02"), "%Y-%m-%dT%H:%M:%S %z")).toBe(
       "2008-07-02T00:00:00 +0000",
     );
@@ -1488,41 +1189,28 @@ describe("DateTime", () => {
   });
 
   it("rolls a 24:00:00 time of day onto the next day, as jd_local_to_utc does", () => {
-    // ruby 3.3.11: d = DateTime.parse("2008-03-01T24:00:00")
-    //   [d.year, d.mon, d.mday, d.hour] #=> [2008, 3, 2, 0]
     const datetime = RubyDateTime.parse("2008-03-01T24:00:00");
     expect([datetime.year, datetime.month, datetime.day, datetime.hour]).toEqual([2008, 3, 2, 0]);
     expect(RubyDateTime.parse("2008-03-01T24:00:00+09:00").day).toBe(2);
   });
 
   it("ignores an offset the zone table would not answer, as dt_new_by_frags does", () => {
-    // ruby 3.3.11:
-    //   Date._parse("2008-03-01T06:00:00+99:00")[:offset] #=> nil
-    //   DateTime.parse("2008-03-01T06:00:00+99:00").zone   #=> "+00:00"
     expect(RubyDate._parse("2008-03-01T06:00:00+99:00").offset).toBeNull();
     expect(gemDateTime("2008-03-01T06:00:00+99:00").zone).toBe("+00:00");
     expect(dtNewByFrags({ year: 2008, mon: 3, mday: 1, offset: 999999 }).zone).toBe("+00:00");
   });
 
   it("reads the offset argument as a day fraction, as val2off does", () => {
-    // Every row transcribed from ruby 3.3.11, e.g.
-    //   DateTime.new(2000,1,1,0,0,0, 1).zone        #=> "+24:00"   (1 day)
-    //   DateTime.new(2000,1,1,0,0,0, 9).zone        #=> "+00:00"   (rejected)
-    //   DateTime.new(2000,1,1,0,0,0, "+09:00").zone #=> "+09:00"
     for (const [offset, zone] of [
-      // The Fixnum arm (date_core.c:2376-2385) takes only -1, 0 and 1.
       [1, "+24:00"],
       [-1, "-24:00"],
       [0, "+00:00"],
       [9, "+00:00"],
       [24, "+00:00"],
       [-5, "+00:00"],
-      // The Float arm (:2386-2397), bounded at ±DAY_IN_SECONDS. `1.0` is `1`
-      // in JS, so it lands on the Fixnum arm — which answers the same second.
       [0.5, "+12:00"],
       [-0.5, "-12:00"],
       [1.0, "+24:00"],
-      // The String arm (:2435-2449), through date_zone_to_diff.
       ["+09:00", "+09:00"],
       ["+05:45", "+05:45"],
       ["JST", "+09:00"],
@@ -1531,9 +1219,6 @@ describe("DateTime", () => {
     ] as const) {
       expect(new RubyDateTime(2000, 1, 1, 0, 0, 0, offset).zone).toBe(zone);
     }
-    // The Rational arm (:2398-2434). A day_to_sec whose denominator reduces to
-    // 1 is taken as-is and never bounds-checked (:2421-2422), which is why two
-    // whole days east is accepted where the integer `2` is rejected.
     for (const [num, den, zone] of [
       [1, 2, "+12:00"],
       [-1, 2, "-12:00"],
@@ -1547,47 +1232,26 @@ describe("DateTime", () => {
   });
 
   it("raises Date::Error on a string naming no date, as dt_new_by_frags does", () => {
-    // ruby 3.3.11: DateTime.parse("not a date") #=> Date::Error: invalid date
     expect(() => RubyDateTime.parse("not a date")).toThrow("invalid date");
   });
 
   it("keeps a constructed fractional second, so %N and %L answer real digits", () => {
-    // ruby 3.3.11:
-    //   d = DateTime.new(2008, 3, 1, 6, 0, Rational(1, 2))
-    //   d.strftime("%N")  #=> "500000000"
-    //   d.strftime("%L")  #=> "500"
-    //   d.sec_fraction    #=> (1/2)
-    //   d.sec             #=> 0
     const datetime = new RubyDateTime(2008, 3, 1, 6, 0, 0.5);
     expect(datetime.strftime("%N")).toBe("500000000");
     expect(datetime.strftime("%L")).toBe("500");
     expect(datetime.secFraction).toEqual(new Rational(1, 2));
     expect(datetime.sec).toBe(0);
-    // ruby 3.3.11: DateTime.new(2008, 3, 1, 6, 0, 1.5).sec #=> 1
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 1.5).sec).toBe(1);
   });
 
   it("keeps a parsed fractional second across the offset conversion", () => {
-    // ruby 3.3.11:
-    //   d = DateTime.parse("2008-03-01T06:00:00.123456789+09:00")
-    //   d.strftime("%N") #=> "123456789"
-    //   d.sec_fraction   #=> (123456789/1000000000)
     const datetime = gemDateTime("2008-03-01T06:00:00.123456789+09:00");
     expect(datetime.strftime("%N")).toBe("123456789");
     expect(datetime.secFraction).toEqual(new Rational(123456789, 1000000000));
-    // ruby 3.3.11:
-    //   DateTime.parse("2008-03-01T06:00:00.9999999999").strftime("%N")
-    //     #=> "999999999"   (sf is (9999999999/10000000000); %N truncates)
     expect(strftime(RubyDateTime.parse("2008-03-01T06:00:00.9999999999"), "%N")).toBe("999999999");
   });
 
   it("rounds the fractional second to a nanosecond, where Time#nsec truncates", () => {
-    // ruby 3.3.11 — d_lite_plus's T_FLOAT arm rounds (date_core.c:6097):
-    //   DateTime.new(2008, 3, 1, 6, 0, 0.3).strftime("%N")          #=> "300000000"
-    //   DateTime.new(2008, 3, 1, 6, 0, 0.1234567895).strftime("%N") #=> "123456790"
-    //   DateTime.new(2008, 3, 1, 6, 0, 6.1234567891).strftime("%N") #=> "123456789"
-    //   DateTime.new(2008, 3, 1, 6, 0, 0.000000001).strftime("%N")  #=> "000000001"
-    // where Time.utc(2008, 3, 1, 6, 0, 0.3).nsec #=> 299999999
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.3).strftime("%N")).toBe("300000000");
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.1234567895).strftime("%N")).toBe("123456790");
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 6.1234567891).strftime("%N")).toBe("123456789");
@@ -1595,37 +1259,21 @@ describe("DateTime", () => {
   });
 
   it("answers zeros for an integer second, as ::Date does with no time of day", () => {
-    // ruby 3.3.11:
-    //   DateTime.new(2008, 3, 1, 6, 0, 0).strftime("%N") #=> "000000000"
-    //   DateTime.new(2008, 3, 1, 6, 0, 0).sec_fraction   #=> (0/1)
-    //   Date.new(2008, 3, 1).strftime("%N")              #=> "000000000"
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).strftime("%N")).toBe("000000000");
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0).secFraction).toEqual(new Rational(0, 1));
     expect(new RubyDate(2008, 3, 1).strftime("%N")).toBe("000000000");
   });
 
   it("raises Date::Error on a fraction in any but the last argument supplied", () => {
-    // ruby 3.3.11 — num2int_with_frac's `argc > n` (date_core.c:3296-3304):
-    //   DateTime.new(2008, 3, 1, 6, 0.5, 0) #=> Date::Error: invalid fraction
-    //   DateTime.new(2008, 3, 1, 6.5, 0)    #=> Date::Error: invalid fraction
-    //   DateTime.new(2008, 3, 1.5, 0)       #=> Date::Error: invalid fraction
     expect(() => new RubyDateTime(2008, 3, 1, 6, 0.5, 0)).toThrow("invalid fraction");
     expect(() => new RubyDateTime(2008, 3, 1, 6.5, 0)).toThrow("invalid fraction");
     expect(() => new RubyDateTime(2008, 3, 1, 6.5, 0, 0)).toThrow("invalid fraction");
     expect(() => new RubyDateTime(2008, 3, 1.5, 0)).toThrow("invalid fraction");
     expect(() => new RubyDateTime(2008, 3, 1.5, 6)).toThrow("invalid fraction");
-    // The second's bound is `positive_inf`, so a later argument never makes its
-    // fraction illegal:
-    //   DateTime.new(2008, 3, 1, 6, 0, 0.5, 3600).sec_fraction #=> (1/2)
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5, 3600).secFraction).toEqual(new Rational(1, 2));
   });
 
   it("counts the offset and the start among the positions the fraction bound reads", () => {
-    // ruby 3.3.11 — num2int_with_frac's `argc > n` counts EVERY position, so an
-    // offset or a start makes an earlier fraction illegal:
-    //   DateTime.new(2008, 3, 1, 6, 0.5, 0, "+09:00")          #=> Date::Error: invalid fraction
-    //   DateTime.new(2008, 3, 1, 6, 0.5, 0, 0, Date::ITALY)    #=> Date::Error: invalid fraction
-    //   DateTime.new(2008, 3, 1.5, 0, 0, 0, "+09:00")          #=> Date::Error: invalid fraction
     expect(() => new RubyDateTime(2008, 3, 1, 6, 0.5, undefined, "+09:00")).toThrow(
       "invalid fraction",
     );
@@ -1638,13 +1286,6 @@ describe("DateTime", () => {
   });
 
   it("carries the fraction of a legal non-final argument through add_frac", () => {
-    // ruby 3.3.11:
-    //   DateTime.new(2008, 3, 1, 6, 0.5).to_s   #=> "2008-03-01T06:00:30+00:00"
-    //   DateTime.new(2008, 3, 1, 6, 0.5).sec_fraction #=> (0/1)
-    //   DateTime.new(2008, 3, 1, 6, 0.25).to_s  #=> "2008-03-01T06:00:15+00:00"
-    //   DateTime.new(2008, 3, 1, 6.5).to_s      #=> "2008-03-01T06:30:00+00:00"
-    //   DateTime.new(2008, 3, 1, 23.75).to_s    #=> "2008-03-01T23:45:00+00:00"
-    //   DateTime.new(2008, 3, 1.5).to_s         #=> "2008-03-01T12:00:00+00:00"
     const halfMinute = new RubyDateTime(2008, 3, 1, 6, 0.5);
     expect(halfMinute.strftime("%H:%M:%S")).toBe("06:00:30");
     expect(halfMinute.secFraction).toEqual(new Rational(0, 1));
@@ -1655,15 +1296,6 @@ describe("DateTime", () => {
   });
 
   it("takes the leading digits of the fraction at the width %N and %L are given", () => {
-    // ruby 3.3.11 — date_strftime.c:275-315 reads the width off the directive:
-    //   d = DateTime.new(2008, 3, 1, 6, 0, Rational(1, 2))
-    //   d.strftime("%1N")  #=> "5"
-    //   d.strftime("%3N")  #=> "500"
-    //   d.strftime("%6N")  #=> "500000"
-    //   d.strftime("%9N")  #=> "500000000"
-    //   d.strftime("%12N") #=> "500000000000"
-    //   d.strftime("%3L")  #=> "500"
-    //   d.strftime("%12L") #=> "500000000000"
     const datetime = new RubyDateTime(2008, 3, 1, 6, 0, 0.5);
     expect(datetime.strftime("%1N")).toBe("5");
     expect(datetime.strftime("%3N")).toBe("500");
@@ -1672,41 +1304,20 @@ describe("DateTime", () => {
     expect(datetime.strftime("%12N")).toBe("500000000000");
     expect(datetime.strftime("%3L")).toBe("500");
     expect(datetime.strftime("%12L")).toBe("500000000000");
-    // Bare %N and %L keep their nine and three digits.
-    // ruby 3.3.11: d.strftime("%N %L") #=> "500000000 500"
     expect(datetime.strftime("%N %L")).toBe("500000000 500");
   });
 
   it("truncates rather than rounds, so a sub-nanosecond tail survives a wide %N", () => {
-    // ruby 3.3.11:
-    //   d = DateTime.parse("2008-03-01T06:00:00.9999999999")
-    //   d.strftime("%3N")  #=> "999"
-    //   d.strftime("%9N")  #=> "999999999"
-    //   d.strftime("%12N") #=> "999999999900"
     const datetime = gemDateTime("2008-03-01T06:00:00.9999999999");
     expect(datetime.strftime("%3N")).toBe("999");
     expect(datetime.strftime("%9N")).toBe("999999999");
     expect(datetime.strftime("%12N")).toBe("999999999900");
-    //   d.strftime("%15N") #=> "999999999900000"
-    //   d.strftime("%20N") #=> "99999999990000000000"
     expect(datetime.strftime("%15N")).toBe("999999999900000");
     expect(datetime.strftime("%20N")).toBe("99999999990000000000");
-    // ruby 3.3.11:
-    //   DateTime.new(2008, 3, 1, 6, 0, Rational(1, 2)).strftime("%20N")
-    //     #=> "50000000000000000000"
     expect(new RubyDateTime(2008, 3, 1, 6, 0, 0.5).strftime("%20N")).toBe("50000000000000000000");
   });
 
   it("keeps a Rational second exact at any width, as ComplexDateData's sf is", () => {
-    // ruby 3.3.11:
-    //   d = DateTime.new(2008, 3, 1, 6, 0, Rational(1, 3))
-    //   d.to_s           #=> "2008-03-01T06:00:00+00:00"
-    //   d.sec            #=> 0
-    //   d.sec_fraction   #=> (1/3)
-    //   d.strftime("%L")   #=> "333"
-    //   d.strftime("%N")   #=> "333333333"
-    //   d.strftime("%12N") #=> "333333333333"
-    //   d.strftime("%30N") #=> "333333333333333333333333333333"
     const datetime = new RubyDateTime(2008, 3, 1, 6, 0, new Rational(1, 3));
     expect(datetime.toS()).toBe("2008-03-01T06:00:00+00:00");
     expect(datetime.sec).toBe(0);
@@ -1718,66 +1329,34 @@ describe("DateTime", () => {
   });
 
   it("splits a Rational second over one, as d_lite_plus's T_RATIONAL arm does", () => {
-    // ruby 3.3.11:
-    //   DateTime.new(2008, 3, 1, 6, 0, Rational(3, 2)).to_s #=> "2008-03-01T06:00:01+00:00"
-    //   DateTime.new(2008, 3, 1, 6, 0, Rational(3, 2)).sec_fraction #=> (1/2)
     expect(new RubyDateTime(2008, 3, 1, 6, 0, new Rational(3, 2)).toS()).toBe(
       "2008-03-01T06:00:01+00:00",
     );
     expect(new RubyDateTime(2008, 3, 1, 6, 0, new Rational(3, 2)).secFraction).toEqual(
       new Rational(1, 2),
     );
-    // ruby 3.3.11: DateTime.new(2008, 3, 1, 6, 0, Rational(2)).sec_fraction #=> (0/1)
     expect(new RubyDateTime(2008, 3, 1, 6, 0, new Rational(2, 1)).sec).toBe(2);
   });
 
   it("folds 24:00 with a Rational second through canon24oc, as fr2 + 1 day does", () => {
-    // ruby 3.3.11:
-    //   DateTime.new(2008, 3, 1, 24, 0, Rational(1, 3)).to_s #=> "2008-03-02T00:00:00+00:00"
-    //   DateTime.new(2008, 3, 1, 24, 0, Rational(1, 3)).sec_fraction #=> (1/3)
     const datetime = new RubyDateTime(2008, 3, 1, 24, 0, new Rational(1, 3));
     expect(datetime.toS()).toBe("2008-03-02T00:00:00+00:00");
     expect(datetime.secFraction).toEqual(new Rational(1, 3));
   });
 
   it("raises invalid fraction for a Rational minute behind a second, as num2int_with_frac does", () => {
-    // ruby 3.3.11:
-    //   DateTime.new(2008, 3, 1, 6, Rational(1, 3), 0) #=> Date::Error: invalid fraction
     expect(() => new RubyDateTime(2008, 3, 1, 6, new Rational(1, 3), 0)).toThrow(
       "invalid fraction",
     );
   });
 
   it("answers zeros at every width for a ::Date, which has no time of day", () => {
-    // ruby 3.3.11:
-    //   Date.new(2008, 3, 1).strftime("%3N")  #=> "000"
-    //   Date.new(2008, 3, 1).strftime("%12N") #=> "000000000000"
-    //   Date.new(2008, 3, 1).strftime("%12L") #=> "000000000000"
     expect(new RubyDate(2008, 3, 1).strftime("%3N")).toBe("000");
     expect(new RubyDate(2008, 3, 1).strftime("%12N")).toBe("000000000000");
     expect(new RubyDate(2008, 3, 1).strftime("%12L")).toBe("000000000000");
   });
 
   it("builds from a jd, an ordinal, a civil or a commercial date with a time of day and a start", () => {
-    // ruby 3.3.11 — DateTime has singleton methods of its own for all four
-    // (date_core.c:9971-9975), unlike Date's, which take a time of day, an
-    // offset and a trailing start:
-    //   DateTime.jd(2451944).to_s                    #=> "2001-02-03T00:00:00+00:00"
-    //   DateTime.jd(2451944, 4, 5, 6, "+7").to_s     #=> "2001-02-03T04:05:06+07:00"
-    //   DateTime.jd(2299160, 0, 0, 0, 0, Date::GREGORIAN).to_s
-    //                                                #=> "1582-10-14T00:00:00+00:00"
-    //   DateTime.jd(2299160).to_s                    #=> "1582-10-04T00:00:00+00:00"
-    //   DateTime.ordinal(2001, 34, 4, 5, 6, "+7").to_s #=> "2001-02-03T04:05:06+07:00"
-    //   DateTime.ordinal(1582, 355, 1, 2, 3, 0, Date::GREGORIAN).to_s
-    //                                                #=> "1582-12-21T01:02:03+00:00"
-    //   DateTime.civil(2001, 2, 3, 4, 5, 6, "+7").to_s #=> "2001-02-03T04:05:06+07:00"
-    //   DateTime.commercial(2001, 5, 6, 4, 5, 6, "+7").to_s
-    //                                                #=> "2001-02-03T04:05:06+07:00"
-    //   DateTime.commercial(1582, 41, 4, 0, 0, 0, 0, Date::GREGORIAN).to_s
-    //                                                #=> "1582-10-14T00:00:00+00:00"
-    //   DateTime.commercial(1582, 41, 4).to_s        #=> "1582-10-21T00:00:00+00:00"
-    //   DateTime.jd(2451944, 24).to_s                #=> "2001-02-04T00:00:00+00:00"
-    //   DateTime.jd(2451944, 0, 0, 0.5).sec_fraction #=> (1/2)
     const iso = (v: Temporal.PlainDateTime | Temporal.ZonedDateTime) =>
       v instanceof Temporal.ZonedDateTime ? v.toString({ timeZoneName: "never" }) : v.toString();
 
@@ -1800,29 +1379,15 @@ describe("DateTime", () => {
     );
     expect(iso(RubyDateTime.commercial(1582, 41, 4))).toBe("1582-10-21T00:00:00");
 
-    // `num2num_with_frac` / `num2int_with_frac` (date_core.c:3286-3304): a
-    // fraction is legal only in the LAST argument SUPPLIED, and an explicitly
-    // passed later zero is supplied.
-    //   DateTime.jd(2451944.5).to_s        #=> "2001-02-03T12:00:00+00:00"
-    //   DateTime.jd(2451944, 1.5).to_s     #=> "2001-02-03T01:30:00+00:00"
-    //   DateTime.jd(2451944, 1.5, 0)       #=> raises Date::Error "invalid fraction"
-    //   DateTime.jd(2451944.5, 0)          #=> raises Date::Error "invalid fraction"
-    //   DateTime.jd(Rational(1, 2)).to_s   #=> "-4712-01-01T12:00:00+00:00"
-    //   DateTime.ordinal(2001, 34.5).to_s  #=> "2001-02-03T12:00:00+00:00"
-    //   DateTime.ordinal(2001, 34.5, 0)    #=> raises Date::Error "invalid fraction"
-    //   DateTime.commercial(2001, 5, 6.5).to_s #=> "2001-02-03T12:00:00+00:00"
     expect(iso(RubyDateTime.jd(2451944.5))).toBe("2001-02-03T12:00:00");
     expect(iso(RubyDateTime.jd(2451944, 1.5))).toBe("2001-02-03T01:30:00");
     expect(() => RubyDateTime.jd(2451944, 1.5, 0)).toThrow("invalid fraction");
     expect(() => RubyDateTime.jd(2451944.5, 0)).toThrow("invalid fraction");
-    // Temporal pads a negative ISO year to six digits where the gem's `to_s`
-    // does not; the day and the time of day are the gem's.
     expect(iso(RubyDateTime.jd(new Rational(1, 2)))).toBe("-004712-01-01T12:00:00");
     expect(iso(RubyDateTime.ordinal(2001, 34.5))).toBe("2001-02-03T12:00:00");
     expect(() => RubyDateTime.ordinal(2001, 34.5, 0)).toThrow("invalid fraction");
     expect(iso(RubyDateTime.commercial(2001, 5, 6.5))).toBe("2001-02-03T12:00:00");
 
-    // canon24oc and add_frac, the tail all four share with DateTime.new.
     expect(iso(RubyDateTime.jd(2451944, 24))).toBe("2001-02-04T00:00:00");
     const half = RubyDateTime.jd(2451944, 0, 0, 0.5);
     expect(half).toBeInstanceOf(Temporal.PlainDateTime);
@@ -1830,31 +1395,12 @@ describe("DateTime", () => {
   });
 
   it("takes a start argument after the offset, and keeps the time of day across new_start", () => {
-    // ruby 3.3.11:
-    //   dt = DateTime.new(1582, 10, 10, 6, 30, 0, "+02:00", Date::GREGORIAN)
-    //   dt.to_s                       #=> "1582-10-10T06:30:00+02:00"
-    //   dt.jd                         #=> 2299156
-    //   dt.start                      #=> -Infinity
-    //   dt.new_start(Date::ITALY).to_s #=> "1582-09-30T06:30:00+02:00"
-    //   DateTime.parse("1582-10-10T06:30:00+02:00", true, Date::GREGORIAN).to_s
-    //     #=> "1582-10-10T06:30:00+02:00"
     const dt = new RubyDateTime(1582, 10, 10, 6, 30, 0, "+02:00", RubyDate.GREGORIAN);
     expect(dt.toS()).toBe("1582-10-10T06:30:00+02:00");
     expect(dt.jd).toBe(2299156);
     expect(dt.start).toBe(-Infinity);
     expect(dt.newStart(RubyDate.ITALY).toS()).toBe("1582-09-30T06:30:00+02:00");
 
-    // `m_julian_p` (date_core.c:1683-1703) reads the STORED UTC day, not the
-    // local one `jd` answers, so an offset that carries the date across the
-    // reform flips the answer while `jd` is the same on both.
-    //   DateTime.new(1582, 10, 15, 0, 30, 0, "+02:00").jd       #=> 2299161
-    //   DateTime.new(1582, 10, 15, 0, 30, 0, "+02:00").julian?  #=> true
-    //   DateTime.new(1582, 10, 15, 23, 30, 0, "-02:00").jd      #=> 2299161
-    //   DateTime.new(1582, 10, 15, 23, 30, 0, "-02:00").julian? #=> false
-    // `dup_obj` copies the receiver's own class, so the aliases answer a
-    // DateTime with its time of day intact:
-    //   DateTime.new(1582, 10, 10, 6, 30, 0, "+02:00", Date::GREGORIAN).italy.to_s
-    //     #=> "1582-09-30T06:30:00+02:00"
     expect(dt.italy()).toBeInstanceOf(RubyDateTime);
     expect(dt.italy().toS()).toBe("1582-09-30T06:30:00+02:00");
 
@@ -1862,8 +1408,6 @@ describe("DateTime", () => {
     const west = new RubyDateTime(1582, 10, 15, 23, 30, 0, "-02:00");
     expect([east.jd, west.jd]).toEqual([2299161, 2299161]);
     expect([east.isJulian, west.isJulian]).toEqual([true, false]);
-    // The `Temporal.ZonedDateTime` seat spells its own zone in brackets after
-    // the offset, which the gem's `to_s` has no counterpart for.
     expect(
       RubyDateTime.parse("1582-10-10T06:30:00+02:00", true, RubyDate.GREGORIAN).toString(),
     ).toBe("1582-10-10T06:30:00+02:00[+02:00]");
@@ -1871,11 +1415,6 @@ describe("DateTime", () => {
   });
 
   it("new_offset fills the day and day-fraction in on the proleptic-Gregorian seat", () => {
-    // `set_of` (`date_core.c:5890-5897`) runs `get_c_jd` / `get_c_df` before it
-    // writes the new offset, because `datetime_initialize`'s proleptic-Gregorian
-    // arm (`:7851-7870`) stores the civil triple and the time of day alone.
-    //   d = DateTime.new(2001, 2, 3, 4, 5, 6, "-02:00", Date::GREGORIAN)
-    //   d.new_offset("+09:00").to_s #=> "2001-02-03T15:05:06+09:00"
     const d = new RubyDateTime(2001, 2, 3, 4, 5, 6, "-02:00", RubyDate.GREGORIAN);
     const shifted = d.newOffset("+09:00");
     expect([shifted.jd, shifted.hour, shifted.min, shifted.sec]).toEqual([2451944, 15, 5, 6]);
@@ -1895,16 +1434,6 @@ describe("Time", () => {
   });
 
   it("hands to_datetime's seat the whole second, the sub-second and the offset apart", () => {
-    // ruby 3.3.11:
-    //   Time.new(2008, 3, 1, 6, 0, 7.456789, 3600).to_datetime.strftime("%H:%M:%S.%9N%:z")
-    //     #=> "06:00:07.456788999+01:00"
-    //   Time.new(2008, 3, 1, 6, 0, 7.456789, -1800).to_datetime.zone #=> "-00:30"
-    // `time_to_datetime` (date_core.c:8901-8935) passes `s`, `sf` in
-    // nanoseconds and `of` in SECONDS as three separate fields of
-    // `d_complex_new_internal`; folding `s` into `sf` or spelling `of` as a
-    // fraction of a day is a lossier hand-over of the same values. A HALF-hour
-    // offset is the one that catches the fraction spelling: `Rational(1800,
-    // 86400)` and the seconds it came from only agree when nothing rounds.
     const dt = new RubyTime(2008, 3, 1, 6, 0, 7.456789, 3600).toDatetime();
     expect((dt as Temporal.ZonedDateTime).offset).toBe("+01:00");
     expect((dt as Temporal.ZonedDateTime).toPlainDateTime().toString()).toBe(
@@ -1919,17 +1448,6 @@ describe("Time", () => {
   });
 
   it("rolls a 60th second into the next minute, as ::Time does", () => {
-    // ruby 3.3.11:
-    //   Time.utc(2015, 6, 30, 23, 59, 60)             #=> 2015-07-01 00:00:00 UTC
-    //   Time.utc(2015, 6, 30, 23, 59, 60).sec         #=> 0
-    //   Time.utc(2015, 6, 30, 23, 59, 60).strftime("%S") #=> "00"
-    //   Time.utc(2015, 6, 30, 23, 59, 60).to_datetime.to_s
-    //     #=> "2015-07-01T00:00:00+00:00"
-    //   Time.utc(2015, 6, 30, 23, 59, 61)             #=> ArgumentError
-    // MRI admits the 60th second and, with no `right/` zoneinfo loaded, rolls
-    // it; `Temporal` rejects it in the slot, so the roll is spelled in the
-    // constructor. This is what leaves `time_to_datetime`'s `s == 60` fold
-    // (`date_core.c:8913-8915`) unreachable on both runtimes.
     const t = RubyTime.utc(2015, 6, 30, 23, 59, 60);
     expect(t.sec).toBe(0);
     expect(t.strftime("%Y-%m-%d %H:%M:%S")).toBe("2015-07-01 00:00:00");
@@ -1938,12 +1456,6 @@ describe("Time", () => {
   });
 
   it("keeps the day the offset carries across midnight", () => {
-    // ruby 3.3.11:
-    //   Time.new(2008, 3, 1, 23, 30, 0, 3600).to_datetime.to_s  #=> "2008-03-01T23:30:00+01:00"
-    //   Time.new(2008, 3, 1, 0, 30, 0, -3600).to_datetime.to_s   #=> "2008-03-01T00:30:00-01:00"
-    // The seat stores the day already taken to UTC (`jd_local_to_utc`), so a
-    // local time within `of` of a day boundary is where a dropped conversion
-    // would show up.
     expect(new RubyTime(2008, 3, 1, 23, 30, 0, 3600).toDatetime().toString()).toBe(
       "2008-03-01T23:30:00+01:00[+01:00]",
     );
@@ -1978,7 +1490,6 @@ describe("strftime over a Temporal subject", () => {
     for (const format of FORMATS) {
       expect(strftime(plain, format)).toBe(strftime(date, format));
     }
-    // ::Date is midnight, UTC — `%s` and the zone directives come off that.
     expect(strftime(plain, "%s %z %Z")).toBe("1214956800 +0000 +00:00");
   });
 
@@ -2006,34 +1517,11 @@ describe("strftime over a Temporal subject", () => {
     );
   });
 
-  /**
-   * `date_strftime` writes every field into the ONE buffer
-   * `date_strftime_alloc` sized and gives up against
-   * `char *endp = s + maxsize` (date_strftime.c:54, date_core.c:7081-7097), so
-   * a format whose fields are individually short still fails once their TOTAL
-   * runs past it. Thirteen copies is the smallest count whose precision
-   * (100_000) is itself inside `1024 * flen` (= 106_496); twelve copies raise
-   * on the precision instead.
-   *
-   * ruby 3.3.11 -rdate:
-   *   Date.new(2001, 2, 3).strftime("%100000Y" * 13) #=> Errno::ERANGE
-   */
   it("bounds the accumulated output, not one field, at 1024 * format length", () => {
     const d = Temporal.PlainDate.from("2001-02-03");
     expect(() => strftime(d, "%100000Y".repeat(13))).toThrow(ERANGE);
   });
 
-  /**
-   * `date_strftime_alloc` runs a pass at `size` BEFORE testing
-   * `size >= 1024 * flen` (date_core.c:7081-7095), so `1024 * flen` is the size
-   * the loop gives up AT, not the size it stops growing at: a format needing
-   * more than it still answers whenever the next doubling fits. `%6145Y` needs
-   * 6145 characters against a `1024 * flen` of 6144, and the pass at 8192
-   * produces it.
-   *
-   * ruby 3.3.11 -rdate:
-   *   Date.new(2001, 2, 3).strftime("%6145Y").length #=> 6145
-   */
   it("answers a format one doubling past 1024 * format length", () => {
     const d = Temporal.PlainDate.from("2001-02-03");
     expect(strftime(d, "%6145Y")).toHaveLength(6145);
@@ -2174,11 +1662,6 @@ describe("Date::Infinity as a Range endpoint", () => {
   });
 });
 
-/**
- * Trails-only: `Init_date_core` registers `date_s_valid_civil_p` and
- * `date_s_gregorian_leap_p` under a second name each (`date_core.c:9659`,
- * `:9676`), and no test in `vendor/date/test/date/` calls either spelling.
- */
 describe("Date's second registration names", () => {
   it("valid_date? is valid_civil? — the same C function", () => {
     expect(RubyDate.isValidDate(2001, 2, 3)).toBe(true);
@@ -2196,26 +1679,12 @@ describe("Date's second registration names", () => {
   });
 });
 
-/**
- * Ruby's Rational arithmetic does NOT fold a denominator of one back to an
- * Integer — on ruby 3.3.11 `(Rational(1,2) * 12).class` is `Rational`, `(6/1)`
- * — so `date_core.c`'s `FIXNUM_P` branches see a reducible Rational as a
- * Rational, and only `wholenum_p`, a predicate, tests for the fold. The gem's
- * own tests pass Integers throughout and never pin which arm a Rational takes,
- * which is why these live here.
- */
 describe("Date#amjd", () => {
   it("answers m_real_jd less 2400001 as a Rational", () => {
-    // ruby 3.3.11 -rdate:
-    //   Date.new(2001,2,3).amjd       #=> (51943/1)
-    //   Date.new(2001,2,3).amjd.class #=> Rational
     expect(new RubyDate(2001, 2, 3).amjd.toString()).toBe("51943/1");
   });
 
   it("is not adjusted by the offset", () => {
-    // The C's own doc example (date_core.c:5224-5228):
-    //   DateTime.new(2001,2,3,4,5,6,'+7').amjd  #=> (249325817/4800)
-    //   DateTime.new(2001,2,2,14,5,6,'-7').amjd #=> (249325817/4800)
     expect(new RubyDateTime(2001, 2, 3, 4, 5, 6, "+7").amjd.toString()).toBe("249325817/4800");
     expect(new RubyDateTime(2001, 2, 2, 14, 5, 6, "-7").amjd.toString()).toBe("249325817/4800");
   });
@@ -2223,14 +1692,6 @@ describe("Date#amjd", () => {
 
 describe("a reducible Rational operand at the C's Integer branches", () => {
   it("takes d_lite_rshift's f_idiv/f_mod arm, never the FIXNUM_P one", () => {
-    // ruby 3.3.11 -rdate:
-    //   Date.new(2000,1,31).next_year(Rational(1,2)).to_s #=> "2000-07-31"
-    //   (Date.new(2000,1,31) >> Rational(1,2)).to_s       #=> "2000-01-31"
-    //   (Date.new(2000,1,31) >> Rational(3,2)).to_s       #=> "2000-02-29"
-    //   (Date.new(2000,1,31) >> Rational(23,2)).to_s      #=> "2000-12-31"
-    //   Date.new(2000,1,31).next_year(Rational(4,2)).to_s #=> "2002-01-31"
-    // 23/2 is the case that pins the arm: FIX2INT truncates the 11.5 months
-    // f_mod leaves, which is the else arm's arithmetic and not a Fixnum one.
     expect(new RubyDate(2000, 1, 31).nextYear(new Rational(1, 2)).toS()).toBe("2000-07-31");
     expect(new RubyDate(2000, 1, 31).rshift(new Rational(1, 2)).toS()).toBe("2000-01-31");
     expect(new RubyDate(2000, 1, 31).rshift(new Rational(3, 2)).toS()).toBe("2000-02-29");
@@ -2239,27 +1700,14 @@ describe("a reducible Rational operand at the C's Integer branches", () => {
   });
 
   it("takes d_lite_plus's wholenum_p re-dispatch for a whole Rational", () => {
-    // ruby 3.3.11 -rdate: wholenum_p is a predicate over the denominator, so a
-    // Rational(2,1) addend re-dispatches through rb_rational_num as the Integer
-    // 2 and the sum is a whole day.
-    //   (Date.new(2001,1,1) + Rational(2,1)).to_s #=> "2001-01-03"
-    //   (Date.new(2001,1,1) + Rational(2,1)).jd   #=> 2451913
     const d = new RubyDate(2001, 1, 1).plus(new Rational(2, 1));
     expect(d.toS()).toBe("2001-01-03");
     expect(d.jd).toBe(2451913);
   });
 });
 
-/**
- * Trails-only: `check_limit` measures `RSTRING_LEN(str)` — bytes
- * (`date_core.c:4468-4479`) — and the gem's own tests are all ASCII, where a
- * byte count and a JS UTF-16 code-unit count agree. They diverge on any
- * multi-byte string, both in whether the raise fires and in the number the
- * message reports.
- */
 describe("check_limit measures bytes, not UTF-16 code units", () => {
   it("raises for a string whose byte length crosses the limit its length does not", () => {
-    // 40 code units, 120 UTF-8 bytes.
     const str = "日".repeat(40);
     expect(str.length).toBe(40);
     expect(() => RubyDate._parse(str, false, { limit: 100 })).toThrow(ArgumentError);
@@ -2270,27 +1718,14 @@ describe("check_limit measures bytes, not UTF-16 code units", () => {
   });
 });
 
-/**
- * Trails-only: `test_dup` (`test/date/test_switch_hitter.rb:611-623`) only ever
- * dups a `Date` and a `DateTime`, so the arm `d_lite_initialize_copy` raises on
- * (`date_core.c:5172-5175`) has no gem test at all.
- */
 describe("initialize_copy", () => {
   it("cannot load complex into simple", () => {
-    // ruby 3.3.11 -rdate: ::Date allocates simple (date_core.c:9636), so a
-    // fractional Date — which d_lite_plus made complex — has nowhere to go.
-    //   (Date.new(2001,1,1) + Rational(1,2)).dup
-    //   #=> ArgumentError: cannot load complex into simple
     const d = new RubyDate(2001, 1, 1).plus(new Rational(1, 2));
     expect(() => d.dup()).toThrow(ArgumentError);
     expect(() => d.dup()).toThrow("cannot load complex into simple");
   });
 
   it("refuses a frozen receiver", () => {
-    // ruby 3.3.11 -rdate: rb_check_frozen(copy) (date_core.c:5142) —
-    //   Date.new(2001,2,3).freeze.send(:initialize_copy, Date.new(2002,1,1))
-    //   #=> FrozenError: can't modify frozen Date:
-    //        #<Date: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>
     const d = Object.freeze(new RubyDate(2001, 2, 3));
     expect(() => d.initializeCopy(new RubyDate(2002, 1, 1))).toThrow(
       expect.objectContaining({ name: "FrozenError" }),
@@ -2301,16 +1736,12 @@ describe("initialize_copy", () => {
   });
 
   it("carries a DateTime's day-fraction, sub-second and offset across", () => {
-    // The complex arm's `adat->c = bdat->c` (date_core.c:5176) with values the
-    // gem's own test_dup cannot distinguish from zero. ruby 3.3.11 -rdate:
-    //   DateTime.new(2001,2,3,4,5,6,"+09:00").dup.offset #=> (3/8)
     const dt = new RubyDateTime(2001, 2, 3, 4, 5, 6, "+09:00").dup();
     expect(dt.toS()).toBe("2001-02-03T04:05:06+09:00");
     expect(dt.offset.toString()).toBe("3/8");
   });
 
   it("returns the receiver when it is its own source", () => {
-    // The C's `copy == date` early return (date_core.c:5144-5145).
     const d = new RubyDate(2001, 2, 3);
     expect(d.initializeCopy(d)).toBe(d);
   });
@@ -2318,11 +1749,6 @@ describe("initialize_copy", () => {
 
 describe("Date#inspect", () => {
   it("spells a non-finite reform start Inf/-Inf, as mk_inspect's %.0f does", () => {
-    // ruby 3.3.11 -rdate:
-    //   Date.new(2001,2,3,Date::JULIAN).inspect
-    //     #=> "#<Date: 2001-02-03 ((2451957j,0s,0n),+0s,Infj)>"
-    //   Date.new(2001,2,3,Date::GREGORIAN).inspect
-    //     #=> "#<Date: 2001-02-03 ((2451944j,0s,0n),+0s,-Infj)>"
     expect(new RubyDate(2001, 2, 3, RubyDate.JULIAN).inspect()).toBe(
       "#<Date: 2001-02-03 ((2451957j,0s,0n),+0s,Infj)>",
     );
@@ -2335,14 +1761,10 @@ describe("Date#inspect", () => {
   });
 
   it("names the class from a literal a class-renaming bundler cannot rewrite", () => {
-    // ruby 3.3.11 -rdate:
-    //   DateTime.new(2001,2,3).inspect
-    //     #=> "#<DateTime: 2001-02-03T00:00:00+00:00 ((2451944j,0s,0n),+0s,2299161j)>"
     expect(new RubyDateTime(2001, 2, 3).inspect()).toBe(
       "#<DateTime: 2001-02-03T00:00:00+00:00 ((2451944j,0s,0n),+0s,2299161j)>",
     );
 
-    // esbuild renames a colliding class binding, rewriting `constructor.name`.
     const renamed = Object.defineProperty(RubyDate, "name", {
       value: "Date2",
       configurable: true,
@@ -2357,10 +1779,6 @@ describe("Date#inspect", () => {
   });
 
   it("names a subclass the way rb_obj_class(self) does", () => {
-    // ruby 3.3.11 -rdate:
-    //   class MyDate < Date; end
-    //   MyDate.new(2001,2,3).inspect
-    //     #=> "#<MyDate: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>"
     class MyDate extends RubyDate {}
     expect(new MyDate(2001, 2, 3).inspect()).toBe(
       "#<MyDate: 2001-02-03 ((2451944j,0s,0n),+0s,2299161j)>",
@@ -2368,11 +1786,6 @@ describe("Date#inspect", () => {
   });
 });
 
-// `dup_obj_with_new_start` (date_core.c:5801-5810) and `d_simple_new_internal`
-// / `d_complex_new_internal` (date_core.c:3036-3071) all build
-// `rb_obj_class(self)`, so every copy/builder seat answers the RECEIVER's
-// class. The construction statics (`Date.today`, `Date.jd`, ...) are a separate
-// question — they answer the `Temporal` seat under RFC 0088.
 describe("builder seats answer rb_obj_class(self)", () => {
   class DateSub extends RubyDate {}
   class DateTimeSub extends RubyDateTime {}
@@ -2412,11 +1825,6 @@ describe("builder seats answer rb_obj_class(self)", () => {
 
 describe("the instance formatters", () => {
   it("answers iso8601 and rfc2822 off the date, as d_lite_iso8601 and d_lite_rfc2822 do", () => {
-    // ruby 3.3.11:
-    //   Date.new(2001,2,3).iso8601  #=> "2001-02-03"
-    //   Date.new(2001,2,3).rfc2822  #=> "Sat, 3 Feb 2001 00:00:00 +0000"
-    //   Date.new(2001,2,3).xmlschema #=> "2001-02-03"
-    //   Date.new(2001,2,3).rfc822    #=> "Sat, 3 Feb 2001 00:00:00 +0000"
     const d = new RubyDate(2001, 2, 3);
     expect(d.iso8601()).toBe("2001-02-03");
     expect(d.rfc2822()).toBe("Sat, 3 Feb 2001 00:00:00 +0000");
@@ -2425,10 +1833,6 @@ describe("the instance formatters", () => {
   });
 
   it("carries the time of day and the offset into a DateTime's, as dt_lite_iso8601 does", () => {
-    // ruby 3.3.11:
-    //   DateTime.new(2001,2,3).iso8601   #=> "2001-02-03T00:00:00+00:00"
-    //   DateTime.new(2001,2,3).xmlschema #=> "2001-02-03T00:00:00+00:00"
-    //   DateTime.new(2001,2,3).rfc2822   #=> "Sat, 3 Feb 2001 00:00:00 +0000"
     const dt = new RubyDateTime(2001, 2, 3);
     expect(dt.iso8601()).toBe("2001-02-03T00:00:00+00:00");
     expect(dt.xmlschema()).toBe("2001-02-03T00:00:00+00:00");
@@ -2437,10 +1841,6 @@ describe("the instance formatters", () => {
   });
 
   it("takes n digits of fractional seconds through iso8601_timediv", () => {
-    // ruby 3.3.11:
-    //   DateTime.parse("2001-02-03T04:05:06.123456").iso8601(3)
-    //     #=> "2001-02-03T04:05:06.123+00:00"
-    //   ...iso8601(9) #=> "2001-02-03T04:05:06.123456000+00:00"
     const d2 = new RubyDateTime(RubyDateTime.parse("2001-02-03T04:05:06.123456"));
     expect(d2.iso8601(3)).toBe("2001-02-03T04:05:06.123+00:00");
     expect(d2.iso8601(9)).toBe("2001-02-03T04:05:06.123456000+00:00");
@@ -2448,11 +1848,6 @@ describe("the instance formatters", () => {
   });
 });
 
-// `d_lite_marshal_load`'s `case 2` (1.6.x) and `case 3` (1.8.x, 1.9.2) arms
-// (`date_core.c:7570-7588`) over `old_to_new` (`:3105-3137`). ruby/date's own
-// suite only round-trips the 6-element dump `marshal_dump` writes, so the two
-// legacy arms are covered here; the expectations are what MRI 3.3 answers for
-// the same arrays.
 describe("Date#marshalLoad legacy dumps", () => {
   it("loads the 3-element 1.8.x dump", () => {
     const d = new RubyDate(2001, 2, 3);

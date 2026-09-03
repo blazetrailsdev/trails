@@ -4,10 +4,6 @@ import { Base } from "../base.js";
 import { Metal } from "../metal.js";
 import { Request } from "../../action-dispatch/http/request.js";
 
-// ==========================================================================
-// Test controllers
-// ==========================================================================
-
 class PostsController extends Base {
   async index() {
     this.render({ json: [{ id: 1, title: "Hello" }] });
@@ -78,9 +74,6 @@ class PostsController extends Base {
   }
 }
 
-// ==========================================================================
-// action_controller/test_case_test.rb
-// ==========================================================================
 describe("TestCaseTest", () => {
   let tc: TestCase;
 
@@ -388,10 +381,6 @@ describe("TestCaseTest", () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Rails test_case_test.rb — process helpers (S7b)
-  // -------------------------------------------------------------------------
-
   describe("process helpers", () => {
     class FlashSetController extends Base {
       async setFlash() {
@@ -509,10 +498,6 @@ describe("TestCaseTest", () => {
   });
 });
 
-// ==========================================================================
-// Rails TestController (mirrors test_case_test.rb TestController)
-// ==========================================================================
-
 class TestController extends Base {
   _counter: number | undefined = undefined;
 
@@ -579,7 +564,6 @@ class TestController extends Base {
   }
 
   async testRemoteAddr() {
-    // request.remoteAddr maps to REMOTE_ADDR env; use remoteIp which falls back to it
     this.render({ plain: (this.request.env["REMOTE_ADDR"] as string | undefined) ?? "127.0.0.1" });
   }
 
@@ -601,10 +585,6 @@ class TestController extends Base {
   }
 }
 
-// ==========================================================================
-// action_controller/test_case_test.rb — TestCaseTest (ported)
-// ==========================================================================
-
 describe("TestCaseTest", () => {
   let tc: TestCase;
 
@@ -617,13 +597,9 @@ describe("TestCaseTest", () => {
     expect(tc.response.status).toBe(200);
   });
 
-  it.skip("process with flash now", async () => {
-    // flash.now not yet implemented in FlashHash
-  });
+  it.skip("process with flash now", async () => {});
 
-  it.skip("process delete flash", async () => {
-    // flash persistence between requests not yet implemented
-  });
+  it.skip("process delete flash", async () => {});
 
   it("process with session", async () => {
     await tc.process("setSession");
@@ -637,13 +613,9 @@ describe("TestCaseTest", () => {
     expect(tc.session["foo"]).toBe("baz");
   });
 
-  it.skip("session is cleared from controller after reset session", async () => {
-    // resetSession() does not clear controller.session plain object; skip until wired
-  });
+  it.skip("session is cleared from controller after reset session", async () => {});
 
-  it.skip("session is cleared from request after reset session", async () => {
-    // resetSession() does not clear request.session visible to TestCase; skip until wired
-  });
+  it.skip("session is cleared from request after reset session", async () => {});
 
   it("response and request have nice accessors", async () => {
     await tc.process("noOp");
@@ -652,8 +624,6 @@ describe("TestCaseTest", () => {
   });
 
   it.skip("process with query string", async () => {
-    // params are stored in parameters_override; process() does not encode them
-    // into QUERY_STRING, so request.queryString returns "". Requires assignParameters wiring.
     await tc.process("testQueryString", { method: "GET", params: { q: "test" } });
     expect(tc.responseBody).toContain("q=test");
   });
@@ -673,9 +643,7 @@ describe("TestCaseTest", () => {
     expect(tc.responseBody).toBe("192.0.0.1");
   });
 
-  it.skip("header properly reset after remote http request", async () => {
-    // scrub_env! not called post-request; headers persist on tc.request — skip
-  });
+  it.skip("header properly reset after remote http request", async () => {});
 
   it("xhr with session", async () => {
     await tc.get("setSession", { xhr: true });
@@ -700,8 +668,6 @@ describe("TestCaseTest", () => {
   });
 
   it.skip("request protocol is reset after request", async () => {
-    // HTTPS env is not translated to rack.url_scheme in Request constructor;
-    // scheme() reads rack.url_scheme (defaulted to "http") not HTTPS directly.
     await tc.get("testProtocol");
     expect(tc.responseBody).toBe("http://");
 
@@ -713,9 +679,6 @@ describe("TestCaseTest", () => {
   });
 
   it.skip("request format", async () => {
-    // params-based format requires mimeHost.parameters to read req.parameters
-    // (including parameters_override), not req.params (merged path+query+body).
-    // Blocked until mimeHost wiring or assignParameters integration is fixed.
     await tc.get("testFormat", { params: { format: "html" } });
     expect(tc.responseBody).toBe("text/html");
 
@@ -767,8 +730,6 @@ describe("TestCaseTest", () => {
   });
 
   it.skip("using as json with path parameters", async () => {
-    // process() only sets { controller, action } in pathParameters; extra params
-    // are in parameters_override and not merged into pathParameters.
     await tc.post("testParams", { params: { id: "12345" }, as: "json" });
     expect(tc.request.pathParameters["id"]).toBe("12345");
   });
@@ -778,8 +739,6 @@ describe("TestCaseTest", () => {
   });
 
   it.skip("request state is cleared after exception", async () => {
-    // params not encoded to QUERY_STRING, so request.queryString is always "";
-    // responseBody would be "" not "q=test2". Requires QUERY_STRING wiring.
     await expect(tc.process("boom", { method: "GET", params: { q: "test1" } })).rejects.toThrow();
     await tc.process("testQueryString", { method: "GET", params: { q: "test2" } });
     expect(tc.responseBody).toContain("q=test2");
@@ -793,9 +752,7 @@ describe("TestCaseTest", () => {
     expect(tc.responseBody).toBe("1");
   });
 
-  it.skip("parsed body without as option", async () => {
-    // body: {hash} auto-serialization not supported; use explicit JSON string
-  });
+  it.skip("parsed body without as option", async () => {});
 
   it("parsed body with as option", async () => {
     await tc.post("renderJson", { body: JSON.stringify({ foo: "heyo" }), as: "json" });

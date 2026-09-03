@@ -7,7 +7,6 @@ import { zone, setZone } from "./time-zone-config.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 describe("CurrentAttributesTest", () => {
-  /** Rails' `Person = Struct.new(:id, :name, :time_zone)`. */
   class Person {
     constructor(
       public id: number,
@@ -41,17 +40,10 @@ describe("CurrentAttributesTest", () => {
       this.resets(":clearTimeZone");
     }
 
-    /** Rails' `delegate :time_zone, to: :person` (a Struct member is a method). */
     get timeZone(): string | undefined {
       return this.person?.timeZone;
     }
 
-    /**
-     * Rails' overrides call `super`, which is the generated writer
-     * `attributes[:account] = value` (current_attributes.rb:120-133).
-     * TypeScript has no `super` for a member the base class does not declare,
-     * so these reach the same `attributes` hash the generated pair does.
-     */
     get account(): string | undefined {
       return this.attributes["account"] as string | undefined;
     }
@@ -102,20 +94,10 @@ describe("CurrentAttributesTest", () => {
     declare counterCallable: number;
   };
 
-  /**
-   * Rails answers every public instance method off the class, via
-   * `method_missing` / `respond_to_missing?` (current_attributes.rb:180-184) and
-   * the `method_added` hook generating the same delegators (:186-193) — Ruby
-   * language hooks whose trails idiom is `methodMissingProxy`.
-   */
   const Current = methodMissingProxy(CurrentClass, {
     delegate: (klass) => klass.instance(),
   }) as typeof CurrentClass & InstanceType<typeof CurrentClass>;
 
-  /**
-   * `ActiveSupport::CurrentAttributes::TestHelper` resets every instance around
-   * each test; `before_setup` / `after_teardown` restore `Time.zone`.
-   */
   let originalTimeZone: ReturnType<typeof zone>;
 
   beforeEach(() => {
@@ -279,12 +261,6 @@ describe("CurrentAttributesTest", () => {
     expect(Current.counterInteger).toBe(0);
   });
 
-  // Rails flips `IsolatedExecutionState.isolation_level` and reads the
-  // attribute from inside an `Enumerator`, which runs its block on a separate
-  // fiber. JS has neither fibers nor threads, so the two levels port to the two
-  // things trails' IsolatedExecutionState actually distinguishes: a forked
-  // execution context (`run`, the analogue of :fiber) and the caller's own
-  // context (the analogue of :thread, which the Enumerator's fiber shares).
   it("CurrentAttributes use fiber-local variables", () => {
     Session.current = 42;
     const inner = IsolatedExecutionState.run(() => Session.current);

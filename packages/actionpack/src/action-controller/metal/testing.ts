@@ -1,11 +1,3 @@
-/**
- * ActionController::Testing
- *
- * Behavior specific to functional tests. Provides instance variable
- * cleanup and controller recycling between requests.
- * @see https://api.rubyonrails.org/classes/ActionController/Testing.html
- */
-
 export function recycle(controller: Record<string, unknown>): void {
   controller._url_options = undefined;
   controller.formats = undefined;

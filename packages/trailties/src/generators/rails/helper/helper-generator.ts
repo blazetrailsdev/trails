@@ -5,7 +5,6 @@ export interface HelperRunOptions {
   test?: boolean;
 }
 
-// Mirrors railties/lib/rails/generators/rails/helper/helper_generator.rb.
 export class HelperGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
     super(options);

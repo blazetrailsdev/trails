@@ -58,7 +58,6 @@ describe("ActionDispatch::Journey::Routes", () => {
     expect(routes.anchoredRoutes.length).toBe(1);
     expect(routes.customRoutes.length).toBe(0);
 
-    // anchor: false → custom_routes
     routes.addRoute("bar", mappingFor("/not_anchored/hello/:who-notanchored", false));
     expect(routes.customRoutes.length).toBe(1);
     expect(routes.anchoredRoutes.length).toBe(1);

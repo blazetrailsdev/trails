@@ -1,18 +1,3 @@
-/**
- * ActionDispatch::DebugView
- *
- * Mirrors Rails `action_dispatch/middleware/debug_view.rb`.
- *
- * In Rails, DebugView extends ActionView::Base and is used by
- * DebugExceptions to render error pages. ActionView::Base is not yet
- * ported in trails, so this port provides the DebugView helper surface
- * (debugParams / debugHeaders / debugHash / paramsValid /
- * protectAgainstForgery / compiledMethodContainer) as a standalone
- * class. Once ActionView::Base lands, DebugView should be re-derived
- * from it and its `render` (logger-silence wrapper around super)
- * ported alongside.
- */
-
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 
 const TEMPLATES_URL = new URL("./templates", import.meta.url).href;
@@ -57,12 +42,6 @@ export class DebugView {
     return "None";
   }
 
-  /**
-   * Mirrors `debug_hash` (debug_view.rb:44-46) — `object.to_hash` sorted by
-   * `k.to_s` and each value inspected, `$!.message` when `inspect` raises.
-   * `HashWithIndifferentAccess#toHash` answers a `@blazetrails/ruby-compat`
-   * `Hash`, so the entries are read as a Ruby Hash's are.
-   */
   debugHash(object: { toHash?: () => unknown } | Record<string, unknown>): string {
     const hash =
       typeof (object as { toHash?: () => unknown }).toHash === "function"

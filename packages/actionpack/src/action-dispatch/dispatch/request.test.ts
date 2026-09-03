@@ -33,15 +33,15 @@ describe("RequestIP", () => {
     expect(req.remoteIp).toBe("::1");
   });
 
-  it.skip("remote ip spoof detection", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip with spoof detection disabled", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip spoof protection ignores private addresses", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip v6 spoof detection", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip v6 spoof detection disabled", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip with user specified trusted proxies String", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip v6 with user specified trusted proxies String", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip with user specified trusted proxies Regexp", () => {}); // needs RemoteIp middleware
-  it.skip("remote ip v6 with user specified trusted proxies Regexp", () => {}); // needs RemoteIp middleware
+  it.skip("remote ip spoof detection", () => {});
+  it.skip("remote ip with spoof detection disabled", () => {});
+  it.skip("remote ip spoof protection ignores private addresses", () => {});
+  it.skip("remote ip v6 spoof detection", () => {});
+  it.skip("remote ip v6 spoof detection disabled", () => {});
+  it.skip("remote ip with user specified trusted proxies String", () => {});
+  it.skip("remote ip v6 with user specified trusted proxies String", () => {});
+  it.skip("remote ip with user specified trusted proxies Regexp", () => {});
+  it.skip("remote ip v6 with user specified trusted proxies Regexp", () => {});
 });
 
 describe("RequestDomain", () => {
@@ -259,9 +259,9 @@ describe("RequestMethod", () => {
       UnknownHttpMethod,
     );
   });
-  it.skip("exception on invalid HTTP method unaffected by I18n settings", () => {}); // no I18n
-  it.skip("post uneffected by local inflections", () => {}); // no Inflector integration
-  it.skip("delegates to Object#method if an argument is passed", () => {}); // TS getter cannot accept arguments
+  it.skip("exception on invalid HTTP method unaffected by I18n settings", () => {});
+  it.skip("post uneffected by local inflections", () => {});
+  it.skip("delegates to Object#method if an argument is passed", () => {});
 });
 
 describe("RequestMimeType", () => {
@@ -311,7 +311,6 @@ describe("RequestMimeType", () => {
     const json = MimeType.lookup("json");
     expect(req.negotiateMime([xml, json])).toBeNull();
     expect(req.negotiateMime([xml, MimeType.HTML])).toBe(MimeType.HTML);
-    // Mime::ALL: any "*/*" entry — fall back to the request's first format.
     const all = MimeType.parse("*/*")[0];
     expect(req.negotiateMime([xml, all])?.symbol).toBe("html");
   });
@@ -349,8 +348,8 @@ describe("RequestParamsParsing", () => {
     expect(req.contentLength).toBeUndefined();
   });
 
-  it.skip("request_parameters raises BadRequest when content length lower than actual data length for a multipart request", () => {}); // needs Rack multipart parsing
-  it.skip("request_parameters raises BadRequest when content length is higher than actual data length", () => {}); // needs Rack multipart parsing
+  it.skip("request_parameters raises BadRequest when content length lower than actual data length for a multipart request", () => {});
+  it.skip("request_parameters raises BadRequest when content length is higher than actual data length", () => {});
 });
 
 describe("RequestFormat", () => {
@@ -400,9 +399,6 @@ describe("RequestFormat", () => {
   });
 
   it("format is not nil with unknown format", () => {
-    // Rails: stub_request("QUERY_STRING" => "format=hello") + assert_nil request.format.
-    // Unknown format extension yields an empty `formats` array → NullType.instance,
-    // whose `.symbol` is null and `.nil?` is true.
     const req = new Request({ QUERY_STRING: "format=hello" });
     expect(req.format.symbol).toBeNull();
   });
@@ -454,8 +450,8 @@ describe("RequestFormat", () => {
     expect(req.format.symbol).toBeNull();
   });
 
-  it.skip("format does not throw exceptions when malformed GET parameters", () => {}); // ParameterTypeError not caught in formats path
-  it.skip("format does not throw exceptions when invalid POST parameters", () => {}); // needs Rack body parsing
+  it.skip("format does not throw exceptions when malformed GET parameters", () => {});
+  it.skip("format does not throw exceptions when invalid POST parameters", () => {});
 
   it("ignore_accept_header", () => {
     const prev = Request.ignoreAcceptHeader;
@@ -525,7 +521,7 @@ describe("RequestRewind", () => {
     expect(req.rawPost).toBe("body content");
   });
 
-  it.skip("body should be rewound", () => {}); // Rack < 3 only
+  it.skip("body should be rewound", () => {});
 });
 
 describe("RequestParameters", () => {
@@ -547,8 +543,6 @@ describe("RequestParameters", () => {
   });
 
   it("merges request, query, and path parameters with Rails precedence", () => {
-    // Rails: request_parameters.merge(query_parameters).merge!(path_parameters).
-    // Query wins over request-body; path wins over both.
     const req = new Request({
       QUERY_STRING: "k=query",
       "action_dispatch.request.request_parameters": { k: "body", b: "body-only" },
@@ -567,22 +561,21 @@ describe("RequestParameters", () => {
       action: "show",
       id: "1",
     });
-    // Path params win over query string on key collision (Rails: merge!).
     req.pathParameters = { view: "edit" };
     expect(req.params).toEqual({ view: "edit" });
   });
 
-  it.skip("parameters", () => {}); // needs Rack body parsing (JSON POST + query merge)
-  it.skip("parameters not accessible after rack parse error", () => {}); // needs Rack parse error path
-  it.skip("path parameters with invalid UTF8 encoding", () => {}); // needs encoding validation
-  it.skip("path parameters don't re-encode frozen strings", () => {}); // needs CustomParamEncoder
-  it.skip("parameters containing an invalid UTF8 character", () => {}); // needs encoding validation
-  it.skip("parameters containing a deeply nested invalid UTF8 character", () => {}); // needs encoding validation
-  it.skip("POST parameters containing invalid UTF8 character", () => {}); // needs Rack body parsing
-  it.skip("query parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {}); // needs CustomParamEncoder
-  it.skip("POST parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {}); // needs CustomParamEncoder
-  it.skip("parameters not accessible after rack parse error 1", () => {}); // needs Rack body parsing
-  it.skip("we have access to the original exception", () => {}); // needs Rack parse error path
+  it.skip("parameters", () => {});
+  it.skip("parameters not accessible after rack parse error", () => {});
+  it.skip("path parameters with invalid UTF8 encoding", () => {});
+  it.skip("path parameters don't re-encode frozen strings", () => {});
+  it.skip("parameters containing an invalid UTF8 character", () => {});
+  it.skip("parameters containing a deeply nested invalid UTF8 character", () => {});
+  it.skip("POST parameters containing invalid UTF8 character", () => {});
+  it.skip("query parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {});
+  it.skip("POST parameters specified as ASCII_8BIT encoded do not raise InvalidParameterError", () => {});
+  it.skip("parameters not accessible after rack parse error 1", () => {});
+  it.skip("we have access to the original exception", () => {});
 });
 
 describe("LocalhostTest", () => {
@@ -605,9 +598,6 @@ describe("RequestEtag", () => {
   });
 
   it("always matches *", () => {
-    // Rails: stub_request("HTTP_IF_NONE_MATCH" => "*") then etag_matches?("\"strong\"") etc.
-    // The previous body tested `req.format` with HTTP_ACCEPT="*/*" — unrelated to
-    // the Rails test of the same name (request_test.rb:1297-1306).
     const req = new Request({ HTTP_IF_NONE_MATCH: "*" });
     expect(req.ifNoneMatch).toBe("*");
     expect(req.ifNoneMatchEtags).toEqual(["*"]);
@@ -770,7 +760,6 @@ describe("RequestFilterParameters", () => {
 
   it("parameterFilter returns NULL_PARAM_FILTER when no header is configured", () => {
     const req = new Request({});
-    // No filter list set → identity-style filter.
     expect(req.parameterFilter().filter({ password: "x" })).toEqual({ password: "x" });
   });
 });

@@ -46,7 +46,7 @@ describe("DispatcherTest", () => {
         throw new Error("error");
       });
     } catch {
-      // expected
+      /** @empty */
     }
     expect(counts.a).toBe(6);
     expect(counts.b).toBe(6);

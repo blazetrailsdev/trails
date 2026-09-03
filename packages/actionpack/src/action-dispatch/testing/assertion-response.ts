@@ -1,12 +1,3 @@
-/**
- * ActionDispatch::AssertionResponse
- *
- * Abstracts an asserted response. Accepts an explicit status code
- * (Integer or numeric String) or a symbol pseudo-code (`:success`,
- * `:missing`, `:redirect`, `:error`) for the canonical status ranges,
- * plus any of Rack's symbolic status names (e.g. `:not_found` → 404).
- */
-
 import { HTTP_STATUS_CODES, statusCode as rackStatusCode } from "@blazetrails/rack";
 
 const GENERIC_RESPONSE_CODES: Record<string, string> = {
@@ -57,8 +48,5 @@ function codeFromName(name: string): string | undefined {
 
 /** @internal */
 function nameFromCode(code: number): string | undefined {
-  // Faithful Rails behavior: GENERIC_RESPONSE_CODES.invert keys are
-  // Strings ("2XX", "404", ...) and we look up by Integer, which
-  // always misses — so we fall straight through to HTTP_STATUS_CODES.
   return HTTP_STATUS_CODES[code];
 }

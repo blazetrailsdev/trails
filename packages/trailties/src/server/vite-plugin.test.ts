@@ -97,7 +97,6 @@ describe("trailsPlugin", () => {
       const registerFn = await (plugin as any).configureServer(fakeServer);
       registerFn();
 
-      // Create a request that streams > 10 MB
       const socket = new Socket();
       const req = new IncomingMessage(socket);
       req.method = "POST";
@@ -109,8 +108,7 @@ describe("trailsPlugin", () => {
       res.end = vi.fn().mockReturnValue(res);
       const next = vi.fn();
 
-      // Push chunks that exceed the 10 MB limit
-      const chunk = Buffer.alloc(1024 * 1024); // 1 MB
+      const chunk = Buffer.alloc(1024 * 1024);
       process.nextTick(() => {
         for (let i = 0; i < 11; i++) {
           req.push(chunk);

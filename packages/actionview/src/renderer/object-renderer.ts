@@ -9,20 +9,14 @@ import type { LookupContext } from "../lookup-context.js";
 import type { RenderOptions } from "./abstract-renderer.js";
 import { PartialRenderer } from "./partial-renderer.js";
 
-/**
- * ActionView::ObjectRenderer
- *
- * Renders a partial inferred from `object.toPartialPath()` or with an
- * explicit partial name. Binds the object as a local variable.
- * @internal
- */
+/** @internal */
 export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHost {
-  /** `include ObjectRendering` (`object_renderer.rb:5`). @internal */
+  /** @internal */
   localVariable = localVariable;
-  /** `include ObjectRendering` (`object_renderer.rb:5`). @internal */
+  /** @internal */
   partialPath = partialPath;
 
-  /** Mirrors `@context_prefix` (`abstract_renderer.rb:39`). @internal */
+  /** @internal */
   contextPrefix: string;
   private object: unknown = null;
   private localName: string | null = null;
@@ -32,7 +26,6 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     this.contextPrefix = lookupContext.prefixes[0] ?? "";
   }
 
-  /** Mirrors `render_object_with_partial` (`object_renderer.rb:12-16`). */
   async renderObjectWithPartial(
     object: unknown,
     partial: string,
@@ -44,7 +37,6 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     return this.render(partial, context, block);
   }
 
-  /** Mirrors `render_object_derive_partial` (`object_renderer.rb:18-21`). */
   async renderObjectDerivePartial(
     object: unknown,
     context: ViewContext,
@@ -54,12 +46,12 @@ export class ObjectRenderer extends PartialRenderer implements ObjectRenderingHo
     return this.renderObjectWithPartial(object, path, context, block);
   }
 
-  /** Mirrors `template_keys(path)` (`object_renderer.rb:24-26`). @internal */
+  /** @internal */
   protected override templateKeys(path: string): string[] {
     return [...super.templateKeys(path), ...(this.localName != null ? [this.localName] : [])];
   }
 
-  /** Mirrors `render_partial_template` (`object_renderer.rb:28-31`). @internal */
+  /** @internal */
   protected override async renderPartialTemplate(
     view: ViewContext,
     locals: Record<string, unknown>,

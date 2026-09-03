@@ -151,7 +151,6 @@ describe("template-builder", () => {
 
   it("tsImportDefault preserves the default name as the refs key type", () => {
     const d = tsImportDefault("./foo.js", "Foo");
-    // Compile-time: d.refs.Foo is Ref; runtime: shape is correct.
     expect(d.refs.Foo).toBeDefined();
   });
 

@@ -328,7 +328,6 @@ function httpDate(date: Date): string {
 
 export function deleteSetCookieHeader(key: string, value: Record<string, any> = {}): string {
   // boundary: epoch-zero Date is the standard delete-cookie sentinel for the
-  // Set-Cookie `Expires` attribute (RFC 6265 / 6265bis).
   return setCookieHeader(key, { ...value, maxAge: "0", expires: new Date(0), value: "" });
 }
 
@@ -355,7 +354,6 @@ export function deleteCookieHeaderBang(
 }
 
 export function rfc2822(time: Date): string {
-  // Format: "Thu, 01 Jan 1970 00:00:00 -0000"
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const months = [
     "Jan",
@@ -420,7 +418,6 @@ export function getByteRanges(
     if (r0 <= r1) ranges.push([r0, r1]);
   }
 
-  // Check if sum of ranges exceeds size
   const totalBytes = ranges.reduce((sum, [a, b]) => sum + (b - a + 1), 0);
   if (totalBytes > size) return [];
 
@@ -439,10 +436,8 @@ export function secureCompare(a: string, b: string): boolean {
 export function statusCode(status: number | string | symbol): number {
   if (typeof status === "number") return status;
   const s = String(status);
-  // Try numeric parse first
   const num = parseInt(s, 10);
   if (!isNaN(num) && String(num) === s) return num;
-  // Symbol/string lookup
   const code = Object.hasOwn(SYMBOL_TO_STATUS_CODE, s) ? SYMBOL_TO_STATUS_CODE[s] : undefined;
   if (code !== undefined) return code;
   const obsolete = Object.hasOwn(OBSOLETE_SYMBOLS_TO_STATUS_CODES, s)
@@ -558,7 +553,6 @@ export function validPath(path: string): boolean {
   return !path.includes("\0");
 }
 
-// Context utility
 export class Context {
   readonly for: any;
   readonly app: any;

@@ -4,12 +4,6 @@ import { Cookies, COOKIES_APP_OPTIONS_KEY } from "../../middleware/cookies.js";
 import { CookieStore } from "../../middleware/session/cookie-store.js";
 import { Request } from "../../http/request.js";
 
-/**
- * The `CookieStore` half of Rails' `dispatch/session/cookie_store_test.rb`
- * that needs a real stack: `ActionDispatch::Cookies` over
- * `ActionDispatch::Session::CookieStore`, driven twice so the second request
- * carries the first's `Set-Cookie` back in.
- */
 async function* body(text: string): RackBody {
   yield text;
 }

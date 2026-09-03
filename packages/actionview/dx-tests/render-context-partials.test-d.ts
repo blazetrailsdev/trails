@@ -1,6 +1,3 @@
-/**
- * Type-level tests for TseRenderContext#render conditional-generic signature.
- */
 import { describe, it, expectTypeOf } from "vitest";
 import type { SafeBuffer } from "@blazetrails/activesupport";
 import { TseRenderContextImpl } from "@blazetrails/actionview";
@@ -95,9 +92,6 @@ describe("TseRenderContext#render — conditional generic (Story 5.8 + follow-up
   });
 
   it("collection render omits auto-injected keys from locals requirement", () => {
-    // "items/item" has { item, item_counter, item_iteration, label } — the first
-    // three are auto-injected by the collection iterator, so only `label` should
-    // be required from the caller.
     ctx.render({ partial: "items/item", collection: [1, 2], locals: { label: "x" } });
 
     // @ts-expect-error — 'label' is required and not auto-injected

@@ -6,12 +6,6 @@ import { Request } from "./request.js";
 import { escapeHtml } from "./utils.js";
 import type { RackApp } from "./mock-request.js";
 
-/**
- * `Frame = Struct.new(:filename, :lineno, :function, :pre_context_lineno,
- * :pre_context, :context_line, :post_context_lineno, :post_context)`
- * (`rack/lib/rack/show_exceptions.rb:21-24`). A Struct member is a Ruby
- * `attr_accessor` pair, so each is a reader property plus a `setX` writer.
- */
 export class Frame {
   private _filename: string | null = null;
   private _lineno: number | null = null;
@@ -153,7 +147,7 @@ export class ShowExceptions {
             frame.setPostContextLineno(Math.min(lineno + ShowExceptions.CONTEXT, lines.length));
             frame.setPostContext(lines.slice(lineno + 1, frame.postContextLineno! + 1));
           } catch {
-            /* empty */
+            /** @empty */
           }
 
           return frame;
@@ -166,13 +160,6 @@ export class ShowExceptions {
     return this.template(env, exception, path, frames);
   }
 
-  /**
-   * `Exception#backtrace`'s lines, which `dump_exception` (`show_exceptions.rb:71`)
-   * and `pretty` (`:82`) both consume. Ruby answers
-   * `"file:lineno:in `function'"` strings; a JS `Error` carries one decorated
-   * `stack` string instead, so its frames are reshaped into that spelling for
-   * the `/(.*?):(\d+)(:in `(.*)')?/` match at `:84`.
-   */
   private backtrace(exception: Error): string[] {
     if (!exception.stack) return [];
     return exception.stack
@@ -234,7 +221,6 @@ export class ShowExceptions {
     const stack = e.stack;
     if (!stack) return "unknown location";
     const lines = stack.split("\n").filter((line) => {
-      // Filter out lines that don't look like stack frames
       return (
         line.includes(":") && (line.includes("/") || line.includes("\\") || line.includes("at "))
       );

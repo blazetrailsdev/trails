@@ -3,24 +3,6 @@ import { Mapper } from "../../routing/mapper.js";
 import { RouteSet } from "../../routing/route-set.js";
 import { ConsoleFormatter, RoutesFormatter, RoutesInspector } from "../../routing/inspector.js";
 
-// =============================================================================
-// dispatch/routing/inspector_test.rb
-//
-// Rails design: RoutesInspector wraps each Route in RouteWrapper and passes
-// CollectedRoute records to a RoutesFormatter (Sheet, Expanded, Unused, …).
-// The Sheet formatter right-pads columns to uniform widths; Expanded renders
-// one labeled block per route.  Tests assert full golden-output arrays so that
-// any column-width regression or reqs-string change is caught immediately.
-//
-// Skips in this file fall into three categories:
-//   • engine/rack-app mounting — Engine and rack-app concepts are not yet
-//     ported to trails.
-//   • deprecated dynamic-segment syntax — `get ":controller/:action"` /
-//     `get ":controller(/:action)"` rely on `ActionDispatch.deprecator.silence`
-//     which has no trails analogue.
-//   • formatter divergences — documented inline per skip.
-// =============================================================================
-
 describe("RoutesInspectorTest", () => {
   let set: RouteSet;
 
@@ -37,13 +19,9 @@ describe("RoutesInspectorTest", () => {
     return new RoutesInspector(set.getRoutes()).format(formatter, filter).split("\n");
   }
 
-  it.skip("displaying routes for engines", () => {
-    // pending: Engine mounting not yet ported to trails
-  });
+  it.skip("displaying routes for engines", () => {});
 
-  it.skip("displaying routes for engines without routes", () => {
-    // pending: Engine mounting not yet ported to trails
-  });
+  it.skip("displaying routes for engines without routes", () => {});
 
   it("cart inspect", () => {
     const output = draw((r) => {
@@ -55,10 +33,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("articles inspect with multiple verbs", () => {
-    // pending: formatter divergence — match via: [put, patch] emits two
-    // separate rows (PUT and PATCH) instead of Rails' combined "PUT|PATCH" row.
-  });
+  it.skip("articles inspect with multiple verbs", () => {});
 
   it("inspect shows custom assets", () => {
     const output = draw((r) => {
@@ -97,56 +72,27 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("inspect routes shows dynamic action route", () => {
-    // pending: requires deprecated `get "api/:action" => "api"` syntax
-  });
+  it.skip("inspect routes shows dynamic action route", () => {});
 
-  it.skip("inspect routes shows controller and action only route", () => {
-    // pending: requires deprecated `get ":controller/:action"` syntax
-  });
+  it.skip("inspect routes shows controller and action only route", () => {});
 
-  it.skip("inspect routes shows controller and action route with constraints", () => {
-    // pending: requires deprecated `get ":controller(/:action(/:id))"` syntax
-  });
+  it.skip("inspect routes shows controller and action route with constraints", () => {});
 
-  it.skip("rails routes shows route with defaults", () => {
-    // pending: formatter divergence — route defaults (e.g. format: "jpg") are
-    // not surfaced in the reqs column; RouteWrapper#requirements does not yet
-    // merge Route#defaults into the displayed constraints hash.
-  });
+  it.skip("rails routes shows route with defaults", () => {});
 
-  it.skip("rails routes shows route with constraints", () => {
-    // pending: formatter divergence — inline path constraints (e.g. id: /regex/)
-    // passed directly to `get` are not propagated to Route#constraints and
-    // therefore do not appear in the reqs column.
-  });
+  it.skip("rails routes shows route with constraints", () => {});
 
-  it.skip("rails routes shows routes with dashes", () => {
-    // pending: multiple divergences — shorthand controller/action inference
-    // (`get "our-work/latest"`) is not applied through the `get`/`post` helpers
-    // (only through `match`), and nested member routes inside a resources block
-    // produce different name/path structures.
-  });
+  it.skip("rails routes shows routes with dashes", () => {});
 
-  it.skip("rails routes shows route with rack app", () => {
-    // pending: rack-app routing not yet ported to trails
-  });
+  it.skip("rails routes shows route with rack app", () => {});
 
-  it.skip("rails routes shows named route with mounted rack app", () => {
-    // pending: rack-app mounting not yet ported to trails
-  });
+  it.skip("rails routes shows named route with mounted rack app", () => {});
 
-  it.skip("rails routes shows overridden named route with mounted rack app with name", () => {
-    // pending: rack-app mounting not yet ported to trails
-  });
+  it.skip("rails routes shows overridden named route with mounted rack app with name", () => {});
 
-  it.skip("rails routes shows route with rack app nested with dynamic constraints", () => {
-    // pending: rack-app mounting not yet ported to trails
-  });
+  it.skip("rails routes shows route with rack app nested with dynamic constraints", () => {});
 
-  it.skip("rails routes dont show app mounted in assets prefix", () => {
-    // pending: rack-app mounting + assets-prefix filtering not yet ported
-  });
+  it.skip("rails routes dont show app mounted in assets prefix", () => {});
 
   it("rails routes shows route defined in under assets prefix", () => {
     const output = draw((r) => {
@@ -160,11 +106,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("redirect", () => {
-    // pending: formatter divergence — redirect(307, path: /foo/bar) renders as
-    // redirect(307) (path omitted), and a lambda redirect renders as
-    // "Inline handler (Proc/Lambda)" instead of "redirect(301)".
-  });
+  it.skip("redirect", () => {});
 
   it("routes can be filtered", () => {
     const output = draw(
@@ -187,10 +129,7 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("routes when expanded", () => {
-    // pending: source location tracking (RouteWrapper#sourceLocation) is not
-    // yet implemented — the "Source Location" row is always absent.
-  });
+  it.skip("routes when expanded", () => {});
 
   it("no routes matched filter when expanded", () => {
     const output = draw(
@@ -219,17 +158,9 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("routes can be filtered with namespaced controllers", () => {
-    // pending: formatter divergence — namespace name prefix order differs:
-    // trails emits `admin_new_post` / `admin_edit_post` whereas Rails emits
-    // `new_admin_post` / `edit_admin_post`.  Fixing requires changing how
-    // `new_` / `edit_` prefixes are combined with the namespace name, which
-    // cascades to route-helpers tests that already assert the current names.
-  });
+  it.skip("routes can be filtered with namespaced controllers", () => {});
 
-  it.skip("regression route with controller regexp", () => {
-    // pending: requires deprecated `get ":controller(/:action)"` syntax
-  });
+  it.skip("regression route with controller regexp", () => {});
 
   it("routes with undefined filter", () => {
     const output = draw(
@@ -268,37 +199,24 @@ describe("RoutesInspectorTest", () => {
     ]);
   });
 
-  it.skip("displaying routes for internal engines", () => {
-    // pending: Engine mounting not yet ported to trails
-  });
+  it.skip("displaying routes for internal engines", () => {});
 
-  it.skip("route with proc handler", () => {
-    // pending: `to: () => [...]` (lambda/proc endpoint) throws in Mapper#addRoute
-    // because parseEndpoint receives a function instead of a string.
-  });
+  it.skip("route with proc handler", () => {});
 
-  // Non-Rails tests: edge-cases for inferred route-name logic in mapper.ts.
   it("digit-leading path segment does not produce an inferred name", () => {
-    // /123 would yield "123" which fails RouteSet#addRoute's /^[_a-z]\w*$/i guard.
     const output = draw((r) => {
       r.get("/123", { to: "pages#show" });
     });
-    // No name inferred — Prefix column is blank (right-padded to header width).
     expect(output[1]).toMatch(/^\s+GET\s/);
   });
 
   it("explicit as:'' does not trigger path-based name inference", () => {
-    // as:"" is an explicit (empty) name override in Rails; inference must not run.
     const output = draw((r) => {
       r.get("/health", { to: "health#show", as: "" });
     });
-    // No helper name in the Prefix column.
     expect(output[1]).toMatch(/^\s+GET\s/);
   });
 
-  // Non-Rails test: verifies RouteWrapper#path suppresses (.:format) when
-  // format: false was passed (covered indirectly by regression_route_with_controller_regexp
-  // in Rails, which is skipped here for unrelated reasons).
   it("format false suppresses (.:format) suffix", () => {
     const output = draw((r) => {
       r.get("/health", { to: "health#show", format: false });

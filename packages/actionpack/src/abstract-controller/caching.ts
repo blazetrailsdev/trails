@@ -1,13 +1,4 @@
-/**
- * `AbstractController::Caching` — config slot contract and convenience
- * `cache(key, options, block)` helper. The fragment sub-module
- * (`AbstractController::Caching::Fragments`) lives in `./fragments.ts`
- * and is re-exported from here.
- *
- * Ported from `vendor/rails/actionpack/lib/abstract_controller/caching.rb`.
- *
- * @internal
- */
+/** @internal */
 
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
@@ -25,16 +16,8 @@ const SLOTS = ["defaultStaticExtension", "performCaching", "enableFragmentCacheL
 
 export type CachingSlot = (typeof SLOTS)[number];
 
-/** Reified list of config-slot names — useful for introspection / parity:api. */
 export const CACHING_SLOTS: readonly CachingSlot[] = SLOTS;
 
-/**
- * Rails-shaped class-level defaults. Hosts read these once at include
- * time; we don't install them eagerly to avoid the
- * subclass-shadowing trap: an eager write of `undefined` creates an own
- * property on the subclass that permanently shadows a later assignment
- * on a parent class.
- */
 export const CACHING_DEFAULTS = {
   defaultStaticExtension: ".html",
   performCaching: true,
@@ -48,7 +31,6 @@ export interface CachingClassMethods {
   performCaching?: boolean;
   defaultStaticExtension?: string;
   enableFragmentCacheLogging?: boolean;
-  /** Class-level cache-dependency blocks, appended via `viewCacheDependency`. */
   _viewCacheDependencies?: ViewCacheDependency[];
 }
 
@@ -66,32 +48,17 @@ export class ConfigMethods {
   }
 }
 
-/**
- * Mirrors `AbstractController::Caching::ConfigMethods#cache_configured?`.
- * Truthy when caching is on AND a store is wired up.
- *
- * @internal
- */
+/** @internal */
 export function cacheConfigured(host: CachingHost): boolean {
   const cls = host.constructor;
   return Boolean(cls.performCaching && cls.cacheStore);
 }
 
-/**
- * Append a block that's evaluated per-request to derive a fragment
- * cache-key dependency. Stored on the **class** so subclasses inherit.
- * Mirrors `ClassMethods#view_cache_dependency`.
- */
 export function viewCacheDependency(cls: CachingClassMethods, block: ViewCacheDependency): void {
   const existing = cls._viewCacheDependencies ?? [];
   cls._viewCacheDependencies = [...existing, block];
 }
 
-/**
- * Evaluate every registered dependency block in the instance's context
- * and return the non-nullish results. Mirrors Rails' `filter_map` —
- * `nil` (here: `null` / `undefined`) entries are dropped.
- */
 export function viewCacheDependencies(this: CachingHost): unknown[] {
   const deps = this.constructor._viewCacheDependencies ?? [];
   const out: unknown[] = [];
@@ -102,17 +69,6 @@ export function viewCacheDependencies(this: CachingHost): unknown[] {
   return out;
 }
 
-/**
- * Convenience `cache(key, options?, block)` — mirrors the private
- * helper in `AbstractController::Caching`. Delegates to
- * `cacheStore.fetch(expandedKey, options, block)` when caching is
- * configured; otherwise just runs `block`.
- *
- * The Rails impl calls `ActiveSupport::Cache.expand_cache_key(key, :controller)`.
- * Trails doesn't yet expose a public `expandCacheKey` helper, so we
- * inline the same shape: stringify the key and prepend the
- * `"controller/"` namespace fragment so the on-disk layout matches.
- */
 export function cache<T>(this: CachingHost, key: unknown, options: CacheOptions, block: () => T): T;
 export function cache<T>(this: CachingHost, key: unknown, block: () => T): T;
 export function cache<T>(
@@ -131,21 +87,10 @@ export function cache<T>(
   return store.fetch(expanded, options, block) as T;
 }
 
-/**
- * Tiny stand-in for `ActiveSupport::Cache.expand_cache_key(key, :controller)`.
- * Mirrors the shape (`"<namespace>/<flattened-key>"`) without pulling in
- * the full Rails helper, which isn't ported yet.
- */
 function expandControllerCacheKey(key: unknown): string {
   const flat = Array.isArray(key) ? key.map(stringify).join("/") : stringify(key);
   return `controller/${flat}`;
 }
-
-// Rails `include AbstractController::Caching::Fragments` exposes the fragment
-// API on the `Caching` module itself. The implementations live in `fragments.ts`;
-// these thin wrappers republish them on `caching.ts` so `parity:api` sees the
-// surface where Rails exposes it. Re-export statements wouldn't suffice — the
-// extractor counts only direct `export function` declarations.
 
 export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unknown[] {
   return _combinedFragmentCacheKey.call(this, key);
@@ -191,8 +136,6 @@ function stringify(part: unknown): string {
   if (typeof part === "number" || typeof part === "boolean" || typeof part === "bigint") {
     return String(part);
   }
-  // Match Rails' `cache_key` convention where objects implement it; fall
-  // back to JSON for plain objects so the key is at least deterministic.
   const maybe = (part as { cacheKey?: () => string }).cacheKey;
   if (typeof maybe === "function") return maybe.call(part);
   try {

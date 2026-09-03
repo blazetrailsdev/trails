@@ -15,9 +15,6 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// action_controller/rescue_test.rb
-// ==========================================================================
 describe("RescueControllerTest", () => {
   it("rescues a known error", async () => {
     class AppError extends Error {
@@ -151,11 +148,8 @@ describe("RescueControllerTest", () => {
         throw new AppError("fail");
       }
     }
-    C.rescueFrom(AppError, function (this: any, _err: Error) {
-      // Note: handler doesn't have `this` bound to controller in current impl
-    });
+    C.rescueFrom(AppError, function (this: any, _err: Error) {});
 
-    // Test that the rescue prevents the error from propagating
     let rescued = false;
     class C2 extends Base {
       async index() {
@@ -212,7 +206,6 @@ describe("RescueControllerTest", () => {
 
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    // The last registered matching handler should win (Rails behavior)
     expect(which).toBe("specific");
   });
 
@@ -231,8 +224,6 @@ describe("RescueControllerTest", () => {
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(rescued).toBe(true);
   });
-
-  // --- Tests matching Rails test names ---
 
   it("rescue handler", async () => {
     class NotAuthorized extends Error {}

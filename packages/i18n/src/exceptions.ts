@@ -1,26 +1,10 @@
-/**
- * Mirrors: i18n/lib/i18n/exceptions.rb
- *
- * Ruby Symbols have no JS analogue, so every symbol-typed value here (locale,
- * translation key, interpolation key) is a plain string. A Symbol whose
- * message renders it through `#inspect` alongside a String keeps the leading
- * colon in that string (`":bar"`), so `inspectSymbolOrString` can tell the two
- * apart the way Ruby's types do; `inspect` itself stays Ruby's `Object#inspect`
- * and quotes every String. Where the Symbol spelling is not carried,
- * `inspectSymbol` puts the colon back.
- */
-
 import { EMPTY_HASH, normalizeKeys } from "./i18n.js";
 import type { Locale, TranslationKey } from "./i18n.js";
 import { ArgumentError as RubyArgumentError } from "@blazetrails/ruby-compat";
 
 /**
- * Ruby `Object#inspect`, as far as the values reaching this file go.
- *
  * @internal
- * @noRailsEquivalent PERMANENT — Ruby gets `inspect` from `Object`, so no gem
- * file declares it; JS has no equivalent universal method and the exception
- * messages this file builds are defined in terms of it.
+ * @noRailsEquivalent PERMANENT
  */
 export function inspect(value: unknown): string {
   if (value === null || value === undefined) return "nil";
@@ -47,23 +31,8 @@ const RUBY_ESCAPES: Record<string, string> = {
   "\x1b": "\\e",
 };
 
-/**
- * MRI escapes every code point `rb_enc_isprint` rejects, which is wider than
- * the C0/DEL/C1 controls: unassigned code points (`"͸".inspect` =>
- * `"\\u0378"`), noncharacters (`"￾"`) and the line and paragraph
- * separators all render escaped. `\p{Cf}` does not — soft hyphen, ZWSP and
- * U+1D173 all print literally — and neither does private use (`\p{Co}`) or
- * `\p{Zs}`. Surrogates are `\p{Cs}` but take the invalid-byte arm below.
- */
 const NONPRINTABLE = /^[\p{Cc}\p{Cn}\p{Zl}\p{Zp}]$/u;
 
-/**
- * Ruby `String#inspect` (MRI `string.c`, `rb_str_inspect`). `JSON.stringify`
- * is not a stand-in: Ruby renders ESC as `\e`, escapes `#` before `{`, `$` and
- * `@` so the result re-parses as the same string, prints printable non-ASCII
- * literally, and renders bytes that are not valid UTF-8 — here, a lone
- * surrogate — as the `\xNN` bytes of their encoding.
- */
 function inspectString(value: string): string {
   const chars = Array.from(value);
   let result = '"';
@@ -96,23 +65,10 @@ function inspectSymbol(value: unknown): string {
   return typeof value === "string" ? `:${value}` : inspect(value);
 }
 
-/**
- * `#inspect` for a value Rails types as `Symbol | String`, where the two
- * render differently (`:bar` against `"key"`). The Symbol arm is the string
- * carrying the Symbol's leading colon, which is what Ruby gets from the type.
- */
 function inspectSymbolOrString(value: string): string {
   return value.startsWith(":") ? value : inspect(value);
 }
 
-/**
- * Mirrors: I18n::ArgumentError, the root of every error in this file —
- * `class ArgumentError < ::ArgumentError` (i18n/lib/i18n/exceptions.rb:14).
- *
- * `message` is passed straight through rather than defaulting to `""`, so
- * `Error` installs no own `message` property when it is undefined — an own
- * property would shadow `MissingTranslation`'s computed getter.
- */
 export class ArgumentError extends RubyArgumentError {
   constructor(message?: string) {
     super(message);
@@ -120,15 +76,7 @@ export class ArgumentError extends RubyArgumentError {
   }
 }
 
-/**
- * Mirror of Ruby's `NoMethodError`, raised where the gem sends a method to a
- * receiver that does not respond to it — `locale.to_sym` in `Config#locale=`
- * and `Config#default_locale=` (i18n/lib/i18n/config.rb:17, :37), which is
- * what makes junk assignment fail rather than be ignored.
- *
- * @noRailsEquivalent PERMANENT — a Ruby core class the gem raises but does not
- * define; JS has no `NoMethodError`, so the port has to carry one.
- */
+/** @noRailsEquivalent PERMANENT */
 export class NoMethodError extends Error {
   constructor(message: string) {
     super(message);
@@ -178,13 +126,6 @@ export interface MissingTranslationOptions {
 
 const PERMITTED_KEYS = ["scope", "default"] as const;
 
-/**
- * Mirrors: I18n::MissingTranslation::Base. Ruby mixes this module into both
- * `MissingTranslation` and `MissingTranslationData`; here it is their shared
- * superclass, which puts the same methods on both. The constructor keeps only
- * the permitted options, plus every Proc-valued entry (permitted or not) in
- * its inspected form, as Ruby does.
- */
 export class Base extends ArgumentError {
   readonly locale: Locale;
   readonly key: TranslationKey;
@@ -314,13 +255,6 @@ export class UnknownFileType extends ArgumentError {
   }
 }
 
-/**
- * Mirrors: I18n::UnsupportedMethod (i18n/lib/i18n/exceptions.rb:122-130).
- *
- * `backend_klass` is interpolated into the message, which for a Ruby Class is
- * `Class#to_s` — its name. A JS class is a function, whose default string
- * conversion is its whole source text, so the name is taken off `.name`.
- */
 type BackendKlass = (abstract new (...args: never[]) => unknown) & { name: string };
 
 export class UnsupportedMethod extends ArgumentError {
@@ -337,10 +271,6 @@ export class UnsupportedMethod extends ArgumentError {
   }
 }
 
-/**
- * Mirrors: I18n::ExceptionHandler. Returns the message for a missing
- * translation and re-raises anything else.
- */
 export class ExceptionHandler {
   call(exception: Error, _locale: Locale, _key: TranslationKey, _options: unknown): string {
     if (exception instanceof MissingTranslation) {

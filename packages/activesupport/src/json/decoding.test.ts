@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Date as RubyDate } from "@blazetrails/date";
 import { ActiveSupportJSON, parseJsonTimes, setParseJsonTimes } from "../json.js";
 
-/** Mirrors the `with_parse_json_times` helper (json/decoding_test.rb:118-124). */
 function withParseJsonTimes<T>(value: boolean, fn: () => T): T {
   const oldValue = parseJsonTimes;
   setParseJsonTimes(value);

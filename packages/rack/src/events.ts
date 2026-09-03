@@ -1,15 +1,3 @@
-/**
- * Rack::Events
- *
- * Middleware that fires lifecycle events (on_start, on_commit, on_send,
- * on_finish, on_error) to a list of event handlers.
- *
- * Event order for a successful request:
- *   on_start → app.call → on_commit → (body consumed) on_send → on_finish
- *
- * If the app raises, on_error and on_finish are called instead.
- */
-
 import type { RackApp, RackEnv, RackResponse, RackBody } from "./index.js";
 import { Request } from "./request.js";
 
@@ -43,7 +31,6 @@ export class Events {
     const req = new Request(env);
     const res = new EventResponse(0, {});
 
-    // on_start
     for (const h of this.handlers) {
       h.onStart?.(req, res);
     }
@@ -52,7 +39,6 @@ export class Events {
     try {
       response = await this.app(env);
     } catch (error) {
-      // on_error + on_finish (reverse order)
       for (const h of this.handlers) {
         h.onError?.(req, res, error as Error);
       }
@@ -65,12 +51,10 @@ export class Events {
     res.status = response[0];
     res.headers = response[1];
 
-    // on_commit
     for (const h of this.handlers) {
       h.onCommit?.(req, res);
     }
 
-    // Wrap body to fire on_send/on_finish
     const originalBody = response[2];
     const handlers = this.handlers;
     const wrappedBody = wrapBody(originalBody, handlers, req, res);

@@ -127,7 +127,6 @@ describe("ContentSecurityPolicyTest", () => {
     expect(header).toContain("default-src 'self'");
     expect(header).toContain("script-src cdn.example.com");
     expect(header).toContain("style-src 'unsafe-inline'");
-    // Directives separated by semicolons
     expect(header.split("; ").length).toBe(3);
   });
 
@@ -274,8 +273,6 @@ describe("ContentSecurityPolicyTest", () => {
     expect(policy.build()).toBe("trusted-types default");
   });
 
-  // Rails: test_mappings — every MAPPINGS key resolves through a fetch
-  // directive (content_security_policy_test.rb).
   it("mappings table is exhaustive", () => {
     for (const [key, expected] of Object.entries(MAPPINGS)) {
       const policy = new ContentSecurityPolicy();
@@ -284,28 +281,23 @@ describe("ContentSecurityPolicyTest", () => {
     }
   });
 
-  // Rails: test_dynamic_directives — Proc returning Array<String> flattens.
   it("dynamic directive returning array of sources", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc(() => ["https://a.example", "https://b.example"]);
     expect(policy.build({})).toBe("default-src https://a.example https://b.example");
   });
 
-  // Rails: test_invalid_directive_source — non-string/non-proc raises.
   it("invalid directive source", () => {
     const policy = new ContentSecurityPolicy();
     expect(() => policy.defaultSrc(123 as unknown as string)).toThrow(/Invalid/);
   });
 
-  // Rails: test_raises_runtime_error_when_unexpected_source — Proc returns
-  // an unexpected (non-string) value.
   it("raises runtime error when unexpected source", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc(() => 42 as unknown as string);
     expect(() => policy.build({})).toThrow(/Unexpected|Invalid/);
   });
 
-  // Rails: DSL with no args deletes the directive (content_security_policy.rb:189).
   it("DSL with no args clears the directive", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc("'self'");
@@ -320,15 +312,12 @@ describe("ContentSecurityPolicyTest", () => {
     expect(policy.hasDirective("script-src")).toBe(false);
   });
 
-  // Ruby truthiness: empty string stays truthy, so DSL with "" preserves the
-  // directive (content_security_policy.rb:189-197).
   it("DSL with empty-string first arg keeps the directive (Ruby truthiness)", () => {
     const policy = new ContentSecurityPolicy();
     policy.scriptSrc("");
     expect(policy.hasDirective("script-src")).toBe(true);
   });
 
-  // Bare directives store the `true` sentinel (Rails parity).
   it("block_all_mixed_content stores true sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.blockAllMixedContent();
@@ -348,7 +337,6 @@ describe("ContentSecurityPolicyTest", () => {
     expect(policy.build()).toBe("sandbox");
   });
 
-  // Rails: test_whitespace_validation — embedded whitespace raises.
   it("whitespace validation", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc("foo bar");
@@ -363,11 +351,6 @@ describe("ContentSecurityPolicyTest", () => {
     expect(copy.build()).toBe("upgrade-insecure-requests");
   });
 });
-
-// ==========================================================================
-// Full-stack integration tests
-// dispatch/content_security_policy_test.rb
-// ==========================================================================
 
 function resolvedCspHeader(app: IntegrationTest): string | null {
   if (app.response.status === 304) return null;
@@ -572,7 +555,6 @@ describe("DisabledContentSecurityPolicyIntegrationTest", () => {
 
   it("generates content security policy header when globally disabled", async () => {
     await app.get("/inline", { env: cspEnv(null) });
-    // The before_action dupes a fresh policy when none is set on the request.
     expect(resolvedCspHeader(app)).toBe("default-src https://example.com");
   });
 });
@@ -653,9 +635,5 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
 });
 
 describe("HelpersContentSecurityPolicyIntegrationTest", () => {
-  it.skip("can call helper methods in csp", () => {
-    // pending: trails does not yet expose a `helpers` proxy inside CSP blocks;
-    // helper_method registration exists but the CSP before_action block
-    // runs without a view-context binding.
-  });
+  it.skip("can call helper methods in csp", () => {});
 });

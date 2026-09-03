@@ -64,7 +64,7 @@ export function newCommand(): Command {
           execSync("git init", { cwd: appDir, stdio: "pipe" });
           console.log("  Initialized git repository");
         } catch {
-          // git not available
+          /** @empty */
         }
       }
 

@@ -27,8 +27,6 @@ describe("ErrorReporterTest", () => {
   let subscriber: ErrorSubscriber;
   let error: Error;
 
-  // ExecutionContext is automatically reset in Rails app via executor hooks set in railtie
-  // But not in Active Support's own test suite.
   beforeEach(() => {
     ExecutionContext.clear();
     reporter = new ErrorReporter();
@@ -129,8 +127,6 @@ describe("ErrorReporterTest", () => {
     expect(result).toBe(4);
   });
 
-  // Ruby raises NoMethodError from `fallback.call`; JS' equivalent for calling a
-  // non-function is TypeError.
   it("#handle raises if the fallback is not a callable", () => {
     expect(() =>
       reporter.handle({ fallback: "four" }, () => {

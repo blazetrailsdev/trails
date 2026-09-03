@@ -3,17 +3,17 @@ import { describe, it, expect } from "vitest";
 describe("TestLoadError", () => {
   it("with require", async () => {
     const mod = "no_this_file_dont_exist";
-    await expect(import(/* @vite-ignore */ mod)).rejects.toThrow();
+    await expect(import(mod)).rejects.toThrow();
   });
 
   it("with load", async () => {
     const mod = "nor_does_this_one";
-    await expect(import(/* @vite-ignore */ mod)).rejects.toThrow();
+    await expect(import(mod)).rejects.toThrow();
   });
 
   it("path", async () => {
     const mod = "nor/this/one";
-    await expect(import(/* @vite-ignore */ mod)).rejects.toThrow(/nor\/this\/one/);
+    await expect(import(mod)).rejects.toThrow(/nor\/this\/one/);
   });
 
   it("is missing with nil path", () => {

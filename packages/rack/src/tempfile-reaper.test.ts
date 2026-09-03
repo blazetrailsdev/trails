@@ -148,7 +148,7 @@ it("handle missing rack.tempfiles on normal response", async () => {
     delete e[RACK_TEMPFILES];
     return [200, {}, ["Hello, World!"]] as any;
   }, env);
-  resp[2].close(); // Should not throw
+  resp[2].close();
 });
 
 it("handle missing rack.tempfiles on normal response with rack.response_finished", async () => {

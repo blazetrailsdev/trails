@@ -5,7 +5,6 @@ import { I18n } from "./i18n.js";
 import { transliterate } from "./transliterate.js";
 
 describe("TransliterateTest", () => {
-  // abstract_unit.rb:35
   let enforceAvailableLocales: boolean;
   beforeAll(() => {
     enforceAvailableLocales = I18n.config().enforceAvailableLocales;
@@ -29,7 +28,7 @@ describe("TransliterateTest", () => {
   });
 
   it("transliterate should work with custom i18n rules and uncomposed utf8", () => {
-    const char = "\u0075\u0308"; // "ü" as ASCII "u" plus COMBINING DIAERESIS
+    const char = "\u0075\u0308";
     I18n.backend().storeTranslations("de", { i18n: { transliterate: { rule: { ü: "ue" } } } });
     const defaultLocale = I18n.locale();
     I18n.setLocale("de");
@@ -41,7 +40,7 @@ describe("TransliterateTest", () => {
   });
 
   it("transliterate respects the locale argument", () => {
-    const char = "\u0075\u0308"; // "ü" as ASCII "u" plus COMBINING DIAERESIS
+    const char = "\u0075\u0308";
     I18n.backend().storeTranslations("de", { i18n: { transliterate: { rule: { ü: "ue" } } } });
     expect(transliterate(char, "?", { locale: "de" })).toBe("ue");
   });
@@ -84,7 +83,6 @@ describe("TransliterateTest", () => {
     const original = "hello";
     const result = transliterate(original);
     expect(result).toBe("hello");
-    // returns a string value (new or same reference doesn't matter in JS)
     expect(typeof result).toBe("string");
   });
 });

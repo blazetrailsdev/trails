@@ -9,16 +9,6 @@ import { createArTrailsProgram, createArSolutionBuilder } from "./ar-program.js"
 import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
 import { parseSchemaTs } from "./schema-ts-parser.js";
 
-/**
- * Load schema columns from a `--schema` file. Accepts:
- *   - `.ts` / `.js` — TypeScript schema file (e.g. `db/schema.ts`); parsed by `parseSchemaTs`.
- *   - `.json` — legacy column-dump. Column values take either shape:
- *       `{ "<table>": { "<column>": "<rails_type>", ... }, ... }` — legacy
- *       `{ "<table>": { "<column>": { "type": "<rails_type>", "null"?: boolean, "arrayElementType"?: string }, ... }, ... }` — rich
- *
- * The rich JSON shape drives nullability (`T | null`) and typed array elements
- * (`ElementTsType[]`) in the generated TypeScript declares.
- */
 type RichColumnValue = Extract<SchemaColumnValue, object>;
 
 export function loadSchemaColumns(
@@ -92,8 +82,6 @@ export function loadSchemaColumns(
   return validateSchemaShape(parsed, resolved);
 }
 
-// Keys whose assignment on a plain object would pollute the prototype
-// chain — rejected up front rather than trusted from JSON input.
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 function validateSchemaShape(
@@ -107,10 +95,6 @@ function validateSchemaShape(
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     fail("expected a top-level object of { [table]: { [column]: railsType | richValue } }");
   }
-  // Use null-prototype maps so untrusted keys from the JSON can't reach
-  // Object.prototype. Iterate with Object.keys to skip inherited keys on
-  // the input (defense-in-depth; JSON.parse never sets them, but the
-  // function signature accepts `unknown`).
   const out: Record<string, Record<string, SchemaColumnValue>> = Object.create(null);
   for (const table of Object.keys(value as object)) {
     if (UNSAFE_KEYS.has(table)) fail(`table name "${table}" is not allowed`);
@@ -129,11 +113,6 @@ function validateSchemaShape(
   return out;
 }
 
-/**
- * A column value can be either a Rails type string (legacy) or a rich
- * object `{ type, null?, arrayElementType? }`. Reject anything else with
- * a targeted message so users see the actual problem instead of a crash.
- */
 function validateColumnValue(
   raw: unknown,
   fqColumn: string,
@@ -158,9 +137,6 @@ function validateColumnValue(
     if (typeof r.arrayElementType !== "string") {
       fail(`column "${fqColumn}" rich shape: \`arrayElementType\` must be a string when present`);
     }
-    // Catch typos / misconfiguration at load time — a non-"array" `type`
-    // would silently ignore `arrayElementType` downstream, leaving the
-    // user with an unexpectedly-untyped declare.
     if (r.type !== "array") {
       fail(
         `column "${fqColumn}" rich shape: \`arrayElementType\` is only valid when ` +
@@ -208,8 +184,6 @@ function handlePrintVirtualized(args: string[]): void {
 }
 
 function parsePretty(args: string[], options: ts.CompilerOptions): boolean {
-  // Accept both `--pretty true|false` and `--pretty=true|false`; a
-  // bare `--pretty` with no following value means `true` (matches tsc).
   const parseValue = (value: string | undefined): boolean | undefined => {
     if (value === undefined) return true;
     if (value === "true") return true;
@@ -244,15 +218,9 @@ function formatHost(): ts.FormatDiagnosticsHost {
 }
 
 function handleBuildMode(args: string[]): void {
-  // --build / -b must be the first arg for tsc compatibility, but be
-  // lenient: accept it anywhere so users can pass flags in either
-  // order.
   const buildIdx = args.findIndex((a) => a === "--build" || a === "-b");
   if (buildIdx === -1) return;
 
-  // Project paths are positional args AFTER --build. Flags that
-  // consume a value must skip that value so we don't treat `false`
-  // (from `--pretty false`) or similar as a project path.
   const buildArgs = args.slice(buildIdx + 1);
   const verbose = args.includes("--verbose");
   const clean = args.includes("--clean");
@@ -287,25 +255,15 @@ function handleBuildMode(args: string[]): void {
       process.stderr.write(out);
     },
     onStatus: (d) => {
-      // Solution-builder status (informational, not diagnostics).
       const msg = ts.flattenDiagnosticMessageText(d.messageText, ts.sys.newLine);
       process.stdout.write(`${msg}${ts.sys.newLine}`);
     },
   });
 
   const status = clean ? builder.clean() : builder.build();
-  // Preserve TS ExitStatus semantics (Success / DiagnosticsPresent_OutputsSkipped
-  // / InvalidProject_OutputsSkipped / ProjectReferenceCycle_OutputsSkipped) so
-  // callers scripting `trails-tsc --build` can distinguish them exactly like `tsc -b`.
   process.exit(status);
 }
 
-/**
- * Entry point. Invoked by `bin/trails-tsc.js`; not run on import, so tests
- * can exercise `loadSchemaColumns` directly. The bin is a different file
- * from this module, so an `import.meta.url === argv[1]` self-execution
- * guard here would never fire through it and the CLI would be a no-op.
- */
 export function main(): void {
   const args = process.argv.slice(2);
 
@@ -313,8 +271,6 @@ export function main(): void {
   handlePrintVirtualized(args);
   handleBuildMode(args);
 
-  // Find -p / --project flag; default to ./tsconfig.json.
-  // Error if the flag is present but no value follows (matches tsc).
   let configPath: string | undefined;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === "-p" || args[i] === "--project") {
@@ -325,8 +281,6 @@ export function main(): void {
       configPath = args[i + 1];
     }
   }
-  // When no -p is given, search upward from cwd for the nearest
-  // tsconfig.json — matches tsc's default behavior.
   if (!configPath) {
     configPath =
       ts.findConfigFile(process.cwd(), ts.sys.fileExists) ?? path.resolve("tsconfig.json");
@@ -341,18 +295,13 @@ export function main(): void {
 
   const fh = formatHost();
 
-  // Config-level errors (bad tsconfig read / parse) — format and
-  // exit before attempting to use the program.
   if (configDiagnostics.length > 0) {
     process.stderr.write(ts.formatDiagnostics(configDiagnostics, fh));
     process.exit(1);
   }
 
-  // getPreEmitDiagnostics includes semantic + syntactic + global +
-  // options diagnostics — matches what tsc reports before emit.
   const diagnostics = [...ts.getPreEmitDiagnostics(program)];
 
-  // Check for --noEmit
   const noEmit = args.includes("--noEmit") || program.getCompilerOptions().noEmit;
 
   if (!noEmit) {
@@ -360,8 +309,6 @@ export function main(): void {
     diagnostics.push(...emitResult.diagnostics);
   }
 
-  // Remap diagnostic positions from virtualized-source coordinates back
-  // to the user's original lines, then sort + deduplicate.
   const remapped = remapDiagnostics(diagnostics, host);
   const sorted = ts.sortAndDeduplicateDiagnostics(remapped);
 

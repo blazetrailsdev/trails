@@ -1,5 +1,3 @@
-// Response header keys. Rack 3 uses lowercase; trails targets Rack 3 only,
-// so the Rack 2.x branch from Rails action_dispatch/constants.rb is omitted.
 export const VARY = "vary";
 export const CONTENT_ENCODING = "content-encoding";
 export const CONTENT_SECURITY_POLICY = "content-security-policy";

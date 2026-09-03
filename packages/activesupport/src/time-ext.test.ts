@@ -59,12 +59,10 @@ import { toFs, formattedOffset, xmlschema } from "./core-ext/time/conversions.js
 import { toTime } from "./core-ext/time/compatibility.js";
 import { toTime as dateToTime } from "./core-ext/date/conversions.js";
 
-// Helper: make a local date
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
   return new Date(year, month - 1, day, hour, min, sec, ms);
 }
 
-// Helpers for Temporal.Instant assertions (period-bound helpers return Instant)
 function i(
   year: number,
   month: number,
@@ -123,7 +121,7 @@ describe("TimeExtCalculationsTest", () => {
     expect(result.getSeconds()).toBe(59);
     expect(result.getMilliseconds()).toBe(999);
     expect(result.getFullYear()).toBe(2007);
-    expect(result.getMonth()).toBe(7); // August
+    expect(result.getMonth()).toBe(7);
     expect(result.getDate()).toBe(12);
   });
 
@@ -149,8 +147,6 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("change_preserves_offset_for_zoned_times_around_end_of_dst", () => {
-    // DST ended just before 2005-10-30 2:00:00 AM in US/Eastern, and clocks
-    // were rolled back 1 hour.
     const at = (hour: number) =>
       Temporal.ZonedDateTime.from({
         timeZone: "US/Eastern",
@@ -162,10 +158,10 @@ describe("TimeExtCalculationsTest", () => {
     const eq = (actual: Temporal.ZonedDateTime, expected: Temporal.ZonedDateTime) =>
       expect(actual.epochNanoseconds).toBe(expected.epochNanoseconds);
 
-    const midnight = at(0); // 2005-10-30 00:00:00 -0400
-    const oneAm1 = at(1); // 2005-10-30 01:00:00 -0400
-    const oneAm2 = at(2).subtract({ seconds: 3600 }); // 2005-10-30 01:00:00 -0500
-    const twoAm = at(2); // 2005-10-30 02:00:00 -0500
+    const midnight = at(0);
+    const oneAm1 = at(1);
+    const oneAm2 = at(2).subtract({ seconds: 3600 });
+    const twoAm = at(2);
     expect(Temporal.ZonedDateTime.compare(oneAm1, oneAm2)).toBe(-1);
 
     eq(change(midnight, { hour: 1 }), oneAm1);
@@ -223,15 +219,13 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("advance leap day plus one year", () => {
-    // Feb 29 + 1 year = Feb 28
     expect(advance(d(2004, 2, 29, 15, 15, 10), { years: 1 })).toEqual(i(2005, 2, 28, 15, 15, 10));
   });
 
   it("next_week", () => {
-    // A Monday (2023-01-09) -> next monday = 2023-01-16
     const monday = d(2023, 1, 9);
     const result = asDate(nextWeek(monday, "monday"));
-    expect(result.getDay()).toBe(1); // Monday
+    expect(result.getDay()).toBe(1);
     expect(result > monday).toBe(true);
   });
 
@@ -269,7 +263,6 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("next_occurring", () => {
-    // Monday 2023-01-09, next friday
     const monday = d(2023, 1, 9);
     const result = asDate(nextOccurring(monday, "friday"));
     expect(result.getDay()).toBe(5);
@@ -284,14 +277,14 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("on_weekday", () => {
-    expect(onWeekday(d(2023, 1, 9))).toBe(true); // Monday
-    expect(onWeekday(d(2023, 1, 7))).toBe(false); // Saturday
-    expect(onWeekday(d(2023, 1, 8))).toBe(false); // Sunday
+    expect(onWeekday(d(2023, 1, 9))).toBe(true);
+    expect(onWeekday(d(2023, 1, 7))).toBe(false);
+    expect(onWeekday(d(2023, 1, 8))).toBe(false);
   });
 
   it("on_weekend", () => {
-    expect(onWeekend(d(2023, 1, 7))).toBe(true); // Saturday
-    expect(onWeekend(d(2023, 1, 9))).toBe(false); // Monday
+    expect(onWeekend(d(2023, 1, 7))).toBe(true);
+    expect(onWeekend(d(2023, 1, 9))).toBe(false);
   });
 
   it("is_today, is_tomorrow, is_yesterday", () => {
@@ -345,9 +338,9 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("all_week", () => {
-    const { start, end } = allWeek(d(2023, 1, 11)); // Wednesday
-    expect(asDate(start).getDay()).toBe(1); // Monday
-    expect(asDate(end).getDay()).toBe(0); // Sunday
+    const { start, end } = allWeek(d(2023, 1, 11));
+    expect(asDate(start).getDay()).toBe(1);
+    expect(asDate(end).getDay()).toBe(0);
   });
 
   it("all_month", () => {
@@ -359,7 +352,7 @@ describe("TimeExtCalculationsTest", () => {
   it("all_quarter", () => {
     const { start, end } = allQuarter(d(2023, 5, 15));
     expect(start).toEqual(i(2023, 4, 1, 0, 0, 0));
-    expect(asDate(end).getMonth()).toBe(5); // June (0-indexed)
+    expect(asDate(end).getMonth()).toBe(5);
   });
 
   it("all_year", () => {
@@ -369,20 +362,20 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("sec fraction", () => {
-    const t = d(2005, 2, 4, 10, 10, 10, 500); // 500ms
+    const t = d(2005, 2, 4, 10, 10, 10, 500);
     expect(secFraction(t)).toBeCloseTo(0.5, 2);
   });
 
   it("floor", () => {
     const t = new Date(2005, 1, 4, 10, 10, 10, 500);
-    const result = asDate(floor(t, 1000)); // floor to nearest second
+    const result = asDate(floor(t, 1000));
     expect(result.getMilliseconds()).toBe(0);
     expect(result.getSeconds()).toBe(10);
   });
 
   it("ceil", () => {
     const t = new Date(2005, 1, 4, 10, 10, 10, 1);
-    const result = asDate(ceil(t, 1000)); // ceil to nearest second
+    const result = asDate(ceil(t, 1000));
     expect(result.getMilliseconds()).toBe(0);
     expect(result.getSeconds()).toBe(11);
   });
@@ -418,9 +411,9 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("last week", () => {
-    const t = d(2005, 2, 4, 10, 10, 10); // Friday
+    const t = d(2005, 2, 4, 10, 10, 10);
     const result = asDate(lastWeek(t, "monday"));
-    expect(result.getDay()).toBe(1); // Monday
+    expect(result.getDay()).toBe(1);
     expect(result < t).toBe(true);
   });
 
@@ -451,7 +444,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("days in month with year", () => {
-    expect(daysInMonth(2, 2004)).toBe(29); // leap year
+    expect(daysInMonth(2, 2004)).toBe(29);
     expect(daysInMonth(2, 2005)).toBe(28);
     expect(daysInMonth(1, 2005)).toBe(31);
   });
@@ -512,7 +505,7 @@ describe("TimeExtCalculationsTest", () => {
     const t = d(2005, 2, 22, 15, 15, 10);
     const result = asDate(change(t, { year: 2006, month: 6, day: 1 }));
     expect(result.getFullYear()).toBe(2006);
-    expect(result.getMonth()).toBe(5); // June
+    expect(result.getMonth()).toBe(5);
     expect(result.getDate()).toBe(1);
     expect(result.getHours()).toBe(15);
   });
@@ -634,15 +627,13 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("last quarter on 31st", () => {
-    // July 31 -> last quarter = Q1 start = January 1
     const t = d(2005, 7, 31, 10, 10, 10);
     const quarterStart = beginningOfQuarter(t);
     const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
-    expect(lastQuarterStart.getMonth()).toBe(3); // April
+    expect(lastQuarterStart.getMonth()).toBe(3);
   });
 
   it("fp inaccuracy ticket 1836", () => {
-    // Test that floating point arithmetic doesn't cause issues
     const t = d(2005, 2, 22, 10, 10, 10);
     const result = advance(t, { seconds: 0.1 });
     expect(result).toBeInstanceOf(Temporal.Instant);
@@ -671,23 +662,20 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("beginning_of_week", () => {
-    // Wednesday 2023-01-11 -> Monday 2023-01-09
     const result = asDate(beginningOfWeek(d(2023, 1, 11)));
-    expect(result.getDay()).toBe(1); // Monday
+    expect(result.getDay()).toBe(1);
     expect(result.getDate()).toBe(9);
   });
 
   it("beginning_of_week with sunday start", () => {
-    // Wednesday 2023-01-11 -> Sunday 2023-01-08
     const result = asDate(beginningOfWeek(d(2023, 1, 11), "sunday"));
-    expect(result.getDay()).toBe(0); // Sunday
+    expect(result.getDay()).toBe(0);
     expect(result.getDate()).toBe(8);
   });
 
   it("end_of_week", () => {
-    // Wednesday 2023-01-11 -> Sunday 2023-01-15
     const result = asDate(endOfWeek(d(2023, 1, 11)));
-    expect(result.getDay()).toBe(0); // Sunday
+    expect(result.getDay()).toBe(0);
     expect(result.getDate()).toBe(15);
   });
 
@@ -698,7 +686,7 @@ describe("DateExtCalculationsTest", () => {
   it("end_of_month", () => {
     const result = asDate(endOfMonth(d(2005, 2, 15)));
     expect(result.getDate()).toBe(28);
-    expect(result.getMonth()).toBe(1); // February
+    expect(result.getMonth()).toBe(1);
   });
 
   it("beginning_of_quarter", () => {
@@ -710,11 +698,11 @@ describe("DateExtCalculationsTest", () => {
 
   it("end_of_quarter", () => {
     const q1End = asDate(endOfQuarter(d(2005, 2, 15)));
-    expect(q1End.getMonth()).toBe(2); // March
+    expect(q1End.getMonth()).toBe(2);
     expect(q1End.getDate()).toBe(31);
 
     const q2End = asDate(endOfQuarter(d(2005, 5, 15)));
-    expect(q2End.getMonth()).toBe(5); // June
+    expect(q2End.getMonth()).toBe(5);
     expect(q2End.getDate()).toBe(30);
   });
 
@@ -727,12 +715,10 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("advance date with months overflow", () => {
-    // Jan 31 + 1 month = Feb 28
     expect(advance(d(2005, 1, 31), { months: 1 })).toEqual(i(2005, 2, 28));
   });
 
   it("next_week various days", () => {
-    // 2023-01-09 (Monday)
     const mon = d(2023, 1, 9);
     expect(asDate(nextWeek(mon, "wednesday")).getDay()).toBe(3);
     expect(asDate(nextWeek(mon, "friday")).getDay()).toBe(5);
@@ -776,7 +762,7 @@ describe("DateExtCalculationsTest", () => {
     const date = d(2005, 2, 21);
     const result = asDate(change(date, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
-    expect(result.getMonth()).toBe(1); // February
+    expect(result.getMonth()).toBe(1);
     expect(result.getDate()).toBe(21);
   });
 
@@ -788,12 +774,10 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("advance does first years and then days", () => {
-    // 2012 is a leap year (Feb 29), advance by 1 year -> 2013 (no Feb 29, so Feb 28)
     expect(advance(d(2012, 2, 29), { years: 1 })).toEqual(i(2013, 2, 28));
   });
 
   it("advance does first months and then days", () => {
-    // Jan 29 + 1 month = Feb 28 (non-leap)
     expect(advance(d(2005, 1, 29), { months: 1 })).toEqual(i(2005, 2, 28));
   });
 
@@ -810,17 +794,15 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("last quarter on 31st", () => {
-    // Oct 31 -> current quarter start = October 1
     const dt = d(2005, 10, 31);
     const quarterStart = beginningOfQuarter(dt);
-    // last quarter = go back 3 months from current quarter start
     const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
-    expect(lastQuarterStart.getMonth()).toBe(6); // July
+    expect(lastQuarterStart.getMonth()).toBe(6);
     expect(lastQuarterStart.getDate()).toBe(1);
   });
 
   it("to fs with single digit day", () => {
-    const date = d(2005, 2, 1); // Feb 1
+    const date = d(2005, 2, 1);
     const result = toFs(date);
     expect(result).toContain("2005");
   });
@@ -841,13 +823,13 @@ describe("DateExtCalculationsTest", () => {
 
   it("since", () => {
     const date = d(2005, 2, 21);
-    const result = asDate(since(date, 3600)); // 1 hour
+    const result = asDate(since(date, 3600));
     expect(result.getHours()).toBe(1);
   });
 
   it("since when zone is set", () => {
     const date = d(2005, 2, 21, 12, 0, 0);
-    const result = asDate(since(date, 1800)); // 30 min
+    const result = asDate(since(date, 1800));
     expect(result.getMinutes()).toBe(30);
   });
 
@@ -923,32 +905,32 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("all week", () => {
-    const date = d(2005, 2, 21); // Monday
+    const date = d(2005, 2, 21);
     const { start, end } = allWeek(date);
-    expect(asDate(start).getDay()).toBe(1); // Monday
-    expect(asDate(end).getDay()).toBe(0); // Sunday
+    expect(asDate(start).getDay()).toBe(1);
+    expect(asDate(end).getDay()).toBe(0);
   });
 
   it("all month", () => {
     const date = d(2005, 2, 15);
     const { start, end } = allMonth(date);
     expect(asDate(start).getDate()).toBe(1);
-    expect(asDate(start).getMonth()).toBe(1); // February
+    expect(asDate(start).getMonth()).toBe(1);
     expect(asDate(end).getDate()).toBe(28);
   });
 
   it("all quarter", () => {
-    const date = d(2005, 2, 15); // Q1
+    const date = d(2005, 2, 15);
     const { start, end } = allQuarter(date);
-    expect(asDate(start).getMonth()).toBe(0); // January
-    expect(asDate(end).getMonth()).toBe(2); // March
+    expect(asDate(start).getMonth()).toBe(0);
+    expect(asDate(end).getMonth()).toBe(2);
   });
 
   it("all year", () => {
     const date = d(2005, 6, 15);
     const { start, end } = allYear(date);
-    expect(asDate(start).getMonth()).toBe(0); // January
-    expect(asDate(end).getMonth()).toBe(11); // December
+    expect(asDate(start).getMonth()).toBe(0);
+    expect(asDate(end).getMonth()).toBe(11);
   });
 
   it("xmlschema", () => {
@@ -1041,14 +1023,14 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("next_occurring from datetime", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10); // Tuesday
+    const dt = d(2005, 2, 22, 10, 10, 10);
     const result = asDate(nextOccurring(dt, "friday"));
     expect(result.getDay()).toBe(5);
     expect(result > dt).toBe(true);
   });
 
   it("prev_occurring from datetime", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10); // Tuesday
+    const dt = d(2005, 2, 22, 10, 10, 10);
     const result = asDate(prevOccurring(dt, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
@@ -1065,9 +1047,9 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("beginning_of_week from datetime", () => {
-    const dt = d(2005, 2, 4, 10, 10, 10); // Friday
+    const dt = d(2005, 2, 4, 10, 10, 10);
     const result = asDate(beginningOfWeek(dt));
-    expect(result.getDay()).toBe(1); // Monday
+    expect(result.getDay()).toBe(1);
     expect(result.getHours()).toBe(0);
   });
 
@@ -1080,20 +1062,20 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("on_weekday from datetime", () => {
-    expect(onWeekday(d(2023, 1, 9))).toBe(true); // Monday
-    expect(onWeekday(d(2023, 1, 7))).toBe(false); // Saturday
+    expect(onWeekday(d(2023, 1, 9))).toBe(true);
+    expect(onWeekday(d(2023, 1, 7))).toBe(false);
   });
 
   it("on_weekend from datetime", () => {
-    expect(onWeekend(d(2023, 1, 8))).toBe(true); // Sunday
-    expect(onWeekend(d(2023, 1, 9))).toBe(false); // Monday
+    expect(onWeekend(d(2023, 1, 8))).toBe(true);
+    expect(onWeekend(d(2023, 1, 9))).toBe(false);
   });
 
   it("changeDate preserves time components", () => {
     const dt = d(2005, 2, 22, 15, 15, 10);
     const result = asDate(change(dt, { year: 2006 }));
     expect(result.getFullYear()).toBe(2006);
-    expect(result.getMonth()).toBe(1); // February
+    expect(result.getMonth()).toBe(1);
     expect(result.getDate()).toBe(22);
   });
 
@@ -1101,14 +1083,14 @@ describe("DateTimeExtCalculationsTest", () => {
     const dt = d(2005, 2, 28, 10, 10, 10);
     const result = asDate(nextDay(dt));
     expect(result.getDate()).toBe(1);
-    expect(result.getMonth()).toBe(2); // March
+    expect(result.getMonth()).toBe(2);
   });
 
   it("prev_day from datetime", () => {
     const dt = d(2005, 3, 1, 10, 10, 10);
     const result = asDate(prevDay(dt));
     expect(result.getDate()).toBe(28);
-    expect(result.getMonth()).toBe(1); // February
+    expect(result.getMonth()).toBe(1);
   });
 
   it("to fs", () => {
@@ -1183,8 +1165,8 @@ describe("DateTimeExtCalculationsTest", () => {
   it("advanced processes first the date deltas and then the time deltas", () => {
     const dt = d(2005, 2, 28, 15, 15, 10);
     const result = asDate(advance(dt, { months: 1, days: 1 }));
-    expect(result.getMonth()).toBe(2); // March (0-indexed)
-    expect(result.getDate()).toBe(29); // Last day of Feb + 1 day in March
+    expect(result.getMonth()).toBe(2);
+    expect(result.getDate()).toBe(29);
   });
 
   it("last week", () => {
@@ -1195,18 +1177,17 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("date time should have correct last week for leap year", () => {
-    const dt = d(2016, 3, 7); // March 7, 2016 (leap year)
+    const dt = d(2016, 3, 7);
     const result = asDate(lastWeek(dt, "monday"));
     expect(result.getDay()).toBe(1);
     expect(result < dt).toBe(true);
   });
 
   it("last quarter on 31st", () => {
-    // Oct 31 -> last quarter start = July 1
     const dt = d(2005, 10, 31, 10, 10, 10);
     const quarterStart = beginningOfQuarter(dt);
     const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
-    expect(lastQuarterStart.getMonth()).toBe(6); // July
+    expect(lastQuarterStart.getMonth()).toBe(6);
   });
 
   it("xmlschema", () => {
@@ -1333,14 +1314,12 @@ describe("DateTimeExtCalculationsTest", () => {
 
   it("localtime", () => {
     const dt = new Date("2005-02-22T10:10:10Z");
-    // localtime = local representation
     expect(dt instanceof Date).toBe(true);
     expect(dt.getTime()).toBeGreaterThan(0);
   });
 
   it("getlocal", () => {
     const dt = new Date("2005-02-22T10:10:10Z");
-    // getlocal is same as localtime in TS
     expect(dt.getFullYear()).toBeGreaterThan(2004);
   });
 
@@ -1373,13 +1352,11 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("blank?", () => {
-    // In TS, a Date object is never blank
     expect(new Date() instanceof Date).toBe(true);
   });
 
   it("utc?", () => {
     const dt = new Date("2005-02-22T10:10:10Z");
-    // Check if timezone offset is 0
     const isUtc = dt.getTimezoneOffset() === 0;
     expect(typeof isUtc).toBe("boolean");
   });

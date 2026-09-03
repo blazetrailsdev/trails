@@ -1,22 +1,3 @@
-/**
- * ActionDispatch deprecator + RequestCookieMethods re-exports.
- *
- * Mirrors Rails `actionpack/lib/action_dispatch/deprecator.rb`:
- *
- *     module ActionDispatch
- *       def self.deprecator
- *         @deprecator ||= ActiveSupport::Deprecation.new
- *       end
- *     end
- *
- * `RequestCookieMethods` instance methods are included into the
- * `ActionDispatch` module at load time (via the `on_load` block in
- * `middleware/cookies.rb`), so the Ruby-API extractor attributes them
- * to the file where `module ActionDispatch` is first opened
- * (`deprecator.rb`). Re-exporting them here keeps parity:api matching
- * the Rails surface without duplicating the implementations.
- */
-
 import { Deprecation } from "@blazetrails/activesupport";
 import * as _cookies from "./middleware/cookies.js";
 
@@ -24,10 +5,6 @@ export { Deprecation as Deprecator };
 
 let _deprecator: Deprecation | undefined;
 
-/**
- * Lazily-initialized Deprecation instance for the ActionDispatch
- * namespace. Mirrors Rails `ActionDispatch.deprecator`.
- */
 export function deprecator(): Deprecation {
   if (!_deprecator) _deprecator = new Deprecation();
   return _deprecator;

@@ -92,12 +92,8 @@ describe("ActionPackAssertionsControllerTest", () => {
     tc = new TestCase(ActionPackAssertionsController);
   });
 
-  it.skip("render file absolute path", () => {
-    /* depends on filesystem template rendering */
-  });
-  it.skip("render file relative path", () => {
-    /* depends on filesystem template rendering */
-  });
+  it.skip("render file absolute path", () => {});
+  it.skip("render file relative path", () => {});
 
   it("get request", async () => {
     await expect(tc.get("raiseExceptionOnGet")).rejects.toThrow("get");
@@ -122,27 +118,13 @@ describe("ActionPackAssertionsControllerTest", () => {
     expect(tc.responseBody).toContain("GET");
   });
 
-  it.skip("string constraint", () => {
-    /* depends on with_routing / routing DSL */
-  });
-  it.skip("with routing works with api only controllers", () => {
-    /* depends on with_routing */
-  });
-  it.skip("assert redirect to named route failure", () => {
-    /* depends on with_routing / named routes */
-  });
-  it.skip("assert redirect to nested named route", () => {
-    /* depends on with_routing / named routes */
-  });
-  it.skip("assert redirected to top level named route from nested controller", () => {
-    /* depends on with_routing */
-  });
-  it.skip("assert redirected to top level named route with same controller name in both namespaces", () => {
-    /* depends on with_routing */
-  });
-  it.skip("assert redirect failure message with protocol relative url", () => {
-    /* depends on with_routing */
-  });
+  it.skip("string constraint", () => {});
+  it.skip("with routing works with api only controllers", () => {});
+  it.skip("assert redirect to named route failure", () => {});
+  it.skip("assert redirect to nested named route", () => {});
+  it.skip("assert redirected to top level named route from nested controller", () => {});
+  it.skip("assert redirected to top level named route with same controller name in both namespaces", () => {});
+  it.skip("assert redirect failure message with protocol relative url", () => {});
 
   it("template objects exist", async () => {
     await tc.get("assignThis");
@@ -278,9 +260,7 @@ describe("ActionPackAssertionsControllerTest", () => {
     expect(tc.response.redirectUrl).toContain("elsewhere");
   });
 
-  it.skip("assert redirection with custom message", () => {
-    /* depends on assertRedirectedTo custom message parameter */
-  });
+  it.skip("assert redirection with custom message", () => {});
 
   it("assert redirection with status", async () => {
     await tc.get("redirectToPath");
@@ -291,9 +271,7 @@ describe("ActionPackAssertionsControllerTest", () => {
     tc.assertRedirectedTo("http://test.host/some/path");
   });
 
-  it.skip("redirected to with nested controller", () => {
-    /* depends on namespaced controller routing */
-  });
+  it.skip("redirected to with nested controller", () => {});
 
   it("assert response uses exception message", async () => {
     const tc2 = new TestCase(AssertResponseWithUnexpectedErrorController);
@@ -314,15 +292,9 @@ describe("ActionPackHeaderTest", () => {
     tc = new TestCase(ActionPackAssertionsController);
   });
 
-  it.skip("rendering xml sets content type", () => {
-    /* depends on XML template rendering */
-  });
-  it.skip("rendering xml respects content type", () => {
-    /* depends on XML template rendering */
-  });
-  it.skip("rendering xml respects content type when set in the header", () => {
-    /* depends on XML template rendering */
-  });
+  it.skip("rendering xml sets content type", () => {});
+  it.skip("rendering xml respects content type", () => {});
+  it.skip("rendering xml respects content type when set in the header", () => {});
 
   it("render text with custom content type", async () => {
     await tc.get("renderTextWithCustomContentType");

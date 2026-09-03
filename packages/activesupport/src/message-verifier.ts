@@ -37,18 +37,12 @@ export class MessageVerifier extends Codec {
 
   declare rotate: (...args: unknown[]) => this;
   declare onRotation: (callback: OnRotation) => this;
-  /** Ruby's `fall_back_to(fallback)` takes any verifier, not one of the
-   * receiver's own class (`messages/rotator.rb:23-26`); a `this`-typed
-   * parameter would make a subclass — `GlobalID::Verifier` — unassignable to
-   * `MessageVerifier`. */
   declare fallBackTo: (fallback: MessageVerifier) => this;
 
   private secret: string | Buffer;
   private digest: string;
 
   constructor(secret: string | Buffer, options: MessageVerifierOptions = {}) {
-    // Ruby's `unless secret` rejects only nil and false; an empty secret is
-    // truthy there, so this must not be a plain JS falsiness check.
     if (secret == null) throw new ArgumentError("Secret should not be nil.");
     super({
       serializer: options.serializer,
@@ -132,12 +126,7 @@ export class MessageVerifier extends Codec {
     }
   }
 
-  /**
-   * @missingRailsCall hexdigest — PERMANENT: Rails calls `OpenSSL::HMAC.hexdigest`; trails
-   *   routes every HMAC through the crypto adapter
-   *   (`createHmac(...).digest("hex")`), which is the same digest by a different
-   *   call.
-   */
+  /** @missingRailsCall hexdigest — PERMANENT */
   private generateDigest(data: string): string {
     return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
   }

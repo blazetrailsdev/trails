@@ -1,10 +1,6 @@
 import type { Node } from "./nodes/node.js";
 import { escapePath, escapeSegment } from "./router/utils.js";
 
-// ==========================================================================
-// Format — path-evaluation tree built by FormatBuilder
-// ==========================================================================
-
 type Escaper = (value: string) => string;
 const ESCAPE_PATH: Escaper = (value) => escapePath(value);
 const ESCAPE_SEGMENT: Escaper = (value) => escapeSegment(value);
@@ -15,7 +11,6 @@ export class Parameter {
     readonly escaper: Escaper,
   ) {}
 
-  /** Rails coerces with `.to_s` before escaping; mirror that here. */
   escape(value: unknown): string {
     return this.escaper(globalThis.String(value));
   }
@@ -51,9 +46,6 @@ export class Format {
 
     for (const index of this._parameters) {
       const param = parts[index] as Parameter;
-      // Guard against prototype pollution: only treat own properties as supplied
-      // parameters. Without this, `toString`/`constructor` from Object.prototype
-      // would satisfy a required-parameter check.
       const value = Object.hasOwn(hash, param.name) ? hash[param.name] : undefined;
       if (value == null) return "";
       parts[index] = param.escape(value);
@@ -67,17 +59,6 @@ export class Format {
   }
 }
 
-// ==========================================================================
-// Visitor base classes
-// ==========================================================================
-
-/**
- * Stateful tree-walking visitor. Subclasses override `visit_<TYPE>` (camelCase
- * `visit<TYPE>`) or the catch-alls `binary`/`nary`/`unary`/`terminal`.
- *
- * Rails uses a `DISPATCH_CACHE` populated by reflection; we use a static
- * dispatch table for the same effect with explicit registration.
- */
 export class Visitor {
   accept(node: Node): unknown {
     return this.visit(node);
@@ -162,9 +143,6 @@ export class Visitor {
   }
 }
 
-/**
- * Seeded variant. Each visit takes and returns an accumulator.
- */
 export class FunctionalVisitor<S = unknown> {
   accept(node: Node, seed: S): S {
     return this.visit(node, seed);
@@ -236,13 +214,6 @@ export class FunctionalVisitor<S = unknown> {
   }
 }
 
-// ==========================================================================
-// Concrete visitors
-// ==========================================================================
-
-/**
- * Builds a Format tree (per-segment path-eval plan) from an AST.
- */
 export class FormatBuilder extends Visitor {
   override accept(node: Node): Format {
     return new Format(super.accept(node) as FormatPart[]);
@@ -279,9 +250,6 @@ export class FormatBuilder extends Visitor {
   }
 }
 
-/**
- * Walk every node, invoking `block` once per node (pre-order).
- */
 export class Each extends FunctionalVisitor<(node: Node) => void> {
   static readonly INSTANCE = new Each();
 
@@ -291,9 +259,6 @@ export class Each extends FunctionalVisitor<(node: Node) => void> {
   }
 }
 
-/**
- * Serialize an AST back to its source string form.
- */
 export class String extends FunctionalVisitor<string> {
   static readonly INSTANCE = new String();
 
@@ -323,9 +288,6 @@ export class String extends FunctionalVisitor<string> {
   }
 }
 
-/**
- * Render an AST as a Graphviz `dot` parse-tree diagram.
- */
 type DotSeed = [nodes: string[], edges: string[]];
 
 let __dotIdCounter = 1;
@@ -348,7 +310,6 @@ export class Dot extends FunctionalVisitor<DotSeed> {
     return [nodes, edges];
   }
 
-  /** Render an AST to a dot-graph string. */
   render(node: Node): string {
     const [nodes, edges] = this.accept(node);
     return `  digraph parse_tree {

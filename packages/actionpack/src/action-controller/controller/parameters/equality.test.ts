@@ -31,7 +31,6 @@ describe("ParametersAccessorsTest", () => {
 
   it("has_value? converts hashes to parameters", () => {
     const params = new Parameters({ a: { nested: "value" } });
-    // After accessing, the internal hash should be converted
     params.get("a");
     expect(params.hasValue(params.get("a"))).toBe(true);
   });

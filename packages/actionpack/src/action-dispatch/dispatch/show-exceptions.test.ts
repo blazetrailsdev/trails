@@ -35,9 +35,6 @@ function buildApp(
   return new ShowExceptions((env: RackEnv) => new Boomer().call(env), exceptionsApp);
 }
 
-// ==========================================================================
-// dispatch/show_exceptions_test.rb
-// ==========================================================================
 describe("ShowExceptionsTest", () => {
   it("skip exceptions app if not showing exceptions", async () => {
     const app = buildApp();

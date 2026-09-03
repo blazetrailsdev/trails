@@ -1,6 +1,3 @@
-// Mirrors railties/test/application/initializers/finisher_test.rb.
-// The ported subset of finisher initializers is exercised against a
-// mock host so we don't need the full Application shell (PR 2.5).
 import { afterEach, describe, it, expect } from "vitest";
 import {
   Finisher,

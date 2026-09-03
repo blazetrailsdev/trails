@@ -3,10 +3,6 @@ import { SafeBuffer, htmlSafe } from "@blazetrails/activesupport";
 import { capture, type CaptureHelperHost } from "./capture-helper.js";
 import { cdataSection, contentTag } from "./tag-helper.js";
 
-/**
- * ActionView::Helpers::JavaScriptHelper
- */
-
 export const JS_ESCAPE_MAP: Record<string, string> = {
   "\\": "\\\\",
   "</": "<\\/",
@@ -23,10 +19,6 @@ export const JS_ESCAPE_MAP: Record<string, string> = {
 
 const JS_ESCAPE_PATTERN = /(\\|<\/|\r\n|\u2028|\u2029|[\n\r"']|[`]|[$])/g;
 
-/**
- * Escapes carriage returns and single and double quotes for JavaScript
- * segments. Also available through the alias {@link j}.
- */
 export function escapeJavascript(javascript: unknown): string | SafeBuffer {
   const str = javascript == null ? "" : String(javascript);
   const result =
@@ -42,12 +34,6 @@ export function javascriptCdataSection(content: unknown): SafeBuffer {
   return htmlSafe(`\n//${cdataSection(`\n${String(content ?? "")}\n//`).toString()}\n`);
 }
 
-/**
- * Returns a JavaScript `<script>` tag wrapping `content` in a CDATA section.
- * Mirrors `ActionView::Helpers::JavaScriptHelper#javascript_tag`. Pass a
- * block (with optional leading `htmlOptions`) to capture from the output
- * buffer instead.
- */
 export function javascriptTag(
   this: CaptureHelperHost | void,
   contentOrOptionsWithBlock?: unknown,

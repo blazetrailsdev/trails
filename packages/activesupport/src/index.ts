@@ -2,10 +2,6 @@ export { NameError } from "./core-ext/name-error.js";
 export { FileUpdateChecker } from "./file-update-checker.js";
 
 export { trailsRoot, setTrailsRoot } from "./trails-root.js";
-// Note: glob is intentionally kept as a subpath import
-// (`@blazetrails/activesupport/glob`) so browser bundles that don't need
-// it don't pull tinyglobby's Node-only transitive deps. Mirrors the
-// pattern used by message-verifier, digest, etc.
 
 export {
   registerAsyncContextAdapter,
@@ -56,27 +52,7 @@ import { httpAdapterConfig } from "./http-adapter.js";
 import { osAdapterConfig } from "./os-adapter.js";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
 
-/**
- * ActiveSupport configuration — mirrors Rails' ActiveSupport module.
- *
- * In Node, "node" adapters auto-register at module load. The adapter
- * property is null by default (meaning "use auto-detected default").
- * Set explicitly to override:
- *
- *   // Browser:
- *   registerFsAdapter("vfs", vfsImpl, pathImpl);
- *   ActiveSupport.fsAdapter = "vfs";
- *
- *   registerCryptoAdapter("webcrypto", webCryptoImpl);
- *   ActiveSupport.cryptoAdapter = "webcrypto";
- */
 export const ActiveSupport = {
-  /**
-   * Rails: `@error_reporter = ActiveSupport::ErrorReporter.new` plus
-   * `singleton_class.attr_accessor :error_reporter`
-   * (activesupport/lib/active_support.rb:104-105) — always a reporter, never
-   * nil, so `ActiveSupport.error_reporter.report(...)` call sites need no guard.
-   */
   get errorReporter(): ErrorReporter {
     return currentErrorReporter;
   },
@@ -126,9 +102,6 @@ export const ActiveSupport = {
     osAdapterConfig.adapter = name;
   },
 
-  // processAdapter is read-only — there is only one process the program
-  // runs in, and the live `env`/`argv` exports require a single source
-  // of truth. To switch implementations, call `registerProcessAdapter()`.
   get processAdapter(): string | null {
     return processAdapterConfig.adapter;
   },
@@ -233,9 +206,6 @@ export {
   toQuery,
   isPlainObject,
   compact,
-  // `compactBlank` is Hash#compact_blank (core_ext/enumerable.rb:222-224);
-  // the barrel already exports Enumerable#compact_blank under the bare name
-  // from enumerable-utils.ts, and one ESM namespace cannot hold both.
   compactBlank as compactBlankObj,
   compactBlankBang,
   valuesAt,
@@ -262,8 +232,6 @@ export {
   min,
   selectBang,
   toSentence,
-  // `toXml` is Hash#to_xml above; one ESM namespace cannot hold both, the same
-  // collision `compactBlank as compactBlankObj` resolves.
   toXml as toXmlArray,
 } from "./array-utils.js";
 
@@ -306,14 +274,6 @@ export {
   uuidV4,
   uuidV5,
 } from "./core-ext/digest/uuid.js";
-
-// Note: `Hash#extract!` is intentionally kept off this flat index and reached
-// through the "./core-ext/hash/slice" subpath, which mirrors its Rails require
-// path (`active_support/core_ext/hash/slice`). `Hash#extract!`
-// (core_ext/hash/slice.rb:24-26) and `Array#extract!` (core_ext/array/extract.rb)
-// are distinct Ruby methods on distinct receivers, so they never collide there;
-// in a flat ESM namespace they do, and array-utils' `extractBang` owns the
-// spelling here. Same shape as the core-ext/range and core-ext/date notes above.
 
 export { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 
@@ -392,7 +352,6 @@ export { LogSubscriber } from "./log-subscriber.js";
 export { MemoryStore } from "./cache/memory-store.js";
 export { DupCoder } from "./cache/memory-store.js";
 export { NullStore } from "./cache/null-store.js";
-// FileStore reaches the filesystem through `File` / `Dir` but is kept as a subpath import for tree-shaking
 export type { CacheOptions, CacheStore } from "./cache/index.js";
 
 export { Deprecation, DeprecationException, DEFAULT_BEHAVIORS } from "./deprecation.js";
@@ -417,29 +376,11 @@ export {
 } from "./testing/deprecation.js";
 
 export * from "./time-ext.js";
-// `core_ext/time/calculations.rb` is a reopening, so what it publishes is the
-// methods it lands on `Time`; its names are reached through the subpath
-// `@blazetrails/activesupport/core-ext/time/calculations`, as core-ext/date's
-// calculations are and for the same collision reason documented below.
 import "./core-ext/time/calculations.js";
 export * from "./core-ext/time/conversions.js";
-// Two Ruby methods, one TS spelling: the class-side parser `Time.rfc3339(str)`
-// (`core_ext/time/calculations.rb:69-83`) lives in `time-ext.js`, and the
-// instance-side alias `Time#rfc3339` (`core_ext/time/conversions.rb:74`, an
-// `alias_method` of `xmlschema`) lives in `core-ext/time/conversions.js`. In
-// Ruby they never collide; in a flat ESM namespace the two star exports make
-// the name ambiguous and ESM drops it silently, taking `Time.rfc3339` down
-// too. The explicit re-export below pins the class-side one, and the
-// instance-side alias is reached through the subpath
-// `@blazetrails/activesupport/core-ext/time/conversions` -- the same shape the
-// comment below documents for core-ext/range's and core-ext/date's
-// conversions.
 export { rfc3339 } from "./time-ext.js";
 export * from "./core-ext/time/compatibility.js";
 export * from "./core-ext/string/zones.js";
-// MessageEncryptor/MessageVerifier use getCrypto() adapter but are kept as subpath imports:
-//   import { MessageVerifier } from "@blazetrails/activesupport/message-verifier"
-//   import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor"
 
 export { Duration, seconds, minutes, hours, days, weeks, months, years } from "./duration.js";
 export type { DurationParts } from "./duration.js";
@@ -502,7 +443,6 @@ export {
   xmlNameEscape,
 } from "./core-ext/tse/util.js";
 export { HtmlSafeTranslation } from "./html-safe-translation.js";
-// KeyGenerator uses getCrypto() adapter — import from "@blazetrails/activesupport/key-generator"
 export { BacktraceCleaner } from "./backtrace-cleaner.js";
 export { OrderedHash } from "./ordered-hash.js";
 export { ErrorReporter } from "./error-reporter.js";
@@ -560,18 +500,12 @@ export { OptionMerger } from "./option-merger.js";
 export { ArrayInquirer, inquiry as arrayInquiry } from "./array-inquirer.js";
 export { tryCall, tryWith, tryBang } from "./try.js";
 export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
-// Digest/SecurityUtils/ConfigurationFile use adapter pattern — kept as subpath imports:
-//   import { Digest } from "@blazetrails/activesupport/digest"
-//   import { SecurityUtils } from "@blazetrails/activesupport/security-utils"
-//   import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file"
-// Thin wrapper exported from the main index for consumers that can't use subpath imports.
 export { hexdigest } from "./hexdigest.js";
 export { WeakSet as DescendantsTrackerWeakSet } from "./descendants-tracker.js";
 export { ActionableError, NonActionable } from "./actionable-error.js";
 export { NullLock } from "./concurrency/null-lock.js";
 export { synchronize, Monitor, type MonitorMixin } from "./concurrency/monitor.js";
 export { LoadInterlockAwareMonitor } from "./concurrency/load-interlock-aware-monitor.js";
-// Gzip requires node:zlib — import from "@blazetrails/activesupport/gzip"
 export { DescendantsTracker } from "./descendants-tracker.js";
 export { Configurable, Configuration } from "./configurable.js";
 export {
@@ -664,33 +598,6 @@ export { rbEqual } from "@blazetrails/ruby-compat";
 export { rbHash } from "@blazetrails/ruby-compat";
 export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";
 export { overlap, overlaps } from "./core-ext/range/overlap.js";
-// Note: core-ext/range's conversions and each are intentionally kept as subpath
-// imports (`@blazetrails/activesupport/core-ext/range/conversions`), the way
-// Rails users reach them through `require "active_support/core_ext/range/..."`.
-// Re-exporting them here would collide with `time-ext.ts`'s `Date#to_fs` and the
-// enumerable `each`/`step`. Mirrors the pattern used by glob, digest, etc.
-//
-// Same for core-ext/date's calculations
-// (`@blazetrails/activesupport/core-ext/date/calculations`), the `Date` arm of
-// `active_support/core_ext/date/calculations.rb`: in Ruby its `ago`/`since`/
-// `beginning_of_day`/`middle_of_day`/`end_of_day`/`advance`/`change`/`current`
-// are methods on `Date`, so they never collide with the `Time` arm's
-// same-named methods; in a flat ESM namespace they would, and `time-ext.js`
-// below owns those spellings, and for core-ext/string's conversions
-// (`@blazetrails/activesupport/core-ext/string/conversions`), the `String` arm
-// of `to_time`/`to_date`/`to_datetime`.
-//
-// core-ext/date-time's calculations
-// (`@blazetrails/activesupport/core-ext/date-time/calculations`) is the same
-// case one receiver over: `DateTime.current`
-// (`active_support/core_ext/date_time/calculations.rb:10-12`) is
-// `Time.current` plus `to_datetime`, so in Ruby the two never collide and in a
-// flat ESM namespace they would.
-// Its `conversions` sibling
-// (`@blazetrails/activesupport/core-ext/date-time/conversions`) is the same
-// case again: `DateTime#usec`/`#nsec`/`#to_i`
-// (`active_support/core_ext/date_time/conversions.rb:79-96`) read the
-// receiver's own offset where the `Time` arm reads an instant.
 
 export { I18n } from "./i18n.js";
 export { Scalar } from "./duration.js";

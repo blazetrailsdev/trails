@@ -1,12 +1,5 @@
 import { SafeBuffer, htmlEscape, htmlSafe, isHtmlSafe } from "@blazetrails/activesupport";
 
-/**
- * OutputBuffer — wraps a string with `<<`-collecting semantics for ERB-style templates.
- *
- * Mirrors ActionView::OutputBuffer. Difference vs SafeBuffer: `<<` / `concat`
- * call `.toString()` on the input (so non-string values like numbers stringify
- * naturally) and skip nil/undefined values entirely.
- */
 export class OutputBuffer {
   private _raw: string;
 
@@ -30,22 +23,19 @@ export class OutputBuffer {
     return htmlSafe(this._raw);
   }
 
-  /** Returns the raw, unescaped string. Mirrors Rails `to_str`. */
   toStr(): string {
     return this._raw;
   }
 
-  /** Always true — OutputBuffer content is HTML safe. Mirrors Rails `html_safe?`. */
   get htmlSafe(): true {
     return true;
   }
 
-  /** @deprecated Use {@link htmlSafe} getter or {@link toString} instead. */
+  /** @deprecated */
   htmlSafeBuffer(): SafeBuffer {
     return this.toString();
   }
 
-  /** Append a value, escaping if not html-safe. Nil values are skipped. */
   append(value: unknown): this {
     if (value === null || value === undefined) return this;
     if (isHtmlSafe(value)) {
@@ -58,11 +48,6 @@ export class OutputBuffer {
     return this;
   }
 
-  /**
-   * Append without escaping. Mirrors Rails `safe_concat` / `safe_append=`.
-   * Unlike `safeExprAppend`, this does NOT skip nil — Rails raises TypeError
-   * on `String#<<(nil)`, so we throw to match.
-   */
   safeAppend(value: unknown): this {
     if (value === null || value === undefined) {
       throw new TypeError("no implicit conversion of nil into String");
@@ -71,29 +56,22 @@ export class OutputBuffer {
     return this;
   }
 
-  /** @deprecated Use {@link append} instead. */
+  /** @deprecated */
   concat(value: unknown): this {
     return this.append(value);
   }
 
-  /** @deprecated Use {@link safeAppend} instead. */
+  /** @deprecated */
   safeConcat(value: unknown): this {
     return this.safeAppend(value);
   }
 
-  /** Mirrors Rails `safe_expr_append=` — like safe_concat but skips nil. */
   safeExprAppend(value: unknown): this {
     if (value === null || value === undefined) return this;
     this._raw += value instanceof SafeBuffer ? value.toString() : String(value);
     return this;
   }
 
-  /**
-   * Capture — swaps the buffer for the duration of `fn`, returns what was
-   * appended as an HTML-safe string. Mirrors Rails `capture(*args, &block)`;
-   * Ruby's splat is an array because TypeScript cannot follow a rest parameter
-   * with the block.
-   */
   capture<TArgs extends unknown[]>(args: TArgs, fn: (...args: TArgs) => void): SafeBuffer {
     const saved = this._raw;
     this._raw = "";
@@ -113,21 +91,17 @@ export class OutputBuffer {
     return new RawOutputBuffer(this);
   }
 
-  /** @internal Direct access to the underlying string, used by RawOutputBuffer. */
+  /** @internal */
   get rawBuffer(): string {
     return this._raw;
   }
 
-  /** @internal Used by RawOutputBuffer to append without escaping. */
+  /** @internal */
   appendRaw(value: string): void {
     this._raw += value;
   }
 }
 
-/**
- * RawOutputBuffer — bypasses escaping when appending to an OutputBuffer.
- * Used by the template compiler for `<%== %>` raw-output expressions.
- */
 export class RawOutputBuffer {
   constructor(private readonly buffer: OutputBuffer) {}
 
@@ -137,7 +111,7 @@ export class RawOutputBuffer {
     return this;
   }
 
-  /** @deprecated Use {@link append} instead. */
+  /** @deprecated */
   concat(value: unknown): this {
     return this.append(value);
   }
@@ -147,12 +121,6 @@ export class RawOutputBuffer {
   }
 }
 
-/**
- * StreamingBuffer — buffer that streams writes through a callback instead
- * of accumulating into a string. Mirrors ActionView::StreamingBuffer; used
- * by `render stream: true` to push chunks to the response as they're
- * produced.
- */
 export class StreamingBuffer {
   private _block: (value: string) => void;
 
@@ -160,16 +128,10 @@ export class StreamingBuffer {
     this._block = block;
   }
 
-  /** The current chunk sink. Mirrors Rails `attr_reader :block`. */
   get block(): (value: string) => void {
     return this._block;
   }
 
-  /**
-   * Append a value, escaping if not html-safe. Mirrors Rails `<<` — unlike
-   * `OutputBuffer`/`RawStreamingBuffer`, nil is NOT skipped: `nil.to_s`
-   * produces `""`, which is still passed through to the block.
-   */
   append(value: unknown): this {
     const str = toRawString(value);
     const safe = isHtmlSafe(value) || value instanceof OutputBuffer;
@@ -177,30 +139,21 @@ export class StreamingBuffer {
     return this;
   }
 
-  /**
-   * Append without escaping. Mirrors Rails `safe_append=` / `safe_concat`,
-   * which is `@block.call(value.to_s)` — `nil.to_s` is `""`, so nil flows
-   * through as an empty chunk rather than the literal "null"/"undefined".
-   */
   safeAppend(value: unknown): this {
     this._block(toRawString(value));
     return this;
   }
 
-  /** @deprecated Use {@link append} instead. */
+  /** @deprecated */
   concat(value: unknown): this {
     return this.append(value);
   }
 
-  /** @deprecated Use {@link safeAppend} instead. */
+  /** @deprecated */
   safeConcat(value: unknown): this {
     return this.safeAppend(value);
   }
 
-  /**
-   * Swap the chunk sink for the duration of `fn`, returning everything it
-   * appended as an HTML-safe string. Mirrors Rails `capture`.
-   */
   capture(fn: () => void): SafeBuffer {
     let buffer = "";
     const previous = this._block;
@@ -224,11 +177,6 @@ export class StreamingBuffer {
   }
 }
 
-/**
- * RawStreamingBuffer — bypasses escaping when streaming through a
- * StreamingBuffer. Used by the template compiler for `<%== %>` in
- * streaming responses.
- */
 export class RawStreamingBuffer {
   constructor(private readonly buffer: StreamingBuffer) {}
 
@@ -238,7 +186,7 @@ export class RawStreamingBuffer {
     return this;
   }
 
-  /** @deprecated Use {@link append} instead. */
+  /** @deprecated */
   concat(value: unknown): this {
     return this.append(value);
   }
@@ -248,12 +196,6 @@ export class RawStreamingBuffer {
   }
 }
 
-/**
- * Stringify a value the way Rails `to_s` would for streaming/output
- * buffers: `nil → ""`, `SafeBuffer → underlying string`, `OutputBuffer →
- * underlying raw string` (avoids `String(outputBuffer)` throwing because
- * `OutputBuffer.toString()` returns a non-primitive `SafeBuffer`).
- */
 function toRawString(value: unknown): string {
   if (value == null) return "";
   if (value instanceof SafeBuffer) return value.toString();

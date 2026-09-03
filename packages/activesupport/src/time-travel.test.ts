@@ -9,7 +9,6 @@ import {
   setTimeOffsetNs,
 } from "./time-travel.js";
 
-/** The instant `assert_equal`'s `Time#==` compares two Times on. */
 function instantOf(time: Time): bigint {
   return time.toTime().epochNanoseconds;
 }
@@ -21,10 +20,8 @@ describe("TimeTravelTest", () => {
 
   it("time helper travel", () => {
     const before = Date.now();
-    travel(24 * 60 * 60 * 1000); // 1 day
+    travel(24 * 60 * 60 * 1000);
     const after = currentTime().getTime();
-    // travel_to floors the usec unless with_usec, so the delta lands within a
-    // second of the requested duration (time_helpers.rb:170).
     expect(after - before).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000 - 1000);
   });
 
@@ -82,7 +79,7 @@ describe("TimeTravelTest", () => {
     const target = new Date("2033-03-15T10:30:00Z");
     travelTo(target);
     expect(currentTime().getUTCFullYear()).toBe(2033);
-    expect(currentTime().getUTCMonth()).toBe(2); // March = 2
+    expect(currentTime().getUTCMonth()).toBe(2);
   });
 
   it.skip("time helper travel to with separate class");
@@ -104,11 +101,7 @@ describe("TimeTravelTest", () => {
   it("time helper travel to with nested calls with blocks", () => {
     travelTo(new Date("2035-01-01"), {}, () => {
       expect(currentTime().getUTCFullYear()).toBe(2035);
-      expect(() =>
-        travelTo(new Date("2036-01-01"), {}, () => {
-          // noop
-        }),
-      ).toThrow(
+      expect(() => travelTo(new Date("2036-01-01"), {}, () => {})).toThrow(
         /Calling `travel_to` with a block, when we have previously already made a call to `travel_to`, can lead to confusing time stubbing\./,
       );
     });
@@ -234,7 +227,7 @@ describe("TimeTravelTest", () => {
   });
 
   it("currentTimeInstant respects nanosecond time offset", () => {
-    const offsetNs = 365n * 24n * 3600n * 1_000_000_000n + 42n; // ~1 year + 42 ns
+    const offsetNs = 365n * 24n * 3600n * 1_000_000_000n + 42n;
     const before = Temporal.Now.instant().epochNanoseconds;
     setTimeOffsetNs(offsetNs);
     try {

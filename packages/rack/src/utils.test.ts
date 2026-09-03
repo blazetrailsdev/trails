@@ -35,7 +35,6 @@ it("escape objects that responds to to_s", () => {
 });
 
 it("escape non-UTF8 strings", () => {
-  // In JS, we encode the ø character
   expect(Utils.escape("ø")).toBe("%C3%B8");
 });
 
@@ -82,10 +81,8 @@ it("parse query strings correctly using arrays", () => {
 });
 
 it("not create infinite loops with cycle structures", () => {
-  // In JS we don't have the same issue, but ensure params work
   const params: Record<string, any> = {};
   params["foo"] = params;
-  // Just ensure it doesn't hang
   expect(params["foo"]["foo"]).toBe(params);
 });
 
@@ -98,7 +95,6 @@ it("raise an exception if the params are too deep", () => {
   expect(() => {
     Utils.parseNestedQuery("foo" + "[a]".repeat(len) + "=bar");
   }).toThrow(Utils.ParamsTooDeepError);
-  // Should not throw at one less
   Utils.parseNestedQuery("foo" + "[a]".repeat(len - 1) + "=bar");
 });
 
@@ -152,15 +148,11 @@ it("parse nested query strings correctly", () => {
     },
   });
 
-  // Type error edge cases - these match Ruby's behavior for conflicting types
   expect(() => Utils.parseNestedQuery("x[y]=1&x[]=1")).toThrow(Utils.ParameterTypeError);
   expect(() => Utils.parseNestedQuery("x[y]=1&x[y][][w]=2")).toThrow(Utils.ParameterTypeError);
 });
 
 it("can parse a query string with a key that has invalid UTF-8 encoded bytes", () => {
-  // JS decodeURIComponent throws on invalid UTF-8, so we test that parsing handles it
-  // The key will be partially decoded or left as-is
-  // JS may throw on invalid UTF-8 decoding (acceptable) or partially decode
   const result = (() => {
     try {
       return Utils.parseNestedQuery("foo%81E=1");
@@ -172,7 +164,6 @@ it("can parse a query string with a key that has invalid UTF-8 encoded bytes", (
 });
 
 it("only moves to a new array when the full key has been seen", () => {
-  // Complex nested array/hash interactions
   const result1 = Utils.parseNestedQuery(
     "x[][id]=1&x[][y][a]=5&x[][y][b]=7&x[][z][id]=3&x[][z][w]=0&x[][id]=2&x[][y][a]=6&x[][y][b]=8&x[][z][id]=4&x[][z][w]=0",
   );
@@ -182,21 +173,17 @@ it("only moves to a new array when the full key has been seen", () => {
 });
 
 it("handles unexpected use of [ and ] in parameter keys as normal characters", () => {
-  // Basic bracket edge cases
   expect(Utils.parseNestedQuery("[]=1&[a]=2&b[=3&c]=4")).toEqual({
     "[]": "1",
     "[a]": "2",
     "b[": "3",
     "c]": "4",
   });
-  // Complex bracket edge cases with trailing chars after brackets
   const result = Utils.parseNestedQuery("g[h]=8");
   expect(result.g.h).toBe("8");
 });
 
 it("allow setting the params hash class to use for parsing query strings", () => {
-  // JS doesn't have configurable param classes the same way, skip this Ruby-specific test
-  // Just verify basic parsing still works
   expect(Utils.parseNestedQuery("x[y][][z]=1&x[y][][w]=2")).toEqual({
     x: { y: [{ z: "1", w: "2" }] },
   });
@@ -378,7 +365,6 @@ it("return status code for symbol", () => {
 });
 
 it("return status code and give deprecation warning for obsolete symbols", () => {
-  // Just verify the codes are returned correctly
   expect(Utils.statusCode("payload_too_large" as any)).toBe(413);
   expect(Utils.statusCode("unprocessable_entity" as any)).toBe(422);
 });
@@ -457,7 +443,6 @@ describe("cookies", () => {
   });
 
   it("encodes cookie key values by default", () => {
-    // Our implementation raises for invalid keys rather than encoding
     expect(() => Utils.setCookieHeader("na e", "value")).toThrow();
   });
 

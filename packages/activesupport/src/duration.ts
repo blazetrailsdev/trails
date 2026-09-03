@@ -31,12 +31,9 @@ const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
 export const SECONDS_PER_DAY = 86400;
 export const SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
-const SECONDS_PER_MONTH = 2629746; // 1/12 of a gregorian year (duration.rb:117)
-const SECONDS_PER_YEAR = 31556952; // length of a gregorian year (duration.rb:118)
+const SECONDS_PER_MONTH = 2629746;
+const SECONDS_PER_YEAR = 31556952;
 
-/**
- * Mirrors: ActiveSupport::Duration::PARTS_IN_SECONDS (duration.rb:120-128).
- */
 const PARTS_IN_SECONDS: Record<keyof DurationParts, number> = {
   seconds: 1,
   minutes: SECONDS_PER_MINUTE,
@@ -47,7 +44,6 @@ const PARTS_IN_SECONDS: Record<keyof DurationParts, number> = {
   years: SECONDS_PER_YEAR,
 };
 
-// Mirrors Rails PARTS (duration.rb:130).
 const PARTS: (keyof DurationParts)[] = [
   "years",
   "months",
@@ -58,15 +54,8 @@ const PARTS: (keyof DurationParts)[] = [
   "seconds",
 ];
 
-// Mirrors Rails VARIABLE_PARTS (duration.rb:131): the calendar units whose
-// wall-clock length varies (DST, month/year length).
 const VARIABLE_PARTS: (keyof DurationParts)[] = ["years", "months", "weeks", "days"];
 
-// Mirrors Rails `@parts.merge(other._parts) { |_k, v, ov| v + ov }`
-// (duration.rb:270-272): a Ruby Hash keeps insertion order, and `sum`
-// (`:397-419`) applies the parts in exactly that order, so the receiver's keys
-// come first and the other's new keys are appended in `other._parts`' own
-// order, not in a canonical one.
 function mergeParts(
   a: DurationParts,
   aKeys: readonly (keyof DurationParts)[],
@@ -87,32 +76,14 @@ function mergeParts(
 export class Duration {
   readonly parts: DurationParts;
 
-  /**
-   * @internal The keys of Rails' `@parts` (`duration.rb:227`) — the units the
-   * duration was built from, zeroes rejected unless the whole duration is zero.
-   * `parts` itself stays a full fixed record so its readers stay total, so this
-   * carries the sparseness `@parts.reject!` gives Ruby, which `sum` (`:397-419`)
-   * and `inspect` (`:340-357`) both read as "the parts there are".
-   */
+  /** @internal */
   private readonly _partKeys: readonly (keyof DurationParts)[];
 
   private readonly _variable: boolean;
 
-  /**
-   * Mirrors: ActiveSupport::Duration#value (duration.rb:133) — the
-   * `attr_reader :value` every factory fills through the constructor seat.
-   */
   readonly value: number;
 
-  // Mirrors Rails `Duration#initialize(value, parts, variable = nil)`
-  // (duration.rb:280-287).
-  /**
-   * @missingRailsCall reject! — PERMANENT: Ruby `Hash#reject!` prunes the zero-valued
-   *   entries of `@parts` in place; the TS constructor omits them while building
-   *   the parts object, so there is no receiver to reject from. Surfaced by the
-   *   DescendantsTracker `reject!` port making the name resolvable, not by a
-   *   change in this file.
-   */
+  /** @missingRailsCall reject! — PERMANENT */
   constructor(value: number, parts: Partial<DurationParts> = {}, variable: boolean | null = null) {
     this.value = value;
     this.parts = {
@@ -124,8 +95,6 @@ export class Duration {
       minutes: parts.minutes ?? 0,
       seconds: parts.seconds ?? 0,
     };
-    // Ruby's `@parts` is a Hash, and both `sum` and `merge` read it in
-    // insertion order, so the argument's own key order is the part order.
     const given = (Object.keys(parts) as (keyof DurationParts)[]).filter(
       (part) => PARTS.includes(part) && parts[part] !== undefined,
     );
@@ -133,12 +102,6 @@ export class Duration {
     this._variable = variable ?? this._partKeys.some((part) => VARIABLE_PARTS.includes(part));
   }
 
-  // ---------------------------------------------------------------------------
-  // Factory methods
-  // ---------------------------------------------------------------------------
-
-  // Explicit variable flags mirror Rails' factory constructors
-  // (duration.rb:155-180): fixed units pass false, calendar units true.
   static seconds(value: number): Duration {
     return new Duration(value, { seconds: value }, false);
   }
@@ -161,59 +124,36 @@ export class Duration {
     return new Duration(value * SECONDS_PER_YEAR, { years: value }, true);
   }
 
-  // Numeric/Integer singular aliases (core_ext/numeric/time.rb, core_ext/integer/time.rb):
-  // Ruby reopens Numeric so `2.second` reads as an alias of `2.seconds`; here the
-  // receiver is the argument, so the aliases sit beside the factories they forward to.
-  /** Alias of {@link Duration.seconds}. */
   static second(n: number): Duration {
     return Duration.seconds(n);
   }
-  /** Alias of {@link Duration.minutes}. */
   static minute(n: number): Duration {
     return Duration.minutes(n);
   }
-  /** Alias of {@link Duration.hours}. */
   static hour(n: number): Duration {
     return Duration.hours(n);
   }
-  /** Alias of {@link Duration.days}. */
   static day(n: number): Duration {
     return Duration.days(n);
   }
-  /** Alias of {@link Duration.weeks}. */
   static week(n: number): Duration {
     return Duration.weeks(n);
   }
 
-  /**
-   * Returns a Duration instance matching the number of fortnights provided.
-   *
-   *   2.fortnights # => 4 weeks
-   */
   static fortnights(n: number): Duration {
     return Duration.weeks(n * 2);
   }
-  /** Alias of {@link Duration.fortnights}. */
   static fortnight(n: number): Duration {
     return Duration.fortnights(n);
   }
 
-  /** Alias of {@link Duration.months}. */
   static month(n: number): Duration {
     return Duration.months(n);
   }
-  /** Alias of {@link Duration.years}. */
   static year(n: number): Duration {
     return Duration.years(n);
   }
 
-  // ---------------------------------------------------------------------------
-  // Arithmetic
-  // ---------------------------------------------------------------------------
-
-  // Variable flags below mirror Rails' arithmetic (duration.rb:268-304,
-  // 322-324): `+` with a Duration ORs the flags, numeric `+`/`*`/`/` and
-  // unary `-` carry the receiver's flag — never recomputed from result parts.
   plus(other: Duration | number): Duration {
     if (typeof other === "number") {
       return new Duration(
@@ -277,7 +217,7 @@ export class Duration {
     this.raiseTypeError(other);
   }
 
-  /** @internal Rails' `@parts.transform_values` (`duration.rb:288`, `:299`). */
+  /** @internal */
   private transformValues(fn: (number: number) => number): Partial<DurationParts> {
     const result: Partial<DurationParts> = {};
     for (const key of this._partKeys) {
@@ -304,16 +244,6 @@ export class Duration {
     this.raiseTypeError(other);
   }
 
-  // ---------------------------------------------------------------------------
-  // Conversion
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Mirrors: ActiveSupport::Duration#to_i (duration.rb:377-380) — `@value.to_i`,
-   * with `in_seconds` declared as its alias. trails carries the body on
-   * `inSeconds`; `toI` is the Rails-primary spelling of the same value,
-   * truncated the way `Integer#to_i` is.
-   */
   toI(): number {
     return Math.trunc(this.inSeconds());
   }
@@ -350,10 +280,6 @@ export class Duration {
     return this.inSeconds() / SECONDS_PER_YEAR;
   }
 
-  // ---------------------------------------------------------------------------
-  // Date application — applies each part sequentially like Rails does
-  // ---------------------------------------------------------------------------
-
   since(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   since(time?: Date | Temporal.Instant): Temporal.Instant;
   since(
@@ -386,10 +312,6 @@ export class Duration {
     return this.ago(time);
   }
 
-  // ---------------------------------------------------------------------------
-  // Inspection
-  // ---------------------------------------------------------------------------
-
   inspect(): string {
     const activeParts: string[] = [];
 
@@ -413,13 +335,6 @@ export class Duration {
     return `${rest}, and ${last}`;
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration#== (duration.rb:341-347) — another
-   * Duration with the same `value`, or `other == value` for anything else, so
-   * `2.days == 172800` is true. The else arm is a `==` SEND to `other`, so a
-   * receiver that answers `==` against a number (a `Scalar`) decides it —
-   * `rbEqual` is that dispatch. `value` is seconds, a JS number.
-   */
   equals(other: unknown): boolean {
     if (other instanceof Duration) {
       return other.value === this.value;
@@ -441,11 +356,9 @@ export class Duration {
 
   eql(other: unknown): boolean {
     if (!(other instanceof Duration)) return false;
-    // Rails eql? compares in_seconds values for Duration
     return Math.abs(this.inSeconds() - other.inSeconds()) < 0.001;
   }
 
-  // comparable
   compareTo(other: Duration | number | unknown): number {
     if (typeof other !== "number" && !(other instanceof Duration)) return NaN;
     const a = this.inSeconds();
@@ -459,47 +372,14 @@ export class Duration {
     return klass === Duration || this instanceof (klass as any);
   }
 
-  /** Mirrors Rails `Duration#variable?` (duration.rb:477-479): reads the
-   * `@variable` flag computed (or passed) at construction. */
   isVariable(): boolean {
     return this._variable;
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration#_parts (duration.rb:481-483) — the
-   * `:nodoc:` reader `@parts` is exposed through, which `Duration#sum` and
-   * `TimeWithZone#advance` read off another Duration.
-   *
-   * `@parts` is sparse: `initialize` runs `@parts.reject! { |k, v| v.zero? }`
-   * unless the whole value is zero (duration.rb:228), so a zero-valued unit is
-   * absent rather than present-and-zero. `parts` here is a total record, so the
-   * sparseness lives in `_partKeys` and is applied on the way out.
-   */
   _parts(): Partial<DurationParts> {
     return this.transformValues((number) => number);
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration#sum (duration.rb:485-510).
-   *
-   * The `acts_like?` guard is spelled as the receiver check
-   * `core-ext/date-and-time/calculations.ts:200-210` uses: neither of trails'
-   * receivers carries an `acts_like_*?` marker method, so being one IS the
-   * answer — a `Date`/`Temporal.Instant` is a moment, a `Temporal.PlainDate`
-   * is a calendar day.
-   *
-   * `time.since(sign * value)` reads the value off `inSeconds()`, trails'
-   * `@value`; an empty `@parts` means a zero one (the constructor only leaves
-   * `_partKeys` empty when it was given no parts), so a moment receiver comes
-   * back unchanged while `Date#since` still widens the calendar day into a
-   * zoned Time (`core_ext/date/calculations.rb:61-63`).
-   *
-   * The `@parts.each` loop lives in a module function because the two receivers
-   * take different unit methods: {@link applyDurationToDate} is that loop
-   * verbatim, {@link applyDurationPreservingNs} carries it for a moment
-   * receiver in a fixed unit order rather than `@parts` order (tracked by
-   * `duration-sum-instant-arm-ignores-part-order`).
-   */
   private sum(
     sign: 1 | -1,
     time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
@@ -524,18 +404,10 @@ export class Duration {
     return applyDurationPreservingNs(time, this.parts, sign);
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration#as_json (duration.rb:459-461).
-   */
   asJson(_options: unknown = null): number {
     return Math.trunc(this.inSeconds());
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration#coerce (duration.rb:245-254). Ruby's
-   * numeric-coercion protocol hands back `[other, self]` so the arithmetic
-   * operator re-dispatches with a Scalar on the left.
-   */
   coerce(other: unknown): [Scalar, Duration] {
     if (other instanceof Scalar) {
       return [other, this];
@@ -546,20 +418,13 @@ export class Duration {
     return [new Scalar(other as number), this];
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration#raise_type_error (duration.rb:520-522).
-   *
-   * @internal
-   */
+  /** @internal */
   raiseTypeError(other: unknown): never {
     throw new TypeError(
       `no implicit conversion of ${(other as object)?.constructor?.name ?? String(other)} into Duration`,
     );
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration.calculate_total_seconds (duration.rb:217-221).
-   */
   private static calculateTotalSeconds(parts: Partial<DurationParts>): number {
     return Object.entries(parts).reduce(
       (total, [part, value]) => total + value * PARTS_IN_SECONDS[part as keyof DurationParts],
@@ -567,39 +432,15 @@ export class Duration {
     );
   }
 
-  /**
-   * Build ISO 8601 Duration string for this duration. The `precision`
-   * parameter can be used to limit seconds' precision of duration.
-   *
-   * Mirrors: ActiveSupport::Duration#iso8601 (duration.rb:471-475).
-   */
   iso8601({ precision = null }: { precision?: number | null } = {}): string {
     return new ISO8601Serializer(this, { precision }).serialize();
   }
 
-  /**
-   * Creates a new Duration from string formatted according to ISO 8601
-   * Duration.
-   *
-   * See {ISO 8601}[https://en.wikipedia.org/wiki/ISO_8601#Durations] for more
-   * information. This method allows negative parts to be present in pattern.
-   * If invalid string is provided, it will raise
-   * `ActiveSupport::Duration::ISO8601Parser::ParsingError`.
-   *
-   * Mirrors: ActiveSupport::Duration.parse (duration.rb:139-147).
-   */
   static parse(iso8601duration: string): Duration {
     const parts = new ISO8601Parser(iso8601duration).parseBang();
     return new Duration(Duration.calculateTotalSeconds(parts), parts);
   }
 
-  /**
-   * Creates a new Duration from a seconds value that is converted
-   * to the individual parts (duration.rb:183-214):
-   *
-   *   Duration.build(31556952).parts // => { years: 1 }
-   *   Duration.build(2716146).parts  // => { months: 1, days: 1 }
-   */
   static build(value: unknown): Duration {
     if (typeof value !== "number") {
       const typeName =
@@ -632,43 +473,27 @@ export class Duration {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Numeric helpers — functional equivalents of Rails' numeric extensions
-// (e.g. `5.minutes` in Ruby → `minutes(5)` in TypeScript)
-// ---------------------------------------------------------------------------
-
-/** @example seconds(30).since(date) */
 export function seconds(n: number): Duration {
   return Duration.seconds(n);
 }
-/** @example minutes(5).ago() */
 export function minutes(n: number): Duration {
   return Duration.minutes(n);
 }
-/** @example hours(2).fromNow() */
 export function hours(n: number): Duration {
   return Duration.hours(n);
 }
-/** @example days(3).since(date) */
 export function days(n: number): Duration {
   return Duration.days(n);
 }
-/** @example weeks(1).fromNow() */
 export function weeks(n: number): Duration {
   return Duration.weeks(n);
 }
-/** @example months(6).ago() */
 export function months(n: number): Duration {
   return Duration.months(n);
 }
-/** @example years(2).fromNow() */
 export function years(n: number): Duration {
   return Duration.years(n);
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function singular(key: keyof DurationParts): string {
   switch (key) {
@@ -695,18 +520,6 @@ function toDateInput(date: Date | Temporal.Instant): Date {
   throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
 }
 
-/**
- * The `time.acts_like?(:date)` arm of `ActiveSupport::Duration#sum`
- * (`duration.rb:397-419`): each part is applied in turn, the sub-day ones
- * through `Date#since` — which widens the day into a zoned `Time`
- * (`core_ext/date/calculations.rb:61-63`) — and the rest through `advance`,
- * which keeps the receiver a calendar day.
- *
- * The loop walks `partKeys` — Rails' `@parts` keys, not every key
- * `DurationParts` carries — so `0.days` advances by zero days and stays a
- * `PlainDate` while `0.seconds` still takes the `since` arm and widens, which
- * is what `@parts.reject! ... unless value == 0` (`duration.rb:228`) gives Ruby.
- */
 function applyDurationToDate(
   date: Temporal.PlainDate,
   parts: DurationParts,
@@ -732,12 +545,10 @@ function applyDurationToDate(
   return time;
 }
 
-/** `t.since(seconds)` over either receiver {@link applyDurationToDate} carries. */
 function dateOrTimeSince(t: Temporal.PlainDate | TimeWithZone, seconds: number): TimeWithZone {
   return t instanceof Temporal.PlainDate ? dateSince(t, seconds) : t.since(seconds);
 }
 
-/** `t.advance(options)` over either receiver {@link applyDurationToDate} carries. */
 function dateOrTimeAdvance(
   t: Temporal.PlainDate | TimeWithZone,
   options: Partial<DurationParts>,
@@ -745,11 +556,6 @@ function dateOrTimeAdvance(
   return t instanceof Temporal.PlainDate ? dateAdvance(t, options) : t.advance(options);
 }
 
-/**
- * Apply a Duration while preserving the sub-millisecond nanosecond remainder
- * of a Temporal.Instant input. Calendar math runs at ms precision through
- * applyDuration; the original ns remainder is re-added to the result.
- */
 function applyDurationPreservingNs(
   date: Date | Temporal.Instant,
   parts: DurationParts,
@@ -760,10 +566,6 @@ function applyDurationPreservingNs(
   return nsRemainder === 0n ? result : result.add({ nanoseconds: Number(nsRemainder) });
 }
 
-/**
- * Apply duration parts to a Date sequentially, matching Rails advance() semantics.
- * direction: 1 for since/after, -1 for ago/before
- */
 function applyDuration(date: Date, parts: DurationParts, direction: 1 | -1): Date {
   if (!(date instanceof Date)) {
     throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
@@ -779,21 +581,18 @@ function applyDuration(date: Date, parts: DurationParts, direction: 1 | -1): Dat
   const minutes = parts.minutes * direction;
   const seconds = parts.seconds * direction;
 
-  // Integer years via setFullYear for calendar accuracy
   if (Number.isInteger(years) && years !== 0) {
     d.setFullYear(d.getFullYear() + years);
   } else if (years !== 0) {
     d = new Date(d.getTime() + years * SECONDS_PER_YEAR * 1000);
   }
 
-  // Integer months via setMonth for calendar accuracy
   if (Number.isInteger(months) && months !== 0) {
     d.setMonth(d.getMonth() + months);
   } else if (months !== 0) {
     d = new Date(d.getTime() + months * SECONDS_PER_MONTH * 1000);
   }
 
-  // Integer weeks and days via setDate for calendar accuracy
   const intWeeks = Math.trunc(weeks);
   const fracWeeks = weeks - intWeeks;
   if (intWeeks !== 0) {
@@ -806,7 +605,6 @@ function applyDuration(date: Date, parts: DurationParts, direction: 1 | -1): Dat
     d.setDate(d.getDate() + intDays);
   }
 
-  // Fractional weeks/days + time parts via millisecond arithmetic
   const extraMs =
     fracWeeks * 7 * SECONDS_PER_DAY * 1000 +
     fracDays * SECONDS_PER_DAY * 1000 +
@@ -828,26 +626,17 @@ export class Scalar {
     this.value = value;
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration::Scalar#coerce (duration.rb:23-25).
-   */
   coerce(other: unknown): [Scalar, Scalar] {
     return [new Scalar(other as number), this];
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration::Scalar#raise_type_error
-   * (duration.rb:108-110).
-   *
-   * @internal
-   */
+  /** @internal */
   raiseTypeError(other: unknown): never {
     throw new TypeError(
       `no implicit conversion of ${(other as object)?.constructor?.name ?? String(other)} into Scalar`,
     );
   }
 
-  /** Mirrors: ActiveSupport::Duration::Scalar#variable? (duration.rb:93-95). */
   isVariable(): boolean {
     return false;
   }
@@ -864,11 +653,7 @@ export class Scalar {
     return String(this.value);
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT (`vendor/rails/activesupport/lib/active_support/duration.rb:353,
-   *   :377` — `def to_s` and `def to_i` are the Ruby coercion hooks).
-   * JS primitive-coercion protocol — Ruby coerces through to_s/to_i instead
-   */
+  /** @noRailsEquivalent PERMANENT */
   valueOf(): number {
     return this.value;
   }
@@ -883,16 +668,10 @@ export class Scalar {
     return new Scalar(this.value - otherVal);
   }
 
-  /** Unary minus (`Scalar#-@`): `Scalar.new(-value)`. */
   negate(): Scalar {
     return new Scalar(-this.value);
   }
 
-  /**
-   * Mirrors: ActiveSupport::Duration::Scalar#<=> (duration.rb:31-38), whose
-   * `else` arm is Ruby's **nil** — the answer a `number` return has nowhere to
-   * put, and which every Comparable operator below is derived from.
-   */
   compareTo(other: unknown): number | null {
     if (other instanceof Scalar || other instanceof Duration) {
       return cmp(this.value, other.value);
@@ -903,20 +682,8 @@ export class Scalar {
     }
   }
 
-  /**
-   * The name `rb_cmperr` (Ruby core `compar.c`) puts in its message, which no
-   * JS `constructor.name` can spell.
-   */
   readonly [rubyClass] = "ActiveSupport::Duration::Scalar";
 
-  /**
-   * `Scalar < Numeric` includes Comparable, so `==` IS Comparable's
-   * `cmp_equal` (Ruby core `compar.c`) over `<=>` above — which is why
-   * `Scalar.new(172800) == 172800` is true, and why `Duration#==`'s
-   * `other == value` arm (duration.rb:341-347) answers a Scalar. It is
-   * `@blazetrails/ruby-compat`'s one copy of that body, including the identity
-   * shortcut a hand-rolled `compareTo(other) === 0` does not have.
-   */
   equals = cmpEquals;
 
   times(other: number): Scalar {

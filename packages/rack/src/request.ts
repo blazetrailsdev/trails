@@ -54,9 +54,6 @@ import { include } from "@blazetrails/activesupport";
 import * as MediaTypeModule from "./media-type.js";
 import * as Multipart from "./multipart.js";
 
-// ipv6 extracted from resolv stdlib, simplified
-// to remove numbered match group creation.
-// Mirrors the `ipv6` union at `rack/request.rb:700-720`.
 const ipv6 = [
   /(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}/,
   /(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4})*)?/,
@@ -68,22 +65,12 @@ const ipv6 = [
   .map((r) => r.source)
   .join("|");
 
-/**
- * Mirrors the private `AUTHORITY` constant (`rack/request.rb:722-735`). Ruby's
- * `[[:graph:]]` under UTF-8 is Onigmo's "not space, and not `Cc`, `Cn` or
- * `Cs`" — `Cf` (U+00AD, U+200B, U+FEFF) and `Co` are graph, while unassigned
- * code points and C1 controls are not — so the class is derived as
- * `[^\p{Cc}\p{Cn}\p{Cs}\p{White_Space}]` under the `u` flag, which agrees
- * with MRI on every code point that both Unicode tables assign.
- */
 const AUTHORITY = new RegExp(
   "^(?<host>" +
-    // Match IPv6 as a string of hex digits and colons in square brackets
     "\\[(?<address>" +
     ipv6 +
     ")\\]" +
     "|" +
-    // Match any other printable string (except square brackets) as a hostname
     "(?<address>[^\\p{Cc}\\p{Cn}\\p{Cs}\\p{White_Space}\\[\\]]*?)" +
     ")" +
     "(:(?<port>\\d+))?$",
@@ -93,11 +80,6 @@ const AUTHORITY = new RegExp(
 const FORM_DATA_MEDIA_TYPES = ["application/x-www-form-urlencoded", "multipart/form-data"];
 const PARSEABLE_DATA_MEDIA_TYPES = ["multipart/related", "multipart/mixed"];
 
-/**
- * Default ports depending on scheme. Used to decide whether or not to include
- * the port in a generated URI. Mirrors
- * `Rack::Request::Helpers::DEFAULT_PORTS` (`rack/request.rb:168`).
- */
 const DEFAULT_PORTS: Record<string, number | undefined> = { http: 80, https: 443, coffee: 80 };
 
 const ALLOWED_SCHEMES = ["https", "http", "wss", "ws"] as const;
@@ -108,7 +90,6 @@ const FORWARDED_SCHEME_HEADERS: Record<string, string> = {
 
 const validIpv4Octet = "\\.(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])";
 
-/** Mirrors the `trusted_proxies` union at `rack/request.rb:48-57`. */
 const trustedProxies = new RegExp(
   [
     `^127(?:${validIpv4Octet}){3}$`,
@@ -122,145 +103,110 @@ const trustedProxies = new RegExp(
   "i",
 );
 
-/**
- * Mirrors `Rack::Request::Helpers` (`rack/lib/rack/request.rb:149-787`), the
- * module `Rack::Request` and `ActionDispatch::Request` both `include`
- * (`rack/request.rb:790`, `actionpack/lib/action_dispatch/http/request.rb:21`).
- * Modelled as a class module so `include()` carries its accessors.
- */
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers`; the class/interface merge is how the module's host state surfaces on the type side. */
 export interface Helpers {
-  /** Supplied by the including class (`Rack::Request::Env#env`). */
   readonly env: Record<string, any>;
-  /** Supplied by the including class (`Rack::Request::Env#get_header`). */
   getHeader(name: string): any;
-  /** Supplied by the including class (`Rack::Request::Env#set_header`). */
   setHeader(name: string, v: any): any;
-  /** Supplied by the including class (`Rack::Request::Env#fetch_header`). */
   fetchHeader(name: string, block?: (key: string) => any): any;
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export abstract class Helpers {
-  /** Mirrors `Rack::Request::Helpers#body` (`rack/request.rb:190`). */
   get body(): any {
     return this.getHeader(RACK_INPUT);
   }
 
-  /** Mirrors `Rack::Request::Helpers#script_name` (`rack/request.rb:191`). */
   get scriptName(): string {
     return this.getHeader(SCRIPT_NAME) || "";
   }
-  /** Mirrors `Rack::Request::Helpers#script_name=` (`rack/request.rb:192`). */
   set scriptName(v: string) {
     this.setHeader(SCRIPT_NAME, v);
   }
 
-  /** Mirrors `Rack::Request::Helpers#path_info` (`rack/request.rb:194`). */
   get pathInfo(): string {
     return this.getHeader(PATH_INFO) ?? "";
   }
-  /** Mirrors `Rack::Request::Helpers#path_info=` (`rack/request.rb:195`). */
   set pathInfo(v: string) {
     this.setHeader(PATH_INFO, v);
   }
 
-  /** Mirrors `Rack::Request::Helpers#request_method` (`rack/request.rb:197`). */
   get requestMethod(): string {
     return this.getHeader(REQUEST_METHOD);
   }
 
-  /** Mirrors `Rack::Request::Helpers#query_string` (`rack/request.rb:198`). */
   get queryString(): string {
     return this.getHeader(QUERY_STRING) ?? "";
   }
 
-  /** Mirrors `Rack::Request::Helpers#content_length` (`rack/request.rb:199`). */
   get contentLength(): string | null {
     return this.getHeader("CONTENT_LENGTH") ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#logger` (`rack/request.rb:200`). */
   get logger(): any {
     return this.getHeader(RACK_LOGGER) ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#user_agent` (`rack/request.rb:201`). */
   get userAgent(): string | null {
     return this.getHeader("HTTP_USER_AGENT") || null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#referer` (`rack/request.rb:204`). */
   get referer(): string | null {
     return this.getHeader("HTTP_REFERER") ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#referrer` (`rack/request.rb:205`). */
   get referrer(): string | null {
     return this.referer;
   }
 
-  /** Mirrors `Rack::Request::Helpers#session` (`rack/request.rb:207-211`). */
   get session(): Record<string, any> {
     return this.fetchHeader(RACK_SESSION, (k) => this.setHeader(k, this.defaultSession()));
   }
 
-  /** Mirrors `Rack::Request::Helpers#session_options` (`rack/request.rb:213-217`). */
   get sessionOptions(): Record<string, any> {
     return this.fetchHeader(RACK_SESSION_OPTIONS, (k) => this.setHeader(k, {}));
   }
 
-  /** Mirrors `Rack::Request::Helpers#delete?` (`rack/request.rb:220`). */
   isDelete(): boolean {
     return this.requestMethod === DELETE;
   }
 
-  /** Mirrors `Rack::Request::Helpers#get?` (`rack/request.rb:223`). */
   isGet(): boolean {
     return this.requestMethod === GET;
   }
 
-  /** Mirrors `Rack::Request::Helpers#head?` (`rack/request.rb:226`). */
   isHead(): boolean {
     return this.requestMethod === HEAD;
   }
 
-  /** Mirrors `Rack::Request::Helpers#options?` (`rack/request.rb:229`). */
   isOptions(): boolean {
     return this.requestMethod === OPTIONS;
   }
 
-  /** Mirrors `Rack::Request::Helpers#link?` (`rack/request.rb:232`). */
   isLink(): boolean {
     return this.requestMethod === LINK;
   }
 
-  /** Mirrors `Rack::Request::Helpers#patch?` (`rack/request.rb:235`). */
   isPatch(): boolean {
     return this.requestMethod === PATCH;
   }
 
-  /** Mirrors `Rack::Request::Helpers#post?` (`rack/request.rb:238`). */
   isPost(): boolean {
     return this.requestMethod === POST;
   }
 
-  /** Mirrors `Rack::Request::Helpers#put?` (`rack/request.rb:241`). */
   isPut(): boolean {
     return this.requestMethod === PUT;
   }
 
-  /** Mirrors `Rack::Request::Helpers#trace?` (`rack/request.rb:244`). */
   isTrace(): boolean {
     return this.requestMethod === TRACE;
   }
 
-  /** Mirrors `Rack::Request::Helpers#unlink?` (`rack/request.rb:247`). */
   isUnlink(): boolean {
     return this.requestMethod === UNLINK;
   }
 
-  /** Mirrors `Rack::Request::Helpers#scheme` (`rack/request.rb:249-258`). */
   get scheme(): string {
     if (this.getHeader(HTTPS) === "on") {
       return "https";
@@ -273,12 +219,10 @@ export abstract class Helpers {
     }
   }
 
-  /** Mirrors `Rack::Request::Helpers#authority` (`rack/request.rb:266-268`). */
   get authority(): string | null {
     return this.forwardedAuthority ?? this.hostAuthority ?? this.serverAuthority;
   }
 
-  /** Mirrors `Rack::Request::Helpers#server_authority` (`rack/request.rb:272-283`). */
   get serverAuthority(): string | null {
     const host = this.serverName;
     const port = this.serverPort;
@@ -293,17 +237,14 @@ export abstract class Helpers {
     return null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#server_name` (`rack/request.rb:285-287`). */
   get serverName(): string | null {
     return this.getHeader(SERVER_NAME) ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#server_port` (`rack/request.rb:289-291`). */
   get serverPort(): string | null {
     return this.getHeader(SERVER_PORT) ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#cookies` (`rack/request.rb:293-306`). */
   get cookies(): Record<string, string> {
     const hash: Record<string, string> = this.fetchHeader(RACK_REQUEST_COOKIE_HASH, (key) =>
       this.setHeader(key, {}),
@@ -320,23 +261,19 @@ export abstract class Helpers {
     return hash;
   }
 
-  /** Mirrors `Rack::Request::Helpers#content_type` (`rack/request.rb:308-311`). */
   get contentType(): string | null {
     const contentType = this.getHeader("CONTENT_TYPE");
     return contentType == null || contentType === "" ? null : contentType;
   }
 
-  /** Mirrors `Rack::Request::Helpers#xhr?` (`rack/request.rb:313-315`). */
   get xhr(): boolean {
     return (this.getHeader("HTTP_X_REQUESTED_WITH") || "").toLowerCase() === "xmlhttprequest";
   }
 
-  /** Mirrors `Rack::Request::Helpers#host_authority` (`rack/request.rb:318-320`). */
   get hostAuthority(): string | null {
     return this.getHeader(HTTP_HOST) ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#host_with_port` (`rack/request.rb:322-330`). */
   hostWithPort(authority: string | null = this.authority): string | null {
     const [host, , port] = this.splitAuthority(authority);
 
@@ -347,17 +284,14 @@ export abstract class Helpers {
     }
   }
 
-  /** Mirrors `Rack::Request::Helpers#host` (`rack/request.rb:333-335`). */
   get host(): string | null {
     return this.splitAuthority(this.authority)[0] ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#hostname` (`rack/request.rb:341-343`). */
   get hostname(): string | null {
     return this.splitAuthority(this.authority)[1] ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#port` (`rack/request.rb:345-351`). */
   get port(): number | string | null {
     let port: number | null | undefined = null;
     const authority = this.authority;
@@ -368,7 +302,6 @@ export abstract class Helpers {
     return port ?? this.forwardedPort?.at(-1) ?? DEFAULT_PORTS[this.scheme] ?? this.serverPort;
   }
 
-  /** Mirrors `Rack::Request::Helpers#forwarded_for` (`rack/request.rb:353-372`). */
   get forwardedFor(): Array<string | undefined> | null {
     for (const type of this.forwardedPriority()) {
       if (type === "forwarded") {
@@ -385,7 +318,6 @@ export abstract class Helpers {
     return null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#forwarded_port` (`rack/request.rb:374-391`). */
   get forwardedPort(): number[] | null {
     for (const type of this.forwardedPriority()) {
       if (type === "forwarded") {
@@ -402,7 +334,6 @@ export abstract class Helpers {
     return null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#forwarded_authority` (`rack/request.rb:393-408`). */
   get forwardedAuthority(): string | null {
     for (const type of this.forwardedPriority()) {
       if (type === "forwarded") {
@@ -419,12 +350,10 @@ export abstract class Helpers {
     return null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#ssl?` (`rack/lib/rack/request.rb:410-412`). */
   get ssl(): boolean {
     return this.scheme === "https" || this.scheme === "wss";
   }
 
-  /** Mirrors `Rack::Request::Helpers#ip` (`rack/request.rb:414-433`). */
   get ip(): string | null {
     const remoteAddresses = this.splitHeader(this.getHeader("REMOTE_ADDR"));
     const externalAddresses = this.rejectTrustedIpAddresses(remoteAddresses);
@@ -442,22 +371,18 @@ export abstract class Helpers {
     return remoteAddresses[0] ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#media_type` (`rack/request.rb:441-443`). */
   get mediaType(): string | null {
     return MediaTypeModule.type(this.contentType);
   }
 
-  /** Mirrors `Rack::Request::Helpers#media_type_params` (`rack/request.rb:450-452`). */
   get mediaTypeParams(): Record<string, string> {
     return MediaTypeModule.params(this.contentType);
   }
 
-  /** Mirrors `Rack::Request::Helpers#content_charset` (`rack/request.rb:458-460`). */
   get contentCharset(): string | null {
     return this.mediaTypeParams["charset"] ?? null;
   }
 
-  /** Mirrors `Rack::Request::Helpers#form_data?` (`rack/request.rb:470-475`). */
   get formData(): boolean {
     const type = this.mediaType;
     const meth =
@@ -468,17 +393,11 @@ export abstract class Helpers {
     );
   }
 
-  /** Mirrors `Rack::Request::Helpers#parseable_data?` (`rack/request.rb:479-481`). */
   isParseableData(): boolean {
     const mt = this.mediaType;
     return mt !== null && PARSEABLE_DATA_MEDIA_TYPES.includes(mt);
   }
 
-  /**
-   * Returns the data received in the query string.
-   *
-   * Mirrors `Rack::Request::Helpers#GET` (`rack/request.rb:484-497`).
-   */
   get GET(): Record<string, any> {
     const rrQueryString = this.getHeader(RACK_REQUEST_QUERY_STRING);
     const queryString = this.queryString;
@@ -497,14 +416,6 @@ export abstract class Helpers {
     }
   }
 
-  /**
-   * Returns the data received in the request body.
-   *
-   * This method support both application/x-www-form-urlencoded and
-   * multipart/form-data.
-   *
-   * Mirrors `Rack::Request::Helpers#POST` (`rack/request.rb:503-551`).
-   */
   get POST(): Record<string, any> {
     const error = this.getHeader(RACK_REQUEST_FORM_ERROR);
     if (error) {
@@ -514,11 +425,9 @@ export abstract class Helpers {
     try {
       const rackInput = this.getHeader(RACK_INPUT);
 
-      // If the form hash was already memoized:
       const formHash = this.getHeader(RACK_REQUEST_FORM_HASH);
       if (formHash) {
         const formInput = this.getHeader(RACK_REQUEST_FORM_INPUT);
-        // And it was memoized from the same input:
         if (formInput === rackInput) {
           return formHash;
         } else if (formInput) {
@@ -528,7 +437,6 @@ export abstract class Helpers {
         }
       }
 
-      // Otherwise, figure out how to parse the input:
       if (rackInput == null) {
         this.setHeader(RACK_REQUEST_FORM_INPUT, null);
         this.setHeader(RACK_REQUEST_FORM_HASH, {});
@@ -541,7 +449,6 @@ export abstract class Helpers {
         } else {
           let formVars: string = this.getHeader(RACK_INPUT).read();
 
-          // Fix for Safari Ajax postings that always append \0
           if (formVars.endsWith("\0")) formVars = formVars.slice(0, -1);
 
           this.setHeader(RACK_REQUEST_FORM_VARS, formVars);
@@ -561,12 +468,10 @@ export abstract class Helpers {
     }
   }
 
-  /** Mirrors `Rack::Request::Helpers#params` (`rack/request.rb:556-558`). */
   get params(): Record<string, any> {
     return { ...this.GET, ...this.POST };
   }
 
-  /** Mirrors `Rack::Request::Helpers#update_param` (`rack/request.rb:565-578`). */
   updateParam(k: string, v: any): void {
     const get = this.GET;
     const post = this.POST;
@@ -577,7 +482,6 @@ export abstract class Helpers {
     }
   }
 
-  /** Mirrors `Rack::Request::Helpers#delete_param` (`rack/request.rb:585-588`). */
   deleteParam(k: string): any {
     const post = this.POST;
     if (k in post) {
@@ -594,42 +498,34 @@ export abstract class Helpers {
     return undefined;
   }
 
-  /** Mirrors `Rack::Request::Helpers#base_url` (`rack/request.rb:590-592`). */
   get baseUrl(): string {
     return `${this.scheme}://${this.hostWithPort()}`;
   }
 
-  /** Mirrors `Rack::Request::Helpers#url` (`rack/request.rb:595-597`). */
   get url(): string {
     return this.baseUrl + this.fullpath;
   }
 
-  /** Mirrors `Rack::Request::Helpers#path` (`rack/request.rb:599-601`). */
   get path(): string {
     return this.scriptName + this.pathInfo;
   }
 
-  /** Mirrors `Rack::Request::Helpers#fullpath` (`rack/request.rb:603-605`). */
   get fullpath(): string {
     return this.queryString === "" ? this.path : `${this.path}?${this.queryString}`;
   }
 
-  /** Mirrors `Rack::Request::Helpers#accept_encoding` (`rack/request.rb:607-609`). */
   get acceptEncoding(): Array<[string, number]> {
     return this.parseHttpAcceptHeader(this.getHeader("HTTP_ACCEPT_ENCODING"));
   }
 
-  /** Mirrors `Rack::Request::Helpers#accept_language` (`rack/request.rb:611-613`). */
   get acceptLanguage(): Array<[string, number]> {
     return this.parseHttpAcceptHeader(this.getHeader("HTTP_ACCEPT_LANGUAGE"));
   }
 
-  /** Mirrors `Rack::Request::Helpers#trusted_proxy?` (`rack/request.rb:615-617`). */
   trustedProxy(ip: string | undefined): boolean {
     return Request.ipFilter(ip);
   }
 
-  /** Mirrors `Rack::Request::Helpers#values_at` (`rack/request.rb:620-624`). */
   valuesAt(...keys: string[]): any[] {
     console.warn(
       "Request#values_at is deprecated and will be removed in a future version of Rack. Please use request.params.values_at instead",
@@ -638,18 +534,12 @@ export abstract class Helpers {
     return keys.map((key) => this.params[key]);
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#default_session` (`rack/request.rb:628`).
-   * @internal
-   */
+  /** @internal */
   defaultSession(): Record<string, any> {
     return {};
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#wrap_ipv6` (`rack/request.rb:631-642`).
-   * @internal
-   */
+  /** @internal */
   wrapIpv6(host: string): string {
     if (host && !host.startsWith("[") && host.split(":").length - 1 > 1) {
       return `[${host}]`;
@@ -657,11 +547,7 @@ export abstract class Helpers {
     return host;
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#parse_http_accept_header`
-   * (`rack/request.rb:644-665`).
-   * @internal
-   */
+  /** @internal */
   parseHttpAcceptHeader(header: string | null | undefined): Array<[string, number]> {
     const parts = (header ?? "").split(",");
     const result: Array<[string, number]> = [];
@@ -680,44 +566,27 @@ export abstract class Helpers {
     return result;
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#get_http_forwarded`
-   * (`rack/lib/rack/request.rb:668-670`).
-   * @internal
-   */
+  /** @internal */
   getHttpForwarded(token: string): string[] | null {
     return forwardedValues(this.getHeader(HTTP_FORWARDED))?.[token] ?? null;
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#query_parser` (`rack/request.rb:672-674`).
-   * @internal
-   */
+  /** @internal */
   queryParser(): QueryParser {
     return getDefaultQueryParser();
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#parse_query` (`rack/request.rb:676-678`).
-   * @internal
-   */
+  /** @internal */
   parseQuery(qs: string, d = "&"): Record<string, any> {
     return this.queryParser().parseNestedQuery(qs, d);
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#parse_multipart` (`rack/request.rb:680-682`).
-   * @internal
-   */
+  /** @internal */
   parseMultipart(): Record<string, any> | null {
     return Multipart.extractMultipart(this, this.queryParser());
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#expand_param_pairs`
-   * (`rack/request.rb:684-692`).
-   * @internal
-   */
+  /** @internal */
   expandParamPairs(
     pairs: Array<[string, any]>,
     queryParser: QueryParser = this.queryParser(),
@@ -731,25 +600,12 @@ export abstract class Helpers {
     return params.toParamsHash();
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#split_header` (`rack/request.rb:694-696`).
-   * @internal
-   */
+  /** @internal */
   splitHeader(value: string | null | undefined): string[] {
     return value ? value.trim().split(/[,\s]+/) : [];
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#split_authority` (`rack/request.rb:737-741`)
-   * over the `AUTHORITY` pattern (`rack/request.rb:722-733`).
-   *
-   * Both misses answer Ruby's `[]`, so `.length` and out-of-range reads match
-   * the Ruby exactly. Only the static type is looser: TypeScript cannot say
-   * "either 0 or 3 elements", so the arity-3 shape is spelled with optional
-   * positions, which is what makes `split_authority(x)[1]` yield `undefined`
-   * for `nil` the way Ruby's out-of-range indexing does.
-   * @internal
-   */
+  /** @internal */
   splitAuthority(authority: string | null | undefined): [string?, string?, (number | null)?] {
     if (authority == null) return [];
     const match = AUTHORITY.exec(authority);
@@ -758,20 +614,12 @@ export abstract class Helpers {
     return [match.groups!.host, match.groups!.address, port != null ? parseInt(port, 10) : null];
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#reject_trusted_ip_addresses`
-   * (`rack/request.rb:743-745`).
-   * @internal
-   */
+  /** @internal */
   rejectTrustedIpAddresses<T extends string | undefined>(ipAddresses: T[]): T[] {
     return ipAddresses.filter((ip) => !this.trustedProxy(ip));
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#forwarded_scheme`
-   * (`rack/lib/rack/request.rb:752-774`).
-   * @internal
-   */
+  /** @internal */
   get forwardedScheme(): string | null {
     for (const type of this.forwardedPriority()) {
       if (type === "forwarded") {
@@ -796,29 +644,18 @@ export abstract class Helpers {
     return null;
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#allowed_scheme` (`rack/request.rb:776-778`).
-   * @internal
-   */
+  /** @internal */
   allowedScheme(header: string | null | undefined): string | null {
     if (!header) return null;
     return (ALLOWED_SCHEMES as readonly string[]).includes(header) ? header : null;
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#forwarded_priority`
-   * (`rack/lib/rack/request.rb:780-782`).
-   * @internal
-   */
+  /** @internal */
   forwardedPriority(): Array<"forwarded" | "x_forwarded" | null> {
     return Request.forwardedPriority;
   }
 
-  /**
-   * Mirrors `Rack::Request::Helpers#x_forwarded_proto_priority`
-   * (`rack/lib/rack/request.rb:784-786`).
-   * @internal
-   */
+  /** @internal */
   xForwardedProtoPriority(): Array<"proto" | "scheme" | null> {
     return Request.xForwardedProtoPriority;
   }
@@ -848,7 +685,6 @@ export class Request {
     return key in this.env;
   }
 
-  /** Mirrors: `Rack::Request::Env#get_header` (`rack/request.rb:100-102`). */
   getHeader(name: string): any {
     return this.env[name];
   }
@@ -884,23 +720,16 @@ export class Request {
     }
   }
 
-  /**
-   * Mirrors: `Rack::Request::Env#fetch_header` (`rack/request.rb:106-108`) —
-   * `@env.fetch(name, &block)`, where an absent block is `&nil` and so reaches
-   * `Hash#fetch`'s one-argument arm rather than handing it a `nil` default.
-   */
   fetchHeader(name: string): any;
   fetchHeader(name: string, block: (key: string) => any): any;
   fetchHeader(name: string, block?: (key: string) => any): any {
     return block === undefined ? fetch(this.env, name) : fetch(this.env, name, rbBlock(block));
   }
 
-  /** Mirrors: `Rack::Request::Env#set_header` (`rack/request.rb:116-118`). */
   setHeader(name: string, v: any): any {
     return (this.env[name] = v);
   }
 
-  /** Mirrors: `Rack::Request::Env#each_header` (`rack/request.rb:111-113`). */
   eachHeader(callback: (key: string, value: any) => void): void {
     this.each(callback);
   }
@@ -916,12 +745,7 @@ export class Request {
     return purpose === "prefetch" || secPurpose === "prefetch" || purpose2 === "prefetch";
   }
 
-  /**
-   * The flat `[key, value]` pair list `POST` seats under
-   * `rack.request.form_pairs` (`rack/request.rb:528`), or the pairs of the
-   * urlencoded body it seated under `rack.request.form_vars` (`:537`).
-   * @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs
-   */
+  /** @noRailsEquivalent CONVERGEABLE port-rack-request-form-pairs */
   get formPairs(): [string, any][] {
     void this.POST;
 

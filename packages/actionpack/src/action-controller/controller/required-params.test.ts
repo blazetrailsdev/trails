@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Parameters, ParameterMissing } from "../metal/strong-parameters.js";
 
-// ==========================================================================
-// controller/required_params_test.rb
-// ==========================================================================
 describe("ActionControllerRequiredParamsTest", () => {
   it("missing required parameters will raise exception", () => {
     const params = new Parameters({ name: "John" });

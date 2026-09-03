@@ -1,12 +1,4 @@
 import { dup, hasKey, merge, mergeBang } from "@blazetrails/ruby-compat";
-/**
- * ActionController::Renderer
- *
- * Renders json, plain text, or HTML outside of controller actions.
- * Returns the rendered body string, matching Rails' Renderer#render.
- * Template/partial rendering requires integration with LookupContext.
- * @see https://api.rubyonrails.org/classes/ActionController/Renderer.html
- */
 
 import type { RouteSetLike } from "../abstract-controller/url-for.js";
 import { resolveStatus } from "./metal/status-codes.js";
@@ -37,7 +29,6 @@ export class Renderer {
     return new Renderer(controller, env, defaults);
   }
 
-  /** Derive a new Renderer with the given Rack env (Rails: Renderer#new). */
   new(env: Record<string, unknown> | null = null): Renderer {
     return new Renderer(this._controller, env, this._defaults);
   }
@@ -86,7 +77,6 @@ export class Renderer {
     return this._controller;
   }
 
-  /** The normalized Rack env that would be passed to a request. */
   get env(): Record<string, unknown> {
     return this.envForRequest();
   }
@@ -99,16 +89,7 @@ export class Renderer {
     return this.render(options);
   }
 
-  /**
-   * Build the Rack env for a request. Mirrors Rails:
-   *   env_for_request: if @env has HTTP_HOST or controller has no routes,
-   *   return a copy of @env; otherwise merge @env on top of the routes'
-   *   default_env so explicit overrides win.
-   */
   private envForRequest(): Record<string, unknown> {
-    // Narrow to the slice we actually need — `_routes` may be supplied as
-    // a partial `RouteSetLike` (some callers/tests provide only
-    // `defaultEnv` and skip `namedRoutes`).
     type EnvSlice = Pick<RouteSetLike, "defaultEnv">;
     const routes = (this._controller as { _routes?: EnvSlice | null } | null | undefined)?._routes;
     if (hasKey(this._env, "HTTP_HOST") || !routes) {

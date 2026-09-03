@@ -1,22 +1,3 @@
-/**
- * Ruby's stdlib `MonitorMixin` (`monitor.rb`), the reentrant lock Rails classes
- * pick up with `include MonitorMixin` — e.g.
- * `ActiveRecord::ConnectionAdapters::PoolConfig` at `pool_config.rb:6`.
- *
- * There is no Rails file to mirror because `monitor` is Ruby stdlib, so this
- * lives next to the other lock primitive we already carry
- * (`concurrency/null-lock.ts`). The names it exports are Rails' own — Rails
- * calls `synchronize` and includes `MonitorMixin` — so they score as moved,
- * not as invented surface, and the file carries no `@noRailsEquivalent`.
- *
- * Ruby's monitor is owned by a Thread; ours is owned by an async chain, via an
- * AsyncContext-token scheme: each acquisition mints a fresh symbol stored both in the
- * AsyncContext and on the monitor, and reentry requires both to match — so a
- * detached task that inherits the AsyncContext but outlives the holder's
- * release correctly queues for the lock instead of walking into it.
- *
- */
-
 import {
   getAsyncContext,
   type AsyncContext,
@@ -30,11 +11,6 @@ interface MonData {
   adapter: AsyncContextAdapter | null;
 }
 
-/**
- * Ruby's `@mon_data`, kept off the host object: in Ruby these ivars come from
- * the mixin, not from the including class, so the ported class stays a
- * line-for-line match for its Rails counterpart.
- */
 const MON_DATA = new WeakMap<object, MonData>();
 
 function monData(self: object): MonData {
@@ -51,32 +27,6 @@ function monData(self: object): MonData {
   return data;
 }
 
-/**
- * Mirrors: `MonitorMixin#synchronize` — enter the monitor, run the block, exit
- * it however the block leaves, and return the block's value. Reentrant: a call
- * made from inside the critical section runs straight through rather than
- * deadlocking on the lock it already holds.
- *
- * Waiters queue rather than re-test: each caller reads the current tail,
- * publishes its own link as the new tail, and only then awaits the tail it
- * found — all synchronously, before its first `await`. So arrival order fixes
- * service order and there is no window in which a caller entering in the same
- * turn as a release observes a free lock and overtakes a parked waiter. Ruby's
- * `Monitor` is FIFO-fair per thread, so Rails has no such barge either.
- *
- * No `@mon_count`: Ruby needs one because `mon_exit` can be called explicitly,
- * so the release has to be gated on the nesting depth reaching zero. Here the
- * only exit is the outer call's `finally`, and a reentrant call cannot reach
- * it, so the count would have nothing to gate.
- *
- * Assign it onto a class to spell Ruby's `include MonitorMixin`:
- *
- * ```ts
- * class PoolConfig {
- *   synchronize = synchronize;
- * }
- * ```
- */
 export async function synchronize<T>(this: object, block: () => T | Promise<T>): Promise<T> {
   const data = monData(this);
   const storage = data.storage!;
@@ -107,19 +57,10 @@ export async function synchronize<T>(this: object, block: () => T | Promise<T>):
   }
 }
 
-/**
- * The host side of `include MonitorMixin` — what a class gains by assigning
- * {@link synchronize}.
- */
 export interface MonitorMixin {
   synchronize<T>(block: () => T | Promise<T>): Promise<T>;
 }
 
-/**
- * Ruby stdlib's `Monitor` — the class that is nothing but `Object` plus
- * `MonitorMixin`, and the superclass Rails' own monitors derive from
- * (`ActiveSupport::Concurrency::LoadInterlockAwareMonitor < Monitor`).
- */
 export class Monitor implements MonitorMixin {
   synchronize = synchronize;
 }

@@ -9,24 +9,11 @@ import {
 } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
 
-/**
- * ActionView::Helpers::OutputSafetyHelper
- *
- * Provides raw, safe_join, and to_sentence — html_safe-aware helpers.
- */
-
-/**
- * raw — marks a string as HTML safe without escaping.
- */
 export function raw(stringish: unknown): SafeBuffer {
   if (stringish instanceof OutputBuffer) return htmlSafe(stringish.toStr());
   return htmlSafe(String(stringish ?? ""));
 }
 
-/**
- * safeJoin — joins an array with a separator, escaping non-html_safe elements.
- * Both elements and separator are escaped unless html_safe.
- */
 export function safeJoin(array: unknown[], sep?: string | SafeBuffer | null): SafeBuffer {
   const escapedSep = unwrappedHtmlEscape(sep ?? "");
 
@@ -55,10 +42,6 @@ export interface ToSentenceOptions {
   locale?: string | false;
 }
 
-/**
- * toSentence — converts an array to a comma-separated sentence.
- * HTML-safe-aware version of Array#to_sentence.
- */
 export function toSentence(array: unknown[], options: ToSentenceOptions = {}): SafeBuffer {
   assertValidKeys(options as Record<string, unknown>, [
     "wordsConnector",
@@ -79,9 +62,6 @@ export function toSentence(array: unknown[], options: ToSentenceOptions = {}): S
   for (const [k, v] of Object.entries(i18nConnectors)) {
     defaultConnectors[camelize(k, "lower")] = v;
   }
-  // Ruby's `default_connectors.merge!(options)` overrides on key presence; a TS
-  // caller forwarding an absent option passes `undefined`, which must not
-  // override, so the merge skips `undefined` values.
   for (const [k, v] of Object.entries(options)) {
     if (v !== undefined) defaultConnectors[k] = v as string | SafeBuffer | null;
   }

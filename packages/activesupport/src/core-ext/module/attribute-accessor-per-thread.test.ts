@@ -13,7 +13,6 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     class Parent {}
     mattrAccessor.call(Parent, "shared", { default: 42 });
     class Child extends Parent {}
-    // Class-level accessor is on the class object, not prototype-chained
     expect((Parent as unknown as Record<string, unknown>).shared).toBe(42);
   });
 
@@ -21,7 +20,6 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     const defaultArr = [1, 2, 3];
     class M {}
     mattrAccessor.call(M, "list", { default: defaultArr });
-    // The stored value is independent; setting a different value doesn't affect default
     const cls = M as unknown as Record<string, unknown>;
     const val = cls.list;
     expect(val).toEqual([1, 2, 3]);
@@ -52,9 +50,7 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     class M {}
     mattrAccessor.call(M, "x_rw", { instanceWriter: false, default: "val" });
     const cls = M as unknown as Record<string, unknown>;
-    // Class-level getter/setter works
     expect(cls.x_rw).toBe("val");
-    // Instance getter should read the class value
     const inst = new M() as Record<string, unknown>;
     expect(inst.x_rw).toBe("val");
   });
@@ -63,8 +59,6 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     class M {}
     mattrAccessor.call(M, "y", { instanceReader: false });
     const inst = new M() as Record<string, unknown>;
-    // Instance should not have a getter-based property
-    // (the property won't be defined on prototype if instanceReader: false)
     const cls = M as unknown as Record<string, unknown>;
     cls.y = "class-val";
     expect(cls.y).toBe("class-val");
@@ -95,8 +89,6 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     mattrAccessor.call(Parent, "attr_v");
     const pCls = Parent as unknown as Record<string, unknown>;
     pCls.attr_v = "parent";
-    // Subclass has its own storage only if we set up separate mattrAccessor
-    // In JS, class attrs are on the class object — subclass doesn't automatically inherit writes
     expect(pCls.attr_v).toBe("parent");
   });
 
@@ -107,7 +99,6 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     expect(b.setting).toBe("base");
     b.setting = "changed";
     expect(b.setting).toBe("changed");
-    // Another class with same default is independent
     class Other {}
     mattrAccessor.call(Other, "setting", { default: "base" });
     expect((Other as unknown as Record<string, unknown>).setting).toBe("base");

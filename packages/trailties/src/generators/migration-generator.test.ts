@@ -124,9 +124,7 @@ describe("MigrationGeneratorTest", () => {
     expect(content).toMatch(/removeReference\("books", "distributor",.*polymorphic: true/);
   });
 
-  it.skip("remove migration with references removes foreign keys when primary key uuid", () => {
-    // Needs --primary_key_type=uuid support on remove migrations
-  });
+  it.skip("remove migration with references removes foreign keys when primary key uuid", () => {});
 
   it("add migration with attributes and indices", () => {
     const gen = makeGen();
@@ -189,13 +187,9 @@ describe("MigrationGeneratorTest", () => {
     expect(content).toMatch(/addReference\("books", "distributor",.*polymorphic: true/);
   });
 
-  it.skip("add migration with references adds null false by default", () => {
-    // Needs belongs_to_required_by_default config support
-  });
+  it.skip("add migration with references adds null false by default", () => {});
 
-  it.skip("add migration with references does not add belongs to when required by default global config is false", () => {
-    // Needs belongs_to_required_by_default config support
-  });
+  it.skip("add migration with references does not add belongs to when required by default global config is false", () => {});
 
   it("add migration with references adds foreign keys", () => {
     const gen = makeGen();
@@ -250,17 +244,11 @@ describe("MigrationGeneratorTest", () => {
     expect(content).toMatch(/createTable\("books", \{ id: "uuid" \}/);
   });
 
-  it.skip("add migration with references options when primary key uuid", () => {
-    // Needs --primary_key_type=uuid on add_reference
-  });
+  it.skip("add migration with references options when primary key uuid", () => {});
 
-  it.skip("database puts migrations in configured folder", () => {
-    // Needs --database option support
-  });
+  it.skip("database puts migrations in configured folder", () => {});
 
-  it.skip("database puts migrations in configured folder with aliases", () => {
-    // Needs --db alias support
-  });
+  it.skip("database puts migrations in configured folder with aliases", () => {});
 
   it("should create empty migrations if name not start with add or remove or create", () => {
     const gen = makeGen();
@@ -270,21 +258,13 @@ describe("MigrationGeneratorTest", () => {
     expect(content).toMatch(/change\(\).*\{[\s]*\}/s);
   });
 
-  it.skip("properly identifies usage file", () => {
-    // Not applicable in TS implementation
-  });
+  it.skip("properly identifies usage file", () => {});
 
-  it.skip("migration with singular table name", () => {
-    // Needs singular table name config
-  });
+  it.skip("migration with singular table name", () => {});
 
-  it.skip("create join table migration with singular table name", () => {
-    // Needs singular table name config
-  });
+  it.skip("create join table migration with singular table name", () => {});
 
-  it.skip("create table migration with singular table name", () => {
-    // Needs singular table name config
-  });
+  it.skip("create table migration with singular table name", () => {});
 
   it("create table migration with token option", () => {
     const gen = makeGen();
@@ -305,9 +285,7 @@ describe("MigrationGeneratorTest", () => {
     expect(content).toMatch(/addIndex\("users", "auth_token", \{ unique: true \}/);
   });
 
-  it.skip("add migration to configured path", () => {
-    // Needs configurable migration path
-  });
+  it.skip("add migration to configured path", () => {});
 
   it("add migration ignores virtual attributes", () => {
     const gen = makeGen();

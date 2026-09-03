@@ -1,11 +1,3 @@
-/**
- * ActionController::Flash
- *
- * Flash message integration for controllers. Provides add_flash_types
- * and integrates flash with redirect_to.
- * @see https://api.rubyonrails.org/classes/ActionController/Flash.html
- */
-
 export class FlashTypeRegistry {
   private _types: Set<string> = new Set(["alert", "notice"]);
 
@@ -41,7 +33,7 @@ export class FlashTypeRegistry {
     return remaining;
   }
 
-  /** Rails `Flash::ClassMethods#action_methods` — filters flash type names out of the controller's public action set. @internal */
+  /** @internal */
   actionMethods(superMethods: Set<string>): Set<string> {
     const result = new Set(superMethods);
     for (const type of this._types) {

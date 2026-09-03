@@ -1,7 +1,3 @@
-// Cover for `NamedRouteCollection` (`action_dispatch/routing/route_set.rb:60-348`)
-// and the two helper modules `generate_url_helpers` includes (`:594-609`).
-// Trails-only — Rails proves these through `actionpack/test/controller/routing_test.rb`,
-// which is not enrolled here yet.
 import { describe, it, expect } from "vitest";
 import { RouteSet, type UrlHelperContext } from "./route-set.js";
 
@@ -24,8 +20,6 @@ describe("NamedRouteCollection", () => {
     expect(named.length()).toBe(2);
     expect(named.keyQ("posts")).toBe(true);
     expect(named.keyQ("nope")).toBe(false);
-    // `route_defined?` takes the suffixed selector its Rails caller passes
-    // (`testing/assertions/routing.rb:266`), not the bare route name.
     expect(named.routeDefinedQ("postsPath")).toBe(true);
     expect(named.routeDefinedQ("posts")).toBe(false);
   });

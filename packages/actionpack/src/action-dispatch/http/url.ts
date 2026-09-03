@@ -1,13 +1,3 @@
-/**
- * ActionDispatch::Http::URL
- *
- * Port of `actionpack/lib/action_dispatch/http/url.rb`.
- *
- * Provides the class-level URL helpers (extractDomain, urlFor, pathFor, etc.)
- * used by routing to assemble URLs from option hashes. The corresponding
- * instance methods (url, host, port, ...) live on {@link Request}.
- */
-
 import { isBlank, toParam, toQuery } from "@blazetrails/activesupport";
 import { escapeFragment, rackEscape } from "../journey/router/utils.js";
 
@@ -15,15 +5,7 @@ const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const HOST_REGEXP = /(^[^:]+:\/\/)?(\[[^\]]+\]|[^:]+)(?::(\d+$))?/;
 const PROTOCOL_REGEXP = /^([^:]+)(:)?(\/\/)?$/;
 
-/**
- * The options hash `urlFor` / `pathFor` accept. In Ruby this is a bare `Hash`
- * with no constant of its own.
- *
- * @noRailsEquivalent PERMANENT — name collision only. The Ruby
- * `ActionDispatch::Integration::UrlOptions` (`testing/integration.rb`) is an
- * integration-test mixin that supplies `url_options`; it has nothing to do
- * with this option-hash shape.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface UrlOptions {
   host?: string;
   protocol?: string | false | null;
@@ -55,10 +37,6 @@ function extractDomainFrom(host: string, tldLength: number): string {
 /** @internal */
 function extractSubdomainsFrom(host: string, tldLength: number): string[] {
   const parts = host.split(".");
-  // Rails: `parts[0..-(tld_length + 2)]` returns `[]` (not the tail) when the
-  // host has fewer parts than the TLD requires. JS `Array#slice` with a
-  // negative `end` would otherwise drop array *elements* off the end —
-  // e.g. `["example", "com"].slice(0, -1) === ["example"]` — so clamp at 0.
   return parts.slice(0, Math.max(0, parts.length - (tldLength + 1)));
 }
 
@@ -161,38 +139,18 @@ function buildHostUrl(
   return result;
 }
 
-/**
- * ActionDispatch::Http::URL — class-level helpers.
- *
- * Instance methods (url, host, port, ...) live on {@link Request}.
- */
 export const URL = {
   secureProtocol: false as boolean,
   tldLength: 1 as number,
 
-  /**
-   * Returns the domain part of a host given the domain level.
-   *
-   *     URL.extractDomain('www.example.com', 1) // => "example.com"
-   *     URL.extractDomain('dev.www.example.co.uk', 2) // => "example.co.uk"
-   */
   extractDomain(host: string, tldLength: number): string | null {
     return namedHost(host) ? extractDomainFrom(host, tldLength) : null;
   },
 
-  /**
-   * Returns the subdomains of a host as an Array given the domain level.
-   *
-   *     URL.extractSubdomains('www.example.com', 1) // => ["www"]
-   *     URL.extractSubdomains('dev.www.example.co.uk', 2) // => ["dev", "www"]
-   */
   extractSubdomains(host: string, tldLength: number): string[] {
     return namedHost(host) ? extractSubdomainsFrom(host, tldLength) : [];
   },
 
-  /**
-   * Returns the subdomains of a host as a String given the domain level.
-   */
   extractSubdomain(host: string, tldLength: number): string {
     return URL.extractSubdomains(host, tldLength).join(".");
   },

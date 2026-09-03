@@ -1,54 +1,30 @@
-/**
- * ActionDispatch::Session::CookieStore
- *
- * Mirrors `vendor/rails/actionpack/lib/action_dispatch/middleware/session/cookie_store.rb`.
- *
- * Cookie-based session store. Sessions are serialized into the
- * `signed_or_encrypted` cookie jar and round-trip through the request's
- * cookie jar bridge — the secret-key plumbing lives in
- * `ActionDispatch::Cookies`, not here.
- */
-
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { SessionId as RackSessionId } from "@blazetrails/rack-session";
 import { AbstractSecureStore } from "./abstract-store.js";
 
-/** @internal Minimum shape this store needs out of `ActionDispatch::Request`. */
+/** @internal */
 export interface CookieStoreRequest {
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   setHeader(key: string, value: unknown): void;
   cookieJar(): { signedOrEncrypted: CookieJarLike };
 }
 
-/**
- * @internal Minimum shape this store needs out of the cookie jar. Ruby's
- * `[]`/`[]=` (`cookie_store.rb:107,111`) are `get`/`set` in TS.
- */
+/** @internal */
 export interface CookieJarLike {
   get(key: string): unknown;
   set(key: string, value: unknown): void;
 }
 
-/**
- * Rails: `class SessionId < DelegateClass(Rack::Session::SessionId)`
- * (`cookie_store.rb:53-59`). `DelegateClass` builds a wrapper, not a subclass:
- * it holds the `Rack::Session::SessionId` and forwards its public surface,
- * which is why `attr_reader :cookie_value` (`cookie_store.rb:54`) freely
- * replaces the delegate's `alias :cookie_value :public_id`
- * (`vendor/rack-session/lib/rack/session/abstract/id.rb:34`) with the cookie hash.
- */
 export class SessionId {
   readonly #obj: RackSessionId;
   readonly #cookieValue: Record<string, unknown>;
 
-  /** Rails: `initialize(session_id, cookie_value = {})` (`cookie_store.rb:56-59`). */
   constructor(sessionId: RackSessionId, cookieValue: Record<string, unknown> = {}) {
     this.#obj = sessionId;
     this.#cookieValue = cookieValue;
   }
 
-  /** Rails: `attr_reader :cookie_value` (`cookie_store.rb:54`). */
   get cookieValue(): Record<string, unknown> {
     return this.#cookieValue;
   }
@@ -74,10 +50,7 @@ export class SessionId {
   }
 }
 
-/**
- * Rails: `DEFAULT_SAME_SITE = proc { |request| request.cookies_same_site_protection }`.
- * @internal
- */
+/** @internal */
 export const DEFAULT_SAME_SITE = (request: {
   cookiesSameSiteProtection?: () => unknown;
 }): unknown => request.cookiesSameSiteProtection?.();
@@ -88,7 +61,6 @@ export interface CookieStoreSessionOptions {
   [key: string]: unknown;
 }
 
-/** Rails: `class CookieStore < AbstractSecureStore`. */
 export class CookieStore extends AbstractSecureStore {
   constructor(app?: RackApp, options: CookieStoreSessionOptions = {}) {
     options.cookieOnly = true;
@@ -98,7 +70,6 @@ export class CookieStore extends AbstractSecureStore {
     super(app, options);
   }
 
-  /** Rails: `delete_session(req, session_id, options)`. */
   deleteSession(
     req: any,
     _sessionId: unknown,
@@ -112,7 +83,6 @@ export class CookieStore extends AbstractSecureStore {
     return newSid;
   }
 
-  /** Rails: `load_session(req)`. */
   loadSession(req: any): [RackSessionId, Record<string, unknown>] {
     return this.staleSessionCheckBang(() => {
       let data = this.unpackedCookieData(req);
@@ -121,7 +91,7 @@ export class CookieStore extends AbstractSecureStore {
     });
   }
 
-  /** @internal Rails: `extract_session_id(req)` (private). */
+  /** @internal */
   extractSessionId(req: any): RackSessionId | null {
     return this.staleSessionCheckBang(() => {
       const sid = this.unpackedCookieData(req)["session_id"];
@@ -129,7 +99,7 @@ export class CookieStore extends AbstractSecureStore {
     });
   }
 
-  /** @internal Rails: `unpacked_cookie_data(req)` (private). */
+  /** @internal */
   unpackedCookieData(req: CookieStoreRequest): Record<string, unknown> {
     return req.fetchHeader("action_dispatch.request.unsigned_session_cookie", (k: string) => {
       const v = this.staleSessionCheckBang(() => {
@@ -141,7 +111,7 @@ export class CookieStore extends AbstractSecureStore {
     }) as Record<string, unknown>;
   }
 
-  /** @internal Rails: `persistent_session_id!(data, sid = nil)` (private). */
+  /** @internal */
   persistentSessionIdBang(
     data: Record<string, unknown> | null | undefined,
     sid: RackSessionId | null = null,
@@ -153,7 +123,7 @@ export class CookieStore extends AbstractSecureStore {
     return out;
   }
 
-  /** @internal Rails: `write_session(req, sid, session_data, options)` (private). */
+  /** @internal */
   writeSession(
     _req: CookieStoreRequest | PersistedRequest,
     sid: RackSessionId,
@@ -164,21 +134,21 @@ export class CookieStore extends AbstractSecureStore {
     return new SessionId(sid, sessionData);
   }
 
-  /** @internal Rails: `set_cookie(request, session_id, cookie)` (private). */
+  /** @internal */
   override setCookie(request: any, _sessionId: unknown, cookie: unknown): void {
     this.cookieJar(request).set(this.key, cookie);
   }
 
-  /** @internal Rails: `get_cookie(req)` (private). */
+  /** @internal */
   getCookie(req: CookieStoreRequest): unknown {
     return this.cookieJar(req).get(this.key);
   }
 
-  /** @internal Rails: `cookie_jar(request)` (private). */
+  /** @internal */
   cookieJar(request: CookieStoreRequest): CookieJarLike {
     return request.cookieJar().signedOrEncrypted;
   }
 
-  /** @internal Inherited from `StaleSessionCheck`; declared for type narrowing. */
+  /** @internal */
   declare staleSessionCheckBang: <T>(block: () => T) => T;
 }

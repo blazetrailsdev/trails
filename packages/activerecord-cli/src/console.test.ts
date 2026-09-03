@@ -9,7 +9,6 @@ function makeReplStub() {
   const server = {
     context: {} as Record<string, unknown>,
     on(event: string, cb: () => void) {
-      // Fire the exit handler immediately so arConsole resolves in tests.
       if (event === "exit") setImmediate(cb);
       return server;
     },

@@ -5,9 +5,7 @@ import type { NotificationEvent as Event } from "@blazetrails/activesupport";
 import type { RackApp, RackBody, RackResponse } from "@blazetrails/rack";
 
 const emptyBody = (): RackBody => ({
-  async *[Symbol.asyncIterator]() {
-    /* empty */
-  },
+  async *[Symbol.asyncIterator]() {},
 });
 
 const okApp: RackApp = async () => [200, {}, emptyBody()];

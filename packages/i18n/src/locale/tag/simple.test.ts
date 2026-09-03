@@ -1,5 +1,3 @@
-/** Mirrors: i18n/test/locale/tag/simple_test.rb */
-
 import { describe, expect, it } from "vitest";
 
 import { Simple } from "./simple.js";

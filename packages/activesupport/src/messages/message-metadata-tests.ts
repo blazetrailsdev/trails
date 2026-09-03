@@ -33,16 +33,6 @@ export function freezeTime(
   }
 }
 
-/**
- * Ruby's `Time#<=>` coerces a non-Time operand through `to_datetime <=> other`
- * (activesupport/lib/active_support/core_ext/time/calculations.rb:329-343), so
- * `Time.local(2004) == "2004-01-01 00:00:00 -0500"` is true and Rails'
- * `assert_equal data, ...` holds over {@link DATA} even under the serializers
- * that decode the time back as a string. JS equality has no such coercion, so
- * the two spellings `ActiveSupport::JSON` can render an instant in —
- * `xmlschema` and the `use_standard_json_time_format = false` slash format
- * (`core-ext/object/json.ts` `Time.asJson`) — are compared the same way here.
- */
 expect.addEqualityTesters([
   function (a: unknown, b: unknown): boolean | undefined {
     const [instant, other] =
@@ -64,10 +54,8 @@ expect.addEqualityTesters([
   },
 ]);
 
-/** Rails' `Time.local(2004)`. */
 const A_TIME = Temporal.Instant.from("2004-01-01T00:00:00Z");
 
-/** Rails' `DATA`. */
 const DATA: readonly unknown[] = [
   "a string",
   { a_number: 123, a_time: A_TIME, an_object: { key: "value" } },
@@ -84,11 +72,6 @@ const CustomSerializer: MessageSerializer = {
   },
 };
 
-/**
- * Rails' `SERIALIZERS`. Rails lists `JSON` and `ActiveSupport::JSON`
- * separately; trails' `:json` serializer is `ActiveSupport::JSON`, so those
- * two entries collapse into one.
- */
 const SERIALIZERS: readonly (Format | MessageSerializer)[] = [
   "marshal",
   "json",
@@ -112,17 +95,12 @@ export function eachScenario<T>(
   }
 }
 
-/** Rails' `make_codec` / `encode` / `decode`, which each including test supplies. */
 export interface MetadataCodecHooks<T> {
   makeCodec(serializer: Format | MessageSerializer): T;
   encode(data: unknown, codec: T, options?: MetadataOptions): string;
   decode(message: string, codec: T, options?: ExpectedMetadataOptions): unknown;
 }
 
-/**
- * Rails' `MessageMetadataTests` — the module both `MessageVerifierMetadataTest`
- * and `MessageEncryptorMetadataTest` `include`.
- */
 export function messageMetadataTests<T>(hooks: MetadataCodecHooks<T>): void {
   const { makeCodec, encode, decode } = hooks;
 
@@ -162,10 +140,6 @@ export function messageMetadataTests<T>(hooks: MetadataCodecHooks<T>): void {
       assertNoRoundtrip(data, codec, {}, { purpose: "x" });
     });
   });
-
-  // Rails' ":purpose can be a symbol" has no analogue here: JS has no Ruby
-  // symbol, and `String(Symbol("x"))` is `"Symbol(x)"` rather than `"x"`, so a
-  // JS symbol is not the string-interchangeable value that case asserts about.
 
   it("message expires with :expires_at", () => {
     freezeTime((travel) => {

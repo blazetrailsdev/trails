@@ -1,7 +1,3 @@
-// Unit smoke for LazyRouteSet. Rails' `railties/test/engine/lazy_route_set_test.rb`
-// requires a fully-booted application + mounted engine (PR 2.5 / 2.6 / engine
-// mounting). Test names here mirror the routing-op being exercised; the full
-// Rails-mirrored cases land alongside the Application + engine-mount wiring.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mapper } from "@blazetrails/actionpack";
 import { RouteSet } from "@blazetrails/actionpack";

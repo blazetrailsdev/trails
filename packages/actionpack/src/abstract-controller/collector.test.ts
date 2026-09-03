@@ -2,14 +2,6 @@ import { describe, expect, it } from "vitest";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { Collector, generateMethodForMime } from "./collector.js";
 
-// ==========================================================================
-// abstract/collector_test.rb
-// ==========================================================================
-
-// Rails' `MyCollector` records each per-MIME invocation as
-// `[mime, args, kwargs, block]`. JS has no kwargs/block distinction;
-// we record `[mime, args]` and treat the last arg as the "block" when
-// it's a function (mirroring Rails' &block sugar).
 class MyCollector extends Collector {
   responses: [MimeType, unknown[], (() => unknown) | null][] = [];
   custom(mime: MimeType, ...args: unknown[]): unknown {
@@ -34,11 +26,6 @@ describe("TestCollector", () => {
   });
 
   it("register mime types on method missing", () => {
-    // Rails: `remove_method :js`; first call → method_missing →
-    // define_method. JS has no method_missing; trails' Proxy dispatches
-    // dynamically every call. The behavioral parity is "MIME types
-    // become reachable as soon as they're registered" — exercise that
-    // by unregistering and re-registering js.
     MimeType.unregister("js");
     try {
       const collector = new MyCollector();
@@ -77,12 +64,6 @@ describe("TestCollector", () => {
   });
 });
 
-// ==========================================================================
-// trails-only Proxy-shape coverage — no Rails counterpart. Kept here
-// because every assertion targets a Proxy edge case that doesn't exist
-// in Rails (then/catch/inspect collisions, JSON.stringify, late MIME
-// registration via the Proxy, undefined-shadowing).
-// ==========================================================================
 class TestCollector extends Collector {
   readonly calls: [string, unknown[]][] = [];
   custom(mime: MimeType, ...args: unknown[]): unknown {

@@ -1,10 +1,3 @@
-/**
- * trails-only coverage for `./time.ts`, the `::Time` duck type. The gem has no
- * test of its own for Ruby core `::Time`, so these assert the two constructors
- * against MRI's documented behaviour: `Time.utc` is UTC, `Time.new` is local,
- * and `%z`/`%Z` answer the receiver's zone rather than a constant.
- */
-
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./date.js";
@@ -38,18 +31,11 @@ describe("Time", () => {
     const time = new Time(2008, 3, 1, 6, 0, 0, "-05:00");
     expect(time.hour).toBe(6);
     expect(time.utcOffset).toBe(-5 * 3600);
-    // MRI answers no abbreviation for an offset-built time, so `%Z` is empty.
     expect(time.zone).toBeNull();
     expect(time.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-03-01 06:00:00 -0500 ");
   });
 
   it("Time.new takes the zone as MRI's `in:` keyword", () => {
-    // MRI 3.3:
-    //   Time.new(2020, 1, 1, in: "+05:00").to_s       #=> "2020-01-01 00:00:00 +0500"
-    //   Time.new(2020, 1, 1, in: "+05:00").utc_offset #=> 18000
-    //   Time.now(in: "+05:00").utc_offset             #=> 18000
-    //   Time.new(2020, 1, in: "+05:00").to_s          #=> "2020-01-01 00:00:00 +0500"
-    //   Time.new(2020, 1, 1, 5, in: "+05:00").to_s    #=> "2020-01-01 05:00:00 +0500"
     expect(Time.new(2020, 1, 1, { in: "+05:00" }).toS()).toBe("2020-01-01 00:00:00 +0500");
     expect(Time.new(2020, 1, 1, { in: "+05:00" }).utcOffset).toBe(18000);
     expect(Time.new(2020, 1, 1, 0, 0, 0, { in: "+05:00" }).utcOffset).toBe(18000);
@@ -59,11 +45,6 @@ describe("Time", () => {
   });
 
   it("Time.new takes the zone as MRI's seventh positional", () => {
-    // MRI 3.3:
-    //   Time.new(2020, 1, 1, 0, 0, 0, "+05:00").utc_offset #=> 18000
-    //   Time.new(2020, 1, 1, 0, 0, 0, 3600).utc_offset     #=> 3600
-    //   Time.new(2020, 1, 1, 0, 0, 0, "+05:00", in: "+06:00")
-    //     #=> ArgumentError: timezone argument given as positional and keyword arguments
     expect(Time.new(2020, 1, 1, 0, 0, 0, "+05:00").utcOffset).toBe(18000);
     expect(Time.new(2020, 1, 1, 0, 0, 0, 3600).utcOffset).toBe(3600);
     expect(() => Time.new(2020, 1, 1, 0, 0, 0, "+05:00", { in: "+06:00" })).toThrow(
@@ -72,9 +53,6 @@ describe("Time", () => {
   });
 
   it("Time.new takes MRI's `precision:` keyword, which trims only a string argument", () => {
-    // MRI 3.3 applies `precision:` to the STRING form alone:
-    //   Time.new(2020, 1, 1, 0, 0, 0.56789, precision: 3).nsec #=> 567890000
-    // and `Time.new(precision: 3)` is just the current time.
     expect(Time.new(2020, 1, 1, 0, 0, 0.56789, { precision: 3 }).nsec).toBe(567890000);
     expect(Time.new({ precision: 3 })).toBeInstanceOf(Time);
   });
@@ -104,7 +82,6 @@ describe("Time", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, "K").utcOffset).toBe(10 * 3600);
     expect(new Time(2008, 3, 1, 6, 0, 0, "Y").utcOffset).toBe(-12 * 3600);
     expect(new Time(2008, 3, 1, 6, 0, 0, "K").strftime("%z %Z")).toBe("+1000 ");
-    // MRI treats `"Z"` as UTC itself, so it keeps a zone where an offset does not.
     expect(new Time(2008, 3, 1, 6, 0, 0, "Z").strftime("%z %Z")).toBe("+0000 UTC");
   });
 
@@ -144,8 +121,6 @@ describe("Time", () => {
     expect(time.strftime("%z")).toBe(local.offset.replace(":", ""));
   });
 
-  // Every expectation below was read off a live `ruby -e`, e.g.
-  // `Time.utc(2008, 3, 1, 6, 0, 0.3).nsec # => 299999999`.
   it("Time.utc keeps a fractional second", () => {
     const time = Time.utc(2008, 3, 1, 6, 0, 0.5);
     expect(time.sec).toBe(0);
@@ -174,8 +149,6 @@ describe("Time", () => {
   });
 
   it("the usec positional is exact, matching the Rational spelling", () => {
-    // ruby 3.3.11:
-    //   Time.utc(2005, 2, 27, 23, 50, 19, 275038).nsec  #=> 275038000
     expect(Time.utc(2005, 2, 27, 23, 50, 19, 275038).toTime().epochNanoseconds).toBe(
       Time.utc(2005, 2, 27, 23, 50, new Rational(19275038, 1000000)).toTime().epochNanoseconds,
     );
@@ -186,11 +159,6 @@ describe("Time", () => {
   });
 
   it("a usec positional truncates sec to a whole second, as MRI's does", () => {
-    // ruby 3.3.11:
-    //   Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec                #=> 5000
-    //   Time.utc(2008, 3, 1, 6, 0, 0.3, 0.5).nsec              #=> 500
-    //   Time.utc(2008, 3, 1, 6, 0, Rational(1, 3), 0).nsec     #=> 0
-    //   Time.utc(2008, 3, 1, 6, 0, 0.3).nsec                   #=> 299999999
     expect(Time.utc(2008, 3, 1, 6, 0, 0.3, 5).nsec).toBe(5000);
     expect(Time.utc(2008, 3, 1, 6, 0, 0.3, 0.5).nsec).toBe(500);
     expect(Time.utc(2008, 3, 1, 6, 0, new Rational(1, 3), 0).nsec).toBe(0);
@@ -198,13 +166,6 @@ describe("Time", () => {
   });
 
   it("Time.new takes a Rational second, as MRI's does", () => {
-    // ruby 3.3.11:
-    //   Time.new(2008, 3, 1, 6, 0, Rational(1, 3)).nsec           #=> 333333333
-    //   Time.new(2008, 3, 1, 6, 0, Rational(1, 3)).strftime("%9N") #=> "333333333"
-    //   Time.new(2008, 3, 1, 6, 0, Rational(7, 2)).sec            #=> 3
-    // MRI's `::Time` holds the second as a Rational, which is the form
-    // `datetime_to_time` (`date_core.c:9053-9055`) passes as
-    // `f_add(INT2FIX(m_sec(dat)), m_sf_in_sec(dat))`.
     const time = new Time(2008, 3, 1, 6, 0, new Rational(1, 3), "UTC");
     expect(time.sec).toBe(0);
     expect(time.nsec).toBe(333333333);
@@ -298,9 +259,6 @@ describe("Time", () => {
     });
 
     it("Time.at answers the exact instant inside a DST fall-back's repeated hour", () => {
-      // America/New_York falls back at 2008-11-02 02:00 EDT, so 01:30 local
-      // names two instants: 05:30 UTC at -0400 and 06:30 UTC at -0500. MRI's
-      // `::Time` holds the epoch, so `Time.at` answers each of them exactly.
       inZone("America/New_York");
       const edt = Time.at(1225603800);
       expect(edt.strftime("%Y-%m-%d %H:%M:%S %z %Z")).toBe("2008-11-02 01:30:00 -0400 EDT");
@@ -421,15 +379,12 @@ describe("Time", () => {
         Time.new("2000-12-31 23:59:59.567").nsec,
       );
       expect(Time.new("2000-12-31 23:59:59.56789", { precision: 20 }).nsec).toBe(567890000);
-      // A negative `precision` truncates nothing, as `nil` does.
       expect(Time.new("2000-12-31 23:59:59.56789", { precision: -1 }).nsec).toBe(567890000);
-      // `precision:` acts on nothing but the string form.
       expect(Time.new(2020, 1, 1, 0, 0, 0.56789, null, { precision: 3 }).nsec).toBe(567890000);
     });
 
     it("takes `in:` for a string that spells no zone of its own", () => {
       expect(Time.new("2020-01-01 00:00:00", { in: "+05:00" }).utcOffset).toBe(18000);
-      // MRI does NOT collide the two: the zone the string spells wins.
       expect(Time.new("2020-01-01 00:00:00+01:00", { in: "+05:00" }).utcOffset).toBe(3600);
     });
 

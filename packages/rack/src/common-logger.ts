@@ -46,7 +46,6 @@ export class CommonLogger {
     elapsed: number,
     logger: any,
   ): void {
-    // Determine client IP
     let addr: string;
     if (env["HTTP_X_FORWARDED_FOR"]) {
       addr = env["HTTP_X_FORWARDED_FOR"].split(",")[0].trim();
@@ -66,7 +65,6 @@ export class CommonLogger {
     const time = elapsed.toFixed(4);
 
     // boundary: Common Log Format timestamp (`[10/Oct/2000:13:55:36 -0700]`)
-    // is built from JS Date components.
     const now = new Date();
     const months = [
       "Jan",

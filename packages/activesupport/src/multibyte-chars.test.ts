@@ -335,7 +335,7 @@ describe("MultibyteCharsUTF8BehaviorTest", () => {
   });
 
   it("ord should return unicode value for first character", () => {
-    expect(UNICODE_STRING.codePointAt(0)).toBe(0x3053); // こ
+    expect(UNICODE_STRING.codePointAt(0)).toBe(0x3053);
   });
 
   it("upcase should upcase ascii characters", () => {

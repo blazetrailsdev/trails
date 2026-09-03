@@ -5,11 +5,6 @@ import { tmpdir } from "node:os";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-// Integration tests for ar models:dump. All tests use db/schema.ts as the
-// schema source — no live database connection. Subprocess runDump is kept for
-// args-validation cases (help, unknown flags) that don't parse a schema; all
-// functional cases use the in-process runDumpInProcess helper.
-
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "../../../..");
 const AR_BIN_TS = resolve(SCRIPT_DIR, "../bin.ts");
@@ -38,9 +33,6 @@ function runAr(args: string[], env: NodeJS.ProcessEnv = {}): RunResult {
   };
 }
 
-// In-process variant: call the exported `run()` directly instead of spawning
-// tsx. Pure file read + codegen — no Base.establishConnection, no global
-// connection state — safe to run in the test worker without isolation.
 async function runDumpInProcess(
   args: string[],
   env: Record<string, string> = {},
@@ -75,9 +67,6 @@ async function runDumpInProcess(
   return { code, stdout: outChunks.join(""), stderr: errChunks.join("") };
 }
 
-// The CLI imports from @blazetrails/activesupport and transitively from
-// @blazetrails/arel / activemodel / activerecord. Build deps in dependency
-// order so workspace resolution finds each dist/ before its consumers start.
 beforeAll(() => {
   const packagesRoot = resolve(REPO_ROOT, "packages");
   const depsInOrder = [
@@ -120,8 +109,6 @@ describe("ar models:dump", { timeout: 30_000 }, () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  // --- helpers ---
-
   function writeSchema(source: string): string {
     const schemaPath = join(tmp, "schema.ts");
     writeFileSync(schemaPath, source);
@@ -157,8 +144,6 @@ describe("ar models:dump", { timeout: 30_000 }, () => {
     }
   `;
 
-  // --- args / help ---
-
   it("prints usage and exits 0 on --help", () => {
     const { code, stdout } = runAr(["models:dump", "--help"]);
     expect(code).toBe(0);
@@ -177,17 +162,12 @@ describe("ar models:dump", { timeout: 30_000 }, () => {
     expect(stderr).toMatch(/unknown argument: --nope/);
   });
 
-  // --- error: no schema found ---
-
   it("exits 1 with a pointed error when no schema file is found", async () => {
-    // CWD has no db/schema.ts and no --schema is passed.
     const { code, stderr } = await withCwd(tmp, () => runDumpInProcess([]));
     expect(code).toBe(1);
     expect(stderr).toMatch(/no schema file found/);
     expect(stderr).toMatch(/ar db:schema:dump/);
   });
-
-  // --- --schema path ---
 
   it("generates model classes and associations from --schema", async () => {
     const schemaPath = writeSchema(SIMPLE_SCHEMA);
@@ -407,8 +387,6 @@ describe("ar models:dump", { timeout: 30_000 }, () => {
     expect(code).toBe(1);
     expect(stderr).toMatch(/--schema expects a value/);
   });
-
-  // --- convention auto-discovery ---
 
   it("auto-discovers db/schema.ts relative to CWD when --schema is absent", async () => {
     writeConventionSchema(SIMPLE_SCHEMA);

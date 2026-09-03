@@ -41,7 +41,6 @@ describe("ScaffoldGeneratorTest", () => {
       "user:references",
     ]);
 
-    // Model
     const model = readFile("app/models/product-line.ts");
     expect(model).toContain("class ProductLine extends ApplicationRecord");
 
@@ -53,11 +52,9 @@ describe("ScaffoldGeneratorTest", () => {
     expect(migContent).toContain('t.boolean("approved")');
     expect(migContent).toContain('t.references("user"');
 
-    // Route
     const routes = readFile("config/routes.ts");
     expect(routes).toContain('resources("product_lines")');
 
-    // Controller
     const controller = readFile("app/controllers/product-lines-controller.ts");
     expect(controller).toContain("class ProductLinesController");
     expect(controller).toContain("async index()");
@@ -66,62 +63,35 @@ describe("ScaffoldGeneratorTest", () => {
     expect(controller).toContain("async update()");
     expect(controller).toContain("async destroy()");
 
-    // Views
     expect(files.some((f) => f.includes("views/product_lines/index.html"))).toBe(true);
     expect(files.some((f) => f.includes("views/product_lines/show.html"))).toBe(true);
   });
 
-  it.skip("api scaffold on invoke", () => {
-    // Needs --api mode
-  });
+  it.skip("api scaffold on invoke", () => {});
 
-  it.skip("functional tests without attributes", () => {
-    // Needs controller test generation matching Rails format
-  });
+  it.skip("functional tests without attributes", () => {});
 
-  it.skip("system tests without attributes", () => {
-    // Needs system test generation
-  });
+  it.skip("system tests without attributes", () => {});
 
-  it.skip("scaffold on revoke", () => {
-    // Needs revoke/destroy behavior
-  });
+  it.skip("scaffold on revoke", () => {});
 
-  it.skip("scaffold with namespace on invoke", () => {
-    // Needs namespace support
-  });
+  it.skip("scaffold with namespace on invoke", () => {});
 
-  it.skip("scaffold with namespace on revoke", () => {
-    // Needs namespace + revoke
-  });
+  it.skip("scaffold with namespace on revoke", () => {});
 
-  it.skip("scaffold generator on revoke does not mutilate legacy map parameter", () => {
-    // Needs revoke behavior
-  });
+  it.skip("scaffold generator on revoke does not mutilate legacy map parameter", () => {});
 
-  it.skip("scaffold generator on revoke does not mutilate routes", () => {
-    // Needs revoke behavior
-  });
+  it.skip("scaffold generator on revoke does not mutilate routes", () => {});
 
-  it.skip("scaffold generator ignores commented routes", () => {
-    // Needs commented route handling
-  });
+  it.skip("scaffold generator ignores commented routes", () => {});
 
-  it.skip("scaffold generator with switch resource route false", () => {
-    // Needs --no-resource-route option
-  });
+  it.skip("scaffold generator with switch resource route false", () => {});
 
-  it.skip("scaffold generator no helper with switch no helper", () => {
-    // Needs --no-helper option
-  });
+  it.skip("scaffold generator no helper with switch no helper", () => {});
 
-  it.skip("scaffold generator no helper with switch helper false", () => {
-    // Needs --helper=false option
-  });
+  it.skip("scaffold generator no helper with switch helper false", () => {});
 
-  it.skip("scaffold generator outputs error message on missing attribute type", () => {
-    // Needs error handling for missing types
-  });
+  it.skip("scaffold generator outputs error message on missing attribute type", () => {});
 
   it("scaffold generator belongs to and references", () => {
     const gen = makeGen();
@@ -150,45 +120,25 @@ describe("ScaffoldGeneratorTest", () => {
     expect(model).toContain('this.hasRichText("content")');
   });
 
-  it.skip("scaffold generator multi db abstract class", () => {
-    // Needs --database option
-  });
+  it.skip("scaffold generator multi db abstract class", () => {});
 
-  it.skip("scaffold generator database with aliases", () => {
-    // Needs --db alias
-  });
+  it.skip("scaffold generator database with aliases", () => {});
 
-  it.skip("scaffold generator password digest", () => {
-    // Needs password_digest type support
-  });
+  it.skip("scaffold generator password digest", () => {});
 
-  it.skip("scaffold tests pass by default inside mountable engine", () => {
-    // Needs engine support
-  });
+  it.skip("scaffold tests pass by default inside mountable engine", () => {});
 
-  it.skip("scaffold tests pass by default inside namespaced mountable engine", () => {
-    // Needs engine support
-  });
+  it.skip("scaffold tests pass by default inside namespaced mountable engine", () => {});
 
-  it.skip("scaffold tests pass by default inside full engine", () => {
-    // Needs engine support
-  });
+  it.skip("scaffold tests pass by default inside full engine", () => {});
 
-  it.skip("scaffold tests pass by default inside api mountable engine", () => {
-    // Needs engine support
-  });
+  it.skip("scaffold tests pass by default inside api mountable engine", () => {});
 
-  it.skip("scaffold tests pass by default inside api full engine", () => {
-    // Needs engine support
-  });
+  it.skip("scaffold tests pass by default inside api full engine", () => {});
 
-  it.skip("scaffold on invoke inside mountable engine", () => {
-    // Needs engine support
-  });
+  it.skip("scaffold on invoke inside mountable engine", () => {});
 
-  it.skip("scaffold on revoke inside mountable engine", () => {
-    // Needs engine support
-  });
+  it.skip("scaffold on revoke inside mountable engine", () => {});
 });
 
 describe("ScaffoldGeneratorTest (JavaScript project)", () => {

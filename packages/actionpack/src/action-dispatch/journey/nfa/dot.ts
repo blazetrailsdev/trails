@@ -5,14 +5,7 @@ export interface DotHost {
   acceptingStates(): readonly number[];
 }
 
-/**
- * Render the host's transition graph as Graphviz dot source.
- *
- * Used by `@internal` debugging tooling. Mixed into NFA/GTG hosts via
- * `static toDot = toDot` so callers can `host.toDot()` like Rails.
- *
- * @internal
- */
+/** @internal */
 export function toDot(this: DotHost): string {
   const edges = this.transitions()
     .map(([from, sym, to]) => `  ${from} -> ${to} [label="${sym ?? "ε"}"];`)

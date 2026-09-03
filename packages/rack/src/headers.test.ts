@@ -155,7 +155,7 @@ describe("RackHeadersTest", () => {
   it("fetch", () => {
     expect(() => h.fetch("1")).toThrow(/IndexError/);
     h.setDefault("33");
-    expect(() => h.fetch("1")).toThrow(/IndexError/); // default doesn't affect fetch
+    expect(() => h.fetch("1")).toThrow(/IndexError/);
     h.set("1", "8");
     expect(h.fetch("1")).toBe("8");
     expect(h.fetch("2", "3")).toBe("3");
@@ -184,7 +184,6 @@ describe("RackHeadersTest", () => {
 
   it("inspect", () => {
     expect(h.inspect()).toBe("{}");
-    // Keys are stored lowercase
     const str = fh.inspect();
     expect(str).toContain('"ab"=>"1"');
     expect(str).toContain('"cd"=>"2"');
@@ -217,22 +216,21 @@ describe("RackHeadersTest", () => {
 
     const merged = h.merge({ ab: "55" });
     expect(merged.get("ab")).toBe("55");
-    expect(h.size).toBe(0); // original unchanged
+    expect(h.size).toBe(0);
 
     h.update({ ab: "55" });
     expect(h.get("ab")).toBe("55");
 
     const merged2 = fh.merge({ ab: "55" });
     expect(merged2.get("ab")).toBe("55");
-    expect(fh.get("ab")).toBe("1"); // original unchanged
+    expect(fh.get("ab")).toBe("1");
 
     fh.mergeInPlace({ ab: "55" });
     expect(fh.get("ab")).toBe("55");
 
-    // With block
     const merged3 = fh.merge({ ab: "ss" }, (k, ov, nv) => [k, nv, ov].join(""));
     expect(merged3.get("ab")).toBe("abss55");
-    expect(fh.get("ab")).toBe("55"); // original unchanged
+    expect(fh.get("ab")).toBe("55");
 
     fh.update({ ab: "ss" }, (k, ov, nv) => [k, nv, ov].join(""));
     expect(fh.get("ab")).toBe("abss55");
@@ -420,7 +418,7 @@ describe("RackHeadersTest", () => {
 
   it("transform values", () => {
     const tv = fh.transformValues((v) => v.repeat(2));
-    expect(fh.get("aB")).toBe("1"); // original unchanged
+    expect(fh.get("aB")).toBe("1");
     expect(tv.get("Ab")).toBe("11");
     expect(tv.get("cD")).toBe("22");
     expect(tv.get("3")).toBe("44");
@@ -449,7 +447,7 @@ describe("RackHeadersTest", () => {
     const map: Record<string, string> = { ab: "Xy", cd: "dC", "3": "5" };
     const dhBefore = fh.dup();
     const tk = fh.transformKeys((k) => map[k]);
-    expect(fh.equals(dhBefore)).toBe(true); // original unchanged
+    expect(fh.equals(dhBefore)).toBe(true);
     expect(tk.get("xY")).toBe("1");
     expect(tk.get("Dc")).toBe("2");
     expect(tk.get("5")).toBe("4");
@@ -493,7 +491,6 @@ describe("RackHeadersTest", () => {
   });
 
   it("public interface", () => {
-    // Headers should expose all Hash-like methods
     const h = new Headers();
     expect(typeof h.get).toBe("function");
     expect(typeof h.set).toBe("function");

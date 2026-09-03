@@ -1,8 +1,3 @@
-/**
- * Inflector — transforms words between singular/plural, camelCase/underscore, etc.
- * Mirrors ActiveSupport::Inflector from Rails.
- */
-
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
@@ -31,12 +26,6 @@ function applyInflections(
 
 export function pluralize(word: string, locale?: string): string;
 export function pluralize(word: string, count: number | null, locale?: string): string;
-/**
- * Mirrors `ActiveSupport::Inflector.pluralize` (inflector/methods.rb:39-41) and
- * the `String#pluralize(count = nil, locale = :en)` that fronts it
- * (core_ext/string/inflections.rb:35-42) — Ruby routes on the argument's class,
- * a Symbol standing for the locale and an Integer for the count.
- */
 export function pluralize(word: string, count?: number | string | null, locale = "en"): string {
   if (typeof count === "string") locale = count;
   if (count === 1) {
@@ -63,7 +52,6 @@ export function camelize(
 
   if (uppercaseFirstLetter) {
     result = result.replace(/^[a-z\d]*/, (match) => {
-      // Check if the match is an acronym
       const acronym = inflections().acronyms.get(match);
       if (acronym) return acronym;
       return match.charAt(0).toUpperCase() + match.slice(1);
@@ -127,10 +115,8 @@ export function humanize(
   if (!keepIdSuffix) {
     result = result.replace(/_id$/, "");
   }
-  // Replace underscores with spaces
   result = result.replace(/_/g, " ");
 
-  // Handle acronyms
   result = result.replace(/([a-z\d]*)/gi, (match) => {
     const acronym = inflections().acronyms.get(match.toLowerCase());
     return acronym || match.toLowerCase();
@@ -143,22 +129,10 @@ export function humanize(
   return result;
 }
 
-/**
- * Converts the first character in the string to uppercase.
- *
- * Mirrors: ActiveSupport::Inflector.upcase_first (inflector/methods.rb:166-168),
- * reached from `String#upcase_first` (core_ext/string/inflections.rb:273-275).
- */
 export function upcaseFirst(string: string): string {
   return string.length > 0 ? string[0].toUpperCase().concat(string.slice(1)) : "";
 }
 
-/**
- * Converts the first character in the string to lowercase.
- *
- * Mirrors: ActiveSupport::Inflector.downcase_first (inflector/methods.rb:175-177),
- * reached from `String#downcase_first` (core_ext/string/inflections.rb:284-286).
- */
 export function downcaseFirst(string: string): string {
   return string.length > 0 ? string[0].toLowerCase().concat(string.slice(1)) : "";
 }
@@ -170,14 +144,8 @@ export function titleize(word: string, options: { keepIdSuffix?: boolean } = {})
   );
 }
 
-/**
- * `alias_method :camelcase, :camelize` (core_ext/string/inflections.rb:111).
- */
 export const camelcase = camelize;
 
-/**
- * `alias_method :titlecase, :titleize` (core_ext/string/inflections.rb:129).
- */
 export const titlecase = titleize;
 
 export function tableize(className: string): string {
@@ -185,7 +153,6 @@ export function tableize(className: string): string {
 }
 
 export function classify(tableName: string): string {
-  // strip out any leading schema name
   return camelize(singularize(String(tableName).replace(/.*\./, "")));
 }
 
@@ -212,73 +179,24 @@ export function deconstantize(path: string): string {
 const _constants = new Map<string, unknown>();
 const _privateConstants = new Set<string>();
 
-/**
- * @noRailsEquivalent PERMANENT
- *   (`vendor/rails/activesupport/lib/active_support/inflector/methods.rb:289` — `constantize` walks
- *   Ruby's constant namespace; ESM has neither a constant namespace nor an autoload hook, so
- *   application code must register what exists).
- * The registration half of Ruby's constant table. `class Foo`
- * writes Ruby's global constant namespace as a side effect of definition; ESM
- * classes are module-local bindings with no such namespace, so a JS host names
- * its classes explicitly. Only registration is invented — lookup goes through
- * {@link constantize}, which Rails has.
- */
+/** @noRailsEquivalent PERMANENT */
 export function registerConstant(name: string, value: unknown): void {
   _constants.set(name, value);
 }
 
-/**
- * @noRailsEquivalent PERMANENT
- *   (`vendor/rails/activesupport/lib/active_support/inflector/methods.rb:289` — the registry stands
- *   in for Ruby's constant namespace, which `remove_const` unwinds; ESM has no constant namespace).
- * The removal half of the invented constant table (see
- * {@link registerConstant}). Ruby constants are removed with
- * `Object.send(:remove_const, …)`, which has no ESM analogue; trails needs it so
- * a registry teardown cannot leave a name resolvable through
- * {@link constantize}. The removal is conditional on `expected`: the name is
- * dropped only when it currently resolves to that value, so a caller tearing
- * down its own binding cannot clobber a later rebinding by someone else.
- * Dropping the entry also drops its visibility, the way `remove_const` takes the
- * private mark with the constant — otherwise the name would keep raising
- * `private constant` where Ruby raises `uninitialized constant`.
- */
+/** @noRailsEquivalent PERMANENT */
 export function unregisterConstant(name: string, expected: unknown): void {
   if (_constants.get(name) !== expected) return;
   _constants.delete(name);
   _privateConstants.delete(name);
 }
 
-/**
- * @noRailsEquivalent PERMANENT
- *   (`vendor/rails/activesupport/lib/active_support/inflector/methods.rb:289` — `constantize`
- *   honours Ruby's `private_constant` visibility; ESM has no constant visibility to consult).
- * The visibility half of Ruby's constant table, mirroring
- * `Module#private_constant` (a language feature Rails calls, not one it
- * defines). Ruby's constant table carries per-constant visibility;
- * trails' invented table (see {@link registerConstant}) is flat, so the private
- * set lives alongside it and is global rather than per-owner: Ruby's visibility
- * is a property of the constant within its owning module, so `Country` still
- * resolves `HABTM_Treaties` lexically while `Object.const_get` raises. Here the
- * name is unresolvable from everywhere — wider than Ruby, and sufficient for
- * the only consumer (the habtm join key), which nothing resolves lexically.
- * The mark is also independent of registration order, so a caller can declare a
- * name private before whatever writes it does so.
- */
+/** @noRailsEquivalent PERMANENT */
 export function privateConstant(name: string): void {
   _privateConstants.add(name);
 }
 
-/**
- * @noRailsEquivalent PERMANENT
- *   (`vendor/rails/activesupport/lib/active_support/inflector/methods.rb:289` — the reverse of the
- *   invented registry; Ruby needs none because `Module#name` already IS the full constant path).
- * The name half of Ruby's `Module#name` for a namespaced class. Ruby names a
- * constant as a side effect of definition, so `Admin::Json.name` is
- * `"Admin::Json"`; a JS class carries only its own identifier, so the path a
- * host registered through {@link registerConstant} is the only place it exists.
- * Returns the registered name for `value`, or `undefined` when nothing
- * registered it — the trails spelling of Ruby's anonymous `name.nil?`.
- */
+/** @noRailsEquivalent PERMANENT */
 export function registeredConstantName(value: unknown): string | undefined {
   for (const [name, registered] of _constants) {
     if (registered === value) return name;
@@ -286,25 +204,13 @@ export function registeredConstantName(value: unknown): string | undefined {
   return undefined;
 }
 
-/** @internal — test use only: clear the registered constant table. */
+/** @internal */
 export function _resetConstants(): void {
   _constants.clear();
   _privateConstants.clear();
 }
 
-/**
- * The segment `Object.const_get` would fail on: it resolves `A::B::C` one step
- * at a time, so the NameError names the first link that is missing, not the
- * whole path. Our table is keyed by full path, so walking prefixes is the
- * equivalent probe.
- *
- * This is exact only for paths whose enclosing modules are themselves
- * registered. Ruby walks real modules, so `A::B` with `A` a live module names
- * `:B`; here, if nothing registered `A`, the walk stops at `A` and names that
- * instead. Registering the enclosing names (as a namespaced model registration
- * does) makes the two agree.
- * @internal
- */
+/** @internal */
 function missingSegment(path: string): string {
   const segments = path.split("::");
   for (let i = 1; i <= segments.length; i++) {
@@ -318,21 +224,12 @@ function isValidConstantPath(path: string): boolean {
   return path.split("::").every((segment) => /^[A-Z]\w*$/.test(segment));
 }
 
-/** Mirrors: Inflector.constantize — `Object.const_get(camel_cased_word)`. */
 export function constantize(camelCasedWord: string): unknown {
   const path = camelCasedWord.startsWith("::") ? camelCasedWord.slice(2) : camelCasedWord;
   if (!isValidConstantPath(path)) {
     throw new NameError(`wrong constant name ${camelCasedWord}`);
   }
-  // Privacy is checked before existence, which Ruby cannot reach: there
-  // `private_constant` on an undefined name is itself a NameError, so a name is
-  // never private-and-absent. trails allows it because marking and binding are
-  // two calls made by independent writers, and the mark must hold whichever runs
-  // first.
   if (_privateConstants.has(path)) {
-    // Ruby raises NameError here too, with `name` set to the constant itself —
-    // which is why `safe_constantize` returns nil for a private constant rather
-    // than propagating. Carrying the leaf keeps that guard satisfied.
     throw new NameError(`private constant ${path} referenced`, demodulize(path));
   }
   if (!_constants.has(path)) {
@@ -342,27 +239,14 @@ export function constantize(camelCasedWord: string): unknown {
 }
 
 /**
- * Mirrors: Inflector.safe_constantize.
- *
- * @missingRailsCall const_regexp — PERMANENT: Same `rescue LoadError` arm as
- *   this file's `safe_constantize` → `match?` tag: `const_regexp` is only
- *   interpolated into the "Unable to autoload constant" pattern that arm
- *   matches. trails has no Ruby autoload and `constantize` never raises
- *   LoadError, so the arm has no analogue — `constRegexp` itself is ported
- *   (inflector/methods.rb:357-367).
- * @missingRailsCall match? — PERMANENT: Rails' `match?` here is in the `rescue
- *   LoadError` arm, matching the "Unable to autoload constant" message. trails
- *   has no Ruby autoload and `constantize` never raises LoadError, so the arm —
- *   and its `match?` — has no analogue.
+ * @missingRailsCall const_regexp — PERMANENT
+ * @missingRailsCall match? — PERMANENT
  */
 export function safeConstantize(camelCasedWord: string): unknown {
   try {
     return constantize(camelCasedWord);
   } catch (e) {
     if (!(e instanceof NameError)) throw e;
-    // Ruby: `raise if e.name && !(camel_cased_word.split("::").include?(e.name) ||
-    // e.name == camel_cased_word)` — swallow only a miss on this path's own
-    // segments, never one bubbling out of an unrelated constant.
     const name = e.constantName;
     if (name && !(camelCasedWord.split("::").includes(name) || name === camelCasedWord)) {
       throw e;
@@ -378,17 +262,7 @@ export function foreignKey(
   return underscore(demodulize(className)) + (separateClassNameAndIdWithUnderscore ? "_id" : "id");
 }
 
-/**
- * Mirrors: `Inflector.const_regexp` (`inflector/methods.rb:357-367`) — a
- * `Regexp` source that will match part by part the given constant.
- *
- *   constRegexp("Foo::Bar::Baz") // => "Foo(::Bar(::Baz)?)?"
- *   constRegexp("::")            // => "::"
- */
 export function constRegexp(camelCasedWord: string): string {
-  // Ruby's `String#split` drops trailing empty fields, so `"::".split("::")`
-  // is `[]` where JS's is `["", ""]` — that empty result is what selects the
-  // `Regexp.escape` arm below.
   const parts = camelCasedWord.split("::");
   while (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
 
@@ -407,10 +281,4 @@ export function ordinalize(number: number): string {
   return String(I18n.translate("number.nth.ordinalized", { number }));
 }
 
-/**
- * `String#parameterize` (core_ext/string/inflections.rb:184-186) is one line —
- * `ActiveSupport::Inflector.parameterize(self, ...)`. Ruby's own definition
- * lives in `inflector/transliterate.rb:87`, and so does trails'; this
- * re-export is that delegation.
- */
 export { parameterize } from "./transliterate.js";

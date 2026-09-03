@@ -1,10 +1,3 @@
-/**
- * classAttribute — mirroring Rails' class_attribute.
- *
- * Creates inheritable class-level attributes with optional instance
- * reader/writer and predicate methods.
- */
-
 export interface ClassAttributeOptions {
   instanceAccessor?: boolean;
   instanceReader?: boolean;
@@ -18,15 +11,8 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
-/**
- * A Ruby class's singleton class holds its class methods; in JS those live on
- * the constructor itself, and the constructor's prototype chain gives the same
- * inheritance, so `owner.singleton_class` is the owner.
- */
 export namespace ClassAttribute {
   export function redefine(owner: any, name: string, namespacedName: string, value: unknown): void {
-    // Rails' `if owner.singleton_class?` arm has no JS counterpart: there is no
-    // singleton class to reopen, and no attached object to test for a Module.
     redefineMethod(owner, namespacedName, true, () => value);
 
     redefineMethod(owner, `${namespacedName}=`, true, function (this: any, newValue: unknown) {
@@ -44,9 +30,6 @@ export namespace ClassAttribute {
     isPrivate: boolean,
     fn: (...args: any[]) => unknown,
   ): void {
-    // A zero-arg Ruby reader is a JS getter and a Ruby `name=` writer is a JS
-    // setter; both are `define_method` on the Ruby side. Ruby's two methods are
-    // one JS property, so the writer keeps whatever reader is already there.
     const isWriter = name.endsWith("=");
     const key = isWriter ? name.slice(0, -1) : name;
     const existing = isWriter ? Object.getOwnPropertyDescriptor(owner, key) : undefined;
@@ -59,14 +42,6 @@ export namespace ClassAttribute {
   }
 }
 
-/**
- * Define a class-level attribute that is inherited by subclasses.
- * Reads walk the constructor chain; writes are local to the class/instance.
- *
- * Rails defines this on Module (core_ext/class/attribute.rb:86), so the class
- * being extended is `self` — here the `this`-typed mixin idiom (CLAUDE.md,
- * _Module mixins_), which callers reach with `classAttribute.call(Klass, ...)`.
- */
 export function classAttribute(this: any, ...attrs: (string | ClassAttributeOptions)[]): void {
   const last = attrs[attrs.length - 1];
   const options: ClassAttributeOptions =
@@ -81,8 +56,6 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
 
   for (const name of attrs as string[]) {
     if (typeof name !== "string") {
-      // Ruby's core TypeError, exactly as attribute.rb:91 raises it — there is
-      // no Rails error class to port here.
       // eslint-disable-next-line blazetrails/rails-error-parity
       throw new TypeError(`${inspect(name)} is not a symbol nor a string`);
     }

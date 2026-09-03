@@ -2,21 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-// Import via the public subpath so the vitest alias is exercised — same
-// pattern other tests use for /message-verifier, /temporal, etc.
 import { glob } from "@blazetrails/activesupport/glob";
 
 let root: string;
 
 beforeAll(() => {
   root = mkdtempSync(join(tmpdir(), "glob-test-"));
-  // Layout:
-  //   foo.rb
-  //   bar.txt
-  //   .hidden
-  //   app/models/{user,post,admin}.rb
-  //   app/controllers/application_controller.rb
-  //   lib/tasks/deploy.rake
   for (const f of ["foo.rb", "bar.txt", ".hidden"]) {
     writeFileSync(join(root, f), "");
   }

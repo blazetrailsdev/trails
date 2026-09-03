@@ -1,16 +1,3 @@
-/**
- * ActionDispatch::Routing::RouteHelpers
- *
- * Generates `_path` and `_url` helper functions from named routes in a RouteSet.
- * In Rails, these are methods like `posts_path`, `post_url(id)`, etc.
- *
- * Usage:
- *   const helpers = RouteHelpers.generate(routeSet);
- *   helpers.posts_path()        // => "/posts"
- *   helpers.post_path(1)        // => "/posts/1"
- *   helpers.post_url(1)         // => "http://localhost/posts/1"
- */
-
 import type { RouteSet } from "./route-set.js";
 
 export type PathHelper = (...args: any[]) => string;
@@ -20,9 +7,6 @@ export interface RouteHelpersMap {
   [name: string]: PathHelper | UrlHelper;
 }
 
-/**
- * Generate route helper functions from a RouteSet.
- */
 export function generateRouteHelpers(
   routeSet: RouteSet,
   urlOptions: { host?: string; protocol?: string } = {},
@@ -33,20 +17,14 @@ export function generateRouteHelpers(
   for (const [name, route] of namedRoutes) {
     const paramNames = extractParamNames(route.path);
 
-    // _path helper
     helpers[`${name}_path`] = createPathHelper(routeSet, name, paramNames);
 
-    // _url helper
     helpers[`${name}_url`] = createUrlHelper(routeSet, name, paramNames, urlOptions);
   }
 
   return helpers;
 }
 
-/**
- * Extract dynamic parameter names from a route path.
- * "/posts/:id/comments/:comment_id" => ["id", "comment_id"]
- */
 function extractParamNames(path: string): string[] {
   const names: string[] = [];
   const parts = path.split("/");
@@ -60,13 +38,6 @@ function extractParamNames(path: string): string[] {
   return names;
 }
 
-/**
- * Create a _path helper for a named route.
- *
- * Supports two calling conventions (like Rails):
- *   post_path(1)             — positional args mapped to params in order
- *   post_path({ id: 1 })     — explicit params hash
- */
 function createPathHelper(routeSet: RouteSet, routeName: string, paramNames: string[]): PathHelper {
   return function (...args: any[]): string {
     const params = resolveArgs(paramNames, args);
@@ -74,9 +45,6 @@ function createPathHelper(routeSet: RouteSet, routeName: string, paramNames: str
   };
 }
 
-/**
- * Create a _url helper for a named route.
- */
 function createUrlHelper(
   routeSet: RouteSet,
   routeName: string,
@@ -102,19 +70,13 @@ function createUrlHelper(
   };
 }
 
-/**
- * Resolve arguments into a params hash.
- * Supports positional args or a single hash argument.
- */
 function resolveArgs(paramNames: string[], args: any[]): Record<string, string | number> {
   if (args.length === 0) return {};
 
-  // Single object argument => params hash
   if (args.length === 1 && typeof args[0] === "object" && args[0] !== null) {
     return args[0];
   }
 
-  // Positional arguments mapped to param names in order
   const params: Record<string, string | number> = {};
   for (let i = 0; i < Math.min(args.length, paramNames.length); i++) {
     params[paramNames[i]] = args[i];
@@ -122,10 +84,6 @@ function resolveArgs(paramNames: string[], args: any[]): Record<string, string |
   return params;
 }
 
-/**
- * Resolve arguments into params + options (for _url helpers).
- * The last argument may contain url options like host, protocol, onlyPath.
- */
 function resolveArgsWithOptions(
   paramNames: string[],
   args: any[],
@@ -137,7 +95,6 @@ function resolveArgsWithOptions(
 
   const URL_OPTION_KEYS = new Set(["host", "protocol", "onlyPath", "only_path", "port", "anchor"]);
 
-  // Single object: separate url options from route params
   if (args.length === 1 && typeof args[0] === "object" && args[0] !== null) {
     const obj = args[0];
     const params: Record<string, string | number> = {};
@@ -153,7 +110,6 @@ function resolveArgsWithOptions(
     return { params, options };
   }
 
-  // Multiple args: last one might be options hash
   const lastArg = args[args.length - 1];
   let urlOptions: any = {};
   let positionalArgs = args;

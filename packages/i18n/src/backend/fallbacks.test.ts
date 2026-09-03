@@ -1,21 +1,3 @@
-/**
- * Mirrors: i18n/test/backend/fallbacks_test.rb
- *
- * JS has no threads, so a `Thread.new { ... }.join` runs its body in place —
- * which is what "falls back to default locale - Issue #546" asks for: a fresh
- * thread carries no `I18n.config`, so the localization has to build the default
- * one. "multi-threaded fallbacks" is the case that cannot follow, because it
- * turns on `I18n.fallbacks=` writing a `Thread.current` slot the outer thread
- * does not see (fallbacks.rb:19-26); `fallbacks()` here is a single
- * module-level binding, and giving it per-execution-context storage needs a
- * facility this package does not have — filed as
- * `i18n-thread-local-fallbacks`.
- *
- * `RegressionTestFor617` assigns a plain Ruby Hash as the fallbacks object,
- * which quacks like one because it answers `[]`; a `Map` is the JS Hash, and
- * its `get` is that `[]`.
- */
-
 import { beforeEach, describe, expect, it } from "vitest";
 import { Fallbacks, fallbacks, setFallbacks } from "./fallbacks.js";
 import { Chain } from "./chain.js";
@@ -30,7 +12,6 @@ import type { TranslationData } from "../utils.js";
 
 class Backend extends Fallbacks(Simple) {}
 
-/** Mirrors: `I18n::TestCase#setup` (i18n/test/test_helper.rb:20-26). */
 function setup(): Backend {
   resetConfig();
   resetClassConfig();
@@ -200,7 +181,6 @@ describe("I18nBackendFallbacksTranslateTest", () => {
   });
 });
 
-// See Issue #534
 describe("I18nBackendFallbacksLocalizeTestWithDefaultLocale", () => {
   let backend: Backend;
 
@@ -218,7 +198,6 @@ describe("I18nBackendFallbacksLocalizeTestWithDefaultLocale", () => {
   });
 });
 
-// See Issue #546
 describe("I18nBackendFallbacksLocalizeTestWithMultipleThreads", () => {
   let backend: Backend;
 
@@ -236,11 +215,9 @@ describe("I18nBackendFallbacksLocalizeTestWithMultipleThreads", () => {
   });
 });
 
-// See Issue #536
 describe("I18nBackendFallbacksWithCustomClass", () => {
   let backend: Backend;
 
-  /** Quacks like a fallback class. */
   class MyDefaultFallback {
     get(_key: Locale): Locale[] {
       return ["my_language"];
@@ -261,7 +238,6 @@ describe("I18nBackendFallbacksWithCustomClass", () => {
   });
 });
 
-// See Issue #590
 describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () => {
   let backend: Backend;
 
@@ -276,7 +252,6 @@ describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () =
             format: {
               abbreviated: {
                 1: "S-Ɔ",
-                // Other months omitted for brevity
               },
             },
           },
@@ -291,7 +266,6 @@ describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () =
               abbreviated: ":calendars.gregorian.months.format.wide",
               wide: {
                 1: "M01",
-                // Other months omitted for brevity
               },
             },
             "stand-alone": {
@@ -310,7 +284,6 @@ describe("I18nBackendFallbacksSymbolResolveRestartsLookupAtOriginalLocale", () =
   });
 });
 
-// See Issue #617
 describe("RegressionTestFor617", () => {
   let backend: Backend;
 

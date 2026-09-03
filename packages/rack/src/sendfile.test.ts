@@ -185,7 +185,6 @@ it("sets x-accel-redirect response header and discards body when initialized wit
     expect(res.bodyString).toBe("");
     expect(res.headers["x-accel-redirect"]).toBe("/wibble/rack_sendfile");
 
-    // Third body has no mapping match - falls through to path itself
     res = await new MockRequest((env) =>
       new Sendfile(simpleApp(body3), "X-Accel-Redirect", []).call(env),
     ).get("/", headers);

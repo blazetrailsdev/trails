@@ -32,12 +32,6 @@ export class BaseIterator {
     });
   }
 
-  /**
-   * A Rack body answers `each`; the JS spelling of that protocol is the
-   * iterable one, so a consumer that reads the response with `for..of` /
-   * `for await..of` — every trails middleware — sees the same chunks Ruby's
-   * `each` yields.
-   */
   *[Symbol.iterator](): Generator<string> {
     const chunks: string[] = [];
     this.each((chunk) => chunks.push(chunk));

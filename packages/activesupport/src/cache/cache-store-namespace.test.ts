@@ -3,8 +3,6 @@ import { MemoryStore } from "./memory-store.js";
 import type { Entry } from "./entry.js";
 import { assert, assertNot } from "../testing/assertions.js";
 
-// Mirrors Rails' `cache.instance_variable_get(:@data)["tester:foo"].value`
-// peek at the raw namespaced key.
 function rawValue(cache: MemoryStore, key: string): unknown {
   const data = (cache as unknown as { data: Map<string, Entry> }).data;
   return data.get(key)?.value;

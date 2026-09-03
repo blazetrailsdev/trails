@@ -1,63 +1,24 @@
-/**
- * The slice of Ruby's REXML that `XmlMini_REXML` uses (`require
- * "rexml/document"`, rexml.rb:3): `REXML::Document`, the `Element`/`Text`
- * nodes it exposes, and `REXML::ParseException`.
- *
- * REXML is Ruby stdlib, not Rails, so it has no `vendor/rails` counterpart and
- * no parity population — this file stands in for the gem the way
- * `@blazetrails/date` stands in for `date`. The names and semantics are REXML's
- * (`Document#root`, `Element#has_elements?`, `#each_element`, `#has_text?`,
- * `#texts`, `#attributes`, `Text#value`), so the ported `xml-mini/rexml.ts`
- * bodies read as the Ruby ones.
- */
-
 import { RuntimeError } from "@blazetrails/ruby-compat";
 
-/**
- * Mirrors: REXML::ParseException.
- *
- * @noRailsEquivalent PERMANENT — `REXML::ParseException` is Ruby stdlib (rexml/document.rb),
- * not Rails; `XmlMini_REXML` `require`s it.
- */
+/** @noRailsEquivalent PERMANENT */
 export class ParseException extends Error {
-  /** The Ruby class name, which is what `rescue`/message formatting shows. */
   override name = "REXML::ParseException";
 }
 
-/**
- * Mirrors: REXML::Text — a text (or CDATA) node.
- *
- * @noRailsEquivalent PERMANENT — `REXML::Text` is Ruby stdlib (rexml/document.rb),
- * not Rails; `XmlMini_REXML` `require`s it.
- */
+/** @noRailsEquivalent PERMANENT */
 export class Text {
   constructor(
     private readonly raw: string,
     private readonly entities: Record<string, string> = {},
   ) {}
 
-  /**
-   * Mirrors: REXML::Text#value — the unescaped text, with the DOCTYPE's
-   * internal-subset entities expanded. REXML expands lazily, here as there:
-   * `Document.new` on a billion-laughs payload succeeds and the
-   * `entity expansion has grown too large` RuntimeError is raised at the first
-   * `#value`, which is where `XmlMini_REXML#merge_texts!` reads it.
-   *
-   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
-   * not Rails.
-   */
+  /** @noRailsEquivalent PERMANENT */
   get value(): string {
     return unescapeXml(this.raw, this.entities);
   }
 }
 
-/**
- * Mirrors: REXML::Attributes — the attribute table of an element, iterated by
- * `attributes.each { |n, v| ... }`.
- *
- * @noRailsEquivalent PERMANENT — `REXML::Attributes` is Ruby stdlib (rexml/document.rb),
- * not Rails; `XmlMini_REXML` `require`s it.
- */
+/** @noRailsEquivalent PERMANENT */
 export class Attributes {
   private readonly entries = new Map<string, string>();
 
@@ -70,64 +31,34 @@ export class Attributes {
   }
 }
 
-/**
- * Mirrors: REXML::Element.
- *
- * @noRailsEquivalent PERMANENT — `REXML::Element` is Ruby stdlib (rexml/document.rb),
- * not Rails; `XmlMini_REXML` `require`s it.
- */
+/** @noRailsEquivalent PERMANENT */
 export class Element {
   readonly attributes = new Attributes();
   readonly children: Array<Element | Text> = [];
 
   constructor(public readonly name: string) {}
 
-  /**
-   * Mirrors: REXML::Element#has_elements?.
-   *
-   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
-   * not Rails.
-   */
+  /** @noRailsEquivalent PERMANENT */
   hasElements(): boolean {
     return this.children.some((child) => child instanceof Element);
   }
 
-  /**
-   * Mirrors: REXML::Element#each_element.
-   *
-   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
-   * not Rails.
-   */
+  /** @noRailsEquivalent PERMANENT */
   eachElement(fn: (child: Element) => void): void {
     for (const child of this.children) if (child instanceof Element) fn(child);
   }
 
-  /**
-   * Mirrors: REXML::Element#has_text?.
-   *
-   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
-   * not Rails.
-   */
+  /** @noRailsEquivalent PERMANENT */
   hasText(): boolean {
     return this.children.some((child) => child instanceof Text);
   }
 
-  /**
-   * Mirrors: REXML::Element#texts — the element's direct text children.
-   *
-   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
-   * not Rails.
-   */
+  /** @noRailsEquivalent PERMANENT */
   get texts(): Text[] {
     return this.children.filter((child): child is Text => child instanceof Text);
   }
 
-  /**
-   * Mirrors: REXML::Element#to_s — serializes the element back to XML.
-   *
-   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
-   * not Rails.
-   */
+  /** @noRailsEquivalent PERMANENT */
   toString(): string {
     let attrs = "";
     this.attributes.each((name, value) => {
@@ -155,18 +86,10 @@ function escapeXml(text: string): string {
 
 export { RuntimeError };
 
-/** REXML::Security.entity_expansion_limit. */
 const ENTITY_EXPANSION_LIMIT = 10000;
 
-/** REXML::Security.entity_expansion_text_limit. */
 const ENTITY_EXPANSION_TEXT_LIMIT = 10240;
 
-/**
- * Resolve the standard entities, numeric character references and the
- * DOCTYPE's internal-subset entities, under REXML's expansion caps: a
- * billion-laughs payload raises `RuntimeError: entity expansion has grown too
- * large` rather than expanding, which is verified against MRI REXML 3.4.
- */
 function unescapeXml(text: string, entities: Record<string, string> = {}): string {
   let expansions = 0;
 
@@ -197,7 +120,6 @@ function unescapeXml(text: string, entities: Record<string, string> = {}): strin
   return result;
 }
 
-/** Read the `<!ENTITY name "value">` declarations out of an internal DTD subset. */
 function parseEntityDeclarations(subset: string): Record<string, string> {
   const entities: Record<string, string> = {};
   const declaration = /<!ENTITY\s+([^\s%]+)\s+("([^"]*)"|'([^']*)')\s*>/g;
@@ -207,34 +129,18 @@ function parseEntityDeclarations(subset: string): Record<string, string> {
 
 const NAME = /[^\s/>]+/y;
 
-/**
- * Mirrors: REXML::Document — parses an XML document string into a node tree.
- *
- * @noRailsEquivalent PERMANENT — `REXML::Document` is Ruby stdlib (rexml/document.rb),
- * not Rails; `XmlMini_REXML` `require`s it.
- */
+/** @noRailsEquivalent PERMANENT */
 export class Document {
-  /**
-   * Mirrors: REXML::Document#root — the root element, or `undefined`.
-   *
-   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
-   * not Rails.
-   */
+  /** @noRailsEquivalent PERMANENT */
   root: Element | undefined;
 
-  /** The DOCTYPE internal-subset entities, expanded lazily by {@link Text#value}. */
   private entities: Record<string, string> = {};
 
   constructor(source: string) {
     this.parse(source);
   }
 
-  /**
-   * Mirrors: REXML::Document#to_s.
-   *
-   * @noRailsEquivalent PERMANENT — a `REXML::` member (Ruby stdlib rexml/document.rb),
-   * not Rails.
-   */
+  /** @noRailsEquivalent PERMANENT */
   toString(): string {
     return this.root ? this.root.toString() : "";
   }
@@ -275,7 +181,6 @@ export class Document {
         if (parent) parent.children.push(new Text(escapeXml(source.slice(pos + 9, end))));
         pos = end + 3;
       } else if (source.startsWith("<!", pos)) {
-        // A DOCTYPE, with or without an internal subset.
         const subset = source.indexOf("[", pos);
         const close = source.indexOf(">", pos);
         if (close === -1) fail(`Missing end of declaration at ${pos}`);

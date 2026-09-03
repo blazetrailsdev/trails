@@ -3,7 +3,6 @@ import { deepMerge, deepMergeBang } from "./index.js";
 import { DeepMergeable } from "./deep-mergeable.js";
 
 describe("DeepMergeableTest", () => {
-  // deep_mergeable_test.rb:38-45 — the shared setup fixtures.
   const hash1 = { a: 1, b: 1, c: { d1: 1, d2: 1, d3: { e1: 1, e3: 1 } } };
   const hash2 = { a: 2, c: { d2: 2, d3: { e2: 2, e3: 2 } } };
   const summed = { a: 3, b: 1, c: { d1: 1, d2: 3, d3: { e1: 1, e2: 2, e3: 3 } } };

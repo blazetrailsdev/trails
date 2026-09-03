@@ -2,12 +2,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { registerConstant, unregisterConstant } from "../../inflector.js";
 import { moduleParent, moduleParentName, moduleParents } from "../../module-ext.js";
 
-/**
- * Ruby's nested `module ParentA; module B; module C; end; end; end`. A JS class
- * has no enclosing lexical namespace, so the `::` path lives in its `name` and
- * the constant registry is what `constantize` resolves it through — the same
- * two facts `module_parent_name` and `module_parent` read in Ruby.
- */
 function namedModule(name: string): { name: string } {
   const mod = {};
   Object.defineProperty(mod, "name", { value: name, configurable: true });

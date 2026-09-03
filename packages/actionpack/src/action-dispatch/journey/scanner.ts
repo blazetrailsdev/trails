@@ -30,7 +30,7 @@ export class Scanner {
     if (this._pos >= this._str.length) return null;
     let token: Token | null = null;
     while (this._pos < this._str.length && (token = this.scan()) === null) {
-      // continue scanning
+      /** @empty */
     }
     return token;
   }
@@ -68,7 +68,6 @@ export class Scanner {
       return "LITERAL";
     }
 
-    // Fallback: consume one character as a literal (matches Rails `skip(/./)`).
     this._length = 1;
     this._pos += 1;
     return "LITERAL";

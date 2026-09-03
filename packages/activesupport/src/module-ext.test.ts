@@ -112,7 +112,6 @@ describe("ModuleTest", () => {
     const w = new Widget() as Widget & { color: unknown };
     w.color = "red";
     expect(w.color).toBe("red");
-    // Stored in _color
     expect((w as unknown as Record<string, unknown>)["_color"]).toBe("red");
   });
 
@@ -140,7 +139,6 @@ describe("ModuleTest", () => {
   });
 
   it("moduleParentName — returns parent namespace for namespaced class", () => {
-    // We simulate a namespaced class by naming it "Outer::Inner"
     const Inner = { name: "Outer::Inner" };
     expect(moduleParentName(Inner)).toBe("Outer");
   });
@@ -189,10 +187,8 @@ describe("ModuleAttributeAccessorTest", () => {
     class MyModule {}
     mattrAccessor.call(MyModule, "config", { instanceWriter: false });
     const instance = new MyModule() as any;
-    // Instance reader works (delegates to class)
     (MyModule as any).config = "class_value";
     expect(instance.config).toBe("class_value");
-    // Instance setter is not defined on prototype
     const desc = Object.getOwnPropertyDescriptor(MyModule.prototype, "config");
     expect(desc?.set).toBeUndefined();
   });
@@ -200,9 +196,6 @@ describe("ModuleAttributeAccessorTest", () => {
   it("should not create instance reader", () => {
     class MyModule {}
     mattrAccessor.call(MyModule, "secret", { instanceReader: false });
-    // Rails' `instance_reader: false` suppresses only the reader half —
-    // `mattr_writer` still runs with its default `instance_writer: true`
-    // (module/attribute_accessors.rb:210-211), so the prototype keeps a setter.
     const desc = Object.getOwnPropertyDescriptor(MyModule.prototype, "secret");
     expect(desc?.get).toBeUndefined();
     expect(desc?.set).toBeDefined();
@@ -230,7 +223,7 @@ describe("ModuleAttributeAccessorTest", () => {
       },
     });
     expect((MyModule as any).computed).toBe("computed_val");
-    expect(callCount).toBe(1); // block called once at definition
+    expect(callCount).toBe(1);
   });
 
   it("method invocation should not invoke the default block", () => {
@@ -242,7 +235,6 @@ describe("ModuleAttributeAccessorTest", () => {
         return "result";
       },
     });
-    // Reading multiple times does not re-invoke block
     expect((MyModule as any).lazy).toBe("result");
     expect((MyModule as any).lazy).toBe("result");
     expect(callCount).toBe(1);
@@ -266,16 +258,16 @@ describe("KernelSuppressTest", () => {
     const log: string[] = [];
     suppress(() => {
       throw new TypeError("boom");
-      log.push("should not reach"); // intentionally unreachable
+      log.push("should not reach");
     }, TypeError);
-    expect(log).toEqual([]); // exception was suppressed
+    expect(log).toEqual([]);
   });
 
   it("reraise", () => {
     expect(() => {
       suppress(() => {
         throw new RangeError("out of range");
-      }, TypeError); // only suppresses TypeError, not RangeError
+      }, TypeError);
     }).toThrow(RangeError);
   });
 });
@@ -296,7 +288,6 @@ describe("ConfigurableActiveSupport", () => {
     class Base {}
     configAccessor.call(Base, "timeout", { default: 30 });
     class Child extends Base {}
-    // Child reads from Base's class-level accessor
     expect((Base as any).timeout).toBe(30);
   });
 
@@ -311,7 +302,7 @@ describe("ConfigurableActiveSupport", () => {
     configAccessor.call(Base, "verbose", { default: false });
     (Base as any).verbose = true;
     const instance = new Base() as any;
-    expect(instance.verbose).toBe(true); // instance delegates to class
+    expect(instance.verbose).toBe(true);
   });
 
   it("should raise name error if attribute name is invalid", () => {

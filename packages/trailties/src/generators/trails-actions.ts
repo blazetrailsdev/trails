@@ -1,10 +1,3 @@
-// Trails-native template DSL — the JS/TS analogue of railties'
-// Ruby-shape `gem`, `route`, `environment`, `initializer` actions.
-//
-// Kept separate from `actions.ts` (Rails-shape mirror) so `parity:api`
-// stays clean. These actions mutate `package.json` and `config/*.ts`
-// files in a trails app; they have no Ruby counterpart.
-
 import { getFsAsync, getPathAsync, type FsAdapter } from "@blazetrails/ruby-compat";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { assertNoRubySource } from "../template-builder/no-ruby-source.js";
@@ -37,12 +30,6 @@ export interface PkgOptions {
   dev?: boolean;
 }
 
-/**
- * Add a package to the application's `package.json`. The trails analogue of
- * railties' `gem` action — `version` defaults to `"*"`, and `{ dev: true }`
- * targets `devDependencies` instead of `dependencies`. Re-adding an existing
- * name overwrites its version.
- */
 export async function pkg(
   this: TrailsActionsHost,
   name: string,
@@ -74,8 +61,6 @@ export async function pkg(
     const actual = existing === null ? "null" : Array.isArray(existing) ? "array" : typeof existing;
     throw new Error(`package.json "${key}" must be an object, got ${actual}`);
   }
-  // Null-prototype target so a hostile name can't reach Object.prototype
-  // even if the explicit reject above is ever bypassed.
   const deps: Record<string, string> = Object.assign(
     Object.create(null) as Record<string, string>,
     (existing as Record<string, string> | undefined) ?? {},
@@ -86,12 +71,6 @@ export async function pkg(
   this.output(`         pkg  ${name}`);
 }
 
-/**
- * Insert TS source at the `// routes` marker in `config/routes.ts`.
- * The trails analogue of railties' `route` action — caller supplies valid
- * TS; the marker is left in place so subsequent `route()` calls append
- * below the prior insertion.
- */
 export async function route(this: TrailsActionsHost, tsCode: string): Promise<void> {
   assertNoRubySource(tsCode);
   await insertAtMarker(this, "config/routes.ts", "// routes", tsCode);
@@ -102,11 +81,6 @@ export interface EnvironmentOptions {
   env?: string;
 }
 
-/**
- * Insert TS source at the `// config` marker in `config/application.ts`,
- * or in `config/environments/$env.ts` when `env` is passed. The trails
- * analogue of railties' `environment` action.
- */
 export async function environment(
   this: TrailsActionsHost,
   tsCode: string,
@@ -123,13 +97,6 @@ export async function environment(
   this.output(` environment  ${summarize(tsCode)}`);
 }
 
-/**
- * Write a new file under `config/initializers/`. The trails analogue of
- * railties' `initializer` action — `content` must be valid TS produced via
- * the `tsModule` builder (the `assertNoRubySource` check rejects raw Ruby
- * source like `class … end`). `filename` is a plain leaf name; path
- * separators and `..` segments are rejected.
- */
 export async function initializer(
   this: TrailsActionsHost,
   filename: string,
@@ -164,11 +131,6 @@ async function insertAtMarker(
   const path = await getPathAsync();
   const full = path.join(host.cwd, relPath);
   const existing = await fs.readFile(full, "utf-8");
-  // Match the marker as a full line (`^<indent><marker>$`, multiline) so a
-  // user-supplied block containing the marker substring inside other code
-  // can't shadow the real marker line. Take the LAST match — every
-  // insertion goes ABOVE the marker, so the original marker line is always
-  // last in file.
   const re = new RegExp(`^([\\t ]*)${regexpEscape(marker)}[\\t ]*$`, "gm");
   let match: RegExpExecArray | null;
   let last: RegExpExecArray | null = null;

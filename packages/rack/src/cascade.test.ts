@@ -39,7 +39,6 @@ it("uses new response object if empty", async () => {
   expect(res[1]["content-type"]).toBe("text/plain");
   expect(res[2]).toEqual([]);
 
-  // Mutating the result shouldn't affect next call
   res[0] = 200;
   res[1]["content-type"] = "text/html";
   res[2].push("a");

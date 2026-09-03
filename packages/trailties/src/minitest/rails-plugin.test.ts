@@ -4,16 +4,10 @@ import { BacktraceFilter, Minitest } from "@blazetrails/activesupport";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { pluginRailsInit } from "./rails-plugin.js";
 
-/**
- * `backtrace_gem_line` (rails_plugin_test.rb:96-98) builds a frame inside a
- * gem's `lib`. trails' gems are packages under `node_modules`, which is what
- * `Rails::BacktraceCleaner`'s `APP_DIRS_PATTERN` silences.
- */
 function backtraceGemLine(gemName: string): string {
   return `node_modules/${gemName}/lib/${gemName}.js:1:1`;
 }
 
-/** Mirrors `with_plugin` (rails_plugin_test.rb:83-94). */
 function withPlugin(
   options: { fullBacktrace?: boolean },
   initialBacktraceFilter: BacktraceFilter,

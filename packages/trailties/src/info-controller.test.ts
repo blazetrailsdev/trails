@@ -3,11 +3,6 @@ import { ActionController } from "@blazetrails/actionpack";
 import { InfoController, matchingRoutes } from "./info-controller.js";
 import { Info, PropertyList } from "./info.js";
 
-// Mirrors railties/test/rails_info_controller_test.rb. Test names match
-// Rails verbatim for the subset of behavior we can exercise without
-// `ApplicationController` / `RoutesInspector` (those tests are deferred
-// follow-ups — see the PR body).
-
 const { TestCase } = ActionController;
 
 function exactResults(tc: InstanceType<typeof TestCase>): string[] {
@@ -38,8 +33,6 @@ describe("InfoControllerTest", () => {
     expect(fuzzyResults(tc)).toEqual([]);
   });
 
-  // Until RoutesInspector lands, the route table is empty — these mirror
-  // the "should not match" branch of the Rails tests of the same name.
   test("info controller search returns exact matches for route names", async () => {
     const tc = new TestCase(InfoController);
     await tc.get("routes", { params: { query: "rails_info_properties" } });

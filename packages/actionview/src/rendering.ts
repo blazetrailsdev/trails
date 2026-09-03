@@ -1,10 +1,4 @@
-/**
- * Module-as-host interfaces mixed into ActionController::Base. Defined as
- * TS interfaces (not classes) so AC can declaration-merge them into its
- * own class without inheriting state. Real method bodies land in Phase 4.
- *
- * @internal stub - real impl in Phase 4
- */
+/** @internal */
 
 import { include } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
@@ -26,7 +20,7 @@ export interface RenderOptions {
   [k: string]: unknown;
 }
 
-/** @internal stub - real impl in Phase 4 */
+/** @internal */
 export interface Rendering {
   lookupContext: LookupContext;
   render(options: RenderOptions | string, extra?: RenderOptions): string;
@@ -52,7 +46,7 @@ export interface Layouts {
   _layoutFor(name?: string | symbol): string;
 }
 
-/** @internal stub - real impl in Phase 4 */
+/** @internal */
 export interface LayoutsClass {
   layout(
     name: string | symbol | false | null | ((...args: unknown[]) => unknown),
@@ -60,15 +54,7 @@ export interface LayoutsClass {
   ): void;
 }
 
-/**
- * The class-side of `ActionView::Rendering::ClassMethods`
- * (`actionview/lib/action_view/rendering.rb:45-93`), mixed onto a controller
- * class by the module-mixin convention (`this`-typed functions assigned to the
- * class). `_routes` / `_helpers` / `supportsPathQ` are the reader hooks Rails
- * declares alongside (`rendering.rb:46-51`).
- *
- * @internal
- */
+/** @internal */
 export interface ViewContextClassMethods {
   _routes?: ViewContextRoutes | null;
   _helpers?: object | null;
@@ -81,23 +67,21 @@ export interface ViewContextClassMethods {
     helpers: object | null | undefined,
   ): typeof Base;
   inheritViewContextClassQ(): boolean;
-  /** @internal Rails: `@view_context_class`. */
+  /** @internal */
   _viewContextClass?: typeof Base;
 }
 
-/** The `routes.url_helpers(supports_path)` / `routes.mounted_helpers` pair. */
 export interface ViewContextRoutes {
   urlHelpers(supportsPath?: boolean): object;
   mountedHelpers(): object;
 }
 
-/** @internal The superclass of a class, as Ruby's `superclass`. */
+/** @internal */
 function superclassOf(klass: ViewContextClassMethods): ViewContextClassMethods | null {
   const parent = Object.getPrototypeOf(klass) as ViewContextClassMethods | null;
   return typeof parent === "function" ? parent : null;
 }
 
-/** Mirrors `inherit_view_context_class?` (`rendering.rb:52-57`). */
 export function inheritViewContextClassQ(this: ViewContextClassMethods): boolean {
   const superclass = superclassOf(this);
   return (
@@ -108,11 +92,7 @@ export function inheritViewContextClassQ(this: ViewContextClassMethods): boolean
   );
 }
 
-/**
- * Mirrors `build_view_context_class(klass, supports_path, routes, helpers)` (`rendering.rb:59-73`).
- *
- * @missingRailsArgs include — PERMANENT
- */
+/** @missingRailsArgs include — PERMANENT */
 export function buildViewContextClass(
   this: ViewContextClassMethods,
   klass: typeof Base,
@@ -136,12 +116,9 @@ export function buildViewContextClass(
   return subclass;
 }
 
-/** Mirrors `view_context_class` (`rendering.rb:82-92`). */
 export function viewContextClass(this: ViewContextClassMethods): typeof Base {
   const klass = DetailsKey.viewContextClass();
 
-  // Ruby's `@view_context_class ||=` reads the ivar on THIS class only; a
-  // plain field read would walk the constructor chain to a superclass's memo.
   if (this._viewContextClass === undefined || !Object.hasOwn(this, "_viewContextClass")) {
     this._viewContextClass = this.buildViewContextClass(
       klass,
@@ -163,14 +140,13 @@ export function viewContextClass(this: ViewContextClassMethods): typeof Base {
   return this._viewContextClass;
 }
 
-/** @internal The instance half of `ActionView::Rendering` (`rendering.rb:95-111`). */
+/** @internal */
 export interface ViewContextHost {
   constructor: ViewContextClassMethods;
   lookupContext: LookupContext;
   viewAssigns(): Record<string, unknown>;
 }
 
-/** Mirrors `Rendering#view_context` (`rendering.rb:108-110`). */
 export function viewContext(this: ViewContextHost): Base {
   return new (this.constructor.viewContextClass())(
     this.lookupContext,

@@ -46,15 +46,11 @@ describe("EncryptedFileTest", () => {
     for (const p of [contentPath, keyPath]) {
       try {
         await fs.unlink!(p);
-      } catch {
-        /* missing */
-      }
+      } catch {}
     }
     try {
       fs.rmSync(tmpdir, { recursive: true, force: true });
-    } catch {
-      /* */
-    }
+    } catch {}
     setEnv("CONTENT_KEY", originalEnv);
   });
 
@@ -88,10 +84,6 @@ describe("EncryptedFileTest", () => {
     const ef = make();
     await ef.write(CONTENT);
     const fs = await getFsAsync();
-    // Ruby's `File::Stat#owned?` is `uid == Process.uid`. `FsStatResult.uid` is
-    // the only uid the adapters carry — neither ProcessAdapter nor OsAdapter
-    // exposes the running process's — so the tmpdir this test just created
-    // stands in for it, the same workaround core-ext/file/atomic.ts:57 uses.
     const tmpdirStat = await fs.stat!(tmpdir);
     await ef.change(async (file) => {
       const stat = await fs.stat!(file);
@@ -132,8 +124,6 @@ describe("EncryptedFileTest", () => {
     await fs.writeFile!(keyPath, key);
 
     await assertNothingRaised(async () => {
-      // Fresh instance — Rails caches key-file contents per instance too, so
-      // re-add-after-miss requires a new EncryptedFile (Rails uses ||=).
       expect(await make().key()).toBe(key);
     });
   });
@@ -169,13 +159,6 @@ describe("EncryptedFileTest", () => {
     await assertRaise([InvalidKeyLengthError], {}, () => make().write(CONTENT));
   });
 
-  // Bug-for-bug port of the Rails tests: the upstream `encrypted_file`
-  // helper takes a `content_path` arg but ignores it (uses `@content_path`
-  // instead — Ruby instance-var shadowing typo). The "symlink" assertions
-  // therefore exercise the original path, not the symlink. We mirror that.
-  // Our EncryptedFile DOES resolve content_path symlinks lazily via
-  // `resolveContentPath()`; that behavior is covered indirectly by the
-  // other tests writing through the constructed path.
   it("respects existing content_path symlink", async () => {
     const fs = await getFsAsync();
     const path = await getPathAsync();
@@ -204,13 +187,6 @@ describe("EncryptedFileTest", () => {
     expect(await ef.read()).toBe(CONTENT);
   });
 
-  // Rails exercises `Messages::Codec.with(default_serializer: :marshal/:json)`
-  // to flip a global serializer across an encrypt/decrypt boundary and
-  // assert the envelope still round-trips. Our port hardcodes the `marshal`
-  // serializer, as Rails does, and exposes serializer choice
-  // per-MessageEncryptor — there is no global flip-able state, so the
-  // "changing" half of this scenario does not apply. Until `Codec.with` is
-  // ported, the test reduces to the basic round-trip the name promises.
   it("can read encrypted file after changing default_serializer", async () => {
     const ef = make();
     await ef.write(CONTENT);

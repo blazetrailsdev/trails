@@ -1,23 +1,3 @@
-/**
- * Trailtie — initialization hooks for ActionDispatch.
- *
- * Mirrors: ActionDispatch::Railtie < Rails::Railtie (railtie.rb)
- *
- * Registers the ActionDispatch config namespace and two initializers:
- *   - `action_dispatch.deprecator` — installs the ActionDispatch deprecator
- *     into the application's `deprecators` collection.
- *   - `action_dispatch.configure` — copies `config.actionDispatch.*` values
- *     (trails camelCase mirror of Rails' `config.action_dispatch.*`) onto
- *     the framework-level holders (URL, QueryParser, Request::Utils,
- *     Cache::Request, ...).
- *
- * Unported targets (ExceptionWrapper.rescue_responses/_templates,
- * CookieJar.always_write_cookie, Mapper.route_source_locations,
- * Response.default_headers, Request.ignore_accept_header,
- * ParamBuilder.ignore_leading_brackets, ActionDispatch.test_app) are left
- * out of the configure body and will wire in as those classes gain the
- * matching surface — see actionpack-100-percent.md.
- */
 import { type Deprecators } from "@blazetrails/activesupport";
 import {
   deprecator,
@@ -37,10 +17,6 @@ import {
 } from "@blazetrails/actionpack";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
-/**
- * Shape of `config.actionDispatch` — mirrors the
- * `ActiveSupport::OrderedOptions` block at the top of Rails' railtie.rb.
- */
 export interface ActionDispatchConfig {
   xSendfileHeader: string | null;
   ipSpoofingCheck: boolean;
@@ -66,11 +42,6 @@ export interface ActionDispatchConfig {
   ignoreLeadingBrackets: boolean | null;
   strictQueryStringSeparator: boolean | null;
   defaultHeaders: Record<string, string>;
-  /**
-   * Mirrors `ActiveSupport::Messages::RotationConfiguration.new`. The
-   * messages rotation-configuration port has not landed yet, so this slot
-   * is typed `unknown` and defaults to `null` until that arrives.
-   */
   cookiesRotations: unknown | null;
   alwaysWriteCookie?: boolean;
 }
@@ -112,14 +83,6 @@ function defaultActionDispatchConfig(): ActionDispatchConfig {
   };
 }
 
-/**
- * Shape of `config.contentSecurityPolicy` — mirrors the top-level CSP slots
- * on `Rails::Application::Configuration` (`content_security_policy`,
- * `_report_only`, `_nonce_generator`, `_nonce_directives`). Rails routes
- * these into the env via `application.rb:342-346`; the
- * `action_dispatch.content_security_policy` initializer below mirrors that
- * by seeding per-request env keys via [[seedContentSecurityPolicyEnv]].
- */
 export interface ContentSecurityPolicyConfig {
   policy: ContentSecurityPolicy | null;
   reportOnly: boolean;
@@ -161,22 +124,10 @@ export class Trailtie extends BaseTrailtie {
       QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
       RequestUtils.performDeepMunge = cfg.performDeepMunge;
       CacheConfig.strictFreshness = cfg.strictFreshness;
-      // Rails: `on_load(:action_dispatch_response) { self.default_charset =
-      //   app.config.action_dispatch.default_charset || app.config.encoding }`
-      // (railtie.rb:65-68). Rails assigns unconditionally — a null cfg
-      // falls through to `app.config.encoding` (defaults to "utf-8"). trails
-      // has no app-level `encoding` config yet, so a null cfg restores
-      // "utf-8" so initializer state doesn't leak across runs.
       Response.defaultCharset = cfg.defaultCharset ?? "utf-8";
     });
   }
 
-  /**
-   * Default ActionDispatch middleware contributed by this trailtie. Apps
-   * compose this into their own stack on boot. Mirrors the per-framework
-   * middleware insertions Rails performs in
-   * `railties/lib/rails/application/default_middleware_stack.rb`.
-   */
   static defaultMiddleware(): MiddlewareStack {
     const stack = new MiddlewareStack();
     stack.use(ContentSecurityPolicyMiddleware);
@@ -184,17 +135,8 @@ export class Trailtie extends BaseTrailtie {
     return stack;
   }
 
-  /**
-   * Seed per-request CSP env keys from `config.contentSecurityPolicy`.
-   *
-   * Called by hosts at the start of request processing — mirrors the
-   * `env_config` propagation in `railties/lib/rails/application.rb:342-346`.
-   */
   static seedContentSecurityPolicyEnv(request: CspRequestHost): void {
     const cfg = this.config.get("contentSecurityPolicy") as ContentSecurityPolicyConfig;
-    // Mirror Rails application.rb:342-346 — all four slots are copied
-    // unconditionally so toggling app config back to a falsy value
-    // overwrites any stale env carried over from a prior request.
     const csp = cspAccessors(request);
     csp.contentSecurityPolicy = cfg.policy;
     csp.contentSecurityPolicyReportOnly = cfg.reportOnly;

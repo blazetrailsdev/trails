@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { respondTo, Collector, UnknownFormat } from "../../../action-dispatch/respond-to.js";
 
-// ==========================================================================
-// controller/mime/respond_to_test.rb
-// ==========================================================================
 describe("RespondToControllerTest", () => {
   it("html", () => {
     const result = respondTo(
@@ -24,7 +21,6 @@ describe("RespondToControllerTest", () => {
       },
       { accept: "*/*" },
     );
-    // Returns first registered format
     expect(result).toBe("html");
   });
 
@@ -73,13 +69,10 @@ describe("RespondToControllerTest", () => {
   });
 
   it("using defaults", () => {
-    const result = respondTo(
-      (format) => {
-        format.html(() => "html");
-        format.json(() => "json");
-      },
-      {}, // no accept header, returns first
-    );
+    const result = respondTo((format) => {
+      format.html(() => "html");
+      format.json(() => "json");
+    }, {});
     expect(result).toBe("html");
   });
 
@@ -230,8 +223,6 @@ describe("RespondToControllerTest", () => {
     expect(result).toBe("any");
   });
 
-  // --- Collector API ---
-
   it("collector formats", () => {
     const c = new Collector();
     c.html().json().xml();
@@ -263,7 +254,6 @@ describe("RespondToControllerTest", () => {
     const c = new Collector();
     c.html(() => "html");
     c.json(() => "json");
-    // Prefer json with higher quality
     const result = c.negotiate({ accept: "text/html;q=0.5, application/json;q=1.0" });
     expect(result?.format).toBe("json");
   });
@@ -344,7 +334,6 @@ describe("RespondToControllerTest", () => {
   });
 
   it("synonyms", () => {
-    // text/xml should match xml handler
     const result = respondTo(
       (format) => {
         format.xml(() => "xml content");
@@ -355,7 +344,6 @@ describe("RespondToControllerTest", () => {
   });
 
   it("xhtml alias", () => {
-    // application/xhtml+xml should match html
     const result = respondTo(
       (format) => {
         format.html(() => "html content");
@@ -397,7 +385,6 @@ describe("RespondToControllerTest", () => {
   });
 
   it("extension synonyms", () => {
-    // htm should match html
     const result = respondTo(
       (format) => {
         format.html(() => "html");
@@ -408,7 +395,6 @@ describe("RespondToControllerTest", () => {
   });
 
   it("firefox simulation", () => {
-    // Firefox sends: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
     const result = respondTo(
       (format) => {
         format.html(() => "html");

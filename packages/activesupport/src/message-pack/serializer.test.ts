@@ -35,18 +35,11 @@ describe("MessagePackSerializerTest", () => {
     expect(roundtrip(Symbol.for("some_symbol"))).toBe(Symbol.for("some_symbol"));
   });
 
-  // Pinned against real MRI Rails (activesupport 8.0.2):
-  //   ActiveSupport::MessagePack.dump(:some_symbol).bytes
   it("dumps Symbol bytes identical to real Rails MessagePack", () => {
     const expected = [204, 128, 199, 11, 0, 115, 111, 109, 101, 95, 115, 121, 109, 98, 111, 108];
     expect([...dump(Symbol.for("some_symbol"))]).toEqual(expected);
   });
 
-  // The remaining native extension types are registered by
-  // activesupport-messagepack-native-extension-types. Type IDs without a
-  // faithful, non-lossy JS representation are intentionally descoped (see PR):
-  //   2 BigDecimal, 3 Rational, 4 Complex, 10 Duration, 11 Range, 13 URI,
-  //   14 IPAddr, 15 Pathname, 16 Regexp.
   it("enshrines type IDs", () => {
     MessagePack.warmup();
     const actual = Object.fromEntries(
@@ -73,8 +66,6 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips 64-bit native integers", () => {
-    // Lifts the #3255 throw: integers across the full 64-bit native range encode
-    // without routing through the bigint ext.
     expect(roundtrip(2 ** 33)).toBe(2 ** 33);
     expect(roundtrip(Number.MAX_SAFE_INTEGER)).toBe(Number.MAX_SAFE_INTEGER);
     expect(roundtrip(-(2 ** 33))).toBe(-(2 ** 33));
@@ -132,8 +123,6 @@ describe("MessagePackSerializerTest", () => {
     expect(result.toHash()).toEqual(hwia.toHash());
   });
 
-  // Pinned against real MRI Rails (activesupport 8.0.2):
-  //   ActiveSupport::MessagePack.dump(value).bytes
   it("dumps native extension type bytes identical to real Rails MessagePack", () => {
     expect([...dump(2n ** 512n)]).toEqual([
       204, 128, 199, 69, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

@@ -13,15 +13,8 @@ import {
 } from "./asset-url-helper.js";
 import { tag } from "./tag-helper.js";
 
-/**
- * `ActionView::Helpers::AssetTagHelper`
- * (`actionview/lib/action_view/helpers/asset_tag_helper.rb`).
- */
-
-/** `mattr_accessor :preload_links_header` (`asset_tag_helper.rb:27`). */
 export let preloadLinksHeader: boolean | null = null;
 
-/** `mattr_accessor :apply_stylesheet_media_default` (`asset_tag_helper.rb:28`). */
 export let applyStylesheetMediaDefault: boolean | null = null;
 
 export function setPreloadLinksHeader(value: boolean | null): void {
@@ -32,7 +25,6 @@ export function setApplyStylesheetMediaDefault(value: boolean | null): void {
   applyStylesheetMediaDefault = value;
 }
 
-/** `MAX_HEADER_SIZE = 1_000` (`asset_tag_helper.rb:652`). */
 export const MAX_HEADER_SIZE = 1_000;
 
 interface PreloadHeaderHost {
@@ -48,7 +40,6 @@ export type AssetTagHelperHost = AssetUrlHelperHost &
     contentSecurityPolicyNonce?(): string | null;
   };
 
-/** Mirrors `AssetTagHelper#stylesheet_link_tag` (`asset_tag_helper.rb:202-242`). */
 export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[]): SafeBuffer {
   const [rawSources, extracted] = extractOptionsBang(sources);
   const options = stringifyKeys(extracted);
@@ -112,11 +103,7 @@ export function stylesheetLinkTag(this: AssetTagHelperHost, ...sources: unknown[
   return sourcesTags;
 }
 
-/**
- * Mirrors the private `send_preload_links_header` (`asset_tag_helper.rb:654-677`).
- *
- * @internal
- */
+/** @internal */
 export function sendPreloadLinksHeader(
   this: PreloadHeaderHost,
   preloadLinks: string[],
@@ -150,7 +137,6 @@ function byteSize(value: string): number {
   return new TextEncoder().encode(value).length;
 }
 
-/** Ruby `Hash#extract!` — removes the named keys and returns them. */
 function extractBang(hash: Record<string, unknown>, keys: string[]): Record<string, unknown> {
   const extracted: Record<string, unknown> = {};
   for (const key of keys) {

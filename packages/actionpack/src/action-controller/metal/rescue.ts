@@ -1,11 +1,3 @@
-/**
- * ActionController::Rescue
- *
- * Provides rescue_from handler chain for controllers, wrapping actions
- * to handle configured errors.
- * @see https://api.rubyonrails.org/classes/ActionController/Rescue.html
- */
-
 export type RescueHandler = (error: Error) => void | Promise<void>;
 
 export class RescueRegistry {

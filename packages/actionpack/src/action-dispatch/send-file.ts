@@ -1,28 +1,15 @@
-/**
- * ActionController::DataStreaming (send_file / send_data)
- *
- * Helpers for sending files and raw data as downloads.
- */
-
 import { File } from "@blazetrails/ruby-compat";
 
 export interface SendFileOptions {
-  /** Content type (auto-detected from filename if not provided) */
   type?: string;
-  /** Content disposition: "inline" or "attachment" (default: "attachment") */
   disposition?: "inline" | "attachment" | null;
-  /** Display filename (defaults to the file's basename) */
   filename?: string;
-  /** Stream the file (default: true) */
   stream?: boolean;
 }
 
 export interface SendDataOptions {
-  /** Content type (default: "application/octet-stream") */
   type?: string;
-  /** Content disposition: "inline" or "attachment" (default: "attachment") */
   disposition?: "inline" | "attachment" | null;
-  /** Display filename */
   filename?: string;
 }
 
@@ -58,18 +45,12 @@ const MIME_TYPES: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
-/** Look up a MIME type by extension or symbol. */
 export function lookupMimeType(typeOrExt: string): string {
-  if (typeOrExt.includes("/")) return typeOrExt; // Already a MIME type
+  if (typeOrExt.includes("/")) return typeOrExt;
   const ext = typeOrExt.startsWith(".") ? typeOrExt : `.${typeOrExt}`;
   return MIME_TYPES[ext.toLowerCase()] ?? "application/octet-stream";
 }
 
-/**
- * Generate headers and body for sending a file. Mirrors Rails' `send_file`,
- * whose guard is `File.file?(path) && File.readable?(path)`
- * (`data_streaming.rb:77`).
- */
 export function sendFile(path: string, options: SendFileOptions = {}): SendResult {
   const resolvedPath = File.expandPath(path);
 
@@ -90,13 +71,9 @@ export function sendFile(path: string, options: SendFileOptions = {}): SendResul
     "content-length": String(stat.size),
   };
 
-  // Don't include charset for binary types
-  // (Rails strips charset from send_file headers)
-
   if (disposition !== null && disposition !== undefined) {
     headers["content-disposition"] = buildContentDisposition(disposition, filename);
   } else if (disposition === undefined) {
-    // Default: attachment
     headers["content-disposition"] = buildContentDisposition("attachment", filename);
   }
 
@@ -108,10 +85,6 @@ export function sendFile(path: string, options: SendFileOptions = {}): SendResul
   return { status: 200, headers, body };
 }
 
-/**
- * Generate headers and body for sending raw data.
- * Mirrors Rails' send_data.
- */
 export function sendData(data: Buffer | string, options: SendDataOptions = {}): SendResult {
   const body = Buffer.isBuffer(data) ? data : Buffer.from(data);
   const type = options.type ? lookupMimeType(options.type) : "application/octet-stream";
@@ -125,7 +98,6 @@ export function sendData(data: Buffer | string, options: SendDataOptions = {}): 
   if (disposition !== null && disposition !== undefined) {
     headers["content-disposition"] = buildContentDisposition(disposition, options.filename);
   } else if (disposition === undefined) {
-    // Default: attachment
     headers["content-disposition"] = buildContentDisposition("attachment", options.filename);
   }
 
@@ -134,7 +106,6 @@ export function sendData(data: Buffer | string, options: SendDataOptions = {}): 
 
 function buildContentDisposition(disposition: "inline" | "attachment", filename?: string): string {
   if (!filename) return disposition;
-  // RFC 6266: use filename* for non-ASCII
   const hasNonAscii = /[^\x20-\x7E]/.test(filename);
   if (hasNonAscii) {
     const encoded = encodeURIComponent(filename);

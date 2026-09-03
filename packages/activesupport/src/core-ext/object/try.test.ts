@@ -52,7 +52,6 @@ describe("ObjectTryTest", () => {
   });
 
   it("false try", () => {
-    // false is not null/undefined — tryCall can still be called on it
     expect(tryCall(false as any, "nonexistent")).toBeUndefined();
   });
 

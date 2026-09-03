@@ -1,11 +1,3 @@
-/**
- * ActionController::UrlFor
- *
- * Includes url_for into the host class, adding HTTP-layer URL options
- * like host, port, and protocol from the current request.
- * @see https://api.rubyonrails.org/classes/ActionController/UrlFor.html
- */
-
 export function urlOptionsFromRequest(request: {
   host?: string;
   port?: number | string;

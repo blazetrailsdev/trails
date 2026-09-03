@@ -9,10 +9,6 @@ import {
   ProcCall,
 } from "./callbacks.js";
 
-// trails-only coverage: CallbackChain.compile() memoizes the folded
-// CallbackSequence (Rails' @all_callbacks), rebuilding only on chain mutation.
-// No Rails counterpart test — this pins our internal optimization so a future
-// refactor can't silently reintroduce per-run refolding.
 describe("CallbackChain compile memoization (trails)", () => {
   const makeCallback = (name: string) => new Callback(name, () => {}, "before", {}, {});
 
@@ -73,9 +69,6 @@ describe("CallbackChain compile memoization (trails)", () => {
   });
 });
 
-// trails-only coverage: the documented type-omitted form
-// `set_callback :save, :before_method` (`callbacks.rb:713`) defaults to
-// `:before` (`callbacks.rb:698`).
 describe("setCallback type-omitted form (trails)", () => {
   it("defaults the callback type to before", () => {
     const target = {};
@@ -98,10 +91,6 @@ describe("setCallback type-omitted form (trails)", () => {
   });
 });
 
-// trails-only coverage: `run_callbacks(kind, type)` (callbacks.rb:96-104)
-// forwards `type` into `CallbackChain#compile(type)` (callbacks.rb:614-630),
-// whose type arm folds only the callbacks of that one kind and memoizes them in
-// @single_callbacks. Rails has no test for it, so it is pinned here.
 describe("runCallbacks type argument (trails)", () => {
   class Target {}
 
@@ -140,8 +129,6 @@ describe("runCallbacks type argument (trails)", () => {
   });
 });
 
-// `(@override_target || target)` (callbacks.rb:470, :475, :481) — a `ProcCall`
-// built with no target resolves to the runtime `target`.
 describe("ProcCall", () => {
   it("falls back to the runtime target when no override target was given", () => {
     const calls: unknown[] = [];

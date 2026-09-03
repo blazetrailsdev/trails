@@ -2,11 +2,8 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { Info, PropertyList } from "./info.js";
 import { VERSION } from "./version.js";
 
-// Mirrors railties/test/rails_info_test.rb. Test names are kept verbatim.
-
 describe("InfoTest", () => {
   beforeEach(() => {
-    // Reset to a known baseline before each test — the module is a singleton.
     Info.properties = new PropertyList();
     Info.property("Trails version", VERSION);
   });

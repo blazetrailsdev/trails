@@ -2,33 +2,12 @@ import type { LookupContext } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
-/**
- * ActionView::StreamingTemplateRenderer
- *
- * Rack-compatible streaming renderer. Mirrors Rails' Fiber-based approach:
- * the layout streams its prefix, yields to the inner template, then streams
- * its suffix. In TypeScript we achieve this by rendering the layout with a
- * sentinel placeholder substituted at `<%= yield %>`, splitting the result at
- * that placeholder, then yielding the three chunks in order.
- *
- * Rails source: actionview/lib/action_view/renderer/streaming_template_renderer.rb
- * @internal
- */
+/** @internal */
 export class StreamingTemplateRenderer extends AbstractRenderer {
   render(..._args: unknown[]): never {
     throw new Error("Use renderStream() for streaming rendering.");
   }
 
-  /**
-   * Yields string chunks as they become available.
-   *
-   * Without a layout, the template body is yielded as a single chunk.
-   * With a layout, the layout is split at its `yield` point so the prefix
-   * is flushed before the (potentially slow) inner template renders.
-   *
-   * On error, logs and yields `ActionView::Base.streaming_completion_on_exception`
-   * (an empty string in this port) so the response can still be closed cleanly.
-   */
   async *renderStream(context: ViewContext, options: RenderOptions): AsyncGenerator<string> {
     const locals = options.locals ?? {};
     const keys = Object.keys(locals);
@@ -79,19 +58,13 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     }
   }
 
-  /**
-   * Mirrors `delayed_render`: splits the layout at its yield point so the
-   * prefix reaches the client before the inner template is rendered.
-   * @internal
-   */
+  /** @internal */
   private async *delayedRender(
     context: ViewContext,
     template: RenderableTemplate,
     layout: RenderableTemplate,
     locals: Record<string, unknown>,
   ): AsyncGenerator<string> {
-    // Render the layout with a unique sentinel in place of the template body.
-    // This lets us split the layout output at the yield boundary.
     const sentinel = `\x00STREAM_YIELD_${Date.now()}_${Math.random()}\x00`;
     const streamingContext: ViewContext = {
       ...context,
@@ -102,7 +75,6 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     const sentinelIdx = layoutBody.indexOf(sentinel);
 
     if (sentinelIdx === -1) {
-      // Layout never yielded — render template normally and append.
       const templateBody = await template.render(context, locals);
       const fullBody = layoutBody + templateBody;
       yield fullBody;
@@ -112,14 +84,11 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
     const layoutPrefix = layoutBody.slice(0, sentinelIdx);
     const layoutSuffix = layoutBody.slice(sentinelIdx + sentinel.length);
 
-    // Stream layout prefix immediately (e.g. <html><head>…</head><body>).
     yield layoutPrefix;
 
-    // Render the template (this is where the "wait" happens in Rails' Fiber).
     const templateBody = await template.render(context, locals);
     yield templateBody;
 
-    // Resume: stream layout suffix (e.g. </body></html>).
     yield layoutSuffix;
   }
 
@@ -153,25 +122,18 @@ export class StreamingTemplateRenderer extends AbstractRenderer {
   }
 }
 
-/** Mirrors `ActionView::Base.streaming_completion_on_exception`. @internal */
+/** @internal */
 const streamingCompletionOnException = "";
 
-/** Mirrors `Body#log_error`. @internal */
+/** @internal */
 function logError(exception: unknown): void {
   const message =
     exception instanceof Error ? `${exception.name}: ${exception.message}` : String(exception);
-  // Use console.error in the absence of ActionView::Base.logger.
 
   console.error(`\n${message}\n`);
 }
 
-/**
- * A Rack-compatible streaming body.
- *
- * Mirrors `ActionView::StreamingTemplateRenderer::Body`. Iterates over chunks
- * by consuming the async generator returned by `StreamingTemplateRenderer`.
- * @internal
- */
+/** @internal */
 export class StreamingBody {
   constructor(
     private readonly lookupContext: LookupContext,
@@ -179,19 +141,12 @@ export class StreamingBody {
     private readonly options: RenderOptions,
   ) {}
 
-  /**
-   * Yields rendered chunks. Mirrors Rails' `Body#each`.
-   */
   async *each(): AsyncGenerator<string> {
     const renderer = new StreamingTemplateRenderer(this.lookupContext);
     yield* renderer.renderStream(this.context, this.options);
   }
 
-  /**
-   * Collects all chunks into a single string. Convenience wrapper used by
-   * `Renderer#renderBody` when the caller needs the full body at once.
-   * @internal
-   */
+  /** @internal */
   async toArray(): Promise<string[]> {
     const chunks: string[] = [];
     for await (const chunk of this.each()) {
@@ -201,10 +156,7 @@ export class StreamingBody {
   }
 }
 
-/**
- * A `RenderedTemplate` variant that carries the streaming body.
- * @internal
- */
+/** @internal */
 export class StreamingRenderedTemplate extends RenderedTemplate {
   constructor(
     readonly streamingBody: StreamingBody,

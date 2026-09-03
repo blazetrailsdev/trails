@@ -6,11 +6,6 @@ import { Worker } from "node:worker_threads";
 import { FileStore } from "./file-store.js";
 import { MemoryStore } from "./memory-store.js";
 
-// trails-only coverage for the members Rails' file_store_test.rb exercises only
-// indirectly: `write_serialized_entry`'s `File.atomic_write`
-// (file_store.rb:135), `lock_file` around `modify_value` (file_store.rb:140-153,
-// :228), and the `inspect` strings (file_store.rb:97-99,
-// memory_store.rb:186-188).
 describe("FileStore atomic write and inspect", () => {
   function withStore(fn: (store: FileStore, dir: string) => void): void {
     const dir = mkdtempSync(join(tmpdir(), "trails-file-store-"));
@@ -25,8 +20,6 @@ describe("FileStore atomic write and inspect", () => {
     withStore((store, dir) => {
       store.write("foo", "bar");
       expect(store.read("foo")).toBe("bar");
-      // The tempfile is created in cache_path itself (`File.atomic_write(key,
-      // cache_path)`), so a leaked one shows up as a stray root child.
       const strays = readdirSync(dir).filter((f) => f.startsWith("."));
       expect(strays).toEqual([]);
     });
@@ -45,12 +38,6 @@ describe("FileStore atomic write and inspect", () => {
     const iterations = 100;
     try {
       const store = new FileStore(dir);
-      // Seed the key first: `lock_file` yields UNLOCKED when the file does not
-      // exist (file_store.rb:148-158) and `modify_value` is what creates it
-      // (:228), so Rails itself loses an increment when two writers race the
-      // seeding write. The mutual exclusion under test is the existing-file
-      // arm, and racing the create instead made this assert a guarantee Rails
-      // does not make — it dropped exactly one increment in CI.
       store.write("counter", 0);
       const worker = new Worker(new URL("./file-store-lock-worker.trails.mjs", import.meta.url), {
         workerData: { dir, iterations },

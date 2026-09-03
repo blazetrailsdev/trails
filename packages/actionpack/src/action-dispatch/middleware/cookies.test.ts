@@ -80,9 +80,6 @@ describe("Cookies middleware", () => {
       const jar = new CookieJar();
       jar.set("c", "3");
       env[COOKIES_KEY] = jar;
-      // Rack::Response carries set-cookie as string[] when stacking
-      // multiple cookies. The RackResponse tuple narrows to string at
-      // the type level, but real downstream apps still emit arrays.
       return [
         200,
         { "set-cookie": ["a=1; path=/", "b=2; path=/"] as unknown as string },
@@ -107,8 +104,6 @@ describe("Cookies middleware", () => {
       return [200, { "Set-Cookie": "a=1; path=/" }, bodyFromString("")];
     });
     const [, headers] = await cookies.call({});
-    // The non-lowercase key is dropped; the merged canonical lowercase
-    // header carries both cookies.
     expect(headers["Set-Cookie"]).toBeUndefined();
     const lines = headers["set-cookie"].split("\n");
     expect(lines[0]).toBe("a=1; path=/");

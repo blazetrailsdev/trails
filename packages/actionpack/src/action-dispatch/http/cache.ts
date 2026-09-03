@@ -1,11 +1,3 @@
-/**
- * ActionDispatch::Http::Cache
- *
- * Mirrors `ActionDispatch::Http::Cache::Request` / `::Response`: conditional-GET
- * helpers (`If-Modified-Since` / `If-None-Match`), ETag generation, and
- * `Cache-Control` normalization. Reference: rfc7232#section-6.
- */
-
 import { getCrypto } from "@blazetrails/ruby-compat";
 
 const HTTP_IF_MODIFIED_SINCE = "If-Modified-Since";
@@ -99,14 +91,7 @@ const MONTHS: Record<string, number> = {
 
 const RFC2822_ZONE_RE = /^(?:GMT|UT|UTC|Z|[+-]\d{4}|EDT|EST|CDT|CST|MDT|MST|PDT|PST)$/;
 
-/**
- * Parse an RFC 2822 date — Rails' `Time.rfc2822` is used by
- * `ActionDispatch::Http::Cache::Request#if_modified_since`. Accepts numeric
- * zone offsets (`+0000`, `-0500`) and the obsolete zone names from RFC 2822
- * §4.3, plus `GMT` which is what real-world HTTP clients send.
- *
- * @internal
- */
+/** @internal */
 export function parseRfc2822Date(s: string | undefined): Date | undefined {
   if (!s) return undefined;
   const m =
@@ -145,15 +130,7 @@ export function parseRfc2822Date(s: string | undefined): Date | undefined {
   return new Date(t - offsetMin * 60_000);
 }
 
-/**
- * Parse an HTTP-date header value, strict RFC 1123 (IMF-fixdate) per RFC 9110.
- * Returns undefined for any non-conforming value — including the obsolete
- * RFC 850 and asctime forms, and any locale-sensitive `Date.parse` interpretations.
- *
- * Rails' `Time.httpdate` is similarly strict (accepts only RFC 1123 / RFC 2616).
- *
- * @internal
- */
+/** @internal */
 export function parseHttpDate(s: string | undefined): Date | undefined {
   if (!s) return undefined;
   const m = RFC1123_RE.exec(s);
@@ -237,7 +214,7 @@ export function generateStrongEtag(validators: unknown): string {
   return `"${getCrypto().createHash("md5").update(expandCacheKey(validators)).digest("hex").slice(0, 32)}"`;
 }
 
-/** @internal Minimal ActiveSupport::Cache.expand_cache_key analogue. */
+/** @internal */
 function expandCacheKey(key: unknown): string {
   if (Array.isArray(key)) return key.map(expandCacheKey).join("/");
   if (key == null) return "";

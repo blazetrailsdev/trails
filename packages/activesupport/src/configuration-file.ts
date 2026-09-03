@@ -18,12 +18,7 @@ export class ConfigurationFile {
     this.content = this.read(contentPath);
   }
 
-  /**
-   * @missingRailsCall load — PERMANENT: configuration_file.rb:26-28 `YAML.unsafe_load_file`
-   *   / `YAML.load_file` — Ruby's YAML/Psych is stdlib with no port; trails
-   *   reads the file through the async fs adapter and hands the source to its
-   *   own YAML parser, so no `load` call exists to make.
-   */
+  /** @missingRailsCall load — PERMANENT */
   static parse(
     contentPath: string,
     options: { context?: Record<string, unknown>; [option: string]: unknown } = {},
@@ -31,30 +26,7 @@ export class ConfigurationFile {
     return new ConfigurationFile(contentPath).parse(options);
   }
 
-  /**
-   * Mirrors `ConfigurationFile#parse` (configuration_file.rb:21-41). Rails'
-   * rendered/raw split picks `YAML.unsafe_load` over `unsafe_load_file` (:24-34);
-   * one `yamlParse(source)` covers both, since the content is already read. The
-   * `render` call stays outside the `try` because Rails' rescue names
-   * `Psych::SyntaxError` alone, so a template error escapes unwrapped.
-   *
-   * Rails' `**options` are Psych loader options, forwarded verbatim to the
-   * `yaml` package's own loader options. Three Psych keys have no analogue
-   * there and are inert rather than dropped in silence: `aliases:` (the `yaml`
-   * loader always resolves aliases, so Rails' `aliases: true` — the form
-   * `Rails::Application::Configuration#database_configuration` passes — is
-   * already the behaviour, and `aliases: false` has no off switch short of
-   * `maxAliasCount: 0`), `permitted_classes:` / `permitted_symbols:` (the
-   * `yaml` loader builds only JSON-shaped values, never arbitrary class
-   * instances or Symbols, so there is nothing to permit), and `freeze:` (no
-   * deep-freeze pass). Everything else — `merge:`, `version:`, `schema:`,
-   * `maxAliasCount:` — reaches the loader.
-   *
-   * @missingRailsCall load — PERMANENT: configuration_file.rb:26-28 `YAML.unsafe_load_file`
-   *   / `YAML.load_file` — Ruby's YAML/Psych is stdlib with no port; trails
-   *   reads the file through the async fs adapter and hands the source to its
-   *   own YAML parser, so no `load` call exists to make.
-   */
+  /** @missingRailsCall load — PERMANENT */
   parse({
     context,
     ...options
@@ -80,7 +52,6 @@ export class ConfigurationFile {
     }
   }
 
-  /** Mirrors the private `read` (configuration_file.rb:44-52). */
   private read(contentPath: string): string {
     const content = File.read(contentPath);
     if (content.includes("\u00A0")) {
@@ -91,23 +62,6 @@ export class ConfigurationFile {
     return content;
   }
 
-  /**
-   * Mirrors the private `render` (configuration_file.rb:54-58).
-   *
-   * Rails compiles the file with `ERB.new(@content)`, stamps `e.filename =
-   * @content_path` so raises inside the template point at the config file, and
-   * evaluates it — against `context` (a Binding) when one is given, otherwise
-   * against ERB's own. trails' TSE template pipeline is compile-time and lives
-   * in actionview, above activesupport, so the ERB seat is taken here by the
-   * dependency-free `@blazetrails/tse-compiler` parser plus a plain `Function`
-   * — the same "compile the template to source, then eval it" shape ERB has.
-   * `context`'s keys become the template's locals, standing in for the names a
-   * Binding brings into scope; `//# sourceURL` is `e.filename`, and it is what
-   * puts `@content_path` in the stack of a raise from inside the template.
-   *
-   * No HTML escaping: Ruby's stdlib ERB does not escape either, and a config
-   * file is not markup.
-   */
   private render(context?: Record<string, unknown>): string {
     const { nodes } = tseParse(this.content);
     let body = 'let __out = "";\n';

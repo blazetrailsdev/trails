@@ -1,11 +1,3 @@
-/**
- * trails-only coverage for `start_processing`'s params and format branches
- * (`vendor/rails/actionpack/lib/action_controller/log_subscriber.rb:9-27`).
- * Rails reaches them through a real controller request, so its own
- * `ACLogSubscriberTest` asserts only the `Processing by` line; these drive the
- * payload directly.
- */
-
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   LogSubscriber as BaseLogSubscriber,

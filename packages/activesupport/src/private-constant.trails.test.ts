@@ -23,9 +23,6 @@ describe("PrivateConstantTest", () => {
     expect(() => constantize("Country::HABTM_Treaties")).toThrow(
       "private constant Country::HABTM_Treaties referenced",
     );
-    // Ruby raises NameError for a private constant, with `name` set to the
-    // constant itself — which is what makes safe_constantize swallow it rather
-    // than propagate (see the next test).
     expect(() => constantize("Country::HABTM_Treaties")).toThrow(NameError);
   });
 

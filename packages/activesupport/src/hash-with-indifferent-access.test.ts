@@ -2,14 +2,12 @@ import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import { Hash, KeyError } from "@blazetrails/ruby-compat";
 
-/** Deeply unwraps a `Hash` tree into plain objects so `toEqual` can read it. */
 const plainly = (hash: Hash<string, unknown>): Record<string, unknown> =>
   Object.fromEntries(
     [...hash].map(([key, value]) => [key, value instanceof Hash ? plainly(value) : value]),
   );
 
 describe("HashWithIndifferentAccessTest", () => {
-  // Basic indifferent access
   it("indifferent reading — string and symbol keys are interchangeable", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: true, c: false });
     expect(h.get("a")).toBe(1);
@@ -46,7 +44,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(h.size).toBe(3);
   });
 
-  // merge / update
   it("indifferent merging — merge returns new HWIA", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: "failure", b: "failure" });
     const other = { a: 1, b: 2 };
@@ -54,7 +51,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(merged).toBeInstanceOf(HashWithIndifferentAccess);
     expect(merged.get("a")).toBe(1);
     expect(merged.get("b")).toBe(2);
-    // original unchanged
     expect(h.get("a")).toBe("failure");
   });
 
@@ -81,7 +77,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(h.get("b")).toBe(2);
   });
 
-  // select / reject
   it("indifferent select — returns new HWIA with matching pairs", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const selected = h.select((_k, v) => v === 1);
@@ -103,7 +98,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(Object.fromEntries(rejected.toHash())).toEqual({ a: 1 });
   });
 
-  // transform_keys / transform_values
   it("indifferent transform_keys — returns new HWIA", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const transformed = h.transformKeys((k) => k.repeat(2));
@@ -134,13 +128,11 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(Object.fromEntries(transformed.toHash())).toEqual({ a: 2, b: 4 });
   });
 
-  // compact
   it("indifferent compact — removes null/undefined values", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: null, c: undefined, d: 2 });
     const compacted = h.compact();
     expect(compacted).toBeInstanceOf(HashWithIndifferentAccess);
     expect(Object.fromEntries(compacted.toHash())).toEqual({ a: 1, d: 2 });
-    // original unchanged
     expect(h.hasKey("b")).toBe(true);
   });
 
@@ -150,14 +142,12 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(Object.fromEntries(compacted.toHash())).toEqual({ a: 1, b: 2 });
   });
 
-  // assoc
   it("indifferent assoc — returns [key, value] pair", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     expect(h.assoc("a")).toEqual(["a", 1]);
     expect(h.assoc("z")).toBeUndefined();
   });
 
-  // dig
   it("nested dig indifferent access", () => {
     const data = new HashWithIndifferentAccess<unknown>({ this: { views: 1234 } });
     expect(data.dig(":this", ":views")).toBe(1234);
@@ -169,7 +159,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(h.dig("z", "y")).toBeUndefined();
   });
 
-  // slice
   it("indifferent slice — returns HWIA with only given keys", () => {
     const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
     const sliced = original.slice("a", "b");
@@ -188,7 +177,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(sliced.get("login")).toBe("bender");
   });
 
-  // except / without
   it("indifferent except — returns HWIA without given keys", () => {
     const original = new HashWithIndifferentAccess({ a: "x", b: "y", c: 10 });
     const result = original.except("a", "b");
@@ -203,7 +191,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(Object.fromEntries(result.toHash())).toEqual({ c: 10 });
   });
 
-  // toHash
   it("indifferent to_hash — converts to plain object with string keys", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 1, b: 2 });
     const plain = Object.fromEntries(h.toHash());
@@ -211,7 +198,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(plain).not.toBeInstanceOf(HashWithIndifferentAccess);
   });
 
-  // any / all / none / count / find / each / map
   it("any — true if any entries exist", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     expect(h.any()).toBe(true);
@@ -270,7 +256,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(result.sort()).toEqual(["a=1", "b=2"]);
   });
 
-  // invert
   it("invert — swaps keys and values", () => {
     const h = new HashWithIndifferentAccess({ a: "x", b: "y" });
     const inverted = h.invert();
@@ -278,14 +263,12 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(inverted.get("y")).toBe("b");
   });
 
-  // store
   it("store — alias for set", () => {
     const h = new HashWithIndifferentAccess<number>();
     h.store("a", 1);
     expect(h.get("a")).toBe(1);
   });
 
-  // toParam / toQuery
   it("toParam — encodes to query string", () => {
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const param = h.toParam();
@@ -298,7 +281,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(h.toQuery()).toContain("hello=world");
   });
 
-  // deep merge
   it("deep_merge on indifferent access", () => {
     const h1 = new HashWithIndifferentAccess<unknown>({
       a: "a",
@@ -313,7 +295,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect((merged.get("c") as HashWithIndifferentAccess<unknown>).get("c2")).toBe("c2");
   });
 
-  // replace
   it("replace — clears and repopulates hash", () => {
     const h = new HashWithIndifferentAccess<unknown>({ a: 42 });
     h.replace({ b: 12 });
@@ -321,15 +302,12 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(h.get("b")).toBe(12);
   });
 
-  // sub-hashes become HWIA
   it("indifferent sub-hashes — nested plain objects become HWIA on set", () => {
     const h = new HashWithIndifferentAccess<unknown>({ user: { id: 5 } });
     const user = h.get("user");
-    // In our implementation nested objects are plain; just verify the outer access works
     expect(h.get("user")).toBeDefined();
   });
 
-  // withIndifferentAccess returns dup
   it("withIndifferentAccess returns a new equivalent HWIA", () => {
     const h = new HashWithIndifferentAccess({ a: 1 });
     const dup = h.withIndifferentAccess();
@@ -374,7 +352,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("symbolize keys preserves keys that cant be symbolized for hash with indifferent access", () => {
-    // All keys are strings in TS; just verify they survive
     const h = new HashWithIndifferentAccess({ "123": "val" });
     const symbolized = h.symbolizeKeys();
     expect(symbolized.get("123")).toBe("val");
@@ -465,7 +442,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent reading with nonnil default", () => {
-    // In Ruby, h[:d] returns the default; our impl returns undefined for missing keys
     const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
     expect(h.get("a")).toBe(1);
     expect(h.get("missing")).toBeUndefined();
@@ -488,7 +464,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("update with to hash conversion", () => {
-    // An object with a toHash method — we use a plain object here
     const h = new HashWithIndifferentAccess<unknown>({ x: 1 });
     h.update({ y: 2 });
     expect(h.get("x")).toBe(1);
@@ -501,7 +476,6 @@ describe("HashWithIndifferentAccessTest", () => {
     expect(merged).toBeInstanceOf(HashWithIndifferentAccess);
     expect(merged.get("a")).toBe(1);
     expect(merged.get("b")).toBe(2);
-    // original unchanged
     expect(h.get("a")).toBe("failure");
   });
 
@@ -535,7 +509,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent merging with block", () => {
-    // Our merge always uses the other's value; skip block merging (not supported)
     const h = new HashWithIndifferentAccess<unknown>({ a: 1 });
     const merged = h.merge({ a: 2 });
     expect(merged.get("a")).toBe(2);
@@ -580,7 +553,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent select returns enumerator", () => {
-    // In TS, select() returns a HWIA; verify it returns all on true predicate
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     const selected = h.select(() => true);
     expect(selected.size).toBe(2);
@@ -594,7 +566,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent select bang", () => {
-    // We don't have a bang variant; test that select does not mutate
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     h.select((_k, v) => v === 1);
     expect(h.size).toBe(2);
@@ -614,7 +585,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent reject bang", () => {
-    // Verify reject does not mutate original
     const h = new HashWithIndifferentAccess({ a: 1, b: 2 });
     h.reject((_k, v) => v === 1);
     expect(h.size).toBe(2);
@@ -628,14 +598,12 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent deep transform keys", () => {
-    // transformKeys only transforms top-level keys
     const h = new HashWithIndifferentAccess({ a: 1 });
     const transformed = h.transformKeys((k) => k.toUpperCase());
     expect(transformed.get("A")).toBe(1);
   });
 
   it("indifferent transform keys bang", () => {
-    // transformKeys returns new HWIA, original unchanged
     const h = new HashWithIndifferentAccess({ a: 1 });
     const transformed = h.transformKeys((k) => k.toUpperCase());
     expect(h.hasKey("a")).toBe(true);
@@ -656,7 +624,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent transform values bang", () => {
-    // transformValues returns new HWIA, original unchanged
     const h = new HashWithIndifferentAccess({ a: 1 });
     const transformed = h.transformValues((v) => (v as number) + 10);
     expect(h.get("a")).toBe(1);
@@ -751,10 +718,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("argless default with existing nil key", () => {
-    // Rails builds the source as `Hash.new(:default).merge(nil => "defined")`.
-    // A plain JS object has no default seat and no nil key — every key is a
-    // string — so the default comes from the HWIA constructor and the nil key
-    // is JS's own spelling of it.
     const h = new HashWithIndifferentAccess<unknown>(":default").merge({ null: "defined" });
 
     expect(h.default()).toBe(":default");
@@ -780,7 +743,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("assorted keys not stringified", () => {
-    // All keys are strings in our implementation
     const h = new HashWithIndifferentAccess({ a: 1 });
     const keys = [...h.keys()];
     expect(keys.every((k) => typeof k === "string")).toBe(true);
@@ -852,7 +814,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("indifferent extract", () => {
-    // except removes keys; verify
     const h = new HashWithIndifferentAccess({ a: 1, b: 2, c: 3 });
     const result = h.except("b", "c");
     expect(Object.fromEntries(result.toHash())).toEqual({ a: 1 });
@@ -902,7 +863,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("inheriting from top level hash with indifferent access preserves ancestors chain", () => {
-    // We can subclass HWIA
     class MyHWIA<V> extends HashWithIndifferentAccess<V> {}
     const h = new MyHWIA({ a: 1 });
     expect(h).toBeInstanceOf(HashWithIndifferentAccess);
@@ -916,7 +876,6 @@ describe("HashWithIndifferentAccessTest", () => {
   });
 
   it("should use default proc for unknown key", () => {
-    // No default proc support; unknown key returns undefined
     const h = new HashWithIndifferentAccess({ a: 1 });
     expect(h.get("unknown")).toBeUndefined();
   });

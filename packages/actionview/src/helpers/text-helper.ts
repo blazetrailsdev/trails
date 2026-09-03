@@ -12,22 +12,11 @@ import { contentTag } from "./tag-helper.js";
 import { sanitize } from "./sanitize-helper.js";
 import { raw } from "./output-safety-helper.js";
 
-/**
- * Host interface for helpers that write to or read per-render state from
- * a view context. Rails stores `@output_buffer` and `@_cycles` on the
- * view instance; the equivalents here are properties on the host.
- */
 export interface TextHelperHost {
   outputBuffer: OutputBuffer;
   /** @internal */
   _cycles?: Record<string, Cycle>;
 }
-
-/**
- * ActionView::Helpers::TextHelper
- *
- * Pure-ish text helpers: truncate, pluralize, word_wrap, simple_format.
- */
 
 export interface TruncateOptions {
   length?: number;
@@ -36,11 +25,6 @@ export interface TruncateOptions {
   escape?: boolean;
 }
 
-/**
- * truncate — shortens +text+ to +length+, appending omission marker.
- * Result is marked HTML-safe; escaped unless `escape: false`.
- * If a block is given and text was truncated, its return value is appended.
- */
 export function truncate(
   text: string | SafeBuffer | null | undefined,
   options: TruncateOptions = {},
@@ -75,9 +59,6 @@ export interface PluralizeOptions {
   plural?: string;
 }
 
-/**
- * pluralize — returns "<count> <word>", pluralizing +singular+ unless count == 1.
- */
 export function pluralize(
   count: number | string | null | undefined,
   singular: string,
@@ -102,12 +83,6 @@ export interface HighlightOptions {
   sanitize?: boolean;
 }
 
-/**
- * highlight — highlights occurrences of +phrases+ in +text+ by wrapping
- * matches in `<mark>` (or a custom highlighter / block-supplied) HTML.
- * Sanitizes input by default; preserves HTML tag structure by only
- * substituting within text segments.
- */
 export function highlight(
   text: string | SafeBuffer | null | undefined,
   phrases: string | RegExp | Array<string | RegExp> | null | undefined,
@@ -160,11 +135,6 @@ export interface ExcerptOptions {
   separator?: string;
 }
 
-/**
- * excerpt — extracts the first occurrence of +phrase+ plus surrounding text,
- * prepending / appending an omission marker when the excerpt is truncated.
- * Returns null if +phrase+ is not found.
- */
 export function excerpt(
   text: string | null | undefined,
   phrase: string | RegExp | null | undefined,
@@ -233,18 +203,12 @@ export interface WordWrapOptions {
   breakSequence?: string;
 }
 
-/**
- * word_wrap — wraps +text+ into lines no longer than +lineWidth+ (80 by default).
- */
 export function wordWrap(text: string | SafeBuffer, options: WordWrapOptions = {}): string {
   const textStr = text instanceof SafeBuffer ? text.toString() : text;
   if (textStr.length === 0) return "";
   const lineWidth = options.lineWidth ?? 80;
   const breakSequence = options.breakSequence ?? "\n";
 
-  // Match up to `lineWidth` characters, followed by either non-newline whitespace
-  // (plus optional newline), end of string (with trailing newlines), or a newline.
-  // OR match an empty line.
   const pattern = new RegExp(`(.{1,${lineWidth}})(?:[^\\S\\n]+\\n?|\\n*$|\\n)|\\n`, "g");
 
   const replaced = textStr.replace(pattern, (_match, group1: string | undefined) =>
@@ -259,10 +223,6 @@ export interface SimpleFormatOptions {
   wrapperTag?: string;
 }
 
-/**
- * simple_format — wraps text in `<p>` paragraphs (split on `\n\n+`) and
- * converts single newlines to `<br />`. Sanitizes by default.
- */
 export function simpleFormat(
   text: string | SafeBuffer | null | undefined,
   htmlOptions: Record<string, unknown> = {},
@@ -289,28 +249,16 @@ export function simpleFormat(
   return htmlSafe(wrapped.join("\n\n"));
 }
 
-/**
- * concat — append +value+ to the host's output buffer. Use inside non-output
- * code blocks where you cannot use `<%= %>`. Mirrors `ActionView::Helpers::TextHelper#concat`.
- */
 export function concat(this: TextHelperHost, string: unknown): OutputBuffer {
   this.outputBuffer.append(string);
   return this.outputBuffer;
 }
 
-/**
- * safe_concat — like {@link concat}, but appends the value as HTML-safe.
- * Mirrors `ActionView::Helpers::TextHelper#safe_concat`.
- */
 export function safeConcat(this: TextHelperHost, string: unknown): OutputBuffer {
   this.outputBuffer.safeAppend(string);
   return this.outputBuffer;
 }
 
-/**
- * Cycle — cycles through its values each time {@link Cycle.toString} is called.
- * Mirrors `ActionView::Helpers::TextHelper::Cycle`.
- */
 export class Cycle {
   readonly values: unknown[];
   private _index = 0;
@@ -367,11 +315,6 @@ function isCycleOptions(value: unknown): value is CycleOptions {
   );
 }
 
-/**
- * cycle — returns a {@link Cycle} (stringifies to the next value each call).
- * The first arg may be an array of values; trailing options may carry `name`
- * to scope the cycle. Mirrors `ActionView::Helpers::TextHelper#cycle`.
- */
 export function cycle(this: TextHelperHost, firstValue: unknown, ...rest: unknown[]): string {
   if (arguments.length === 0) {
     throw new TypeError("wrong number of arguments (given 0, expected 1+)");
@@ -391,19 +334,11 @@ export function cycle(this: TextHelperHost, firstValue: unknown, ...rest: unknow
   return existing.toString();
 }
 
-/**
- * current_cycle — returns the current cycle string without advancing.
- * Mirrors `ActionView::Helpers::TextHelper#current_cycle`.
- */
 export function currentCycle(this: TextHelperHost, name = "default"): string | undefined {
   const c = getCycle(this, name);
   return c ? c.currentValue() : undefined;
 }
 
-/**
- * reset_cycle — rewinds the named cycle to its first element.
- * Mirrors `ActionView::Helpers::TextHelper#reset_cycle`.
- */
 export function resetCycle(this: TextHelperHost, name = "default"): void {
   const c = getCycle(this, name);
   if (c) c.reset();

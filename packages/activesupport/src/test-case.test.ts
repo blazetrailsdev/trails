@@ -19,12 +19,8 @@ function mbUpcase(str: string): string {
 function mbDowncase(str: string): string {
   return str.toLowerCase();
 }
-// ==========================================================================
-// MultibyteCharsUTF8BehaviorTest — targets multibyte_chars_test.rb
-// ==========================================================================
 
 describe("AssertionsTest", () => {
-  // Helper: assert_difference equivalent
   function assertDifference<T>(
     expr: () => T,
     diff: T extends number ? number : never,
@@ -36,7 +32,6 @@ describe("AssertionsTest", () => {
     expect(after - before).toBe(diff as number);
   }
 
-  // Helper: assert_no_difference
   function assertNoDifference<T>(expr: () => T, fn: () => void): void {
     const before = expr();
     fn();
@@ -44,7 +39,6 @@ describe("AssertionsTest", () => {
     expect(after).toBe(before);
   }
 
-  // Helper: assert_changes
   function assertChanges<T>(expr: () => T, options: { from?: T; to?: T }, fn: () => void): void {
     const before = expr();
     if (options.from !== undefined) {
@@ -71,7 +65,6 @@ describe("AssertionsTest", () => {
   });
 
   it("assert raises with match fail", () => {
-    // assert_raises with wrong match should fail — we verify inverse
     expect(() => {
       throw new Error("something went wrong");
     }).not.toThrow(/xyz/);
@@ -81,9 +74,7 @@ describe("AssertionsTest", () => {
     const count = 5;
     assertNoDifference(
       () => count,
-      () => {
-        // no-op
-      },
+      () => {},
     );
   });
 
@@ -155,7 +146,6 @@ describe("AssertionsTest", () => {
   });
 
   it("assert difference with implicit difference", () => {
-    // Default diff is 1
     let count = 0;
     assertDifference(
       () => count,
@@ -384,13 +374,8 @@ describe("AssertionsTest", () => {
       assertChanges(
         () => val,
         { to: "same" },
-        () => {
-          // no change — but to matches current value, so no change is detected
-          // we force failure by changing then checking mismatch
-        },
+        () => {},
       );
-      // val didn't change, to: "same" should match current but diff check should fail
-      // simulate: check not changed
       expect(val).not.toBe("different");
     }).not.toThrow();
   });
@@ -489,23 +474,19 @@ describe("AssertionsTest", () => {
     const val = "stable";
     assertNoDifference(
       () => val,
-      () => {
-        // no change
-      },
+      () => {},
     );
   });
 
   it("assert no changes with from option", () => {
     const val = "x";
     expect(val).toBe("x");
-    // no change
     expect(val).toBe("x");
   });
 
   it("assert no changes with from option with wrong value", () => {
     const val = "actual";
     expect(() => {
-      // Simulate: from says "wrong" but val is "actual"
       expect(val).toBe("wrong");
     }).toThrow();
   });
@@ -545,12 +526,10 @@ describe("AssertionsTest", () => {
       return count;
     };
     const before = expr();
-    // no op
     expect(expr()).toBe(before);
   });
 
   it("assert no changes message with not real callable", () => {
-    // In TS, only functions are callable; a non-function cannot be called
     const notCallable = "a string";
     expect(typeof notCallable).toBe("string");
     expect(typeof notCallable === "function").toBe(false);
@@ -559,7 +538,6 @@ describe("AssertionsTest", () => {
   it("assert no changes with long string wont output everything", () => {
     const long = "a".repeat(1000);
     expect(long.length).toBe(1000);
-    // no change assertion
     const before = long;
     expect(long).toBe(before);
   });
@@ -600,7 +578,6 @@ describe("ExceptionsInsideAssertionsTest", () => {
 
 describe("SetupAndTeardownTest", () => {
   it("inherited setup callbacks", () => {
-    // In JS, beforeEach callbacks are inherited through describe nesting
     const log: string[] = [];
     const setup = () => log.push("setup");
     setup();
@@ -610,7 +587,6 @@ describe("SetupAndTeardownTest", () => {
 
 describe("TestCaseTaggedLoggingTest", () => {
   it("logs tagged with current test case", () => {
-    // In JS, we can tag logs manually; verify tagged logger works
     const output = { string: "" };
     const tag = "TestCase";
     const msg = `[${tag}] test message`;
@@ -621,7 +597,6 @@ describe("TestCaseTaggedLoggingTest", () => {
 
 describe("TestOrderTest", () => {
   it("defaults to random", () => {
-    // Test order in vitest is deterministic by default, but configurable
     expect(true).toBe(true);
   });
 
@@ -661,8 +636,6 @@ describe("TestConstStubbing", () => {
       stubConst(ConstStubbable as never, "NOT_A_CONSTANT", 1, () => {});
     }).toThrow(NameError);
 
-    // `const_get(constant, false)` does not look up the ancestors, so the
-    // constant the SUBCLASS inherits is not one it defines.
     expect(() => {
       stubConst(SubclassOfConstStubbable as never, "CONSTANT", 1, () => {});
     }).toThrow(NameError);
@@ -679,10 +652,8 @@ describe("TestConstStubbing", () => {
       { exists: false },
     );
 
-    // Ruby raises NameError for an undefined constant; JS reads `undefined`.
     expect((ConstStubbable as { NOT_A_CONSTANT?: number }).NOT_A_CONSTANT).toBeUndefined();
 
-    // Ruby's `Object`, the namespace `ConstStubbable` itself is defined in.
     const namespace = { ConstStubbable } as unknown as Record<string, unknown>;
     expect(() => {
       stubConst(namespace, "ConstStubbable", 1, () => {}, { exists: false });

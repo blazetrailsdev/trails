@@ -1,15 +1,3 @@
-/**
- * Normalize a URI path.
- *
- * Strips trailing slash, ensures a leading slash, collapses repeated
- * slashes, and upper-cases percent-encoded escapes.
- *
- *     normalizePath("/foo")  // => "/foo"
- *     normalizePath("/foo/") // => "/foo"
- *     normalizePath("foo")   // => "/foo"
- *     normalizePath("")      // => "/"
- *     normalizePath("/%ab")  // => "/%AB"
- */
 export function normalizePath(path: string | null | undefined): string {
   let p = `/${path ?? ""}`.replace(/\/+/g, "/");
   if (p !== "/") {
@@ -19,10 +7,6 @@ export function normalizePath(path: string | null | undefined): string {
   return p;
 }
 
-// RFC 3986: UNRESERVED + SUB_DELIMS + `:` `@` keep their literal byte.
-// PATH adds `/`; FRAGMENT adds `/` and `?` (also `:` `@` which are already in).
-// `/u` so non-BMP characters match as a single code point rather than two
-// surrogate halves (which would percent-encode to U+FFFD bytes).
 const UNSAFE_PATH = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@/]/gu;
 const UNSAFE_SEGMENT = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@]/gu;
 const UNSAFE_FRAGMENT = /[^a-zA-Z0-9\-._~!$&'()*+,;=:@/?]/gu;
@@ -54,14 +38,6 @@ export function escapeFragment(fragment: string): string {
   return escapeWith(fragment, UNSAFE_FRAGMENT);
 }
 
-/**
- * Form-component percent-encoding, matching Ruby's
- * `Rack::Utils.escape` / `URI.encode_www_form_component`.
- *
- * Encodes every byte except `*-._0-9A-Za-z`; space becomes `+`. JS's
- * `encodeURIComponent` leaves `!'()~` unencoded (RFC 3986 unreserved),
- * so we manually pct-encode those single-byte chars to match Rack.
- */
 export function rackEscape(value: string): string {
   return encodeURIComponent(value)
     .replace(/[!'()~]/g, (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase())
@@ -81,8 +57,6 @@ export function unescapeUri(uri: string): string {
         continue;
       }
     }
-    // Walk by code point so non-BMP characters (surrogate pairs) get encoded
-    // as their real UTF-8 byte sequence, not two replacement surrogates.
     const cp = uri.codePointAt(i)!;
     for (const b of encoder.encode(String.fromCodePoint(cp))) bytes.push(b);
     i += cp > 0xffff ? 2 : 1;

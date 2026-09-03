@@ -1,6 +1,3 @@
-// Port of `Rails::Application`. PR 2.5c adds routesReloader/configFor/
-// credentials/encrypted/keyGenerator/messageVerifier. Skipped methods
-// listed in docs/trailties-plan.md.
 import {
   ArgumentError,
   dasherize,
@@ -23,8 +20,6 @@ import { DefaultMiddlewareStack } from "./application/default-middleware-stack.j
 import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
-// Registers the Vite asset pipeline's trailtie, the way requiring an asset
-// gem registers its railtie.
 import "./assets/trailtie.js";
 import { resolveEnv, loadDatabaseConfig, type DatabaseConfig } from "./database.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
@@ -32,7 +27,7 @@ import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import type { MiddlewareStack, RackApp } from "@blazetrails/actionpack";
 
 let _appClass: typeof Application | null = null;
-/** @internal Tracks which subclasses have fired `:before_configuration`. */
+/** @internal */
 const _registered = new WeakSet<typeof Application>();
 
 export class Application extends Engine {
@@ -47,25 +42,10 @@ export class Application extends Engine {
   private _credentials?: EncryptedFile;
   private _deprecators?: Deprecators;
   private _app?: RackApp;
-  /** Rails: `@executor = Class.new(ActiveSupport::Executor)` (`application.rb:122`);
-   * `@reloader.executor = @executor` (`application.rb:124`) is the constructor.
-   * The `typeof Executor` annotation is declaration-emit only: TypeScript
-   * cannot write a `.d.ts` for an anonymous class type inheriting `#private`
-   * fields (TS4094). */
   readonly executor: typeof Executor = class extends Executor {};
-  /** Rails: `@reloader = Class.new(ActiveSupport::Reloader)` (`application.rb:123`) —
-   * a per-application subclass so one app's prepare callbacks don't leak into
-   * another's. Annotated for the same declaration-emit reason as `executor`. */
   readonly reloader: typeof Reloader = class extends Reloader {};
   logger: Logger | null = null;
   cache: CacheStore | null = null;
-  /**
-   * Rails: `attr_reader :reloaders` (`application.rb:102`), seeded
-   * `@reloaders = []` (`application.rb:113`). Holds every object whose
-   * `updated?` the `:set_clear_dependencies_hook` initializer polls; the
-   * routes reloader registers itself here from `:set_routes_reloader_hook`
-   * (`finisher.rb:162`).
-   */
   readonly reloaders: unknown[] = [];
 
   constructor() {
@@ -73,7 +53,6 @@ export class Application extends Engine {
     this.reloader.executor = this.executor;
   }
 
-  /** Mirrors Rails' `Rails.app_class`. Set by {@link Application.register}. */
   static get appClass(): typeof Application | null {
     return _appClass;
   }
@@ -81,11 +60,6 @@ export class Application extends Engine {
     _appClass = klass;
   }
 
-  /**
-   * Register a concrete Application subclass. Replaces Rails' `inherited`
-   * hook; mirrors `Rails.app_class = base` and runs the
-   * `:before_configuration` load hooks.
-   */
   static register(subclass: typeof Application): void {
     const fresh = !_registered.has(subclass);
     Trailtie.register(subclass);
@@ -96,11 +70,6 @@ export class Application extends Engine {
     }
   }
 
-  /**
-   * Trailties equivalent of Rails' `find_root_with_flag "config.ru"`:
-   * walks parents from `from` looking for `config.ts`, falling back to
-   * the fs adapter's cwd.
-   */
   static async findRoot(from: string): Promise<string> {
     const fs = await getFsAsync();
     return this.findRootWithFlag("config.ts", from, fs.cwd());
@@ -114,12 +83,6 @@ export class Application extends Engine {
     return newCfg;
   }
 
-  /**
-   * A managed collection of deprecators. The collection's configuration
-   * methods affect all deprecators in it.
-   *
-   * Mirrors `Application#deprecators` (`application.rb:244-248`).
-   */
   get deprecators(): Deprecators {
     if (!this._deprecators) {
       this._deprecators = new Deprecators();
@@ -128,24 +91,14 @@ export class Application extends Engine {
     return this._deprecators;
   }
 
-  /** Returns true once {@link Application#initialize} has completed. */
   initialized(): boolean {
     return this._initialized;
   }
 
-  /**
-   * Dasherized application name — mirrors Rails' `def name`. Strips a
-   * trailing `/application` segment so `MyApp::Application#name` returns
-   * `"my-app"`.
-   */
   name(): string {
     return dasherize(underscore(this.constructor.name)).replace(/-application$/, "");
   }
 
-  /**
-   * Splice Bootstrap + Engine/Trailtie + Finisher initializers — mirrors
-   * Rails' `Application#initializers` (`application.rb:445-449`).
-   */
   get initializers(): Collection {
     const bootstrap = Bootstrap.initializersFor(this);
     const inherited = super.initializers;
@@ -154,14 +107,7 @@ export class Application extends Engine {
       .plus(Finisher.initializersFor(this));
   }
 
-  /**
-   * Returns the ordered railties for this application considering
-   * railtiesOrder — mirrors `Application#ordered_railties`
-   * (`application.rb:588-612`). The `:all` slot holds the nested array Rails
-   * flattens back out in `railtiesInitializers`.
-   *
-   * @internal
-   */
+  /** @internal */
   orderedRailties(): Array<Trailtie | Trailtie[] | string> {
     if (!this._orderedRailties) {
       const order: Array<Trailtie | Trailtie[] | string> = this.config.railtiesOrder.map(
@@ -187,11 +133,7 @@ export class Application extends Engine {
     return this._orderedRailties;
   }
 
-  /**
-   * Mirrors `Application#railties_initializers` (`application.rb:614-624`).
-   *
-   * @internal
-   */
+  /** @internal */
   railtiesInitializers(current: Collection): Collection {
     let initializers = new Collection();
     for (const r of [...this.orderedRailties()].reverse().flat()) {
@@ -204,18 +146,8 @@ export class Application extends Engine {
     return initializers;
   }
 
-  /**
-   * Run the initializer chain — Rails' `initialize!`. Idempotency mirrors
-   * Rails: re-entry raises rather than silently returning.
-   */
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
-    // Publish a live view of the app root so ActiveRecord's path-resolution
-    // sites (SQLite DB path, config/database.* lookup) expand against it —
-    // mirrors Rails' `Rails.root` being a live read of `application.config.root`
-    // (rails.rb:65-67). The getter prefers `config.root` so a later
-    // `config.setRoot(...)` (e.g. in an initializer) stays visible; `bootRoot`
-    // is the discovered/cwd fallback for before any explicit override.
     const bootRoot = await this.resolvedRoot();
     setTrailsRoot(() => this.config.root ?? bootRoot);
     await this.runInitializers(group, this);
@@ -244,32 +176,18 @@ export class Application extends Engine {
     return (this._app = stack.build(this.endpoint()));
   }
 
-  /**
-   * Rails: `alias :build_middleware_stack :app` (`application.rb:558`).
-   *
-   * @internal
-   */
+  /** @internal */
   buildMiddlewareStack(): RackApp {
     return this.app();
   }
 
-  /** Mirrors `Application#default_middleware_stack` (`application.rb:626-629`).
-   * Rails passes `paths`; `Engine#paths()` is async in trails (it resolves the
-   * root first), so the sync `config.paths()` it delegates to is passed here.
-   *
-   * @internal
-   */
+  /** @internal */
   defaultMiddlewareStack(): MiddlewareStack {
     const defaultStack = new DefaultMiddlewareStack(this, this.config, this.config.paths());
     return defaultStack.buildStack();
   }
 
-  /**
-   * Mirrors `Application#ensure_generator_templates_added`
-   * (`application.rb:631-634`).
-   *
-   * @internal
-   */
+  /** @internal */
   async ensureGeneratorTemplatesAdded(): Promise<void> {
     const configuredPaths = this.config.generators().templates as string[];
     const libTemplates = (await this.paths()).get("lib/templates");
@@ -281,29 +199,18 @@ export class Application extends Engine {
     return (this._routesReloader ??= new RoutesReloader());
   }
 
-  /** Reload application routes regardless if they changed or not. */
   async reloadRoutesBang(): Promise<void> {
     await this.routesReloader().reload();
   }
 
-  /** Rails: `reload_routes_unless_loaded` (`application.rb:164-166`). */
   async reloadRoutesUnlessLoaded(): Promise<boolean> {
     return this.initialized() && (await this.routesReloader().executeUnlessLoaded(this));
   }
 
-  /** `config.secretKeyBase` wins, else `SECRET_KEY_BASE` env. */
   secretKeyBase(): string | null {
     return this.config.secretKeyBase ?? getEnv("SECRET_KEY_BASE") ?? null;
   }
 
-  /**
-   * 1000 iterations match Rails for cookie compatibility. A missing
-   * `secretKeyBase` raises the `ArgumentError` Rails raises from
-   * `Configuration#secret_key_base=`
-   * (`railties/lib/rails/application/configuration.rb:524`); trails'
-   * `Configuration#secretKeyBase` is a plain field, so the raise lands at the
-   * first read that needs a key.
-   */
   keyGenerator(secretKeyBase: string | null = this.secretKeyBase()): CachingKeyGenerator {
     if (secretKeyBase === null) {
       throw new ArgumentError(
@@ -318,8 +225,6 @@ export class Application extends Engine {
     return gen;
   }
 
-  /** Raw 64-byte derived key — Rails feeds `generate_key(salt)` bytes to
-   * HMAC, not hex; required for signed-cookie compatibility. */
   messageVerifier(verifierName: string): MessageVerifier {
     return new MessageVerifier(this.keyGenerator().generateKey(verifierName));
   }
@@ -333,8 +238,6 @@ export class Application extends Engine {
     }));
   }
 
-  /** `path` is absolute or root-relative; both flow through
-   * Rails.root.join / path.resolve. */
   async encrypted(
     path: string,
     opts: { keyPath?: string; envKey?: string } = {},
@@ -349,7 +252,6 @@ export class Application extends Engine {
     });
   }
 
-  /** Trails: only `"database"` — dynamic `import()` of config/database.{ts,js}. */
   async configFor(name: string, opts: { env?: string } = {}): Promise<DatabaseConfig> {
     if (name !== "database") {
       throw new Error(`configFor: only "database" is supported in trailties (got "${name}").`);
@@ -357,15 +259,6 @@ export class Application extends Engine {
     return loadDatabaseConfig(opts.env ?? resolveEnv(), await this.resolvedRoot());
   }
 
-  /** Boot-time root resolution for callers that need a concrete path
-   * (credentials, `configFor`, the `trailsRoot()` seam): an explicit
-   * `config.root=` override, else the root `Application.findRoot` resolves.
-   * Rails needs no such method — `config.root` is seeded from
-   * `find_root(called_from)` when the configuration is built
-   * (`engine.rb:553`) and so is never nil — but that seeding is async here.
-   * The `cwd` fallback is Rails' own: `find_root_with_flag "config.ru", from,
-   * Dir.pwd` (`application.rb:88-90`), not a tail bolted on afterwards.
-   */
   async resolvedRoot(): Promise<string> {
     return this.config.root ?? (await this.root());
   }

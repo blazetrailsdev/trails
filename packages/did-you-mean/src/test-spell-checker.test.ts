@@ -1,11 +1,7 @@
-// Port of vendor/did_you_mean/test/test_spell_checker.rb.
-// Test names mirror the Ruby file so parity:test matches.
 import { describe, it, expect } from "vitest";
 
 import { SpellChecker } from "./spell-checker.js";
 
-// minitest's `assert_empty`. did-you-mean has no dependencies, so the shared
-// activesupport testing/assertions surface is not reachable from here.
 function assertEmpty(actual: unknown[]): void {
   expect(actual).toHaveLength(0);
 }
@@ -68,8 +64,6 @@ describe("SpellCheckerTest", () => {
 
   it("spell checker excludes input from dictionary", () => {
     assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
-    // The gem's second and third arms pass `:input` as the dictionary entry and
-    // as the input; a Ruby Symbol is a JS string, so both are the first arm here.
     assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
     assertEmpty(new SpellChecker({ dictionary: ["input"] }).correct("input"));
   });

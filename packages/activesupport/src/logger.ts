@@ -1,7 +1,3 @@
-/**
- * Logger and TaggedLogging — mirroring ActiveSupport's logging API.
- */
-
 import { stdout } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { File } from "@blazetrails/ruby-compat";
@@ -31,10 +27,6 @@ const LEVEL_NAMES: Record<number, string> = {
 
 export interface LoggerOutput {
   write(s: string): void;
-  /**
-   * `logger.rb:26` — `logdev.try(:filename)`. File-backed sinks carry the path
-   * they write to; stream sinks leave it unset and match by identity.
-   */
   filename?: string;
 }
 
@@ -44,10 +36,6 @@ const defaultOutput: LoggerOutput = {
   },
 };
 
-/**
- * ActiveSupport::Logger — a structured logger with level filtering, silence blocks,
- * and formatter support. Mirrors the Rails API as closely as TypeScript allows.
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerThreadSafeLevel` (`logger_silence.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
 export class Logger {
   progname: string = "trails";
@@ -67,14 +55,9 @@ export class Logger {
     this._formatter = value;
   }
 
-  protected _level: number = 0; // DEBUG
+  protected _level: number = 0;
   protected output: LoggerOutput | null;
 
-  /**
-   * `logger_silence.rb:14` — `cattr_accessor :silencer, default: true`. Each
-   * class that includes LoggerSilence gets its own slot, so the static lives
-   * on the class rather than the module.
-   */
   static silencer: boolean = true;
 
   static setSilencer(silencer: boolean): void {
@@ -89,19 +72,12 @@ export class Logger {
     (this.constructor as typeof Logger).setSilencer(silencer);
   }
 
-  /**
-   * `logger.rb:19` — returns true if the logger destination matches one of the
-   * sources.
-   */
   static isLoggerOutputsTo(logger: Logger, ...sources: unknown[]): boolean {
     const loggers: Logger[] =
       BroadcastLoggerClass !== null && logger instanceof BroadcastLoggerClass
         ? logger.broadcasts
         : [logger];
 
-    // trails' Logger holds the sink directly where Ruby wraps it in a
-    // `Logger::LogDevice`, so the output object *is* `@logdev.dev`; a
-    // file-backed sink carries `filename` just as the wrapper does.
     const logdevs = loggers.map((logger) => logger.output);
     const loggerSources = logdevs
       .map((logdev) => logdev?.filename ?? logdev)
@@ -189,7 +165,6 @@ export class Logger {
     return this.level <= Logger.FATAL;
   }
 
-  /** `logger_silence.rb:19` — silences the logger for the duration of the block. */
   silence(severity: number | LogLevel = Logger.ERROR, fn?: (logger: this) => void): void {
     if (this.silencer) {
       this.logAt(severity, () => fn?.(this));
@@ -198,40 +173,32 @@ export class Logger {
     }
   }
 
-  /** `ruby/logger lib/logger.rb#debug!` — sets the log level to DEBUG. */
   debugBang(): void {
     this.level = Logger.DEBUG;
   }
 
-  /** `ruby/logger lib/logger.rb#info!` — sets the log level to INFO. */
   infoBang(): void {
     this.level = Logger.INFO;
   }
 
-  /** `ruby/logger lib/logger.rb#warn!` — sets the log level to WARN. */
   warnBang(): void {
     this.level = Logger.WARN;
   }
 
-  /** `ruby/logger lib/logger.rb#error!` — sets the log level to ERROR. */
   errorBang(): void {
     this.level = Logger.ERROR;
   }
 
-  /** `ruby/logger lib/logger.rb#fatal!` — sets the log level to FATAL. */
   fatalBang(): void {
     this.level = Logger.FATAL;
   }
 
-  close(): void {
-    // no-op for in-memory; file loggers would close here
-  }
+  close(): void {}
 
   append(s: string): void {
     this.output?.write(s);
   }
 
-  /** `logger.rb:46` — private. */
   private static normalizeSources(sources: unknown[]): unknown[] {
     return sources.map((source) => {
       if (typeof (source as { path?: unknown })?.path === "string") {
@@ -243,7 +210,6 @@ export class Logger {
   }
 }
 
-/** `logger_silence.rb:9` — `include ActiveSupport::LoggerThreadSafeLevel`. */
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the class/interface merge is how `include()` surfaces on the type side. */
 export interface Logger {
   get level(): number;
@@ -253,11 +219,6 @@ export interface Logger {
   logAt(level: number | LogLevel, fn: () => void): void;
 }
 include(Logger, LoggerThreadSafeLevel);
-
-/**
- * TaggedLogging — wraps a Logger to prepend tags to messages.
- * Mirrors ActiveSupport::TaggedLogging.
- */
 
 interface TaggedFormatter {
   tagged(...tags: string[]): this;
@@ -291,17 +252,11 @@ function flattenTags(tags: (string | string[] | null | undefined)[]): string[] {
   return result;
 }
 
-/**
- * Creates a tagged logger that wraps the given logger.
- * Each instance has its own isolated tag stack. Calling tagged() returns a new
- * independent proxy with additional tags — the parent's stack is unaffected.
- */
 export function taggedLogging(logger: Logger): TaggedLogger {
   return makeTaggedProxy(logger, []);
 }
 
 function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
-  // mutable stack local to this proxy instance
   const tagStack: string[] = [...ownTags];
 
   function formatMsg(msg: string): string {
@@ -400,13 +355,6 @@ function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
       }
     },
 
-    /**
-     * Without a block: returns a NEW independent proxy that includes the
-     * current tags plus the new ones (tagStack is NOT modified).
-     *
-     * With a block (last arg is a function): pushes tags, calls the block
-     * with the tagged logger, then pops tags.
-     */
     tagged(
       ...rawTags: (string | string[] | null | undefined | ((logger: TaggedLogger) => void))[]
     ): TaggedLogger {
@@ -447,10 +395,6 @@ function makeTaggedProxy(logger: Logger, ownTags: string[]): TaggedLogger {
   return proxy as TaggedLogger;
 }
 
-/**
- * Convenience factory — creates a new Logger writing to the given output and
- * wraps it with TaggedLogging.
- */
 taggedLogging.logger = function (output: LoggerOutput): TaggedLogger {
   const logger = new Logger(output);
   return taggedLogging(logger);

@@ -1,12 +1,8 @@
-/**
- * ExecutionContext — per-request key/value store.
- * Mirrors ActiveSupport::ExecutionContext.
- */
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 const ACTIVE_SUPPORT_EXECUTION_CONTEXT = "active_support_execution_context";
 
-/** Mirrors ActiveSupport::ExecutionContext.store (execution_context.rb:47-49). @internal */
+/** @internal */
 function store(): Map<string, unknown> {
   return IsolatedExecutionState.fetch(
     ACTIVE_SUPPORT_EXECUTION_CONTEXT,
@@ -14,9 +10,6 @@ function store(): Map<string, unknown> {
   );
 }
 
-// Callbacks fired whenever the context mutates. Mirrors Rails'
-// `@after_change_callbacks` (execution_context.rb). ActiveRecord::QueryLogs
-// registers one here to invalidate its cached SQL comment on every change.
 const _afterChangeCallbacks: Array<() => void> = [];
 
 function runAfterChange(): void {
@@ -49,12 +42,6 @@ function restore(saved: Map<string, { hadKey: boolean; value: unknown }>): void 
 }
 
 export const ExecutionContext = {
-  /**
-   * Register a callback fired whenever the context changes — after `set` and
-   * `setKey`, and again when a block-form `set` restores the previous context.
-   * Like Rails, `clear` does not fire.
-   * Mirrors: ActiveSupport::ExecutionContext.after_change.
-   */
   afterChange(fn: () => void): void {
     _afterChangeCallbacks.push(fn);
   },
@@ -112,10 +99,6 @@ export const ExecutionContext = {
     return Object.fromEntries(store());
   },
 
-  // Rails' `clear` does NOT fire after_change (execution_context.rb:43-45) —
-  // it is the executor's per-request reset, and the cache it would invalidate
-  // (QueryLogs' cached comment) is re-cleared by the next `set`/`setKey`. We
-  // match that exactly rather than firing here.
   clear(): void {
     store().clear();
   },

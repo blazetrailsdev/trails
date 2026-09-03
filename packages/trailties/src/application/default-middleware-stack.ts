@@ -1,4 +1,3 @@
-// Port of `Rails::Application::DefaultMiddlewareStack`.
 import {
   ActionableExceptions,
   AssumeSSL,
@@ -24,9 +23,7 @@ import type { Root } from "../paths.js";
 
 export interface DefaultStackHostApp {
   config: Configuration;
-  /** `app.executor` (`default_middleware_stack.rb:49`). */
   executor: ExecutorLike;
-  /** `app.reloader` (`default_middleware_stack.rb:70`). */
   reloader: ExecutorLike;
 }
 
@@ -41,10 +38,6 @@ export class DefaultMiddlewareStack {
     this.paths = paths;
   }
 
-  /**
-   * Mirrors `DefaultMiddlewareStack#build_stack`
-   * (`application/default_middleware_stack.rb:11`).
-   */
   buildStack(): MiddlewareStack {
     const stack = new MiddlewareStack();
     const config = this.config;
@@ -109,7 +102,7 @@ export class DefaultMiddlewareStack {
     return stack;
   }
 
-  /** @internal Rails' `exceptions_app || PublicExceptions.new(Rails.public_path)`. */
+  /** @internal */
   private _showExceptionsApp(): unknown {
     return (
       this.config.exceptionsApp ??

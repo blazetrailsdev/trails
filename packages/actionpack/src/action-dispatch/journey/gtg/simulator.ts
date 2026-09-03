@@ -3,7 +3,6 @@ export type GtgState = ReadonlyArray<readonly [state: number, dataIndex: number 
 export interface TransitionTableLike {
   move(state: GtgState, string: string, startIndex: number, endIndex: number): GtgState;
   memo(state: number): readonly unknown[];
-  /** Rails: `accepting?(s)` */
   isAccepting(state: number): boolean;
 }
 
@@ -15,8 +14,6 @@ export class MatchData {
   }
 }
 
-// Rails uses StringScanner with /([\/.?]|[^\/.?]+)/ — match one delimiter or
-// one run of non-delimiters, advancing as we go.
 const TOKEN = /([/.?]|[^/.?]+)/y;
 
 export class Simulator {
@@ -28,11 +25,6 @@ export class Simulator {
     this.tt = transitionTable;
   }
 
-  /**
-   * Walk the GTG over `string` collecting accepting memos. Yields each
-   * memo array; falls back to `onNoMatch()` when no accepting state is
-   * reached (Rails passes a block; we take a callback).
-   */
   memos(string: string, onNoMatch: () => readonly unknown[]): readonly unknown[] {
     let state: GtgState = Simulator.INITIAL_STATE;
     let startIndex = 0;

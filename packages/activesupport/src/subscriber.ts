@@ -12,12 +12,6 @@ function camelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
 
-/**
- * Per-class state storage. In Rails, `@namespace`, `@subscriber`, `@notifier`
- * are instance variables on the class (per-class), while `@@subscribers` is a
- * class variable (shared). We mirror this with a WeakMap for per-class state
- * and a shared array for subscribers.
- */
 interface ClassState {
   namespace?: string;
   subscriber?: Subscriber;
@@ -27,10 +21,8 @@ interface ClassState {
 const _classState = new WeakMap<AnyClass, ClassState>();
 
 /**
- * @internal Exposed for LogSubscriber to read per-class namespace.
- * @noRailsEquivalent PERMANENT Ruby reads the per-class ivars directly
- * (`@namespace`, set at subscriber.rb:36); TS has no ivar, so the state lives in a
- * module-level WeakMap that LogSubscriber reaches through this reader.
+ * @internal
+ * @noRailsEquivalent PERMANENT
  */
 export function getClassState(cls: AnyClass): ClassState {
   return getState(cls);
@@ -45,29 +37,15 @@ function getState(cls: AnyClass): ClassState {
   return state;
 }
 
-/**
- * ActiveSupport::Subscriber — base class for notification consumers.
- *
- * Subclasses define instance methods matching event prefixes (e.g. `sql`
- * for `sql.active_record`). Calling `attach_to(:active_record)` wires
- * up subscriptions automatically.
- */
 export class Subscriber {
-  /** Per-instance map of pattern → Notifications subscriber handle. */
   patterns: Map<string, NotificationSubscriber> = new Map();
 
-  // Shared across all subclasses, matching Rails' @@subscribers class variable.
   private static _subscribers: Subscriber[] = [];
 
   static get subscribers(): Subscriber[] {
     return this._subscribers;
   }
 
-  /**
-   * Attach a subscriber instance to a namespace.
-   * Every public method on the subscriber (minus Subscriber's own methods)
-   * becomes a listener for `<method>.<namespace>` events.
-   */
   static attachTo(
     namespace: string,
     subscriber?: Subscriber,
@@ -90,12 +68,6 @@ export class Subscriber {
     return sub;
   }
 
-  /**
-   * Notify that a method was added to the class after attach_to.
-   * In Rails this is a Ruby hook (`method_added`) that auto-subscribes
-   * new public methods. Call manually in TS after dynamically adding
-   * event handler methods post-attachment.
-   */
   static methodAdded(event: string): void {
     const state = getState(this);
     if (!state.notifier) return;
@@ -103,7 +75,6 @@ export class Subscriber {
     this._addEventSubscriber(snaked, state);
   }
 
-  /** Detach a subscriber from its namespace. */
   static detachFrom(namespace: string, notifier: typeof Notifications = Notifications): void {
     const state = getState(this);
     state.namespace = namespace;
@@ -121,8 +92,6 @@ export class Subscriber {
     }
     state.notifier = undefined;
   }
-
-  // -- Instance methods ----------------------------------------------------
 
   call(event: Event): void {
     const dotIdx = event.name.indexOf(".");
@@ -152,8 +121,6 @@ export class Subscriber {
     if (method) (this as any)[method](event);
   }
 
-  // -- Private class helpers -----------------------------------------------
-
   private static _invalidEvent(event: string): boolean {
     return event === "start" || event === "finish";
   }
@@ -182,11 +149,7 @@ export class Subscriber {
     sub.patterns.delete(pattern);
   }
 
-  /**
-   * @missingRailsArgs public_instance_methods — PERMANENT: Ruby calls this on
-   * the module as a receiver; the TS mirror is a free function, so the receiver
-   * is its first argument.
-   */
+  /** @missingRailsArgs public_instance_methods — PERMANENT */
   protected static _fetchPublicMethods(subscriber: Subscriber, inheritAll: boolean): string[] {
     const baseKeys = new Set(publicInstanceMethods(Subscriber, true));
     const keys = new Set<string>();

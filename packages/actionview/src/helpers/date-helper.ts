@@ -1,13 +1,5 @@
 import { I18n } from "@blazetrails/activesupport";
 
-/**
- * ActionView::Helpers::DateHelper — formatting half.
- *
- * Implements `distanceOfTimeInWords`, `timeAgoInWords`, and the
- * `distanceOfTimeInWordsToNow` alias. Date-select tag helpers are part of
- * Phase 5 T3 and not included here.
- */
-
 const MINUTES_IN_YEAR = 525600;
 const MINUTES_IN_QUARTER_YEAR = 131400;
 const MINUTES_IN_THREE_QUARTERS_YEAR = 394200;
@@ -27,11 +19,6 @@ const DEFAULT_DISTANCE_IN_WORDS: Record<string, { one: string; other: string } |
   almost_x_years: { one: "almost 1 year", other: "almost %{count} years" },
 };
 
-/**
- * The `{ epochMilliseconds }` arm is the `Temporal.Instant` ActiveRecord
- * returns for a datetime column. Rails has no seam here — an AR datetime is
- * an `ActiveSupport::TimeWithZone`, which `to_time` normalizes.
- */
 export type DistanceOfTimeInput =
   | Date
   | number
@@ -93,16 +80,6 @@ function translateDistance(
   return template.replace(/%\{count\}/g, String(count));
 }
 
-/**
- * Reports the approximate distance in time between two dates as a human
- * phrase ("about 1 hour", "3 days", etc.). Mirrors Rails
- * `ActionView::Helpers::DateHelper#distance_of_time_in_words`.
- *
- * - `toTime` defaults to 0 (epoch), matching Rails' default argument.
- * - Numeric inputs are seconds since the Unix epoch (Rails `Time.at(n)`).
- * - With `includeSeconds: true`, sub-minute differences resolve to
- *   "less than N seconds" / "half a minute" / "1 minute".
- */
 export function distanceOfTimeInWords(
   fromTime: DistanceOfTimeInput,
   toTime: DistanceOfTimeInput = 0,
@@ -161,10 +138,6 @@ export function distanceOfTimeInWords(
   return t("almost_x_years", distanceInYears + 1);
 }
 
-/**
- * Like {@link distanceOfTimeInWords}, but with `toTime` fixed to the
- * current time. Numeric inputs are not accepted, matching Rails.
- */
 export function timeAgoInWords(
   fromTime: Exclude<DistanceOfTimeInput, number>,
   options: DistanceOfTimeOptions = {},
@@ -173,5 +146,4 @@ export function timeAgoInWords(
   return distanceOfTimeInWords(fromTime, new Date(), options);
 }
 
-/** Alias of {@link timeAgoInWords}. */
 export const distanceOfTimeInWordsToNow = timeAgoInWords;

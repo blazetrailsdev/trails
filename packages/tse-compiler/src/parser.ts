@@ -1,7 +1,3 @@
-/** Builds a TseAst from the token stream. Lifts `<%# locals: (...) %>` and
- * `<%! types: ... !%>` magic comments onto the AST root — mirrors Rails'
- * `Template#strict_locals!` mutating source before Erubi compiles it. */
-
 import { tokenize, TseSyntaxError } from "./lexer.js";
 
 export type TseNode =
@@ -15,7 +11,6 @@ export interface TseAst {
   nodes: TseNode[];
   localsSignature: string | null;
   typesAnnotation: string | null;
-  /** Format override from `<%! format: "json" !%>`. Overrides filename-derived format. */
   formatAnnotation: string | null;
 }
 

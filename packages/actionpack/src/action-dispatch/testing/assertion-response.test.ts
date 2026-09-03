@@ -16,8 +16,6 @@ describe("AssertionResponse", () => {
   });
 
   it("constructs from an integer code (falls through to HTTP_STATUS_CODES)", () => {
-    // Faithful Rails behavior: integer code never hits GENERIC_RESPONSE_CODES.invert
-    // (its keys are strings), so we get the canonical Rack name.
     const r = new AssertionResponse(404);
     expect(r.name).toBe("Not Found");
     expect(r.code).toBe("404");

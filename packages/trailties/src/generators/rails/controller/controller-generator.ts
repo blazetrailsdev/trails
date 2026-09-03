@@ -14,7 +14,6 @@ export interface ControllerRunOptions {
   parent?: string;
 }
 
-// Mirrors railties/lib/rails/generators/rails/controller/controller_generator.rb.
 export class ControllerGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
     super(options);
@@ -62,8 +61,6 @@ ${cases}
       this.createFile(`app/views/${paths.viewBase}/${action}.html.tse`, "");
     }
     if (actions.length === 0) {
-      // Touch the directory by emitting a placeholder .keep so all fs work
-      // stays in createFile (no node:fs / sync mkdir paths needed).
       this.createFile(`app/views/${paths.viewBase}/.keep`, "");
     }
 

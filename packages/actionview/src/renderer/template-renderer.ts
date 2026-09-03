@@ -3,16 +3,9 @@ import { MissingTemplate } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
-/**
- * ActionView::TemplateRenderer
- *
- * Resolves and renders a single template (non-partial). Handles the
- * `template:`, `inline:`, `body:`, `plain:`, `html:`, and `renderable:`
- * render paths. Wraps the rendered body in a layout when `layout:` is set.
- * @internal
- */
+/** @internal */
 export class TemplateRenderer extends AbstractRenderer {
-  /** Details extracted from options on each render call. @internal */
+  /** @internal */
   private details: Record<string, readonly (string | symbol)[]> = {};
 
   constructor(lookupContext: LookupContext) {
@@ -45,7 +38,6 @@ export class TemplateRenderer extends AbstractRenderer {
       );
     }
     if (Object.prototype.hasOwnProperty.call(options, "inline")) {
-      // Rails derives format from handler.default_format; without handlers, use lookupContext.formats.first.
       const inlineFormat = (this.formats[0] as string | undefined) ?? null;
       return new InlineTemplate(String(options.inline ?? ""), inlineFormat);
     }
@@ -118,7 +110,6 @@ export class TemplateRenderer extends AbstractRenderer {
       if (layout.startsWith("/")) {
         throw new Error("Rendering layouts from an absolute path is not supported.");
       }
-      // Try Rails-shape lookup first (PathSet resolvers).
       const detailsWithFormats = { ...this.details, formats };
       const found = this.lookupContext.findAll(
         layout,
@@ -128,7 +119,6 @@ export class TemplateRenderer extends AbstractRenderer {
         detailsWithFormats,
       ) as RenderableTemplate[];
       if (found.length > 0) return found[0];
-      // Fall back to findLayout (TemplateResolver chain).
       const fromResolver = this.lookupContext.findLayout(layout, ["layouts"], formats);
       return fromResolver as unknown as RenderableTemplate | null;
     }
@@ -136,7 +126,6 @@ export class TemplateRenderer extends AbstractRenderer {
       const resolved = layout(this.lookupContext, this.formats as readonly string[], keys);
       return resolved ? this.resolveLayout(resolved, keys, formats) : null;
     }
-    // null / false / undefined — no layout
     return null;
   }
 
@@ -146,7 +135,6 @@ export class TemplateRenderer extends AbstractRenderer {
     prefixes: readonly string[],
     keys: readonly string[],
   ): RenderableTemplate {
-    // Try Rails-shape PathSet resolvers first.
     const found = this.lookupContext.findAll(
       name,
       prefixes as string[],
@@ -156,7 +144,6 @@ export class TemplateRenderer extends AbstractRenderer {
     ) as RenderableTemplate[];
     if (found.length > 0) return found[0];
 
-    // Fall back to the 3-arg TemplateResolver chain.
     const lastSlash = name.lastIndexOf("/");
     const baseName = lastSlash >= 0 ? name.slice(lastSlash + 1) : name;
     const prefix = lastSlash >= 0 ? name.slice(0, lastSlash) : (prefixes[0] ?? "");
@@ -168,15 +155,12 @@ export class TemplateRenderer extends AbstractRenderer {
   }
 }
 
-// --- Inline template wrappers (mirrors Rails Template::Text, Template::HTML, etc.) ---
-
 class BodyTemplate implements RenderableTemplate {
   readonly identifier = "body template";
   readonly format = null;
 
   constructor(private readonly content: string) {}
 
-  /** Mirrors: `Template::Text#render(*args)` (`template/text.rb:23-25`). */
   async render(..._args: unknown[]): Promise<string> {
     return this.content;
   }
@@ -188,7 +172,6 @@ class PlainTemplate implements RenderableTemplate {
 
   constructor(private readonly content: string) {}
 
-  /** Mirrors: `Template::Text#render(*args)` (`template/text.rb:23-25`). */
   async render(..._args: unknown[]): Promise<string> {
     return this.content;
   }
@@ -202,7 +185,6 @@ class HtmlTemplate implements RenderableTemplate {
     readonly format: string,
   ) {}
 
-  /** Mirrors: `Template::HTML#render(*args)` (`template/html.rb:24-26`). */
   async render(..._args: unknown[]): Promise<string> {
     return this.content;
   }
@@ -216,7 +198,6 @@ class InlineTemplate implements RenderableTemplate {
     readonly format: string | null,
   ) {}
 
-  /** Mirrors: `Template::Inline#render(*args)`. */
   async render(..._args: unknown[]): Promise<string> {
     return this.source;
   }
@@ -228,7 +209,6 @@ class RenderableWrapper implements RenderableTemplate {
 
   constructor(private readonly inner: { renderIn(context: ViewContext): string }) {}
 
-  /** Mirrors: `Template::Renderable#render(context, *args)` (`template/renderable.rb:15-16`). */
   async render(context: ViewContext, ..._args: unknown[]): Promise<string> {
     return this.inner.renderIn(context ?? {});
   }

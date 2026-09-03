@@ -11,16 +11,6 @@ import { Session } from "../../request/session.js";
 
 const opts = (o: Record<string, unknown> = {}) => new Session.Options(null, o);
 
-// ==========================================================================
-// dispatch/session/cookie_store_test.rb
-//
-// Rails' suite is a full Rack/ActionController integration test. We can't
-// drive a real Set-Cookie cycle without porting that harness, so each
-// Rails-named test below exercises the matching behavior directly on
-// `CookieStore` using a fake `signedOrEncrypted` jar that stands in for
-// the cookie jar bridge `ActionDispatch::Cookies` provides at runtime.
-// ==========================================================================
-
 class FakeJar {
   store = new Map<string, unknown>();
   signedOrEncrypted: CookieJarLike;
@@ -84,9 +74,6 @@ describe("CookieStoreTest", () => {
   });
 
   it("disregards tampered sessions", () => {
-    // Tamper detection lives in the signed/encrypted CookieJar; CookieStore
-    // sees a `null` cookie value when verification fails, which loadSession
-    // treats as a fresh session.
     const store = makeStore();
     const req = makeReq();
     req.jar.store.set(store.key, null);
@@ -96,8 +83,6 @@ describe("CookieStoreTest", () => {
   });
 
   it("does not set secure cookies over http", () => {
-    // The `secure` flag is decided by the cookie jar / middleware, not
-    // CookieStore. Verify only that CookieStore does not force secure on.
     const opts: Record<string, unknown> = {};
     makeStore(opts);
     expect(opts.secure).toBeUndefined();
@@ -115,16 +100,12 @@ describe("CookieStoreTest", () => {
   });
 
   it("does set secure cookies over https", () => {
-    // Same as the http counterpart — CookieStore does not override secure;
-    // confirm an explicit secure:true round-trips through options.
     const opts: Record<string, unknown> = { secure: true };
     makeStore(opts);
     expect(opts.secure).toBe(true);
   });
 
   it("deserializes unloaded classes on get id", () => {
-    // Rails retries after constantize; the JS path is terminal but
-    // extractSessionId must still surface a SessionId.
     const store = makeStore();
     const req = makeReq();
     req.jar.store.set(store.key, { session_id: "xyz" });
@@ -140,8 +121,6 @@ describe("CookieStoreTest", () => {
   });
 
   it("close raises when data overflows", () => {
-    // Overflow is raised by ActionDispatch::Cookies when the serialized
-    // value exceeds 4096 bytes; CookieStore itself does not gate.
     const store = makeStore();
     const req = makeReq();
     const sid = store.generateSid();
@@ -151,7 +130,6 @@ describe("CookieStoreTest", () => {
   });
 
   it("doesnt write session cookie if session is not accessed", () => {
-    // Without a touch, no setCookie call. Verify the jar is empty.
     const store = makeStore();
     const req = makeReq();
     expect(req.jar.store.has(store.key)).toBe(false);
@@ -217,8 +195,6 @@ describe("CookieStoreTest", () => {
   });
 
   it("session store with expire after does not accept expired session", () => {
-    // Expiry enforcement lives in the cookie jar / Rack. CookieStore
-    // simply propagates expireAfter into options.
     const opts: Record<string, unknown> = { expireAfter: 1 };
     makeStore(opts);
     expect(opts.expireAfter).toBe(1);
@@ -268,9 +244,6 @@ describe("CookieStoreTest", () => {
   });
 });
 
-// ==========================================================================
-// trails-only unit tests for the private cookie-jar bridge.
-// ==========================================================================
 describe("CookieStore unit", () => {
   describe("cookieJar", () => {
     it("returns the request's signedOrEncrypted jar", () => {

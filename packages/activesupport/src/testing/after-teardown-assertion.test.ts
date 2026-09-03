@@ -1,13 +1,3 @@
-/**
- * Mirrors: activesupport/test/testing/after_teardown_assertion_test.rb
- *
- * The `Minitest::Assertion` arm of `setup_and_teardown.rb:44-53`'s rescue:
- * Rails' teardown block calls `flunk`, which raises `Minitest::Assertion`, and
- * that is recorded on `failures` as itself rather than wrapped. trails has no
- * `flunk`, so the block raises the `Assertion` it would have raised, and
- * `otherAfterTeardown` is `AfterTeardownAssertionTest::OtherAfterTeardown#after_teardown`
- * (after_teardown_assertion_test.rb:6-10).
- */
 import { describe, expect, it } from "vitest";
 
 import { resetCallbacks } from "../callbacks.js";

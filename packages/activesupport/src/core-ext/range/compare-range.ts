@@ -25,19 +25,6 @@ declare module "@blazetrails/ruby-compat/range" {
 
 type Super = (...args: unknown[]) => unknown;
 
-/**
- * Extends the default `Range#===` to support range comparisons.
- *  (1..5) === (1..5)  # => true
- *  (1..5) === (2..3)  # => true
- *  (1..5) === (1...6) # => true
- *  (1..5) === (2..6)  # => false
- *
- * The native `Range#===` behavior is untouched.
- *  ('a'..'f') === ('c') # => true
- *  (5..9) === (11) # => false
- *
- * The given range must be fully bounded, with both start and end.
- */
 export function caseEquals<T>(this: Range<T>, super_: Super, value: Range<T> | T): boolean {
   if (value instanceof Range) {
     const isBackwardsOp = value.excludeEnd
@@ -50,8 +37,6 @@ export function caseEquals<T>(this: Range<T>, super_: Super, value: Range<T> | T
     ) {
       return false;
     }
-    // 1...10 includes 1..9 but it does not include 1..10.
-    // 1..10 includes 1...11 but it does not include 1...12.
     const operator =
       this.excludeEnd && !value.excludeEnd
         ? (a: number, b: number): boolean => a < b
@@ -66,19 +51,6 @@ export function caseEquals<T>(this: Range<T>, super_: Super, value: Range<T> | T
   }
 }
 
-/**
- * Extends the default `Range#include?` to support range comparisons.
- *  (1..5).include?(1..5)  # => true
- *  (1..5).include?(2..3)  # => true
- *  (1..5).include?(1...6) # => true
- *  (1..5).include?(2..6)  # => false
- *
- * The native `Range#include?` behavior is untouched.
- *  ('a'..'f').include?('c') # => true
- *  (5..9).include?(11) # => false
- *
- * The given range must be fully bounded, with both start and end.
- */
 export function isInclude<T>(this: Range<T>, super_: Super, value: Range<T> | T): boolean {
   if (value instanceof Range) {
     const isBackwardsOp = value.excludeEnd
@@ -91,8 +63,6 @@ export function isInclude<T>(this: Range<T>, super_: Super, value: Range<T> | T)
     ) {
       return false;
     }
-    // 1...10 includes 1..9 but it does not include 1..10.
-    // 1..10 includes 1...11 but it does not include 1...12.
     const operator =
       this.excludeEnd && !value.excludeEnd
         ? (a: number, b: number): boolean => a < b

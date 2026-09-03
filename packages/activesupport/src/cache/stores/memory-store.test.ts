@@ -13,7 +13,6 @@ import type { Event } from "../../notifications/instrumenter.js";
 import { Notifications } from "../../notifications.js";
 import { assert, assertNot, assertSame } from "../../testing/assertions.js";
 
-/** Rails' `with_instrumentation` (cache/behaviors/cache_instrumentation_behavior.rb). */
 function withInstrumentation(operation: string, block: () => void): Event[] {
   const eventName = `cache_${operation}.active_support`;
   const events: Event[] = [];
@@ -28,11 +27,6 @@ function withInstrumentation(operation: string, block: () => void): Event[] {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Mirrors Rails' `MemoryStore.new.send(:cached_size, 1, Entry.new("aaaaaaaaaa"))`
-// (memory_store_test.rb:101-104), the record size the pruning budget is sized in.
-// The Entry carries the store's expiry because a trails payload is the coder's
-// dump of `Entry#pack`, which includes expires_at — Rails' DupCoder payload is
-// the Entry itself and `bytesize` counts only its value.
 function cachedSizeOf(key: string, value: string): number {
   const probe = new MemoryStore() as unknown as {
     cachedSize(key: string, payload: string): number;
@@ -49,9 +43,6 @@ describe("MemoryStoreTest", () => {
   });
 
   it("increment preserves expiry", async () => {
-    // Rails stubs `Time.now` forward a minute (memory_store_test.rb:31-46); the
-    // port sleeps past a short `expires_in` instead, since the store reads the
-    // wall clock directly and JS has no equivalent of Ruby's `Time.stub`.
     const cache = new MemoryStore();
     cache.write("counter", 1, { raw: true, expiresIn: 0.05 });
     expect(cache.read("counter", { raw: true })).toEqual(1);
@@ -115,34 +106,25 @@ describe("MemoryStoreTest", () => {
     expect(store.write("1", "aaaaaaaaaa", { unlessExist: true })).toEqual(false);
   });
 
-  // Mirrors `include CacheStoreBehavior` (memory_store_test.rb:16).
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
 
-  // Mirrors `include CacheStoreCoderBehavior` (memory_store_test.rb:18).
   cacheStoreCoderBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
 
-  // Mirrors `include CacheStoreCompressionBehavior` (memory_store_test.rb:19);
-  // MemoryStore overrides `compression_always_disabled_by_default?`
-  // (memory_store_test.rb:93-96).
   cacheStoreCompressionBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
     compressionAlwaysDisabledByDefault: true,
   });
 
-  // Mirrors `include CacheStoreSerializerBehavior` (memory_store_test.rb:20).
   cacheStoreSerializerBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
   });
 
-  // Mirrors `include CacheDeleteMatchedBehavior` (memory_store_test.rb:21).
   cacheDeleteMatchedBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
 
-  // Mirrors `include CacheIncrementDecrementBehavior` (memory_store_test.rb:22).
   cacheIncrementDecrementBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
   });
 
-  // Mirrors `include CacheInstrumentationBehavior` (memory_store_test.rb:23).
   cacheInstrumentationBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
     storeName: "MemoryStore",
@@ -156,12 +138,9 @@ describe("MemoryStore increment/decrement amount coercion", () => {
     cache = new MemoryStore();
   });
 
-  // The seed path writes `Integer(amount)` (memory_store.rb:248), which raises
-  // FloatDomainError on NaN/Infinity rather than seeding a non-integer entry.
   it("increment raises on a non-integer amount when seeding a missing key", () => {
     expect(() => cache.increment("foo", NaN)).toThrow();
     expect(() => cache.increment("foo", Infinity)).toThrow();
-    // The raise fires before any write, so the key is never seeded.
     expect(cache.read("foo")).toBeNull();
   });
 
@@ -171,15 +150,11 @@ describe("MemoryStore increment/decrement amount coercion", () => {
     expect(cache.read("foo")).toBeNull();
   });
 
-  // Rails seeds a missing key with `Integer(amount)` (so `1.5` writes `1`) but
-  // returns the raw `amount` (memory_store.rb:248-249).
   it("increment seeds with the integer amount but returns the raw amount", () => {
     expect(cache.increment("frac", 1.5)).toBe(1.5);
     expect(Number(cache.read("frac"))).toBe(1);
   });
 
-  // The hit path never calls `Integer()` (memory_store.rb:251): it adds the raw
-  // `amount` to `entry.value.to_i` without truncation.
   it("increment adds the raw amount on the hit path", () => {
     cache.write("frac", 1, { raw: true });
     expect(cache.increment("frac", 2.5)).toBe(3.5);
@@ -188,8 +163,6 @@ describe("MemoryStore increment/decrement amount coercion", () => {
 
 describe("MemoryStore delete_matched namespacing", () => {
   it("scopes delete_matched to the configured namespace", () => {
-    // keyMatcher prefixes the namespace into the regex source, so an unanchored
-    // pattern only deletes this store's namespaced keys.
     const cache = new MemoryStore({ namespace: "ns" });
     cache.write("foo", "bar");
     cache.write("fu", "baz");
@@ -201,8 +174,6 @@ describe("MemoryStore delete_matched namespacing", () => {
 
 describe("MemoryStore increment instrumentation", () => {
   it("instruments with the raw, unnormalized name under a namespace", async () => {
-    // Rails MemoryStore#increment passes `name` (not the normalized key) to
-    // instrument (memory_store.rb:149); FileStore passes the normalized key.
     const store = new MemoryStore({ namespace: "ns" });
     store.write("counter", 0);
     const events: Event[] = [];
@@ -284,9 +255,7 @@ describe("MemoryStorePruningTest", () => {
     const deleteEntry = slow.deleteEntry.bind(store);
     slow.deleteEntry = (key: string, options: object) => {
       const until = Date.now() + 10;
-      while (Date.now() < until) {
-        /* Rails sleeps 0.01s inside delete_entry (memory_store_test.rb:172-175) */
-      }
+      while (Date.now() < until) {}
       return deleteEntry(key, options);
     };
     store.write("1", "aaaaaaaaaa");
@@ -320,9 +289,6 @@ describe("MemoryStorePruningTest", () => {
   });
 
   it("cache different object ids string", () => {
-    // Rails compares `object_id`s (memory_store_test.rb:216-217); JS has no
-    // object_id, so the deep-clone contract is spelled as reference inequality —
-    // which a string primitive cannot carry, hence the wrapper object.
     const item = { toS: "my_string" };
     store.write("test_key", item);
     expect(store.read("test_key")).not.toBe(item);
@@ -340,19 +306,14 @@ describe("CacheStoreRaceConditionTtlTest", () => {
   it("fetch with race condition ttl", async () => {
     store.write("foo", "bar", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
-    // Within the race window: stale entry is bumped; caller regenerates
     const result = store.fetch("foo", { raceConditionTtl: 0.2 }, () => "new");
     expect(result).toBe("new");
-    // Now the store has the new value
     expect(store.read("foo")).toBe("new");
   });
 
   it("fetch with race condition ttl serves stale to concurrent readers", async () => {
     store.write("foo", "stale", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 30));
-    // Simulate a concurrent reader by reading inside the fallback callback.
-    // At that point handleExpiredEntry has bumped the entry back into the store,
-    // so read() returns the stale value (not null) — the race-window guarantee.
     let seenDuringRegen: unknown;
     store.fetch("foo", { raceConditionTtl: 0.5 }, () => {
       seenDuringRegen = store.read("foo");
@@ -372,15 +333,10 @@ describe("CacheStoreRaceConditionTtlTest", () => {
   it("race condition ttl beyond window deletes expired entry", async () => {
     store.write("foo", "bar", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 200));
-    // Beyond the race window: entry is deleted normally
     const result = store.fetch("foo", { raceConditionTtl: 0.05 }, () => "regen");
     expect(result).toBe("regen");
   });
 
-  // Inherited Store#fetch_multi routes through the readEntry hook, which must
-  // reconstruct the stored expiry so an expired entry is a miss + regenerate
-  // (cache.rb read_multi_entries -> read_entry). Without expiry round-trip the
-  // reconstructed Entry would look fresh and serve stale data.
   it("fetch_multi honors entry expiration", async () => {
     store.write("foo", "old", { expiresIn: 0.02 });
     await new Promise((r) => setTimeout(r, 40));
@@ -389,9 +345,6 @@ describe("CacheStoreRaceConditionTtlTest", () => {
     expect(store.read("foo")).toBe("foo-generated");
   });
 
-  // The persisted version must round-trip through readEntry so the inherited
-  // readMultiEntries' isMismatched check fires (cache.rb), making a version
-  // mismatch a miss + regenerate.
   it("fetch_multi honors version mismatch", () => {
     store.write("foo", "old", { version: "v1" });
     const result = store.fetchMulti("foo", { version: "v2" }, (key) => `${key}-generated`);

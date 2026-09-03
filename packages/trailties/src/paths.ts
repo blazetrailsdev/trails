@@ -11,7 +11,6 @@ export interface PathOptions {
   exclude?: string[];
 }
 
-// Port of railties/lib/rails/paths.rb.
 export class Root {
   path: string | null;
   _entries: Map<string, Path> = new Map();
@@ -40,28 +39,22 @@ export class Root {
     return Array.from(new Set(this._entries.values()));
   }
 
-  /** Mirrors Rails `Paths::Root#autoload_once` (paths.rb:89-91). */
   autoloadOnce(): Promise<string[]> {
     return this.filterBy((path) => path.isAutoloadOnce());
   }
 
-  /** Mirrors Rails `Paths::Root#eager_load` (paths.rb:93-95). */
   eagerLoad(): Promise<string[]> {
     return this.filterBy((path) => path.isEagerLoad());
   }
 
-  /** Mirrors Rails `Paths::Root#autoload_paths` (paths.rb:97-99). */
   autoloadPaths(): Promise<string[]> {
     return this.filterBy((path) => path.isAutoload());
   }
 
-  /** Mirrors Rails `Paths::Root#load_paths` (paths.rb:101-103). */
   loadPaths(): Promise<string[]> {
     return this.filterBy((path) => path.isLoadPath());
   }
 
-  /** Mirrors Rails `Paths::Root#filter_by` (paths.rb:106-110). Async because
-   * trails' `Path#existentDirectories` resolves via async fs. */
   private async filterBy(block: (path: Path) => boolean): Promise<string[]> {
     const out: string[] = [];
     for (const path of this.allPaths()) {
@@ -154,8 +147,6 @@ export class Path {
     for (const raw of this._paths) {
       const abs = path.resolve(this._root.path, raw);
       if (this.glob && (await isDir(fs, abs))) {
-        // Mirrors Rails Path#files_in (paths.rb:238-240): the exclude list is
-        // subtracted from the relative glob results before joining.
         let files = await fsGlob(this.glob, { cwd: abs });
         if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
         out.push(...files.map((f) => path.join(abs, f)).sort());

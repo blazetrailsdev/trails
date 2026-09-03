@@ -8,7 +8,6 @@ import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
 import { _setTrailsLogger } from "./trails-logger-slot.js";
 
-/** Mirrors `deprecation_test.rb`'s `with_rails_logger` helper. */
 function withTrailsLogger<T>(logger: Logger | null, fn: () => T): T {
   _setTrailsLogger(logger);
   try {
@@ -18,7 +17,6 @@ function withTrailsLogger<T>(logger: Logger | null, fn: () => T): T {
   }
 }
 
-/** Ruby reaches the private helper with `send`; TS needs the cast. */
 function callDeprecatedMethodWarning(
   deprecator: Deprecation,
   methodName: string,
@@ -46,7 +44,6 @@ describe("DeprecationTest", () => {
 
   it(":silence behavior", () => {
     dep.behavior = "silence";
-    // Should not throw
     expect(() => dep.warn("something")).not.toThrow();
   });
 
@@ -60,7 +57,6 @@ describe("DeprecationTest", () => {
 
   it("nil behavior is ignored", () => {
     dep.behavior = null;
-    // Should not throw
     expect(() => dep.warn("fubar")).not.toThrow();
   });
 
@@ -317,8 +313,6 @@ describe("DeprecationTest", () => {
 
   it("default deprecation_horizon is greater than the current Rails version", () => {
     const d = new Deprecation();
-    // Rails asserts against ActiveSupport::VERSION::STRING (8.0.2), which
-    // trails has no constant for.
     expect(d.deprecationHorizon > "8.0.2").toBe(true);
   });
 
@@ -345,7 +339,6 @@ describe("DeprecationTest", () => {
   });
 
   it("assert_not_deprecated returns the result of the block", () => {
-    // In Rails this is a test assertion helper; in TS we verify silence returns the value
     const result = dep.silence(() => 42);
     expect(result).toBe(42);
   });
@@ -416,7 +409,6 @@ describe("DeprecationTest", () => {
 
   it("Module::deprecate can be called before the target method is defined", () => {
     const obj: any = {};
-    // In Ruby, you can deprecate before defining. In JS, we can set up the method first
     obj.myMethod = () => "result";
     dep.deprecateMethod(obj, "myMethod", "myMethod deprecated");
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -426,7 +418,6 @@ describe("DeprecationTest", () => {
   });
 
   it("DeprecatedConstantProxy with explicit deprecator", () => {
-    // No DeprecatedConstantProxy in our impl; verify basic deprecation works
     const d = new Deprecation();
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     d.warn("constant deprecated");
@@ -451,8 +442,6 @@ describe("DeprecationTest", () => {
   it("allow only allows matching warnings using a substring as a symbol", () => {
     dep.disallowedWarnings = ":all";
 
-    // A Ruby Symbol value is a colon-prefixed string in trails; `explicitly_allowed?`
-    // compares with `rule.to_s`, i.e. without the colon.
     dep.allow([":foo bar", ":baz qux"], {}, () => {
       expect(() => dep.warn("foo bar")).not.toThrow();
       expect(() => dep.warn("baz qux")).not.toThrow();
@@ -461,9 +450,6 @@ describe("DeprecationTest", () => {
   });
 
   it("allow only affects the current thread", () => {
-    // JS has one thread of execution, so the "other thread still disallowed"
-    // half of the Rails case has no analogue; what remains is that the
-    // allowance ends with its block.
     dep.disallowedWarnings = ":all";
 
     dep.allow(":all", {}, () => {
@@ -473,7 +459,6 @@ describe("DeprecationTest", () => {
     expect(() => dep.warn()).toThrow(DeprecationException);
   });
 
-  // A `Thread::Backtrace::Location` stand-in — see CallerLocation.
   const frame = (path: string, lineno = 1, label = "block"): CallerLocation => ({
     path,
     lineno,
@@ -503,7 +488,6 @@ describe("DeprecationTest", () => {
   });
 
   it("assert_deprecated", () => {
-    // assert_deprecated is a testing helper; verify warn triggers the behavior
     dep.behavior = "raise";
     expect(() => dep.warn("deprecated!")).toThrow(DeprecationException);
   });
@@ -577,7 +561,6 @@ describe("DeprecationTest", () => {
   });
 
   it("DeprecatedObjectProxy", () => {
-    // Our impl wraps methods via deprecateMethod; verify it works
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const obj = { getValue: () => 42 };
     dep.deprecateMethod(obj, "getValue", "getValue deprecated");
@@ -714,7 +697,6 @@ describe("DeprecationTest", () => {
   });
 
   it("DeprecatedInstanceVariableProxy", () => {
-    // Ruby-specific concept; verify deprecateMethod wraps instances similarly
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const obj = { getValue: () => 99 };
     dep.deprecateMethod(obj, "getValue", "use newValue instead");
@@ -723,7 +705,6 @@ describe("DeprecationTest", () => {
   });
 
   it("DeprecatedInstanceVariableProxy does not warn on inspect", () => {
-    // Not directly applicable; verify no spurious warnings on toString
     const d = new Deprecation();
     expect(() => d.toString()).not.toThrow();
   });
@@ -734,7 +715,6 @@ describe("DeprecationTest", () => {
   });
 
   it("DeprecatedConstantProxy", () => {
-    // Not implemented in TS; verify deprecation module loads
     expect(Deprecation).toBeDefined();
   });
 
@@ -752,7 +732,6 @@ describe("DeprecationTest", () => {
   });
 
   it("deprecate_constant", () => {
-    // Not directly supported; verify deprecation system works
     dep.behavior = "raise";
     expect(() => dep.warn("constant deprecated")).toThrow(DeprecationException);
   });
@@ -775,7 +754,6 @@ describe("DeprecationTest", () => {
   });
 
   it("assert_deprecated raises when no deprecation warning", () => {
-    // If no warning is issued, we can verify silence doesn't trigger
     dep.behavior = "silence";
     expect(() => dep.warn("x")).not.toThrow();
   });

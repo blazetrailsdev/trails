@@ -1,11 +1,3 @@
-/**
- * ActionController::BasicImplicitRender
- *
- * After dispatching an action, if no render was performed,
- * sends head :no_content.
- * @see https://api.rubyonrails.org/classes/ActionController/BasicImplicitRender.html
- */
-
 interface BasicImplicitRenderHost {
   performed: boolean;
   head(status: number | string): void;

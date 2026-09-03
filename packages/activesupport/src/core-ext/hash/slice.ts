@@ -3,16 +3,6 @@ import { slice } from "../../hash-utils.js";
 
 type AnyObject = Record<string, unknown>;
 
-/**
- * Replaces the hash with only the given keys, returning the removed
- * key/value pairs — Ruby's `Hash#slice!` (core_ext/hash/slice.rb:10-17).
- *
- * `hash.default` / `hash.default_proc` (slice.rb:13-14) land on the seat
- * `@blazetrails/ruby-compat`'s `Hash` carries; a plain object has none, so the
- * `Record` arm is the receiver Rails' two lines have nothing to copy from.
- * `replace(hash)` (slice.rb:15) is the own-key clear plus `Object.assign` —
- * JS objects carry no `replace`.
- */
 export function sliceBang<K, V>(hash: Hash<K, V>, ...keys: K[]): Hash<K, V>;
 export function sliceBang<T extends AnyObject>(hash: T, ...keys: string[]): Partial<T>;
 export function sliceBang(
@@ -42,10 +32,6 @@ export function sliceBang(
   return omit;
 }
 
-/**
- * Removes and returns the key/value pairs matching the given keys, mutating
- * the receiver — Ruby's `Hash#extract!` (core_ext/hash/slice.rb:24-26).
- */
 export function extractBang<T extends AnyObject>(obj: T, ...keys: string[]): Partial<T> {
   const result: Partial<T> = {};
   for (const key of keys) {

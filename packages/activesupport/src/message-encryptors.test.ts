@@ -4,7 +4,6 @@ import { MessageEncryptors } from "./message-encryptors.js";
 import { rotationCoordinatorTests } from "./messages/rotation-coordinator-tests.js";
 import type { SecretGenerator } from "./messages/rotation-coordinator.js";
 
-/** Rails' `"".ljust(secret_length, salt)`. */
 const SECRET_GENERATOR: SecretGenerator = (salt, { secretLength }) =>
   salt.repeat(secretLength as number).slice(0, secretLength as number);
 

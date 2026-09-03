@@ -1,10 +1,3 @@
-/**
- * ActionController::RequestForgeryProtection
- *
- * CSRF protection that verifies authenticity tokens on non-GET requests.
- * Mirrors Rails' protect_from_forgery functionality.
- */
-
 import type { Session } from "./request/session.js";
 
 import { getCrypto } from "@blazetrails/ruby-compat";
@@ -15,21 +8,13 @@ const CSRF_TOKEN_HEADER = "X-CSRF-Token";
 export type CsrfStrategy = "exception" | "reset_session" | "null_session";
 
 export interface CsrfOptions {
-  /** How to handle invalid tokens (default: "exception") */
   strategy?: CsrfStrategy;
-  /** Custom session key for storing the token (default: "_csrf_token") */
   sessionKey?: string;
-  /** Custom form parameter name (default: "authenticity_token") */
   paramName?: string;
-  /** HTTP methods that require CSRF verification */
   protectedMethods?: Set<string>;
-  /** Whether to check Origin header */
   originCheck?: boolean;
-  /** Allowed origins for origin checking */
   allowedOrigins?: string[];
-  /** Whether to log warnings (default: true) */
   logging?: boolean;
-  /** Generate per-form tokens (default: false) */
   perFormTokens?: boolean;
 }
 
@@ -61,12 +46,10 @@ export class RequestForgeryProtection {
     this.perFormTokens = options.perFormTokens ?? false;
   }
 
-  /** Generate a new random CSRF token (base64-encoded). */
   static generateToken(): string {
     return getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH).toString("base64");
   }
 
-  /** Get or create the real (unmasked) token stored in the session. */
   getRealToken(session: Session): string {
     let token = session.get(this.sessionKey) as string | undefined;
     if (!token) {
@@ -76,7 +59,6 @@ export class RequestForgeryProtection {
     return token;
   }
 
-  /** Create a masked version of the token for embedding in forms/meta tags. */
   maskToken(rawToken: string): string {
     const tokenBytes = Buffer.from(rawToken, "base64");
     const otp = Buffer.from(getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH));
@@ -88,23 +70,19 @@ export class RequestForgeryProtection {
     return masked.toString("base64");
   }
 
-  /** Generate a per-form token for a specific action and method. */
   generatePerFormToken(session: Session, actionPath: string, method: string): string {
     const realToken = this.getRealToken(session);
     const normalizedPath = this.normalizePath(actionPath);
     const normalizedMethod = method.toUpperCase();
     const message = `${normalizedPath}#${normalizedMethod}`;
     const hmac = Buffer.from(getCrypto().createHmac("sha256", realToken).update(message).digest());
-    // Take first AUTHENTICITY_TOKEN_LENGTH bytes and mask
     const perFormToken = hmac.subarray(0, AUTHENTICITY_TOKEN_LENGTH).toString("base64");
     return this.maskToken(perFormToken);
   }
 
-  /** Unmask a masked token to get the raw token bytes. */
   unmaskToken(maskedToken: string): string {
     const decoded = Buffer.from(maskedToken, "base64");
     if (decoded.length === AUTHENTICITY_TOKEN_LENGTH) {
-      // Unmasked token (global token)
       return maskedToken;
     }
     if (decoded.length !== AUTHENTICITY_TOKEN_LENGTH * 2) {
@@ -119,7 +97,6 @@ export class RequestForgeryProtection {
     return raw.toString("base64");
   }
 
-  /** Verify a submitted token against the session token. */
   verifyToken(
     session: Session,
     submittedToken: string | null | undefined,
@@ -133,10 +110,8 @@ export class RequestForgeryProtection {
     const unmasked = this.unmaskToken(submittedToken);
     if (!unmasked) return false;
 
-    // Check global token match
     if (this.secureCompare(unmasked, realToken)) return true;
 
-    // Check per-form token if enabled
     if (this.perFormTokens && options?.actionPath && options?.method) {
       const normalizedPath = this.normalizePath(options.actionPath);
       const normalizedMethod = options.method.toUpperCase();
@@ -151,33 +126,28 @@ export class RequestForgeryProtection {
     return false;
   }
 
-  /** Check if a request method requires CSRF verification. */
   requiresVerification(method: string): boolean {
     return this.protectedMethods.has(method.toUpperCase());
   }
 
-  /** Verify the Origin header if origin checking is enabled. */
   verifyOrigin(origin: string | null | undefined, host: string): boolean {
     if (!this.originCheck) return true;
-    if (!origin) return true; // No origin header = same-origin
-    if (origin === "null") return false; // Null origin is suspicious
+    if (!origin) return true;
+    if (origin === "null") return false;
 
     try {
       const originUrl = new URL(origin);
       const originHost = originUrl.host;
 
-      // Check if origin matches request host
       if (originHost === host) return true;
 
-      // Check allowed origins
       for (const allowed of this.allowedOrigins) {
         if (originHost === allowed) return true;
-        // Support scheme://host format
         try {
           const allowedUrl = new URL(allowed);
           if (originHost === allowedUrl.host) return true;
         } catch {
-          // Not a URL, treat as hostname
+          /** @empty */
         }
       }
 
@@ -187,10 +157,6 @@ export class RequestForgeryProtection {
     }
   }
 
-  /**
-   * Full verification: check origin + token.
-   * Returns true if the request is verified, false otherwise.
-   */
   verifyRequest(params: {
     method: string;
     session: Session;
@@ -201,12 +167,10 @@ export class RequestForgeryProtection {
   }): { verified: boolean; warning?: string } {
     const { method, session, token, origin, host, actionPath } = params;
 
-    // Safe methods don't need verification
     if (!this.requiresVerification(method)) {
       return { verified: true };
     }
 
-    // Check origin
     if (!this.verifyOrigin(origin, host)) {
       return {
         verified: false,
@@ -216,7 +180,6 @@ export class RequestForgeryProtection {
       };
     }
 
-    // Check token
     if (!this.verifyToken(session, token, { actionPath, method })) {
       return {
         verified: false,
@@ -227,10 +190,6 @@ export class RequestForgeryProtection {
     return { verified: true };
   }
 
-  /**
-   * Handle a failed verification according to the configured strategy.
-   * Throws InvalidAuthenticityToken for "exception" strategy.
-   */
   handleUnverified(session: Session): void {
     switch (this.strategy) {
       case "exception":
@@ -239,28 +198,22 @@ export class RequestForgeryProtection {
         session.clear();
         break;
       case "null_session":
-        // Caller is responsible for using an empty session for the
-        // remainder of the request; we don't clear the underlying store.
         break;
     }
   }
 
-  /** Get the form parameter name for the CSRF token. */
   get formParamName(): string {
     return this.paramName;
   }
 
-  /** Get the header name for the CSRF token. */
   get headerName(): string {
     return CSRF_TOKEN_HEADER;
   }
 
-  /** Get the session key used to store the CSRF token. */
   get tokenSessionKey(): string {
     return this.sessionKey;
   }
 
-  /** Generate a meta tag value for embedding in HTML. */
   csrfMetaTag(session: Session): { param: string; token: string } {
     const realToken = this.getRealToken(session);
     return {
@@ -269,24 +222,20 @@ export class RequestForgeryProtection {
     };
   }
 
-  /** Reset the CSRF token (generates a new one). */
   resetToken(session: Session): string {
     session.delete(this.sessionKey);
     return this.getRealToken(session);
   }
 
   private normalizePath(path: string): string {
-    // Extract just the pathname from full or protocol-relative URLs
     if (/^https?:\/\/|^\/\//i.test(path)) {
       try {
         path = new URL(/^\/\//.test(path) ? `https:${path}` : path).pathname;
       } catch {
-        // fall through and treat as path
+        /** @empty */
       }
     }
-    // Remove query string and fragment
     let normalized = path.split("?")[0].split("#")[0];
-    // Remove trailing slash (but keep root /)
     if (normalized.length > 1 && normalized.endsWith("/")) {
       normalized = normalized.slice(0, -1);
     }

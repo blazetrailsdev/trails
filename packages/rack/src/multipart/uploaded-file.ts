@@ -15,14 +15,6 @@ export interface UploadedFileOptions {
   io?: UploadedFileTempfile;
 }
 
-/**
- * Rack::Multipart::UploadedFile
- *
- * A wrapper around a tempfile-like object that holds the uploaded
- * content plus the original filename and content-type. Used by
- * Rack::Multipart::Generator for building mock multipart bodies and
- * by Rack::Multipart::Parser to expose parsed files.
- */
 export class UploadedFile {
   readonly originalFilename: string;
   contentType: string;
@@ -54,8 +46,6 @@ export class UploadedFile {
       this.originalFilename = opts.filename ?? "";
     } else {
       if (!path || !File.isExist(path)) {
-        // Mirrors Ruby's `raise "#{path} file does not exist"` — Rails emits
-        // an empty path prefix when nil, so use "" instead of "null".
         throw new Error(`${path ?? ""} file does not exist`);
       }
       this.originalFilename = opts.filename ?? File.basename(path);
@@ -66,17 +56,14 @@ export class UploadedFile {
     this._binary = binary;
   }
 
-  /** The tempfile's path, if it has one. */
   get path(): string | undefined {
     return this._tempfile.path;
   }
 
-  /** Alias of {@link path}. */
   get localPath(): string | undefined {
     return this._tempfile.path;
   }
 
-  /** Read the tempfile content. */
   read(): string | Buffer {
     return this._tempfile.read();
   }
@@ -91,7 +78,6 @@ export class UploadedFile {
     return this._tempfile;
   }
 
-  /** Whether the file is in binary mode. Mirrors Ruby's `binmode?`. */
   get binmode(): boolean {
     return this._binary;
   }

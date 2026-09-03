@@ -5,23 +5,12 @@ import { getFormatVersion, setFormatVersion } from "../format-version-slot.js";
 import { deflate, inflate } from "../../gzip.js";
 import type { Store, StoreOptions } from "../store.js";
 
-// Mirrors Rails `CacheStoreCompressionBehavior`
-// (activesupport/test/cache/behaviors/cache_store_compression_behavior.rb).
-// Ruby's `include CacheStoreCompressionBehavior` is spelled here as a function
-// the store test file calls inside its own describe, which is the trails
-// spelling of a test-behavior mixin.
-
-// Use strings that are guaranteed to compress well, so we can easily tell if
-// the compression kicked in or not.
 const SMALL_STRING = "0".repeat(100);
 const LARGE_STRING = "0".repeat(2 * 1024);
 
 const SMALL_OBJECT = { data: SMALL_STRING };
 const LARGE_OBJECT = { data: LARGE_STRING };
 
-// Ruby names `Marshal` and `Zlib` directly; trails' equivalents are the
-// fidelity coder (cache/coder.ts) framed as a cache coder, and the gzip pair
-// `Store#initialize` itself installs as the default `:compressor`.
 const MARSHAL_CODER = {
   dump: (entry: Entry): string => coder.dump(entry.pack()),
   load: (payload: string): Entry => Entry.unpack(coder.load(payload) as unknown[]),
@@ -31,16 +20,12 @@ const ZLIB = { deflate, inflate };
 /** @internal */
 export interface CompressionBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
-  /** Mirrors `compression_always_disabled_by_default?` (memory_store_test.rb:94). */
   compressionAlwaysDisabledByDefault?: boolean;
 }
 
 export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): void {
   let cache: Store;
 
-  // Stands in for the including test class's `setup` (`@cache = lookup_store`,
-  // e.g. file_store_test.rb:30-32), which the cases that never call
-  // `lookup_store` themselves rely on.
   beforeEach(() => {
     cache = host.lookupStore();
   });
@@ -49,8 +34,6 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
     setFormatVersion(7.0);
   });
 
-  // Ruby `ActiveSupport::Cache.with(format_version:)` (Object#with), which
-  // restores the previous value once the block returns.
   function withFormat<T>(formatVersion: number, block: () => T): T {
     const previous = getFormatVersion();
     setFormatVersion(formatVersion);
@@ -64,21 +47,12 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
   function computeEntrySizeReduction(value: unknown, withOptions: StoreOptions = {}): number {
     const entry = new Entry(value);
 
-    // Ruby reaches the private hook with `@cache.send(:serialize_entry, ...)`,
-    // and calls `#bytesize` on the payload — a String for `Cache::Coder`, a
-    // `Cache::Entry` for `MemoryStore::DupCoder`.
     const send = cache as unknown as {
       serializeEntry(entry: Entry, options: StoreOptions): unknown;
     };
     const uncompressed = send.serializeEntry(entry, { ...withOptions, compress: false });
     const actual = send.serializeEntry(entry, withOptions);
 
-    // Ruby's payload is a String either way, so `#bytesize` is unambiguous. A JS
-    // string carries no encoding, and the two shapes count differently (see
-    // Entry#bytesize, entry.rb:60-69): a serializer dump is UTF-8, while a
-    // deflated payload is the binary string `gzip.ts` returns, one char per
-    // byte. A payload that differs from the uncompressed one is the compressed
-    // shape.
     const sizeOf = (payload: unknown, compressed = false): number =>
       payload instanceof Entry
         ? payload.bytesize()
@@ -178,7 +152,6 @@ export function cacheStoreCompressionBehavior(host: CompressionBehaviorHost): vo
 
   it("compression ignores incompressible data", () => {
     assertNotCompress("", { compress: true, compressThreshold: 1 });
-    // Ruby's `[*0..127].pack("C*")`.
     assertNotCompress(Array.from({ length: 128 }, (_, i) => String.fromCharCode(i)).join(""), {
       compress: true,
       compressThreshold: 1,

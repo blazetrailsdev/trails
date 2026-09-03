@@ -8,7 +8,6 @@ import { Tse } from "./template/handlers/tse.js";
 import { Template } from "./template.js";
 import { FixtureResolver } from "./testing/resolvers.js";
 
-/** Compile and run a `.tse` source through `Template#render`, as Rails does. */
 const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
   new Template({ source, identifier: "t", extension: "tse", handler: new Tse() }).render(
     view,
@@ -163,8 +162,6 @@ describe("ActionView::Base include ControllerHelper", () => {
   };
 
   it("raises DelegationError for a delegate read on a nil-controller view", () => {
-    // `delegate(*CONTROLLER_DELEGATES, to: :controller)` (controller_helper.rb:19)
-    // passes no allow_nil, so delegation.rb:129-143 raises rather than answering nil.
     const view = new (Base.withEmptyTemplateCache())(null, {}, null) as unknown as {
       params: unknown;
     };
@@ -197,8 +194,6 @@ describe("ActionView::Base include ControllerHelper", () => {
   });
 
   it("initialize sets _config to an InheritableOptions before assign_controller runs", () => {
-    // base.rb:245 assigns it unconditionally; controller_helper.rb:27's
-    // `@_config ||= nil` is then a no-op against the truthy value.
     expect(new (Base.withEmptyTemplateCache())(null, {}, null)._config).toBeInstanceOf(
       InheritableOptions,
     );
@@ -262,8 +257,6 @@ describe("ActionView::Base lookup_context delegation", () => {
     const lookupContext = new LookupContext(null, {}, []);
     const view = new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
     expect(view.viewPaths).toBe(lookupContext.viewPaths);
-    // lookup_context.rb:126 is attr_reader; view_paths= lives on the
-    // controller-side ViewPaths (view_paths.rb:68), so Rails raises here too.
     expect(() => {
       (view as unknown as { viewPaths: unknown }).viewPaths = [];
     }).toThrow(TypeError);
@@ -278,8 +271,6 @@ describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
   });
 
   it("raises when a controller carries a config that cannot be copied", () => {
-    // controller_helper.rb:24 guards on respond_to?(:config), then calls
-    // inheritable_copy unconditionally — a config without it is a NoMethodError.
     expect(() => new (Base.withEmptyTemplateCache())(null, {}, { config: {} } as never)).toThrow(
       TypeError,
     );
@@ -363,8 +354,6 @@ describe("ActionView::Base#render", () => {
     const view = buildView();
     expect(view.render({ body: "b" }).toString()).toBe("b");
     expect(view.render({ plain: "p" }).toString()).toBe("p");
-    // `render html:` escapes an unsafe string and passes an html_safe one
-    // through (`template/html.rb:20-22`, `render_html_test.rb:168-178`).
     expect(view.render({ html: "<p>hello world</p>" }).toString()).toBe(
       "&lt;p&gt;hello world&lt;/p&gt;",
     );

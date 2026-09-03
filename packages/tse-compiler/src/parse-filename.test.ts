@@ -82,7 +82,6 @@ describe("parseFilename", () => {
   });
 
   it("unknown token between name and handler is kept in name", () => {
-    // 'pdf' is not in FORMATS — treated as part of name
     expect(parseFilename("report.pdf.tse", FORMATS)).toEqual({
       name: "report.pdf",
       locale: null,
@@ -103,7 +102,6 @@ describe("parseFilename", () => {
   });
 
   it("bare two-letter name is not consumed as locale (no remaining name token)", () => {
-    // `en.tse`: only one token left after handler pop, guard prevents empty name
     expect(parseFilename("en.tse", FORMATS)).toEqual({
       name: "en",
       locale: null,

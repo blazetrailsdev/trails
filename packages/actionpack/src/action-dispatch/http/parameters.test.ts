@@ -113,7 +113,7 @@ describe("pathParameters", () => {
 describe("Parameters#pathParameters=", () => {
   it("stores under PARAMETERS_KEY and invalidates the merged cache", () => {
     const host = makeHost({ queryParameters: { q: 1 } });
-    parameters.call(host); // populates cache
+    parameters.call(host);
     host.pathParameters = { controller: "x" };
     expect(host.getHeader(PARAMETERS_KEY)).toEqual({ controller: "x" });
     expect(host.getHeader("action_dispatch.request.parameters")).toBeUndefined();

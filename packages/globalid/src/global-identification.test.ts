@@ -56,10 +56,6 @@ describe("GlobalIdentificationTest", () => {
     expect(GlobalID.create(model, { some: "param" })).toEqual(toGid.call(model, { some: "param" }));
   });
 
-  // Rails compares SignedGlobalIDs with `assert_equal`, which routes through
-  // SignedGlobalID#== (uri + purpose). Vitest's `toEqual` is structural and
-  // would also compare the per-instance inspect id, so the ported assertions
-  // go through the same `equals` Rails' `==` is.
   it("creates a signed Global ID from self", () => {
     const verifier = makeVerifier();
     expect(
@@ -99,9 +95,6 @@ describe("GlobalIdentificationTest", () => {
   });
 
   it("dup should clear memoized to_global_id", () => {
-    // Rails calls model.dup (which clears the @global_id memoization) before
-    // bumping the id. Trails doesn't memoize toGlobalId, so the dup is a plain
-    // structural copy and the same invariant holds.
     const globalId = toGlobalId.call(model);
     const dupModel = new Person(String(Number(model.id) + 1));
     const dupGlobalId = toGlobalId.call(dupModel);
@@ -177,10 +170,8 @@ describe("Locator.locateSigned + locateManySigned", () => {
     const verifier = makeVerifier();
     const sgid = SignedGlobalID.create(new Person("4"), { verifier });
     const sgid2 = SignedGlobalID.create(new Person("5"), { verifier });
-    // locateSigned with a SignedGlobalID instance, not a string.
     const found = (await Locator.locateSigned(sgid, { verifier })) as Person;
     expect(found.id).toBe("4");
-    // locateManySigned with an array of SignedGlobalID instances.
     const many = await Locator.locateManySigned([sgid, sgid2], { verifier });
     expect(many).toHaveLength(2);
     expect((many[0] as Person).id).toBe("4");

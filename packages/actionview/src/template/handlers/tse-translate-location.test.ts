@@ -77,10 +77,6 @@ describe("tokenizeLine", () => {
 
 describe("findOffset", () => {
   it("returns the source-line column for a CODE token matched in compiled output", () => {
-    // The compiler trims tag bodies (parser.ts), so `<%= name %>` emits
-    // `_ob.append(name);` and the CODE anchor string is `"name"`. The
-    // returned column is relative to the concatenated source-token content
-    // (delimiters excluded from the accounting), so column 0 = 'n'.
     const tokens = tokenizeLine("<%= name %>");
     const compiled = "_ob.append(name);";
     const errorColumn = compiled.indexOf("name");

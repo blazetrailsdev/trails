@@ -6,9 +6,6 @@ function makeHeaders(hash: Record<string, unknown>): Headers {
   return new Headers(new Request(hash));
 }
 
-// ==========================================================================
-// dispatch/header_test.rb
-// ==========================================================================
 describe("HeaderTest", () => {
   function setup() {
     return makeHeaders({

@@ -3,51 +3,28 @@ import type { Template } from "../template.js";
 
 export type { Template };
 
-/**
- * Minimal "renderable" interface shared by `Template` and its subtypes
- * (Text, HTML, Inline, Renderable, RawFile). Mirrors the duck type that
- * Rails relies on in `TemplateRenderer` / `PartialRenderer`.
- */
 export interface RenderableTemplate {
   readonly identifier: string;
   readonly format: string | null;
-  /** Partial local-variable name derived from the virtual path. */
   readonly variable?: string | null;
-  /** Virtual path relative to the view root (e.g. `"users/_card"`). */
   readonly virtualPath?: string | null;
-  /** Render the template body, returning the HTML/text output. */
   render(view: ViewContext, locals: Record<string, unknown>): string | Promise<string>;
 }
 
-/**
- * The view context passed to every render call — the ActionView::Base-like
- * object that templates execute against. Phase 4 will flesh this out with
- * `output_buffer`, `view_flow`, `_layout_for`, etc.
- */
 export interface ViewContext {
   readonly lookupContext?: LookupContext;
-  /** Render the named `content_for` region or the default yield. */
   _layoutFor?(name?: string): string;
-  /** View flow for layout yield tracking. Phase 4. */
   viewFlow?: { set(key: string, content: string): void };
-  /** Whether to prefix object partial paths with the controller namespace. */
   prefixPartialPathWithControllerNamespace?: boolean;
-  /** The active renderer (for cache_hits tracking). */
   viewRenderer?: { cacheHits: Record<string, number> };
 }
 
-/**
- * Raw render options hash — mirrors the kwargs accepted by Rails'
- * `ActionView::Renderer#render` / `ActionController::Base#render`.
- */
 export interface RenderOptions {
   template?: string;
   partial?: string | object;
   inline?: string;
   body?: string;
   plain?: string;
-  /** Rails: `Template::HTML.new(options[:html], ...)` does `string.to_s`
-   * (`template/html.rb:10`), so any object — an html_safe buffer included. */
   html?: unknown;
   file?: string;
   renderable?: { renderIn(context: ViewContext): string };
@@ -70,10 +47,6 @@ export interface RenderOptions {
   [key: string]: unknown;
 }
 
-/**
- * Carries the rendered body together with the template that produced it.
- * Mirrors `ActionView::AbstractRenderer::RenderedTemplate`.
- */
 export class RenderedTemplate {
   static readonly EMPTY_SPACER: RenderedTemplate = new RenderedTemplate("", null);
 
@@ -87,10 +60,6 @@ export class RenderedTemplate {
   }
 }
 
-/**
- * Carries the rendered body of an entire collection.
- * Mirrors `ActionView::AbstractRenderer::RenderedCollection`.
- */
 export class RenderedCollection {
   static empty(format: string): EmptyCollection {
     return new EmptyCollection(format);
@@ -110,7 +79,6 @@ export class RenderedCollection {
   }
 }
 
-/** Mirrors `ActionView::AbstractRenderer::RenderedCollection::EmptyCollection`. */
 export class EmptyCollection {
   constructor(readonly format: string) {}
   get body(): null {
@@ -118,21 +86,13 @@ export class EmptyCollection {
   }
 }
 
-/**
- * ActionView::AbstractRenderer::ObjectRendering
- *
- * Mixin used by ObjectRenderer and CollectionRenderer — provides partial-path
- * inference from model objects and local-variable naming helpers.
- * @internal
- */
+/** @internal */
 export interface ObjectRenderingHost {
-  /** Mirrors `@context_prefix` (`abstract_renderer.rb:39`). */
   contextPrefix: string;
-  /** Mirrors `@options` (`partial_renderer.rb:225`). */
   readonly options: RenderOptions;
 }
 
-/** Cached map: `[contextPrefix][objectPath] → prefixed path`. @internal */
+/** @internal */
 const PREFIXED_PARTIAL_NAMES = new Map<string, Map<string, string>>();
 
 function getPrefixedName(contextPrefix: string, objectPath: string): string | undefined {
@@ -230,15 +190,7 @@ export function mergePrefixIntoObjectPath(prefix: string, objectPath: string): s
   return objectPath;
 }
 
-/**
- * ActionView::AbstractRenderer
- *
- * Base class for all renderer objects. Each concrete subclass handles one
- * rendering mode (template, partial, collection, streaming). A new instance
- * is created per `render` call — no per-instance state is reused across
- * invocations.
- * @internal
- */
+/** @internal */
 export abstract class AbstractRenderer {
   /** @internal */
   protected readonly lookupContext: LookupContext;
@@ -251,9 +203,6 @@ export abstract class AbstractRenderer {
     ...args: unknown[]
   ): Promise<RenderedTemplate> | RenderedTemplate | RenderedCollection;
 
-  // --- delegates to lookupContext (mirrors AbstractRenderer's `delegate`) ---
-
-  /** Mirrors Rails `template_exists?`. */
   templateExists(
     name: string,
     prefixes: readonly string[] = [],
@@ -264,7 +213,6 @@ export abstract class AbstractRenderer {
     return this.lookupContext.isExists(name, prefixes, partial, keys, options);
   }
 
-  /** Mirrors Rails `any_templates?`. */
   anyTemplates(name: string, prefixes: readonly string[] = [], partial = false): boolean {
     return this.lookupContext.isAny(name, prefixes, partial);
   }
@@ -272,8 +220,6 @@ export abstract class AbstractRenderer {
   get formats(): readonly (string | symbol)[] {
     return this.lookupContext.formats;
   }
-
-  // --- private helpers (exposed as protected for subclasses) ---
 
   /** @internal */
   protected extractDetails(

@@ -1,20 +1,3 @@
-/**
- * Mirrors: i18n/lib/i18n/backend/chain.rb
- *
- * The gem's `Chain` has no superclass: it splits the code into a
- * `Chain::Implementation` module that `include Base` (chain.rb:21-23) and
- * `include Implementation`s it back (chain.rb:127), so a module included over
- * `Chain` lands *between* the two. TypeScript has no module reopening, so this
- * file keeps the bodies in the `Chain` class itself and spells `include Base`
- * as the prototype copy at the bottom, exactly as `simple.ts` does. The class
- * body still wins over `Base`, as Ruby's `include` does.
- *
- * `translate` and `localize` each `return` from inside a `catch(:exception)`
- * block (chain.rb:65, chain.rb:85), which in Ruby leaves the enclosing method;
- * the one-shot carrier in those two bodies is that non-local exit, checked
- * immediately after each backend so the control flow stays the gem's.
- */
-
 import { MissingTranslation } from "../exceptions.js";
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { throwException, catchException } from "../throw-catch.js";
@@ -25,17 +8,10 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** Ruby truthiness: only `nil` and `false` are falsy. */
 function truthy(value: unknown): boolean {
   return value !== undefined && value !== null && value !== false;
 }
 
-/**
- * The gem reaches `initialized?`, `init_translations` and `translations` on a
- * chained backend through `instance_eval` / `send`, which ignore Ruby's method
- * visibility. TypeScript has no such escape, so the members the chain reaches
- * for are named here and the backend is cast to this shape at the call site.
- */
 interface ChainedBackend extends Base {
   initialized(): boolean;
   /** @internal */
@@ -44,34 +20,9 @@ interface ChainedBackend extends Base {
   translations(): TranslationData;
 }
 
-/**
- * Ruby `include Base` (chain.rb:22) as a type: the merged interface gives
- * `Chain` every member `Base` declares, without an `extends` clause the gem
- * does not have. The runtime half of the same `include` is the prototype copy
- * at the bottom of this file.
- */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
 export interface Chain extends Base {}
 
-/**
- * Backend that chains multiple other backends and checks each of them when
- * a translation needs to be looked up. This is useful when you want to use
- * standard translations with a Simple backend but store custom application
- * translations in a database or other backends.
- *
- * To use the Chain backend instantiate it and set it to the I18n module.
- * You can add chained backends through the initializer or backends
- * accessor:
- *
- *     // preserves the existing Simple backend set to I18n.backend
- *     I18n.setBackend(new I18n.Backend.Chain(new ActiveRecordBackend(), I18n.backend()));
- *
- * The implementation assumes that all backends added to the Chain implement
- * a lookup method with the same API as Simple backend does.
- *
- * Fallback translations using the `default` option are only used by the last
- * backend of a chain.
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Chain {
   backends: Base[];
@@ -80,7 +31,6 @@ export class Chain {
     this.backends = backends;
   }
 
-  /** Mirrors: `initialized?` */
   initialized(): boolean {
     for (const backend of this.backends) {
       if (!(backend as ChainedBackend).initialized()) return false;
@@ -172,17 +122,10 @@ export class Chain {
     return memo;
   }
 
-  /** Mirrors: `namespace_lookup?` */
   protected namespaceLookup(result: unknown, options: TranslateOptions): boolean {
     return isHash(result) && !("count" in options);
   }
 
-  /**
-   * This is approximately what gets used in ActiveSupport.
-   * However since we are not guaranteed to run in an ActiveSupport context
-   * it is wise to have our own copy. We underscore it
-   * to not pollute the namespace of the including class.
-   */
   private _deepMerge(hash: TranslationData, otherHash: TranslationData): TranslationData {
     const copy = { ...hash };
     for (const [k, v] of Object.entries(otherHash)) {
@@ -193,13 +136,6 @@ export class Chain {
   }
 }
 
-/**
- * Ruby `include Base` (chain.rb:22). `include` copies a module's instance
- * methods into the ancestry *below* the class body, so a key the class body
- * already defines is never replaced — the `hasOwnProperty` guard below. Some of
- * `Base`'s members are TS class fields (`transliterate`, `loadYaml`), which
- * only exist on an instance, so an instance is the second source read.
- */
 for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;

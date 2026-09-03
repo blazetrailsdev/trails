@@ -69,8 +69,6 @@ it("be able to handle each", () => {
 
 it("not buffer into a Tempfile if no data has been read yet", () => {
   const input = makeInput("hello");
-  // Before any read, internal buffer should not exist
-  // Just verify it doesn't throw
   expect(input.size).toBe(5);
 });
 

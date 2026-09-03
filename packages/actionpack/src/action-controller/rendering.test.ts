@@ -17,11 +17,7 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// action_controller/render_test.rb
-// ==========================================================================
 describe("ActionController rendering", () => {
-  // --- render json ---
   describe("render json", () => {
     it("renders object as JSON", async () => {
       class C extends Base {
@@ -91,7 +87,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- render plain ---
   describe("render plain", () => {
     it("renders plain text", async () => {
       class C extends Base {
@@ -117,7 +112,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- render html ---
   describe("render html", () => {
     it("renders HTML string", async () => {
       class C extends Base {
@@ -132,7 +126,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- render body ---
   describe("render body", () => {
     it("renders raw body", async () => {
       class C extends Base {
@@ -147,7 +140,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- render text ---
   describe("render text", () => {
     it("renders text", async () => {
       class C extends Base {
@@ -162,7 +154,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- render status ---
   describe("render with status", () => {
     it("accepts numeric status", async () => {
       class C extends Base {
@@ -209,7 +200,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- head ---
   describe("head", () => {
     it("head with numeric status", async () => {
       class C extends Metal {
@@ -257,7 +247,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- render_to_string ---
   describe("renderToString", () => {
     it("returns rendered content without committing", async () => {
       class C extends Base {
@@ -288,7 +277,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- double render ---
   describe("double render prevention", () => {
     it("raises on render after render", async () => {
       class C extends Base {
@@ -343,7 +331,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- implicit render ---
   describe("implicit render", () => {
     it("renders empty HTML without template resolver", async () => {
       class C extends Base {
@@ -370,7 +357,6 @@ describe("ActionController rendering", () => {
     });
   });
 
-  // --- API rendering ---
   describe("API controller rendering", () => {
     it("renders JSON", async () => {
       class C extends API {
@@ -418,9 +404,6 @@ describe("ActionController rendering", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/send_data_test.rb
-// ==========================================================================
 describe("ActionController sendData", () => {
   it("sends string data with default content type", async () => {
     class C extends Base {
@@ -516,9 +499,6 @@ describe("ActionController sendData", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/render_edge_cases_test.rb
-// ==========================================================================
 describe("ActionController render edge cases", () => {
   it("render with custom content type", async () => {
     class C extends Base {

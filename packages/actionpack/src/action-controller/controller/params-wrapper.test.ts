@@ -2,9 +2,6 @@ import { describe, it, expect } from "vitest";
 import { wrapParameters, applyParamsWrapper, deriveWrapperKey } from "../params-wrapper.js";
 import { Parameters } from "../metal/strong-parameters.js";
 
-// ==========================================================================
-// action_controller/params_wrapper_test.rb
-// ==========================================================================
 describe("ParamsWrapperTest", () => {
   describe("wrapParameters", () => {
     it("creates config with key", () => {
@@ -39,7 +36,7 @@ describe("ParamsWrapperTest", () => {
     it("exclude adds to default exclusions", () => {
       const config = wrapParameters("user", { exclude: ["admin"] });
       expect(config.exclude.has("admin")).toBe(true);
-      expect(config.exclude.has("controller")).toBe(true); // default
+      expect(config.exclude.has("controller")).toBe(true);
     });
   });
 
@@ -114,7 +111,7 @@ describe("ParamsWrapperTest", () => {
     });
 
     it("does not wrap for non-matching format", () => {
-      const config = wrapParameters("user"); // json only
+      const config = wrapParameters("user");
       const params = new Parameters({ name: "Dean" });
       const result = applyParamsWrapper(params, config, "html");
 
@@ -135,7 +132,6 @@ describe("ParamsWrapperTest", () => {
       const params = new Parameters({ user: userParams, extra: "val" });
       const result = applyParamsWrapper(params, config);
 
-      // Should return original, not double-wrap
       expect(result.get("user")).toBe(userParams);
     });
 

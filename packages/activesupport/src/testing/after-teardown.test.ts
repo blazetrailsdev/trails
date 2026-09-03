@@ -1,12 +1,3 @@
-/**
- * Mirrors: activesupport/test/testing/after_teardown_test.rb
- *
- * Rails drives this through a `Minitest::Test` subclass whose `after_teardown`
- * asserts the failure count moved 0 -> 1 around `super` and that the other
- * `after_teardown` in the chain still ran. trails has no Minitest runner, so
- * the chain is spelled out: the mixed-in `afterTeardown` calls the ported one
- * and then records its witness, exactly as `OtherAfterTeardown` does.
- */
 import { describe, expect, it } from "vitest";
 
 import { resetCallbacks } from "../callbacks.js";

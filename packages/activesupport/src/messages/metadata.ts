@@ -26,7 +26,6 @@ function isPresent(value: unknown): boolean {
 }
 
 export abstract class Metadata {
-  /** Mirrors: Metadata.use_message_serializer_for_metadata (messages/metadata.rb:10). */
   static useMessageSerializerForMetadata = false;
 
   static readonly ENVELOPE_SERIALIZERS: readonly unknown[] = [
@@ -107,13 +106,7 @@ export abstract class Metadata {
     return { _rails: hash };
   }
 
-  /**
-   * @missingRailsCall utc — PERMANENT: `Time.now.utc >= parse_expiry(...)`
-   *   (messages/metadata.rb:81). trails reads the clock as a
-   *   `Temporal.Instant`, which by construction carries no offset to drop, so
-   *   `Time#utc` has no receiver here to call it on — the same seat that makes
-   *   `advance` and `iso8601` below PERMANENT.
-   */
+  /** @missingRailsCall utc — PERMANENT */
   protected extractFromMetadataEnvelope(
     envelope: unknown,
     { purpose = null }: ExpectedMetadataOptions = {},
@@ -143,13 +136,8 @@ export abstract class Metadata {
   }
 
   /**
-   * @missingRailsCall utc — PERMANENT: `expires_at.utc` / `Time.now.utc.advance(...)`
-   *   (messages/metadata.rb:100-105). Same seat as `extractFromMetadataEnvelope`
-   *   above: the expiry is a `Temporal.Instant`, absolute by construction, so
-   *   there is no offset for `Time#utc` to drop and no receiver to call it on.
-   * @missingRailsCall advance — PERMANENT: Rails advances a `Time` with
-   *   `Time.now.utc.advance(seconds:)`; trails' `Time` analogue is
-   *   `Temporal.Instant`, whose equivalent is `add({ milliseconds })`.
+   * @missingRailsCall utc — PERMANENT
+   * @missingRailsCall advance — PERMANENT
    */
   protected pickExpiry(
     expiresAt: Temporal.Instant | null | undefined,
@@ -170,12 +158,8 @@ export abstract class Metadata {
   }
 
   /**
-   * @missingRailsCall iso8601 — PERMANENT: Rails parses with `Time.iso8601`; trails parses
-   *   the same ISO 8601 string with `Temporal.Instant.from`.
-   * @missingRailsCall parse — PERMANENT: Both branches are ported; Ruby's lenient
-   *   `Time.parse` has no Temporal equivalent, so the non-standard-format branch
-   *   parses with `new Date(...)` and converts to a `Temporal.Instant`, which is
-   *   the same parse under a different call name.
+   * @missingRailsCall iso8601 — PERMANENT
+   * @missingRailsCall parse — PERMANENT
    */
   protected parseExpiry(expiresAt: string | Temporal.Instant): Temporal.Instant {
     if (typeof expiresAt !== "string") {
@@ -184,7 +168,6 @@ export abstract class Metadata {
       return Temporal.Instant.from(expiresAt);
     } else {
       // boundary: Ruby's lenient `Time.parse` has no Temporal equivalent; `Date` parses
-      // the non-ISO string and the result is handed straight back as an `Instant`.
       const parsed = new Date(expiresAt).getTime();
       if (Number.isNaN(parsed))
         throw new ArgumentError(`no time information in ${JSON.stringify(expiresAt)}`);
@@ -200,17 +183,11 @@ export abstract class Metadata {
     try {
       return ActiveSupportJSON.decode(serialized);
     } catch (error) {
-      // Throw :invalid_message_format instead of :invalid_message_serialization
-      // because here a parse error is due to a bad message rather than an
-      // incompatible `self.serializer`.
       throw new Thrown("invalid_message_format", error);
     }
   }
 
   protected serializeToJsonSafeString(data: unknown): string {
-    // Ruby's `encode` is `::Base64.strict_encode64`, which raises on anything
-    // but a String — the narrowing `serializer.dump`'s duck type does not state
-    // (messages/codec.rb:35-37).
     return this.encode(this.serialize(data) as string, { urlSafe: false });
   }
 

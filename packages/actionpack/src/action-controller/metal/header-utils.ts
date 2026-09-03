@@ -1,7 +1,3 @@
-/**
- * Shared header utilities for ActionController metal modules.
- */
-
 export function deleteHeaderCaseInsensitive(headers: Record<string, string>, name: string): void {
   const lower = name.toLowerCase();
   for (const key of Object.keys(headers)) {

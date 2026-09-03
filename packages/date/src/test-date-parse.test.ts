@@ -1,20 +1,3 @@
-/**
- * Port of ruby/date's `test/date/test_date_parse.rb`.
- *
- * RFC 0088 answers `Temporal` where MRI answers `Date`/`DateTime`
- * (`vendor/sources.ts`'s `date` entry), so `Date.parse` / `DateTime.parse`
- * assertions read the Temporal counterpart of the value Ruby asserts on.
- * `Date._parse` answers the frag hash itself in both, with the hash keys
- * camelCased by `docs/ruby-ts-conventions.md` (`:sec_fraction` is
- * `secFraction`).
- *
- * `test__parse`'s zone rows also assert the zone's `String#encoding`; a JS
- * string carries no encoding, so only the zone equality carries over.
- *
- * `test_parse__ex`'s two trailing `begin ... rescue ArgumentError => e` blocks
- * assert that what `parse('')` raises is both an `ArgumentError` and a
- * `Date::Error`; they are the last two expectations of `parse  ex`.
- */
 import { Temporal } from "@js-temporal/polyfill";
 import { describe, it, expect } from "vitest";
 import {
@@ -28,7 +11,6 @@ import {
 import { Time } from "./time.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
-/** Ruby's `h.values_at(...)` over the frag hash, `nil` for an absent key. */
 function valuesAt(h: DateParts, ...keys: (keyof DateParts)[]): unknown[] {
   return keys.map((k) => h[k] ?? null);
 }
@@ -36,7 +18,6 @@ function valuesAt(h: DateParts, ...keys: (keyof DateParts)[]): unknown[] {
 describe("TestDateParse", () => {
   it(" parse", () => {
     const cases: [[string, boolean], (number | string | null)[]][] = [
-      // ctime(3), asctime(3)
       [
         ["Sat Aug 28 02:55:50 1999", false],
         [1999, 8, 28, 2, 55, 50, null, null, 6],
@@ -58,7 +39,6 @@ describe("TestDateParse", () => {
         [2, 8, 28, 2, 55, 50, null, null, 6],
       ],
 
-      // date(1)
       [
         ["Sat Aug 28 02:29:34 JST 1999", false],
         [1999, 8, 28, 2, 29, 34, "JST", 9 * 3600, 6],
@@ -159,7 +139,6 @@ describe("TestDateParse", () => {
         [2000, 8, 28, 2, 29, 34, "W. Central Africa Standard Time", 1 * 3600, 6],
       ],
 
-      // part of iso 8601
       [
         ["1999-05-23 23:55:21", false],
         [1999, 5, 23, 23, 55, 21, null, null, null],
@@ -370,7 +349,6 @@ describe("TestDateParse", () => {
         [null, null, null, null, 5, 21, "-0900", -9 * 3600, null],
       ],
 
-      // reversed iso 8601 (?)
       [
         ["23-05-1999", false],
         [1999, 5, 23, null, null, null, null, null, null],
@@ -392,7 +370,6 @@ describe("TestDateParse", () => {
         [1999, 5, 23, null, null, null, null, null, null],
       ],
 
-      // broken iso 8601 (?)
       [
         ["19990523T23:55:21Z", false],
         [1999, 5, 23, 23, 55, 21, "Z", 0, null],
@@ -406,7 +383,6 @@ describe("TestDateParse", () => {
         [1999, 5, 23, 23, 55, 21, "-10", -10 * 3600, null],
       ],
 
-      // part of jis x0301
       [
         ["M11.05.23", false],
         [1878, 5, 23, null, null, null, null, null, null],
@@ -444,7 +420,6 @@ describe("TestDateParse", () => {
         [2019, 4, 30, 23, 55, 21, "Z", 0, null],
       ],
 
-      // ofx date
       [
         ["19990523235521", false],
         [1999, 5, 23, 23, 55, 21, null, null, null],
@@ -514,7 +489,6 @@ describe("TestDateParse", () => {
         [null, null, null, 23, 55, 21, "JST", +9 * 3600, null],
       ],
 
-      // rfc 2822
       [
         ["Sun, 22 Aug 1999 00:45:29 -0400", false],
         [1999, 8, 22, 0, 45, 29, "-0400", -4 * 3600, 0],
@@ -560,19 +534,16 @@ describe("TestDateParse", () => {
         [99, 8, 22, 0, 45, 29, "UT", 0, 0],
       ],
 
-      // rfc 850, obsoleted by rfc 1036
       [
         ["Tuesday, 02-Mar-99 11:20:32 GMT", true],
         [1999, 3, 2, 11, 20, 32, "GMT", 0, 2],
       ],
 
-      // W3C Working Draft - XForms - 4.8 Time
       [
         ["2000-01-31 13:20:00-5", false],
         [2000, 1, 31, 13, 20, 0, "-5", -5 * 3600, null],
       ],
 
-      // [-+]\d+.\d+
       [
         ["2000-01-31 13:20:00-5.5", false],
         [2000, 1, 31, 13, 20, 0, "-5.5", -5 * 3600 - 30 * 60, null],
@@ -590,7 +561,6 @@ describe("TestDateParse", () => {
         [2000, 1, 31, 13, 20, 0, "+3,5", 3 * 3600 + 30 * 60, null],
       ],
 
-      // mil
       [
         ["2000-01-31 13:20:00 Z", false],
         [2000, 1, 31, 13, 20, 0, "Z", 0 * 3600, null],
@@ -620,7 +590,6 @@ describe("TestDateParse", () => {
         [2000, 1, 31, 13, 20, 0, "P", -3 * 3600, null],
       ],
 
-      // dot
       [
         ["1999.5.2", false],
         [1999, 5, 2, null, null, null, null, null, null],
@@ -652,7 +621,6 @@ describe("TestDateParse", () => {
         [1999, 5, 2, null, null, null, null, null, null],
       ],
 
-      // reversed dot
       [
         ["2.5.1999", false],
         [1999, 5, 2, null, null, null, null, null, null],
@@ -684,7 +652,6 @@ describe("TestDateParse", () => {
         [1999, 5, 2, null, null, null, null, null, null],
       ],
 
-      // vms
       [
         ["08-DEC-1988", false],
         [1988, 12, 8, null, null, null, null, null, null],
@@ -715,7 +682,6 @@ describe("TestDateParse", () => {
         [88, 12, 8, null, null, null, null, null, null],
       ],
 
-      // swapped vms
       [
         ["DEC-08-1988", false],
         [1988, 12, 8, null, null, null, null, null, null],
@@ -737,7 +703,6 @@ describe("TestDateParse", () => {
         [-1999, 1, null, null, null, null, null, null, null],
       ],
 
-      // reversed vms
       [
         ["1988-DEC-08", false],
         [1988, 12, 8, null, null, null, null, null, null],
@@ -769,7 +734,6 @@ describe("TestDateParse", () => {
         [1988, 12, 8, null, null, null, null, null, null],
       ],
 
-      // non-spaced eu
       [
         ["08/dec/1988", false],
         [1988, 12, 8, null, null, null, null, null, null],
@@ -795,7 +759,6 @@ describe("TestDateParse", () => {
         [-1999, 1, 31, null, null, null, null, null, null],
       ],
 
-      // non-spaced us
       [
         ["dec/08/1988", false],
         [1988, 12, 8, null, null, null, null, null, null],
@@ -837,7 +800,6 @@ describe("TestDateParse", () => {
         [1988, 1, null, null, null, null, null, null, null],
       ],
 
-      // month and day of month
       [
         ["Jan 1", false],
         [null, 1, 1, null, null, null, null, null, null],
@@ -899,7 +861,6 @@ describe("TestDateParse", () => {
         [null, null, 23, null, null, null, null, null, null],
       ],
 
-      // month and year
       [
         ["Sept 1990", false],
         [1990, 9, null, null, null, null, null, null, null],
@@ -925,7 +886,6 @@ describe("TestDateParse", () => {
         [90, null, null, null, null, null, null, null, null],
       ],
 
-      // year
       [
         ["'90", false],
         [90, null, null, null, null, null, null, null, null],
@@ -935,7 +895,6 @@ describe("TestDateParse", () => {
         [1990, null, null, null, null, null, null, null, null],
       ],
 
-      // month
       [
         ["Jun", false],
         [null, 6, null, null, null, null, null, null, null],
@@ -961,7 +920,6 @@ describe("TestDateParse", () => {
         [null, null, null, null, null, null, null, null, null],
       ],
 
-      // day of month
       [
         ["1st", false],
         [null, null, 1, null, null, null, null, null, null],
@@ -991,7 +949,6 @@ describe("TestDateParse", () => {
         [null, null, null, null, null, null, null, null, null],
       ],
 
-      // era
       [
         ["Sat Aug 28 02:29:34 GMT CE 2000", false],
         [2000, 8, 28, 2, 29, 34, "GMT", 0, 6],
@@ -1041,33 +998,31 @@ describe("TestDateParse", () => {
         [-1999, 8, 28, 2, 29, 34, "GMT", 0, 6],
       ],
 
-      // collection
       [
         ["Tuesday, May 18, 1999 Published at 13:36 GMT 14:36 UK", false],
         [1999, 5, 18, 13, 36, null, "GMT", 0, 2],
-      ], // bbc.co.uk
+      ],
       [
         ["July 20, 2000 Web posted at: 3:37 p.m. EDT (1937 GMT)", false],
         [2000, 7, 20, 15, 37, null, "EDT", -4 * 3600, null],
-      ], // cnn.com
+      ],
       [
         ["12:54 p.m. EDT, September 11, 2006", false],
         [2006, 9, 11, 12, 54, null, "EDT", -4 * 3600, null],
-      ], // cnn.com
+      ],
       [
         ["February 04, 2001 at 10:59 AM PST", false],
         [2001, 2, 4, 10, 59, null, "PST", -8 * 3600, null],
-      ], // old amazon.com
+      ],
       [
         ["Monday May 08, @01:55PM", false],
         [null, 5, 8, 13, 55, null, null, null, 1],
-      ], // slashdot.org
+      ],
       [
         ["06.June 2005", false],
         [2005, 6, 6, null, null, null, null, null, null],
-      ], // dhl.com
+      ],
 
-      // etc.
       [
         ["8:00 pm lt", false],
         [null, null, null, 20, 0, null, "lt", null, null],
@@ -1129,7 +1084,6 @@ describe("TestDateParse", () => {
         [3, 2, 1, null, null, null, null, null, null],
       ],
 
-      // apostrophe
       [
         ["July 4, '79", true],
         [1979, 7, 4, null, null, null, null, null, null],
@@ -1139,7 +1093,6 @@ describe("TestDateParse", () => {
         [1979, 7, 4, null, null, null, null, null, null],
       ],
 
-      // day of week
       [
         ["Sunday", false],
         [null, null, null, null, null, null, null, null, 0],
@@ -1181,7 +1134,6 @@ describe("TestDateParse", () => {
         [null, null, null, null, null, null, null, null, 6],
       ],
 
-      // time
       [
         ["09:55", false],
         [null, null, null, 9, 55, null, null, null, null],
@@ -1350,7 +1302,6 @@ describe("TestDateParse", () => {
         [null, null, null, 23, 0, null, null, null, null],
       ],
 
-      // pick up the rest
       [
         ["2000-01-02 1", false],
         [2000, 1, 2, 1, null, null, null, null, null],
@@ -1376,7 +1327,6 @@ describe("TestDateParse", () => {
         [null, null, 31, 3, 4, 5, null, null, null],
       ],
 
-      // null, space
       [
         ["", false],
         [null, null, null, null, null, null, null, null, null],
@@ -1428,7 +1378,6 @@ describe("TestDateParse", () => {
       const l = `<failed at ${x[0]}>`;
       expect(a, l).toEqual(y);
       if (y[6] != null) {
-        // Ruby also asserts the zone's `encoding`; a JS string has none.
         const h2 = Date._parse(x[0], x[1]);
         // eslint-disable-next-line vitest/no-conditional-expect -- Ruby's `if y[6]` guards it too
         expect(h2.zone, l).toBe(y[6]);
@@ -1438,7 +1387,6 @@ describe("TestDateParse", () => {
 
   it(" parse slash exp", () => {
     const cases: [[string, boolean], (number | null)[]][] = [
-      // little
       [
         ["2/5/1999", false],
         [1999, 5, 2, null, null, null, null, null, null],
@@ -1486,7 +1434,6 @@ describe("TestDateParse", () => {
         [-1999, 5, 2, null, null, null, null, null, null],
       ],
 
-      // big
       [
         ["99/5/2", false],
         [99, 5, 2, null, null, null, null, null, null],
@@ -1666,13 +1613,6 @@ describe("TestDateParse", () => {
     expect(h.offset).toBe(5025);
   });
 
-  /**
-   * Ruby's `EnvUtil.timeout(3)` guards against the quadratic sub-parser walk
-   * the `limit:` here is what makes safe; there is no vitest analogue and the
-   * ported walk is linear, so only the assertions carry over. Ruby's
-   * `Math.log10(h[:year])` is read off the digit count: JS `Math.log10` takes a
-   * number, which this 100_001-digit year is not.
-   */
   it(" parse too long year", () => {
     let str = "Jan 1" + "0".repeat(100_000);
     let h = Date._parse(str, true, { limit: 100_010 });
@@ -1889,7 +1829,6 @@ describe("TestDateParse", () => {
     h = Date._iso8601(null as unknown as string);
     expect(h).toEqual({});
 
-    // See ` rfc2822` below for why the Ruby Symbol is spelled as a non-string.
     expect(() => Date._iso8601(1 as unknown as string)).toThrow(TypeError);
   });
 
@@ -1907,7 +1846,6 @@ describe("TestDateParse", () => {
     h = Date._rfc3339(null as unknown as string);
     expect(h).toEqual({});
 
-    // See ` rfc2822` below for why the Ruby Symbol is spelled as a non-string.
     expect(() => Date._rfc3339(1 as unknown as string)).toThrow(TypeError);
   });
 
@@ -1972,7 +1910,6 @@ describe("TestDateParse", () => {
     h = Date._xmlschema(null as unknown as string);
     expect(h).toEqual({});
 
-    // See ` rfc2822` below for why the Ruby Symbol is spelled as a non-string.
     expect(() => Date._xmlschema(1 as unknown as string)).toThrow(TypeError);
   });
 
@@ -2003,10 +1940,6 @@ describe("TestDateParse", () => {
     h = Date._rfc2822(null as unknown as string);
     expect(h).toEqual({});
 
-    // Ruby hands `_rfc2822` the `Symbol` form of the string, which `StringValue`
-    // in `check_limit` (date_core.c:4468-4479) rejects. A Ruby Symbol is a JS
-    // string here (CLAUDE.md), so the argument that is not a `String` is spelled
-    // as the nearest JS value that is not one.
     expect(() => Date._rfc2822(1 as unknown as string)).toThrow(TypeError);
   });
 
@@ -2028,7 +1961,6 @@ describe("TestDateParse", () => {
     h = Date._httpdate(null as unknown as string);
     expect(h).toEqual({});
 
-    // See ` rfc2822` above for why the Ruby Symbol is spelled as a non-string.
     expect(() => Date._httpdate(1 as unknown as string)).toThrow(TypeError);
   });
 
@@ -2088,7 +2020,6 @@ describe("TestDateParse", () => {
     h = Date._jisx0301(null as unknown as string);
     expect(h).toEqual({});
 
-    // See ` rfc2822` above for why the Ruby Symbol is spelled as a non-string.
     expect(() => Date._jisx0301(1 as unknown as string)).toThrow(TypeError);
   });
 
@@ -2202,11 +2133,6 @@ describe("TestDateParse", () => {
     expect(dtStartOf(Date._jisx0301("R01.05.01T04:05:06+07:00"))).toBe(Date.ITALY + 10);
   });
 
-  /**
-   * Ruby also asserts the argument came back unmutated (`assert_equal(s0, s)`)
-   * after each parse; a JS string is immutable, so those arms read the same
-   * assertion against the untouched local.
-   */
   it("given string", () => {
     let s = "2001-02-03T04:05:06Z";
     let s0 = s;
@@ -2251,10 +2177,6 @@ describe("TestDateParse", () => {
     expect(s).toEqual(s0);
   });
 
-  /**
-   * Ruby's list has no `httpdate` arm at all; the four this port carried were
-   * an over-port, and go here.
-   */
   it("length limit", () => {
     expect(() => Date._parse("1".repeat(1000))).toThrow(ArgumentError);
     expect(() => Date._iso8601("1".repeat(1000))).toThrow(ArgumentError);
@@ -2284,16 +2206,10 @@ describe("TestDateParse", () => {
   });
 });
 
-/**
- * Ruby's `DateTime.parse` before `to_datetime`: `test_parse__2` adds a day
- * fraction to the parsed value with `Date#+`, which only the gem-shaped object
- * carries (RFC 0088's seat answers `Temporal`).
- */
 function dtParse(str: string): DateTime {
   return dtNewByFrags(Date._parse(str));
 }
 
-/** Ruby `begin ... rescue ArgumentError => e`, answering the rescued `e`. */
 function rescueArgumentError(block: () => unknown): unknown {
   try {
     block();
@@ -2304,40 +2220,30 @@ function rescueArgumentError(block: () => unknown): unknown {
   return null;
 }
 
-/** minitest `assert_nothing_raised`, which vitest has no matcher for. */
 function assertNothingRaised<T>(block: () => T): T {
   return block();
 }
 
-/** Ruby `h.values_at(:year, :mon, :mday, :hour, :min, :sec, :offset)`. */
 function ymdhms(h: DateParts): unknown[] {
   return valuesAt(h, "year", "mon", "mday", "hour", "min", "sec", "offset");
 }
 
-/**
- * Ruby asserts `Date::ITALY + 10` came back as the built date's `start`, which
- * only the gem-shaped receiver carries — RFC 0088's statics answer `Temporal`.
- */
 function startOf(h: DateParts): number {
   return dNewByFrags(h, Date.ITALY + 10).start;
 }
 
-/** {@link startOf}, for the `DateTime` arms. */
 function dtStartOf(h: DateParts): number {
   return dtNewByFrags(h, Date.ITALY + 10).start;
 }
 
-/** Ruby `h.values_at(:year, :yday, :hour, :min, :sec, :offset)`. */
 function ydhms(h: DateParts): unknown[] {
   return valuesAt(h, "year", "yday", "hour", "min", "sec", "offset");
 }
 
-/** Ruby `h.values_at(:cwyear, :cweek, :cwday, :hour, :min, :sec, :offset)`. */
 function cwhms(h: DateParts): unknown[] {
   return valuesAt(h, "cwyear", "cweek", "cwday", "hour", "min", "sec", "offset");
 }
 
-/** Ruby `h.values_at(:hour, :min, :sec, :sec_fraction)`. */
 function secFrag(h: DateParts): unknown[] {
   return valuesAt(h, "hour", "min", "sec", "secFraction");
 }

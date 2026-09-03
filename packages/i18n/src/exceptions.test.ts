@@ -1,5 +1,3 @@
-/** Mirrors: i18n/test/i18n/exceptions_test.rb */
-
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -20,7 +18,6 @@ import type { TranslationData } from "./utils.js";
 describe("I18nExceptionsTest", () => {
   let backend: Simple;
 
-  /** Mirrors: `store_translations` in i18n/test/test_helper.rb:40. */
   function storeTranslations(locale: string, data: TranslationData): void {
     backend.storeTranslations(locale, data);
   }
@@ -113,7 +110,6 @@ describe("I18nExceptionsTest", () => {
     expect(new MissingTranslationData("en", "key")).toBeTruthy();
   });
 
-  /** Mirrors: the private helpers at i18n/test/i18n/exceptions_test.rb:80-108. */
   function forceInvalidLocale(block?: (exception: InvalidLocale) => void): void {
     try {
       translate("foo", { locale: null });

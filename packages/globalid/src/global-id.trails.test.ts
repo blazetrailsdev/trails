@@ -4,9 +4,6 @@ import { GlobalID } from "./global-id.js";
 import { Locator } from "./locator.js";
 import { GID } from "./uri/gid.js";
 
-// Members with no dedicated Rails test of their own: GlobalID#deconstruct_keys
-// (delegated to @uri), GlobalID.default_locator, and the private
-// GlobalID.parse_encoded_gid fallback exercised through .parse.
 describe("GlobalID (trails)", () => {
   afterEach(() => {
     _resetApp();
@@ -38,11 +35,6 @@ describe("GlobalID (trails)", () => {
     }
   });
 
-  // `GlobalID#==` compares two `URI::GID`s through `URI::Generic#==`
-  // (uri/generic.rb:1396-1402), which compares `normalize.component_ary`.
-  // `normalize` (uri/generic.rb:1340-1350) downcases the host — `app` — but
-  // nothing else, so `gid://App/Person/1 == gid://app/Person/1` is true in
-  // Ruby while a differing `model_name` case is not.
   it("== normalizes the app before comparing, as URI::Generic#== does", () => {
     expect(GID.parse("gid://App/Person/1").equals(GID.parse("gid://app/Person/1"))).toBe(true);
     expect(

@@ -27,19 +27,11 @@ export interface MigrationRunOptions {
   primaryKeyType?: string;
 }
 
-/**
- * Parse column arguments with modifiers.
- * Supports: name:type, name:type:index, name:type:uniq,
- * name:references{polymorphic}, name:belongs_to{polymorphic},
- * name:string{40}, name:decimal{1,2}, name:string!, name:token,
- * name:index (type defaults to string), name:uniq (type defaults to string)
- */
 function parseColumnsWithModifiers(args: string[]): ParsedColumn[] {
   const columns: ParsedColumn[] = [];
   for (const arg of args) {
     if (arg.startsWith("-")) continue;
 
-    // Handle {polymorphic} modifier on references: user:references{polymorphic}
     const polyMatch = arg.match(/^(\w+):(references|belongs_to)\{polymorphic\}(.*)$/);
     if (polyMatch) {
       const [, name, type, rest] = polyMatch;
@@ -54,7 +46,6 @@ function parseColumnsWithModifiers(args: string[]): ParsedColumn[] {
       continue;
     }
 
-    // Handle attribute options like {40} or {1,2} or {3.4}
     const attrOptsMatch = arg.match(/^(\w+):(\w+!?)\{([^}]+)\}(.*)$/);
     if (attrOptsMatch) {
       const [, name, rawType, opts, rest] = attrOptsMatch;
@@ -70,7 +61,6 @@ function parseColumnsWithModifiers(args: string[]): ParsedColumn[] {
         unique: modifiers.includes("uniq"),
       };
 
-      // Parse {40} as limit, {1,2} or {3.4} as precision,scale
       if (opts.includes(",") || opts.includes(".")) {
         const parts = opts.split(/[,.]/);
         col.precision = parseInt(parts[0], 10);
@@ -87,7 +77,6 @@ function parseColumnsWithModifiers(args: string[]): ParsedColumn[] {
     const [name, rawType, ...modifiers] = parts;
     if (!name) continue;
 
-    // Handle token type specially
     if (rawType === "token") {
       columns.push({
         name,
@@ -99,7 +88,6 @@ function parseColumnsWithModifiers(args: string[]): ParsedColumn[] {
       continue;
     }
 
-    // Handle index/uniq as type (default to string)
     if (rawType === "index" || rawType === "uniq") {
       columns.push({
         name,
@@ -253,7 +241,6 @@ ${body}
   ): string {
     const realColumns = columns.filter((c) => !isVirtual(c.type));
 
-    // CreateUsers -> createTable("users", ...)
     const createMatch = _name.match(/^create[_-]?(.+)$/i);
     if (createMatch) {
       const table = tableize(createMatch[1]);
@@ -268,13 +255,11 @@ ${body}
       return parts.join("\n");
     }
 
-    // JoinTable migration: name contains "join_table" and args are bare column names or col:uniq
     const joinMatch = _name.match(/^(?:add|create)[_-]?(.+)[_-]join[_-]table$/i);
     if (joinMatch) {
       return this.joinTableBody(rawArgs);
     }
 
-    // AddEmailToUsers -> addColumn/addReference
     const addMatch = _name.match(/^add[_-]?(.+?)[_-]?to[_-]?(.+)$/i);
     if (addMatch) {
       const table = tableize(addMatch[2]);
@@ -290,7 +275,6 @@ ${body}
       return idxLines ? `${upLines}\n${idxLines}` : upLines;
     }
 
-    // RemoveEmailFromUsers -> removeColumn/removeReference
     const removeMatch = _name.match(/^remove[_-]?(.+?)[_-]?from[_-]?(.+)$/i);
     if (removeMatch) {
       const table = tableize(removeMatch[2]);
@@ -309,7 +293,6 @@ ${body}
       return rmIdxLines ? `${rmIdxLines}\n${upLines}` : upLines;
     }
 
-    // Default: empty body (Rails uses change with empty body)
     return "";
   }
 

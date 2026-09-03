@@ -1,11 +1,3 @@
-/**
- * ActionDispatch::ActionableExceptions
- *
- * Middleware that dispatches actions defined on actionable errors when the
- * exception page POSTs back to its endpoint. Mirrors Rails'
- * `action_dispatch/middleware/actionable_exceptions.rb` 1:1.
- */
-
 import { ActionableError, cattrAccessor } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
@@ -13,16 +5,6 @@ import { LOCATION } from "../constants.js";
 import { Request } from "../http/request.js";
 
 export class ActionableExceptions {
-  /**
-   * Endpoint that actionable-exception forms POST back to. Declared via
-   * {@link cattrAccessor} to mirror Rails'
-   * `cattr_accessor :endpoint, default: "/rails/actions"`: assignment goes
-   * through a getter/setter pair so apps can swap it via
-   * `ActionableExceptions.endpoint = "..."` (or via Railtie config) instead of
-   * shadowing a plain class field. Rails' `cattr_accessor` stores the value in
-   * a single class variable shared across the hierarchy, so subclass writes
-   * mutate the same slot — `cattrAccessor` matches that semantics.
-   */
   static endpoint: string;
 
   private app: RackApp;

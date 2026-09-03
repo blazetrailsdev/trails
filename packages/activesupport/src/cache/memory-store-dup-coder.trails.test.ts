@@ -2,9 +2,6 @@ import { describe, expect, it } from "vitest";
 import { DupCoder, MemoryStore } from "./memory-store.js";
 import { Entry } from "./entry.js";
 
-// trails-only coverage for `ActiveSupport::Cache::MemoryStore::DupCoder`
-// (memory_store.rb:29-70), which Rails exercises only indirectly through the
-// shared cache-store behaviour suites.
 describe("DupCoder", () => {
   it("deep-clones plain objects", () => {
     const obj = { a: { b: 1 }, c: [2, 3] };

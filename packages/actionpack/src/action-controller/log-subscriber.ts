@@ -1,11 +1,3 @@
-/**
- * ActionController::LogSubscriber
- *
- * Log formatting for controller actions. Subscribes to
- * ActiveSupport::Notifications events.
- * @see https://api.rubyonrails.org/classes/ActionController/LogSubscriber.html
- */
-
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
@@ -26,17 +18,12 @@ import {
 const INTERNAL_PARAMS = ["controller", "action", "format", "_method", "only_path"];
 
 export class LogSubscriber extends BaseLogSubscriber {
-  /** Rails `ActionController::LogSubscriber#logger` — delegates to `Base.logger`. @internal */
+  /** @internal */
   override get logger() {
     return LogSubscriber.logger;
   }
 
-  /**
-   * `ActionController::LogSubscriber#start_processing`
-   * (`vendor/rails/actionpack/lib/action_controller/log_subscriber.rb:9-27`).
-   *
-   * @missingRailsArgs each_pair — PERMANENT
-   */
+  /** @missingRailsArgs each_pair — PERMANENT */
   startProcessing(event: Event): void {
     if (!this.logger?.["info?"]) return;
 
@@ -58,15 +45,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     if (!isEmpty(params)) this._info(`  Parameters: ${inspect(params)}`);
   }
 
-  /**
-   * `ActionController::LogSubscriber#process_action`
-   * (`vendor/rails/actionpack/lib/action_controller/log_subscriber.rb:26-44`).
-   *
-   * `defined?(Rails.env)` (`:40`) is the constant check for a booted app, which
-   * outside one is absent; its JS reading is the `Trails` global.
-   *
-   * @missingRailsArgs round — PERMANENT
-   */
+  /** @missingRailsArgs round — PERMANENT */
   processAction(event: Event): void {
     this._info(() => {
       const payload = event.payload as {
@@ -138,8 +117,6 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 }
 
-// "action_controller" is the AS::Notifications channel identifier, which uses
-// Rails snake_case naming conventions as a cross-package wire protocol.
 LogSubscriber.subscribeLogLevel("start_processing", "info");
 LogSubscriber.subscribeLogLevel("process_action", "info");
 LogSubscriber.subscribeLogLevel("halted_callback", "info");

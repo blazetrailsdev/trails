@@ -43,12 +43,6 @@ import {
   setBeginningOfWeek,
 } from "../date/calculations.js";
 
-/**
- * Mirrors `DateAndTimeBehavior`'s `date_time_init` hook
- * (`date_ext_test.rb` builds a `Date`, `time_ext_test.rb` a `Time`): every case
- * below runs against both receivers, as Rails does by mixing the module into
- * both test classes.
- */
 function dateTimeInit(
   year: number,
   month: number,
@@ -64,13 +58,8 @@ function dateTimeInit(
   };
 }
 
-/** Rails' `Rational(999999999, 1000)` usec — the last instant of a second. */
 const LAST_USEC = 999999999 / 1000;
 
-/**
- * Mirrors `DateAndTimeBehavior`'s `with_bw_default`
- * (`date_and_time_behavior.rb:355-361`).
- */
 function withBwDefault(bw: string, block: () => void): void {
   const oldBw = dateBeginningOfWeek();
   setBeginningOfWeek(bw);
@@ -225,7 +214,7 @@ describe("DateAndTimeBehavior", () => {
     for (const [fy, fm, fd, years, y, m, d] of [
       [2005, 6, 5, 1, 2004, 6, 5],
       [2005, 6, 5, 7, 1998, 6, 5],
-      [2004, 2, 29, 1, 2003, 2, 28], // 1 year ago from leap day
+      [2004, 2, 29, 1, 2003, 2, 28],
     ]) {
       const from = dateTimeInit(fy, fm, fd, 10, 10, 10);
       expectSame(
@@ -239,7 +228,7 @@ describe("DateAndTimeBehavior", () => {
     for (const [fy, fm, fd, years, y, m, d] of [
       [2005, 6, 5, 1, 2006, 6, 5],
       [2005, 6, 5, 7, 2012, 6, 5],
-      [2004, 2, 29, 1, 2005, 2, 28], // 1 year since leap day
+      [2004, 2, 29, 1, 2005, 2, 28],
       [2005, 6, 5, 177, 2182, 6, 5],
     ]) {
       const from = dateTimeInit(fy, fm, fd, 10, 10, 10);
@@ -605,7 +594,6 @@ describe("DateAndTimeBehavior", () => {
       { date: beginningOfWeek(feb.date), time: beginningOfWeek(feb.time) },
       dateTimeInit(2005, 1, 31, 0, 0, 0),
     );
-    // monday through sunday all answer the same monday
     for (const [m, d] of [
       [11, 28],
       [11, 29],

@@ -1,9 +1,3 @@
-/**
- * ActionController redirect helpers.
- *
- * Generates redirect responses with appropriate status codes and headers.
- */
-
 export interface RedirectResult {
   status: number;
   location: string;
@@ -52,11 +46,9 @@ export function redirectBack(options: {
 }
 
 function sanitizeUrl(url: string): string {
-  // Block header injection
   if (url.includes("\r") || url.includes("\n")) {
     throw new Error("Invalid redirect URL: contains header break characters");
   }
-  // Block null bytes
   if (url.includes("\0")) {
     throw new Error("Invalid redirect URL: contains null bytes");
   }

@@ -2,12 +2,8 @@ import { describe, expect, it } from "vitest";
 import { toF, toI } from "./string/conversions.js";
 import { toD } from "./big-decimal/conversions.js";
 
-// Ruby core conversions with no Rails `.rb` to mirror, so no Rails test names
-// them. Every expectation below is MRI 3.3 output.
 describe("StringCoreConversions", () => {
   it("to_i takes the leading integer", () => {
-    // ruby -e 'p "".to_i, "  42abc".to_i, "0x1f".to_i, "1_000".to_i, "+3".to_i,
-    //           "12e3".to_i, " -5".to_i, "-  5".to_i, "1__0".to_i'
     expect(toI("")).toBe(0);
     expect(toI("  42abc")).toBe(42);
     expect(toI("0x1f")).toBe(0);
@@ -20,8 +16,6 @@ describe("StringCoreConversions", () => {
   });
 
   it("to_f takes the leading float", () => {
-    // ruby -e 'p "123,003".to_f, "abc".to_f, ".5".to_f, "5.".to_f, "1e".to_f,
-    //           "12e3".to_f, "1_0.5_5".to_f, "0x10".to_f'
     expect(toF("123,003")).toBe(123.0);
     expect(toF("abc")).toBe(0.0);
     expect(toF(".5")).toBe(0.5);
@@ -33,9 +27,6 @@ describe("StringCoreConversions", () => {
   });
 
   it("to_d interprets the leading numeric prefix loosely", () => {
-    // ruby -rbigdecimal/util -e 'p "123,003".to_d.to_s, "".to_d.to_s,
-    //   "1_000.5".to_d.to_s, "  12abc".to_d.to_s, "12e3".to_d.to_s,
-    //   "-.5".to_d.to_s, "45.67 degrees".to_d.to_s'
     expect(toD("123,003").toString("E")).toBe("0.123e3");
     expect(toD("").toString("E")).toBe("0.0");
     expect(toD("1_000.5").toString("E")).toBe("0.10005e4");

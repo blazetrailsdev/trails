@@ -63,7 +63,6 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   });
 
   it("image path does not include failures text if test skipped", () => {
-    // skipped = not failed; _testFailed stays false
     expect(imagePath.call(host)).toMatch(/tmp\/screenshots\/0_x\.png$/);
     expect(htmlPath.call(host)).toMatch(/tmp\/screenshots\/0_x\.html$/);
   });
@@ -164,7 +163,6 @@ describe("ActionDispatch::SystemTesting::TestHelpers::ScreenshotHelper", () => {
   });
 
   it("image path returns the absolute path from root", () => {
-    // imagePath is constructed from projectRoot() (process.cwd())
     const path = imagePath.call(host);
     expect(path).toContain("tmp/screenshots");
     expect(path).toMatch(/tmp\/screenshots\/0_x\.png$/);

@@ -1,12 +1,4 @@
-/**
- * Rack-style HTTP status name → numeric code lookup, shared by Metal,
- * its rendering privates, and head(). Lives in its own module so the
- * helpers in `metal/rendering.ts` can resolve status symbols without
- * importing `Metal` (which would create an ESM cycle: `metal.ts` ↔
- * `metal/rendering.ts`).
- *
- * @internal
- */
+/** @internal */
 
 export const STATUS_CODES: Record<string, number> = {
   ok: 200,

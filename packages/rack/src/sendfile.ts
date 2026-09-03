@@ -25,7 +25,6 @@ export class Sendfile {
         const url = this.mapAccelPath(env, path);
         if (url != null) {
           headers["content-length"] = "0";
-          // '?' must be percent-encoded because it is not query string but a part of path
           headers[type.toLowerCase()] = escapePath(url).replace(/\?/g, "%3F");
           const obody = body;
           if (typeof obody.close === "function") obody.close();
@@ -41,7 +40,7 @@ export class Sendfile {
         if (typeof obody.close === "function") obody.close();
         response[2] = [];
       } else if (type === "" || type == null) {
-        // Rails' `when '', nil` arm is empty (`rack/sendfile.rb:138`).
+        /** @empty */
       } else {
         env[RACK_ERRORS].puts(`Unknown x-sendfile variation: "${type}"`);
       }

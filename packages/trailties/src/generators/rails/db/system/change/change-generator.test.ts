@@ -148,9 +148,6 @@ describe("ChangeGeneratorTest", () => {
   });
 
   it("editDockerfile prefers longest-match alternation", () => {
-    // sqlite's build list ("build-essential git") is a prefix of pg's
-    // ("build-essential git libpq-dev"); first-match alternation would
-    // truncate. Verify the full line is replaced.
     write("Dockerfile", "RUN apt-get install -y build-essential git libpq-dev\n");
     run("mysql");
     expect(read("Dockerfile")).toBe(
@@ -159,8 +156,6 @@ describe("ChangeGeneratorTest", () => {
   });
 
   it("editDockerfile does not match inside a longer word token", () => {
-    // \b boundaries (mirroring Rails change_generator.rb) prevent matching
-    // when a canonical token is the prefix of a longer word like "gitlab-cli".
     write("Dockerfile", "RUN apt-get install -y build-essential gitlab-cli\n");
     run("postgresql");
     expect(read("Dockerfile")).toBe("RUN apt-get install -y build-essential gitlab-cli\n");
@@ -259,7 +254,6 @@ describe("ChangeGeneratorTest", () => {
 
     it("non-DB depends_on entries are preserved when swapping database", () => {
       seedDevcontainer("postgres", true);
-      // Inject non-DB depends_on entries that the devcontainer generator may add.
       const composePath = ".devcontainer/compose.yaml";
       const compose = JSON.parse(read(composePath)) as {
         services: Record<string, { depends_on?: string[]; [k: string]: unknown }>;

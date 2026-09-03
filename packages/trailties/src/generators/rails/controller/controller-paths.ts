@@ -69,8 +69,6 @@ export function emitControllerClass(opts: EmitControllerClassOpts): string {
     extendsRef = opts.parent.ref;
     if (opts.parent.import) imports.push(opts.parent.import);
   } else {
-    // ActionController.Base — render as dotted access; cover the namespace
-    // import explicitly so auto-collect does not produce a broken import.
     extendsRef = ref("ActionController.Base");
     imports.push({ from: ACTIONPACK, named: { ActionController: "named" } });
   }

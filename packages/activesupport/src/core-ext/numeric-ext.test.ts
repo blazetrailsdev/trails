@@ -21,21 +21,18 @@ describe("NumericExtTimeAndDateTimeTest", () => {
   });
 
   it("irregular durations", () => {
-    const now = new Date(2005, 1, 10, 15, 30, 45); // Feb 10 2005
+    const now = new Date(2005, 1, 10, 15, 30, 45);
     const in3000days = Duration.days(3000).since(now);
     expect(asDate(in3000days).getDate()).toBeGreaterThan(0);
-    // 1 month since Feb → March (month index 2)
     const in1month = Duration.months(1).since(now);
-    expect(asDate(in1month).getMonth()).toBe(2); // March (0-indexed)
-    // until = ago — 1 month before Feb → January (month index 0)
+    expect(asDate(in1month).getMonth()).toBe(2);
     const minus1month = Duration.months(1).until(now);
-    expect(asDate(minus1month).getMonth()).toBe(0); // January
+    expect(asDate(minus1month).getMonth()).toBe(0);
   });
 
   it("duration addition", () => {
     const now = new Date(2005, 1, 10, 15, 30, 45);
     const combined = Duration.days(1).plus(Duration.months(1)).since(now);
-    // advance day 1 then month 1
     const expected = new Date(now);
     expected.setDate(expected.getDate() + 1);
     expected.setMonth(expected.getMonth() + 1);
@@ -62,7 +59,6 @@ describe("NumericExtTimeAndDateTimeTest", () => {
   });
 
   it("duration after conversion is no longer accurate", () => {
-    // After converting to seconds, months/years lose calendar semantics
     const secPerMonth = Math.round(Duration.months(1).inSeconds());
     expect(secPerMonth).toBeGreaterThan(2500000);
   });
@@ -71,8 +67,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     const leapDay = new Date(2004, 1, 29, 15, 15, 10);
     const result = Duration.years(1).since(leapDay);
     expect(asDate(result).getFullYear()).toBe(2005);
-    // JS behavior: setFullYear(2005) on Feb 29 overflows to Mar 1
-    expect(asDate(result).getMonth()).toBe(2); // Mar (0-indexed), overflowed from Feb 29
+    expect(asDate(result).getMonth()).toBe(2);
   });
 
   it("in milliseconds", () => {
@@ -82,12 +77,12 @@ describe("NumericExtTimeAndDateTimeTest", () => {
 
 describe("NumericExtDateTest", () => {
   it("date plus duration", () => {
-    const today = new Date(2005, 1, 10); // Feb 10 2005
+    const today = new Date(2005, 1, 10);
     const plus1day = Duration.days(1).since(today);
     expect(asDate(plus1day).getDate()).toBe(11);
 
     const plus1month = Duration.months(1).since(today);
-    expect(asDate(plus1month).getMonth()).toBe(2); // March
+    expect(asDate(plus1month).getMonth()).toBe(2);
 
     const plus1sec = Duration.seconds(1).since(today);
     expect(plus1sec.epochMilliseconds).toBe(today.getTime() + 1000);

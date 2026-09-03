@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 
 describe("KernelTest", () => {
   it("silence warnings", () => {
-    // In JS we can suppress console.warn
     const original = console.warn;
     const captured: string[] = [];
     console.warn = (...args: unknown[]) => {
@@ -14,7 +13,6 @@ describe("KernelTest", () => {
   });
 
   it("silence warnings verbose invariant", () => {
-    // Silencing does not affect non-warning output
     const original = console.log;
     let called = false;
     console.log = () => {
@@ -26,7 +24,6 @@ describe("KernelTest", () => {
   });
 
   it("enable warnings", () => {
-    // After re-enabling, warnings are captured again
     const captured: string[] = [];
     const original = console.warn;
     console.warn = (...args: unknown[]) => captured.push(args.join(" "));
@@ -40,7 +37,6 @@ describe("KernelTest", () => {
   });
 
   it("class eval", () => {
-    // Dynamic class method access
     class Foo {
       greet() {
         return "hello";
@@ -66,7 +62,6 @@ describe("KernelSuppressTest", () => {
 
   it("reraise", () => {
     const suppresser = suppress(TypeError);
-    // A non-suppressed error should rethrow
     expect(() =>
       suppresser(() => {
         throw new RangeError("boom");
@@ -76,7 +71,6 @@ describe("KernelSuppressTest", () => {
 
   it("suppression", () => {
     const suppresser = suppress(Error);
-    // A suppressed error should be swallowed
     expect(() =>
       suppresser(() => {
         throw new Error("suppressed");

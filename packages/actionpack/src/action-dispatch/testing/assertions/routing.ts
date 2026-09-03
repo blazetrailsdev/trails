@@ -1,11 +1,3 @@
-/**
- * ActionDispatch::Assertions::RoutingAssertions — `this`-typed port of
- * Rails' `assertions/routing.rb`. Class-level `with_routing` (via
- * Minitest setup/teardown) and the `WithIntegrationRouting` flavour are
- * deferred until integration-session cloning is ported; Ruby's
- * `method_missing` named-route forwarding has no TS equivalent.
- */
-
 import { deleteIf, hasKey } from "@blazetrails/ruby-compat";
 import { RouteSet } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
@@ -23,21 +15,12 @@ export interface PathWithMethod {
 
 type Options = Record<string, unknown>;
 
-/** Mirrors Rails' `%r{://}` test for "is this a full URL, not a path?" */
 const URL_FORM_RE = /:\/\//;
 
-/** Initialises `@routes`. Mirrors Rails' `setup`. Call from your own setup. */
 export function setup(this: RoutingAssertionsHost): void {
   if (this.routes == null) this.routes = undefined;
 }
 
-/**
- * Temporarily replaces `this.routes` with a fresh RouteSet, yields it to
- * `block`, and restores the previous routes (and controller) on exit.
- * Mirrors Rails' instance-level `with_routing`. `config` is accepted for
- * parity and forwarded to `createRoutes` (Rails passes it to
- * `RouteSet.new`, which trails doesn't yet wire).
- */
 export function withRouting<T>(
   this: RoutingAssertionsHost,
   config: unknown,
@@ -56,10 +39,6 @@ export function withRouting<T>(
   }
   const oldRoutes = this.routes;
   const oldController = this.controller;
-  // Mirrors Ruby's `ensure`: cleanup runs after the block's work has
-  // completed. For sync blocks that's the synchronous return; for
-  // Promise-returning blocks we defer until the promise settles so the
-  // temporary RouteSet stays installed across `await` points.
   const restore = () => resetRoutes.call(this, oldRoutes, oldController);
   let result: T;
   try {
@@ -72,13 +51,7 @@ export function withRouting<T>(
     restore();
     throw e;
   }
-  // Treat anything thenable as async (matches the check used in url-for.ts)
-  // so cross-realm promises and library thenables don't fall through to the
-  // synchronous restore path before their awaited work runs.
   if (result != null && typeof (result as { then?: unknown }).then === "function") {
-    // Wrap the .then() call so a thenable that throws synchronously from
-    // its then() still triggers restore — otherwise the temp RouteSet
-    // would leak across tests.
     try {
       return (result as unknown as PromiseLike<unknown>).then(
         (v) => {
@@ -99,7 +72,6 @@ export function withRouting<T>(
   return result;
 }
 
-/** Asserts that `path` recognizes to `expectedOptions`. */
 export function assertRecognizes(
   this: RoutingAssertionsHost,
   expectedOptions: Options,
@@ -124,7 +96,6 @@ export function assertRecognizes(
   }
 }
 
-/** Inverse of `assertRecognizes`. */
 export function assertGenerates(
   this: RoutingAssertionsHost,
   expectedPath: string,
@@ -135,9 +106,6 @@ export function assertGenerates(
 ): void {
   let path: string;
   if (URL_FORM_RE.test(expectedPath)) {
-    // Rails: `URI.parse(expected_path).path` (falls back to "/" when empty).
-    // Ruby's URI accepts relative inputs that contain `://` (e.g. inside a
-    // query string), so use a base URL when WHATWG's absolute parse fails.
     path = failOn(TypeError, message, () => {
       let parsed: URL;
       try {
@@ -153,8 +121,6 @@ export function assertGenerates(
   const routes = requireRoutes(this);
   const opts = { ...options };
   const [generatedPath, queryStringKeys] = routes.generateExtras(opts, defaults);
-  // Null-prototype map so an extra key named `__proto__` becomes an own
-  // property rather than hitting the inherited setter.
   const foundExtras: Options = Object.create(null);
   for (const k of queryStringKeys) {
     if (Object.hasOwn(opts, k)) foundExtras[k] = opts[k];
@@ -167,7 +133,6 @@ export function assertGenerates(
   }
 }
 
-/** Combined `assertRecognizes` + `assertGenerates`. */
 export function assertRouting(
   this: RoutingAssertionsHost,
   path: string | PathWithMethod,
@@ -204,11 +169,6 @@ export function recognizedRequestFor(
 
   const request = new TestRequest();
   if (URL_FORM_RE.test(pathStr)) {
-    // Rails uses Ruby's `URI.parse`, which is more permissive than
-    // WHATWG `URL`: a relative path that happens to contain `://` (e.g.
-    // `/items?next=http://example.com`) parses to a `URI::Generic` with
-    // no scheme/host/port. Mirror that by attempting an absolute parse
-    // first and falling back to a base URL when WHATWG rejects the input.
     let parsed: URL;
     let isAbsolute = true;
     try {
@@ -222,10 +182,6 @@ export function recognizedRequestFor(
       request.env["rack.url_scheme"] = scheme;
       if (parsed.host) request.env["HTTP_HOST"] = parsed.host;
       if (parsed.hostname) request.env["SERVER_NAME"] = parsed.hostname;
-      // Rails: `request.port = uri.port if uri.port`. Ruby's URI yields
-      // the default port for known schemes (80/443) and nil otherwise.
-      // WHATWG URL returns "" for default ports, so reapply defaults for
-      // http/https only and leave SERVER_PORT alone for other schemes.
       if (parsed.port) {
         request.env["SERVER_PORT"] = parsed.port;
       } else if (scheme === "https") {
@@ -248,7 +204,7 @@ export function recognizedRequestFor(
   return request;
 }
 
-/** @internal Mirrors Rails' private `create_routes`. */
+/** @internal */
 export function createRoutes<T>(
   this: RoutingAssertionsHost,
   block: (routes: RouteSet) => T,
@@ -257,14 +213,10 @@ export function createRoutes<T>(
 ): T {
   const routes = new RouteSet();
   this.routes = routes;
-  // Rails additionally clones `@controller` and mixes in `_routes.url_helpers`
-  // (and `view_context_class`). That depends on singleton-class re-opening
-  // which has no direct TS equivalent; consumers that need helpers on the
-  // controller assign them explicitly.
   return block(routes);
 }
 
-/** @internal Mirrors Rails' private `reset_routes`. */
+/** @internal */
 export function resetRoutes(
   this: RoutingAssertionsHost,
   oldRoutes: RouteSet | undefined,
@@ -274,11 +226,7 @@ export function resetRoutes(
   if (this.controller != null) this.controller = oldController;
 }
 
-/**
- * @internal Mirrors Rails' private `fail_on`. Runs `block`; if it throws
- * an instance of `ExceptionClass`, re-raises as an assertion error with
- * the caller-supplied `message` (or the original message when omitted).
- */
+/** @internal */
 export function failOn<T>(
   exceptionClass: new (...args: never[]) => Error,
   message: string | undefined,
@@ -302,10 +250,6 @@ function requireRoutes(host: RoutingAssertionsHost): RouteSet {
 }
 
 function deepEqual(a: unknown, b: unknown): boolean {
-  // Strict value comparison. Rails' `assert_recognizes` stringifies expected
-  // option *keys* (`expected_options.stringify_keys!`) only; values in
-  // `request.path_parameters` are URL-decoded strings, so an expected
-  // `id: 1` is meant to fail against actual `id: "1"`.
   if (Object.is(a, b)) return true;
   if (a === null || b === null || typeof a !== "object" || typeof b !== "object") return false;
   if (Array.isArray(a) !== Array.isArray(b)) return false;

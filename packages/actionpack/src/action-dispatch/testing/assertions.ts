@@ -1,15 +1,3 @@
-/**
- * ActionDispatch::Assertions — aggregator mirroring
- * `action_dispatch/testing/assertions.rb`. Rails includes
- * ResponseAssertions + RoutingAssertions + Rails::Dom::Testing::Assertions
- * into the host test class; trails re-exports their helpers here as
- * `this`-typed functions so parity:api sees the full mixed-in surface
- * on this file.
- *
- * The HTML branch of `htmlDocument` (rails-dom-testing) remains deferred.
- * The XML branch is wired via `@blazetrails/nokogiri`.
- */
-
 import { XML } from "@blazetrails/nokogiri";
 import * as response from "./assertions/response.js";
 import * as routing from "./assertions/routing.js";
@@ -29,7 +17,6 @@ export type { AssertionResponseHost, AssertionResponseLike } from "./assertions/
 
 export type { RoutingAssertionsHost, PathWithMethod } from "./assertions/routing.js";
 
-// Response assertions
 export const assertResponse = response.assertResponse;
 export const assertRedirectedTo = response.assertRedirectedTo;
 /** @internal */
@@ -47,7 +34,6 @@ export const locationIfRedirected = response.locationIfRedirected;
 /** @internal */
 export const codeWithName = response.codeWithName;
 
-// Routing assertions
 export const setup = routing.setup;
 export const withRouting = routing.withRouting;
 export const assertRecognizes = routing.assertRecognizes;

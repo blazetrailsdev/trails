@@ -1,5 +1,3 @@
-// Oracle values computed via Ruby 3.3 did_you_mean's
-// DidYouMean::Jaro.distance and DidYouMean::JaroWinkler.distance.
 import { describe, it, expect } from "vitest";
 import { Jaro, JaroWinkler } from "./jaro-winkler.js";
 
@@ -50,7 +48,6 @@ describe("JaroWinkler.distance", () => {
   it("equals Jaro distance when Jaro <= 0.7", () => {
     expect(JaroWinkler.distance("foo", "qux")).toBe(0);
     close(JaroWinkler.distance("kitten", "sitting"), 0.746031746031746);
-    // kitten/sitting share no prefix, so JW == Jaro even above the threshold.
   });
 
   it("applies a prefix bonus when Jaro > 0.7", () => {
@@ -65,7 +62,6 @@ describe("JaroWinkler.distance", () => {
   });
 
   it("caps prefix bonus at 4 codepoints", () => {
-    // JELLYFISH/SMELLYFISH share no common prefix → no bonus.
     close(JaroWinkler.distance("JELLYFISH", "SMELLYFISH"), 0.8962962962962963);
   });
 });

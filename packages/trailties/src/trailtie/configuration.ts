@@ -1,12 +1,3 @@
-/**
- * Port of `Rails::Railtie::Configuration` from
- * `railties/lib/rails/railtie/configuration.rb`. Holds the shared config
- * accessed via `Trailtie.config`. Lifecycle hooks are stored on a
- * class-side registry — Rails routes them through `ActiveSupport.on_load`
- * with `yield: true`; a direct class-side array matches the observable
- * behavior without coupling to a hook surface that doesn't expose that
- * semantic yet.
- */
 import { NoMethodError } from "@blazetrails/ruby-compat";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
@@ -21,7 +12,7 @@ const LIFECYCLE_HOOKS = [
 export type LifecycleHook = (typeof LIFECYCLE_HOOKS)[number];
 
 export class Configuration {
-  /** @internal Rails `@@eager_load_namespaces` (`railtie/configuration.rb:17-20`). */
+  /** @internal */
   static readonly _eagerLoadNamespaces: unknown[] = [];
   /** @internal */
   static readonly _watchableFiles: string[] = [];
@@ -29,7 +20,7 @@ export class Configuration {
   static readonly _watchableDirs: Record<string, string[]> = {};
   /** @internal */
   static readonly _toPrepareBlocks: ConfigurationBlock[] = [];
-  /** @internal Per-hook block registries shared across subclasses. */
+  /** @internal */
   static readonly _lifecycleBlocks: Record<LifecycleHook, ConfigurationBlock[]> = {
     beforeConfiguration: [],
     beforeInitialize: [],
@@ -38,11 +29,7 @@ export class Configuration {
     afterRoutesLoaded: [],
   };
 
-  /** @internal Rails' `@@options` (`railtie/configuration.rb:96-108`) — a class
-   * variable, so every `Railtie::Configuration` instance reads and writes the
-   * same hash. That sharing is what lets a framework railtie seed
-   * `config.active_record` in its class body and the application read it back
-   * off its own `config`. */
+  /** @internal */
   private static readonly _options: Record<string, unknown> = {};
 
   get eagerLoadNamespaces(): unknown[] {
@@ -103,9 +90,6 @@ export class Configuration {
     return LIFECYCLE_HOOKS;
   }
 
-  /** Stubs for `Configuration#appMiddleware` / `appGenerators` — wired
-   * when actionpack ships `MiddlewareStackProxy` and the generators
-   * config surface lands. Returning `undefined` keeps the gap loud. */
   appMiddleware(): undefined {
     return undefined;
   }
@@ -113,15 +97,10 @@ export class Configuration {
     return undefined;
   }
 
-  /** Free-form option bag (mirrors Ruby `method_missing` get/set). */
   get(key: string): unknown {
     return Configuration._options[key];
   }
 
-  /**
-   * Mirrors `method_missing`'s setter arm (`railtie/configuration.rb:99-105`),
-   * including its refusal to shadow a real configuration method.
-   */
   set(key: string, value: unknown): void {
     if (this._actualMethod(key)) {
       throw new NoMethodError(`Cannot assign to \`${key}\`, it is a configuration method`);
@@ -129,14 +108,6 @@ export class Configuration {
     Configuration._options[key] = value;
   }
 
-  /**
-   * Mirrors `respond_to?` (`railtie/configuration.rb:90-92`). Ruby's `super` is
-   * `Object#respond_to?`, which answers for public METHODS: not for an ivar
-   * like `@@options`, and not for private methods, since `include_private`
-   * defaults to false. A TS instance field is the ivar analogue, so only the
-   * prototype chain is walked, and a leading underscore is trails' spelling of
-   * Ruby `private`.
-   */
   respondTo(key: string): boolean {
     if (!key.startsWith("_")) {
       for (let proto = Object.getPrototypeOf(this); proto; proto = Object.getPrototypeOf(proto)) {
@@ -146,7 +117,6 @@ export class Configuration {
     return Object.prototype.hasOwnProperty.call(Configuration._options, key);
   }
 
-  /** Mirrors the private `actual_method?` (`railtie/configuration.rb:95-97`). */
   private _actualMethod(key: string): boolean {
     return (
       !Object.prototype.hasOwnProperty.call(Configuration._options, key) && this.respondTo(key)

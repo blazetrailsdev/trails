@@ -7,7 +7,6 @@ export interface DumpColumnSchema {
 }
 export type SchemaColumnsByTable = Record<string, Record<string, DumpColumnSchema>>;
 
-// Rails default PK is bigint (Rails 5.1+).
 const DEFAULT_PK_TYPE = "bigint";
 
 export function strLiteral(node: ts.Node | undefined): string | undefined {
@@ -91,8 +90,6 @@ function parseColumnStatement(stmt: ts.Statement): { colName: string; col: DumpC
 
   const args = call.arguments;
 
-  // checkConstraint is emitted inside the createTable block by SchemaDumper
-  // (schema-dumper.ts:820) but is not a column — skip it explicitly.
   if (method === "checkConstraint") return [];
 
   if (method === "timestamps") {

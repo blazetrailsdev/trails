@@ -9,7 +9,6 @@ import { Verifier } from "@blazetrails/globalid";
 
 const SECRET_KEY_BASE = "x".repeat(30);
 
-/** Stands in for Rails' `BlogApp::Application`, which the Ruby test boots. */
 function blogApp(
   secretKeyBase: string | null = SECRET_KEY_BASE,
 ): TrailtieApp & { config: { globalId: GlobalIdConfig } } {
@@ -27,8 +26,6 @@ function blogApp(
   };
 }
 
-/** Rails' `@app.initialize!` — the `global_id` initializer, then the
- * `after_initialize` block it registers. */
 function initializeApp(app: TrailtieApp): void {
   Trailtie.initialize(app);
   runLoadHooks("after_initialize", app);

@@ -12,12 +12,7 @@ import { getCrypto } from "@blazetrails/ruby-compat";
 
 import { includeContent as _includeContent } from "./head.js";
 
-/**
- * Rails `Head#include_content?` — re-exposed because `ConditionalGet`
- * includes `Head`, so the predicate is part of its mixed-in surface.
- *
- * @internal
- */
+/** @internal */
 export function includeContent(status: number): boolean {
   return _includeContent(status);
 }
@@ -104,7 +99,7 @@ export function httpCacheForever(
   block?: () => void,
 ): void {
   const cc = buildCacheControl({
-    maxAge: 100 * 365.25 * 24 * 60 * 60, // 100 years in seconds
+    maxAge: 100 * 365.25 * 24 * 60 * 60,
     public: options.public ?? false,
     immutable: true,
   });
@@ -128,35 +123,11 @@ export function getEtaggers(): ReadonlyArray<Etagger> {
   return _etaggers;
 }
 
-/** Clear the registered etaggers. Test seam; mirrors `clearDefaultHeaders`. */
 export function clearEtaggers(): void {
   _etaggers.length = 0;
 }
 
-/**
- * Mirrors Rails:
- *   def combine_etags(validator, options)
- *     [validator, *etaggers.map { |etagger| instance_exec(options, &etagger) }].compact
- *   end
- *
- * Ruby's `compact` only drops nil — it keeps `false`, `0`, `""`. We match that
- * with `!= null` (drops null/undefined only) rather than `.filter(Boolean)`,
- * which would also drop empty strings and zeros.
- *
- * Rails etaggers can return any object (template digest, model record,
- * arbitrary marker) — `response.weak_etag=` / `strong_etag=` serialize the
- * resulting array. So both validator and the result are typed as `unknown`,
- * not `string`, to keep the door open for parity etaggers like
- * `etag_with_template_digest`.
- *
- * Rails uses `instance_exec(options, &etagger)` so the etagger block runs
- * with the controller as `self`. We mirror that by accepting the controller
- * via `this` and dispatching with `etagger.call(this, options)`. Callers
- * (e.g. `freshWhen`) bind `this` to the controller; tests bind to a stub or
- * leave it `undefined`.
- *
- * @internal
- */
+/** @internal */
 export function combineEtags(
   this: unknown,
   validator: unknown,

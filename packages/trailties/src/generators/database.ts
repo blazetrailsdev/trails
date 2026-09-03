@@ -1,10 +1,3 @@
-// Mirrors railties/lib/rails/generators/database.rb. Ports the Database
-// class hierarchy with npm-flavored substitutions (Rails `gem` →
-// `pkgDependency`, base/build packages map to apt packages used in the
-// Dockerfile template). Trilogy is intentionally omitted — it's a
-// Ruby-only mysql driver with no Node equivalent — so the set here is
-// mysql / postgresql / sqlite3 plus the MariaDB-via-mysql2 variant.
-
 export const DATABASES = ["mysql", "postgresql", "sqlite3", "mariadb-mysql"] as const;
 export type DatabaseName = (typeof DATABASES)[number];
 
@@ -22,15 +15,6 @@ export interface DockerService {
 }
 
 export abstract class Database {
-  /**
-   * Service/volume identifier — mirrors Rails `Database#name` in
-   * railties/lib/rails/generators/database.rb. This is NOT the same as
-   * the `Database.build` argument or `DatabaseName`: Rails deliberately
-   * exposes `"postgres"` (not `"postgresql"`) so the Docker volume,
-   * service image, and devcontainer feature share an identifier, while
-   * the MariaDB variant surfaces `"mariadb"`. Use `Database.build(name)`
-   * for the adapter id; use `db.name` for service-layer identity.
-   */
   abstract readonly name: string;
   abstract readonly template: string;
   abstract readonly pkgDependency: PkgDependency;

@@ -15,7 +15,7 @@ describe("CLI", () => {
     try {
       program.parse(["node", "trails", "--version"]);
     } catch (e: any) {
-      // commander throws on --version
+      /** @empty */
     }
     expect(output.trim()).toBe(VERSION);
   });

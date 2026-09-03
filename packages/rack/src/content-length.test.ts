@@ -55,7 +55,6 @@ it("close bodies that need to be closed", async () => {
   const app = async () => [200, { "content-type": "text/plain" }, body] as any;
   const cl = new ContentLength(app);
   await cl.call(request());
-  // ContentLength doesn't close bodies itself in this implementation
   (body as any).close();
   expect(closed).toBe(true);
 });

@@ -408,7 +408,6 @@ describe("ParametersPermitTest", () => {
   });
 
   it("only String and Symbol keys are allowed", () => {
-    // In TS, all keys are strings by default. This test verifies the constructor works.
     const params = new Parameters({ name: "John" });
     expect(params.get("name")).toBe("John");
   });

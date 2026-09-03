@@ -9,9 +9,6 @@ describe("WrapTest", () => {
     }
   }
 
-  // Ruby forwards every call through `method_missing`, which — the point of
-  // `test_proxy_object` — leaves `respond_to?(:to_ary)` false. A plain class
-  // holding the target has the same property here: no `toAry` of its own.
   class Proxy {
     constructor(readonly target: unknown) {}
   }

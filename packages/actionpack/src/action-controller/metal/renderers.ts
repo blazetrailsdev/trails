@@ -1,10 +1,3 @@
-/**
- * ActionController::Renderers
- *
- * Registry for renderer procs (:json, :js, :xml, etc.).
- * @see https://api.rubyonrails.org/classes/ActionController/Renderers.html
- */
-
 export class MissingRenderer extends Error {
   constructor(format: string) {
     super(`No renderer defined for format: ${format}`);
@@ -23,10 +16,6 @@ export class Renderers {
     return new Set(RENDERERS);
   }
 
-  /**
-   * Mirrors Rails `Renderers._render_with_renderer_method_name(key)`.
-   * Returns the conventional dispatch method name for a renderer key.
-   */
   static _renderWithRendererMethodName(key: string): string {
     return `_render_with_renderer_${key}`;
   }
@@ -45,12 +34,6 @@ export class Renderers {
     return this._registry.get(this._renderWithRendererMethodName(key));
   }
 
-  /**
-   * Mirrors Rails `_render_to_body_with_renderer(options)`. Iterates the
-   * registered renderer names, and for the first key present in `options`
-   * dispatches to the renderer proc by its conventional method name.
-   * Returns `null` when no registered renderer key matches.
-   */
   static _renderToBodyWithRenderer(options: Record<string, unknown>): string | null {
     for (const name of RENDERERS) {
       if (Object.hasOwn(options, name)) {
@@ -62,7 +45,7 @@ export class Renderers {
     return null;
   }
 
-  /** @deprecated use {@link _renderToBodyWithRenderer} */
+  /** @deprecated */
   static renderToBody(options: Record<string, unknown>): string | null {
     return this._renderToBodyWithRenderer(options);
   }

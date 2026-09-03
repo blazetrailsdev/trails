@@ -21,17 +21,6 @@ describe("TimeZoneTest", () => {
     expect(TimeZone.find("Moscow")!.name).toBe("Moscow");
   });
 
-  /**
-   * Rails' four `test_country_zones*` cases (time_zone_test.rb:850-867) all name
-   * ZONE-backed countries, where ECMA-402's country table and
-   * `TZInfo::Country#zone_identifiers` already agree. These pin the LINK-backed
-   * ones, where `Intl` reports the link name (`Europe/Vatican`) and TZInfo
-   * reports its canonical target (`Europe/Rome`) — the target being a MAPPING
-   * value is what puts `load_country_zones` (time_zone.rb:276-281) on the
-   * Rails-named branch. `ua` is the other arm: MAPPING still spells its key
-   * `Europe/Kiev` (time_zone.rb:101), the link name, so the canonical
-   * `Europe/Kyiv` misses `MAPPING.value?` and Rails takes `create(tz_id)`.
-   */
   it("country zones for a link-backed country answer the canonical zone's Rails name", () => {
     expect(TimeZone.countryZones("va")).toEqual([TimeZone.find("Rome")]);
   });
@@ -43,16 +32,6 @@ describe("TimeZoneTest", () => {
 });
 
 describe("TimeZone country zone membership", () => {
-  /**
-   * `TZInfo::Country#zone_identifiers` reads tzdata's `zone1970.tab`, which
-   * files a zone under every country that observes it; ECMA-402's CLDR table
-   * names one country per zone. Pinned by FULL membership rather than
-   * `toContain`, because the gap this covers is a MISSING member —
-   * `Asia/Tokyo` under `au`, `Europe/Simferopol` under `ru` — which every
-   * `assert_includes`-style assertion in `time_zone.test.ts` is blind to.
-   * Both lists are `TZInfo::Country.get(code).zone_identifiers` run through
-   * Rails' MAPPING, in Rails' `<=>` order.
-   */
   it("country zones agree with TZInfo zone_identifiers for au", () => {
     expect(TimeZone.countryZones("au").map((z) => z.name)).toEqual([
       "Perth",
@@ -106,11 +85,6 @@ describe("TimeZone country zone membership", () => {
     ]);
   });
 
-  /**
-   * `zone1970.tab` knows `bv`/`hm` and files no zone under either, so
-   * `TZInfo::Country.get("bv").zone_identifiers` is `[]` and Rails answers an
-   * empty list rather than raising `InvalidCountryCode`.
-   */
   it("country zones for a known zoneless country answer an empty list", () => {
     expect(TimeZone.countryZones("bv")).toEqual([]);
     expect(TimeZone.countryZones("hm")).toEqual([]);
@@ -121,12 +95,6 @@ describe("TimeZone country zone membership", () => {
   });
 });
 
-/**
- * trails-only coverage for the local-side period lookups
- * (`periods_for_local` / `period_for_local`, time_zone.rb:559-565). Rails
- * leans on TZInfo's own suite for the ambiguous and nonexistent local times;
- * trails computes them off `Intl`, so the two edges are covered here.
- */
 describe("TimeZoneLocalPeriodsTest", () => {
   const zone = () => TimeZone.find("Eastern Time (US & Canada)")!;
 
@@ -138,7 +106,6 @@ describe("TimeZoneLocalPeriodsTest", () => {
   });
 
   it("periods_for_local returns both periods for an ambiguous local time", () => {
-    // 2006-10-29 01:30 local occurs twice: once as EDT, once as EST.
     const periods = zone().periodsForLocal(Time.utc(2006, 10, 29, 1, 30));
     expect(periods.length).toBe(2);
     expect(periods.map((period) => period.observedUtcOffset)).toEqual([-4 * 3600, -5 * 3600]);
@@ -151,7 +118,6 @@ describe("TimeZoneLocalPeriodsTest", () => {
   });
 
   it("periods_for_local returns no periods for a nonexistent local time", () => {
-    // 2024-03-10 02:30 local never happens: the clocks jump 02:00 to 03:00.
     expect(zone().periodsForLocal(Time.utc(2024, 3, 10, 2, 30))).toEqual([]);
   });
 

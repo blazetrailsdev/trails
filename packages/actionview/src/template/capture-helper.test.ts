@@ -245,10 +245,7 @@ describe("CaptureHelperTest", () => {
     expect(buffer).toBe(av.outputBuffer);
   });
 
-  it.skip("with output buffer sets proper encoding", () => {
-    // SKIPPED: TS strings are always UTF-16 — no per-string encoding
-    // to swap, so Rails' force_encoding propagation has no analogue.
-  });
+  it.skip("with output buffer sets proper encoding", () => {});
 
   it("with output buffer does not assume there is an output buffer", () => {
     expect(av.outputBuffer!.isEmpty()).toBe(true);

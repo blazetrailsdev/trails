@@ -1,7 +1,3 @@
-/**
- * Array utilities mirroring Rails ActiveSupport array extensions.
- */
-
 import { ArgumentError, assertValidKeys } from "./hash-utils.js";
 import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
@@ -11,13 +7,6 @@ import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-co
 import { isEmpty } from "@blazetrails/ruby-compat";
 import { rbObjClass } from "@blazetrails/ruby-compat";
 
-/**
- * Wraps its argument in an array unless it is already an array (or array-like).
- *
- * Mirrors: `Array.wrap` (`core_ext/array/wrap.rb:39-46`) — the
- * `respond_to?(:to_ary)` arm is `object.to_ary || [object]`, so a `to_ary`
- * answering nil still wraps and one answering a non-array is returned as-is.
- */
 export function wrap<T>(object: T | T[] | null | undefined): T[] {
   if (object === null || object === undefined) return [];
   if (Array.isArray(object)) return object;
@@ -28,40 +17,16 @@ export function wrap<T>(object: T | T[] | null | undefined): T[] {
   return [object] as T[];
 }
 
-/**
- * Ruby's `Kernel#Array` — the one-or-many normalization Rails leans on
- * directly (e.g. `encryption/cipher.rb:26`, `relation/batches.rb:260`).
- *
- * It is NOT `Array.wrap`: `Kernel#Array` tries `to_ary` and then `to_a`, so a
- * Hash becomes its pairs and an Enumerable becomes its elements, where
- * `Array.wrap` would wrap either in a one-element array. `Array(nil)` is `[]`
- * in both.
- *
- * @noRailsEquivalent PERMANENT — Ruby core (Kernel#Array), which Rails calls
- * without defining, so there is no Ruby file in any gem for the port to mirror;
- * JS has no global equivalent (`Array(3)` builds a 3-hole array, not `[3]`).
- */
+/** @noRailsEquivalent PERMANENT */
 export function kernelArray<T>(value: T | T[] | null | undefined): T[] {
   if (value === null || value === undefined) return [];
   if (Array.isArray(value)) return value;
-  // `to_ary` / `to_a`: anything iterable (bar a String, which defines neither)
-  // spreads; a Map's entries mirror Ruby's Hash#to_a pairs.
   if (typeof value === "object" && typeof (value as any)[Symbol.iterator] === "function") {
     return [...(value as unknown as Iterable<T>)];
   }
   return [value] as T[];
 }
 
-/**
- * Splits or iterates over the array in groups of size +number+, padding any
- * remaining slots with +fill_with+ unless it is +false+.
- *
- * Mirrors: `Array#in_groups_of` (`core_ext/array/grouping.rb:21-49`). Ruby's
- * `to_i` and `Array.new` both TRUNCATE, and `each_slice` truncates through
- * `to_int`, so a fractional +number+ is floored at three separate points while
- * the error message reports it unrounded via `inspect` — `in_groups_of(0.7)`
- * raises where `0.7 > 0` would have passed.
- */
 export function inGroupsOf<T>(
   array: T[],
   number: number,
@@ -91,14 +56,6 @@ export function inGroupsOf<T>(
   return result;
 }
 
-/**
- * Convert an array to a sentence string.
- * `["a", "b", "c"]` → `"a, b, and c"`
- *
- * Ruby's `default_connectors.merge!(options)` overrides on key presence; a TS
- * caller forwarding an absent option passes `undefined`, which must not
- * override, so the merge skips `undefined` values.
- */
 export function toSentence(
   array: string[],
   options: {
@@ -136,27 +93,15 @@ export function toSentence(
   return array.slice(0, -1).join(wordsConnector) + lastWordConnector + array[array.length - 1];
 }
 
-/**
- * Splits or iterates over the array in +number+ of groups, padding any
- * remaining slots with +fill_with+ unless it is +false+.
- *
- * Mirrors: `Array#in_groups` (`core_ext/array/grouping.rb:57-84`). `division`
- * is Ruby's `size.div number`, floor division as a method — JS has only the
- * operator, so it is `Math.floor` here.
- */
 export function inGroups<T>(
   array: T[],
   number: number,
   fillWith: T | null | false = null,
   block?: (group: (T | null | false)[]) => void,
 ): (T | null | false)[][] {
-  // size.div number gives minor group size;
-  // size % number gives how many objects need extra accommodation;
-  // each group hold either division or division + 1 items.
   const division = Math.floor(array.length / number);
   const modulo = array.length % number;
 
-  // create a new array avoiding dup
   const groups: (T | null | false)[][] = [];
   let start = 0;
 
@@ -172,10 +117,6 @@ export function inGroups<T>(
   return groups;
 }
 
-/**
- * Split an array on a value or using a predicate function.
- * Mirrors Rails' `Array#split`.
- */
 export function split<T>(array: T[], valueOrFn: T | ((item: T) => boolean)): T[][] {
   const predicate =
     typeof valueOrFn === "function"
@@ -196,34 +137,13 @@ export function split<T>(array: T[], valueOrFn: T | ((item: T) => boolean)): T[]
   return result;
 }
 
-/**
- * Keep only the elements matching `predicate`, IN PLACE — Ruby's
- * `Array#select!`. The mutation is the point: every holder of the array sees
- * it, which is what `HasManyAssociation#count_records`
- * (`has_many_association.rb:91`) relies on when it prunes the loaded target.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Array`, not Rails, exactly as
- * `transformKeys` (hash-utils.ts) is Ruby core `Hash`. Rails bodies call it and
- * JS arrays have no in-place filter, so it is spelled here for the ports that
- * consume it.
- */
+/** @noRailsEquivalent PERMANENT */
 export function selectBang<T>(array: T[], predicate: (item: T) => boolean): T[] {
   array.splice(0, array.length, ...array.filter(predicate));
   return array;
 }
 
-/**
- * The smallest element of `collection`, or `undefined` when it is empty —
- * Ruby's `Enumerable#min` in its no-argument RECEIVER form, which
- * `HasManyAssociation#count_records` (`has_many_association.rb:95`) calls as
- * `[association_scope.limit_value, count].compact.min`.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Enumerable`, not Rails, exactly as
- * `selectBang` above is Ruby core `Array`. JS spells the same operation
- * `Math.min(...values)`, which is a different shape (the values are arguments,
- * not a receiver) and is numbers-only, so the receiver form is spelled here for
- * the ports that consume it.
- */
+/** @noRailsEquivalent PERMANENT */
 export function min<T>(collection: readonly T[]): T | undefined {
   let result: T | undefined;
   let seen = false;
@@ -236,14 +156,6 @@ export function min<T>(collection: readonly T[]): T | undefined {
   return result;
 }
 
-/**
- * Remove elements from `array` that match `predicate`, returning the removed elements.
- *
- * Mirrors: `Array#extract!` (core_ext/array/extract.rb:10-20). Ruby's no-block
- * arm (`return to_enum(:extract!) { size } unless block_given?`, line 11) has
- * no JS analogue — there is no Enumerator to return, as at `Enumerable#index_with`
- * and `Deprecators#each` — so the predicate is required.
- */
 export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[] {
   const extracted: T[] = [];
   for (let i = array.length - 1; i >= 0; i--) {
@@ -254,12 +166,6 @@ export function extractBang<T>(array: T[], predicate: (item: T) => boolean): T[]
   return extracted;
 }
 
-/**
- * Extends `Array#to_s` to convert a collection of elements into a comma
- * separated id list if `:db` argument is given as the format.
- *
- * Mirrors: `Array#to_fs` (`core_ext/array/conversions.rb:94-105`).
- */
 export function toFs(self: unknown[], format = "default"): string {
   switch (format) {
     case "db":
@@ -273,15 +179,8 @@ export function toFs(self: unknown[], format = "default"): string {
   }
 }
 
-// `alias_method :to_formatted_s, :to_fs` — conversions.rb:106.
 export { toFs as toFormattedS };
 
-/**
- * Returns a string that represents the array in XML by invoking `to_xml` on
- * each element. Mirrors: `Array#to_xml` (conversions.rb:183-212). Ruby `||=`
- * replaces only nil/false and `0` is truthy there, so `indent: 0` survives the
- * defaulting — hence `??=`.
- */
 export function toXml(
   self: unknown[],
   options: XmlMini.ToXmlOptions = {},

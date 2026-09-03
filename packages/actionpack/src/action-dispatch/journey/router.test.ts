@@ -196,9 +196,6 @@ describe("ActionDispatch::Journey::Router", () => {
   });
 
   it("recognize() accepts callbacks that incidentally return non-boolean values", () => {
-    // Regression test: an expression-bodied callback like
-    // `(r) => arr.push(r.name)` (which returns the new length, a number)
-    // must remain type-compatible with the unknown-return block signature.
     const r1 = new Route({ name: "a", app: okApp("a"), path: pat("/x") });
     const r2 = new Route({ name: "b", app: okApp("b"), path: pat("/x") });
     const router = new Router(buildRoutes([r1, r2]));

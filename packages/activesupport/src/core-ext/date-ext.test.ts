@@ -50,12 +50,10 @@ function instant(date: Date): Temporal.Instant {
   return Temporal.Instant.fromEpochMilliseconds(date.getTime());
 }
 
-/** Ruby `Time#to_i`, the seconds an `assert_equal Time.local(...)` compares. */
 function seconds(date: Date): number {
   return Math.floor(date.getTime() / 1000);
 }
 
-/** The calendar days a Rails `Date` range's two ends name. */
 function range(r: { start: Temporal.Instant; end: Temporal.Instant }): Temporal.PlainDate[] {
   return [toDate(asDate(r.start)), toDate(asDate(r.end))];
 }
@@ -124,10 +122,6 @@ describe("DateExtCalculationsTest", () => {
 
   it("readable inspect", () => {
     expect(readableInspect(pd(2005, 2, 21))).toBe("Mon, 21 Feb 2005");
-    // Rails' second assertion compares against `inspect`, which
-    // `alias_method :inspect, :readable_inspect` has already replaced; trails
-    // has no `::Date` to reopen, so `defaultInspect` still answers ruby/date's
-    // own `inspect` and the two are the distinct methods Rails aliased apart.
     expect(defaultInspect(pd(2005, 2, 21))).not.toBe(readableInspect(pd(2005, 2, 21)));
   });
 
@@ -157,13 +151,11 @@ describe("DateExtCalculationsTest", () => {
     expect(asDate(change(d(2005, 2, 11), { day: 21 })).getDate()).toBe(21);
     const changed = asDate(change(d(2005, 2, 11), { year: 2007, month: 5 }));
     expect(changed.getFullYear()).toBe(2007);
-    expect(changed.getMonth()).toBe(4); // May
+    expect(changed.getMonth()).toBe(4);
     expect(changed.getDate()).toBe(11);
   });
 
   it("sunday", () => {
-    // Rails `Date#sunday` is `end_of_week(:monday)`, which the port spells with
-    // the week-start day number rather than its Symbol.
     expect(toDate(asDate(endOfWeek(d(2008, 3, 2))))).toEqual(pd(2008, 3, 2));
     expect(toDate(asDate(endOfWeek(d(2008, 2, 29))))).toEqual(pd(2008, 3, 2));
   });
@@ -182,9 +174,6 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("advance in calendar reform", () => {
-    // The port's calendar is proleptic Gregorian throughout — it has no Julian
-    // reform seam — so the day either side of 1582-10-15 is its neighbour, not
-    // the reform's, and the expected dates below are that calendar's.
     expect(toDate(asDate(advance(d(1582, 10, 4), { days: 1 })))).toEqual(pd(1582, 10, 5));
     expect(toDate(asDate(advance(d(1582, 10, 15), { days: -1 })))).toEqual(pd(1582, 10, 14));
     for (let day = 5; day <= 14; day++) {
@@ -207,7 +196,7 @@ describe("DateExtCalculationsTest", () => {
     const dt = d(2004, 5, 31);
     const quarterStart = beginningOfQuarter(dt);
     const lastQuarterStart = asDate(advance(asDate(quarterStart), { months: -3 }));
-    expect(lastQuarterStart.getMonth()).toBe(0); // January
+    expect(lastQuarterStart.getMonth()).toBe(0);
   });
 
   it("yesterday constructor", () => {
@@ -301,8 +290,6 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("all day", () => {
-    // Rails' range end carries `Rational(999999999, 1000)` of a second; the
-    // port's `Temporal.Instant` seat holds milliseconds, so it ends at `.999`.
     const beginningOfDay = d(2011, 6, 7, 0, 0, 0);
     const endOfDay = d(2011, 6, 7, 23, 59, 59, 999);
     expect(allDay(d(2011, 6, 7))).toEqual({
@@ -331,9 +318,6 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("xmlschema", () => {
-    // Rails wraps this in `with_env_tz "US/Eastern"`; the port reads the
-    // ambient zone, so the offset is whatever the day's midnight sits at in
-    // the zone the process runs in — `Z` where that zone is UTC, as on CI.
     expect(dateXmlschema(pd(1980, 2, 28))).toMatch(/^1980-02-28T00:00:00([+-]\d{2}:?\d{2}|Z)$/);
     expect(dateXmlschema(pd(1980, 6, 28))).toMatch(/^1980-06-28T00:00:00([+-]\d{2}:?\d{2}|Z)$/);
   });
@@ -348,9 +332,6 @@ describe("DateExtCalculationsTest", () => {
     }
   });
 
-  // Rails stubs `Date.current` to 2000-01-01 and reads the day before, the day
-  // itself and the day after. The port has no stub seam on `current`, so the
-  // three days are taken relative to the real one instead.
   it("past", () => {
     expect(isPast(DateExt.current().subtract({ days: 1 }))).toBe(true);
     expect(isPast(DateExt.current())).toBe(false);
@@ -416,8 +397,6 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("end of day", () => {
-    // Rails' expected `Time` carries `Rational(999999999, 1000)` of a second;
-    // `TimeWithZone#toI` truncates to the second either way.
     expect(DateExt.endOfDay(pd(2005, 2, 21)).toI()).toEqual(seconds(d(2005, 2, 21, 23, 59, 59)));
   });
 });

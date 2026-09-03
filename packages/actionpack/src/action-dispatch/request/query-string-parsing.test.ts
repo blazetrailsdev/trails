@@ -1,14 +1,3 @@
-/**
- * Mirrors `actionpack/test/dispatch/request/query_string_parsing_test.rb`.
- *
- * Rails' tests run the parser through the full controller pipeline
- * (IntegrationTest + a TestController#parse that returns
- * `request.query_parameters`). We exercise the same code path directly
- * against `Request.queryParameters` — `parseNestedQuery` +
- * `RequestUtils.normalizeEncodeParams` is the entire pipeline that
- * Rails' controller indirection eventually invokes.
- */
-
 import { describe, it, expect, afterEach } from "vitest";
 import { Request } from "../http/request.js";
 import { RequestUtils } from "./utils.js";

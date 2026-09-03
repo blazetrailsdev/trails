@@ -12,10 +12,6 @@ import { migrationLookupAt } from "./migration-lookup.js";
 export { NotImplementedError };
 export { migrationLookupAt, migrationExists } from "./migration-lookup.js";
 
-// Mirrors railties/lib/rails/generators/migration.rb. ERB template rendering
-// is supplied by the caller (a render callback) until PR 1.12c lands the
-// template pipeline. Filesystem and path access come from the activesupport
-// adapter registry.
 export interface MigrationAssigns {
   migrationNumber: string;
   migrationFileName: string;
@@ -43,8 +39,6 @@ export function buildMigrationAssigns(destination: string, nextNumber: string): 
   };
 }
 
-// Rails source: railties/lib/rails/generators/migration.rb#create_migration.
-// The action runs immediately rather than queuing through a Thor action stack.
 export async function createMigration(
   host: CreateMigrationHost,
   destination: string,
@@ -60,11 +54,6 @@ export interface MigrationTemplateHost extends CreateMigrationHost {
   setMigrationAssigns(assigns: MigrationAssigns): void;
 }
 
-// Rails source: railties/lib/rails/generators/migration.rb#migration_template.
-// Rails' `source` is an ERB template path it reads and renders inline; here
-// the same slot is a callback that receives the migration assigns (so the
-// EJS/template pipeline can be swapped in later without changing this
-// dispatch). Argument order follows Rails: source, destination, config.
 export async function migrationTemplate(
   host: MigrationTemplateHost,
   source: (assigns: MigrationAssigns) => string | Promise<string>,
@@ -77,10 +66,6 @@ export async function migrationTemplate(
   const assigns = buildMigrationAssigns(resolved, nextNumber);
   host.setMigrationAssigns(assigns);
   const numbered = File.join(dir, `${nextNumber}_${File.basename(resolved)}`);
-  // assigns.migrationFileName is the single source of truth for the
-  // CreateMigration action's existence checks. Wrap the host so the action
-  // can't drift from the just-computed assigns even if the host's own
-  // migrationFileName field hasn't been synced.
   const wrapped: CreateMigrationHost = { ...host, migrationFileName: assigns.migrationFileName };
   return createMigration(wrapped, numbered, () => source(assigns), config);
 }

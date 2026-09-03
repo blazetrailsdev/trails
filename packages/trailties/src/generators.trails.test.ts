@@ -1,6 +1,3 @@
-// Trails-only: `Rails::Generators.lookup!` globs the Ruby load path and Thor's
-// `inherited` hook files the subclasses; the ESM port walks the generator tree
-// itself, so these cover the walk and the Commander subcommands built from it.
 import { describe, it, expect, beforeAll } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";

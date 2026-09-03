@@ -59,8 +59,6 @@ describe("DbPrepareTest", () => {
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
 
-  // db:setup
-
   it("db:setup calls create, loadSchemaCurrent, loadSeed in order", async () => {
     const dir = await makeFakeProject();
     DatabaseConfigurations.defaultEnv = "development";
@@ -108,8 +106,6 @@ describe("DbPrepareTest", () => {
     expect(err.join("\n")).toContain("schema load failed");
   });
 
-  // db:reset
-
   it("db:reset calls drop then create/loadSchema/loadSeed", async () => {
     const dir = await makeFakeProject();
     DatabaseConfigurations.defaultEnv = "development";
@@ -154,8 +150,6 @@ describe("DbPrepareTest", () => {
     expect(code).toBe(1);
   });
 
-  // db:prepare
-
   it("db:prepare calls DatabaseTasks.prepareAll", async () => {
     const dir = await makeFakeProject();
     DatabaseConfigurations.defaultEnv = "development";
@@ -179,8 +173,6 @@ describe("DbPrepareTest", () => {
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("failed to load config/database.ts");
   });
-
-  // --help
 
   it("db:setup --help prints help text", async () => {
     const code = await run(["db:setup", "--help"], ".");

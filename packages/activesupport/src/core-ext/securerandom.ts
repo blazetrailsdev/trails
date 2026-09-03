@@ -1,9 +1,5 @@
 import { getCrypto } from "@blazetrails/ruby-compat";
 
-/**
- * Mirrors: SecureRandom (core_ext/securerandom.rb).
- */
-
 const DIGITS = "0123456789".split("");
 const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 const LOWERCASE = "abcdefghijklmnopqrstuvwxyz".split("");
@@ -30,12 +26,6 @@ function randomNumber(n: number): number {
   }
 }
 
-/**
- * SecureRandom.base58 generates a random base58 string.
- *
- * Mirrors: core_ext/securerandom.rb:23-29 (the `random_bytes` branch — trails
- * has no `SecureRandom.alphanumeric(n, chars:)` to delegate to).
- */
 export function base58(n: number | null = 16): string {
   return Array.from(getCrypto().randomBytes(n ?? 16))
     .map((byte) => {
@@ -46,11 +36,6 @@ export function base58(n: number | null = 16): string {
     .join("");
 }
 
-/**
- * SecureRandom.base36 generates a random base36 string in lowercase.
- *
- * Mirrors: core_ext/securerandom.rb:51-57.
- */
 export function base36(n: number | null = 16): string {
   return Array.from(getCrypto().randomBytes(n ?? 16))
     .map((byte) => {

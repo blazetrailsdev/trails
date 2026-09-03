@@ -1,10 +1,3 @@
-/**
- * Trails-only: `translate!` has no case of its own in i18n_test.rb — the gem
- * covers `raise: true` through the backend tests. Same for the
- * `@@normalized_key_cache` memoization (i18n.rb:439-442), which the gem never
- * asserts on directly.
- */
-
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "./exceptions.js";
 import { config, newDoubleNestedCache, normalizeKeys, resetConfig, translateBang } from "./i18n.js";
@@ -54,11 +47,6 @@ describe("I18n.normalizeKeys memoization", () => {
   });
 });
 
-/**
- * Trails-only: the gem gets this from `Symbol#to_s` in `normalize_key`
- * (i18n.rb:447), so it has no case of its own. Our Symbol spelling is a
- * colon-prefixed string, and this is the one place that colon is dropped.
- */
 describe("I18n.normalizeKeys on a Symbol key", () => {
   beforeEach(() => {
     resetConfig();

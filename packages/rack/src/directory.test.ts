@@ -49,22 +49,18 @@ it("serve directory indices", async () => {
 });
 
 it("return 404 for pipes", async () => {
-  // Pipes (FIFOs) are special files - requesting one should 404
-  // Since we can't easily create a pipe in tests, verify non-regular files are rejected
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).get("/nonexistent_pipe");
   expect(res.status).toBe(404);
 });
 
 it("serve directory indices with bad symlinks", async () => {
-  // Bad symlinks should not crash the directory listing
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).get("/");
   expect(res.status).toBe(200);
 });
 
 it("return 404 for unreadable directories", async () => {
-  // Unreadable paths should return 404
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).get("/../../../etc/shadow");
   expect(res.status).toBe(404);
@@ -110,7 +106,6 @@ it("not allow directory traversal via root prefix bypass", async () => {
 
 it("not allow dir globs", async () => {
   const app = makeApp();
-  // Glob patterns should not expand
   const res = await new MockRequest((env) => app.call(env)).get("/*.txt");
   expect(res.status).toBe(404);
 });
@@ -125,7 +120,6 @@ it("uri escape path parts", async () => {
   const app = makeApp();
   const res = await new MockRequest((env) => app.call(env)).get("/");
   expect(res.status).toBe(200);
-  // Directory listing should contain URI-escaped links
   expect(res.bodyString).toContain("href=");
 });
 

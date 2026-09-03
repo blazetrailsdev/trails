@@ -11,18 +11,6 @@ import {
   type TranslationHost,
 } from "./translation.js";
 
-// ==========================================================================
-// abstract/translation_test.rb
-// ==========================================================================
-
-// Rails: `TranslationController < AbstractController::Base; include
-// AbstractController::Translation; end`. trails' translate/t/localize/l
-// are `this`-typed standalone functions — wire them onto a class
-// prototype here so the `respond_to` Rails tests have something to
-// observe.
-// `TranslationHost.constructor` is typed `{ controllerPath(): string }`
-// — JS classes have `constructor: Function` by default, so we cast at
-// the call sites rather than fight the `implements` clause.
 class TranslationController {
   static controllerPath(): string {
     return "abstract_controller/testing/translation";
@@ -42,8 +30,6 @@ class TranslationController {
   }
 }
 
-// Rails' actionpack/test/abstract_unit.rb:65 turns the check off for the
-// whole suite; these cases translate under locales they store themselves.
 I18n.setEnforceAvailableLocales(false);
 
 describe("TranslationControllerTest", () => {
@@ -94,15 +80,11 @@ describe("TranslationControllerTest", () => {
 
   it("dot-prefixed lookup with raise: true still honors the user default chain", () => {
     controller.actionName = "index";
-    // Scoped miss + user default ":one.two" resolves to "bar" — must
-    // NOT throw even though raise: true is set.
     expect(controller.t(".twoz", { raise: true, default: [":one.two"] })).toBe("bar");
   });
 
   it("raises when raise: true and the whole chain (scoped + fallback + defaults-as-keys) misses", () => {
     controller.actionName = "index";
-    // Both the scoped and all `:`-keyed defaults miss → must throw
-    // MissingTranslationData (not silently return the defaults array).
     expect(() =>
       controller.t(".twoz", { raise: true, default: [":also.missing", ":still.gone"] }),
     ).toThrow(MissingTranslationData);
@@ -119,9 +101,6 @@ describe("TranslationControllerTest", () => {
   });
 
   it("lazy lookup with symbol", () => {
-    // Rails distinguishes :".foo" (symbol) from ".foo" (string). JS has
-    // no symbol literals usable as i18n keys; the string form is the
-    // direct equivalent.
     controller.actionName = "index";
     expect(controller.t(".foo")).toBe("bar");
   });
@@ -168,8 +147,6 @@ describe("TranslationControllerTest", () => {
   it("localize", () => {
     const time = new Date(Date.UTC(2000, 0, 1, 0, 0, 0));
     const expected = "Sat, 01 Jan 2000 00:00:00 +0000";
-    // Rails stubs `I18n.localize`; the JS analogue of stubbing a module
-    // function is an own property on the backend the facade delegates to.
     const backend = I18n.backend() as { localize?: unknown };
     const original = Object.getOwnPropertyDescriptor(backend, "localize");
     backend.localize = () => expected;
@@ -223,11 +200,6 @@ describe("TranslationControllerTest", () => {
   });
 });
 
-// ==========================================================================
-// trails-only coverage — exercises the standalone-function shape that
-// Rails doesn't have. Kept for regression-prevention on the `this`-typed
-// call site (`translate.call(host, ...)`); no Rails counterpart.
-// ==========================================================================
 function makeHost(controllerPath: string, actionName: string): TranslationHost {
   return {
     actionName,

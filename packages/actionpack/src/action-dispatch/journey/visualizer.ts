@@ -1,12 +1,3 @@
-/**
- * HTML rendering for `ActionDispatch::Journey::GTG::TransitionTable#visualizer`.
- *
- * Mirrors `action_dispatch/journey/visualizer/index.html.erb` — the
- * bundled `fsm.css` / `fsm.js` assets are inlined verbatim from
- * `./visualizer-assets.js` so the returned HTML is functionally identical
- * to Rails' (interactive d3 FSM with route simulation), modulo the ERB
- * substitution.
- */
 import { FSM_CSS, FSM_JS } from "./visualizer-assets.js";
 
 export interface VisualizerOptions {

@@ -90,8 +90,6 @@ describe("helper", () => {
     const fooBefore = cls._helpers!.foo;
     const headProtoBefore = Object.getPrototypeOf(cls._helpers!);
     helper(cls, FooHelper);
-    // Re-include is a no-op: the lookup still resolves to the same fn,
-    // and no new proto link was spliced in.
     expect(cls._helpers!.foo).toBe(fooBefore);
     expect(Object.getPrototypeOf(cls._helpers!)).toBe(headProtoBefore);
   });
@@ -116,7 +114,6 @@ describe("helper", () => {
     helper(cls, B);
     expect(cls._helpers!.foo.call({})).toBe("B.foo");
     helper(cls, A);
-    // B's override stays in place; A is identity-deduped.
     expect(cls._helpers!.foo.call({})).toBe("B.foo");
   });
 
@@ -133,10 +130,7 @@ describe("helper", () => {
     helperMethod(cls, "x");
     const Override: HelperMethodsModule = { x: () => "from-module" };
     helper(cls, Override);
-    // Definition on the helpers module itself stays on top of the chain.
     expect(typeof cls._helpers!.x).toBe("function");
-    // The proxy installed by helperMethod throws when controller lacks x,
-    // proving the helperMethod proxy is what runs (not Override.x).
     expect(() => cls._helpers!.x.call({ controller: {} })).toThrow(/does not respond to 'x'/);
   });
 
@@ -182,9 +176,6 @@ describe("identity tracking lives on the helpers module chain, not the class", (
 
     clearHelpers(child);
     helper(child, Shared);
-    // Re-included successfully — clearHelpers severed the chain so the
-    // earlier identity record on parent's helpers module is no longer
-    // reachable from child._helpers.
     expect(child._helpers!.shared.call({})).toBe("S");
   });
 });
@@ -200,7 +191,6 @@ describe("clearHelpers", () => {
 
     clearHelpers(cls);
 
-    // helper_method names survive; included modules do not.
     expect(cls._helperMethods).toEqual(["keep"]);
     expect(Object.keys(cls._helpers!)).toEqual(["keep"]);
     expect(typeof cls._helpers!.keep).toBe("function");
@@ -252,7 +242,6 @@ describe("_helpers (class-level reader/writer)", () => {
     helperMethod(parent, "fromParent");
     const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
 
-    // No own slot — JS prototype lookup walks to parent (Rails' superclass fallback).
     expect(_helpers(child)).toBe(parent._helpers);
   });
 
@@ -274,7 +263,6 @@ describe("_helpers (class-level reader/writer)", () => {
 
     _helpers(child, null);
     expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
-    // After clearing, the inherited slot is visible again via prototype.
     expect(child._helpers).toBe(parent._helpers);
   });
 
@@ -307,7 +295,6 @@ describe("defineHelpersModule", () => {
     const child = makeBase();
     const mod = defineHelpersModule(child, parent._helpers);
     expect(Object.getPrototypeOf(mod)).toBe(parent._helpers);
-    // Live: methods added to parent after definition remain visible.
     helperMethod(parent, "addedLater");
     expect(typeof mod.addedLater).toBe("function");
   });

@@ -15,7 +15,6 @@ import {
   httpBasicAuthenticateWith,
   requestHttpBasicAuthentication,
   type BasicControllerHost,
-  // Digest
   decodeDigestCredentials,
   expectedResponse,
   ha1,
@@ -135,18 +134,12 @@ describe("HttpAuthentication::Basic::ControllerMethods::ClassMethods", () => {
   });
 });
 
-// ============================================================================
-// HttpAuthentication::Digest tests
-// (mirrors http_digest_authentication_test.rb low-level helper coverage)
-// ============================================================================
-
 const SECRET = "4fb45da9e4ab4ddeb7580d6a35503d99";
 const SALT = "http authentication";
 
 function makeKeyGenerator(secret: string) {
   return {
     generateKey(salt: string): string {
-      // Simplified: concatenate secret+salt for tests (rails uses PBKDF2-style)
       return `${secret}${salt}`;
     },
   };

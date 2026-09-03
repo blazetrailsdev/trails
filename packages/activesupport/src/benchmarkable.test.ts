@@ -27,13 +27,11 @@ describe("BenchmarkableTest", () => {
   });
 
   it("with silence", () => {
-    // Silence means suppress log output; we just verify the operation still runs
     const result = benchmark("silent", () => 42);
     expect(result.result).toBe(42);
   });
 
   it("within level", () => {
-    // Logging at a level that should be recorded
     const logs: string[] = [];
     function benchmarkLog(label: string, level: string, fn: () => unknown) {
       const result = fn();
@@ -45,7 +43,6 @@ describe("BenchmarkableTest", () => {
   });
 
   it("outside level", () => {
-    // Logging above threshold — nothing logged
     const logs: string[] = [];
     function benchmarkLog(label: string, level: string, fn: () => unknown) {
       const result = fn();

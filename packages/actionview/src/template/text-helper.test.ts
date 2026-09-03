@@ -17,11 +17,6 @@ import {
 } from "../helpers/text-helper.js";
 import { raw } from "../helpers/output-safety-helper.js";
 
-// Mirrors actionview/test/template/text_helper_test.rb. truncate / pluralize /
-// wordWrap / simpleFormat / highlight / excerpt / cycle / current_cycle /
-// reset_cycle / concat are covered. (Rails has no safe_concat test;
-// behavior is exercised in buffers.test.ts.)
-
 function newHost(initial = ""): TextHelperHost {
   return { outputBuffer: new OutputBuffer(initial) };
 }
@@ -327,8 +322,6 @@ describe("TextHelperTest", () => {
   });
 
   // BLOCKED: sanitize() strips script tags but not their text content, so
-  // "code!" leaks through. Follow-up: align sanitizer with Rails (strip
-  // forbidden tags and their inner text).
   it.skip("highlight should sanitize input", () => {
     expect(
       highlight("This is a beautiful morning<script>code!</script>", "beautiful").toString(),

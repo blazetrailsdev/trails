@@ -1,25 +1,3 @@
-/**
- * Port of the ruby/date gem's `test/date/test_date_attr.rb`, which walks every
- * reader on a `Date` and on the `DateTime` naming the same day.
- *
- * The gem's own `test/date/` suite is RFC 0088's fidelity measure — `parity:api`
- * cannot score a C extension, so `vendor/sources.ts` sets `compareApi: false`
- * for this package and `parity:test` carries the whole gate.
- *
- * These readers are exercised on the GEM-SHAPED objects, not on the `Temporal`
- * seat the statics answer: `#jd`, `#mjd`, `#ld`, `#day_fraction`, `#cwyear` and
- * `#nth_kday?` have no `Temporal.PlainDate` counterpart at all, and the
- * calendar-reform readings several of them make are the reason the gem-shaped
- * object exists.
- *
- * `test__attr` walks `[date, datetime].each_with_index` and branches on the
- * index for the readers only a `DateTime` has, so its assertions sit inside
- * `if`s in the Ruby too — hence the `no-conditional-expect` disable below.
- * Flattening the loop into two tests would rename them. Ruby's `respond_to?`
- * arm becomes the prototype-chain `in`, the TS question for a method a class
- * does not define.
- */
-
 /* eslint-disable vitest/no-conditional-expect */
 
 import { describe, it, expect } from "vitest";

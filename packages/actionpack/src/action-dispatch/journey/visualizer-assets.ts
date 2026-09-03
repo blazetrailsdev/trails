@@ -1,12 +1,4 @@
-/**
- * Verbatim copies of the static assets that Rails ships under
- * `action_dispatch/journey/visualizer/`. Exported as string constants so
- * `TransitionTable#visualizer` can inline them into the generated HTML
- * page without depending on filesystem access at runtime (visualizer is a
- * debug-only path; this keeps the import surface trivial).
- *
- * @internal
- */
+/** @internal */
 export const FSM_CSS = String.raw`body {
   font-family: "Helvetica Neue", Helvetica, Arial, Sans-Serif;
   margin: 0;

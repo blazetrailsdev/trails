@@ -5,16 +5,7 @@ import { trailsLogger } from "./trails-logger-slot.js";
 import { transformKeys } from "./hash-utils.js";
 import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 
-/**
- * ActiveSupport::LogSubscriber — a Subscriber that dispatches events
- * to a logger. Provides ANSI coloring helpers and log-level gating.
- *
- * Subclasses define methods like `sql(event)` and call `info()`/`debug()`
- * from them. `attachTo` wires up the subscription.
- */
 export class LogSubscriber extends Subscriber {
-  // -- ANSI color constants ------------------------------------------------
-
   static readonly MODES: Record<string, number> = {
     clear: 0,
     bold: 1,
@@ -31,20 +22,11 @@ export class LogSubscriber extends Subscriber {
   static readonly CYAN = "\x1b[36m";
   static readonly WHITE = "\x1b[37m";
 
-  // -- Class-level config --------------------------------------------------
-
   static colorizeLogging = true;
 
-  /**
-   * Per-class map of method → level-check function.
-   * Uses class_attribute semantics: each subclass gets its own copy
-   * when subscribeLogLevel is called, so AR LogSubscriber's levels
-   * don't bleed into ActionController LogSubscriber's levels.
-   */
   static get logLevels(): Map<string, (logger: Logger) => boolean> {
     const state = getClassState(this) as any;
     if (!state._logLevels) {
-      // class_attribute semantics: inherit parent's levels on first access
       const parent = Object.getPrototypeOf(this) as typeof LogSubscriber | undefined;
       state._logLevels =
         parent && typeof parent === "function" && "logLevels" in parent
@@ -58,12 +40,6 @@ export class LogSubscriber extends Subscriber {
     (getClassState(this) as any)._logLevels = value;
   }
 
-  /**
-   * Rails `LogSubscriber::LEVEL_CHECKS`
-   * (`activesupport/lib/active_support/log_subscriber.rb:86-90`), three lambdas
-   * that ask the logger its own predicate. Trails' {@link Logger} spells those
-   * as `get "debug?"()` getters, so the call is a property read.
-   */
   static readonly LEVEL_CHECKS: Record<string, (logger: Logger) => boolean> = {
     debug: (logger) => !logger["debug?"],
     info: (logger) => !logger["info?"],
@@ -72,15 +48,6 @@ export class LogSubscriber extends Subscriber {
 
   private static _logger: Logger | null = null;
 
-  /**
-   * Rails `LogSubscriber.logger`
-   * (`activesupport/lib/active_support/log_subscriber.rb:93-97`), which falls
-   * back to the application logger. `defined?(Rails) && Rails.respond_to?(:logger)`
-   * is a call-time constant resolution; `trailsLogger` is the zero-import slot
-   * `Trails.logger` writes itself into, read here at call time for the same
-   * reason. The memoization is Rails' `||=`, so a later `Trails.logger =` does
-   * not retroactively change a subscriber that has already read it.
-   */
   static get logger(): Logger | null {
     return (this._logger ??= trailsLogger as Logger | null);
   }
@@ -112,16 +79,8 @@ export class LogSubscriber extends Subscriber {
   }
 
   /**
-   * Register a log-level gate for a method. When the logger level is above
-   * the gate, events for that method are silenced.
-   *
    * @internal
-   *
-   * @missingRailsCall merge — PERMANENT: Ruby Hash#merge returns a NEW hash assigned back
-   *   through the class_attribute writer: `self.log_levels =
-   *   log_levels.merge(...)` (log_subscriber.rb:128); trails' logLevels getter
-   *   already copy-on-writes the parent's Map per class, so the port sets the
-   *   key on that Map instead.
+   * @missingRailsCall merge — PERMANENT
    */
   static subscribeLogLevel(method: string, level: string): void {
     const check = this.LEVEL_CHECKS[level];
@@ -130,11 +89,7 @@ export class LogSubscriber extends Subscriber {
     this._setEventLevels();
   }
 
-  /**
-   * @missingRailsArgs public_instance_methods — PERMANENT: Ruby calls this on
-   * the module as a receiver; the TS mirror is a free function, so the receiver
-   * is its first argument.
-   */
+  /** @missingRailsArgs public_instance_methods — PERMANENT */
   protected static override _fetchPublicMethods(
     subscriber: Subscriber,
     inheritAll: boolean,
@@ -167,24 +122,14 @@ export class LogSubscriber extends Subscriber {
   }
 
   private static _setEventLevels(): void {
-    // Only updates the subscriber from the most recent attachTo call.
     const state = getClassState(this);
     const sub = state.subscriber as LogSubscriber | undefined;
     if (!sub) return;
     sub.eventLevels = transformKeys(this.logLevels, (k) => `${k}.${state.namespace}`);
   }
 
-  // -- Instance state ------------------------------------------------------
-
   eventLevels: Map<string, (logger: Logger) => boolean> = new Map();
 
-  /**
-   * Rails `LogSubscriber#logger`
-   * (`activesupport/lib/active_support/log_subscriber.rb:138-140`), which names
-   * `LogSubscriber` itself — NOT `self.class`. A subclass's own `logger=` sets
-   * a class-level ivar the instance path never reads, so every subscriber logs
-   * through the one base-class logger.
-   */
   get logger(): Logger | null {
     return LogSubscriber.logger;
   }
@@ -197,18 +142,7 @@ export class LogSubscriber extends Subscriber {
     (this.constructor as typeof LogSubscriber).colorizeLogging = value;
   }
 
-  /**
-   * @missingRailsCall call — PERMANENT: log_subscriber.rb:143
-   *   `@event_levels[event]&.call(logger)` — the stored value is a Ruby Proc
-   *   invoked through `#call`; the JS callable it ports to is invoked as
-   *   `check(l)`, so there is no `call` to make. Same substitution as the
-   *   `cache.ts key_matcher -> call` row. Language shortcoming. Cluster ruling
-   *   (RFC 0106): where Ruby `#call` is the OBJECT protocol the port converges
-   *   instead — `subscriber.ts add_event_subscriber` now hands the Subscriber
-   *   itself to `notifier.subscribe`, since `Fanout::Subscribers.new` accepts a
-   *   callable object (fanout.rb:325-331). Only Proc-invocation `#call`, as
-   *   here, stays substituted.
-   */
+  /** @missingRailsCall call — PERMANENT */
   silenced(event: Event | string): boolean {
     const l = this.logger;
     if (!l) return true;
@@ -236,8 +170,6 @@ export class LogSubscriber extends Subscriber {
       this._logException(event.name, e);
     }
   }
-
-  // -- Logging helpers (instance, proxied to logger) -----------------------
 
   protected _info(message?: string | (() => string)): boolean {
     const l = this.logger;
@@ -274,8 +206,6 @@ export class LogSubscriber extends Subscriber {
     if (!l) return false;
     return l.unknown(message);
   }
-
-  // -- Color helper --------------------------------------------------------
 
   protected color(
     text: string,

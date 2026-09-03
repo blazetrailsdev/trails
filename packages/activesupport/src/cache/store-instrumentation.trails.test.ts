@@ -4,11 +4,6 @@ import { WriteOptions, type StoreOptions } from "./store.js";
 import { Notifications } from "../notifications.js";
 import type { Event } from "../notifications/instrumenter.js";
 
-// The instrumentation events `Cache::Store` fires that
-// `CacheInstrumentationBehavior` does not cover — `cache_generate`,
-// `cache_fetch_hit`, `cache_exist?` (cache.rb) — plus the trailing-options-hash
-// extraction `fetch_multi` does before instrumenting. Rails has no test for
-// these, so they live in a trails file rather than in a behavior helper.
 describe("Cache::Store instrumentation", () => {
   let cache: MemoryStore;
 
@@ -41,7 +36,6 @@ describe("Cache::Store instrumentation", () => {
     const opts = { namespace: "foo" };
     expect(events[0].payload.key).toEqual([normalizedKey("a", opts), normalizedKey("b", opts)]);
     expect(events[0].payload.namespace).toBe("foo");
-    // The options hash must not be treated as a cache name.
     expect(cache.read("a", opts)).toBe("aa");
     expect(cache.read("[object Object]")).toBeNull();
   });

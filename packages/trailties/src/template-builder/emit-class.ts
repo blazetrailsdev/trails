@@ -11,7 +11,6 @@ export function emitClass(c: ClassDecl): EmitResult {
   const typeRefs: Ref[] = [];
   let ext = "";
   if (c.extends) {
-    // `extends` requires the base class at runtime.
     valueRefs.push(c.extends);
     ext = ` extends ${refMeta(c.extends).name}`;
   }

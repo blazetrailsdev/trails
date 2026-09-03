@@ -28,7 +28,6 @@ it("allow a suffix to be set", async () => {
 
 it("allow multiple timers to be set", async () => {
   const inner = async () => {
-    // Small delay to ensure measurable time
     await new Promise((r) => setTimeout(r, 10));
     return [200, { "content-type": "text/plain" }, "Hello, World!"] as any;
   };

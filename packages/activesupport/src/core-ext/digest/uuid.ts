@@ -1,24 +1,10 @@
 import { ArgumentError } from "../../hash-utils.js";
 import { getCrypto } from "@blazetrails/ruby-compat";
 
-/**
- * Digest::UUID — mirrors `active_support/core_ext/digest/uuid.rb`.
- *
- * Ruby's namespace constants are 16 raw bytes packed into a String; a JS string
- * cannot hold arbitrary bytes, so they are `Uint8Array` here and
- * `packUuidNamespace` returns bytes rather than a packed String.
- */
-
 function namespaceBytes(hex: string): Uint8Array {
   return Uint8Array.from(hex.match(/../g)!, (byte) => parseInt(byte, 16));
 }
 
-/**
- * Ruby's `[DNS_NAMESPACE, ...].include?(namespace)` (digest/uuid.rb:63) compares
- * Strings with `==`, which is value equality; `Array#includes` over
- * `Uint8Array`s is identity, so any independently-built copy of a known
- * namespace would miss the branch and be rejected as a non-UUID.
- */
 function sameBytes(known: Uint8Array, namespace: string | Uint8Array): boolean {
   if (typeof namespace === "string") return false;
   return known.length === namespace.length && known.every((byte, i) => byte === namespace[i]);
@@ -33,17 +19,6 @@ export const OID_NAMESPACE = namespaceBytes("6ba7b8129dad11d180b400c04fd430c8");
 /** @internal */
 export const X500_NAMESPACE = namespaceBytes("6ba7b8149dad11d180b400c04fd430c8");
 
-/**
- * Generates a v5 non-random UUID (Universally Unique IDentifier).
- *
- * Passing `"md5"` generates version 3 UUIDs; `"sha1"` generates version 5
- * UUIDs. `uuidFromHash` always generates the same UUID for a given name and
- * namespace combination.
- *
- * Mirrors: Digest::UUID.uuid_from_hash (`core_ext/digest/uuid.rb:19-38`).
- * Rails switches on the digest *class*; trails' crypto adapter names its
- * digests with the OpenSSL string, so `hashClass` is that string.
- */
 export function uuidFromHash(
   hashClass: string,
   namespace: string | Uint8Array,
@@ -83,47 +58,22 @@ export function uuidFromHash(
   return `${hex(ary[0], 8)}-${hex(ary[1], 4)}-${hex(ary[2], 4)}-${hex(ary[3], 4)}-${hex(ary[4], 4)}${hex(ary[5], 8)}`;
 }
 
-/**
- * Convenience method for uuidFromHash using MD5.
- *
- * Mirrors: Digest::UUID.uuid_v3 (`core_ext/digest/uuid.rb:41-43`).
- */
 export function uuidV3(uuidNamespace: string | Uint8Array, name: string): string {
   return uuidFromHash("md5", uuidNamespace, name);
 }
 
-/**
- * Convenience method for uuidFromHash using SHA1.
- *
- * Mirrors: Digest::UUID.uuid_v5 (`core_ext/digest/uuid.rb:46-48`).
- */
 export function uuidV5(uuidNamespace: string | Uint8Array, name: string): string {
   return uuidFromHash("sha1", uuidNamespace, name);
 }
 
-/**
- * Convenience method for SecureRandom.uuid.
- *
- * Mirrors: Digest::UUID.uuid_v4 (`core_ext/digest/uuid.rb:51-53`).
- */
 export function uuidV4(): string {
   return getCrypto().randomUUID();
 }
 
-/**
- * Returns the nil UUID. This is a special form of UUID that is specified to
- * have all 128 bits set to zero.
- *
- * Mirrors: Digest::UUID.nil_uuid (`core_ext/digest/uuid.rb:57-59`).
- */
 export function nilUuid(): string {
   return "00000000-0000-0000-0000-000000000000";
 }
 
-/**
- * Mirrors: Digest::UUID.pack_uuid_namespace
- * (`core_ext/digest/uuid.rb:61-71`, `private_class_method`).
- */
 export function packUuidNamespace(namespace: string | Uint8Array): Uint8Array {
   if (
     [DNS_NAMESPACE, OID_NAMESPACE, URL_NAMESPACE, X500_NAMESPACE].some((known) =>

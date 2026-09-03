@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { isBlank, isPresent, presence, TimeWithZone, TimeZone } from "../../index.js";
 
-// blank_test.rb's NOT list carries `Time.now`; Ruby has one Time class, so the
-// trails analogue is the whole Temporal family plus `TimeWithZone`.
 const NOW = new Temporal.Instant(1_700_000_000_000_000_000n);
 const TIMES = [
   new Date(NOW.epochMilliseconds),

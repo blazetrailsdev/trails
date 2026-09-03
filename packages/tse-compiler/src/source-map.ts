@@ -1,5 +1,3 @@
-/** V3 source map generator — line-level mappings, no external deps. */
-
 const VLQ = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 export function encodeVlq(value: number): string {

@@ -1,12 +1,4 @@
 import { hasKey, mergeBang, slice } from "@blazetrails/ruby-compat";
-/**
- * ActionController::ParamsWrapper::Options + private mixin methods
- *
- * Configuration data container for parameter wrapping plus the
- * controller-instance mixin functions that perform the wrapping at
- * `process_action` time. Mirrors `metal/params_wrapper.rb`.
- * @see https://api.rubyonrails.org/classes/ActionController/ParamsWrapper.html
- */
 
 import { demodulize, singularize, underscore } from "@blazetrails/activesupport";
 
@@ -22,12 +14,6 @@ export class Options {
   exclude: string[] | null;
   klass: unknown;
   model: unknown;
-  /**
-   * Tracks whether `name` was explicitly provided (mirrors Rails'
-   * `@name_set` mutex flag in `Options#initialize` — `@name_set = name`
-   * is truthy only when a name was passed in). Used by the `inherited`
-   * hook to decide whether to re-derive the default on subclass dup.
-   */
   nameSet: boolean;
 
   constructor(
@@ -99,10 +85,7 @@ export interface WrapperHostClass {
   name?: string | null;
 }
 
-/**
- * Sets `_wrapper_options` on the controller class (class-method mixin).
- * @internal
- */
+/** @internal */
 export function _setWrapperOptions(
   this: { _wrapperOptions: Options },
   options: Record<string, unknown>,
@@ -110,26 +93,17 @@ export function _setWrapperOptions(
   this._wrapperOptions = Options.fromHash(options);
 }
 
-/**
- * Returns the wrapper key under which wrapped params are stored.
- * @internal
- */
+/** @internal */
 export function _wrapperKey(this: ParamsWrapperHost): string | null {
   return this._wrapperOptions.name;
 }
 
-/**
- * Returns the list of enabled formats.
- * @internal
- */
+/** @internal */
 export function _wrapperFormats(this: ParamsWrapperHost): string[] | null {
   return this._wrapperOptions.format;
 }
 
-/**
- * Returns the subset of `parameters` selected by include/exclude options.
- * @internal
- */
+/** @internal */
 export function _extractParameters(
   this: ParamsWrapperHost,
   parameters: Record<string, unknown>,
@@ -151,10 +125,7 @@ export function _extractParameters(
   return out;
 }
 
-/**
- * Wraps `parameters` into `{ wrapperKey => extractedParameters }`.
- * @internal
- */
+/** @internal */
 export function _wrapParameters(
   this: ParamsWrapperHost,
   parameters: Record<string, unknown>,
@@ -164,11 +135,7 @@ export function _wrapParameters(
   return { [key]: _extractParameters.call(this, parameters) };
 }
 
-/**
- * Checks if parameter wrapping should be performed for this request.
- * Mirrors Rails' `_wrapper_enabled?`.
- * @internal
- */
+/** @internal */
 export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
   try {
     if (!this.request.hasContentType()) return false;
@@ -186,8 +153,6 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
 }
 
 /**
- * Performs the wrap: merges wrapped hash into `request.parameters`,
- * `request.requestParameters`, and `request.filteredParameters()`.
  * @internal
  * @missingRailsArgs merge! — PERMANENT
  */
@@ -205,16 +170,7 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
   mergeBang(this.request.filteredParameters(), wrappedFilteredHash);
 }
 
-/**
- * Derive the wrapper model name from the controller class name.
- * Rails uses `safe_constantize` to look up a model class by traversing
- * namespaces (`Foo::Bar::UsersController` → `Foo::Bar::User`, `Foo::User`,
- * `User`); we don't have a global constant registry, so we return the
- * demodulized, singularized, snake_case name as a string fallback. Callers
- * that need a real model class should pass `model:` explicitly to
- * `wrap_parameters`.
- * @internal
- */
+/** @internal */
 export function _defaultWrapModel(this: { _wrapperOptions: Options }): string | null {
   const klass = this._wrapperOptions.klass as WrapperHostClass | null | undefined;
   const name = klass?.name;

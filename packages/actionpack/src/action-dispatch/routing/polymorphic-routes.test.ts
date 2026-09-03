@@ -139,7 +139,6 @@ describe("polymorphic dispatch with leading RoutesProxy", () => {
     const host = makeHost();
     const out = polymorphicPath.call(host, [proxy, new Post(7)]);
     expect(out).toBe("/mounted/posts/7");
-    // helper invoked through proxy → merged options appended as last arg
     expect(seen.length).toBe(1);
     const finalArg = seen[0][seen[0].length - 1] as Record<string, unknown>;
     expect(finalArg.locale).toBe("en");

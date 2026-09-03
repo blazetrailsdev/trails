@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Uncountables } from "./inflector/inflections.js";
 
-// Covers `Inflections::Uncountables` (activesupport/lib/active_support/
-// inflector/inflections.rb:35-63) directly: the downcasing lives in `add`, and
-// `uncountable?` matches on `/\b<word>\Z/i` rather than on set membership.
 describe("Uncountables (trails)", () => {
   it("downcases in add, not at the call site", () => {
     const uncountables = new Uncountables().add(["Equipment", ["Rice", "MONEY"]]);

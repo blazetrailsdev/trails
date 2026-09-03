@@ -5,7 +5,6 @@ import { setApp, _resetApp } from "./config.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "./signed-global-id.js";
 
-/** Stands in for `ActiveRecord::FixtureSet`, the class `railtie.rb:42` extends. */
 class TestFixtureSet {
   static identify(label: string, columnType: string = ":integer"): number | string {
     return columnType === ":uuid" ? `uuid-${label}` : label.length;

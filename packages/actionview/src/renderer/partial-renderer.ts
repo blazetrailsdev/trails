@@ -3,19 +3,14 @@ import { MissingTemplate } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
 import type { RenderableTemplate, ViewContext, RenderOptions } from "./abstract-renderer.js";
 
-/**
- * ActionView::PartialRenderer
- *
- * Renders a single named partial with optional locals and layout.
- * @internal
- */
+/** @internal */
 export class PartialRenderer extends AbstractRenderer {
-  /** Mirrors `@options` (`partial_renderer.rb:225`). @internal */
+  /** @internal */
   readonly options: RenderOptions;
-  /** Mirrors `@locals` (`partial_renderer.rb:226`). @internal */
+  /** @internal */
   protected readonly locals: Record<string, unknown>;
 
-  /** Mirrors `@details` (`partial_renderer.rb:227`). @internal */
+  /** @internal */
   protected readonly details: Record<string, readonly (string | symbol)[]>;
 
   constructor(lookupContext: LookupContext, options: RenderOptions = {}) {
@@ -25,7 +20,6 @@ export class PartialRenderer extends AbstractRenderer {
     this.details = this.extractDetails(options as Record<string, unknown>);
   }
 
-  /** Mirrors `PartialRenderer#render` (`partial_renderer.rb:230-237`). */
   async render(partial: string, context: ViewContext, block: unknown): Promise<RenderedTemplate> {
     const template = this.findTemplate(partial, this.templateKeys(partial));
 
@@ -38,12 +32,12 @@ export class PartialRenderer extends AbstractRenderer {
     return this.renderPartialTemplate(context, this.locals, template, layout, block);
   }
 
-  /** Mirrors `template_keys(_)` (`partial_renderer.rb:241-243`). @internal */
+  /** @internal */
   protected templateKeys(_: string): string[] {
     return Object.keys(this.locals);
   }
 
-  /** Mirrors `render_partial_template` (`partial_renderer.rb:245-260`). @internal */
+  /** @internal */
   protected async renderPartialTemplate(
     view: ViewContext,
     locals: Record<string, unknown>,
@@ -59,7 +53,7 @@ export class PartialRenderer extends AbstractRenderer {
     return this.buildRenderedTemplate(content, template);
   }
 
-  /** Mirrors `find_template(path, locals)` (`partial_renderer.rb:262-265`). @internal */
+  /** @internal */
   protected findTemplate(path: string, locals: readonly string[]): RenderableTemplate {
     const prefixes = path.includes("/") ? [] : this.lookupContext.prefixes;
     const template = this.lookupContext.findAll(

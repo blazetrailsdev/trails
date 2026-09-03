@@ -1,41 +1,3 @@
-/**
- * Mirrors: i18n/lib/i18n/backend/key_value.rb
- *
- * The gem's `KeyValue` has no superclass: it splits the code into a
- * `KeyValue::Implementation` module that `include Base, Flatten`
- * (key_value.rb:69-73) and `include Implementation`s it back
- * (key_value.rb:201), so a module included over `KeyValue` lands *between* the
- * two. TypeScript has no module reopening, so this file keeps the bodies in the
- * `KeyValue` class itself and spells `include Base` as the prototype copy at
- * the bottom, exactly as `simple.ts` does; the class body still wins over
- * `Base`, as Ruby's `include` does. The `Flatten` arm of the same `include` is
- * the trails mixin idiom — `this`-typed functions from `flatten.ts` assigned to
- * the class. The one `super` below is `Base.prototype.pluralize.call(this)` for
- * the reason Ruby resolves it to `Base` too — a module included into `KeyValue`
- * sits above `Implementation`, never between it and `Base`. `pluralize` is
- * protected, which TS only lets a `KeyValue` reach through another `KeyValue`,
- * so `Base.prototype` is cast to what `include Base` already made it.
- *
- * `I18n::JSON` is `Oj` or `ActiveSupport::JSON` depending on what is
- * installed (key_value.rb:7-22); JS has `JSON` in the language, and its
- * `stringify` / `parse` are that `encode` / `decode`.
- *
- * The store is the gem's duck type, not a class: anything answering `[]`,
- * `[]=` and `keys` (key_value.rb:26-30). A Ruby Hash is a JS `Map`, whose
- * `get` / `set` / `keys` are those three, which is the same reading
- * `fallbacks.test.ts` already gives a Hash passed as a collaborator.
- *
- * `reduce` carries a seed because JS has no `inject` — an empty array is a
- * `TypeError` rather than Ruby's `nil`. Seeding with `undefined` restores
- * `inject`'s answer, so an empty store still raises where Ruby raises, inside
- * `deep_symbolize_keys` (i18n/lib/i18n/utils.rb:34), and not a call earlier.
- *
- * Not ported on `SubtreeProxy`: `is_a?`, `kind_of?`, `instance_of?`, `nil?`
- * and `inspect` are Ruby core object protocol (see "Skipped methods" in
- * docs/ruby-ts-conventions.md). `nil?` still has a body here because the
- * emptiness it reports is load-bearing — see `Base`'s `isNil`.
- */
-
 import { isSymbol } from "@blazetrails/ruby-compat";
 
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
@@ -52,7 +14,6 @@ import {
 } from "./flatten.js";
 import { Base, type TranslateOptions } from "./base.js";
 
-/** The store `KeyValue` is initialized with (key_value.rb:26-30). */
 export interface Store {
   get(key: string): string | undefined;
   set(key: string, value: string): unknown;
@@ -63,71 +24,22 @@ function isHash(value: unknown): value is TranslationData {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * The methods `SubtreeProxy` answers itself; every other property read is a
- * store lookup, which is what Ruby gets for free from `[]` being a method
- * while `@master_key` / `@store` / `@subtree` are ivars. Those three keep the
- * Rails names as `#private` fields, which — unlike ordinary ones — are not
- * properties at all, so no translation key can collide with them.
- */
 const SUBTREE_PROXY_METHODS = new Set(["get", "hasKey", "nil"]);
 
-/**
- * Ruby `include Base` (key_value.rb:73) as a type: the merged interface gives
- * `KeyValue` every member `Base` declares, without an `extends` clause the gem
- * does not have. The runtime half of the same `include` is the prototype copy
- * at the bottom of this file.
- */
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge is the point: it is `include Base` on the type side.
 export interface KeyValue extends Base {}
 
-/**
- * This is a basic backend for key value stores. It receives on
- * initialization the store, which should respond to three methods:
- *
- * * store.get(key)        - Used to get a value
- * * store.set(key, value) - Used to set a value
- * * store.keys()          - Used to get all keys
- *
- * Since these stores only supports string, all values are converted
- * to JSON before being stored, allowing it to also store booleans,
- * hashes and arrays. However, this store does not support Procs.
- *
- * As the ActiveRecord backend, Symbols are just supported when loading
- * translations from the filesystem or through explicit store translations.
- *
- * Also, avoid calling I18n.availableLocales since it's a somehow
- * expensive operation in most stores.
- *
- * == Subtrees
- *
- * In most backends, you are allowed to retrieve part of a translation tree:
- *
- *     I18n.backend().storeTranslations("en", { foo: { bar: ":baz" } });
- *     I18n.t("foo"); //=> { bar: ":baz" }
- *
- * This backend supports this feature by default, but it slows down the storage
- * of new data considerably and makes hard to delete entries. That said, you are
- * allowed to disable the storage of subtrees on initialization
- * (`new KeyValue(store, false)`), which is useful when a KeyValue backend is
- * chained to a Simple backend.
- */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class KeyValue {
   store: Store | null;
   private _subtrees: boolean;
 
   /**
-   * Ruby's `@links` ivar, which `Flatten#links` memoizes into.
-   *
    * @internal
-   * @noRailsEquivalent PERMANENT — a Ruby ivar is private to the object; the
-   * TS field cannot be `private` because `Flatten`'s `this`-typed mixin
-   * functions live in another file and read it.
+   * @noRailsEquivalent PERMANENT
    */
   linksCache?: Map<string, Map<string, string>>;
 
-  /** Mirrors: `include Flatten` (key_value.rb:70). */
   normalizeFlatKeys = normalizeFlatKeys;
   links = links;
   flattenKeys = flattenKeys;
@@ -142,12 +54,8 @@ export class KeyValue {
   escapeDefaultSeparator = escapeDefaultSeparator;
 
   /**
-   * Ruby's `@translations` ivar, which `translations` memoizes into.
-   *
    * @internal
-   * @noRailsEquivalent PERMANENT — a Ruby ivar is private to the object; the
-   * TS field cannot be `private` because the `this`-typed store functions live
-   * in another file and read it.
+   * @noRailsEquivalent PERMANENT
    */
   translationsStore?: TranslationData;
 
@@ -156,7 +64,6 @@ export class KeyValue {
     this._subtrees = subtrees;
   }
 
-  /** Mirrors: `initialized?` */
   initialized(): boolean {
     return this.store != null;
   }
@@ -198,11 +105,6 @@ export class KeyValue {
     return locales as Locale[];
   }
 
-  /**
-   * Queries the translations from the key-value store and converts
-   * them into a hash such as the one returned from loading the
-   * haml files
-   */
   protected translations(): TranslationData {
     const nested = [...this.store!.keys()].map((mainKey) => {
       const mainValue: unknown = JSON.parse(this.store!.get(mainKey)!);
@@ -219,15 +121,8 @@ export class KeyValue {
     ));
   }
 
-  protected initTranslations(): void {
-    // NO OP
-    // This call made also inside Simple Backend and accessed by
-    // other plugins like I18n-js and babilu and
-    // to use it along with the Chain backend we need to
-    // provide a uniform API even for protected methods :S
-  }
+  protected initTranslations(): void {}
 
-  /** Mirrors: `subtrees?` */
   protected subtrees(): boolean {
     return this._subtrees;
   }
@@ -268,13 +163,6 @@ export class KeyValue {
   }
 }
 
-/**
- * Ruby `include Base` (key_value.rb:73). `include` copies a module's instance
- * methods into the ancestry *below* the class body, so a key the class body
- * already defines is never replaced — the `hasOwnProperty` guard below. Some of
- * `Base`'s members are TS class fields (`transliterate`, `loadYaml`), which
- * only exist on an instance, so an instance is the second source read.
- */
 for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
@@ -309,12 +197,10 @@ export class SubtreeProxy {
     });
   }
 
-  /** Mirrors: `has_key?` */
   hasKey(key: string): boolean {
     return (this.#subtree != null && key in this.#subtree) || this.get(key) != null;
   }
 
-  /** Mirrors: `[]` */
   get(key: string): unknown {
     let value: unknown;
     if (this.#subtree == null || (value = this.#subtree[key]) == null) {
@@ -327,7 +213,6 @@ export class SubtreeProxy {
     return value;
   }
 
-  /** Mirrors: `nil?` */
   nil(): boolean {
     return this.#subtree == null;
   }

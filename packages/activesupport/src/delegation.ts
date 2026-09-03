@@ -1,18 +1,8 @@
-/**
- * Delegation — delegate method calls to another object.
- * Mirrors ActiveSupport::Delegation and ActiveSupport::DelegationError.
- */
-
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
 import { constantize, registeredConstantName, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
-/**
- * Ruby's `NoMethodError`, raised when the delegator calls a method the target
- * does not answer. Rails re-raises MRI's from the generated body's
- * `rescue NoMethodError => e ... else raise` (delegation.rb:130-141).
- */
 class NoMethodError extends NameError {
   constructor(message: string) {
     super(message);
@@ -32,10 +22,6 @@ export class DelegationError extends Error {
 }
 
 export interface DelegateOptions {
-  /**
-   * A method name, or the trails spelling of a Ruby Module — a class or module
-   * object, whose registered constant name is the receiver (`delegation.rb:36-47`).
-   */
   to: string | object;
   prefix?: boolean | string;
   allowNil?: boolean;
@@ -54,37 +40,6 @@ export namespace Delegation {
     "block",
   ]);
 
-  /**
-   * Mirrors: `ActiveSupport::Delegation.generate`
-   * (`activesupport/lib/active_support/delegation.rb:23-158`). Ruby builds the
-   * delegator bodies as source and `module_eval`s them; TS defines them as
-   * properties on `owner`, so the `location` / `signature` / `nilable` /
-   * `private` / `as` keywords — all of which exist to shape that generated
-   * source or its `def` visibility — have no TS counterpart and are omitted.
-   *
-   * The generated delegator calls a callable member and reads one that is not:
-   * Ruby's `_.#{method}(...)` (`:130`) is a call either way, because a Ruby
-   * attr_reader IS a method, while a trails reader is a property (CLAUDE.md,
-   * "Generated attribute readers are properties"). A member the target does not
-   * answer at all still raises: Rails converts the generated body's
-   * `NoMethodError` to a `DelegationError` only when `_` is nil, and otherwise
-   * re-raises it (`:132-140`).
-   *
-   * Two arms of the receiver step (`:36-58`) read differently in TS. The `self.`
-   * Ruby prepends to a `RESERVED_METHOD_NAMES` receiver (`:58`) disambiguates a
-   * keyword from a method call in the source it compiles; a JS member read is
-   * never ambiguous, so the generated body reads the same member with or without
-   * it — the prefix survives only where Rails also shows it, in the
-   * `DelegationError` message (`:135`). And `prefix: true` with a Module target
-   * raises here: Ruby reaches `TypeError` from `/^[^a-z_]/.match?(to)` (`:27`)
-   * because a Module has no implicit String conversion, where TS has to test the
-   * type itself, so it raises the `ArgumentError` that line is guarding for.
-   *
-   * `to.name` (`:38`, `:41`, `:45`) is Ruby's full constant path, so a nested
-   * `Admin::Json` delegates through `::Admin::Json`; a JS class carries only its
-   * own identifier, so the registered path comes from `registeredConstantName`
-   * and the class's own `name` is the fallback for a top-level registration.
-   */
   export function generate<T extends object>(
     owner: T,
     methods: string[],
@@ -155,24 +110,6 @@ export namespace Delegation {
     return methodNames;
   }
 
-  /**
-   * Mirrors: `ActiveSupport::Delegation.generate_method_missing`
-   * (`delegation.rb:160-198`). Ruby defines `method_missing` and
-   * `respond_to_missing?` on `owner`; the trails idiom for both is a `Proxy`,
-   * whose `get` trap is the former and whose `has` trap is the latter — so this
-   * returns the wrapped object instead of mutating `owner`. The
-   * `marshal_dump` / `_dump` exemption is Rails' and belongs to
-   * `respond_to_missing?` alone (`:167`, `:186`): an explicit call still
-   * forwards, because `method_missing` does not repeat the check.
-   *
-   * The receiver step (`:162`) reads the same way it does in `generate`: the
-   * `self.` Ruby prepends to a `RESERVED_METHOD_NAMES` target — or to one
-   * literally named `__target`, which Ruby has to disambiguate from the local
-   * its generated body binds (`:164`, `:185`) — shapes the source it compiles,
-   * and a JS member read is never ambiguous, so the traps read the same member
-   * either way. The prefix survives where Rails also shows it, in the
-   * `DelegationError` message (`:176`, `:196`).
-   */
   export function generateMethodMissing<T extends object>(
     owner: T,
     target: string,
@@ -199,11 +136,6 @@ export namespace Delegation {
           throw DelegationError.nilTarget(globalThis.String(prop), target);
         }
         if (!(globalThis.String(prop) in Object(__target))) {
-          // Rails' `else super` (`:172`, `:193`), which raises NoMethodError.
-          // A `get` trap cannot raise there — `typeof x.foo === "function"` and
-          // `"foo" in x` both route through it — so the read returns a function
-          // that raises when called, which is where Ruby raises too. Same shape
-          // and same reasoning as `methodMissingProxy`.
           if (PROTOCOL_PROBES.has(globalThis.String(prop))) return undefined;
           return () => {
             throw new NoMethodError(

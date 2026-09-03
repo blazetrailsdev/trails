@@ -1,6 +1,3 @@
-// TS-only surface: Rails' Instrumenter#instrument has no test for its rescue
-// arm (test_record_with_exception covers Event#record), and Ruby's one blocking
-// body has no awaited-block arm to cover at all.
 import { describe, expect, it } from "vitest";
 import { Event, Instrumenter } from "./instrumenter.js";
 
@@ -28,14 +25,9 @@ describe("Instrumenter (trails)", () => {
     expect(notifier.finishes).toHaveLength(1);
   });
 
-  // JS can throw a non-Error; Ruby cannot, so `e.class.name` has no analogue
-  // here and the fallback is what keeps payload[:exception] a [name, message]
-  // pair regardless of what was thrown.
   it("instrument names a thrown non-Error without a constructor", () => {
     const notifier = buildNotifier();
     const payload: Record<string, unknown> = {};
-    // Asserting the thrown value itself, not just toThrow(): a falsy throw is
-    // exactly where "did it re-raise?" and "did it swallow?" look alike.
     let thrown: unknown = "nothing was thrown";
     try {
       new Instrumenter(notifier).instrument("crash", payload, () => {
@@ -71,9 +63,6 @@ describe("Instrumenter (trails)", () => {
     expect(payload.exception_object).toBeInstanceOf(RangeError);
   });
 
-  // The whole point of the unified body: a thenable block moves the `ensure`
-  // arm onto the settled promise, so the handle must NOT be finished while the
-  // block is still in flight.
   it("instrument finishes the handle only once an awaited block settles", async () => {
     const notifier = buildNotifier();
     let release!: () => void;
@@ -90,10 +79,6 @@ describe("Instrumenter (trails)", () => {
     expect(notifier.finishes).toHaveLength(1);
   });
 
-  // trails has thenable-but-not-Promise types — `Relation`, `FutureResult::Complete`,
-  // the `thenableHash` proxy. Ruby's `ensure` fires as soon as the block returns,
-  // so a block that merely RETURNS one must finish the handle immediately and hand
-  // the object back unresolved, not await it.
   it("instrument returns a thenable block result without awaiting it", () => {
     const notifier = buildNotifier();
     const thenable = { then: (onFulfilled: (v: number) => void) => onFulfilled(1) };
@@ -102,9 +87,6 @@ describe("Instrumenter (trails)", () => {
     expect(notifier.finishes).toHaveLength(1);
   });
 
-  // build_handle is the low-level primitive TransactionInstrumenter spans a
-  // transaction with; it publishes one event carrying payload mutations made
-  // between start and finish.
   it("buildHandle publishes one event spanning start→finish", () => {
     const notifier = buildNotifier();
     const payload: Record<string, unknown> = { a: 1 };
@@ -125,9 +107,6 @@ describe("Instrumenter (trails)", () => {
     expect(() => handle.start()).toThrow(/expected state to be "initialized"/);
   });
 
-  // Rails' Instrumenter#build_handle delegates to the notifier when it can build
-  // handles (instrumenter.rb:78-80), only falling back to the LegacyHandle
-  // wrapper for publish-only notifiers (instrumenter.rb:13-15).
   it("buildHandle delegates to a notifier that can build handles", () => {
     const delegated = { start() {}, finish() {} };
     const calls: Array<[string, unknown]> = [];
@@ -145,9 +124,6 @@ describe("Instrumenter (trails)", () => {
   });
 
   it("instrument routes through the notifier's build_handle", () => {
-    // Rails' #instrument is build_handle → start → yield → finish
-    // (instrumenter.rb:54-65), so a notifier that builds handles drives the
-    // event through them rather than a separate publish path.
     const order: string[] = [];
     const notifier = {
       publish() {

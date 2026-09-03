@@ -39,7 +39,6 @@ export function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => v
     throw new InstrumentationSubscriberError(flat);
   }
 
-  // Rails' iterate_guarding_exceptions returns the collection (fanout.rb:41).
   return collection;
 }
 
@@ -60,31 +59,8 @@ type EventObjectCallback = (event: Event) => void;
 
 type Delegate = EventedListener | TimedCallback | EventObjectCallback;
 
-/**
- * Any object responding to `call` — Rails' `Subscribers.new` reaches for
- * `listener.method(:call)` whenever the listener is not itself procish
- * (fanout.rb:328), so a plain object with a `call` method subscribes. Ruby then
- * invokes `@delegate.call` uniformly for procs and callable objects
- * (fanout.rb:423, 439); JS has no such uniform invocation, so `Subscribers.new`
- * binds the object's `call` to its receiver and the groups keep calling a
- * function.
- *
- * Rails classifies a listener as EventObject on `procish.arity == 1 &&
- * procish.parameters.length == 1` (fanout.rb:330). JS exposes only
- * `Function.length`, which counts the parameters before the first defaulted or
- * rest one and has no `parameters` analogue — so `(event, ...rest)`, which Ruby
- * keeps timed, reads as single-arity here. There is no runtime reflection that
- * closes that gap short of parsing `Function.prototype.toString`.
- */
 export type CallableListener = { call(...args: never[]): void };
 
-/**
- * Mirrors `Fanout::Subscribers::Matcher` (fanout.rb:338-372).
- *
- * Rails' `wrap` returns the String pattern itself and relies on `String#===`;
- * TS has no such polymorphic `===`, so a String pattern is wrapped in
- * `StringMatcher` — the same three-way dispatch, spelled through one method.
- */
 export class Matcher {
   readonly pattern: RegExp;
   readonly exclusions = new Set<string>();
@@ -108,19 +84,12 @@ export class Matcher {
     if (this.pattern.test(name)) this.exclusions.add(name);
   }
 
-  /** Ruby `Matcher#===` (fanout.rb:360-362). */
   matches(name: string): boolean {
     this.pattern.lastIndex = 0;
     return this.pattern.test(name) && !this.exclusions.has(name);
   }
 }
 
-// Ruby's `Matcher.wrap` hands a String pattern back untouched (fanout.rb:341-349)
-// and matches it with `String#===`. TS has no polymorphic `===`, so that arm
-// gets an object with the same two methods as the other two matcher kinds.
-// `unsubscribe!` is never reached for a String pattern — Fanout#unsubscribe
-// only walks @other_subscribers (fanout.rb:88) — and answers false as
-// AllMessages#unsubscribe! does (fanout.rb:369-371).
 class StringMatcher {
   constructor(readonly pattern: string) {}
 
@@ -145,7 +114,6 @@ export class AllMessages {
 
 type AnyMatcher = Matcher | StringMatcher | AllMessages;
 
-/** The constructor a subscriber's `group_class` names (fanout.rb:386, 418, 428, 434). */
 type GroupClass = new (
   listeners: never[],
   name: string,
@@ -217,7 +185,6 @@ export class EventedGroup extends BaseGroup<EventedListener> {
 export class EventObjectGroup extends BaseGroup<EventObjectCallback> {
   private _event: Event | null = null;
 
-  /** The Event built at #start — trails threads child-event nesting through it. */
   get event(): Event | null {
     return this._event;
   }
@@ -228,8 +195,6 @@ export class EventObjectGroup extends BaseGroup<EventObjectCallback> {
   }
 
   override finish(_name: string, _id: unknown, payload: Record<string, unknown>): void {
-    // Rails' EventObjectGroup#finish: `@event.payload = payload` — replace the
-    // dup with the final object so deletions are reflected (fanout.rb:166-178).
     this._event!.payload = payload;
     this._event!.finishBang();
 
@@ -260,10 +225,6 @@ export class Handle {
     );
   }
 
-  /**
-   * The Event this handle's event-object group built at #start (if any), so a
-   * caller can thread trails' child-event nesting across nested handles.
-   */
   get event(): Event | null {
     for (const g of this.groups) {
       if (g instanceof EventObjectGroup) return g.event;
@@ -300,10 +261,6 @@ export class Handle {
   }
 }
 
-/**
- * This is a default queue implementation that ships with Notifications.
- * It just pushes events to all registered log subscribers.
- */
 export class Fanout {
   private stringSubscribers = new Map<string, Evented[]>();
   private otherSubscribers: Evented[] = [];
@@ -311,10 +268,6 @@ export class Fanout {
   private groupsForCache = new Map<string, Map<GroupClass, Delegate[]>>();
   private silenceableGroupsForCache = new Map<string, Map<GroupClass, Delegate[]>>();
 
-  // Rails keeps the evented start/finish handle stack in
-  // `IsolatedExecutionState[:_fanout_handle_stack]` (fanout.rb:277), so
-  // concurrent tasks don't share one stack. The key is per-Fanout so separate
-  // notifiers can't collide.
   private readonly _handleStackKey = Symbol("as_fanout_handle_stack");
 
   private handleStack(): Handle[] {
@@ -381,12 +334,7 @@ export class Fanout {
     }
   }
 
-  /**
-   * @missingRailsCall transform_values — PERMANENT: Ruby Hash#transform_values:
-   *   `group_by(&:group_class).transform_values { |s| s.map(&:delegate) }`
-   *   (notifications/fanout.rb:189-191) is folded into the local groupBy helper,
-   *   which emits the delegate lists directly.
-   */
+  /** @missingRailsCall transform_values — PERMANENT */
   groupsFor(name: string): Map<GroupClass, Delegate[]> {
     let groups = this.groupsForCache.get(name);
     if (!groups) {
@@ -435,9 +383,6 @@ export class Fanout {
   ): void {
     const handleStack = this.handleStack();
     const handle = handleStack.pop();
-    // Rails pops nil off an empty stack and lets finish_with_values raise
-    // NoMethodError (fanout.rb:283-287); the assertion keeps an unbalanced
-    // finish loud rather than silently doing nothing.
     handle!.finishWithValues(name, id, payload);
   }
 
@@ -469,21 +414,13 @@ export class Fanout {
     return this.allListenersFor(name).filter((s) => !s.isSilenced(name));
   }
 
-  /** Mirrors: `listening?` (fanout.rb:310-312). */
   listening(name: string): boolean {
     return this.allListenersFor(name).some((s) => !s.isSilenced(name));
   }
 
-  // This is a sync queue, so there is no waiting.
   wait(): void {}
 
-  /**
-   * Drop every subscriber and reset cached state. Used by unsubscribeAll.
-   *
-   * @noRailsEquivalent PERMANENT — Rails' test suite resets a notifier by
-   * reassigning `Notifications.notifier`, relying on Ruby's ivar reflection
-   * for the rest; JS has no such reflection, so the reset is a method.
-   */
+  /** @noRailsEquivalent PERMANENT */
   clear(): void {
     this.stringSubscribers.clear();
     this.otherSubscribers.length = 0;
@@ -491,8 +428,6 @@ export class Fanout {
   }
 }
 
-// Ruby's `group_by(&:group_class).transform_values { |s| s.map(&:delegate) }`
-// (fanout.rb:189-197) in one pass — JS has no Enumerable#group_by.
 function groupBy(subscribers: Evented[]): Map<GroupClass, Delegate[]> {
   const groups = new Map<GroupClass, Delegate[]>();
   for (const s of subscribers) {
@@ -597,8 +532,6 @@ export class Subscribers {
       return new Evented(pattern, listener);
     }
 
-    // Doing this to detect a single argument block or callable
-    // like `proc { |x| }` vs `proc { |*x| }` (fanout.rb:325-331).
     const procish = (
       typeof listener === "function" ? listener : (listener.call as (...args: never[]) => void)
     ) as (...args: never[]) => void;

@@ -120,9 +120,6 @@ describe("Template::Handlers::Tse", () => {
 
   describe("translateLocation", () => {
     it("anchors a compiled spot to the source-line column (Rails parity)", () => {
-      // Snippet matches what @blazetrails/tse-compiler actually emits for
-      // `<%= name %>` (see emit-js.ts + parser.ts trim) so the test exercises
-      // the real anchoring path, not a fabricated one.
       const source = "<h1>hi</h1>\n<%= name %>\n";
       const spot = {
         snippet: "_ob.append(name);",
@@ -179,7 +176,6 @@ describe("Template::Handlers::Tse", () => {
       );
       expect(code).toContain(`_ob.safeAppend("<!-- BEGIN ${id} -->");`);
       expect(code).toContain(`_ob.safeAppend("<!-- END ${id} -->");`);
-      // BEGIN before END
       expect(code.indexOf("BEGIN")).toBeLessThan(code.indexOf("END"));
     });
 

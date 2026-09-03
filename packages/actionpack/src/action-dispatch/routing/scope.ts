@@ -1,9 +1,4 @@
-/**
- * Linked list of scope frames built up by the Mapper DSL, mirroring
- * `ActionDispatch::Routing::Mapper::Scope`.
- *
- * @internal
- */
+/** @internal */
 
 export type ScopeLevel =
   | "resource"
@@ -56,11 +51,6 @@ export class Scope {
   ) {
     this.parent = parent;
     this.scopeLevel = scopeLevel;
-    // Rails: @hash = parent ? parent.frame.merge(hash) : hash
-    // Preserve `null` when parent is null so `null?` (isNull) is observable
-    // on Scope.ROOT. Children of ROOT spread over `ROOT.frame` (which is
-    // `null`); JS object-spread treats `null` as empty, so the result is
-    // a plain copy of `hash` — matching Rails where ROOT.frame is `{}`.
     this.hash = parent ? { ...parent.frame, ...(hash ?? {}) } : hash;
   }
 
@@ -83,7 +73,6 @@ export class Scope {
     return RESOURCE_SCOPES.has(this.scopeLevel);
   }
 
-  /** Mirrors Rails `Scope#action_name`. */
   actionName(
     namePrefix: string | undefined,
     prefix: string | undefined,

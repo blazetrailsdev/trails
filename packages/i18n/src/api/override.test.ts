@@ -1,21 +1,3 @@
-/**
- * Mirrors: i18n/test/api/override_test.rb
- *
- * `I18n.dup` duplicates the module object; an ESM namespace is not duplicable,
- * so the copy below is the object spread of its exports, and `extend` is
- * `Object.assign` of a module's methods onto it. Ruby's `@I18n` cannot keep its
- * name — `I18n` is the namespace import it copies — so the local reads
- * `dupI18n`. `@I18n.backend =` still reaches the one process-wide config, which
- * is what `I18n.config` is here (i18n.ts:92-93).
- *
- * Only "make sure modules can overwrite I18n signature" is ported.
- * "make sure modules can overwrite I18n methods" needs `translate!` to reach
- * the overriding `translate` through `self`, and trails' `translateBang` calls
- * the module-level `translate` directly (i18n.ts:261-267) because a module of
- * top-level functions has no receiver to dispatch on — filed as
- * `i18n-base-receiver-dispatch`.
- */
-
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { Simple } from "../backend/simple.js";
@@ -55,7 +37,6 @@ describe("I18nOverrideTest", () => {
     expect(exception.message).toBeTruthy();
 
     Object.assign(dupI18n, OverrideSignature);
-    // tr8n example
     expect(dupI18n.translate("Hello", "Welcome message on home page", { tokenize: true })).toBe(
       "HelloWelcome message on home page",
     );

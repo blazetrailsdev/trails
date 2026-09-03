@@ -35,9 +35,6 @@ describe("Route", () => {
 
   describe("match() — path-only matcher", () => {
     it("ignores request constraints since match() takes no request attributes", () => {
-      // Subdomain is a request constraint that would only be evaluated
-      // against a real request. Route#match takes (method, path) only,
-      // so it should still match by path despite the request constraint.
       const route = new Route("GET", "/posts", "posts", "index", {
         constraints: { subdomain: "api" },
       });
@@ -45,8 +42,6 @@ describe("Route", () => {
     });
 
     it("returns null without throwing when the path is unparseable", () => {
-      // Mirrors the Journey-parser swallow in collectParamNamesFromJourneyAst:
-      // a malformed path shouldn't crash the route table at match time.
       const route = new Route("GET", "/posts/(unclosed", "posts", "show");
       expect(() => route.match("GET", "/posts/anything")).not.toThrow();
       expect(route.match("GET", "/posts/anything")).toBeNull();
@@ -71,13 +66,12 @@ describe("Route", () => {
     it("scores top-level glob captures as 0 (nested by definition)", () => {
       const r1 = new Route("GET", "/files/static", "files", "show");
       const r2 = new Route("GET", "/files/*path", "files", "show");
-      // Static route should outscore the glob route.
       expect(r1.score()).toBeGreaterThan(r2.score());
     });
 
     it("scores symbols inside optional groups as 0", () => {
-      const r1 = new Route("GET", "/posts/:id", "posts", "show"); // top-level :id
-      const r2 = new Route("GET", "/posts(/:id)", "posts", "show"); // optional :id
+      const r1 = new Route("GET", "/posts/:id", "posts", "show");
+      const r2 = new Route("GET", "/posts(/:id)", "posts", "show");
       expect(r1.score()).toBeGreaterThan(r2.score());
     });
 
@@ -87,9 +81,6 @@ describe("Route", () => {
     });
 
     it("does not read inherited keys (Object.prototype) from the knowledge map", () => {
-      // `:toString` would read `Object.prototype.toString` (a function — truthy)
-      // and inflate the score without `Object.hasOwn`. After the fix, an empty
-      // knowledge map must score the same as having no `toString` entry.
       const r = new Route("GET", "/:toString", "x", "y");
       expect(r.score({})).toBeLessThan(r.score({ toString: true }));
     });
@@ -107,43 +98,27 @@ describe("Route", () => {
     });
 
     it("treats bare '*' as a literal (no implicit empty-name splat)", () => {
-      // The Journey scanner treats trailing/bare `*` as a literal — it
-      // doesn't capture an empty-named splat. So `/page*` has no path
-      // params and pathFor() round-trips the literal star.
       const route = new Route("GET", "/page*", "x", "y");
       expect(route.pathParamNames).toEqual([]);
       expect(route.pathFor()).toBe("/page*");
     });
 
     it("collapses structural // when slash-bearing capture is in an omitted optional", () => {
-      // controller carries '/' but its group is omitted because :action is
-      // missing. The slash-bearing value never lands in the output, so
-      // the structural `//` left by that omitted group must still collapse.
       const route = new Route("GET", "(/:controller/:action)(/:id)", "x", "y");
       expect(route.pathFor({ controller: "admin/posts", id: "1" })).toBe("/1");
     });
 
     it("collapses slashes when slash-bearing-capture optional is omitted", () => {
-      // The route declares a `:controller` (which preserves `/` in its
-      // value via Format.requiredPath) but the user doesn't supply it.
-      // The supplied-value check should detect that no used value
-      // contains `/`, so the collapse runs and removes the leading `//`
-      // from the omitted optional.
       const route = new Route("GET", "(/:controller)(/:action)", "x", "y");
       expect(route.pathFor({ action: "show" })).toBe("/show");
     });
 
     it("ignores unused params when deciding whether to collapse slashes", () => {
-      // `extra` isn't declared in the route, so a `/` in its value must
-      // not block the collapse of the structural double-slash.
       const route = new Route("GET", "(/:a)(/:b)", "x", "y");
       expect(route.pathFor({ b: "x", extra: "/" } as Record<string, string>)).toBe("/x");
     });
 
     it("treats empty string as supplied (matches Journey Formatter semantics)", () => {
-      // Journey Formatter follows Ruby truthiness — `""` is supplied.
-      // `/posts/:id` with `{ id: "" }` formats as `/posts/` (the empty
-      // segment is preserved by the structural separator that follows).
       const route = new Route("GET", "/posts/:id", "posts", "show");
       expect(route.pathFor({ id: "" })).toBe("/posts/");
     });
@@ -152,17 +127,12 @@ describe("Route", () => {
       const route = new Route("GET", "/posts/:id", "posts", "show", {
         constraints: { id: /\d+/ },
       });
-      // `42abc` would pass an unanchored `/\d+/` but fails the anchored
-      // `^(?:\d+)$` Journey wraps requirements in.
       expect(() => route.pathFor({ id: "42abc" })).toThrow(/Missing required parameter :id/);
       expect(() => route.pathFor({ id: "abc" })).toThrow(/Missing required parameter :id/);
       expect(route.pathFor({ id: "42" })).toBe("/posts/42");
     });
 
     it("ignores request-attribute constraints (only path captures are validated)", () => {
-      // `subdomain` is a request constraint, not a path capture. pathFor
-      // shouldn't validate against it even when the caller supplies an
-      // unrelated value with a non-matching key.
       const route = new Route("GET", "/posts/:id", "posts", "show", {
         constraints: { id: /\d+/, subdomain: /^api$/ },
       });
@@ -181,11 +151,6 @@ describe("Route", () => {
     });
 
     it("does not lose a route param named __proto__", () => {
-      // Plain-object hash inside pathFor() would route an own `__proto__`
-      // assignment to the inherited setter, silently dropping it. Using a
-      // null-prototype hash makes it an own property. The input needs an
-      // explicit own __proto__ since the literal { __proto__: ... } sets
-      // the prototype rather than an own property.
       const route = new Route("GET", "/:__proto__", "x", "y");
       const params: Record<string, string> = Object.create(null);
       params["__proto__"] = "evil";
@@ -193,18 +158,11 @@ describe("Route", () => {
     });
 
     it("throws missing-required when a name is required at the top level even if it also appears optionally", () => {
-      // `/:id(.:id)` has `:id` both required (top-level) and inside an
-      // optional group. Pattern.requiredNames would drop it; the
-      // top-level-symbol walk keeps it.
       const route = new Route("GET", "/:id(.:id)", "x", "y");
       expect(() => route.pathFor({})).toThrow(/Missing required parameter :id/);
     });
 
     it("strips stateful flags (g/y/m) from anchored requirement regexes", () => {
-      // The `/g` flag carries `lastIndex` across `.test()` calls — without
-      // stripping it, consecutive pathFor() calls with the same params
-      // would alternate pass/fail. `/m` weakens `^…$` anchoring to line
-      // boundaries (so `"42\nabc"` would pass).
       const route = new Route("GET", "/posts/:id", "x", "y", {
         constraints: { id: /\d+/gm },
       });
@@ -212,19 +170,14 @@ describe("Route", () => {
       expect(route.pathFor({ id: "42" })).toBe("/posts/42");
       expect(() => route.pathFor({ id: "bad" })).toThrow(/Missing required parameter :id/);
       expect(() => route.pathFor({ id: "bad" })).toThrow(/Missing required parameter :id/);
-      // With `/m` not stripped, this would slip through.
       expect(() => route.pathFor({ id: "42\nabc" })).toThrow(/Missing required parameter :id/);
     });
 
     it("skips requirement validation for captures in omitted optional groups", () => {
-      // `:id` and `:slug` share an optional group. If `slug` isn't supplied
-      // the group is omitted by Format.evaluate, so `id`'s value never lands
-      // in the output — the requirement regex shouldn't reject it either.
       const route = new Route("GET", "/posts(/:id/:slug)", "x", "y", {
         constraints: { id: /\d+/ },
       });
       expect(route.pathFor({ id: "bad" } as Record<string, string>)).toBe("/posts");
-      // When both are supplied the group fires and `id` IS validated.
       expect(() => route.pathFor({ id: "bad", slug: "x" })).toThrow(
         /Missing required parameter :id/,
       );
@@ -250,25 +203,18 @@ describe("Route", () => {
     });
 
     it("normalizes when caller passes the leading '/' explicitly", () => {
-      // Rails' normalize_path collapses '/(' to '(/' so both forms classify
-      // identically.
       const route = new Route("GET", "/(/:locale)/posts", "posts", "index");
       expect(route.match("GET", "/posts")).not.toBeNull();
       expect(route.match("GET", "/en/posts")).not.toBeNull();
     });
 
     it("keeps leading /( for all-optional paths (root-style routes)", () => {
-      // Rails restores '/(' when the path is composed entirely of optional
-      // segments, so the root '/' case still matches.
       const route = new Route("GET", "(/:locale)(/:platform)", "x", "y");
       expect(route.match("GET", "/")).not.toBeNull();
       expect(route.match("GET", "/en")).not.toBeNull();
     });
 
     it("handles all-optional paths with non-`/:` groups (e.g. dot-prefix format)", () => {
-      // `(/:locale)(.:format)` is all-optional but the second group starts
-      // with `.` rather than `/:`. The balanced-paren scan should still
-      // classify this as all-optional and restore the leading `/(`.
       const route = new Route("GET", "(/:locale)(.:format)", "x", "y");
       expect(route.match("GET", "/")).not.toBeNull();
       expect(route.match("GET", "/en")).not.toBeNull();
@@ -301,16 +247,12 @@ describe("Route", () => {
     });
 
     it("classifies sigils the way Journey's scanner does", () => {
-      // `\:foo` is a literal escaped colon — Journey's LITERAL_RUN absorbs `\:`.
       const escapedColon = new Route("GET", "/page\\:foo", "x", "y");
       expect(escapedColon.pathParamNames).toEqual([]);
 
-      // `\*rest` is NOT an escaped sequence in Journey's scanner — the
-      // backslash is literal, the STAR captures `rest`.
       const escapedStar = new Route("GET", "/page\\*rest", "x", "y");
       expect(escapedStar.pathParamNames).toEqual(["rest"]);
 
-      // A bare `*` with no name is literal in Journey.
       const bareStar = new Route("GET", "/page*", "x", "y");
       expect(bareStar.pathParamNames).toEqual([]);
     });

@@ -1,4 +1,3 @@
-// Mirrors railties/lib/rails/generators/rails/devcontainer/devcontainer_generator.rb.
 import { File } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 import { Database, DATABASES, type DatabaseName } from "../../database.js";

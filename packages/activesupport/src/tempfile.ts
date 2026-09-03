@@ -1,10 +1,8 @@
 import { getCrypto, File } from "@blazetrails/ruby-compat";
 import { getOs } from "./os-adapter.js";
 
-/** The `basename` of `Dir::Tmpname.create`: a String, or a `[prefix, suffix]` pair. */
 export type TempfileBasename = string | [string, string];
 
-/** `Dir::Tmpname::UNUSABLE_CHARS` (`tmpdir.rb:122`), as the complement class it names. */
 const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
 
 /**
@@ -45,7 +43,6 @@ function createTmpname(
   let n: number | null = null;
   for (;;) {
     // boundary: `Time.now.strftime("%Y%m%d")` (`tmpdir.rb:152`) — the stamp is
-    // a filename component, not a modelled instant.
     const t = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     const path = File.join(
       tmpdir,
@@ -93,14 +90,6 @@ export class Tempfile {
     this.tmpname = tmpname;
   }
 
-  /**
-   * `Tempfile.new(basename = "", tmpdir = nil)` (`tempfile.rb:150-166`).
-   *
-   * `File.open(tmpname, RDWR|CREAT|EXCL, perm: 0600)` is `File.open(path, "wx")`
-   * — the exclusive create whose `EEXIST` is what {@link createTmpname} retries
-   * on — followed by `File.chmod`, since the mode is not a `File.open` argument
-   * the `FsAdapter` contract carries.
-   */
   static new(basename: TempfileBasename = "", tmpdir?: string): Tempfile {
     const tmpname = createTmpname(basename, tmpdir, (path) => {
       File.open(path, "wx").close();
@@ -109,13 +98,6 @@ export class Tempfile {
     return new Tempfile(tmpname);
   }
 
-  /**
-   * `Tempfile.open(*args)` (`tempfile.rb:366-380`). With a block, yields the
-   * file and closes it on block exit, returning the block's value; without one,
-   * returns the open file. Unlike {@link create} it does not unlink — Ruby
-   * leaves removal to the finalizer, which JS has no equivalent of, so a
-   * caller of this form removes the file itself.
-   */
   static open(basename?: TempfileBasename, tmpdir?: string): Tempfile;
   static open<T>(
     basename: TempfileBasename | undefined,
@@ -139,12 +121,6 @@ export class Tempfile {
     }
   }
 
-  /**
-   * `Tempfile.create(basename = "", tmpdir = nil)` (`tempfile.rb:438-465`).
-   * With a block, yields the file, then closes and unlinks it — on the raising
-   * path too — and returns the block's value; without one, returns the open
-   * file, which the caller closes and unlinks itself.
-   */
   static create(basename?: TempfileBasename, tmpdir?: string): Tempfile;
   static create<T>(
     basename: TempfileBasename | undefined,
@@ -171,12 +147,10 @@ export class Tempfile {
     }
   }
 
-  /** `Tempfile#path` (`tempfile.rb:268-270`) — nil once {@link unlink} has run. */
   get path(): string | null {
     return this.unlinked ? null : this.tmpname;
   }
 
-  /** `IO#write` — appends, and returns the number of bytes written. */
   write(contents: string | Buffer | Uint8Array): number {
     const chunk = typeof contents === "string" ? Buffer.from(contents, "utf8") : contents;
     this.buffer = Buffer.concat([this.buffer, chunk]);
@@ -184,34 +158,22 @@ export class Tempfile {
     return chunk.length;
   }
 
-  /** `IO#read` — the whole file. */
   read(): Buffer {
     this.flush();
     return File.open(this.tmpname, "rb", (f) => Buffer.from(f.read(), "latin1"));
   }
 
-  /** `IO#flush` — writes the buffered bytes through to the file. */
   private flush(): void {
     if (this.flushed) return;
     File.open(this.tmpname, "wb", (f) => f.write(this.buffer.toString("latin1")));
     this.flushed = true;
   }
 
-  /**
-   * `Tempfile#close(unlink_now = false)` (`tempfile.rb:208-211`). Ruby's
-   * `_close` releases the descriptor; there is none to release here, so what
-   * closing does is flush the buffered writes.
-   */
   close(unlinkNow = false): void {
     this.flush();
     if (unlinkNow) this.unlink();
   }
 
-  /**
-   * `Tempfile#unlink` (`tempfile.rb:252-265`). `ENOENT` is swallowed and
-   * `EACCES` returns without marking the file unlinked, the way Ruby leaves a
-   * Windows unlink-before-close for a later `close!` to retry.
-   */
   unlink(): void {
     if (this.unlinked) return;
     try {

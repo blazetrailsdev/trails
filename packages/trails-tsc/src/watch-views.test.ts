@@ -38,7 +38,6 @@ describe("watchViews", () => {
 
   it("creates the views dir if missing and surfaces build errors", async () => {
     const cwd = mkScratch();
-    // Pre-existing symlinked .trails escape trips the safety guard on build.
     fs.symlinkSync(mkScratch(), path.join(cwd, ".trails"));
     const errors: Error[] = [];
     const handle = watchViews({ cwd, debounceMs: 5, onError: (e) => errors.push(e) });

@@ -27,7 +27,6 @@ describe("NullStoreTest", () => {
 
   it("increment", () => {
     const store = new NullStore();
-    // NullStore increment always returns null/0
     expect(store.increment("counter")).toBeNull();
   });
 

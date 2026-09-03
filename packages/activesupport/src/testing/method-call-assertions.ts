@@ -1,26 +1,6 @@
-/**
- * Mirrors: active_support/testing/method_call_assertions.rb
- *
- * Ruby's `object.stub(method_name, ...) { ... }` (Minitest::Mock) swaps a
- * singleton method for the duration of the block; the TS equivalent is an own
- * property assignment restored in a `finally`, and the `Minitest::Mock` of
- * `assert_called_with` is the recorded call list compared against `args`.
- */
-
 import { Assertion } from "./assertions.js";
 
-/**
- * Mirrors `MockExpectationError` (minitest/mock.rb) — what a `Minitest::Mock`
- * raises when a call does not match what was expected, and so what
- * `assert_called_with` raises through `assert_mock`. It is a top-level
- * `StandardError`, a sibling of `Minitest::Assertion` rather than a subclass of
- * it, so it extends `Error` the way {@link Assertion} does.
- *
- * @noRailsEquivalent PERMANENT — minitest's, not Rails': Rails raises it
- * through `Minitest::Mock` (method_call_assertions.rb:20-27) but the class is
- * defined in the minitest gem, which has no vendored Rails file for the
- * comparator to map onto.
- */
+/** @noRailsEquivalent PERMANENT */
 export class MockExpectationError extends Error {
   override name = "MockExpectationError";
 }
@@ -31,12 +11,7 @@ interface Mock {
   calls: unknown[][];
 }
 
-/**
- * Asserts that `methodName` is called on `object` `times` times while `block`
- * runs, stubbing it to return `returns`.
- *
- * @internal
- */
+/** @internal */
 export function assertCalled<T extends object>(
   object: T,
   methodName: keyof T & string,
@@ -62,13 +37,8 @@ export function assertCalled<T extends object>(
 }
 
 /**
- * Asserts that `methodName` is called on `object` with `args` while `block`
- * runs.
- *
  * @internal
- *
- * @missingRailsCall new — PERMANENT: `Minitest::Mock.new`; minitest is not ported, so the
- *   mock is the recorded-call list `assertMock` compares against `args`.
+ * @missingRailsCall new — PERMANENT
  */
 export function assertCalledWith<T extends object>(
   object: T,
@@ -93,11 +63,7 @@ export function assertCalledWith<T extends object>(
   assertMock(mock);
 }
 
-/**
- * Asserts that `methodName` is never called on `object` while `block` runs.
- *
- * @internal
- */
+/** @internal */
 export function assertNotCalled<T extends object>(
   object: T,
   methodName: keyof T & string,
@@ -107,11 +73,7 @@ export function assertNotCalled<T extends object>(
   assertCalled(object, methodName, message, { times: 0 }, block);
 }
 
-/**
- * Records the call `mock` is expected to receive.
- *
- * @internal
- */
+/** @internal */
 export function expectCalledWith(
   mock: Mock,
   args: unknown[],
@@ -121,12 +83,7 @@ export function expectCalledWith(
   mock.returns = returns;
 }
 
-/**
- * Asserts that `methodName` is called `times` times on any instance of
- * `klass` while `block` runs.
- *
- * @internal
- */
+/** @internal */
 export function assertCalledOnInstanceOf<T>(
   klass: new (...args: any[]) => T,
   methodName: keyof T & string,
@@ -153,11 +110,7 @@ export function assertCalledOnInstanceOf<T>(
   assertEqual(times, timesCalled, error);
 }
 
-/**
- * Asserts that `methodName` is never called on any instance of `klass`.
- *
- * @internal
- */
+/** @internal */
 export function assertNotCalledOnInstanceOf<T>(
   klass: new (...args: any[]) => T,
   methodName: keyof T & string,
@@ -167,20 +120,7 @@ export function assertNotCalledOnInstanceOf<T>(
   assertCalledOnInstanceOf(klass, methodName, message, { times: 0 }, block);
 }
 
-/**
- * Stubs `klass.new` to return `instance` for the duration of `block`
- * (method_call_assertions.rb:64-65).
- *
- * In Ruby `new` is an ordinary class method, so stubbing it redirects every
- * construction of `klass`, however the caller spells it. In JavaScript `new` is
- * an operator on the class object itself, not a property of it, and a class
- * binding cannot be replaced in modules that already imported it — so the stub
- * can only cover the literal `Klass.new()` spelling, which is the direct analog
- * of the Ruby method being stubbed. Code under test that says `new Klass()`
- * still constructs normally; pass the yielded `instance` to it instead.
- *
- * @internal
- */
+/** @internal */
 export function stubAnyInstance<T>(
   klass: { new (...args: any[]): T },
   { instance = new klass() }: { instance?: T } = {},

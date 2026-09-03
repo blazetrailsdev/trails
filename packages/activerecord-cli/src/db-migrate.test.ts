@@ -77,8 +77,6 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:migrate --version passes version string", async () => {
-    // `--version` is the CLI spelling of Rails' `VERSION=x rake db:migrate`, so
-    // it reaches `migrate` through `targetVersion()` rather than as an argument.
     let seenTargetVersion: number | null = null;
     migrateSpy.mockImplementation(async () => {
       seenTargetVersion = DatabaseTasks.targetVersion();
@@ -91,9 +89,6 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:migrate calls MigrationContext#migrations before migrate", async () => {
-    // Discovery is `migration_connection_pool.migration_context`
-    // (`database_tasks.rb:270`), so the real `migrate` has to run for the
-    // getter to be reached.
     vi.mocked(DatabaseTasks.migrate).mockRestore();
     DatabaseConfigurations.defaultEnv = "development";
     const discoverSpy = vi
@@ -104,9 +99,6 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:migrate takes the multi-database path when the env has several configs", async () => {
-    // `migrateAll`'s multi-db branch never touches the ambient pool `dbMigrate`
-    // opens — it drives each config through its own `withTemporaryConnection`,
-    // so the single-primary fast path (and with it `migrate`) is never reached.
     DatabaseConfigurations.defaultEnv = "development";
     expect(await run(["db:migrate"], await makeMultiDbFakeProject())).toBe(0);
     expect(DatabaseTasks.configsFor({ envName: "development" })).toHaveLength(2);

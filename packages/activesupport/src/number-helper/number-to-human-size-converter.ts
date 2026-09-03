@@ -16,7 +16,6 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
   protected convert(): string {
     this.number = kernelFloat(this.number);
 
-    // For backwards compatibility with those that didn't add stripInsignificantZeros to their locale files.
     const options = this.options;
     if (!hasKey(options, "stripInsignificantZeros")) {
       options.stripInsignificantZeros = true;
@@ -57,7 +56,7 @@ export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSiz
   private exponent(): number {
     const max = STORAGE_UNITS.length - 1;
     let exp = Math.trunc(Math.log(Math.abs(this.number as number)) / Math.log(this.base()));
-    if (exp > max) exp = max; // avoid overflow for the highest unit
+    if (exp > max) exp = max;
     return exp;
   }
 

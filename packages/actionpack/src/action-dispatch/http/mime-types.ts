@@ -1,11 +1,3 @@
-// Build list of Mime types for HTTP responses
-// https://www.iana.org/assignments/media-types/
-//
-// Mirrors `actionpack/lib/action_dispatch/http/mime_types.rb`. The Ruby file
-// runs `Mime::Type.register` at load time; here we expose the same data as a
-// function so `mime-type.ts` can invoke it after defining the class (avoids
-// a circular import).
-
 interface MimeTypeRegistrar {
   register(string: string, symbol: string, synonyms?: string[], extensions?: string[]): unknown;
 }
@@ -22,7 +14,6 @@ export function registerDefaultMimeTypes(MimeType: MimeTypeRegistrar): void {
   MimeType.register("text/calendar", "ics");
   MimeType.register("text/csv", "csv");
   MimeType.register("text/vcard", "vcf");
-  // Rails passes %w(vtt) in the synonyms slot (not extensions); mirror 1:1.
   MimeType.register("text/vtt", "vtt", ["vtt"]);
 
   MimeType.register("image/png", "png", [], ["png"]);
@@ -55,9 +46,6 @@ export function registerDefaultMimeTypes(MimeType: MimeTypeRegistrar): void {
   MimeType.register("multipart/form-data", "multipart_form");
   MimeType.register("application/x-www-form-urlencoded", "url_encoded_form");
 
-  // https://www.ietf.org/rfc/rfc4627.txt
-  // http://www.json.org/JSONRequest.html
-  // https://www.ietf.org/rfc/rfc7807.txt
   MimeType.register("application/json", "json", [
     "text/x-json",
     "application/jsonrequest",

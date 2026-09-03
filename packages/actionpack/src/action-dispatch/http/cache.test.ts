@@ -14,10 +14,6 @@ import {
 } from "./cache.js";
 
 const req = (h: Record<string, string> = {}): RequestCacheHost => ({ getHeader: (n) => h[n] });
-// Real Response exercises the prototype-wired Cache::Response mixin
-// (see ./response.ts; ../response.ts is a re-export shim). The
-// case-insensitive header lookup in Response#getHeader means tests can
-// assert via either casing.
 const res = (h: Record<string, string> = {}): Response => new Response(200, h);
 
 describe("Cache::Request", () => {
@@ -29,14 +25,12 @@ describe("Cache::Request", () => {
 
   it("if_modified_since parses RFC 2822 numeric zone offsets (Time.rfc2822 parity)", () => {
     const r = req({ "If-Modified-Since": "Sun, 06 Nov 1994 03:49:37 -0500" });
-    // Same instant as "Sun, 06 Nov 1994 08:49:37 GMT"
     expect(notModified.call(r, new Date("1994-11-06T08:49:36Z"))).toBe(true);
   });
 
   it("if_modified_since rejects malformed values (no permissive Date.parse fallback)", () => {
     const r = req({ "If-None-Match": '"abc"', "If-Modified-Since": "yesterday" });
-    expect(fresh.call(r, { etag: '"abc"' })).toBe(true); // etag still matches
-    // not_modified? returns false because the date is unparseable
+    expect(fresh.call(r, { etag: '"abc"' })).toBe(true);
     expect(notModified.call(r, new Date("1994-11-06T08:49:36Z"))).toBe(false);
   });
 
@@ -69,11 +63,8 @@ describe("Cache::Response", () => {
   });
 
   it("last_modified rejects RFC 850 / asctime / numeric-zone forms (httpdate is strict)", () => {
-    // RFC 850 form
     expect(res({ "Last-Modified": "Sunday, 06-Nov-94 08:49:37 GMT" }).lastModified).toBeUndefined();
-    // asctime form
     expect(res({ "Last-Modified": "Sun Nov  6 08:49:37 1994" }).lastModified).toBeUndefined();
-    // Numeric zone offset — valid RFC 2822 but rejected by Time.httpdate
     expect(
       res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 -0500" }).lastModified,
     ).toBeUndefined();
@@ -81,7 +72,6 @@ describe("Cache::Response", () => {
 
   it("last_modified rejects out-of-range and impossible-calendar values", () => {
     expect(res({ "Last-Modified": "Sun, 99 Nov 1994 08:49:37 GMT" }).lastModified).toBeUndefined();
-    // 31 Feb — Date.UTC would silently roll into March
     expect(res({ "Last-Modified": "Tue, 31 Feb 2015 08:49:37 GMT" }).lastModified).toBeUndefined();
   });
 

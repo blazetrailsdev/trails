@@ -26,10 +26,6 @@ describe("compileJs", () => {
   });
 
   it("emits block-expr with capture wrapper so inner writes go to capture buffer", () => {
-    // `_ob.append(` and `forEach(` stay open; `context.capture(() => {` wraps
-    // inner content so inner writes use `context.outputBuffer` (the swapped buf).
-    // `})` from template closes the capture arrow + `context.capture(`.
-    // Emitter appends `));` to close `forEach(` and `_ob.append(` → `})));`.
     const src = "<%= forEach(items, (item) => { %><li><%= item %></li><% }) %>";
     const { code } = compileJs(src);
     expect(code).toBe(
@@ -54,14 +50,11 @@ describe("compileJs", () => {
     const { code } = compileJs(src);
     const lines = code.split("\n");
     expect(lines).toContain("  _ob.append(outer((x) =>");
-    // inner blockExpr uses context.outputBuffer since it is inside outer capture
     expect(lines).toContain("  context.outputBuffer.append(inner((y) =>");
     expect(lines.filter((l) => l === "  })));")).toHaveLength(2);
   });
 
   it("does not close blockExpr on inner code braces", () => {
-    // `<% if (x) { %>...<% } %>` inside a blockExpr body must not consume the
-    // blockExpr closer — the inner `}` increments/decrements innerDepth only.
     const src = "<%= forEach(items, (item) => { %><% if (x) { %><%= item %><% } %><% }) %>";
     const { code } = compileJs(src);
     const lines = code.split("\n");
@@ -81,20 +74,15 @@ describe("compileJs", () => {
   });
 
   it("closes correctly when the blockExpr has no wrapping helper call (zero callExpr parens)", () => {
-    // `(x) => {` leaves 0 unclosed parens in callExpr, so only 2 emitter-owned
-    // parens need closing (bufRef.append + context.capture), not 3.
     const src = "<%= (x) => { %><span><%= x %></span><% } %>";
     const { code } = compileJs(src);
     const lines = code.split("\n");
     expect(lines).toContain("  _ob.append((x) =>");
     expect(lines).toContain("  context.capture(() => {");
-    // Closer `}` has 0 existing `)`, so suffix = "));" → "}))" → "}));"
     expect(lines).toContain("  }));");
   });
 
   it("throws a clear error for function-form blockExpr (arrow syntax required)", () => {
-    // function(x) { cannot be capture-wrapped correctly — the closer only closes
-    // context.capture(() => {, leaving the function body { unclosed (invalid JS).
     expect(() => compileJs("<%= helper(function(x) { %><li><%= x %></li><% }) %>")).toThrow(
       /block-expr.*arrow syntax/,
     );
@@ -161,7 +149,6 @@ describe("compileJs", () => {
 
   describe("source map", () => {
     it("emits one mapping per output line for a multi-line code tag", () => {
-      // `<%` opens on src line 1; value has two code lines on src lines 2-3.
       const src = "before\n<%\nconst a = 1;\nconst b = 2;\n%>after";
       const { code, sourceMap } = compileJs(src, {
         fileName: "t.tse.js",
@@ -170,24 +157,16 @@ describe("compileJs", () => {
       expect(sourceMap).not.toBeNull();
       const codeLines = code.split("\n");
       const segs = sourceMap!.mappings.split(";");
-      // Find the exact genLines where the code-tag body lands in the output.
       const genLineA = codeLines.findIndex((l) => l.includes("const a = 1;"));
       const genLineB = codeLines.findIndex((l) => l.includes("const b = 2;"));
       expect(genLineA).toBeGreaterThan(-1);
       expect(genLineB).toBe(genLineA + 1);
-      // Both output lines must have a defined, non-empty source-map segment.
       expect(segs.length).toBeGreaterThan(genLineB);
       expect(segs[genLineA]).toBeTruthy();
       expect(segs[genLineB]).toBeTruthy();
     });
 
     it("maps each code-tag output line to its actual source line (not the opener line)", () => {
-      // Template with only a multi-line code tag — no preceding text node so
-      // srcLine deltas in the VLQ segments are predictable.
-      // src line 0: `<%`
-      // src line 1: `const x = 1;`
-      // src line 2: `const y = 2;`
-      // src line 3: `%>`
       const src = "<%\nconst x = 1;\nconst y = 2;\n%>";
       const { code, sourceMap } = compileJs(src, {
         fileName: "t.tse.js",
@@ -198,9 +177,6 @@ describe("compileJs", () => {
       const segs = sourceMap!.mappings.split(";");
       const genLineX = codeLines.findIndex((l) => l.includes("const x = 1;"));
       const genLineY = codeLines.findIndex((l) => l.includes("const y = 2;"));
-      // Segment format: genCol(0) + srcIdx(0) + srcLineDelta + srcCol(0) = "AA<delta>A"
-      // genLineX maps to srcLine 1 (delta from prevSrc=0 → +1 → VLQ "C") → "AACA"
-      // genLineY maps to srcLine 2 (delta from prevSrc=1 → +1 → VLQ "C") → "AACA"
       expect(segs[genLineX]).toBe("AACA");
       expect(segs[genLineY]).toBe("AACA");
     });

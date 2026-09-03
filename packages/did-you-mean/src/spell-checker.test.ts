@@ -1,5 +1,3 @@
-// Oracle outputs computed via Ruby 3.3 did_you_mean's
-// DidYouMean::SpellChecker.new(dictionary:).correct.
 import { describe, it, expect } from "vitest";
 import { SpellChecker } from "./spell-checker.js";
 
@@ -17,8 +15,6 @@ describe("SpellChecker", () => {
   });
 
   it("uses the stricter 0.834 threshold for longer inputs", () => {
-    // 'xyz' is below threshold against all candidates; no JW candidates
-    // means we never reach the misspell fallback.
     expect(correct("xyz", ["foo", "bar", "baz"])).toEqual([]);
   });
 
@@ -49,17 +45,10 @@ describe("SpellChecker", () => {
   });
 
   it("falls through to the misspell fallback when Levenshtein filters all mistype candidates", () => {
-    // "abcd" → mistypeThreshold = ceil(4 * 0.25) = 1. Lev("abcd","abdc") = 2
-    // (transposition costs two ops), so the mistype filter rejects it. JW is
-    // ~0.93 (above 0.834), so the candidate reaches the fallback, where
-    // Lev=2 < min(len)=4 keeps it.
     expect(correct("abcd", ["abdc"])).toEqual(["abdc"]);
   });
 
   it("uses codepoint length (not UTF-16) when picking the JW threshold", () => {
-    // "🎉ab" is 3 codepoints (UTF-16 length 4). JW vs "🎉ac" is ~0.82, which
-    // sits between the short (0.77) and long (0.834) thresholds — so this
-    // test only passes if length is measured in codepoints.
     expect(correct("🎉ab", ["🎉ac"])).toEqual(["🎉ac"]);
   });
 

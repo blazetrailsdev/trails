@@ -1,15 +1,3 @@
-/**
- * ActionView::Resolver
- *
- * Base class for template resolvers. A resolver answers the single lookup
- * protocol `PathSet` drives — `findAll(name, prefix, partial, details, key,
- * locals)` — so every entry point (`LookupContext#find`, `#findAll`,
- * `#isExists`, `#isAny`, and the render path) resolves through the same
- * details cascade.
- *
- * Mirrors `actionview/lib/action_view/template/resolver.rb:11-84`.
- */
-
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
@@ -19,11 +7,6 @@ import { TemplatePath } from "../template-path.js";
 import { Types } from "../template/types.js";
 import { Template } from "../template.js";
 
-/**
- * A candidate template plus the details parsed off its path. Rails carries the
- * pair as an `UnboundTemplate` (`unbound_template.rb`), whose `bind_locals`
- * step trails does eagerly; `UnboundTemplate` itself is unported.
- */
 export interface TemplateWithDetails {
   template: Template;
   details: TemplateDetails;
@@ -32,7 +15,6 @@ export interface TemplateWithDetails {
 export abstract class Resolver implements PathSetResolver {
   clearCache(): void {}
 
-  /** Normalizes the arguments and passes it on to `findTemplates`. */
   findAll(
     name: TemplatePath | string,
     prefix = "",
@@ -51,12 +33,10 @@ export abstract class Resolver implements PathSetResolver {
     );
   }
 
-  /** Used for error pages (`resolver.rb:63-66`). */
   builtTemplates(): Template[] {
     return [];
   }
 
-  /** Not implemented by default (`resolver.rb:68-71`). */
   allTemplatePaths(): readonly TemplatePath[] {
     return [];
   }
@@ -73,11 +53,7 @@ export abstract class Resolver implements PathSetResolver {
     return this.findTemplates(name, prefix, partial, details, locals);
   }
 
-  /**
-   * @internal
-   * This is what child classes implement. No defaults are needed because
-   * `Resolver` guarantees that the arguments are present and normalized.
-   */
+  /** @internal */
   protected findTemplates(
     _name: string,
     _prefix: string,
@@ -90,12 +66,7 @@ export abstract class Resolver implements PathSetResolver {
     );
   }
 
-  /**
-   * @internal
-   * `key || TemplateDetails::Requested.new(**details)` — the resolver builds
-   * its own when `LookupContext` had its details cache off and passed no key
-   * (`resolver.rb:128`).
-   */
+  /** @internal */
   protected requestedDetailsFor(details: LookupDetails, key: unknown): Requested {
     if (key instanceof Requested) return key;
     const d = details as Record<string, ReadonlyArray<DetailKey> | undefined>;
@@ -107,23 +78,12 @@ export abstract class Resolver implements PathSetResolver {
     });
   }
 
-  /**
-   * @internal
-   * Ruby `File.fnmatch` (`testing/resolvers.rb:27`), which JS has no
-   * equivalent of and no admissible third-party one. `FixtureResolver` passes
-   * no `FNM_PATHNAME`, so `*` matches `/` too — verified against MRI.
-   */
+  /** @internal */
   protected fnmatch(glob: string): RegExp {
     return new RegExp(`^${fnmatchChars(glob, ".*", ".")}$`);
   }
 
-  /**
-   * @internal
-   * `resolver.rb:172-181`. Rails keeps this private on `FileSystemResolver`,
-   * the only resolver upstream that filters candidates itself; trails' second
-   * such resolver is `testing/resolvers.ts`, and TypeScript has no way to
-   * share a private method between two classes without a common ancestor.
-   */
+  /** @internal */
   protected filterAndSortByDetails(
     templates: ReadonlyArray<TemplateWithDetails>,
     requestedDetails: Requested,
@@ -143,16 +103,6 @@ export abstract class Resolver implements PathSetResolver {
   }
 }
 
-/**
- * Ruby `sort_by!` orders by an Array key, comparing element by element
- * (`resolver.rb:177-179`); `Array#sort` takes a number, so the tuple
- * comparison is spelled out.
- */
-/**
- * One `File.fnmatch` pattern segment as a regular expression: a backslash
- * quotes the character after it (`escape_entry`'s output), `*` and `?` are the
- * wildcards, everything else is literal.
- */
 function fnmatchChars(text: string, star: string, question: string): string {
   let pattern = "";
   for (let c = 0; c < text.length; c++) {
@@ -187,7 +137,6 @@ export class FileSystemResolver extends Resolver {
     this._path = File.expandPath(path);
   }
 
-  /** Rails' `attr_reader :path`. */
   path(): string {
     return this._path;
   }
@@ -202,15 +151,10 @@ export class FileSystemResolver extends Resolver {
     return this._path;
   }
 
-  /** Rails' `alias :to_path :to_s` (`resolver.rb:106`). */
   toPath(): string {
     return this.toString();
   }
 
-  /**
-   * `resolver.rb:108-111`, and the `alias :== :eql?` beside it — JS has no
-   * operator to overload, so the one method answers both spellings.
-   */
   isEql(resolver: unknown): boolean {
     return (
       resolver instanceof FileSystemResolver &&
@@ -234,13 +178,7 @@ export class FileSystemResolver extends Resolver {
     return Array.from(seen, (filename) => TemplatePath.parse(filename));
   }
 
-  /**
-   * @internal
-   * `resolver.rb:127-140`. `cache = key ? @unbound_templates :
-   * Concurrent::Map.new` — with no key the map Rails computes into is fresh,
-   * so the persistent one is neither read nor written and the scan always
-   * runs. That is what `LookupContext#disableCache` relies on.
-   */
+  /** @internal */
   protected override _findAll(
     name: string,
     prefix: string,
@@ -264,21 +202,13 @@ export class FileSystemResolver extends Resolver {
 
   /**
    * @internal
-   * `resolver.rb:141-143`. Rails wraps the path in a lazy
-   * `Template::Sources::File`, which is unported; the contents are read
-   * eagerly instead.
-   *
    * @missingRailsCall new — CONVERGEABLE port-template-sources-file-for-lazy-resolver-sources
    */
   protected sourceForTemplate(template: string): string {
     return File.read(template);
   }
 
-  /**
-   * @internal
-   * Rails' `build_unbound_template` (`resolver.rb:145-155`); trails binds the
-   * template eagerly because `UnboundTemplate` is unported.
-   */
+  /** @internal */
   protected buildUnboundTemplate(template: string): TemplateWithDetails | null {
     const parsed = this.pathParser.parse(template.slice(this._path.length + 1));
     const details = parsed.details;
@@ -298,12 +228,7 @@ export class FileSystemResolver extends Resolver {
     return { template: built, details };
   }
 
-  /**
-   * @internal
-   * Rails' `unbound_templates_from_path` (`resolver.rb:157-171`) — instead of
-   * checking every possible path, scan the directory for files with the right
-   * prefix and keep the exact virtual-path matches.
-   */
+  /** @internal */
   protected unboundTemplatesFromPath(path: TemplatePath): TemplateWithDetails[] {
     if (path.name.includes(".")) return [];
 
@@ -318,11 +243,7 @@ export class FileSystemResolver extends Resolver {
     return templates;
   }
 
-  /**
-   * @internal
-   * Safe glob within the resolver root (`resolver.rb:202-207`), yielding
-   * expanded paths.
-   */
+  /** @internal */
   protected templateGlob(glob: string): string[] {
     const query = File.join(this.escapeEntry(this._path), glob);
     const pathWithSlash = File.join(this._path, "");
@@ -335,7 +256,7 @@ export class FileSystemResolver extends Resolver {
     });
   }
 
-  /** @internal `resolver.rb:208-209`. */
+  /** @internal */
   protected escapeEntry(entry: string): string {
     return entry.replace(/[*?{}[\]]/g, "\\$&");
   }
@@ -354,10 +275,6 @@ export class ParsedPath {
 export class PathParser {
   private regex: RegExp | null = null;
 
-  /**
-   * `resolver.rb:16-33`. I18n is unported, so `available_locales` contributes
-   * nothing to the locale union and only Rails' generic shape is left.
-   */
   buildPathRegex(): RegExp {
     const handlers = union(TemplateHandlers.extensions());
     const formats = union(Types.symbols());
@@ -392,10 +309,6 @@ export class PathParser {
   }
 }
 
-/**
- * Ruby `Regexp.union` over a list of literal alternatives. An empty list
- * matches nothing, where a bare `()` would match the empty string.
- */
 function union(alternatives: readonly string[]): string {
   if (alternatives.length === 0) return "(?!)";
   return alternatives.map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");

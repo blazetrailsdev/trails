@@ -1,29 +1,3 @@
-/**
- * Dump the committed db/schema.ts as a TypeScript module declaring one
- * `@blazetrails/activerecord` model class per table, with belongsTo /
- * hasMany associations inferred from foreign keys.
- *
- * Usage:
- *   ar models:dump [--schema <path>] [--out <path>]
- *                  [--ignore t1,t2] [--only t1,t2]
- *                  [--strip-prefix <str>] [--strip-suffix <str>]
- *                  [--no-header] [--format]
- *
- * Schema source, in order:
- *   1. --schema <path>   parse the given db/schema.ts (explicit)
- *   2. db/schema.ts      auto-discovered relative to CWD
- *
- * Run `ar db:schema:dump` first to create db/schema.ts if you haven't yet.
- *
- * Output:
- *   --out <path>   writes a .ts module to the given file
- *   (absent)       prints the .ts module to stdout
- *
- * The generated module is pure trails ActiveRecord — `class X extends Base`
- * with static-block declarations. Users own the file afterward; there is
- * no round-trip merge. Re-running regenerates.
- */
-
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 
 import { generateModels } from "@blazetrails/activerecord";
@@ -132,7 +106,6 @@ function parseArgs(argv: readonly string[]): Args | number {
   return out;
 }
 
-// Metadata tables Rails maintains that users shouldn't be modelling.
 const BUILTIN_IGNORE = new Set(["schema_migrations", "ar_internal_metadata"]);
 
 export async function run(argv: readonly string[]): Promise<number> {
@@ -147,8 +120,6 @@ export async function run(argv: readonly string[]): Promise<number> {
     if (onlySet) return onlySet.has(name);
     return true;
   };
-
-  // Resolve the schema source: --schema > auto-discovered db/schema.ts > error.
 
   let schemaFilePath: string;
   if (args.schemaPath) {
@@ -175,8 +146,6 @@ export async function run(argv: readonly string[]): Promise<number> {
   const sourceHint = schemaFilePath;
   const parsedTables = parseSchemaForModels(source, schemaFilePath);
   if (parsedTables.length === 0) {
-    // Distinguish "wrong/empty file" from the post-filter "--only/--ignore
-    // matched nothing" case handled by the shared check below.
     process.stderr.write(
       `ar models:dump: no createTable found in ${schemaFilePath} — is it a db/schema.ts?\n`,
     );
@@ -213,8 +182,6 @@ export async function run(argv: readonly string[]): Promise<number> {
 
 async function maybePrettierFormat(code: string): Promise<string> {
   try {
-    // Dynamic import so prettier stays an opt-in runtime dep — users who
-    // don't pass --format never need it installed.
     const prettier = (await import("prettier")) as {
       format(src: string, opts: { parser: string }): Promise<string>;
     };

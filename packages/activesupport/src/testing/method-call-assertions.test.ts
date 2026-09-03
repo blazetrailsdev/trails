@@ -55,9 +55,7 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called failure", async () => {
     const error = await assertRaises([Assertion], {}, () => {
-      assertCalled(object, "increment", null, {}, () => {
-        // Call nothing...
-      });
+      assertCalled(object, "increment", null, {}, () => {});
     });
 
     expect(error.message).toBe(
@@ -67,9 +65,7 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called with message", async () => {
     const error = await assertRaises([Assertion], {}, () => {
-      assertCalled(object, "increment", "dang it", {}, () => {
-        // Call nothing...
-      });
+      assertCalled(object, "increment", "dang it", {}, () => {});
     });
 
     expect(error.message).toMatch(/dang it.\nExpected increment/);
@@ -126,9 +122,7 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called on instance of failure", async () => {
     const error = await assertRaises([Assertion], {}, () => {
-      assertCalledOnInstanceOf(Level, "increment", null, {}, () => {
-        // Call nothing...
-      });
+      assertCalledOnInstanceOf(Level, "increment", null, {}, () => {});
     });
 
     expect(error.message).toBe(
@@ -138,9 +132,7 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert called on instance of with message", async () => {
     const error = await assertRaises([Assertion], {}, () => {
-      assertCalledOnInstanceOf(Level, "increment", "dang it", {}, () => {
-        // Call nothing...
-      });
+      assertCalledOnInstanceOf(Level, "increment", "dang it", {}, () => {});
     });
 
     expect(error.message).toMatch(/dang it.\nExpected increment/);
@@ -196,9 +188,7 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert not called on instance of nesting", () => {
     assertNotCalledOnInstanceOf(Level, "increment", null, () => {
-      assertNotCalledOnInstanceOf(Level, "decrement", null, () => {
-        // Call nothing...
-      });
+      assertNotCalledOnInstanceOf(Level, "decrement", null, () => {});
     });
   });
 
@@ -217,11 +207,6 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert changes when assertions are included", async () => {
     let counter = 1;
-    // Rails builds a `Minitest::Test` subclass, runs it, and asserts
-    // `test_results.passed?` (method_call_assertions_test.rb:189-201). trails
-    // has no runnable test-case class — vitest owns the run loop and exposes no
-    // "run this test and hand me its result" entry point — so the result object
-    // is the block completing without the assertion raising.
     const testResults = { passed: false };
     await assertChanges(
       () => counter,

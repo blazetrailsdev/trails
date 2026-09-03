@@ -17,9 +17,6 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// action_controller/metal_test.rb
-// ==========================================================================
 describe("MetalControllerInstanceTests", () => {
   it("has default status 200", () => {
     class TestController extends Metal {
@@ -140,9 +137,6 @@ describe("MetalControllerInstanceTests", () => {
     expect(c.response).toBe(res);
   });
 
-  // Rails: action_controller/metal.rb#set_request! writes the controller into
-  // `request.env["action_controller.instance"]`, where CSP and permissions-
-  // policy middlewares look it up (http/request.rb:194-196).
   it("dispatch exposes controller via action_controller.instance env slot", async () => {
     class TestController extends Metal {
       async index() {

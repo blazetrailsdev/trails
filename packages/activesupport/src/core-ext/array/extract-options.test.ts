@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import { extractOptionsBang, HashWithIndifferentAccess, OrderedOptions } from "../../index.js";
 
 describe("ExtractOptionsTest", () => {
-  // Ruby's `class HashSubclass < Hash`; a class instance is not a plain object,
-  // so it is the TS shape of a Hash subclass that does not opt in.
   class HashSubclass {
     foo?: number;
   }

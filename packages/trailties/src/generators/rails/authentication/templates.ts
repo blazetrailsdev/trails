@@ -1,4 +1,3 @@
-/** `.../rails/authentication/templates/**.tt`, keyed as `template` names them. */
 export const TEMPLATES: Record<string, string> = {
   "app/models/session.rb": `import { ApplicationRecord } from "./application-record.js";
 

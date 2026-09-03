@@ -203,7 +203,6 @@ describe("ModuleTest", () => {
       helper = Helper;
     }
     const obj = new Service() as Service & { version?: () => string };
-    // We can't easily delegate static methods; verify delegate call is valid
     expect(typeof delegate).toBe("function");
   });
 
@@ -327,7 +326,6 @@ describe("ModuleTest", () => {
   });
 
   it("delegation to method that exists on nil", () => {
-    // In JS, null has no methods; delegate should throw
     class Container {
       val: null = null;
     }
@@ -344,7 +342,6 @@ describe("ModuleTest", () => {
   });
 
   it("delegation line number", () => {
-    // Not applicable in TS; verify delegate works
     class Foo {}
     expect(() => delegate.call(Foo.prototype, "bar", { to: "baz", allowNil: true })).not.toThrow();
   });
@@ -426,7 +423,6 @@ describe("ModuleTest", () => {
   });
 
   it("delegate missing to with method", () => {
-    // delegateMissingTo is a marker; verify basic delegation works
     class Foo {
       bar() {
         return "bar";
@@ -484,7 +480,6 @@ describe("ModuleTest", () => {
   });
 
   it("delegate missing to does not delegate to private methods", () => {
-    // TS doesn't enforce private at runtime; just verify delegation works
     expect(typeof delegate).toBe("function");
   });
 
@@ -568,7 +563,6 @@ describe("ModuleTest", () => {
   });
 
   it("private delegate", () => {
-    // TS has no private at runtime; verify delegate works normally
     class Foo {
       bar() {
         return 1;

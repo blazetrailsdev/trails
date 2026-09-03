@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PermissionsPolicy } from "../permissions-policy.js";
 
-// ==========================================================================
-// dispatch/permissions_policy_test.rb — PermissionsPolicyTest
-// ==========================================================================
 describe("PermissionsPolicyTest", () => {
   it("test_mappings", () => {
     const policy = new PermissionsPolicy();
@@ -44,10 +41,6 @@ describe("PermissionsPolicyTest", () => {
   });
 });
 
-// ==========================================================================
-// dispatch/permissions_policy_test.rb — PermissionsPolicyMiddlewareTest
-// (Unit coverage for the header output; full middleware requires Rack integration)
-// ==========================================================================
 describe("PermissionsPolicyMiddlewareTest", () => {
   it("html requests will set a policy", () => {
     const policy = new PermissionsPolicy();
@@ -68,9 +61,6 @@ describe("PermissionsPolicyMiddlewareTest", () => {
   });
 });
 
-// ==========================================================================
-// dispatch/permissions_policy_test.rb — PermissionsPolicyIntegrationTest
-// ==========================================================================
 describe("PermissionsPolicyIntegrationTest", () => {
   it("test_generates_permissions_policy_header", () => {
     const policy = new PermissionsPolicy();
@@ -97,9 +87,6 @@ describe("PermissionsPolicyIntegrationTest", () => {
   });
 });
 
-// ==========================================================================
-// dispatch/permissions_policy_test.rb — PermissionsPolicyWithHelpersIntegrationTest
-// ==========================================================================
 describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
   it("test_generates_permissions_policy_header", () => {
     const policy = new PermissionsPolicy();
@@ -109,7 +96,6 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
   });
 });
 
-// Constructor block form (mirrors Ruby's `PermissionsPolicy.new { |p| p.gyroscope :self }`)
 describe("PermissionsPolicy constructor block", () => {
   it("accepts a block", () => {
     const policy = new PermissionsPolicy((p) => {

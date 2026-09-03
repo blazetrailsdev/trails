@@ -16,9 +16,6 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// action_controller/caching_test.rb — Conditional GET
-// ==========================================================================
 describe("FragmentCachingTest", () => {
   it("freshWhen sets ETag", async () => {
     class C extends Base {
@@ -77,13 +74,11 @@ describe("FragmentCachingTest", () => {
         if (!this.performed) this.render({ plain: "body" });
       }
     }
-    // Get the etag
     const c1 = new C();
     await c1.dispatch("show", makeRequest(), makeResponse());
     const etag = c1.getHeader("etag")!;
     expect(c1.status).toBe(200);
 
-    // Conditional request
     const c2 = new C();
     await c2.dispatch(
       "show",
@@ -162,7 +157,6 @@ describe("FragmentCachingTest", () => {
         if (!this.performed) this.render({ plain: "body" });
       }
     }
-    // Get etag
     const c1 = new C();
     await c1.dispatch("show", makeRequest(), makeResponse());
     const etag = c1.getHeader("etag")!;
@@ -249,16 +243,10 @@ describe("FragmentCachingTest", () => {
   });
 });
 
-// ==========================================================================
-// action_controller/caching_test.rb — FragmentCachingMetalTest
-// ==========================================================================
 describe("FragmentCachingMetalTest", () => {
   it.skip("combined fragment cache key", () => {});
 });
 
-// ==========================================================================
-// action_controller/caching_test.rb — FragmentCachingTest
-// ==========================================================================
 describe("FragmentCachingTest", () => {
   it.skip("combined fragment cache key", () => {});
   it.skip("read fragment with caching enabled", () => {});
@@ -274,9 +262,6 @@ describe("FragmentCachingTest", () => {
   it.skip("html safety", () => {});
 });
 
-// ==========================================================================
-// action_controller/caching_test.rb — FunctionalFragmentCachingTest
-// ==========================================================================
 describe("FunctionalFragmentCachingTest", () => {
   it.skip("fragment caching", () => {});
   it.skip("fragment caching in partials", () => {});
@@ -293,26 +278,17 @@ describe("FunctionalFragmentCachingTest", () => {
   it.skip("caching with callable cache key", () => {});
 });
 
-// ==========================================================================
-// action_controller/caching_test.rb — ViewCacheDependencyTest
-// ==========================================================================
 describe("ViewCacheDependencyTest", () => {
   it.skip("view cache dependencies are empty by default", () => {});
   it.skip("view cache dependencies are listed in declaration order", () => {});
 });
 
-// ==========================================================================
-// action_controller/caching_test.rb — CollectionCacheTest
-// ==========================================================================
 describe("CollectionCacheTest", () => {
   it.skip("collection fetches cached views", () => {});
   it.skip("preserves order when reading from cache plus rendering", () => {});
   it.skip("explicit render call with options", () => {});
 });
 
-// ==========================================================================
-// action_controller/caching_test.rb — FragmentCacheKeyTest
-// ==========================================================================
 describe("FragmentCacheKeyTest", () => {
   it.skip("combined fragment cache key", () => {});
   it.skip("combined fragment cache key with envs", () => {});

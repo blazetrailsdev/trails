@@ -50,7 +50,6 @@ describe("buildViews", () => {
     expect(manifest).toContain('"users/show.json": () => import("./views/users/show.json.tse.js")');
     expect(manifest).toContain("export type ViewKey = keyof typeof views;");
     expect(manifest).toContain("export type ViewsManifest = ");
-    // No-edit banner survives so reviewers see the file is generated.
     expect(manifest).toContain("AUTO-GENERATED");
   });
 
@@ -82,12 +81,9 @@ describe("buildViews", () => {
   it("refuses to build when outDir is a symlink escaping cwd", () => {
     const cwd = mkScratch();
     const elsewhere = mkScratch();
-    // `.trails` inside cwd is a symlink to a sibling tempdir. Lexically
-    // the mirror path is fine; realpath check must catch the escape.
     fs.symlinkSync(elsewhere, path.join(cwd, ".trails"));
     write(cwd, "app/views/home.html.tse", "x");
     expect(() => buildViews({ cwd })).toThrow(/symlink escape/);
-    // Sanity: the symlinked-to dir was not wiped.
     expect(fs.existsSync(elsewhere)).toBe(true);
   });
 
@@ -101,15 +97,12 @@ describe("buildViews", () => {
 
   it("emits template-registry-augmentation.d.ts keyed by Rails partial name", () => {
     const cwd = mkScratch();
-    // partial: _user.html.tse → "users/user" (strips `_` prefix and format ext)
     write(
       cwd,
       "app/views/users/_user.html.tse",
       "<%# locals: (name:, role: 'guest') %><%= name %>",
     );
-    // non-partial with locals directive: NOT included (no `_` prefix)
     write(cwd, "app/views/posts/index.html.tse", "<%# locals: (page:) %>list");
-    // partial without locals directive: NOT included
     write(cwd, "app/views/shared/_nav.html.tse", "nav");
 
     buildViews({ cwd });
@@ -121,14 +114,11 @@ describe("buildViews", () => {
     expect(aug).toContain("export {};");
     expect(aug).toContain('declare module "@blazetrails/actionview"');
     expect(aug).toContain("interface TemplateRegistry");
-    // key matches Rails render call: no `_`, no format extension
     expect(aug).toContain('"users/user"');
     expect(aug).not.toContain('"users/_user.html"');
     expect(aug).toContain("name: unknown");
     expect(aug).toContain("role?: unknown");
-    // non-partial excluded even with locals directive
     expect(aug).not.toContain("posts/index");
-    // partial without locals directive excluded
     expect(aug).not.toContain("shared/nav");
     expect(aug).toContain("AUTO-GENERATED");
   });
@@ -183,12 +173,9 @@ describe("buildViews", () => {
         { customStub: registryStub },
       );
 
-    // intersection requires `name` (shared) and `email` (json-only required)
     expect(check("const a: R extends { name: unknown } ? 1 : 2 = 1; void a;")).toEqual([]);
     expect(check("const a: R extends { email: unknown } ? 1 : 2 = 1; void a;")).toEqual([]);
-    // `role` is optional in html format — intersection preserves optionality
     expect(check("const a: R extends { role: unknown } ? 1 : 2 = 2; void a;")).toEqual([]);
-    // missing `email` (required by json format) is a type error
     expect(
       check("const a: R extends { name: unknown } ? 1 : 2 = 2; void a;").length,
     ).toBeGreaterThan(0);
@@ -273,8 +260,6 @@ describe("runCli", () => {
   });
 
   it("catches buildViews errors and returns 1 instead of throwing", () => {
-    // outDir resolving outside cwd trips the safety guard; the CLI must
-    // surface that as a clean stderr message + non-zero exit, not a stack.
     const cwd = mkScratch();
     expect(runCli(["build", "--cwd", cwd, "--out", "/tmp/elsewhere"])).toBe(1);
   });
@@ -286,8 +271,6 @@ describe("runCli", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("`dev` starts the watcher synchronously and runs an initial build", () => {
-    // Stub `process.exit` so the `dev` SIGINT handler can call it
-    // during teardown without actually killing the vitest process.
     vi.spyOn(process, "exit").mockImplementation(((_c?: number) => undefined) as never);
     const cwd = mkScratch();
     write(cwd, "app/views/home.html.tse", "hi");

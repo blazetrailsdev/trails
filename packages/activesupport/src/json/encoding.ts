@@ -2,11 +2,6 @@ import { fetch } from "@blazetrails/ruby-compat";
 import { asJson, Float, isPlainObject } from "../core-ext/object/json.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
-/**
- * Serialization options threaded through `as_json` — only the subset Rails'
- * `ActiveSupport::JSON.encode(value, options)` forwards to collections. `only`
- * / `except` accept a scalar or list, mirroring Rails' `Array(attrs)` coercion.
- */
 export interface EncodeOptions {
   only?: string | number | Array<string | number>;
   except?: string | number | Array<string | number>;
@@ -21,13 +16,6 @@ export class JSONGemEncoder {
     this.options = options ?? {};
   }
 
-  /**
-   * Encode the given object into a JSON string.
-   *
-   * Rails escapes more than the JSON gem natively does: U+2028 and U+2029, and
-   * optionally `>`, `<`, `&`, to work around certain browser problems
-   * (encoding.rb:60-70).
-   */
   encode(value: unknown): string {
     if (!isEmpty(this.options)) {
       value = asJson(value, this.options);
@@ -49,24 +37,6 @@ export class JSONGemEncoder {
     return json;
   }
 
-  /**
-   * Convert an object into a "JSON-ready" representation composed of primitives
-   * like Hash, Array, String, Symbol, Numeric, and `true`/`false`/`nil`.
-   * Recursively calls `asJson` to the object to recursively build a fully
-   * JSON-ready object.
-   *
-   * This allows developers to implement `asJson` without having to worry about
-   * what base types of objects they are allowed to return or having to remember
-   * to call `asJson` recursively.
-   *
-   * Note: the `options` hash passed to `toJSON` is only passed to `asJson`, not
-   * any of this method's recursive `asJson` calls.
-   *
-   * Rails' private `JSONGemEncoder#jsonify` (encoding.rb:88-104). JS has a
-   * single numeric type, so Ruby's `Integer`-in-the-first-arm / `Float`-in-the
-   * -`Numeric`-arm split collapses onto `Float#as_json`, whose finite values
-   * are returned unchanged; a `bigint` takes the `Integer` arm.
-   */
   private jsonify(value: unknown): unknown {
     if (
       typeof value === "string" ||
@@ -92,45 +62,18 @@ export class JSONGemEncoder {
     }
   }
 
-  /**
-   * Encode a "jsonified" data structure. Rails' private
-   * `JSONGemEncoder#stringify` calls
-   * `JSON.generate(jsonified, quirks_mode: true, max_nesting: false)`
-   * (encoding.rb:108-111); `quirks_mode` — emitting a bare scalar at the root
-   * rather than raising — is `JSON.stringify`'s only behaviour, and it has no
-   * nesting limit to lift. `JSON.stringify` returns `undefined` for `undefined`,
-   * which has no Ruby analogue, so it becomes `null` as Ruby's `nil` would.
-   *
-   * @missingRailsCall generate — PERMANENT: ::JSON.generate is the Ruby JSON gem entry
-   *   point; JSON.stringify is its only JS analogue and already implements
-   *   quirks_mode with no nesting limit.
-   */
+  /** @missingRailsCall generate — PERMANENT */
   private stringify(jsonified: unknown): string {
     return JSON.stringify(jsonified) ?? "null";
   }
 }
 
-/**
- * Backing storage for the `Encoding` singleton accessors below. Rails' module
- * sets them at the bottom of encoding.rb (:132-135), in this order; the
- * defaults live on the declarations here so a reader before any writer still
- * sees Rails' value.
- */
 let _useStandardJsonTimeFormat = true;
 let _escapeHtmlEntitiesInJson = true;
 let _jsonEncoder: typeof JSONGemEncoder = JSONGemEncoder;
 let _timePrecision = 3;
 
-/**
- * Rails' `ActiveSupport::JSON::Encoding` singleton accessors
- * (encoding.rb:114-130). A class with `static` accessors rather than an object
- * literal so `class << self; attr_accessor ...` maps member-for-member.
- */
 export class Encoding {
-  /**
-   * If true, use ISO 8601 format for dates and times. Otherwise, fall back
-   * to the Active Support legacy format.
-   */
   static get useStandardJsonTimeFormat(): boolean {
     return _useStandardJsonTimeFormat;
   }
@@ -139,10 +82,6 @@ export class Encoding {
     _useStandardJsonTimeFormat = value;
   }
 
-  /**
-   * If true, encode >, <, & as escaped unicode sequences (e.g. > as \u003e)
-   * as a safety measure.
-   */
   static get escapeHtmlEntitiesInJson(): boolean {
     return _escapeHtmlEntitiesInJson;
   }
@@ -151,10 +90,6 @@ export class Encoding {
     _escapeHtmlEntitiesInJson = value;
   }
 
-  /**
-   * Sets the precision of encoded time values.
-   * Defaults to 3 (equivalent to millisecond precision)
-   */
   static get timePrecision(): number {
     return _timePrecision;
   }
@@ -163,10 +98,6 @@ export class Encoding {
     _timePrecision = value;
   }
 
-  /**
-   * Sets the encoder used by trails to encode objects into JSON strings in
-   * `ActiveSupportJSON.encode`.
-   */
   static get jsonEncoder(): typeof JSONGemEncoder {
     return _jsonEncoder;
   }

@@ -1,34 +1,14 @@
-/**
- * Port of actionpack/test/controller/routing_test.rb
- *
- * Rails design rationale: the routing layer is tested at two levels — route
- * recognition (path → params) and URL generation (params → path). The
- * `LegacyRouteSetTests` class exercises both via lambda/app-endpoint routes
- * (so tests don't require a real controller) and via `recognize_path` /
- * `url_for`. Subdomain constraints and named-route URL helpers require
- * infrastructure not yet ported (NamedRouteCollection, full request-env
- * subdomain parsing); those tests are skipped below.
- *
- * Deferred to T-AC9 part 2: RouteSetTest (large class).
- * Deferred to T-AC9 part 3: RackMountIntegrationTests + remaining LegacyRouteSetTests (named-route
- * helpers, controller.url_for post-dispatch, subdomain constraint tests).
- */
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { bodyFromString, bodyToString } from "@blazetrails/rack";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UrlGenerationError } from "../metal/exceptions.js";
 
-// Rails: `url_for(set, options)` helper from RoutingTestHelpers.
-// `set.url_for(options.merge(only_path: true), route_name)` →
-// generateExtras returns [path, extras]; we only need the path.
 function urlFor(rs: RouteSet, options: Record<string, unknown>): string {
   const opts = { ...options };
   return rs.generateExtras(opts)[0];
 }
 
-// Rails: `get(URI(...))` dispatches the route set as a Rack app and joins
-// the response body. Returns the body string or "Not Found" on 404.
 async function rackGet(rs: RouteSet, urlStr: string): Promise<string> {
   const url = new URL(urlStr);
   const env = {
@@ -43,9 +23,6 @@ async function rackGet(rs: RouteSet, urlStr: string): Promise<string> {
   return bodyToString(body);
 }
 
-// ==========================================================================
-// UriReservedCharactersRoutingTest
-// ==========================================================================
 describe("UriReservedCharactersRoutingTest", () => {
   let rs: RouteSet;
   let segment: string;
@@ -68,7 +45,6 @@ describe("UriReservedCharactersRoutingTest", () => {
   });
 
   it.skip("route generation escapes unsafe path characters", () => {
-    // pending: generateExtras route lookup fails for dynamic controller/action routes with special chars
     expect(
       urlFor(rs, {
         controller: "content",
@@ -96,7 +72,6 @@ describe("UriReservedCharactersRoutingTest", () => {
   });
 
   it.skip("route generation allows passing non string values to generated helper", () => {
-    // pending: generateExtras route lookup fails for dynamic controller/action routes
     expect(
       urlFor(rs, {
         controller: "content",
@@ -108,9 +83,6 @@ describe("UriReservedCharactersRoutingTest", () => {
   });
 });
 
-// ==========================================================================
-// LegacyRouteSetTests
-// ==========================================================================
 describe("LegacyRouteSetTests", () => {
   let rs: RouteSet;
 
@@ -208,7 +180,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("star paths are greedy but not too much", async () => {
-    // pending: glob params don't split trailing .ext into format segment
     rs.draw((r) => {
       r.get("/*path", {
         app: async (env: any) => {
@@ -239,7 +210,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("optional star paths are greedy but not too much", async () => {
-    // pending: glob params don't split trailing .ext into format segment
     rs.draw((r) => {
       r.get("/(*filters)", {
         app: async (env: any) => {
@@ -275,7 +245,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("format symbol constraints", async () => {
-    // pending: format constraint matching against extracted format segment not yet wired
     rs.draw((r) => {
       r.get("/api", {
         constraints: { format: "json" },
@@ -304,7 +273,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("non greedy glob regexp", async () => {
-    // pending: format segment not split from glob with non-greedy regexp constraint
     let capturedParams: Record<string, unknown> = {};
     rs.draw((r) => {
       r.get("/posts/:id(/*filters)", {
@@ -342,7 +310,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("route with regexp for action", () => {
-    // pending: generateExtras route lookup skips routes with regexp action constraints
     rs.draw((r) => {
       r.get("/:controller/:action", { action: /auth[-|_].+/ } as any);
     });
@@ -365,7 +332,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("route with regexp and captures for controller", () => {
-    // pending: controller regexp with captures doesn't produce namespaced controller string
     rs.draw((r) => {
       r.get("/:controller(/:action(/:id))", { controller: /admin\/(accounts|users)/ } as any);
     });
@@ -382,7 +348,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("route with regexp and dot", () => {
-    // pending: generateExtras route lookup skips routes with regexp controller/action constraints
     rs.draw((r) => {
       r.get(":controller/:action/:file", {
         controller: /admin|user/,
@@ -427,7 +392,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("non controllers cannot be matched", () => {
-    // pending: :controller dynamic segment doesn't validate against known controllers
     rs.draw((r) => {
       r.get(":controller/:action/:id", {});
     });
@@ -436,7 +400,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("should list options diff when routing constraints dont match", () => {
-    // pending: use_route with constraint mismatch doesn't throw UrlGenerationError
     rs.draw((r) => {
       r.get("post/:id", { to: "post#show", constraints: { id: /\d+/ }, as: "post" });
     });
@@ -447,7 +410,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("dynamic path allowed", () => {
-    // pending: array values for glob params are joined with comma instead of /
     rs.draw((r) => {
       r.get("*path", { to: "content#show_file" });
     });
@@ -480,7 +442,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("route with integer default", () => {
-    // pending: integer route default not suppressed in URL generation when value matches default
     rs.draw((r) => {
       r.get("page(/:id)", { to: "content#show_page", id: 1 } as any);
     });
@@ -508,7 +469,6 @@ describe("LegacyRouteSetTests", () => {
   });
 
   it.skip("requirement should prevent optional id", () => {
-    // pending: missing required param throws generic Error instead of UrlGenerationError
     rs.draw((r) => {
       r.get("post/:id", { to: "post#show", constraints: { id: /\d+/ }, as: "post" });
     });
@@ -518,115 +478,57 @@ describe("LegacyRouteSetTests", () => {
     expect(() => urlFor(rs, { controller: "post", action: "show" })).toThrow(UrlGenerationError);
   });
 
-  // -- skipped: named-route URL helpers (NamedRouteCollection not yet ported) --
+  it.skip("basic named route", () => {});
 
-  it.skip("basic named route", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route with option", () => {});
 
-  it.skip("named route with option", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route with default", () => {});
 
-  it.skip("named route with default", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route with path prefix", () => {});
 
-  it.skip("named route with path prefix", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route with blank path prefix", () => {});
 
-  it.skip("named route with blank path prefix", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route with nested controller", () => {});
 
-  it.skip("named route with nested controller", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("optimised named route with host", () => {});
 
-  it.skip("optimised named route with host", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route without hash", () => {});
 
-  it.skip("named route without hash", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route root", () => {});
 
-  it.skip("named route root", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route root without hash", () => {});
 
-  it.skip("named route root without hash", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route root with hash", () => {});
 
-  it.skip("named route root with hash", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("root without path raises argument error", () => {});
 
-  it.skip("root without path raises argument error", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route root with trailing slash", () => {});
 
-  it.skip("named route root with trailing slash", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("named route with regexps", () => {});
 
-  it.skip("named route with regexps", () => {
-    // pending: named-route url helpers require NamedRouteCollection port
-  });
+  it.skip("class and lambda constraints", () => {});
 
-  it.skip("class and lambda constraints", () => {
-    // pending: subdomain request parsing requires HTTP_HOST subdomain extraction
-  });
+  it.skip("lambda constraints", () => {});
 
-  it.skip("lambda constraints", () => {
-    // pending: subdomain request parsing requires HTTP_HOST subdomain extraction
-  });
+  it.skip("scoped lambda", () => {});
 
-  it.skip("scoped lambda", () => {
-    // pending: scope constraint callable protocol not yet wired
-  });
+  it.skip("scoped lambda with get lambda", () => {});
 
-  it.skip("scoped lambda with get lambda", () => {
-    // pending: scope constraint callable protocol not yet wired
-  });
+  it.skip("default setup", () => {});
 
-  // -- skipped: controller.url_for post-dispatch (requires full controller wiring) --
+  it.skip("route uri pattern", () => {});
 
-  it.skip("default setup", () => {
-    // pending: controller.url_for after get() requires ActionController::Base wiring
-  });
+  it.skip("changing controller", () => {});
 
-  it.skip("route uri pattern", () => {
-    // pending: route_uri_pattern header not yet set on request
-  });
+  it.skip("dynamic recall paths allowed", () => {});
 
-  it.skip("changing controller", () => {
-    // pending: controller.url_for after get() requires ActionController::Base wiring
-  });
+  it.skip("backwards", () => {});
 
-  it.skip("dynamic recall paths allowed", () => {
-    // pending: controller.url_for after get() requires ActionController::Base wiring
-  });
+  it.skip("route with text default", () => {});
 
-  it.skip("backwards", () => {
-    // pending: controller.url_for after get() requires ActionController::Base wiring
-  });
+  it.skip("action expiry", () => {});
 
-  it.skip("route with text default", () => {
-    // pending: binary-string encoding (force_encoding BINARY) not applicable in JS
-  });
+  it.skip("id encoding", () => {});
 
-  it.skip("action expiry", () => {
-    // pending: controller.url_for after get() requires ActionController::Base wiring
-  });
-
-  it.skip("id encoding", () => {
-    // pending: binary URI encoding (.b) not applicable in JS
-  });
-
-  it.skip("set to nil forgets", () => {
-    // pending: controller.url_for after get() requires ActionController::Base wiring
-  });
+  it.skip("set to nil forgets", () => {});
 });

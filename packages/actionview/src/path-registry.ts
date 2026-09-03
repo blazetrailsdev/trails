@@ -1,13 +1,3 @@
-/**
- * ActionView::PathRegistry
- *
- * Process-wide registry of view-path resolvers. Tracks FileSystemResolver
- * instances keyed by resolved path (so the same disk path always returns the
- * same resolver instance) and per-class view-path overrides used by
- * controller inheritance. `DetailsKey.clear()` walks `allResolvers()` to
- * invalidate resolver caches.
- */
-
 import { File } from "@blazetrails/ruby-compat";
 import { PathSet } from "./path-set.js";
 import { FileSystemResolver } from "./template/resolver.js";
@@ -16,7 +6,7 @@ import type { PathSetResolver } from "./path-set.js";
 type ClassLike = new (...args: unknown[]) => unknown;
 
 export class PathRegistry {
-  /** @internal Hooks fired whenever a new FileSystemResolver is built via castFileSystemResolvers. */
+  /** @internal */
   static readonly fileSystemResolverHooks: Array<() => void> = [];
 
   private static _fileSystemResolvers = new Map<string, FileSystemResolver>();
@@ -36,13 +26,7 @@ export class PathRegistry {
     this._viewPathsByClass.set(klass, paths);
   }
 
-  /**
-   * Converts an array of strings (filesystem paths) and/or existing resolver
-   * instances into resolvers. String paths are resolved to absolute paths and
-   * deduplicated — the same absolute path always yields the same
-   * FileSystemResolver instance.
-   * @internal
-   */
+  /** @internal */
   static castFileSystemResolvers(paths: Array<string | PathSetResolver>): PathSetResolver[] {
     let builtNew = false;
     const result = paths.map((p) => {
@@ -83,7 +67,7 @@ export class PathRegistry {
     return out;
   }
 
-  /** @internal Reset all registry state — for use in tests only. */
+  /** @internal */
   static reset(): void {
     this._fileSystemResolvers.clear();
     this._viewPathsByClass.clear();

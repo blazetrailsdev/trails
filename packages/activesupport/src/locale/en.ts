@@ -1,22 +1,9 @@
-/**
- * Mirrors: active_support/locale/en.yml and active_support/locale/en.rb.
- *
- * Rails ships the `en` locale as two files on `I18n.load_path` — a YAML file
- * for the data and a Ruby file for the `number.nth` lambdas. Translation-file
- * loading is not ported yet (story `i18n-backend-file-loading-localize`), so
- * both live here as one module, keyed exactly as the two files are and stored
- * into the backend by `i18n.ts`.
- */
-
 import type { TranslationData } from "@blazetrails/i18n";
 import { ordinal } from "../inflector.js";
 
 export const en: TranslationData = {
   date: {
     formats: {
-      // Use the strftime parameters for formats.
-      // When no format has been given, it uses default.
-      // You can provide other formats here if you like!
       default: "%Y-%m-%d",
       short: "%b %d",
       long: "%B %d, %Y",
@@ -25,7 +12,6 @@ export const en: TranslationData = {
     day_names: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     abbr_day_names: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
 
-    // Don't forget the nil at the beginning; there's no such thing as a 0th month
     month_names: [
       null,
       "January",
@@ -56,7 +42,6 @@ export const en: TranslationData = {
       "Nov",
       "Dec",
     ],
-    // Used in date_select and datetime_select.
     order: ["year", "month", "day"],
   },
 
@@ -70,7 +55,6 @@ export const en: TranslationData = {
     pm: "pm",
   },
 
-  // Used in array.to_sentence.
   support: {
     array: {
       words_connector: ", ",
@@ -80,8 +64,6 @@ export const en: TranslationData = {
   },
 
   number: {
-    // Used in NumberHelper.number_to_delimited()
-    // These are also the defaults for 'currency', 'percentage', 'precision', and 'human'
     format: {
       separator: ".",
       delimiter: ",",
@@ -91,7 +73,6 @@ export const en: TranslationData = {
       strip_insignificant_zeros: false,
     },
 
-    // Used in NumberHelper.number_to_currency()
     currency: {
       format: {
         format: "%u%n",
@@ -105,7 +86,6 @@ export const en: TranslationData = {
       },
     },
 
-    // Used in NumberHelper.number_to_percentage()
     percentage: {
       format: {
         delimiter: "",
@@ -113,14 +93,12 @@ export const en: TranslationData = {
       },
     },
 
-    // Used in NumberHelper.number_to_rounded()
     precision: {
       format: {
         delimiter: "",
       },
     },
 
-    // Used in NumberHelper.number_to_human_size() and NumberHelper.number_to_human()
     human: {
       format: {
         delimiter: "",
@@ -128,7 +106,6 @@ export const en: TranslationData = {
         significant: true,
         strip_insignificant_zeros: true,
       },
-      // Used in number_to_human_size()
       storage_units: {
         format: "%n %u",
         units: {
@@ -145,7 +122,6 @@ export const en: TranslationData = {
           zb: "ZB",
         },
       },
-      // Used in NumberHelper.number_to_human()
       decimal_units: {
         format: "%n %u",
         units: {

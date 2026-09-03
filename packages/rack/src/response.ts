@@ -13,12 +13,6 @@ import * as MediaTypeModule from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
 import { include } from "@blazetrails/activesupport";
 
-/**
- * Mirrors `Rack::Response::Helpers` (`rack/lib/rack/response.rb:180-370`), the
- * module both `Rack::Response` (`response.rb:373`) and `Rack::Response::Raw`
- * (`response.rb:376`) include. Modelled as a class module so `include()`
- * carries its accessor pairs (Ruby's `content_type` / `content_type=`).
- */
 export abstract class Helpers {
   declare status: number;
   declare headers: Record<string, any>;
@@ -103,11 +97,6 @@ export abstract class Helpers {
     return this.hasHeader(header);
   }
 
-  /**
-   * Add a header that may have multiple values.
-   *
-   * Mirrors `Rack::Response::Helpers#add_header` (`response.rb:219-238`).
-   */
   addHeader(key: string | null, value: string | null): any {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
     if (value === null || value === undefined) return this.getHeader(key) ?? null;
@@ -127,12 +116,10 @@ export abstract class Helpers {
     }
   }
 
-  /** Get the content type of the response. */
   get contentType(): string | undefined {
     return this.getHeader(CONTENT_TYPE);
   }
 
-  /** Set the content type of the response. */
   set contentType(contentType: string) {
     this.setHeader(CONTENT_TYPE, contentType);
   }
@@ -182,13 +169,11 @@ export abstract class Helpers {
     this.setHeader(CACHE_CONTROL, value);
   }
 
-  /** Specifies that the content shouldn't be cached. Overrides `cacheBang` if already called. */
   doNotCacheBang(): void {
     this.setHeader(CACHE_CONTROL, "no-cache, must-revalidate");
     this.setHeader(EXPIRES, new Date().toUTCString()); // boundary: HTTP-date header
   }
 
-  /** Specify that the content should be cached. */
   cacheBang(duration: number = 3600, { directive = "public" }: { directive?: string } = {}): void {
     if (!/no-cache/.test(this.getHeader(CACHE_CONTROL) ?? "")) {
       this.setHeader(CACHE_CONTROL, `${directive}, max-age=${duration}`);
@@ -204,11 +189,7 @@ export abstract class Helpers {
     this.setHeader(ETAG, value);
   }
 
-  /**
-   * Convert the body of this response into an internally buffered Array if possible.
-   *
-   * @internal — `protected` in Ruby (`response.rb:322-355`).
-   */
+  /** @internal */
   bufferedBodyBang(): boolean {
     if (this._buffered === null) {
       if (Array.isArray(this.body)) {
@@ -237,7 +218,7 @@ export abstract class Helpers {
     return this._buffered;
   }
 
-  /** @internal — `protected` in Ruby (`response.rb:357-368`). */
+  /** @internal */
   append(chunk: string): string {
     this.body.push(chunk);
     if (this.length !== null) {
@@ -291,7 +272,6 @@ export class Response {
     return new Response(body, status, headers);
   }
 
-  // Bracket accessor
   get(key: string): any {
     return this.headers[key];
   }
@@ -299,7 +279,6 @@ export class Response {
     this.headers[key] = value;
   }
 
-  // Alias for bracket notation
   [Symbol.for("[]")](key: string): any {
     return this.headers[key];
   }
@@ -361,7 +340,6 @@ export class Response {
 
   write(chunk: string): void {
     this.bufferedBodyBang();
-    // Clone array body on first write to avoid mutating original
     if (this._buffered && Array.isArray(this.body) && !this._bodyCloned) {
       this.body = [...this.body];
       this._bodyCloned = true;
@@ -399,7 +377,6 @@ export class Response {
   }
 }
 
-/** Mirrors `Rack::Response::Raw` (`rack/lib/rack/response.rb:375-401`). */
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers` (`rack/response.rb:376`); the class/interface merge is how a mixin surfaces on the type side. */
 export class ResponseRaw {
   status: number;

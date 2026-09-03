@@ -1,6 +1,3 @@
-/**
- * Mirrors: i18n/test/backend/exceptions_test.rb
- */
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingInterpolationArgument, MissingTranslationData, inspect } from "../exceptions.js";
 import { config, l, resetConfig, setBackend, t } from "../i18n.js";
@@ -8,10 +5,6 @@ import { resetClassConfig } from "../config.js";
 import { catchException } from "../throw-catch.js";
 import { Simple } from "./simple.js";
 
-/**
- * Stands in for `Time.now`: `localize` duck-types its object off `strftime`
- * and `sec`, and this case raises at the format lookup before `strftime` runs.
- */
 const timeNow = {
   sec: 0,
   strftime(format: string): string {

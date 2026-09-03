@@ -1,24 +1,3 @@
-/**
- * Mirrors: `activesupport/test/xml_mini/xml_mini_engine_test.rb` — the shared
- * engine suite every backend test inherits (`XMLMiniEngineTest.inherited`
- * mixes `EngineTests` into the subclass, `xml_mini_engine_test.rb:19-22`).
- * Rails runs it once per backend by subclassing inside
- * `XMLMiniEngineTest.run_with_gem` (`rexml_engine_test.rb:5`,
- * `nokogiri_engine_test.rb:5`, `nokogirisax_engine_test.rb:5`). JavaScript has
- * no `inherited` hook (CLAUDE.md, "Module mixins"), so `engineTests` is the
- * `EngineTests` module and each call below is one of Ruby's subclasses:
- * `REXMLEngineTest`, whose own cases live in `rexml-engine.test.ts`;
- * `NokogiriEngineTest`, whose `expansion_attack_error` is
- * `Nokogiri::XML::SyntaxError`; and `NokogiriSAXEngineTest`, whose is
- * `RuntimeError`. `nokogirisax.ts` raises Ruby's `RuntimeError` for its bare
- * `raise error_message` (`nokogirisax.rb:37-39`); the DOM backend re-raises the
- * parser's own first error (`raise doc.errors.first`, `nokogiri.rb:27`), a
- * `Nokogiri::XML::SyntaxError`.
- * The three calls live in this one file, rather than in a file per Ruby file,
- * because `parity:test` credits a Rails test file against its convention TS
- * file and every one of these names is defined in `xml_mini_engine_test.rb`.
- */
-
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { RuntimeError } from "../rexml/document.js";
 import * as XmlMini from "../xml-mini.js";
@@ -29,12 +8,6 @@ import { assertRaises } from "../testing/assertions.js";
 import { fromXml } from "../hash-utils.js";
 import { FileLike } from "../xml-mini.js";
 
-/**
- * Ruby's `rescue LoadError` catches only the package being absent; a syntax or
- * runtime failure inside it still propagates. `import()` signals the absent
- * package as `ERR_MODULE_NOT_FOUND` naming the specifier, the same test
- * `xml-mini/nokogiri.ts`'s own loader makes.
- */
 function isLoadError(e: unknown, gemName: string): boolean {
   return (
     e instanceof Error &&
@@ -43,19 +16,13 @@ function isLoadError(e: unknown, gemName: string): boolean {
   );
 }
 
-/**
- * `XMLMiniEngineTest.run_with_gem` (`xml_mini_engine_test.rb:8-13`): require
- * the gem, yield, and skip the suite on `LoadError`. Ruby's block then reads
- * `Nokogiri::XML::SyntaxError` off the constant the `require` installed; ESM
- * has no such ambient constant, so the imported module is yielded to it.
- */
 async function runWithGem(
   gemName: string,
   block: (gem: Record<string, any>) => void,
 ): Promise<void> {
   let gem: Record<string, any>;
   try {
-    gem = await import(/* @vite-ignore */ gemName);
+    gem = await import(gemName);
   } catch (e) {
     if (!isLoadError(e, gemName)) throw e;
     return;
@@ -64,34 +31,16 @@ async function runWithGem(
 }
 
 interface EngineTestsOptions {
-  /**
-   * `#engine` (`rexml_engine_test.rb:20-22`), which Ruby uses both as the
-   * `XmlMini.backend=` argument and to name the constant.
-   */
   engine: string;
-  /** The `ActiveSupport::XmlMini_#{engine}` constant `#assert_engine_class` reads. */
   backendModule: XmlMini.XmlMiniBackend;
-  /** `#expansion_attack_error` (`rexml_engine_test.rb:24-26`). */
   expansionAttackError: new (...args: any[]) => Error;
 }
 
 function engineTests({ engine, backendModule, expansionAttackError }: EngineTestsOptions): void {
-  /**
-   * `XMLMiniEngineTest::EngineTests#assert_engine_class`
-   * (`xml_mini_engine_test.rb:212-214`): Ruby reads the
-   * `ActiveSupport::XmlMini_#{engine}` constant out of `ActiveSupport`, where a
-   * trails backend is the module namespace object of `xml-mini/<name>.js`.
-   */
   function assertEngineClass(actual: unknown): void {
     expect(actual).toBe(backendModule);
   }
 
-  /**
-   * `XMLMiniEngineTest::EngineTests#assert_equal_rexml`
-   * (`xml_mini_engine_test.rb:216-221`) — the engine's own parse against the
-   * REXML one. `xml.rewind` has no analog: a trails backend takes a string
-   * (`XmlMiniBackend` in `xml-mini.ts`), so there is no IO to rewind.
-   */
   async function assertEqualRexml(xml: string): Promise<void> {
     const parsedXml = await XmlMini.parse(xml);
     const hash = await XmlMini.withBackend(XmlMini_REXML, () => XmlMini.parse(xml));
@@ -127,8 +76,6 @@ function engineTests({ engine, backendModule, expansionAttackError }: EngineTest
     });
 
     it("exception thrown on expansion attack", async () => {
-      // Rails goes through `Hash.from_xml`, which is unported; the raise is
-      // `XmlMini.parse`'s either way (`xml_mini_engine_test.rb:51-68`).
       await assertRaises([expansionAttackError], {}, () =>
         XmlMini.parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE member [
@@ -242,9 +189,6 @@ function engineTests({ engine, backendModule, expansionAttackError }: EngineTest
     });
 
     it("parse from io", async () => {
-      // Rails wraps the document in a `StringIO` (`xml_mini_engine_test.rb:154`);
-      // a trails backend's `parse` takes a string (`XmlMiniBackend` in
-      // `xml-mini.ts`), so the string arm is the trails analog.
       await assertEqualRexml(`
       <root>
         good

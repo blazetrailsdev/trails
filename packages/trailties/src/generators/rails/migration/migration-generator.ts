@@ -9,10 +9,6 @@ import {
 import { NamedBase } from "../../named-base.js";
 import { classify, migrationTimestamp } from "../../base.js";
 
-// Mirrors railties/lib/rails/generators/rails/migration/migration_generator.rb.
-// hook_for :orm defers to the ORM-provided generator. This skeleton emits a
-// minimal Migration shell; CreateX/AddXToY inference lives in the existing
-// top-level MigrationGenerator and folds in when the ORM hook lands.
 let lastTimestamp: string | null = null;
 
 export function emitMigrationSource(className: string, timestamp: string): string {

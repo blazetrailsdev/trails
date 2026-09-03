@@ -1,12 +1,3 @@
-/**
- * ActionDispatch::ShowExceptions
- *
- * Middleware that catches exceptions and renders error pages.
- * Checks the `action_dispatch.show_exceptions` env variable to decide
- * whether to show an error page (:all), only for rescuable exceptions
- * (:rescuable), or re-raise (:none).
- */
-
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";

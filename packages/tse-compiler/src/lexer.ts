@@ -1,6 +1,3 @@
-/** TSE lexer. Rails analogue: the `erubi` gem scanner. Single divergence:
- * `<%! ... !%>` magic blocks for TS-only type annotations (plan §2.10.1). */
-
 export type TokenKind =
   | "text"
   | "code"
@@ -10,15 +7,12 @@ export type TokenKind =
   | "comment"
   | "typesMagic";
 
-/** Mirrors Erubi's BLOCK_EXPR: expression ends with a block opener so the
- * emitter must not wrap it in parens — the trailing block would be cut off. */
 const BLOCK_EXPR_RE = /((\s|\))do|\{)(\s*\|[^|]*\|)?\s*$/;
 export interface Token {
   kind: TokenKind;
   value: string;
   trimLeft: boolean;
   trimRight: boolean;
-  /** 0-indexed line number in the original `.tse` source. */
   srcLine: number;
 }
 export class TseSyntaxError extends Error {}

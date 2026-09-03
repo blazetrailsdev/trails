@@ -1,21 +1,7 @@
-/**
- * ActionDispatch::Http::FilterParameters
- *
- * Port of `actionpack/lib/action_dispatch/http/filter_parameters.rb`. Allows
- * specifying sensitive query string and POST parameters to filter from the
- * request log. The filter list lives at
- * `env["action_dispatch.parameter_filter"]`.
- *
- * Rails mixes this into `ActionDispatch::Request`. Per CLAUDE.md, we expose
- * the methods as `this`-typed functions against a {@link FilterParametersHost}
- * interface so they can be assigned directly onto the host class.
- */
-
 import { ParameterFilter } from "@blazetrails/activesupport";
 import type { ParametersHost } from "./parameters.js";
 import { ParseError } from "./parameters.js";
 
-/** Patterns Rails always strips from `filtered_env`. */
 export const ENV_MATCH: ReadonlyArray<string | RegExp> = [
   /RAW_POST_DATA/,
   "rack.request.form_vars",
@@ -26,20 +12,11 @@ export const NULL_PARAM_FILTER = new ParameterFilter();
 /** @internal */
 export const NULL_ENV_FILTER = new ParameterFilter([...ENV_MATCH]);
 
-/**
- * Minimal host surface required by the {@link FilterParameters} mixin.
- * Mirrors the methods Rails' `Http::FilterParameters` calls on `self`.
- */
 export interface FilterParametersHost extends ParametersHost {
   hasHeader(key: string): boolean;
   env: Record<string, unknown>;
   path: string;
   queryString: string;
-  /**
-   * The merged parameter hash. Rails calls this `parameters`; trails exposes
-   * the same value via the `params` getter on `Request`, so the mixin reads
-   * from `params` to keep wiring onto `Request` collision-free.
-   */
   params: Record<string, unknown>;
 }
 
@@ -50,7 +27,6 @@ interface CachedState {
   _parameterFilter?: ParameterFilter;
 }
 
-/** Returns a hash of parameters with all sensitive data replaced. */
 export function filteredParameters(this: FilterParametersHost): Record<string, unknown> {
   const host = this as FilterParametersHost & CachedState;
   if (host._filteredParameters !== undefined) return host._filteredParameters;
@@ -66,7 +42,6 @@ export function filteredParameters(this: FilterParametersHost): Record<string, u
   return host._filteredParameters;
 }
 
-/** Returns a hash of request.env with all sensitive data replaced. */
 export function filteredEnv(this: FilterParametersHost): Record<string, unknown> {
   const host = this as FilterParametersHost & CachedState;
   if (host._filteredEnv !== undefined) return host._filteredEnv;
@@ -74,7 +49,6 @@ export function filteredEnv(this: FilterParametersHost): Record<string, unknown>
   return host._filteredEnv;
 }
 
-/** Reconstructs a path with all sensitive GET parameters replaced. */
 export function filteredPath(this: FilterParametersHost): string {
   const host = this as FilterParametersHost & CachedState;
   if (host._filteredPath !== undefined) return host._filteredPath;
@@ -83,7 +57,6 @@ export function filteredPath(this: FilterParametersHost): string {
   return host._filteredPath;
 }
 
-/** Returns the `ParameterFilter` object used to filter in this request. */
 export function parameterFilter(this: FilterParametersHost): ParameterFilter {
   const host = this as FilterParametersHost & CachedState;
   if (host._parameterFilter !== undefined) return host._parameterFilter;

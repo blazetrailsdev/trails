@@ -28,17 +28,6 @@ interface UnusedRoutesOptions {
   grep?: string;
 }
 
-/**
- * Mirrors `Rails::Command::UnusedRoutesCommand::RouteInfo`
- * (`railties/lib/rails/commands/unused_routes/unused_routes_command.rb:12-39`).
- *
- * Rails resolves the controller with
- * `(@controller_name.to_s.camelize + "Controller").safe_constantize`. ESM has
- * no constant table, so the lookup goes through `controllerConstants` — the
- * same map `Request#controller_class_for` (`http/request.rb:94-110`) uses —
- * and a miss arrives as the absent map entry rather than `safe_constantize`'s
- * nil.
- */
 export class RouteInfo {
   /** @internal */
   private controllerName: string | undefined;
@@ -73,12 +62,7 @@ export class RouteInfo {
     return this.controllerName != null && this.controllerClass == null;
   }
 
-  /**
-   * @internal
-   * Rails globs `Dir["#{view_path(path)}.*"]`, whose pattern is absolute;
-   * trails' glob seam always resolves against a cwd, so the filesystem root is
-   * spelled out.
-   */
+  /** @internal */
   private async templateMissing(): Promise<boolean> {
     if (this.controllerClass == null) return false;
     const paths = this.controllerClass.viewPaths?.() ?? [];
@@ -96,10 +80,6 @@ export class RouteInfo {
   }
 }
 
-/**
- * Mirrors `Rails::Command::UnusedRoutesCommand`
- * (`railties/lib/rails/commands/unused_routes/unused_routes_command.rb:7-72`).
- */
 export class UnusedRoutesCommand {
   /** @internal */
   private options: UnusedRoutesOptions;

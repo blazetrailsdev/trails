@@ -17,7 +17,6 @@ export interface ScaffoldControllerRunOptions {
   helper?: boolean;
 }
 
-// Mirrors railties/lib/rails/generators/rails/scaffold_controller/scaffold_controller_generator.rb.
 export class ScaffoldControllerGenerator extends GeneratorBase {
   constructor(options: GeneratorOptions) {
     super(options);

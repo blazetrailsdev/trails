@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Document, Element, ParseException, RuntimeError, Text } from "./document.js";
 
-// REXML is Ruby stdlib, so there is no Rails test file to mirror: these cover
-// the slice of the parser `XmlMini_REXML` drives.
 describe("REXML::Document", () => {
   it("exposes the root element", () => {
     const doc = new Document("<?xml version='1.0'?><root/>");
@@ -65,7 +63,6 @@ describe("REXML::Document", () => {
         <!ENTITY g "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
       ]>
       <member>&a;</member>`);
-    // REXML expands lazily: the document parses, #value raises.
     expect(() => doc.root!.texts.map((t) => t.value)).toThrow(RuntimeError);
   });
 

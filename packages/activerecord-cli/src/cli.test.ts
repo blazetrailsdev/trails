@@ -45,7 +45,7 @@ describe("ArCliTest", () => {
 
   it("generate:manifest writes app/models/index.ts, is idempotent, and --check detects drift", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-cli-"));
-    const models = join(dir, "app", "models"); // the default scan root
+    const models = join(dir, "app", "models");
     await mkdir(models, { recursive: true });
     await writeFile(
       join(models, "user.ts"),
@@ -63,13 +63,12 @@ describe("ArCliTest", () => {
     out.length = 0;
     expect(await run(["generate:manifest"], dir)).toBe(0);
     expect(out.join("\n")).toContain("unchanged");
-    // --root targets the models dir directly; now up to date, exits 0.
     expect(await run(["generate:manifest", "--check", "--root", models], dir)).toBe(0);
   });
 
   it("resolves a relative --root against the passed cwd, not process.cwd()", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-cli-"));
-    const models = join(dir, "src", "models"); // a non-default root, via --root
+    const models = join(dir, "src", "models");
     await mkdir(models, { recursive: true });
     await writeFile(
       join(models, "user.ts"),
@@ -78,7 +77,6 @@ describe("ArCliTest", () => {
     );
 
     expect(await run(["generate:manifest", "--root", "src/models"], dir)).toBe(0);
-    // The manifest landed under `dir`, not the test runner's process cwd.
     expect(await readFile(join(models, "index.ts"), "utf8")).toContain(`import { User }`);
   });
 
@@ -98,7 +96,6 @@ describe("ArCliTest", () => {
     expect(await run(["generate:manifest", "--root"], ".")).toBe(1);
     expect(err.join("\n")).toContain("--root requires a directory");
     err.length = 0;
-    // A following flag must not be swallowed as the directory.
     expect(await run(["generate:manifest", "--root", "--check"], ".")).toBe(1);
     expect(err.join("\n")).toContain("--root requires a directory");
   });
@@ -123,7 +120,6 @@ describe("ArCliTest", () => {
     const dir = await mkdtemp(join(tmpdir(), "ar-cli-gen-mig-dry-"));
     expect(await run(["generate:migration", "--dry-run", "CreateThings"], dir)).toBe(0);
     expect(out[0]).toContain("(dry)");
-    // db/migrate must not have been created
     await expect(
       import("fs/promises").then((m) => m.readdir(join(dir, "db", "migrate"))),
     ).rejects.toThrow();

@@ -1,8 +1,3 @@
-/**
- * ActionDispatch::Static — middleware that serves static files from a
- * directory. Mirrors Rails' `middleware/static.rb` (Static + FileHandler).
- */
-
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Files, Mime, Request, Utils } from "@blazetrails/rack";
 import { File } from "@blazetrails/ruby-compat";
@@ -40,7 +35,6 @@ export class Static {
 }
 
 export class FileHandler {
-  /** `Accept-Encoding` value -> file extension (static.rb:47-51) */
   static readonly PRECOMPRESSED: Record<string, string | null> = {
     br: ".br",
     gzip: ".gz",
@@ -80,10 +74,6 @@ export class FileHandler {
     return (await this.attempt(env)) ?? this.fileServer.call(env);
   }
 
-  /**
-   * Match a `GET`/`HEAD` request to a file on disk and return its Rack
-   * response, or `null` to let the caller fall through to the next app.
-   */
   async attempt(env: RackEnv): Promise<RackResponse | null> {
     const request = new Request(env);
 
@@ -107,7 +97,6 @@ export class FileHandler {
 
     try {
       const [status, headers, body] = await this.fileServer.call(request.env);
-      // Omit content-encoding/type/etc headers for 304 Not Modified
       if (status !== 304) {
         Object.assign(headers, contentHeaders);
       }
@@ -117,14 +106,7 @@ export class FileHandler {
     }
   }
 
-  /**
-   * Match a URI path to a static file to be served.
-   *
-   * Checks for `path`, `path`.html, and `path`/index.html files, in that
-   * order, including .br and .gzip compressed extensions.
-   *
-   * @internal
-   */
+  /** @internal */
   private findFile(
     pathInfo: string,
     { acceptEncoding }: { acceptEncoding: AcceptEncoding },
@@ -165,11 +147,6 @@ export class FileHandler {
     let result: Found | null = null;
     this.eachPrecompressedFilepath(filepath, (contentEncoding, precompressedFilepath) => {
       if (this.isFileReadable(precompressedFilepath)) {
-        // Identity encoding is default, so we skip Accept-Encoding negotiation
-        // and needn't set Content-Encoding.
-        //
-        // Vary header is expected when we've found other available encodings
-        // that Accept-Encoding ruled out.
         if (contentEncoding === "identity") {
           result = [precompressedFilepath, headers];
           return true;
@@ -189,11 +166,7 @@ export class FileHandler {
     return result;
   }
 
-  /**
-   * @internal
-   *
-   * static.rb:141-142.
-   */
+  /** @internal */
   private isFileReadable(path: string): boolean {
     const filePath = File.join(this.root, path);
     return File.isFile(filePath) && File.isReadable(filePath);
@@ -215,14 +188,7 @@ export class FileHandler {
     }
   }
 
-  /**
-   * @internal
-   *
-   * Rails reads `::ActionController::Base.default_static_extension`
-   * (static.rb:165). trails' `ActionController::Base` does not carry that
-   * config slot yet, so the value `abstract_controller/caching.rb:36` seeds it
-   * with stands in until it does.
-   */
+  /** @internal */
   private eachCandidateFilepath(
     pathInfo: string,
     block: (filepath: string, contentType: string) => boolean | void,
@@ -234,9 +200,6 @@ export class FileHandler {
     const contentType = Mime.mimeType(ext, null);
     if (block(path, contentType ?? "text/plain")) return;
 
-    // Tack on .html and /index.html only for paths that don't have an explicit,
-    // resolvable file extension. No need to check for foo.js.html and
-    // foo.js/index.html.
     if (!contentType) {
       const defaultExt = ".html";
       if (ext !== defaultExt) {

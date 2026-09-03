@@ -1,6 +1,5 @@
 import { parseConfigFileTextToJson } from "typescript";
 
-/** compilerOptions keys AR requires and their required values. */
 const AR_REQUIRED_OPTIONS: ReadonlyArray<readonly [string, unknown]> = [
   ["target", "ES2022"],
   ["module", "Node16"],
@@ -10,13 +9,10 @@ const AR_REQUIRED_OPTIONS: ReadonlyArray<readonly [string, unknown]> = [
   ["skipLibCheck", true],
 ];
 
-/** Include globs AR needs present (for models and migrations). */
 const AR_REQUIRED_INCLUDES = ["app/models/**/*.ts", "db/migrate/**/*.ts"] as const;
 
-/** The trails-tsc language service plugin subpath (exposes the TS language service plugin). */
 const TRAILS_TSC_PLUGIN = "@blazetrails/trails-tsc/ts-plugin";
 
-/** Fresh tsconfig scaffold written when no existing file is found. */
 export const FRESH_TSCONFIG =
   JSON.stringify(
     {
@@ -45,21 +41,14 @@ export interface TsconfigConflict {
 }
 
 export interface TsconfigMergeResult {
-  /** Updated file content (pretty-printed JSON). */
   content: string;
-  /** compilerOptions keys that were added. */
   added: string[];
-  /** Keys whose existing value differed — NOT overwritten. */
   conflicts: TsconfigConflict[];
-  /** Whether the trails-tsc plugin entry was appended. */
   pluginAdded: boolean;
-  /** Include globs appended to `include`. */
   includesAppended: string[];
-  /** True when any modification was made (false = file is already compliant). */
   changed: boolean;
 }
 
-/** Parse JSONC text (comments + trailing commas) using TypeScript's parser. */
 function parseJsonc(text: string): unknown {
   const { config, error } = parseConfigFileTextToJson("<tsconfig.json>", text);
   if (error) {
@@ -68,10 +57,6 @@ function parseJsonc(text: string): unknown {
   return config;
 }
 
-/**
- * Merge AR-required settings into an existing tsconfig.json JSONC string.
- * Conflicting keys are NOT overwritten — they are reported in `conflicts`.
- */
 export function mergeTsconfig(existingText: string): TsconfigMergeResult {
   const cfg = parseJsonc(existingText) as {
     compilerOptions?: Record<string, unknown>;
@@ -94,7 +79,6 @@ export function mergeTsconfig(existingText: string): TsconfigMergeResult {
     }
   }
 
-  // Ensure trails-tsc plugin is present.
   let pluginAdded = false;
   const plugins = cfg.compilerOptions["plugins"];
   if (!Array.isArray(plugins)) {
@@ -108,7 +92,6 @@ export function mergeTsconfig(existingText: string): TsconfigMergeResult {
     }
   }
 
-  // Ensure required include globs are present.
   const includesAppended: string[] = [];
   if (!Array.isArray(cfg.include)) {
     cfg.include = [...AR_REQUIRED_INCLUDES];

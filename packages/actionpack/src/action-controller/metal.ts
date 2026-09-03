@@ -1,10 +1,3 @@
-/**
- * ActionController::Metal
- *
- * Minimal controller with Rack interface. Provides params, request,
- * response accessors and basic status/header management.
- */
-
 import { AbstractController } from "../abstract-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
@@ -35,13 +28,7 @@ import {
 } from "./metal/rendering.js";
 
 export class MiddlewareStack extends AbstractMiddlewareStack {
-  /**
-   * Mirrors `ActionController::MiddlewareStack#build_middleware`
-   * (`action_controller/metal.rb:44-52`) — an ActionController entry
-   * carries the `:only`/`:except` predicate.
-   *
-   * @internal
-   */
+  /** @internal */
   buildMiddleware(
     klass: MiddlewareEntry["klass"],
     args: unknown[],
@@ -51,13 +38,6 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
     return { klass: middleware.klass, args: middleware.args, block, valid: middleware.valid };
   }
 
-  /**
-   * Mirrors `ActionController::MiddlewareStack#build`
-   * (`action_controller/metal.rb:31-37`). The non-string arm of `action`
-   * only exists so the override stays assignable to
-   * `ActionDispatch::MiddlewareStack#build(app)` (`stack.rb:166`), which
-   * Ruby does not have to reconcile.
-   */
   build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
     if (typeof action !== "string") return super.build(action);
     let current: RackApp =
@@ -86,15 +66,8 @@ export class Middleware {
 const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
 
 export class Metal extends AbstractController {
-  /**
-   * Rails: `attr_internal :request` (`metal.rb:164`) and
-   * `attr_internal_reader :response` (`metal.rb:170`) — the ivars are
-   * `@_request` / `@_response`, which is why `PROTECTED_IVARS` names them and
-   * `view_assigns` never carries the request or response into a view.
-   */
   _request!: Request;
   _response!: Response;
-  /** Rails: `@_params` — `Metal#params` reads `request.parameters` (`metal.rb:181-187`). */
   _params: Parameters = new Parameters({});
 
   get params(): Parameters {
@@ -114,17 +87,12 @@ export class Metal extends AbstractController {
   get response(): Response {
     return this._response;
   }
-  /** Mirrors `Metal#response=` (`metal.rb:268-273`). */
   set response(value: Response) {
     this.setResponseBang(value);
 
-    // Rails: `@_response_body = true` — "Force `performed?` to return true".
-    // trails' `_responseBody` is the body slot, not a flag, so the same forcing
-    // is spelled through `markPerformed`.
     this.markPerformed();
   }
 
-  /** Rails: `delegate :session, to: "@_request"` (`metal.rb:176`). */
   get session(): Session {
     return this.request.session;
   }
@@ -149,12 +117,6 @@ export class Metal extends AbstractController {
     return false;
   }
 
-  /**
-   * `class_attribute :middleware_stack` (`metal.rb:288`) plus the
-   * `inherited` hook's `subclass.middleware_stack = middleware_stack.dup`
-   * (`metal.rb:148`). JS has no hook that fires when a subclass is defined,
-   * so the dup happens on first read instead, which is the same value.
-   */
   static middleware(): MiddlewareStack {
     let stack = _middlewareStacks.get(this);
     if (!stack) {
@@ -172,10 +134,6 @@ export class Metal extends AbstractController {
     this.middleware().use(args[0] as MiddlewareEntry["klass"], ...(args.slice(1) as any));
   }
 
-  /**
-   * Returns a Rack endpoint for the given action name — mirrors
-   * `ActionController::Metal.action` (`action_controller/metal.rb:315-327`).
-   */
   static action(this: typeof Metal, name: string): RackApp {
     const app: RackApp = async (env: RackEnv) => {
       const req = new Request(env);
@@ -192,11 +150,6 @@ export class Metal extends AbstractController {
     }
   }
 
-  /**
-   * Direct dispatch to the controller. Instantiates the controller, then
-   * executes the action named `name` — mirrors
-   * `ActionController::Metal.dispatch` (`action_controller/metal.rb:331-337`).
-   */
   static async dispatch(
     this: typeof Metal,
     name: string,
@@ -232,7 +185,6 @@ export class Metal extends AbstractController {
     return string;
   }
 
-  /** Dispatch an action in the context of a request/response (`metal.rb:249-255`). */
   async dispatch(name: string, request: Request, response: Response): Promise<RackResponse> {
     this.setRequestBang(request);
     this.setResponseBang(response);
@@ -261,50 +213,38 @@ export class Metal extends AbstractController {
     }
   }
 
-  /** Delegates to `ActionDispatch::Response#status=` (`metal.rb:183-184`). */
   set status(value: number | string) {
     this.response.status = value;
   }
 
-  /** Delegates to `ActionDispatch::Response#status` (`metal.rb:195-196`). */
   get status(): number {
     return this.response.status;
   }
 
-  /** Delegates to `ActionDispatch::Response#headers` (`metal.rb:179-180`). */
   get headers(): Response["headers"] {
     return this.response.headers;
   }
 
-  /** `headers[name] = value` through the delegated `headers` (`metal.rb:179-180`). */
   setHeader(name: string, value: string): void {
     this.response.setHeader(name, value);
   }
 
-  /** `headers[name]` through the delegated `headers` (`metal.rb:179-180`). */
   getHeader(name: string): string | undefined {
     return this.response.getHeader(name);
   }
 
-  /** Delegates to `ActionDispatch::Response#content_type=` (`metal.rb:191-192`). */
   set contentType(value: string) {
     this.response.contentType = value;
   }
 
-  /** Delegates to `ActionDispatch::Response#content_type` (`metal.rb:203-204`). */
   get contentType(): string | null {
     return this.response.contentType ?? null;
   }
 
-  /** Delegates to `ActionDispatch::Response#media_type` (`metal.rb:207-208`). */
   get mediaType(): string | undefined {
     return this.response.mediaType;
   }
 
-  /** Send a head-only response with given status. Mirrors Rails'
-   * `ActionController::Head#head` (`actionpack/lib/action_controller/metal/head.rb`):
-   * sets status, optional `location` / `content_type` / extra headers,
-   * and assigns `response_body = ""` to mark `performed?` true. */
   head(status: number | string | null, options?: Record<string, unknown>): true {
     if (status !== null && typeof status === "object") {
       throw new Error(`${JSON.stringify(status)} is not a valid value for \`status\`.`);
@@ -317,10 +257,6 @@ export class Metal extends AbstractController {
       contentType = options.content_type;
       for (const [key, value] of Object.entries(options)) {
         if (key === "location" || key === "content_type") continue;
-        // Rails capitalizes each `-`/`_`-separated segment (`cache_control`
-        // → `Cache-Control`), but `setHeader` lowercases keys for storage,
-        // so the case transformation has no observable effect — only the
-        // underscore-to-hyphen normalization matters here.
         this.setHeader(key.replace(/_/g, "-"), String(value));
       }
     }
@@ -340,13 +276,10 @@ export class Metal extends AbstractController {
       }
       this.response.charset = false;
     }
-    // Route through the public setter so the response stream is updated
-    // in lock-step (mirrors Rails' `self.response_body = ""` in head.rb).
     this.responseBody = "";
     return true;
   }
 
-  /** Writes through `response_body=` (`metal.rb:238-246`) so the Response carries it. */
   set body(value: string) {
     this.responseBody = value;
   }
@@ -355,11 +288,6 @@ export class Metal extends AbstractController {
     return this.responseBody;
   }
 
-  /**
-   * Public Rails-style setter that writes through to the underlying
-   * response. Mirrors `ActionController::Metal#response_body=`. After
-   * assignment, `isPerformed()` returns true.
-   */
   override set responseBody(body: string | string[] | Buffer | null | undefined) {
     if (body === null || body === undefined) {
       this.response.resetBodyBang();
@@ -379,34 +307,17 @@ export class Metal extends AbstractController {
     return typeof body === "string" ? body : (body?.toString() ?? "");
   }
 
-  /**
-   * Tests if render or redirect has already happened. Mirrors
-   * `ActionController::Metal#performed?` which returns
-   * `response_body || response.committed?`.
-   */
   isPerformed(): boolean {
     return this.performed || (this.response?.committed ?? false);
   }
 
-  /**
-   * Mirrors `ActionController::Metal#to_a` (`metal.rb:280-282`) — `response.to_a`.
-   * `to_a` is a Ruby core protocol name (SKIP_GROUPS in
-   * `scripts/parity/conventions.ts`), so it keeps its trails spelling.
-   */
   toRackResponse(): RackResponse {
     return this.response.toRack() as RackResponse;
   }
 
-  /** Resolve a status symbol to a number. */
   static resolveStatus = resolveStatus;
 
-  /**
-   * Rails `Metal.build_middleware` — wraps a middleware klass + args
-   * into the action-aware `:only`/`:except` predicate form consumed by
-   * the dispatch middleware stack.
-   *
-   * @internal
-   */
+  /** @internal */
   static buildMiddleware(
     klass: MiddlewareEntry["klass"],
     args: unknown[],
@@ -414,10 +325,6 @@ export class Metal extends AbstractController {
   ): Middleware & { valid(action: string): boolean } {
     const next = [...args];
     const last = next[next.length - 1];
-    // Clone the options object so we can safely delete `only`/`except`
-    // without mutating the caller's hash (Rails' `extract_options!` pops
-    // the trailing hash off `args` — the hash itself is still the caller's
-    // reference; trails defensively copies to avoid surprising the caller).
     const options: Record<string, unknown> =
       last && typeof last === "object" && !Array.isArray(last)
         ? { ...(next.pop() as Record<string, unknown>) }
@@ -444,23 +351,8 @@ export class Metal extends AbstractController {
     return wrapped;
   }
 
-  /**
-   * Composes the Rails `render_to_body` chain. With `ActionController::Base`'s
-   * include order, the effective chain is:
-   *
-   *   Rendering#render_to_body   → super || _render_in_priorities(options) || " "
-   *   Renderers#render_to_body   → _render_to_body_with_renderer(options) || super
-   *   AbstractController         → (nil — no-op base)
-   *
-   * Flattened: try the registered renderers first, then the
-   * `:body`/`:plain`/`:html` priority resolver, finally the
-   * single-space fallback. Subclasses that template-render override
-   * this and delegate back via `super`.
-   * @internal
-   */
+  /** @internal */
   renderToBody(options: Record<string, unknown> = {}): unknown {
-    // Match Ruby `||` short-circuit semantics: skip on `nil`/`false`,
-    // keep `""` and `0` (truthy in Ruby).
     const truthy = (v: unknown): boolean => v != null && v !== false;
     const renderer = Renderers._renderToBodyWithRenderer(options);
     if (truthy(renderer)) return renderer;
@@ -469,9 +361,6 @@ export class Metal extends AbstractController {
     return " ";
   }
 
-  // Rails-private rendering helpers — wired onto the class so the
-  // `metal/rendering.rb` privates resolve as `Metal._foo` (parity:api
-  // surface) while keeping the implementation in `metal/rendering.ts`.
   /** @internal */
   static _normalizeOptions = _normalizeOptionsFn;
   /** @internal */

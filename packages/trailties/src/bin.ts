@@ -22,7 +22,4 @@ for (const candidate of [
 await Generators.lookupBang();
 
 const program = createProgram();
-// `argv` is the process adapter's snapshot of the host argv, populated
-// at activesupport's module load via the eager Node auto-register.
-// Spread into a fresh mutable array since Commander expects string[].
 await program.parseAsync([...argv]);

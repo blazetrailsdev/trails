@@ -1,13 +1,3 @@
-/**
- * No-op Logger — discards all output while honoring the Logger interface
- * (level filtering, silence blocks, tagged logging). Used as a safe default
- * before an application wires up real logging (e.g. as the fallback in
- * `Application::Bootstrap`'s `:initialize_logger` initializer).
- *
- * `add` / `log` short-circuit to avoid formatter calls and
- * `Temporal.Now.instant()` allocations on the boot hot path; level
- * predicates (`debug?`, `warn?`, …) still reflect `this.level`.
- */
 import { Logger } from "./logger.js";
 
 export class NullLogger extends Logger {
@@ -27,7 +17,6 @@ export class NullLogger extends Logger {
   override close(): void {}
 }
 
-/** Convenience factory; equivalent to `new NullLogger()`. */
 export function nullLogger(): NullLogger {
   return new NullLogger();
 }

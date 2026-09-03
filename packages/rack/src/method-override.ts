@@ -46,13 +46,6 @@ export class MethodOverride {
     return null;
   }
 
-  /**
-   * Mirrors: `Rack::MethodOverride#method_override_param`
-   * (`rack/method_override.rb:48-54`). Its second rescue arm is `EOFError`,
-   * which `Multipart.parse_multipart` raises on a body whose terminating
-   * boundary never arrives — `Rack::Multipart::EmptyContentError < ::EOFError`
-   * (`rack/multipart/parser.rb:20`).
-   */
   private methodOverrideParam(req: Request): string | null {
     try {
       if (req.formData || req.isParseableData()) {

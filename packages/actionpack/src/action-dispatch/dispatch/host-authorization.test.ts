@@ -276,7 +276,6 @@ describe("HostAuthorizationTest", () => {
   });
 });
 
-// Rails-verbatim port of actionpack/test/dispatch/host_authorization_test.rb
 const successApp = async (_env: RackEnv): Promise<RackResponse> => [
   200,
   { "content-type": "text/plain" },
@@ -419,9 +418,7 @@ describe("HostAuthorizationTest", () => {
     expect(await bodyToString(body)).toContain("Blocked hosts: .example.com");
   });
 
-  it.skip("checks for requests with #=== to support wider range of host checks", () => {
-    // HostPermission type does not support arbitrary callable predicates
-  });
+  it.skip("checks for requests with #=== to support wider range of host checks", () => {});
 
   it("mark the host when authorized", async () => {
     const env: RackEnv = { HTTP_HOST: "www.example.com", REQUEST_METHOD: "GET", PATH_INFO: "/" };
@@ -756,7 +753,5 @@ describe("HostAuthorizationTest", () => {
     expect(messages.join("")).toContain("Blocked hosts: www.example.com");
   });
 
-  it.skip("uses ActionView::Base logger when no logger in the env", () => {
-    // ActionView::Base is not yet ported to trails
-  });
+  it.skip("uses ActionView::Base logger when no logger in the env", () => {});
 });

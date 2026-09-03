@@ -1,10 +1,3 @@
-/**
- * ActionDispatch::Http::ContentDisposition
- *
- * Builds Content-Disposition header values per RFC 5987, with an ASCII
- * fallback for legacy clients. Used by send_file / send_data.
- */
-
 import { transliterate } from "@blazetrails/activesupport";
 
 const TRADITIONAL_ESCAPED_CHAR = /[^ A-Za-z0-9!#$+.^_`|~-]/g;

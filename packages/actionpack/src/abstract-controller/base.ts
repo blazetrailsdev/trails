@@ -1,11 +1,3 @@
-/**
- * AbstractController::Base
- *
- * Foundation for all controllers. Provides action dispatching,
- * callbacks, and format collection.
- * @see https://api.rubyonrails.org/classes/AbstractController/Base.html
- */
-
 import { underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 
@@ -50,7 +42,6 @@ export type {
   CallbackPredicateLike,
 } from "./callbacks.js";
 
-/** Raised when an action cannot be found for the given controller. */
 export class ActionNotFound extends Error {
   readonly controller: AbstractController | null;
   readonly action: string | null;
@@ -68,12 +59,6 @@ export class ActionNotFound extends Error {
 
   #cachedCorrections?: string[];
 
-  /**
-   * Mirrors Ruby's `DidYouMean::Correctable#corrections` (memoised via
-   * `@corrections ||= ...` in Rails). Suggests action methods on the
-   * raising controller close to the missing action name. Empty when
-   * the error was constructed without a controller/action context.
-   */
   get corrections(): string[] {
     if (this.#cachedCorrections !== undefined) return this.#cachedCorrections;
     if (!this.controller || !this.action) {
@@ -89,15 +74,8 @@ export class ActionNotFound extends Error {
 }
 
 export class AbstractController {
-  /**
-   * Rails: `attr_internal :action_name` (`abstract_controller/base.rb:32`) —
-   * the ivar is `@_action_name`, which is why
-   * `DEFAULT_PROTECTED_INSTANCE_VARIABLES` names it and `view_assigns` never
-   * carries the action name into a view.
-   */
   _actionName: string = "";
 
-  /** The action currently being processed. */
   get actionName(): string {
     return this._actionName;
   }
@@ -105,20 +83,14 @@ export class AbstractController {
     this._actionName = value;
   }
 
-  /** Mirrors `AbstractController::Base.supports_path?` (`abstract_controller/base.rb:200`). */
   static supportsPathQ(): boolean {
     return true;
   }
 
-  /** When true, ActionFilter#isMatch raises if `:only`/`:except` references
-   * an action that doesn't exist on the controller. Rails 7.1 mattr_accessor. */
   static raiseOnMissingCallbackActions: boolean = false;
 
-  /** Internal storage for response body. Subclasses may override the
-   * `responseBody` accessor (e.g. Metal writes through to the response). */
   protected _responseBody: string | Buffer | null = null;
 
-  /** Response body. */
   get responseBody(): string | Buffer | null {
     return this._responseBody;
   }
@@ -126,7 +98,6 @@ export class AbstractController {
     this._responseBody = value;
   }
 
-  /** Whether a response has been committed (render/redirect called). */
   protected _performed: boolean = false;
 
   private static readonly _internalMethods: ReadonlySet<string> = new Set([
@@ -165,35 +136,28 @@ export class AbstractController {
 
   private static _actionMethodCache?: Set<string>;
 
-  /** Rails `attr_reader :abstract` — class-level abstract flag. Defaults
-   * to `false`; flipped via `abstractBang()`. */
   protected static _abstract: boolean = false;
 
-  /** Rails `class << self; attr_reader :abstract`. @internal */
+  /** @internal */
   static get abstract(): boolean {
     return Object.prototype.hasOwnProperty.call(this, "_abstract")
       ? (this as unknown as { _abstract: boolean })._abstract
       : false;
   }
 
-  /** Rails `abstract?` predicate; aliases `abstract`. @internal */
+  /** @internal */
   static isAbstract(): boolean {
     return this.abstract;
   }
 
-  /** Rails `abstract!` — marks this class as abstract. @internal */
+  /** @internal */
   static abstractBang(): void {
     (this as unknown as { _abstract: boolean })._abstract = true;
   }
 
-  /** Cached controller_path memo (per-class own property). @internal */
+  /** @internal */
   protected static _controllerPath?: string;
 
-  /**
-   * Rails `controller_path` — the controller's underscored name with
-   * the `Controller` suffix stripped (`MyApp::MyPostsController` →
-   * `"my_app/my_posts"`). Returns the empty string for anonymous classes.
-   */
   static controllerPath(): string {
     if (Object.prototype.hasOwnProperty.call(this, "_controllerPath")) {
       return (this as unknown as { _controllerPath: string })._controllerPath;
@@ -206,16 +170,7 @@ export class AbstractController {
       underscore(stripped));
   }
 
-  /**
-   * Rails `internal_methods` — walks the superclass chain up to the
-   * first abstract ancestor, collecting non-abstract subclasses' own
-   * public instance methods, then returns the abstract ancestor's full
-   * public method set minus those collected. Combined with the
-   * curated `_internalMethods` constant so wired-up entry points
-   * (`processAction`, `render`, …) are always treated as internal even
-   * before the class chain marks them.
-   * @internal
-   */
+  /** @internal */
   static internalMethods(): string[] {
     const collected = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -233,27 +188,21 @@ export class AbstractController {
     return [...all];
   }
 
-  /** Rails `clear_action_methods!` — invalidate the cached action set. @internal */
+  /** @internal */
   static clearActionMethodsBang(): void {
     (this as unknown as { _actionMethodCache?: Set<string> })._actionMethodCache = undefined;
   }
 
-  /**
-   * Rails `method_added(name)` hook — invalidates the action-method
-   * cache when a new method is defined on the controller. JS has no
-   * `method_added` hook; callers (e.g. helpers wiring that defines
-   * methods at runtime) must invoke this explicitly. @internal
-   */
+  /** @internal */
   static methodAdded(_name: string): void {
     this.clearActionMethodsBang();
   }
 
-  /** Rails `eager_load!` — warm the action-method cache. @internal */
+  /** @internal */
   static eagerLoadBang(): void {
     this.actionMethods();
   }
 
-  /** Returns the set of public action methods defined on this controller. */
   static actionMethods(): string[] {
     if (
       !Object.prototype.hasOwnProperty.call(this, "_actionMethodCache") ||
@@ -277,18 +226,13 @@ export class AbstractController {
     return [...this._actionMethodCache];
   }
 
-  /** @internal Rails-private callback option normalizer. */
+  /** @internal */
   static _normalizeCallbackOptions = _normalizeCallbackOptions;
-  /** @internal Rails-private single-key callback option normalizer. */
+  /** @internal */
   static _normalizeCallbackOption = _normalizeCallbackOption;
-  /** @internal Rails-private callback insertion helper. */
+  /** @internal */
   static _insertCallbacks = _insertCallbacks;
 
-  /**
-   * Rails' `*_action` callback macros. Defined in `callbacks.ts` (the file
-   * that matches `abstract_controller/callbacks.rb`) and installed here,
-   * mirroring Rails' `include AbstractController::Callbacks`.
-   */
   static beforeAction = beforeAction;
   static afterAction = afterAction;
   static aroundAction = aroundAction;
@@ -296,22 +240,14 @@ export class AbstractController {
   static skipAfterAction = skipAfterAction;
   static skipAroundAction = skipAroundAction;
 
-  /**
-   * Process an action by name. Delegates to the callbacks-wrapping
-   * dispatcher in `callbacks.ts`, which then invokes `_dispatchAction` as
-   * the inner step (mirrors Rails AC::Callbacks#process_action overriding
-   * Base#process_action with a `run_callbacks { super }` wrapper).
-   *
-   * @internal
-   */
+  /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
     this.actionName = action;
     this._performed = false;
     await _runProcessActionCallbacks(this, action, () => this._dispatchAction(action, ...args));
   }
 
-  /** Rails `Base#send_action` — raw method dispatch with actionMissing
-   * fallback and ActionNotFound on no match. @internal */
+  /** @internal */
   async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
     if (this.isActionMethod(action)) {
       const method = (this as any)[action];
@@ -329,15 +265,6 @@ export class AbstractController {
     }
   }
 
-  /**
-   * Rails `Base#process` — public entry. Validates the action via
-   * `_findActionName`, resets the response body, then delegates to
-   * `processAction` which handles the per-request `actionName` /
-   * `_performed` setup. Splitting state ownership this way (Rails-style
-   * single-setter is the goal, but trails has long-standing direct
-   * `processAction` callers in Metal and tests that need their state
-   * primed) avoids the double-assign that earlier iterations had.
-   */
   async process(action: string, ...args: unknown[]): Promise<void> {
     if (!this._findActionName(action)) {
       throw new ActionNotFound(
@@ -350,26 +277,11 @@ export class AbstractController {
     await this.processAction(action, ...args);
   }
 
-  /** Rails `available_action?` — `action` is a real method or covered by
-   * `actionMissing`. */
   isAvailableAction(actionName: string): boolean {
     return this._findActionName(actionName) !== undefined;
   }
 
-  /**
-   * Rails `action_method?` — `self.class.action_methods.include?(name)`.
-   * Rails memoizes `action_methods` to a Set, so its `include?` is a hash
-   * lookup; our `actionMethods()` hands back a defensive array copy, so we
-   * warm the memo and probe the underlying Set instead. This runs on every
-   * dispatch.
-   *
-   * Reading the memo rather than the return value means a subclass that
-   * narrows `actionMethods` by overriding it (Rails does this in
-   * `UrlFor::ClassMethods`, subtracting named-route helper names) would not
-   * narrow this predicate with it. No trails subclass overrides it today; one
-   * that wants to must filter into the memo, not around it.
-   * @internal
-   */
+  /** @internal */
   isActionMethod(name: string): boolean {
     const cls = this.constructor as typeof AbstractController;
     cls.actionMethods();
@@ -393,38 +305,26 @@ export class AbstractController {
     return undefined;
   }
 
-  /** @internal Rails `_valid_action_name?` — reject path-separator names. */
+  /** @internal */
   _validActionName(actionName: string): boolean {
     return !actionName.includes("/");
   }
 
-  /** Rails `Base.supports_path?` — whether this controller renders URL paths. */
   static supportsPath(): boolean {
     return true;
   }
 
-  /**
-   * Whether a render or redirect has been performed. Mirrors Rails'
-   * `AbstractController::Base#performed?` which is defined as
-   * `response_body` — i.e. truthy iff the response body has been
-   * assigned. The `_performed` flag is also honored so internal helpers
-   * (e.g. `head`) can mark performed without assigning a body.
-   */
   get performed(): boolean {
     return this._performed || this._responseBody !== null;
   }
 
-  /** Mark the response as performed. */
   protected markPerformed(): void {
     this._performed = true;
   }
 
-  /** Get available action names. */
   availableActions(): string[] {
     return (this.constructor as typeof AbstractController).actionMethods();
   }
 }
 
-// Provision the `processAction` AS::Callbacks chain on the root prototype;
-// all subclasses inherit through prototype-chain COW in AS::Callbacks.
 _defineActionCallbacks(AbstractController.prototype);

@@ -1,34 +1,3 @@
-// Cache serialization strategy (story: cache-serialization-marshal-vs-json).
-//
-// Rails serializes cache values with `Marshal.dump`/`Marshal.load`
-// (cache/entry.rb:90,124, cache/coder.rb). Ruby Marshal is a wire format for
-// Ruby objects; there is no Ruby runtime in trails and no Marshal-encoded store
-// for us to interoperate with, so byte-for-byte Marshal compatibility is both
-// infeasible and serves no consumer.
-//
-// We therefore converge on the dimension of Marshal that actually matters for a
-// cache: round-trip *type fidelity*. Plain `JSON.stringify`/`JSON.parse` — what
-// PR #3621 used as a placeholder — silently drops or mangles the values Marshal
-// preserves: `undefined` (elided in objects, `null`-ified in arrays), `Date`
-// (flattened to an ISO string), `bigint` (throws), and non-finite numbers
-// (`NaN`/`±Infinity` → `null`). This codec is the trails Marshal-equivalent: a
-// type-tagging JSON serializer that survives those cases.
-//
-// It is deliberately NOT Ruby-wire-compatible. The rest of the cache
-// serialization surface has since converged: the MessagePack serializer
-// (`message-pack/cache-serializer.ts`), `SerializerWithFallback`
-// (`cache/serializer-with-fallback.ts`), and MemoryStore/FileStore all route
-// their values through this Coder rather than their own ad-hoc JSON.
-
-// Special values are encoded as a compact 1- or 2-element array whose head is a
-// short sentinel code: `["~#d", 1750000000000]` for a Date, `["~#u"]` for
-// undefined, etc. This keeps per-tag overhead to a handful of bytes (vs. the
-// ~30 a `{ "__type__": …, "value": … }` object would repeat for every Date in
-// a record). Because tags are arrays, plain objects never collide and pass
-// through untouched; only a real array whose head is itself a sentinel string
-// needs escaping (see ARRAY_ESCAPE below).
-// entry.ts imports `coder` from here; `LazyEntry` extends `Entry` lazily (see
-// lazyEntryClass) so this cyclic import is never dereferenced at module-eval.
 import { Temporal } from "@blazetrails/date";
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
@@ -61,17 +30,13 @@ function encode(value: unknown): unknown {
   if (type !== "object") return value;
 
   // boundary: cache values are arbitrary JS objects; a real JS Date must be
-  // preserved with full fidelity, so we tag it explicitly here.
   if (value instanceof Date) return [DATE, value.getTime()];
 
   // boundary: Ruby Marshal round-trips a Time, and `Temporal.Instant` is the
-  // trails analogue, so it is tagged for the same reason a JS Date is.
   if (value instanceof Temporal.Instant) return [INSTANT, value.toString()];
 
   if (Array.isArray(value)) {
     const encoded = value.map(encode);
-    // A genuine array whose head encodes to a sentinel string would be misread
-    // as a tag on the way back, so prefix it with the escape marker.
     return looksTagged(encoded[0]) ? [ARRAY_ESCAPE, ...encoded] : encoded;
   }
 
@@ -116,14 +81,6 @@ function decode(node: unknown): unknown {
   return decoded;
 }
 
-// `Marshal.dump` writes a String's bytes verbatim, so a binary-ish value keeps
-// its byte size in the payload and deflating it is a loss — which is what
-// `compression ignores incompressible data`
-// (cache_store_compression_behavior.rb:71-74) asserts. `JSON.stringify` instead
-// emits every control character as a six-byte `\uXXXX` escape, more than
-// doubling such a payload and making it deflate well. So the escapes are undone
-// on the way out and redone on the way in; the two passes are exact inverses,
-// since a dump carries no raw control character it did not itself unescape.
 const CONTROL_CHAR_ESCAPE = /\\u00[01][0-9a-f]/g;
 
 function unescapeControlChars(json: string): string {
@@ -141,13 +98,7 @@ function escapeControlChars(dumped: string): string {
   return escaped;
 }
 
-/**
- * The trails Marshal-equivalent cache serializer. Mirrors the `dump`/`load`
- * surface of Rails' `Cache::Coder` while preserving JS type fidelity (Date,
- * `Temporal.Instant`, undefined, bigint, NaN/±Infinity) that plain JSON would lose.
- *
- * @internal
- */
+/** @internal */
 export const coder = {
   dump(value: unknown): string {
     return unescapeControlChars(JSON.stringify(encode(value)));
@@ -157,7 +108,7 @@ export const coder = {
   },
 };
 
-/** Serializer surface a {@link Coder} wraps. @internal */
+/** @internal */
 export interface CoderSerializer {
   dump(value: unknown): string;
   load(dumped: string): unknown;
@@ -170,20 +121,12 @@ export interface CoderCompressor {
   inflate(value: string): string;
 }
 
-// Rails' Coder framing (coder.rb): a signature prefix lets `load` tell framed
-// payloads from a bare legacy dump; the type byte flags serializer + compression
-// and the header carries expires_at/version. Rails packs a fixed-width binary
-// header; trails has no Ruby wire to interop with, so we frame with a JSON header
-// (control-char-free) and a NUL separator — the first NUL after the signature.
 const SIGNATURE = "\x00\x11";
 const HEADER_SEP = "\x00";
 const OBJECT_DUMP_TYPE = 0x01;
 const STRING_TYPE = 0x02;
 const COMPRESSED_FLAG = 0x80;
 
-// Rails stores UTF-8/BINARY/US-ASCII strings as the payload verbatim (skipping
-// the serializer); JS strings carry no encoding tag, so trails collapses all of
-// them onto one string fast path whose deserializer is the identity.
 const stringDeserializer: CoderSerializer = {
   dump: (value) => value as string,
   load: (dumped) => dumped,
@@ -194,9 +137,6 @@ let lazyEntry:
   | (new (s: CoderSerializer, c: CoderCompressor | null, p: string, o: LazyEntryOptions) => Entry)
   | undefined;
 
-// Rails' Coder::LazyEntry: an Entry whose value stays serialized (and
-// compressed) until first read. Defined lazily to keep the cyclic Entry import
-// safe (see the import note above).
 function lazyEntryClass(): NonNullable<typeof lazyEntry> {
   return (lazyEntry ??= class LazyEntry extends Entry {
     private _lazySerializer: CoderSerializer;
@@ -225,10 +165,6 @@ function lazyEntryClass(): NonNullable<typeof lazyEntry> {
       return this._value;
     }
 
-    // Mirrors Rails' LazyEntry#mismatched? (coder.rb:114-117): when the version
-    // is not mismatched, force the value so a corrupt payload surfaces — a
-    // DeserializationError then counts as mismatched (a cache miss) rather than
-    // leaving the entry deceptively usable.
     override isMismatched(version: string | null | undefined): boolean {
       try {
         const mismatched = super.isMismatched(version);
@@ -242,12 +178,7 @@ function lazyEntryClass(): NonNullable<typeof lazyEntry> {
   });
 }
 
-/**
- * The trails equivalent of Rails' `Cache::Coder`: wraps a serializer +
- * compressor, framing entries so `load` can lazily deserialize/decompress and
- * fall back to a bare serializer dump. Framing is not Ruby-wire-compatible.
- * @internal
- */
+/** @internal */
 export class Coder {
   private legacySerializer: boolean;
 
@@ -313,18 +244,10 @@ export class Coder {
     return typeof dumped === "string" && dumped.startsWith(SIGNATURE);
   }
 
-  // Rails keys a String's encoding (UTF-8/BINARY/US-ASCII) to a type byte so the
-  // value is stored as the payload verbatim. JS strings carry no encoding tag,
-  // so every string takes the single fast path; anything else returns undefined
-  // and falls through to the serializer.
   private typeForString(value: unknown): number | undefined {
     return typeof value === "string" ? STRING_TYPE : undefined;
   }
 
-  // Rails packs the version, Marshal-encoding non-UTF-8 / Marshal-signature
-  // strings. trails carries the version as a plain string in the JSON header, so
-  // there is nothing to pack — the analog is the identity, and Rails'
-  // Marshal-version branch is N/A here (no Ruby wire).
   private dumpVersion(version: string): string {
     return version;
   }

@@ -38,13 +38,6 @@ function clone(date: Date): Date {
   return new Date(date.getTime());
 }
 
-/**
- * Returns `Time.zone.now` when `Time.zone` or `config.time_zone` are set,
- * otherwise just returns `Time.now` — time/calculations.rb:39-41. DateTime's
- * `current` (date_time/calculations.rb:10-12) is that expression plus
- * `to_datetime`, and lives on its own receiver in
- * `core-ext/date-time/calculations.ts`.
- */
 export function current(): TimeWithZone | Date {
   const zone = timeZone();
   if (zone) {
@@ -52,10 +45,6 @@ export function current(): TimeWithZone | Date {
   }
   return currentTime();
 }
-
-// ---------------------------------------------------------------------------
-// Day boundaries
-// ---------------------------------------------------------------------------
 
 export function beginningOfDay(date: Date): Temporal.Instant {
   return change(date, { hour: 0 });
@@ -65,20 +54,11 @@ export function middleOfDay(date: Date): Temporal.Instant {
   return change(date, { hour: 12 });
 }
 
-/**
- * @missingRailsArgs change — PERMANENT: time/calculations.rb:256-263 passes
- * `usec: Rational(999999999, 1000)`, and trails passes the same Rational; Ruby's
- * `Rational()` is a Kernel function where TS spells the construction
- * `new Rational(...)`, which the extractor records as `ref:constructor` rather
- * than `ref:Rational`.
- */
+/** @missingRailsArgs change — PERMANENT */
 export function endOfDay(date: Date): Temporal.Instant {
   return change(date, { hour: 23, min: 59, sec: 59, usec: new Rational(999999999, 1000) });
 }
 
-// Rails' `alias`es on the day boundaries — time/calculations.rb:241-243,
-// 250-254, 264. DateTime's identical set is on its own receiver
-// (core-ext/date-time/calculations.ts).
 export { beginningOfDay as midnight };
 export { beginningOfDay as atMidnight };
 export { beginningOfDay as atBeginningOfDay };
@@ -89,55 +69,29 @@ export { middleOfDay as atNoon };
 export { middleOfDay as atMiddleOfDay };
 export { endOfDay as atEndOfDay };
 
-// ---------------------------------------------------------------------------
-// Hour boundaries
-// ---------------------------------------------------------------------------
-
 export function beginningOfHour(date: Date): Temporal.Instant {
   return change(date, { min: 0 });
 }
 
-/**
- * @missingRailsArgs change — PERMANENT: time/calculations.rb:273-279 passes
- * `usec: Rational(999999999, 1000)`, and trails passes the same Rational; Ruby's
- * `Rational()` is a Kernel function where TS spells the construction
- * `new Rational(...)`, which the extractor records as `ref:constructor` rather
- * than `ref:Rational`.
- */
+/** @missingRailsArgs change — PERMANENT */
 export function endOfHour(date: Date): Temporal.Instant {
   return change(date, { min: 59, sec: 59, usec: new Rational(999999999, 1000) });
 }
 
-// time/calculations.rb:270, 281.
 export { beginningOfHour as atBeginningOfHour };
 export { endOfHour as atEndOfHour };
-
-// ---------------------------------------------------------------------------
-// Minute boundaries
-// ---------------------------------------------------------------------------
 
 export function beginningOfMinute(date: Date): Temporal.Instant {
   return change(date, { sec: 0 });
 }
 
-/**
- * @missingRailsArgs change — PERMANENT: time/calculations.rb:289-294 passes
- * `usec: Rational(999999999, 1000)`, and trails passes the same Rational; Ruby's
- * `Rational()` is a Kernel function where TS spells the construction
- * `new Rational(...)`, which the extractor records as `ref:constructor` rather
- * than `ref:Rational`.
- */
+/** @missingRailsArgs change — PERMANENT */
 export function endOfMinute(date: Date): Temporal.Instant {
   return change(date, { sec: 59, usec: new Rational(999999999, 1000) });
 }
 
-// time/calculations.rb:286, 295.
 export { beginningOfMinute as atBeginningOfMinute };
 export { endOfMinute as atEndOfMinute };
-
-// ---------------------------------------------------------------------------
-// Week boundaries
-// ---------------------------------------------------------------------------
 
 /** @internal */
 function _beginningOfWeekDate(date: Date, startDay: string = beginningOfWeekDefault()): Date {
@@ -167,10 +121,6 @@ export function endOfWeek(
   return instantFrom(d);
 }
 
-// ---------------------------------------------------------------------------
-// Month boundaries
-// ---------------------------------------------------------------------------
-
 export function beginningOfMonth(date: Date): Temporal.Instant {
   const d = clone(date);
   d.setDate(1);
@@ -180,20 +130,15 @@ export function beginningOfMonth(date: Date): Temporal.Instant {
 
 export function endOfMonth(date: Date): Temporal.Instant {
   const d = clone(date);
-  // First day of next month, then go back 1ms
   d.setMonth(d.getMonth() + 1, 1);
   d.setHours(0, 0, 0, 0);
   d.setTime(d.getTime() - 1);
   return instantFrom(d);
 }
 
-// ---------------------------------------------------------------------------
-// Quarter boundaries
-// ---------------------------------------------------------------------------
-
 export function beginningOfQuarter(date: Date): Temporal.Instant {
   const d = clone(date);
-  const month = d.getMonth(); // 0-11
+  const month = d.getMonth();
   const quarterStartMonth = Math.floor(month / 3) * 3;
   d.setMonth(quarterStartMonth, 1);
   d.setHours(0, 0, 0, 0);
@@ -210,10 +155,6 @@ export function endOfQuarter(date: Date): Temporal.Instant {
   return instantFrom(d);
 }
 
-// ---------------------------------------------------------------------------
-// Year boundaries
-// ---------------------------------------------------------------------------
-
 export function beginningOfYear(date: Date): Temporal.Instant {
   const d = clone(date);
   d.setMonth(0, 1);
@@ -227,10 +168,6 @@ export function endOfYear(date: Date): Temporal.Instant {
   d.setHours(23, 59, 59, 999);
   return instantFrom(d);
 }
-
-// ---------------------------------------------------------------------------
-// next/prev Week/Month/Year/Day
-// ---------------------------------------------------------------------------
 
 export function nextMonth(date: Date, months = 1): Temporal.Instant {
   return advance(date, { months: months });
@@ -256,12 +193,7 @@ export function prevDay(date: Date, days = 1): Temporal.Instant {
   return advance(date, { days: -days });
 }
 
-// Alias used in Rails
 export { nextDay as tomorrow, prevDay as yesterday };
-
-// ---------------------------------------------------------------------------
-// next/prev occurring
-// ---------------------------------------------------------------------------
 
 export function nextOccurring(date: Date, day: string): Temporal.Instant {
   const targetDay = dayIndex(day);
@@ -281,10 +213,6 @@ export function prevOccurring(date: Date, day: string): Temporal.Instant {
   return instantFrom(d);
 }
 
-// ---------------------------------------------------------------------------
-// advance
-// ---------------------------------------------------------------------------
-
 interface AdvanceOptions {
   years?: number;
   months?: number;
@@ -295,22 +223,7 @@ interface AdvanceOptions {
   seconds?: number;
 }
 
-/**
- * Rails' `Time#advance` (time/calculations.rb:194-217) writes the normalised
- * `:weeks` / `:days` back into the caller's hash, but `Date#advance`
- * (date/calculations.rb:127-136) reads it only — and Rails asserts that
- * difference (`test_date_advance_should_not_change_passed_options_hash`,
- * date_ext_test.rb:367-371). One TS function stands in for both reopenings, so
- * it takes the non-mutating arm and normalises into a copy.
- */
 export function advance(date: Date, options: AdvanceOptions): Temporal.Instant;
-/**
- * A `::Time` receiver answers a `::Time`, as it does in Ruby — the receiver
- * `TimeWithZone#advance`'s variable-length arm hands `time.advance(options)`
- * (time_with_zone.rb:433-434). A JS `Date` reads its components in the SYSTEM
- * zone, so that arm cannot go through the `Date` one without moving the wall
- * clock it is advancing.
- */
 export function advance(date: RubyTime, options: AdvanceOptions): RubyTime;
 export function advance(
   date: Date | RubyTime,
@@ -349,17 +262,6 @@ export function advance(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Seconds calculations
-// ---------------------------------------------------------------------------
-
-/**
- * `Time#seconds_since_midnight` (`core_ext/time/calculations.rb:64-66`). The
- * `DateTime` arm of the same name (`core_ext/date_time/calculations.rb:20-22`)
- * is `sec + (min * 60) + (hour * 3600)` — a whole-second count, with none of
- * this sub-second arithmetic — and lives on its own receiver in
- * `core-ext/date-time/calculations.ts`.
- */
 export function secondsSinceMidnight(date: Date): number {
   return (
     Math.floor(date.getTime() / 1000) -
@@ -372,26 +274,17 @@ export function secondsUntilEndOfDay(date: Date): number {
   return Math.floor(endOfDay(date).epochMilliseconds / 1000) - Math.floor(date.getTime() / 1000);
 }
 
-// ---------------------------------------------------------------------------
-// Days/year helpers
-// ---------------------------------------------------------------------------
-
 export function leapYear(year: number): boolean {
   return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
 export function daysInMonth(month: number, year: number): number {
-  // month is 1-indexed
   return new Date(year, month, 0).getDate();
 }
 
 export function daysInYear(year: number): number {
   return daysInMonth(2, year) + 337;
 }
-
-// ---------------------------------------------------------------------------
-// all* ranges
-// ---------------------------------------------------------------------------
 
 export function allDay(date: Date): { start: Temporal.Instant; end: Temporal.Instant } {
   return { start: beginningOfDay(date), end: endOfDay(date) };
@@ -416,27 +309,17 @@ export function allYear(date: Date): { start: Temporal.Instant; end: Temporal.In
   return { start: beginningOfYear(date), end: endOfYear(date) };
 }
 
-// ---------------------------------------------------------------------------
-// ago / since
-// ---------------------------------------------------------------------------
-
 export function ago(date: Date, seconds: number): Temporal.Instant {
   return since(date, -seconds);
 }
 
 export function since(date: Date | Temporal.Instant, seconds: number): Temporal.Instant {
   // boundary: the `Time` arm's receiver is a JS `Date`, and a chained call — as
-  // `advance` makes below — answers the same moment as a `Temporal.Instant`.
   const epochMilliseconds = date instanceof Date ? date.getTime() : date.epochMilliseconds;
   return instantFrom(new Date(epochMilliseconds + seconds * 1000));
 }
 
-// `alias :in :since` — time/calculations.rb:235.
 export { since as in };
-
-// ---------------------------------------------------------------------------
-// change
-// ---------------------------------------------------------------------------
 
 interface ChangeOptions {
   year?: number;
@@ -445,10 +328,8 @@ interface ChangeOptions {
   hour?: number;
   min?: number;
   sec?: number;
-  /** Ruby passes a `Rational` here (`Rational(999999999, 1000)`), as well as an Integer. */
   usec?: number | Rational;
   nsec?: number;
-  /** Ruby's `:offset` takes either a `"+HH:MM"` String or a seconds Integer. */
   offset?: string | number;
 }
 
@@ -457,14 +338,6 @@ export function change(
   options: ChangeOptions,
 ): Temporal.ZonedDateTime;
 export function change(date: Date, options: ChangeOptions): Temporal.Instant;
-/**
- * A `::Time` receiver answers a `::Time`, as `change` does in Ruby, and takes
- * the same four terminal arms the Ruby body does — `:offset`, `utc?`, `zone`
- * and the trailing `utc_offset` one. The `zone.respond_to?(:utc_to_local)` arm
- * (time/calculations.rb:148-171) selects a receiver whose `zone` is a `TZInfo`
- * zone OBJECT, which no trails `::Time` is; its second-occurrence correction is
- * not lost with it, because `::Time.local`'s `isdst` makes the same choice.
- */
 export function change(date: RubyTime, options: ChangeOptions): RubyTime;
 export function change(
   date: Date | RubyTime | Temporal.ZonedDateTime,
@@ -472,10 +345,6 @@ export function change(
 ): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
   if (date instanceof RubyTime) return timeChange.call(date, options);
 
-  // Ruby reads the components off the receiver; a JS `Date` spells those readers
-  // differently, and reads them in the system's local zone, and a `::Time`
-  // spells them on its own zone, so widen both to the one shape the arms below
-  // share.
   const self =
     date instanceof Date ? instantFrom(date).toZonedDateTimeISO(Temporal.Now.timeZoneId()) : date;
   const nsec = self.millisecond * 1_000_000 + self.microsecond * 1_000 + self.nanosecond;
@@ -518,8 +387,6 @@ export function change(
 
   if (newUsec.cmp(1000000) >= 0) throw new ArgumentError("argument out of range");
 
-  // `Rational(new_usec, 1000000)` (time/calculations.rb:141) — `Rational()` of a
-  // Rational over an Integer is that Rational divided by it, which `quo` spells.
   newSec = newSec.add(newUsec.quo(1_000_000));
 
   const secFloor = newSec.div(1);
@@ -536,14 +403,9 @@ export function change(
     nanosecond: newNsecOfSec % 1_000,
   };
 
-  // `utc?` (time/calculations.rb:147) — a `::Time` carries Ruby's own flag; a
-  // JS `Date` carries none and is never `utc?`, even under `TZ=UTC`.
   const isUtc = date instanceof Date ? false : date.timeZoneId === "UTC";
 
   if (newOffset !== null) {
-    // `if new_offset` (time/calculations.rb:145-146). Ruby's `::Time.new` takes
-    // the offset as a `"+HH:MM"` String or a seconds Integer; Temporal spells
-    // the same fixed-offset zone with the String form only.
     const timeZone =
       typeof newOffset === "number"
         ? `${newOffset < 0 ? "-" : "+"}${String(Math.floor(Math.abs(newOffset) / 3600)).padStart(2, "0")}:${String(Math.floor((Math.abs(newOffset) % 3600) / 60)).padStart(2, "0")}`
@@ -553,36 +415,19 @@ export function change(
   }
 
   if (isUtc) {
-    // `elsif utc?` (time/calculations.rb:147-148).
     return Temporal.ZonedDateTime.from({ timeZone: "UTC", ...newComponents });
   }
 
-  // `elsif zone.respond_to?(:utc_to_local)` (time/calculations.rb:148-171) —
-  // only a `Temporal.ZonedDateTime` carries a zone object to reach it.
   if (date instanceof Temporal.ZonedDateTime) {
     let newTime = Temporal.ZonedDateTime.from(
       { timeZone: date.timeZoneId, ...newComponents },
-      // Ruby's `Time.new` with a zone object picks the first chronological
-      // occurrence of an ambiguous nominal time; `"compatible"` is the same choice.
       { disambiguation: "compatible" },
     );
 
-    // Some versions of Ruby have a bug where Time.new with a zone object and
-    // fractional seconds will end up with a broken utc_offset.
-    // This is fixed in Ruby 3.3.1 and 3.2.4
     if (!Number.isInteger(newTime.offsetNanoseconds)) {
       newTime = newTime.add({ nanoseconds: 0 });
     }
 
-    // When there are two occurrences of a nominal time due to DST ending,
-    // `Time.new` chooses the first chronological occurrence (the one with a
-    // larger UTC offset). However, for `change`, we want to choose the
-    // occurrence that matches this time's UTC offset.
-    //
-    // If the new time's UTC offset is larger than this time's UTC offset, the
-    // new time might be a first chronological occurrence. So we add the offset
-    // difference to fast-forward the new time, and check if the result has the
-    // desired UTC offset (i.e. is the second chronological occurrence).
     const offsetDifference = newTime.offsetNanoseconds - date.offsetNanoseconds;
     let newTime2: Temporal.ZonedDateTime;
     if (
@@ -596,9 +441,6 @@ export function change(
     }
   }
 
-  // `elsif zone` (time/calculations.rb:172-175) — `::Time.local` in Ruby's
-  // reversed component order, `isdst` picking the occurrence of a wall clock a
-  // DST fall-back repeats. A JS `Date` has no `isdst` and only milliseconds.
   const newTime = RubyTime.local(
     newSec,
     newMin,
@@ -613,10 +455,6 @@ export function change(
   );
   return Temporal.Instant.fromEpochMilliseconds(newTime.toTime().epochMilliseconds);
 }
-
-// ---------------------------------------------------------------------------
-// Boolean predicates
-// ---------------------------------------------------------------------------
 
 export function onWeekday(date: Date): boolean {
   const day = date.getDay();
@@ -664,9 +502,6 @@ export function isFuture(date: Date | Temporal.Instant): boolean {
   return Temporal.Instant.compare(instant, Temporal.Now.instant()) > 0;
 }
 
-/**
- * floor — rounds time down to nearest multiple of ms.
- */
 export function floor(date: Date, ms: number): Temporal.Instant {
   if (!Number.isFinite(ms) || ms <= 0) {
     throw new RangeError(`floor: ms must be a positive finite number, got ${ms}`);
@@ -674,9 +509,6 @@ export function floor(date: Date, ms: number): Temporal.Instant {
   return instantFrom(new Date(Math.floor(date.getTime() / ms) * ms));
 }
 
-/**
- * ceil — rounds time up to nearest multiple of ms.
- */
 export function ceil(date: Date, ms: number): Temporal.Instant {
   if (!Number.isFinite(ms) || ms <= 0) {
     throw new RangeError(`ceil: ms must be a positive finite number, got ${ms}`);
@@ -684,9 +516,6 @@ export function ceil(date: Date, ms: number): Temporal.Instant {
   return instantFrom(new Date(Math.ceil(date.getTime() / ms) * ms));
 }
 
-/**
- * secFraction — returns the sub-second fraction of the receiver as a float.
- */
 export function secFraction(datetime: Temporal.PlainDateTime | Temporal.ZonedDateTime): number;
 export function secFraction(date: Date): number;
 export function secFraction(
@@ -702,21 +531,8 @@ export function secFraction(
   return receiver.getMilliseconds() / 1000;
 }
 
-// `DateTime#subsec` is `sec_fraction` (date_time/calculations.rb:36-38); the
-// Time direction is the mirror image (`Time#sec_fraction` is `subsec`,
-// time/calculations.rb:107-109), so one function answers both names.
 export { secFraction as subsec };
 
-/**
- * Creates a Time instance from an RFC 3339 string — time/calculations.rb:68-81.
- *
- *   rfc3339("1999-12-31T14:00:00-10:00") // => 2000-01-01 00:00:00 UTC
- *
- * If the time or offset components are missing then an ArgumentError is raised,
- * mirroring Rails' `raise ArgumentError, "invalid date" if parts.empty?` — Ruby's
- * `Date._rfc3339` answers an empty hash for anything that is not a full
- * date-time-with-offset.
- */
 export function rfc3339(str: string): Temporal.Instant {
   const parts =
     /^(-?\d{4,})-(\d\d)-(\d\d)[Tt ](\d\d):(\d\d):(\d\d)(\.\d+)?([Zz]|[+-]\d\d:\d\d)$/.exec(str);
@@ -726,9 +542,6 @@ export function rfc3339(str: string): Temporal.Instant {
   return instantFrom(new Date(ms));
 }
 
-/**
- * toDate — Rails `Time#to_date`. Returns the calendar date in local time.
- */
 export function toDate(date: Date): Temporal.PlainDate {
   return Temporal.PlainDate.from({
     year: date.getFullYear(),
@@ -738,13 +551,8 @@ export function toDate(date: Date): Temporal.PlainDate {
 }
 
 /**
- * instantToS — Rails `Time#to_s` for a UTC `Temporal.Instant`.
- * Returns `"YYYY-MM-DD HH:MM:SS UTC"` — the default Ruby format for UTC times.
- *
  * @internal
- * @noRailsEquivalent PERMANENT Ruby gets this from `Time#to_s`, which every Time
- * answers (`Time#to_fs`, core_ext/time/conversions.rb:55-61). A `Temporal.Instant` is not a Time
- * and carries no such method, so the format has to be spelled as a free function.
+ * @noRailsEquivalent PERMANENT
  */
 export function instantToS(instant: Temporal.Instant): string {
   const zdt = instant.toZonedDateTimeISO("UTC");

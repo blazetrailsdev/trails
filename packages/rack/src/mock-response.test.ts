@@ -155,7 +155,6 @@ it("does not calculate content length for streaming body", () => {
     },
   };
   const res = new MockResponse(200, {}, streamBody);
-  // Streaming bodies don't get content-length set automatically
   expect(res.status).toBe(200);
 });
 

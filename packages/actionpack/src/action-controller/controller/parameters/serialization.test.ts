@@ -3,7 +3,6 @@ import { Parameters } from "../../metal/strong-parameters.js";
 
 describe("ParametersSerializationTest", () => {
   it("YAML serialization", () => {
-    // In TS we use JSON serialization as an equivalent
     const params = new Parameters({ name: "John", age: 22 });
     const json = JSON.stringify(params.toJSON());
     const parsed = JSON.parse(json);
@@ -20,7 +19,6 @@ describe("ParametersSerializationTest", () => {
   });
 
   it("YAML backwardscompatible with psych 2.0.8 format", () => {
-    // N/A in TS — verify basic round-trip works
     const params = new Parameters({ key: "value" });
     const data = params.toJSON();
     const restored = new Parameters(data);
@@ -28,7 +26,6 @@ describe("ParametersSerializationTest", () => {
   });
 
   it("YAML backwardscompatible with psych 2.0.9+ format", () => {
-    // N/A in TS — verify basic round-trip works
     const params = new Parameters({ key: "value" }).permitAll();
     const data = params.toJSON();
     const restored = new Parameters(data);

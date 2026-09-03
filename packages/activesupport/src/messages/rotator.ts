@@ -29,12 +29,6 @@ function stateOf(host: object): RotatorState {
   return state;
 }
 
-/**
- * Ruby's `Messages::Rotator#initialize` captures the constructor's positional
- * args and options so `rotate` can fill in the ones a rotation omits. A
- * prepended module cannot wrap a TypeScript constructor, so each rotatable
- * class calls this from its own constructor instead.
- */
 export function initialize(
   host: object,
   args: unknown[],
@@ -96,10 +90,6 @@ function catchRotationError<T>(block: () => T): { value?: T; error?: Thrown } {
   }
 }
 
-/**
- * Ruby's `Messages::Rotator#read_message`. Shaped for `prepend()`, so the
- * wrapped implementation arrives as `super_`.
- */
 export function readMessage(
   this: object,
   super_: (...superArgs: unknown[]) => unknown,

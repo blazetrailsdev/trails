@@ -27,12 +27,8 @@ describe("ActionDispatch::Journey::GTG::TransitionTable — set() regex anchorin
   it("wraps alternation so anchors bind around the whole regex, not branches", () => {
     const t = new TransitionTable();
     t.set(0, 1, /foo|bar/);
-    // Token "xfooy" must NOT match — would have, with /^foo|bar$/ (parses as
-    // (^foo)|(bar$)).
     const next = t.move([[0, null]], "xfooy", 0, 5);
-    // Only the "carry forward" self-loop entry, no transition to 1.
     expect(next.some(([s]) => s === 1)).toBe(false);
-    // Real "foo" still matches.
     expect(t.move([[0, null]], "foo", 0, 3).some(([s]) => s === 1)).toBe(true);
   });
 
@@ -45,8 +41,6 @@ describe("ActionDispatch::Journey::GTG::TransitionTable — set() regex anchorin
   it("filters /m to keep ^/$ strict — newline tokens must not slip in", () => {
     const t = new TransitionTable();
     t.set(0, 1, /foo/m);
-    // /m would have made ^foo$ line-anchored; "foo\nbar" would have matched
-    // the first line. After filtering, only "foo" exactly matches.
     expect(t.move([[0, null]], "foo\nbar", 0, 7).some(([s]) => s === 1)).toBe(false);
     expect(t.move([[0, null]], "foo", 0, 3).some(([s]) => s === 1)).toBe(true);
   });
@@ -67,12 +61,10 @@ describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
       accepting: Record<string, true>;
     };
 
-    // Shape: every accepting key is an integer state id, mapped to `true`.
     expect(Object.values(json.accepting).every((v) => v === true)).toBe(true);
     expect(Object.keys(json.accepting).every((k) => /^\d+$/.test(k))).toBe(true);
     expect(Object.keys(json.accepting).length).toBeGreaterThan(0);
 
-    // A `/articles` route must produce a `/` and `articles` string-state transition.
     const allStringEdges = new Set<string>();
     for (const inner of Object.values(json.string_states)) {
       for (const edge of Object.keys(inner)) allStringEdges.add(edge);
@@ -80,15 +72,12 @@ describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
     expect(allStringEdges.has("/")).toBe(true);
     expect(allStringEdges.has("articles")).toBe(true);
 
-    // Standard-param routes (e.g. `:format`, `:id`) should produce a
-    // stdparam transition whose key is the DEFAULT_EXP source.
     const allStdparamEdges = new Set<string>();
     for (const inner of Object.values(json.stdparam_states)) {
       for (const edge of Object.keys(inner)) allStdparamEdges.add(edge);
     }
     expect([...allStdparamEdges].some((s) => s.includes("[^./?]+"))).toBe(true);
 
-    // Every transition target must point at a known state id (integer key).
     const allStateIds = new Set<string>([
       ...Object.keys(json.string_states),
       ...Object.keys(json.stdparam_states),
@@ -130,8 +119,6 @@ describe("ActionDispatch::Journey::GTG::TransitionTable", () => {
   });
 
   it("root-level optional group matches paths starting with the optional segment", () => {
-    // `(/:foo)` is fully-optional at the root; the parser produces a Group
-    // wrapping Cat(Slash, Symbol). Match must succeed for a real path.
     const sim = simulatorFor(["(/:foo)"]);
     expect(sim.memos("/bar", () => []).length).toBeGreaterThan(0);
   });

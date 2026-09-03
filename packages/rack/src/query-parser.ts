@@ -136,8 +136,6 @@ export class QueryParser {
         this._normalizeParams(params, k, v, 0);
       }
     } catch (e) {
-      // Mirror Rails' `rescue ArgumentError`: wrap URIError from decodeURIComponent
-      // (invalid percent-encoding) as InvalidParameterError.
       if (e instanceof URIError) {
         throw new InvalidParameterError((e as Error).message);
       }
@@ -166,8 +164,6 @@ export class QueryParser {
         `total query size (${bytesize}) exceeds limit (${this.bytesizeLimit})`,
       );
     }
-    // Mirror Ruby's qs.count(sep.is_a?(String) ? sep : '&'):
-    // count separator chars without materializing a match array (avoids ~4MB allocation).
     const sepChars = sep || "&";
     const sepRe = new RegExp(`[${sepChars.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")}]`, "g");
     let paramCount = 0;
@@ -190,8 +186,6 @@ export class QueryParser {
       return;
     }
 
-    // Only match names with a non-empty prefix followed by complete bracket segments.
-    // Malformed inputs like "b[=3" or "[a]=2" fail the match and are stored as-is.
     const match = name.match(/^([^[]*)((?:\[[^\]]*\])*)$/);
     if (!match || !match[1]) {
       params[name] = v;
@@ -207,7 +201,6 @@ export class QueryParser {
       return;
     }
 
-    // Check for trailing content after all complete brackets (e.g. "g[h]i=8")
     const brackets = rest.match(/\[[^\]]*\]/g) || [];
     const fullBrackets = brackets.join("");
     const afterBrackets = rest.substring(fullBrackets.length);

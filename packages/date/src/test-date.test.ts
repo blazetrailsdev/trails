@@ -1,21 +1,8 @@
-/**
- * Port of ruby/date's `test/date/test_date.rb`.
- */
-
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
 import { Date as RubyDate, DateTime as RubyDateTime, dNewByFrags, dtNewByFrags } from "./date.js";
 import { Rational } from "@blazetrails/ruby-compat";
 
-/**
- * Ruby's `Float#<=>` (`ruby/numeric.c` `flo_cmp`, not vendored), which is the
- * receiver of half of `test_infinity_comparison`'s assertions and of the
- * `-Float::INFINITY` end of `test_range_infinite_float`'s second Range. JS has
- * no `<=>` on a `number`, so the C's dispatch is spelled here: an infinite
- * receiver asks the operand for `infinite?` and answers from the two signs,
- * which is the protocol `Date::Infinity#infinite?` and `Date#infinite?` exist
- * to serve. Anything else is a plain double comparison.
- */
 function floCmp(a: number, b: unknown): number | null {
   if (Number.isNaN(a)) return null;
   if (typeof b === "number") return a === b ? 0 : a < b ? -1 : 1;
@@ -28,18 +15,11 @@ function floCmp(a: number, b: unknown): number | null {
   return null;
 }
 
-/** Ruby's `<=>` over the operands these tests put on either side of one. */
 function spaceship(a: unknown, b: unknown): number | null {
   if (typeof a === "number") return floCmp(a, b);
   return (a as RubyDate).cmp(b);
 }
 
-/**
- * Ruby's `Range#cover?` (`ruby/range.c` `r_cover_p` over `r_less`) for the
- * `begin...end` Ranges `test_range_infinite_float` builds, one endpoint of
- * which is a `Float` rather than a `Date`. JS has no Range literal, so the
- * exclusive-end Range and the one method the test calls on it are spelled out.
- */
 class RubyRange {
   constructor(
     readonly begin: unknown,
@@ -55,12 +35,6 @@ class RubyRange {
   }
 }
 
-/**
- * Ruby's `Hash` for the `Date` keys `test_hash` puts in one: a Hash buckets by
- * `#hash` and settles a collision with `#eql?`, which is the pair the test is
- * about, and a JS `Map` is identity-keyed instead. Only the three operations
- * the test performs are here.
- */
 class RubyHash {
   readonly #buckets = new Map<number, [RubyDate, number][]>();
 
@@ -83,16 +57,6 @@ class RubyHash {
   }
 }
 
-/**
- * Ruby's `Marshal.dump` / `Marshal.load` over the two `Date#marshal_dump` /
- * `Date#marshal_load` (`date_core.c:7529-7625`) hooks `test_sub` round-trips a
- * date through. JS has no `Marshal`, so the two calls the test makes are
- * spelled here: `dump` is the hook's Array under the receiver's class, and
- * `load` is what `Marshal` does with it — allocate an instance of that class
- * and send it `marshal_load`. Ruby's allocator does not run `initialize`;
- * TS cannot allocate without a constructor, so the no-argument one runs and
- * `marshalLoad` overwrites every field it set.
- */
 const Marshal = {
   dump(d: RubyDate): { klass: new () => RubyDate; a: unknown[] } {
     return { klass: d.constructor as new () => RubyDate, a: d.marshalDump() };
@@ -102,24 +66,11 @@ const Marshal = {
   },
 };
 
-/** ruby/date `test/date/test_date.rb:8`. */
 class DateSub extends RubyDate {}
 
-/** ruby/date `test/date/test_date.rb:11`. */
 class DateTimeSub extends RubyDateTime {}
 
 describe("TestDate", () => {
-  /**
-   * ruby/date `test/date/test_date.rb:46-107`.
-   *
-   * `assert_instance_of(DateSub, DateSub.today)` and its `DateTimeSub.now`
-   * sibling (`:53-54`) assert the class the port cannot answer there: the
-   * mapping table RFC 0088 commits to (`README.md:110-122`, "Temporal is the
-   * default return type") has the two statics answer a `Temporal.PlainDate` /
-   * `Temporal.ZonedDateTime` rather than a gem-shaped instance, so there is no
-   * receiver class for them to carry and the two lines assert what the port
-   * does answer instead. Every other assertion is here verbatim.
-   */
   it("sub", () => {
     const d = new DateSub();
     const dt = new DateTimeSub();
@@ -261,8 +212,6 @@ describe("TestDate", () => {
     expect(h.get(new RubyDate(1999, 5, 25))).toEqual(9);
     expect(h.get(new RubyDateTime(1999, 5, 25))).toEqual(9);
 
-    // A JS string primitive is not `instanceof String`; `Object()` boxes it to
-    // the one the Ruby `assert_instance_of(String, ...)` names.
     expect(Object(String(new RubyDate(1999, 5, 25).hash()))).toBeInstanceOf(String);
   });
 
@@ -270,8 +219,6 @@ describe("TestDate", () => {
     const d = new RubyDate();
     Object.freeze(d);
     expect(Object.isFrozen(d)).toEqual(true);
-    // See `hash` above: a JS number/string primitive is boxed to the class the
-    // Ruby `assert_instance_of` names.
     expect(Object(d.yday)).toBeInstanceOf(Number);
     expect(Object(d.toS())).toBeInstanceOf(String);
   });
@@ -279,7 +226,6 @@ describe("TestDate", () => {
   it("submillisecond comparison", () => {
     const d1 = new RubyDateTime(2013, 12, 6, 0, 0, new Rational(1, 10000));
     const d2 = new RubyDateTime(2013, 12, 6, 0, 0, new Rational(2, 10000));
-    // d1 is 0.0001s earlier than d2
     expect(d1.cmp(d2)).toEqual(-1);
     expect(d1.cmp(d1)).toEqual(0);
     expect(d2.cmp(d1)).toEqual(1);

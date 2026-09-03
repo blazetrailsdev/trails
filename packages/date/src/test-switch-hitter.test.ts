@@ -1,49 +1,3 @@
-/**
- * Port of the ruby/date gem's `test/date/test_switch_hitter.rb` (`TestSH`).
- *
- * The gem's own `test/date/` suite is RFC 0088's fidelity measure —
- * `parity:api` cannot score a C extension, so `vendor/sources.ts` sets
- * `compareApi: false` for this package and `parity:test` carries the gate.
- *
- * The constructors are exercised on the GEM-SHAPED objects rather than on the
- * `Temporal` seat the statics answer, for the reason `test-date-attr.test.ts`
- * gives: `#mon`, `#mday`, `#cwyear`, `#yday` and `#offset` have no
- * `Temporal.PlainDate` counterpart, and `Date.new` / `DateTime.new` are the
- * gem-shaped spelling of the same C function `Date.civil` / `DateTime.civil`
- * are defined over (`date_core.c:9973-9974`). No `Temporal` return is
- * converged back to a Ruby-shaped one here.
- *
- * Ruby's `Encoding::US_ASCII` assertions in `test_zone` / `test_to_s` /
- * `test_inspect` have no JS analogue — a JS string carries no encoding tag —
- * so the ported assertion is the property the Ruby one is checking for: the
- * answer is ASCII-only. `test_enc` is the same conversion: its `euc-jp` and
- * `ascii-8bit` arms differ only in the tag `force_encoding` puts on an
- * identical string, so each pair ports to one assertion on the value.
- *
- * `test_base` is `def test_base ... end if defined?(Date.test_all)`, and
- * `Date.test_all` is registered only under `#ifndef NDEBUG`
- * (`date_core.c:10045-10057`) — so a released gem never defines the method and
- * never defines the test. trails has no debug build either, which is what the
- * ported body asserts.
- *
- * `test_canon24oc`'s three static spellings answer the `Temporal` seat, which
- * has no `#hour`/`#offset`, so each is asserted through the seat's own
- * `toString` — a `PlainDateTime` with no zone IS the `offset == 0` the Ruby
- * asserts. The `DateTime.new` arm is the one that reaches `canon24oc`
- * (`date_core.c:7885-7888`) on the gem-shaped object, so it keeps the Ruby's
- * full reader tuple.
- *
- * `test_commercial` and `test_fractional` assert through the seat's `toString`
- * rather than through `yearOfWeek` / `weekOfYear` / `dayOfWeek` for the reason
- * documented on `Date#toDate` (`date.ts`): the seat renders the receiver's
- * CIVIL triple into an ISO `Temporal.PlainDate`, so for a Julian-side day
- * every reader Temporal derives from the ABSOLUTE day disagrees with MRI —
- * `Date.commercial(-4712, 1, 1)` has `cwday` 1 in Ruby and `dayOfWeek` 4 here.
- * That is a ratified RFC 0088 decision, so asserting the week readers would
- * enshrine the wrong weekday; `toString` asserts the triple the seat is
- * actually faithful to.
- */
-
 import { describe, it, expect } from "vitest";
 import {
   Date as RubyDate,
@@ -56,21 +10,10 @@ import { Rational } from "@blazetrails/ruby-compat";
 
 /* eslint-disable no-control-regex */
 
-/** Ruby `String#encoding == Encoding::US_ASCII`; see the file comment. */
 function isUsAscii(s: string): boolean {
   return /^[\x00-\x7f]*$/.test(s);
 }
 
-/**
- * `Date.jd` / `DateTime.jd` on the gem-shaped object. The statics answer the
- * `Temporal` seat, whose year range (±271821) cannot hold `test_period`'s
- * -5,000,000 or `test_period2`'s Bignum Julian days, and `#mon`/`#wday`/
- * `#gregorian` are gem-object members. These are the same `d_new_by_frags`
- * (`date_core.c:4110-4147`) the statics themselves run over, given the `:jd`
- * the C's `date_s_jd` sets. `gemDateTimeJd`'s `offset` is the `:offset` frag,
- * seconds east of UTC — what `DateTime.jd`'s own `'+12:00'` argument reaches
- * `d_new_by_frags` as (`val2off`, `date_core.c:5071-5077`).
- */
 const gemJd = (jd: number | bigint, sg?: number) => dNewByFrags({ jd }, sg);
 const gemDateTimeJd = (
   jd: number | bigint,
@@ -81,7 +24,6 @@ const gemDateTimeJd = (
   sg?: number,
 ) => dtNewByFrags({ jd, hour, min, sec, offset }, sg);
 
-/** `TestSH#period2_iter2`, the private helper `test_period2` drives. */
 function period2Iter2(from: bigint, to: bigint, sg: number): void {
   for (let j = from; j <= to; j++) {
     const d = gemJd(j, sg);
@@ -98,7 +40,6 @@ function period2Iter2(from: bigint, to: bigint, sg: number): void {
   }
 }
 
-/** `TestSH#period2_iter`, the private helper `test_period2` drives. */
 function period2Iter(from: bigint, to: bigint): void {
   period2Iter2(from, to, RubyDate.GREGORIAN);
   period2Iter2(from, to, RubyDate.ITALY);
@@ -440,7 +381,6 @@ describe("TestSH", () => {
   });
 
   it("period", () => {
-    // -5000
     let d = new RubyDate(-5000, 1, 1);
     expect([d.year, d.mon, d.mday, d.wday]).toEqual([-5000, 1, 1, 5]);
     let d2 = d.gregorian();
@@ -471,7 +411,6 @@ describe("TestSH", () => {
     d2 = d.julian();
     expect([d2.year, d2.mon, d2.mday, d.wday]).toEqual([-5000, 2, 10, 3]);
 
-    // -5000000
     d = new RubyDate(-5_000_000, 1, 1);
     expect([d.year, d.mon, d.mday, d.wday]).toEqual([-5_000_000, 1, 1, 3]);
     d2 = d.gregorian();
@@ -502,7 +441,6 @@ describe("TestSH", () => {
     d2 = d.julian();
     expect([d2.year, d2.mon, d2.mday, d.wday]).toEqual([-4_999_898, 9, 4, 6]);
 
-    // 5000000
     d = new RubyDate(5_000_000, 1, 1);
     expect([d.year, d.mon, d.mday, d.wday]).toEqual([5_000_000, 1, 1, 6]);
     d2 = d.julian();
@@ -533,7 +471,6 @@ describe("TestSH", () => {
     d2 = d.julian();
     expect([d2.year, d2.mon, d2.mday, d.wday]).toEqual([4_999_897, 5, 3, 6]);
 
-    // dt
     let dt = new RubyDateTime(-123456789, 2, 3, 4, 5, 6, 0);
     expect([dt.year, dt.mon, dt.mday, dt.hour, dt.min, dt.sec, dt.wday]).toEqual([
       -123456789, 2, 3, 4, 5, 6, 1,
@@ -649,11 +586,6 @@ describe("TestSH", () => {
       expect(isUsAscii(s)).toBe(true);
     });
 
-    // Ruby asserts each value carries the encoding its input was forced to, so
-    // every reader below is asked twice — once for `euc-jp`, once for
-    // `ascii-8bit`. A JS string has no encoding to carry, so both arms of a
-    // pair read the one same value; the pair is kept so the reader count still
-    // lines up with the Ruby, one arm per encoding.
     let h = RubyDate._strptime("15:43+09:00", "%R%z");
     expect(h?.zone).toBe("+09:00");
     h = RubyDate._strptime("15:43+09:00", "%R%z");
@@ -695,9 +627,6 @@ describe("TestSH", () => {
   });
 
   it("base", () => {
-    // `def test_base ... end if defined?(Date.test_all)`: `test_all` is a
-    // debug-build-only singleton, absent here as it is in a release MRI, so the
-    // guard is what stands in for Ruby's `assert_equal(true, Date.test_all)`.
     expect(!("testAll" in RubyDate)).toBe(true);
   });
 });

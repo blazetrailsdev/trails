@@ -10,8 +10,6 @@ import {
 } from "./testing/assertions.js";
 
 describe("ArrayInquirerTest", () => {
-  // Ruby `[:mobile, :tablet, "api"]` — a Symbol is a JS string, so all three
-  // elements are plain strings here.
   let arrayInquirer: ArrayInquirer<string>;
 
   beforeEach(() => {
@@ -52,9 +50,6 @@ describe("ArrayInquirerTest", () => {
   });
 
   it("respond to fallback to array respond to", () => {
-    // Rails reopens `Array` with a `respond_to_missing?` that answers `:foo`.
-    // The `super` arm of the inquirer's `has` trap is the prototype chain, so
-    // teaching `Array` one more name is `Array.prototype`.
     Object.defineProperty(Array.prototype, "foo", { value: () => true, configurable: true });
     const arr = new ArrayInquirer("x");
 

@@ -10,17 +10,6 @@ import { StreamingBody } from "./streaming-template-renderer.js";
 export type { ViewContext, RenderOptions };
 export { RenderedTemplate };
 
-/**
- * ActionView::Renderer
- *
- * Top-level rendering orchestrator shared by ActionView and ActionController.
- * Parses render options and delegates to the appropriate sub-renderer:
- * `TemplateRenderer` (Phase 3b) or `PartialRenderer` / `CollectionRenderer` /
- * `ObjectRenderer` (Phase 3c).
- *
- * A new sub-renderer instance is created per render call. `cacheHits` is the
- * only instance-level mutable state and accumulates across calls.
- */
 export class Renderer {
   lookupContext: LookupContext;
 
@@ -28,18 +17,11 @@ export class Renderer {
     this.lookupContext = lookupContext;
   }
 
-  /**
-   * Main render entry point shared by ActionView and ActionController.
-   * Returns a Promise resolving to the rendered body string.
-   */
   async render(context: ViewContext, options: RenderOptions): Promise<string> {
     return (await this.renderToObject(context, options)).body;
   }
 
-  /**
-   * Like `render` but returns a `RenderedTemplate` object carrying the body.
-   * @internal
-   */
+  /** @internal */
   async renderToObject(context: ViewContext, options: RenderOptions): Promise<RenderedTemplate> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return this.renderPartialToObject(context, options);
@@ -47,11 +29,6 @@ export class Renderer {
     return this.renderTemplateToObject(context, options);
   }
 
-  /**
-   * Render and return a Rack-compatible body. For partials this is a single
-   * string wrapped in an array; for templates this would be a streaming body
-   * (Phase 3d). Currently both paths return an array.
-   */
   async renderBody(context: ViewContext, options: RenderOptions): Promise<string[]> {
     if (Object.prototype.hasOwnProperty.call(options, "partial")) {
       return [await this.renderPartial(context, options)];
@@ -62,10 +39,7 @@ export class Renderer {
     return [(await this.renderTemplateToObject(context, options)).body];
   }
 
-  /**
-   * Render a partial and return the body string.
-   * @internal
-   */
+  /** @internal */
   async renderPartial(
     context: ViewContext,
     options: RenderOptions,
@@ -74,7 +48,6 @@ export class Renderer {
     return (await this.renderPartialToObject(context, options, block)).body;
   }
 
-  /** Tracks partial cache hits across renders on this Renderer instance. */
   cacheHits: Record<string, number> = {};
 
   private renderTemplateToObject(
@@ -115,7 +88,6 @@ export class Renderer {
       return new PartialRenderer(this.lookupContext, options).render(partial, context, block);
     }
 
-    // partial is an object — derive path from toPartialPath()
     const collection = collectionFromObject(partial) ?? collectionFromOptions(options);
 
     if (collection !== undefined) {

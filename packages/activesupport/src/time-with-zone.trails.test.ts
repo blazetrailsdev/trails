@@ -5,9 +5,6 @@ import { Temporal, Time } from "@blazetrails/date";
 import { DATE_FORMATS } from "./core-ext/time/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
 
-// Ruby's Time carries full nanosecond precision, so %N answers nine significant
-// digits (time_with_zone.rb:223-227 delegates strftime to that Time). These
-// cover the readers and formatters that derive the sub-second part.
 describe("TimeWithZone sub-millisecond precision", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
   const subMs = () =>
@@ -58,8 +55,6 @@ describe("TimeWithZone sub-millisecond precision", () => {
   });
 });
 
-// `to_fs` resolves through `Time::DATE_FORMATS` (time_with_zone.rb:212-220), so
-// every key in that hash answers here — including one an app registers at boot.
 describe("TimeWithZone to_fs over Time::DATE_FORMATS", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
   const twz = () => new TimeWithZone(Temporal.Instant.from("2000-01-01T00:00:00Z"), eastern);
@@ -82,11 +77,6 @@ describe("TimeWithZone to_fs over Time::DATE_FORMATS", () => {
   });
 });
 
-// `initialize`'s local-time arm (time_with_zone.rb:51-56): with no `utc_time`,
-// `get_period_and_ensure_valid_local_time` (:570-581) resolves the period from
-// the LOCAL time, and rescues `TZInfo::PeriodNotFound` by moving the time
-// forward an hour and retrying — the only place the class raises on, or
-// repairs, a local time that does not exist.
 describe("TimeWithZone local-time construction", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
 
@@ -98,7 +88,6 @@ describe("TimeWithZone local-time construction", () => {
   });
 
   it("moves a local time in the spring-forward gap ahead one hour", () => {
-    // 2006-04-02 02:30 EST does not exist: the clocks went 02:00 → 03:00.
     const twz = new TimeWithZone(null, eastern, Temporal.PlainDateTime.from("2006-04-02T02:30:00"));
     expect(twz.zone).toBe("EDT");
     expect(twz.inspect()).toBe("2006-04-02 03:30:00.000000000 EDT -04:00");
@@ -116,11 +105,6 @@ describe("TimeWithZone local-time construction", () => {
   });
 });
 
-// `method_missing` forwards to `time` and re-wraps the result
-// (time_with_zone.rb:553-557 → :593-602). trails' `time` is a Temporal wall
-// clock, and no Temporal method returns a Range, so the `..` arm of
-// `wrap_with_time_zone` is reached through a `time` that answers one — the
-// stand-in for Ruby's `Time#all_day`.
 describe("TimeWithZone method_missing", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
 

@@ -1,21 +1,3 @@
-/**
- * Port of `Rails::Application::Bootstrap` from
- * `railties/lib/rails/application/bootstrap.rb`.
- *
- * Rails-mirrored initializers kept here:
- *   - `:load_environment_hook`   — empty anchor; `Engine#load_environment_config`
- *                                  runs before it.
- *   - `:initialize_logger`       — wire `host.logger` from `config.logger` or
- *                                  fall back to a `NullLogger`.
- *   - `:initialize_cache`        — wire `host.cache` from `config.cacheStore`
- *                                  or fall back to a `NullStore`.
- *   - `:bootstrap_hook`          — fires the `before_initialize` load hook.
- *
- * Intentionally skipped (see docs/trailties-plan.md):
- *   - `:set_load_path`, `:set_autoload_paths`,
- *     `:initialize_dependency_mechanism`, `:set_eager_load_paths` —
- *     autoload / eager-load only; ESM + bundlers cover this in trailties.
- */
 import {
   type CacheStore,
   type Logger,
@@ -44,9 +26,7 @@ export abstract class Bootstrap extends Initializable implements BootstrapHost {
   abstract config: BootstrapConfig;
 }
 
-Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {
-  // Rails: `initializer :load_environment_hook, group: :all do end` (bootstrap.rb:13).
-});
+Bootstrap.initializer("load_environment_hook", { group: "all" }, function () {});
 
 Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, function () {
   if (!this.logger) {
@@ -59,7 +39,6 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
 Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, function () {
   if (!this.cache) {
     const store = this.config.cacheStore;
-    // Array form (Rails `[:file_store, "tmp/cache/"]`) needs Cache.lookup_store — not ported yet.
     if (Array.isArray(store)) this.cache = new NullStore();
     else this.cache = typeof store === "function" ? store() : (store ?? new NullStore());
   }

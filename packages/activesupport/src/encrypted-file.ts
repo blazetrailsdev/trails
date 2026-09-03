@@ -1,20 +1,3 @@
-/**
- * EncryptedFile — port of `ActiveSupport::EncryptedFile`.
- *
- * Reads / writes a file whose contents are encrypted with a key sourced
- * from either an env var (`envKey`) or a key file on disk (`keyPath`).
- * Mirrors `vendor/rails/activesupport/lib/active_support/encrypted_file.rb`
- * method-for-method, including the private surface
- * (`writing`, `encrypt`, `decrypt`, `encryptor`, `readEnvKey`,
- * `readKeyFile`, `handleMissingKey`, `checkKeyLength`).
- *
- * Documented divergences from Rails:
- *
- * - **Async API.** Rails is sync; the async surface is required for
- *   trailties' "async fs only" rule and for browser hosts without sync fs.
- * - **Env lookup goes through `processAdapter.env`**, not `process.env`.
- */
-
 import {
   getCrypto,
   FileUtils,
@@ -74,12 +57,7 @@ export class EncryptedFile {
   private resolvedContentPath: string | null = null;
   private memoEncryptor: MessageEncryptor | null = null;
 
-  /**
-   * @missingRailsCall new — PERMANENT. encrypted_file.rb:42-43 `Pathname.new(content_path)`
-   *   / `Pathname.new(key_path)` — Ruby's Pathname has no port; trails keeps
-   *   paths as strings and reaches the filesystem through the async fs/path
-   *   adapters, so there is no Pathname to construct.
-   */
+  /** @missingRailsCall new — PERMANENT */
   constructor(opts: EncryptedFileOptions) {
     this.contentPath = opts.contentPath;
     this.keyPath = opts.keyPath;
@@ -88,9 +66,6 @@ export class EncryptedFile {
   }
 
   static generateKey(): string {
-    // Randomness is sourced from cryptoAdapter so we never fall back to a
-    // non-cryptographic RNG. In Node the adapter auto-registers synchronously;
-    // browser hosts must register a webcrypto adapter first.
     return Buffer.from(getCrypto().randomBytes(MessageEncryptor.keyLen(CIPHER))).toString("hex");
   }
 
@@ -107,7 +82,6 @@ export class EncryptedFile {
     return this.handleMissingKey();
   }
 
-  /** Rails: `key?`. */
   async isKey(): Promise<boolean> {
     if (this.readEnvKey()) return true;
     return (await this.readKeyFile()) !== null;
@@ -133,18 +107,7 @@ export class EncryptedFile {
     await this.writing(await this.readOrEmpty(), block);
   }
 
-  // ---- private ----
-
-  /**
-   * `Tempfile.create` defaults to mode 0600, which is load-bearing here: the
-   * temp file holds plaintext secrets between the editor write and the
-   * re-encrypt step, so it must not be world-readable.
-   *
-   * @missingRailsArgs chomp — PERMANENT. encrypted_file.rb:89
-   *   `content_path.basename.to_s.chomp(".enc")` — trails ports Ruby's String
-   *   methods as free functions rather than String.prototype patches, so the
-   *   receiver is argument 1: `chomp(path.basename(contentPath), ".enc")`.
-   */
+  /** @missingRailsArgs chomp — PERMANENT */
   private async writing(
     contents: string,
     block: (tmpPath: string) => void | Promise<void>,
@@ -178,15 +141,7 @@ export class EncryptedFile {
     return (await this.encryptor()).decryptAndVerify(contents) as string;
   }
 
-  /**
-   * @missingRailsArgs new — PERMANENT. encrypted_file.rb:113
-   *   `MessageEncryptor.new([key].pack("H*"), cipher: CIPHER, serializer: Marshal)`
-   *   — `Buffer.from(key, "hex")` is the `pack("H*")`, and Ruby's `Marshal`
-   *   constant is spelled here as the `"marshal"` format key, which is how the
-   *   whole package names the trails Marshal-equivalent
-   *   (`messages/serializer-with-fallback.ts`). Ruby's Marshal wire format is
-   *   excluded project-wide in `scripts/api-compare/unported-files.ts`.
-   */
+  /** @missingRailsArgs new — PERMANENT */
   private async encryptor(): Promise<MessageEncryptor> {
     if (this.memoEncryptor) return this.memoEncryptor;
     this.memoEncryptor = new MessageEncryptor(Buffer.from((await this.key()) ?? "", "hex"), {
@@ -196,12 +151,7 @@ export class EncryptedFile {
     return this.memoEncryptor;
   }
 
-  /**
-   * @missingRailsCall presence — PERMANENT. Per-entry verified (RFC 0032 wide-entry
-   *   verification): Rails encrypted_file.rb:117-119 reads
-   *   `ENV[env_key].presence`; trails encrypted-file.ts:192-195 spells presence
-   *   as an explicit empty-string check.
-   */
+  /** @missingRailsCall presence — PERMANENT */
   private readEnvKey(): string | null {
     const v = processEnv[this.envKey];
     return v && v.length > 0 ? v : null;
@@ -238,11 +188,6 @@ export class EncryptedFile {
     }
   }
 
-  /**
-   * Rails resolves `content_path` symlinks eagerly in `initialize`
-   * (`path.symlink? ? path.realpath : path`). We can't await in a
-   * constructor, so the resolution is lazy + memoized on first I/O.
-   */
   private async resolveContentPath(): Promise<string> {
     if (this.resolvedContentPath !== null) return this.resolvedContentPath;
     const fs = await getFsAsync();
@@ -254,7 +199,6 @@ export class EncryptedFile {
         this.resolvedContentPath = this.contentPath;
       }
     } catch {
-      // ENOENT etc. — leave unresolved; downstream I/O will surface the error.
       this.resolvedContentPath = this.contentPath;
     }
     return this.resolvedContentPath;

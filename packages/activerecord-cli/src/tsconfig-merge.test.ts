@@ -18,7 +18,6 @@ describe("mergeTsconfig", () => {
     expect(cfg.compilerOptions["skipLibCheck"]).toBe(true);
     expect(result.added).toContain("target");
     expect(result.added).toContain("strict");
-    // outDir was already present — not in added
     expect(result.added).not.toContain("outDir");
   });
 
@@ -27,10 +26,8 @@ describe("mergeTsconfig", () => {
       JSON.stringify({ compilerOptions: { target: "ES5", strict: false } }, null, 2) + "\n";
     const result = mergeTsconfig(existing);
     const cfg = JSON.parse(result.content) as { compilerOptions: Record<string, unknown> };
-    // Existing conflicting values preserved
     expect(cfg.compilerOptions["target"]).toBe("ES5");
     expect(cfg.compilerOptions["strict"]).toBe(false);
-    // Conflicts reported
     expect(result.conflicts.find((c) => c.key === "target")).toMatchObject({
       existing: "ES5",
       required: "ES2022",

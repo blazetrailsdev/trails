@@ -1,23 +1,13 @@
-/** JS runtime emitter — TseAst → ES module. Mirrors actionview-flavored Erubi
- * (plan §2.6): static text → `safeAppend`; `<%= %>` → `append` (escapes unless
- * SafeString) or `safeExprAppend` when format is in `escape_ignore_list`;
- * `<%== %>` always `safeExprAppend`. */
-
 import { parse, type TseAst, type TseNode } from "./parser.js";
 import { parseLocalsSignature, type LocalEntry } from "./parse-locals.js";
 import { generateSourceMap, type RawSourceMap, type LineMapping } from "./source-map.js";
 
 export interface EmitJsOptions {
   escapeIgnore?: boolean;
-  /** Injected immediately after `const _ob = …` — Rails `:preamble` analogue. */
   preamble?: string;
-  /** Injected immediately before `return _ob` — Rails `:postamble` analogue. */
   postamble?: string;
-  /** Default true when a `locals:` signature is present. */
   raiseOnStrictLocalsMismatch?: boolean;
-  /** File name for the generated output (used in source map `file` field). */
   fileName?: string;
-  /** Source `.tse` file path (used in source map `sources` field). */
   sourceFileName?: string;
 }
 
@@ -28,12 +18,6 @@ export interface EmitResult {
   typesAnnotation: string | null;
 }
 
-/**
- * Compile a `.tse` template source to an ES module. The generated
- * `render(context, locals)` function requires `context` to implement
- * `TseRenderContext` from `@blazetrails/actionview` (provides `outputBuffer`
- * and `capture`).
- */
 export function compileJs(source: string, options: EmitJsOptions = {}): EmitResult {
   const ast = parse(source);
   const { code, mappings } = emit(ast, options);
@@ -49,14 +33,10 @@ export function compileJs(source: string, options: EmitJsOptions = {}): EmitResu
   };
 }
 
-/** Matches `<% } %>` / `<% }) %>` / `<% })) %>` closers that can terminate an open blockExpr. */
 const BLOCK_CLOSE_RE = /^\s*\}\)*\s*;?\s*$/;
 
-/** Arrow-function blockExpr: `(x) => {` or `() => {`. Function form (`function(x) {`) does NOT match. */
 const ARROW_BLOCK_RE = /=>\s*\{\s*$/;
 
-/** Net change in `{}`-brace depth for a code tag value. Counts `{` as +1 and
- * `}` as -1 so that `} else {` correctly resolves to 0, not +1. */
 function netBraceDepth(code: string): number {
   let depth = 0;
   for (const ch of code) {
@@ -66,9 +46,6 @@ function netBraceDepth(code: string): number {
   return depth;
 }
 
-/** Net unclosed `(` parens in `code`. Used to compute how many `)` the close
- * tag must supply beyond the two emitter-owned parens (`bufRef.append(` and
- * `context.capture(`). */
 function netUnclosedParens(code: string): number {
   let depth = 0;
   for (const ch of code) {

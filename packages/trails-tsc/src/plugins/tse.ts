@@ -1,12 +1,3 @@
-/**
- * TSE virtualization plugin — the in-memory tsc-virtualization half of
- * Phase 2b (plan §2 / §4). Maps `.tse` sources to a typed TS render
- * function so tsc can check `<%= expr %>` / `<% code %>` against the
- * declared locals. This PR covers the virtualizing `TscPlugin` only;
- * on-disk `.tse.d.ts` / `.tse.js` emission, the views-manifest writer,
- * and the build CLI are Phase 2c.
- */
-
 import {
   parse,
   parseLocalsSignature,
@@ -17,16 +8,11 @@ import {
 import type { LineDelta, TscPlugin, VirtualizeOutput } from "../plugin.js";
 
 export { parseLocalsSignature };
-// TseLocalsSignatureError is the name this module previously used.
 export { LocalsSignatureError as TseLocalsSignatureError };
 
 export function localsParamType(ast: TseAst, locals: LocalEntry[]): string {
   if (ast.typesAnnotation !== null) return ast.typesAnnotation;
-  // No `<%# locals: %>` at all → permissive default (no strict check).
   if (ast.localsSignature === null) return "Record<string, unknown>";
-  // Explicit empty `<%# locals: () %>` → reject any keys (Rails `**nil`).
-  // `Record<string, never>` makes every key map to `never` — any property is
-  // a type error. Wrap in NoExtraKeys for variable-arg rejection too.
   if (locals.length === 0) return "NoExtraKeys<Record<string, never>>";
   const fields = locals.map((l) => `${l.name}${l.defaultExpr ? "?" : ""}: unknown`);
   return `NoExtraKeys<{ ${fields.join("; ")} }>`;
@@ -37,8 +23,6 @@ function destructureLines(locals: LocalEntry[]): string[] {
   const pieces = locals.map((l) =>
     l.defaultExpr === null ? l.name : `${l.name} = ${l.defaultExpr}`,
   );
-  // `void name;` shields unused destructured locals from `noUnusedLocals`,
-  // matching the `void context; void locals;` shield on the parameters.
   const voids = `  ${locals.map((l) => `void ${l.name};`).join(" ")}`;
   return [`  const { ${pieces.join(", ")} } = locals;`, voids];
 }
@@ -56,7 +40,6 @@ function netBraceDepth(code: string): number {
 
 function emitNodes(nodes: TseAst["nodes"]): string[] {
   const lines: string[] = [];
-  // Stack: one entry per open blockExpr, tracking net unclosed `{` inside it.
   const innerDepths: number[] = [];
   for (const node of nodes) {
     if (node.kind === "blockExpr") {
@@ -166,15 +149,7 @@ export function virtualizeTseWithDeltas(source: string): VirtualizeTseResult {
   for (const line of emitNodes(ast.nodes)) body.push(line);
   const footer = ["  return _ob;", "}", ""];
 
-  // Two LineDeltas: one for the prepended header, one for the trailing
-  // footer (return + `}`). Without the footer delta, tsc errors landing
-  // at the closing brace would mis-remap to nonexistent `.tse` lines.
-  // Per-node line-precise mapping inside the body is a follow-up tied
-  // to tse-compiler emitting token spans.
   const ts = [...header, ...body, ...footer].join("\n");
-  // Body strings may contain embedded newlines (multi-line `<% %>`
-  // code chunks); compute virtual-line counts from the emitted text,
-  // not the node array length.
   const headerLineCount = header.join("\n").split("\n").length;
   const bodyLineCount = body.length === 0 ? 0 : body.join("\n").split("\n").length;
   const footerLineCount = footer.join("\n").split("\n").length;
@@ -185,14 +160,8 @@ export function virtualizeTseWithDeltas(source: string): VirtualizeTseResult {
   return { ts, deltas };
 }
 
-// Build a virtualized TS source that surfaces `msg` as a tsc semantic
-// diagnostic (a string literal assigned to a `never`-typed binding) so
-// a single malformed `.tse` produces a readable error rather than
-// crashing the host's `tsc` run.
 function errorShim(filePath: string, msg: string): string {
   const safe = JSON.stringify(`${filePath}: ${msg}`);
-  // `string` is not assignable to `never`, so tsc reports a clear
-  // semantic error whose message includes the failure detail.
   return [
     `// .tse virtualization failed: ${safe}`,
     `const __tseFailure: never = ${safe};`,

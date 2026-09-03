@@ -11,7 +11,6 @@ import {
   type ViewContextRoutes,
 } from "./rendering.js";
 
-/** A stand-in for the controller class Rails mixes `Rendering::ClassMethods` into. */
 class Controller {
   static _routes: ViewContextRoutes | null = null;
   static _helpers: object | null = null;
@@ -29,7 +28,6 @@ const routesWith = (helpers: object): ViewContextRoutes => ({
   mountedHelpers: () => ({}),
 });
 
-/** Compile and run a `.tse` source through `Template#render`, as Rails does. */
 const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
   new Template({ source, identifier: "t", extension: "tse", handler: new Tse() }).render(
     view,

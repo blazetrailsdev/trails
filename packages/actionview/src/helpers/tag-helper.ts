@@ -13,10 +13,6 @@ import {
 } from "./output-safety-helper.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
-/**
- * ActionView::Helpers::TagHelper
- */
-
 const BOOLEAN_ATTRIBUTES = new Set([
   "allowfullscreen",
   "allowpaymentrequest",
@@ -105,7 +101,6 @@ const SELF_CLOSING_ELEMENTS = new Set([
   "view",
 ]);
 
-// Map from method_name (underscore) to actual SVG element name (camelCase)
 const METHOD_TO_TAG_NAME: Record<string, string> = {
   animate_motion: "animateMotion",
   animate_transform: "animateTransform",
@@ -122,11 +117,7 @@ function dasherize(str: string): string {
   return str.replace(/_/g, "-");
 }
 
-/**
- * buildTagValues — constructs a flat array of CSS class values from mixed inputs.
- *
- * @internal
- */
+/** @internal */
 export function buildTagValues(...args: unknown[]): string[] {
   const tagValues: string[] = [];
 
@@ -158,9 +149,6 @@ export function buildTagValues(...args: unknown[]): string[] {
   return tagValues;
 }
 
-/**
- * Like buildTagValues but preserves SafeBuffer instances for html_safe-aware joining.
- */
 function buildTagValuesPreservingSafety(value: unknown): Array<string | SafeBuffer> {
   const result: Array<string | SafeBuffer> = [];
 
@@ -242,7 +230,7 @@ function tagOption(key: string, value: unknown, escape: boolean): string {
 function prefixTagOption(prefix: string, key: string, value: unknown, escape: boolean): string {
   const dasherizedKey = `${prefix}-${dasherize(String(key))}`;
   if (typeof value === "string" || value instanceof SafeBuffer || typeof value === "symbol") {
-    // Pass through as-is
+    /** @empty */
   } else if (
     Array.isArray(value) ||
     (typeof value === "object" && value !== null && !(value instanceof RegExp))
@@ -310,12 +298,6 @@ function tagOptions(options: Record<string, unknown> | undefined, escape: boolea
   return output;
 }
 
-/**
- * tag() — legacy tag helper. Returns self-closing XHTML tag.
- * tag("br") => "<br />"
- * tag("br", nil, true) => "<br>"
- * Called with no arguments, returns the TagBuilder proxy.
- */
 export function tag(
   name?: string,
   options?: Record<string, unknown> | null,
@@ -332,9 +314,6 @@ export function tag(
   return htmlSafe(`<${name}${opts}${suffix}`);
 }
 
-/**
- * contentTag — creates an HTML block tag wrapping content.
- */
 export function contentTag(
   name: string,
   contentOrOptionsWithBlock?: unknown,
@@ -381,13 +360,9 @@ function contentTagString(
   return htmlSafe(`<${name}${opts}>${pre}${contentStr}</${name}>`);
 }
 
-/**
- * tokenList / classNames — builds a deduplicated list of CSS class tokens.
- */
 export function tokenList(...args: unknown[]): SafeBuffer {
   const tokens = buildTagValues(...args)
     .flatMap((value) => {
-      // Unescape HTML entities before splitting (for safe values)
       const unescaped = value
         .replace(/&amp;/g, "&")
         .replace(/&lt;/g, "<")
@@ -412,25 +387,16 @@ export function tokenList(...args: unknown[]): SafeBuffer {
 
 export const classNames = tokenList;
 
-/**
- * cdataSection — wraps content in a CDATA section.
- */
 export function cdataSection(content: unknown): SafeBuffer {
   const str = String(content ?? "");
   const splitted = str.replace(/\]\]>/g, "]]]]><![CDATA[>");
   return htmlSafe(`<![CDATA[${splitted}]]>`);
 }
 
-/**
- * escapeOnce — escapes HTML without double-escaping.
- */
 export function escapeOnce(html: string): SafeBuffer {
   return htmlEscapeOnce(html);
 }
 
-/**
- * TagBuilder — modern HTML5 tag builder accessed via tag.div, tag.p, etc.
- */
 export class TagBuilder {
   /** @internal */
   viewContext: unknown;
@@ -439,19 +405,12 @@ export class TagBuilder {
     this.viewContext = viewContext;
   }
 
-  /**
-   * attributes() — transforms a hash into HTML attributes string.
-   */
   attributes(attributes: Record<string, unknown> | null | undefined): SafeBuffer {
     if (!attributes) return htmlSafe("");
     const result = tagOptions(attributes).trim();
     return htmlSafe(result);
   }
 
-  /**
-   * tagString() — low-level builder used by the dynamic dispatch methods.
-   * Mirrors `TagBuilder#tag_string`.
-   */
   tagString(
     name: string,
     content: unknown,
@@ -470,21 +429,12 @@ export class TagBuilder {
     return contentTagString(name, actualContent, options ?? undefined, escape);
   }
 
-  /**
-   * defineElement — registers a content-bearing element. Mirrors
-   * `TagBuilder.define_element`. The Proxy already dispatches arbitrary
-   * element names; calling this explicitly is only needed when a non-default
-   * tag name should be reachable through a different method name.
-   */
   static defineElement(name: string, opts?: { methodName?: string }): void {
     if (opts?.methodName && opts.methodName !== name) {
       METHOD_TO_TAG_NAME[opts.methodName] = name;
     }
   }
 
-  /**
-   * defineVoidElement — registers a void element (no closing tag, no content).
-   */
   static defineVoidElement(name: string, opts?: { methodName?: string }): void {
     VOID_ELEMENTS.add(name);
     if (opts?.methodName && opts.methodName !== name) {
@@ -492,9 +442,6 @@ export class TagBuilder {
     }
   }
 
-  /**
-   * defineSelfClosingElement — registers a self-closing SVG-style element.
-   */
   static defineSelfClosingElement(name: string, opts?: { methodName?: string }): void {
     SELF_CLOSING_ELEMENTS.add(name);
     if (opts?.methodName && opts.methodName !== name) {
@@ -502,34 +449,22 @@ export class TagBuilder {
     }
   }
 
-  /**
-   * Dynamic element methods are handled via Proxy
-   */
-
   [key: string]: unknown;
 }
 
-/**
- * tagBuilder() — returns the shared TagBuilder proxy. Mirrors the private
- * `TagHelper#tag_builder` accessor.
- *
- * @internal
- */
+/** @internal */
 export function tagBuilder(): TagBuilder {
   return getTagBuilder();
 }
 
-/** Re-exported from output-safety-helper so Rails parity matches `TagHelper`'s `OutputSafetyHelper` include. */
 export function raw(stringish: unknown): SafeBuffer {
   return _raw(stringish);
 }
 
-/** Re-exported from output-safety-helper so Rails parity matches `TagHelper`'s `OutputSafetyHelper` include. */
 export function safeJoin(array: unknown[], sep?: string | SafeBuffer | null): SafeBuffer {
   return _safeJoin(array, sep);
 }
 
-/** Re-exported from output-safety-helper so Rails parity matches `TagHelper`'s `OutputSafetyHelper` include. */
 export function toSentence(array: unknown[], options?: ToSentenceOptions): SafeBuffer {
   return _toSentence(array, options);
 }
@@ -543,12 +478,10 @@ function createTagBuilderProxy(): TagBuilder {
         return Reflect.get(target, prop, receiver);
       }
 
-      // Prevent thenable assimilation (Promise/await duck-typing)
       if (prop === "then" || prop === "catch" || prop === "finally") {
         return undefined;
       }
 
-      // Known own properties
       if (
         prop === "attributes" ||
         prop === "tagString" ||
@@ -560,20 +493,17 @@ function createTagBuilderProxy(): TagBuilder {
         return Reflect.get(target, prop, receiver);
       }
 
-      // Return a function that builds the tag
       const methodName = String(prop);
       const tagName = METHOD_TO_TAG_NAME[methodName] ?? dasherize(methodName);
 
       return (contentOrOpts?: unknown, optsOrBlock?: Record<string, unknown> | (() => unknown)) => {
         ensureValidHtml5TagName(tagName);
-        // Parse arguments: tag.div("content", {opts}), tag.div({opts}), tag.div({opts}, block), tag.div(block), tag.div("content", block)
         let content: unknown = undefined;
         let options: Record<string, unknown> = {};
         let escape = true;
         let block: ((tagBuilder?: unknown) => unknown) | undefined;
 
         if (typeof contentOrOpts === "function") {
-          // tag.div(() => "content")
           block = contentOrOpts as () => unknown;
         } else if (
           typeof contentOrOpts === "object" &&
@@ -581,13 +511,11 @@ function createTagBuilderProxy(): TagBuilder {
           !(contentOrOpts instanceof SafeBuffer) &&
           !Array.isArray(contentOrOpts)
         ) {
-          // First arg is options: tag.div({class: "x"}) or tag.div({class: "x"}, block)
           options = { ...contentOrOpts } as Record<string, unknown>;
           if (typeof optsOrBlock === "function") {
             block = optsOrBlock;
           }
         } else {
-          // First arg is content: tag.div("text") or tag.div("text", {opts})
           content = contentOrOpts;
           if (typeof optsOrBlock === "function") {
             block = optsOrBlock;
@@ -596,7 +524,6 @@ function createTagBuilderProxy(): TagBuilder {
           }
         }
 
-        // Extract escape option
         if (typeof options.escape === "boolean") {
           escape = options.escape;
           delete options.escape;
@@ -604,7 +531,6 @@ function createTagBuilderProxy(): TagBuilder {
 
         const hasOptions = Object.keys(options).length > 0;
 
-        // Void elements don't accept content
         if (VOID_ELEMENTS.has(tagName)) {
           if (content !== undefined || block) {
             throw new ArgumentError(`No content allowed for void element "${tagName}"`);
@@ -612,7 +538,6 @@ function createTagBuilderProxy(): TagBuilder {
           return selfClosingTagString(tagName, options, escape, ">");
         }
 
-        // Self-closing SVG elements
         if (SELF_CLOSING_ELEMENTS.has(tagName) || SELF_CLOSING_ELEMENTS.has(methodName)) {
           const actualTagName = SELF_CLOSING_ELEMENTS.has(methodName) ? methodName : tagName;
           if (content !== undefined || block) {
@@ -627,7 +552,6 @@ function createTagBuilderProxy(): TagBuilder {
           return selfClosingTagString(actualTagName, options, escape);
         }
 
-        // Regular elements
         if (block) {
           const blockContent = block(receiver);
           return contentTagString(tagName, blockContent, hasOptions ? options : undefined, escape);
@@ -667,8 +591,6 @@ function getTagBuilder(): TagBuilder {
   return _tagBuilder;
 }
 
-// For cases where people call tag() with no args to get the builder,
-// also export a way to reset it (for testing)
 export function resetTagBuilder(): void {
   _tagBuilder = null;
 }

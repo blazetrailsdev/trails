@@ -1,20 +1,8 @@
-/**
- * trails-only coverage for `./tzdata-isdst.ts`, the vendored tzdata `isdst`
- * bit. Every case is a reading MRI answers one way and an offset-derived guess
- * answers the other: year-round DST (`America/New_York` 1943, 1974) reads the
- * same offset in January and July, and a PERMANENT standard-offset shift
- * (`America/Cancun` 2015, `Europe/Istanbul` 2017, `Asia/Amman` 2023,
- * `Africa/Juba` 2020) looks like a DST transition to anything reading the
- * offset segments around it. Each expectation is `TZ=<zone> ruby -e
- * 'p Time.at(<epoch>).isdst'`.
- */
-
 import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Time, resetLocalTimeZoneId } from "./time.js";
 import { tzdataIsdst } from "./tzdata-isdst.js";
 
-/** `Time.at(epochSeconds).isdst` with `zone` as the local zone, as MRI's `TZ` does. */
 function localIsdst(zone: string, epochSeconds: number): boolean {
   vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue(zone);
   resetLocalTimeZoneId();

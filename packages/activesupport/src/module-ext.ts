@@ -3,28 +3,7 @@ import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
 import { extractOptionsBang } from "./hash-utils.js";
 
-/**
- * Module extensions mirroring Rails ActiveSupport module/class extensions.
- * Covers delegate, mattr_accessor, cattr_accessor, attr_internal, and helpers.
- */
-
-/**
- * delegate — provides a delegate class method to easily expose contained
- * objects' public methods as your own.
- *
- * Mirrors: Module#delegate (`core_ext/module/delegation.rb:160-170`), a thin
- * front for `ActiveSupport::Delegation.generate`.
- *
- * @missingRailsArgs generate — PERMANENT: `location:` names the
- * `caller_locations` line Ruby stamps on the source `module_eval` compiles, and
- * `private:` sets the generated `def`'s visibility. TS defines the delegators
- * directly with `Object.defineProperty` and has no runtime method visibility,
- * so neither keyword has a counterpart to carry.
- *
- * Usage:
- *   delegate.call(MyClass.prototype, "street", "city", { to: "place" });
- *   delegate.call(MyClass.prototype, "name", { to: "place", prefix: true });
- */
+/** @missingRailsArgs generate — PERMANENT */
 export function delegate(this: object, ...methods: (string | DelegateOptions)[]): string[] {
   const [names, options] = extractOptionsBang(methods);
   const { to, prefix, allowNil } = options as unknown as DelegateOptions;
@@ -32,15 +11,6 @@ export function delegate(this: object, ...methods: (string | DelegateOptions)[])
   return Delegation.generate(this, names as string[], { to, prefix, allowNil });
 }
 
-/**
- * delegateMissingTo — forwards any method the receiver does not define to the
- * named property.
- *
- * Mirrors: Module#delegate_missing_to
- * (`core_ext/module/delegation.rb:218-224`). Ruby defines `method_missing` on
- * the owner; the trails idiom is a `Proxy`, so this returns the wrapped object
- * rather than mutating `target` in place.
- */
 export function delegateMissingTo<T extends object>(
   host: T,
   target: string,
@@ -64,11 +34,6 @@ function assertValidAttrName(name: string): void {
   }
 }
 
-/**
- * Ruby defines the reader and the writer as two independent methods; JS holds
- * both halves of an accessor in one property descriptor, so defining one half
- * has to preserve whichever half is already there.
- */
 function defineAccessorHalf(
   target: object,
   name: string,
@@ -83,14 +48,6 @@ function defineAccessorHalf(
   });
 }
 
-/**
- * Resolves and stores the attribute's default. Rails' `sym_default_value` is
- * the block's return when a block was given and `default` is nil; trails spells
- * a Ruby block as a function-valued `default`.
- *
- * Mirrors: the shared tail of `mattr_reader` / `mattr_writer`
- * (module/attribute_accessors.rb:68-69, 134-135).
- */
 function setMattrDefault(
   target: any,
   name: string,
@@ -104,13 +61,6 @@ function setMattrDefault(
   }
 }
 
-/**
- * mattrReader — defines a class attribute and creates class and instance
- * reader methods.
- *
- * Mirrors: Module#mattr_reader (`module/attribute_accessors.rb:54-73`).
-
- */
 export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void {
   const target = this;
   const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
@@ -131,17 +81,8 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
   }
 }
 
-/**
- * cattrReader — alias for mattrReader (`module/attribute_accessors.rb:74`).
- */
 export const cattrReader = mattrReader;
 
-/**
- * mattrWriter — defines a class attribute and creates class and instance
- * writer methods to allow assignment to the attribute.
- *
- * Mirrors: Module#mattr_writer (`module/attribute_accessors.rb:121-139`).
- */
 export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void {
   const target = this;
   const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
@@ -170,23 +111,8 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
   }
 }
 
-/**
- * cattrWriter — alias for mattrWriter (`module/attribute_accessors.rb:140`).
- */
 export const cattrWriter = mattrWriter;
 
-/**
- * mattrAccessor — defines both class and instance accessors for class
- * attributes.
- *
- * Mirrors: Module#mattr_accessor (`module/attribute_accessors.rb:208-212`).
- * Rails passes `default: default` to BOTH calls and forwards the block (`&blk`)
- * to `mattr_reader` only. The writer's `default:` never takes effect, because
- * `mattr_writer`'s `unless sym_default_value.nil? && class_variable_defined?`
- * guard (attribute_accessors.rb:135) sees the value the reader already stored;
- * trails drops `default` before the writer call instead, which is the same
- * no-op reached without evaluating a function-valued default a second time.
- */
 export function mattrAccessor(this: any, ...syms: (string | MattrOptions)[]): void {
   const [names, options] = extractOptionsBang(syms) as [string[], MattrOptions];
   const writerOptions: MattrOptions = { ...options };
@@ -196,9 +122,6 @@ export function mattrAccessor(this: any, ...syms: (string | MattrOptions)[]): vo
   mattrWriter.call(this, ...names, writerOptions);
 }
 
-/**
- * cattrAccessor — alias for mattrAccessor (`module/attribute_accessors.rb:213`).
- */
 export const cattrAccessor = mattrAccessor;
 
 /**
@@ -236,9 +159,6 @@ function internalStorageKey(name: string): string {
   return _attrInternalNamingFormat.replace("%s", name);
 }
 
-/**
- * attrInternalReader — defines a reader for an attribute stored in a prefixed key.
- */
 export function attrInternalReader(this: object, ...attrs: string[]): void {
   const target = this;
   for (const name of attrs) {
@@ -252,9 +172,6 @@ export function attrInternalReader(this: object, ...attrs: string[]): void {
   }
 }
 
-/**
- * attrInternalWriter — defines a writer for an attribute stored in a prefixed key.
- */
 export function attrInternalWriter(this: object, ...attrs: string[]): void {
   const target = this;
   for (const name of attrs) {
@@ -276,35 +193,17 @@ export function attrInternalWriter(this: object, ...attrs: string[]): void {
   }
 }
 
-/**
- * attrInternalAccessor — declares an attribute reader and writer backed by an
- * internally-named instance variable.
- *
- * Mirrors: Module#attr_internal_accessor (`module/attr_internal.rb:16-19`).
- */
 export function attrInternalAccessor(this: object, ...attrs: string[]): void {
   attrInternalReader.call(this, ...attrs);
   attrInternalWriter.call(this, ...attrs);
 }
 
-/**
- * attrInternal — alias for attrInternalAccessor
- * (`module/attr_internal.rb:20`).
- */
 export const attrInternal = attrInternalAccessor;
 
-/**
- * isAnonymous — returns true if a class/function has no name.
- * Mirrors Ruby's Module#anonymous?.
- */
 export function isAnonymous(klass: { name: string }): boolean {
   return !klass.name || klass.name === "";
 }
 
-/**
- * moduleParentName — returns the parent namespace name of a class (best-effort in JS).
- * In Ruby this would parse the constant path. In JS/TS we can only go by convention.
- */
 export function moduleParentName(klass: { name: string }): string | null {
   const name = klass.name ?? "";
   const parts = name.split("::");
@@ -312,23 +211,10 @@ export function moduleParentName(klass: { name: string }): string | null {
   return parts.slice(0, -1).join("::");
 }
 
-/**
- * moduleParent — returns the module which contains this one according to its
- * name. The parent of top-level and anonymous modules is `Object`.
- *
- * Mirrors: Module#module_parent (`core_ext/module/introspection.rb:36-38`).
- */
 export function moduleParent(klass: { name: string }): unknown {
   return moduleParentName(klass) != null ? constantize(moduleParentName(klass)!) : Object;
 }
 
-/**
- * moduleParents — returns all the parents of this module according to its
- * name, ordered from nested outwards. The receiver is not contained within the
- * result.
- *
- * Mirrors: Module#module_parents (`core_ext/module/introspection.rb:54-64`).
- */
 export function moduleParents(klass: { name: string }): unknown[] {
   const parents: unknown[] = [];
   const parentName = moduleParentName(klass);
@@ -343,10 +229,6 @@ export function moduleParents(klass: { name: string }): unknown[] {
   return parents;
 }
 
-/**
- * suppress — runs fn(), swallowing any error that is an instance of one of the given classes.
- * Re-raises errors that don't match. Mirrors Ruby's Kernel#suppress.
- */
 export function suppress<T>(
   fn: () => T,
   ...errorClasses: Array<new (...args: any[]) => Error>
@@ -359,8 +241,6 @@ export function suppress<T>(
   }
 }
 
-// ── Descendants tracking ──────────────────────────────────────────────────────
-
 export function registerSubclass(parent: AnyClass, child: AnyClass): void {
   DescendantsTracker.registerSubclass(parent, child);
 }
@@ -372,8 +252,6 @@ export function subclasses(klass: AnyClass): AnyClass[] {
 export function descendants(klass: AnyClass): AnyClass[] {
   return DescendantsTracker.descendants(klass);
 }
-
-// ── Rescuable ────────────────────────────────────────────────────────────────
 
 type ErrorHandler = ((error: Error) => void) | string;
 
@@ -389,14 +267,6 @@ function getRescueHandlers(target: object): RescueEntry[] {
   return _rescueHandlers.get(target)!;
 }
 
-/**
- * rescueFrom — registers an error handler on the class.
- * Mirrors Rails Rescuable::ClassMethods#rescue_from.
- *
- * Usage:
- *   rescueFrom.call(MyClass, SomeError, { with: (e) => console.log(e) });
- *   rescueFrom.call(MyClass, SomeError, { with: "handleError" });
- */
 export function rescueFrom(
   this: any,
   ...klasses: Array<(new (...args: any[]) => Error) | { with?: ErrorHandler }>
@@ -410,10 +280,6 @@ export function rescueFrom(
   getRescueHandlers(this).push({ errorClasses, handler });
 }
 
-/**
- * handleRescue — attempts to handle an error using registered rescueFrom handlers.
- * Returns true if handled. Call from inside a try/catch.
- */
 export function handleRescue(target: any, error: Error): boolean {
   const handlers = getRescueHandlers(target);
   for (const { errorClasses, handler } of [...handlers].reverse()) {

@@ -1,5 +1,3 @@
-// Trails-only coverage for per-subclass isolation of `ActiveSupport::Reloader`'s
-// `:prepare` callbacks. The Rails-mirrored cases live in `reloader.test.ts`.
 import { describe, it, expect } from "vitest";
 import { Reloader } from "./reloader.js";
 

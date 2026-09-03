@@ -4,19 +4,11 @@ import { IsolatedExecutionState } from "./isolated-execution-state.js";
 describe("IsolatedExecutionStateTest", () => {
   beforeEach(() => IsolatedExecutionState.clear());
 
-  // Rails parameterizes isolation as `:fiber` vs `:thread`. trails has no
-  // fiber/thread distinction (single-threaded Node + AsyncLocalStorage), so
-  // these three Rails tests are not portable; they stay skipped to preserve
-  // the parity:test mapping with the upstream file.
   it.skip("#[] when isolation level is :fiber");
 
   it.skip("#[] when isolation level is :thread");
 
   it.skip("changing the isolation level clear the old store");
-
-  // ---------------------------------------------------------------------------
-  // trails-specific behavioral coverage (no Rails counterpart)
-  // ---------------------------------------------------------------------------
 
   it("get/set/has/delete on the fallback (no scope)", () => {
     expect(IsolatedExecutionState.has("k")).toBe(false);

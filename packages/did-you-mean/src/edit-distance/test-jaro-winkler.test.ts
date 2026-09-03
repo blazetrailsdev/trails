@@ -1,5 +1,3 @@
-// Port of vendor/did_you_mean/test/edit_distance/test_jaro_winkler.rb.
-// Test names mirror the Ruby file so parity:test matches.
 import { describe, it, expect } from "vitest";
 
 import { JaroWinkler } from "../jaro-winkler.js";

@@ -1,5 +1,3 @@
-// Mirrors `railties/test/application/routes_reloading_test.rb` for the
-// subset of behavior the trailties RoutesReloader implements.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { onLoad, resetLoadHooks } from "@blazetrails/activesupport";
 import { RoutesReloader, type RouteSetLike } from "./routes-reloader.js";

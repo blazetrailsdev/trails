@@ -1,11 +1,3 @@
-/**
- * Rack::Headers
- *
- * A case-insensitive hash for HTTP headers. All keys are downcased on storage.
- * Implements the same interface as Ruby's Hash so it can be used as a drop-in
- * replacement in Rack middleware.
- */
-
 import { type DefaultProc, Hash } from "@blazetrails/ruby-compat";
 
 export class Headers extends Hash<string, string> {
@@ -13,11 +5,6 @@ export class Headers extends Hash<string, string> {
     super(defaultValue);
   }
 
-  /**
-   * Create a Headers from key-value pairs.
-   * Headers.from({ "Content-Type": "text/html" })
-   * Headers.from("Content-Type", "text/html", "Accept", "application/json")
-   */
   static from(...args: any[]): Headers {
     const h = new Headers();
     if (args.length === 0) return h;
@@ -44,8 +31,6 @@ export class Headers extends Hash<string, string> {
   private _key(key: string): string {
     return this.downcaseKey(key);
   }
-
-  // --- Core accessors ---
 
   override get(key: string): string | undefined {
     return super.get(this._key(key));
@@ -80,8 +65,6 @@ export class Headers extends Hash<string, string> {
     return this.size === 0;
   }
 
-  // --- Iteration ---
-
   each(fn: (key: string, value: string) => void): void {
     for (const [k, v] of this) {
       fn(k, v);
@@ -100,13 +83,9 @@ export class Headers extends Hash<string, string> {
     }
   }
 
-  // --- Keys/Values ---
-
   valuesAt(...keys: string[]): (string | undefined | null)[] {
     return keys.map((k) => this.get(k));
   }
-
-  // --- Conversion ---
 
   toArray(): [string, string][] {
     return [...this.entries()];
@@ -123,8 +102,6 @@ export class Headers extends Hash<string, string> {
   toH(): Record<string, string> {
     return this.toHash();
   }
-
-  // --- Searching ---
 
   fetch(key: string, ...args: any[]): string {
     if (args.length > 1) throw new Error("ArgumentError: wrong number of arguments");
@@ -179,8 +156,6 @@ export class Headers extends Hash<string, string> {
     return false;
   }
 
-  // --- Mutation ---
-
   merge(
     hash: Record<string, string> | Headers,
     fn?: (key: string, oldVal: string, newVal: string) => string,
@@ -225,8 +200,6 @@ export class Headers extends Hash<string, string> {
     this.clear();
     return this.update(hash);
   }
-
-  // --- Filtering ---
 
   select(fn: (key: string, value: string) => boolean): Headers {
     const result = new Headers();
@@ -317,8 +290,6 @@ export class Headers extends Hash<string, string> {
     return result;
   }
 
-  // --- Transform ---
-
   transformValues(fn: (value: string) => string): Headers {
     const result = new Headers();
     for (const [k, v] of this) {
@@ -362,8 +333,6 @@ export class Headers extends Hash<string, string> {
     }
     return result;
   }
-
-  // --- Other ---
 
   flatten(_depth = 1): string[] {
     const result: string[] = [];

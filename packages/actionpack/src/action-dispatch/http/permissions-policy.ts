@@ -1,15 +1,3 @@
-/**
- * ActionDispatch::PermissionsPolicy
- *
- * Emits legacy Feature-Policy header format (e.g. `camera 'self'; usb 'none'`)
- * matching Rails' output. The header name is `Feature-Policy` per
- * ActionDispatch::Constants::FEATURE_POLICY.
- *
- * Note: Rails itself notes the header was renamed from Feature-Policy to
- * Permissions-Policy but keeps the legacy implementation for now. We mirror
- * that decision so `build()` output is byte-for-byte identical to Rails.
- */
-
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { FEATURE_POLICY } from "../constants.js";
@@ -23,7 +11,6 @@ const MAPPINGS: Record<string, string> = {
 
 export type PolicySource = string | ((context: unknown) => string);
 
-/** Materializes a per-request policy into the `Feature-Policy` response header. */
 export class Middleware {
   private app: RackApp;
 

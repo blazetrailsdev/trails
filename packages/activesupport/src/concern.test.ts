@@ -251,8 +251,6 @@ describe("ConcernTest", () => {
       },
     });
     includeConcern(Base, m);
-    // When prepend is true, included block still runs in our implementation
-    // (Rails distinction doesn't apply in TS, we just verify it doesn't crash)
     expect(Array.isArray(log)).toBe(true);
   });
   it("prepended block is ran", () => {
@@ -267,7 +265,6 @@ describe("ConcernTest", () => {
     expect(log).toContain("included");
   });
   it("prepended block is not ran when included", () => {
-    // In TS we don't have a separate prepended block, just included
     const log: string[] = [];
     class Base {}
     const m = concern({
@@ -276,7 +273,7 @@ describe("ConcernTest", () => {
       },
     });
     includeConcern(Base, m);
-    expect(log.length).toBeGreaterThanOrEqual(0); // just verify no error
+    expect(log.length).toBeGreaterThanOrEqual(0);
   });
   it("modules dependencies are met", () => {
     class Base {}
@@ -336,7 +333,6 @@ describe("ConcernTest", () => {
     expect(new (Base as any)().depMethod()).toBe("dep");
   });
   it("raise on multiple included calls", () => {
-    // Our implementation is idempotent (no raise), just verify no duplicate effects
     const log: string[] = [];
     class Base {}
     const m = concern({
@@ -345,7 +341,7 @@ describe("ConcernTest", () => {
       },
     });
     includeConcern(Base, m);
-    includeConcern(Base, m); // second call should be no-op
+    includeConcern(Base, m);
     expect(log.length).toBe(1);
   });
   it("raise on multiple prepended calls", () => {
@@ -359,7 +355,7 @@ describe("ConcernTest", () => {
       },
     });
     includeConcern(Base, m);
-    includeConcern(Base, m); // second call is no-op
+    includeConcern(Base, m);
     expect(hasConcern(Base, m)).toBe(true);
   });
   it("no raise on same included or prepended call", () => {

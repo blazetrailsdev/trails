@@ -13,8 +13,6 @@ function makeVerifier(secret = "test-secret"): MessageVerifier {
   return new MessageVerifier(secret, { digest: "sha256", url_safe: true });
 }
 
-// ─── Fixture models ────────────────────────────────────────────────────────
-
 class Person {
   static primaryKey = "id";
   id: string;
@@ -34,8 +32,6 @@ class Person {
     conds: Record<string, unknown>,
   ): { toArray(): Promise<Person[]> } {
     const ids = conds["id"] as unknown[];
-    // Subclasses (PersonUuid, PersonChild) should instantiate themselves;
-    // arrow function captures `this` lexically as the class constructor.
     const make = (id: unknown) => new this(String(id));
     return {
       async toArray() {
@@ -44,7 +40,6 @@ class Person {
     };
   }
 }
-// Rails 'Person::Child' equivalent — class extending Person.
 class PersonChild extends Person {}
 class PersonUuid extends Person {}
 
@@ -75,8 +70,6 @@ const REGISTRY: Record<string, LocatorModel> = {
   PersonUuid: PersonUuid as unknown as LocatorModel,
   CompositePrimaryKeyModel: CompositePrimaryKeyModel as unknown as LocatorModel,
 };
-
-// ─── GlobalLocatorTest ─────────────────────────────────────────────────────
 
 describe("GlobalLocatorTest", () => {
   let verifier: MessageVerifier;
@@ -374,12 +367,10 @@ describe("GlobalLocatorTest", () => {
     expect(await Locator.locate("http://app/Person/1")).toBeNull();
     expect(await Locator.locate("gid://Person/1")).toBeNull();
     expect(await Locator.locate("gid://app/Person")).toBeNull();
-    // Scalar-PK model with composite-form id — exercises modelIdIsValid arity.
     expect(await Locator.locate("gid://app/Person/1/2")).toBeNull();
   });
 
   it("locating by a GID URI with a mismatching model_id returns nil", async () => {
-    // 4 cases mirroring Rails: composite-id over-supply, under-supply, partial.
     expect(
       await Locator.locate(
         "gid://app/CompositePrimaryKeyModel/tenant-key-value/id-value/something_else",
@@ -388,8 +379,6 @@ describe("GlobalLocatorTest", () => {
     expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value/")).toBeNull();
     expect(await Locator.locate("gid://app/CompositePrimaryKeyModel/tenant-key-value")).toBeNull();
   });
-
-  // ─── Locator.use(app, locator) — per-app dispatch ──────────────────────
 
   it("use locator with block", async () => {
     Locator.use("foo", (gid) => `block-located:${gid.modelName}:${gid.modelId}`);
@@ -459,17 +448,11 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("by many with one record missing leading to a raise", async () => {
-    // Rails: `Person.find` raises RecordNotFound when one id misses. Our
-    // fixture's `Person.find` throws when it sees the sentinel "missing"
-    // id, so locating many GIDs where one resolves to "missing" must
-    // surface the error.
     const gids = [GlobalID.create(new Person("1")), GlobalID.create(new Person("missing"))];
     await expect(Locator.locateMany(gids)).rejects.toThrow();
   });
 
   it("by many with one record missing not leading to a raise when ignoring missing", async () => {
-    // With ignoreMissing the locator routes through `where(id: ids).toArray()`,
-    // which the fixture filters down to non-"missing" entries — no throw.
     const gids = [GlobalID.create(new Person("1")), GlobalID.create(new Person("missing"))];
     const found = (await Locator.locateMany(gids, { ignoreMissing: true })) as Person[];
     expect(found).toHaveLength(1);
@@ -477,9 +460,6 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("by GID without a primary key method", async () => {
-    // Rails fixture PersonWithoutPrimaryKey has no `primary_key` method; the
-    // locator falls back to the default ('id'). Trails analog: a model class
-    // with `find` and `where` but no `primaryKey` static.
     class PersonNoPk {
       id: string;
       constructor(id: string) {
@@ -517,8 +497,6 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("can set default_locator", async () => {
-    // Rails: Locator.default_locator = MyLocator.new — swap the locator
-    // used when no per-app locator is registered.
     const sentinel = { located: true };
     const previous = Locator.defaultLocator;
     Locator.defaultLocator = {
@@ -534,9 +512,6 @@ describe("GlobalLocatorTest", () => {
   });
 
   it("use locator with class and single argument", async () => {
-    // Rails: a registered class with locate(gid) (no options arg) still
-    // dispatches. The locator's locate / locateMany are duck-typed via
-    // LocatorLike; method arity isn't checked.
     const deprecated = {
       locate: async () => "deprecated",
       locateMany: async (gids: GlobalID[]) => gids.map((g) => g.modelId),
@@ -553,13 +528,6 @@ describe("GlobalLocatorTest", () => {
   });
 });
 
-// ─── ScopedRecordLocatingTest ──────────────────────────────────────────────
-//
-// Mirrors vendor/globalid/test/cases/global_locator_test.rb#ScopedRecordLocatingTest.
-// Rails fixture `Person::Scoped` has `find` gated by an `unscoped { ... }`
-// block — only callable inside the block. Exercises `UnscopedLocator`'s
-// `klass.unscoped(block)` wrap.
-
 class PersonScoped extends Person {
   static _findAllowed = false;
   static async unscoped<R>(block: () => R | Promise<R>): Promise<R> {
@@ -570,9 +538,6 @@ class PersonScoped extends Person {
       PersonScoped._findAllowed = false;
     }
   }
-  // When the gating flag is off, Rails' `Person::Scoped.find` returns nil
-  // (via `super if @find_allowed`). The signature widens to `| null` only
-  // at the call site (cast) since the base `Person.find` type is fixed.
   static override async find(id: unknown): Promise<PersonScoped | PersonScoped[]> {
     if (!PersonScoped._findAllowed) {
       return (Array.isArray(id) ? [] : null) as unknown as PersonScoped;
@@ -619,8 +584,6 @@ describe("ScopedRecordLocatingTest", () => {
     expect(found.map((r) => r.id)).toEqual(["1", "2"]);
   });
 });
-
-// ─── Non-Rails coverage (regressions / edge cases not in Rails suite) ──────
 
 describe("Locator (non-Rails coverage)", () => {
   beforeEach(() => {
@@ -697,8 +660,6 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
   it("defaultLocator getter/setter (Rails: Locator.default_locator=)", () => {
     const original = Locator.defaultLocator;
     const custom = new BlockLocator(() => "custom-default");
-    // LocatorLike-widened defaultLocator accepts a BlockLocator directly —
-    // no cast needed.
     Locator.defaultLocator = custom;
     expect(Locator.defaultLocator).toBe(custom);
     Locator.defaultLocator = original;
@@ -724,38 +685,23 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
   });
 
   it("locateMany returns [] when parseAllowed filters out every input", async () => {
-    // All GIDs are invalid / unknown class / filtered by only: → empty allowed
-    // set → return [] without dispatching to any locator (no first-locator
-    // crash, no extraneous work).
     const found = await Locator.locateMany(["not-a-gid", "gid://bcx/Unknown/1"], {});
     expect(found).toEqual([]);
   });
 
   it("locate returns null for arity-mismatched GIDs even with a BlockLocator registered", async () => {
-    // Without the facade-level arity check, the registered BlockLocator
-    // would run on bad-arity GIDs (inconsistent with BaseLocator's
-    // modelIdIsValid filter, which returns null for them).
     Locator.use("ba", () => {
       throw new Error("should not be called — bad-arity GID must be filtered at the facade");
     });
-    // Person has scalar primaryKey; composite-form id is bad arity.
     expect(await Locator.locate("gid://ba/Person/1/2")).toBeNull();
   });
 
   it("locateMany drops arity-mismatched GIDs before the first-app dispatch selection", async () => {
-    // Bad-arity GID anchored at allowed[0] with a different app would
-    // otherwise cause locateMany to filter to its app and lose the valid
-    // same-app GIDs that follow. parseAllowed's arity filter removes the
-    // bad entry first, so allowed[0] is a real candidate.
     Locator.use("doomed-app", () => {
       throw new Error("should not be called — bad-arity GID must be filtered first");
     });
     const found = await Locator.locateMany(
-      [
-        "gid://doomed-app/Person/1/2", // scalar-PK Person with composite-form id → bad arity
-        "gid://bcx/Person/3",
-        "gid://bcx/Person/4",
-      ],
+      ["gid://doomed-app/Person/1/2", "gid://bcx/Person/3", "gid://bcx/Person/4"],
       {},
     );
     expect(found).toHaveLength(2);
@@ -764,18 +710,11 @@ describe("Locator non-Rails coverage — per-app dispatch helpers", () => {
   });
 
   it("locateMany filters out mismatched-app GIDs (single-app dispatch invariant)", async () => {
-    // Register an 'other-app' BlockLocator that would crash if asked to
-    // resolve a 'bcx' GID. locateMany should keep only the first-GID-app
-    // entries; the foreign GID is silently dropped.
     Locator.use("other-app", () => {
       throw new Error("should not be called — foreign-app GID must be filtered");
     });
     const found = await Locator.locateMany(
-      [
-        "gid://bcx/Person/1",
-        "gid://other-app/Person/99", // would route to the throwing locator
-        "gid://bcx/Person/2",
-      ],
+      ["gid://bcx/Person/1", "gid://other-app/Person/99", "gid://bcx/Person/2"],
       {},
     );
     expect(found).toHaveLength(2);

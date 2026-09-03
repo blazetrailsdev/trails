@@ -5,12 +5,8 @@ import { AppBase, type AppBaseOptions } from "./app-base.js";
 import { GeneratorError } from "./generated-attribute.js";
 import { type DatabaseName } from "./database.js";
 
-// Rails' `Rails::Generators::AppName::RESERVED_NAMES` (`app_name.rb:6`).
 const RESERVED_NAMES = ["application", "destroy", "plugin", "runner", "test"];
 
-// CLI-friendly DB aliases — `trails new -d sqlite|postgres|mysql` maps
-// onto the canonical Rails `DatabaseName`. MariaDB is exposed via the
-// canonical `mariadb-mysql` adapter id only (no short alias).
 const DB_ALIAS: Record<string, DatabaseName> = {
   sqlite: "sqlite3",
   postgres: "postgresql",
@@ -35,17 +31,6 @@ export interface AppGeneratorOptions extends Omit<AppBaseOptions, "database" | "
   sqliteDriver?: SqliteDriver;
 }
 
-/**
- * The one supported way a generated app invokes the trails CLI: through the
- * `tsx` loader, so a command that imports application code can resolve the
- * `.js` specifiers `Node16` resolution requires of a `.ts` source.
- *
- * The package scripts name the loader bare, because a package manager puts
- * `node_modules/.bin` on PATH for them. `bin/trails` is run directly, where
- * nothing does, so it resolves both halves from its own location instead —
- * the same way `bin/rails` reaches the app through `require_relative`
- * (`bin/rails.tt:3`) rather than through PATH.
- */
 const TRAILS_LOADER = "tsx";
 const TRAILS_CLI = "node_modules/@blazetrails/trailties/bin/trails.js";
 const TRAILS = `${TRAILS_LOADER} ${TRAILS_CLI}`;
@@ -73,36 +58,22 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /** Rails' `AppName#original_app_name` (`app_name.rb:12`):
-   * `options[:name] || File.basename(destination_root)`. */
   private originalAppName(): string {
     return this.options.name ?? File.basename(this.destinationRoot);
   }
 
-  /** Rails' `AppName#app_name` (`app_name.rb:9`):
-   * `original_app_name.parameterize(preserve_case: true).underscore`. */
   private appName(): string {
     return underscore(parameterize(this.originalAppName(), { preserveCase: true }));
   }
 
-  /** Rails' `AppName#app_const_base` (`app_name.rb:18`):
-   * `app_name.gsub(/\W/, "_").squeeze("_").camelize`. */
   private appConstBase(): string {
     return camelize(this.appName().replace(/\W/g, "_").replace(/_+/g, "_"));
   }
 
-  /** Rails' `AppName#app_const` (`app_name.rb:22`) is
-   * `"#{app_const_base}::Application"`. TypeScript has no module nesting, so
-   * the generated class is `app_const_base` itself — which is what
-   * `Application#name` dasherizes back into the Rails app name. */
   private appConst(): string {
     return this.appConstBase();
   }
 
-  /** Rails' `AppName#valid_const?` (`app_name.rb:26`), called from
-   * `AppBase#create_root` (`app_base.rb:258`). The third Rails arm,
-   * `Object.const_defined?(app_const_base)`, has no counterpart: JavaScript
-   * has no global constant table to probe. */
   private isValidConst(): void {
     if (/^\d/.test(this.appConst())) {
       throw new GeneratorError(
@@ -117,12 +88,6 @@ export class AppGenerator extends AppBase {
     }
   }
 
-  /**
-   * `npm run` / `pnpm` / `yarn` — the prefix a generated script is invoked
-   * with. Rails has no analogue: `bin/rails` is executable because Ruby needs
-   * no build step, while every trails CLI command that executes application
-   * code has to enter through the `tsx` loader the scripts declare.
-   */
   private pmRun(): string {
     return this.packageManager === "npm" ? "npm run" : this.packageManager;
   }
@@ -166,10 +131,6 @@ export class AppGenerator extends AppBase {
 
   private createRootFiles(name: string): void {
     const dep = this.database.pkgDependency;
-    // For sqlite3 the driver dep depends on the chosen driver: node-sqlite is
-    // built into Node (no dep), expo-sqlite needs its own package, and
-    // better-sqlite3 (the default) uses the database's pkgDependency. Other
-    // databases always include their pkgDependency.
     const dbDep =
       this.database.name === "sqlite3" && this.sqliteDriver !== "better-sqlite3"
         ? this.sqliteDriver === "expo-sqlite"
@@ -436,13 +397,6 @@ process.exit(status ?? 1);
     );
   }
 
-  /**
-   * Mirrors `AppGenerator#config_target_version`
-   * (`generators/rails/app/app_generator.rb:261-263`). Rails answers
-   * `Rails::VERSION::STRING.to_f`; trails' own `VERSION` is not a
-   * `loadDefaults` branch, so the generated app targets the Rails release
-   * this port tracks.
-   */
   private configTargetVersion(): string {
     return "8.0";
   }
@@ -1045,9 +999,6 @@ dist
 };
 `;
       default: {
-        // Each SQLite driver maps to its own registered adapter name; the
-        // adapter subclass bundles its driver, so no side-effect import is
-        // needed. better-sqlite3 backs the canonical `sqlite3` name.
         const adapter = this.sqliteDriver === "better-sqlite3" ? "sqlite3" : this.sqliteDriver;
         return `export default {
   development: {

@@ -1,12 +1,3 @@
-/**
- * Mirrors: activesupport/test/constantize_test_cases.rb
- *
- * Arms that a flat constant table cannot express are omitted rather than
- * faked: inherited-constant lookup (`Ace::Base::Fase::Dice` resolving through
- * `Fase < Case`), the `Object::…` / `AddtlGlobalConstants` arms that depend on
- * Ruby's implicit `Object` namespace and `include`-into-`Object`, and the
- * `with_autoloading_fixtures` arms.
- */
 import { expect } from "vitest";
 import { registerConstant } from "./inflector.js";
 

@@ -14,16 +14,9 @@ import { TransitionTable, type Edge } from "./transition-table.js";
 
 const DUMMY_END_NODE = new Dummy("<end>");
 
-/**
- * Builds a deterministic transition table from a route AST using the
- * standard regex→DFA construction (firstpos / lastpos / followpos).
- *
- * Mirrors `ActionDispatch::Journey::GTG::Builder`.
- */
 export class Builder {
   readonly root: Node;
   readonly ast: Cat;
-  /** Endpoints — reserved for parity with Rails attr; unused in build. */
   readonly endpoints: unknown[] = [];
 
   /** @internal */
@@ -54,13 +47,10 @@ export class Builder {
       if (marked.has(s)) continue;
       marked.add(s);
 
-      // Group states by their edge symbol.
       const groups = new Map<Edge, Node[]>();
       const seen = new Map<string, Edge>();
       for (const state of s) {
         const sym = this.symbol(state);
-        // Disambiguate equivalent regexes by their source string, since
-        // every parse produces a fresh RegExp instance.
         const key = typeof sym === "string" ? `s:${sym}` : `r:${sym.source}\0${sym.flags}`;
         let canonical = seen.get(key);
         if (!canonical) {
@@ -87,7 +77,6 @@ export class Builder {
         const from = idFor(s);
 
         if (u.every((pos) => pos === DUMMY_END_NODE)) {
-          // Allocate a fresh accepting state.
           const to = idFor({});
           dtrans.set(from, to, sym);
           dtrans.addAccepting(to);

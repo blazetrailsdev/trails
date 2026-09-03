@@ -1,8 +1,3 @@
-/**
- * Tagged logging primitives (TagStack, Formatter, LocalTagStorage, TaggedLogging helpers).
- * Mirrors ActiveSupport::TaggedLogging; logger-wrapping logic lives in `logger.ts` (`taggedLogging`).
- */
-
 import { Logger, taggedLogging as _taggedLogging } from "./logger.js";
 import type { TaggedLogger } from "./logger.js";
 import type { Temporal } from "@blazetrails/date";

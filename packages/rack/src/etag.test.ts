@@ -92,7 +92,7 @@ it("not set etag if last-modified is set", async () => {
 });
 
 it("not set etag if a sendfile_body is given", async () => {
-  const sendfileBody = { each() {} }; // non-array body
+  const sendfileBody = { each() {} };
   const app = async () => [200, { "content-type": "text/plain" }, sendfileBody] as any;
   const response = await etag(app).call(request());
   expect(response[1]["etag"]).toBeUndefined();

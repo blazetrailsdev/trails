@@ -47,9 +47,6 @@ describe("ActionDispatch::ParamError", () => {
     });
 
     it("Rack errors do not match individual ActionDispatch subclasses", () => {
-      // Rails only overrides `self.===` on ParamError; subclasses retain
-      // default semantics, so an unrelated Rack error must not be caught
-      // by a `rescueFrom(InvalidParameterError)`.
       expect(new RackParameterTypeError("x") instanceof InvalidParameterError).toBe(false);
       expect(new RackParameterTypeError("x") instanceof ParameterTypeError).toBe(false);
       expect(new RackInvalidParameterError("x") instanceof ParameterTypeError).toBe(false);

@@ -1,44 +1,20 @@
-/**
- * MessagePack packer/unpacker with extension-type support.
- *
- * Mirrors the slice of the `msgpack` gem's `MessagePack::Factory` that
- * `ActiveSupport::MessagePack` relies on: `register_type` plus packer/unpacker
- * objects that understand the ext format. Base scalars (nil/bool/int/float/
- * str/bin/array/map) are byte-compatible with MRI; registered types serialize
- * as msgpack ext (`fixext`/`ext8`/`ext16`/`ext32`) carrying a 0..127 type id.
- *
- * `recursive` types pack their parts through a child packer so the ext payload
- * is itself a packed stream (e.g. Time's tv_sec/tv_nsec/utc_offset); plain
- * types map a JS value straight to/from the raw ext payload bytes.
- *
- * No third-party deps; `Buffer` is a runtime global, not a `node:*` import.
- */
-
 import { Hash } from "@blazetrails/ruby-compat";
 
 export class MessagePackError extends Error {}
 
-/** @internal A plain hash (literal or null-prototype) vs. a tagged class instance. */
+/** @internal */
 function isPlainObject(value: object): boolean {
   const proto = Object.getPrototypeOf(value) as object | null;
   return proto === null || proto === Object.prototype;
 }
 
-/** A type registered with the factory, matched during packing by `match`. */
 export interface RegisteredType {
   type: number;
-  /** Label for the type→class enshrine parity (Ruby registers the actual class). */
   klass: string;
   match: (value: unknown) => boolean;
   recursive: boolean;
-  /**
-   * Ruby's `oversized_integer_extension: true`. Integers outside the native
-   * 64-bit range route through this ext (type 1) instead of `typeFor` lookup.
-   */
   oversizedInteger?: boolean;
-  /** Non-recursive: return the raw ext payload. Recursive: write parts to `packer`. */
   packer: (value: unknown, packer: Packer) => Buffer | void;
-  /** Non-recursive: receive the raw payload Buffer. Recursive: read parts from `unpacker`. */
   unpacker: (source: Buffer | Unpacker) => unknown;
 }
 
@@ -61,7 +37,6 @@ export class Factory {
     return this.types.find((t) => t.oversizedInteger);
   }
 
-  /** Type id → class label, mirroring Ruby's `registered_types` for parity checks. */
   registeredTypes(): { type: number; klass: string }[] {
     return this.types.map((t) => ({ type: t.type, klass: t.klass }));
   }
@@ -93,9 +68,6 @@ export class Packer {
     if (typeof value === "bigint") return this.writeBigInt(value);
     if (Array.isArray(value)) return this.writeArray(value);
 
-    // Plain hashes map to native msgpack maps; only tagged values (Symbol) and
-    // class instances dispatch to registered ext types — matching msgpack's
-    // class-based lookup, where Hash is native and Object (127) is the catch-all.
     if (typeof value === "object" && isPlainObject(value)) {
       return this.writeMap(value as Record<string, unknown>);
     }
@@ -145,12 +117,7 @@ export class Packer {
     this.writeBigInt(BigInt(n));
   }
 
-  /**
-   * @internal Encodes any integer (JS `number` widened to `bigint`, or a native
-   * `bigint`). Values inside the 64-bit native range use msgpack int tags;
-   * anything wider routes through the oversized-integer ext (type 1), matching
-   * Ruby's `oversized_integer_extension`.
-   */
+  /** @internal */
   private writeBigInt(n: bigint): void {
     if (n >= 0n) {
       if (n < 0x80n) return void this.out.push(Number(n));
@@ -170,7 +137,7 @@ export class Packer {
     this.writeExt(ext, n);
   }
 
-  /** @internal Pushes a tag followed by an 8-byte big-endian field from a bigint. */
+  /** @internal */
   private pushBig(tag: number, value: bigint): void {
     this.out.push(tag);
     for (let shift = 56n; shift >= 0n; shift -= 8n) this.out.push(Number((value >> shift) & 0xffn));
@@ -246,17 +213,14 @@ export class Unpacker {
     return u >= 2 ** (bits - 1) ? u - 2 ** bits : u;
   }
 
-  /**
-   * @internal Reads an 8-byte big-endian unsigned int. Returns a `number` when
-   * it fits in the safe-integer range, else a `bigint` (mirroring Ruby Integer).
-   */
+  /** @internal */
   private readBigUint(): number | bigint {
     let v = 0n;
     for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(this.buf[this.pos++]);
     return v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v) : v;
   }
 
-  /** @internal Reads an 8-byte big-endian two's-complement signed int. */
+  /** @internal */
   private readBigInt(): number | bigint {
     let v = 0n;
     for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(this.buf[this.pos++]);

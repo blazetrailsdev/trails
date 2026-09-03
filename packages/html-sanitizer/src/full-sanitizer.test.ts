@@ -1,8 +1,3 @@
-// Mirrors rails-html-sanitizer test/sanitizer_test.rb -> FullSanitizerTest.
-// Test names track Rails' test_* methods for parity:test alignment.
-// Where libxml2/Loofah outputs differ from sanitize-html/htmlparser2 we
-// document the divergence in the assertion comment.
-
 import { describe, expect, test } from "vitest";
 import { FullSanitizer } from "./full-sanitizer.js";
 
@@ -20,9 +15,6 @@ describe("FullSanitizer", () => {
   test("strip_tags_multiline", () => {
     const input =
       '<h1>This is <b>a <a href="" target="_blank">test</a></b>.</h1>\n\n<!-- it has a comment -->\n\n<p>It no <b>longer <strong>contains <em>any <strike>HTML</strike></em>.</strong></b></p>\n';
-    // Rails output is multi-line; sanitize-html collapses block-tag
-    // boundaries without inserting Loofah's trailing newlines. Assert
-    // the meaningful content survives and tags are gone.
     const out = fullSanitize(input)!;
     expect(out).toContain("This is a test.");
     expect(out).toContain("It no longer contains any HTML.");
@@ -65,8 +57,6 @@ describe("FullSanitizer", () => {
   });
 
   test("strip_script_contents", () => {
-    // Not in Rails' FullSanitizer suite by this name, but Rails docs
-    // guarantee scripts are stripped along with their contents.
     expect(fullSanitize("hi <script>alert(1)</script> bye")).toBe("hi  bye");
   });
 });

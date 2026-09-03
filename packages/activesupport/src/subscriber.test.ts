@@ -43,8 +43,6 @@ describe("SubscriberTest", () => {
   });
 
   it("does not attach private methods", () => {
-    // In JS there are no private methods on subscribers in the same way
-    // Test that only the intended handler is called
     let called = 0;
     const sub = Notifications.subscribe("private.test", () => called++);
     Notifications.instrument("private.test");

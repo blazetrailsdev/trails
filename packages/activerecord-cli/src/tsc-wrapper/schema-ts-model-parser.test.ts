@@ -52,7 +52,6 @@ describe("parseSchemaForModels", () => {
     `;
     const memberships = tableNamed(source, "memberships");
     expect(memberships.primaryKey).toEqual(["user_id", "group_id"]);
-    // No synthesized id column; the composite members appear as ordinary columns.
     expect(memberships.columns).toEqual([
       { name: "user_id", type: "bigint" },
       { name: "group_id", type: "bigint" },
@@ -102,7 +101,6 @@ describe("parseSchemaForModels", () => {
     `;
     const fk = tableNamed(source, "reviews").foreignKeys[0];
     expect(fk.column).toBe("book_id");
-    // Synthesized name mirrors Rails' fk_rails_<10hex> so it round-trips through SchemaDumper.
     expect(fk.name).toBe("fk_rails_924a0b30ca");
   });
 
@@ -118,7 +116,6 @@ describe("parseSchemaForModels", () => {
     `;
     const fk = tableNamed(source, "memberships").foreignKeys[0];
     expect(fk.column).toBe("tenant_id,account_id");
-    // sha256("memberships_tenant_id_and_account_id_fk").slice(0,10)
     expect(fk.name).toBe("fk_rails_4bc705af9c");
   });
 
@@ -163,8 +160,6 @@ describe("parseSchemaForModels", () => {
   });
 
   it("produces a shape generateModels consumes into correct classes and associations", () => {
-    // Locks the real contract: the parsed IntrospectedTable[] must flow
-    // straight into generateModels (PR 2 wires this into the CLI).
     const source = `
       export default async function defineSchema(ctx) {
         await ctx.createTable("authors", { force: "cascade" }, (t) => {

@@ -1,4 +1,3 @@
-// Port of `Rails::Initializable` from `railties/lib/rails/initializable.rb`.
 export type InitializerGroup = string;
 
 export interface InitializerOptions {
@@ -67,12 +66,10 @@ export class Collection extends Array<Initializer> {
     return new Collection(...this, ...other);
   }
 
-  /** Mirrors: Rails `tsort_each_child` (initializable.rb:49). */
   tsortEachChild(initializer: Initializer): Initializer[] {
     return this.filter((i) => i.before === initializer.name || i.name === initializer.after);
   }
 
-  /** DFS post-order matching Ruby `TSort#tsort_each`. Stable on iteration order. */
   tsort(): Initializer[] {
     const out: Initializer[] = [];
     const visited = new Set<Initializer>();
@@ -91,14 +88,14 @@ export class Collection extends Array<Initializer> {
   }
 }
 
-/** @internal Per-class own collections, keyed by constructor. */
+/** @internal */
 const OWN = new WeakMap<typeof Initializable, Collection>();
 
 export class Initializable {
   private _initializers?: Collection;
   private _ran?: boolean;
 
-  /** @internal Per-class collection — mirrors Rails' `@initializers ||= ...`. */
+  /** @internal */
   static _ownInitializers(): Collection {
     let own = OWN.get(this);
     if (!own) {
@@ -108,7 +105,6 @@ export class Initializable {
     return own;
   }
 
-  /** Subclasses may override to splice in extra initializers. */
   static get initializers(): Collection {
     return this._ownInitializers();
   }
@@ -166,14 +162,6 @@ export class Initializable {
     return this._initializers;
   }
 
-  /**
-   * Rails' `run_initializers` is synchronous because Ruby's `File`,
-   * `require` and `load` are. Trails' filesystem seam is async-only
-   * (`getFsAsync`) and module loading goes through `import()`, so an
-   * initializer body that reads `paths[...].existent` or loads a routes
-   * file can only be a promise. Each initializer is therefore awaited in
-   * declaration order — the sequencing Rails gets for free.
-   */
   async runInitializers(group: InitializerGroup = "default", ...args: unknown[]): Promise<void> {
     if (this._ran) return;
     for (const init of this.initializers.tsort()) {

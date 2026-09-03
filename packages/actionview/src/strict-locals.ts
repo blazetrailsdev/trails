@@ -1,7 +1,5 @@
-/** Rejects excess keys even for variable-typed arguments (closes the TS excess-property check gap). */
 export type NoExtraKeys<T> = T & { [K in Exclude<string, keyof T>]?: never };
 
-/** Mirrors Rails `ActionView::Template::StrictLocalsError`. */
 export class StrictLocalsMismatch extends Error {
   readonly extraKeys: readonly string[];
   readonly allowedKeys: readonly string[];

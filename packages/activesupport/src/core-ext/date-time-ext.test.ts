@@ -79,7 +79,6 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
   }
 }
 
-/** Ruby's `Time#==`, which compares the instant the two receivers name. */
 function sameTime(actual: Time, expected: Time): void {
   expect(actual.toTime().epochNanoseconds).toBe(expected.toTime().epochNanoseconds);
 }
@@ -88,7 +87,6 @@ function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0,
   return new Date(year, month - 1, day, hour, min, sec, ms);
 }
 
-/** `DateTime.civil`, the receiver every `date_time/calculations.rb` member takes. */
 function dt(
   year: number,
   month = 1,
@@ -100,7 +98,6 @@ function dt(
   return DateTime.civil(year, month, day, hour, min, sec);
 }
 
-/** The end-of-period second `Rational(999999999, 1000)` usec lands on. */
 const END_OF_PERIOD_SEC = new Rational(59999999999, 1000000000);
 
 describe("DateTimeExtCalculationsTest", () => {
@@ -117,8 +114,6 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(toFs(datetime)).toMatch(/^2005-02-21T14:30:00(Z|\+00:00)$/);
     expect(toFs(datetime, "not_existent")).toMatch(/^2005-02-21T14:30:00(Z|\+00:00)$/);
 
-    // Rails wraps these three in `with_env_tz "US/Central"`; a `DateTime`
-    // carries its own offset, so the ambient zone never reaches `:iso8601`.
     expect(
       toFs(DateTime.civil(2009, 2, 5, 14, 30, 5, new Rational(-21600, 86400)), "iso8601"),
     ).toBe("2009-02-05T14:30:05-06:00");
@@ -135,9 +130,6 @@ describe("DateTimeExtCalculationsTest", () => {
   it("readable inspect", () => {
     const datetime = dt(2005, 2, 21, 14, 30, 0);
     expect(readableInspect(datetime)).toBe("Mon, 21 Feb 2005 14:30:00 +0000");
-    // Rails asserts `datetime.readable_inspect == datetime.inspect`, the alias
-    // its `alias_method :inspect, :readable_inspect` installs; trails reopens
-    // no `::DateTime`, so the alias target is compared directly.
     expect(readableInspect(datetime)).toBe(toFs(datetime, "rfc822"));
   });
 
@@ -257,12 +249,10 @@ describe("DateTimeExtCalculationsTest", () => {
     );
     expect(change(receiver, { min: 45 }).toString()).toBe(dt(2005, 2, 22, 15, 45).toString());
 
-    // datetime with non-zero offset
     expect(change(dt(2005, 2, 22, 15, 15, 10), { offset: new Rational(-5, 24) }).toString()).toBe(
       DateTime.civil(2005, 2, 22, 15, 15, 10, new Rational(-5, 24)).toString(),
     );
 
-    // datetime with fractions of a second
     expect(change(dt(2005, 2, 22, 15, 15, 10.7), { day: 1 }).toString()).toBe(
       dt(2005, 2, 1, 15, 15, 10.7).toString(),
     );
@@ -292,8 +282,6 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("advanced processes first the date deltas and then the time deltas", () => {
-    // If the time deltas were processed first, the following datetimes would be
-    // advanced to 2010/04/01 instead.
     expect(advance(dt(2010, 2, 28, 23, 59, 59), { months: 1, seconds: 1 }).toString()).toBe(
       dt(2010, 3, 29).toString(),
     );
@@ -331,7 +319,7 @@ describe("DateTimeExtCalculationsTest", () => {
     const dt = d(2005, 10, 31, 10, 10, 10);
     const quarterStart = beginningOfQuarter(dt);
     const lastQuarterStart = asDate(timeAdvance(asDate(quarterStart), { months: -3 }));
-    expect(lastQuarterStart.getMonth()).toBe(6); // July
+    expect(lastQuarterStart.getMonth()).toBe(6);
   });
 
   it("xmlschema", () => {
@@ -405,9 +393,6 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("current returns date today when zone is not set", () => {
-    // Rails stubs `Time.now` and pins TZ to US/Eastern to name the offset
-    // outright; trails freezes the same local wall clock and reads the offset
-    // back off the host zone, so the assertion holds wherever it runs.
     const now = d(1999, 12, 31, 23, 59, 59);
     setFrozenTime(now);
     const dt = current();
@@ -673,7 +658,6 @@ describe("DateTimeExtCalculationsTest", () => {
     expect(advance(receiver(), { years: -3, months: -2, days: -1 }).toString()).toBe(
       dt(2001, 12, 27, 15, 15, 10).toString(),
     );
-    // leap day plus one year
     expect(advance(dt(2004, 2, 29, 15, 15, 10), { years: 1 }).toString()).toBe(
       dt(2005, 2, 28, 15, 15, 10).toString(),
     );

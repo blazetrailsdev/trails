@@ -11,13 +11,6 @@ function pendingMessage(pending: MigrationProxy[]): string {
   return msg;
 }
 
-/**
- * Resolve the list of pending migrations for the current environment.
- *
- * Mirrors `db:abort_if_pending_migrations`' reader
- * (`railties/databases.rake:330-336`): each pool's own `migration_context`
- * answers what is pending, rather than a second migration scan of its own.
- */
 export async function checkPendingMigrations(cwd?: string): Promise<MigrationProxy[]> {
   const dir = cwd ?? process.cwd();
   await loadDatabaseConfig(dir);

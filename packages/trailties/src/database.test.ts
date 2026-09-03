@@ -20,9 +20,6 @@ describe("databaseConfiguration", () => {
     if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
-  // Mirrors Rails' `Rails.root` seam: a relative `config/database.*` is loaded
-  // from the application root, then assigned to `Base.configurations` before
-  // `establish_connection` is called at all (railtie.rb:256-262).
   it("loads config/database.json from the injected root", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
@@ -49,7 +46,6 @@ describe("databaseConfiguration", () => {
     await expect(databaseConfiguration()).rejects.toThrow(/Could not load database configuration/);
   });
 
-  // configuration.rb:451-453 — the flat arm.
   it("reverse merges the shared key into each environment", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
@@ -67,7 +63,6 @@ describe("databaseConfiguration", () => {
     expect(config.test).toEqual({ adapter: "sqlite3", database: "db/test.sqlite3", pool: 9 });
   });
 
-  // configuration.rb:441-450 — the nested arm.
   it("reverse merges shared per named database when both are hashes of hashes", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
@@ -91,7 +86,6 @@ describe("databaseConfiguration", () => {
     expect(config.test.animals).toEqual({ adapter: "sqlite3", database: "db/animals_test" });
   });
 
-  // configuration.rb:458 — `Hash.new(shared).merge(loaded_yaml)`.
   it("resolves an unlisted environment to shared", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));

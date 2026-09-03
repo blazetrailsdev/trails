@@ -1,25 +1,9 @@
-/**
- * ActionController::Caching
- *
- * Fragment caching support for controllers.
- * @see https://api.rubyonrails.org/classes/ActionController/Caching.html
- */
-
-/** Host shape for the private `instrumentPayload` mixin reader. */
 interface CachingInstrumentHost {
   controllerName(): string;
   actionName: string;
 }
 
-/**
- * Mirrors Rails `ActionController::Caching#instrument_payload` (private):
- *
- *     def instrument_payload(key)
- *       { controller: controller_name, action: action_name, key: key }
- *     end
- *
- * @internal
- */
+/** @internal */
 export function instrumentPayload(
   this: CachingInstrumentHost,
   key: unknown,
@@ -27,15 +11,7 @@ export function instrumentPayload(
   return { controller: this.controllerName(), action: this.actionName, key };
 }
 
-/**
- * Mirrors Rails `ActionController::Caching#instrument_name` (private):
- *
- *     def instrument_name
- *       "action_controller"
- *     end
- *
- * @internal
- */
+/** @internal */
 export function instrumentName(this: unknown): string {
   return "action_controller";
 }

@@ -5,7 +5,6 @@ import { ArgumentError } from "./hash-utils.js";
 import { assertRaises } from "./testing/assertions.js";
 
 describe("KeyGeneratorTest", () => {
-  // Rails' `class InvalidDigest; end` — anything that is not an OpenSSL digest.
   const InvalidDigest = "InvalidDigest";
 
   let secret: string;
@@ -29,10 +28,6 @@ describe("KeyGeneratorTest", () => {
   });
 
   it("Expected results", () => {
-    // For any given set of inputs, this method must continue to return
-    // the same output: if it changes, any existing values relying on a
-    // key would break.
-
     let expected =
       "b129376f68f1ecae788d7433310249d65ceec090ecacd4c872a3a9e9ec78e055739be5cc6956345d5ae38e7e1daa66f1de587dc8da2bf9e8b965af4b3918a122";
     expect(new KeyGenerator("0".repeat(64)).generateKey("some_salt").toString("hex")).toBe(

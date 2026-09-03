@@ -1,11 +1,3 @@
-/**
- * Port of ActionDispatch::Routing::Redirection
- * (Rails actionpack/lib/action_dispatch/routing/redirection.rb)
- *
- * Provides Redirect, PathRedirect, OptionRedirect endpoint classes and a
- * redirect() factory for building redirect endpoints in route definitions.
- */
-
 import { Notifications } from "@blazetrails/activesupport";
 import { Request } from "../http/request.js";
 import { Response } from "../http/response.js";
@@ -22,7 +14,6 @@ export { Endpoint } from "./endpoint.js";
 
 export type RedirectBlock = (params: Record<string, string>, request: Request) => string;
 
-/** Parsed pieces of a URI, mirroring Ruby's URI::Generic. */
 interface ParsedUri {
   scheme: string | null;
   host: string | null;
@@ -86,7 +77,6 @@ function transformValues(
   return out;
 }
 
-/** Ruby's `String % Hash` for `%{key}` interpolation. */
 function interpolate(template: string, params: Record<string, string>): string {
   return template.replace(/%\{(\w+)\}/g, (_m, key: string) => {
     if (!(key in params)) {
@@ -284,10 +274,6 @@ export interface RedirectCallable {
   call(params: Record<string, string>, request: Request): string;
 }
 
-/**
- * Build a Redirect endpoint. Mirrors the `redirect(*args, &block)` factory on
- * the ActionDispatch::Routing::Redirection module.
- */
 export function redirect(
   ...args: Array<
     string | (OptionRedirectOptions & { status?: number }) | RedirectBlock | RedirectCallable

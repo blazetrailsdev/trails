@@ -18,9 +18,6 @@ import {
 } from "@blazetrails/activerecord";
 import { MigrationProxy } from "@blazetrails/activerecord";
 
-// Discovery is `MigrationContext#migrations` (`migration.rb:1303-1315`) — the
-// one path there is — built with the null collaborators `Migration.copy` uses
-// (`migration.rb:1065-1066`), which the discovery half never reaches.
 function discoverMigrations(migrationsPath: string): MigrationProxy[] {
   return new MigrationContext(
     [migrationsPath],
@@ -29,8 +26,6 @@ function discoverMigrations(migrationsPath: string): MigrationProxy[] {
   ).migrations;
 }
 
-// `rollback` / `forward` live on MigrationContext (`migration.rb:1240-1246`);
-// these cases drive the same discovered migrations off the same path.
 function migrationContextFor(
   migrationsPath: string,
   schemaMigration: SchemaMigration,
@@ -42,11 +37,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 
-// `Migrator#connection` and `Migration#connection` both resolve
-// `ActiveRecord::Tasks::DatabaseTasks.migration_connection`
-// (migration.rb:1036-1038, 1488-1491) — nothing pins an adapter to the
-// Migrator any more — so a case that drives a hand-built adapter has to
-// establish it as the migration pool's connection for the duration.
 let migrationAdapters = 0;
 async function establishMigrationConnection(
   adapter: unknown,
@@ -72,9 +62,6 @@ async function establishMigrationConnection(
     ownerName: Base,
     clobber: true,
   });
-  // Lease eagerly so the adapter's `pool` back-reference is in place before the
-  // caller reads or overrides it (`record_environment` goes through
-  // `connection.pool.db_config`, migration.rb:1512-1516).
   await pool.leaseConnection();
   onTestFinished(() => {
     Base.connectionHandler.removeConnection("ActiveRecord::Base");
@@ -210,11 +197,6 @@ describe("resolveEnv", () => {
     expect(resolveEnv()).toBe("development");
   });
 
-  // Behavior change: previously this suite had a "falls back to
-  // NODE_ENV" test. NODE_ENV is a build-time bundler hint in JS
-  // (dead-code elimination, etc.), not a runtime env selector;
-  // conflating it with the runtime env caused action-at-a-distance.
-  // The replacement test below locks in the new behavior.
   it("ignores NODE_ENV", () => {
     setEnv("TRAILS_ENV", undefined);
     setEnv("NODE_ENV", "production");
@@ -234,8 +216,6 @@ describe("connectAdapter", () => {
 
   it("creates SqliteAdapter for sqlite3", async () => {
     adapter = await connectAdapter({ adapter: "sqlite3", database: ":memory:" });
-    // The `sqlite3` name resolves to the concrete better-sqlite3 subclass,
-    // matching ConnectionAdapters.resolve("sqlite3").
     expect(adapter.constructor.name).toBe("BetterSQLite3Adapter");
   });
 
@@ -300,9 +280,6 @@ describe("loadDatabaseConfig", () => {
   });
 
   it("returns the primary sub-config for a multi-DB environment", async () => {
-    // Rails-style multi-DB shape: env key -> named sub-configs.
-    // loadDatabaseConfig picks 'primary' so single-adapter CLI commands
-    // still have something to connect to.
     const configDir = path.join(tmpDir, "config");
     fs.mkdirSync(configDir, { recursive: true });
     fs.writeFileSync(
@@ -319,9 +296,6 @@ describe("loadDatabaseConfig", () => {
   });
 
   it("rejects an array env value instead of silently falling through", async () => {
-    // Arrays are objects in JS; without an explicit guard the check
-    // would slip into multi-DB handling and confuse users with a
-    // 'no primary' error. Reject up front.
     const configDir = path.join(tmpDir, "config");
     fs.mkdirSync(configDir, { recursive: true });
     fs.writeFileSync(path.join(configDir, "database.ts"), `export default { development: [] };`);
@@ -389,11 +363,6 @@ describe("loadAllDatabaseConfigs", () => {
   });
 
   it("treats an env with any non-object sub-value as single-DB (Rails all-values-are-hashes rule)", async () => {
-    // Matches Rails' `DatabaseConfigurations#build_configs`: unless every
-    // sub-value is a Hash, the whole env-level object is the primary
-    // config. Here `url` is a string, so the env-object is NOT walked
-    // as sub-configs — the whole thing becomes the single primary
-    // config. Trails mirrors this behavior exactly.
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -420,9 +389,6 @@ describe("loadAllDatabaseConfigs", () => {
   });
 
   it("treats a url-only env value as single-DB (the string value fails Rails' all-hashes check)", async () => {
-    // Detection rule is `config.values.all?(Hash)`. Here the only
-    // value is a string, so the predicate is false and the whole env
-    // object becomes the single primary config.
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -436,10 +402,6 @@ describe("loadAllDatabaseConfigs", () => {
   });
 
   it("rejects an array env value with a clear error", async () => {
-    // Arrays pass `typeof === 'object'` but a `development: []` config
-    // is never valid — catch it up front instead of letting it slip
-    // into the multi-DB path and producing a misleading
-    // 'no database configurations defined' error.
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default { development: [] };`,
@@ -458,9 +420,6 @@ describe("resolveSchemaFormat", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sf-"));
     fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
     fs.mkdirSync(path.join(tmpDir, "db"), { recursive: true });
-    // Phase 6 reads SCHEMA_FORMAT as a Rails-parity override; make sure
-    // tests start from a clean slot so a stray env var from the outer
-    // process doesn't flip results.
     setEnv("SCHEMA_FORMAT", undefined);
   });
 
@@ -470,8 +429,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("prefers an explicit --format flag over everything else", async () => {
-    // Even with config.schemaFormat = "ts" and an existing structure.sql,
-    // --format=js must win (explicit intent beats inference).
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -490,7 +447,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("honors SCHEMA_FORMAT env var below --format but above config", async () => {
-    // Matches Rails' rake: ENV.fetch("SCHEMA_FORMAT", ActiveRecord.schema_format).
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -499,9 +455,7 @@ describe("resolveSchemaFormat", () => {
 };`,
     );
     setEnv("SCHEMA_FORMAT", "sql");
-    // Env wins over config.
     expect(await resolveSchemaFormat({}, tmpDir)).toBe("sql");
-    // --format still beats env.
     expect(await resolveSchemaFormat({ format: "js" }, tmpDir)).toBe("js");
   });
 
@@ -511,9 +465,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("rejects an invalid schemaFormat in the config file", async () => {
-    // Previously we silently fell through to inference when config had
-    // a garbage value. Now the config path validates the same way as
-    // --format and SCHEMA_FORMAT — misconfig should be a loud error.
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -525,11 +476,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("treats empty-string overrides as present-and-invalid, not unset", async () => {
-    // --format="", SCHEMA_FORMAT="", schemaFormat: "" in config all
-    // represent an explicitly-set knob; they shouldn't silently fall
-    // through to inference. Detection is presence-based (`!== undefined`
-    // / `"KEY" in env` / `"schemaFormat" in module`) so a
-    // deliberately-empty value reaches the validator.
     await expect(resolveSchemaFormat({ format: "" }, tmpDir)).rejects.toThrow(/Invalid --format/);
 
     setEnv("SCHEMA_FORMAT", "");
@@ -547,9 +493,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("rejects non-string schemaFormat values in config without crashing", async () => {
-    // schemaFormat is user-authored JS; TS can't prevent a number/bool
-    // from slipping in. normalize() now refuses with a source-labeled
-    // error instead of throwing a TypeError on .toLowerCase().
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -561,10 +504,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("formats non-string schemaFormat values without JSON.stringify crashing on bigint", async () => {
-    // A bigint in config would make JSON.stringify throw; normalize()
-    // routes through the local formatUnknown() helper so the error
-    // message still reaches the user with a readable repr of the
-    // offending value ("42n" for bigint, per the helper's toString).
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -578,9 +517,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("filters top-level keys out of the 'Available envs' error message", async () => {
-    // schemaFormat is a config-level setting, not a database environment —
-    // including it in the error list would make users think they can
-    // TRAILS_ENV=schemaFormat their way to a connection.
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -631,9 +567,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("reports 'No environments defined' when config has only top-level keys", async () => {
-    // Without this branch the error ends with a bare 'Available: ' —
-    // technically accurate, visually confusing. Explicit wording makes
-    // the misconfiguration obvious.
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default { schemaFormat: "ts" };`,
@@ -644,9 +577,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("rejects env names that collide with top-level config keys", async () => {
-    // TRAILS_ENV=schemaFormat must not resolve to the string "ts" as a
-    // DatabaseConfig — adapter resolution would crash later with a
-    // confusing error. Reject up front instead.
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -660,9 +590,6 @@ describe("resolveSchemaFormat", () => {
   });
 
   it("rejects a non-object default export with a source-named error", async () => {
-    // `export default "oops"` imports fine, but treating the string as
-    // a config would crash downstream `in`/Object.keys lookups. Surface
-    // it early with a clear message.
     fs.writeFileSync(path.join(tmpDir, "config", "database.ts"), `export default "oops";`);
     await expect(loadDatabaseConfig("development", tmpDir)).rejects.toThrow(
       /Invalid database config in .*database\.ts.*"oops"/,
@@ -700,8 +627,6 @@ describe("discoverMigrations", () => {
     const migrations = discoverMigrations(tmpDir);
     expect(migrations).toHaveLength(2);
     expect(migrations[0].version).toBe(20260101000000);
-    // discoverMigrations camelizes proxy.name as Rails does
-    // (migration.rb:1311) regardless of the on-disk separator.
     expect(migrations[0].name).toBe("CreateUsers");
     expect(migrations[1].version).toBe(20260102000000);
     expect(migrations[1].name).toBe("AddEmailToUsers");
@@ -765,37 +690,27 @@ export class CreatePosts extends Migration {
     const schemaMigration = new SchemaMigration(adapter.pool);
     const internalMetadata = new InternalMetadata(adapter.pool);
     const context = migrationContextFor(tmpDir, schemaMigration, internalMetadata);
-    // Rails' `Migrator#initialize` creates the bookkeeping tables
-    // (`migration.rb:1429-1430`) before anything reads them; `migrations_status`
-    // reads `schema_migration.normalized_versions` directly.
     await schemaMigration.createTable();
 
-    // Status before migrate
     const beforeStatus = await context.migrationsStatus();
     expect(beforeStatus).toHaveLength(1);
     expect(beforeStatus[0].status).toBe("down");
 
-    // Migrate up
     await context.migrate();
 
-    // Status after migrate
     const afterStatus = await context.migrationsStatus();
     expect(afterStatus[0].status).toBe("up");
 
-    // Verify table exists
     const tables = await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
     );
     expect(tables).toHaveLength(1);
 
-    // Rollback
     await context.rollback(1);
 
-    // Status after rollback
     const rollbackStatus = await context.migrationsStatus();
     expect(rollbackStatus[0].status).toBe("down");
 
-    // Verify table is gone
     const tablesAfter = await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
     );
@@ -834,10 +749,6 @@ export class CreateComments extends Migration {
       new InternalMetadata(adapter.pool),
     );
 
-    // `MigrationContext#forward` is `move(:up, steps)` (`migration.rb:1244`),
-    // which counts steps from the *current* migration — from version 0 a single
-    // step already lands on the second migration. Start at the first one so the
-    // step moves the schema forward by exactly one.
     await migrator.migrate(20260101000000);
     const posts = await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
@@ -969,28 +880,19 @@ describe("schema dump and load", () => {
     const sourceAdapter = new BetterSQLite3Adapter(":memory:");
     const targetAdapter = new BetterSQLite3Adapter(":memory:");
     try {
-      // Create a database with a table
       await sourceAdapter.createTable("users", {}, (t) => {
         t.string("name");
         t.integer("age");
       });
 
-      // Dump schema
       const source = new AdapterSchemaSource(sourceAdapter);
-      // Dump as JS so the JSDoc-annotated output is valid input to
-      // `new Function` below (no TS `import type` / annotation syntax).
       const schema = (await SchemaDumper.dump(source, [], { language: "js" })).join("\n");
       expect(schema).toContain("users");
       expect(schema).toContain("createTable");
 
-      // Load into a fresh database
       const defineSchema = new Function(
         "ctx",
         schema
-          // Strip only the header JSDoc (first /** ... */ before the
-          // export statement). Anchored to start-of-string with optional
-          // leading // line comments / blank lines so later block comments
-          // in the body aren't clobbered.
           .replace(/^(?:\s*\/\/[^\n]*\n)*\s*\/\*\*[\s\S]*?\*\/\s*/, "")
           .replace(
             /export default async function defineSchema\(ctx(?:: any)?\) \{/,
@@ -1000,7 +902,6 @@ describe("schema dump and load", () => {
       );
       await defineSchema(targetAdapter);
 
-      // Verify table exists in target
       const tables = await targetAdapter.execute(
         `SELECT name FROM sqlite_master WHERE type='table' AND name='users'`,
       );
@@ -1036,8 +937,6 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
     logs = [];
     errs = [];
     origExitCode = process.exitCode;
-    // Use vi.spyOn so vi.restoreAllMocks() in afterEach reliably reverts
-    // any mutation even if an assertion throws mid-test.
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       logs.push(args.map((a) => String(a)).join(" "));
     });
@@ -1076,8 +975,6 @@ describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
 
   it("db version prints 0 against a fresh database", async () => {
     await runDb(["version"]);
-    // Three puts, mirroring databases.rake:309-312: a leading blank line plus
-    // the `database:` header, the version line, and a trailing blank line.
     const at = logs.indexOf("Current version: 0");
     expect(at).toBeGreaterThan(0);
     expect(logs[at - 1]).toMatch(/^\ndatabase: /);
@@ -1104,8 +1001,6 @@ export class CreatePosts extends Migration {
     const joined = errs.join("\n");
     expect(joined).toContain("You have 1 pending migration:");
     expect(joined).toContain("20260101000000");
-    // migration-loader derives the display name from the filename suffix
-    // and camelizes it as Rails does (migration.rb:1311).
     expect(joined).toContain("CreatePosts");
     expect(joined).toContain("Run `trails db migrate` to resolve this issue.");
   });
@@ -1119,10 +1014,6 @@ export class CreatePosts extends Migration {
   async down() { await this.dropTable("posts"); }
 }`,
     );
-    // :memory: DBs aren't shared across adapter connections, so we can't
-    // assert migrate->version against the same DB via CLI. Instead verify
-    // db version handles a standalone :memory: adapter cleanly — we
-    // already asserted the post-migrate version elsewhere via Migrator.
     await runDb(["version"]);
     expect(logs).toContain("Current version: 0");
   });
@@ -1134,9 +1025,6 @@ export class CreatePosts extends Migration {
   });
 
   it("db migrate:up applies the named migration and dumps schema.ts", async () => {
-    // Point both config AND this CLI's migrations at a persistent sqlite
-    // file so the adapter used by the CLI and the one we use to assert
-    // against see the same DB.
     const dbFile = path.join(tmpDir, "test.sqlite3");
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
@@ -1156,10 +1044,8 @@ export class CreatePosts extends Migration {
 
     await runDb(["migrate:up", "--version=20260101000000"]);
 
-    // Schema dump should have been written.
     expect(fs.existsSync(path.join(tmpDir, "db", "schema.ts"))).toBe(true);
 
-    // Table was created.
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const a = new BetterSQLite3Adapter(dbFile);
@@ -1180,10 +1066,6 @@ export class CreatePosts extends Migration {
   });
 
   it("db migrate --version migrates up to that version, not only that version", async () => {
-    // Guards the DatabaseTasks.migrate seam: an explicit positional argument
-    // there is an exact-version *filter* (migrate:up semantics), so --version
-    // has to travel as the target version instead. With three migrations and
-    // a target of the second, target semantics runs the first two.
     const dbFile = path.join(tmpDir, "test.sqlite3");
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
@@ -1259,9 +1141,6 @@ export class CreatePosts extends Migration {
 
   it("db migrate:up requires --version", async () => {
     await runDb(["migrate:up"]).catch(() => undefined);
-    // commander's exitOverride() raises before the action runs; the test
-    // just confirms the option is required (no exception also satisfies
-    // 'no silent success' since we'd otherwise have printed something).
     expect(logs.filter((l) => l.startsWith("=="))).toHaveLength(0);
   });
 
@@ -1284,8 +1163,6 @@ export class CreatePosts extends Migration {
       const rows = await a.execute(
         `SELECT value FROM ar_internal_metadata WHERE key = 'environment'`,
       );
-      // Matches whatever NODE_ENV / TRAILS_ENV resolves to at test time
-      // (vitest sets NODE_ENV=test).
       expect((rows[0] as { value: string }).value).toBe(resolveEnv());
     } finally {
       await a.close();
@@ -1314,8 +1191,6 @@ export class CreatePosts extends Migration {
     await establishMigrationConnection(adapter, dbFile);
     try {
       const internalMetadata = new InternalMetadata(adapter.pool);
-      // Rails' last_stored_environment returns nil at current_version == 0, so
-      // record a version (as database_tasks_test.rb does) to make the DB stamped.
       await new SchemaMigration(adapter.pool).createTable();
       await new SchemaMigration(adapter.pool).createVersion("1");
       await internalMetadata.createTable();
@@ -1354,8 +1229,6 @@ export class CreatePosts extends Migration {
     await establishMigrationConnection(adapter, dbFile);
     try {
       const internalMetadata = new InternalMetadata(adapter.pool);
-      // Rails' last_stored_environment returns nil at current_version == 0, so
-      // record a version (as database_tasks_test.rb does) to make the DB stamped.
       await new SchemaMigration(adapter.pool).createTable();
       await new SchemaMigration(adapter.pool).createVersion("1");
       await internalMetadata.createTable();
@@ -1389,8 +1262,6 @@ export class CreatePosts extends Migration {
     await establishMigrationConnection(adapter, dbFile);
     try {
       const internalMetadata = new InternalMetadata(adapter.pool);
-      // Rails' last_stored_environment returns nil at current_version == 0, so
-      // record a version (as database_tasks_test.rb does) to make the DB stamped.
       await new SchemaMigration(adapter.pool).createTable();
       await new SchemaMigration(adapter.pool).createVersion("1");
       await internalMetadata.createTable();
@@ -1430,15 +1301,10 @@ export class CreatePosts extends Migration {
     try {
       const internalMetadata = new InternalMetadata(adapter.pool);
       const context = new MigrationContext([], new SchemaMigration(adapter.pool), internalMetadata);
-      // No environment stamped yet → false even though the current env is
-      // in the protected list. Matches Rails' protected_environment? ==
-      // nil semantics.
       expect(await context.protectedEnvironment()).toBe(false);
 
-      // Verify no ar_internal_metadata was created by the check.
       expect(await internalMetadata.tableExists()).toBe(false);
 
-      // After stamping as production, the check reflects the protected state.
       await new SchemaMigration(adapter.pool).createTable();
       await new SchemaMigration(adapter.pool).createVersion("1");
       await internalMetadata.createTable();
@@ -1450,17 +1316,8 @@ export class CreatePosts extends Migration {
     }
   });
 
-  // internal_metadata.rb:35-36 — `enabled?` is `@pool.db_config.use_metadata_table?`.
-  // Re-establish over the same adapter with `use_metadata_table: false` in the
-  // db_config, the way database.yml turns the flag off — `enabled?` reads
-  // `@pool.db_config.use_metadata_table?` (internal_metadata.rb:35-36), so the
-  // config is the only place to set it.
   async function disableMetadataTable(adapter: unknown, database?: string): Promise<void> {
     const { Base } = await import("@blazetrails/activerecord");
-    // Hand the adapter back before it is leased into the replacement pool:
-    // removing the connection disconnects the pool, whose `disconnect` does
-    // `conn.steal!; checkin conn` (connection_pool.rb:456-459), and `checkin`
-    // expires the connection.
     Base.connectionHandler.removeConnection("ActiveRecord::Base");
     await establishMigrationConnection(adapter, database, { useMetadataTable: false });
   }
@@ -1478,14 +1335,10 @@ export class CreatePosts extends Migration {
       const disabledMeta = new InternalMetadata(adapter.pool);
       expect(disabledMeta.enabled).toBe(false);
 
-      // createTable + createTableAndSetFlags silently no-op (Rails'
-      // create_table_and_set_flags returns early when enabled? is false).
       await expect(disabledMeta.createTable()).resolves.toBeUndefined();
       await expect(disabledMeta.createTableAndSetFlags("production")).resolves.toBeUndefined();
       expect(await disabledMeta.tableExists()).toBe(false);
 
-      // Direct `set` raises so callers that attempt a write through a
-      // disabled instance fail loudly.
       await expect(disabledMeta.set("environment", "test")).rejects.toBeInstanceOf(
         EnvironmentStorageError,
       );
@@ -1525,11 +1378,8 @@ export class CreatePosts extends Migration {
         new InternalMetadata(adapter.pool),
       );
 
-      // Migrate should succeed and NOT throw EnvironmentStorageError
-      // despite the stamping call site being hit.
       await expect(migrator.migrate()).resolves.toEqual(expect.any(Array));
 
-      // Table exists; metadata table does not.
       const tables = (await adapter.execute(
         `SELECT name FROM sqlite_master WHERE type='table' ORDER BY name`,
       )) as Array<{ name: string }>;
@@ -1537,7 +1387,6 @@ export class CreatePosts extends Migration {
       expect(names).toContain("widgets");
       expect(names).not.toContain("ar_internal_metadata");
 
-      // lastStoredEnvironment short-circuits to null when disabled.
       const context = new MigrationContext(
         [],
         new SchemaMigration(adapter.pool),
@@ -1558,14 +1407,11 @@ export class CreatePosts extends Migration {
     const adapter = new BetterSQLite3Adapter(dbFile);
     await establishMigrationConnection(adapter, dbFile);
     try {
-      // Seed a real metadata table + environment value with a separate
-      // enabled=true instance.
       const enabledMeta = new InternalMetadata(adapter.pool);
       await enabledMeta.createTable();
       await enabledMeta.set("environment", "production");
       await disableMetadataTable(adapter, dbFile);
 
-      // Disabled context should still report null (no stale read).
       const context = new MigrationContext(
         [],
         new SchemaMigration(adapter.pool),
@@ -1608,11 +1454,6 @@ export class CreatePosts extends Migration {
       adapter: "sqlite3",
       database: dbFile,
     });
-    // Every Rails db task runs against an established connection —
-    // `with_temporary_connection` reads `connection_db_config` to restore
-    // (`tasks/database_tasks.rb:541-548`) and `connection` is
-    // `Base.lease_connection` (`tasks/sqlite_database_tasks.rb:68-70`); both
-    // raise ConnectionNotEstablished with no pool.
     const { Base } = await import("@blazetrails/activerecord");
     await Base.establishConnection({ adapter: "sqlite3", database: dbFile });
     try {
@@ -1721,8 +1562,6 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, "ran");`,
   it("db:prepare works on all databases", async () => {
     const primaryDb = path.join(tmpDir, "prepare-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "prepare-animals.sqlite3");
-    // Distinct files per environment: a development prepare also prepares
-    // the test databases (Rails' each_current_environment).
     const testPrimaryDb = path.join(tmpDir, "prepare-primary-test.sqlite3");
     const testAnimalsDb = path.join(tmpDir, "prepare-animals-test.sqlite3");
     fs.writeFileSync(
@@ -1917,7 +1756,6 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     await runDb(["prepare"]);
     expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
 
-    // Both databases are initialized now, so a second prepare seeds nothing.
     await runDb(["prepare"]);
     expect(fs.readFileSync(seedMarker, "utf8")).toBe("1");
   });
@@ -2012,8 +1850,6 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     expect(fs.existsSync(cachePath)).toBe(false);
     await runDb(["schema:cache:clear"]);
     expect(errs).toHaveLength(0);
-    // No "Cleared ..." log when nothing was deleted — the command
-    // previously logged unconditionally which falsely implied a deletion.
     expect(logs.find((l) => l.includes("Cleared schema cache"))).toBeUndefined();
   });
 
@@ -2062,8 +1898,6 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
   });
 
   it("db create + migrate fans out across every multi-DB config", async () => {
-    // Multi-DB: `trails db create` and `trails db migrate` iterate
-    // every named config. Each gets its own DB file + migration dir.
     const primaryDb = path.join(tmpDir, "primary.sqlite3");
     const animalsDb = path.join(tmpDir, "animals.sqlite3");
     fs.writeFileSync(
@@ -2079,7 +1913,6 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
   },
 };`,
     );
-    // Primary migrations in db/migrate; animals in db/migrate_animals.
     fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
@@ -2104,7 +1937,6 @@ export class CreateDogs extends Migration {
 
     await runDb(["migrate"]);
 
-    // Verify each DB got its own migration applied.
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const pAdapter = new BetterSQLite3Adapter(primaryDb);
@@ -2113,7 +1945,6 @@ export class CreateDogs extends Migration {
         "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
       );
       expect(users).toHaveLength(1);
-      // users migration should NOT have landed in animals DB.
       const noDogs = await pAdapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
       );
@@ -2135,10 +1966,6 @@ export class CreateDogs extends Migration {
       await aAdapter.close();
     }
 
-    // Schema dump fan-out: each named DB should get its own schema
-    // file — primary → db/schema.ts, animals → db/animals_schema.ts.
-    // Without the per-config HashConfig threading in
-    // dumpSchemaAfterMigrate, both would dump to db/schema.ts.
     const primarySchema = path.join(tmpDir, "db", "schema.ts");
     const animalsSchema = path.join(tmpDir, "db", "animals_schema.ts");
     expect(fs.existsSync(primarySchema)).toBe(true);
@@ -2356,7 +2183,6 @@ export class CreateDogs extends Migration {
     );
 
     await runDb(["create"]);
-    // Only migrate animals — primary should stay unmigrated.
     await runDb(["migrate", "--database=animals"]);
 
     const { BetterSQLite3Adapter } =
@@ -2366,7 +2192,7 @@ export class CreateDogs extends Migration {
       const users = await pAdapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
       );
-      expect(users).toHaveLength(0); // primary NOT migrated
+      expect(users).toHaveLength(0);
     } finally {
       await pAdapter.close();
     }
@@ -2375,16 +2201,13 @@ export class CreateDogs extends Migration {
       const dogs = await aAdapter.execute(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='dogs'",
       );
-      expect(dogs).toHaveLength(1); // animals IS migrated
+      expect(dogs).toHaveLength(1);
     } finally {
       await aAdapter.close();
     }
   });
 
   it("db migrate respects migrationsPaths config override", async () => {
-    // A named DB can set migrationsPaths to override the default
-    // an explicit migrationsPaths convention. Verify the CLI discovers
-    // migrations from the configured path instead.
     const primaryDb = path.join(tmpDir, "mp-primary.sqlite3");
     const animalsDb = path.join(tmpDir, "mp-animals.sqlite3");
     const customDir = "custom/animal_migrations";
@@ -2436,10 +2259,6 @@ export class CreateCats extends Migration {
   });
 
   it("db schema:cache:dump fans out across every multi-DB config", async () => {
-    // Rails multi-DB: each named sub-config gets its own
-    // `db/<name>_schema_cache.json`. HashConfig.defaultSchemaCachePath
-    // emits `schema_cache.json` for primary and `<name>_schema_cache.json`
-    // for others, so we assert both files show up.
     const primaryDb = path.join(tmpDir, "primary.sqlite3");
     const animalsDb = path.join(tmpDir, "animals.sqlite3");
     fs.writeFileSync(
@@ -2502,8 +2321,6 @@ export class CreateCats extends Migration {
 
     await runDb(["schema:dump", "--format=sql"]);
 
-    // The --format flag should route through the structure-dump path,
-    // producing db/structure.sql — not db/schema.ts.
     expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "db", "schema.ts"))).toBe(false);
     const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
@@ -2531,14 +2348,10 @@ export class CreateCats extends Migration {
 
     await runDb(["schema:dump"]);
 
-    // No --format flag — config.schemaFormat drives it.
     expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
   });
 
   it("db schema:load --format=sql replays structure.sql end-to-end", async () => {
-    // Round-trip: populate → dump → drop → load → verify. Covers the
-    // sqlite3 structureLoad path (db.exec of the full dump) so a real
-    // regression in either direction surfaces.
     const dbFile = path.join(tmpDir, "roundtrip.sqlite3");
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
@@ -2562,8 +2375,6 @@ export class CreateCats extends Migration {
     await runDb(["schema:dump", "--format=sql"]);
     expect(fs.existsSync(path.join(tmpDir, "db", "structure.sql"))).toBe(true);
 
-    // Drop the table behind the CLI's back, then load from the dump to
-    // prove structureLoad actually replays the DDL.
     const dropper = new BetterSQLite3Adapter(dbFile);
     try {
       await dropper.executeMutation("DROP TABLE gadgets");
@@ -2589,10 +2400,6 @@ export class CreateCats extends Migration {
   });
 
   it("post-migrate schema dump honors config.schemaFormat=sql", async () => {
-    // Rails runs db:_dump after db:migrate; trails' dumpSchemaAfterMigrate
-    // must respect the same format precedence as the standalone
-    // schema:dump command. Otherwise `trails db migrate` would clobber
-    // an app's structure.sql with a schema.ts.
     const dbFile = path.join(tmpDir, "migrate-fmt.sqlite3");
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
@@ -2620,10 +2427,6 @@ export class CreateThings extends Migration {
   });
 
   it("db schema:dump --format=sql appends schema_migrations versions", async () => {
-    // Rails' dump_schema calls dump_schema_information after
-    // structure_dump so schema_migrations' version rows round-trip
-    // through load. Without this, loading structure.sql into a fresh DB
-    // leaves schema_migrations empty and every prior migration replays.
     const dbFile = path.join(tmpDir, "migrations-dump.sqlite3");
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
@@ -2648,8 +2451,6 @@ export class CreatePosts extends Migration {
     expect(dumped).toMatch(/INSERT INTO "schema_migrations"/);
     expect(dumped).toContain("20260101000000");
 
-    // Drop schema_migrations + the user table to prove load replays
-    // both the DDL and the version INSERTs.
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
     const dropper = new BetterSQLite3Adapter(dbFile);
@@ -2675,12 +2476,6 @@ export class CreatePosts extends Migration {
   });
 
   it("db schema:dump --format=sql works against ':memory:' sqlite by reusing the migration adapter", async () => {
-    // Regression for Copilot's #2 on PR 534. ":memory:" sqlite DBs
-    // aren't shared across connections — a fresh per-call adapter
-    // would see an empty DB, dump nothing, and any later
-    // _appendSchemaInformation call would write INSERTs into a
-    // structureless dump that fails to load. Fix routes structureDump
-    // through the migration adapter when one is set.
     fs.writeFileSync(
       path.join(tmpDir, "config", "database.ts"),
       `export default {
@@ -2701,9 +2496,6 @@ export class CreateThings extends Migration {
     await runDb(["migrate"]);
 
     const dumped = fs.readFileSync(path.join(tmpDir, "db", "structure.sql"), "utf8");
-    // The user table DDL proves structureDump saw real data; the
-    // schema_migrations CREATE proves the in-memory connection was
-    // actually queried (a fresh in-memory adapter would have neither).
     expect(dumped).toContain("things");
     expect(dumped).toMatch(/CREATE TABLE.*schema_migrations/);
   });
@@ -2717,8 +2509,6 @@ export class CreateThings extends Migration {
   test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
 };`,
     );
-    // Create the DB file so the adapter can connect, but don't create
-    // a structure.sql — the CLI should bail out cleanly.
     new (
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js")
     ).BetterSQLite3Adapter(dbFile).close();

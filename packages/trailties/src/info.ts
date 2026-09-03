@@ -2,9 +2,6 @@ import { htmlEscape } from "@blazetrails/activesupport";
 import { env } from "@blazetrails/ruby-compat";
 import { VERSION } from "./version.js";
 
-// Port of railties/lib/rails/info.rb. Builds the runtime properties shown
-// in InfoController responses (Trails version, environment, middleware, ...).
-
 export type InfoValue = string | string[];
 export type PropertyEntry = [string, InfoValue];
 
@@ -24,7 +21,6 @@ export class PropertyList {
 export class Info {
   static properties: PropertyList = new PropertyList();
 
-  /** Register a property. Block form lazy-evaluates; exceptions are swallowed. */
   static property(name: string, value: InfoValue | (() => InfoValue | undefined)): void {
     try {
       const resolved = typeof value === "function" ? value() : value;
@@ -32,11 +28,10 @@ export class Info {
         Info.properties.entries.push([name, resolved]);
       }
     } catch {
-      // swallow per Rails: a failing property is simply omitted
+      /** @empty */
     }
   }
 
-  /** Plain-text rendering: aligned `name   value` rows under a header. */
   static toS(): string {
     const names = Info.properties.names();
     const width = names.reduce((max, n) => Math.max(max, n.length), 0);
@@ -51,7 +46,6 @@ export class Info {
     return Info.toS();
   }
 
-  /** HTML rendering used by InfoController#properties. */
   static toHtml(): string {
     let table = "<table>";
     for (const [name, value] of Info.properties.entries) {

@@ -1,7 +1,3 @@
-/**
- * Hash/object utilities mirroring Rails ActiveSupport hash extensions.
- */
-
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
 import * as XmlMini from "./xml-mini.js";
@@ -12,15 +8,6 @@ type AnyObject = Record<string, unknown>;
 
 export { ArgumentError };
 
-/**
- * Mirrors Ruby's `Hash#values_at` — the values stored under each of the given
- * keys, in the order given, with `undefined` where a key is absent (Ruby's
- * `nil`, which the callers' `compact` drops).
- *
- * A Ruby Hash keys by value, so a `Map` receiver is the faithful shape wherever
- * the keys are not strings — `group_by(&key).values_at(*series)` over arbitrary
- * attribute values (core_ext/enumerable.rb:199).
- */
 export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | undefined)[];
 export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | undefined)[];
 export function valuesAt(
@@ -31,10 +18,6 @@ export function valuesAt(
   return keys.map((key) => hash[key as string]);
 }
 
-/**
- * Deep merge two objects recursively. When both values are objects, they are
- * merged recursively. Otherwise the other value wins.
- */
 export function deepMerge<T extends AnyObject>(target: T, other: AnyObject): T {
   const result = { ...target } as AnyObject;
   for (const key of Object.keys(other)) {
@@ -49,10 +32,6 @@ export function deepMerge<T extends AnyObject>(target: T, other: AnyObject): T {
   return result as T;
 }
 
-/**
- * Deep merge `other` into `target` in place (mutating `target`).
- * Mirrors Ruby's Hash#deep_merge!.
- */
 export function deepMergeBang<T extends AnyObject>(target: T, other: AnyObject): T {
   for (const key of Object.keys(other)) {
     const thisVal = target[key as keyof T];
@@ -66,15 +45,9 @@ export function deepMergeBang<T extends AnyObject>(target: T, other: AnyObject):
   return target;
 }
 
-/**
- * Deep clone an object.
- */
 export function deepDup<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) return obj.map((item) => deepDup(item)) as T;
-  // Ruby dispatches `deep_dup` on the receiver (core_ext/object/deep_dup.rb),
-  // so a class that defines its own answers instead of falling through to the
-  // Hash/Array recursion below.
   if (typeof (obj as { deepDup?: unknown }).deepDup === "function") {
     return (obj as unknown as { deepDup(): T }).deepDup();
   }
@@ -88,9 +61,6 @@ export function deepDup<T>(obj: T): T {
   return obj;
 }
 
-/**
- * Pick only the specified keys from an object.
- */
 export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K[]): Pick<T, K> {
   const result = {} as Pick<T, K>;
   for (const key of keys) {
@@ -101,45 +71,24 @@ export function slice<T extends AnyObject, K extends keyof T>(obj: T, ...keys: K
   return result;
 }
 
-/**
- * Ruby's `Hash#merge` — a non-destructive copy of the receiver with
- * `otherHash`'s pairs written over it.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link mergeBang} is.
- */
+/** @noRailsEquivalent PERMANENT */
 export function merge<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
   return { ...hash, ...otherHash } as T;
 }
 
-/**
- * Ruby's `Hash#merge!` — the destructive form of {@link merge}: `otherHash`'s
- * pairs are written into the receiver, which is returned.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link merge} is.
- */
+/** @noRailsEquivalent PERMANENT */
 export function mergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
   return Object.assign(hash, otherHash);
 }
 
-/**
- * Returns a new hash with all keys converted by the block operation, through
- * the root hash and every nested hash and array — Ruby's
- * `Hash#deep_transform_keys` (core_ext/hash/keys.rb:64-66).
- */
 export function deepTransformKeys(obj: unknown, block: (key: string) => string): unknown {
   return _deepTransformKeysInObject(obj, block);
 }
 
-/**
- * Recursively convert all keys to camelCase (Rails' symbolize_keys equivalent).
- */
 export function deepCamelizeKeys(obj: unknown): unknown {
   return deepTransformKeys(obj, (key) => key.replace(/_([a-z])/g, (_, c) => c.toUpperCase()));
 }
 
-/**
- * Recursively convert all keys to snake_case (Rails' stringify_keys equivalent).
- */
 export function deepUnderscoreKeys(obj: unknown): unknown {
   return deepTransformKeys(obj, (key) =>
     key
@@ -149,18 +98,6 @@ export function deepUnderscoreKeys(obj: unknown): unknown {
   );
 }
 
-/**
- * By default, only instances of Hash itself are extractable.
- * Subclasses of Hash may implement this method and return
- * true to declare themselves as extractable. If a Hash
- * is extractable, `Array#extract_options!` pops it from
- * the Array when it is the last element of the Array.
- *
- * Ruby reopens `Hash`; the receiver is the first parameter here, and the
- * subclass override is a method on the subclass (see
- * {@link HashWithIndifferentAccess.isExtractableOptions}), which this function
- * dispatches to the way Ruby's method lookup would.
- */
 export function isExtractableOptions(self: unknown): boolean {
   if (self !== null && typeof self === "object" && "isExtractableOptions" in self) {
     return (self as { isExtractableOptions(): boolean }).isExtractableOptions();
@@ -168,21 +105,6 @@ export function isExtractableOptions(self: unknown): boolean {
   return isPlainObject(self);
 }
 
-/**
- * Extracts options from a set of arguments. Removes and returns the last
- * element in the array if it's a hash, otherwise returns a blank hash.
- *
- *   options(1, 2)        # => {}
- *   options(1, 2, a: :b) # => {:a=>:b}
- *
- * Ruby's `extract_options!` mutates the receiver and returns only the options;
- * the args array is returned alongside it here because a TS caller has no
- * `pop`-in-place idiom for a rest parameter.
- *
- * Ruby's `last.is_a?(Hash)` guard (`core_ext/array/extract_options.rb:26`)
- * admits every Hash subclass, which in TS is an object declaring the
- * `extractable_options?` override.
- */
 export function extractOptionsBang<T>(args: T[]): [T[], AnyObject] {
   const last = args[args.length - 1];
   const isHash =
@@ -194,42 +116,22 @@ export function extractOptionsBang<T>(args: T[]): [T[], AnyObject] {
   return [args, {}];
 }
 
-/**
- * Convert all keys to strings (Rails' stringify_keys).
- */
 export function stringifyKeys<T extends AnyObject>(obj: T): Record<string, unknown> {
   return transformKeys(obj, (k) => String(k));
 }
 
-/**
- * Destructively converts all keys to strings — Ruby's `Hash#stringify_keys!`
- * (core_ext/hash/keys.rb:15-17). Mutates the receiver and returns it.
- */
 export function stringifyKeysBang<T extends AnyObject>(hash: T): T {
   return transformKeysBang(hash, (k) => String(k));
 }
 
-/**
- * Recursively convert all keys to strings (Rails' deep_stringify_keys).
- */
 export function deepStringifyKeys(obj: unknown): unknown {
   return deepTransformKeys(obj, (key) => String(key));
 }
 
-/**
- * Convert all keys to symbols — in TypeScript we use strings, so this is
- * equivalent to stringifyKeys but mirrors Rails' symbolize_keys semantics.
- */
 export function symbolizeKeys<T extends AnyObject>(obj: T): Record<string, unknown> {
   return transformKeys(obj, (key) => key);
 }
 
-/**
- * Destructively converts all keys to symbols — Ruby's `Hash#symbolize_keys!`
- * (core_ext/hash/keys.rb:33-35). A Ruby Symbol is a JS string, so this is
- * `stringify_keys!`'s transform, exactly as `symbolize_keys` is
- * `stringify_keys`'s here.
- */
 export function symbolizeKeysBang<T extends Map<string, unknown>>(hash: T): T;
 export function symbolizeKeysBang<T extends AnyObject>(hash: T): T;
 export function symbolizeKeysBang(
@@ -238,32 +140,15 @@ export function symbolizeKeysBang(
   return transformKeysBang(hash as Map<string, unknown>, (key) => key);
 }
 
-/**
- * `alias_method :to_options, :symbolize_keys` (core_ext/hash/keys.rb:30).
- */
 export const toOptions = symbolizeKeys;
 
-/**
- * `alias_method :to_options!, :symbolize_keys!` (core_ext/hash/keys.rb:36).
- */
 export const toOptionsBang = symbolizeKeysBang;
 
-/**
- * Recursively convert all keys to symbols (strings in TS).
- *
- * @missingRailsArgs deep_transform_keys — PERMANENT: keys.rb:104 calls it on
- * the receiver with only a block; the Ruby receiver becomes the first TS
- * argument here, as it does everywhere in this file.
- */
+/** @missingRailsArgs deep_transform_keys — PERMANENT */
 export function deepSymbolizeKeys(obj: unknown): unknown {
   return deepTransformKeys(obj, (key) => key);
 }
 
-/**
- * Destructively converts all keys by the block operation, through the root
- * hash and every nested hash and array — Ruby's `Hash#deep_transform_keys!`
- * (core_ext/hash/keys.rb:74-76).
- */
 export function deepTransformKeysBang<T extends Map<string, unknown>>(
   hash: T,
   block: (key: string) => string,
@@ -279,16 +164,10 @@ export function deepTransformKeysBang(
   return _deepTransformKeysInObjectBang(hash, block) as AnyObject | Map<string, unknown>;
 }
 
-/**
- * Ruby's `Hash#deep_stringify_keys!` (core_ext/hash/keys.rb:90-92).
- */
 export function deepStringifyKeysBang(hash: AnyObject): AnyObject {
   return deepTransformKeysBang(hash, (k) => String(k));
 }
 
-/**
- * Ruby's `Hash#deep_symbolize_keys!` (core_ext/hash/keys.rb:110-112).
- */
 export function deepSymbolizeKeysBang<T extends Map<string, unknown>>(hash: T): T;
 export function deepSymbolizeKeysBang<T extends AnyObject>(hash: T): T;
 export function deepSymbolizeKeysBang(
@@ -297,16 +176,7 @@ export function deepSymbolizeKeysBang(
   return deepTransformKeysBang(hash as Map<string, unknown>, (key) => key);
 }
 
-/**
- * Support method for deep transforming nested hashes and arrays — Ruby's
- * private `Hash#_deep_transform_keys_in_object` (core_ext/hash/keys.rb:116-125).
- *
- * Ruby's `when Hash` arm covers both trails spellings of a Ruby Hash — a plain
- * object and `@blazetrails/ruby-compat`'s `Hash`, which is what
- * `HashWithIndifferentAccess#toHash` now answers — so the `Map` arm builds the
- * plain-object spelling of the same value.
- * @internal
- */
+/** @internal */
 export function _deepTransformKeysInObject(
   object: unknown,
   block: (key: string) => string,
@@ -330,14 +200,7 @@ export function _deepTransformKeysInObject(
   }
 }
 
-/**
- * Ruby's private `Hash#_deep_transform_keys_in_object!`
- * (core_ext/hash/keys.rb:127-138). Ruby's `Array#map!` mutates in place; so
- * does this, so array identity survives the transform as it does in Ruby, and
- * so does a `Map` receiver's — the other trails spelling of a Ruby Hash, which
- * is renamed key by key in place exactly as {@link transformKeysBang} does it.
- * @internal
- */
+/** @internal */
 export function _deepTransformKeysInObjectBang(
   object: unknown,
   block: (key: string) => string,
@@ -365,15 +228,7 @@ export function _deepTransformKeysInObjectBang(
   }
 }
 
-/**
- * Ruby's `Hash#transform_keys` — a new hash with each key replaced by the
- * block's result. The primitive the `keys.rb` key casts are written on top of.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Hash`, not Rails. `keys.rb` writes
- * every key cast on top of it (keys.rb:11, :22) but never defines it, so there
- * is no Rails method for the port to converge on; JS objects have no such
- * primitive, so it is spelled here in the file that consumes it.
- */
+/** @noRailsEquivalent PERMANENT */
 export function transformKeys<V>(
   hash: Map<string, V>,
   block: (key: string) => string,
@@ -386,9 +241,6 @@ export function transformKeys(
   hash: AnyObject | Map<string, unknown>,
   block: (key: string) => string,
 ): Record<string, unknown> | Map<string, unknown> {
-  // A Ruby Hash is spelled either way in trails — a plain object where the keys
-  // are known, a `Map` where they are not — and the primitive has to reach both
-  // or a body holding the Map spelling cannot make the call Ruby makes.
   if (hash instanceof Map) {
     const result = new Map<string, unknown>();
     for (const [key, value] of hash) result.set(block(key), value);
@@ -401,15 +253,7 @@ export function transformKeys(
   return result;
 }
 
-/**
- * Ruby's `Hash#transform_keys!`, the in-place primitive the `keys.rb` bang
- * forms are written on top of. Ruby mutates the receiver and answers it, so
- * both spellings of a Ruby Hash do too — a `Map` receiver is renamed key by
- * key in place, which leaves it in the original insertion order the way Ruby's
- * rehash does, and the receiver's own seat (`Hash#default`) survives the call.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Hash`, as {@link transformKeys} is.
- */
+/** @noRailsEquivalent PERMANENT */
 export function transformKeysBang<T extends Map<string, unknown>>(
   hash: T,
   block: (key: string) => string,
@@ -434,26 +278,12 @@ export function transformKeysBang(
   return hash;
 }
 
-/**
- * Merges the caller into `otherHash` — Ruby's `Hash#reverse_merge`
- * (core_ext/hash/reverse_merge.rb:14-16), which is literally
- * `other_hash.merge(self)`, so the result carries `other_hash`'s key ORDER
- * with the receiver's values winning (hash_ext_test.rb:317 asserts it).
- */
 export function reverseMerge<T extends AnyObject>(obj: T, otherHash: AnyObject): T {
   return { ...otherHash, ...obj } as T;
 }
 
-/**
- * `alias_method :with_defaults, :reverse_merge`
- * (core_ext/hash/reverse_merge.rb:16).
- */
 export const withDefaults = reverseMerge;
 
-/**
- * Destructive `reverse_merge` — Ruby's `Hash#reverse_merge!`
- * (core_ext/hash/reverse_merge.rb:19-21), which `replace`s the receiver.
- */
 export function reverseMergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T {
   const merged = reverseMerge(hash, otherHash);
   for (const key of Object.keys(hash)) delete hash[key];
@@ -461,47 +291,22 @@ export function reverseMergeBang<T extends AnyObject>(hash: T, otherHash: AnyObj
   return hash;
 }
 
-/**
- * `alias_method :reverse_update, :reverse_merge!`
- * (core_ext/hash/reverse_merge.rb:22).
- */
 export const reverseUpdate = reverseMergeBang;
 
-/**
- * `alias_method :with_defaults!, :reverse_merge!`
- * (core_ext/hash/reverse_merge.rb:23).
- */
 export const withDefaultsBang = reverseMergeBang;
 
-/**
- * Removes the given keys from the hash and returns it — Ruby's `Hash#except!`
- * (core_ext/hash/except.rb:8-11).
- */
 export function exceptBang<T extends AnyObject>(hash: T, ...keys: string[]): T {
   keys.forEach((key) => delete hash[key]);
   return hash;
 }
 
-// `Hash#with_indifferent_access` and its `nested_under_indifferent_access`
-// alias live in the file Rails puts them in,
-// core_ext/hash/indifferent_access.rb; re-exported here so existing importers
-// are untouched.
 export {
   withIndifferentAccess,
   nestedUnderIndifferentAccess,
 } from "./core-ext/hash/indifferent-access.js";
 
-/**
- * Assert that all keys in obj are within the allowed set of validKeys.
- * Throws ArgumentError if any key is invalid (Rails' assert_valid_keys).
- */
 export function assertValidKeys(obj: AnyObject, validKeys: string[]): void {
   validKeys = validKeys.flat(Infinity);
-  // Rails builds the message with Symbol#inspect on each key, so keys carry a
-  // leading `:` (keys.rb:52). Our keys are strings, but we mirror the symbol
-  // rendering to match hash_ext_test.rb:254's exact expectation. Symbol#inspect
-  // bare-renders identifier-shaped symbols (`:name`) and quotes the rest
-  // (`:"foo bar"`), so we branch on the same identifier shape.
   const inspect = (key: string): string =>
     /^[a-zA-Z_][a-zA-Z0-9_]*[?!=]?$/.test(key) ? `:${key}` : `:${JSON.stringify(key)}`;
   for (const key of Object.keys(obj)) {
@@ -513,9 +318,6 @@ export function assertValidKeys(obj: AnyObject, validKeys: string[]): void {
   }
 }
 
-/**
- * Recursively transform all values using the provided function.
- */
 export function deepTransformValues(obj: unknown, fn: (value: unknown) => unknown): unknown {
   if (Array.isArray(obj)) {
     return obj.map((item) => deepTransformValues(item, fn));
@@ -538,16 +340,6 @@ export function isPlainObject(value: unknown): value is AnyObject {
   return proto === Object.prototype || proto === null;
 }
 
-/**
- * Convert a value to its URL parameter representation (Rails' to_param).
- *
- * - null/undefined → null
- * - boolean → the boolean itself
- * - Array → each element's toParam joined with "/"
- * - objects with a toParam method → call it
- * - plain objects → URL query string (delegated to toQuery)
- * - everything else → String(value)
- */
 export function toParam(value: unknown): string | boolean | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean") return value;
@@ -565,7 +357,6 @@ export function toParam(value: unknown): string | boolean | null {
     }
     if (value instanceof Map) return toQuery(value);
     if (isPlainObject(value)) {
-      // If toString is overridden, use it (mirrors Ruby Object#to_param → to_s)
       if (value.toString !== Object.prototype.toString) {
         return String(value);
       }
@@ -592,8 +383,6 @@ function buildQueryParts(value: unknown, prefix: string): string[] {
     return value.flatMap((v) => buildQueryParts(v, `${prefix}[]`));
   }
   if (typeof value === "object") {
-    // Ruby's fallback is `Object#to_query` (`core_ext/object/to_query.rb:11-13`)
-    // — anything answering `to_param` is a leaf, not a container to walk into.
     if (typeof (value as { toParam?: unknown }).toParam === "function") {
       return [`${encodeQueryKey(prefix)}=${encodeQueryValue(toParam(value))}`];
     }
@@ -606,17 +395,10 @@ function buildQueryParts(value: unknown, prefix: string): string[] {
   return [`${encodeQueryKey(prefix)}=${encodeQueryValue(value)}`];
 }
 
-/**
- * Convert an object to a URL query string with nested key support.
- * Mirrors Rails' Hash#to_query / Hash#to_param.
- */
 export function toQuery(
   obj: Record<string, unknown> | Map<unknown, unknown>,
   namespace?: string,
 ): string {
-  // Ruby hashes key on any object, so `key.to_param`
-  // (`core_ext/object/to_query.rb:12`) is the key's spelling; a JS object keys
-  // only on strings, so a `Map` is the receiver that still carries one.
   const entries: [string, unknown][] = (
     obj instanceof Map ? [...obj.entries()] : Object.entries(obj)
   ).map(([key, value]) => [String(toParam(key)), value]);
@@ -629,9 +411,6 @@ export function toQuery(
   return parts.join("&");
 }
 
-/**
- * Remove null and undefined values from a plain object (Rails' compact).
- */
 export function compact<T extends AnyObject>(obj: T): Partial<T> {
   const result: Partial<T> = {};
   for (const key of Object.keys(obj)) {
@@ -642,10 +421,6 @@ export function compact<T extends AnyObject>(obj: T): Partial<T> {
   return result;
 }
 
-/**
- * Mirrors: `Hash#compact_blank` (`core_ext/enumerable.rb:222-224`) —
- * `reject { |_k, v| v.blank? }`.
- */
 export function compactBlank<T extends AnyObject>(obj: T): Partial<T> {
   const result: Partial<T> = {};
   for (const key of Object.keys(obj)) {
@@ -657,13 +432,6 @@ export function compactBlank<T extends AnyObject>(obj: T): Partial<T> {
   return result;
 }
 
-/**
- * Removes all blank values from the `Hash` in place and returns self.
- *
- * Mirrors: `Hash#compact_blank!` (`core_ext/enumerable.rb:232-235`) —
- * `delete_if { |_k, v| v.blank? }`, which Rails uses rather than `reject!`
- * because it always returns self even if nothing changed.
- */
 export function compactBlankBang<T extends AnyObject>(hash: T): T {
   for (const key of Object.keys(hash)) {
     if (isBlank(hash[key])) delete hash[key];
@@ -671,13 +439,6 @@ export function compactBlankBang<T extends AnyObject>(hash: T): T {
   return hash;
 }
 
-/**
- * Returns a string containing an XML representation of its receiver.
- *
- * Mirrors: `Hash#to_xml` (`core_ext/hash/conversions.rb:74-91`). Ruby `||=`
- * replaces only nil/false and `0` is truthy there, so `indent: 0` survives the
- * defaulting — hence `??=`.
- */
 export function toXml(
   self: AnyObject,
   options: XmlMini.ToXmlOptions = {},
@@ -704,11 +465,6 @@ export function toXml(
   return builder.target();
 }
 
-/**
- * Returns a Hash containing a collection of pairs when the key is the node name
- * and the value is its content. Mirrors: `Hash.from_xml`
- * (`core_ext/hash/conversions.rb:128-130`).
- */
 export function fromXml(
   xml: string | StringIO | null | undefined,
   disallowedTypes?: string[] | null,
@@ -716,10 +472,6 @@ export function fromXml(
   return new XMLConverter(xml, disallowedTypes).toH();
 }
 
-/**
- * Builds a Hash from XML just like `Hash.from_xml`, but also allows Symbol and
- * YAML. Mirrors: `Hash.from_trusted_xml` (conversions.rb:133-135).
- */
 export function fromTrustedXml(xml: string | StringIO | null | undefined): unknown {
   return fromXml(xml, []);
 }

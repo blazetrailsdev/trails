@@ -1,51 +1,17 @@
-/**
- * Mirrors: ActiveSupport::OrderedOptions
- * (activesupport/lib/active_support/ordered_options.rb).
- *
- * Rails' class is `OrderedOptions < Hash`, so every Hash method IS the API and
- * the class itself overrides only `[]=`, `[]`, `dig`, `method_missing`,
- * `respond_to_missing?`, `extractable_options?` and `inspect`
- * (ordered_options.rb:33-70). TypeScript has no Hash to subclass, so — exactly
- * as `HashWithIndifferentAccess` does — the Hash storage is a private `Map` and
- * the Hash members this class is actually used through are spelled by
- * docs/ruby-ts-conventions.md (`[]` → `get`, `[]=` → `set`, `key?` → `isKey`).
- *
- * `method_missing` is a `Proxy`: property reads and writes that do not name a
- * member fall through to the Hash, which is what makes `opts.boy = "John"`
- * work.
- */
-
 import { presence } from "./core-ext/object/blank.js";
 import { KeyError, rbObjClass } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
-  /**
-   * Ruby's `self.class.name` carries the module nesting, and `inspect`
-   * (ordered_options.rb:68-70) renders it. The class declares that name over
-   * `Function.name` so `this.constructor.name` is the gem's string.
-   */
   static name = "ActiveSupport::OrderedOptions";
 
   private readonly data: Map<string, unknown>;
 
-  /**
-   * Ruby's Hash default block (`Hash.new { |h, k| … }`), the hook
-   * `InheritableOptions` hands its parent lookup to (ordered_options.rb:90-99).
-   * Only the un-overridden read (`_get`) consults it, as in Ruby.
-   */
   protected defaultBlock?: (key: string) => unknown;
 
-  /**
-   * `Hash.new` — Rails' `OrderedOptions < Hash` inherits it untouched, so it
-   * takes no entries; a subclass hands it a default block instead
-   * (ordered_options.rb:89-99).
-   */
   constructor(defaultBlock?: (key: string) => unknown) {
     this.data = new Map();
     this.defaultBlock = defaultBlock;
     return new Proxy(this, {
-      // Mirrors `method_missing` (ordered_options.rb:49-58) and
-      // `respond_to_missing?` (:60-62), which answers true for every name.
       get(target, method: string | symbol) {
         if (typeof method === "symbol" || method in target) {
           const value = (target as any)[method];
@@ -69,32 +35,22 @@ export class OrderedOptions {
         target.set(method, value);
         return true;
       },
-      // Mirrors `respond_to_missing?` (ordered_options.rb:60-62), which answers
-      // true for every name — `key?` is the membership test, not this.
       has() {
         return true;
       },
     });
   }
 
-  /**
-   * Mirrors `alias_method :_get, :[]` (ordered_options.rb:34-35) — the
-   * original, un-overridden Hash read, kept so `InheritableOptions` can reach a
-   * parent's own storage without going through the subclass's `[]`. Being the
-   * Hash read, it is the one that runs the default block.
-   */
   protected _get(key: string): unknown {
     if (this.data.has(key)) return this.data.get(key);
     return this.defaultBlock?.(key);
   }
 
-  /** Mirrors `[]=` (ordered_options.rb:37-39). */
   set(key: string, value: unknown): this {
     this.data.set(String(key), value);
     return this;
   }
 
-  /** Mirrors `[]` (ordered_options.rb:41-43). */
   get(key: string): unknown {
     return this._get(String(key));
   }
@@ -142,96 +98,60 @@ export class OrderedOptions {
     return obj;
   }
 
-  /** Mirrors `extractable_options?` (ordered_options.rb:64-66). */
   isExtractableOptions(): boolean {
     return true;
   }
 
-  /**
-   * Mirrors `inspect` (ordered_options.rb:68-70). Its `super` is `Hash#inspect`,
-   * which is the rendering `toString` below carries.
-   */
   inspect(): string {
     return `#<${this.constructor.name} ${this.toString()}>`;
   }
 
-  /**
-   * `Hash#to_s`, which is `Hash#inspect`. Rails does not override it on
-   * `OrderedOptions`, so `to_s` renders the pairs and not the `#<…>` form
-   * (activesupport/test/ordered_options_test.rb:283-285).
-   */
   toString(): string {
     const pairs = [...this.data.entries()].map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
     return `{${pairs.join(", ")}}`;
   }
 
-  // -- Hash members, which Rails inherits rather than defining --
-
-  /** `Hash#key?` — the un-overridden membership test. */
   isKey(key: string): boolean {
     return this.data.has(key);
   }
 
-  /** `Hash#key` — the first key holding `value`. */
   key(value: unknown): string | undefined {
     for (const [k, v] of this.data) if (v === value) return k;
     return undefined;
   }
 
-  /** `Hash#clear`. */
   clear(): this {
     this.data.clear();
     return this;
   }
 
-  /** `Hash#keys`. */
   keys(): string[] {
     return [...this.data.keys()];
   }
 
-  /**
-   * `Enumerable#entries` — Ruby builds it on `each`, not on the Hash storage,
-   * which is why `InheritableOptions`'s `each` override (ordered_options.rb:142-145)
-   * makes it answer the parent-merged pairs.
-   */
   entries(): [string, unknown][] {
     const out: [string, unknown][] = [];
     this.each((key, value) => out.push([key, value]));
     return out;
   }
 
-  /** `Hash#to_h`. */
   toH(): Record<string, unknown> {
     return Object.fromEntries(this.data);
   }
 
-  /** `Hash#each`. */
   each(fn: (key: string, value: unknown) => void): this {
     for (const [k, v] of this.data) fn(k, v);
     return this;
   }
 
-  /** `Hash#size` — the own-entry count, unlike `Enumerable#count`. */
   get size(): number {
     return this.data.size;
   }
 
-  /** `Enumerable#count` — like `entries`, counted through `each`. */
   get count(): number {
     return this.entries().length;
   }
 
-  /**
-   * `Object#dup` — allocates the receiver's OWN class and copies its ivars, so
-   * an `InheritableOptions` dup stays an `InheritableOptions` reading through
-   * the same parent (`Hash#dup` carries the default block over too).
-   *
-   * TypeScript has no allocate-without-initialize, so the ivars are replayed
-   * through the constructor: this is only valid for the two classes in this
-   * file, whose sole constructor argument is the parent (`InheritableOptions`)
-   * or the default block (`OrderedOptions`, which has no `parent`). A subclass
-   * with a differently-shaped constructor would need its own `dup`.
-   */
   dup(): this {
     const copy = new (this.constructor as new (parent?: unknown) => this)(
       (this as unknown as { parent?: unknown }).parent,
@@ -242,25 +162,11 @@ export class OrderedOptions {
   }
 }
 
-/**
- * Mirrors: ActiveSupport::InheritableOptions (ordered_options.rb:88-146).
- *
- * The parent lookup is Rails' Hash default block, not a hand-written read
- * override: the constructor installs `defaultBlock`, so the un-overridden
- * `_get` finds the parent's value exactly where Ruby's Hash does — and, as
- * Rails documents at ordered_options.rb:92, an `OrderedOptions` parent is read
- * through the faster `_get`.
- */
 export class InheritableOptions extends OrderedOptions {
   static override name = "ActiveSupport::InheritableOptions";
 
   private readonly parent: OrderedOptions | Record<string, unknown>;
 
-  /**
-   * Mirrors `initialize(parent = nil)` (ordered_options.rb:89-99) — an
-   * `OrderedOptions` parent is read through the faster `_get`, any other hash
-   * through `[]`, and a nil parent leaves an empty hash behind.
-   */
   constructor(parent: OrderedOptions | Record<string, unknown> | null = null) {
     if (parent instanceof OrderedOptions) {
       super((k) => (parent as unknown as { _get(key: string): unknown })._get(k));
@@ -274,56 +180,39 @@ export class InheritableOptions extends OrderedOptions {
     }
   }
 
-  /** Mirrors `to_h` (ordered_options.rb:100-102). */
   override toH(): Record<string, unknown> {
     return { ...this.parentToH(), ...super.toH() };
   }
 
-  /** Mirrors `inspect` (ordered_options.rb:108-110). */
   override inspect(): string {
     return `#<${this.constructor.name} ${this.toString()}>`;
   }
 
-  /** Mirrors `to_s` (ordered_options.rb:112-114) — `to_h.to_s`. */
   override toString(): string {
     const pairs = Object.entries(this.toH()).map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
     return `{${pairs.join(", ")}}`;
   }
 
-  /**
-   * Mirrors `alias_method :own_key?, :key?` (ordered_options.rb:123-124) — the
-   * un-overridden `key?`, which sees only this object's own entries.
-   */
   protected ownKey(key: string): boolean {
     return super.isKey(key);
   }
 
-  /** Mirrors `key?` (ordered_options.rb:126-128). */
   override isKey(key: string): boolean {
     return super.isKey(key) || this.parentIsKey(key);
   }
 
-  /** Mirrors `overridden?` (ordered_options.rb:130-132). */
   isOverridden(key: string): boolean {
     return !!(this.parent && this.parentIsKey(key) && this.ownKey(String(key)));
   }
 
-  /**
-   * Mirrors `inheritable_copy` (ordered_options.rb:134-136) — `self.class.new`,
-   * so a `Configurable::Configuration` copy stays a Configuration, reading
-   * through the same anonymous class the compiled readers live on
-   * (configurable.rb:33).
-   */
   inheritableCopy(): InheritableOptions {
     return new (this.constructor as new (parent: OrderedOptions) => InheritableOptions)(this);
   }
 
-  /** Mirrors `to_a` (ordered_options.rb:138-140). */
   toA(): [string, unknown][] {
     return this.entries();
   }
 
-  /** Mirrors `each` (ordered_options.rb:142-145). */
   override each(fn: (key: string, value: unknown) => void): this {
     for (const [k, v] of Object.entries(this.toH())) fn(k, v);
     return this;

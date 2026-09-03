@@ -97,14 +97,12 @@ describe("ArGenerateModelTest", () => {
   });
 
   it("rejects illegal model names before writing any file", async () => {
-    // colon survives normalizeSnakeName (hyphens do not — they become underscores)
     await expect(generateModel(dir, "user:admin", [], "20240101120008")).rejects.toThrow(
       IllegalMigrationNameError,
     );
     await expect(generateModel(dir, "my model", [], "20240101120008")).rejects.toThrow(
       IllegalMigrationNameError,
     );
-    // Nothing should have been written
     await expect(readFile(join(dir, "app", "models", "user_admin.ts"), "utf8")).rejects.toThrow();
   });
 });

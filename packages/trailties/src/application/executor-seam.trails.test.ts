@@ -1,9 +1,3 @@
-// Trails-only integration coverage for the seam that runs
-// `ActiveSupport::Executor` around a unit of work: `Rails::Application#executor`
-// (`application.rb:122`) handed to `ActionDispatch::Executor`
-// (`default_middleware_stack.rb:49`). Rails covers the two halves separately
-// (`dispatch/executor_test.rb`, `asynchronous_queries_test.rb`); the wiring
-// between them has no single Rails counterpart.
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Executor as ActionDispatchExecutor } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
@@ -28,8 +22,6 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   class TestApplication extends Application {}
   let app: TestApplication;
 
-  // The initializers register the executor hooks on `ActiveSupport::Executor`
-  // itself, so running them per-test would stack a second copy of every hook.
   beforeAll(async () => {
     await runTrailtieInitializers(Trailtie, {
       deprecators: new Deprecators(),
@@ -62,8 +54,6 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
     expect(sessionActiveInRequest).toBe(true);
     expect(rows).toEqual([{ one: 1 }]);
 
-    // `ActionDispatch::Executor` defers `state.complete!` to the body's close
-    // (`executor.rb:23`), so the session outlives `call` and dies with the body.
     expect(Base.asynchronousQueriesSession().active()).toBe(true);
     (body as unknown as { close(): void }).close();
     expect(() => Base.asynchronousQueriesSession()).toThrow(SESSION_ERROR);
@@ -129,10 +119,6 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   });
 });
 
-// `Class.new(ActiveSupport::Executor)` / `Class.new(ActiveSupport::Reloader)`
-// (`application.rb:122-123`). Rails gets the per-app isolation for free from
-// `Class.new` and has no test for it; trails' properties carry a written type,
-// which a plain `Executor` would also satisfy.
 describe("Rails::Application#executor and #reloader are per-application (trails)", () => {
   class TestApplication extends Application {}
 

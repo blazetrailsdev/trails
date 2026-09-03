@@ -18,20 +18,16 @@ import { currentErrorReporter } from "../error-reporter.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
-/** Mirrors Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45). */
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
-/** Mirrors Rails `Cache::Store::DEFAULT_POOL_OPTIONS` (cache.rb:197). */
 const DEFAULT_POOL_OPTIONS: StoreOptions = { size: 5, timeout: 5 };
 
-/** Mirrors Ruby `Object#inspect` for the values `retrieve_pool_options` reports. */
 function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
   if (value === null || value === undefined) return "nil";
   return String(value);
 }
 
-/** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
 const Zlib: CoderCompressor = { deflate, inflate };
 
 export { ArgumentError };
@@ -48,23 +44,13 @@ export interface CacheLogger {
 
 export type StoreOptions = Record<string, unknown>;
 
-/**
- * The coder surface `Store` holds in `@coder` (cache.rb:301-312): `dump`/`load`,
- * plus `dump_compressed` when the coder answers it.
- *
- * @noRailsEquivalent PERMANENT — Ruby duck-types `@coder` (cache.rb:301-312);
- * TS has to name the shape a structural type checks against.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface CacheCoder {
   dump(entry: Entry): unknown;
   load(payload: unknown): unknown;
   dumpCompressed?(entry: Entry, threshold: number): unknown;
 }
 
-/**
- * Mirrors Ruby `Array#extract_options!`: mutably pops a trailing plain-object
- * options hash off the args array, returning it (or undefined). @internal
- */
 function extractOptions(args: unknown[]): StoreOptions | undefined {
   const last = args[args.length - 1];
   if (last != null && typeof last === "object" && !Array.isArray(last)) {
@@ -73,7 +59,7 @@ function extractOptions(args: unknown[]): StoreOptions | undefined {
   return undefined;
 }
 
-/** Mirrors Rails Cache::Store::WriteOptions (cache.rb:1064). @internal */
+/** @internal */
 export class WriteOptions {
   constructor(private _opts: StoreOptions) {}
   get expiresIn() {
@@ -98,7 +84,7 @@ export class WriteOptions {
   }
 }
 
-/** Mirrors Rails `ActiveSupport::Cache::Store` (cache.rb). @internal */
+/** @internal */
 export abstract class Store {
   static logger: CacheLogger | null = null;
   static raiseOnInvalidCacheExpirationTime = false;
@@ -113,14 +99,6 @@ export abstract class Store {
     }
   }
 
-  /**
-   * Mirrors Rails `Cache::Store.retrieve_pool_options` (cache.rb:200-220), a
-   * private class method the pooled stores call on their own options hash.
-   * `options.key?(:pool)` distinguishes an explicit `pool: nil` from an absent
-   * key, so the read is `"pool" in options`, not `?? true`. Ruby's
-   * `Integer()`/`Float()` (cache.rb:213-214) raise on a value they cannot
-   * convert rather than yielding NaN the way `Number()` does.
-   */
   static retrievePoolOptions(options: StoreOptions): StoreOptions | false | undefined {
     let poolOptions: unknown;
     if ("pool" in options) {
@@ -151,33 +129,18 @@ export abstract class Store {
   silence = false;
   options: StoreOptions;
 
-  /**
-   * The coder `Store#initialize` installs (cache.rb:301-312): `options[:coder]`
-   * when the store names one — MemoryStore names `DupCoder`
-   * (memory_store.rb:73-75) — else `Cache::Coder` over the default serializer
-   * and Zlib. Rails also remembers whether it answers `dump_compressed`.
-   */
   protected coder: CacheCoder;
   protected coderSupportsCompression: boolean;
 
-  /**
-   * @missingRailsCall delete — PERMANENT: `@options.delete(:coder)`
-   *   (cache.rb:301) is the JS `delete` operator here, a statement rather than
-   *   a call the extractor can see.
-   */
+  /** @missingRailsCall delete — PERMANENT */
   constructor(options?: StoreOptions) {
     this.options = options ? this.validateOptions(Store.normalizeOptions({ ...options })) : {};
 
     if (!("compress" in this.options)) this.options.compress = true;
-    // Ruby `||=` replaces only nil/false, so an explicit `compress_threshold: 0`
-    // — compress everything — survives where JS `||=` would take the default.
     if (this.options.compressThreshold == null || this.options.compressThreshold === false) {
       this.options.compressThreshold = DEFAULT_COMPRESS_LIMIT;
     }
 
-    // Ruby `@options.delete(:coder) { ... }` runs the block only when the key is
-    // absent, so an explicit `coder: nil` stays nil and falls through the `||=`
-    // below to the passthrough serializer — Rails' direct-entry path.
     const hadCoder = "coder" in this.options;
     let coder = this.options.coder as CacheCoder | null | undefined;
     delete this.options.coder;
@@ -186,8 +149,6 @@ export abstract class Store {
       let serializer = this.options.serializer as Serializer | string | undefined;
       delete this.options.serializer;
       serializer ||= this.defaultSerializer();
-      // A Ruby Symbol is a colon-prefixed string in trails, which is what
-      // `serializer.is_a?(Symbol)` discriminates on (cache.rb:303).
       if (typeof serializer === "string") {
         serializer = SerializerWithFallback.get(serializer.slice(1));
       }
@@ -221,7 +182,6 @@ export abstract class Store {
     }
   }
 
-  /** Mirrors Rails `Cache::Store#fetch` (cache.rb:443). */
   fetch(
     name: string,
     options?: StoreOptions,
@@ -499,7 +459,6 @@ export abstract class Store {
     ) as T;
   }
 
-  /** Mirrors Rails `Cache::Store#default_serializer` (cache.rb:764-773). */
   private defaultSerializer(): Serializer {
     switch (getFormatVersion()) {
       case 7.0:
@@ -517,7 +476,6 @@ export abstract class Store {
   protected abstract writeEntry(key: string, entry: Entry, options: StoreOptions): boolean;
   protected abstract deleteEntry(key: string, options: StoreOptions): boolean;
 
-  /** Mirrors Rails `Cache::Store#serialize_entry` (cache.rb:806-813). */
   protected serializeEntry(entry: Entry, options?: StoreOptions): unknown {
     options = this.mergedOptions(options);
     if (this.coderSupportsCompression && options.compress) {
@@ -527,7 +485,6 @@ export abstract class Store {
     }
   }
 
-  /** Mirrors Rails `Cache::Store#deserialize_entry` (cache.rb:815-819). */
   protected deserializeEntry(payload: unknown): Entry | null {
     if (payload == null) return null;
     try {
@@ -568,14 +525,7 @@ export abstract class Store {
     return entries.filter((key) => this.deleteEntry(key, options)).length;
   }
 
-  /**
-   * Mirrors Rails `Cache::Store#merged_options` (cache.rb:861–888).
-   *
-   * @missingRailsCall merge — PERMANENT: cache.rb:883
-   *   `options.merge(call_options)` — Ruby Hash#merge returns a new hash, which
-   *   JS object spread (`{ ...this.options, ...call }`) is; trails has no Hash
-   *   object to call `merge` on.
-   */
+  /** @missingRailsCall merge — PERMANENT */
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
     if (!callOptions) return this.options;
 
@@ -587,8 +537,6 @@ export abstract class Store {
 
     const expiresAt = call.expiresAt as number | undefined;
     if (expiresAt != null) {
-      // expiresAt is epoch-ms; expiresIn is in seconds (mirrors Rails' Time
-      // arithmetic, where `expires_at - Time.now` yields seconds).
       call.expiresIn = (expiresAt - Date.now()) / 1000;
       delete call.expiresAt;
     }
@@ -615,11 +563,8 @@ export abstract class Store {
     }
   }
 
-  /** Mirrors Rails `Cache::Store#normalize_options` (cache.rb:905–911). */
   static normalizeOptions(options: StoreOptions): StoreOptions {
     const opts = { ...options };
-    // OPTION_ALIASES = { expires_in: [:expire_in, :expired_in] }
-    // Alias is only applied if the canonical key is not already present (mirrors ||=).
     const aliasKey =
       opts.expire_in != null ? "expire_in" : opts.expired_in != null ? "expired_in" : null;
     if (aliasKey != null) {
@@ -630,7 +575,6 @@ export abstract class Store {
     return opts;
   }
 
-  /** Mirrors Rails `Cache::Store#validate_options` (cache.rb:912-925). */
   private validateOptions(options: StoreOptions): StoreOptions {
     if ("coder" in options && options.serializer) {
       throw new ArgumentError("Cannot specify :serializer and :coder options together");
@@ -650,7 +594,6 @@ export abstract class Store {
     return options;
   }
 
-  /** Mirrors Rails `Cache::Store#handle_invalid_expires_in` (cache.rb:892–898). */
   static handleInvalidExpiresIn(message: string): void {
     const error = new ArgumentError(message);
     if (Store.raiseOnInvalidCacheExpirationTime) {
@@ -667,22 +610,8 @@ export abstract class Store {
     return this.namespaceKey(strKey, options);
   }
 
-  /**
-   * Mirrors Rails `Cache::Store#key_matcher` (cache.rb): when a namespace is
-   * configured, prefixes it into the regex source so a namespaced store scopes
-   * `delete_matched` to its own keys. A `^`-anchored source has the anchor moved
-   * in front of the prefix; an unanchored source is matched anywhere after the
-   * prefix (`.*`).
-   *
-   * @missingRailsCall call — PERMANENT: cache.rb:780
-   *   `options[:namespace].is_a?(Proc) ? options[:namespace].call : ...` — a
-   *   Ruby Proc is invoked through `#call`; the JS callable it ports to is
-   *   invoked as `ns()`, so there is no `call` to make.
-   */
+  /** @missingRailsCall call — PERMANENT */
   protected keyMatcher(pattern: RegExp, options?: StoreOptions): RegExp {
-    // Same per-call override semantics as namespaceKey below: Rails'
-    // key_matcher reads options[:namespace] from the merged options with no
-    // store-level fallback (cache.rb:779-790), so an explicit nil wins.
     const ns = options && "namespace" in options ? options.namespace : this.options.namespace;
     const prefix = typeof ns === "function" ? (ns as () => string)() : (ns as string | undefined);
     if (prefix) {
@@ -693,10 +622,6 @@ export abstract class Store {
     return pattern;
   }
 
-  /** Mirrors Rails `Cache::Store#namespace_key` (cache.rb:948-968): a per-call
-   * `:namespace` key wins even when its value is nil (`call_options&.key?`,
-   * not a nil-coalescing fallback), and callable namespaces are invoked.
-   * Rails' UTF-8 re-encoding of the key has no JS analogue. */
   protected namespaceKey(key: string, callOptions?: StoreOptions): string {
     let ns =
       callOptions && "namespace" in callOptions ? callOptions.namespace : this.options.namespace;
@@ -707,11 +632,6 @@ export abstract class Store {
     return namespace ? `${namespace}:${key}` : key;
   }
 
-  /**
-   * Mirrors Rails `Cache::Store#expanded_key` (cache.rb:973-988): the `case`
-   * picks the shape and the single trailing `to_param` renders it, so an Array
-   * of expansions joins with `/` exactly as {@link toParam} does.
-   */
   protected expandedKey(key: unknown): string {
     if (key != null && typeof key === "object" && "cacheKey" in key)
       return String((key as { cacheKey(): string }).cacheKey());
@@ -730,29 +650,13 @@ export abstract class Store {
     return String(toParam(expanded) ?? "");
   }
 
-  /**
-   * Mirrors Rails `Cache::Store#normalize_version` (cache.rb:989-991).
-   *
-   * @missingRailsCall try — PERMANENT: cache.rb:991
-   *   `options[:version].try(:to_param)` — Ruby's `to_param` is an Object
-   *   core_ext method every receiver responds to, so `try` guards only nil;
-   *   trails ports `to_param` as the free function `toParam`, so the guard is
-   *   the explicit `!= null` check and there is no method to `try`.
-   */
+  /** @missingRailsCall try — PERMANENT */
   protected normalizeVersion(key: unknown, options?: StoreOptions): string | undefined {
-    // Ruby's `||` falls through on nil AND false, so a `to_param` that answers
-    // false takes `expanded_version`, where `??` alone would keep "false".
     const version = options?.version != null ? toParam(options.version) : null;
     if (version != null && version !== false) return String(version);
     return this.expandedVersion(key);
   }
 
-  /**
-   * Mirrors Rails `Cache::Store#expanded_version` (cache.rb:994-1000): the
-   * version an object carries with it, so a stale entry is detected without the
-   * caller passing `:version`. Ruby's `case` with no matching `when` returns
-   * nil, so a key that answers neither `cache_version` nor `to_a` is versionless.
-   */
   protected expandedVersion(key: unknown): string | undefined {
     if (key != null && typeof key === "object") {
       if (typeof (key as { cacheVersion?: () => unknown }).cacheVersion === "function") {
@@ -773,13 +677,6 @@ export abstract class Store {
     return undefined;
   }
 
-  /**
-   * Mirrors Rails `Cache::Store#handle_expired_entry` (cache.rb). When a
-   * positive `race_condition_ttl` is set, a stale entry is bumped back into the
-   * cache for a brief window (so concurrent readers get the stale value) while
-   * the caller recalculates; otherwise the expired entry is deleted. Rails
-   * `race_condition_ttl` is in seconds, our `expiresAt` is in epoch-ms.
-   */
   protected handleExpiredEntry(
     entry: Entry | null,
     key: string,
@@ -818,14 +715,7 @@ export abstract class Store {
   }
 }
 
-/**
- * Ruby `Hash#inspect` over a store's `@options`, for the `inspect` strings the
- * cache stores build (cache.rb / file_store.rb:97-99, memory_store.rb:186-188).
- * The keys stand in for Ruby Symbols, so they render with a leading colon.
- *
- * @noRailsEquivalent PERMANENT — Ruby core (Hash#inspect), not Rails, so no
- * Ruby file maps onto it.
- */
+/** @noRailsEquivalent PERMANENT */
 export function inspectOptions(options: Record<string, unknown>): string {
   const pairs = Object.entries(options).map(([k, v]) => `:${k}=>${inspectValue(v)}`);
   return `{${pairs.join(", ")}}`;

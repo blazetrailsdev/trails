@@ -349,7 +349,7 @@ describe("SafeBufferTest", () => {
   });
 
   it("Should raise an error when safe_concat is called on unsafe buffers", () => {
-    const buf = new SafeBuffer("not safe"); // unsafe by default
+    const buf = new SafeBuffer("not safe");
     expect(() => buf.safeConcat("<unsafe>")).toThrow();
   });
 
@@ -367,7 +367,7 @@ describe("SafeBufferTest", () => {
   });
 
   it("Should continue unsafe on slice", () => {
-    const buf = new SafeBuffer("abcdef"); // unsafe
+    const buf = new SafeBuffer("abcdef");
     const sliced = buf.slice(2, 4);
     expect(sliced.toString()).toBe("cd");
   });

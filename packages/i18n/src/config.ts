@@ -1,7 +1,3 @@
-/**
- * Mirrors: i18n/lib/i18n/config.rb
- */
-
 import { enforceAvailableLocalesBang, type Locale, type TranslationKey } from "./i18n.js";
 import {
   ExceptionHandler,
@@ -13,14 +9,6 @@ import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 import type { Base } from "./backend/base.js";
 import { Simple } from "./backend/simple.js";
 
-/**
- * Ruby's handler is a Symbol naming a method on `I18n`, a Proc, or any object
- * responding to `#call`; a JS function carries `Function#call`, whose first
- * argument is a receiver, so the latter two arms stay distinct here and
- * `handle_exception` dispatches on all three. The Symbol arm is a string that
- * keeps its leading colon (`":customExceptionHandler"`), naming the member of
- * the `I18n` module `send` reaches.
- */
 export type ExceptionHandlerLike =
   | string
   | ((exception: Error, locale: Locale, key: TranslationKey, options: unknown) => unknown)
@@ -32,11 +20,6 @@ export type MissingInterpolationArgumentHandler = (
   string: string,
 ) => unknown;
 
-/**
- * Ruby's `@@`-scoped config lives on the class and is shared by every `Config`
- * instance (and subclass); these module-level bindings are the JS equivalent.
- * Only `locale` is per-instance, exactly as in the gem.
- */
 let backend: Base | undefined;
 let defaultLocale: Locale | undefined;
 let availableLocales: Locale[] | undefined;
@@ -51,16 +34,10 @@ let interpolationPatterns: RegExp[] | undefined;
 export class Config {
   private localeValue?: Locale | false;
 
-  /** Not global/thread-scoped like the rest; defaults to `defaultLocale`. */
   get locale(): Locale | false {
     return this.localeValue ?? this.defaultLocale;
   }
 
-  /**
-   * Sets the current locale. Ruby's `locale && locale.to_sym`: a Symbol is a
-   * plain string here, so `to_sym` is the identity for one; anything else has
-   * no `to_sym` and raises.
-   */
   set locale(locale: Locale | false) {
     enforceAvailableLocalesBang(locale);
     if (locale != null && locale !== false && typeof locale !== "string") {
@@ -69,7 +46,6 @@ export class Config {
     this.localeValue = locale;
   }
 
-  /** Returns the current backend. Defaults to `Backend::Simple`. */
   get backend(): Base {
     backend ??= new Simple();
     return backend;
@@ -79,13 +55,11 @@ export class Config {
     backend = value;
   }
 
-  /** Returns the current default locale. Defaults to `en`. */
   get defaultLocale(): Locale {
     defaultLocale ??= "en";
     return defaultLocale;
   }
 
-  /** Sets the default locale; `to_sym` as in `locale=` above. */
   set defaultLocale(locale: Locale) {
     enforceAvailableLocalesBang(locale);
     if (locale != null && (locale as unknown) !== false && typeof locale !== "string") {
@@ -94,12 +68,10 @@ export class Config {
     defaultLocale = locale;
   }
 
-  /** Locales with translations; delegated to the backend unless set. */
   get availableLocales(): Locale[] {
     return availableLocales ?? this.backend.availableLocales();
   }
 
-  /** Cached as a Set for faster available-locales enforce checks. */
   get availableLocalesSet(): Set<Locale> {
     availableLocalesSet ??= this.availableLocales.reduce(
       (set, locale) => set.add(locale),
@@ -114,17 +86,14 @@ export class Config {
     availableLocalesSet = undefined;
   }
 
-  /** Returns true if the available locales have been initialized. */
   get availableLocalesInitialized(): boolean {
     return availableLocales !== undefined;
   }
 
-  /** Clears the set so it is recomputed after I18n gets reloaded. */
   clearAvailableLocalesSet(): void {
     availableLocalesSet = undefined;
   }
 
-  /** Returns the current default scope separator. Defaults to `.` */
   get defaultSeparator(): string {
     defaultSeparator ??= ".";
     return defaultSeparator;
@@ -134,7 +103,6 @@ export class Config {
     defaultSeparator = separator;
   }
 
-  /** Returns the current exception handler. Defaults to an `ExceptionHandler`. */
   get exceptionHandler(): ExceptionHandlerLike {
     exceptionHandler ??= new ExceptionHandler();
     return exceptionHandler;
@@ -144,7 +112,6 @@ export class Config {
     exceptionHandler = handler;
   }
 
-  /** Handler for a missing interpolation argument; raises by default. */
   get missingInterpolationArgumentHandler(): MissingInterpolationArgumentHandler {
     missingInterpolationArgumentHandler ??= (missingKey, providedHash, string) => {
       throw new MissingInterpolationArgument(missingKey, providedHash, string);
@@ -156,27 +123,17 @@ export class Config {
     missingInterpolationArgumentHandler = handler;
   }
 
-  /** Paths providing translation data sources; the backend defines what it accepts. */
   get loadPath(): (string | string[])[] {
     loadPath ??= [];
     return loadPath;
   }
 
-  /**
-   * Sets the load path instance. Custom implementations are expected to behave
-   * like a Ruby Array.
-   *
-   * Mirrors `load_path=` (config.rb:132-136); it is a method rather than a
-   * `set` accessor because `backend.reload!` is async here and a TS `set`
-   * accessor cannot be awaited.
-   */
   async setLoadPath(value: (string | string[])[]): Promise<void> {
     loadPath = value;
     availableLocalesSet = undefined;
     await this.backend.reloadBang();
   }
 
-  /** Whether to verify locales are in the available list. Defaults to true. */
   get enforceAvailableLocales(): boolean {
     return enforceAvailableLocalesFlag;
   }
@@ -185,7 +142,6 @@ export class Config {
     enforceAvailableLocalesFlag = value;
   }
 
-  /** Defaults to a copy of `DEFAULT_INTERPOLATION_PATTERNS`. */
   get interpolationPatterns(): RegExp[] {
     interpolationPatterns ??= [...DEFAULT_INTERPOLATION_PATTERNS];
     return interpolationPatterns;

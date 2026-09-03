@@ -1,14 +1,3 @@
-// Port of `Rails` module from `railties/lib/rails.rb`.
-// Renamed `Rails` → `Trails`; `parity:api` wires the alias via the
-// `Rails: "Trails"` entry in `TS_CLASS_RENAMES` (compare.ts).
-//
-// Modeled as a class with static accessors (cf.
-// `packages/activesupport/src/log-subscriber.ts`,
-// `packages/activesupport/src/digest.ts`) so the api-compare extractor
-// harvests getters/setters —
-// `harvestObjectLiteralMethods` ignores accessors on object literals, but
-// the class extractor walks `ts.isGetAccessorDeclaration` for static
-// members. `Trails` is never instantiated.
 import "./trailties/active-support.js";
 import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
@@ -28,24 +17,12 @@ let _cache: CacheStore | null = null;
 let _env: EnvironmentInquirer | undefined;
 let _backtraceCleaner: BacktraceCleaner | undefined;
 
-/**
- * Trails-renamed `Rails` module from `railties/lib/rails.rb`. Mutations
- * flow through explicit setters (`Trails.application = app`,
- * `Trails.env = "test"`).
- *
- * `Trails.version` returns the `@blazetrails/trailties` package version
- * (`packages/trailties/src/version.ts`), NOT the tracked Rails upstream
- * version — resolves open question #3 in `docs/trailties-plan.md`.
- */
 export class Trails {
   private constructor() {
     throw new Error("Trails is a static-only namespace; do not instantiate.");
   }
 
   static get application(): Application | null {
-    // Rails: `@application ||= (app_class.instance if app_class)`. The `||=`
-    // caches the first non-nil result, so a later `Application.appClass =`
-    // does not retroactively change `Trails.application`.
     if (_application) return _application;
     const klass = Application.appClass;
     if (!klass) return null;
@@ -63,9 +40,6 @@ export class Trails {
     _cache = value;
   }
 
-  // Rails' `Rails.logger` is `mattr_accessor :logger` (railties/lib/rails.rb:41).
-  // The storage is the activesupport slot so Active Support's own call-time
-  // `defined?(Rails.logger)` readers (Deprecation's `:log` behavior) see it.
   static get logger(): Logger | null {
     return trailsLogger as Logger | null;
   }
@@ -77,19 +51,10 @@ export class Trails {
     return VERSION;
   }
 
-  /** Rails: `Rails.configuration` → `application.config`. */
   static get configuration(): Configuration | null {
     return Trails.application?.config ?? null;
   }
 
-  /**
-   * Rails: `@_env ||= ActiveSupport::EnvironmentInquirer.new(...)`.
-   * Delegates to `resolveEnv()` in `database.ts` for a single source of
-   * truth — reads `TRAILS_ENV`, defaults to `"development"`. Deliberately
-   * does NOT fall back to `NODE_ENV` (see `database.ts:resolveEnv` for
-   * the rationale: JS ecosystem treats `NODE_ENV` as a build-time hint,
-   * not a runtime selector).
-   */
   static get env(): EnvironmentInquirer {
     return (_env ??= new EnvironmentInquirer(resolveEnv()));
   }
@@ -97,8 +62,6 @@ export class Trails {
     _env = typeof value === "string" ? new EnvironmentInquirer(value) : value;
   }
 
-  /** Rails: `delegate :initialize!, to: :application`. Throws when no app
-   * is registered, matching Rails' `NoMethodError` on `nil.initialize!`. */
   static async initialize(group: InitializerGroup = "default"): Promise<Application> {
     const app = Trails.application;
     if (!app)
@@ -106,9 +69,6 @@ export class Trails {
     return app.initialize(group);
   }
 
-  /** Rails: `delegate :initialized?, to: :application`. Rails has no
-   * `allow_nil:` on the delegate, so this throws when no app is
-   * registered — matching the symmetric behavior of `initialize()`. */
   static initialized(): boolean {
     const app = Trails.application;
     if (!app)
@@ -120,22 +80,12 @@ export class Trails {
     return (_backtraceCleaner ??= new BacktraceCleaner());
   }
 
-  /** Rails: `application && application.config.root` (`rails.rb:65-67`).
-   * `config.root` is an `attr_reader` (`engine/configuration.rb:8`) seeded from
-   * `find_root(called_from)` at construction (`engine.rb:553`), so an explicit
-   * `config.setRoot(...)` override wins over source discovery. Rails never
-   * synthesizes a cwd here — when neither is resolved it returns nil, so we
-   * return undefined rather than reaching for `Application#resolvedRoot`'s
-   * boot-time cwd fallback. */
   static async root(): Promise<string | undefined> {
     const app = Trails.application;
     if (!app) return undefined;
     return app.config.root ?? (await app.root());
   }
 
-  /** Rails: `application && Pathname.new(application.paths["public"].first)`.
-   * Returns null only when no app is registered; `Application#root` always
-   * resolves a root (`application.rb:88-90` defaults it to `Dir.pwd`). */
   static async publicPath(): Promise<string | null> {
     const app = Trails.application;
     if (!app) return null;
@@ -144,19 +94,7 @@ export class Trails {
     return expanded?.[0] ?? null;
   }
 
-  /**
-   * Rails: `Rails.groups(*groups)`. Combines `"default"`, current env, the
-   * `TRAILS_GROUPS` env var, and option-hash keys whose value array
-   * includes the current env. Result is deduped, preserving insertion
-   * order.
-   */
   static groups(...args: Array<string | Record<string, string[]>>): string[] {
-    // Rails' `extract_options!` only pops a plain Hash. The TS signature
-    // restricts callers to `string` group identifiers + an optional
-    // trailing plain object, but at runtime someone could still pass an
-    // array (`String(arr)` would yield a comma-joined identifier). The
-    // plain-Object-prototype check is the defensive guard that mirrors
-    // `extract_options!` exactly.
     const last = args[args.length - 1];
     const isPlainObject =
       last !== null &&
@@ -166,9 +104,6 @@ export class Trails {
     const opts = isPlainObject ? (args.pop() as Record<string, string[]>) : {};
     const env = Trails.env.toString();
     const out: string[] = ["default", env, ...(args as string[])];
-    // Rails: `groups.concat ENV["RAILS_GROUPS"].to_s.split(",")`.
-    // Ruby's `String#split(",")` (no -1 limit) drops trailing empty
-    // segments but preserves middle ones — mirror exactly.
     const envGroups = getEnv("TRAILS_GROUPS");
     if (envGroups) {
       const parts = envGroups.split(",");
@@ -182,8 +117,7 @@ export class Trails {
   }
 }
 
-/** @internal Test-only — drops cached module-private singletons that
- * leak across vitest tests (EnvironmentInquirer, BacktraceCleaner). */
+/** @internal */
 export function _resetTrailsEnv(): void {
   _env = undefined;
   _backtraceCleaner = undefined;

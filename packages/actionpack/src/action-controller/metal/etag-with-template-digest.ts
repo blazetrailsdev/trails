@@ -1,11 +1,3 @@
-/**
- * ActionController::EtagWithTemplateDigest
- *
- * When rendering, includes the template digest in the ETag so that
- * template changes bust browser caches.
- * @see https://api.rubyonrails.org/classes/ActionController/EtagWithTemplateDigest.html
- */
-
 import { getCrypto } from "@blazetrails/ruby-compat";
 import {
   combineEtags as _combineEtags,
@@ -15,16 +7,11 @@ import {
   type ConditionalGetHost,
 } from "./conditional-get.js";
 
-/**
- * Rails `Head#include_content?` — re-exposed because `EtagWithTemplateDigest` includes
- * `ConditionalGet` which includes `Head`.
- * @internal
- */
+/** @internal */
 export function includeContent(status: number): boolean {
   return _includeContent(status);
 }
 
-/** Rails `ConditionalGet#http_cache_forever` — re-exposed via include chain. */
 export function httpCacheForever(
   this: ConditionalGetHost,
   options: { public?: boolean } = {},
@@ -33,15 +20,11 @@ export function httpCacheForever(
   return _httpCacheForever.call(this, options, block);
 }
 
-/** Rails `ConditionalGet#no_store` — re-exposed via include chain. */
 export function noStore(this: ConditionalGetHost): void {
   return _noStore.call(this);
 }
 
-/**
- * Rails `ConditionalGet#combine_etags` — re-exposed via include chain.
- * @internal
- */
+/** @internal */
 export function combineEtags(
   this: unknown,
   validator: unknown,
@@ -56,11 +39,7 @@ export function templateDigest(template: string): string {
 
 export type TemplateLookupContext = { digestFor?(template: string): string | null };
 
-/**
- * The controller state `EtagWithTemplateDigest`'s privates read off `self`.
- *
- * @internal
- */
+/** @internal */
 export interface EtagWithTemplateDigestHost {
   actionName?: string;
   lookupContext?: TemplateLookupContext;

@@ -1,47 +1,10 @@
-/**
- * Port of `Rails::Railtie` from `railties/lib/rails/railtie.rb`. Subclasses
- * opt in to the registry via `Trailtie.register(...)` — no `inherited`
- * hook. Block runners (`rakeTasks`/`console`/`runner`/`generators`/
- * `server`) walk ancestors like Rails' `each_registered_block`.
- *
- * This is the ONLY `Trailtie` in trails. Every framework railtie subclasses it
- * — `ActiveModel::Railtie`, `ActiveRecord::Railtie`, `ActionView::Railtie`,
- * `ActionController::Railtie`, `ActionDispatch::Railtie`, `GlobalID::Railtie`,
- * `ActiveSupport::Railtie` — and they live in `src/trailties/` rather than at
- * their own gem's `railtie.rb` path.
- *
- * That relocation is the one deviation this file's shape costs, and it is
- * forced: `tsc --build` requires a DAG, `trailties` already depends on
- * `activerecord` → `activemodel`, so `packages/activemodel/src/trailtie.ts`
- * cannot import `Trailtie` from here without a cycle. Ruby escapes it because
- * `active_model/railtie.rb:4`'s `require "rails"` is a runtime, opt-in load
- * with no static graph, and the zero-import slot idiom does not help across an
- * `extends` edge (see CLAUDE.md — nothing would then load the subclass modules
- * at all, so their registration never runs). Moving `Rails::Railtie` DOWN into
- * activesupport instead was tried and rejected (PR #7386): it costs 58 methods
- * off trailties' `parity:api` score, since `PATH_SEGMENT_ALIASES` maps
- * `railtie.rb` here. The six moved files contribute no methods at all, so this
- * direction costs ~0 — and it matches the framework → railties edge Rails
- * itself takes.
- */
 import { underscore } from "@blazetrails/activesupport";
 import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 import { assertNotSealed } from "./trailtie/configurable.js";
 
-/**
- * Mirrors `ABSTRACT_RAILTIES` (`railtie.rb:142`), which lists the three
- * classes by their FULLY-QUALIFIED Ruby names — `Rails::Railtie`,
- * `Rails::Engine`, `Rails::Application`. TypeScript class names carry no
- * namespace, and every framework railtie is `Trailtie` inside its own package
- * (`ActiveModel::Railtie`, `ActionView::Railtie`, ...), so a bare-name list
- * would call all of them abstract. The list holds the three classes
- * themselves, which is what the Ruby names denote.
- *
- * @noRailsEquivalent PERMANENT — see the paragraph above; this is the
- * unqualified-class-name shortcoming, not a new concept.
- */
+/** @noRailsEquivalent PERMANENT */
 export const ABSTRACT_RAILTIES: unknown[] = [];
 
 export function abstractRailtie(klass: unknown): void {
@@ -70,7 +33,6 @@ export class Trailtie extends Initializable {
     }
   }
 
-  /** Non-abstract subclasses, sorted by load order. Mirrors `Rails::Railtie.subclasses`. */
   static subclasses(): Array<typeof Trailtie> {
     return [...Trailtie._registry]
       .filter((s) => !s.isAbstractRailtie())
@@ -81,7 +43,6 @@ export class Trailtie extends Initializable {
       );
   }
 
-  /** Explicit subclass registration — replaces Rails' `inherited` hook. */
   static register(subclass: typeof Trailtie): void {
     if (Trailtie._registry.includes(subclass)) return;
     assertNotSealed(subclass);
@@ -95,7 +56,6 @@ export class Trailtie extends Initializable {
     return ABSTRACT_RAILTIES.includes(this);
   }
 
-  /** Set or get the short railtie name (defaults to underscored class name). */
   static railtieName(name?: string): string {
     if (name !== undefined) writeOwnState(this, "_railtieName", name);
     let existing = readOwnState<string>(this, "_railtieName");
@@ -106,7 +66,6 @@ export class Trailtie extends Initializable {
     return existing;
   }
 
-  /** Lazily-created per-class singleton. */
   static instance<T extends typeof Trailtie>(this: T): InstanceType<T> {
     return ownState(this, "_instance", () => new (this as unknown as new () => InstanceType<T>)());
   }
@@ -136,12 +95,8 @@ export class Trailtie extends Initializable {
   }
 
   /**
-   * @internal Read the blocks registered directly on `klass` for `kind`.
-   *
-   * @noRailsEquivalent PERMANENT — Rails reads the per-class block array
-   * straight off the class with `instance_variable_get` (railtie.rb:235-241).
-   * JS class objects have no ivars, so own-state has to be read through a named
-   * accessor; see `ownState` in trailtie/per-class-state.ts.
+   * @internal
+   * @noRailsEquivalent PERMANENT
    */
   static registeredBlocksFor(kind: BlockRunnerKind): TrailtieBlock[] {
     return readOwnState<TrailtieBlock[]>(this, blockKey(kind)) ?? [];

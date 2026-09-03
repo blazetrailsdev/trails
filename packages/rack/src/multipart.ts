@@ -24,7 +24,6 @@ export class MultipartBufferedMimeDataError extends Error {
   }
 }
 
-/** Default limit for buffered (non-file) MIME data: 64 KB */
 const MULTIPART_TEXT_LIMIT = 64 * 1024;
 
 export class MissingInputError extends Error {
@@ -49,23 +48,11 @@ interface ParamsCollector {
   toParamsHash(): any;
 }
 
-/** The `QueryParser`-shaped accumulator `parse_multipart` takes as `params`. */
 interface QueryParserLike {
   makeParams(): ParamsCollector;
   normalizeParams(params: any, key: string, value: any): void;
 }
 
-/**
- * Parse a multipart/form-data body.
- *
- * The `env` object should have:
- *   CONTENT_TYPE - the multipart content type with boundary
- *   CONTENT_LENGTH - content length (optional)
- *   rack.input - an object with a read() method returning the body
- *
- * Returns a params hash (possibly nested via query-string normalization),
- * or null if the content type is not multipart.
- */
 export function parseMultipart(
   env: Record<string, any>,
   params: QueryParserLike = getDefaultQueryParser() as unknown as QueryParserLike,
@@ -144,33 +131,27 @@ function parseBody(
   let totalCount = 0;
   let totalTextSize = 0;
 
-  // Find all boundary positions
   let pos = 0;
 
-  // Skip any preamble - find first boundary
   const firstBoundaryIdx = findNextBoundary(body, delimiter, pos);
   if (firstBoundaryIdx === -1) {
     throw new EmptyContentError();
   }
 
-  // Check for preceding data (invalid)
   if (firstBoundaryIdx > 0) {
     const preamble = body.subarray(0, firstBoundaryIdx).toString("binary").trim();
     if (preamble.length > 0) {
-      // Check if the first boundary is actually an end boundary
       const afterFirst = body.subarray(
         firstBoundaryIdx + delimiter.length,
         firstBoundaryIdx + delimiter.length + 2,
       );
       if (afterFirst.toString() === "--") {
-        // End boundary first - look for a real opening boundary after it
         const nextBoundary = findNextBoundary(
           body,
           delimiter,
           firstBoundaryIdx + endDelimiter.length,
         );
         if (nextBoundary === -1) {
-          // Only had end boundary
           return params.toParamsHash();
         }
         pos = nextBoundary;
@@ -184,11 +165,9 @@ function parseBody(
     pos = firstBoundaryIdx;
   }
 
-  // Check if first boundary is an end boundary
   {
     const afterDelim = body.subarray(pos + delimiter.length, pos + delimiter.length + 2);
     if (afterDelim.toString() === "--") {
-      // End boundary first - look for opening boundary after
       const nextBoundary = findNextBoundary(body, delimiter, pos + endDelimiter.length);
       if (nextBoundary === -1) {
         return params.toParamsHash();
@@ -198,24 +177,20 @@ function parseBody(
   }
 
   while (pos < body.length) {
-    // We should be at a boundary
     const boundaryEnd = pos + delimiter.length;
     if (boundaryEnd > body.length) break;
 
-    // Check what follows boundary
     const afterBoundary = body.subarray(boundaryEnd, boundaryEnd + 2);
     const ab = afterBoundary.toString();
     if (ab === "--") {
-      break; // end boundary
+      break;
     }
 
-    // Skip \r\n after boundary
     let headStart = boundaryEnd;
     if (body[headStart] === 0x0d && body[headStart + 1] === 0x0a) {
       headStart += 2;
     }
 
-    // Find header/body separator
     const headerEndIdx = bufferIndexOf(body, headerSep, headStart);
     if (headerEndIdx === -1) {
       if (headStart >= body.length) break;
@@ -227,13 +202,11 @@ function parseBody(
 
     const bodyStart = headerEndIdx + 4;
 
-    // Find next boundary
     const nextBoundaryIdx = findNextBoundary(body, delimiter, bodyStart);
     let bodyEnd: number;
     if (nextBoundaryIdx === -1) {
       throw new EmptyContentError();
     } else {
-      // Body ends before the \r\n preceding the boundary
       bodyEnd = nextBoundaryIdx;
       if (body[bodyEnd - 2] === 0x0d && body[bodyEnd - 1] === 0x0a) {
         bodyEnd -= 2;
@@ -242,7 +215,6 @@ function parseBody(
 
     const contentBuf = body.subarray(bodyStart, bodyEnd);
 
-    // Parse headers
     const headers = parseMimeHeaders(headerStr);
     const disposition = headers["content-disposition"] || "";
     const contentTypeHeader = headers["content-type"] || null;
@@ -258,7 +230,6 @@ function parseBody(
     }
 
     if (!name || name === "") {
-      // Fall back to content-id or content-type
       if (contentId) {
         name = contentId;
       } else if (filename) {
@@ -280,7 +251,7 @@ function parseBody(
 
     if (filename !== undefined) {
       if (filename === "") {
-        // Empty filename means no file selected - skip
+        /** @empty */
       } else {
         fileCount++;
         if (fileLimit > 0 && fileCount > fileLimit) {
@@ -312,7 +283,6 @@ function parseBody(
         queryParser.normalizeParams(params, name, fileInfo);
       }
     } else {
-      // Text field
       let _encoding = "utf-8";
       if (contentTypeHeader) {
         const charsetMatch = contentTypeHeader.match(/charset=(?:"([^"]+)"|([^\s;]+))/i);
@@ -323,7 +293,6 @@ function parseBody(
 
       const textValue = contentBuf.toString("utf-8");
 
-      // Check buffered text size limit
       if (textLimit > 0) {
         totalTextSize += contentBuf.length;
         if (contentBuf.length > textLimit || totalTextSize > textLimit) {
@@ -355,24 +324,21 @@ function makeTempfile(buf: Buffer): { read(): string; rewind(): void } {
 }
 
 function normalizeFilename(filename: string): string {
-  // If all % sequences are valid hex escapes, decode them
   const percentSequences = filename.match(/%..?/g);
   if (percentSequences && percentSequences.every((s) => /^%[0-9a-fA-F]{2}$/.test(s))) {
     try {
       filename = decodeURIComponent(filename);
     } catch {
-      // keep as-is if decode fails
+      /** @empty */
     }
   }
 
-  // Strip IE full paths - take last component after / or \
   const parts = filename.split(/[/\\]/);
   return parts[parts.length - 1] || "";
 }
 
 function parseMimeHeaders(headerStr: string): Record<string, string> {
   const headers: Record<string, string> = {};
-  // Handle folded headers (continuation lines)
   const unfolded = headerStr.replace(/\r\n([ \t])/g, " ");
   for (const line of unfolded.split("\r\n")) {
     if (!line) continue;
@@ -385,16 +351,10 @@ function parseMimeHeaders(headerStr: string): Record<string, string> {
   return headers;
 }
 
-/**
- * Parse Content-Disposition header value with full Ruby Rack compatibility.
- * Handles quoted values with backslash escaping, unquoted values,
- * semicolons in values, IE paths, etc.
- */
 function parseContentDisposition(disposition: string): { name?: string; filename?: string } {
   let name: string | undefined;
   let filename: string | undefined;
 
-  // Skip "form-data" or "attachment" type
   const semiIdx = disposition.indexOf(";");
   if (semiIdx === -1) return {};
 
@@ -414,8 +374,7 @@ function parseContentDisposition(disposition: string): { name?: string; filename
     let value: string;
 
     if (rest.startsWith('"')) {
-      // Quoted value - parse with backslash escape handling
-      rest = rest.substring(1); // skip opening quote
+      rest = rest.substring(1);
       value = "";
 
       while (rest.length > 0) {
@@ -431,15 +390,13 @@ function parseContentDisposition(disposition: string): { name?: string; filename
         rest = rest.substring(nextSpecial + 1);
 
         if (ch === '"') {
-          break; // end of quoted value
+          break;
         }
 
-        // Backslash escape
         if (rest.length > 0) {
           const escapedChar = rest[0];
           rest = rest.substring(1);
           if (paramName === "filename" && escapedChar !== '"') {
-            // IE uploaded filename: keep backslash and char
             value += ch + escapedChar;
           } else {
             value += escapedChar;
@@ -447,7 +404,6 @@ function parseContentDisposition(disposition: string): { name?: string; filename
         }
       }
     } else {
-      // Unquoted value
       const nextSemi = rest.indexOf(";");
       if (nextSemi !== -1) {
         value = rest.substring(0, nextSemi);
@@ -463,9 +419,7 @@ function parseContentDisposition(disposition: string): { name?: string; filename
     } else if (paramName === "filename") {
       filename = value;
     }
-    // ignore filename* and other params (prefer filename over filename*)
 
-    // Skip to next semicolon
     const nextSemiIdx = rest.indexOf(";");
     if (nextSemiIdx !== -1) {
       rest = rest.substring(nextSemiIdx + 1);
@@ -481,30 +435,22 @@ function bufferIndexOf(haystack: Buffer, needle: Buffer, fromIndex: number): num
   return haystack.indexOf(needle, fromIndex);
 }
 
-/**
- * Find the next real boundary position. A real boundary is the delimiter
- * followed by \r\n (part boundary) or -- (end boundary) or end of buffer.
- */
 function findNextBoundary(body: Buffer, delimiter: Buffer, fromIndex: number): number {
   let pos = fromIndex;
   while (pos < body.length) {
     const idx = body.indexOf(delimiter, pos);
     if (idx === -1) return -1;
     const afterIdx = idx + delimiter.length;
-    if (afterIdx >= body.length) return idx; // at end of buffer
+    if (afterIdx >= body.length) return idx;
     const b0 = body[afterIdx];
     const b1 = afterIdx + 1 < body.length ? body[afterIdx + 1] : -1;
-    // Valid: \r\n or --
     if ((b0 === 0x0d && b1 === 0x0a) || (b0 === 0x2d && b1 === 0x2d)) {
       return idx;
     }
-    // Not a real boundary, keep searching
     pos = idx + 1;
   }
   return -1;
 }
-
-// --- Generator / Builder API ---
 
 export class MultipartParser {
   static parse(
@@ -604,11 +550,6 @@ export class MultipartParser {
   }
 }
 
-/**
- * Accumulator for multipart form data.
- * Mirrors Rack::Multipart::ParamList — toParamsHash() returns an array of
- * [key, value] pairs (not a Record), matching the Ruby implementation.
- */
 export class ParamList {
   private _pairs: [string, unknown][] = [];
 
@@ -629,10 +570,6 @@ export class ParamList {
   }
 }
 
-/**
- * Extract multipart params from a Rack request object.
- * Mirrors Rack::Multipart.extract_multipart.
- */
 export function extractMultipart(
   request: { env: Record<string, any> },
   _params: QueryParserLike = getDefaultQueryParser() as unknown as QueryParserLike,
@@ -640,10 +577,6 @@ export function extractMultipart(
   return parseMultipart(request.env);
 }
 
-/**
- * Build a multipart body from a params hash.
- * Mirrors Rack::Multipart.build_multipart.
- */
 export function buildMultipart(
   params: unknown,
   first: boolean = true,
@@ -651,7 +584,6 @@ export function buildMultipart(
   return new Generator(params, first).dump();
 }
 
-// Convenience top-level
 export const Multipart = {
   parseMultipart,
   parseBoundary,

@@ -1,26 +1,7 @@
-/**
- * OS adapter — mirrors the Rails adapter pattern.
- *
- * Exposes the few runtime surfaces higher-level packages need (`tmpdir`,
- * `platform`, `cwd`, `availableParallelism`) so they can avoid importing
- * `node:os` / `process` directly.
- */
-
 export interface OsAdapter {
   tmpdir(): string;
-  /** Normalized platform id, e.g. "linux", "darwin", "win32". */
   platform(): string;
-  /**
-   * Current working directory. On Node this is `process.cwd()`. Adapters
-   * for non-Node runtimes should return the logical root they'd like
-   * relative paths resolved against.
-   */
   cwd(): string;
-  /**
-   * Number of logical CPUs available to this process. On Node this is
-   * `os.availableParallelism()`. Runtimes without the notion should return
-   * their best estimate of usable concurrency (never less than 1).
-   */
   availableParallelism(): number;
 }
 
@@ -55,15 +36,6 @@ function wrap(os: NodeOs): OsAdapter {
   };
 }
 
-/**
- * Sync auto-registration of the node implementation.
- *
- * Works under CommonJS. In pure Node ESM the sync path cannot synchronously
- * pull in `node:os` without a top-level static import of `node:module`
- * (which would break browser bundles). Consumers running under ESM should
- * call {@link getOsAsync} instead — it uses dynamic `import("node:os")`
- * and works everywhere.
- */
 function tryAutoRegisterNode(): boolean {
   if (registry.has("node")) return true;
   if (nodeAttempted) return false;

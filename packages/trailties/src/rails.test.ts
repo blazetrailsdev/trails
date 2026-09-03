@@ -43,7 +43,6 @@ describe("Trails", () => {
     const first = Trails.application;
     class OtherApp extends Application {}
     Application.register(OtherApp);
-    // Even though appClass is now OtherApp, the memoized application sticks.
     expect(Trails.application).toBe(first);
     expect(Trails.application).toBeInstanceOf(MyApp);
   });
@@ -65,9 +64,6 @@ describe("Trails", () => {
   });
 
   it("Trails.env returns an EnvironmentInquirer wrapping TRAILS_ENV (NOT NODE_ENV)", () => {
-    // `resolveEnv()` in database.ts deliberately ignores NODE_ENV.
-    // Set TRAILS_ENV explicitly via the processAdapter so this assertion
-    // is decoupled from vitest's default `NODE_ENV=test`.
     setEnv("TRAILS_ENV", "staging");
     try {
       _resetTrailsEnv();
@@ -109,9 +105,6 @@ describe("Trails", () => {
   });
 
   it("Trails.groups concatenates TRAILS_GROUPS env entries (Rails-faithful: no trim)", () => {
-    // Rails: `groups.concat ENV["RAILS_GROUPS"].to_s.split(",")`. No trim;
-    // Ruby `split(",")` preserves middle empties and drops trailing
-    // empties. Trails mirrors that on TRAILS_GROUPS.
     Trails.env = "development";
     setEnv("TRAILS_GROUPS", "assets,workers");
     try {
@@ -125,9 +118,6 @@ describe("Trails", () => {
     Trails.env = "development";
     setEnv("TRAILS_GROUPS", "assets,,workers,,");
     try {
-      // Trailing two empties dropped; the middle empty between assets and
-      // workers is preserved (matches `"assets,,workers,,".split(",")` in
-      // Ruby → `["assets", "", "workers"]`).
       expect(Trails.groups()).toEqual(["default", "development", "assets", "", "workers"]);
     } finally {
       setEnv("TRAILS_GROUPS", undefined);

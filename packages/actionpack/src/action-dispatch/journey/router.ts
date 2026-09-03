@@ -5,10 +5,6 @@ import { unescapeUri } from "./router/utils.js";
 import type { Route } from "./route.js";
 import type { Routes } from "./routes.js";
 
-/**
- * Minimal request shape consumed by the Router. Trails' `ActionDispatch::Request`
- * conforms; tests in this file build inline fakes.
- */
 export interface RouterRequest {
   pathInfo: string;
   scriptName: string;
@@ -16,7 +12,6 @@ export interface RouterRequest {
   pathParameters: Record<string, unknown>;
   routeUriPattern?: string | null;
   isHead?(): boolean;
-  /** Route matching is verb-based; constraints may inspect arbitrary keys. */
   [key: string]: unknown;
 }
 
@@ -30,12 +25,6 @@ export interface RoutableApp {
   serve(req: RouterRequest): RackishResponse | Promise<RackishResponse>;
 }
 
-/**
- * Journey router. Drives `serve` (Rack-style dispatch with X-Cascade pass-
- * through) and `recognize` (route introspection used by tests / inspect).
- *
- * Mirrors `action_dispatch/journey/router.rb`.
- */
 export class Router {
   routes: Routes;
 
@@ -89,10 +78,6 @@ export class Router {
   /** @missingRailsArgs merge — PERMANENT */
   recognize(
     railsReq: RouterRequest,
-    // Block return is `unknown` so expression-bodied callbacks like
-    // `(r) => arr.push(r.name)` (which return a number) remain type-
-    // compatible with the previous `() => void` signature. Only an
-    // explicit `=== true` signals short-circuit.
     block: (route: Route, parameters: Record<string, unknown>) => unknown,
   ): void {
     for (const { match, parameters, route } of this.findRoutes(railsReq)) {
@@ -103,16 +88,10 @@ export class Router {
         railsReq.pathInfo = post;
       }
       const merged: Record<string, unknown> = merge(route.defaults, parameters);
-      // JS callbacks can't `return` from the caller's frame the way Ruby
-      // blocks can; returning `true` from the block signals "stop iterating".
       if (block(route, merged) === true) return;
     }
   }
 
-  /**
-   * Debug-only: render the routes FSM as HTML. Mirrors
-   * `action_dispatch/journey/router.rb#visualizer`.
-   */
   visualizer(): string {
     const ast = this.ast();
     if (!ast) throw new Error("Router#visualizer requires a non-empty route set");

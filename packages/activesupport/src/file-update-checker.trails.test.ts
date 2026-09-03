@@ -1,12 +1,3 @@
-/**
- * `ActiveSupport::FileUpdateChecker`'s Rails coverage is
- * `file_update_checker_test.rb`, which mixes in
- * `FileUpdateCheckerSharedTests` — a suite built on `touch` timing loops and
- * `Process.fork`. It is not enrolled here; these are the trails-only
- * invariants of the port: the async block (`execute` awaits, because
- * `CheckPending`'s block reaches the database) and the sync directory walk
- * that stands in for Ruby's `Dir[@glob]`.
- */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -61,9 +52,6 @@ describe("FileUpdateChecker", () => {
     expect(await checker.executeIfUpdated()).toBe(false);
     expect(calls).toBe(0);
 
-    // A bare write races `max_mtime`'s future-mtime skip (`file_update_checker.rb:134`):
-    // a kernel mtime can read ahead of `Date.now()` and be ignored. The backdate
-    // clears that skew and still lands newer than the -10s the checker was built on.
     touch(file, -5);
 
     expect(await checker.executeIfUpdated()).toBe(true);

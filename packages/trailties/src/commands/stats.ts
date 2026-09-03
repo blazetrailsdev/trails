@@ -3,8 +3,6 @@ import { getPathAsync } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { CodeStatistics } from "../code-statistics.js";
 
-// Mirror of `bin/rails stats`. Rails source:
-// railties/lib/rails/tasks/statistics.rake.
 export function statsCommand(): Command {
   return new Command("stats")
     .description("Report code statistics (KLOCs, etc) from the application or engine")

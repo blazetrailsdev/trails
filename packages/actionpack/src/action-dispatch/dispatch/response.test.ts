@@ -126,7 +126,6 @@ describe("ResponseTest", () => {
     const res = new Response();
     res.weakEtag("abc123");
     res._cacheControl = "public, max-age=3600";
-    // Rails: `etag` reader returns the raw header set by weak_etag=.
     expect(res.etag?.startsWith('W/"')).toBe(true);
     expect(res._cacheControl).toBe("public, max-age=3600");
   });
@@ -163,8 +162,6 @@ describe("ResponseTest", () => {
     expect(res.headers.get("Status")).toBeUndefined();
   });
 
-  // --- Stream / commit ---
-
   it("can wait until commit", () => {
     const res = new Response();
     expect(res.committed).toBe(false);
@@ -197,8 +194,6 @@ describe("ResponseTest", () => {
     expect(res.body).toBe("direct body");
   });
 
-  // --- toRack ---
-
   it("toRack returns rack-compatible triple", () => {
     const res = Response.create(200, { "content-type": "text/plain" }, "hi");
     const [status, headers, body] = res.toRack();
@@ -207,24 +202,17 @@ describe("ResponseTest", () => {
     expect([...(body as Iterable<unknown>)]).toEqual(["hi"]);
   });
 
-  // --- Inspect ---
-
   it("inspect", () => {
     const res = new Response(200);
     expect(res.inspect()).toBe("#<ActionDispatch::Response 200 OK>");
   });
 
-  // --- Body encoding ---
-
   it("response body encoding", () => {
     const res = new Response();
     res.body = "テスト";
     expect(res.body).toBe("テスト");
-    // Content-length should be byte length, not char length
     expect(res.contentLength).toBe(Buffer.byteLength("テスト", "utf-8"));
   });
-
-  // --- Headers ---
 
   it("getHeader is case insensitive", () => {
     const res = new Response();
@@ -246,8 +234,6 @@ describe("ResponseTest", () => {
     expect(res.getHeader("X-Custom")).toBe("second");
   });
 
-  // --- ETag ---
-
   it("weak ETag detection", () => {
     const res = new Response();
     res.setHeader("etag", 'W/"abc"');
@@ -262,8 +248,6 @@ describe("ResponseTest", () => {
     expect(res.isWeakEtag()).toBe(true);
   });
 
-  // --- Cache-Control ---
-
   it("setting _cacheControl to undefined removes it", () => {
     const res = new Response();
     res._cacheControl = "no-cache";
@@ -271,15 +255,11 @@ describe("ResponseTest", () => {
     expect(res._cacheControl).toBeUndefined();
   });
 
-  // --- Content type ---
-
   it("text content type gets charset appended", () => {
     const res = new Response();
     res.contentType = "text/plain";
     expect(res.getHeader("content-type")).toBe("text/plain; charset=utf-8");
   });
-
-  // --- Cookies with options ---
 
   it("setCookie with options", () => {
     const res = new Response();
@@ -293,8 +273,6 @@ describe("ResponseTest", () => {
     res.deleteCookie("token");
     expect(res.cookies.token).toBe("");
   });
-
-  // --- Factory ---
 
   it("Response.create with no body", () => {
     const res = Response.create(404);
@@ -314,15 +292,11 @@ describe("ResponseTest", () => {
     expect(res.body).toBe("Hello World");
   });
 
-  // --- Default constructor ---
-
   it("default constructor has status 200", () => {
     const res = new Response();
     expect(res.status).toBe(200);
     expect(res.body).toBe("");
   });
-
-  // --- Status messages ---
 
   it("status messages for common codes", () => {
     expect(new Response(201).message).toBe("Created");
@@ -335,14 +309,10 @@ describe("ResponseTest", () => {
     expect(new Response(503).message).toBe("Service Unavailable");
   });
 
-  // --- contentLength ---
-
   it("contentLength returns undefined when not set", () => {
     const res = new Response();
     expect(res.contentLength).toBeUndefined();
   });
-
-  // --- inspect ---
 
   it("inspect for error status", () => {
     expect(new Response(500).inspect()).toBe(
@@ -412,16 +382,9 @@ describe("ResponseTest", () => {
     expect(headers["x-header"]).toBe("Best of all possible worlds.");
   });
 
-  it.skip("read body during action", () => {
-    // pending: toRack() does not call commitBang(); content-type is not
-    // auto-assigned without an explicit commit. Rails' to_a commits first.
-  });
+  it.skip("read body during action", () => {});
 
-  it.skip("code", () => {
-    // pending: Rails response.code returns the string "200"; our implementation
-    // returns a number. Fixing this requires a breaking change to the existing
-    // "response code" test which already asserts res.code === 200 (number).
-  });
+  it.skip("code", () => {});
 
   it("read content type with default charset utf-8", () => {
     const res = new Response(200, { "Content-Type": "text/xml" });
@@ -477,10 +440,7 @@ describe("ResponseTest", () => {
     }
   });
 
-  it.skip("respond_to? accepts include_private", () => {
-    // pending: Ruby-only introspection (respond_to? with include_private).
-    // No TypeScript equivalent.
-  });
+  it.skip("respond_to? accepts include_private", () => {});
 
   it("can be explicitly destructured into status, headers and an enumerable body", () => {
     const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
@@ -494,14 +454,9 @@ describe("ResponseTest", () => {
     expect([...body]).toEqual(["Not Found"]);
   });
 
-  it.skip("[response.to_a].flatten does not recurse infinitely", () => {
-    // pending: requires Timeout equivalent; no TS parallel. The fix is a
-    // Ruby-specific infinite-recursion guard in to_a / flatten.
-  });
+  it.skip("[response.to_a].flatten does not recurse infinitely", () => {});
 
-  it.skip("compatibility with Rack::ContentLength", () => {
-    // pending: requires Rack::ContentLength middleware, not available in TS.
-  });
+  it.skip("compatibility with Rack::ContentLength", () => {});
 });
 
 describe("ResponseFilterRedirect", () => {
@@ -519,8 +474,6 @@ describe("ResponseFilterRedirect", () => {
     const res = new Response();
     res.request = req;
     res.location = "https://example.com/foo?token=secret&name=alice";
-    // WHATWG URL parser may URL-encode the brackets; check key behaviour
-    // (the `secret` value must be filtered).
     const filtered = res.filteredLocation();
     expect(filtered).toContain("name=alice");
     expect(filtered).not.toContain("secret");
@@ -578,7 +531,6 @@ describe("Response Cache::Response wiring", () => {
     expect(res.isWeakEtag()).toBe(true);
     expect(res.isStrongEtag()).toBe(false);
     expect(res.isEtag).toBe(e);
-    // Case-insensitive read: same value via any casing.
     expect(res.getHeader("etag")).toBe(e);
     expect(res.getHeader("ETAG")).toBe(e);
   });
@@ -638,9 +590,8 @@ describe("Response Cache::Response wiring", () => {
       const res = new Response();
       res.commitBang();
       expect(res.committed).toBe(true);
-      // Default content-type set by assignDefaultContentTypeAndCharsetBang
       expect(res.getHeader("content-type")).toMatch(/text\/html/);
-      res.commitBang(); // second call is a no-op
+      res.commitBang();
       expect(res.committed).toBe(true);
     });
 
@@ -719,49 +670,27 @@ describe("ResponseHeadersTest", () => {
     expect(res.hasHeader("Foo")).toBe(false);
   });
 
-  it.skip("add_header", () => {
-    // pending: addHeader (Rails add_header) is not yet implemented.
-  });
+  it.skip("add_header", () => {});
 });
 
 describe("ResponseIntegrationTest", () => {
-  it.skip("response cache control from railsish app", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response cache control from railsish app", () => {});
 
-  it.skip("response cache control from rackish app", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response cache control from rackish app", () => {});
 
-  it.skip("response charset and content type from railsish app", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response charset and content type from railsish app", () => {});
 
-  it.skip("response charset and content type from rackish app", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response charset and content type from rackish app", () => {});
 
-  it.skip("strong ETag validator", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("strong ETag validator", () => {});
 
-  it.skip("response Content-Type with optional parameters", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response Content-Type with optional parameters", () => {});
 
-  it.skip("response Content-Type with optional parameters that set before charset", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response Content-Type with optional parameters that set before charset", () => {});
 
-  it.skip("response Content-Type with quoted-string", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response Content-Type with quoted-string", () => {});
 
-  it.skip("response body with enumerator", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response body with enumerator", () => {});
 
-  it.skip("response body with lazy enumerator", () => {
-    // pending: requires ActionDispatch::IntegrationTest / full Rack app harness.
-  });
+  it.skip("response body with lazy enumerator", () => {});
 });

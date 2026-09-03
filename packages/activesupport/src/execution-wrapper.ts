@@ -1,9 +1,4 @@
-/**
- * Port of `ActiveSupport::ExecutionWrapper`
- * (activesupport/lib/active_support/execution_wrapper.rb).
- *
- * @internal
- */
+/** @internal */
 
 import { currentErrorReporter } from "./error-reporter.js";
 import type { ErrorReporter } from "./error-reporter.js";
@@ -19,28 +14,20 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
   );
 }
 
-/**
- * The `run`/`complete` pair `register_hook` threads state between
- * (execution_wrapper.rb:41-48). `complete` is handed whatever `run` returned.
- */
 export interface ExecutionHook {
   run(): unknown;
   complete(state: unknown): void;
 }
 
-/** What `run!` returns: either an instance or {@link ExecutionWrapper.Null}. */
 export interface CompletableExecution {
   completeBang(): void;
 }
 
 export class ExecutionWrapper {
-  /** Mirrors Ruby's nested `ExecutionWrapper::RunHook`. */
   static RunHook: typeof RunHook;
 
-  /** Mirrors Ruby's nested `ExecutionWrapper::CompleteHook`. */
   static CompleteHook: typeof CompleteHook;
 
-  /** Mirrors: `Null = Object.new` / `def Null.complete!` (execution_wrapper.rb:9-11). */
   static Null: CompletableExecution = {
     completeBang(): void {},
   };
@@ -50,11 +37,6 @@ export class ExecutionWrapper {
     defineCallbacks(this.prototype, "complete");
   }
 
-  /**
-   * Backs {@link ExecutionWrapper.activeKey}. Ruby memoizes
-   * `:"active_execution_wrapper_#{object_id}"` per class; a fresh Symbol is the
-   * TS spelling of an object-id-derived key.
-   */
   static _activeKey?: symbol;
 
   #_hookState?: Map<ExecutionHook, unknown>;
@@ -67,16 +49,6 @@ export class ExecutionWrapper {
     setCallback(this.prototype, "complete", ...args);
   }
 
-  /**
-   * Register an object to be invoked during both the +run+ and
-   * +complete+ steps.
-   *
-   * +hook.complete+ will be passed the value returned from +hook.run+,
-   * and will only be invoked if +run+ has previously been called.
-   * (Mostly, this means it won't be invoked if an exception occurs in
-   * a preceding +to_run+ block; all ordinary +to_complete+ blocks are
-   * invoked in that situation.)
-   */
   static registerHook(hook: ExecutionHook, { outer = false }: { outer?: boolean } = {}): void {
     if (outer) {
       this.toRun(new RunHook(hook), { prepend: true });
@@ -87,14 +59,6 @@ export class ExecutionWrapper {
     }
   }
 
-  /**
-   * Run this execution.
-   *
-   * Returns an instance, whose +complete!+ method *must* be invoked
-   * after the work has been performed.
-   *
-   * Where possible, prefer +wrap+.
-   */
   static runBang({ reset = false }: { reset?: boolean } = {}): CompletableExecution {
     if (reset) {
       const lostInstance = IsolatedExecutionState.delete<CompletableExecution>(this.activeKey());
@@ -114,18 +78,6 @@ export class ExecutionWrapper {
     return instance;
   }
 
-  /**
-   * Perform the work in the supplied block as an execution.
-   *
-   * Ruby takes `source:` as a keyword and the work as a trailing block; TS has
-   * no block argument, so the block leads and the keywords follow it.
-   *
-   * A Ruby block returns only when its work is done, so `ensure` is the whole
-   * bracket. A JS block that returns a promise has not finished at `finally`,
-   * and completing there closes the query cache and the async-query session
-   * out from under the still-running body, so the thenable arm re-hangs the
-   * same `rescue`/`ensure` pair onto the promise instead.
-   */
   static wrap<T>(block: () => T, { source = "application.active_support" } = {}): T {
     if (this.active()) return block();
 
@@ -191,12 +143,6 @@ export class ExecutionWrapper {
     runCallbacks(this, "run");
   }
 
-  /**
-   * Complete this in-flight execution. This method *must* be called
-   * exactly once on the result of any call to +run!+.
-   *
-   * Where possible, prefer +wrap+.
-   */
   completeBang(): void {
     try {
       this.complete();
@@ -209,19 +155,13 @@ export class ExecutionWrapper {
     runCallbacks(this, "complete");
   }
 
-  /**
-   * Ruby private; reached from the hooks below via `target.send(:hook_state)`.
-   *
-   * @internal
-   */
+  /** @internal */
   hookState(): Map<ExecutionHook, unknown> {
     return (this.#_hookState ??= new Map());
   }
 }
 
-/** Mirrors: `RunHook = Struct.new(:hook)` (execution_wrapper.rb:25-30). */
 export class RunHook {
-  /** Lets an instance satisfy `CallbackObject`, the ObjectCall filter shape. */
   [key: string]: unknown;
 
   constructor(readonly hook: ExecutionHook) {}
@@ -232,9 +172,7 @@ export class RunHook {
   }
 }
 
-/** Mirrors: `CompleteHook = Struct.new(:hook)` (execution_wrapper.rb:32-39). */
 export class CompleteHook {
-  /** Lets an instance satisfy `CallbackObject`, the ObjectCall filter shape. */
   [key: string]: unknown;
 
   constructor(readonly hook: ExecutionHook) {}

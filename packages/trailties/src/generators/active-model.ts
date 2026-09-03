@@ -1,6 +1,3 @@
-// Mirrors railties/lib/rails/generators/active_model.rb. Per-ORM subclasses
-// override these methods to emit ORM-specific snippets that the scaffold
-// controller template inlines.
 export class ActiveModel {
   readonly name: string;
   constructor(name: string) {

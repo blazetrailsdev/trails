@@ -3,7 +3,6 @@ import { concern, hasConcern, includeConcern } from "../../concern.js";
 
 describe("ModuleConcerningTest", () => {
   it("concerning declares a concern and includes it immediately", () => {
-    // In Rails, Module#concerning is sugar for defining+including a concern
     const Host: Record<string, unknown> = {};
     const FooConcern = concern({ classMethods: { foo: () => "foo" } });
     includeConcern(Host, FooConcern);

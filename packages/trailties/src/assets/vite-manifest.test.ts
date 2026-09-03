@@ -1,7 +1,3 @@
-// Trails-only cover for RFC 0104: the generated layout names its stylesheet
-// logically, so the href a production build renders is the digested file
-// `vite build` emitted. Rails has no Vite pipeline, so there is no counterpart
-// test to mirror.
 import { describe, it, expect, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";

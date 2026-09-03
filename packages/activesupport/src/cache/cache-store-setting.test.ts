@@ -30,10 +30,9 @@ describe("CacheStoreSettingTest", () => {
   });
 
   it("mem cache fragment cache store", () => {
-    // NullStore simulates an unavailable memcache
     const store = new NullStore();
     store.write("k", "v");
-    expect(store.read("k")).toBeNull(); // NullStore always returns null
+    expect(store.read("k")).toBeNull();
   });
 
   it("mem cache fragment cache store with not dalli client", () => {
@@ -59,7 +58,6 @@ describe("CacheStoreSettingTest", () => {
   });
 
   it("redis cache store with single array object", () => {
-    // NullStore simulates Redis unavailability in tests
     const store = new NullStore();
     expect(store).toBeDefined();
   });

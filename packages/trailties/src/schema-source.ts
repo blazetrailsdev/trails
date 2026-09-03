@@ -1,12 +1,10 @@
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 import type { SchemaSource, ColumnInfo, IndexInfo } from "@blazetrails/activerecord";
 
-/** Escape a SQLite identifier (double internal quotes). */
 function sqliteId(name: string): string {
   return `"${name.replace(/"/g, '""')}"`;
 }
 
-/** Detect adapter type from the adapter's type-registry key. */
 function detectAdapter(adapter: DatabaseAdapter): "sqlite" | "postgres" | "mysql" {
   const name = adapter.typeRegistryKey.toLowerCase();
   if (name.includes("postgres")) return "postgres";
@@ -14,11 +12,6 @@ function detectAdapter(adapter: DatabaseAdapter): "sqlite" | "postgres" | "mysql
   return "sqlite";
 }
 
-/**
- * Adapter-backed SchemaSource for use with SchemaDumper.
- * Queries the actual database for table, column, and index info.
- * Supports SQLite and Postgres.
- */
 export class AdapterSchemaSource implements SchemaSource {
   private _type: "sqlite" | "postgres" | "mysql" | undefined;
 
@@ -45,7 +38,6 @@ export class AdapterSchemaSource implements SchemaSource {
       throw new Error("MySQL schema introspection is not yet supported by AdapterSchemaSource.");
     }
 
-    // SQLite
     const rows = await this.adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
     );
@@ -57,13 +49,6 @@ export class AdapterSchemaSource implements SchemaSource {
     if (t === "mysql") {
       throw new Error("MySQL schema introspection is not yet supported by AdapterSchemaSource.");
     }
-    // Delegate to the adapter's own reflection so `type` carries the resolved
-    // DSL cast type (`"integer"`, `"bit_varying"`, …) — not the raw SQL type
-    // string. The dumper's `valid_type?` gate rejects unmapped types, and its
-    // `schema_type`/`schema_default` helpers key off the DSL type, so a raw
-    // `"INTEGER"`/`"character varying"` here would be misread as unmapped and
-    // dumped (or dropped) incorrectly. Mirrors the activerecord
-    // AdapterSchemaSource, which already reflects through `adapter.columns()`.
     const cols = (await this.adapter.columns(tableName)) as any[];
     return cols.map((c) => ({
       name: c.name,
@@ -84,7 +69,6 @@ export class AdapterSchemaSource implements SchemaSource {
     }));
   }
 
-  /** The dumper's `schema_default` cast-type lookup, served by the adapter. */
   lookupCastTypeFromColumn(
     column: ColumnInfo,
   ): ReturnType<SchemaSource["lookupCastTypeFromColumn"]> {
@@ -119,7 +103,6 @@ export class AdapterSchemaSource implements SchemaSource {
       }));
     }
 
-    // SQLite
     const rows = await this.adapter.execute(`PRAGMA index_list(${sqliteId(tableName)})`);
     const result: IndexInfo[] = [];
     for (const row of rows as any[]) {

@@ -1,73 +1,16 @@
-/**
- * `AbstractController::Railties::RoutesHelpers` (trails: `Trailties`) — factory that
- * produces a per-class wiring step. The Rails version returns an
- * anonymous `Module` whose `inherited(klass)` hook walks
- * `klass.module_parents` for a namespace exposing
- * `railtie_routes_url_helpers` and includes the appropriate URL-helper
- * module into the subclass; if no namespace has one, it falls back to
- * `routes.url_helpers(include_path_helpers)`.
- *
- * TS has no `inherited` trigger and no `module_parents` traversal,
- * so the factory returns a *function* the host calls on each new
- * subclass. The Ruby namespace chain (e.g. `Admin::PostsController`
- * → `[Admin, Object]`) has no JS equivalent; we approximate by
- * walking the class's own static-side prototype chain for an
- * optional `trailtieRoutesUrlHelpers` slot. This catches the common
- * "Admin::PostsController extends AdminController" shape but won't
- * find a same-name namespace module that isn't an ancestor class —
- * a documented deviation, not a fixable gap.
- *
- * The URL-helpers module is mixed into the controller class as
- * instance methods (mirroring Rails' `klass.include(mod)`), so an
- * action can call `this.postPath(post)` directly. Bridging to views
- * is the job of `ActionController::Helpers`, not this factory.
- *
- * Ported from `vendor/rails/actionpack/lib/abstract_controller/railties/routes_helpers.rb`.
- *
- * @internal
- */
+/** @internal */
 
 import type { HelperMethodsModule, HelpersClassMethods } from "../helpers.js";
 
-/**
- * Minimum shape this factory needs from a route set. Once a real
- * `RouteSet` lands in `action-dispatch/routing`, that class can
- * implement this interface directly.
- */
 export interface UrlHelpersRouteSet {
   urlHelpers(includePathHelpers?: boolean): HelperMethodsModule;
 }
 
-/**
- * Optional class-level slot: if a host class (or one of its
- * inheritance chain ancestors) wants to override the inherited
- * url-helper module, it sets `trailtieRoutesUrlHelpers` to a builder
- * function. Mirrors the Rails `respond_to?(:railtie_routes_url_helpers)`
- * branch.
- */
 export interface RoutesHelpersClassMethods extends HelpersClassMethods {
   trailtieRoutesUrlHelpers?(includePathHelpers?: boolean): HelperMethodsModule;
-  /** Rails: the url-helpers module's singleton `_routes` (`route_set.rb:610-612`). */
   _routes?: unknown;
 }
 
-/**
- * `RoutesHelpers.with(routes, include_path_helpers)` — returns a
- * subclass-init function. Hosts invoke the returned function with the
- * new controller class to wire its URL helpers.
- *
- *     const wire = withRoutesHelpers(routes);
- *     wire(PostsController);
- *
- * The url-helpers module's `included` block is
- * `redefine_singleton_method(:_routes) { routes }`
- * (`action_dispatch/routing/route_set.rb:610-612`), so including it is what
- * gives the class its `_routes` — which `build_view_context_class`
- * (`action_view/rendering.rb:61-64`) then reads to mix the same helpers into
- * the view context. A trails `include` copies methods, so that half runs here,
- * on both arms: the block is the module's own, so a namespace module
- * (`routes_helpers.rb:14-15`) sets the routes that produced it.
- */
 export function withRoutesHelpers(
   routes: UrlHelpersRouteSet,
   includePathHelpers = true,
@@ -77,30 +20,15 @@ export function withRoutesHelpers(
     const mod = namespaceBuilder
       ? namespaceBuilder(includePathHelpers)
       : routes.urlHelpers(includePathHelpers);
-    // Rails: `klass.include(mod)` — make URL helpers available as
-    // instance methods on the controller. Copy each method onto the
-    // class prototype. Iterate with `for...in` so methods reachable
-    // via prototype chains (e.g. a helpers module built through
-    // `_helpersForModification` / `makeIncludeLink` proxy nodes)
-    // aren't silently skipped.
     const proto = cls.prototype as Record<string, unknown>;
     for (const name in mod) {
       const fn = (mod as Record<string, unknown>)[name];
       if (typeof fn === "function") proto[name] = fn;
     }
-    // Rails runs the `included do redefine_singleton_method(:_routes) { routes } end`
-    // block on both arms — each module closes over the routes that produced
-    // it, so a namespace module sets its own. Read it back off the module
-    // rather than assuming the RouteSet passed here.
     cls._routes = (mod as { _routes?: unknown })._routes ?? routes;
   };
 }
 
-/**
- * Combined shape: a class (`{ prototype }`) optionally carrying the
- * namespace-helper slot. Splitting these into two types would force
- * every caller to intersect them; the union keeps the API ergonomic.
- */
 export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods {
   prototype: object;
 }
@@ -109,10 +37,6 @@ function findTrailtieUrlHelpers(
   cls: RoutesHelpersClassMethods,
 ): RoutesHelpersClassMethods["trailtieRoutesUrlHelpers"] {
   let current: object | null = cls;
-  // Stop before Function.prototype / Object.prototype so a polyfill
-  // or accidental property defined there can't be picked up. Rails
-  // restricts the lookup to namespace modules; we restrict to
-  // user-defined classes.
   while (current && current !== Function.prototype && current !== Object.prototype) {
     const own = Object.getOwnPropertyDescriptor(current, "trailtieRoutesUrlHelpers")?.value as
       | RoutesHelpersClassMethods["trailtieRoutesUrlHelpers"]
@@ -123,7 +47,4 @@ function findTrailtieUrlHelpers(
   return undefined;
 }
 
-// Rails-name alias: `AbstractController::Railties::RoutesHelpers.with(...)`.
-// Exported under the bare name so `parity:api` matches; the descriptive
-// `withRoutesHelpers` remains the recommended import for consumers.
 export { withRoutesHelpers as with };

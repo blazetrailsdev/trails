@@ -15,9 +15,9 @@ describe("DurationTest", () => {
   it("is a", () => {
     const d = Duration.days(1);
     expect(d instanceof Duration).toBe(true);
-    expect(d instanceof Duration).toBe(true); // isA(Duration)
-    expect(d instanceof Duration).toBe(true); // isKindOf Duration
-    expect(d instanceof Map).toBe(false); // not a Hash
+    expect(d instanceof Duration).toBe(true);
+    expect(d instanceof Duration).toBe(true);
+    expect(d instanceof Map).toBe(false);
   });
 
   it("instance of", () => {
@@ -33,9 +33,7 @@ describe("DurationTest", () => {
 
   it("equals", () => {
     expect(Duration.days(1).isEqualTo(Duration.days(1))).toBe(true);
-    // Duration equals its inSeconds number (via compareTo)
     expect(Duration.days(1).compareTo(86400)).toBe(0);
-    // comparing to non-number returns NaN (not 0)
     expect(isNaN(Duration.days(1).compareTo("foo"))).toBe(true);
   });
 
@@ -105,7 +103,6 @@ describe("DurationTest", () => {
   });
 
   it("inspect ignores locale", () => {
-    // No I18n in TypeScript — just verify the format is always English
     expect(Duration.years(10).plus(Duration.months(1)).plus(Duration.days(1)).inspect()).toBe(
       "10 years, 1 month, and 1 day",
     );
@@ -140,18 +137,14 @@ describe("DurationTest", () => {
   it("multiply", () => {
     expect(Duration.days(1).times(7).eql(Duration.days(7))).toBe(true);
     expect(Duration.days(1).times(7) instanceof Duration).toBe(true);
-    // Duration * Duration => numeric (seconds product)
     expect(Duration.days(1).inSeconds() * Duration.seconds(1).inSeconds()).toBe(86400);
   });
 
   it("divide", () => {
-    // dividedBy divides each part (Rails duration.rb:297-305)
     expect(Duration.days(7).dividedBy(7).isEqualTo(Duration.days(1))).toBe(true);
     expect(Duration.days(7).dividedBy(7) instanceof Duration).toBe(true);
     expect(Math.round(Duration.days(7).dividedBy(7).inSeconds())).toBe(86400);
-    // 1.day / 24 => 3600 seconds
     expect(Math.round(Duration.days(1).dividedBy(24).inSeconds())).toBe(3600);
-    // numeric / Duration
     expect(Math.round(86400 / Duration.hours(1).inSeconds())).toBe(24);
     expect(Math.round(Duration.days(1).inSeconds() / Duration.hours(1).inSeconds())).toBe(24);
     expect(Math.round(Duration.days(1).inSeconds() / Duration.days(1).inSeconds())).toBe(1);
@@ -199,12 +192,10 @@ describe("DurationTest", () => {
   });
 
   it("plus with time", () => {
-    // 1 + 1.second == 1.second + 1 (both = 2 seconds)
     expect(Duration.seconds(1).plus(1).inSeconds()).toBe(Duration.seconds(1).plus(1).inSeconds());
   });
 
   it("time plus duration returns same time datatype", () => {
-    // Duration#since now returns Temporal.Instant — verify arithmetic works for each unit
     const now = new Date();
     for (const unit of [
       "seconds",
@@ -244,7 +235,7 @@ describe("DurationTest", () => {
 
   it("since and ago preserve sub-millisecond precision of Temporal.Instant inputs", () => {
     const baseMs = new Date(2000, 0, 1).getTime();
-    const baseNs = BigInt(baseMs) * 1_000_000n + 123_456n; // 123_456 ns past the ms boundary
+    const baseNs = BigInt(baseMs) * 1_000_000n + 123_456n;
     const t = Temporal.Instant.fromEpochNanoseconds(baseNs);
     const after = Duration.seconds(1).since(t);
     expect(after.epochNanoseconds).toBe(baseNs + 1_000_000_000n);
@@ -264,7 +255,6 @@ describe("DurationTest", () => {
   it("since and ago without argument", () => {
     const before = new Date();
     const result = Duration.seconds(1).since();
-    // result should be at least 1 second after before
     expect(result.epochMilliseconds).toBeGreaterThanOrEqual(before.getTime() + 1000 - 50);
   });
 
@@ -272,7 +262,6 @@ describe("DurationTest", () => {
     const t = new Date(2000, 0, 1);
     const via36h = Duration.hours(36).since(t);
     const via15days = Duration.days(1.5).since(t);
-    // fractional days use ms arithmetic, same as hours — should be equal
     expect(Math.abs(via36h.epochMilliseconds - via15days.epochMilliseconds)).toBeLessThan(1000);
 
     const ago36h = Duration.hours(36).ago(t);
@@ -288,13 +277,11 @@ describe("DurationTest", () => {
   });
 
   it("since and ago anchored to time now when time zone is not set", () => {
-    // JS doesn't have TimeWithZone — just verify since() returns a Temporal.Instant
     const result = Duration.seconds(5).since();
     expect(result).toBeInstanceOf(Temporal.Instant);
   });
 
   it("since and ago anchored to time zone now when time zone is set", () => {
-    // No TimeWithZone in JS — skip timezone-specific behavior
     expect(true).toBe(true);
   });
 
@@ -313,23 +300,19 @@ describe("DurationTest", () => {
   });
 
   it("adding hours across dst boundary", () => {
-    // JS Date handles DST automatically via timestamp arithmetic
-    const base = new Date(2009, 2, 29, 0, 0, 0); // Mar 29 2009
+    const base = new Date(2009, 2, 29, 0, 0, 0);
     const result = Duration.hours(24).since(base);
-    // 24 hours later in wall-clock time
     expect(result.epochMilliseconds).toBe(base.getTime() + 24 * 3600 * 1000);
   });
 
   it("adding day across dst boundary", () => {
-    const base = new Date(2009, 2, 29, 0, 0, 0); // Mar 29 2009
+    const base = new Date(2009, 2, 29, 0, 0, 0);
     const result = Duration.days(1).since(base);
-    // calendar day advance
     expect(asDate(result).getDate()).toBe(30);
     expect(asDate(result).getMonth()).toBe(2);
   });
 
   it("delegation with block works", () => {
-    // 1.minute.times { } — in JS we'd iterate inSeconds() times
     let counter = 0;
     const count = Math.round(Duration.minutes(1).inSeconds());
     for (let i = 0; i < count; i++) counter++;
@@ -356,7 +339,6 @@ describe("DurationTest", () => {
   });
 
   it("hash", () => {
-    // In JS we verify eql equality as a proxy for same hash
     expect(Duration.minutes(1).eql(Duration.seconds(60))).toBe(true);
   });
 
@@ -375,12 +357,10 @@ describe("DurationTest", () => {
   });
 
   it("scalar coerce", () => {
-    // Scalar is not implemented; just verify Duration arithmetic returns Duration
     expect(Duration.seconds(10).plus(Duration.seconds(0)) instanceof Duration).toBe(true);
   });
 
   it("scalar delegations", () => {
-    // In TS, Duration has inSeconds() (float), toString() (string)
     expect(typeof Duration.seconds(10).inSeconds()).toBe("number");
     expect(typeof Math.round(Duration.seconds(10).inSeconds())).toBe("number");
     expect(typeof Duration.seconds(10).toString()).toBe("string");
@@ -405,7 +385,6 @@ describe("DurationTest", () => {
   });
 
   it("scalar plus parts", () => {
-    // scalar(10) + 1.day → { days: 1, seconds: 10 }
     const result = Duration.seconds(10).plus(Duration.days(1));
     expect(result.parts.days).toBe(1);
     expect(result.parts.seconds).toBe(10);
@@ -418,7 +397,6 @@ describe("DurationTest", () => {
   });
 
   it("scalar minus parts", () => {
-    // scalar(10) - 1.day → { days: -1, seconds: 10 }
     const result = Duration.seconds(10).minus(Duration.days(1));
     expect(result.parts.days).toBe(-1);
     expect(result.parts.seconds).toBe(10);
@@ -430,7 +408,6 @@ describe("DurationTest", () => {
   });
 
   it("scalar multiply parts", () => {
-    // scalar(1) * 2.days → { days: 2 }
     const result = Duration.days(2).times(1);
     expect(result.parts.days).toBe(2);
     expect(Math.round(result.inSeconds())).toBe(172800);
@@ -452,16 +429,13 @@ describe("DurationTest", () => {
   });
 
   it("scalar modulo parts", () => {
-    // 82800 % 2.hours (7200s) = 3600s = 1 hour
     const result = Duration.seconds(82800).modulo(Duration.hours(2));
     expect(Math.round(result.inSeconds())).toBe(3600);
   });
 
   it("twelve months equals one year", () => {
-    // In our implementation, 12 months ≈ 1 year (seconds-based comparison within ~1%)
     const twelveMonths = Duration.months(12).inSeconds();
     const oneYear = Duration.years(1).inSeconds();
-    // Allow up to 1% difference due to floating-point month/year constants
     expect(Math.abs(twelveMonths - oneYear) / oneYear).toBeLessThan(0.01);
   });
 
@@ -470,7 +444,6 @@ describe("DurationTest", () => {
   });
 
   it("adding one month maintains day of month", () => {
-    // Jan 14 + 1 month = Feb 14
     const jan14 = new Date(2016, 0, 14);
     const feb14 = Duration.months(1).since(jan14);
     expect(asDate(feb14).getMonth()).toBe(1);
@@ -508,7 +481,6 @@ describe("DurationTest", () => {
   });
 
   it("iso8601 parsing per-component negatives (PG intervalstyle=iso_8601)", () => {
-    // PG emits e.g. "P-1Y-2D" for "1 year 2 days ago".
     expect(Duration.parse("P-1Y-2D").eql(Duration.years(-1).plus(Duration.days(-2)))).toBe(true);
     expect(Duration.parse("P-21D").eql(Duration.days(-21))).toBe(true);
     expect(Duration.parse("PT-3H").eql(Duration.hours(-3))).toBe(true);
@@ -550,7 +522,6 @@ describe("DurationTest", () => {
     const d = Duration.years(1).plus(Duration.months(1)).plus(Duration.days(1));
     const reparsed = Duration.parse(d.iso8601());
     const now = new Date();
-    // Both should produce roughly same result when applied to now
     expect(
       Math.abs(d.since(now).epochMilliseconds - reparsed.since(now).epochMilliseconds),
     ).toBeLessThan(1000);
@@ -579,7 +550,6 @@ describe("DurationTest", () => {
   });
 
   it("durations survive yaml serialization", () => {
-    // No YAML in TypeScript; test JSON round-trip proxy
     const d = Duration.minutes(10);
     const json = JSON.stringify({ seconds: d.inSeconds() });
     const parsed = JSON.parse(json);

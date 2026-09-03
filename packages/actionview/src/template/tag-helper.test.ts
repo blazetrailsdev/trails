@@ -180,7 +180,6 @@ describe("TagHelperTest", () => {
     for (const char of INVALID_TAG_CHARS.split("").filter((c) => c !== " ")) {
       expect(() => tag(`asdf-${char}`)).toThrow();
     }
-    // space
     expect(() => tag("asdf- ")).toThrow();
   });
 
@@ -721,7 +720,6 @@ describe("TagHelperTest", () => {
     expect(result).toContain('aria-label="label"');
     expect(result).toContain('data-input-value="data"');
     expect(result).toContain('required="required"');
-    // value=nil should be excluded, but data-input-value is fine
     expect(result).not.toMatch(/(?<![- ])value="/);
     expect(result).not.toMatch(/^value="/);
     expect(result).not.toContain(' value="');
@@ -795,7 +793,7 @@ describe("TagHelperTest", () => {
     expect(contentTag("p").toString()).toBe(
       contentTag("p", null, null, true, () => {
         for (let i = 0; i < 3; i++) {
-          /* do_something */
+          /** @empty */
         }
         return "";
       }).toString(),
@@ -808,7 +806,7 @@ describe("TagHelperTest", () => {
       t
         .p(() => {
           for (let i = 0; i < 3; i++) {
-            /* do_something */
+            /** @empty */
           }
           return "";
         })

@@ -1,9 +1,3 @@
-/**
- * Smoke tests for RemoteIp middleware. Full Rails-mirrored cases
- * (actionpack/test/dispatch/request_test.rb RequestIP class) follow up
- * in a sibling PR.
- */
-
 import { describe, it, expect } from "vitest";
 import { Request } from "../http/request.js";
 import { RemoteIp, IpSpoofAttackError, TRUSTED_PROXIES, type Proxy } from "./remote-ip.js";
@@ -131,12 +125,7 @@ describe("RemoteIp middleware (smoke)", () => {
     async function* emptyBody(): AsyncGenerator<string> {}
     expect(
       () =>
-        new RemoteIp(
-          async () => [200, {}, emptyBody()],
-          true,
-          // Numbers aren't iterable in JS.
-          42 as unknown as Iterable<Proxy>,
-        ),
+        new RemoteIp(async () => [200, {}, emptyBody()], true, 42 as unknown as Iterable<Proxy>),
     ).toThrow(/single value/);
   });
 });

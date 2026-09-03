@@ -103,12 +103,9 @@ describe("StringAccessTest", () => {
   });
 });
 
-/** Mirrors `string_ext_test.rb`'s `with_env_tz` helper (`test/abstract_unit.rb`). */
 function withEnvTz<T>(tz: string, fn: () => T): T {
   const orig = process.env.TZ;
   process.env.TZ = tz;
-  // `Time`'s local-zone memo is MRI's `tzset` cache; `TZ` moving under it has
-  // to drop it, exactly as `tzset` does.
   resetLocalTimeZoneId();
   try {
     return fn();
@@ -119,11 +116,6 @@ function withEnvTz<T>(tz: string, fn: () => T): T {
   }
 }
 
-/**
- * Ruby's `assert_equal` on two `Time`s compares the instant; trails' `to_time`
- * answers a `Temporal.ZonedDateTime` and `Time.local`/`Time.utc` a `Time`, so
- * both sides are read as their epoch nanoseconds.
- */
 function epochNs(time: Temporal.ZonedDateTime | Time | undefined): bigint | undefined {
   if (time === undefined) return undefined;
   return (time instanceof Time ? time.toTime() : time).epochNanoseconds;
@@ -167,10 +159,6 @@ describe("StringConversionsTest", () => {
 
   it("string to time utc offset", () => {
     withEnvTz("US/Eastern", () => {
-      // Rails' `else` branch: `preserve_timezone` defaults to nil, which its
-      // reader latches to false absent an app initializer setting
-      // `to_time_preserves_timezone = :zone` (date_and_time/compatibility.rb:24-37),
-      // so `Time#to_time` converts an offset-built time to the system zone.
       expect(toTime("2005-02-27 23:50", "utc")!.offsetNanoseconds / 1_000_000_000).toBe(0);
       expect(toTime("2005-02-27 23:50")!.offsetNanoseconds / 1_000_000_000).toBe(-18000);
       expect(toTime("2005-02-27 22:50 -0100", "utc")!.offsetNanoseconds / 1_000_000_000).toBe(0);
@@ -180,7 +168,6 @@ describe("StringConversionsTest", () => {
 
   it("partial string to time", () => {
     withEnvTz("Europe/Moscow", () => {
-      // use timezone which does not observe DST.
       const now = Time.now();
       expect(epochNs(toTime("23:50"))).toBe(
         epochNs(Time.mktime(now.year, now.month, now.day, 23, 50)),
@@ -197,10 +184,6 @@ describe("StringConversionsTest", () => {
     });
   });
 
-  // Rails wraps the four cases below in `Time.stub(:now, ...)`, which fixes the
-  // date `to_time` would default a partial string to. Every string here names a
-  // full date, so the stubbed clock never reaches the answer; trails' clock is
-  // left alone rather than stubbed through a seam Rails does not have.
   it("standard time string to time when current time is standard time", () => {
     withEnvTz("US/Eastern", () => {
       expect(epochNs(toTime("2012-01-01 10:00"))).toBe(epochNs(Time.mktime(2012, 1, 1, 10, 0)));
@@ -328,10 +311,6 @@ describe("StringConversionsTest", () => {
   it.skip("partial string to time when current time is standard time");
   it.skip("partial string to time when current time is daylight savings");
   it("string to datetime", () => {
-    // Rails asserts `DateTime.civil(2039, 2, 27, 23, 50)` and a `.offset` of 0;
-    // trails' `DateTime.parse` returns the offsetless `Temporal.PlainDateTime`
-    // for an offsetless string and a `ZonedDateTime` when the string carries
-    // one, which is the same pair of values Ruby's DateTime holds.
     expect(String(toDatetime("2039-02-27 23:50"))).toEqual("2039-02-27T23:50:00");
     expect(String(toDatetime("2039-02-27T23:50:19.275038-04:00"))).toEqual(
       "2039-02-27T23:50:19.275038-04:00[-04:00]",
@@ -562,7 +541,6 @@ describe("StringInflectionsTest", () => {
     expect(parameterize("!@#Leading bad characters")).toBe("leading-bad-characters");
     expect(parameterize("Squeeze   separators")).toBe("squeeze-separators");
     expect(parameterize("Test with + sign")).toBe("test-with-sign");
-    // Diacritic transliteration (matches Rails' transliterate behavior)
     expect(parameterize("café")).toBe("cafe");
     expect(parameterize("Müller")).toBe("muller");
     expect(parameterize("naïve")).toBe("naive");
@@ -651,7 +629,6 @@ describe("StringInflectionsTest", () => {
     expect(
       truncate("Oh dear! Oh dear! I shall be late!", 18, { omission: "...", separator: " " }),
     ).toBe("Oh dear! Oh...");
-    // Separator falls at exactly the truncation boundary (Rails rindex behavior)
     expect(truncate("ab-ab-ab-ab-ab-ab-ab-rest", 20, { omission: "", separator: /-/ })).toBe(
       "ab-ab-ab-ab-ab-ab-ab",
     );
@@ -760,7 +737,6 @@ describe("OutputSafetyTest", () => {
   });
 
   it("An integer is safe by default", () => {
-    // In JS, numbers aren't strings, so isHtmlSafe is false for primitives
     expect(isHtmlSafe(42)).toBe(false);
   });
 
@@ -816,7 +792,6 @@ describe("OutputSafetyTest", () => {
   });
 
   it("Concatting safe onto unsafe yields unsafe", () => {
-    // A plain string concat'd with safe is still plain
     const unsafe = "hello ";
     const safe = htmlSafe("world");
     const result = unsafe + safe.toString();

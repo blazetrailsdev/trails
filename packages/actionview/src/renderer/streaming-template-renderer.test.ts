@@ -121,7 +121,6 @@ describe("StreamingTemplateRenderer", () => {
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
       const chunks = await collectChunks(renderer.renderStream(ctx, { template: "posts/show" }));
 
-      // Rails: streaming_completion_on_exception — empty string in this port
       expect(chunks).toEqual([""]);
       expect(spy).toHaveBeenCalled();
     });

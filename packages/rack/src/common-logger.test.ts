@@ -33,7 +33,6 @@ it("work with standard library logger", async () => {
       this.str += s;
     },
   };
-  // Simulate Logger with info method
   const log = {
     info(msg: string) {
       logdev.write(msg + "\n");
@@ -103,7 +102,6 @@ it("escapes non printable characters including newline", async () => {
       logdev.write(msg + "\n");
     },
   };
-  // Test newline escaping in REMOTE_USER and QUERY_STRING
   await new MockRequest((env) => new CommonLogger(app, log).call(env)).get("/", {
     REMOTE_USER: "foo\nbar",
     QUERY_STRING: "bar\nbaz",

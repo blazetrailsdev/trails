@@ -1,11 +1,3 @@
-/**
- * ActionDispatch::RequestEncoder
- *
- * Registry of per-MIME-type request/response encoders. Maps a content-type
- * string (or registered MIME symbol) to a parser callable used by
- * {@link TestResponse#parsedBody}.
- */
-
 import { MimeType } from "../http/mime-type.js";
 
 export type ResponseParser = (body: string) => unknown;

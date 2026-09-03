@@ -15,7 +15,6 @@ function testCase(): Record<string, never> {
   return klass;
 }
 
-/** The `self` Ruby's `self.failures` resolves against — one list per test. */
 function runningTest(): Pick<RunningTest, "failures"> {
   return { failures: [] };
 }

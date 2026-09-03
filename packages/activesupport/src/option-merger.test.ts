@@ -3,16 +3,6 @@ import { withOptions } from "./core-ext/object/with-options.js";
 import { OptionMerger } from "./option-merger.js";
 import { assertNotSame } from "./testing/assertions.js";
 
-/**
- * Port of activesupport/test/option_merger_test.rb.
- *
- * Rails' test case *is* the receiver, and `context` below carries its private
- * helpers `method_with_options` / `method_with_args`
- * (option_merger_test.rb:139-155). Ruby's kwargs variants collapse onto one
- * TypeScript shape — a trailing options object — so `method_with_kwargs` /
- * `method_with_kwargs_only` have no separate form, and the assertions naming
- * them fold into their `method_with_options` siblings.
- */
 describe("OptionMergerTest", () => {
   const context = {
     methodWithArgs(...args: unknown[]): unknown[] {

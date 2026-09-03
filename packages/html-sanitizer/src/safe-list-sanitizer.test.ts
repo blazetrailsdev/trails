@@ -1,12 +1,3 @@
-// Mirrors rails-html-sanitizer test/sanitizer_test.rb -> SafeListSanitizerTest.
-// Test names track Rails' test_* methods for parity:test alignment.
-//
-// Rails' suite is heavily intertwined with libxml2 / Loofah specifics
-// (many tests use `acceptable_results = [...]` to span libxml2 versions
-// and the gumbo/neko parsers). For engine-divergent cases we assert the
-// security-relevant invariant (no scripts, no js: URLs) rather than the
-// exact byte-for-byte output.
-
 import { afterEach, describe, expect, test } from "vitest";
 import { SafeListSanitizer } from "./safe-list-sanitizer.js";
 import { DEFAULT_ALLOWED_ATTRIBUTES, DEFAULT_ALLOWED_TAGS } from "./config.js";
@@ -22,7 +13,6 @@ const assertSanitized = (raw: string, expected?: string) => {
 
 describe("SafeListSanitizer", () => {
   afterEach(() => {
-    // Reset class-level state mutated by scope_* helpers.
     SafeListSanitizer.allowedTags = new Set(DEFAULT_ALLOWED_TAGS);
     SafeListSanitizer.allowedAttributes = new Set(DEFAULT_ALLOWED_ATTRIBUTES);
   });
@@ -47,25 +37,15 @@ describe("SafeListSanitizer", () => {
   });
 
   test("sanitize_javascript_href", () => {
-    // javascript:-scheme URLs are dropped from the actual <a>/<span>
-    // attributes. The bare prefix text outside any tag survives as
-    // plain text — that matches Rails (the leading `href="javascript:bang" `
-    // is text, not an attribute).
     const out = sanitize(
       `href="javascript:bang" <a href="javascript:bang" name="hello">foo</a>, <span href="javascript:bang">bar</span>`,
     )!;
     expect(out).toContain(`<a name="hello">foo</a>`);
     expect(out).toContain(`<span>bar</span>`);
-    // No javascript: scheme on any actual element attribute.
     expect(out).not.toMatch(/<[^>]+\bhref="javascript:/i);
   });
 
   test("should_allow_anchors", () => {
-    // Divergence from Rails: sanitize-html unconditionally discards
-    // <script>/<style> tag *contents* as a security measure (cannot be
-    // disabled). Loofah strips the tag and keeps "baz" — Rails output
-    // would be `<a href="foo">baz</a>`. We get the empty <a> instead,
-    // which is strictly safer. Revisit when PR 3 swaps engine internals.
     expect(sanitize(`<a href="foo" onclick="bar"><script>baz</script></a>`)).toBe(
       `<a href="foo"></a>`,
     );
@@ -77,11 +57,7 @@ describe("SafeListSanitizer", () => {
 
   for (const attr of ["src", "width", "height", "alt"]) {
     test(`should_allow_image_${attr}_attribute`, () => {
-      assertSanitized(
-        `<img ${attr}="foo" onclick="bar" />`,
-        // sanitize-html self-closes void elements; the value is preserved.
-        `<img ${attr}="foo" />`,
-      );
+      assertSanitized(`<img ${attr}="foo" onclick="bar" />`, `<img ${attr}="foo" />`);
     });
   }
 
@@ -156,8 +132,6 @@ describe("SafeListSanitizer", () => {
     expect(() => sanitize("<a>some html</a>", { attributes: "foo" })).toThrow(TypeError);
   });
 
-  // XSS protection: javascript: / vbscript: / data: schemes must never
-  // survive on src/href, regardless of source obfuscation.
   test("should_strip_src_attribute_in_img_with_bad_protocols", () => {
     expect(sanitize(`<img src="javascript:bang" title="1">`)).not.toContain("javascript:");
   });
@@ -178,8 +152,6 @@ describe("SafeListSanitizer", () => {
     expect(sanitize(`<img lowsrc="javascript:alert('XSS')" />`)).not.toContain("javascript:");
   });
 
-  // Various javascript: obfuscation hacks — assert no js:-scheme leaks
-  // through, regardless of casing, whitespace, or entity-encoding.
   for (const hack of [
     `<IMG SRC="javascript:alert('XSS');">`,
     `<IMG SRC=javascript:alert('XSS')>`,

@@ -1,27 +1,19 @@
 export { DeserializationError } from "./deserialization-error.js";
 
 export interface CacheOptions {
-  expiresIn?: number; // seconds TTL (relative; mirrors Rails second-unit Entry)
-  expiresAt?: number; // epoch-ms absolute expiry; converted to expiresIn by mergedOptions
-  expire_in?: number; // alias for expiresIn (mirrors Rails OPTION_ALIASES)
-  expired_in?: number; // alias for expiresIn (mirrors Rails OPTION_ALIASES)
+  expiresIn?: number;
+  expiresAt?: number;
+  expire_in?: number;
+  expired_in?: number;
   namespace?: string;
   compress?: boolean;
   compressThreshold?: number;
   unlessExist?: boolean;
-  raceConditionTtl?: number; // seconds
-  [key: string]: unknown; // open hash (Rails); flows into the Store base's StoreOptions
+  raceConditionTtl?: number;
+  [key: string]: unknown;
 }
 
-/**
- * The public surface every store in this package satisfies — the TS spelling
- * of "responds to the `ActiveSupport::Cache::Store` protocol", which Ruby
- * expresses by subclassing `Store` rather than by a named shape.
- *
- * @noRailsEquivalent PERMANENT — name collision only. Ruby's `CacheStore`
- * (`ActionDispatch::Session::CacheStore`) is a session middleware that stores
- * sessions *in* a cache; it is not the cache protocol.
- */
+/** @noRailsEquivalent PERMANENT */
 export interface CacheStore {
   read(key: string, options?: CacheOptions): unknown;
   write(key: string, value: unknown, options?: CacheOptions): boolean;

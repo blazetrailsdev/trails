@@ -1,6 +1,3 @@
-/**
- * Mirrors Rails activesupport/test/deprecation/deprecators_test.rb
- */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Deprecation } from "../deprecation.js";
 import { Deprecators } from "./deprecators.js";
@@ -16,8 +13,6 @@ describe("DeprecationTest", () => {
     }
   });
 
-  // Rails' assert_deprecated / assert_not_deprecated over `deprecator.warn`:
-  // a silenced deprecator emits nothing to stderr.
   function assertSilencing(deprecator: Deprecation, silencing: boolean): void {
     const behaviorWas = deprecator.behavior;
     const emitted = vi.fn();
@@ -44,8 +39,6 @@ describe("DeprecationTest", () => {
   });
 
   it("#each without block returns an Enumerator", () => {
-    // JS has no Enumerator; `each` always takes a block. Its iteration order
-    // and membership are what the Rails assertion checks.
     const gemNames: (string | undefined)[] = [];
     deprecators.each((deprecator) => gemNames.push(deprecator.gemName));
     expect(gemNames.sort()).toEqual([...deprecatorNames].sort());
@@ -131,9 +124,6 @@ describe("DeprecationTest", () => {
   });
 
   it("#silence only affects the current thread", () => {
-    // JS has no threads; the silence counter is per-instance, so the
-    // observable half of the Rails test is that silencing is scoped to the
-    // block and reverted after it.
     deprecators.silence(() => {
       deprecators.each((deprecator) => assertSilencing(deprecator, true));
     });

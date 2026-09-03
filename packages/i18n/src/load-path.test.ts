@@ -1,20 +1,3 @@
-/**
- * Mirrors: i18n/test/i18n/load_path_test.rb
- *
- * Ruby reads a load-path entry with a synchronous `YAML.load_file`; trails
- * awaits the bytes once through `preloadTranslationFiles` and keeps every
- * ported body verbatim over them (see base.ts). `I18n.load_path =` is
- * `setLoadPath()` for the same reason — it reloads the backend, and a TS `set`
- * accessor cannot be awaited.
- *
- * `Pathname.new(path)` has no JS counterpart: a path is a String here, so both
- * Pathname cases push the same value `Dir[]` yields above them. The Ruby file
- * fixture is `en.rb`; trails authors it as TypeScript and registers it under
- * its emitted `en.js` name, the way backend/simple.test.ts does — so
- * `Dir[locales_dir + '/*.{rb,yml}']` is the `.js`/`.yml` entries of the
- * fixture directory, listed the way `Dir[]` sorts them.
- */
-
 import { readFile } from "node:fs/promises";
 import { beforeEach, describe, expect, it } from "vitest";
 

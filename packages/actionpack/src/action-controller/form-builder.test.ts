@@ -69,7 +69,6 @@ describe("defaultFormBuilder DSL", () => {
     expect(MyController.defaultFormBuilder()).toBe(FakeBuilder);
     const inst = new MyController();
     expect(inst.defaultFormBuilder()).toBe(FakeBuilder);
-    // Sibling controllers don't inherit from each other.
     class SiblingController extends Base {}
     expect(SiblingController.defaultFormBuilder()).toBeUndefined();
   });

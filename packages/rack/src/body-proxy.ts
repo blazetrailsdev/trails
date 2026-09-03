@@ -24,11 +24,7 @@ export class BodyProxy {
     return this._closed;
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT (`vendor/rack/lib/rack/body_proxy.rb:45` — `method_missing`
-   *   forwards the synchronous `each` to the wrapped body).
-   * JS async-iteration protocol — Ruby's Enumerable#each is synchronous
-   */
+  /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterator<any> {
     if (this.body && typeof this.body[Symbol.asyncIterator] === "function") {
       for await (const item of this.body) yield item;
@@ -76,7 +72,6 @@ export class BodyProxy {
     return typeof this.body?.[method] === "function";
   }
 
-  /** Delegate method calls to the wrapped body */
   delegate(method: string, ...args: any[]): any {
     if (method === "toStr" || method === "to_str") {
       throw new Error("NoMethodError: undefined method 'to_str'");

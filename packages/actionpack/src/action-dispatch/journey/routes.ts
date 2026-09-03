@@ -17,10 +17,6 @@ export interface Mapping {
   makeRoute(name: string, index: number): Route;
 }
 
-/**
- * The routing table. Contains all routes for a system. Routes can be
- * added by calling `Routes#addRoute`.
- */
 export class Routes implements Iterable<Route> {
   readonly routes: Route[];
   readonly customRoutes: Route[] = [];
@@ -43,7 +39,6 @@ export class Routes implements Iterable<Route> {
     return this.routes.length;
   }
 
-  /** Rails alias :size :length */
   get size(): number {
     return this.length;
   }
@@ -52,17 +47,11 @@ export class Routes implements Iterable<Route> {
     return this.routes[this.routes.length - 1];
   }
 
-  /**
-   * @noRailsEquivalent PERMANENT
-   *   (`use-site:vendor/rails/actionpack/lib/action_dispatch/journey/routes.rb:10, :35` — `include
-   *   Enumerable` plus `def each`).
-   * JS iteration protocol — Ruby reaches iteration through Enumerable#each
-   */
+  /** @noRailsEquivalent PERMANENT */
   [Symbol.iterator](): Iterator<Route> {
     return this.routes[Symbol.iterator]();
   }
 
-  /** Rails `routes.each(&block)`. */
   each(block: (route: Route) => void): void {
     for (const r of this.routes) block(r);
   }

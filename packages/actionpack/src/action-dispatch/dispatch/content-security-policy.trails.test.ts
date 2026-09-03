@@ -1,10 +1,3 @@
-/**
- * trails-only cover for the two things `ContentSecurityPolicy#report_uri`
- * (content_security_policy.rb:238-240) does NOT do, precisely because it is
- * the one directive writer that assigns `@directives` directly instead of
- * going through the `DIRECTIVES` loop (content_security_policy.rb:189-197):
- * it applies no `apply_mappings`, and it has no delete-on-nil arm.
- */
 import { describe, it, expect } from "vitest";
 import { ContentSecurityPolicy } from "../http/content-security-policy.js";
 

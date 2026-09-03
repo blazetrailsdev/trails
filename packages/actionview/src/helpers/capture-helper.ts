@@ -3,21 +3,11 @@ import { SafeBuffer, htmlEscape, isPresent } from "@blazetrails/activesupport";
 import { OutputBuffer } from "../buffers.js";
 import { OutputFlow } from "../flows.js";
 
-/**
- * Host shape required by capture-helper. Mixed into ActionView::Base
- * (and ActionView::TestCase) via `this`-typed function assignment.
- */
 export interface CaptureHelperHost {
   outputBuffer: OutputBuffer | null;
   viewFlow: OutputFlow;
 }
 
-/**
- * capture — runs `block`, returning what it appended to the output buffer
- * as an HTML-safe string. If the block's return value is itself a string
- * (and the buffer stayed empty), that value is HTML-escaped and returned.
- * Mirrors `ActionView::Helpers::CaptureHelper#capture`.
- */
 export function capture<TArgs extends unknown[]>(
   this: CaptureHelperHost,
   block: (...args: TArgs) => unknown,
@@ -43,13 +33,6 @@ export function capture<TArgs extends unknown[]>(
   return null;
 }
 
-/**
- * contentFor — stores or retrieves a block of markup keyed by `name`.
- * With `content` or a block: appends (or replaces, when `flush: true`)
- * into the view flow and returns `null`. Without either: returns the
- * stored content if any, else `null`. Mirrors
- * `ActionView::Helpers::CaptureHelper#content_for`.
- */
 export function contentFor(
   this: CaptureHelperHost,
   name: string,
@@ -57,9 +40,6 @@ export function contentFor(
   options?: { flush?: boolean },
   block?: () => unknown,
 ): SafeBuffer | null {
-  // Ruby spells the block with `&`, so `content_for(:name) { ... }` arrives in
-  // `&block` no matter how many optional positionals precede it. JS has no
-  // sigil: a lone trailing callback lands in `content`, so recognize it here.
   if (typeof content === "function" && block === undefined) {
     block = content as () => unknown;
     content = undefined;
@@ -86,18 +66,12 @@ export function contentFor(
   return isPresent(stored.toString()) ? stored : null;
 }
 
-/** Mirrors Ruby's `Hash === value` for the options-vs-content disambiguation. */
 function isPlainOptions(value: unknown): value is { flush?: boolean } {
   return (
     typeof value === "object" && value !== null && Object.getPrototypeOf(value) === Object.prototype
   );
 }
 
-/**
- * provide — like `contentFor`, but for streaming responses flushes back
- * to the layout immediately. Mirrors
- * `ActionView::Helpers::CaptureHelper#provide`.
- */
 export function provide(
   this: CaptureHelperHost,
   name: string,
@@ -113,20 +87,11 @@ export function provide(
   return null;
 }
 
-/**
- * contentForQuestion — `content_for?(name)`. True if any content has been
- * captured for `name`. Mirrors `CaptureHelper#content_for?`.
- */
 export function contentForQuestion(this: CaptureHelperHost, name: string): boolean {
   return isPresent(this.viewFlow.get(name).toString());
 }
 
-/**
- * withOutputBuffer — swaps the output buffer for the duration of `block`,
- * returning the swapped-in buffer. Mirrors `CaptureHelper#with_output_buffer`.
- *
- * @internal
- */
+/** @internal */
 export function withOutputBuffer(
   this: CaptureHelperHost,
   buf: OutputBuffer | null,

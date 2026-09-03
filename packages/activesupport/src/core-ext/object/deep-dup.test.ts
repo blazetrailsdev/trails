@@ -35,7 +35,6 @@ describe("DeepDupTest", () => {
   });
 
   it("deep dup initialize", () => {
-    // Ruby Hash.new(0) returns 0 for missing keys; TS equivalent uses a Proxy
     const zeroHash = new Proxy<Record<string, number>>(
       {},
       {
@@ -47,8 +46,6 @@ describe("DeepDupTest", () => {
     );
     const hash = { a: zeroHash };
     const dup = deepDup(hash);
-    // After deep dup, the nested object is a plain copy (not a Proxy)
-    // but the original values should be preserved
     expect(dup.a).toBeDefined();
     expect(dup.a).not.toBe(hash.a);
   });
@@ -62,14 +59,12 @@ describe("DeepDupTest", () => {
   });
 
   it("deep dup with hash class key", () => {
-    // Ruby uses class objects as keys; in TS we use string keys
     const hash: Record<string, number> = { Integer: 1 };
     const dup = deepDup(hash);
     expect(Object.keys(dup).length).toBe(1);
   });
 
   it("deep dup with mutable frozen key", () => {
-    // In TS, object keys are always strings, so we test that values are deeply copied
     const hash: Record<string, any> = { key: { array: [] } };
     const dup = deepDup(hash);
     dup.key.array.push("element");
@@ -78,7 +73,6 @@ describe("DeepDupTest", () => {
   });
 
   it("named modules arent duped", () => {
-    // Named classes/constructors shouldn't be deep-duped; they're references
     const hash = { class: Object, module: Array };
     const dup = deepDup(hash);
     expect(dup.class).toBe(hash.class);
@@ -86,7 +80,6 @@ describe("DeepDupTest", () => {
   });
 
   it("anonymous modules are duped", () => {
-    // Anonymous classes (plain objects) should be deep-duped
     const hash = { class: { name: "anon" }, module: { name: "anon2" } };
     const dup = deepDup(hash);
     expect(dup.class).not.toBe(hash.class);

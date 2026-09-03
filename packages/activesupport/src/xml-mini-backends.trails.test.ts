@@ -2,19 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { castBackendNameToModule } from "./xml-mini.js";
 
-/**
- * Ruby's `cast_backend_name_to_module` is
- * `require "active_support/xml_mini/#{name.downcase}"` (xml_mini.rb:200-206),
- * so its reachable set IS the directory listing. trails spells the set out in
- * `XML_MINI_BACKENDS`, which a new backend file could silently miss — these
- * cover the two halves of that: every ported file resolves, and the three
- * backends Rails ships that trails does not carry raise what their own Ruby
- * file raises.
- */
 describe("XmlMini backends", () => {
-  // Vite rewrites a LITERAL `import.meta.glob` call at transform time, so the
-  // spelling has to stay as written; the repo's tsconfig omits `vite/client`,
-  // which is the only thing that declares it.
   // @ts-expect-error -- Property 'glob' does not exist on type 'ImportMeta'
   const ported = Object.keys(import.meta.glob("./xml-mini/*.ts") as Record<string, unknown>)
     .map((path) => path.replace(/^\.\/xml-mini\//, "").replace(/\.ts$/, ""))
@@ -40,14 +28,6 @@ describe("XmlMini backends", () => {
   });
 });
 
-/**
- * Rails' Nokogiri engine suites are the shared `EngineTests` module and nothing
- * else (`nokogiri_engine_test.rb:5-15`), which trails runs from
- * `xml-mini/xml-mini-engine.test.ts`. These two cases have no Rails
- * counterpart: they pin behaviour of the trails backends themselves — the
- * malformed-document raise and entity decoding — which `assert_equal_rexml`
- * never reaches.
- */
 describe("Nokogiri XmlMini backends", () => {
   for (const name of ["Nokogiri", "NokogiriSAX"]) {
     it(`throws on malformed xml under ${name}`, async () => {

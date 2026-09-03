@@ -16,7 +16,6 @@ describe("Base ParamsWrapper wiring", () => {
     expect(UsersController._wrapperOptions.name).toBe("person");
     expect(UsersController._wrapperOptions.include).toEqual(["name"]);
     expect(UsersController._wrapperOptions.klass).toBe(UsersController);
-    // Parent unchanged
     expect(Base._wrapperOptions.name).toBeNull();
   });
 
@@ -24,9 +23,7 @@ describe("Base ParamsWrapper wiring", () => {
     class A extends Base {}
     A.wrapParameters({ format: ["json"] });
     class B extends A {}
-    // No own format set yet; inherits A's [json]
     expect(B._wrapperOptions.format).toEqual(["json"]);
-    // Adding more options preserves format from current
     B.wrapParameters({ include: ["x"] });
     expect(B._wrapperOptions.format).toEqual(["json"]);
     expect(B._wrapperOptions.include).toEqual(["x"]);
@@ -62,7 +59,6 @@ describe("Base ParamsWrapper wiring", () => {
     expect(Child._wrapperOptions.klass).toBe(Child);
     expect(Child._wrapperOptions.name).toBe("parent");
     expect(Child._wrapperOptions.format).toEqual(["json"]);
-    // Parent's options unchanged
     expect(Parent._wrapperOptions.klass).toBe(Parent);
   });
 
@@ -73,7 +69,6 @@ describe("Base ParamsWrapper wiring", () => {
     expect(UsersController._wrapperOptions.nameSet).toBe(false);
     class AdminsController extends UsersController {}
     AdminsController.inheritedParamsWrapper();
-    // Re-derived from AdminsController, not inherited "user"
     expect(AdminsController._wrapperOptions.name).toBe("admin");
     expect(AdminsController._wrapperOptions.klass).toBe(AdminsController);
   });

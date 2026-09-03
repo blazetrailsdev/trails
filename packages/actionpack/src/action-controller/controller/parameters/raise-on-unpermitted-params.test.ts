@@ -23,7 +23,6 @@ describe("RaiseOnUnpermittedParamsTest", () => {
     Parameters.actionOnUnpermittedParameters = "raise";
     const inner = new Parameters({ title: "Hi", admin: true });
     const params = new Parameters({ post: inner });
-    // expect uses suppressUnpermitted to skip unpermitted-parameter checks
     expect(() => params.expect({ post: ["title"] })).not.toThrow(UnpermittedParameters);
   });
 

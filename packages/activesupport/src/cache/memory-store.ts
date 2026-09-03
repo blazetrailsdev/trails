@@ -7,11 +7,8 @@ import { registerStoreClass } from "./store-registry.js";
 
 const PER_ENTRY_OVERHEAD = 240;
 
-// Ruby `String#bytesize`; JS strings are UTF-16, so the UTF-8 length is encoded.
 const UTF8 = new TextEncoder();
 
-// Mirrors Ruby `#to_i`: Integer/Float truncate toward zero, a String yields its
-// leading integer (0 when none), and anything else is 0.
 function toI(value: unknown): number {
   if (typeof value === "number") return Math.trunc(value);
   if (typeof value === "bigint") return Number(value);
@@ -23,27 +20,17 @@ function toI(value: unknown): number {
 }
 
 export class MemoryStore extends Store implements CacheStore {
-  /** Advertise cache versioning support (memory_store.rb:87-90). */
   static supportsCacheVersioning(): boolean {
     return true;
   }
 
-  // Rails stores the `serialize_entry` payload itself (`@data[key] = payload`,
-  // memory_store.rb:213-227), which is a DupCoder-dumped `Entry` by default and
-  // a serializer's dumped string when the caller names one, and keeps the LRU
-  // order in the Hash — re-inserted on read (:204-208).
   private data: Map<string, Entry | string> = new Map();
   private maxSize: number;
   private maxPruneTime: number;
   private cacheSize: number;
   private _pruning = false;
 
-  /**
-   * @missingRailsCall new — PERMANENT: memory_store.rb:83 `@monitor = Monitor.new` — Ruby's
-   *   Monitor is a reentrant mutex guarding the store against other THREADS. JS
-   *   has one thread and the store's mutations are synchronous, so there is
-   *   nothing to construct and nothing to lock. Language shortcoming.
-   */
+  /** @missingRailsCall new — PERMANENT */
   constructor(options?: {
     size?: number;
     maxPruneTime?: number;
@@ -54,9 +41,6 @@ export class MemoryStore extends Store implements CacheStore {
     coder?: unknown;
     serializer?: unknown;
   }) {
-    // Rails installs DupCoder and disables compression by default
-    // (memory_store.rb:73-77); the coder is skipped when the caller named a
-    // `:coder` or a `:serializer` of their own.
     const opts: StoreOptions = { ...(options ?? {}) };
     if (!("coder" in opts) && !("serializer" in opts)) opts.coder = DupCoder;
     if (!opts.compress) opts.compress = false;
@@ -66,9 +50,6 @@ export class MemoryStore extends Store implements CacheStore {
     this.cacheSize = 0;
   }
 
-  // Mirrors Rails MemoryStore#cached_size (memory_store.rb:198-200). Ruby's
-  // `payload.bytesize` reads the same on a Marshal/serializer String as on a
-  // DupCoder `Entry`; TS has to branch because JS strings have no such method.
   private cachedSize(key: string, payload: Entry | string): number {
     return (
       UTF8.encode(String(key)).length +
@@ -77,11 +58,6 @@ export class MemoryStore extends Store implements CacheStore {
     );
   }
 
-  // Abstract entry hooks of the instrumented Store base, backed by the Map. The
-  // public read/write/delete/exist?/fetch/*_multi methods are inherited.
-  // Mirrors Rails MemoryStore#read_entry (memory_store.rb:202-212): re-inserting
-  // the payload makes the Map's iteration order the LRU order Rails gets from
-  // Ruby's insertion-ordered Hash.
   protected readEntry(key: string, _options: Record<string, unknown>): Entry | null {
     const payload = this.data.get(key);
     if (payload === undefined) return null;
@@ -96,8 +72,6 @@ export class MemoryStore extends Store implements CacheStore {
 
     const oldPayload = this.data.get(key);
     if (oldPayload !== undefined) {
-      // Ruby `old_payload.bytesize - payload.bytesize` (memory_store.rb:216)
-      // duck-types over String and Entry; JS strings have no `bytesize`.
       this.cacheSize -=
         (typeof oldPayload === "string" ? UTF8.encode(oldPayload).length : oldPayload.bytesize()) -
         (typeof payload === "string" ? UTF8.encode(payload).length : payload.bytesize());
@@ -121,8 +95,6 @@ export class MemoryStore extends Store implements CacheStore {
     this.cacheSize = 0;
   }
 
-  // Mirrors Rails MemoryStore#cleanup (memory_store.rb): instrumented, deletes
-  // every expired entry.
   override cleanup(options?: CacheOptions): void {
     options = this.mergedOptions(options);
     this.instrument("cleanup", null, { size: this.data.size }, () => {
@@ -133,9 +105,6 @@ export class MemoryStore extends Store implements CacheStore {
     });
   }
 
-  // Mirrors Rails MemoryStore#delete_matched (memory_store.rb): instrumented with
-  // the matcher, which is run through keyMatcher so a namespaced store scopes the
-  // deletion to its own (namespace-prefixed) keys.
   override deleteMatched(matcher: string | RegExp, options?: CacheOptions): void {
     options = this.mergedOptions(options);
     if (typeof matcher === "string") matcher = new RegExp(matcher);
@@ -147,18 +116,12 @@ export class MemoryStore extends Store implements CacheStore {
     });
   }
 
-  // Mirrors Rails MemoryStore#inspect (memory_store.rb:186-188). Ruby's
-  // `self.class.name` is the fully-qualified constant; TS has only the class
-  // name, which is the same last segment.
   inspect(): string {
     return `#<${this.constructor.name} entries=${this.data.size}, size=${this.cacheSize}, options=${inspectOptions(
       this.options as Record<string, unknown>,
     )}>`;
   }
 
-  // Rails MemoryStore instruments increment/decrement with the raw, unnormalized
-  // name (memory_store.rb:149,167) — unlike FileStore, which uses the normalized
-  // key (file_store.rb:62-64).
   override increment(name: string, amount = 1, options?: CacheOptions): number {
     return this.instrument("increment", name, { amount }, () =>
       this.modifyValue(name, amount, options),
@@ -171,28 +134,16 @@ export class MemoryStore extends Store implements CacheStore {
     );
   }
 
-  // Mirrors Rails MemoryStore#modify_value (memory_store.rb): on a missing,
-  // expired, or version-mismatched entry it *creates* the key set to
-  // Integer(amount) through the instrumented write path and returns amount (so
-  // `increment("foo") # => 1`); on a hit it adds to entry.value.to_i, preserving
-  // the entry's expiresAt/version.
   private modifyValue(name: string, amount: number, options?: CacheOptions): number {
     options = this.mergedOptions(options);
     const key = this.normalizeKey(name, options);
     const version = this.normalizeVersion(name, options) ?? null;
     const entry = this.readEntry(key, options);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
-      // Rails seeds with `Integer(amount)` (raises on NaN/Infinity) but returns
-      // the raw `amount` (memory_store.rb:248-249), so `increment("foo", 1.5)`
-      // writes 1 yet returns 1.5.
       this.write(name, kernelInteger(amount), options);
       return amount;
     }
-    // Hit path adds the raw `amount` — Rails never calls `Integer()` here
-    // (memory_store.rb:251), so no truncation and no NaN/Infinity raise.
     const num = toI(entry.value) + amount;
-    // Rails calls `write_entry(key, entry)` with no options (memory_store.rb:255),
-    // so `unless_exist` never suppresses the hit-path rewrite; pass `{}` to match.
     this.writeEntry(
       key,
       new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
@@ -201,11 +152,6 @@ export class MemoryStore extends Store implements CacheStore {
     return num;
   }
 
-  /**
-   * Rails guards `prune` against re-entry with the `@pruning` flag
-   * (memory_store.rb:110-127): `cleanup` and the per-key deletion below can both
-   * re-enter through a write, and the inner call must not prune again.
-   */
   prune(targetSize: number, maxTime?: number): void {
     if (this.isPruning()) return;
     this._pruning = true;
@@ -228,19 +174,12 @@ export class MemoryStore extends Store implements CacheStore {
     }
   }
 
-  /** Returns true if the cache is currently being pruned (memory_store.rb:129-131). */
   isPruning(): boolean {
     return this._pruning;
   }
 }
 
 export namespace DupCoder {
-  /**
-   * Mirrors Rails MemoryStore::DupCoder#dump (memory_store.rb:32-38): rebuild
-   * the Entry around a dumped value so the stored value can't alias the
-   * caller's, preserving expires_at/version. Ruby's `entry.value && … != true
-   * && !Numeric` leaves nil/false/true/Numeric entries untouched.
-   */
   export function dump(entry: Entry): Entry {
     const value = entry.value;
     if (
@@ -256,13 +195,11 @@ export namespace DupCoder {
     }
   }
 
-  /** Mirrors Rails MemoryStore::DupCoder#dump_compressed (memory_store.rb:40-43). */
   export function dumpCompressed(entry: Entry, threshold: number): Entry {
     const compressedEntry = entry.compressed(threshold);
     return compressedEntry.isCompressed() ? compressedEntry : dump(entry);
   }
 
-  /** Mirrors Rails MemoryStore::DupCoder#load (memory_store.rb:45-51). */
   export function load(entry: Entry): Entry {
     if (!entry.isCompressed() && typeof entry.value === "string") {
       return new Entry(loadValue(entry.value), {
@@ -274,21 +211,8 @@ export namespace DupCoder {
     }
   }
 
-  /**
-   * Rails' `MARSHAL_SIGNATURE` (memory_store.rb:54) is the two leading bytes
-   * every `Marshal.dump` payload carries, which is how `load_value` tells a
-   * serialized value from a String stored verbatim. The trails Marshal
-   * equivalent is the fidelity Coder (coder.ts), whose JSON output carries no
-   * such self-identifying prefix, so `dump_value` prepends the same signature
-   * and `load_value` strips it — same discriminator, same two arms.
-   */
   const MARSHAL_SIGNATURE = "\x04\x08";
 
-  /**
-   * Mirrors Rails MemoryStore::DupCoder#dump_value (memory_store.rb:56-62).
-   * Ruby's `value.dup` guards against the caller mutating the stored String;
-   * JS strings are immutable, so the String arm returns it as-is.
-   */
   export function dumpValue(value: unknown): string {
     if (typeof value === "string" && !value.startsWith(MARSHAL_SIGNATURE)) {
       return value;
@@ -297,7 +221,6 @@ export namespace DupCoder {
     }
   }
 
-  /** Mirrors Rails MemoryStore::DupCoder#load_value (memory_store.rb:64-70). */
   export function loadValue(string: string): unknown {
     if (string.startsWith(MARSHAL_SIGNATURE)) {
       return coder.load(string.slice(MARSHAL_SIGNATURE.length));

@@ -1,10 +1,3 @@
-/**
- * `ActiveSupport::Benchmarkable` — mixed into `AbstractController::Logger`
- * (logger.rb:13) and `ActiveRecord::Base` (base.rb:285) the way Rails'
- * `include`/`extend` mixes it in. `benchmark` reads the host's own `logger`
- * reader (benchmarkable.rb:38,44,46) rather than taking it as a parameter.
- */
-
 import { assertValidKeys } from "./hash-utils.js";
 
 export interface BenchmarkLogger {
@@ -21,7 +14,6 @@ export interface BenchmarkOptions {
   silence?: boolean;
 }
 
-/** The host of `include ActiveSupport::Benchmarkable` — supplies `logger`. */
 export interface Benchmarkable {
   logger?: BenchmarkLogger | null;
 }

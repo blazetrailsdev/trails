@@ -6,8 +6,6 @@ export {
   type TseImplementation,
 } from "./template/handlers/tse.js";
 
-// Merged: `Template` is both the interface (data shape) and a namespace
-// exposing the Rails-spelled `Template.Error` class.
 export { Template } from "./template.js";
 export type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-location.js";
 

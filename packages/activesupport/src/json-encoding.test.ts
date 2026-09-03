@@ -75,7 +75,6 @@ describe("TestJSONEncoding", () => {
   });
 
   it("to json works when as json returns infinite number", () => {
-    // Infinity serializes as null in JSON
     const obj = { value: Infinity };
     const json = JSON.stringify(obj);
     expect(JSON.parse(json).value).toBeNull();
@@ -123,7 +122,6 @@ describe("TestJSONEncoding", () => {
   });
 
   it("struct encoding", () => {
-    // In TS, a plain object with defined shape works like a struct
     const point = { x: 10, y: 20 };
     const json = JSON.stringify(point);
     expect(JSON.parse(json)).toEqual({ x: 10, y: 20 });

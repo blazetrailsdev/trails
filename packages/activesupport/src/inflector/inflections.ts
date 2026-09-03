@@ -1,8 +1,3 @@
-/**
- * Inflections — stores pluralization, singularization, and other rules.
- * Mirrors ActiveSupport::Inflector::Inflections from Rails.
- */
-
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
@@ -17,18 +12,10 @@ export interface HumanRule {
   replacement: string;
 }
 
-/**
- * Mirrors: ActiveSupport::Inflector::Inflections::Uncountables
- * (inflector/inflections.rb:35-63) — an Array of downcased words plus the
- * parallel `@regex_array` that `uncountable?` matches against. The downcasing
- * lives here, in `add`, exactly as it does in Ruby; call sites pass the word
- * through untouched.
- */
 export class Uncountables extends Array<string> {
   private _regexArray: RegExp[] = [];
 
   delete(entry: string): void {
-    // Ruby's Array#delete removes every equal element, not just the first.
     let index: number;
     while ((index = this.indexOf(entry)) !== -1) this.splice(index, 1);
     const regex = this.toRegex(entry);
@@ -48,8 +35,6 @@ export class Uncountables extends Array<string> {
     return this._regexArray.some((regex) => regex.test(str));
   }
 
-  // Ruby's `/\b…\Z/i` boundary is Unicode-aware, so it fires before a
-  // non-ASCII word like "猫"; JS `\b` is ASCII-only.
   private toRegex(string: string): RegExp {
     return new RegExp(`(?<![\\p{L}\\p{N}_])${regexpEscape(string)}$`, "iu");
   }
@@ -74,11 +59,6 @@ export class Inflections {
     return this.instances.get(locale)!;
   }
 
-  /**
-   * Mirrors: inflections.rb:70-75 — walks the locale's fallback chain and
-   * returns the first instance already built for one of them, falling back to
-   * building the requested locale's own.
-   */
   static instanceOrFallback(locale: string): Inflections {
     for (const k of I18n.fallbacks().get(locale)) {
       if (this.instances.has(k)) return this.instances.get(k)!;
@@ -99,11 +79,7 @@ export class Inflections {
     this.instances.delete(locale);
   }
 
-  /**
-   * @missingRailsCall prepend — PERMANENT: Ruby Array#prepend is the alias of #unshift:
-   *   `@plurals.prepend([rule, replacement])` (inflector/inflections.rb:154)
-   *   ports to `this.plurals.unshift({ rule, replacement })`.
-   */
+  /** @missingRailsCall prepend — PERMANENT */
   plural(rule: RegExp | string, replacement: string): void {
     if (typeof rule === "string") {
       this.uncountables.delete(rule);
@@ -113,11 +89,7 @@ export class Inflections {
     this.plurals.unshift({ rule, replacement });
   }
 
-  /**
-   * @missingRailsCall prepend — PERMANENT: Ruby Array#prepend is the alias of #unshift:
-   *   `@singulars.prepend([rule, replacement])` (inflector/inflections.rb:165)
-   *   ports to `this.singulars.unshift({ rule, replacement })`.
-   */
+  /** @missingRailsCall prepend — PERMANENT */
   singular(rule: RegExp | string, replacement: string): void {
     if (typeof rule === "string") {
       this.uncountables.delete(rule);
@@ -178,11 +150,7 @@ export class Inflections {
     }
   }
 
-  /**
-   * @missingRailsCall prepend — PERMANENT: Ruby Array#prepend is the alias of #unshift:
-   *   `@humans.prepend([rule, replacement])` (inflector/inflections.rb:221)
-   *   ports to `this.humans.unshift({ rule, replacement })`.
-   */
+  /** @missingRailsCall prepend — PERMANENT */
   human(rule: RegExp | string, replacement: string): void {
     this.humans.unshift({ rule, replacement });
   }
@@ -212,10 +180,6 @@ export class Inflections {
   }
 }
 
-/**
- * Mirrors: ActiveSupport::Inflector#inflections (inflections.rb:265-271) —
- * yields the locale's singleton so rules can be added, or returns it.
- */
 export function inflections(
   locale: string = "en",
   block?: (inflect: Inflections) => void,
@@ -229,9 +193,6 @@ export function inflections(
   }
 }
 
-/**
- * Load default English inflection rules (matching Rails exactly).
- */
 export function loadDefaults(inflect: Inflections): void {
   inflect.plural(/$/, "s");
   inflect.plural(/s$/i, "s");
@@ -304,7 +265,6 @@ export function loadDefaults(inflect: Inflections): void {
   );
 }
 
-// Initialize default English inflections
 const defaultInflections = Inflections.instance("en");
 loadDefaults(defaultInflections);
 

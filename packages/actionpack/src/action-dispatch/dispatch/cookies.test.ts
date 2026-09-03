@@ -138,7 +138,6 @@ describe("CookiesTest", () => {
 
   it("setting cookie expires from a Temporal.Instant", () => {
     const jar = new CookieJar();
-    // Pin to a known instant so the rendered RFC 7231 string is deterministic.
     const instant = Temporal.Instant.from("2030-04-15T12:00:00Z");
     jar.set("user_name", { value: "david", expires: instant });
     const headers = jar.getSetCookieHeaders();
@@ -259,8 +258,6 @@ describe("CookiesTest", () => {
     expect(jar.permanent.get("user_name")).toBe("david");
   });
 
-  // --- Signed cookies ---
-
   it("signed cookie using default digest", () => {
     const jar = new CookieJar({ secret: "test_secret_key_base_1234567890" });
     jar.signed.set("user_id", "42");
@@ -272,7 +269,6 @@ describe("CookiesTest", () => {
   it("tampered with signed cookie", () => {
     const jar = new CookieJar({ secret: "test_secret_key_base_1234567890" });
     jar.signed.set("user_id", "42");
-    // Tamper with the value
     jar.set("user_id", "99--fakesignature");
     expect(jar.signed.get("user_id")).toBeUndefined();
   });
@@ -283,12 +279,9 @@ describe("CookiesTest", () => {
     jar1.signed.set("session_id", "abc123");
     const raw = jar1.get("session_id")!;
 
-    // Parse into a new jar
     const jar2 = CookieJar.parse(`session_id=${raw}`, { secret });
     expect(jar2.signed.get("session_id")).toBe("abc123");
   });
-
-  // --- Encrypted cookies ---
 
   it("encrypted cookie round trip", () => {
     const secret = "super_secret_key_12345678901234";
@@ -306,8 +299,6 @@ describe("CookiesTest", () => {
     jar.set("data", "tampered--value");
     expect(jar.encrypted.get("data")).toBeUndefined();
   });
-
-  // --- Cookie parsing ---
 
   it("parse empty cookie header", () => {
     const jar = CookieJar.parse("");
@@ -327,16 +318,12 @@ describe("CookiesTest", () => {
     expect(jar.get("token")).toBe("abc=def=");
   });
 
-  // --- No same site protection ---
-
   it("setting cookie with no same site protection", () => {
     const jar = new CookieJar();
     jar.set("foo", { value: "bar" });
     const headers = jar.getSetCookieHeaders();
     expect(headers[0]).not.toContain("SameSite");
   });
-
-  // --- Default options ---
 
   it("default secure from jar options", () => {
     const jar = new CookieJar({ secure: true });
@@ -366,15 +353,9 @@ describe("CookiesTest", () => {
     expect(headers[0]).toContain("domain=.example.com");
   });
 
-  it.skip("setting cookie with secure on onion address", () => {
-    // Rails sets request.host = "fake.onion" to test that .onion hosts are
-    // exempt from the HTTPS-only secure-cookie restriction; requires
-    // controller/request stack not available at CookieJar unit level (S11)
-  });
+  it.skip("setting cookie with secure on onion address", () => {});
 
-  it.skip("setting cookie with same site protection proc normal user agent", () => {
-    // SameSite proc callback not wired (S11 handle_options)
-  });
+  it.skip("setting cookie with same site protection proc normal user agent", () => {});
 
   function assertDeletedCookie(jar: CookieJar) {
     expect(jar.get("user_name")).toBeUndefined();
@@ -541,115 +522,59 @@ describe("CookiesTest", () => {
     expect(jar.encrypted.get("foo")).toBeUndefined();
   });
 
-  it.skip("setting cookie with same site protection proc special user agent", () => {
-    // SameSite proc callback not wired (S11 handle_options)
-  });
+  it.skip("setting cookie with same site protection proc special user agent", () => {});
 
-  it.skip("setting cookie with misspelled same site protection raises", () => {
-    // SameSite proc callback not wired (S11 handle_options)
-  });
+  it.skip("setting cookie with misspelled same site protection raises", () => {});
 
-  it.skip("setting cookie with secure when always write cookie is true", () => {
-    // always_write_cookie not implemented (S11)
-  });
+  it.skip("setting cookie with secure when always write cookie is true", () => {});
 
-  it.skip("signed cookie using custom digest", () => {
-    // action_dispatch.signed_cookie_digest env key not wired into CookieJar.signed (S11)
-  });
+  it.skip("signed cookie using custom digest", () => {});
 
-  it.skip("signed cookie rotating secret and digest", () => {
-    // key rotation not implemented (S11)
-  });
+  it.skip("signed cookie rotating secret and digest", () => {});
 
-  it.skip("signed cookie using marshal serializer", () => {
-    // Marshal serializer not portable to JS
-  });
+  it.skip("signed cookie using marshal serializer", () => {});
 
-  it.skip("wrapped signed cookie using json serializer", () => {
-    // JSONWrapper object serialization gap (S11)
-  });
+  it.skip("wrapped signed cookie using json serializer", () => {});
 
-  it.skip("signed cookie using message pack serializer", () => {
-    // MessagePack serializer not supported
-  });
+  it.skip("signed cookie using message pack serializer", () => {});
 
-  it.skip("signed cookie using marshal serializer can read from json dumped value", () => {
-    // Marshal serializer not portable to JS
-  });
+  it.skip("signed cookie using marshal serializer can read from json dumped value", () => {});
 
-  it.skip("signed cookie using hybrid serializer can migrate marshal dumped value to json", () => {
-    // Marshal/hybrid serializer not portable to JS
-  });
+  it.skip("signed cookie using hybrid serializer can migrate marshal dumped value to json", () => {});
 
-  it.skip("signed cookie using hybrid serializer can read from json dumped value", () => {
-    // Marshal/hybrid serializer not portable to JS
-  });
+  it.skip("signed cookie using hybrid serializer can read from json dumped value", () => {});
 
-  it.skip("signed cookie using json serializer will drop marshal dumped value", () => {
-    // Marshal serializer not portable to JS
-  });
+  it.skip("signed cookie using json serializer will drop marshal dumped value", () => {});
 
-  it.skip("signed cookie using message pack serializer can migrate json dumped value to message pack", () => {
-    // MessagePack serializer not supported
-  });
+  it.skip("signed cookie using message pack serializer can migrate json dumped value to message pack", () => {});
 
-  it.skip("encrypted cookie using marshal serializer", () => {
-    // Marshal serializer not portable to JS
-  });
+  it.skip("encrypted cookie using marshal serializer", () => {});
 
-  it.skip("wrapped encrypted cookie using json serializer", () => {
-    // JSONWrapper object serialization gap (S11)
-  });
+  it.skip("wrapped encrypted cookie using json serializer", () => {});
 
-  it.skip("encrypted cookie using message pack serializer", () => {
-    // MessagePack serializer not supported
-  });
+  it.skip("encrypted cookie using message pack serializer", () => {});
 
-  it.skip("encrypted cookie using hybrid serializer can migrate marshal dumped value to json", () => {
-    // Marshal/hybrid serializer not portable to JS
-  });
+  it.skip("encrypted cookie using hybrid serializer can migrate marshal dumped value to json", () => {});
 
-  it.skip("encrypted cookie using hybrid serializer can read from json dumped value", () => {
-    // Marshal/hybrid serializer not portable to JS
-  });
+  it.skip("encrypted cookie using hybrid serializer can read from json dumped value", () => {});
 
-  it.skip("encrypted cookie using json serializer will drop marshal dumped value", () => {
-    // Marshal serializer not portable to JS
-  });
+  it.skip("encrypted cookie using json serializer will drop marshal dumped value", () => {});
 
-  it.skip("encrypted cookie using message pack serializer can migrate json dumped value to message pack", () => {
-    // MessagePack serializer not supported
-  });
+  it.skip("encrypted cookie using message pack serializer can migrate json dumped value to message pack", () => {});
 
-  it.skip("cookie jar mutated by request persists on future requests", () => {
-    // Requires ActionController::TestCase request infrastructure
-  });
+  it.skip("cookie jar mutated by request persists on future requests", () => {});
 
-  it.skip("permanent signed cookie", () => {
-    // PermanentCookieJar.signed not implemented (S11)
-  });
+  it.skip("permanent signed cookie", () => {});
 
-  it.skip("use authenticated cookie encryption uses legacy hmac aes cbc encryption when not enabled", () => {
-    // CBC legacy mode not implemented (S11)
-  });
+  it.skip("use authenticated cookie encryption uses legacy hmac aes cbc encryption when not enabled", () => {});
 
-  it.skip("rotating signed cookies digest", () => {
-    // key rotation not implemented (S11)
-  });
+  it.skip("rotating signed cookies digest", () => {});
 
-  it.skip("legacy hmac aes cbc marshal mode falls back to authenticated encrypted cookie", () => {
-    // CBC legacy mode not implemented (S11)
-  });
+  it.skip("legacy hmac aes cbc marshal mode falls back to authenticated encrypted cookie", () => {});
 
-  it.skip("legacy hmac aes cbc json mode falls back to authenticated encrypted cookie", () => {
-    // CBC legacy mode not implemented (S11)
-  });
+  it.skip("legacy hmac aes cbc json mode falls back to authenticated encrypted cookie", () => {});
 
-  it.skip("legacy hmac aes cbc encrypted marshal cookie is upgraded to authenticated encrypted cookie", () => {
-    // CBC legacy mode not implemented (S11)
-  });
+  it.skip("legacy hmac aes cbc encrypted marshal cookie is upgraded to authenticated encrypted cookie", () => {});
 
-  it.skip("legacy hmac aes cbc encrypted json cookie is upgraded to authenticated encrypted cookie", () => {
-    // CBC legacy mode not implemented (S11)
-  });
+  it.skip("legacy hmac aes cbc encrypted json cookie is upgraded to authenticated encrypted cookie", () => {});
 });

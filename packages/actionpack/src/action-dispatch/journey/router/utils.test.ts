@@ -47,9 +47,6 @@ describe("ActionDispatch::Journey::Router::Utils", () => {
   });
 
   it("escapes non-BMP code points as their real UTF-8 bytes, not surrogate halves", () => {
-    // 🚀 (U+1F680) is a surrogate pair in UTF-16. The /u flag on the escape
-    // regex makes it match as one code point so the encoder produces the
-    // actual 4-byte UTF-8 sequence (F0 9F 9A 80) instead of two U+FFFD bytes.
     expect(escapeSegment("🚀")).toBe("%F0%9F%9A%80");
   });
 

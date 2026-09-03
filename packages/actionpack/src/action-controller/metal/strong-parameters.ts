@@ -1,10 +1,8 @@
-/** ActionController::StrongParameters Provides ActionController::Parameters, a hash-like object that controls which parameters are permitted for mass assignment. @see https://api.rubyonrails.org/classes/ActionController/StrongParameters.html @internal */
+/** @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import { KeyError, block, eachPair, hasKey, merge, mergeBang } from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
-
-// --- Error classes ---
 
 export class ParameterMissing extends Error {
   readonly param: string;
@@ -18,12 +16,6 @@ export class ParameterMissing extends Error {
     this.keys = keys;
   }
 
-  /**
-   * Mirrors Rails' `ParameterMissing#corrections`, memoised via Ruby's
-   * `@corrections ||=` idiom. Runs the missing param name through
-   * `@blazetrails/did-you-mean`'s SpellChecker against the keys the
-   * caller had at the time of the raise.
-   */
   get corrections(): string[] {
     if (this.#cachedCorrections !== undefined) return this.#cachedCorrections;
     if (!this.keys) {
@@ -67,16 +59,12 @@ export class InvalidParameterKey extends Error {
   }
 }
 
-// --- Scalar type guard ---
-
 /** @internal */
 function isPermittedScalar(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   const t = typeof value;
   return t === "string" || t === "number" || t === "boolean";
 }
-
-// --- Parameters ---
 
 export class Parameters {
   private _data: Record<string, unknown>;
@@ -87,9 +75,7 @@ export class Parameters {
   static actionOnUnpermittedParameters: "log" | "raise" | false = false;
   static alwaysPermittedParameters: string[] = ["controller", "action"];
 
-  static hookIntoYamlLoading(): void {
-    // No-op in TypeScript — YAML deserialization is not a concern
-  }
+  static hookIntoYamlLoading(): void {}
 
   constructor(data: Record<string, unknown> = {}) {
     this._data = { ...data };
@@ -99,8 +85,6 @@ export class Parameters {
   static nestedAttribute(key: string, value: unknown): boolean {
     return /^-?\d+$/.test(key) && (value instanceof Parameters || isPlainObject(value));
   }
-
-  // --- Permit / require ---
 
   /** @internal */
   get permitted(): boolean {
@@ -118,7 +102,6 @@ export class Parameters {
     return p;
   }
 
-  /** Sets permitted to true in-place (recursive). Returns self. */
   permitBang(): this {
     this.eachPair((_key, value) => {
       const values = Array.isArray(value) ? value.flat() : [value];
@@ -165,8 +148,6 @@ export class Parameters {
       throw e;
     }
   }
-
-  // --- Hash-like accessors ---
 
   get(key: string): unknown {
     return this._convertHashesToParameters(key, this._data[key]);
@@ -224,8 +205,6 @@ export class Parameters {
     return this.length;
   }
 
-  // --- Transformations (non-mutating) ---
-
   except(...keys: string[]): Parameters {
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(this._data)) {
@@ -246,7 +225,6 @@ export class Parameters {
     return this._newWithInheritedPermitted(result);
   }
 
-  /** Mutating slice — keeps only the given keys, returns self. */
   sliceBang(...keys: string[]): this {
     const keepSet = new Set(keys);
     for (const k of Object.keys(this._data)) {
@@ -259,7 +237,6 @@ export class Parameters {
     return this.slice(...keys);
   }
 
-  /** Mutating extract! — removes and returns the key/value pairs. */
   extractBang(...keys: string[]): Parameters {
     const result: Record<string, unknown> = {};
     for (const key of keys) {
@@ -276,7 +253,6 @@ export class Parameters {
     return this._newWithInheritedPermitted({ ...this._data, ...otherData });
   }
 
-  /** Mutating merge — merges other into self, returns self. */
   mergeBang(
     otherHash: Parameters | Record<string, unknown>,
     block?: (key: string, left: unknown, right: unknown) => unknown,
@@ -310,13 +286,10 @@ export class Parameters {
     return this._newWithInheritedPermitted(merge(otherData, this._data));
   }
 
-  /** Alias for reverseMerge */
   withDefaults(otherHash: Parameters | Record<string, unknown>): Parameters {
     return this.reverseMerge(otherHash);
   }
 
-  /** Mirrors `reverse_merge!` (strong_parameters.rb:1042-1046) — the
-   *  receiver-wins conflict block is what makes it a REVERSE merge. */
   reverseMergeBang(otherHash: Parameters | Record<string, unknown>): this {
     const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
     mergeBang(
@@ -327,12 +300,11 @@ export class Parameters {
     return this;
   }
 
-  /** Alias for reverseMergeBang */
   withDefaultsBang(otherHash: Parameters | Record<string, unknown>): this {
     return this.reverseMergeBang(otherHash);
   }
 
-  /** @deprecated Use reverseMerge instead */
+  /** @deprecated */
   reversemerge(otherHash: Parameters | Record<string, unknown>): Parameters {
     return this.reverseMerge(otherHash);
   }
@@ -353,7 +325,6 @@ export class Parameters {
     return this._newWithInheritedPermitted(result);
   }
 
-  /** Mutating transform_keys! — returns self. */
   transformKeysBang(fn: (key: string) => string): this {
     const entries = Object.entries(this._data);
     this._data = {};
@@ -390,7 +361,6 @@ export class Parameters {
     return this._newWithInheritedPermitted(result);
   }
 
-  /** Mutating transform_values! — returns self. */
   transformValuesBang(fn: (value: unknown) => unknown): this {
     for (const [k, v] of Object.entries(this._data)) {
       const converted = this._convertValueToParameters(v);
@@ -407,7 +377,6 @@ export class Parameters {
     return this._newWithInheritedPermitted(result);
   }
 
-  /** Mutating select! — returns self. */
   selectBang(fn: (key: string, value: unknown) => boolean): this {
     for (const k of Object.keys(this._data)) {
       if (!fn(k, this._data[k])) delete this._data[k];
@@ -415,7 +384,6 @@ export class Parameters {
     return this;
   }
 
-  /** Alias for selectBang */
   keepIf(fn: (key: string, value: unknown) => boolean): this {
     return this.selectBang(fn);
   }
@@ -424,7 +392,6 @@ export class Parameters {
     return this.select((k, v) => !fn(k, v));
   }
 
-  /** Mutating reject! — returns self. */
   rejectBang(fn: (key: string, value: unknown) => boolean): this {
     for (const k of Object.keys(this._data)) {
       if (fn(k, this._data[k])) delete this._data[k];
@@ -432,7 +399,6 @@ export class Parameters {
     return this;
   }
 
-  /** Alias for rejectBang */
   deleteIf(fn: (key: string, value: unknown) => boolean): this {
     return this.rejectBang(fn);
   }
@@ -441,7 +407,6 @@ export class Parameters {
     return this.select((_k, v) => v !== null && v !== undefined);
   }
 
-  /** Mutating compact! — returns self if changes were made, null otherwise. */
   compactBang(): this | null {
     let changed = false;
     for (const k of Object.keys(this._data)) {
@@ -468,8 +433,6 @@ export class Parameters {
     return keys.map((k) => this.get(k));
   }
 
-  // --- Iteration ---
-
   each(fn: (key: string, value: unknown) => void): this {
     for (const [k, v] of Object.entries(this._data)) {
       fn(k, this._convertHashesToParameters(k, v));
@@ -495,8 +458,6 @@ export class Parameters {
     return this;
   }
 
-  // --- Fetch ---
-
   fetch(key: string, ...args: unknown[]): unknown {
     if (key in this._data) {
       return this.get(key);
@@ -511,7 +472,6 @@ export class Parameters {
     if (keys.length === 0) {
       throw new Error("wrong number of arguments (given 0, expected 1+)");
     }
-    // Convert first key's value like Rails does
     this._convertHashesToParameters(keys[0], this._data[keys[0]]);
     let current: unknown = this._data;
     for (const key of keys) {
@@ -532,8 +492,6 @@ export class Parameters {
     return current;
   }
 
-  // --- Delete ---
-
   delete(key: string, ...args: unknown[]): unknown {
     if (key in this._data) {
       const val = this._data[key];
@@ -545,8 +503,6 @@ export class Parameters {
     }
     return args.length > 0 ? args[0] : undefined;
   }
-
-  // --- Conversion ---
 
   toH(block?: (key: string, value: unknown) => [string, unknown]): Record<string, unknown> {
     if (!this._permitted) {
@@ -571,7 +527,6 @@ export class Parameters {
     throw new UnfilteredParameters();
   }
 
-  /** Returns the raw internal data as a plain object (without permission check). */
   _toRawHash(): Record<string, unknown> {
     return { ...this._data };
   }
@@ -628,35 +583,22 @@ export class Parameters {
     return `#<ActionController::Parameters ${JSON.stringify(this._data)}${permitted}>`;
   }
 
-  // --- Deep operations ---
-
   deepDup(): Parameters {
     const p = new Parameters(structuredClone(this._data));
     p._permitted = this._permitted;
     return p;
   }
 
-  /**
-   * Ruby's `-1` limit is what makes `String#split` keep trailing empty fields
-   * (strong_parameters.rb:1111); JS `String#split` keeps them with no limit at
-   * all, and a numeric limit there TRUNCATES instead. Passing Rails' argument
-   * would change the result, not match it.
-   *
-   * @missingRailsArgs split — PERMANENT
-   */
+  /** @missingRailsArgs split — PERMANENT */
   extractValue(key: string, delimiter = "_"): string[] | null {
     const val = this._data[key];
     if (val === null || val === undefined) return null;
     return String(val).split(delimiter);
   }
 
-  // --- Static ---
-
   static create(data: Record<string, unknown> = {}): Parameters {
     return new Parameters(data);
   }
-
-  // --- Private helpers ---
 
   private _permitFilters(
     filters: (string | Record<string, unknown>)[],
@@ -699,7 +641,6 @@ export class Parameters {
     filter: Record<string, unknown>,
     options: { suppressUnpermitted?: boolean } = {},
   ): void {
-    // Empty filter object {} permits all keys on this Parameters
     if (Object.keys(filter).length === 0) {
       for (const [ek, ev] of Object.entries(this._data)) {
         params._data[ek] = ev;
@@ -738,7 +679,6 @@ export class Parameters {
         }
       } else if (isPlainObject(val)) {
         if (Array.isArray(v) && v.length === 0) {
-          // empty array filter for a hash — permit arbitrary hash
           params._data[k] = val;
         } else if (Array.isArray(v)) {
           const nestedParams = new Parameters(val);
@@ -826,17 +766,17 @@ export class Parameters {
     return value;
   }
 
-  /** Rails-private `attr_reader :parameters` — the underlying hash. Trails stores it on `_data`; exposed under the Rails name for parity with the strong-parameters private surface. @internal */
+  /** @internal */
   get parameters(): Record<string, unknown> {
     return this._data;
   }
 
-  /** Rails `nested_attributes?` — true when any key/value pair looks like a nested-attribute index (`/\A-?\d+\z/`). @internal */
+  /** @internal */
   isNestedAttributes(): boolean {
     return Object.entries(this._data).some(([k, v]) => Parameters.nestedAttribute(k, v));
   }
 
-  /** Rails `each_nested_attribute` — yields each nested-attribute pair, returning a new Parameters with the block result. @internal */
+  /** @internal */
   eachNestedAttribute(fn: (value: unknown) => unknown): Parameters {
     const result = new Parameters();
     for (const [k, v] of Object.entries(this._data)) {
@@ -847,7 +787,7 @@ export class Parameters {
     return result;
   }
 
-  /** Rails `permit_filters(filters, on_unpermitted:, explicit_arrays:)` — Rails-named entry point. Delegates to the existing internal `_permitFilters` (the option shape differs slightly; `onUnpermitted` is honoured only when `actionOnUnpermittedParameters` is set on the class — trails has no per-call override yet). @internal */
+  /** @internal */
   permitFilters(
     filters: (string | Record<string, unknown>)[],
     _options: { onUnpermitted?: "raise" | "log" | null; explicitArrays?: boolean } = {},
@@ -855,27 +795,27 @@ export class Parameters {
     return this._permitFilters(filters);
   }
 
-  /** Rails `new_instance_with_inherited_permitted_status(hash)` — wraps a raw hash in a new Parameters that inherits this instance's permitted flag. @internal */
+  /** @internal */
   newInstanceWithInheritedPermittedStatus(hash: Record<string, unknown>): Parameters {
     return this._newWithInheritedPermitted(hash);
   }
 
-  /** Rails `convert_parameters_to_hashes(value, using)` — recursively converts nested Parameters into plain hashes using the given method. @internal */
+  /** @internal */
   convertParametersToHashes(value: unknown, using: string): unknown {
     return this._convertParametersToHashes(value, using);
   }
 
-  /** Rails `convert_hashes_to_parameters(key, value)` — converts a single raw-hash entry to a Parameters, replacing the slot when the underlying value actually changed (Rails' `equal?` identity check). @internal */
+  /** @internal */
   convertHashesToParameters(key: string, value: unknown): unknown {
     return this._convertHashesToParameters(key, value);
   }
 
-  /** Rails `convert_value_to_parameters(value)` — recursively wraps plain hashes/arrays in Parameters instances. @internal */
+  /** @internal */
   convertValueToParameters(value: unknown): unknown {
     return this._convertValueToParameters(value);
   }
 
-  /** Rails `_deep_transform_keys_in_object!(object, &block)` — in-place variant of `_deep_transform_keys_in_object`. Mutates the input. @internal */
+  /** @internal */
   _deepTransformKeysInObjectBang(object: unknown, fn: (key: string) => string): unknown {
     if (object instanceof Parameters) {
       const keys = Object.keys(object._data);
@@ -905,7 +845,7 @@ export class Parameters {
     return object;
   }
 
-  /** Rails `specify_numeric_keys?(filter)` — true when the filter is a hash whose top-level keys include numeric strings (nested-attribute style). @internal */
+  /** @internal */
   isSpecifyNumericKeys(filter: unknown): boolean {
     if (filter && typeof filter === "object" && !Array.isArray(filter)) {
       return Object.keys(filter as Record<string, unknown>).some((k) => /^-?\d+$/.test(k));
@@ -913,12 +853,12 @@ export class Parameters {
     return false;
   }
 
-  /** Rails `array_filter?(filter)` — recognises the `[[:flavor]]` shape used by `params.expect` for explicit-array declarations. @internal */
+  /** @internal */
   isArrayFilter(filter: unknown): boolean {
     return Array.isArray(filter) && filter.length === 1 && Array.isArray(filter[0]);
   }
 
-  /** Rails `each_array_element(object, filter, &block)` — applies the block to each element of an array, or each nested-attribute pair when the input is a Parameters with non-numeric keys. @internal */
+  /** @internal */
   eachArrayElement(object: unknown, filter: unknown, fn: (el: Parameters) => unknown): unknown {
     if (Array.isArray(object)) {
       const out: unknown[] = [];
@@ -938,12 +878,12 @@ export class Parameters {
     return undefined;
   }
 
-  /** Rails `unpermitted_parameters!(params, on_unpermitted:)` — explicit Rails-named entry point. Delegates to `_unpermittedParameters`. @internal */
+  /** @internal */
   unpermittedParametersBang(params: Parameters): void {
     this._unpermittedParameters(params);
   }
 
-  /** Rails `unpermitted_keys(params)` — keys present on self but absent from the permitted projection, minus the always-permitted list. @internal */
+  /** @internal */
   unpermittedKeys(params: Parameters): string[] {
     const allowed = new Set([
       ...Object.keys(params._data),
@@ -952,17 +892,17 @@ export class Parameters {
     return Object.keys(this._data).filter((k) => !allowed.has(k));
   }
 
-  /** Rails `permitted_scalar_filter(params, key)` — copies a scalar value across into `params` when it passes the scalar-type check. @internal */
+  /** @internal */
   permittedScalarFilter(params: Parameters, permittedKey: string): void {
     this._permittedScalarFilter(params, permittedKey);
   }
 
-  /** Rails `non_scalar?(value)` — true for arrays and Parameters. @internal */
+  /** @internal */
   isNonScalar(value: unknown): boolean {
     return Array.isArray(value) || value instanceof Parameters;
   }
 
-  /** Rails `hash_filter(params, filter, on_unpermitted:, explicit_arrays:)`. @internal */
+  /** @internal */
   hashFilter(
     params: Parameters,
     filter: Record<string, unknown>,
@@ -971,7 +911,7 @@ export class Parameters {
     this._hashFilter(params, filter, options);
   }
 
-  /** Rails `permit_value(value, filter, on_unpermitted:, explicit_arrays:)`. Dispatches by filter shape. @internal */
+  /** @internal */
   permitValue(value: unknown, filter: unknown): unknown {
     if (Array.isArray(filter) && filter.length === 0) {
       return this.permitArrayOfScalars(value);
@@ -993,13 +933,13 @@ export class Parameters {
     return undefined;
   }
 
-  /** Rails `permit_array_of_scalars(value)`. @internal */
+  /** @internal */
   permitArrayOfScalars(value: unknown): unknown {
     if (Array.isArray(value) && value.every((el) => isPermittedScalar(el))) return value;
     return undefined;
   }
 
-  /** Rails `permit_array_of_hashes(value, filter, ...)`. @internal */
+  /** @internal */
   permitArrayOfHashes(value: unknown, filter: unknown): unknown {
     return this.eachArrayElement(value, filter, (el) =>
       el.permitFilters(
@@ -1008,7 +948,7 @@ export class Parameters {
     );
   }
 
-  /** Rails `permit_hash(value, filter, ...)`. @internal */
+  /** @internal */
   permitHash(value: unknown, filter: Record<string, unknown> | unknown): unknown {
     if (!(value instanceof Parameters)) return undefined;
     if (
@@ -1024,14 +964,14 @@ export class Parameters {
     );
   }
 
-  /** Rails `permit_hash_or_array(value, filter, ...)`. @internal */
+  /** @internal */
   permitHashOrArray(value: unknown, filter: unknown): unknown {
     const arr = this.permitArrayOfHashes(value, filter);
     if (arr != null) return arr;
     return this.permitHash(value, filter);
   }
 
-  /** Rails `permit_any_in_parameters(params)`. @internal */
+  /** @internal */
   permitAnyInParameters(params: Parameters): Parameters {
     const sanitized = new Parameters();
     params.each((k, v) => {
@@ -1046,7 +986,7 @@ export class Parameters {
     return sanitized;
   }
 
-  /** Rails `permit_any_in_array(array)`. @internal */
+  /** @internal */
   permitAnyInArray(array: unknown[]): unknown[] {
     const sanitized: unknown[] = [];
     for (const el of array) {
@@ -1080,13 +1020,9 @@ export class Parameters {
   }
 }
 
-// --- StrongParameters module mixin ---
-
 export interface StrongParameters {
   params: Parameters;
 }
-
-// --- Helpers ---
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

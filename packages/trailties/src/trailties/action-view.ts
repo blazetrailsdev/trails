@@ -1,21 +1,3 @@
-/**
- * Trailtie — initialization hooks for ActionView.
- *
- * Mirrors: ActionView::Railtie < ::Rails::Engine
- * (actionview/lib/action_view/railtie.rb)
- *
- * Registers itself in the global initialization pipeline. Seeds the
- * `actionView` config slot with the same defaults Rails establishes at the
- * top of `railtie.rb`.
- *
- * Skipped initializers (deferred until the underlying helpers / resolver
- * caching surface are ported): `action_view.logger`, `action_view.caching`,
- * `action_view.setup_action_pack`, `action_view.collection_caching`, and
- * every `config.after_initialize` block that mutates AssetTagHelper /
- * FormHelper / FormTagHelper / SanitizeHelper / UrlHelper / Template /
- * ContentExfiltrationPreventionHelper / Resolver. The matching helper
- * setters either don't exist yet or live in unported namespaces.
- */
 import { type Deprecators } from "@blazetrails/activesupport";
 import { Base, deprecator } from "@blazetrails/actionview";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";

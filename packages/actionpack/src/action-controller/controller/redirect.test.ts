@@ -16,9 +16,6 @@ function makeResponse(): Response {
   return new Response();
 }
 
-// ==========================================================================
-// action_controller/redirect_test.rb
-// ==========================================================================
 describe("RedirectTest", () => {
   it("redirect_to with path", async () => {
     class C extends Base {
@@ -384,9 +381,6 @@ describe("RedirectTest", () => {
   });
 });
 
-// ==========================================================================
-// controller/redirect_test.rb — ModuleRedirectTest
-// ==========================================================================
 describe("ModuleRedirectTest", () => {
   it("simple redirect", () => {
     const result = redirectTo("/module/dashboard");

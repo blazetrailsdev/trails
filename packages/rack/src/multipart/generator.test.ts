@@ -60,7 +60,6 @@ describe("Rack::Multipart::Generator", () => {
     const data = new Generator({ "submit-name": "Larry", files }).dump() as string;
     expect(data).toContain(`name="files"; filename="bar.txt"`);
     expect(data).toContain("foo\r\n");
-    // io-only uploads have no path, so no content-length line is emitted
     expect(data).not.toContain("content-length:");
   });
 });

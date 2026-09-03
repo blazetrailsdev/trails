@@ -65,8 +65,6 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
   }
-  // Mirror DatabaseTasks.dropAll / dropCurrent: check protected envs before
-  // any drop so a single production config in a multi-db set doesn't slip through.
   try {
     for (const config of configs) {
       await DatabaseTasks.checkProtectedEnvironmentsBang(config.envName);
@@ -104,9 +102,6 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   }
   await tryLoadModels(cwd);
 
-  // Rails' `rake db:migrate` (railties/databases.rake:89) takes its target from
-  // `ENV["VERSION"]`, which `migrate_all` reads back through `target_version`;
-  // `--version` is the CLI spelling of that env var, not an extra argument.
   const version = flagValue(args, "--version");
   const previousVersion = getEnv("VERSION");
   if (version !== undefined) setEnv("VERSION", version);
@@ -176,8 +171,6 @@ export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number
     return 1;
   }
   try {
-    // databases.rake:449-455 — `task dump: :load_config` does no model or
-    // environment load, just `with_temporary_pool_for_each { dump_schema }`.
     await DatabaseTasks.withTemporaryPoolForEach({ env }, async (pool) => {
       const dbConfig = pool.dbConfig;
       await DatabaseTasks.dumpSchema(dbConfig);
@@ -362,10 +355,6 @@ export async function dbMigrateStatus(cwd: string, args: string[]): Promise<numb
 
   const env = DatabaseConfigurations.defaultEnv;
 
-  // Rails: `with_temporary_pool_for_each` (no name) iterates all configs for the env.
-  // --all extends this to every configured env/database, through `configs_for`
-  // as `for_each`'s per-name tasks (databases.rake:316-325) do. It has no local-
-  // host check: that belongs to `each_local_configuration`, not to these tasks.
   const configs = all
     ? (DatabaseTasks.databaseConfiguration?.configsFor() ?? [])
     : DatabaseTasks.configsFor({ envName: env });

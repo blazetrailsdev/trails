@@ -1,18 +1,3 @@
-/**
- * Type registrations for ActiveSupport::MessagePack.
- *
- * Mirrors: ActiveSupport::MessagePack::Extensions
- *
- * `install` registers the extension types (the remaining Ruby-native types are
- * tracked as follow-up). `installUnregisteredTypeError`
- * and `installUnregisteredTypeFallback` register the catch-all type 127 used by
- * the plain serializer (raise) and the cache serializer (object fallback via
- * `toMsgpackExt`/`fromMsgpackExt` or `asJson`/`jsonCreate`).
- *
- * Ruby's `Object.const_get` class lookup becomes an explicit name→constructor
- * registry: object-fallback classes opt in via `registerObjectClass`.
- */
-
 import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
@@ -43,28 +28,14 @@ function nanosecondOfSecond(time: {
   return time.millisecond * 1_000_000 + time.microsecond * 1_000 + time.nanosecond;
 }
 
-/**
- * Mirrors: `DateTime#sec_fraction` — Ruby's DateTime carries the sub-second part
- * as a Rational directly; `Temporal.PlainDateTime` splits it across
- * milli/micro/nanosecond, so it is recomposed here.
- */
 function secFraction(datetime: Temporal.PlainDateTime): Rational {
   return rational(nanosecondOfSecond(datetime), NANOS_PER_SECOND);
 }
 
-/**
- * Mirrors: `DateTime#offset` — a `Temporal.PlainDateTime` is zone-less, which is
- * the Ruby `DateTime` this branch packs, so the offset is always zero.
- */
 function offset(_datetime: Temporal.PlainDateTime): Rational {
   return rational(0, 1);
 }
 
-/**
- * Encodes a bigint as MessagePack::Bigint's `CL>*` ext payload: a sign byte (0
- * positive / 1 negative) followed by 32-bit big-endian chunks, least-significant
- * chunk first. Byte-identical to `MessagePack::Bigint.to_msgpack_ext`.
- */
 function bigIntToMsgpackExt(value: bigint): Buffer {
   let n = value;
   const bytes: number[] = [n < 0n ? 1 : 0];
@@ -92,7 +63,6 @@ function bigIntFromMsgpackExt(payload: Buffer): bigint {
 export class UnserializableObjectError extends Error {}
 export class MissingClassError extends Error {}
 
-/** A constructor that participates in the cache serializer's object fallback. */
 export interface ObjectClass {
   name: string;
   fromMsgpackExt?: (data: unknown) => unknown;
@@ -101,7 +71,6 @@ export interface ObjectClass {
 
 const objectClassRegistry = new Map<string, ObjectClass>();
 
-/** Mirror of Ruby's implicit `Object.const_get` resolution for object fallback. */
 export function registerObjectClass(klass: ObjectClass): void {
   objectClassRegistry.set(klass.name, klass);
 }
@@ -114,12 +83,6 @@ function classOf(value: object): ObjectClass {
 }
 
 export const Extensions = {
-  /**
-   * Mirrors `install` (message_pack/extensions.rb:20-105). Type 17's packer,
-   * `write_hash_with_indifferent_access` (:236-238), hands `packer.write` a
-   * Ruby Hash; the packer here writes a plain object, so `deep_stringify_keys`
-   * (core_ext/hash/keys.rb:82-84) spells the tree `toHash` answers the same way.
-   */
   install(registry: Factory): void {
     registry.registerType({
       type: 0,
@@ -130,9 +93,6 @@ export const Extensions = {
       unpacker: (payload) => Symbol.for((payload as Buffer).toString("utf-8")),
     });
 
-    // Native ints inside the 64-bit range are handled directly by the packer;
-    // this ext only fires for oversized integers (Ruby Bigint), reached via the
-    // `oversizedInteger` flag rather than `match`.
     registry.registerType({
       type: 1,
       klass: "Integer",
@@ -348,10 +308,6 @@ export const Extensions = {
   writeObject(object: object, packer: Packer): void {
     const klass = classOf(object);
     const o = object as { toMsgpackExt?: () => unknown; asJson?: () => unknown };
-    // Rails pairs a class-level `from_msgpack_ext`/`json_create` with an
-    // instance-level `to_msgpack_ext`/`as_json`. Guard the instance half too so
-    // a half-implemented protocol raises UnserializableObjectError rather than a
-    // bare TypeError from the cast.
     if (typeof klass.fromMsgpackExt === "function" && typeof o.toMsgpackExt === "function") {
       packer.write(LOAD_WITH_MSGPACK_EXT);
       Extensions.writeClass(klass, packer);

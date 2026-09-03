@@ -44,7 +44,6 @@ describe("TimeWithZoneTest", () => {
 
   it("creates from TimeZone.parse() with ISO string", () => {
     const twz = eastern.parse("2024-06-15T12:00:00Z")!;
-    // 12:00 UTC = 8:00 EDT
     expect(twz.hour).toBe(8);
     expect(twz.day).toBe(15);
   });
@@ -56,11 +55,9 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("returns correct local components", () => {
-    // 2024-01-15 15:30:45 UTC
     const utcDate = new Date(Date.UTC(2024, 0, 15, 15, 30, 45, 123));
     const twz = new TimeWithZone(instantFromDate(utcDate), eastern);
 
-    // EST is UTC-5
     expect(twz.year).toBe(2024);
     expect(twz.month).toBe(1);
     expect(twz.day).toBe(15);
@@ -71,7 +68,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("handles day boundary crossing", () => {
-    // 2024-01-16 03:00:00 UTC -> 2024-01-15 22:00:00 EST
     const utcDate = new Date(Date.UTC(2024, 0, 16, 3, 0, 0));
     const twz = new TimeWithZone(instantFromDate(utcDate), eastern);
 
@@ -80,32 +76,29 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("returns wday (day of week)", () => {
-    // 2024-01-15 is a Monday
     const twz = eastern.local(2024, 1, 15, 12, 0, 0);
-    expect(twz.wday).toBe(1); // Monday
+    expect(twz.wday).toBe(1);
   });
 
   it("returns yday (day of year)", () => {
     const twz = eastern.local(2024, 2, 1, 12, 0, 0);
-    expect(twz.yday).toBe(32); // Jan has 31 days, so Feb 1 = 32
+    expect(twz.yday).toBe(32);
   });
 
   it("returns timezone abbreviation", () => {
-    // Winter (EST)
     const winter = eastern.local(2024, 1, 15, 12, 0, 0);
     expect(winter.zone).toBe("EST");
 
-    // Summer (EDT)
     const summer = eastern.local(2024, 7, 15, 12, 0, 0);
     expect(summer.zone).toBe("EDT");
   });
 
   it("returns utcOffset in seconds", () => {
     const winter = eastern.local(2024, 1, 15, 12, 0, 0);
-    expect(winter.utcOffset).toBe(-5 * 3600); // EST = -5h
+    expect(winter.utcOffset).toBe(-5 * 3600);
 
     const summer = eastern.local(2024, 7, 15, 12, 0, 0);
-    expect(summer.utcOffset).toBe(-4 * 3600); // EDT = -4h
+    expect(summer.utcOffset).toBe(-4 * 3600);
   });
 
   it("detects DST", () => {
@@ -126,7 +119,7 @@ describe("TimeWithZoneTest", () => {
     const utc = twz.utc();
     expect(utc).toBeInstanceOf(Time);
     const z = utc.toTime();
-    expect(z.hour).toBe(15); // 10 EST + 5 = 15 UTC
+    expect(z.hour).toBe(15);
     expect(z.minute).toBe(30);
   });
 
@@ -158,7 +151,7 @@ describe("TimeWithZoneTest", () => {
     const twz = eastern.local(2024, 3, 15, 10, 30, 0);
     const date = twz.toDate();
     expect(date.year).toBe(2024);
-    expect(date.month).toBe(3); // Temporal months are 1-indexed
+    expect(date.month).toBe(3);
     expect(date.day).toBe(15);
   });
 
@@ -166,8 +159,7 @@ describe("TimeWithZoneTest", () => {
     const estTime = eastern.local(2024, 1, 15, 12, 0, 0);
     const pstTime = estTime.inTimeZone(pacific);
 
-    // Same moment, different local time
-    expect(pstTime.hour).toBe(9); // 12 EST = 9 PST
+    expect(pstTime.hour).toBe(9);
     expect(pstTime.utc().toTime().epochMilliseconds).toBe(estTime.utc().toTime().epochMilliseconds);
   });
 
@@ -180,31 +172,26 @@ describe("TimeWithZoneTest", () => {
   it("inTimeZone() accepts IANA zone name", () => {
     const estTime = eastern.local(2024, 1, 15, 12, 0, 0);
     const tokyoTime = estTime.inTimeZone("Asia/Tokyo");
-    // 12 EST = 17 UTC = next day 02:00 JST
     expect(tokyoTime.hour).toBe(2);
     expect(tokyoTime.day).toBe(16);
   });
 
   it("to s (formatting)", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.toString()).toBe("2024-01-15 10:30:45 -0500");
   });
 
   it("inspect()", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.inspect()).toBe("2024-01-15 10:30:45.000000000 EST -05:00");
   });
 
   it("formattedOffset() with colon", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.formattedOffset()).toBe("-05:00");
   });
 
   it("formattedOffset() without colon", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.formattedOffset(false)).toBe("-0500");
   });
@@ -215,7 +202,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("xmlschema() / iso8601()", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.xmlschema()).toBe("2024-01-15T10:30:45-05:00");
   });
@@ -226,61 +212,51 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("iso8601", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.iso8601()).toBe(twz.xmlschema());
   });
 
   it("rfc3339", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.rfc3339()).toBe(twz.xmlschema());
   });
 
   it("rfc2822()", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.rfc2822()).toBe("Mon, 15 Jan 2024 10:30:45 -0500");
   });
 
   it("httpdate() returns UTC-based HTTP date", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.httpdate()).toBe("Mon, 15 Jan 2024 15:30:45 GMT");
   });
 
   it("to fs long", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.toFs("long")).toBe("January 15, 2024 10:30");
   });
 
   it("to fs short", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.toFs("short")).toBe("15 Jan 10:30");
   });
 
   it("toFormattedS() is alias for toFs()", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.toFormattedS("db")).toBe(twz.toFs("db"));
   });
 
   it("asJson() returns ISO 8601 with 3 fraction digits", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.asJson()).toBe("2024-01-15T10:30:45.000-05:00");
   });
 
   it("toJSON() is alias for asJson()", () => {
-    // 2024-01-15 10:30:45 EST
     const twz = eastern.local(2024, 1, 15, 10, 30, 45);
     expect(twz.toJSON()).toBe(twz.asJson());
   });
 
   it("formats year tokens", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%Y")).toBe("2024");
     expect(twz.strftime("%C")).toBe("20");
@@ -288,7 +264,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("formats month/day tokens", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%m")).toBe("01");
     expect(twz.strftime("%d")).toBe("15");
@@ -296,13 +271,11 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("formats day-of-year", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%j")).toBe("015");
   });
 
   it("formats time tokens", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%H")).toBe("10");
     expect(twz.strftime("%M")).toBe("05");
@@ -310,7 +283,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("formats 12-hour time", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%I")).toBe("10");
     expect(twz.strftime("%P")).toBe("am");
@@ -322,13 +294,11 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("formats milliseconds", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%L")).toBe("042");
   });
 
   it("formats timezone", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%z")).toBe("-0500");
     expect(twz.strftime("%Z")).toBe("EST");
@@ -336,28 +306,24 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("formats day names", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%A")).toBe("Monday");
     expect(twz.strftime("%a")).toBe("Mon");
   });
 
   it("formats month names", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%B")).toBe("January");
     expect(twz.strftime("%b")).toBe("Jan");
   });
 
   it("formats wday", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
-    expect(twz.strftime("%w")).toBe("1"); // Monday
-    expect(twz.strftime("%u")).toBe("1"); // Monday (ISO)
+    expect(twz.strftime("%w")).toBe("1");
+    expect(twz.strftime("%u")).toBe("1");
   });
 
   it("handles - flag to remove padding", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%-d")).toBe("15");
     expect(twz.strftime("%-m")).toBe("1");
@@ -367,13 +333,11 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("formats composite patterns", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%Y-%m-%d %H:%M:%S")).toBe("2024-01-15 10:05:09");
   });
 
   it("handles literal % and special chars", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%%")).toBe("%");
     expect(twz.strftime("%n")).toBe("\n");
@@ -381,14 +345,13 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("formats unix timestamp", () => {
-    // Monday, 2024-01-15 10:05:09 EST
     const twz = eastern.local(2024, 1, 15, 10, 5, 9, 42);
     expect(twz.strftime("%s")).toBe(String(twz.toI()));
   });
 
   it("plus() adds seconds", () => {
     const twz = eastern.local(2024, 1, 15, 10, 0, 0);
-    const result = twz.plus(3600); // 1 hour
+    const result = twz.plus(3600);
     expect(result.hour).toBe(11);
   });
 
@@ -433,7 +396,6 @@ describe("TimeWithZoneTest", () => {
   it("advances by months", () => {
     const twz = eastern.local(2024, 1, 31, 10, 0, 0);
     const result = twz.advance({ months: 1 });
-    // Feb doesn't have 31 days -> clamped to 29 (2024 is leap year)
     expect(result.month).toBe(2);
     expect(result.day).toBe(29);
   });
@@ -466,16 +428,13 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("handles DST spring forward correctly", () => {
-    // 2024 DST starts March 10 at 2:00 AM EST -> 3:00 AM EDT
     const before = eastern.local(2024, 3, 10, 1, 0, 0);
-    // Advance by 1 day should land on March 11 at 1:00 AM
     const result = before.advance({ days: 1 });
     expect(result.day).toBe(11);
     expect(result.hour).toBe(1);
   });
 
   it("handles DST fall back correctly", () => {
-    // 2024 DST ends November 3 at 2:00 AM EDT -> 1:00 AM EST
     const before = eastern.local(2024, 11, 3, 0, 30, 0);
     const result = before.advance({ days: 1 });
     expect(result.day).toBe(4);
@@ -514,7 +473,7 @@ describe("TimeWithZoneTest", () => {
   it("clamps day to valid range for new month", () => {
     const twz = eastern.local(2024, 1, 31, 10, 0, 0);
     const result = twz.change({ month: 2 });
-    expect(result.day).toBe(29); // 2024 is leap year
+    expect(result.day).toBe(29);
   });
 
   it("changes usec", () => {
@@ -542,8 +501,8 @@ describe("TimeWithZoneTest", () => {
   it("minus() preserves nanosecond precision for Temporal.Instant operands", () => {
     const baseNs = 1_700_000_000_000_000_000n;
     const a = new TimeWithZone(Temporal.Instant.fromEpochNanoseconds(baseNs), eastern);
-    const b = Temporal.Instant.fromEpochNanoseconds(baseNs - 500n); // 500 ns earlier
-    expect(a.minus(b)).toBeCloseTo(5e-7, 12); // 5e-7 seconds = 500 ns
+    const b = Temporal.Instant.fromEpochNanoseconds(baseNs - 500n);
+    expect(a.minus(b)).toBeCloseTo(5e-7, 12);
   });
 
   it("eql() is nanosecond-precise for Temporal.Instant operands", () => {
@@ -557,7 +516,7 @@ describe("TimeWithZoneTest", () => {
     const est = eastern.local(2024, 1, 15, 12, 0, 0);
     const pst = est.inTimeZone(pacific);
     expect(est.equals(pst)).toBe(true);
-    expect(pst.hour).toBe(9); // different local time
+    expect(pst.hour).toBe(9);
   });
 
   it("equals() works with Date", () => {
@@ -585,7 +544,7 @@ describe("TimeWithZoneTest", () => {
     const c = eastern.local(2024, 1, 20, 0, 0, 0);
     expect(b.isBetween(a, c)).toBe(true);
     expect(a.isBetween(b, c)).toBe(false);
-    expect(a.isBetween(a, c)).toBe(true); // inclusive
+    expect(a.isBetween(a, c)).toBe(true);
   });
 
   it("valueOf() enables comparison operators", () => {
@@ -625,7 +584,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("handles year boundary crossing", () => {
-    // Dec 31 23:00 EST = Jan 1 04:00 UTC
     const twz = eastern.local(2024, 12, 31, 23, 0, 0);
     const z = twz.utc().toTime();
     expect(z.year).toBe(2025);
@@ -639,16 +597,6 @@ describe("TimeWithZoneTest", () => {
     expect(twz.day).toBe(29);
   });
 
-  // ---------------------------------------------------------------------------
-  // Rails parity tests — ported from Rails activesupport/test/core_ext/time_with_zone_test.rb
-  // Uses the same setup: @utc = Time.utc(2000, 1, 1, 0), @time_zone = Eastern
-  // Local time = 1999-12-31 19:00:00 EST
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // Tests ported from time_with_zone_test.rb (formerly "Rails parity: TimeWithZoneTest")
-  // Each test creates its own twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern)
-  // Local: 1999-12-31 19:00:00 EST (-05:00)
-  // ---------------------------------------------------------------------------
   it("nsec", () => {
     const hawaii = TimeZone.find("Hawaii")!;
     const withZone = new TimeWithZone(
@@ -663,16 +611,11 @@ describe("TimeWithZoneTest", () => {
     expect(twz.usec).toBe(0);
   });
 
-  // ---------------------------------------------------------------------------
-  // DST transition tests (from time_with_zone_test.rb)
-  // ---------------------------------------------------------------------------
   it("advance 1 day expressed as seconds across spring dst", () => {
-    // Adding 86400 seconds across spring DST results in 11:30 EDT (not 10:30)
-    // because 86400 seconds is exactly 24 hours but the day was only 23 hours
     const twz = eastern.local(2006, 4, 1, 10, 30);
     const result = twz.plus(86400);
     expect(result.day).toBe(2);
-    expect(result.hour).toBe(11); // 24 hours later, but DST gained an hour
+    expect(result.hour).toBe(11);
     expect(result.min).toBe(30);
     expect(result.zone).toBe("EDT");
   });
@@ -681,24 +624,18 @@ describe("TimeWithZoneTest", () => {
     const twz = eastern.local(2006, 4, 1, 10, 30);
     const result = twz.advance({ hours: 24 });
     expect(result.day).toBe(2);
-    expect(result.hour).toBe(11); // 24 real hours later
+    expect(result.hour).toBe(11);
     expect(result.min).toBe(30);
   });
 
   it("advance 1 day expressed as seconds across fall dst", () => {
-    // Adding 86400 seconds across fall DST results in 9:30 EST
-    // because 86400 seconds is 24 hours but the day was 25 hours
     const twz = eastern.local(2006, 10, 28, 10, 30);
     const result = twz.plus(86400);
     expect(result.day).toBe(29);
-    expect(result.hour).toBe(9); // 24 hours later, but DST lost an hour
+    expect(result.hour).toBe(9);
     expect(result.min).toBe(30);
     expect(result.zone).toBe("EST");
   });
-
-  // ---------------------------------------------------------------------------
-  // Rails parity: change() tests
-  // ---------------------------------------------------------------------------
 
   it("change year", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
@@ -721,9 +658,6 @@ describe("TimeWithZoneTest", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.change({ month: 2 });
     expect(result.month).toBe(2);
-    // 1999 is not a leap year, Feb has 28 days; original day is 31 -> clamped
-    // But wait, 2000 was a leap year... the year is 1999 (from local time)
-    // Actually year stays 1999 so Feb 28
     expect(result.day).toBeLessThanOrEqual(28);
   });
 
@@ -757,10 +691,6 @@ describe("TimeWithZoneTest", () => {
     expect(result.min).toBe(0);
     expect(result.sec).toBe(30);
   });
-
-  // ---------------------------------------------------------------------------
-  // Rails parity: advance() tests
-  // ---------------------------------------------------------------------------
 
   it("advance years", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
@@ -811,10 +741,6 @@ describe("TimeWithZoneTest", () => {
     expect(result.sec).toBe(30);
   });
 
-  // ---------------------------------------------------------------------------
-  // formatting and serialization (from time_with_zone_test.rb)
-  // ---------------------------------------------------------------------------
-
   it("to fs rfc822", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     expect(twz.toFs("rfc822")).toBe(twz.rfc2822());
@@ -862,15 +788,6 @@ describe("TimeWithZoneTest", () => {
     expect(JSON.parse(json).time).toBe(twz.asJson());
   });
 
-  // ---------------------------------------------------------------------------
-  // far future / past dates (from time_with_zone_test.rb)
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // Additional comparison tests (from time_with_zone_test.rb)
-  // ---------------------------------------------------------------------------
-  // ---------------------------------------------------------------------------
-  // Multiple timezone conversion tests (from time_with_zone_test.rb)
-  // ---------------------------------------------------------------------------
   it("Hawaii timezone basic operations", () => {
     const hawaii = TimeZone.find("Hawaii")!;
     const twz = hawaii.local(2000, 1, 1, 0, 0, 0);
@@ -878,9 +795,8 @@ describe("TimeWithZoneTest", () => {
     expect(twz.hour).toBe(0);
     expect(twz.zone).toBe("HST");
     expect(twz.utcOffset).toBe(-10 * 3600);
-    expect(twz.dst()).toBe(false); // Hawaii doesn't observe DST
+    expect(twz.dst()).toBe(false);
 
-    // UTC should be 10 hours ahead
     expect(twz.utc().toTime().hour).toBe(10);
   });
 
@@ -901,32 +817,23 @@ describe("TimeWithZoneTest", () => {
     const hawaii_twz = pacific_twz.inTimeZone(hawaii);
     const back_to_eastern = hawaii_twz.inTimeZone(eastern);
 
-    // All should represent the same UTC instant
     expect(eastern_twz.utc().toTime().epochMilliseconds).toBe(utcTime.getTime());
     expect(pacific_twz.utc().toTime().epochMilliseconds).toBe(utcTime.getTime());
     expect(hawaii_twz.utc().toTime().epochMilliseconds).toBe(utcTime.getTime());
     expect(back_to_eastern.utc().toTime().epochMilliseconds).toBe(utcTime.getTime());
 
-    // Local hours should differ
-    expect(eastern_twz.hour).toBe(8); // EDT
-    expect(pacific_twz.hour).toBe(5); // PDT
-    expect(hawaii_twz.hour).toBe(2); // HST
+    expect(eastern_twz.hour).toBe(8);
+    expect(pacific_twz.hour).toBe(5);
+    expect(hawaii_twz.hour).toBe(2);
   });
 
-  // ---------------------------------------------------------------------------
-  // Seconds since midnight (from time_with_zone_test.rb)
-  // ---------------------------------------------------------------------------
   it("calculates seconds since midnight correctly", () => {
-    // 1999-12-31 19:00:00 EST = 19 * 3600 seconds since midnight
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const expectedSeconds = 19 * 3600;
     const actualSeconds = twz.hour * 3600 + twz.min * 60 + twz.sec;
     expect(actualSeconds).toBe(expectedSeconds);
   });
 
-  // ---------------------------------------------------------------------------
-  // Duration arithmetic with Duration class (from time_with_zone_test.rb)
-  // ---------------------------------------------------------------------------
   it("plus Duration.days(5)", () => {
     const twz = new TimeWithZone(instantFromDate(new Date(Date.UTC(2000, 0, 1, 0, 0, 0))), eastern);
     const result = twz.plus(Duration.days(5));
@@ -968,7 +875,6 @@ describe("TimeWithZoneTest", () => {
   });
 
   it("plus Duration with mixed variable and fixed parts across DST", () => {
-    // 2006-04-01 10:30 EST + 1 day + 1 second
     const twz = eastern.local(2006, 4, 1, 10, 30);
     const dur = new Duration(86401, { days: 1, seconds: 1 });
     const result = twz.plus(dur);

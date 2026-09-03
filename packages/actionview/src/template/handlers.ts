@@ -1,45 +1,14 @@
-/**
- * ActionView::Template::Handlers
- *
- * Registry of template handlers, keyed by file extension. Rails mixes this
- * module into `ActionView::Template` via `extend` so `Template` itself
- * answers `register_template_handler` / `handler_for_extension` / etc.
- *
- * To add a new template engine:
- *
- *   import { TemplateHandlers } from "@blazetrails/actionview";
- *   TemplateHandlers.registerTemplateHandler("tse", new TseHandler());
- */
-
-/**
- * The rendering context passed to handlers.
- */
 export interface RenderContext {
-  /** Controller name (e.g., "posts") */
   controller: string;
-  /** Action name (e.g., "index") */
   action: string;
-  /** Response format (e.g., "html", "json") */
   format: string;
-  /** Layout content — present when rendering a layout template */
   yield?: string;
-  /** The full template path for error reporting */
   templatePath?: string;
 }
 
-/**
- * A template handler compiles a template source string to a code string, which
- * `Template#compile!` (`template.rb:418-438`) turns into a method on the view.
- * Rails' handlers answer `call(template, source)` and nothing else.
- */
 export interface TemplateHandler {
-  /** File extensions this handler supports (e.g., ["tse"], ["tsx", "jsx"]) */
   readonly extensions: string[];
 
-  /**
-   * Mirrors `Handlers::ERB#call(template, source)` — compile `source` into a
-   * code string evaluated inside the compiled method's body.
-   */
   call(template: unknown, source: string): string;
 }
 
@@ -47,19 +16,7 @@ const handlers = new Map<string, TemplateHandler>();
 let defaultHandler: TemplateHandler | null = null;
 let cachedExtensions: string[] | null = null;
 
-/**
- * ActionView::Template::Handlers — registry of template handlers.
- *
- * Rails mirror: `action_view/template/handlers.rb`.
- */
 export const TemplateHandlers = {
-  /**
-   * Register an object that knows how to handle template files with one or
-   * more extensions. The handler must implement {@link TemplateHandler}.
-   * Rails: `register_template_handler(*extensions, handler)` — variadic
-   * extensions with the handler as the trailing argument. Raises
-   * `ArgumentError` (here, a plain `Error`) when no extension is supplied.
-   */
   registerTemplateHandler(...extensionsAndHandler: [...string[], TemplateHandler]): void {
     const handler = extensionsAndHandler[extensionsAndHandler.length - 1] as TemplateHandler;
     const extensions = extensionsAndHandler.slice(0, -1) as string[];
@@ -68,7 +25,6 @@ export const TemplateHandlers = {
     cachedExtensions = null;
   },
 
-  /** Opposite to {@link registerTemplateHandler}. */
   unregisterTemplateHandler(...extensions: string[]): void {
     for (const ext of extensions) {
       const handler = handlers.get(ext);
@@ -78,42 +34,28 @@ export const TemplateHandlers = {
     cachedExtensions = null;
   },
 
-  /** Sorted list of registered extensions, as strings. */
   templateHandlerExtensions(): string[] {
     return [...handlers.keys()].sort();
   },
 
-  /** Return the handler registered for `extension`, or undefined. */
   registeredTemplateHandler(extension: string | null | undefined): TemplateHandler | undefined {
     return extension ? handlers.get(extension) : undefined;
   },
 
-  /**
-   * Register a handler and make it the default returned by
-   * {@link handlerForExtension} when an unknown extension is requested.
-   */
   registerDefaultTemplateHandler(extension: string, klass: TemplateHandler): void {
     this.registerTemplateHandler(extension, klass);
     defaultHandler = klass;
   },
 
-  /** Handler for `extension`, falling back to the default handler. */
   handlerForExtension(extension: string | null | undefined): TemplateHandler | undefined {
     return this.registeredTemplateHandler(extension) ?? defaultHandler ?? undefined;
   },
 
-  /**
-   * All registered extensions, lazily memoized. Rails memoizes via
-   * `@@template_extensions ||= @@template_handlers.keys`.
-   */
   extensions(): string[] {
     return (cachedExtensions ??= [...handlers.keys()]);
   },
 
-  /**
-   * Clear all registered handlers. Not in Rails — useful for test isolation.
-   * @internal
-   */
+  /** @internal */
   clear(): void {
     handlers.clear();
     defaultHandler = null;

@@ -18,7 +18,6 @@ describe("InTest", () => {
   });
 
   it("in range", () => {
-    // JS doesn't have a native range; simulate with array
     const range = [1, 2, 3, 4, 5];
     expect(isIn(3, range)).toBe(true);
     expect(isIn(6, range)).toBe(false);
@@ -31,7 +30,6 @@ describe("InTest", () => {
   });
 
   it("in date range", () => {
-    // Simulate date range membership check
     const start = new Date("2023-01-01");
     const end = new Date("2023-12-31");
     const inside = new Date("2023-06-15");

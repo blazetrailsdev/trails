@@ -1,17 +1,3 @@
-/**
- * `trails-tsc-views build` core — Phase 2c-a (plan §2 / actionview-100 §2c).
- *
- * Walks `app/views/**\/*.tse`, runs the in-tree `.tse` virtualizer
- * (typed shim) + tse-compiler `compileJs` (runtime ES module) per
- * file, mirrors output under `.trails/views/`, and emits
- * `.trails/views-manifest.ts` — a lazy-thunk registry per Decision 7.
- *
- * The CLI is published as `trails-tsc-views` (not `trails-tsc`) because
- * activerecord already ships a `trails-tsc` bin. Unification is a
- * follow-up. Watch mode, the LSP plugin, and the postinstall hook are
- * deferred to 2c-b / 2c-c.
- */
-
 import * as fs from "node:fs";
 import * as path from "node:path";
 import ts from "typescript";
@@ -21,15 +7,12 @@ import { remapLine } from "./remap.js";
 
 export interface BuildViewsOptions {
   cwd?: string;
-  /** Source directory holding `**\/*.tse`. Default `app/views`. */
   viewsDir?: string;
-  /** Mirror root. Default `.trails`. Outputs land under `<outDir>/views/`. */
   outDir?: string;
 }
 
 export interface BuildViewsResult {
   count: number;
-  /** `.tse` paths relative to `viewsDir`, in POSIX form, sorted. */
   files: readonly string[];
 }
 
@@ -39,18 +22,6 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
   const outDir = path.resolve(cwd, opts.outDir ?? ".trails");
   const outViews = path.join(outDir, "views");
   const files = walkTse(viewsDir);
-  // Safety: refuse to wipe a mirror dir that escapes `cwd`. A mistaken
-  // `--out /` would otherwise resolve `outViews` to `/views` and recurse
-  // into shared system state. Two checks:
-  //
-  //   (1) Lexical — outViews resolves under cwd. Catches obvious escapes
-  //       (`--out /tmp/x`, `--out ../sibling`).
-  //   (2) Symlink-aware — realpath of the deepest existing ancestor of
-  //       outViews stays under realpath(cwd). A symlinked `.trails`
-  //       (or any ancestor) pointing outside the project would pass the
-  //       lexical check but `fs.rmSync` follows symlinks and could
-  //       delete shared state. We compare realpaths because `cwd` itself
-  //       may legitimately be reached through a symlink.
   const lexicalRel = path.relative(cwd, outViews);
   if (lexicalRel === "" || lexicalRel.startsWith("..") || path.isAbsolute(lexicalRel)) {
     throw new Error(
@@ -65,16 +36,8 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
       `refusing to build into ${JSON.stringify(outViews)} — resolved path ${JSON.stringify(realOutAncestor)} is outside cwd ${JSON.stringify(realCwd)} (symlink escape)`,
     );
   }
-  // Wipe the mirror dir so deleted .tse sources don't leave orphan shims
-  // behind. The docs (plan §2.8) state the mirror "is regenerated on
-  // every build"; keeping orphans would let stale `views-manifest.ts`
-  // entries silently typecheck against templates the user already removed.
   fs.rmSync(outViews, { recursive: true, force: true });
   fs.mkdirSync(outViews, { recursive: true });
-  // Collect all format-specific locals types per partial key so that
-  // _user.html.tse and _user.json.tse with different locals both
-  // contribute to the registry entry. The emitted type is an intersection
-  // of all format types, requiring callers to satisfy every format's locals.
   const registryMap = new Map<string, string[]>();
   const shimPaths: string[] = [];
   for (const rel of files) {
@@ -127,10 +90,6 @@ export function buildViews(opts: BuildViewsOptions = {}): BuildViewsResult {
   return { count: files.length, files };
 }
 
-/** Walk up from `p` until we find an extant path. Always terminates at the
- * filesystem root, which is guaranteed to exist. Used by the realpath-based
- * safety check so we resolve symlinks on the deepest portion of the target
- * mirror dir that actually exists on disk. */
 function deepestExisting(p: string): string {
   let cur = path.resolve(p);
   while (!fs.existsSync(cur)) {
@@ -147,9 +106,6 @@ function walkTse(dir: string): string[] {
   const entries = fs.readdirSync(dir, { recursive: true, withFileTypes: true });
   for (const e of entries) {
     if (!e.isFile() || !e.name.endsWith(".tse")) continue;
-    // `parentPath` is the Node 20.12+ field; older builds expose the same
-    // value under the deprecated `path`. Read both so we don't break on
-    // engines that still ship the old shape.
     const parent =
       (e as fs.Dirent & { parentPath?: string }).parentPath ??
       (e as fs.Dirent & { path?: string }).path ??
@@ -160,16 +116,10 @@ function walkTse(dir: string): string[] {
   return out.sort();
 }
 
-/** Strip the trailing `.tse` handler. Keeps `<name>.<format>` (e.g. `users/show.html`). */
 function manifestKey(rel: string): string {
   return rel.replace(/\.tse$/u, "");
 }
 
-/**
- * Rails partial key for a `.tse` path: strips `_` prefix and format extension
- * so `users/_user.html.tse` → `"users/user"`, matching `render partial: "users/user"`.
- * Returns `null` for non-partial templates (filename doesn't start with `_`).
- */
 function partialRegistryKey(rel: string): string | null {
   const parts = rel.replace(/\.tse$/u, "").split("/");
   const filename = parts[parts.length - 1];
@@ -183,9 +133,6 @@ function emitRegistryAugmentation(entries: Array<{ key: string; localsType: stri
     "// AUTO-GENERATED by `trails-tsc-views build` — do not edit.",
     "// Regenerate by running `trails-tsc-views build`.",
     "",
-    // `export {}` makes this file an ES module so `declare module` augments
-    // the real @blazetrails/actionview exports instead of shadowing them with
-    // a fresh ambient module declaration.
     "export {};",
     "",
     'declare module "@blazetrails/actionview" {',

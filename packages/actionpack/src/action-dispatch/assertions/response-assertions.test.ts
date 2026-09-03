@@ -1,4 +1,3 @@
-// Mirrors Rails actionpack/test/assertions/response_assertions_test.rb
 import { describe, expect, it } from "vitest";
 import {
   assertResponse,

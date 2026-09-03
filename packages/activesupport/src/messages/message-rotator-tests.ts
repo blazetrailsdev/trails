@@ -3,13 +3,8 @@ import { expect, it } from "vitest";
 import type { MessageSerializer } from "./codec.js";
 import type { OnRotation } from "./rotator.js";
 
-/** Rails' `MessageRotatorTests::DATA`. */
 export const DATA: readonly unknown[] = [{ a_boolean: true, a_number: 123, a_string: "abc" }];
 
-/**
- * Rails' `secret` / `make_codec` / `encode` / `decode`, which each including
- * test supplies.
- */
 export interface RotatorCodecHooks<T> {
   secret(key: string): unknown;
   makeCodec(...args: unknown[]): T;
@@ -26,7 +21,6 @@ function rotatable(codec: unknown): RotatableCodec {
   return codec as RotatableCodec;
 }
 
-/** Rails' `assert_rotate`. */
 export function assertRotate<T>(
   hooks: RotatorCodecHooks<T>,
   current: unknown[],
@@ -49,10 +43,6 @@ export function assertRotate<T>(
   }
 }
 
-/**
- * Rails' `MessageRotatorTests`, the module both `MessageVerifierRotatorTest`
- * and `MessageEncryptorRotatorTest` `include`.
- */
 export function messageRotatorTests<T>(hooks: RotatorCodecHooks<T>): void {
   const { secret, makeCodec, encode, decode } = hooks;
 

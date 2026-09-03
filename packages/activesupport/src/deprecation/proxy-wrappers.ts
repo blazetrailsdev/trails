@@ -3,17 +3,6 @@ import { extend, include, Module, prepend } from "@blazetrails/ruby-compat/inclu
 import { constantize } from "../inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
-/**
- * Mirrors: active_support/deprecation/proxy_wrappers.rb
- *
- * A TS constructor can neither return `nil`/`false` nor un-define an inherited
- * method, so `new` stays the static method Rails writes, and the
- * `undef_method` + `method_missing` lookup is a `Proxy` — the shape
- * `methodMissingProxy` (method-missing-proxy.ts) uses, spelled out here because
- * Rails' hook warns on every forwarded call, from the called name and args.
- */
-
-/** Mirrors Ruby's `Object#inspect` for the values these messages interpolate. */
 function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
   if (value === null || value === undefined) return "nil";
@@ -21,7 +10,6 @@ function inspect(value: unknown): string {
   return String(value);
 }
 
-/** The `instance_methods.each { |m| undef_method m }` lookup. */
 function undefMethodProxy<T extends object>(instance: T, methodMissing: MethodMissing): T {
   return new Proxy(instance, {
     get(target, prop, receiver) {
@@ -36,9 +24,7 @@ function undefMethodProxy<T extends object>(instance: T, methodMissing: MethodMi
 
 type MethodMissing = (this: unknown, called: string, args: unknown[]) => unknown;
 
-/** :nodoc: */
 export abstract class DeprecationProxy {
-  /** Mirrors: proxy_wrappers.rb:6-11. */
   static new(...args: unknown[]): unknown {
     const object = args[0];
 
@@ -47,8 +33,6 @@ export abstract class DeprecationProxy {
     return undefMethodProxy(instance, DeprecationProxy.prototype.methodMissing);
   }
 
-  // Don't give a deprecation warning on inspect since test/unit and error
-  // logs rely on it for diagnostics.
   inspect(): string {
     return inspect(this.target);
   }
@@ -57,7 +41,6 @@ export abstract class DeprecationProxy {
 
   protected abstract warn(callstack: CallerLocation[], called: string, args: unknown[]): void;
 
-  /** Mirrors: proxy_wrappers.rb:19-22. */
   private methodMissing(called: string, args: unknown[]): unknown {
     this.warn(callerLocations(), called, args);
     const value = (this.target as Record<string, unknown>)[called];
@@ -67,12 +50,6 @@ export abstract class DeprecationProxy {
   }
 }
 
-/**
- * DeprecatedObjectProxy transforms an object into a deprecated one. It takes an
- * object, a deprecation message, and a deprecator.
- *
- * Mirrors: proxy_wrappers.rb:35-51.
- */
 export class DeprecatedObjectProxy extends DeprecationProxy {
   private _object: unknown;
   private _message: string;
@@ -94,18 +71,6 @@ export class DeprecatedObjectProxy extends DeprecationProxy {
   }
 }
 
-/**
- * DeprecatedInstanceVariableProxy transforms an instance variable into a
- * deprecated one. It takes an instance of a class, a method on that class, an
- * instance variable, and a deprecator as the last argument.
- *
- * Trying to use the deprecated instance variable will result in a deprecation
- * warning, pointing to the method as a replacement. Ruby's `var = "@#{method}"`
- * default sits before the `deprecator:` kwarg, so a caller passing only the
- * kwarg lands it in the `var` slot; both arrangements are accepted.
- *
- * Mirrors: proxy_wrappers.rb:83-99.
- */
 export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
   private _instance: Record<string, unknown>;
   private _method: string;
@@ -140,16 +105,7 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
   }
 }
 
-/**
- * DeprecatedConstantProxy transforms a constant into a deprecated one. It takes
- * the full names of an old (deprecated) constant and of a new constant (both in
- * string form) and a deprecator. The deprecated constant now returns the value
- * of the new one.
- *
- * Mirrors: proxy_wrappers.rb:117-180.
- */
 export class DeprecatedConstantProxy extends Module {
-  /** Mirrors: proxy_wrappers.rb:118-123. */
   static new(...args: unknown[]): unknown {
     const object = args[0];
 
@@ -181,15 +137,10 @@ export class DeprecatedConstantProxy extends Module {
     this._message = message ?? `${oldConst} is deprecated! Use ${newConst} instead.`;
   }
 
-  // Don't give a deprecation warning on inspect since test/unit and error
-  // logs rely on it for diagnostics.
   inspect(): string {
     return inspect(this.target);
   }
 
-  // Don't give a deprecation warning on methods that IRB may invoke
-  // during tab-completion. Rails: `delegate :hash, :instance_methods, :name,
-  // :respond_to?, to: :target` (proxy_wrappers.rb:145).
   override instanceMethods(): string[] {
     return (this.target as Module).instanceMethods();
   }
@@ -198,20 +149,11 @@ export class DeprecatedConstantProxy extends Module {
     return (this.target as { name: string }).name;
   }
 
-  /**
-   * Ruby's `Object#hash` is universal and TypeScript's is not, so the delegation
-   * calls the target's own port when it has one.
-   */
   hash(): unknown {
     const target = this.target as { hash?: () => unknown };
     return typeof target.hash === "function" ? target.hash() : undefined;
   }
 
-  /**
-   * Ruby's `Object#respond_to?` is universal and TypeScript's is not, so the
-   * delegation calls the target's own port when it has one and reads the object
-   * itself otherwise.
-   */
   respondTo(method: string): boolean {
     const target = this.target as { respondTo?: (m: string) => boolean };
     return typeof target.respondTo === "function"
@@ -219,24 +161,20 @@ export class DeprecatedConstantProxy extends Module {
       : method in (target as object);
   }
 
-  /** Returns the class of the new constant. Mirrors: proxy_wrappers.rb:152-154. */
   class(): unknown {
     return (this.target as object).constructor;
   }
 
-  /** Mirrors: proxy_wrappers.rb:156-159. */
   appendFeatures(base: new (...args: any[]) => any): void {
     this._deprecator.warn(this._message, callerLocations());
     include(base, this.target as Module);
   }
 
-  /** Mirrors: proxy_wrappers.rb:161-164. */
   prependFeatures(base: new (...args: any[]) => any): void {
     this._deprecator.warn(this._message, callerLocations());
     prepend(base, this.target as Module);
   }
 
-  /** Mirrors: proxy_wrappers.rb:166-169. */
   extended(base: object): void {
     this._deprecator.warn(this._message, callerLocations());
     extend(base, this.target as Module);
@@ -246,7 +184,6 @@ export class DeprecatedConstantProxy extends Module {
     return constantize(String(this._newConst));
   }
 
-  /** Mirrors: proxy_wrappers.rb:180-183. */
   private methodMissing(called: string, args: unknown[]): unknown {
     this._deprecator.warn(this._message, callerLocations());
     const value = (this.target as Record<string, unknown>)[called];

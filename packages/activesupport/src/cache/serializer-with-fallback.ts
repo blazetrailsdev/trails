@@ -1,16 +1,3 @@
-/**
- * Mirrors Rails `ActiveSupport::Cache::SerializerWithFallback`
- * (cache/serializer_with_fallback.rb).
- *
- * Provides four serializers (passthrough, marshal_7_0, marshal_7_1,
- * message_pack) that share a prefix-dispatch `load` so any serializer can read
- * payloads written by any other.
- *
- * trails has no Ruby Marshal runtime; marshal_7_0 and marshal_7_1 are backed by
- * the fidelity `coder` (`coder.ts`) but keep Rails' wire-prefix framing so
- * cross-format dispatch still works.
- */
-
 import { KeyError } from "@blazetrails/ruby-compat";
 
 import { Entry } from "./entry.js";
@@ -20,12 +7,8 @@ import { coder } from "./coder.js";
 import { deflate, inflate } from "../gzip.js";
 import { CacheSerializer } from "../message-pack/cache-serializer.js";
 
-// Singleton used by message_pack serializer.
 const messagePack = new CacheSerializer();
 
-// Mirrors Rails SerializerWithFallback#marshal_load: deserializes via the
-// fidelity coder (trails' Marshal-equivalent) and converts parse errors to
-// Cache::DeserializationError (same rescue-ArgumentError pattern as Rails).
 /** @internal */
 function marshalLoad(payload: string): unknown {
   try {
@@ -36,13 +19,8 @@ function marshalLoad(payload: string): unknown {
 }
 
 /**
- * Interface shared by all four serializers. In Ruby they are anonymous
- * modules inside `SERIALIZERS`, so the shared shape has no constant.
- *
  * @internal
- * @noRailsEquivalent PERMANENT — name collision only. Ruby's `Serializer`
- * (`ActiveSupport::MessagePack::Serializer`) is one concrete MessagePack
- * serializer, not the shape the fallback table's members share.
+ * @noRailsEquivalent PERMANENT
  */
 export interface Serializer {
   dump(entryOrValue: Entry | unknown): string | Entry;
@@ -53,11 +31,9 @@ export interface Serializer {
   isAvailable?(): boolean;
 }
 
-// Rails marshal_7_0 mark bytes (\x00 uncompressed, \x01 compressed).
 const MARK_UNCOMPRESSED = "\x00";
 const MARK_COMPRESSED = "\x01";
 
-// Rails marshal_7_1 signature (\x04\x08 — the Ruby Marshal magic bytes).
 const MARSHAL_SIGNATURE = "\x04\x08";
 
 const passthroughWithFallback: Serializer = {
@@ -132,8 +108,6 @@ const messagePackWithFallback: Serializer = {
 
   _load(dumped: string | Entry): unknown {
     const result = messagePack.load(Buffer.from(dumped as string, "latin1"));
-    // CacheSerializer swallows MissingClassError and returns undefined (cache miss);
-    // Rails returns nil, so convert undefined → null here.
     return result === undefined ? null : result;
   },
 
@@ -146,8 +120,6 @@ const messagePackWithFallback: Serializer = {
     );
   },
 
-  // Mirrors Rails MessagePackWithFallback#available?: message_pack is a
-  // bundled dep in trails, so this always returns true (no dynamic require).
   isAvailable(): boolean {
     return true;
   },
@@ -182,7 +154,7 @@ function sharedLoad(dumped: unknown): unknown {
   }
 }
 
-/** Mirrors Rails `ActiveSupport::Cache::SerializerWithFallback`. @internal */
+/** @internal */
 export const SerializerWithFallback = {
   SERIALIZERS,
 
