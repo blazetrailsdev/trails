@@ -1,5 +1,5 @@
 import { Notifications, onLoad } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { File, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
@@ -59,19 +59,13 @@ export class Engine extends Trailtie {
     rootPath: string | undefined,
     defaultValue?: string,
   ): Promise<string> {
-    const p = await getPathAsync();
-    const fs = await getFsAsync();
-    while (
-      rootPath &&
-      (await isDirectory(fs, rootPath)) &&
-      !(await fs.exists(p.join(rootPath, flag)))
-    ) {
-      const parent = p.dirname(rootPath);
+    while (rootPath && File.isDirectory(rootPath) && !File.isExist(`${rootPath}/${flag}`)) {
+      const parent = File.dirname(rootPath);
       rootPath = parent !== rootPath ? parent : undefined;
     }
-    const found = rootPath && (await fs.exists(p.join(rootPath, flag))) ? rootPath : defaultValue;
-    if (!found) throw new Error(`Could not find root path for ${this.name}`);
-    return await realpathOr(fs, found);
+    const root = rootPath && File.isExist(`${rootPath}/${flag}`) ? rootPath : defaultValue;
+    if (!root) throw new Error(`Could not find root path for ${this.name}`);
+    return File.realpath(root);
   }
 
   static findRoot(from: string): Promise<string> {
@@ -238,14 +232,6 @@ interface ActionControllerBaseLike {
 }
 
 type Fs = Awaited<ReturnType<typeof getFsAsync>>;
-async function isDirectory(fs: Fs, p: string): Promise<boolean> {
-  if (!fs.stat) throw new Error("FsAdapter.stat() is required for trailties (async-only).");
-  try {
-    return (await fs.stat(p)).isDirectory();
-  } catch {
-    return false;
-  }
-}
 async function realpathOr(fs: Fs, p: string): Promise<string> {
   try {
     return fs.realpath ? await fs.realpath(p) : p;

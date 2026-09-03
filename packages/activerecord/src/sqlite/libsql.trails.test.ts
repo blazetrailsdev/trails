@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
-import { getFs } from "@blazetrails/ruby-compat";
-import { getOs } from "@blazetrails/activesupport/os-adapter";
+import { File, getOs } from "@blazetrails/ruby-compat";
 import {
   libsqlDriver,
   libsqlRemoteDriver,
@@ -101,7 +100,7 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
   const removeFiles = (): void => {
     for (const p of sidecars) {
       try {
-        getFs().unlinkSync(p);
+        File.delete(p);
       } catch {}
     }
   };
@@ -149,7 +148,7 @@ describe("SqliteDriver — libsql local-file round-trip", () => {
     } finally {
       for (const p of [relName, `${relName}-wal`, `${relName}-shm`]) {
         try {
-          getFs().unlinkSync(p);
+          File.delete(p);
         } catch {}
       }
     }
@@ -162,7 +161,7 @@ describe("LibSQLAdapter — local-file smoke", () => {
   const removeFiles = (): void => {
     for (const p of sidecars) {
       try {
-        getFs().unlinkSync(p);
+        File.delete(p);
       } catch {}
     }
   };
@@ -214,7 +213,7 @@ describe("SqliteDriver — libsql restoreFromPath", () => {
   const removeTempFiles = (): void => {
     for (const p of tempFiles) {
       try {
-        getFs().unlinkSync(p);
+        File.delete(p);
       } catch {}
     }
   };
@@ -524,7 +523,7 @@ describe.skipIf(!hasCredentials)(
     const removeFiles = (): void => {
       for (const p of sidecars) {
         try {
-          getFs().unlinkSync(p);
+          File.delete(p);
         } catch {}
       }
     };
@@ -580,7 +579,7 @@ describe.skipIf(!hasCredentials)(
     const removeFiles = (): void => {
       for (const p of sidecars) {
         try {
-          getFs().unlinkSync(p);
+          File.delete(p);
         } catch {}
       }
     };

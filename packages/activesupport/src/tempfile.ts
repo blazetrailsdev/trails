@@ -1,5 +1,4 @@
-import { getCrypto, File } from "@blazetrails/ruby-compat";
-import { getOs } from "./os-adapter.js";
+import { getCrypto, File, getOs } from "@blazetrails/ruby-compat";
 
 export type TempfileBasename = string | [string, string];
 

@@ -5,7 +5,11 @@
     "rubyName": "visualizer",
     "call": "join",
     "kind": "args",
-    "rubyArgs": [],
-    "reason": "Ruby's argument-less Array#join (journey/gtg/transition_table.rb:148) joins with the empty string; JS Array#join defaults to \",\", so the port has to spell the \"\" Rails leaves implicit."
+    "rubyArgs": [
+      "ref:__dir__",
+      "str:..",
+      "str:visualizer"
+    ],
+    "reason": "Rails reads fsm.js/fsm.css/index.html.erb off disk from `File.join __dir__, \"..\", \"visualizer\"` (transition_table.rb:128); trails ships those assets inlined in journey/visualizer.ts, so there is no asset directory to join."
   }
 ]

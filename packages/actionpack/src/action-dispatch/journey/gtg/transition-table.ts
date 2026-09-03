@@ -1,9 +1,5 @@
-import {
-  getChildProcess,
-  include,
-  ToJsonWithActiveSupportEncoder,
-  type Included,
-} from "@blazetrails/activesupport";
+import { include, ToJsonWithActiveSupportEncoder, type Included } from "@blazetrails/activesupport";
+import { getChildProcess } from "@blazetrails/ruby-compat";
 import { toDot, type DotHost, type DotTransition } from "../nfa/dot.js";
 import { Symbol as SymbolNode, Terminal, type Node } from "../nodes/node.js";
 import { renderVisualizer } from "../visualizer.js";

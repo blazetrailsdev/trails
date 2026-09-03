@@ -1,4 +1,4 @@
-import { osAdapterConfig, registerOsAdapter } from "@blazetrails/activesupport";
+import { osAdapterConfig, registerOsAdapter } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 

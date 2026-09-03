@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
-import { getOsAsync } from "@blazetrails/activesupport";
-import { setEnv, setExitCode } from "@blazetrails/ruby-compat";
 import {
+  getFsAsync,
+  getPathAsync,
+  getOsAsync,
+  setEnv,
+  setExitCode,
   registerChildProcessAdapter,
   childProcessAdapterConfig,
-} from "@blazetrails/activesupport/child-process-adapter";
+} from "@blazetrails/ruby-compat";
 import { editEncryptedFile, showEncryptedFile } from "./encrypted-file-editor.js";
 
 describe("encrypted-file-editor", () => {

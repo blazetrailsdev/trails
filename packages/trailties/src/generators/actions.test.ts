@@ -5,7 +5,7 @@ import {
   type ChildProcessAdapter,
   type SpawnSyncOptions,
   type SpawnSyncResult,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/ruby-compat";
 import { GeneratorBase } from "./base.js";
 
 class TestGenerator extends GeneratorBase {}

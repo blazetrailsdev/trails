@@ -36,17 +36,23 @@ const stat = (d: boolean) => ({
 });
 
 function installFs(dirs: Set<string>, files: Set<string>): void {
+  const norm = (p: string) => p.replace(/\/+/g, "/");
   registerFsAdapter(
     "engine-test",
     {
       cwd: () => "/",
-      exists: async (p: string) => dirs.has(p) || files.has(p),
+      exists: async (p: string) => dirs.has(norm(p)) || files.has(norm(p)),
       stat: async (p: string) => {
-        if (dirs.has(p)) return stat(true);
-        if (files.has(p)) return stat(false);
+        if (dirs.has(norm(p))) return stat(true);
+        if (files.has(norm(p))) return stat(false);
         throw new Error("ENOENT");
       },
-      statSync: () => stat(false),
+      existsSync: (p: string) => dirs.has(norm(p)) || files.has(norm(p)),
+      statSync: (p: string) => {
+        if (dirs.has(norm(p))) return stat(true);
+        if (files.has(norm(p))) return stat(false);
+        throw new Error("ENOENT");
+      },
       realpath: async (p: string) => p,
     } as unknown as FsAdapter,
     posixPath,

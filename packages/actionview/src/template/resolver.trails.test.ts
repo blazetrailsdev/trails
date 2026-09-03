@@ -1,5 +1,4 @@
-import { getOsAsync } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getOsAsync, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { LookupContext } from "../lookup-context.js";

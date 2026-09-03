@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile, InvalidKeyLengthError, MissingKeyError } from "./encrypted-file.js";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
-import { getOsAsync } from "./os-adapter.js";
-import { setEnv } from "@blazetrails/ruby-compat";
+import { getFsAsync, getPathAsync, getOsAsync, setEnv } from "@blazetrails/ruby-compat";
 import {
   assert,
   assertNot,

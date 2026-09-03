@@ -54,16 +54,30 @@ export type {
   HashAdapter,
   HmacAdapter,
 } from "./crypto-adapter.js";
-export { FloatDomainError } from "./float-domain-error.js";
-export { FrozenError } from "./frozen-error.js";
 export {
-  fsAdapterConfig,
-  getFs,
-  getFsAsync,
-  getPath,
-  getPathAsync,
-  registerFsAdapter,
-} from "./fs-adapter.js";
+  registerAsyncContextAdapter,
+  getAsyncContext,
+  asyncContextAdapterConfig,
+} from "./async-context-adapter.js";
+export type { AsyncContext, AsyncContextAdapter } from "./async-context-adapter.js";
+export {
+  registerChildProcessAdapter,
+  getChildProcess,
+  getChildProcessAsync,
+  childProcessAdapterConfig,
+} from "./child-process-adapter.js";
+export type {
+  ChildProcessAdapter,
+  SpawnSyncOptions,
+  SpawnSyncResult,
+} from "./child-process-adapter.js";
+export { FloatDomainError } from "./float-domain-error.js";
+export { registerHttpAdapter, getHttpAsync, httpAdapterConfig } from "./http-adapter.js";
+export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-adapter.js";
+export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
+export type { OsAdapter } from "./os-adapter.js";
+export { FrozenError } from "./frozen-error.js";
+export { fsAdapterConfig, getFsAsync, getPathAsync, registerFsAdapter } from "./fs-adapter.js";
 export type { FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs-adapter.js";
 export {
   Module,

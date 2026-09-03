@@ -1,0 +1,21 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/database-tasks.ts",
+    "rubyName": "dump_schema",
+    "call": "open",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:filename",
+      "str:w:utf-8"
+    ],
+    "reason": "Rails' `\"w:utf-8\"` carries Ruby's external-encoding suffix (database_tasks.rb:441); ruby-compat's File.open passes the mode straight to FsAdapter.openSync, which takes plain flags, so the port passes `\"w\"`."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/database-tasks.ts",
+    "rubyName": "dump_schema",
+    "call": "order:dump,open",
+    "reason": "Rails runs SchemaDumper.dump INSIDE the File.open block (database_tasks.rb:441-443); trails' SchemaDumper.dump is async and File.open's block is synchronous, so the dump has to complete before the file is opened."
+  }
+]

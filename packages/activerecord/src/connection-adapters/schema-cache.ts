@@ -1,4 +1,4 @@
-import { File, FileUtils, getFs } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
 import { deduplicate } from "./deduplicable.js";
@@ -104,10 +104,9 @@ export class SchemaCache {
     }
   }
 
-  /** @missingRailsCall open — PERMANENT */
   static read<T>(filename: string, callback: (data: string) => T): T {
     if (File.extname(filename) === ".gz") {
-      const raw = getFs().readFileSync(filename, "latin1");
+      const raw = File.open(filename, "rb", (f) => f.read());
       return callback(Gzip.decompress(raw));
     }
     return callback(File.read(filename));
@@ -385,7 +384,7 @@ export class SchemaCache {
     this.encodeWith(coder);
     const payload = JSON.stringify(coder, null, 2);
     if (File.extname(filename) === ".gz") {
-      getFs().writeFileSync(filename, Gzip.compress(payload), "latin1");
+      File.open(filename, "wb", (f) => f.write(Gzip.compress(payload)));
     } else {
       File.write(filename, payload);
     }

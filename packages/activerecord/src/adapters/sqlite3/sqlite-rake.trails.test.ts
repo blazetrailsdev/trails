@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import * as activesupport from "@blazetrails/activesupport";
+import { getChildProcess } from "@blazetrails/ruby-compat";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLiteDatabaseTasks } from "../../tasks/sqlite-database-tasks.js";
 import { HashConfig } from "../../database-configurations/hash-config.js";
@@ -20,9 +20,10 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     database = path.join(os.tmpdir(), `db_create-${randomUUID()}.sqlite3`);
     created.push(database);
     for (const table of ["bar", "prefix_foo", "prefix_bar"]) {
-      const result = activesupport
-        .getChildProcess()
-        .spawnSync("sqlite3", [database, `CREATE TABLE ${table}(id INTEGER)`]);
+      const result = getChildProcess().spawnSync("sqlite3", [
+        database,
+        `CREATE TABLE ${table}(id INTEGER)`,
+      ]);
       if (result.status !== 0) throw new Error(`sqlite3 failed: ${result.stderr}`);
     }
     configuration = new HashConfig("development", "primary", {

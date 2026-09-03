@@ -1,7 +1,11 @@
-import { getChildProcessAsync } from "./child-process-adapter.js";
-import { getCryptoAsync, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
-import { getHttpAsync } from "./http-adapter.js";
-import { getOsAsync } from "./os-adapter.js";
+import {
+  getChildProcessAsync,
+  getCryptoAsync,
+  getFsAsync,
+  getHttpAsync,
+  getOsAsync,
+  getPathAsync,
+} from "@blazetrails/ruby-compat";
 
 await Promise.all([
   getChildProcessAsync(),

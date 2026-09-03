@@ -1,4 +1,4 @@
-import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
+import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/ruby-compat";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";

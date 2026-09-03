@@ -3,9 +3,14 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import * as activesupport from "@blazetrails/activesupport";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
-import { stdout, stderr } from "@blazetrails/ruby-compat";
+import {
+  getChildProcess,
+  getChildProcessAsync,
+  File,
+  FileUtils,
+  stdout,
+  stderr,
+} from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
@@ -23,7 +28,7 @@ function awesomeFile(): string {
 }
 
 function runSqlite3(database: string, sql: string): void {
-  const result = activesupport.getChildProcess().spawnSync("sqlite3", [database, sql]);
+  const result = getChildProcess().spawnSync("sqlite3", [database, sql]);
   if (result.status !== 0) throw new Error(`sqlite3 failed: ${result.stderr}`);
 }
 
@@ -317,7 +322,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     const filename = awesomeFile();
     created.push(filename);
 
-    const childProcess = await activesupport.getChildProcessAsync();
+    const childProcess = await getChildProcessAsync();
     const spawnSync = vi.spyOn(childProcess, "spawnSync");
 
     let message = "";

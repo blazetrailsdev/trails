@@ -3,13 +3,6 @@ export { FileUpdateChecker } from "./file-update-checker.js";
 
 export { trailsRoot, setTrailsRoot } from "./trails-root.js";
 
-export {
-  registerAsyncContextAdapter,
-  getAsyncContext,
-  asyncContextAdapterConfig,
-} from "./async-context-adapter.js";
-export type { AsyncContext, AsyncContextAdapter } from "./async-context-adapter.js";
-
 export { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 export {
@@ -23,33 +16,15 @@ export type { EncryptedFileOptions } from "./encrypted-file.js";
 export { Tempfile } from "./tempfile.js";
 export type { TempfileBasename } from "./tempfile.js";
 
-export {
-  registerChildProcessAdapter,
-  getChildProcess,
-  getChildProcessAsync,
-  childProcessAdapterConfig,
-} from "./child-process-adapter.js";
-export type {
-  ChildProcessAdapter,
-  SpawnSyncOptions,
-  SpawnSyncResult,
-} from "./child-process-adapter.js";
-
-export { registerHttpAdapter, getHttpAsync, httpAdapterConfig } from "./http-adapter.js";
-export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-adapter.js";
-
-export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
-export type { OsAdapter } from "./os-adapter.js";
-
 import {
+  asyncContextAdapterConfig,
+  childProcessAdapterConfig,
   cryptoAdapterConfig,
   fsAdapterConfig,
+  httpAdapterConfig,
+  osAdapterConfig,
   processAdapterConfig,
 } from "@blazetrails/ruby-compat";
-import { asyncContextAdapterConfig } from "./async-context-adapter.js";
-import { childProcessAdapterConfig } from "./child-process-adapter.js";
-import { httpAdapterConfig } from "./http-adapter.js";
-import { osAdapterConfig } from "./os-adapter.js";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
 
 export const ActiveSupport = {

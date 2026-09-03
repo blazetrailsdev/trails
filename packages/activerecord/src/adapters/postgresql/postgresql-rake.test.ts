@@ -3,9 +3,8 @@ import {
   getOsAsync,
   getChildProcessAsync,
   type ChildProcessAdapter,
-} from "@blazetrails/activesupport";
-import { stdout, stderr } from "@blazetrails/ruby-compat";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+} from "@blazetrails/ruby-compat";
+import { stdout, stderr, File, FileUtils } from "@blazetrails/ruby-compat";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import { PostgreSQLDatabaseTasks } from "../../tasks/postgresql-database-tasks.js";
@@ -359,8 +358,8 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
 
   beforeEach(async () => {
     const os = await getOsAsync();
-    filename = getPath().join(os.tmpdir(), "awesome-file.sql");
-    getFs().writeFileSync(filename, "");
+    filename = File.join(os.tmpdir(), "awesome-file.sql");
+    File.write(filename, "");
     previousFlags = DatabaseTasks.structureDumpFlags;
     previousDumpSchemas = DatabaseTasks.dumpSchemas;
     PostgreSQLDatabaseTasks.register();
@@ -375,12 +374,12 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     DatabaseTasks.structureDumpFlags = previousFlags;
     DatabaseTasks.dumpSchemas = previousDumpSchemas;
     SchemaDumper.ignoreTables = [];
-    getFs().rmSync(filename, { force: true });
+    FileUtils.rmF(filename);
   });
 
   it("structure dump", async () => {
     spawnSync.mockRestore();
-    expect(getFs().readFileSync(filename, "utf8")).toEqual("");
+    expect(File.read(filename)).toEqual("");
 
     const config = new HashConfig("default_env", "primary", {
       adapter: "postgresql",
@@ -389,13 +388,11 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
 
     await DatabaseTasks.structureDump(config, filename);
 
-    expect(
-      getFs().readFileSync(filename, "utf8").includes("PostgreSQL database dump complete"),
-    ).toBeTruthy();
+    expect(File.read(filename).includes("PostgreSQL database dump complete")).toBeTruthy();
   });
 
   it("structure dump header comments removed", async () => {
-    getFs().writeFileSync(
+    File.write(
       filename,
       "-- header comment\n\n-- more header comment\n statement \n-- lower comment\n",
     );
@@ -403,8 +400,7 @@ describeIfPostgresqlAdapter("PostgreSQLStructureDumpTest", () => {
     await DatabaseTasks.structureDump(configuration(), filename);
 
     expect(
-      getFs()
-        .readFileSync(filename, "utf8")
+      File.read(filename)
         .split(/(?<=\n)/)
         .slice(0, 2),
     ).toEqual([" statement \n", "-- lower comment\n"]);

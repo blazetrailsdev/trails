@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import * as activesupport from "@blazetrails/activesupport";
+import { getChildProcess } from "@blazetrails/ruby-compat";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -39,9 +39,7 @@ describe("SQLiteDatabaseTasks structure_load input redirect", () => {
     });
     await new SQLiteDatabaseTasks(configuration).structureLoad(filename);
 
-    const result = activesupport
-      .getChildProcess()
-      .spawnSync("sqlite3", [database, "SELECT hex(a) FROM t;"]);
+    const result = getChildProcess().spawnSync("sqlite3", [database, "SELECT hex(a) FROM t;"]);
     expect(result.stdout.trim()).toBe("FF");
   });
 });

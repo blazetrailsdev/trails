@@ -1,3 +1,4 @@
+import { File } from "@blazetrails/ruby-compat";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
 
@@ -124,7 +125,7 @@ export function localVariable(this: ObjectRenderingHost, path: string): string {
     if (!/^[a-z_]\w*$/.test(String(as))) raiseInvalidOptionAs(as);
     return String(as);
   }
-  const base = path.endsWith("/") ? "" : path.split("/").pop()!;
+  const base = path.endsWith("/") ? "" : File.basename(path);
   const match = /^_?(.*?)(?:\.\w+)*$/.exec(base);
   if (!match) raiseInvalidIdentifier(path);
   return match[1];

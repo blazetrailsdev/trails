@@ -30,7 +30,6 @@
       ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
       "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
-      "@blazetrails/activesupport/os-adapter": ["../../activesupport/src/os-adapter.ts"],
       "@blazetrails/activesupport/testing/temporal-helpers": [
         "../../activesupport/src/testing/temporal-helpers.ts"
       ],

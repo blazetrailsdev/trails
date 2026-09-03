@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ColumnInfo, SqliteConnection } from "../sqlite-adapter.js";
-import { getFs } from "@blazetrails/ruby-compat";
-import { getOs } from "@blazetrails/activesupport/os-adapter";
+import { File, getOs } from "@blazetrails/ruby-compat";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
 
 describe("SqliteDriver — better-sqlite3 round-trip", () => {
@@ -115,13 +114,13 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
       await conn.exec("CREATE TABLE t (x INTEGER)");
       await conn.exec("DROP TABLE IF EXISTS t");
       await conn.close();
-      expect(getFs().existsSync(literal)).toBe(true);
-      expect(getFs().existsSync(`/${relName}`)).toBe(false);
+      expect(File.isExist(literal)).toBe(true);
+      expect(File.isExist(`/${relName}`)).toBe(false);
       expect(betterSqlite3Driver.databaseExists?.({ database: literal })).toBe(true);
     } finally {
       for (const p of [literal, `${literal}-wal`, `${literal}-shm`]) {
         try {
-          getFs().unlinkSync(p);
+          File.delete(p);
         } catch {}
       }
     }
@@ -149,7 +148,7 @@ describe("SqliteDriver — better-sqlite3 restoreFromPath", () => {
   const removeTempFiles = (): void => {
     for (const p of tempFiles) {
       try {
-        getFs().unlinkSync(p);
+        File.delete(p);
       } catch {}
     }
   };

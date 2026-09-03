@@ -1,5 +1,5 @@
-import { getAsyncContext } from "./async-context-adapter.js";
-import type { AsyncContext, AsyncContextAdapter } from "./async-context-adapter.js";
+import { getAsyncContext } from "@blazetrails/ruby-compat";
+import type { AsyncContext, AsyncContextAdapter } from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 
