@@ -11,7 +11,17 @@ import {
   NotificationEvent as Event,
 } from "@blazetrails/activesupport";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
-import { eachPair, inspect, isEmpty, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { Base } from "./base.js";
+import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
+import {
+  eachPair,
+  inspect,
+  isEmpty,
+  isSymbol,
+  rbObjAsString,
+  round,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 const INTERNAL_PARAMS = ["controller", "action", "format", "_method", "only_path"];
 
@@ -48,11 +58,39 @@ export class LogSubscriber extends BaseLogSubscriber {
     if (!isEmpty(params)) this._info(`  Parameters: ${inspect(params)}`);
   }
 
+  /**
+   * `ActionController::LogSubscriber#process_action`
+   * (`vendor/rails/actionpack/lib/action_controller/log_subscriber.rb:26-44`).
+   *
+   * `defined?(Rails.env)` (`:40`) is the constant check for a booted app, which
+   * outside one is absent; its JS reading is the `Trails` global.
+   *
+   * @missingRailsArgs round — PERMANENT
+   */
   processAction(event: Event): void {
-    const { status } = event.payload as { status: number | string };
-    const statusText = typeof status === "number" ? (HTTP_STATUS_CODES[status] ?? "") : "";
-    const statusStr = statusText ? `${status} ${statusText}` : String(status);
-    this._info(`Completed ${statusStr} in ${Math.round(event.duration)}ms`);
+    this._info(() => {
+      const payload = event.payload as {
+        status?: number | null;
+        exception?: [string, string] | null;
+      };
+      const additions = Base.logProcessAction(payload as Record<string, unknown>);
+      let status = payload.status;
+
+      let exceptionClassName: string | undefined;
+      if (status == null && (exceptionClassName = payload.exception?.[0]) != null) {
+        status = ExceptionWrapper.statusCodeForException(exceptionClassName);
+      }
+
+      additions.push(`GC: ${round(event.gcTime, 1)}ms`);
+
+      let message =
+        `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status!])} in ${round(event.duration)}ms` +
+        ` (${additions.join(" | ")})`;
+      const Trails = (globalThis as { Trails?: { env?: { isDevelopment(): boolean } } }).Trails;
+      if (Trails?.env != null && Trails.env.isDevelopment()) message += "\n\n";
+
+      return message;
+    });
   }
 
   halted(event: Event): void {
@@ -103,5 +141,6 @@ export class LogSubscriber extends BaseLogSubscriber {
 // "action_controller" is the AS::Notifications channel identifier, which uses
 // Rails snake_case naming conventions as a cross-package wire protocol.
 LogSubscriber.subscribeLogLevel("start_processing", "info");
+LogSubscriber.subscribeLogLevel("process_action", "info");
 
 LogSubscriber.attachTo("action_controller");

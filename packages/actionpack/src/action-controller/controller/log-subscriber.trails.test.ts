@@ -19,8 +19,8 @@ class CaptureLogger {
   get "info?"(): boolean {
     return true;
   }
-  info(msg: string): void {
-    this.messages.push(msg);
+  info(msg: string | (() => string)): void {
+    this.messages.push(typeof msg === "function" ? msg() : msg);
   }
 }
 

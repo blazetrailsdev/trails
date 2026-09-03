@@ -16,7 +16,7 @@
  */
 
 import { presence } from "./core-ext/object/blank.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, rbObjClass } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
   /**
@@ -99,14 +99,47 @@ export class OrderedOptions {
     return this._get(String(key));
   }
 
-  /** Mirrors `dig` (ordered_options.rb:45-47). */
+  /**
+   * Mirrors `dig` (ordered_options.rb:45-47), whose `super` is `rb_hash_dig`
+   * (`vendor/ruby/hash.c:4627`): `rb_hash_aref` for the first key — which is
+   * `get`, so the default block runs — and `rb_obj_dig`
+   * (`vendor/ruby/object.c:3906`) for the rest. That loop ends on `nil`,
+   * indexes a Hash through `rb_hash_aref` and an Array through `rb_ary_at`
+   * — whose index goes through `NUM2LONG` (`vendor/ruby/array.c:1881-1883`),
+   * so a String identifier is a TypeError there and not an index —
+   * hands the remaining identifiers to an object that answers `dig`, and
+   * otherwise raises `no_dig_method`'s TypeError (`object.c:3897-3900`). A
+   * Ruby Hash is a plain object or a `Map` in trails, so both take the
+   * `rb_hash_aref` arm.
+   */
   dig(key: string, ...identifiers: (string | number)[]): unknown {
-    let value = this.get(String(key));
-    for (const identifier of identifiers) {
-      if (value == null || typeof value !== "object") return undefined;
-      value = (value as any)[identifier];
+    let obj: unknown = this.get(String(key));
+    for (let i = 0; i < identifiers.length; i++) {
+      const identifier = identifiers[i];
+      if (obj == null) return undefined;
+      if (obj instanceof Map) {
+        obj = obj.get(identifier);
+        continue;
+      }
+      if (Array.isArray(obj)) {
+        if (typeof identifier !== "number") {
+          throw new TypeError(`no implicit conversion of ${rbObjClass(identifier)} into Integer`);
+        }
+        obj = obj[identifier < 0 ? obj.length + identifier : identifier];
+        continue;
+      }
+      const proto: unknown = Object.getPrototypeOf(obj);
+      if (proto === Object.prototype || proto === null) {
+        obj = (obj as Record<string | number, unknown>)[identifier];
+        continue;
+      }
+      const dig = (obj as { dig?: unknown }).dig;
+      if (typeof dig === "function") {
+        return (dig as (...args: (string | number)[]) => unknown).apply(obj, identifiers.slice(i));
+      }
+      throw new TypeError(`${rbObjClass(obj)} does not have #dig method`);
     }
-    return value;
+    return obj;
   }
 
   /** Mirrors `extractable_options?` (ordered_options.rb:64-66). */

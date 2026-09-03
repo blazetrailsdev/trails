@@ -6,6 +6,7 @@ import {
   deleteIf,
   dup,
   eachKey,
+  eachValue,
   eachPair,
   inspect,
   except,
@@ -359,5 +360,14 @@ describe("Hash#default", () => {
       ary.push(ary);
       expect(inspect({ ary })).toBe('{"ary"=>[1, [...]]}');
     });
+  });
+});
+
+describe("eachValue", () => {
+  it("yields each value alone and returns the receiver", () => {
+    const h = { a: 1, b: 2 };
+    const seen: number[] = [];
+    expect(eachValue(h, (v) => seen.push(v))).toBe(h);
+    expect(seen).toEqual([1, 2]);
   });
 });

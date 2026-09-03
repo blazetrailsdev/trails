@@ -20,6 +20,8 @@ export class Event {
   private _end: number | null;
   private _cpuTimeStart = 0.0;
   private _cpuTimeFinish = 0.0;
+  private _gcTimeStart = 0;
+  private _gcTimeFinish = 0;
 
   constructor(
     name: string,
@@ -84,11 +86,13 @@ export class Event {
   startBang(): void {
     this._time = this.now();
     this._cpuTimeStart = this.nowCpu();
+    this._gcTimeStart = this.nowGc();
   }
 
   /** Record information at the time this event finishes */
   finishBang(): void {
     this._cpuTimeFinish = this.nowCpu();
+    this._gcTimeFinish = this.nowGc();
     this._end = this.now();
   }
 
@@ -107,6 +111,14 @@ export class Event {
   get idleTime(): number {
     const diff = this.duration - this.cpuTime;
     return diff > 0.0 ? diff : 0.0;
+  }
+
+  /**
+   * Returns the time spent in GC (in milliseconds) between the call to
+   * #startBang and the call to #finishBang.
+   */
+  get gcTime(): number {
+    return (this._gcTimeFinish - this._gcTimeStart) / 1_000_000.0;
   }
 
   /**
@@ -136,6 +148,15 @@ export class Event {
    */
   private nowCpu(): number {
     return 0.0;
+  }
+
+  /**
+   * instrumenter.rb:218-225 — Ruby defines `now_gc` from `GC.total_time` and
+   * falls back to the `0` arm on a build without it. JS exposes no GC clock at
+   * all, so this is Rails' own fallback arm, not a stub of the first one.
+   */
+  private nowGc(): number {
+    return 0;
   }
 }
 

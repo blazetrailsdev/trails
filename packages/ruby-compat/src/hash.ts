@@ -200,6 +200,21 @@ export function inspect(hash: Record<string, unknown> | Map<unknown, unknown>): 
 }
 
 /**
+ * Ruby `Hash#each_value` (`vendor/ruby/hash.c:3060` `rb_hash_each_value`):
+ * yields each value alone and returns the receiver.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/hash.c:3060`).
+ */
+export function eachValue<T>(
+  hash: Record<string, T>,
+  block: (value: T) => unknown,
+): Record<string, T> {
+  for (const key of Object.keys(hash)) {
+    block(hash[key]);
+  }
+  return hash;
+}
+
+/**
  * Ruby `Hash#each_key` (`vendor/ruby/hash.c:3098` `rb_hash_each_key`): yields
  * each key alone and returns the receiver.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/hash.c:3098`).
