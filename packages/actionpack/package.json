@@ -30,6 +30,7 @@
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-session": "workspace:*",
+    "@blazetrails/rack-test": "workspace:*",
     "ua-parser-js": "^2.0.9"
   }
 }

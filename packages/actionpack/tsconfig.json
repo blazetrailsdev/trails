@@ -15,6 +15,7 @@
     { "path": "../i18n" },
     { "path": "../rack" },
     { "path": "../rack-session" },
+    { "path": "../rack-test" },
     { "path": "../nokogiri" }
   ]
 }
