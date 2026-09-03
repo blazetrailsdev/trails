@@ -107,8 +107,8 @@ export class Topic extends Model {
   }
 
   myValidationWithArg(attr: string): void {
-    if ((this as unknown as Record<string, unknown>)[attr] == null)
-      this.errors.add(attr, "is missing");
+    const value = (this as unknown as Record<string, unknown>)[attr];
+    if (value == null || value === false) this.errors.add(attr, "is missing");
   }
 
   get price(): unknown {
