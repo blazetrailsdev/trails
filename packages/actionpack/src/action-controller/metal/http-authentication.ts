@@ -3,7 +3,7 @@
  * ported from `actionpack/lib/action_controller/metal/http_authentication.rb`.
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import type { Headers } from "@blazetrails/rack";
 
 export {

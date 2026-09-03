@@ -1,4 +1,4 @@
-import { getCrypto } from "./crypto-adapter.js";
+import { getCrypto, prepend } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "./message-verifier.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
@@ -11,7 +11,6 @@ import {
   type OnRotation,
   type RotatableOptions,
 } from "./messages/rotator.js";
-import { prepend } from "@blazetrails/ruby-compat";
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export namespace NullSerializer {
@@ -144,15 +143,18 @@ export class MessageEncryptor extends Codec {
   private encrypt(data: string): string {
     const spec = this.newCipher();
     const key = this.secret.slice(0, spec.keyLen);
-    const iv = getCrypto().randomBytes(spec.ivLen);
+    const iv = Buffer.from(getCrypto().randomBytes(spec.ivLen));
 
     const cipher = getCrypto().createCipheriv(this.cipher, key, iv);
     if (this.aeadMode) cipher.setAAD?.(Buffer.alloc(0));
 
-    const encryptedData = Buffer.concat([cipher.update(data, "latin1"), cipher.final()]);
+    const encryptedData = Buffer.concat([
+      Buffer.from(cipher.update(data, "latin1")),
+      Buffer.from(cipher.final()),
+    ]);
 
     const parts = [encryptedData, iv];
-    if (this.aeadMode) parts.push(cipher.getAuthTag!());
+    if (this.aeadMode) parts.push(Buffer.from(cipher.getAuthTag!()));
 
     return this.joinParts(parts);
   }

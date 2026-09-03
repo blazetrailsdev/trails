@@ -1,5 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
-import { getCrypto } from "./crypto-adapter.js";
+import { ArgumentError, getCrypto } from "@blazetrails/ruby-compat";
 
 export class SecurityUtils {
   static fixedLengthSecureCompare(a: string, b: string): boolean {

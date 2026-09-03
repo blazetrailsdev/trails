@@ -10,8 +10,7 @@
  *   bridges Temporal inputs to Date for on-wire serialization.
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { getCrypto, KeyError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 

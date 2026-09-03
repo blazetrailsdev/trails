@@ -1,5 +1,4 @@
-import { ArgumentError, Process } from "@blazetrails/ruby-compat";
-import { getCrypto } from "../crypto-adapter.js";
+import { ArgumentError, Process, getCrypto } from "@blazetrails/ruby-compat";
 
 export type EventPayload = Record<string, unknown>;
 

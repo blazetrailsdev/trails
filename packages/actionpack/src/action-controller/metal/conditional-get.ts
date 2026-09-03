@@ -8,7 +8,7 @@
  *   strings via JS `Date.parse` semantics for the freshness comparison.
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 
 import { includeContent as _includeContent } from "./head.js";
 

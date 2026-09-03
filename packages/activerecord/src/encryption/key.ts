@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import { Configurable } from "./configurable-slot.js";
 import type { KeyGenerator } from "./key-generator.js";
 import { Properties } from "./properties.js";

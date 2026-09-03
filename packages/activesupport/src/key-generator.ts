@@ -10,7 +10,7 @@
  */
 
 import { ArgumentError } from "./hash-utils.js";
-import { getCrypto } from "./crypto-adapter.js";
+import { getCrypto } from "@blazetrails/ruby-compat";
 
 // Ruby names a digest with the `OpenSSL::Digest` subclass itself; trails' crypto
 // adapter names its digests with the OpenSSL string, so a "digest class" here is
@@ -55,12 +55,8 @@ export class KeyGenerator {
    * i.e. `OpenSSL::Digest::SHA1#block_length`
    */
   generateKey(salt: string, keySize: number = 64): Buffer {
-    return getCrypto().pbkdf2Sync(
-      this.secret,
-      salt,
-      this.iterations,
-      keySize,
-      this.hashDigestClass,
+    return Buffer.from(
+      getCrypto().pbkdf2Sync(this.secret, salt, this.iterations, keySize, this.hashDigestClass),
     );
   }
 

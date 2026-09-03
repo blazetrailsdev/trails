@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 
-import { getCrypto } from "../crypto-adapter.js";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import { InvalidMessage, MessageEncryptor } from "../message-encryptor.js";
 import { extractOptionsBang } from "../hash-utils.js";
 import {
@@ -15,7 +15,7 @@ describe("MessageEncryptorRotatorTest", () => {
   const secret = (key: string): Buffer => {
     let value = secrets.get(key);
     if (!value) {
-      value = getCrypto().randomBytes(32);
+      value = Buffer.from(getCrypto().randomBytes(32));
       secrets.set(key, value);
     }
     return value;

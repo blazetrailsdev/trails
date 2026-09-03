@@ -1,14 +1,12 @@
-/**
- * Crypto adapter — mirrors the Rails adapter pattern.
- */
+import type { Bytes } from "./fs-adapter.js";
 
 export interface CipherAdapter {
   update(data: string, inputEncoding: string, outputEncoding: string): string;
-  update(data: string | Uint8Array, inputEncoding?: string): Buffer;
+  update(data: string | Uint8Array, inputEncoding?: string): Bytes;
   final(outputEncoding: string): string;
-  final(): Buffer;
+  final(): Bytes;
   setAAD?(buffer: Uint8Array): this;
-  getAuthTag?(): Buffer;
+  getAuthTag?(): Bytes;
   setAuthTag?(tag: Uint8Array): this;
 }
 
@@ -22,7 +20,7 @@ export interface DecipherAdapter {
 }
 
 export interface CryptoAdapter {
-  randomBytes(size: number): Buffer;
+  randomBytes(size: number): Bytes;
   randomUUID(): string;
   createHash(algorithm: string): HashAdapter;
   createHmac(algorithm: string, key: string | Uint8Array): HmacAdapter;
@@ -44,39 +42,21 @@ export interface CryptoAdapter {
     iterations: number,
     keylen: number,
     digest: string,
-  ): Buffer;
-  /**
-   * Async PBKDF2 — when implemented, runs on a threadpool so hot
-   * per-request paths don't block the event loop. **Optional**: callers
-   * should go through `pbkdf2Async(adapter, ...)` below, which falls
-   * back to wrapping `pbkdf2Sync` in `Promise.resolve` for adapters that
-   * don't ship an async implementation. Marking this optional keeps
-   * downstream custom adapters source-compatible.
-   */
+  ): Bytes;
   pbkdf2?(
     password: string | Uint8Array,
     salt: string | Uint8Array,
     iterations: number,
     keylen: number,
     digest: string,
-  ): Promise<Buffer>;
+  ): Promise<Bytes>;
   timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
-  /**
-   * Key and IV sizes for a cipher name. **Optional**: only `Cipher`
-   * needs it, so adapters that never mint their own IV stay
-   * source-compatible.
-   */
   getCipherInfo?(name: string): { keyLength: number; ivLength: number } | undefined;
 }
 
-/**
- * An `OpenSSL::Cipher` analogue: a cipher object that exists before its
- * IV does, so a Rails body can build the cipher, ask it for a random IV
- * (`randomIv`, OpenSSL's `random_iv`), and assign the IV afterwards.
- * Node's `createCipheriv` takes key and IV as construction arguments, so
- * the underlying adapter cipher is constructed lazily on first use.
- */
+/** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
 export class Cipher {
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   readonly name: string;
 
   private mode: "encrypt" | "decrypt" | null = null;
@@ -84,43 +64,51 @@ export class Cipher {
   private currentIv: Uint8Array | null = null;
   private impl: CipherAdapter | DecipherAdapter | null = null;
 
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   constructor(name: string) {
     this.name = name;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   get keyLen(): number {
     return this.cipherInfo().keyLength;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   get ivLen(): number {
     return this.cipherInfo().ivLength;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   encrypt(): this {
     this.mode = "encrypt";
     return this;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   decrypt(): this {
     this.mode = "decrypt";
     return this;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   set key(key: Uint8Array) {
     this.currentKey = key;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   set iv(iv: Uint8Array) {
     this.currentIv = iv;
   }
 
-  /** Mint a random IV of this cipher's IV length and assign it. */
-  randomIv(): Buffer {
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
+  randomIv(): Bytes {
     const iv = getCrypto().randomBytes(this.ivLen);
     this.currentIv = iv;
     return iv;
   }
 
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   set authTag(tag: Uint8Array) {
     const impl = this.started();
     if (!impl.setAuthTag) {
@@ -129,29 +117,32 @@ export class Cipher {
     impl.setAuthTag(tag);
   }
 
-  get authTag(): Buffer {
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
+  get authTag(): Bytes {
     const impl = this.started() as CipherAdapter;
     if (!impl.getAuthTag) {
       throw new Error("Crypto adapter does not support GCM auth tags (getAuthTag)");
     }
-    return Buffer.from(impl.getAuthTag());
+    return impl.getAuthTag();
   }
 
-  /** Mirrors: `OpenSSL::Cipher#auth_data=` — Node spells it `setAAD`. */
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
   set authData(data: Uint8Array | string) {
     const impl = this.started();
     if (!impl.setAAD) {
       throw new Error("Crypto adapter does not support AEAD auth data (setAAD)");
     }
-    impl.setAAD(typeof data === "string" ? Buffer.from(data, "utf8") : data);
+    impl.setAAD(typeof data === "string" ? new TextEncoder().encode(data) : data);
   }
 
-  update(data: Uint8Array): Buffer {
-    return Buffer.from((this.started() as CipherAdapter).update(data));
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
+  update(data: Uint8Array): Bytes {
+    return (this.started() as CipherAdapter).update(data);
   }
 
-  final(): Buffer {
-    return Buffer.from((this.started() as CipherAdapter).final());
+  /** @noRailsEquivalent CONVERGEABLE redress-crypto-adapter-as-securerandom-digest-and-openssl-cipher */
+  final(): Bytes {
+    return (this.started() as CipherAdapter).final();
   }
 
   private cipherInfo(): { keyLength: number; ivLength: number } {
@@ -177,11 +168,7 @@ export class Cipher {
   }
 }
 
-/**
- * Use the adapter's async `pbkdf2` when available, otherwise wrap the
- * sync implementation. Lets call sites prefer the threadpool path
- * without breaking adapters that only implement `pbkdf2Sync`.
- */
+/** @noRailsEquivalent PERMANENT */
 export function pbkdf2Async(
   adapter: CryptoAdapter,
   password: string | Uint8Array,
@@ -189,13 +176,10 @@ export function pbkdf2Async(
   iterations: number,
   keylen: number,
   digest: string,
-): Promise<Buffer> {
+): Promise<Bytes> {
   if (typeof adapter.pbkdf2 === "function") {
     return adapter.pbkdf2(password, salt, iterations, keylen, digest);
   }
-  // Defer the sync call so a synchronous throw becomes a Promise
-  // rejection — keeps the function's async contract intact for `.catch`
-  // callers regardless of how the underlying adapter behaves.
   return Promise.resolve().then(() =>
     adapter.pbkdf2Sync(password, salt, iterations, keylen, digest),
   );
@@ -203,29 +187,65 @@ export function pbkdf2Async(
 
 export interface HashAdapter {
   update(data: string | Uint8Array): HashAdapter;
-  digest(): Buffer;
+  digest(): Bytes;
   digest(encoding: string): string;
 }
 
 export interface HmacAdapter {
   update(data: string | Uint8Array): HmacAdapter;
-  digest(): Buffer;
+  digest(): Bytes;
   digest(encoding: string): string;
 }
 
-function wrapNodeCrypto(nodeCrypto: typeof import("node:crypto")): CryptoAdapter {
+interface NodeCrypto {
+  randomBytes(size: number): Bytes;
+  randomUUID(): string;
+  createHash(algorithm: string): HashAdapter;
+  createHmac(algorithm: string, key: string | Uint8Array): HmacAdapter;
+  createCipheriv(
+    algorithm: string,
+    key: Uint8Array,
+    iv: Uint8Array,
+    options?: Record<string, unknown>,
+  ): CipherAdapter;
+  createDecipheriv(
+    algorithm: string,
+    key: Uint8Array,
+    iv: Uint8Array,
+    options?: Record<string, unknown>,
+  ): DecipherAdapter;
+  pbkdf2Sync(
+    password: string | Uint8Array,
+    salt: string | Uint8Array,
+    iterations: number,
+    keylen: number,
+    digest: string,
+  ): Bytes;
+  pbkdf2(
+    password: string | Uint8Array,
+    salt: string | Uint8Array,
+    iterations: number,
+    keylen: number,
+    digest: string,
+    callback: (err: Error | null, key: Bytes) => void,
+  ): void;
+  timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
+  getCipherInfo(name: string): { keyLength?: number; ivLength?: number } | undefined;
+}
+
+function wrapNodeCrypto(nodeCrypto: NodeCrypto): CryptoAdapter {
   return {
-    randomBytes(size: number): Buffer {
+    randomBytes(size: number): Bytes {
       return nodeCrypto.randomBytes(size);
     },
     randomUUID(): string {
       return nodeCrypto.randomUUID();
     },
     createHash(algorithm: string): HashAdapter {
-      return nodeCrypto.createHash(algorithm) as unknown as HashAdapter;
+      return nodeCrypto.createHash(algorithm);
     },
     createHmac(algorithm: string, key: string | Uint8Array): HmacAdapter {
-      return nodeCrypto.createHmac(algorithm, key) as unknown as HmacAdapter;
+      return nodeCrypto.createHmac(algorithm, key);
     },
     createCipheriv(
       algorithm: string,
@@ -233,12 +253,7 @@ function wrapNodeCrypto(nodeCrypto: typeof import("node:crypto")): CryptoAdapter
       iv: Uint8Array,
       options?: Record<string, unknown>,
     ): CipherAdapter {
-      return nodeCrypto.createCipheriv(
-        algorithm,
-        key,
-        iv,
-        options as any,
-      ) as unknown as CipherAdapter;
+      return nodeCrypto.createCipheriv(algorithm, key, iv, options);
     },
     createDecipheriv(
       algorithm: string,
@@ -246,17 +261,12 @@ function wrapNodeCrypto(nodeCrypto: typeof import("node:crypto")): CryptoAdapter
       iv: Uint8Array,
       options?: Record<string, unknown>,
     ): DecipherAdapter {
-      return nodeCrypto.createDecipheriv(
-        algorithm,
-        key,
-        iv,
-        options as any,
-      ) as unknown as DecipherAdapter;
+      return nodeCrypto.createDecipheriv(algorithm, key, iv, options);
     },
-    pbkdf2Sync(password, salt, iterations, keylen, digest): Buffer {
+    pbkdf2Sync(password, salt, iterations, keylen, digest): Bytes {
       return nodeCrypto.pbkdf2Sync(password, salt, iterations, keylen, digest);
     },
-    pbkdf2(password, salt, iterations, keylen, digest): Promise<Buffer> {
+    pbkdf2(password, salt, iterations, keylen, digest): Promise<Bytes> {
       return new Promise((resolve, reject) => {
         nodeCrypto.pbkdf2(password, salt, iterations, keylen, digest, (err, key) => {
           if (err) reject(err);
@@ -279,6 +289,7 @@ const registry = new Map<string, CryptoAdapter>();
 let currentAdapterName: string | null = null;
 let resolved: CryptoAdapter | null = null;
 
+/** @noRailsEquivalent PERMANENT */
 export function registerCryptoAdapter(name: string, adapter: CryptoAdapter): void {
   registry.set(name, adapter);
   if (name === currentAdapterName) resolved = null;
@@ -286,35 +297,42 @@ export function registerCryptoAdapter(name: string, adapter: CryptoAdapter): voi
 
 let nodeAttempted = false;
 
+/** @noRailsEquivalent PERMANENT */
+interface NodeProcess {
+  versions?: { node?: string };
+  getBuiltinModule?(id: string): unknown;
+}
+
+function nodeProcess(): NodeProcess | undefined {
+  return (globalThis as { process?: NodeProcess }).process;
+}
+
+/** @noRailsEquivalent PERMANENT */
+declare const require: ((id: string) => unknown) | undefined;
+
+function syncBuiltinLoader(): ((id: string) => unknown) | null {
+  const proc = nodeProcess();
+  const getBuiltinModule = proc?.getBuiltinModule;
+  if (typeof getBuiltinModule === "function") return (id) => getBuiltinModule.call(proc, id);
+  if (typeof require === "undefined") return null;
+  const nodeModule = require("node:module") as {
+    createRequire(p: string): (id: string) => unknown;
+  };
+  return nodeModule.createRequire("file:///ruby-compat");
+}
+
 function tryAutoRegisterNode(): boolean {
   if (registry.has("node")) return true;
   if (nodeAttempted) return false;
   nodeAttempted = true;
   try {
-    if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
+    const proc = nodeProcess();
+    if (proc === undefined || !proc.versions?.node) {
       return false;
     }
-
-    // Node >= 22.3 exposes builtins synchronously from ESM, where
-    // `require` is undefined and `import()` is a promise. This is the only
-    // sync path a pure-ESM entry has to `node:crypto`.
-    const builtin = globalThis.process.getBuiltinModule?.("node:crypto") as
-      | typeof import("node:crypto")
-      | undefined;
-    if (builtin) {
-      registry.set("node", wrapNodeCrypto(builtin));
-      return true;
-    }
-
-    const nodeModule =
-      typeof require !== "undefined"
-        ? // eslint-disable-next-line @typescript-eslint/no-require-imports
-          require("node:module")
-        : null;
-    if (!nodeModule) return false;
-    const req = nodeModule.createRequire("file:///activesupport");
-    const nodeCrypto = req("node:crypto") as typeof import("node:crypto");
-    registry.set("node", wrapNodeCrypto(nodeCrypto));
+    const req = syncBuiltinLoader();
+    if (!req) return false;
+    registry.set("node", wrapNodeCrypto(req("node:crypto") as NodeCrypto));
     return true;
   } catch {
     return false;
@@ -342,48 +360,23 @@ function resolve(): CryptoAdapter {
   );
 }
 
+/** @noRailsEquivalent PERMANENT */
 export function getCrypto(): CryptoAdapter {
   return resolve();
 }
 
-let nodeAsyncPromise: Promise<boolean> | null = null;
-
-function tryAutoRegisterNodeAsync(): Promise<boolean> {
-  if (registry.has("node")) return Promise.resolve(true);
-  if (!nodeAsyncPromise) {
-    nodeAsyncPromise = (async () => {
-      try {
-        if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
-          return false;
-        }
-        const nodeCrypto = (await import("node:crypto")) as unknown as typeof import("node:crypto");
-        registry.set("node", wrapNodeCrypto(nodeCrypto));
-        return true;
-      } catch {
-        return false;
-      }
-    })();
-  }
-  return nodeAsyncPromise;
-}
-
+/** @noRailsEquivalent PERMANENT */
 export async function getCryptoAsync(): Promise<CryptoAdapter> {
-  try {
-    return resolve();
-  } catch (error) {
-    if (currentAdapterName) throw error;
-    if (await tryAutoRegisterNodeAsync()) {
-      resolved = registry.get("node")!;
-      return resolved;
-    }
-    throw error;
-  }
+  return resolve();
 }
 
+/** @noRailsEquivalent PERMANENT */
 export const cryptoAdapterConfig = {
+  /** @noRailsEquivalent PERMANENT */
   get adapter(): string | null {
     return currentAdapterName;
   },
+  /** @noRailsEquivalent PERMANENT */
   set adapter(name: string | null) {
     currentAdapterName = name;
     resolved = null;

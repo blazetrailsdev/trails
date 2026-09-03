@@ -4,7 +4,7 @@
  * HTTP Basic, Digest, and Token authentication helpers.
  */
 
-import { getCrypto } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 
 // =============================================================================
 // Basic Authentication

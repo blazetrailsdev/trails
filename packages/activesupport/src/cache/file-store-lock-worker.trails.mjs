@@ -1,5 +1,5 @@
 import { parentPort, workerData } from "node:worker_threads";
-import { getCryptoAsync } from "../crypto-adapter.js";
+import { getCryptoAsync } from "@blazetrails/ruby-compat";
 import { FileStore } from "./file-store.js";
 
 // `File.atomic_write` names its temp file through `Dir::Tmpname::RANDOM.next`,

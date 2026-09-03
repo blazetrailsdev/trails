@@ -1,5 +1,4 @@
-import { getCrypto } from "./crypto-adapter.js";
-import { File } from "@blazetrails/ruby-compat";
+import { getCrypto, File } from "@blazetrails/ruby-compat";
 import { getOs } from "./os-adapter.js";
 
 /** The `basename` of `Dir::Tmpname.create`: a String, or a `[prefix, suffix]` pair. */
@@ -18,7 +17,7 @@ const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
  */
 function random(): string {
   const MAX = 36 ** 6;
-  return (getCrypto().randomBytes(4).readUInt32LE(0) % MAX).toString(36);
+  return (Buffer.from(getCrypto().randomBytes(4)).readUInt32LE(0) % MAX).toString(36);
 }
 
 /**

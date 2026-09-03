@@ -1,4 +1,4 @@
-import { getCrypto } from "./crypto-adapter.js";
+import { getCrypto, prepend } from "@blazetrails/ruby-compat";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
 import {
@@ -10,7 +10,6 @@ import {
   type OnRotation,
   type RotatableOptions,
 } from "./messages/rotator.js";
-import { prepend } from "@blazetrails/ruby-compat";
 import { ArgumentError, Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidSignature extends Error {

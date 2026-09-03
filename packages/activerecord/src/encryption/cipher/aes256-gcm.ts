@@ -1,4 +1,4 @@
-import { Cipher, getCrypto } from "@blazetrails/activesupport";
+import { Cipher, getCrypto } from "@blazetrails/ruby-compat";
 import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
 
@@ -53,12 +53,13 @@ export class Aes256Gcm {
     const iv = this.generateIv(cipher, clearText);
     cipher.iv = iv;
 
-    let encryptedData = clearText.length === 0 ? Buffer.from(clearText) : cipher.update(clearText);
-    encryptedData = Buffer.concat([encryptedData, cipher.final()]);
+    let encryptedData =
+      clearText.length === 0 ? Buffer.from(clearText) : Buffer.from(cipher.update(clearText));
+    encryptedData = Buffer.concat([encryptedData, Buffer.from(cipher.final())]);
 
     const message = new Message({ payload: encryptedData });
     message.headers.iv = iv;
-    message.headers.authTag = cipher.authTag;
+    message.headers.authTag = Buffer.from(cipher.authTag);
     return message;
   }
 
@@ -83,8 +84,10 @@ export class Aes256Gcm {
 
       const encryptedData = toBytes(encryptedMessage.payload);
       const decryptedData =
-        encryptedData.length === 0 ? Buffer.from(encryptedData) : cipher.update(encryptedData);
-      return Buffer.concat([decryptedData, cipher.final()]);
+        encryptedData.length === 0
+          ? Buffer.from(encryptedData)
+          : Buffer.from(cipher.update(encryptedData));
+      return Buffer.concat([decryptedData, Buffer.from(cipher.final())]);
     } catch {
       throw new Decryption("The provided key could not decrypt the data");
     }
@@ -104,7 +107,7 @@ export class Aes256Gcm {
     if (this.deterministic) {
       return this.generateDeterministicIv(clearText);
     }
-    return cipher.randomIv();
+    return Buffer.from(cipher.randomIv());
   }
 
   /**
@@ -113,10 +116,8 @@ export class Aes256Gcm {
    */
   private generateDeterministicIv(clearText: Buffer): Buffer {
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
-    return getCrypto()
-      .createHmac("sha256", keyBuf)
-      .update(clearText)
-      .digest()
-      .subarray(0, IV_LENGTH);
+    return Buffer.from(
+      getCrypto().createHmac("sha256", keyBuf).update(clearText).digest(),
+    ).subarray(0, IV_LENGTH);
   }
 }

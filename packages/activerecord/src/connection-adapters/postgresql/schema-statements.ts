@@ -1,6 +1,7 @@
 import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
-import { singularize, getCrypto } from "@blazetrails/activesupport";
+import { singularize } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import { rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";

@@ -8,22 +8,6 @@ export { trailsRoot, setTrailsRoot } from "./trails-root.js";
 // pattern used by message-verifier, digest, etc.
 
 export {
-  registerCryptoAdapter,
-  getCrypto,
-  getCryptoAsync,
-  cryptoAdapterConfig,
-  pbkdf2Async,
-  Cipher,
-} from "./crypto-adapter.js";
-export type {
-  CryptoAdapter,
-  HashAdapter,
-  HmacAdapter,
-  CipherAdapter,
-  DecipherAdapter,
-} from "./crypto-adapter.js";
-
-export {
   registerAsyncContextAdapter,
   getAsyncContext,
   asyncContextAdapterConfig,
@@ -61,8 +45,11 @@ export type { HttpAdapter, HttpRequest, HttpResponse, HttpServer } from "./http-
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
 export type { OsAdapter } from "./os-adapter.js";
 
-import { fsAdapterConfig, processAdapterConfig } from "@blazetrails/ruby-compat";
-import { cryptoAdapterConfig } from "./crypto-adapter.js";
+import {
+  cryptoAdapterConfig,
+  fsAdapterConfig,
+  processAdapterConfig,
+} from "@blazetrails/ruby-compat";
 import { asyncContextAdapterConfig } from "./async-context-adapter.js";
 import { childProcessAdapterConfig } from "./child-process-adapter.js";
 import { httpAdapterConfig } from "./http-adapter.js";

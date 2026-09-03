@@ -12,7 +12,8 @@
  * (`vendor/rack-session/lib/rack/session/abstract/id.rb`).
  */
 
-import { include as includeMixin, getCrypto } from "@blazetrails/activesupport";
+import { include as includeMixin } from "@blazetrails/activesupport";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { assertNot, assertRaises } from "./testing/assertions.js";
 
-import { getCrypto } from "./crypto-adapter.js";
+import { getCrypto } from "@blazetrails/ruby-compat";
 import { ActiveSupportJSON } from "./json.js";
 import { Encoding } from "./json/encoding.js";
 import { base58 } from "./core-ext/securerandom.js";
@@ -30,7 +30,7 @@ describe("MessageVerifierTest", () => {
    * `messages/message-metadata-tests.ts` `DATA` drops its `Time.local(2004)`.
    */
   const data = { some: "data" };
-  const secret = getCrypto().randomBytes(32);
+  const secret = Buffer.from(getCrypto().randomBytes(32));
 
   it("valid message", () => {
     const [encoded, hash] = verifier.generate(data).split("--") as [string, string];

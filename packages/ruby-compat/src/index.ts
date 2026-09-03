@@ -39,6 +39,21 @@ export {
 export type { Block, ConflictBlock } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
 export { FileUtils } from "./file-utils.js";
+export {
+  Cipher,
+  cryptoAdapterConfig,
+  getCrypto,
+  getCryptoAsync,
+  pbkdf2Async,
+  registerCryptoAdapter,
+} from "./crypto-adapter.js";
+export type {
+  CipherAdapter,
+  CryptoAdapter,
+  DecipherAdapter,
+  HashAdapter,
+  HmacAdapter,
+} from "./crypto-adapter.js";
 export { FloatDomainError } from "./float-domain-error.js";
 export { FrozenError } from "./frozen-error.js";
 export {

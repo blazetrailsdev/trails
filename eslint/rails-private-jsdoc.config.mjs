@@ -91,7 +91,8 @@ export default [
   // one CI job that fetches it — the standalone Lint job has none, where the
   // rule skips by design. So this block is the enforcing run, the same way the
   // manifest-backed rules above only go live here.
-  // `fs-adapter.ts` is the platform backend contract RFC 0135 moved in, not an
+  // `crypto-adapter.ts` / `fs-adapter.ts` are the platform backend contracts RFC
+  // 0135 moved in, not an
   // MRI primitive, so it has no `vendor/ruby/` line to cite. Its receipts are
   // written by hand; only the citation half is out of scope. This ignores list
   // must stay in sync with the `ruby-compat-needs-mri-citation` block in
@@ -100,6 +101,7 @@ export default [
     files: ["packages/ruby-compat/src/**/*.ts"],
     ignores: [
       "**/*.test.ts",
+      "packages/ruby-compat/src/crypto-adapter.ts",
       "packages/ruby-compat/src/fs-adapter.ts",
       "packages/ruby-compat/src/process-adapter.ts",
     ],
