@@ -73,17 +73,21 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("every logging method registers the level its subscribe_log_level names", () => {
-    const belowLevel = { "info?": false, "debug?": false, "error?": false };
-    const levels = LogSubscriber.logLevels;
-    const registered = [...levels].map(([method, check]) => [method, check(belowLevel as never)]);
-    expect(registered).toEqual([
-      ["start_processing", true],
-      ["process_action", true],
-      ["halted_callback", true],
-      ["send_file", true],
-      ["redirect_to", true],
-      ["send_data", true],
-      ["unpermitted_parameters", true],
+    const silencedBy = (logger: Record<string, boolean>): string[] =>
+      [...LogSubscriber.logLevels]
+        .filter(([, check]) => check(logger as never))
+        .map(([method]) => method);
+
+    expect(silencedBy({ "info?": false, "debug?": true, "error?": true })).toEqual([
+      "start_processing",
+      "process_action",
+      "halted_callback",
+      "send_file",
+      "redirect_to",
+      "send_data",
+    ]);
+    expect(silencedBy({ "info?": true, "debug?": false, "error?": true })).toEqual([
+      "unpermitted_parameters",
     ]);
   });
 });
