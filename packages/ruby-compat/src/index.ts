@@ -1,4 +1,6 @@
 export { ArgumentError } from "./argument-error.js";
+export { Dir } from "./dir.js";
+export { File } from "./file.js";
 export {
   cmp,
   cmpint,

@@ -1,4 +1,4 @@
-import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, getFs } from "@blazetrails/ruby-compat";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store.js";
@@ -94,10 +94,8 @@ export class FileStore extends Store implements CacheStore {
   // the cache directory except .keep / .gitkeep, swallowing ENOENT/ENOTEMPTY.
   override clear(): void {
     try {
-      const rootDirs = getFs()
-        .readdirSync(this.cachePath)
-        .filter((f) => !GITKEEP_FILES.includes(f));
-      FileUtils.rmR(rootDirs.map((f) => getPath().join(this.cachePath, f)));
+      const rootDirs = Dir.children(this.cachePath).filter((f) => !GITKEEP_FILES.includes(f));
+      FileUtils.rmR(rootDirs.map((f) => File.join(this.cachePath, f)));
     } catch {}
   }
 
@@ -171,7 +169,7 @@ export class FileStore extends Store implements CacheStore {
   // read failure is logged and treated as a miss.
   protected readSerializedEntry(key: string): string | null {
     try {
-      return getFs().existsSync(key) ? getFs().readFileSync(key, "utf-8") : null;
+      return File.isExist(key) ? File.binread(key) : null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       Store.logger?.error?.(`FileStoreError (${message}): ${message}`);
@@ -188,22 +186,22 @@ export class FileStore extends Store implements CacheStore {
   // expiry. The payload lands through File.atomic_write, so a crash mid-write
   // leaves the previous file rather than a truncated one.
   protected writeSerializedEntry(key: string, payload: string, options: StoreOptions): boolean {
-    if (options.unlessExist && getFs().existsSync(key)) return false;
-    this.ensureCachePath(getPath().dirname(key));
+    if (options.unlessExist && File.isExist(key)) return false;
+    this.ensureCachePath(File.dirname(key));
     atomicWrite(key, this.cachePath, (f) => f.write(payload));
     return true;
   }
 
   protected deleteEntry(key: string, _options: StoreOptions): boolean {
-    if (getFs().existsSync(key)) {
+    if (File.isExist(key)) {
       try {
-        getFs().unlinkSync(key);
-        this.deleteEmptyDirectories(getPath().dirname(key));
+        File.delete(key);
+        this.deleteEmptyDirectories(File.dirname(key));
         return true;
       } catch (error) {
         // Just in case the error was caused by another process deleting the
         // file first (file_store.rb:145-147).
-        if (getFs().existsSync(key)) throw error;
+        if (File.isExist(key)) throw error;
         return false;
       }
     } else {
@@ -216,7 +214,7 @@ export class FileStore extends Store implements CacheStore {
   // exposes no flock — still opens and closes the file, and the block runs
   // unlocked, which is the missing-file arm's behaviour anyway.
   protected lockFile<T>(fileName: string, block: () => T): T {
-    if (getFs().existsSync(fileName)) {
+    if (File.isExist(fileName)) {
       const f = getFs().openSync(fileName, "r+");
       try {
         getFs().flockSync?.(f, "ex");
@@ -259,7 +257,7 @@ export class FileStore extends Store implements CacheStore {
       } while (fname !== "");
     }
 
-    return getPath().join(this.cachePath, dirFormatter(dir1), dirFormatter(dir2), ...fnamePaths);
+    return File.join(this.cachePath, dirFormatter(dir1), dirFormatter(dir2), ...fnamePaths);
   }
 
   // Translate a file path into a key (file_store.rb:184-187).
@@ -274,7 +272,7 @@ export class FileStore extends Store implements CacheStore {
    *   TS form; the slice(3).join('') chain computes the same string.
    */
   protected filePathKey(path: string): string {
-    const sep = getPath().sep;
+    const sep = File.SEPARATOR;
     // Ruby `split(File::SEPARATOR, 4).last.delete(File::SEPARATOR)`: the limit
     // keeps the remainder joined, which the delete then concatenates — JS'
     // split limit discards it instead, so slice off the first three fields.
@@ -286,64 +284,34 @@ export class FileStore extends Store implements CacheStore {
   // unlinking the entry, recursively remove now-empty intermediate directories
   // up to — but never including — cachePath.
   private deleteEmptyDirectories(dir: string): void {
-    // Rails compares File.realpath(dir) == File.realpath(cache_path)
-    // (file_store.rb:191), which resolves symlinks; a lexical path.resolve
-    // would mis-compare when cachePath or an intermediate dir is symlinked.
-    if (this.realPath(dir) === this.realPath(this.cachePath)) return;
-    let children: string[];
-    try {
-      children = getFs().readdirSync(dir);
-    } catch {
-      return;
-    }
-    if (isEmpty(children)) {
+    if (File.realpath(dir) === File.realpath(this.cachePath)) return;
+    if (isEmpty(Dir.children(dir))) {
       // Rails: `Dir.delete(dir) rescue nil` — a failed delete is swallowed and
       // we still recurse toward the parent (file_store.rb:197-199).
       try {
-        getFs().rmdirSync(dir);
+        Dir.delete(dir);
       } catch {}
-      this.deleteEmptyDirectories(getPath().dirname(dir));
+      this.deleteEmptyDirectories(File.dirname(dir));
     }
-  }
-
-  // Resolve symlinks like Ruby File.realpath. Adapters without symlink support
-  // (or paths that no longer exist) fall back to a lexical resolve, which keeps
-  // the guard sound for the common no-symlink case.
-  private realPath(dir: string): string {
-    const fs = getFs();
-    if (fs.realpathSync) {
-      try {
-        return fs.realpathSync(dir);
-      } catch {}
-    }
-    return getPath().resolve(dir);
   }
 
   // Make sure a file path's directories exist (file_store.rb:200-202).
   protected ensureCachePath(path: string): void {
-    if (!getFs().existsSync(path)) FileUtils.makedirs(path);
+    if (!File.isExist(path)) FileUtils.makedirs(path);
   }
 
   // Mirrors Rails FileStore#search_dir (file_store.rb:204-214): depth-first walk
   // of the cache directory, yielding every file path.
   protected searchDir(dir: string, callback: (path: string) => void): void {
-    if (!getFs().existsSync(dir)) return;
-    let children: string[];
-    try {
-      children = getFs().readdirSync(dir);
-    } catch {
-      return;
-    }
-    for (const d of children) {
-      const name = getPath().join(dir, d);
-      try {
-        if (getFs().statSync(name).isDirectory()) {
-          this.searchDir(name, callback);
-        } else {
-          callback(name);
-        }
-      } catch {}
-    }
+    if (!File.isExist(dir)) return;
+    Dir.eachChild(dir, (d) => {
+      const name = File.join(dir, d);
+      if (File.isDirectory(name)) {
+        this.searchDir(name, callback);
+      } else {
+        callback(name);
+      }
+    });
   }
 
   // Mirrors Rails FileStore#modify_value (file_store.rb:218-241): on a missing,
