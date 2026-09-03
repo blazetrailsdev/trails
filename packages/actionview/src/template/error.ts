@@ -4,7 +4,7 @@
  * debug view.
  */
 
-import { getPath } from "@blazetrails/ruby-compat";
+import { getPath, regexpEscape } from "@blazetrails/ruby-compat";
 import type { Template } from "../template.js";
 
 export interface TemplateErrorOptions {
@@ -32,9 +32,14 @@ export class TemplateError extends Error {
     this.template = opts.template;
   }
 
-  /** Mirrors `Template::Error#backtrace` (`template/error.rb:181-183`). */
-  backtrace(): string {
-    return this.original.stack ?? "";
+  /**
+   * Mirrors `Template::Error#backtrace` (`template/error.rb:181-183`) —
+   * `@cause.backtrace`, whose JS counterpart is the cause's `stack` frames.
+   */
+  backtrace(): string[] {
+    const stack = this.original.stack;
+    if (stack == null) return [];
+    return stack.split("\n").slice(1);
   }
 
   /** Mirrors `Template::Error#file_name` (`template/error.rb:189-191`). */
@@ -75,16 +80,16 @@ export class TemplateError extends Error {
 
   /** Mirrors `Template::Error#line_number` (`template/error.rb:222-228`). */
   lineNumber(): number | null {
-    if (this._lineNumber !== undefined) return this._lineNumber;
+    // Ruby's `@line_number ||=` re-runs while the memo is nil, so only a
+    // resolved line number is cached.
+    if (this._lineNumber != null) return this._lineNumber;
     this._lineNumber = null;
     const fileName = this.fileName();
-    if (fileName != null && fileName !== "") {
-      const regexp = new RegExp(`${escapeRegexp(getPath().basename(fileName))}:(\\d+)`);
-      const fromMessage = regexp.exec(this.message);
+    if (fileName != null) {
+      const regexp = new RegExp(`${regexpEscape(getPath().basename(fileName))}:(\\d+)`);
       const match =
-        fromMessage ??
+        regexp.exec(this.message) ??
         this.backtrace()
-          .split("\n")
           .map((line) => regexp.exec(line))
           .find((m) => m !== null);
       if (match) this._lineNumber = Number(match[1]);
@@ -97,6 +102,12 @@ export class TemplateError extends Error {
     return this.sourceExtract(4);
   }
 
+  /** Mirrors `Template::Error#source_location` (`template/error.rb:235-241`). */
+  private sourceLocation(): string {
+    const lineNumber = this.lineNumber();
+    return (lineNumber != null ? `on line #${lineNumber} of ` : "in ") + this.fileName();
+  }
+
   /** Mirrors `Template::Error#formatted_code_for` (`template/error.rb:243-249`). */
   private formattedCodeFor(sourceCode: string[], lineCounter: number, indent: number): string[] {
     return sourceCode.map((line) => {
@@ -104,11 +115,6 @@ export class TemplateError extends Error {
       return `${String(lineCounter).padStart(indent)}: ${line}`;
     });
   }
-}
-
-/** `Regexp.escape` (`template/error.rb:225`). */
-function escapeRegexp(source: string): string {
-  return source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**

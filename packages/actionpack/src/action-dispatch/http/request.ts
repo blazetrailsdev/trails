@@ -1265,9 +1265,6 @@ Request.prototype.shouldApplyVaryHeader = function (this: Request) {
 };
 
 // Mix in ActionDispatch::RequestCookieMethods (`middleware/cookies.rb:12-94`).
-// Ruby's `include RequestCookieMethods` (`cookies.rb:94`) is spelled here as
-// the `this`-typed functions assigned onto the class, so each member keeps the
-// Rails name in the Rails file.
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include RequestCookieMethods`; the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request {
   /** Rails: `cookie_jar` / `cookie_jar=` (`cookies.rb:13-17,30-32`). */

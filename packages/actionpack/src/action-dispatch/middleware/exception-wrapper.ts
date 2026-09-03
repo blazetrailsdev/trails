@@ -16,13 +16,6 @@ import {
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
 
 /**
- * Mirrors `ExceptionWrapper::SourceMapLocation` (`exception_wrapper.rb:232-250`).
- *
- * Ruby delegates a `Thread::Backtrace::Location`; a trails backtrace entry IS
- * its own string form, so the delegated object is that string and `String` is
- * the DelegateClass.
- */
-/**
  * A built backtrace entry: a raw V8 frame, or one remapped onto the template
  * it was compiled from. Ruby's `build_backtrace` produces the same union of
  * `Thread::Backtrace::Location` and `SourceMapLocation`.
@@ -31,6 +24,13 @@ import { RoutingError } from "../../action-controller/metal/exceptions.js";
  */
 export type BacktraceLine = string | SourceMapLocation;
 
+/**
+ * Mirrors `ExceptionWrapper::SourceMapLocation` (`exception_wrapper.rb:232-250`).
+ *
+ * Ruby delegates a `Thread::Backtrace::Location`; a trails backtrace entry IS
+ * its own string form, so the delegated object is that string and `String` is
+ * the DelegateClass.
+ */
 class SourceMapLocation extends String {
   private template: Template;
 
@@ -43,35 +43,27 @@ class SourceMapLocation extends String {
    * Mirrors `SourceMapLocation#spot(exc)` (`exception_wrapper.rb:239-248`).
    *
    * Ruby's `else location = super` arm asks `ErrorHighlight` for the spot when
-   * the AST cannot supply one; V8 has no ErrorHighlight, so `exc` has nothing
-   * to be handed to and that arm yields no location.
+   * the AST cannot answer; V8 has no ErrorHighlight, so `exc` has nothing to be
+   * handed to and a frame that carries no line/column yields no location.
    *
    * @missingRailsCall super — PERMANENT
    */
   spot(exc: Error): Spot | null {
-    let location: Spot | null = null;
-    const backtraceLocation = backtraceLocationFor(String(this));
-    if (backtraceLocation) {
-      location = this.template.spot(backtraceLocation);
-    }
+    const getobj = backtraceLocationFor(String(this));
+    if (!getobj) return null;
+    const location = this.template.spot(getobj);
 
     if (location) {
-      return this.template.translateLocation(backtraceLocation!, location);
+      return this.template.translateLocation(getobj, location);
     }
     return null;
   }
 }
 
 /**
- * The line/column half of `__getobj__` — Ruby reads them off a
- * `Thread::Backtrace::Location`, a V8 stack entry carries them in its text.
- *
- * @noRailsEquivalent PERMANENT — Ruby's backtrace location is a parsed object;
- * V8's is a formatted string, so the parse has no Ruby counterpart.
- */
-/**
  * `loc.label` (`exception_wrapper.rb:264`) — the name of the method a frame is
- * inside. V8 spells it between `at ` and the opening paren.
+ * inside. V8 spells it between `at ` and the opening paren, qualified by the
+ * receiver, which Ruby's bare `label` is not.
  *
  * @noRailsEquivalent PERMANENT — Ruby reads `label` off a backtrace location
  * object; V8's frame is a formatted string, so the read has no counterpart.
@@ -83,6 +75,13 @@ function labelFor(trace: string): string | null {
   return qualified.slice(qualified.lastIndexOf(".") + 1);
 }
 
+/**
+ * The line/column half of `__getobj__` — Ruby reads them off a
+ * `Thread::Backtrace::Location`, a V8 stack entry carries them in its text.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's backtrace location is a parsed object;
+ * V8's is a formatted string, so the parse has no Ruby counterpart.
+ */
 function backtraceLocationFor(trace: string): BacktraceLocation | null {
   const match = /:(\d+):(\d+)\)?$/.exec(trace.trim());
   if (!match) return null;
@@ -174,7 +173,15 @@ function _idFor(err: object): number {
 
 export type TraceEntry = { file: string; line: number };
 export type TraceWithId = { exceptionObjectId: number; id: number; trace: string };
-export type SourceExtract = TraceEntry & { code?: Record<number, string> };
+/**
+ * A source fragment keyed by line number. Rails' `extract_source` replaces the
+ * offending line with the `[before, spot, after]` triple `extract_source`
+ * splits at the spot's columns (`exception_wrapper.rb:301-307`), which is why
+ * a value is a string OR that triple.
+ */
+export type SourceExtract = TraceEntry & {
+  code?: Record<number, string | [string, string, string]>;
+};
 
 export class ExceptionWrapper {
   readonly exception: Error;
@@ -394,8 +401,10 @@ export class ExceptionWrapper {
     return this.buildBacktrace();
   }
 
-  /** Mirrors `ExceptionWrapper#build_backtrace` (`exception_wrapper.rb:254-275`). */
-  /** @internal */
+  /**
+   * Mirrors `ExceptionWrapper#build_backtrace` (`exception_wrapper.rb:254-275`).
+   * @internal
+   */
   buildBacktrace(): BacktraceLine[] {
     const builtMethods = new Map<string, Template>();
 
@@ -463,14 +472,25 @@ export class ExceptionWrapper {
       : partitioned;
   }
 
-  /** Mirrors `ExceptionWrapper#extract_source(trace)` (`exception_wrapper.rb:294-320`). */
-  /** @internal */
+  /**
+   * Mirrors `ExceptionWrapper#extract_source(trace)` (`exception_wrapper.rb:294-320`).
+   * @internal
+   */
   extractSource(trace: BacktraceLine): SourceExtract {
     const spot = trace instanceof SourceMapLocation ? trace.spot(this.exception) : null;
 
     if (spot) {
       const line = spot.firstLineno;
       const code = this.extractSourceFragmentLines(spot.scriptLines ?? [], line);
+
+      const offending = code[line];
+      if (line === spot.lastLineno && typeof offending === "string") {
+        code[line] = [
+          offending.slice(0, spot.firstColumn),
+          offending.slice(spot.firstColumn, spot.lastColumn),
+          offending.slice(spot.lastColumn),
+        ];
+      }
 
       return { file: String(trace), line, code };
     }
@@ -482,7 +502,10 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  extractSourceFragmentLines(sourceLines: string[], line: number): Record<number, string> {
+  extractSourceFragmentLines(
+    sourceLines: string[],
+    line: number,
+  ): Record<number, string | [string, string, string]> {
     const start = Math.max(line - 3, 0);
     const slice = sourceLines.slice(start, start + 6);
     const out: Record<number, string> = {};
@@ -491,7 +514,10 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  sourceFragment(path: string, line: number): Record<number, string> | null {
+  sourceFragment(
+    path: string,
+    line: number,
+  ): Record<number, string | [string, string, string]> | null {
     const full = File.expandPath(path);
     if (!File.isExist(full)) return null;
     try {
