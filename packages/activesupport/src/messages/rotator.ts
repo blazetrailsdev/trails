@@ -1,3 +1,4 @@
+import { isEmpty } from "@blazetrails/ruby-compat";
 import { Thrown } from "./serializer-with-fallback.js";
 
 export type OnRotation = () => void;
@@ -109,7 +110,7 @@ export function readMessage(
   const { onRotation: perCall, ...rest } = options as RotatableOptions & Record<string, unknown>;
   const callback = perCall === undefined ? state.onRotation : perCall;
 
-  if (state.rotations.length === 0) {
+  if (isEmpty(state.rotations)) {
     return super_.call(this, message, rest);
   }
 
