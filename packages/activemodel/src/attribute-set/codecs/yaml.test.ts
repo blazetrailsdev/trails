@@ -26,6 +26,10 @@ describe("yamlCodec", () => {
     expect(yamlCodec.decode(yamlCodec.encode(envelope))).toEqual(envelope);
   });
 
+  it("throws AttributeSetCodecError on an unsupported envelope version", () => {
+    expect(() => yamlCodec.decode("v: 2\ntypes: {}\nvalues: {}")).toThrow(AttributeSetCodecError);
+  });
+
   it("throws AttributeSetCodecError on malformed input", () => {
     expect(() => yamlCodec.decode("null")).toThrow(AttributeSetCodecError);
     expect(() => yamlCodec.decode("- item")).toThrow(AttributeSetCodecError);

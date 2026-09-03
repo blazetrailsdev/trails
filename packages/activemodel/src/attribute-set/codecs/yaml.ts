@@ -18,6 +18,7 @@ export const yamlCodec: AttributeSetCodec = {
     if (
       !isPlainObject(parsed) ||
       !("v" in parsed) ||
+      parsed.v !== 1 ||
       !isPlainObject(parsed.types) ||
       !isPlainObject(parsed.values)
     ) {

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { YAMLEncoder } from "./yaml-encoder.js";
-import { AttributeSetCodecError } from "./codecs/codec.js";
 import { jsonCodec } from "./codecs/json.js";
 import type { AttributeSetEnvelope } from "./codecs/codec.js";
 import { AttributeSet } from "../attribute-set.js";
@@ -91,12 +90,6 @@ describe("YAMLEncoder", () => {
     expect(warnSpy).toHaveBeenCalledOnce();
     localEncoder.decode(coder);
     expect(warnSpy).toHaveBeenCalledOnce();
-  });
-
-  it("v mismatch throws AttributeSetCodecError", () => {
-    const coder = { v: 2, types: {}, values: {} } as unknown as AttributeSetEnvelope;
-    expect(() => encoder.decode(coder)).toThrow(AttributeSetCodecError);
-    expect(() => encoder.decode(coder)).toThrow("v=2 not supported");
   });
 
   it("attr not among the default types is kept with its own type", () => {

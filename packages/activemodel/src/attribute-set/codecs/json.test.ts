@@ -25,6 +25,12 @@ describe("jsonCodec", () => {
     expect(jsonCodec.decode(jsonCodec.encode(envelope))).toEqual(envelope);
   });
 
+  it("throws AttributeSetCodecError on an unsupported envelope version", () => {
+    expect(() => jsonCodec.decode('{"v":2,"types":{},"values":{}}')).toThrow(
+      AttributeSetCodecError,
+    );
+  });
+
   it("throws AttributeSetCodecError on malformed input", () => {
     expect(() => jsonCodec.decode("null")).toThrow(AttributeSetCodecError);
     expect(() => jsonCodec.decode("[]")).toThrow(AttributeSetCodecError);

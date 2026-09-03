@@ -3,7 +3,7 @@ import { AttributeSet } from "../attribute-set.js";
 import { typeRegistry } from "../type/registry.js";
 import { defaultValue } from "../type.js";
 import type { Type } from "../type/value.js";
-import { AttributeSetCodecError, type AttributeSetEnvelope } from "./codecs/codec.js";
+import type { AttributeSetEnvelope } from "./codecs/codec.js";
 
 const warnedKeys = new Set<string>();
 
@@ -40,10 +40,6 @@ export class YAMLEncoder {
   }
 
   decode(coder: AttributeSetEnvelope): AttributeSet {
-    if (coder.v !== 1) {
-      throw new AttributeSetCodecError(`envelope version v=${coder.v} not supported`);
-    }
-
     const attributesHash: Record<string, Attribute> = Object.fromEntries(
       Object.entries(coder.types).map(([name, typeKey]) => {
         let type: Type;
