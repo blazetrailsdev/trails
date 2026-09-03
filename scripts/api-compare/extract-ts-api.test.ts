@@ -326,6 +326,58 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("defers a `block(...)`-branded callback the way it defers a bare one", () => {
+    // `Hash#fetch`'s block arm has to be handed the ruby-compat `block(...)`
+    // brand, so the callback reaches the call wrapped in one more
+    // CallExpression. Ruby walks a `do … end` AFTER the send it hangs off
+    // (calculations.rb:617-621 records `fetch` before
+    // `lookup_cast_type_from_join_dependencies`), so the brand must not push
+    // the body ahead of the call the way a value argument would.
+    const branded = extractFromSource(
+      `import { block, fetch } from "@blazetrails/ruby-compat";
+      class Foo {
+        castType(name) {
+          return fetch(this.attributeTypes(), name, block(() => this.lookupFromJoins(name)));
+        }
+      }`,
+    );
+    expect(branded.instanceMethods.find((m) => m.name === "castType")!.callSeq).toEqual([
+      "attributeTypes",
+      "fetch",
+      "block",
+      "lookupFromJoins",
+    ]);
+
+    // The brand is resolved through the file's imports, so a same-named local
+    // helper stays an ordinary value argument — evaluated, and recorded, first.
+    const impostor = extractFromSource(
+      `class Foo {
+        castType(name) {
+          return fetch(this.attributeTypes(), name, block(() => this.lookupFromJoins(name)));
+        }
+      }`,
+    );
+    expect(impostor.instanceMethods.find((m) => m.name === "castType")!.callSeq).toEqual([
+      "attributeTypes",
+      "block",
+      "lookupFromJoins",
+      "fetch",
+    ]);
+
+    const bare = extractFromSource(
+      `class Foo {
+        castType(name) {
+          return fetch(this.attributeTypes(), name, () => this.lookupFromJoins(name));
+        }
+      }`,
+    );
+    expect(bare.instanceMethods.find((m) => m.name === "castType")!.callSeq).toEqual([
+      "attributeTypes",
+      "fetch",
+      "lookupFromJoins",
+    ]);
+  });
+
   it("records `constructor` for an instantiation but not for a class reference", () => {
     // Shape from persistence.rb:949-955: `self.class.primary_key` first,
     // `RecordNotDestroyed.new` last. The instantiation is the operand of a

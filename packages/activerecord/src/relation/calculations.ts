@@ -2,11 +2,11 @@ import { TypeError } from "@blazetrails/ruby-compat";
 import { Nodes, Table, SelectManager, star } from "@blazetrails/arel";
 import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
 import { any, isPresent, many, tryCall } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { block, fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
-import { columnType, Result, type ColumnType } from "../result.js";
+import { Result, type ColumnType, type ColumnTypes } from "../result.js";
 import { EnumType } from "../enum.js";
 import { defaultValue } from "../type.js";
 import {
@@ -836,7 +836,7 @@ export async function executeSimpleCalculation(
 
 /**
  * @internal
- * @missingRailsCall fetch — PERMANENT
+ * @missingRailsArgs fetch — PERMANENT
  */
 export async function executeGroupedCalculation(
   rel: CalculationRelation,
@@ -937,9 +937,7 @@ export async function executeGroupedCalculation(
       ([aliaz, colName]) =>
         (typeCasterFor(colName) ??
           typeFor(rel, colName, () =>
-            Object.hasOwn(calculatedData.columnTypes, aliaz)
-              ? calculatedData.columnTypes[aliaz]
-              : defaultValue(),
+            fetch(calculatedData.columnTypes, aliaz, defaultValue()),
           )) as { deserialize?(v: unknown): unknown } | null,
     );
 
@@ -997,7 +995,7 @@ export function typeFor(
 
 /**
  * @internal
- * @missingRailsCall fetch — PERMANENT
+ * @missingRailsArgs fetch — PERMANENT
  */
 export function lookupCastTypeFromJoinDependencies(
   rel: CalculationRelation,
@@ -1007,24 +1005,16 @@ export function lookupCastTypeFromJoinDependencies(
   let found: unknown = null;
   eachJoinDependencies.call(rel as any, joinDependencies, (join: any) => {
     if (found != null) return;
-    const type = castTypeFromKlass(join.baseKlass, name);
+    const type = fetch(join.baseKlass.attributeTypes(), name, null);
     if (type) found = type;
   });
   return found;
 }
 
-function castTypeFromKlass(klass: any, name: string): unknown {
-  if (!klass) return null;
-  const rawTypes: unknown =
-    typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;
-  if (!rawTypes) return null;
-  return rawTypes instanceof Map ? rawTypes.get(name) : (rawTypes as Record<string, unknown>)[name];
-}
-
 /**
  * @internal
- * @missingRailsCall fetch — PERMANENT
  * @missingRailsCall size — PERMANENT
+ * @missingRailsArgs fetch — PERMANENT
  */
 export async function typeCastPluckValues(
   this: CalculationRelation,
@@ -1032,30 +1022,31 @@ export async function typeCastPluckValues(
   columns: Array<string | Nodes.Node | unknown>,
 ): Promise<unknown[]> {
   await this.model.ensureSchemaLoaded();
+  let castTypes: ColumnTypes | ColumnType[];
   if (result.columns.length !== columns.length) {
-    return result.castValues(this.model.attributeTypes());
+    castTypes = this.model.attributeTypes();
+  } else {
+    let joinDependencies: JoinDependency[] | undefined;
+    castTypes = columns.map((column, i) => {
+      let name: string;
+      return (typeCasterFor(column) ??
+        fetch(
+          this.model.attributeTypes(),
+          (name = result.columns[i]),
+          block(() => {
+            joinDependencies ??= buildJoinDependencies.call(this as any);
+            return (
+              (lookupCastTypeFromJoinDependencies(this, name, joinDependencies) as
+                | ColumnType
+                | undefined) ??
+              result.columnTypes[i] ??
+              defaultValue()
+            );
+          }),
+        )) as ColumnType;
+    });
   }
-  let joinDependencies: JoinDependency[] | undefined;
-  const castTypes = result.columns.map((name, i) => {
-    const known = pluckCastTypeForKnownColumn(this.model, name);
-    if (known) return known;
-    joinDependencies ??= buildJoinDependencies.call(this as any);
-    return (
-      (lookupCastTypeFromJoinDependencies(this, name, joinDependencies) as ColumnType | null) ??
-      columnType(result, name, i, {})
-    );
-  });
   return result.castValues(castTypes);
-}
-
-function pluckCastTypeForKnownColumn(
-  model: CalculationRelation["_model"],
-  name: string,
-): ColumnType | null {
-  if (!Object.hasOwn(model.attributeTypes(), name)) return null;
-  const coder = model._serializedAttributes?.get(name);
-  if (coder) return { deserialize: (value) => coder.load(value) };
-  return model.typeForAttribute?.(name) ?? null;
 }
 
 /** @internal */

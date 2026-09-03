@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { fetch, hasKey } from "@blazetrails/ruby-compat";
 import type {
   SqliteBinds,
   SqliteConnection,
@@ -1777,7 +1777,34 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return !this.resolveDriverFactory().openSync;
   }
 
-  private configurePragmas(): [string, string][] {
+  /** @internal */
+  private castTimeout(): number | undefined {
+    const cfg = this._config as SQLite3AdapterOptions;
+    if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {
+      throw new ArgumentError("Cannot specify both timeout and retries arguments");
+    }
+    if (!isRubyTruthy(cfg.timeout)) return undefined;
+    const timeout = SQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
+    if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
+      throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
+    }
+    return timeout;
+  }
+
+  /**
+   * @missingRailsArgs fetch — PERMANENT
+   * @internal
+   */
+  override configureConnection(): void | Promise<void> {
+    this.castTimeout();
+    const cfg = this._config as SQLite3AdapterOptions;
+    if (isRubyTruthy(cfg.retries) && !isRubyTruthy(cfg.timeout)) {
+      deprecator().warn(
+        "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
+      );
+    }
+    const checked = super.configureConnection();
+
     const stmts: [string, string][] = [];
     if (!this._readonly) {
       const defaults: [string, string][] = [
@@ -1795,62 +1822,33 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       [`dqs_ddl = ${dqsValue}`, "SQLite DQS pragma 'dqs_ddl'"],
       [`dqs_dml = ${dqsValue}`, "SQLite DQS pragma 'dqs_dml'"],
     );
-    const pragmas = (this._config as SQLite3AdapterOptions).pragmas;
-    if (pragmas) {
-      const SAFE = /^\w+$/;
-      for (const [pragma, value] of Object.entries(pragmas)) {
-        if (!SAFE.test(pragma)) {
-          console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
-          continue;
-        }
-        const scalar =
-          typeof value === "boolean"
-            ? value
-              ? "1"
-              : "0"
-            : typeof value === "number"
-              ? String(value)
-              : SAFE.test(value)
-                ? value
-                : null;
-        if (scalar === null) {
-          console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
-          continue;
-        }
-        stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
+    const pragmas = fetch<Record<string, string | number | boolean>>(
+      cfg as unknown as Record<string, unknown>,
+      "pragmas",
+      {},
+    );
+    const SAFE = /^\w+$/;
+    for (const [pragma, value] of Object.entries(pragmas)) {
+      if (!SAFE.test(pragma)) {
+        console.warn(`Skipping invalid SQLite pragma name: ${pragma}`);
+        continue;
       }
+      const scalar =
+        typeof value === "boolean"
+          ? value
+            ? "1"
+            : "0"
+          : typeof value === "number"
+            ? String(value)
+            : SAFE.test(value)
+              ? value
+              : null;
+      if (scalar === null) {
+        console.warn(`Skipping SQLite pragma '${pragma}': value contains unsafe characters`);
+        continue;
+      }
+      stmts.push([`${pragma} = ${scalar}`, `SQLite pragma '${pragma}'`]);
     }
-    return stmts;
-  }
-
-  /** @internal */
-  private castTimeout(): number | undefined {
-    const cfg = this._config as SQLite3AdapterOptions;
-    if (isRubyTruthy(cfg.timeout) && isRubyTruthy(cfg.retries)) {
-      throw new ArgumentError("Cannot specify both timeout and retries arguments");
-    }
-    if (!isRubyTruthy(cfg.timeout)) return undefined;
-    const timeout = SQLite3Adapter.typeCastConfigToInteger(cfg.timeout);
-    if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
-      throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
-    }
-    return timeout;
-  }
-
-  /**
-   * @missingRailsCall fetch — PERMANENT
-   * @internal
-   */
-  override configureConnection(): void | Promise<void> {
-    this.castTimeout();
-    const cfg = this._config as SQLite3AdapterOptions;
-    if (isRubyTruthy(cfg.retries) && !isRubyTruthy(cfg.timeout)) {
-      deprecator().warn(
-        "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
-      );
-    }
-    const checked = super.configureConnection();
-    const stmts = this.configurePragmas();
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);
     if (this.driverIsAsync()) {

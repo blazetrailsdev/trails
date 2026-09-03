@@ -78,18 +78,7 @@ export function commitFlash(this: FlashRequestHost): void {
 
   const hash = flashHash.call(this);
   if (hash && (!hash.empty || session.isKey("flash"))) {
-    // Rails: `session["flash"] = flash_hash.to_session_value` (`flash.rb:76`),
-    // whose shape is `{ "discard" => [], "flashes" => ... }` (`flash.rb:143-147`)
-    // — the discriminator `from_session_value` reads to mark every carried key
-    // for the next sweep. A bare flashes hash reads as Rails-3 and never
-    // sweeps. `to_session_value` answers nil when nothing survives, which
-    // `flash.rb:80-82` then deletes; the delete happens directly here.
-    const flashesToKeep = hash.flashesForSession();
-    if (Object.keys(flashesToKeep).length === 0) {
-      session.delete("flash");
-    } else {
-      session.set("flash", { discard: [], flashes: flashesToKeep });
-    }
+    session.set("flash", hash.toSessionValue());
     // Rails: `self.flash = flash_hash.dup` so further mutations don't
     // bleed into the just-stored session value.
     this.env[KEY] = hash.dup();
@@ -261,32 +250,21 @@ export class FlashHash {
 
   // --- Session serialization ---
 
-  toSessionValue(): Record<string, unknown> {
-    // Returns the persisted flash entries only. Mirrors Rails'
-    // `to_session_value`, which serializes `@flashes` and excludes
-    // `flash.now` — `now` entries are intentionally request-local and
-    // must not bleed into the next request. Callers that want the
-    // request-visible state (including `flash.now`) should use
-    // {@link toHash} instead. The session-commit pipeline applies
-    // discard filtering via {@link flashesForSession}; this method
-    // intentionally skips that filter to preserve the existing
-    // contract used by `metal/etag-with-flash`.
-    return Object.fromEntries(this._flashes);
-  }
-
   /**
-   * Hash projection used by {@link commitFlash} when storing the flash
-   * back into the session — mirrors Rails' `to_session_value`'s
-   * `@flashes.except(*@discard)` filter.
+   * Builds a hash containing the flashes to keep for the next request. If
+   * there are none to keep, returns `null`. Mirrors `to_session_value`
+   * (`flash.rb:143-147`); `flash.now` entries live in `@now` and so never
+   * reach the session.
    *
    * @internal
    */
-  flashesForSession(): Record<string, unknown> {
-    const keep: Record<string, unknown> = {};
+  toSessionValue(): { discard: string[]; flashes: Record<string, unknown> } | null {
+    const flashesToKeep: Record<string, unknown> = {};
     for (const [k, v] of this._flashes) {
-      if (!this._discard.has(k)) keep[k] = v;
+      if (!this._discard.has(k)) flashesToKeep[k] = v;
     }
-    return keep;
+    if (Object.keys(flashesToKeep).length === 0) return null;
+    return { discard: [], flashes: flashesToKeep };
   }
 
   /** Shallow copy mirroring Ruby's `FlashHash#dup`. */

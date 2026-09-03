@@ -41,8 +41,17 @@ describe("FlashHashTest", () => {
   });
 
   it("to session value", () => {
-    const flash = new FlashHash({ notice: "saved" });
-    expect(flash.toSessionValue()).toEqual({ notice: "saved" });
+    const flash = new FlashHash({ foo: "bar" });
+    expect(flash.toSessionValue()).toEqual({ discard: [], flashes: { foo: "bar" } });
+
+    flash.now("qux", 1);
+    expect(flash.toSessionValue()).toEqual({ flashes: { foo: "bar" }, discard: [] });
+
+    flash.discard("foo");
+    expect(flash.toSessionValue()).toBeNull();
+
+    flash.sweep();
+    expect(flash.toSessionValue()).toBeNull();
   });
 
   it("from session value", () => {
@@ -202,11 +211,5 @@ describe("FlashHashTest", () => {
     const copy = original.dup();
     copy.sweep();
     expect(copy.has("a")).toBe(false);
-  });
-
-  it("flashesForSession prunes keys marked for discard", () => {
-    const flash = new FlashHash({ kept: "1", dropped: "2" });
-    flash.discard("dropped");
-    expect(flash.flashesForSession()).toEqual({ kept: "1" });
   });
 });
