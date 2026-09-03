@@ -1,15 +1,4 @@
 /**
- * Ruby's `Kernel.rand` (`vendor/ruby/random.c:1684` `rb_f_rand`), the
- * pseudo-random draw Rack reaches for directly
- * (`vendor/rack-session/lib/rack/session/abstract/id.rb:300`). Ruby core, so
- * no gem file declares it.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `Kernel.rand`
- * (`vendor/ruby/random.c:1684`), which Rack calls without defining, so no
- * Rails or gem file declares the module this file's single export lives in.
- */
-
-/**
  * `vendor/ruby/random.c:1003` `limited_rand`, whose `limit` is INCLUSIVE:
  * whole 32-bit words are drawn under a mask of `limit`'s width and any value
  * above `limit` is retried, so the distribution stays uniform rather than

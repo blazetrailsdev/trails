@@ -1,13 +1,9 @@
 /**
- * `String#force_encoding` — a Ruby *core* method, not a Rails extension, so it
- * has no `core_ext/string/*.rb` counterpart. It lives beside `chomp.ts`.
+ * Ruby core `String#force_encoding` (`vendor/ruby/string.c:11005`
+ * `rb_str_force_encoding`), which Rails inherits rather than defines.
  *
- * @noRailsEquivalent PERMANENT — Ruby core `String#force_encoding`
- * (`vendor/ruby/string.c:11005` `rb_str_force_encoding`), which Rails inherits
- * rather than defines.
+ * @noRailsEquivalent PERMANENT
  */
-
-/** @noRailsEquivalent PERMANENT */
 export function forceEncoding(string: string, encoding: string): string {
   const label = encoding.toUpperCase();
   if (label === "BINARY" || label === "ASCII-8BIT") return string;

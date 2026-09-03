@@ -1,15 +1,4 @@
 /**
- * Ruby's `Object#hash` (`vendor/ruby/object.c:4375`), the C primitive behind
- * every `hash` send. It has no Ruby-level counterpart file for the port to
- * mirror.
- *
- * @noRailsEquivalent PERMANENT — `Object#hash` / `Array#hash` / `String#hash`
- * are C primitives (`vendor/ruby/object.c:4375`, `array.c:5205`,
- * `string.c:3629`), not Ruby methods, so no Rails file declares the module
- * this file's single export lives in.
- */
-
-/**
  * Ruby's `Object#hash` (`vendor/ruby/object.c:4375`, `rb_define_method(rb_mKernel,
  * "hash", rb_obj_hash, 0)`), with the `Array#hash`
  * (`vendor/ruby/array.c:5205` `rb_ary_hash`) and `String#hash`

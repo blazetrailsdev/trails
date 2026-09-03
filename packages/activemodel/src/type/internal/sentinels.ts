@@ -1,5 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
-
 declare const dateInfinityBrand: unique symbol;
 declare const dateNegativeInfinityBrand: unique symbol;
 

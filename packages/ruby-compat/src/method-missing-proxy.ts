@@ -1,13 +1,3 @@
-/**
- * Ruby's `BasicObject#method_missing` (`vendor/ruby/vm_eval.c:2570`), the
- * interpreter hook trails mirrors with a `Proxy`. No Rails file declares the
- * module this file's exports live in.
- *
- * @noRailsEquivalent PERMANENT — `method_missing` is a core interpreter hook
- * (`vendor/ruby/vm_eval.c:2570`), not a Rails method, so it has no counterpart
- * file; JS has no such hook at all, so one shared `Proxy` shape serves every
- * ported `method_missing`.
- */
 import { NoMethodError } from "./no-method-error.js";
 
 /**

@@ -1,13 +1,4 @@
 /**
- * `String#chomp` — a Ruby *core* method, not a Rails extension, so it has no
- * `core_ext/string/*.rb` counterpart. It lives beside `succ.ts`.
- *
- * @noRailsEquivalent PERMANENT — Ruby core `String#chomp`
- * (`vendor/ruby/string.c:9786` `rb_str_chomp`), which Rails inherits rather
- * than defines.
- */
-
-/**
  * With no separator (or `undefined`), removes a single trailing `\n`, `\r\n`,
  * or `\r`. With a separator string, removes that suffix if present. An
  * empty-string separator (Ruby paragraph mode) strips all trailing newline
