@@ -2,7 +2,7 @@ import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the `DEFAULT_PROPERTIES` generator (properties.rb:31-39) installs accessors the class body cannot declare.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Properties {
   static readonly DEFAULT_PROPERTIES = {
     encryptedDataKey: "k",
@@ -124,13 +124,13 @@ export interface Properties {
 
 for (const [name, key] of Object.entries(Properties.DEFAULT_PROPERTIES)) {
   Object.defineProperty(Properties.prototype, name, {
+    configurable: true,
     get(this: Properties): unknown {
       return this.get(key);
     },
     set(this: Properties, value: unknown) {
       this.set(key, value);
     },
-    configurable: true,
   });
 }
 
