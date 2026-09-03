@@ -227,7 +227,6 @@ export default defineConfig(
       "**/*.test.ts",
       // Adapter implementations — these ARE the abstraction layer
       "packages/ruby-compat/src/crypto-adapter.ts",
-      "packages/ruby-compat/src/crypto-adapter.ts",
       "packages/ruby-compat/src/fs-adapter.ts",
       "packages/ruby-compat/src/process-adapter.ts",
       "packages/activesupport/src/async-context-adapter.ts",
