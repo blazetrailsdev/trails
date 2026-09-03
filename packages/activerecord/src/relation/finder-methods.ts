@@ -238,46 +238,8 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
   return conditions;
 }
 
-/** @missingRailsCall find_with_ids — CONVERGEABLE converge-find-to-delegate-to-find-with-ids */
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
-  const pk = this.primaryKey;
-  const modelName = this._model.name;
-  const normalized = normalizeFindArgs(modelName, pk, args);
-  if (normalized.emptyArray) return [];
-  const { ids, wantArray, tuples } = normalized;
-  const conditions = this.whereClause.isEmpty()
-    ? ""
-    : ` [${this.arel().whereSql(this._model)?.value ?? ""}]`;
-
-  if (tuples && Array.isArray(pk)) {
-    const orConditions = tuples.map((tuple) => buildPkWhere(pk, tuple));
-    let rel: any = this.where(orConditions[0]);
-    for (let i = 1; i < orConditions.length; i++) {
-      rel = rel.or(this.where(orConditions[i]));
-    }
-    const records = await rel.toArray();
-    if (records.length !== tuples.length)
-      raiseNotFoundAll(modelName, pk, normalized, records.length, tuples.length, conditions);
-    return wantArray ? records : records[0];
-  }
-
-  if (Array.isArray(pk)) {
-    throw new Error("find: composite PK without tuples (normalizer invariant violation)");
-  }
-
-  if (ids.length === 1) {
-    const id = ids[0];
-    const records = await this.where({ [pk]: id })
-      .limit(1)
-      .toArray();
-    if (records.length === 0) raiseNotFoundSingle(modelName, pk, id, conditions);
-    return wantArray ? [records[0]] : records[0];
-  }
-
-  const records = await this.where({ [pk]: ids }).toArray();
-  if (records.length !== ids.length)
-    raiseNotFoundAll(modelName, pk, normalized, records.length, ids.length, conditions);
-  return records;
+  return findWithIds.call(this, args);
 }
 
 export async function findBy(
@@ -517,6 +479,15 @@ export async function include(this: FinderRelation, record: any): Promise<boolea
 
 export const member = include;
 
+function whereCompositePrimaryKeyIn(relation: any, pk: string[], ids: unknown[]): any {
+  const tuples = ids as unknown[][];
+  let rel = relation.where(buildPkWhere(pk, tuples[0]));
+  for (let i = 1; i < tuples.length; i++) {
+    rel = rel.or(relation.where(buildPkWhere(pk, tuples[i])));
+  }
+  return rel;
+}
+
 /** @missingRailsCall size — PERMANENT */
 export function raiseRecordNotFoundExceptionBang(
   this: FinderRelation,
@@ -659,8 +630,10 @@ export function usingLimitableReflections(
 export async function findWithIds(this: FinderRelation, ids: unknown[]): Promise<any> {
   const normalized = normalizeFindArgs(this.model.name, this.primaryKey, ids);
   if (normalized.emptyArray) return [];
-  if (!normalized.wantArray) {
-    return findOne.call(this, normalized.ids[0]);
+  const expectsArray = normalized.wantArray;
+  if (normalized.ids.length === 1) {
+    const result = await findOne.call(this, normalized.ids[0]);
+    return expectsArray ? [result] : result;
   }
   return (this as any).findSome(normalized.ids);
 }
@@ -682,9 +655,11 @@ export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
 export async function findSome(this: FinderRelation, ids: unknown[]): Promise<any[]> {
   if (this.orderValues.length === 0) return (this as any).findSomeOrdered(ids);
 
-  const pk = this.primaryKey as string;
-  let relation = (this as any).where({ [pk]: ids });
-  if ((this as any).selectValues.length > 0) {
+  const pk = this.primaryKey;
+  let relation = Array.isArray(pk)
+    ? whereCompositePrimaryKeyIn(this, pk, ids)
+    : (this as any).where({ [pk]: ids });
+  if ((this as any).selectValues.length > 0 && !Array.isArray(pk)) {
     relation = relation.select(this.table.get(pk));
   }
   const records = await relation.toArray();
@@ -718,19 +693,22 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
 
   let relation = (this as any).except("limit", "offset");
-  relation = relation.where({ [this.model.primaryKey as string]: ids });
-  if ((this as any).selectValues.length > 0) {
+  const pk = this.model.primaryKey;
+  relation = Array.isArray(pk)
+    ? whereCompositePrimaryKeyIn(relation, pk, ids)
+    : relation.where({ [this.model.primaryKey as string]: ids });
+  if ((this as any).selectValues.length > 0 && !Array.isArray(pk)) {
     relation = relation.select(this.table.get(this.model.primaryKey as string));
   }
   const result: any[] = await relation.records();
 
   if (result.length === ids.length) {
+    const composite = Array.isArray(pk);
+    const keyOf = (id: unknown): unknown => (composite ? String(id) : id);
     return inOrderOf(
       result,
-      (record: any) => record.id,
-      ids.map((id) =>
-        (this.model as any).typeForAttribute(this.model.primaryKey as string).cast(id),
-      ),
+      (record: any) => keyOf(record.id),
+      ids.map((id) => keyOf((this.model as any).typeForAttribute(String(pk)).cast(id))),
     );
   } else {
     this.raiseRecordNotFoundExceptionBang(ids, result.length, ids.length);

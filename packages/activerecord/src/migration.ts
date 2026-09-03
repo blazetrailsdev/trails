@@ -1368,6 +1368,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 }
 
+let loadMigrationSeq = 0;
+
 export class MigrationProxy {
   name: string;
   version: number;
@@ -1416,7 +1418,9 @@ export class MigrationProxy {
    */
   async loadMigration(): Promise<Migration> {
     const { pathToFileURL } = await import("node:url");
-    const mod = (await import(pathToFileURL(this.filename).href)) as Record<string, unknown>;
+    const url = pathToFileURL(this.filename);
+    url.search = `?${(loadMigrationSeq += 1)}`;
+    const mod = (await import(url.href)) as Record<string, unknown>;
     const klass = mod[this.name];
     if (typeof klass !== "function") {
       throw new NameError(`uninitialized constant ${this.name}`, this.name);

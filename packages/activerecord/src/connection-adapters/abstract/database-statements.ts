@@ -426,8 +426,42 @@ export async function withinNewTransaction<T>(
   return transactionManager.call(this)!.withinNewTransaction(options, block as never);
 }
 
+export function openTransactions(this: DatabaseStatementsHost): number {
+  return transactionManager.call(this)!.openTransactions;
+}
+
 export function currentTransaction(this: DatabaseStatementsHost): Transaction | NullTransaction {
   return transactionManager.call(this)!.currentTransaction;
+}
+
+export async function beginTransaction(
+  this: DatabaseStatementsHost,
+  options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
+): Promise<void> {
+  await transactionManager.call(this)!.beginTransaction(options);
+}
+
+export async function commitTransaction(this: DatabaseStatementsHost): Promise<void> {
+  return transactionManager.call(this)!.commitTransaction();
+}
+
+export async function rollbackTransaction(
+  this: DatabaseStatementsHost,
+  transaction?: Transaction,
+): Promise<void> {
+  return transactionManager.call(this)!.rollbackTransaction(transaction);
+}
+
+export async function materializeTransactions(this: DatabaseStatementsHost): Promise<void> {
+  return transactionManager.call(this)!.materializeTransactions();
+}
+
+export async function disableLazyTransactionsBang(this: DatabaseStatementsHost): Promise<void> {
+  return transactionManager.call(this)!.disableLazyTransactionsBang();
+}
+
+export function enableLazyTransactionsBang(this: DatabaseStatementsHost): void {
+  transactionManager.call(this)!.enableLazyTransactionsBang();
 }
 
 export function dirtyCurrentTransaction(this: DatabaseStatementsHost): void {
@@ -996,7 +1030,14 @@ export const DatabaseStatements = {
   truncateTables,
   transactionManager,
   withinNewTransaction,
+  openTransactions,
   currentTransaction,
+  beginTransaction,
+  commitTransaction,
+  rollbackTransaction,
+  materializeTransactions,
+  disableLazyTransactionsBang,
+  enableLazyTransactionsBang,
   dirtyCurrentTransaction,
   isTransactionOpen,
   markTransactionWrittenIfWrite,

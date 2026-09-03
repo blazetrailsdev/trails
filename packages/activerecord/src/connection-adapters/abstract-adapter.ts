@@ -671,12 +671,24 @@ export interface AbstractAdapter {
     kwargs?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
-  currentTransaction(): Transaction | NullTransaction;
-  dirtyCurrentTransaction(): void;
   withinNewTransaction<T>(
     options: { isolation?: string | null; joinable?: boolean },
     block: (tx?: unknown) => Promise<T> | T,
   ): Promise<T>;
+  openTransactions(): number;
+  currentTransaction(): Transaction | NullTransaction;
+  beginTransaction(options?: {
+    isolation?: string | null;
+    joinable?: boolean;
+    _lazy?: boolean;
+  }): Promise<void>;
+  commitTransaction(): Promise<void>;
+  rollbackTransaction(transaction?: Transaction): Promise<void>;
+  materializeTransactions(): Promise<void>;
+  disableLazyTransactionsBang(): Promise<void>;
+  enableLazyTransactionsBang(): void;
+  dirtyCurrentTransaction(): void;
+  isTransactionOpen(): boolean;
   commit(): Promise<void>;
   rollback(): Promise<void>;
   createSavepoint(name: string): Promise<void>;
@@ -1310,40 +1322,6 @@ export class AbstractAdapter implements Quoting {
 
   get transactionManager(): TransactionManager {
     return this._transactionManager;
-  }
-
-  async beginTransaction(
-    options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
-  ): Promise<void> {
-    await this._transactionManager.beginTransaction(options);
-  }
-
-  async rollbackTransaction(): Promise<void> {
-    return this._transactionManager.rollbackTransaction();
-  }
-
-  async commitTransaction(): Promise<void> {
-    return this._transactionManager.commitTransaction();
-  }
-
-  isTransactionOpen(): boolean {
-    return this._transactionManager.currentTransaction.open;
-  }
-
-  get openTransactions(): number {
-    return this._transactionManager.openTransactions;
-  }
-
-  async materializeTransactions(): Promise<void> {
-    return this._transactionManager.materializeTransactions();
-  }
-
-  async disableLazyTransactionsBang(): Promise<void> {
-    return this._transactionManager.disableLazyTransactionsBang();
-  }
-
-  enableLazyTransactionsBang(): void {
-    this._transactionManager.enableLazyTransactionsBang();
   }
 
   async transaction<T>(

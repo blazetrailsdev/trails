@@ -23,18 +23,12 @@ export class JoinAssociation extends JoinPart {
     this.reflection = reflection;
   }
 
-  get table(): string {
-    const t = this._table;
-    if (!t) return this.reflection.tableName;
-    return String(t.tableAlias ?? t.name);
+  get table(): Table | Nodes.TableAlias | null {
+    return this._table;
   }
 
-  set table(value: string) {
-    const table = aliasedArelTableForReflection(this.reflection, this.reflection.tableName, value);
-    this._table = table;
-    if (!this.tables.some((t) => String(t.tableAlias ?? t.name) === value)) {
-      this.tables.push(table);
-    }
+  set table(value: Table | Nodes.TableAlias | null) {
+    this._table = value;
   }
 
   isMatch(other: JoinPart): boolean {

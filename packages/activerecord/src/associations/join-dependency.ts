@@ -98,7 +98,7 @@ export namespace Aliases {
     }
 
     columnAliases(): Nodes.As[] {
-      const t = this.node!.arelTable as ArelTable | Nodes.TableAlias;
+      const t = this.node!.table as ArelTable | Nodes.TableAlias;
       return this.columns.map((column) => t.get(column.name).as(column.alias));
     }
   }
@@ -211,7 +211,7 @@ export class JoinDependency {
 
     const treePart = new JoinAssociation(reflection);
     treePart.tableIndex = tableIndex;
-    treePart.arelTable = targetArelTable;
+    treePart.table = targetArelTable;
     treePart.tableAlias = tableAlias;
     treePart.effectiveSqlName = targetTable;
     treePart.columns = columns;
@@ -310,9 +310,8 @@ export class JoinDependency {
 
     const joins = intersection.flatMap(([l, r]) => {
       if (r instanceof JoinAssociation) {
-        const lt = l.table;
-        r.table =
-          l.effectiveSqlName || (typeof lt === "string" ? lt : String(lt.tableAlias ?? lt.name));
+        r.table = l.table;
+        if (l.effectiveSqlName) r.effectiveSqlName = l.effectiveSqlName;
       }
       return this.walk(l, r, joinType);
     });
@@ -327,7 +326,7 @@ export class JoinDependency {
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
     const foreignTable =
-      parent.arelTable ?? aliasedArelTableFor(parent.baseKlass as never, parent.tableName);
+      parent.table ?? aliasedArelTableFor(parent.baseKlass as never, parent.tableName);
     const foreignKlass = parent.baseKlass;
     const joins: Nodes.Join[] = [];
 
@@ -379,7 +378,7 @@ export class JoinDependency {
       );
 
       if (resolvedRoot) {
-        child.arelTable = resolvedRoot.aliased;
+        child.table = resolvedRoot.aliased;
         child.effectiveSqlName = resolvedRoot.effectiveName;
       }
       joins.push(...(built as Nodes.Join[]));

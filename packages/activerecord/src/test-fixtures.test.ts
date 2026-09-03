@@ -776,6 +776,6 @@ describe("fixtures() pins every pool its sets seed through", () => {
     expect(colleges("FIU").name).toBe("Florida International University");
     const secondary = await College.leaseConnection();
     expect(secondary).not.toBe(await Base.leaseConnection());
-    expect(secondary.openTransactions).toBeGreaterThan(0);
+    expect(secondary.openTransactions()).toBeGreaterThan(0);
   });
 });

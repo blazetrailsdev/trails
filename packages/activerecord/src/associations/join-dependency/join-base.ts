@@ -8,7 +8,6 @@ export class JoinBase extends JoinPart {
   constructor(baseKlass: typeof Base, table: Table, children?: JoinPart[]) {
     super(baseKlass, children);
     this._table = table;
-    this.arelTable = table;
   }
 
   get table(): Table {

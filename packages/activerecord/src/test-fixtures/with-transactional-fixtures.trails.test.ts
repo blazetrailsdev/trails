@@ -162,14 +162,14 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
 
     await Promise.all([
       chainA.withinNewTransaction({ joinable: false }, async () => {
-        expect(chainA.openTransactions).toBeGreaterThan(0);
+        expect(chainA.openTransactions()).toBeGreaterThan(0);
         signalBReady();
         await aDone;
       }),
       (async () => {
         await bReady;
         try {
-          bObservedOpen = chainB.openTransactions;
+          bObservedOpen = chainB.openTransactions();
           bObservedTransactionOpen = chainB.isTransactionOpen();
           const ct = chainB.currentTransaction() as { joinable?: boolean } | null;
           bObservedCurrentTxJoinable = ct?.joinable ?? false;
@@ -186,7 +186,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
 
   it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", async () => {
     const adapter = (await primaryAdapter()) as unknown as LeasedTestAdapter;
-    expect(adapter.openTransactions).toBe(0);
+    expect(adapter.openTransactions()).toBe(0);
     expect(adapter.isTransactionOpen()).toBe(false);
     expect(adapter.currentTransaction()).toBeInstanceOf(NullTransaction);
   });
