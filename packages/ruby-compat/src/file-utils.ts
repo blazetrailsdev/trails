@@ -238,9 +238,7 @@ function fileUtime(atime: Date, mtime: Date, path: string): void {
  */
 export class FileUtils {
   /** `FileUtils.mkdir_p` (`vendor/ruby/lib/fileutils.rb:365-388`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static mkdirP(
     list: string | string[],
@@ -270,16 +268,12 @@ export class FileUtils {
   }
 
   /** `FileUtils.makedirs` (`vendor/ruby/lib/fileutils.rb:392-394`), an alias of `mkdir_p`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static makedirs = FileUtils.mkdirP;
 
   /** `FileUtils.cp` (`vendor/ruby/lib/fileutils.rb:873-879`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static cp(
     src: string | string[],
@@ -297,9 +291,7 @@ export class FileUtils {
    * `remove_entry_secure` (`fileutils.rb:1351-1447`), which is built on
    * `Process.euid`; `process.*` is unavailable here, so the kwarg has no arm to
    * select and is not accepted.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static mv(
     src: string | string[],
@@ -328,9 +320,7 @@ export class FileUtils {
   }
 
   /** `FileUtils.rm` (`vendor/ruby/lib/fileutils.rb:1216-1225`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static rm(
     list: string | string[],
@@ -346,9 +336,7 @@ export class FileUtils {
   }
 
   /** `FileUtils.rm_f` (`vendor/ruby/lib/fileutils.rb:1241-1243`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static rmF(
     list: string | string[],
@@ -358,9 +346,7 @@ export class FileUtils {
   }
 
   /** `FileUtils.rm_r` (`vendor/ruby/lib/fileutils.rb:1299-1310`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static rmR(
     list: string | string[],
@@ -375,9 +361,7 @@ export class FileUtils {
   }
 
   /** `FileUtils.remove_entry` (`vendor/ruby/lib/fileutils.rb:1449-1456`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static removeEntry(path: string, force = false): void {
     try {
@@ -394,9 +378,7 @@ export class FileUtils {
   }
 
   /** `FileUtils.remove_file` (`vendor/ruby/lib/fileutils.rb:1473-1477`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static removeFile(path: string, force = false): void {
     try {
@@ -407,9 +389,7 @@ export class FileUtils {
   }
 
   /** `FileUtils.touch` (`vendor/ruby/lib/fileutils.rb:2006-2026`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
-   * module function the interpreter defines and Rails bodies send.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static touch(
     list: string | string[],
