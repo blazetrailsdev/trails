@@ -84,6 +84,20 @@ describe("kernelInteger", () => {
     expect(() => kernelInteger("11", -37)).toThrow("invalid radix 37");
   });
 
+  it("converts the base through NUM2INT before parsing", () => {
+    expect(kernelInteger("10", 10.7)).toBe(10);
+    expect(kernelInteger("10", -10.9)).toBe(10);
+    expect(() => kernelInteger("10", Infinity)).toThrow("float Inf out of range of integer");
+    expect(() => kernelInteger("10", -Infinity)).toThrow("float -Inf out of range of integer");
+    expect(() => kernelInteger("10", NaN)).toThrow("float NaN out of range of integer");
+    expect(() => kernelInteger("10", 2 ** 40)).toThrow(
+      "integer 1099511627776 too big to convert to `int'",
+    );
+    expect(() => kernelInteger("10", -(2 ** 40))).toThrow(
+      "integer -1099511627776 too small to convert to `int'",
+    );
+  });
+
   it("raises ArgumentError when a base is given for a non-String", () => {
     expect(() => kernelInteger(5, 10)).toThrow(ArgumentError);
     expect(() => kernelInteger(5, 10)).toThrow("base specified for non string value");

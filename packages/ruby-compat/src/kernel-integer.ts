@@ -14,6 +14,12 @@ const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
  * `rb_str_convert_to_inum` (`vendor/ruby/bignum.c:4302`), and anything else is
  * converted through `to_int`, then `to_str`, then `to_i`.
  *
+ * The base itself arrives through `NUM2INT` (`rb_f_integer`,
+ * `vendor/ruby/object.c:3355-3358`), so a fractional base truncates and a
+ * non-finite or out-of-`int` one is a `RangeError` before any parsing. Ruby's
+ * String and `nil` arms of `NUM2INT` are unreachable here — the parameter's
+ * type is what rules them out.
+ *
  * `rb_int_parse_cstr` (`vendor/ruby/bignum.c:4045`) is why the String arm is a
  * grammar rather than a `Number.parseInt`: it strips surrounding whitespace,
  * reads an optional sign and a radix prefix (`0x`/`0b`/`0o`/`0d`, plus bare
@@ -27,6 +33,7 @@ const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
  * is no Ruby file in any gem for the port to mirror.
  */
 export function kernelInteger(val: unknown, base = 0): number {
+  base = rbNum2Int(base);
   if (base !== 0) {
     const tmp = rbCheckStringType(val);
     if (tmp !== null) val = tmp;
@@ -47,6 +54,17 @@ export function kernelInteger(val: unknown, base = 0): number {
   const str = rbCheckStringType(val);
   if (str !== null) return rbStrConvertToInum(str, base);
   return rbToInteger(val);
+}
+
+function rbNum2Int(num: number): number {
+  if (Number.isNaN(num)) throw new RangeError("float NaN out of range of integer");
+  if (!Number.isFinite(num)) {
+    throw new RangeError(`float ${num > 0 ? "Inf" : "-Inf"} out of range of integer`);
+  }
+  const int = Math.trunc(num);
+  if (int > 2147483647) throw new RangeError(`integer ${int} too big to convert to \`int'`);
+  if (int < -2147483648) throw new RangeError(`integer ${int} too small to convert to \`int'`);
+  return int;
 }
 
 function rbCheckStringType(val: unknown): string | null {
