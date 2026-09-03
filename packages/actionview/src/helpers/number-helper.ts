@@ -93,28 +93,25 @@ export function delegateNumberHelperMethod(
   );
 }
 
-const ESCAPE_KEYS = ["format", "negativeFormat", "separator", "delimiter", "unit"] as const;
-
-// activesupport's htmlEscape passes any SafeBuffer through unchanged; Rails
-// only bypasses escaping for html_safe? buffers. Mirror that here.
-function escape(v: string | SafeBuffer | undefined): string | undefined {
-  if (v === undefined) return undefined;
-  if (isHtmlSafe(v)) return (v as SafeBuffer).toString();
-  return htmlEscape(v instanceof SafeBuffer ? v.toString() : v).toString();
-}
-
-/** @internal */
+/**
+ * @internal
+ * @missingRailsArgs html_safe? — PERMANENT
+ */
 export function escapeUnsafeOptions(options: NumberHelperOptions): NumberHelperOptions {
   const out: NumberHelperOptions = { ...options };
-  for (const k of ESCAPE_KEYS) if (out[k] !== undefined) out[k] = escape(out[k]);
-  if (out.units && typeof out.units === "object") out.units = escapeUnits(out.units);
+  if (out.format != null) out.format = htmlEscape(out.format).toString();
+  if (out.negativeFormat != null) out.negativeFormat = htmlEscape(out.negativeFormat).toString();
+  if (out.separator != null) out.separator = htmlEscape(out.separator).toString();
+  if (out.delimiter != null) out.delimiter = htmlEscape(out.delimiter).toString();
+  if (out.unit != null && !isHtmlSafe(out.unit)) out.unit = htmlEscape(out.unit).toString();
+  if (out.units != null && typeof out.units === "object") out.units = escapeUnits(out.units);
   return out;
 }
 
 /** @internal */
 export function escapeUnits(units: Record<string, string | SafeBuffer>): Record<string, string> {
   const escaped: Record<string, string> = {};
-  for (const [k, v] of Object.entries(units)) escaped[k] = escape(v) ?? "";
+  for (const [k, v] of Object.entries(units)) escaped[k] = htmlEscape(v).toString();
   return escaped;
 }
 

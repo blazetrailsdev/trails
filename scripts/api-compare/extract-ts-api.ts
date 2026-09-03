@@ -1800,11 +1800,15 @@ function unwrapTsExpression(expr: ts.Expression): ts.Expression {
 
 /**
  * The array of string literals an expression denotes, or null when any element
- * is not statically a string. Three shapes resolve and nothing else: an array
+ * is not statically a string. Four shapes resolve and nothing else: an array
  * literal (spreads recursed into), an identifier bound to a const in the SAME
- * file, and a property access naming a static of `ownerClass`. A list from
- * another module is null on purpose — the arms below would otherwise credit a
- * class with names this file never spells.
+ * file, a property access naming a static of `ownerClass`, and
+ * `Object.entries` / `Object.keys` of an object literal reached by one of
+ * those — the port of a Ruby hash generator like
+ * `Properties::DEFAULT_PROPERTIES.each do |name, key|`
+ * (`activerecord/lib/active_record/encryption/properties.rb:31-39`). A list
+ * from another module is null on purpose — the arms below would otherwise
+ * credit a class with names this file never spells.
  */
 function resolveStringLiteralList(
   expr: ts.Expression,
@@ -1814,6 +1818,17 @@ function resolveStringLiteralList(
 ): string[] | null {
   if (depth > 4) return null;
   const e = unwrapTsExpression(expr);
+
+  if (
+    ts.isCallExpression(e) &&
+    ts.isPropertyAccessExpression(e.expression) &&
+    ts.isIdentifier(e.expression.expression) &&
+    e.expression.expression.text === "Object" &&
+    (e.expression.name.text === "entries" || e.expression.name.text === "keys") &&
+    e.arguments.length === 1
+  ) {
+    return resolveObjectLiteralKeys(e.arguments[0], checker, ownerClass, depth + 1);
+  }
 
   if (ts.isArrayLiteralExpression(e)) {
     const out: string[] = [];
@@ -1846,6 +1861,53 @@ function resolveStringLiteralList(
       if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
       if (!member.initializer) return null;
       return resolveStringLiteralList(member.initializer, checker, ownerClass, depth + 1);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The keys of the object literal an expression denotes, resolved through the
+ * same three arms as `resolveStringLiteralList` — a same-file const or a static
+ * of `ownerClass`. Null when the expression is not statically an object literal
+ * or any key is computed.
+ */
+function resolveObjectLiteralKeys(
+  expr: ts.Expression,
+  checker: ts.TypeChecker,
+  ownerClass: ts.ClassDeclaration | null,
+  depth = 0,
+): string[] | null {
+  if (depth > 4) return null;
+  const e = unwrapTsExpression(expr);
+
+  if (ts.isObjectLiteralExpression(e)) {
+    const out: string[] = [];
+    for (const p of e.properties) {
+      if (!ts.isPropertyAssignment(p) && !ts.isShorthandPropertyAssignment(p)) return null;
+      if (ts.isIdentifier(p.name)) out.push(p.name.text);
+      else if (ts.isStringLiteral(p.name)) out.push(p.name.text);
+      else return null;
+    }
+    return out;
+  }
+
+  if (ts.isIdentifier(e)) {
+    const sym = checker.getSymbolAtLocation(e);
+    const decl = sym?.valueDeclaration ?? sym?.declarations?.[0];
+    if (!decl || !ts.isVariableDeclaration(decl) || !decl.initializer) return null;
+    if (decl.getSourceFile() !== e.getSourceFile()) return null;
+    return resolveObjectLiteralKeys(decl.initializer, checker, ownerClass, depth + 1);
+  }
+
+  if (ts.isPropertyAccessExpression(e) && ts.isIdentifier(e.name) && ownerClass) {
+    for (const member of ownerClass.members) {
+      if (!ts.isPropertyDeclaration(member)) continue;
+      if (!ts.isIdentifier(member.name) || member.name.text !== e.name.text) continue;
+      if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
+      if (!member.initializer) return null;
+      return resolveObjectLiteralKeys(member.initializer, checker, ownerClass, depth + 1);
     }
   }
 
@@ -1959,7 +2021,14 @@ function forOfElementName(node: ts.ForOfStatement): string | null {
   if (!ts.isVariableDeclarationList(node.initializer)) return null;
   if (node.initializer.declarations.length !== 1) return null;
   const name = node.initializer.declarations[0].name;
-  return ts.isIdentifier(name) ? name.text : null;
+  if (ts.isIdentifier(name)) return name.text;
+  // `for (const [name, key] of Object.entries(HASH))` — the port of Ruby's
+  // two-parameter `HASH.each do |name, key|`; the first binding is the name.
+  if (ts.isArrayBindingPattern(name) && name.elements.length > 0) {
+    const first = name.elements[0];
+    if (ts.isBindingElement(first) && ts.isIdentifier(first.name)) return first.name.text;
+  }
+  return null;
 }
 
 /**

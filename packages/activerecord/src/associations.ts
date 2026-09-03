@@ -259,7 +259,8 @@ export function _resolveInverseName(
   if (typeof options.inverseOf === "string") return options.inverseOf;
   if (options.polymorphic) return null;
   const refl = ownerCtor._reflectOnAssociation?.(assocName);
-  return refl?.inverseName?.() ?? null;
+  const inverseName = refl?.inverseName?.();
+  return inverseName != null && inverseName !== false ? inverseName : null;
 }
 
 /** @internal */

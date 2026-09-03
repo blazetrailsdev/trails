@@ -2145,6 +2145,53 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
     expect(names).toEqual([]);
   });
 
+  it("credits every accessor a hash generator installs (Object.entries destructured)", () => {
+    const info = extractFromFiles("/p", {
+      "properties.ts": `
+        export class Properties {
+          static readonly DEFAULT_PROPERTIES = {
+            encryptedDataKey: "k",
+            iv: "iv",
+            encoding: "e",
+          } as const;
+        }
+        for (const [name, key] of Object.entries(Properties.DEFAULT_PROPERTIES)) {
+          Object.defineProperty(Properties.prototype, name, {
+            get(this: any): unknown { return this.get(key); },
+            set(this: any, value: unknown) { this.set(key, value); },
+          });
+        }
+      `,
+    });
+    const methods = info.classes["properties.ts:Properties"].instanceMethods;
+    expect(methods.filter((m) => m.writer !== true).map((m) => m.name)).toEqual([
+      "encryptedDataKey",
+      "iv",
+      "encoding",
+    ]);
+    expect(methods.filter((m) => m.writer === true).map((m) => m.name)).toEqual([
+      "encryptedDataKey",
+      "iv",
+      "encoding",
+    ]);
+  });
+
+  it("credits nothing when the hash a generator loops over is not a literal", () => {
+    const info = extractFromFiles("/p", {
+      "properties.ts": `
+        import { DEFAULT_PROPERTIES } from "./elsewhere.js";
+        export class Properties {}
+        for (const [name, key] of Object.entries(DEFAULT_PROPERTIES)) {
+          Object.defineProperty(Properties.prototype, name, {
+            get(this: any): unknown { return this.get(key); },
+          });
+        }
+      `,
+      "elsewhere.ts": `export const DEFAULT_PROPERTIES = { encoding: "e" };`,
+    });
+    expect(info.classes["properties.ts:Properties"].instanceMethods).toEqual([]);
+  });
+
   it("credits nothing when defineProperty targets a non-prototype receiver", () => {
     const info = extractFromFiles("/p", {
       "relation.ts": `
