@@ -86,6 +86,7 @@ describe("kernelInteger", () => {
 
   it("converts the base through NUM2INT before parsing", () => {
     expect(kernelInteger("10", 10.7)).toBe(10);
+    expect(kernelInteger("10", 2.0)).toBe(2);
     expect(kernelInteger("10", -10.9)).toBe(10);
     expect(() => kernelInteger("10", Infinity)).toThrow("float Inf out of range of integer");
     expect(() => kernelInteger("10", -Infinity)).toThrow("float -Inf out of range of integer");
@@ -95,6 +96,17 @@ describe("kernelInteger", () => {
     );
     expect(() => kernelInteger("10", -(2 ** 40))).toThrow(
       "integer -1099511627776 too small to convert to `int'",
+    );
+  });
+
+  it("raises NUM2INT's TypeError for a base that is not Integer-convertible", () => {
+    expect(() => kernelInteger("10", null)).toThrow("no implicit conversion from nil to integer");
+    expect(() => kernelInteger("10", "2")).toThrow("no implicit conversion of String into Integer");
+    expect(() => kernelInteger("10", true)).toThrow("no implicit conversion of true into Integer");
+    expect(() => kernelInteger("10", {})).toThrow("no implicit conversion of Object into Integer");
+    expect(kernelInteger("1f", { toInt: () => 16 })).toBe(31);
+    expect(() => kernelInteger("10", { toInt: () => "x" })).toThrow(
+      "can't convert Object to Integer (Object#to_int gives String)",
     );
   });
 

@@ -15,10 +15,9 @@ const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
  * converted through `to_int`, then `to_str`, then `to_i`.
  *
  * The base itself arrives through `NUM2INT` (`rb_f_integer`,
- * `vendor/ruby/object.c:3355-3358`), so a fractional base truncates and a
- * non-finite or out-of-`int` one is a `RangeError` before any parsing. Ruby's
- * String and `nil` arms of `NUM2INT` are unreachable here — the parameter's
- * type is what rules them out.
+ * `vendor/ruby/object.c:3355-3358`), so it is converted before any parsing: a
+ * fractional base truncates, a non-finite or out-of-`int` one is a
+ * `RangeError`, and one that is not Integer-convertible is a `TypeError`.
  *
  * `rb_int_parse_cstr` (`vendor/ruby/bignum.c:4045`) is why the String arm is a
  * grammar rather than a `Number.parseInt`: it strips surrounding whitespace,
@@ -32,9 +31,9 @@ const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
  * (`vendor/ruby/object.c:3355`), which Rails calls without defining, so there
  * is no Ruby file in any gem for the port to mirror.
  */
-export function kernelInteger(val: unknown, base = 0): number {
-  base = rbNum2Int(base);
-  if (base !== 0) {
+export function kernelInteger(val: unknown, base: unknown = 0): number {
+  const radix = rbNum2Int(base);
+  if (radix !== 0) {
     const tmp = rbCheckStringType(val);
     if (tmp !== null) val = tmp;
     else throw new ArgumentError("base specified for non string value");
@@ -44,7 +43,7 @@ export function kernelInteger(val: unknown, base = 0): number {
     return Math.trunc(val);
   }
   if (typeof val === "bigint") return Number(val);
-  if (typeof val === "string") return rbStrConvertToInum(val, base);
+  if (typeof val === "string") return rbStrConvertToInum(val, radix);
   if (val === null || val === undefined) {
     throw new TypeError("can't convert nil into Integer");
   }
@@ -52,16 +51,37 @@ export function kernelInteger(val: unknown, base = 0): number {
   const tmp = rbCheckToInt(val);
   if (tmp !== null) return tmp;
   const str = rbCheckStringType(val);
-  if (str !== null) return rbStrConvertToInum(str, base);
+  if (str !== null) return rbStrConvertToInum(str, radix);
   return rbToInteger(val);
 }
 
-function rbNum2Int(num: number): number {
-  if (Number.isNaN(num)) throw new RangeError("float NaN out of range of integer");
-  if (!Number.isFinite(num)) {
-    throw new RangeError(`float ${num > 0 ? "Inf" : "-Inf"} out of range of integer`);
+function rbNum2Int(val: unknown): number {
+  if (typeof val === "number") {
+    if (Number.isNaN(val)) throw new RangeError("float NaN out of range of integer");
+    if (!Number.isFinite(val)) {
+      throw new RangeError(`float ${val > 0 ? "Inf" : "-Inf"} out of range of integer`);
+    }
+    return checkIntRange(Math.trunc(val));
   }
-  const int = Math.trunc(num);
+  if (typeof val === "bigint") return checkIntRange(Number(val));
+  if (val === null || val === undefined) {
+    throw new TypeError("no implicit conversion from nil to integer");
+  }
+  const klass = rbBuiltinClassName(val);
+  const toInt = (val as { toInt?: unknown }).toInt;
+  if (typeof toInt !== "function") {
+    throw new TypeError(`no implicit conversion of ${klass} into Integer`);
+  }
+  const tmp = (toInt as () => unknown).call(val);
+  if (typeof tmp !== "number" || !Number.isInteger(tmp)) {
+    throw new TypeError(
+      `can't convert ${klass} to Integer (${klass}#to_int gives ${rbBuiltinClassName(tmp)})`,
+    );
+  }
+  return checkIntRange(tmp);
+}
+
+function checkIntRange(int: number): number {
   if (int > 2147483647) throw new RangeError(`integer ${int} too big to convert to \`int'`);
   if (int < -2147483648) throw new RangeError(`integer ${int} too small to convert to \`int'`);
   return int;
