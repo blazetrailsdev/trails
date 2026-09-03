@@ -14,6 +14,8 @@
  * No third-party deps; `Buffer` is a runtime global, not a `node:*` import.
  */
 
+import { Hash } from "@blazetrails/ruby-compat";
+
 export class MessagePackError extends Error {}
 
 /** @internal A plain hash (literal or null-prototype) vs. a tagged class instance. */
@@ -96,6 +98,9 @@ export class Packer {
     // class-based lookup, where Hash is native and Object (127) is the catch-all.
     if (typeof value === "object" && isPlainObject(value)) {
       return this.writeMap(value as Record<string, unknown>);
+    }
+    if (value instanceof Hash && value.constructor === Hash) {
+      return this.writeMap(value as Hash<string, unknown>);
     }
     const registered = this.factory.typeFor(value);
     if (registered) return this.writeExt(registered, value);
@@ -181,8 +186,8 @@ export class Packer {
   }
 
   /** @internal */
-  private writeMap(obj: Record<string, unknown>): void {
-    const entries = Object.entries(obj);
+  private writeMap(obj: Record<string, unknown> | Hash<string, unknown>): void {
+    const entries = obj instanceof Hash ? [...obj] : Object.entries(obj);
     const len = entries.length;
     if (len < 16) this.out.push(0x80 | len);
     else if (len < 0x10000) this.pushSized(0xde, len, 2);

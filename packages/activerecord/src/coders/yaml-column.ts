@@ -1,4 +1,5 @@
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
+import { Hash } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../ar-config.js";
 import { ColumnSerializer } from "./column-serializer.js";
 
@@ -33,6 +34,10 @@ class SafeCoder {
     seen.add(value);
     if (Array.isArray(value)) {
       for (const element of value) this.assertDumpable(element, seen);
+      return;
+    }
+    if (value instanceof Hash) {
+      for (const element of value.values() as unknown[]) this.assertDumpable(element, seen);
       return;
     }
     const proto = Object.getPrototypeOf(value);

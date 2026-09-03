@@ -16,7 +16,6 @@
 import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
-import { deepStringifyKeys } from "../hash-utils.js";
 import { Temporal } from "@blazetrails/date";
 import { Rational, rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
@@ -203,8 +202,7 @@ export const Extensions = {
       klass: "ActiveSupport::HashWithIndifferentAccess",
       recursive: true,
       match: (v) => v instanceof HashWithIndifferentAccess,
-      packer: (v, packer) =>
-        packer.write(deepStringifyKeys((v as HashWithIndifferentAccess).toHash())),
+      packer: (v, packer) => packer.write((v as HashWithIndifferentAccess).toH()),
       unpacker: (unpacker) =>
         new HashWithIndifferentAccess((unpacker as Unpacker).read() as Record<string, unknown>),
     });
