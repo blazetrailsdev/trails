@@ -54,7 +54,12 @@ function rbCheckStringType(val: unknown): string | null {
   const toStr = (val as { toStr?: unknown } | null | undefined)?.toStr;
   if (typeof toStr !== "function") return null;
   const tmp = (toStr as () => unknown).call(val);
-  return typeof tmp === "string" ? tmp : null;
+  if (typeof tmp === "string") return tmp;
+  if (tmp === null || tmp === undefined) return null;
+  const klass = rbBuiltinClassName(val);
+  throw new TypeError(
+    `can't convert ${klass} to String (${klass}#to_str gives ${rbBuiltinClassName(tmp)})`,
+  );
 }
 
 /**

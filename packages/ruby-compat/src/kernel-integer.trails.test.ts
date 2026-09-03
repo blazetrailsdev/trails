@@ -108,6 +108,20 @@ describe("kernelInteger", () => {
     expect(kernelInteger({ toInt: () => 3.5, toI: () => 9 })).toBe(9);
   });
 
+  it("raises the conversion mismatch when to_str answers a non-String", () => {
+    expect(() => kernelInteger({ toStr: () => 1 })).toThrow(
+      "can't convert Object to String (Object#to_str gives Integer)",
+    );
+    expect(() => kernelInteger({ toStr: () => 1, toI: () => 5 })).toThrow(
+      "can't convert Object to String (Object#to_str gives Integer)",
+    );
+    expect(() => kernelInteger({ toStr: () => 1 }, 10)).toThrow(
+      "can't convert Object to String (Object#to_str gives Integer)",
+    );
+    expect(kernelInteger({ toStr: () => null, toI: () => 5 })).toBe(5);
+    expect(kernelInteger({ toInt: () => 1, toStr: () => 2 })).toBe(1);
+  });
+
   it("raises TypeError naming the conversion when to_i answers a non-Integer", () => {
     expect(() => kernelInteger({ toI: () => "q" })).toThrow(
       "can't convert Object to Integer (Object#to_i gives String)",

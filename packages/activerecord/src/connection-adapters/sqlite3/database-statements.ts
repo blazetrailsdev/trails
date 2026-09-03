@@ -32,6 +32,7 @@ export function isWriteQuery(sql: string): boolean {
   return !READ_QUERY.test(stripSqlComments(sql));
 }
 
+/** @missingRailsArgs internal_exec_query — CONVERGEABLE sqlite3-explain-passes-empty-binds */
 export async function explain(
   this: ExplainHost,
   arel: string,
