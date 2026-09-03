@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { ActiveRecordError, StatementInvalid } from "../errors.js";
-import { ActiveRecord } from "../ar-config.js";
+import { Base } from "../base.js";
 import { Transaction } from "../transaction.js";
 import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
@@ -189,16 +189,16 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
 
     it("matches by string matcher on message", () => {
       const a = new AbstractAdapter();
-      ActiveRecord.dbWarningsIgnore = ["deprecated"];
+      Base.dbWarningsIgnore = ["deprecated"];
       expect(a.isWarningIgnored({ message: "this feature is deprecated" })).toBe(true);
-      ActiveRecord.dbWarningsIgnore = [];
+      Base.dbWarningsIgnore = [];
     });
 
     it("matches by RegExp on message", () => {
       const a = new AbstractAdapter();
-      ActiveRecord.dbWarningsIgnore = [/W\d+/];
+      Base.dbWarningsIgnore = [/W\d+/];
       expect(a.isWarningIgnored({ message: "ok", code: "W001" })).toBe(true);
-      ActiveRecord.dbWarningsIgnore = [];
+      Base.dbWarningsIgnore = [];
     });
   });
 

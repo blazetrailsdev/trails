@@ -28,6 +28,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
+import { migrationProxy } from "./test-helpers/migration-proxy.js";
 
 function withMigrationConnection(adapter: DatabaseAdapter): void {
   const spy = vi.spyOn(DatabaseTasks, "migrationConnection").mockReturnValue(adapter);
@@ -52,11 +53,11 @@ function makeMigration(
   upFn?: () => Promise<void>,
   downFn?: () => Promise<void>,
 ): MigrationProxy {
-  return {
+  return migrationProxy({
     version,
     name,
     migration: () => anonymousMigration(name, version, upFn, downFn),
-  };
+  });
 }
 
 fixtures({}, { useTransactionalTests: false });
@@ -603,11 +604,11 @@ describe("Migrator drives migrations through Migration#migrate", () => {
     const migrator = new Migrator(
       "up",
       [
-        {
+        migrationProxy({
           version: 1,
           name: "CreateWidgets",
           migration: () => new SomeOtherClassName("CreateWidgets", 1),
-        },
+        }),
       ],
       schemaMigration,
       internalMetadata,
@@ -627,7 +628,7 @@ describe("Migrator drives migrations through Migration#migrate", () => {
     }
     const migrator = new Migrator(
       "up",
-      [{ version: 1, name: "Shouty", migration: () => new Shouty("Shouty", 1) }],
+      [migrationProxy({ version: 1, name: "Shouty", migration: () => new Shouty("Shouty", 1) })],
       schemaMigration,
       internalMetadata,
     );

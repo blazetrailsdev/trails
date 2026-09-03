@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { MigrationProxy } from "./deprecator.js";
-import { Migration } from "./migration.js";
+import { NameError } from "@blazetrails/activesupport";
+import { Migration, MigrationProxy } from "./migration.js";
 
 class CreateUsers extends Migration {
   async up(): Promise<void> {}
@@ -30,22 +30,6 @@ describe("MigrationProxy", () => {
     expect(proxy.basename()).toBe("20240101000000_create_users.ts");
   });
 
-  it("disableDdlTransaction throws before migration() is awaited", () => {
-    const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
-    expect(() => proxy.disableDdlTransaction).toThrow(
-      "MigrationProxy: await migration() before reading disableDdlTransaction",
-    );
-  });
-
-  it("loadMigrationAsync falls through to import() on ERR_REQUIRE_ESM", async () => {
-    const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
-    const esmError = Object.assign(new Error("ERR_REQUIRE_ESM"), { code: "ERR_REQUIRE_ESM" });
-    vi.spyOn(proxy, "loadMigration").mockImplementation(() => {
-      throw esmError;
-    });
-    await expect(proxy.loadMigrationAsync()).rejects.toThrow();
-  });
-
   it("delegates migrate, announce, write, and disableDdlTransaction to the loaded migration", async () => {
     class NoTransaction extends Migration {
       async up(): Promise<void> {}
@@ -56,7 +40,7 @@ describe("MigrationProxy", () => {
     const announce = vi.spyOn(migration, "announce").mockImplementation(() => {});
     const write = vi.spyOn(migration, "write").mockImplementation(() => {});
     const proxy = new MigrationProxy("NoTransaction", 1, "/fake/path.ts", "");
-    vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(migration);
+    vi.spyOn(proxy, "loadMigration").mockResolvedValue(migration);
 
     await proxy.migrate("up");
     await proxy.announce("hello");
@@ -65,13 +49,13 @@ describe("MigrationProxy", () => {
     expect(migrate).toHaveBeenCalledWith("up");
     expect(announce).toHaveBeenCalledWith("hello");
     expect(write).toHaveBeenCalledWith("text");
-    expect(proxy.disableDdlTransaction).toBe(true);
+    await expect(proxy.disableDdlTransaction()).resolves.toBe(true);
   });
 
   it("migration() caches the result of loadMigration()", async () => {
     const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
     const sentinel = new CreateUsers("CreateUsers", 1);
-    const spy = vi.spyOn(proxy, "loadMigrationAsync").mockResolvedValue(sentinel);
+    const spy = vi.spyOn(proxy, "loadMigration").mockResolvedValue(sentinel);
 
     const first = await proxy.migration();
     const second = await proxy.migration();
@@ -79,5 +63,26 @@ describe("MigrationProxy", () => {
     expect(first).toBe(sentinel);
     expect(second).toBe(sentinel);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadMigration raises NameError when the file has no export named after the migration", async () => {
+    const filename = new URL(
+      "./test-helpers/migrations/valid/1_valid_people_have_last_names.ts",
+      import.meta.url,
+    ).pathname;
+    const proxy = new MigrationProxy("NoSuchMigration", 1, filename, "");
+    await expect(proxy.loadMigration()).rejects.toThrow(NameError);
+    await expect(proxy.loadMigration()).rejects.toThrow("uninitialized constant NoSuchMigration");
+  });
+
+  it("loadMigration instantiates the export named after the migration", async () => {
+    const filename = new URL(
+      "./test-helpers/migrations/valid/1_valid_people_have_last_names.ts",
+      import.meta.url,
+    ).pathname;
+    const proxy = new MigrationProxy("ValidPeopleHaveLastNames", 1, filename, "");
+    const migration = await proxy.loadMigration();
+    expect(migration.name).toBe("ValidPeopleHaveLastNames");
+    expect(migration.version).toBe(1);
   });
 });
