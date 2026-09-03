@@ -46,7 +46,9 @@ export interface RenderOptions {
   inline?: string;
   body?: string;
   plain?: string;
-  html?: string;
+  /** Rails: `Template::HTML.new(options[:html], ...)` does `string.to_s`
+   * (`template/html.rb:10`), so any object — an html_safe buffer included. */
+  html?: unknown;
   file?: string;
   renderable?: { renderIn(context: ViewContext): string };
   layout?:

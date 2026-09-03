@@ -3,17 +3,18 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Trailtie, type ActionControllerConfig } from "./action-controller.js";
 import { Deprecators } from "@blazetrails/activesupport";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-import { ActionController } from "@blazetrails/actionpack";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
 
 let deprecators: Deprecators;
-let app: { deprecators: Deprecators };
+let app: { deprecators: Deprecators; routes(): RouteSet };
 
 describe("ActionController::Trailtie", () => {
   let savedConfig: ActionControllerConfig;
 
   beforeEach(() => {
     deprecators = new Deprecators();
-    app = { deprecators };
+    const routes = new RouteSet();
+    app = { deprecators, routes: () => routes };
     savedConfig = structuredClone(
       Trailtie.config.get("actionController") as ActionControllerConfig,
     );

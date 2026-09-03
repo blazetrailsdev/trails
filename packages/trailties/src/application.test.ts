@@ -9,6 +9,7 @@ import {
   onLoad,
   Reloader,
   resetLoadHooks,
+  runLoadHooks,
   setTrailsRoot,
   trailsRoot,
 } from "@blazetrails/activesupport";
@@ -37,6 +38,7 @@ import {
   SSL,
   Static,
   Session,
+  ActionController,
 } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { Collection } from "./initializable.js";
@@ -412,6 +414,33 @@ describe("Trails.application integration (boot-app fixture)", () => {
     });
     expect(nestedStatus).toBe(200);
     expect(JSON.parse(await bodyToString(nestedBody))).toEqual({ scope: "admin" });
+  });
+
+  it("assigns the drawn route set to the controller's _routes", async () => {
+    const { BootApp } = await import("./__fixtures__/boot-app/config/application.js");
+    class BootAppRoutes extends BootApp {}
+    Application.register(BootAppRoutes);
+    // The file-wide `resetLoadHooks()` drops the `:action_controller` hook
+    // fired at import, so replay it or the `on_load` block never runs.
+    runLoadHooks("action_controller", ActionController.Base);
+    const app = Trails.application!;
+    app.config.setRoot(new URL("./__fixtures__/boot-app", import.meta.url).pathname);
+
+    await Trails.initialize();
+
+    // `action_controller.set_configs` (`action_controller/railtie.rb:69-71`)
+    // includes `app.routes.url_helpers`, whose `included` block is
+    // `redefine_singleton_method(:_routes) { routes }` (`route_set.rb:610-612`);
+    // `build_view_context_class` (`action_view/rendering.rb:61-64`) then reads
+    // it, so a template calls a named route helper as a bare identifier.
+    expect(ActionController.Base._routes).toBe(app.routes());
+    const [status, , body] = await app.app()({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/posts/show",
+      HTTP_ACCEPT: "*/*",
+    });
+    expect(status).toBe(200);
+    expect(await bodyToString(body)).toContain('<a href="/posts">All posts</a>');
   });
 
   it("renders the dev error page through DebugExceptions rather than an ad-hoc catch", async () => {

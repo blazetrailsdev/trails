@@ -9,6 +9,8 @@
 // `harvestObjectLiteralMethods` ignores accessors on object literals, but
 // the class extractor walks `ts.isGetAccessorDeclaration` for static
 // members. `Trails` is never instantiated.
+import "./trailties/active-support.js";
+import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
 import { trailsLogger, _setTrailsLogger } from "@blazetrails/activesupport";

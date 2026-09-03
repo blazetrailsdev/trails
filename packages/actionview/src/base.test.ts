@@ -1,11 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { DelegationError, InheritableOptions } from "@blazetrails/activesupport";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { DelegationError, InheritableOptions, htmlSafe } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { LookupContext } from "./lookup-context.js";
 import { OutputBuffer } from "./buffers.js";
 import { TemplateHandlers } from "./template/handlers.js";
 import { Tse } from "./template/handlers/tse.js";
 import { Template } from "./template.js";
+import { FixtureResolver } from "./testing/resolvers.js";
 
 /** Compile and run a `.tse` source through `Template#render`, as Rails does. */
 const renderTse = (source: string, locals: Record<string, unknown>, view: Base): string =>
@@ -316,5 +317,88 @@ describe("ActionView::Base attr_internal readers", () => {
     } finally {
       TemplateHandlers.clear();
     }
+  });
+});
+
+describe("ActionView::Base#render", () => {
+  beforeEach(() => {
+    TemplateHandlers.registerTemplateHandler("tse", new Tse());
+  });
+  afterEach(() => {
+    TemplateHandlers.clear();
+  });
+
+  const buildView = (): Base => {
+    const resolver = new FixtureResolver({
+      "test/hello_world.html.tse": "Hello world!",
+      "test/_partial_only.html.tse": "only partial",
+      "test/_layout.html.tse": "<div><%= yield %></div>",
+      "test/hello_world.json.tse": '{"hello":"world"}',
+    });
+    const lookupContext = new LookupContext(null, {}, []);
+    lookupContext.addResolver(resolver);
+    return new (Base.withEmptyTemplateCache())(lookupContext, {}, null);
+  };
+
+  it("renders a template through the template: option", () => {
+    expect(buildView().render({ template: "test/hello_world" }).toString()).toBe("Hello world!");
+  });
+
+  it("renders a partial through the partial: option", () => {
+    expect(buildView().render({ partial: "test/partial_only" }).toString()).toBe("only partial");
+  });
+
+  it("treats a non-Hash options as a partial name", () => {
+    expect(buildView().render("test/partial_only").toString()).toBe("only partial");
+  });
+
+  it("renders the layout: option around the block's content", () => {
+    const view = buildView();
+    expect(view.render({ layout: "test/layout" }, {}, () => "inside").toString()).toBe(
+      "<div>inside</div>",
+    );
+  });
+
+  it("renders the plain:, html:, body: and renderable: options", () => {
+    const view = buildView();
+    expect(view.render({ body: "b" }).toString()).toBe("b");
+    expect(view.render({ plain: "p" }).toString()).toBe("p");
+    // `render html:` escapes an unsafe string and passes an html_safe one
+    // through (`template/html.rb:20-22`, `render_html_test.rb:168-178`).
+    expect(view.render({ html: "<p>hello world</p>" }).toString()).toBe(
+      "&lt;p&gt;hello world&lt;/p&gt;",
+    );
+    expect(view.render({ html: htmlSafe("<p>hello world</p>") }).toString()).toBe(
+      "<p>hello world</p>",
+    );
+    expect(view.render({ renderable: { renderIn: () => "r" } }).toString()).toBe("r");
+  });
+
+  it("raises when given none of the render options", () => {
+    expect(() => buildView().render({})).toThrow(
+      "You invoked render but did not give any of :body, :file, :html, :inline, " +
+        ":partial, :plain, :renderable, or :template option.",
+    );
+  });
+
+  it("renders through the formats-prepended lookup context in_rendering_context built", () => {
+    expect(
+      buildView()
+        .render({ template: "test/hello_world", formats: ["json"] })
+        .toString(),
+    ).toBe('{"hello":"world"}');
+  });
+
+  it("says so, rather than that no option was given, for file: and inline:", () => {
+    expect(() => buildView().render({ file: "/tmp/x.html" })).toThrow(
+      "render file: is not available on the synchronous view path",
+    );
+  });
+
+  it("restores the lookup context after in_rendering_context prepends formats", () => {
+    const view = buildView();
+    const before = view.lookupContext;
+    view.render({ template: "test/hello_world", formats: ["html"] });
+    expect(view.lookupContext).toBe(before);
   });
 });

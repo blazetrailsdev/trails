@@ -4,6 +4,9 @@
 // `commands/server.ts` imports and `Application#initialize` walks.
 import { Application } from "../../../application.js";
 
+// Load the framework trailties this application uses.
+import "../../../all.js";
+
 export class BootApp extends Application {}
 
 Application.register(BootApp);

@@ -1,3 +1,5 @@
+import "./active-model.js";
+import "./action-controller.js";
 import { onLoad, type Deprecators } from "@blazetrails/activesupport";
 import {
   ActiveRecord,

@@ -750,6 +750,40 @@ export class LookupContext {
   }
 
   /**
+   * Render a template synchronously, for a `render template:` inside a
+   * compiled template — the sibling of {@link renderPartialSync}, over
+   * `find_template` rather than `find_partial`.
+   *
+   * @noRailsEquivalent PERMANENT — trails' render path is asynchronous by
+   * design where Rails' is synchronous, so the synchronous entry point a
+   * compiled template needs has no Rails counterpart and will not converge.
+   */
+  renderTemplateSync(
+    name: string,
+    prefix: string,
+    format: string,
+    locals: Record<string, unknown> = {},
+    view?: Base,
+  ): string {
+    const slash = name.lastIndexOf("/");
+    const templatePrefix = slash === -1 ? prefix : name.slice(0, slash);
+    const templateName = slash === -1 ? name : name.slice(slash + 1);
+
+    const template = this.findTemplate(templateName, templatePrefix, format);
+    if (!template) {
+      throw new MissingTemplate(
+        templatePrefix,
+        templateName,
+        format,
+        this.resolverNames(),
+        this.allCandidatePaths(),
+      );
+    }
+
+    return template.render(view ?? this.buildViewContext(), locals);
+  }
+
+  /**
    * The view a template renders against when no controller supplied one — a
    * bare `DetailsKey.view_context_class` (`lookup_context.rb:90-94`). A
    * controller-driven render passes its own `view_context`

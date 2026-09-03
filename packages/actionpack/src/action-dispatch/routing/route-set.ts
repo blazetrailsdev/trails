@@ -51,6 +51,7 @@ import { RoutesProxy, type ScriptNamer } from "./routes-proxy.js";
 import { Request as AdRequest } from "../http/request.js";
 import { NameError } from "@blazetrails/activesupport";
 import { normalizePath } from "../journey/router/utils.js";
+import { URL, type UrlOptions } from "../http/url.js";
 import { Routes as JourneyRoutes } from "../journey/routes.js";
 import type { Formatter as JourneyFormatter } from "../journey/formatter.js";
 
@@ -231,14 +232,279 @@ export class MountedHelpers {}
  * `polymorphic_url` / etc. calls in the Rails source map onto methods on
  * an exported class — making them visible to `parity:api`.
  */
+/**
+ * Rails: `NamedRouteCollection::UrlHelper` (`route_set.rb:189-318`). `create`
+ * answers an `OptimizedUrlHelper` for a route Rails takes the fast path on
+ * (`:194-201`); that subclass is unported, and the two produce the same string.
+ *
+ * @missingRailsCall optimize_helper? — CONVERGEABLE port-optimized-url-helper-and-rails-shape-url-for
+ */
+class UrlHelper {
+  /** Rails: `attr_reader :route_name`. */
+  readonly routeName: string;
+  /** @internal Rails: `@options`. */
+  private readonly options: Record<string, unknown>;
+  /** @internal Rails: `@segment_keys`. */
+  private readonly segmentKeys: readonly string[];
+
+  static create(route: Route, options: Record<string, unknown>, routeName: string): UrlHelper {
+    return new UrlHelper(route, options, routeName);
+  }
+
+  constructor(route: Route, options: Record<string, unknown>, routeName: string) {
+    this.options = options;
+    this.segmentKeys = [...new Set(route.pathParamNames)];
+    this.routeName = routeName;
+  }
+
+  /**
+   * Rails: `def call(t, method_name, args, inner_options, url_strategy)`
+   * (`route_set.rb:280-290`), ending in
+   * `t._routes.url_for(hash, route_name, url_strategy, method_name)`.
+   * {@link RouteSet.urlFor} still carries its pre-Rails positional signature,
+   * so the path comes from {@link RouteSet.generate} — the port of the private
+   * `generate` Rails' `url_for` calls — and reaches the strategy as `path`,
+   * the shape `OptimizedUrlHelper#call` (`:215-224`) builds too.
+   *
+   * @missingRailsCall url_for — CONVERGEABLE port-optimized-url-helper-and-rails-shape-url-for
+   */
+  call(
+    t: UrlHelperContext,
+    methodName: string,
+    args: unknown[],
+    innerOptions: Record<string, unknown> | undefined,
+    urlStrategy: UrlStrategy,
+  ): string {
+    const controllerOptions = t.urlOptions?.() ?? {};
+    const options: Record<string, unknown> = { ...controllerOptions, ...this.options };
+    const hash = this.handlePositionalArgs(controllerOptions, innerOptions ?? {}, args, options, [
+      ...this.segmentKeys,
+    ]);
+    hash["path"] = t._routes.generate(this.routeName, hash, {}, methodName);
+    return urlStrategy(hash as UrlOptions);
+  }
+
+  /** Rails: `def handle_positional_args(...)` (`route_set.rb:292-317`). */
+  handlePositionalArgs(
+    controllerOptions: Record<string, unknown>,
+    innerOptions: Record<string, unknown>,
+    args: unknown[],
+    result: Record<string, unknown>,
+    pathParams: string[],
+  ): Record<string, unknown> {
+    if (args.length > 0) {
+      const pathParamsSize = pathParams.includes("format")
+        ? pathParams.length - 1
+        : pathParams.length;
+
+      if (args.length < pathParamsSize) {
+        // Rails `:301-303` also subtracts `(result[:path_params] || {})
+        // .merge(result).keys`, so a segment already supplied that way does
+        // not take a positional argument either.
+        const supplied = {
+          ...((result["path_params"] as Record<string, unknown> | undefined) ?? {}),
+          ...result,
+        };
+        pathParams = pathParams.filter(
+          (k) => !Object.hasOwn(controllerOptions, k) && !Object.hasOwn(supplied, k),
+        );
+      }
+      for (const key of Object.keys(innerOptions)) {
+        const at = pathParams.indexOf(key);
+        if (at !== -1) pathParams.splice(at, 1);
+      }
+
+      args.forEach((arg, index) => {
+        const param = pathParams[index];
+        if (param) result[param] = arg;
+      });
+    }
+
+    return Object.assign(result, innerOptions);
+  }
+}
+
+/** Rails: the `PATH` / `UNKNOWN` lambdas (`route_set.rb:351-352`). */
+type UrlStrategy = (options: UrlOptions) => string;
+
+/** Rails: `PATH = ->(options) { ActionDispatch::Http::URL.path_for(options) }`. */
+const PATH: UrlStrategy = (options) => URL.pathFor(options);
+
+/** Rails: `UNKNOWN = ->(options) { ActionDispatch::Http::URL.url_for(options) }`. */
+const UNKNOWN: UrlStrategy = (options) => URL.urlFor(options);
+
+/**
+ * The `self` a generated helper runs against — Rails' `t`. Its `_routes` is
+ * the RouteSet, which is what both `UrlHelpersModule#_routes` and a wired
+ * controller answer (`route_set.rb:592`, `:617`).
+ */
+export interface UrlHelperContext {
+  _routes: RouteSet;
+  urlOptions?(): Record<string, unknown>;
+}
+
+/** One generated `name_path` / `name_url` method. */
+export type NamedRouteHelper = (this: UrlHelperContext, ...args: unknown[]) => string;
+
+/**
+ * Rails: `RouteSet::NamedRouteCollection` (`route_set.rb:60-348`) — the named
+ * routes plus the two modules holding their generated `name_path` /
+ * `name_url` helpers, which `generate_url_helpers` includes (`:594-609`).
+ * Ruby's `#{name}_path` is `${name}Path` here, so `posts` answers `postsPath`.
+ */
+export class NamedRouteCollection {
+  /** @internal Rails: `@routes`. */
+  private readonly _routes: Map<string, Route> = new Map();
+  /** Rails: `attr_reader :path_helpers_module`. */
+  readonly pathHelpersModule: Record<string, NamedRouteHelper> = {};
+  /** Rails: `attr_reader :url_helpers_module`. */
+  readonly urlHelpersModule: Record<string, NamedRouteHelper> = {};
+  /** @internal Rails: `@path_helpers`. */
+  private readonly pathHelpers: Set<string> = new Set();
+  /** @internal Rails: `@url_helpers`. */
+  private readonly urlHelpers: Set<string> = new Set();
+
+  /** Rails: `alias :routes :@routes` — the name → Route table. */
+  get routes(): ReadonlyMap<string, Route> {
+    return this._routes;
+  }
+
+  /**
+   * Rails: `def route_defined?(name)` (`route_set.rb:96-99`) — `name` is the
+   * already-suffixed helper selector its caller passes
+   * (`testing/assertions/routing.rb:266`), not the bare route name.
+   */
+  routeDefinedQ(name: string): boolean {
+    return this.pathHelpers.has(name) || this.urlHelpers.has(name);
+  }
+
+  /** Rails: `def helper_names` (`route_set.rb:101-103`). */
+  helperNames(): string[] {
+    return [...this.pathHelpers, ...this.urlHelpers];
+  }
+
+  /** Rails: `def clear!` (`route_set.rb:105-117`). */
+  clearBang(): void {
+    for (const helper of this.pathHelpers) delete this.pathHelpersModule[helper];
+    for (const helper of this.urlHelpers) delete this.urlHelpersModule[helper];
+
+    this._routes.clear();
+    this.pathHelpers.clear();
+    this.urlHelpers.clear();
+  }
+
+  /** Rails: `def add(name, route)` (`route_set.rb:119-136`). */
+  add(name: string, route: Route): void {
+    const pathName = `${name}Path`;
+    const urlName = `${name}Url`;
+
+    if (this._routes.has(name)) {
+      delete this.pathHelpersModule[pathName];
+      delete this.urlHelpersModule[urlName];
+    }
+    this._routes.set(name, route);
+
+    const helper = UrlHelper.create(route, route.defaults, name);
+    this.defineUrlHelper(this.pathHelpersModule, pathName, helper, PATH);
+    this.defineUrlHelper(this.urlHelpersModule, urlName, helper, UNKNOWN);
+
+    this.pathHelpers.add(pathName);
+    this.urlHelpers.add(urlName);
+  }
+
+  /** Rails: `def get(name)` (`route_set.rb:138-140`). */
+  get(name: string): Route | undefined {
+    return this._routes.get(name);
+  }
+
+  /** Rails: `def key?(name)` (`route_set.rb:142-145`). */
+  keyQ(name: string | null | undefined): boolean {
+    if (name == null) return false;
+    return this._routes.has(name);
+  }
+
+  /** Rails: `def names` (`route_set.rb:157-159`). */
+  names(): string[] {
+    return [...this._routes.keys()];
+  }
+
+  /** Rails: `def length` (`route_set.rb:161-163`). */
+  length(): number {
+    return this._routes.size;
+  }
+
+  /**
+   * Rails: `def add_url_helper(name, defaults, &block)` (`route_set.rb:165-187`)
+   * — defines `name_path` / `name_url` for `direct`, `resolve` and
+   * `polymorphic`.
+   */
+  addUrlHelper(
+    name: string,
+    defaults: Record<string, unknown>,
+    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
+  ): this {
+    const helper = new CustomUrlHelper(name, defaults, block);
+    const pathName = `${name}Path`;
+    const urlName = `${name}Url`;
+
+    this.pathHelpersModule[pathName] = function (this: UrlHelperContext, ...args): string {
+      return helper.call(this as unknown as PolymorphicHost, args, true);
+    };
+
+    this.urlHelpersModule[urlName] = function (this: UrlHelperContext, ...args): string {
+      return helper.call(this as unknown as PolymorphicHost, args, false);
+    };
+
+    this.pathHelpers.add(pathName);
+    this.urlHelpers.add(urlName);
+
+    return this;
+  }
+
+  /**
+   * Rails: `private def define_url_helper(mod, name, helper, url_strategy)`
+   * (`route_set.rb:335-347`).
+   */
+  private defineUrlHelper(
+    mod: Record<string, NamedRouteHelper>,
+    name: string,
+    helper: UrlHelper,
+    urlStrategy: UrlStrategy,
+  ): void {
+    mod[name] = function (this: UrlHelperContext, ...args: unknown[]): string {
+      const last = args[args.length - 1];
+      const options =
+        (last as object | null)?.constructor === Object
+          ? (args.pop() as Record<string, unknown>)
+          : undefined;
+      return helper.call(this, name, args, options, urlStrategy);
+    };
+  }
+}
+
 export class UrlHelpersModule {
   /** @internal Rails: `@_proxy = proxy_class.new(routes)`. */
   private readonly _proxy: RoutesProxy;
   /** @internal Whether `path` helpers are mixed in. */
   readonly _supportsPath: boolean;
+  /**
+   * Rails: the singleton `def _routes; @_proxy._routes; end` (`route_set.rb:592`)
+   * and the instance `define_method(:_routes) { @_routes || routes }` (`:617`)
+   * answer the same object — `proxy_class#initialize` assigns
+   * `@_routes = routes` (`:553-556`). Declared here, defined in the
+   * constructor: Ruby's `define_method` closes over `routes`, so the method an
+   * includer copies still answers it, which a receiver-reading getter would
+   * not once a trails `include` has copied it onto a view context.
+   */
+  declare readonly _routes: RouteSet;
 
   constructor(routes: RouteSet, supportsPath: boolean) {
     this._supportsPath = supportsPath;
+    Object.defineProperty(this, "_routes", {
+      get: () => routes,
+      enumerable: true,
+      configurable: true,
+    });
     // Rails' proxy_class does `include UrlFor`; `_routes` on the proxy
     // points at the RouteSet's own `_routes` adapter (the one whose
     // `urlFor` has the Rails-shape `(options, routeName?)` signature).
@@ -266,6 +532,14 @@ export class UrlHelpersModule {
     // the prototype and are non-enumerable, so re-publish each as a bound
     // own property here. The prototype methods remain (so `parity:api`
     // extracts them); the own copies make them mountable.
+    // Rails: `extend`/`include url_helpers`, and the `supports_path` pair for
+    // `path_helpers_module` (`route_set.rb:594-609`). A trails `include`
+    // copies own enumerable properties, so they are published as own ones.
+    Object.assign(this, routes.namedRoutes.urlHelpersModule);
+    if (supportsPath) {
+      Object.assign(this, routes.namedRoutes.pathHelpersModule);
+    }
+
     for (const name of [
       "urlFor",
       "fullUrlFor",
@@ -337,9 +611,6 @@ export class UrlHelpersModule {
   polymorphicMapping(record: unknown): PolymorphicMappingEntry | undefined {
     return polymorphicMappingFn(this._proxy as unknown as PolymorphicHost, record);
   }
-  get _routes(): UrlForRoutes {
-    return this._proxy._routes;
-  }
   /** Rails singleton: `def url_options; {}; end`. */
   urlOptions(): Record<string, unknown> {
     return {};
@@ -348,7 +619,8 @@ export class UrlHelpersModule {
 
 export class RouteSet {
   private routes: Route[] = [];
-  private namedRoutes: Map<string, Route> = new Map();
+  /** Rails: `attr_accessor :named_routes` — `NamedRouteCollection.new` (`route_set.rb:389`). */
+  namedRoutes: NamedRouteCollection = new NamedRouteCollection();
   /** @internal Rails: `@config`. */
   private _config: RouteSetConfig;
   /** Rails: `attr_accessor :disable_clear_and_finalize`. */
@@ -389,13 +661,6 @@ export class RouteSet {
   private readonly _append: Array<(mapper: Mapper) => void> = [];
   private readonly _prepend: Array<(mapper: Mapper) => void> = [];
   private _finalized = false;
-  /**
-   * @internal Helpers registered via {@link addUrlHelper}. Rails dispatches
-   * these through NamedRouteCollection, which isn't ported yet. Renamed
-   * from `urlHelpers` so the Rails-shape `urlHelpers(supportsPath)` method
-   * can take that name.
-   */
-  readonly _customUrlHelpers: Map<string, CustomUrlHelper> = new Map();
   /**
    * Registry consulted by `polymorphicUrl` / `polymorphicPath` before falling
    * back to the standard RESTful helper. In Rails this is populated by the
@@ -680,11 +945,10 @@ export class RouteSet {
   clearBang(): void {
     this._finalized = false;
     this.routes = [];
-    this.namedRoutes.clear();
+    this.namedRoutes.clearBang();
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
-    this._customUrlHelpers.clear();
     this._urlHelpersWithPaths = undefined;
     this._urlHelpersWithoutPaths = undefined;
     this._defaultEnv = undefined;
@@ -720,7 +984,11 @@ export class RouteSet {
       throw new Error(`Invalid route name: '${name}'`);
     }
     this.routes.push(mapping);
-    if (name) this.namedRoutes.set(name, mapping);
+    if (name) this.namedRoutes.add(name, mapping);
+    // Rails' helper modules are live, so a route drawn after `url_helpers` was
+    // memoized still answers. A trails `include` copies, so the memo is dropped.
+    this._urlHelpersWithPaths = undefined;
+    this._urlHelpersWithoutPaths = undefined;
     this._journeyRouter = null;
     return mapping;
   }
@@ -733,21 +1001,6 @@ export class RouteSet {
   ): void {
     const key = typeof klass === "string" ? klass : klass.name;
     this.polymorphicMappings.set(key, new CustomUrlHelper(key, options, block));
-  }
-
-  /**
-   * Rails: `NamedRouteCollection#add_url_helper(name, defaults, &block)`.
-   * Stored in {@link _customUrlHelpers} (a private map) until
-   * NamedRouteCollection lands; once ported, these will be folded into
-   * the generated url-helpers module so `${name}Path` / `${name}Url`
-   * become callable on `urlHelpers()`.
-   */
-  addUrlHelper(
-    name: string,
-    options: Record<string, unknown>,
-    block: (this: PolymorphicHost, ...args: unknown[]) => Record<string, unknown> | string,
-  ): void {
-    this._customUrlHelpers.set(name, new CustomUrlHelper(name, options, block));
   }
 
   /** Rails: `extra_keys(options, recall = {})`. */
@@ -1054,11 +1307,10 @@ export class RouteSet {
   clear(): void {
     this._finalized = false;
     this.routes = [];
-    this.namedRoutes.clear();
+    this.namedRoutes.clearBang();
     this.set.clear();
     this.formatter.clear();
     this.polymorphicMappings.clear();
-    this._customUrlHelpers.clear();
     this._urlHelpersWithPaths = undefined;
     this._urlHelpersWithoutPaths = undefined;
     this._defaultEnv = undefined;
@@ -1069,7 +1321,7 @@ export class RouteSet {
    * Return all named routes as a map of name -> Route.
    */
   getNamedRoutes(): ReadonlyMap<string, Route> {
-    return this.namedRoutes;
+    return this.namedRoutes.routes;
   }
 
   /**

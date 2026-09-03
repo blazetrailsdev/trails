@@ -62,6 +62,9 @@ Trails.application.loadServer();
 exports[`AppGenerator > snapshots emitted TypeScript sources > config/application.ts 1`] = `
 "import { Application } from "@blazetrails/trailties";
 
+// Load the framework trailties this application uses.
+import "@blazetrails/trailties/all";
+
 export class MyApp extends Application {
   static {
     // Initialize configuration defaults for originally generated trails version.

@@ -26,7 +26,7 @@ describe("AbstractController::UrlFor", () => {
       // names plus the bare action names that an app might also expose
       // as routes (e.g. `show` here).
       const routes: RouteSetLike = {
-        namedRoutes: { helperNames: ["posts_url", "post_path", "show"] },
+        namedRoutes: { helperNames: () => ["posts_url", "post_path", "show"] },
       };
       expect(actionMethods(["show", "index", "edit"], routes)).toEqual(["index", "edit"]);
     });
@@ -42,7 +42,7 @@ describe("AbstractController::UrlFor", () => {
       // defaultEnv is part of RouteSetLike (consumed by the renderer),
       // but actionMethods shouldn't care about it.
       const routes: RouteSetLike = {
-        namedRoutes: { helperNames: ["posts_path", "show"] },
+        namedRoutes: { helperNames: () => ["posts_path", "show"] },
         defaultEnv: { HTTP_HOST: "example.com" },
       };
       expect(actionMethods(["show", "index"], routes)).toEqual(["index"]);

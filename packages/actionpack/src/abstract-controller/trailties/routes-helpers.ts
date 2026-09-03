@@ -47,6 +47,8 @@ export interface UrlHelpersRouteSet {
  */
 export interface RoutesHelpersClassMethods extends HelpersClassMethods {
   trailtieRoutesUrlHelpers?(includePathHelpers?: boolean): HelperMethodsModule;
+  /** Rails: the url-helpers module's singleton `_routes` (`route_set.rb:610-612`). */
+  _routes?: unknown;
 }
 
 /**
@@ -56,6 +58,15 @@ export interface RoutesHelpersClassMethods extends HelpersClassMethods {
  *
  *     const wire = withRoutesHelpers(routes);
  *     wire(PostsController);
+ *
+ * The url-helpers module's `included` block is
+ * `redefine_singleton_method(:_routes) { routes }`
+ * (`action_dispatch/routing/route_set.rb:610-612`), so including it is what
+ * gives the class its `_routes` — which `build_view_context_class`
+ * (`action_view/rendering.rb:61-64`) then reads to mix the same helpers into
+ * the view context. A trails `include` copies methods, so that half runs here,
+ * on both arms: the block is the module's own, so a namespace module
+ * (`routes_helpers.rb:14-15`) sets the routes that produced it.
  */
 export function withRoutesHelpers(
   routes: UrlHelpersRouteSet,
@@ -77,6 +88,11 @@ export function withRoutesHelpers(
       const fn = (mod as Record<string, unknown>)[name];
       if (typeof fn === "function") proto[name] = fn;
     }
+    // Rails runs the `included do redefine_singleton_method(:_routes) { routes } end`
+    // block on both arms — each module closes over the routes that produced
+    // it, so a namespace module sets its own. Read it back off the module
+    // rather than assuming the RouteSet passed here.
+    cls._routes = (mod as { _routes?: unknown })._routes ?? routes;
   };
 }
 

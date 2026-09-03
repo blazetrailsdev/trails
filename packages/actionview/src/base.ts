@@ -16,6 +16,8 @@ import { OutputFlow } from "./flows.js";
 import * as Helpers from "./helpers/index.js";
 import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
+import type { RenderOptions } from "./renderer/abstract-renderer.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 /**
  * The compiled form of one template: the function `Template#compile!` defines
@@ -181,7 +183,7 @@ export class Base {
   }
 
   /** `attr_reader :lookup_context` (base.rb:217). */
-  readonly lookupContext: LookupContext | null;
+  lookupContext: LookupContext | null;
 
   /** `delegate :formats, to: :lookup_context` (base.rb:221). */
   get formats(): LookupContext["formats"] | undefined {
@@ -361,35 +363,135 @@ export class Base {
 
   /**
    * Mirrors `Helpers::RenderingHelper#render(options, locals, &block)`
-   * (`actionview/lib/action_view/helpers/rendering_helper.rb:31`), which
-   * hands the view itself to the renderer: `view_renderer.render(self, options)`.
+   * (`helpers/rendering_helper.rb:138-153`) — the dispatch on the shape of
+   * `options`: a Hash goes to the renderer, with a block the `:layout` wraps
+   * it as a partial, and anything else is a bare partial name.
    *
    * trails' `Renderer#render` is async by design where Rails' is synchronous,
-   * and a compiled template method is synchronous, so this reaches the lookup
-   * context's synchronous partial path instead.
+   * so each arm reaches the lookup context's synchronous entry points, and
+   * `render_to_object`'s `options.key?(:partial)` branch
+   * (`renderer/renderer.rb:27-33`) is inlined for want of a sync `Renderer`.
+   * The block is Rails' layout content, reached from the layout through
+   * `yield`; trails publishes it on `viewFlow`, where `_layout_for` reads it
+   * (`context.rb:27-30`).
    *
    * @missingRailsCall view_renderer.render — PERMANENT
+   * @missingRailsCall view_renderer.render_partial — PERMANENT
    */
   render(
-    options: { partial: string; locals?: Record<string, unknown> },
+    options: RenderOptions | string = {},
     locals: Record<string, unknown> = {},
+    block?: () => unknown,
   ): SafeBuffer {
     const lookupContext = this.lookupContext;
     if (!lookupContext) {
       throw new Error(
-        `Cannot render partial ${JSON.stringify(options.partial)} — this view has no ` +
+        `Cannot render ${JSON.stringify(options)} — this view has no ` +
           "lookup context. Render through LookupContext so nested partials resolve.",
       );
     }
-    return htmlSafe(
-      lookupContext.renderPartialSync(
-        options.partial,
-        this.virtualPathPrefix(),
-        this.currentFormat(),
-        { ...locals, ...(options.locals ?? {}) },
-        this,
-      ),
-    );
+    const prefix = this.virtualPathPrefix();
+    const viewFormat = this.currentFormat();
+
+    if ((options as object | null)?.constructor !== Object) {
+      return htmlSafe(
+        lookupContext.renderPartialSync(String(options), prefix, viewFormat, { ...locals }, this),
+      );
+    }
+
+    const hash = options as RenderOptions;
+    return this.inRenderingContext(hash, (renderer) => {
+      // Rails resolves through the yielded context's own details, so
+      // `formats:` changes what `find_template` answers
+      // (`renderer/template_renderer.rb:36-50`); the sync entry points take the
+      // format explicitly, so it is read back off that context.
+      const format = hash.formats ? String([...renderer.formats][0] ?? viewFormat) : viewFormat;
+      if (block) {
+        this.viewFlow.set("layout", String(block() ?? ""));
+        return htmlSafe(
+          renderer.renderPartialSync(
+            String(hash.layout),
+            prefix,
+            format,
+            { ...(hash.locals ?? {}) },
+            this,
+          ),
+        );
+      }
+      if (Object.hasOwn(hash, "partial")) {
+        return htmlSafe(
+          renderer.renderPartialSync(
+            String(hash.partial),
+            prefix,
+            format,
+            { ...(hash.locals ?? {}) },
+            this,
+          ),
+        );
+      }
+      // Rails: `TemplateRenderer#determine_template`
+      // (`renderer/template_renderer.rb:16-52`) — a branch per option, in this
+      // order, raising only when none of them is given.
+      if (Object.hasOwn(hash, "body")) return htmlSafe(String(hash.body ?? ""));
+      if (Object.hasOwn(hash, "plain")) return htmlSafe(String(hash.plain ?? ""));
+      // `Template::HTML#to_str` is `ERB::Util.h(@string)` (`template/html.rb:20-22`),
+      // so an unsafe string is escaped and an html_safe one passes through.
+      if (Object.hasOwn(hash, "html")) return htmlEscape(hash.html ?? "");
+      if (Object.hasOwn(hash, "file") || Object.hasOwn(hash, "inline")) {
+        // `Template::RawFile` reads the file and `Template::Inline` compiles
+        // through a handler; both are built by the asynchronous `Renderer`
+        // this path cannot reach. Say so rather than claiming no option was
+        // given, which is what `determine_template`'s ArgumentError means.
+        throw new Error(
+          `render ${Object.hasOwn(hash, "file") ? "file:" : "inline:"} is not available on the ` +
+            "synchronous view path; render it through the controller.",
+        );
+      }
+      if (Object.hasOwn(hash, "renderable")) {
+        const renderable = hash.renderable as { renderIn(context: unknown): string };
+        return htmlSafe(renderable.renderIn(this));
+      }
+      if (Object.hasOwn(hash, "template")) {
+        return htmlSafe(
+          renderer.renderTemplateSync(
+            String(hash.template),
+            prefix,
+            format,
+            { ...(hash.locals ?? {}) },
+            this,
+          ),
+        );
+      }
+      throw new ArgumentError(
+        "You invoked render but did not give any of :body, :file, :html, :inline, " +
+          ":partial, :plain, :renderable, or :template option.",
+      );
+    });
+  }
+
+  /**
+   * Mirrors `Base#in_rendering_context(options)` (`base.rb:292-309`). Rails
+   * yields `@view_renderer`, rebuilt from the prepended-formats lookup
+   * context; trails' arms render through that context, so it is yielded.
+   *
+   * @missingRailsCall new — PERMANENT
+   */
+  inRenderingContext<T>(options: RenderOptions, block: (renderer: LookupContext) => T): T {
+    const oldLookupContext = this.lookupContext;
+
+    if (!this.lookupContext?.htmlFallbackForJs && options.formats) {
+      const formats = Array.isArray(options.formats) ? [...options.formats] : [options.formats];
+      if (formats.length === 1 && formats[0] === "js") {
+        formats.push("html");
+      }
+      this.lookupContext = this.lookupContext!.withPrependedFormats(formats);
+    }
+
+    try {
+      return block(this.lookupContext!);
+    } finally {
+      this.lookupContext = oldLookupContext;
+    }
   }
 
   /** @internal */

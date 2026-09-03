@@ -451,6 +451,9 @@ process.exit(status ?? 1);
       "config/application.ts",
       `import { Application } from "@blazetrails/trailties";
 
+// Load the framework trailties this application uses.
+import "@blazetrails/trailties/all";
+
 export class ${this.appConstBase()} extends Application {
   static {
     // Initialize configuration defaults for originally generated trails version.
