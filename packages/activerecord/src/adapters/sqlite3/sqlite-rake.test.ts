@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import * as activesupport from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import { stdout, stderr } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -154,8 +154,8 @@ describeIfSqlite("SqliteDBDropTest", () => {
   it("checks db dir is absolute", async () => {
     const pathAdapter = getPath() as { isAbsolute(p: string): boolean };
     const isAbsolute = vi.spyOn(pathAdapter, "isAbsolute").mockReturnValue(false);
-    vi.spyOn(getFs(), "rm").mockImplementation(() => undefined);
-    vi.spyOn(getFs(), "rmF").mockImplementation(() => undefined);
+    vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
+    vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 
@@ -163,8 +163,8 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("removes file with absolute path", async () => {
-    const rm = vi.spyOn(getFs(), "rm").mockImplementation(() => undefined);
-    const rmF = vi.spyOn(getFs(), "rmF").mockImplementation(() => undefined);
+    const rm = vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
+    const rmF = vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configurationRoot);
 
@@ -174,8 +174,8 @@ describeIfSqlite("SqliteDBDropTest", () => {
 
   it("generates absolute path with given root", async () => {
     const join = vi.spyOn(getPath(), "join");
-    vi.spyOn(getFs(), "rm").mockImplementation(() => undefined);
-    vi.spyOn(getFs(), "rmF").mockImplementation(() => undefined);
+    vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
+    vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 
@@ -184,8 +184,8 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("removes file with relative path", async () => {
-    const rm = vi.spyOn(getFs(), "rm").mockImplementation(() => undefined);
-    const rmF = vi.spyOn(getFs(), "rmF").mockImplementation(() => undefined);
+    const rm = vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
+    const rmF = vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 
@@ -194,8 +194,8 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("when db dropped successfully outputs info to stdout", async () => {
-    vi.spyOn(getFs(), "rm").mockImplementation(() => undefined);
-    vi.spyOn(getFs(), "rmF").mockImplementation(() => undefined);
+    vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
+    vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 

@@ -1,4 +1,4 @@
-import { getFs, getPath, type FsStatResult } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs, getPath, type FsStatResult } from "@blazetrails/ruby-compat";
 import { Tempfile } from "../../tempfile.js";
 
 /**
@@ -86,6 +86,6 @@ export function probeStatIn(dir: string): FsStatResult | null {
     fileName = null;
     return null;
   } finally {
-    if (fileName) getFs().rmF(fileName);
+    if (fileName) FileUtils.rmF(fileName);
   }
 }

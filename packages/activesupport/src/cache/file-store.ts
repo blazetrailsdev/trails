@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store.js";
@@ -97,9 +97,7 @@ export class FileStore extends Store implements CacheStore {
       const rootDirs = getFs()
         .readdirSync(this.cachePath)
         .filter((f) => !GITKEEP_FILES.includes(f));
-      for (const f of rootDirs) {
-        getFs().rmSync(getPath().join(this.cachePath, f), { recursive: true, force: true });
-      }
+      FileUtils.rmR(rootDirs.map((f) => getPath().join(this.cachePath, f)));
     } catch {}
   }
 
@@ -323,7 +321,7 @@ export class FileStore extends Store implements CacheStore {
 
   // Make sure a file path's directories exist (file_store.rb:200-202).
   protected ensureCachePath(path: string): void {
-    if (!getFs().existsSync(path)) getFs().mkdirSync(path, { recursive: true });
+    if (!getFs().existsSync(path)) FileUtils.makedirs(path);
   }
 
   // Mirrors Rails FileStore#search_dir (file_store.rb:204-214): depth-first walk

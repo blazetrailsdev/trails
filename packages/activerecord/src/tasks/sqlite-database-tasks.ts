@@ -1,5 +1,5 @@
 import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
-import { getFs, getFsAsync, getPath } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs, getFsAsync, getPath } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
@@ -36,8 +36,8 @@ export class SQLiteDatabaseTasks {
     const file =
       !path.isAbsolute || path.isAbsolute(dbPath) ? dbPath : path.join(this.root, dbPath);
     try {
-      fs.rm(file);
-      fs.rmF([`${file}-shm`, `${file}-wal`]);
+      FileUtils.rm(file);
+      FileUtils.rmF([`${file}-shm`, `${file}-wal`]);
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         throw new NoDatabaseError((error as Error).message);

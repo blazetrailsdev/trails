@@ -5,7 +5,7 @@ import {
   Tempfile,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
-import { getFs } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
@@ -199,7 +199,7 @@ export class PostgreSQLDatabaseTasks {
     } finally {
       tempfile.close();
     }
-    fs.copyFileSync(tempfile.path!, filename);
+    FileUtils.cp(tempfile.path!, filename);
     tempfile.unlink();
   }
 

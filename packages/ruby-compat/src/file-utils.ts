@@ -1,0 +1,286 @@
+import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
+
+/** `File.directory?` (`vendor/ruby/file.c:1866`). */
+function directoryQ(path: string): boolean {
+  try {
+    return getFs().statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** `Entry_#exist?` / `#directory?` (`vendor/ruby/lib/fileutils.rb:2109,2129`). */
+function statOrNull(path: string): FsStatResult | null {
+  try {
+    return getFs().statSync(path);
+  } catch {
+    return null;
+  }
+}
+
+/** `remove_trailing_slash` (`vendor/ruby/lib/fileutils.rb:276-278`). */
+function removeTrailingSlash(dir: string): string {
+  return dir === "/" ? dir : dir.endsWith("/") ? dir.slice(0, -1) : dir;
+}
+
+/** `fu_list` (`vendor/ruby/lib/fileutils.rb:2461-2463`). */
+function fuList(arg: string | string[]): string[] {
+  return Array.isArray(arg) ? [...arg] : [arg];
+}
+
+/** `fu_mkdir` (`vendor/ruby/lib/fileutils.rb:396-404`). */
+function fuMkdir(path: string, mode: number | undefined): void {
+  path = removeTrailingSlash(path);
+  if (mode != null) {
+    getFs().mkdirSync(path);
+    getFs().chmodSync?.(path, mode);
+  } else {
+    getFs().mkdirSync(path);
+  }
+}
+
+/** `fu_same?` (`vendor/ruby/lib/fileutils.rb:2491-2493`) — `File.identical?`. */
+function fuSame(a: string, b: string): boolean {
+  const realpathSync = getFs().realpathSync;
+  if (!realpathSync) return a === b;
+  try {
+    return realpathSync(a) === realpathSync(b);
+  } catch {
+    return false;
+  }
+}
+
+/** `fu_each_src_dest0` (`vendor/ruby/lib/fileutils.rb:2474-2489`). */
+function fuEachSrcDest0(
+  src: string | string[],
+  dest: string,
+  yieldFn: (s: string, d: string) => void,
+  targetDirectory = true,
+): void {
+  if (Array.isArray(src)) {
+    for (const s of src) {
+      yieldFn(s, targetDirectory ? getPath().join(dest, getPath().basename(s)) : dest);
+    }
+  } else {
+    if (targetDirectory && directoryQ(dest)) {
+      yieldFn(src, getPath().join(dest, getPath().basename(src)));
+    } else {
+      yieldFn(src, dest);
+    }
+  }
+}
+
+/** `fu_each_src_dest` (`vendor/ruby/lib/fileutils.rb:2466-2472`). */
+function fuEachSrcDest(
+  src: string | string[],
+  dest: string,
+  yieldFn: (s: string, d: string) => void,
+): void {
+  fuEachSrcDest0(src, dest, (s, d) => {
+    if (fuSame(s, d)) throw new Error(`same file: ${s} and ${d}`);
+    yieldFn(s, d);
+  });
+}
+
+/** `copy_file` (`vendor/ruby/lib/fileutils.rb:1076-1080`), whose `Entry_#copy_file`
+ * (`fileutils.rb:2277-2283`) copies the bytes and `copy_metadata`
+ * (`fileutils.rb:2285`) the mode. */
+function copyFile(src: string, dest: string, preserve = false): void {
+  getFs().copyFileSync(src, dest);
+  if (preserve) getFs().chmodSync?.(dest, getFs().statSync(src).mode ?? 0o644);
+}
+
+/**
+ * Ruby's `FileUtils` (stdlib, `vendor/ruby/lib/fileutils.rb:1`), the file
+ * operations Rails sends from ported bodies — `mkdir_p` when a schema dump or a
+ * cache root has to exist, `rm`/`rm_f`/`rm_r` when one is torn down, `cp`, `mv`
+ * and `touch`. Only the members Ruby code in this repo sends are ported.
+ *
+ * Every member runs against the filesystem backend `fs-adapter.ts` resolves, so
+ * `FileUtils` is synchronous exactly as Ruby's is, and a caller reads the same
+ * `FileUtils.mkdir_p(dir)` a Rails dev reads.
+ *
+ * The `verbose:` kwarg is accepted where Ruby accepts it — Rails passes
+ * `verbose: false` (`activerecord/lib/active_record/tasks/database_tasks.rb:509`)
+ * — but `fu_output_message` (`fileutils.rb:2496`) has no `$stdout` to write to
+ * here, so nothing is printed.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `FileUtils` ships with
+ * the interpreter, so no Rails file defines it and no port can remove the need
+ * for it while Rails bodies send `FileUtils.mkdir_p` and friends.
+ */
+export class FileUtils {
+  /** `FileUtils.mkdir_p` (`vendor/ruby/lib/fileutils.rb:365-388`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static mkdirP(
+    list: string | string[],
+    { mode, noop }: { mode?: number; noop?: boolean; verbose?: boolean } = {},
+  ): string[] {
+    list = fuList(list);
+    if (noop === true) return list;
+
+    for (const item of list) {
+      let path = removeTrailingSlash(item);
+
+      const stack: string[] = [];
+      while (!directoryQ(path) && getPath().dirname(path) !== path) {
+        stack.push(path);
+        path = getPath().dirname(path);
+      }
+      for (const dir of stack.reverse()) {
+        try {
+          fuMkdir(dir, mode);
+        } catch (error) {
+          if (!directoryQ(dir)) throw error;
+        }
+      }
+    }
+
+    return list;
+  }
+
+  /** `FileUtils.makedirs` (`vendor/ruby/lib/fileutils.rb:392-394`), an alias of `mkdir_p`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static makedirs = FileUtils.mkdirP;
+
+  /** `FileUtils.cp` (`vendor/ruby/lib/fileutils.rb:873-879`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static cp(
+    src: string | string[],
+    dest: string,
+    { preserve, noop }: { preserve?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): void {
+    if (noop === true) return;
+    fuEachSrcDest(src, dest, (s, d) => {
+      copyFile(s, d, preserve);
+    });
+  }
+
+  /** `FileUtils.mv` (`vendor/ruby/lib/fileutils.rb:1157-1183`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static mv(
+    src: string | string[],
+    dest: string,
+    { force, noop }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): void {
+    if (noop === true) return;
+    fuEachSrcDest(src, dest, (s, d) => {
+      try {
+        const destent = statOrNull(d);
+        if (destent) {
+          if (destent.isDirectory()) throw new Error(`File exists @ rb_file_s_rename - ${d}`);
+        }
+        try {
+          getFs().renameSync(s, d);
+        } catch (error) {
+          const code = (error as { code?: string }).code;
+          if (code !== "EXDEV" && code !== "EPERM") throw error;
+          copyFile(s, d, true);
+          FileUtils.removeEntry(s, force);
+        }
+      } catch (error) {
+        if (force !== true) throw error;
+      }
+    });
+  }
+
+  /** `FileUtils.rm` (`vendor/ruby/lib/fileutils.rb:1216-1225`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static rm(
+    list: string | string[],
+    { force, noop }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): void {
+    list = fuList(list);
+    if (noop === true) return;
+
+    for (const path of list) {
+      FileUtils.removeFile(path, force);
+    }
+  }
+
+  /** `FileUtils.rm_f` (`vendor/ruby/lib/fileutils.rb:1241-1243`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static rmF(
+    list: string | string[],
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): void {
+    FileUtils.rm(list, { force: true, noop, verbose });
+  }
+
+  /** `FileUtils.rm_r` (`vendor/ruby/lib/fileutils.rb:1299-1310`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static rmR(
+    list: string | string[],
+    { force, noop }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+  ): void {
+    list = fuList(list);
+    if (noop === true) return;
+    for (const path of list) {
+      FileUtils.removeEntry(path, force);
+    }
+  }
+
+  /** `FileUtils.remove_entry` (`vendor/ruby/lib/fileutils.rb:1449-1456`), whose
+   * postorder traversal the backend's recursive remove performs.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static removeEntry(path: string, force = false): void {
+    try {
+      getFs().rmSync(path, { recursive: true });
+    } catch (error) {
+      if (force !== true) throw error;
+    }
+  }
+
+  /** `FileUtils.remove_file` (`vendor/ruby/lib/fileutils.rb:1473-1477`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static removeFile(path: string, force = false): void {
+    try {
+      getFs().unlinkSync(path);
+    } catch (error) {
+      if (force !== true) throw error;
+    }
+  }
+
+  /** `FileUtils.touch` (`vendor/ruby/lib/fileutils.rb:2006-2026`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
+   * module function the interpreter defines and Rails bodies send.
+   */
+  static touch(
+    list: string | string[],
+    { noop }: { noop?: boolean; verbose?: boolean } = {},
+  ): void {
+    list = fuList(list);
+    if (noop === true) return;
+    for (const path of list) {
+      getFs().appendFileSync(path, "");
+    }
+  }
+}
