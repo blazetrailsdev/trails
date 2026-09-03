@@ -42,7 +42,7 @@ describe("FlashTest", () => {
 
   it("does not set the session if the flash is empty", () => {
     const flash = new FlashHash();
-    expect(flash.toSessionValue()).toEqual({});
+    expect(flash.toSessionValue()).toBeNull();
   });
 
   it("keep and discard return values", () => {

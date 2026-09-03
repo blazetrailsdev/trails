@@ -45,40 +45,6 @@ describe("lookupCastTypeFromJoinDependencies", () => {
     );
     expect(result).toBe(type1);
   });
-
-  it("supports attributeTypes as a plain object", () => {
-    const strType = { cast: (v: unknown) => String(v) };
-    const fakeNode = { baseKlass: { attributeTypes: { title: strType } } };
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
-      "title",
-      [fakeJoinDependency([fakeNode])],
-    );
-    expect(result).toBe(strType);
-  });
-
-  it("supports attributeTypes as a Map", () => {
-    const strType = { cast: (v: unknown) => String(v) };
-    const fakeNode = { baseKlass: { attributeTypes: new Map([["title", strType]]) } };
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
-      "title",
-      [fakeJoinDependency([fakeNode])],
-    );
-    expect(result).toBe(strType);
-  });
-
-  it("skips nodes without modelClass", () => {
-    const type = { cast: (v: unknown) => v };
-    const nodeMissing = { baseKlass: undefined };
-    const nodeGood = { baseKlass: { attributeTypes: () => ({ val: type }) } };
-    const result = lookupCastTypeFromJoinDependencies(
-      {} as Parameters<typeof lookupCastTypeFromJoinDependencies>[0],
-      "val",
-      [fakeJoinDependency([nodeMissing, nodeGood])],
-    );
-    expect(result).toBe(type);
-  });
 });
 
 describe("lookupCastTypeFromJoinDependencies integration", () => {

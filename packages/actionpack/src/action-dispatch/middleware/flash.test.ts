@@ -63,7 +63,7 @@ describe("Flash::RequestMethods", () => {
     expect(flashHash.call(host)).toBeNull();
   });
 
-  it("commitFlash writes flashesForSession into the session and replaces the cache with a dup", () => {
+  it("commitFlash writes toSessionValue into the session and replaces the cache with a dup", () => {
     const host = makeHost();
     const f = new FlashHash({ notice: "hi", drop: "x" });
     f.discard("drop");
@@ -79,7 +79,7 @@ describe("Flash::RequestMethods", () => {
 
   it("commitFlash deletes session['flash'] when the projected hash is empty", () => {
     const host = makeHost({ flash: { flashes: { gone: "x" } } });
-    // Mark gone for discard so flashesForSession returns {}
+    // Mark gone for discard so toSessionValue returns null
     const f = flash.call(host)!;
     f.discard("gone");
 

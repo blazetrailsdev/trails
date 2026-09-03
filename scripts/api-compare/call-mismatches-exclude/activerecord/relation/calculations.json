@@ -41,5 +41,12 @@
     "rubyName": "pluck",
     "call": "order:loaded,constructor",
     "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/calculations.ts",
+    "rubyName": "type_cast_pluck_values",
+    "call": "order:lookupCastTypeFromJoinDependencies,fetch",
+    "reason": "calculations.rb:617-621 — the call itself IS made now (`fetch(this.model.attributeTypes(), name, block(...))`); only the ORDER differs, because the Ruby extractor records a block-taking `send` after its block body while the TS one records the outer call before its argument. `lookup_cast_type_from_join_dependencies` lives inside the miss block in both languages, and hoisting it out would build the join dependencies eagerly on every hit."
   }
 ]
