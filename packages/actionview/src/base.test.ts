@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { DelegationError, InheritableOptions } from "@blazetrails/activesupport";
+import { DelegationError, InheritableOptions, htmlSafe } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
 import { LookupContext } from "./lookup-context.js";
 import { OutputBuffer } from "./buffers.js";
@@ -363,7 +363,14 @@ describe("ActionView::Base#render", () => {
     const view = buildView();
     expect(view.render({ body: "b" }).toString()).toBe("b");
     expect(view.render({ plain: "p" }).toString()).toBe("p");
-    expect(view.render({ html: "<b>h</b>" }).toString()).toBe("<b>h</b>");
+    // `render html:` escapes an unsafe string and passes an html_safe one
+    // through (`template/html.rb:20-22`, `render_html_test.rb:168-178`).
+    expect(view.render({ html: "<p>hello world</p>" }).toString()).toBe(
+      "&lt;p&gt;hello world&lt;/p&gt;",
+    );
+    expect(view.render({ html: htmlSafe("<p>hello world</p>") }).toString()).toBe(
+      "<p>hello world</p>",
+    );
     expect(view.render({ renderable: { renderIn: () => "r" } }).toString()).toBe("r");
   });
 

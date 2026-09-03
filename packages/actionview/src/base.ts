@@ -434,7 +434,9 @@ export class Base {
       // order, raising only when none of them is given.
       if (Object.hasOwn(hash, "body")) return htmlSafe(String(hash.body ?? ""));
       if (Object.hasOwn(hash, "plain")) return htmlSafe(String(hash.plain ?? ""));
-      if (Object.hasOwn(hash, "html")) return htmlSafe(String(hash.html ?? ""));
+      // `Template::HTML#to_str` is `ERB::Util.h(@string)` (`template/html.rb:20-22`),
+      // so an unsafe string is escaped and an html_safe one passes through.
+      if (Object.hasOwn(hash, "html")) return htmlEscape(hash.html ?? "");
       if (Object.hasOwn(hash, "file") || Object.hasOwn(hash, "inline")) {
         // `Template::RawFile` reads the file and `Template::Inline` compiles
         // through a handler; both are built by the asynchronous `Renderer`
