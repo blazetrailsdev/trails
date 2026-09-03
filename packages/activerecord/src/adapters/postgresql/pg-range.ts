@@ -2,7 +2,7 @@ import {
   findRangeSeparator,
   unquoteRangeBound,
 } from "../../connection-adapters/postgresql/oid/range.js";
-import { Range } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/ruby-compat";
 
 export type SubtypeCast = (value: string) => unknown;
 

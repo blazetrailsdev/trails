@@ -37,7 +37,7 @@ export class IndexedRow {
     for (const key of Object.keys(this.#columnIndexes)) block(key);
   }
 
-  hasKey(column: string): boolean {
+  isKey(column: string): boolean {
     return Object.prototype.hasOwnProperty.call(this.#columnIndexes, column);
   }
 

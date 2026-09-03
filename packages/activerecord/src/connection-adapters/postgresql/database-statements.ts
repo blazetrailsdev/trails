@@ -1,7 +1,6 @@
 import type pg from "pg";
 import { ArgumentError, type Type } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
-import { KeyError } from "@blazetrails/activesupport";
 import { ActiveRecord } from "../../ar-config.js";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
 import { Result } from "../../result.js";
@@ -13,7 +12,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty, KeyError } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 
 export const READ_QUERY =

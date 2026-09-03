@@ -2,11 +2,12 @@ import {
   ArgumentError as RubyArgumentError,
   isSymbol,
   kernelFloat,
+  Range,
 } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
-import { underscore, BigDecimal, Range, mergeBang, slice } from "@blazetrails/activesupport";
+import { underscore, BigDecimal, mergeBang, slice } from "@blazetrails/activesupport";
 import { COMPARE_CHECKS, compareOperator, errorOptions } from "./comparability.js";
 import type { CompareKey } from "./comparability.js";
 import { resolveValue } from "./resolve-value.js";

@@ -6,7 +6,6 @@ import { adapterType } from "./test-adapter.js";
 import { quoteColumnName } from "./support/quote-regex.js";
 import { association } from "./associations.js";
 import { connectedToStack } from "./core.js";
-import { Range as ArRange } from "@blazetrails/activesupport";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
@@ -28,6 +27,7 @@ import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
+import { Range as ArRange } from "@blazetrails/ruby-compat";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 

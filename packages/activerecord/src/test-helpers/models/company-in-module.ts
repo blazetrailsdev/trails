@@ -1,11 +1,11 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import { Range } from "@blazetrails/activesupport";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
 import type { Project } from "./project.js";
 import { registerModel } from "../../associations.js";
 import { registerModuleTableNamePrefix, registerModuleTableNameSuffix } from "../../inheritance.js";
 import { Base } from "../../base.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 registerModuleTableNamePrefix("MyApplication::Business::Prefixed", "prefixed_");
 registerModuleTableNameSuffix("MyApplication::Business::Suffixed", "_suffixed");

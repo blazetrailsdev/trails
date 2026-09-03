@@ -1,6 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { Range } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
+import { Range } from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {
   cast(value: unknown): unknown;

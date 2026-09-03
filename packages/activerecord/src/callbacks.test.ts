@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { Range, throwAbort } from "@blazetrails/activesupport";
+import { throwAbort } from "@blazetrails/activesupport";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 type HistoryEntry = [string, string];
 

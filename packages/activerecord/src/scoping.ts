@@ -10,20 +10,26 @@ export class Scoping {
 }
 
 export class ScopeRegistry {
-  private readonly _currentScopes: WeakMap<object, any> = new WeakMap();
-  private readonly _ignoreDefaultScope: WeakMap<object, any> = new WeakMap();
-  private readonly _globalCurrentScope: WeakMap<object, any> = new WeakMap();
+  private readonly _currentScope: WeakMap<object, any>;
+  private readonly _ignoreDefaultScope: WeakMap<object, any>;
+  private readonly _globalCurrentScope: WeakMap<object, any>;
+
+  constructor() {
+    this._currentScope = new WeakMap();
+    this._ignoreDefaultScope = new WeakMap();
+    this._globalCurrentScope = new WeakMap();
+  }
 
   static instance(): ScopeRegistry {
     return IsolatedExecutionState.fetch(SCOPE_REGISTRY_KEY, () => new ScopeRegistry());
   }
 
   currentScope(model: object, skipInheritedScope = false): any | null {
-    return valueFor(this._currentScopes, model, skipInheritedScope);
+    return valueFor(this._currentScope, model, skipInheritedScope);
   }
 
   setCurrentScope(model: object, value: any): void {
-    setValueFor(this._currentScopes, model, value);
+    setValueFor(this._currentScope, model, value);
   }
 
   ignoreDefaultScope(model: object, skipInheritedScope = false): any | null {

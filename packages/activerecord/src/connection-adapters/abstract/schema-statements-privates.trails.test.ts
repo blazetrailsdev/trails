@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import { KeyError } from "@blazetrails/activesupport";
 import { SchemaStatements, canRemoveIndexByName } from "./schema-statements.js";
 import {
   CheckConstraintDefinition,
@@ -14,6 +13,7 @@ import { NATIVE_DATABASE_TYPES_BY_ADAPTER } from "./native-database-types.js";
 import { NotImplementedError } from "../../errors.js";
 import { Result } from "../../result.js";
 import { Table, Visitors } from "@blazetrails/arel";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 function makeStatements(
   adapterOverrides: Record<string, unknown> = {},

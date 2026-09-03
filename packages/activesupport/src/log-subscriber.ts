@@ -3,7 +3,7 @@ import type { Event } from "./notifications/instrumenter.js";
 import type { Logger } from "./logger.js";
 import { trailsLogger } from "./trails-logger-slot.js";
 import { transformKeys } from "./hash-utils.js";
-import { publicInstanceMethods } from "./include.js";
+import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 
 /**
  * ActiveSupport::LogSubscriber — a Subscriber that dispatches events

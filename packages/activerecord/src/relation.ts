@@ -1,6 +1,6 @@
 import { Temporal } from "@blazetrails/date";
 import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
-import { except } from "@blazetrails/ruby-compat";
+import { except, Range } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/ruby-compat";
 import { first } from "./ruby-first.js";
 import { Table, SelectManager, Nodes, sql, star } from "@blazetrails/arel";
@@ -14,7 +14,7 @@ import type { SerializeOptions } from "@blazetrails/activemodel";
 
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
-import { wrap, any, compactBlank, groupBy, indexBy, Range } from "@blazetrails/activesupport";
+import { wrap, any, compactBlank, groupBy, indexBy } from "@blazetrails/activesupport";
 
 export { Range };
 import {

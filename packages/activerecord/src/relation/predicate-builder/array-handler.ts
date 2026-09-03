@@ -1,8 +1,8 @@
 import { Nodes } from "@blazetrails/arel";
-import { Range } from "@blazetrails/activesupport";
 import type { PredicateBuilder } from "../predicate-builder.js";
 
 import { isBaseInstance } from "./is-base-instance.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 export class NullPredicate {}
 

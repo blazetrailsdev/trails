@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { Range } from "@blazetrails/activesupport";
-
 import { Model } from "../index.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 describe("ValidatesTest (trails)", () => {
   it("parses a Range option into :in, as validates.rb:170 does", () => {

@@ -9,7 +9,7 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { defineCallbacks, runCallbacks, setCallback } from "./callbacks.js";
 import { CodeGenerator } from "./code-generator.js";
 import { objectWith } from "./core-ext/object/with.js";
-import { include, Module } from "./include.js";
+import { include, Module } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 const __FILE__ = import.meta.url;

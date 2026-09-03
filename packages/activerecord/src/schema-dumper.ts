@@ -780,6 +780,22 @@ export abstract class SchemaDumper {
    * @internal
    * @missingRailsCall any? — PERMANENT
    */
+  async indexes(table: string, stream: string[]): Promise<void> {
+    const indexes = await this._source.indexes(table);
+    if (indexes.length > 0) {
+      const addIndexStatements = indexes.map((index) => {
+        const tableName = JSON.stringify(this.removePrefixAndSuffix(index.table ?? table));
+        return `  addIndex(${[tableName, ...this.indexParts(index)].join(", ")});`;
+      });
+      stream.push(addIndexStatements.sort().join("\n"));
+      stream.push("");
+    }
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall any? — PERMANENT
+   */
   async indexesInCreate(table: string, stream: string[]): Promise<void> {
     let indexes = await this._source.indexes(table);
     if (indexes.length > 0) {

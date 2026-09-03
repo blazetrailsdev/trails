@@ -3,7 +3,7 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { Range, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { Errors } from "./errors.js";
 import { ModelName } from "./naming.js";
@@ -11,6 +11,7 @@ import { humanAttributeName } from "./translation.js";
 import { Validations } from "./validations.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 describe("ValidationsTest (trails)", () => {
   describe("presence", () => {

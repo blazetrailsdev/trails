@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { Duration, Range } from "@blazetrails/activesupport";
+import { Duration } from "@blazetrails/activesupport";
 import { Error as ModelError } from "./error.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 describe("Error option value equality", () => {
   const base = {} as never;

@@ -3,10 +3,10 @@ import { Temporal } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
 import { ActiveRecord } from "../../ar-config.js";
-import { Range as OidRange } from "@blazetrails/activesupport";
 import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
 import { Bit } from "../../connection-adapters/postgresql/oid/bit.js";
 import { IntegerType } from "@blazetrails/activemodel";
+import { Range as OidRange } from "@blazetrails/ruby-compat";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

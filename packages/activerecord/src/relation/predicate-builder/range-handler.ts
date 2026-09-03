@@ -1,8 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
 
 import type { PredicateBuilder } from "../predicate-builder.js";
-import { Range } from "@blazetrails/activesupport";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
 
 export class RangeHandler {
   private _predicateBuilder: PredicateBuilder;

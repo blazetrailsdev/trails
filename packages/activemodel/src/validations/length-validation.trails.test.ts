@@ -3,9 +3,10 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
-import { Range, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { Model, NoMethodError } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 class Person extends Model {
   declare static attribute: AttributesClassHalf["attribute"];

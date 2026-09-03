@@ -8,9 +8,9 @@ import {
   assertNotPredicate,
   BigDecimal,
   NumberHelper,
-  Range,
   include,
 } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/ruby-compat";
 import { Model } from "../index.js";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";

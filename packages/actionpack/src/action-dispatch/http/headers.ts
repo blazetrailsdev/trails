@@ -1,6 +1,6 @@
 import type { Request } from "./request.js";
 import { _RequestCtor } from "./request-slot.js";
-import { KeyError } from "@blazetrails/activesupport";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 /**
  * ActionDispatch::Http::Headers

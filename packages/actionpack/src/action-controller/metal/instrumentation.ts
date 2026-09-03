@@ -12,65 +12,6 @@ export interface Notifier {
   instrument(event: string, payload: Record<string, unknown>, block?: () => unknown): void;
 }
 
-export function instrumentAction(
-  controllerName: string,
-  actionName: string,
-  request: {
-    headers: unknown;
-    format?: { ref(): string };
-    requestMethod?: string;
-    filteredParameters(): Record<string, unknown>;
-    filteredPath(): string;
-  },
-  fn: () => Promise<unknown>,
-  notifier?: Notifier,
-): Promise<unknown> {
-  const start = now();
-  const rawPayload: Record<string, unknown> = {
-    controller: controllerName,
-    action: actionName,
-    request: request,
-    params: request.filteredParameters(),
-    headers: request.headers,
-    format: request.format?.ref(),
-    method: request.requestMethod,
-    path: request.filteredPath(),
-  };
-
-  notifier?.instrument("start_processing.action_controller", { ...rawPayload });
-
-  return Promise.resolve()
-    .then(fn)
-    .then(
-      (result) => {
-        notifier?.instrument("process_action.action_controller", {
-          ...rawPayload,
-          status: deriveStatus(result, 200),
-          duration: now() - start,
-        });
-        return result;
-      },
-      (error) => {
-        notifier?.instrument("process_action.action_controller", {
-          ...rawPayload,
-          status: deriveStatus(error, 500),
-          exception: error instanceof Error ? [error.name, error.message] : String(error),
-          duration: now() - start,
-        });
-        throw error;
-      },
-    );
-}
-
-function deriveStatus(obj: unknown, fallback: number): number {
-  if (obj && typeof obj === "object") {
-    const any = obj as Record<string, unknown>;
-    if (typeof any.status === "number") return any.status;
-    if (typeof any.statusCode === "number") return any.statusCode;
-  }
-  return fallback;
-}
-
 export function instrumentRender(
   fn: () => unknown,
   notifier?: Notifier,

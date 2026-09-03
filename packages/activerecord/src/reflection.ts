@@ -45,6 +45,7 @@ import {
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
   CompositePrimaryKeyMismatchError,
+  type CompositePrimaryKeyMismatchReflection,
 } from "./associations/errors.js";
 import { polymorphicName, typeCondition } from "./inheritance.js";
 import { Relation } from "./relation.js";
@@ -127,7 +128,7 @@ export class AbstractReflection {
     return false;
   }
 
-  protected primaryKeyForModel(klass: typeof Base): string | string[] {
+  protected primaryKey(klass: typeof Base): string | string[] {
     const pk = klass.primaryKey;
     if (!pk) throw new UnknownPrimaryKey(klass);
     return pk;
@@ -863,7 +864,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   associationPrimaryKey(klass?: typeof Base): string | string[] {
-    return this.primaryKeyForModel(klass || this.klass);
+    return this.primaryKey(klass || this.klass);
   }
 
   get associationForeignKey(): string {
@@ -904,10 +905,10 @@ export class AssociationReflection extends MacroReflection {
       this._activeRecordPrimaryKeyCache =
         queryConstraintsList.call(this.activeRecord as any) ?? this.activeRecord.primaryKey;
     } else if ((this.activeRecord as any).compositePrimaryKey) {
-      const pk = this.primaryKeyForModel(this.activeRecord);
+      const pk = this.primaryKey(this.activeRecord);
       this._activeRecordPrimaryKeyCache = Array.isArray(pk) && pk.includes("id") ? "id" : pk;
     } else {
-      this._activeRecordPrimaryKeyCache = this.primaryKeyForModel(this.activeRecord);
+      this._activeRecordPrimaryKeyCache = this.primaryKey(this.activeRecord);
     }
 
     return this._activeRecordPrimaryKeyCache;
@@ -931,11 +932,15 @@ export class AssociationReflection extends MacroReflection {
       const fk = this.foreignKey;
       if (this.hasOne() || this.isCollection()) {
         if (arrayLen(this.activeRecordPrimaryKey) !== arrayLen(fk)) {
-          throw new CompositePrimaryKeyMismatchError(this);
+          throw new CompositePrimaryKeyMismatchError(
+            this as unknown as CompositePrimaryKeyMismatchReflection,
+          );
         }
       } else if (this.belongsTo()) {
         if (arrayLen(this.associationPrimaryKey()) !== arrayLen(fk)) {
-          throw new CompositePrimaryKeyMismatchError(this);
+          throw new CompositePrimaryKeyMismatchError(
+            this as unknown as CompositePrimaryKeyMismatchReflection,
+          );
         }
       }
     }
@@ -1173,7 +1178,7 @@ export class BelongsToReflection extends AssociationReflection {
       return primaryKey;
     }
 
-    return this.primaryKeyForModel(targetKlass);
+    return this.primaryKey(targetKlass);
   }
 
   joinPrimaryKey(klass?: typeof Base): string | string[] {
@@ -1409,7 +1414,7 @@ export class ThroughReflection extends AbstractReflection {
         ? rubyInspectArray(primaryKey)
         : String(primaryKey));
     } else {
-      return this.primaryKeyForModel(klass || this.klass);
+      return this.primaryKey(klass || this.klass);
     }
   }
 

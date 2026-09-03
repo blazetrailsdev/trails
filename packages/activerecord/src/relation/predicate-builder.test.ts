@@ -4,7 +4,6 @@ import { Table, Visitors, Nodes, Collectors } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { WhereClause } from "./where-clause.js";
 import { Substitute } from "../statement-cache.js";
-import { Range } from "@blazetrails/activesupport";
 import { TableMetadata } from "../table-metadata.js";
 import { Base, registerModel, modelRegistry } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -12,7 +11,7 @@ import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Author } from "../test-helpers/models/author.js";
 import { quoteTableName } from "../support/quote-regex.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
+import { regexpEscape, Range } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {

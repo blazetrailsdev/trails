@@ -11,7 +11,7 @@ import {
   type OnRotation,
   type RotatableOptions,
 } from "./messages/rotator.js";
-import { prepend } from "./prepend.js";
+import { prepend } from "@blazetrails/ruby-compat";
 import { Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export namespace NullSerializer {

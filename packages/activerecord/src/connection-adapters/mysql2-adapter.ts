@@ -1,5 +1,4 @@
 import mysql from "mysql2/promise";
-import { KeyError } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
@@ -45,6 +44,7 @@ import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-c
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { parseMysqlName as mysqlParseName } from "./mysql/schema-statements.js";
+import { KeyError } from "@blazetrails/ruby-compat";
 
 class Mysql2StatementPool extends MysqlStatementPool {
   private _conn: mysql.Connection | null;

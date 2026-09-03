@@ -10,7 +10,7 @@ import {
   type OnRotation,
   type RotatableOptions,
 } from "./messages/rotator.js";
-import { prepend } from "./prepend.js";
+import { prepend } from "@blazetrails/ruby-compat";
 import { ArgumentError, Thrown, type Format } from "./messages/serializer-with-fallback.js";
 
 export class InvalidSignature extends Error {
