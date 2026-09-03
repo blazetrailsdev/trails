@@ -654,7 +654,7 @@ export interface AbstractAdapter {
     options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
   /** @internal */
-  castResult?(rawResult: unknown): Result;
+  castResult(rawResult: unknown): Result;
   /** @internal */
   executeBatch(
     statements: string[],
@@ -671,6 +671,12 @@ export interface AbstractAdapter {
   ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
   beginTransaction(): Promise<void>;
+  currentTransaction(): Transaction | NullTransaction;
+  dirtyCurrentTransaction(): void;
+  withinNewTransaction<T>(
+    options: { isolation?: string | null; joinable?: boolean },
+    block: (tx?: unknown) => Promise<T> | T,
+  ): Promise<T>;
   commit(): Promise<void>;
   rollback(): Promise<void>;
   createSavepoint(name: string): Promise<void>;
@@ -1306,10 +1312,6 @@ export class AbstractAdapter implements Quoting {
     return this._transactionManager;
   }
 
-  currentTransaction(): Transaction | NullTransaction {
-    return this._transactionManager.currentTransaction;
-  }
-
   async rollbackTransaction(): Promise<void> {
     return this._transactionManager.rollbackTransaction();
   }
@@ -1330,23 +1332,12 @@ export class AbstractAdapter implements Quoting {
     return this._transactionManager.materializeTransactions();
   }
 
-  dirtyCurrentTransaction(): void {
-    this._transactionManager.dirtyCurrentTransaction();
-  }
-
   async disableLazyTransactionsBang(): Promise<void> {
     return this._transactionManager.disableLazyTransactionsBang();
   }
 
   enableLazyTransactionsBang(): void {
     this._transactionManager.enableLazyTransactionsBang();
-  }
-
-  async withinNewTransaction<T>(
-    opts: { isolation?: string | null; joinable?: boolean },
-    fn: (tx?: unknown) => Promise<T> | T,
-  ): Promise<T> {
-    return this._transactionManager.withinNewTransaction(opts, fn as any);
   }
 
   async transaction<T>(
