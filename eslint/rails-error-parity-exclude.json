@@ -125,6 +125,7 @@
   "packages/activesupport/src/core-ext/big-decimal/conversions.ts",
   "packages/activesupport/src/core-ext/object/try.ts",
   "packages/activesupport/src/core-ext/string/output-safety.ts",
+  "packages/ruby-compat/src/crypto-adapter.ts",
   "packages/activesupport/src/current-attributes.ts",
   "packages/activesupport/src/delegation.ts",
   "packages/activesupport/src/descendants-tracker.ts",
@@ -142,6 +143,7 @@
   "packages/activesupport/src/ordered-options.ts",
   "packages/activesupport/src/os-adapter.ts",
   "packages/activesupport/src/prepend.ts",
+  "packages/ruby-compat/src/process-adapter.ts",
   "packages/activesupport/src/string-utils.ts",
   "packages/activesupport/src/testing-helpers.ts",
   "packages/activesupport/src/time-ext.ts",
@@ -151,7 +153,5 @@
   "packages/activesupport/src/try.ts",
   "packages/activesupport/src/values/time-zone.ts",
   "packages/activesupport/src/xml-mini/nokogiri.ts",
-  "packages/activesupport/src/xml-mini/nokogirisax.ts",
-  "packages/ruby-compat/src/crypto-adapter.ts",
-  "packages/ruby-compat/src/process-adapter.ts"
+  "packages/activesupport/src/xml-mini/nokogirisax.ts"
 ]
