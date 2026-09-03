@@ -1610,7 +1610,12 @@ function rubyMethodToTsWithoutUnderscore(
 
   if (name.endsWith("=")) {
     const base = name.slice(0, -1);
-    const camel = snakeToCamel(base);
+    // A Ruby PREDICATE writer carries the `?` into the writer name —
+    // `Struct.new(:exclude_end?)` generates `exclude_end?=` alongside its
+    // `exclude_end?` reader. The `?` is not a legal TypeScript identifier
+    // character, so strip it before spelling the candidates; the reader half
+    // is already handled by the predicate rules below.
+    const camel = snakeToCamel(base.endsWith("?") ? base.slice(0, -1) : base);
     // Underscore-prefixed writers are `class_attribute` storage slots
     // (`_reflections=`), never blocking writers — `set_reflections` would only
     // be a nonsense candidate, so they keep the bare form alone.
@@ -1631,7 +1636,9 @@ function rubyMethodToTsWithoutUnderscore(
     // …and only when Ruby has no `set_#{base}` of its own: `content_type=`
     // sits next to a private `set_content_type` (actionpack
     // `http/response.rb:75-81`), whose port already owns `setContentType`.
-    if (siblingRubyNames?.has(base) && !siblingRubyNames.has(`set_${base}`)) return [setter, camel];
+    const readerBase = base.endsWith("?") ? base.slice(0, -1) : base;
+    if (siblingRubyNames?.has(base) && !siblingRubyNames.has(`set_${readerBase}`))
+      return [setter, camel];
     return [camel, setter];
   }
 
