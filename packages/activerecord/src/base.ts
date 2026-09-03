@@ -112,6 +112,7 @@ import {
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import * as ModelSchema from "./model-schema.js";
+import { ModelSchema as _ModelSchema } from "./model-schema.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import {
   createOrUpdate as callbacksCreateOrUpdate,
@@ -732,8 +733,6 @@ export class Base extends Model {
   static cacheVersioning = false;
   static cacheTimestampFormat: "usec" | "number" = "usec";
   static collectionCacheVersioning = false;
-  static _tableNamePrefix = "";
-  static _tableNameSuffix = "";
   static _protectedEnvironments: string[] = ["production"];
   static _lockingColumn: string = "lock_version";
 
@@ -815,21 +814,9 @@ export class Base extends Model {
     return Base;
   }
 
-  static get tableNamePrefix(): string {
-    return this._tableNamePrefix;
-  }
+  declare static tableNamePrefix: string;
 
-  static set tableNamePrefix(prefix: string) {
-    this._tableNamePrefix = prefix;
-  }
-
-  static get tableNameSuffix(): string {
-    return this._tableNameSuffix;
-  }
-
-  static set tableNameSuffix(suffix: string) {
-    this._tableNameSuffix = suffix;
-  }
+  declare static tableNameSuffix: string;
 
   static get tableName(): string {
     return ModelSchema.tableName.call(this);
@@ -3027,6 +3014,7 @@ include(Base, _BeforeTypeCast);
 include(Base, _Query);
 include(Base, _PrimaryKey);
 include(Base, _CompositePrimaryKey);
+include(Base, _ModelSchema);
 include(Base, _TimeZoneConversion);
 include(Base, AMDirty);
 include(Base, _Dirty);
@@ -3229,10 +3217,10 @@ _setSuperIsValid(Model.prototype.isValid);
 
 registerTableNameOptions({
   get tableNamePrefix() {
-    return Base._tableNamePrefix;
+    return Base.tableNamePrefix;
   },
   get tableNameSuffix() {
-    return Base._tableNameSuffix;
+    return Base.tableNameSuffix;
   },
   get pluralizeTableNames() {
     return Base.pluralizeTableNames;
@@ -3244,10 +3232,10 @@ registerTableNameOptions({
 
 registerMigrationArConfig({
   get tableNamePrefix() {
-    return Base._tableNamePrefix;
+    return Base.tableNamePrefix;
   },
   get tableNameSuffix() {
-    return Base._tableNameSuffix;
+    return Base.tableNameSuffix;
   },
   configurations: () => Base.configurations(),
   connectionHandler: () => Base.connectionHandler,

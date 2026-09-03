@@ -70,7 +70,9 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   async executeMutation(_sql: string, _binds?: unknown[], _name?: string): Promise<number> {
     return 0;
   }
-  async beginTransaction(): Promise<void> {}
+  async beginTransaction(): Promise<never> {
+    throw new Error("not used");
+  }
   async commit(): Promise<void> {}
   async rollback(): Promise<void> {}
   async createSavepoint(_name: string): Promise<void> {}

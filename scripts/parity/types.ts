@@ -173,6 +173,17 @@ export interface MethodInfo {
    */
   bodyless?: boolean;
   /**
+   * TS-side only: this bodyless object-literal member is a bare reference to
+   * ANOTHER function the same file declares — `buildHavingClause:
+   * buildWhereClause` (`relation/query-methods.ts:1890`), which is how TS
+   * spells Ruby's `alias :build_having_clause :build_where_clause`
+   * (`relation/query_methods.rb:1654`). Carries the referenced name. A Ruby
+   * entry with `notes: "alias"` has no body of its own to pair against, so the
+   * call-parity concern behind `bodyless` does not arise for it and compare.ts
+   * scores such a pair as ported rather than declaration-only.
+   */
+  aliasOf?: string;
+  /**
    * True when the method is not part of the public API surface:
    * Ruby `private`/`protected`, TS `private`/`protected`, or
    * TS `#`-prefixed private fields. Consumers should filter these

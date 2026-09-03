@@ -3262,6 +3262,46 @@ describe("declarationOnlyInFile", () => {
   it("does not report a name the file never declares", () => {
     expect(declarationOnlyInFile("crud.ts", "nope", bodyless, bodied)).toBe(false);
   });
+
+  // `alias :build_having_clause :build_where_clause`
+  // (relation/query_methods.rb:1654), ported as `buildHavingClause:
+  // buildWhereClause` (relation/query-methods.ts:1890).
+  const aliasBodyless = new Map([
+    ["relation/query-methods.ts", new Map([["buildHavingClause", new Set(["QueryMethods"])]])],
+  ]);
+  const aliasNames = new Map([["relation/query-methods.ts", new Set(["buildHavingClause"])]]);
+
+  it("does not report an alias binding paired with a Ruby alias entry", () => {
+    expect(
+      declarationOnlyInFile(
+        "relation/query-methods.ts",
+        "buildHavingClause",
+        aliasBodyless,
+        new Map(),
+        "alias",
+        aliasNames,
+      ),
+    ).toBe(false);
+  });
+
+  it("reports a bodyless member with no Ruby alias behind it", () => {
+    expect(
+      declarationOnlyInFile(
+        "relation/query-methods.ts",
+        "buildHavingClause",
+        aliasBodyless,
+        new Map(),
+        undefined,
+        aliasNames,
+      ),
+    ).toBe(true);
+  });
+
+  it("reports a Ruby alias whose TS member is not an alias binding", () => {
+    expect(
+      declarationOnlyInFile("crud.ts", "compileInsert", bodyless, new Map(), "alias", new Map()),
+    ).toBe(true);
+  });
 });
 
 describe("rubyMethodToTsForFqn", () => {

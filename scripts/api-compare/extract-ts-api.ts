@@ -1034,36 +1034,35 @@ export function extractFromProgram(
           .find((key) => info.classes[key] || info.modules[key]) ?? undefined;
       if (target === undefined) continue;
       const entity = info.classes[target] ?? info.modules[target];
-      const declared = new Set(
-        [
-          ...Object.values(info.classes),
-          ...Object.values(info.modules),
-          ...(info.fileFunctions[relPath] ?? []),
-        ]
-          .flatMap((e) =>
-            "instanceMethods" in e ? [...e.instanceMethods, ...e.classMethods] : [e],
-          )
-          .filter((m) => m.file === relPath)
-          .map((m) => m.name),
-      );
       for (const name of attr.names) {
-        if (!declared.has(name)) continue;
         const seats: boolean[] = [true];
         if (attr.instanceReader || attr.instanceWriter) seats.push(false);
+        // Ruby's macro defines `foo`, `foo=` AND `foo?`; conventions.ts spells
+        // the predicate `isFoo`, and class-attribute.ts installs it on the
+        // class, plus on the prototype when there is an instance reader.
+        const predicate = attr.instancePredicate
+          ? `is${name.charAt(0).toUpperCase()}${name.slice(1)}`
+          : undefined;
         for (const isStatic of seats) {
           const members = isStatic ? entity.classMethods : entity.instanceMethods;
-          const at = members.findIndex((m) => m.name === name);
-          if (at !== -1 && members[at].bodyless !== true) continue;
-          const generated: MethodInfo = {
-            name,
-            visibility: "public",
-            params: [],
-            isStatic,
-            line: attr.line,
-            file: relPath,
-          };
-          if (at === -1) members.push(generated);
-          else members[at] = generated;
+          const generatedNames = [name];
+          if (predicate !== undefined && (isStatic || attr.instanceReader)) {
+            generatedNames.push(predicate);
+          }
+          for (const generatedName of generatedNames) {
+            const at = members.findIndex((m) => m.name === generatedName);
+            if (at !== -1 && members[at].bodyless !== true) continue;
+            const generated: MethodInfo = {
+              name: generatedName,
+              visibility: "public",
+              params: [],
+              isStatic,
+              line: attr.line,
+              file: relPath,
+            };
+            if (at === -1) members.push(generated);
+            else members[at] = generated;
+          }
         }
       }
       fileHasClassOrModule = true;
@@ -2939,10 +2938,10 @@ export function isConstantCaseName(name: string): boolean {
  * `enclosing` is the nearest named class or `const` the call sits inside — the
  * structural twin of `process_mattr`'s `current_fqn`; `receiver` is the `.call`
  * receiver, which is all a top-level call site (`classAttribute.call(Base, …)`)
- * states. Two sites credit nothing: a non-literal attribute name, and a name
- * the file never declares — the accessor is real either way, but a name nothing
- * in the file spells has no Rails counterpart to match and would land as novel
- * extra surface.
+ * states. One site credits nothing: a non-literal attribute name, which leaves
+ * nothing to install an accessor under. Every literal name is credited on the
+ * resolved class or module whether or not the file also declares it, exactly as
+ * `process_mattr` credits every `class_attribute` name unconditionally.
  *
  * `instanceReader` / `instanceWriter` each fall back to `instanceAccessor`,
  * which defaults to true, exactly as Ruby's do
@@ -2954,6 +2953,7 @@ interface ClassAttributeCall {
   names: string[];
   instanceReader: boolean;
   instanceWriter: boolean;
+  instancePredicate: boolean;
   line: number;
 }
 
@@ -2999,6 +2999,7 @@ function readClassAttributeCall(
     names,
     instanceReader: optionBool(options, "instanceReader") ?? instanceAccessor,
     instanceWriter: optionBool(options, "instanceWriter") ?? instanceAccessor,
+    instancePredicate: optionBool(options, "instancePredicate") ?? true,
     line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
   };
 }
@@ -3090,6 +3091,9 @@ export function harvestObjectLiteralMethods(
     let writer = false;
     // `{ qux }` / `{ foo: NS.bar }` — see MethodInfo.bodyless.
     let bodyless = false;
+    // `{ foo: bar }` where `bar` is another function THIS file declares — see
+    // MethodInfo.aliasOf.
+    let aliasOf: string | undefined;
     let internal = internalJsDocTagApplies(prop);
     let noRailsEquivalent = noRailsEquivalentReason(prop);
     const propMissingRailsCalls = missingRailsCallTags(prop);
@@ -3140,6 +3144,11 @@ export function harvestObjectLiteralMethods(
           mname = prop.name.text;
           bodyless = true;
           params = resolved;
+          if (ts.isIdentifier(init) && init.text !== mname) {
+            const target = checker.getSymbolAtLocation(init);
+            const decl = target?.valueDeclaration ?? target?.declarations?.[0];
+            if (decl && decl.getSourceFile() === prop.getSourceFile()) aliasOf = init.text;
+          }
           internal = isInternalCallableRef(init, checker);
           noRailsEquivalent ??= noRailsEquivalentOfSymbol(
             checker.getSymbolAtLocation(init),
@@ -3177,6 +3186,7 @@ export function harvestObjectLiteralMethods(
         : {}),
       ...(writer ? { writer: true } : {}),
       ...(bodyless ? { bodyless: true } : {}),
+      ...(aliasOf !== undefined ? { aliasOf } : {}),
     });
   }
   return out;
