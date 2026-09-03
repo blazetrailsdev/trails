@@ -281,7 +281,7 @@ export interface CompositePrimaryKeyMismatchReflection {
   belongsTo?: () => boolean;
   activeRecordPrimaryKey?: string | string[];
   associationPrimaryKey?: () => string | string[];
-  primaryKey?: unknown;
+  primaryKey?: string | string[];
 }
 
 function formatKey(key: string | string[]): string {
@@ -302,7 +302,7 @@ function reflectionPrimaryKey(
     }
     return reflection.associationPrimaryKey?.();
   }
-  return reflection.primaryKey as string | string[] | undefined;
+  return reflection.primaryKey;
 }
 
 export class CompositePrimaryKeyMismatchError extends ActiveRecordError {

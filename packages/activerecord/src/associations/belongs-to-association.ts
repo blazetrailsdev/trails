@@ -272,9 +272,7 @@ export class BelongsToAssociation extends SingularAssociation {
       const qc = queryConstraintsList.call(targetCtor);
       if (qc) return qc;
     }
-    const pk = this.primaryKey(klass ?? this.klass);
-    if (pk) return inferCompositePrimaryKey(pk as string);
-    return ["id"];
+    return inferCompositePrimaryKey(this.primaryKey(klass ?? this.klass));
   }
 
   /** @internal */

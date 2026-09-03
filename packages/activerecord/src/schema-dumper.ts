@@ -785,7 +785,9 @@ export abstract class SchemaDumper {
     if (indexes.length > 0) {
       const addIndexStatements = indexes.map((index) => {
         const tableName = JSON.stringify(this.removePrefixAndSuffix(index.table ?? table));
-        return `  addIndex(${[tableName, ...this.indexParts(index)].join(", ")});`;
+        const [cols, ...opts] = this.indexParts(index);
+        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+        return `  addIndex(${tableName}, ${cols}${optStr});`;
       });
       stream.push(addIndexStatements.sort().join("\n"));
       stream.push("");
