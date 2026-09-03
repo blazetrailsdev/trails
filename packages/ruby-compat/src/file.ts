@@ -72,14 +72,24 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/file.c:1826` `rb_file_readable_p`, which is `eaccess(3)` with
-   * `R_OK` and so is `false` for a file that is not there at all.
+   * `vendor/ruby/file.c:1826` `rb_file_readable_p`, which is
+   * `rb_eaccess(fname, R_OK) >= 0` and so is `false` both for a file that is
+   * not there and for one the effective user cannot read. `R_OK` is POSIX's
+   * `4` rather than a Ruby constant. A backend with no access check has no
+   * `accessSync`, and there existence is all that can be answered.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.readable?`
    * (`vendor/ruby/file.c:1826`).
    */
   static isReadable(fileName: string): boolean {
-    return getFs().existsSync(fileName);
+    const fs = getFs();
+    if (!fs.accessSync) return fs.existsSync(fileName);
+    try {
+      fs.accessSync(fileName, 4);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**

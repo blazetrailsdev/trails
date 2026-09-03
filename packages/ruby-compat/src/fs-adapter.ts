@@ -53,6 +53,7 @@ export interface FsAdapter {
   utimesSync?(path: string, atime: Date, mtime: Date): void;
   chownSync?(path: string, uid: number, gid: number): void;
   realpathSync?(path: string): string;
+  accessSync?(path: string, mode: number): void;
   openSync(path: string, flags: string): number;
   readSync(
     fd: number,

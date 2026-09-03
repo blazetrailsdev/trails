@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { File } from "./file.js";
@@ -89,5 +96,21 @@ describe("File", () => {
     expect(File.stat(join(root, "a.rb")).size).toBe(7);
     expect(File.mtime(join(root, "a.rb"))).toBeInstanceOf(Date);
     expect(() => File.stat(join(root, "nonexistent"))).toThrow();
+  });
+
+  it("readable? is an access check, not the existence check exist? is", () => {
+    // vendor/ruby/file.c:1826 is eaccess(R_OK), not the stat exist? does.
+    const root = fixture();
+    const path = join(root, "a.rb");
+    chmodSync(path, 0o000);
+    let accessible = true;
+    try {
+      readFileSync(path);
+    } catch {
+      accessible = false;
+    }
+
+    expect(File.isExist(path)).toBe(true);
+    expect(File.isReadable(path)).toBe(accessible);
   });
 });

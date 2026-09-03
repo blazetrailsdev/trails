@@ -142,23 +142,30 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:3774` `io_read`, which answers at most `length` bytes
-   * and `nil` — never `""` — once the stream is at EOF and `length` is
-   * positive. The bytes come back as a binary String, one character per byte,
-   * which is the ASCII-8BIT `File.open(path, "rb")` reads in — assembled a
-   * character at a time because no `TextDecoder` encoding gives it: its
-   * "latin1" is windows-1252, and that remaps 0x80-0x9F.
+   * `vendor/ruby/io.c:3774` `io_read`, which behaves like C's `fread` and so
+   * retries `read(2)` until `length` bytes are in hand or the stream hits EOF
+   * (`io.c:3760-3763`) — a short read is not an answer. It answers `nil` —
+   * never `""` — once the stream is at EOF and `length` is positive. The bytes
+   * come back as a binary String, one character per byte, which is the
+   * ASCII-8BIT `File.open(path, "rb")` reads in — assembled a character at a
+   * time because no `TextDecoder` encoding gives it: its "latin1" is
+   * windows-1252, and that remaps 0x80-0x9F.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
    * (`vendor/ruby/io.c:3774`).
    */
   read(length: number): string | null {
     const buffer = new Uint8Array(length);
-    const read = getFs().readSync(this.fd, buffer, 0, length, this.pos);
-    if (read === 0) return length === 0 ? "" : null;
-    this.pos += read;
+    let n = 0;
+    while (n < length) {
+      const read = getFs().readSync(this.fd, buffer, n, length - n, this.pos + n);
+      if (read === 0) break;
+      n += read;
+    }
+    if (n === 0) return length === 0 ? "" : null;
+    this.pos += n;
     let part = "";
-    for (let i = 0; i < read; i++) part += String.fromCharCode(buffer[i]);
+    for (let i = 0; i < n; i++) part += String.fromCharCode(buffer[i]);
     return part;
   }
 
