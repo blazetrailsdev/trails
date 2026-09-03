@@ -363,21 +363,17 @@ export class Base {
 
   /**
    * Mirrors `Helpers::RenderingHelper#render(options, locals, &block)`
-   * (`actionview/lib/action_view/helpers/rendering_helper.rb:138-153`) — the
-   * dispatch on the shape of `options`: a Hash goes to the renderer, and with
-   * a block the `:layout` is rendered as a partial around it; anything else is
-   * a bare partial name.
+   * (`helpers/rendering_helper.rb:138-153`) — the dispatch on the shape of
+   * `options`: a Hash goes to the renderer, with a block the `:layout` wraps
+   * it as a partial, and anything else is a bare partial name.
    *
    * trails' `Renderer#render` is async by design where Rails' is synchronous,
-   * and a compiled template method is synchronous, so each arm reaches the
-   * lookup context's synchronous entry points. `Renderer#render_to_object`'s
-   * `options.key?(:partial)` branch (`renderer/renderer.rb:27-33`) is inlined
-   * into the arm for the same reason — there is no synchronous `Renderer`
-   * to hold it.
-   *
-   * The block is Rails' layout content, handed to `render_partial` as `&block`
-   * and reached from the layout through `yield`; trails publishes its value on
-   * `viewFlow`, which is where `_layout_for` reads it (`context.rb:27-30`).
+   * so each arm reaches the lookup context's synchronous entry points, and
+   * `render_to_object`'s `options.key?(:partial)` branch
+   * (`renderer/renderer.rb:27-33`) is inlined for want of a sync `Renderer`.
+   * The block is Rails' layout content, reached from the layout through
+   * `yield`; trails publishes it on `viewFlow`, where `_layout_for` reads it
+   * (`context.rb:27-30`).
    *
    * @missingRailsCall view_renderer.render — PERMANENT
    * @missingRailsCall view_renderer.render_partial — PERMANENT
@@ -405,11 +401,10 @@ export class Base {
 
     const hash = options as RenderOptions;
     return this.inRenderingContext(hash, (renderer) => {
-      // Rails resolves through the (possibly formats-prepended) lookup
-      // context's own details, so a `formats:` option changes what
-      // `find_template` answers (`renderer/template_renderer.rb:36-50`).
-      // trails' synchronous entry points take the format explicitly, so it is
-      // read back off the renderer `in_rendering_context` yielded.
+      // Rails resolves through the yielded context's own details, so
+      // `formats:` changes what `find_template` answers
+      // (`renderer/template_renderer.rb:36-50`); the sync entry points take the
+      // format explicitly, so it is read back off that context.
       const format = hash.formats ? String([...renderer.formats][0] ?? viewFormat) : viewFormat;
       if (block) {
         this.viewFlow.set("layout", String(block() ?? ""));
@@ -455,8 +450,7 @@ export class Base {
   /**
    * Mirrors `Base#in_rendering_context(options)` (`base.rb:292-309`). Rails
    * yields `@view_renderer`, rebuilt from the prepended-formats lookup
-   * context; trails' arms render through the lookup context itself, so that is
-   * what the block is yielded.
+   * context; trails' arms render through that context, so it is yielded.
    *
    * @missingRailsCall new — PERMANENT
    */

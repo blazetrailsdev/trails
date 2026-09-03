@@ -233,13 +233,9 @@ export class MountedHelpers {}
  * an exported class — making them visible to `parity:api`.
  */
 /**
- * Rails: `NamedRouteCollection::UrlHelper` (`route_set.rb:189-318`) — the
- * object one named-route helper closes over.
- *
- * `UrlHelper.create` answers an `OptimizedUrlHelper` for a route Rails can
- * take the fast path on (`route_set.rb:194-201`); that subclass is not ported,
- * so `create` always answers the generic helper. The two produce the same
- * string — `OptimizedUrlHelper` only skips the generation lookup.
+ * Rails: `NamedRouteCollection::UrlHelper` (`route_set.rb:189-318`). `create`
+ * answers an `OptimizedUrlHelper` for a route Rails takes the fast path on
+ * (`:194-201`); that subclass is unported, and the two produce the same string.
  *
  * @missingRailsCall optimize_helper? — CONVERGEABLE port-optimized-url-helper-and-rails-shape-url-for
  */
@@ -277,14 +273,12 @@ class UrlHelper {
 
   /**
    * Rails: `def call(t, method_name, args, inner_options, url_strategy)`
-   * (`route_set.rb:280-290`), whose last line is
+   * (`route_set.rb:280-290`), ending in
    * `t._routes.url_for(hash, route_name, url_strategy, method_name)`.
-   *
    * {@link RouteSet.urlFor} still carries its pre-Rails positional signature,
-   * so the path is generated through {@link RouteSet.generate} — the port of
-   * the private `generate` that Rails' `url_for` itself calls — and handed to
-   * the strategy as `path`, which is the shape `OptimizedUrlHelper#call`
-   * (`route_set.rb:215-224`) builds too.
+   * so the path comes from {@link RouteSet.generate} — the port of the private
+   * `generate` Rails' `url_for` calls — and reaches the strategy as `path`,
+   * the shape `OptimizedUrlHelper#call` (`:215-224`) builds too.
    *
    * @missingRailsCall url_for — CONVERGEABLE port-optimized-url-helper-and-rails-shape-url-for
    */
@@ -319,10 +313,9 @@ class UrlHelper {
         : pathParams.length;
 
       if (args.length < pathParamsSize) {
-        // Rails: `path_params -= controller_options.keys` then
-        // `path_params -= (result[:path_params] || {}).merge(result).keys`
-        // (`route_set.rb:301-303`) — a segment already supplied through
-        // `path_params` must not take a positional arg either.
+        // Rails `:301-303` also subtracts `(result[:path_params] || {})
+        // .merge(result).keys`, so a segment already supplied that way does
+        // not take a positional argument either.
         const supplied = {
           ...((result["path_params"] as Record<string, unknown> | undefined) ?? {}),
           ...result,
@@ -365,19 +358,15 @@ export interface UrlHelperContext {
 export type NamedRouteHelper = (this: UrlHelperContext, ...args: unknown[]) => string;
 
 /**
- * Rails: `ActionDispatch::Routing::RouteSet::NamedRouteCollection`
- * (`route_set.rb:60-348`) — the named routes plus the two modules holding
- * their generated `name_path` / `name_url` helpers, which
- * `generate_url_helpers` includes (`route_set.rb:594-609`).
- *
- * Ruby's `#{name}_path` becomes `${name}Path` under the repo's Ruby→TS name
- * translation, so a route named `posts` answers `postsPath` on a view.
+ * Rails: `RouteSet::NamedRouteCollection` (`route_set.rb:60-348`) — the named
+ * routes plus the two modules holding their generated `name_path` /
+ * `name_url` helpers, which `generate_url_helpers` includes (`:594-609`).
+ * Ruby's `#{name}_path` is `${name}Path` here, so `posts` answers `postsPath`.
  */
 export class NamedRouteCollection {
   /**
    * @internal The owning `RouteSet`. Rails' `UrlHelper#call` reaches it as
-   * `t._routes` (`route_set.rb:289`); a trails view context does not carry
-   * one, so the collection holds its owner as the fallback.
+   * `t._routes` (`route_set.rb:289`); the collection holds it as the fallback.
    */
   private readonly routeSet: RouteSet;
 
@@ -470,8 +459,8 @@ export class NamedRouteCollection {
 
   /**
    * Rails: `def add_url_helper(name, defaults, &block)` (`route_set.rb:165-187`)
-   * — given a `name`, defines `name_path` and `name_url` helpers. Used by the
-   * `direct`, `resolve` and `polymorphic` route helpers.
+   * — defines `name_path` / `name_url` for `direct`, `resolve` and
+   * `polymorphic`.
    */
   addUrlHelper(
     name: string,
@@ -555,11 +544,9 @@ export class UrlHelpersModule {
     // the prototype and are non-enumerable, so re-publish each as a bound
     // own property here. The prototype methods remain (so `parity:api`
     // extracts them); the own copies make them mountable.
-    // Rails: `url_helpers = routes.named_routes.url_helpers_module` then
-    // `extend url_helpers` / `include url_helpers`, and the `supports_path`
-    // pair for `path_helpers_module` (`route_set.rb:594-609`). A trails
-    // `include` copies own enumerable properties, so the generated helpers are
-    // published as own properties here and travel with the module.
+    // Rails: `extend`/`include url_helpers`, and the `supports_path` pair for
+    // `path_helpers_module` (`route_set.rb:594-609`). A trails `include`
+    // copies own enumerable properties, so they are published as own ones.
     Object.assign(this, routes.namedRoutes.urlHelpersModule);
     if (supportsPath) {
       Object.assign(this, routes.namedRoutes.pathHelpersModule);
@@ -637,13 +624,12 @@ export class UrlHelpersModule {
     return polymorphicMappingFn(this._proxy as unknown as PolymorphicHost, record);
   }
   /**
-   * Rails: the module singleton's `def _routes; @_proxy._routes; end`
-   * (`route_set.rb:592`) and the instance `define_method(:_routes) { @_routes
-   * || routes }` (`:617`) answer the same object — `proxy_class#initialize`
-   * assigns `@_routes = routes` (`:553-556`), the RouteSet. trails builds
-   * {@link _proxy} from the RouteSet's `_routes` adapter instead, because
-   * `RoutesProxy` needs the Rails-shape `urlFor`, so the RouteSet is held
-   * separately and answered here.
+   * Rails: the singleton `def _routes; @_proxy._routes; end` (`route_set.rb:592`)
+   * and the instance `define_method(:_routes) { @_routes || routes }` (`:617`)
+   * answer the same object — `proxy_class#initialize` assigns
+   * `@_routes = routes` (`:553-556`). trails builds {@link _proxy} from the
+   * RouteSet's `_routes` adapter (`RoutesProxy` needs the Rails-shape
+   * `urlFor`), so the RouteSet is held separately and answered here.
    */
   get _routes(): RouteSet {
     return this._routeSet;
@@ -1022,10 +1008,8 @@ export class RouteSet {
     }
     this.routes.push(mapping);
     if (name) this.namedRoutes.add(name, mapping);
-    // Rails' helper modules are live — `define_url_helper` adds the method to
-    // a module the url-helpers module already includes, so a route drawn after
-    // `url_helpers` was memoized still answers. A trails `include` copies, so
-    // the memo has to be dropped for the new helper to reach a later copy.
+    // Rails' helper modules are live, so a route drawn after `url_helpers` was
+    // memoized still answers. A trails `include` copies, so the memo is dropped.
     this._urlHelpersWithPaths = undefined;
     this._urlHelpersWithoutPaths = undefined;
     this._journeyRouter = null;
