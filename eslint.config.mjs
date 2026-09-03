@@ -710,7 +710,9 @@ export default defineConfig(
   //    is NOT an MRI primitive: `fs-adapter.ts` is the backend contract the
   //    Ruby classes register against, so `registerFsAdapter` and friends have
   //    no `vendor/ruby/` line to cite. They still carry their receipts; only
-  //    the citation half is out of scope for them.
+  //    the citation half is out of scope for them. This ignores list must stay
+  //    in sync with the same block in eslint/rails-private-jsdoc.config.mjs,
+  //    which is the enforcing run (it is the CI job that fetches vendor/ruby).
   {
     files: ["packages/ruby-compat/src/**/*.ts"],
     ignores: ["**/*.test.ts", "packages/ruby-compat/src/fs-adapter.ts"],
