@@ -1,3 +1,17 @@
+/**
+ * The byte string a backend answers when no encoding is asked for — Ruby's
+ * `File.binread` (`vendor/ruby/file.c:6222` `rb_io_s_binread`), which is an
+ * ASCII-8BIT String. Node's `Buffer` is one such container and is what the
+ * Node backend below hands over, but naming `Buffer` here would put an ambient
+ * Node global in the leaf's type surface, so the contract names the structural
+ * shape callers actually use: the bytes, and the `toString(encoding)` that
+ * turns them back into a String.
+ *
+ * @noRailsEquivalent PERMANENT — the byte half of Ruby core `String`, which
+ * Rails calls without defining.
+ */
+export type Bytes = Uint8Array & { toString(encoding?: string): string };
+
 export interface FsStatResult {
   isDirectory(): boolean;
   isFile(): boolean;
@@ -17,10 +31,10 @@ export interface FsDirent {
 
 export interface FsAdapter {
   readFileSync(path: string, encoding: "utf-8" | "utf8" | "latin1"): string;
-  readFileSync(path: string): Buffer;
+  readFileSync(path: string): Bytes;
   writeFileSync(
     path: string,
-    content: string | Buffer | Uint8Array,
+    content: string | Uint8Array,
     options?: { mode?: number } | string,
   ): void;
   existsSync(path: string): boolean;
@@ -42,7 +56,7 @@ export interface FsAdapter {
   openSync(path: string, flags: string): number;
   readSync(
     fd: number,
-    buffer: Buffer | Uint8Array,
+    buffer: Uint8Array,
     offset: number,
     length: number,
     position: number | null,
@@ -55,10 +69,10 @@ export interface FsAdapter {
   lstat?(path: string): Promise<FsStatResult>;
   mkdtempSync?(prefix: string): string;
   readFile?(path: string, encoding: "utf-8" | "utf8"): Promise<string>;
-  readFile?(path: string): Promise<Buffer>;
+  readFile?(path: string): Promise<Bytes>;
   writeFile?(
     path: string,
-    content: string | Buffer | Uint8Array,
+    content: string | Uint8Array,
     options?: { mode?: number },
   ): Promise<void>;
   unlink?(path: string): Promise<void>;
@@ -165,14 +179,25 @@ function withFlock<T extends FlockableFs>(nodeFs: T): Partial<FsAdapter> {
   };
 }
 
+/** @noRailsEquivalent PERMANENT */
+interface NodeProcess {
+  versions?: { node?: string };
+  cwd(): string;
+  getBuiltinModule?(id: string): unknown;
+}
+
+function nodeProcess(): NodeProcess | undefined {
+  return (globalThis as { process?: NodeProcess }).process;
+}
+
+/** @noRailsEquivalent PERMANENT */
+declare const require: ((id: string) => unknown) | undefined;
+
 function syncBuiltinLoader(): ((id: string) => unknown) | null {
-  const proc = globalThis.process as
-    | (typeof globalThis.process & { getBuiltinModule?: (id: string) => unknown })
-    | undefined;
+  const proc = nodeProcess();
   const getBuiltinModule = proc?.getBuiltinModule;
   if (typeof getBuiltinModule === "function") return (id) => getBuiltinModule.call(proc, id);
   if (typeof require === "undefined") return null;
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const nodeModule = require("node:module") as {
     createRequire(p: string): (id: string) => unknown;
   };
@@ -184,7 +209,8 @@ function tryAutoRegisterNode(): boolean {
   if (nodeAttempted) return false;
   nodeAttempted = true;
   try {
-    if (typeof globalThis.process === "undefined" || !globalThis.process.versions?.node) {
+    const proc = nodeProcess();
+    if (proc === undefined || !proc.versions?.node) {
       return false;
     }
     const req = syncBuiltinLoader();
@@ -194,8 +220,8 @@ function tryAutoRegisterNode(): boolean {
       access(p: string): Promise<void>;
       stat(p: string): Promise<FsStatResult>;
       lstat(p: string): Promise<FsStatResult>;
-      readFile(p: string, enc?: string): Promise<Buffer | string>;
-      writeFile(p: string, c: string | Buffer | Uint8Array, opts?: unknown): Promise<void>;
+      readFile(p: string, enc?: string): Promise<Bytes | string>;
+      writeFile(p: string, c: string | Uint8Array, opts?: unknown): Promise<void>;
       unlink(p: string): Promise<void>;
       rename(src: string, dest: string): Promise<void>;
       mkdtemp(prefix: string): Promise<string>;
@@ -205,7 +231,7 @@ function tryAutoRegisterNode(): boolean {
       mkdir(path: string, opts?: { recursive?: boolean }): Promise<string | undefined>;
     };
     const fs: FsAdapter = Object.assign({}, nodeFs, {
-      cwd: () => globalThis.process.cwd(),
+      cwd: () => proc.cwd(),
       exists: (p: string) =>
         fsPromises.access(p).then(
           () => true,
@@ -219,7 +245,7 @@ function tryAutoRegisterNode(): boolean {
       lstat: (p: string) => fsPromises.lstat(p),
       readFile: (p: string, enc?: string) =>
         enc ? fsPromises.readFile(p, enc) : fsPromises.readFile(p),
-      writeFile: (p: string, c: string | Buffer | Uint8Array, opts?: { mode?: number }) =>
+      writeFile: (p: string, c: string | Uint8Array, opts?: { mode?: number }) =>
         fsPromises.writeFile(p, c, opts),
       unlink: (p: string) => fsPromises.unlink(p),
       rename: (src: string, dest: string) => fsPromises.rename(src, dest),

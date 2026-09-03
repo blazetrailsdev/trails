@@ -1,5 +1,5 @@
 import { join, resolve } from "path";
-import { getFsAsync } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
 import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environment.js";
 
@@ -17,8 +17,7 @@ import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environm
  */
 export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigurations> {
   const configPath = resolve(join(cwd, "config", "database.ts"));
-  const fsAdapter = await getFsAsync();
-  if (!fsAdapter.existsSync(configPath)) {
+  if (!File.isExist(configPath)) {
     throw new Error(`config/database.ts not found at ${configPath}`);
   }
   const { pathToFileURL } = await import("node:url");
@@ -36,9 +35,8 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
 }
 
 export async function tryLoadModels(cwd: string): Promise<Record<string, unknown>> {
-  const fsAdapter = await getFsAsync();
   const modelsPath = resolve(join(cwd, "app", "models", "index.ts"));
-  if (!fsAdapter.existsSync(modelsPath)) return {};
+  if (!File.isExist(modelsPath)) return {};
   const { pathToFileURL } = await import("node:url");
   return import(pathToFileURL(modelsPath).href) as Promise<Record<string, unknown>>;
 }

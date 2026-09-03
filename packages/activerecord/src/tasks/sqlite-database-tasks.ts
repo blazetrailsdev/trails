@@ -1,5 +1,5 @@
 import { getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
-import { FileUtils, getFs, getFsAsync, getPath } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
@@ -22,19 +22,15 @@ export class SQLiteDatabaseTasks {
   }
 
   async create(): Promise<void> {
-    const fs = getFs();
-    if (fs.existsSync(this.dbConfig.database as string)) throw new DatabaseAlreadyExists();
+    if (File.isExist(this.dbConfig.database as string)) throw new DatabaseAlreadyExists();
 
     await this.establishConnection();
     await this.connection();
   }
 
   async drop(): Promise<void> {
-    const fs = getFs();
-    const path = getPath();
     const dbPath = this.dbConfig.database as string;
-    const file =
-      !path.isAbsolute || path.isAbsolute(dbPath) ? dbPath : path.join(this.root, dbPath);
+    const file = File.isAbsolutePath(dbPath) ? dbPath : File.join(this.root, dbPath);
     try {
       FileUtils.rm(file);
       FileUtils.rmF([`${file}-shm`, `${file}-wal`]);
@@ -91,8 +87,7 @@ export class SQLiteDatabaseTasks {
     if (isInMemoryDatabase(database)) {
       const connection = await this.connection();
       materialized = `${filename}.dump.sqlite3`;
-      const fs = await getFsAsync();
-      if (await fs.exists(materialized)) await fs.unlink!(materialized);
+      if (File.isExist(materialized)) File.delete(materialized);
       await connection.execute(`VACUUM INTO ${connection.quote(materialized)}`);
       database = materialized;
     }
@@ -102,8 +97,7 @@ export class SQLiteDatabaseTasks {
       await runCmd("sqlite3", args, filename);
     } finally {
       if (materialized !== undefined) {
-        const fs = await getFsAsync();
-        if (await fs.exists(materialized)) await fs.unlink!(materialized);
+        if (File.isExist(materialized)) File.delete(materialized);
       }
     }
   }

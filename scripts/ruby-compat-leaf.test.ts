@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import {
   declaredDependencies,
-  isCompiledTestFile,
   moduleSpecifiers,
   nodeBuiltinImports,
   nodeBuiltinNamed,
@@ -52,11 +51,6 @@ describe("ruby-compat leaf guard", () => {
       { specifier: "./range.js", kind: "dynamic" },
       { specifier: "node:crypto", kind: "require" },
     ]);
-  });
-
-  it("exempts compiled test files", () => {
-    expect(isCompiledTestFile("hash.trails.test.js")).toBe(true);
-    expect(isCompiledTestFile("hash.js")).toBe(false);
   });
 
   it("flags a static Node import and allows a guarded require of the same builtin", async () => {

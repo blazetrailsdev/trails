@@ -1,5 +1,5 @@
 import { getEnv } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
@@ -170,9 +170,7 @@ async function sqliteEntries(): Promise<Record<"arunit" | "arunit2", Record<stri
       arunit2: { ...options, database: sqliteSiblingDatabase(workerDb) },
     };
   }
-  const fs = await getFsAsync();
-  const path = await getPathAsync();
-  await fs.mkdir?.(path.dirname(SQLITE_FIXTURE_DATABASE), { recursive: true });
+  FileUtils.mkdirP(File.dirname(SQLITE_FIXTURE_DATABASE));
   return {
     arunit: { ...options, database: SQLITE_FIXTURE_DATABASE },
     arunit2: { ...options, database: SQLITE_FIXTURE_DATABASE_2 },

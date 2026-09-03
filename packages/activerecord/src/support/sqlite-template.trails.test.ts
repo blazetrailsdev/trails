@@ -55,7 +55,7 @@ describe("registerDbFileCleanupOnExit", () => {
   it("tolerates a DB file that was never created", async () => {
     const fs = await getFsAsync();
     const base = await tmpPath();
-    expect(() => unlinkDbFiles(fs, base)).not.toThrow();
+    expect(() => unlinkDbFiles(base)).not.toThrow();
   });
 });
 
@@ -93,7 +93,7 @@ describe("sweepRunDbFiles", () => {
       await sweepRunDbFiles(token());
       expect(await fs.exists(other)).toBe(true);
     } finally {
-      unlinkDbFiles(fs, other);
+      unlinkDbFiles(other);
     }
   });
 });
@@ -109,7 +109,7 @@ describe("sweepStaleDbFiles", () => {
       await sweepStaleDbFiles();
       expect(await fs.exists(fresh)).toBe(true);
     } finally {
-      unlinkDbFiles(fs, fresh);
+      unlinkDbFiles(fresh);
     }
   });
 });

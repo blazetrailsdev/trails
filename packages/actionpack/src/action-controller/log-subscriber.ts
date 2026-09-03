@@ -140,7 +140,17 @@ export class LogSubscriber extends BaseLogSubscriber {
 
 // "action_controller" is the AS::Notifications channel identifier, which uses
 // Rails snake_case naming conventions as a cross-package wire protocol.
+// `log_subscriber.rb:80-88`'s `%w(write_fragment read_fragment exist_fragment?
+// expire_fragment).each` defines those four bodies through `class_eval` and
+// registers `:#{method}, :info` for each; the port has no counterpart for the
+// bodies, so their levels are registered by
+// `port-the-fragment-cache-log-subscriber-methods` alongside them.
 LogSubscriber.subscribeLogLevel("start_processing", "info");
 LogSubscriber.subscribeLogLevel("process_action", "info");
+LogSubscriber.subscribeLogLevel("halted_callback", "info");
+LogSubscriber.subscribeLogLevel("send_file", "info");
+LogSubscriber.subscribeLogLevel("redirect_to", "info");
+LogSubscriber.subscribeLogLevel("send_data", "info");
+LogSubscriber.subscribeLogLevel("unpermitted_parameters", "debug");
 
 LogSubscriber.attachTo("action_controller");

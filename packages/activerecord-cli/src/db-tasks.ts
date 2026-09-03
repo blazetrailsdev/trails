@@ -1,7 +1,7 @@
 import { join, resolve } from "path";
 import { getEnv } from "@blazetrails/activesupport";
 import { setEnv } from "@blazetrails/ruby-compat";
-import { getFsAsync } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseConfigurations } from "@blazetrails/activerecord";
 import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
 import { withEnvironmentConnection } from "./environment.js";
@@ -199,9 +199,8 @@ export async function dbSeed(cwd: string, _args: string[]): Promise<number> {
     return 1;
   }
 
-  const fsAdapter = await getFsAsync();
   const seedsPath = resolve(join(cwd, "db", "seeds.ts"));
-  if (!fsAdapter.existsSync(seedsPath)) {
+  if (!File.isExist(seedsPath)) {
     console.log("db/seeds.ts not found — nothing to seed.");
     return 0;
   }
@@ -228,8 +227,7 @@ function installSeedLoader(cwd: string): void {
   const seedsPath = resolve(join(cwd, "db", "seeds.ts"));
   DatabaseTasks.seedLoader = {
     loadSeed: async () => {
-      const fsAdapter = await getFsAsync();
-      if (!fsAdapter.existsSync(seedsPath)) return;
+      if (!File.isExist(seedsPath)) return;
       const { pathToFileURL } = await import("node:url");
       const mod = await import(pathToFileURL(seedsPath).href);
       const fn = mod.seed ?? mod.default;

@@ -1,5 +1,5 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
-import type { FsAdapter } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
+
 import ts from "typescript";
 
 // A class is a model worth registering when its `extends` chain reaches the
@@ -172,12 +172,9 @@ function extendsName(node: ts.ClassDeclaration): string | undefined {
  * the emitted manifest is byte-stable.
  */
 export async function scanModels(modelsDir: string): Promise<ModelEntry[]> {
-  const fs = await getFsAsync();
-  const path = await getPathAsync();
-
   let names: string[];
   try {
-    names = await fs.readdir!(modelsDir);
+    names = Dir.children(modelsDir);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       throw new Error(`models directory not found: ${modelsDir}`, { cause: err });
@@ -188,7 +185,7 @@ export async function scanModels(modelsDir: string): Promise<ModelEntry[]> {
 
   const byFile = new Map<string, FileInfo>();
   for (const file of files) {
-    const text = await fs.readFile!(path.join(modelsDir, file), "utf8");
+    const text = File.read(File.join(modelsDir, file));
     const sf = ts.createSourceFile(file, text, ts.ScriptTarget.ES2022, true);
     const classes = new Map<string, ClassNode>();
     for (const stmt of sf.statements) {
@@ -296,9 +293,9 @@ export interface ManifestResult {
   changed: boolean; // on-disk content differs (in write mode: was rewritten)
 }
 
-async function readIfPresent(fs: FsAdapter, path: string): Promise<string | undefined> {
+function readIfPresent(path: string): string | undefined {
   try {
-    return await fs.readFile!(path, "utf8");
+    return File.read(path);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return undefined;
     throw err;
@@ -314,11 +311,10 @@ export async function generateManifest(
   modelsDir: string,
   options: { check?: boolean } = {},
 ): Promise<ManifestResult> {
-  const fs = await getFsAsync();
-  const path = (await getPathAsync()).resolve(modelsDir, MANIFEST_NAME);
+  const path = File.expandPath(MANIFEST_NAME, modelsDir);
   const content = await buildManifest(modelsDir);
-  const existing = await readIfPresent(fs, path);
+  const existing = readIfPresent(path);
   const changed = existing !== content;
-  if (!options.check && changed) await fs.writeFile!(path, content);
+  if (!options.check && changed) File.write(path, content);
   return { path, content, changed };
 }

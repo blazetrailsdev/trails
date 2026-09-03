@@ -10,7 +10,7 @@ import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { getCryptoAsync, getOs, getEnv, isBlank, trailsRoot } from "@blazetrails/activesupport";
 import { stdout, stderr, abort } from "@blazetrails/ruby-compat";
-import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
+import { File, FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
 import type { Base } from "../base.js";
@@ -377,7 +377,7 @@ export class DatabaseTasks {
   }
 
   static checkSchemaFile(filename: string): void {
-    if (!getFs().existsSync(filename)) {
+    if (!File.isExist(filename)) {
       let message = `${filename} doesn't exist yet. Run \`bin/rails db:migrate\` to create it, then try again.`;
       const root = trailsRoot();
       if (root != null) {
@@ -591,17 +591,13 @@ export class DatabaseTasks {
     const filename = cfgWithDump.schemaDump(fmt);
     if (filename == null) return null;
 
-    const p = getPath();
-    const dir = p.dirname ? p.dirname(filename) : ".";
-    if (dir === this.dbDir) return filename;
-    return p.join ? p.join(this.dbDir, filename) : `${this.dbDir}/${filename}`;
+    if (File.dirname(filename) === this.dbDir) return filename;
+    return File.join(this.dbDir, filename);
   }
 
   /** @internal */
   static _resolveSchemaPath(filename: string): string {
-    const path = getPath();
-    if (!path.isAbsolute) return filename;
-    return path.isAbsolute(filename) ? filename : (path.resolve?.(this.root, filename) ?? filename);
+    return File.isAbsolutePath(filename) ? filename : File.expandPath(filename, this.root);
   }
 
   static async dumpSchema(
@@ -611,9 +607,7 @@ export class DatabaseTasks {
     const rawFilename = this.schemaDumpPath(dbConfig, format);
     if (rawFilename == null) return;
     const filename = this._resolveSchemaPath(rawFilename);
-    const fs = getFs();
-    const path = getPath();
-    FileUtils.mkdirP(path.dirname(filename));
+    FileUtils.mkdirP(File.dirname(filename));
     if (format !== "sql") {
       const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
       const languageWas = SchemaDumper.language;
@@ -622,7 +616,7 @@ export class DatabaseTasks {
         const migrationConnectionPool = this.migrationConnectionPool();
         const file: string[] = [];
         await SchemaDumper.dump(migrationConnectionPool, file);
-        fs.writeFileSync(filename, file.join("\n"));
+        File.write(filename, file.join("\n"));
       } finally {
         SchemaDumper.language = languageWas;
       }
@@ -893,8 +887,7 @@ export class DatabaseTasks {
     const dbConfig = this.resolveConfiguration(configuration);
     file ??= this.schemaDumpPath(dbConfig) ?? undefined;
     if (!file) return true;
-    const fs = getFs();
-    if (!fs.existsSync(file)) return true;
+    if (!File.isExist(file)) return true;
 
     return await this.withTemporaryPool(dbConfig, async (pool) => {
       const internalMetadata = pool.internalMetadata;
@@ -907,7 +900,7 @@ export class DatabaseTasks {
 
   /** @internal */
   private static async schemaSha1(file: string): Promise<string> {
-    const bytes = getFs().readFileSync(file);
+    const bytes = File.read(file);
     const crypto = await getCryptoAsync();
     const hash = crypto.createHash("sha1");
     hash.update(bytes);
@@ -1102,10 +1095,8 @@ export async function initializeDatabase(dbConfig: HashConfig): Promise<boolean>
     if (!alreadyInitialized) {
       const rawPath = DatabaseTasks.schemaDumpPath(dbConfig);
       if (rawPath) {
-        const p = getPath();
-        const resolved =
-          p.isAbsolute && !p.isAbsolute(rawPath) ? p.resolve(DatabaseTasks.root, rawPath) : rawPath;
-        if (getFs().existsSync(resolved)) {
+        const resolved = DatabaseTasks._resolveSchemaPath(rawPath);
+        if (File.isExist(resolved)) {
           await DatabaseTasks.loadSchema(dbConfig, DatabaseTasks.schemaFormat, undefined);
         }
       }

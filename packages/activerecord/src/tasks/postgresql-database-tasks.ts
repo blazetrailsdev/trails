@@ -5,7 +5,7 @@ import {
   Tempfile,
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
-import { FileUtils, getFs } from "@blazetrails/ruby-compat";
+import { File, FileUtils, getFs } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
@@ -186,11 +186,10 @@ export class PostgreSQLDatabaseTasks {
   }
 
   private removeSqlHeaderComments(filename: string): void {
-    const fs = getFs();
     let removingComments = true;
     const tempfile = Tempfile.open("uncommented_structure.sql");
     try {
-      for (const line of fs.readFileSync(filename, "utf8").split(/(?<=\n)/)) {
+      for (const line of File.read(filename).split(/(?<=\n)/)) {
         if (!(removingComments && (line.startsWith(SQL_COMMENT_BEGIN) || isBlank(line)))) {
           tempfile.write(line);
           removingComments = false;

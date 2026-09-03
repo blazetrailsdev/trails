@@ -1,6 +1,6 @@
 import type { AdapterName } from "../connection-adapters/abstract-adapter.js";
 import { getEnv, getOsAsync } from "@blazetrails/activesupport";
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import type { Schema, ColumnSpec, TableSchema, IndexSpec, ForeignKeySpec } from "./schema-types.js";
 
 const SCHEMA_TO_AR: Record<string, string> = { big_integer: "bigint" };
@@ -189,14 +189,10 @@ export async function generateSchemaFile(
   typeRegistryKey?: AdapterName,
   supportsExpressionIndex?: boolean,
 ): Promise<string> {
-  const [os, fs, path] = await Promise.all([getOsAsync(), getFsAsync(), getPathAsync()]);
+  const os = await getOsAsync();
   const poolId = getEnv("VITEST_POOL_ID") ?? "0";
   const code = generateCode(schema, typeRegistryKey, supportsExpressionIndex);
-  const filePath = path.join(os.tmpdir(), `trails-schema-${poolId}-${schemaChecksum(code)}.ts`);
-  if (fs.writeFile) {
-    await fs.writeFile(filePath, code);
-  } else {
-    fs.writeFileSync(filePath, code);
-  }
+  const filePath = File.join(os.tmpdir(), `trails-schema-${poolId}-${schemaChecksum(code)}.ts`);
+  File.write(filePath, code);
   return filePath;
 }

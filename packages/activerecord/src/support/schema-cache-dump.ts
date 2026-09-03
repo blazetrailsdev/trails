@@ -1,6 +1,6 @@
 /** @internal */
 import { getEnv, getOsAsync, hexdigest } from "@blazetrails/activesupport";
-import { getPathAsync } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import type {
   AbstractAdapter as DatabaseAdapter,
   AdapterName,
@@ -19,9 +19,8 @@ export function templateSchemaFingerprint(): string | null {
 }
 
 export async function schemaCacheDumpPathFor(runToken: string): Promise<string> {
-  const path = await getPathAsync();
   const os = await getOsAsync();
-  return path.join(os.tmpdir(), `${TEMP_DB_PREFIX}schema-cache-${runToken}.json`);
+  return File.join(os.tmpdir(), `${TEMP_DB_PREFIX}schema-cache-${runToken}.json`);
 }
 
 export async function dumpTemplateSchemaCache(

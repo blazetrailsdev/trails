@@ -61,7 +61,7 @@ export class UploadedFile {
   read(): Buffer {
     if (this._content) return this._content;
     if (this._tempfile) {
-      return getFs().readFileSync(this._tempfile);
+      return getFs().readFileSync(this._tempfile) as Buffer;
     }
     return Buffer.alloc(0);
   }

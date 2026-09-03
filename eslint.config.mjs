@@ -143,6 +143,7 @@ export default defineConfig(
     ignores: [
       "vendor/**",
       "**/dist/**",
+      "**/dist-test/**",
       "packages/website/static/**",
       "packages/website/build/**",
       // Vite/Vitest config files outside any tsconfig program — the typed

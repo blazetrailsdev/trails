@@ -61,7 +61,7 @@ import type { DateTimeCastResult } from "@blazetrails/activemodel";
 import { defaultSqlTimezone } from "./abstract/sql-datetime.js";
 import { IntegerType, FloatType } from "@blazetrails/activemodel";
 import { isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
-import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -297,17 +297,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   private prepareDatabasePath(filename: string): string {
-    const fs = getFs();
-    const path = getPath();
-    const expanded = path.resolve(trailsRoot() ?? fs.cwd(), filename);
-    const dirname = path.dirname(expanded);
-    let dirExists = false;
-    try {
-      dirExists = fs.statSync(dirname).isDirectory();
-    } catch {
-      dirExists = false;
-    }
-    if (!dirExists) {
+    const expanded = File.expandPath(filename, trailsRoot() ?? undefined);
+    const dirname = File.dirname(expanded);
+    if (!File.isDirectory(dirname)) {
       try {
         FileUtils.mkdirP(dirname);
       } catch (e) {
@@ -853,14 +845,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   static override async databaseExists(config: { database?: string }): Promise<boolean> {
     if (!config.database || config.database === ":memory:") return true;
     try {
-      return await getFs().exists(config.database);
+      return File.isExist(config.database);
     } catch {
       return false;
     }
   }
 
   override async databaseExists(): Promise<boolean> {
-    return this._memoryDatabase || (await getFs().exists(this._filename));
+    return this._memoryDatabase || File.isExist(this._filename);
   }
 
   /** @missingRailsCall include? — CONVERGEABLE retire-sqlite3-positional-constructor-overload */

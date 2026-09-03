@@ -24,7 +24,7 @@
  * no round-trip merge. Re-running regenerates.
  */
 
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 
 import { generateModels } from "@blazetrails/activerecord";
 
@@ -150,15 +150,12 @@ export async function run(argv: readonly string[]): Promise<number> {
 
   // Resolve the schema source: --schema > auto-discovered db/schema.ts > error.
 
-  const fs = await getFsAsync();
-  const path = await getPathAsync();
-
   let schemaFilePath: string;
   if (args.schemaPath) {
-    schemaFilePath = path.resolve(args.schemaPath);
+    schemaFilePath = File.expandPath(args.schemaPath);
   } else {
-    const conventionPath = path.join(fs.cwd(), "db", "schema.ts");
-    if (await fs.exists(conventionPath)) {
+    const conventionPath = File.expandPath(File.join("db", "schema.ts"));
+    if (File.isExist(conventionPath)) {
       schemaFilePath = conventionPath;
     } else {
       process.stderr.write(
@@ -170,7 +167,7 @@ export async function run(argv: readonly string[]): Promise<number> {
 
   let source: string;
   try {
-    source = fs.readFileSync(schemaFilePath, "utf8");
+    source = File.read(schemaFilePath);
   } catch {
     process.stderr.write(`ar models:dump: cannot read schema file: ${schemaFilePath}\n`);
     return 1;
@@ -204,13 +201,9 @@ export async function run(argv: readonly string[]): Promise<number> {
   }
 
   if (args.outPath) {
-    // getFsAsync / getPathAsync auto-register a Node adapter via dynamic
-    // import(), which works both in ESM (tsx) and CJS (built bin). The sync
-    // getFs()/getPath() variants auto-register via require(), which returns
-    // undefined under ESM — so the async pair is the portable choice here.
-    const resolved = path.resolve(args.outPath);
-    fs.mkdirSync(path.dirname(resolved), { recursive: true });
-    fs.writeFileSync(resolved, output);
+    const resolved = File.expandPath(args.outPath);
+    FileUtils.mkdirP(File.dirname(resolved));
+    File.write(resolved, output);
     process.stdout.write(`ar models:dump: wrote ${resolved}\n`);
   } else {
     process.stdout.write(output);
