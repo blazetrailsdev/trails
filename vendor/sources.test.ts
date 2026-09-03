@@ -75,7 +75,7 @@ describe("vendor/sources.ts", () => {
     expect(vendoredRoot("rack-session").endsWith("vendor/rack-session")).toBe(true);
   });
 
-  it("declares the rack-test source, vendored ahead of its TS package", () => {
+  it("declares the rack-test source, enrolled in test-compare only", () => {
     // actionpack declares `add_dependency "rack-test", ">= 0.6.3"`
     // (vendor/rails/actionpack/actionpack.gemspec:41); v2.2.0 is what
     // vendor/rails/Gemfile.lock:443 resolves.
@@ -93,15 +93,11 @@ describe("vendor/sources.ts", () => {
         libEntryFile: "lib/rack/test.rb",
         testPath: "spec",
         compareApi: false,
-        compareTests: false,
       },
     ]);
-    // Both compares key a package onto packages/<name>/src, which does not
-    // exist yet; enroll-rack-test-in-compare-tooling creates it and flips
-    // these on.
     expect(apiComparePackages()).not.toContain("rack-test");
     expect(Object.keys(libPathsManifest())).not.toContain("rack-test");
-    expect(Object.keys(testPathsManifest())).not.toContain("rack-test");
+    expect(Object.keys(testPathsManifest())).toContain("rack-test");
     expect(resolvePath("rack-test").endsWith("vendor/rack-test/lib/rack/test")).toBe(true);
     expect(resolvePath("rack-test", "test").endsWith("vendor/rack-test/spec")).toBe(true);
     expect(vendoredRoot("rack-test").endsWith("vendor/rack-test")).toBe(true);
@@ -341,6 +337,7 @@ describe("vendor/sources.ts", () => {
         "i18n",
         "rack",
         "rack-session",
+        "rack-test",
         "ruby-compat",
         "trailties",
       ].sort(),

@@ -106,13 +106,17 @@ lines defining the gem's central `Session` class, so the module root stays the
 `libEntryFile` — the mechanism `arel` uses for `activerecord/lib/arel.rb`.
 `testPath` is `spec`, not `test`.
 
-`compareApi` / `compareTests` are off for the same temporary reason
-rack-session's were: both compares key a package onto a TS workspace dir and
-`packages/rack-test/src` does not exist yet. The Ruby half of both extractors
-already runs over this clone unmodified — `extract-ruby-api.rb` reports 5
-classes, 4 modules, 90 public methods and `extract-ruby-tests.rb` 8 files, 234
-tests. RFC 0137's `enroll-rack-test-in-compare-tooling` creates the package and
-flips both on.
+`compareTests` is **on**: test-compare tolerates a package with no
+`packages/<name>/src`, so the gem's 8 spec files / 234 tests are read and simply
+match nothing yet, and `parity:test`'s totals are unmoved.
+
+`compareApi` is off, and unlike rack-session's that is a hard mechanical block
+rather than a policy: `extract-ts-api.ts` refuses to measure a package whose
+`dist` is absent (`packages/rack-test — NotBuilt`, `build-freshness.ts:168-185`),
+so turning it on fails `pnpm parity:api` outright rather than printing a 0% row.
+The Ruby half is ready — `extract-ruby-api.rb` reports 5 classes, 4 modules, 90
+public methods over this clone — so the blocker is only the missing TS
+workspace, which RFC 0137's `enroll-rack-test-in-compare-tooling` creates.
 
 ## Scoping a Rails bump (drift report)
 
