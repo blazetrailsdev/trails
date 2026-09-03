@@ -188,13 +188,13 @@ export class Tempfile {
   /** `IO#read` — the whole file. */
   read(): Buffer {
     this.flush();
-    return Buffer.from(File.binread(this.tmpname), "utf8");
+    return File.open(this.tmpname, "rb", (f) => Buffer.from(f.read(), "latin1"));
   }
 
   /** `IO#flush` — writes the buffered bytes through to the file. */
   private flush(): void {
     if (this.flushed) return;
-    File.binwrite(this.tmpname, this.buffer.toString("utf8"));
+    File.open(this.tmpname, "wb", (f) => f.write(this.buffer.toString("latin1")));
     this.flushed = true;
   }
 

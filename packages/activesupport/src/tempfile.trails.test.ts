@@ -91,6 +91,16 @@ describe("Tempfile", () => {
     b.unlink();
   });
 
+  it("read gives back the bytes write was handed", () => {
+    // `Tempfile#write` is Ruby's binary `IO#write` (`vendor/ruby/io.c:2263`),
+    // so a byte that is not valid UTF-8 survives the round trip.
+    const bytes = Buffer.from([0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe]);
+    const tempfile = Tempfile.new("bin");
+    tempfile.write(bytes);
+    expect([...tempfile.read()]).toEqual([...bytes]);
+    tempfile.unlink();
+  });
+
   it("create unlinks the file when an async block rejects", async () => {
     let path = "";
     await expect(

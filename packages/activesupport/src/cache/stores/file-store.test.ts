@@ -81,14 +81,14 @@ describe("FileStoreTest", () => {
     const key = "A".repeat(FILENAME_MAX_SIZE);
     // Ruby reads the name Tempfile would pick out of `Dir::Tmpname.create`
     // (file_store_test.rb:80); trails' atomicWrite picks its own, so the name
-    // under test is the one the real write hands to `File.binwrite`.
-    const binwrite = vi.spyOn(File, "binwrite");
+    // under test is the one Tempfile hands to its exclusive `File.open`.
+    const open = vi.spyOn(File, "open");
     let tmpname: string;
     try {
       store.write(key, "v");
-      tmpname = basename(String(binwrite.mock.calls[0][0]));
+      tmpname = basename(String(open.mock.calls[0][0]));
     } finally {
-      binwrite.mockRestore();
+      open.mockRestore();
     }
     assert(
       basename(`${tmpname}.lock`).length <= 255,
