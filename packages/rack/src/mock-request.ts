@@ -18,8 +18,7 @@ import {
   HEAD,
   OPTIONS,
 } from "./constants.js";
-import { StringIO } from "@blazetrails/activesupport";
-import { isSymbol } from "@blazetrails/ruby-compat";
+import { isSymbol, StringIO } from "@blazetrails/ruby-compat";
 import { Lint } from "./lint.js";
 import { MockResponse } from "./mock-response.js";
 import { buildMultipart } from "./multipart.js";

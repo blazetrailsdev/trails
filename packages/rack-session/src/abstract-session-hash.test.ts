@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Request } from "@blazetrails/rack";
 import { beforeEach, describe, expect, it } from "vitest";
 

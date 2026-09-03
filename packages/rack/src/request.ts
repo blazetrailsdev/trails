@@ -49,8 +49,7 @@ import {
   QueryParser,
   unescape,
 } from "./utils.js";
-import { block as rbBlock, fetch } from "@blazetrails/ruby-compat";
-import { include } from "@blazetrails/activesupport";
+import { block as rbBlock, fetch, include } from "@blazetrails/ruby-compat";
 import * as MediaTypeModule from "./media-type.js";
 import * as Multipart from "./multipart.js";
 

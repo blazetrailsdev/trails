@@ -2,28 +2,53 @@
  * ESLint rule: no-node-builtins
  *
  * Disallows direct imports of Node.js built-in modules in browser-compatible
- * packages. Points to @blazetrails/activesupport adapters when available and
- * provides autofix that rewrites both the import and all usage sites.
+ * packages. Points to the `@blazetrails/ruby-compat` seat for the builtin when
+ * there is one and provides autofix that rewrites both the import and every
+ * usage site.
  */
 
-const ACTIVESUPPORT_REPLACEMENTS = {
+/**
+ * The Ruby seat for each Node builtin trails packages reach for. `fs` and
+ * `path` are `File` / `Dir` — Ruby's own file and directory API, not an adapter
+ * accessor — so their usage-site rewrite is a static-method call, and only the
+ * members whose Ruby counterpart takes the same arguments are rewritten; a
+ * member with no seat is reported without a fix rather than autofixed into a
+ * call that does not type-check. `crypto` has no Ruby class of its own, so it
+ * keeps the `getCrypto()` adapter accessor.
+ */
+export const RUBY_COMPAT_REPLACEMENTS = {
   fs: {
     importSource: "@blazetrails/ruby-compat",
-    importName: "getFs",
+    importName: "File",
     message:
-      'Use getFs() from @blazetrails/ruby-compat instead of importing "{{module}}" directly.',
+      'Use File / Dir from @blazetrails/ruby-compat instead of importing "{{module}}" directly.',
+    members: {
+      existsSync: "File.isExist",
+      statSync: "File.stat",
+      renameSync: "File.rename",
+      unlinkSync: "File.delete",
+      readdirSync: "Dir.children",
+      rmdirSync: "Dir.delete",
+    },
   },
   path: {
     importSource: "@blazetrails/ruby-compat",
-    importName: "getPath",
-    message:
-      'Use getPath() from @blazetrails/ruby-compat instead of importing "{{module}}" directly.',
+    importName: "File",
+    message: 'Use File from @blazetrails/ruby-compat instead of importing "{{module}}" directly.',
+    members: {
+      join: "File.join",
+      dirname: "File.dirname",
+      basename: "File.basename",
+      extname: "File.extname",
+      sep: "File.SEPARATOR",
+    },
   },
   crypto: {
-    importSource: "@blazetrails/activesupport",
+    importSource: "@blazetrails/ruby-compat",
     importName: "getCrypto",
+    accessor: true,
     message:
-      'Use getCrypto() from @blazetrails/activesupport instead of importing "{{module}}" directly.',
+      'Use getCrypto() from @blazetrails/ruby-compat instead of importing "{{module}}" directly.',
   },
 };
 
@@ -31,15 +56,6 @@ import { builtinModules } from "node:module";
 
 // All Node.js built-in module names (without node: prefix), including underscored internals
 const NODE_BUILTINS = new Set(builtinModules.filter((m) => !m.startsWith("_")));
-
-// `@blazetrails/ruby-compat` is a leaf package with no workspace dependencies
-// (RFC 0129), so the activesupport adapter the crypto row points at is itself a
-// violation there — report the plain message and offer no autofix.
-const LEAF_PACKAGE_PATH = "packages/ruby-compat/";
-
-function isLeafPackageFile(filename) {
-  return typeof filename === "string" && filename.replace(/\\/g, "/").includes(LEAF_PACKAGE_PATH);
-}
 
 function normalizeModule(source) {
   return source.replace(/^node:/, "");
@@ -67,8 +83,6 @@ const rule = {
     schema: [],
   },
   create(context) {
-    const leaf = isLeafPackageFile(context.filename ?? context.getFilename());
-
     function getReferencesForSpec(node, spec) {
       const sourceCode = context.sourceCode || context.getSourceCode();
       const scope = sourceCode.getScope(node);
@@ -103,32 +117,61 @@ const rule = {
       return existingImport.specifiers.every((s) => s.type === "ImportSpecifier");
     }
 
-    function replaceNodeImport(fixer, node, replacement) {
+    /** The import names the rewrite of `members` needs, or null if one has no seat. */
+    function importNamesFor(replacement, memberNames) {
+      if (replacement.accessor) return [replacement.importName];
+      const names = [];
+      for (const memberName of memberNames) {
+        const seat = replacement.members[memberName];
+        if (!seat) return null;
+        const receiver = seat.slice(0, seat.indexOf("."));
+        if (!names.includes(receiver)) names.push(receiver);
+      }
+      return names;
+    }
+
+    /** The expression that replaces one usage site, e.g. `File.join`. */
+    function rewriteMember(localNames, replacement, memberName) {
+      if (replacement.accessor) {
+        return `${localNames[replacement.importName]}().${memberName}`;
+      }
+      const seat = replacement.members[memberName];
+      const dot = seat.indexOf(".");
+      return `${localNames[seat.slice(0, dot)]}.${seat.slice(dot + 1)}`;
+    }
+
+    function replaceNodeImport(fixer, node, replacement, names) {
       const fixes = [];
+      const localNames = {};
       const existing = findExistingAdapterImport(node, replacement);
       if (existing) {
-        const spec = findAdapterSpecifier(existing, replacement.importName);
-        if (spec) {
+        const missing = [];
+        for (const name of names) {
+          const spec = findAdapterSpecifier(existing, name);
           // Already imported (possibly aliased) — use the local name for rewrites
-          fixes.push(fixer.remove(node));
-          fixes._adapterLocalName = spec.local.name;
-        } else if (isNamedImportOnly(existing)) {
-          // Named import exists but doesn't have our specifier — safe to insert
-          fixes.push(fixer.remove(node));
+          if (spec) localNames[name] = spec.local.name;
+          else {
+            localNames[name] = name;
+            missing.push(name);
+          }
+        }
+        // Existing import uses default/namespace style — bail, can't safely merge
+        if (missing.length > 0 && !isNamedImportOnly(existing)) return null;
+        fixes.push(fixer.remove(node));
+        if (missing.length > 0) {
           const lastSpec = existing.specifiers[existing.specifiers.length - 1];
-          fixes.push(fixer.insertTextAfter(lastSpec, `, ${replacement.importName}`));
-        } else {
-          // Existing import uses default/namespace style — bail, can't safely merge
-          return null;
+          fixes.push(fixer.insertTextAfter(lastSpec, `, ${missing.join(", ")}`));
         }
       } else {
+        for (const name of names) localNames[name] = name;
         fixes.push(
           fixer.replaceText(
             node,
-            `import { ${replacement.importName} } from "${replacement.importSource}";`,
+            `import { ${names.join(", ")} } from "${replacement.importSource}";`,
           ),
         );
       }
+      fixes._localNames = localNames;
       return fixes;
     }
 
@@ -136,40 +179,58 @@ const rule = {
       const spec = node.specifiers[0];
       const refs = getReferencesForSpec(node, spec);
 
-      // Bail if any reference isn't a simple member access (e.g. passed as value)
+      const sites = [];
       for (const ref of refs) {
         const parent = ref.identifier.parent;
-        if (!(parent.type === "MemberExpression" && parent.object === ref.identifier)) {
-          return null;
-        }
+        // Bail if any reference isn't a simple member access (e.g. passed as value)
+        if (!(parent.type === "MemberExpression" && parent.object === ref.identifier)) return null;
+        if (parent.computed || parent.property.type !== "Identifier") return null;
+        sites.push({ node: parent, memberName: parent.property.name });
       }
 
-      const fixes = replaceNodeImport(fixer, node, replacement);
+      const names = importNamesFor(
+        replacement,
+        sites.map((site) => site.memberName),
+      );
+      if (!names) return null;
+      const fixes = replaceNodeImport(fixer, node, replacement, names);
       if (!fixes) return null;
-      const adapterCall = `${fixes._adapterLocalName || replacement.importName}()`;
-      for (const ref of refs) {
-        fixes.push(fixer.replaceText(ref.identifier, adapterCall));
+      for (const site of sites) {
+        fixes.push(
+          fixer.replaceText(
+            site.node,
+            rewriteMember(fixes._localNames, replacement, site.memberName),
+          ),
+        );
       }
       return fixes;
     }
 
     function fixNamedImports(fixer, node, replacement) {
-      const refs = [];
+      const sites = [];
       for (const spec of node.specifiers) {
         // Use the imported (original) name, not the local (aliased) name
-        const importedName =
+        const memberName =
           spec.imported && spec.imported.name ? spec.imported.name : spec.local.name;
         for (const ref of getReferencesForSpec(node, spec)) {
-          refs.push({ ref, importedName });
+          sites.push({ node: ref.identifier, memberName });
         }
       }
 
-      const fixes = replaceNodeImport(fixer, node, replacement);
+      const names = importNamesFor(
+        replacement,
+        sites.map((site) => site.memberName),
+      );
+      if (!names) return null;
+      const fixes = replaceNodeImport(fixer, node, replacement, names);
       if (!fixes) return null;
-      const adapterCall = `${fixes._adapterLocalName || replacement.importName}()`;
-
-      for (const { ref, importedName } of refs) {
-        fixes.push(fixer.replaceText(ref.identifier, `${adapterCall}.${importedName}`));
+      for (const site of sites) {
+        fixes.push(
+          fixer.replaceText(
+            site.node,
+            rewriteMember(fixes._localNames, replacement, site.memberName),
+          ),
+        );
       }
       return fixes;
     }
@@ -177,7 +238,7 @@ const rule = {
     function check(node, source) {
       const mod = normalizeModule(source);
       const base = getBuiltinBase(mod);
-      const replacement = leaf ? undefined : ACTIVESUPPORT_REPLACEMENTS[base];
+      const replacement = RUBY_COMPAT_REPLACEMENTS[base];
 
       // Only autofix exact base module imports (not subpaths like "fs/promises")
       if (replacement && base === mod) {
@@ -250,7 +311,7 @@ const rule = {
           const source = node.arguments[0].value;
           const mod = normalizeModule(source);
           const base = getBuiltinBase(mod);
-          const replacement = leaf ? undefined : ACTIVESUPPORT_REPLACEMENTS[base];
+          const replacement = RUBY_COMPAT_REPLACEMENTS[base];
           if (replacement) {
             context.report({
               node,

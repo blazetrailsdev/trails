@@ -264,6 +264,31 @@ export function slice<T>(hash: Record<string, T>, ...keys: string[]): Record<str
 }
 
 /**
+ * Ruby `Hash#values_at` (`vendor/ruby/hash.c:2713` `rb_hash_values_at`) — an
+ * ARRAY of the values for the given keys, in argument order, `nil` for a key
+ * the hash does not hold.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/hash.c:2713`).
+ */
+export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | undefined)[];
+/**
+ * The Map arm: `rb_hash_aref` is the same lookup whichever hash it is given.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/hash.c:2713`).
+ */
+export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | undefined)[];
+/**
+ * `rb_hash_values_at` pushes `rb_hash_aref(hash, argv[i])` for each key, so the
+ * arms share one body over the rest parameter.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#values_at` (`vendor/ruby/hash.c:2713`).
+ */
+export function valuesAt(
+  hash: Record<string, unknown> | Map<unknown, unknown>,
+  ...keys: unknown[]
+) {
+  if (hash instanceof Map) return keys.map((key) => hash.get(key));
+  return keys.map((key) => hash[key as string]);
+}
+
+/**
  * Ruby `Hash#except` (`vendor/ruby/hash.c:2683` `rb_hash_except`) — a dup
  * with the given keys deleted, keys that are absent ignored.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/hash.c:2683`).

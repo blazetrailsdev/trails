@@ -11,7 +11,7 @@ import {
 import { STATUS_WITH_NO_ENTITY_BODY } from "./constants.js";
 import * as MediaTypeModule from "./media-type.js";
 import { setCookieHeader, deleteSetCookieHeaderBang } from "./utils.js";
-import { include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/ruby-compat";
 
 export abstract class Helpers {
   declare status: number;

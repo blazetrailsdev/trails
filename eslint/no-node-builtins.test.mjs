@@ -1,77 +1,105 @@
 import { RuleTester } from "eslint";
-import rule from "./no-node-builtins.mjs";
+import { describe, it, expect } from "vitest";
+import * as rubyCompat from "@blazetrails/ruby-compat";
+import rule, { RUBY_COMPAT_REPLACEMENTS } from "./no-node-builtins.mjs";
 
 const tester = new RuleTester({ languageOptions: { ecmaVersion: 2022, sourceType: "module" } });
 
 tester.run("no-node-builtins", rule, {
   valid: [
-    'import { getFs } from "@blazetrails/ruby-compat";',
-    'import { getPath } from "@blazetrails/ruby-compat";',
-    'import { getCrypto } from "@blazetrails/activesupport";',
+    'import { File } from "@blazetrails/ruby-compat";',
+    'import { Dir } from "@blazetrails/ruby-compat";',
+    'import { getCrypto } from "@blazetrails/ruby-compat";',
     'import { foo } from "./local.js";',
     'import lodash from "lodash";',
   ],
   invalid: [
     // Namespace import — rewrites import + all usage sites
     {
-      code: 'import * as fs from "fs";\nfs.readFileSync("x", "utf-8");',
+      code: 'import * as fs from "fs";\nfs.existsSync("x");',
       errors: [{ messageId: "useAdapter" }],
-      output:
-        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");',
+      output: 'import { File } from "@blazetrails/ruby-compat";\nFile.isExist("x");',
     },
     // node: prefix
     {
-      code: 'import * as fs from "node:fs";\nfs.existsSync("x");',
+      code: 'import * as fs from "node:fs";\nfs.statSync("x");',
       errors: [{ messageId: "useAdapter" }],
-      output: 'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().existsSync("x");',
+      output: 'import { File } from "@blazetrails/ruby-compat";\nFile.stat("x");',
     },
     // Default import
     {
-      code: 'import fs from "fs";\nfs.readFileSync("x", "utf-8");',
+      code: 'import fs from "fs";\nfs.renameSync("x", "y");',
+      errors: [{ messageId: "useAdapter" }],
+      output: 'import { File } from "@blazetrails/ruby-compat";\nFile.rename("x", "y");',
+    },
+    // A directory member takes its seat on Dir, not File
+    {
+      code: 'import * as fs from "fs";\nfs.readdirSync("x");',
+      errors: [{ messageId: "useAdapter" }],
+      output: 'import { Dir } from "@blazetrails/ruby-compat";\nDir.children("x");',
+    },
+    // Both seats at once
+    {
+      code: 'import * as fs from "fs";\nfs.readdirSync("x");\nfs.existsSync("y");',
       errors: [{ messageId: "useAdapter" }],
       output:
-        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");',
+        'import { Dir, File } from "@blazetrails/ruby-compat";\nDir.children("x");\nFile.isExist("y");',
     },
     // Named imports
     {
-      code: 'import { readFileSync } from "fs";\nreadFileSync("x", "utf-8");',
+      code: 'import { existsSync } from "fs";\nexistsSync("x");',
       errors: [{ messageId: "useAdapter" }],
-      output:
-        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");',
+      output: 'import { File } from "@blazetrails/ruby-compat";\nFile.isExist("x");',
     },
     // Named imports — multiple
     {
-      code: 'import { readFileSync, existsSync } from "fs";\nreadFileSync("x", "utf-8");\nexistsSync("y");',
+      code: 'import { unlinkSync, existsSync } from "fs";\nunlinkSync("x");\nexistsSync("y");',
       errors: [{ messageId: "useAdapter" }],
       output:
-        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");\ngetFs().existsSync("y");',
+        'import { File } from "@blazetrails/ruby-compat";\nFile.delete("x");\nFile.isExist("y");',
     },
     // Aliased named import — uses original (imported) name, not alias
     {
-      code: 'import { readFileSync as rfs } from "fs";\nrfs("x", "utf-8");',
+      code: 'import { existsSync as ex } from "fs";\nex("x");',
       errors: [{ messageId: "useAdapter" }],
-      output:
-        'import { getFs } from "@blazetrails/ruby-compat";\ngetFs().readFileSync("x", "utf-8");',
+      output: 'import { File } from "@blazetrails/ruby-compat";\nFile.isExist("x");',
+    },
+    // A member with no Ruby seat is reported without a fix
+    {
+      code: 'import * as fs from "fs";\nfs.readFileSync("x", "utf-8");',
+      errors: [{ messageId: "useAdapter" }],
+      output: null,
+    },
+    // Merges into an existing ruby-compat named import
+    {
+      code: 'import { StringIO } from "@blazetrails/ruby-compat";\nimport * as path from "path";\npath.join("a", "b");',
+      errors: [{ messageId: "useAdapter" }],
+      output: 'import { StringIO, File } from "@blazetrails/ruby-compat";\n\nFile.join("a", "b");',
     },
     // path
     {
       code: 'import * as path from "path";\npath.join("a", "b");',
       errors: [{ messageId: "useAdapter" }],
-      output: 'import { getPath } from "@blazetrails/ruby-compat";\ngetPath().join("a", "b");',
+      output: 'import { File } from "@blazetrails/ruby-compat";\nFile.join("a", "b");',
     },
-    // crypto
+    {
+      code: 'import { basename, extname } from "node:path";\nbasename("a");\nextname("a");',
+      errors: [{ messageId: "useAdapter" }],
+      output:
+        'import { File } from "@blazetrails/ruby-compat";\nFile.basename("a");\nFile.extname("a");',
+    },
+    // crypto keeps the adapter accessor
     {
       code: 'import { createHash } from "crypto";\ncreateHash("sha256");',
       errors: [{ messageId: "useAdapter" }],
       output:
-        'import { getCrypto } from "@blazetrails/activesupport";\ngetCrypto().createHash("sha256");',
+        'import { getCrypto } from "@blazetrails/ruby-compat";\ngetCrypto().createHash("sha256");',
     },
     // crypto with node: prefix
     {
       code: 'import * as crypto from "node:crypto";\ncrypto.randomBytes(16);',
       errors: [{ messageId: "useAdapter" }],
-      output:
-        'import { getCrypto } from "@blazetrails/activesupport";\ngetCrypto().randomBytes(16);',
+      output: 'import { getCrypto } from "@blazetrails/ruby-compat";\ngetCrypto().randomBytes(16);',
     },
     // Namespace passed as value — autofix bails (reports error only)
     {
@@ -102,23 +130,25 @@ tester.run("no-node-builtins", rule, {
       code: 'const fs = require("fs");',
       errors: [{ messageId: "useAdapter" }],
     },
-    // Inside ruby-compat the activesupport crypto adapter is itself a leaf violation.
-    {
-      filename: "/repo/packages/ruby-compat/src/hash.ts",
-      code: 'import * as fs from "fs";\nfs.readFileSync("x", "utf-8");',
-      errors: [{ messageId: "noNodeBuiltin" }],
-      output: null,
-    },
+    // ruby-compat is no longer a special case: the seat it is pointed at is its own
     {
       filename: "/repo/packages/ruby-compat/src/hash.ts",
       code: 'import { createHash } from "node:crypto";\ncreateHash("sha256");',
-      errors: [{ messageId: "noNodeBuiltin" }],
-      output: null,
-    },
-    {
-      filename: "/repo/packages/ruby-compat/src/hash.ts",
-      code: 'const fs = require("fs");',
-      errors: [{ messageId: "noNodeBuiltin" }],
+      errors: [{ messageId: "useAdapter" }],
+      output:
+        'import { getCrypto } from "@blazetrails/ruby-compat";\ngetCrypto().createHash("sha256");',
     },
   ],
+});
+
+describe("no-node-builtins seats", () => {
+  it("every seat the autofix writes exists on @blazetrails/ruby-compat", () => {
+    for (const [builtin, replacement] of Object.entries(RUBY_COMPAT_REPLACEMENTS)) {
+      expect(rubyCompat[replacement.importName], builtin).toBeDefined();
+      for (const seat of Object.values(replacement.members ?? {})) {
+        const [receiver, member] = seat.split(".");
+        expect(rubyCompat[receiver][member], seat).toBeDefined();
+      }
+    }
+  });
 });
