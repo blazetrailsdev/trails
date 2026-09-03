@@ -1,5 +1,5 @@
 import { Notifications } from "./notifications.js";
-import { publicInstanceMethods } from "./include.js";
+import { publicInstanceMethods } from "@blazetrails/ruby-compat/include";
 import type { NotificationSubscriber } from "./notifications.js";
 import type { Event } from "./notifications/instrumenter.js";
 import type { AnyClass } from "./descendants-tracker.js";

@@ -1,4 +1,4 @@
-import { block, fetch } from "@blazetrails/ruby-compat";
+import { block, fetch, KeyError } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
@@ -43,7 +43,6 @@ import {
   isPresent,
   presence,
   assertValidKeys,
-  KeyError,
   any,
   truncateBytes,
   wrap,

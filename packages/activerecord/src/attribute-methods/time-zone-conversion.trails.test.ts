@@ -6,9 +6,9 @@ import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
 import { Array as ArrayType } from "../connection-adapters/postgresql/oid/array.js";
-import { Range } from "@blazetrails/activesupport";
 import { RangeType } from "../connection-adapters/postgresql/oid/range.js";
 import { TimeZoneConverter } from "./time-zone-conversion.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 fixtures({});
 

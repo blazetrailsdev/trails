@@ -1,7 +1,7 @@
 import { callerLocations, type CallerLocation, type Deprecation } from "../deprecation.js";
-import { extend, include, Module, prepend } from "../include.js";
+import { extend, include, Module, prepend } from "@blazetrails/ruby-compat/include";
 import { constantize } from "../inflector.js";
-import { PROTOCOL_PROBES } from "../method-missing-proxy.js";
+import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 /**
  * Mirrors: active_support/deprecation/proxy_wrappers.rb

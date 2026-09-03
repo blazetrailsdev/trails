@@ -5,10 +5,9 @@ import {
   buildExplainClause as mysqlBuildExplainClause,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, KeyError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
-import { KeyError } from "@blazetrails/activesupport";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import { rubyInspect } from "../relation/ruby-inspect.js";
 import type { InsertBuilder } from "../insert-all.js";

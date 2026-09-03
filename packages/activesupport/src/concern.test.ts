@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { concern, includeConcern, hasConcern } from "./concern.js";
-import { extended } from "./include.js";
+import { extended } from "@blazetrails/ruby-compat/include";
 
 describe("Concern", () => {
   it("mixes instance methods into class prototype", () => {

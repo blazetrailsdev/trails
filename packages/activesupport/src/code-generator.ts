@@ -11,7 +11,7 @@
  * directly, and it is that batching the callers thread as `code_generator`.
  */
 import { NameError } from "./core-ext/name-error.js";
-import { Module } from "./include.js";
+import { Module } from "@blazetrails/ruby-compat/include";
 
 /**
  * One entry of Rails' `@sources` array. Rails pushes Ruby source lines that

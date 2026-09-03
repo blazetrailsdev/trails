@@ -16,7 +16,7 @@ interface AttributeHolder {
 export const Read = {
   readAttribute,
   _readAttribute,
-  attribute: _readAttribute,
+  attribute,
 };
 
 export function readAttribute(
@@ -42,6 +42,15 @@ export function _readAttribute(
   block?: (name: string) => unknown,
 ): unknown {
   return this._attributes.fetchValue(attrName, block) ?? null;
+}
+
+/** @internal */
+export function attribute(
+  this: AttributeHolder,
+  attrName: string,
+  block?: (name: string) => unknown,
+): unknown {
+  return _readAttribute.call(this, attrName, block);
 }
 
 /** @internal */

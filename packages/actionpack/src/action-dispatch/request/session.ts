@@ -1,6 +1,6 @@
 import { getRubyClassPath } from "@blazetrails/rack-session";
-import { hasKey } from "@blazetrails/ruby-compat";
-import { KeyError, stringifyKeys } from "@blazetrails/activesupport";
+import { hasKey, KeyError } from "@blazetrails/ruby-compat";
+import { stringifyKeys } from "@blazetrails/activesupport";
 
 /**
  * ActionDispatch::Request::Session

@@ -76,6 +76,12 @@ import {
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
 import { processAction as _processAction } from "./metal/rendering.js";
+import {
+  appendInfoToPayload,
+  cleanupViewRuntime,
+  haltedCallbackHook,
+  processAction as _instrumentProcessAction,
+} from "./metal/instrumentation.js";
 import { Parameters as StrongParameters } from "./metal/strong-parameters.js";
 import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
@@ -906,41 +912,53 @@ export class Base extends Metal {
    * @internal
    */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
-    try {
-      // `ActionController::Rendering#process_action` (`rendering.rb:190-194`)
-      // — `self.formats = request.formats.filter_map(&:ref)` before the
-      // action runs, so the lookup context negotiates `"*/*"` down to the
-      // default formats rather than searching for a `*/*` template.
-      _processAction.call(this as never, action, ...args);
-      if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
-        _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
-        // Rails' controller `params` is `request.parameters` by reference, so
-        // the merge in `_performParameterWrapping` is visible to actions. Our
-        // Metal.dispatch snapshots `request.params` into `this.params` before
-        // processAction runs, so we re-sync after wrapping to surface the
-        // wrapped root key to the action.
-        this.params = new StrongParameters({
-          ...this.request.params,
-          ...this.request.pathParameters,
-        });
-      }
-      await super.processAction(action, ...args);
-
-      // Resolve any pending async renders (template/partial)
-      if (this._pendingRender && !this.performed) {
-        await this.renderAsync(this._pendingRender.options);
-        this._pendingRender = null;
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        const match = this._findRescueHandler(error);
-        if (match) {
-          await match.handler.call(this, match.error);
-          return;
+    // `ActionController::Instrumentation` is included last, so its
+    // `process_action` (`instrumentation.rb:60`) is the outermost one in
+    // Rails' ancestry and everything below runs as its `super`.
+    //
+    // Rails' `AbstractController::Base#process` sets `@_action_name` before
+    // dispatching (`abstract_controller/base.rb:155`), so `raw_payload`'s
+    // `action` is already populated. trails assigns it one layer lower, in
+    // `AbstractController::Base#processAction`, which direct callers depend
+    // on — so prime it here for the payload rather than move it.
+    this.actionName = action;
+    await _instrumentProcessAction.call(this as never, async () => {
+      try {
+        // `ActionController::Rendering#process_action` (`rendering.rb:190-194`)
+        // — `self.formats = request.formats.filter_map(&:ref)` before the
+        // action runs, so the lookup context negotiates `"*/*"` down to the
+        // default formats rather than searching for a `*/*` template.
+        _processAction.call(this as never, action, ...args);
+        if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
+          _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
+          // Rails' controller `params` is `request.parameters` by reference, so
+          // the merge in `_performParameterWrapping` is visible to actions. Our
+          // Metal.dispatch snapshots `request.params` into `this.params` before
+          // processAction runs, so we re-sync after wrapping to surface the
+          // wrapped root key to the action.
+          this.params = new StrongParameters({
+            ...this.request.params,
+            ...this.request.pathParameters,
+          });
         }
+        await super.processAction(action, ...args);
+
+        // Resolve any pending async renders (template/partial)
+        if (this._pendingRender && !this.performed) {
+          await this.renderAsync(this._pendingRender.options);
+          this._pendingRender = null;
+        }
+      } catch (error) {
+        if (error instanceof Error) {
+          const match = this._findRescueHandler(error);
+          if (match) {
+            await match.handler.call(this, match.error);
+            return;
+          }
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   // --- Caching / Conditional GET ---
@@ -1006,6 +1024,12 @@ export class Base extends Metal {
    * @internal
    */
   declare sendFileHeadersBang: typeof sendFileHeadersBang;
+  /** @internal */
+  declare appendInfoToPayload: typeof appendInfoToPayload;
+  /** @internal */
+  declare cleanupViewRuntime: typeof cleanupViewRuntime;
+  /** @internal */
+  declare haltedCallbackHook: typeof haltedCallbackHook;
 
   /** Send file content. */
   sendFile(path: string, options: SendFileHeadersOptions = {}): void {
@@ -1119,6 +1143,12 @@ runLoadHooks("action_controller", Base);
 // Rails: `ActionController::DataStreaming#send_file_headers!` mixed in via
 // `include DataStreaming`. Trails wires it onto Base.prototype explicitly.
 Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
+
+// Rails: `ActionController::Instrumentation`'s private hooks, provided by the
+// module and overridable by subclasses (`instrumentation.rb:86-110`).
+Base.prototype.appendInfoToPayload = appendInfoToPayload;
+Base.prototype.cleanupViewRuntime = cleanupViewRuntime;
+Base.prototype.haltedCallbackHook = haltedCallbackHook;
 
 // Rails: `included do helper_method :content_security_policy?,
 // :content_security_policy_nonce end` (content_security_policy.rb:13).

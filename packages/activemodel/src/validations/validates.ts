@@ -1,4 +1,4 @@
-import { Range, camelize, extractOptionsBang, sliceBang } from "@blazetrails/activesupport";
+import { camelize, extractOptionsBang, sliceBang } from "@blazetrails/activesupport";
 
 import { ArgumentError } from "../attribute-assignment.js";
 
@@ -13,6 +13,7 @@ import { InclusionValidator } from "./inclusion.js";
 import { LengthValidator } from "./length.js";
 import { NumericalityValidator } from "./numericality.js";
 import { PresenceValidator } from "./presence.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 type ValidatorClass = new (options: Record<string, unknown>) => Validator;
 

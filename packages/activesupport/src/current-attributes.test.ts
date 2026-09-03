@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { CurrentAttributes } from "./current-attributes.js";
-import { methodMissingProxy } from "./method-missing-proxy.js";
+import { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
 import { assertSame } from "./testing/assertions.js";
 import { zone, setZone } from "./time-zone-config.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";

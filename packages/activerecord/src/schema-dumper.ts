@@ -757,7 +757,7 @@ export abstract class SchemaDumper {
         ? JSON.stringify(index.columns)
         : `[${index.columns.map((c) => JSON.stringify(c)).join(", ")}]`;
     const parts: string[] = [cols];
-    if (index.name) parts.push(`name: ${JSON.stringify(index.name)}`);
+    parts.push(`name: ${JSON.stringify(index.name)}`);
     if (index.unique) parts.push("unique: true");
     const lengths = conciseOptions(index.columns, index.lengths);
     if (lengths !== undefined) parts.push(`length: ${this.formatIndexParts(lengths)}`);
@@ -774,6 +774,24 @@ export abstract class SchemaDumper {
     if (index.type) parts.push(`type: ${JSON.stringify(index.type)}`);
     if (index.comment) parts.push(`comment: ${JSON.stringify(index.comment)}`);
     return parts;
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall any? — PERMANENT
+   */
+  async indexes(table: string, stream: string[]): Promise<void> {
+    const indexes = await this._source.indexes(table);
+    if (indexes.length > 0) {
+      const addIndexStatements = indexes.map((index) => {
+        const tableName = JSON.stringify(this.removePrefixAndSuffix(index.table ?? table));
+        const [cols, ...opts] = this.indexParts(index);
+        const optStr = opts.length > 0 ? `, { ${opts.join(", ")} }` : "";
+        return `  addIndex(${tableName}, ${cols}${optStr});`;
+      });
+      stream.push(addIndexStatements.sort().join("\n"));
+      stream.push("");
+    }
   }
 
   /**

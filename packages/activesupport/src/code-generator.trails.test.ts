@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CodeGenerator } from "./code-generator.js";
-import { include, Module } from "./include.js";
+import { include, Module } from "@blazetrails/ruby-compat/include";
 
 /**
  * Rails has no `code_generator_test.rb` — CodeGenerator is exercised through

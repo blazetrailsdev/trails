@@ -6,7 +6,7 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
 import { constantize, registeredConstantName, safeConstantize } from "./inflector.js";
-import { PROTOCOL_PROBES } from "./method-missing-proxy.js";
+import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
 /**
  * Ruby's `NoMethodError`, raised when the delegator calls a method the target

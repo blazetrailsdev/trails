@@ -5,7 +5,7 @@ import {
   DeprecatedInstanceVariableProxy,
   DeprecatedObjectProxy,
 } from "./proxy-wrappers.js";
-import { extend, include, prepend } from "../include.js";
+import { extend, include, prepend } from "@blazetrails/ruby-compat/include";
 import { registerConstant } from "../inflector.js";
 import { assertDeprecated, assertNotDeprecated } from "../testing/deprecation.js";
 

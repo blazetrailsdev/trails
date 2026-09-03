@@ -21,8 +21,7 @@ import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import { Range } from "@blazetrails/activesupport";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(msg: string) {

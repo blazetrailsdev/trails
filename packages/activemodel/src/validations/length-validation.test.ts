@@ -3,10 +3,11 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
-import { assertPredicate, assertNothingRaised, Range, include } from "@blazetrails/activesupport";
+import { assertPredicate, assertNothingRaised, include } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
 import { Model } from "../index.js";
 import { Attributes, type AttributesClassHalf } from "../attributes.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 class Topic extends Model {
   declare authorName: string | null;

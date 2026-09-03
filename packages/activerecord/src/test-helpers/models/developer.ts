@@ -1,5 +1,4 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import { Range } from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/date";
 import type { Comment } from "./comment.js";
 import type { Company } from "./company.js";
@@ -17,6 +16,7 @@ import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 export class Developer extends Base {
   declare updated_at: any;

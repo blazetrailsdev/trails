@@ -450,3 +450,39 @@ describe("formatColspec", () => {
     ).toBe('id: { type: "uuid", default: null }, force: "cascade"');
   });
 });
+
+describe("SchemaDumper#indexes", () => {
+  it("emits sorted addIndex statements for a table", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
+    const dumper = new TopLevelDumper({
+      tables: async () => ["posts"],
+      columns: async () => [],
+      indexes: async () => [
+        { table: "posts", columns: ["title"], unique: true, name: "index_posts_on_title" },
+        { table: "posts", columns: ["body"], unique: false, name: "index_posts_on_body" },
+      ],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      adapter: { defaultIndexType: AbstractAdapter.prototype.defaultIndexType },
+    } as never);
+    const stream: string[] = [];
+    await dumper.indexes("posts", stream);
+    expect(stream[0]).toBe(
+      '  addIndex("posts", ["body"], { name: "index_posts_on_body" });\n' +
+        '  addIndex("posts", ["title"], { name: "index_posts_on_title", unique: true });',
+    );
+    expect(stream[1]).toBe("");
+  });
+
+  it("writes nothing when the table has no indexes", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
+    const dumper = new TopLevelDumper({
+      ...EMPTY_SOURCE,
+      lookupCastTypeFromColumn: () => new ValueType(),
+    } as never);
+    const stream: string[] = [];
+    await dumper.indexes("posts", stream);
+    expect(stream).toEqual([]);
+  });
+});

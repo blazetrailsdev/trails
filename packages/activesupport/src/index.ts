@@ -1,6 +1,4 @@
 export { NameError } from "./core-ext/name-error.js";
-export { KeyError } from "@blazetrails/ruby-compat";
-export { regexpEscape } from "@blazetrails/ruby-compat";
 export { FileUpdateChecker } from "./file-update-checker.js";
 
 export { trailsRoot, setTrailsRoot } from "./trails-root.js";
@@ -620,13 +618,13 @@ export {
   defineModule,
   moduleVisibility,
   publicInstanceMethods,
-} from "./include.js";
-export type { Included, Extended, ModuleVisibility } from "./include.js";
+} from "@blazetrails/ruby-compat/include";
+export type { Included, Extended, ModuleVisibility } from "@blazetrails/ruby-compat/include";
 export { CodeGenerator, MethodSet } from "./code-generator.js";
 export type { MethodSource } from "./code-generator.js";
-export { methodMissingProxy } from "./method-missing-proxy.js";
-export { prepend } from "./prepend.js";
-export type { PrependMethod, PrependModule } from "./prepend.js";
+export { methodMissingProxy } from "@blazetrails/ruby-compat/method-missing-proxy";
+export { prepend } from "@blazetrails/ruby-compat";
+export type { PrependMethod, PrependModule } from "@blazetrails/ruby-compat";
 export { ClassAttribute } from "./class-attribute.js";
 
 export {
@@ -675,7 +673,6 @@ export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
-export { Range } from "@blazetrails/ruby-compat/range";
 export { rbEqual } from "@blazetrails/ruby-compat";
 export { rbHash } from "@blazetrails/ruby-compat";
 export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";

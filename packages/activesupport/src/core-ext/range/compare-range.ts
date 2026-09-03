@@ -1,4 +1,4 @@
-import { prepend } from "../../prepend.js";
+import { prepend } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 
 /**

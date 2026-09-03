@@ -1,6 +1,6 @@
 import { resolveValue } from "./resolve-value.js";
 import { ArgumentError, NoMethodError } from "../attribute-assignment.js";
-import { Range } from "@blazetrails/activesupport";
+import { Range } from "@blazetrails/ruby-compat";
 
 export { resolveValue };
 

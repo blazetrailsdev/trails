@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Range } from "@blazetrails/activesupport";
 import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
@@ -19,6 +18,7 @@ import { Person } from "../test-helpers/models/person.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
 import "../support/canonical-model-index.js";
+import { Range } from "@blazetrails/ruby-compat";
 
 const INT_MAX_VALUE = 2147483647;
 

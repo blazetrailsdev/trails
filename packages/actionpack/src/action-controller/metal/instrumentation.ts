@@ -6,69 +6,68 @@
  * @see https://api.rubyonrails.org/classes/ActionController/Instrumentation.html
  */
 
+import { ExecutionContext, Notifications } from "@blazetrails/activesupport";
+import { ExceptionWrapper } from "../../action-dispatch/middleware/exception-wrapper.js";
+import type { Request } from "../../action-dispatch/http/request.js";
+import type { Response } from "../../action-dispatch/http/response.js";
+
 const now = (): number => globalThis.performance?.now() ?? Date.now();
+
+interface InstrumentationHost {
+  actionName?: string;
+  request: Request;
+  response: Response;
+  appendInfoToPayload(payload: Record<string, unknown>): void;
+}
+
+/**
+ * `ActionController::Instrumentation#process_action`
+ * (`actionpack/lib/action_controller/metal/instrumentation.rb:60-84`).
+ *
+ * @internal
+ */
+export async function processAction(
+  this: InstrumentationHost,
+  block: () => Promise<void>,
+): Promise<void> {
+  ExecutionContext.setKey("controller", this);
+
+  const rawPayload: Record<string, unknown> = {
+    controller: this.constructor.name,
+    action: this.actionName,
+    request: this.request,
+    params: this.request.filteredParameters(),
+    headers: this.request.headers,
+    format: this.request.format.ref(),
+    method: this.request.requestMethod,
+    path: this.request.filteredPath(),
+  };
+
+  Notifications.instrument("start_processing.action_controller", rawPayload);
+
+  await Notifications.instrumentAsync(
+    "process_action.action_controller",
+    rawPayload,
+    async (payload) => {
+      try {
+        const result = await block();
+        payload.response = this.response;
+        payload.status = this.response.status;
+        return result;
+      } catch (error) {
+        payload.status = ExceptionWrapper.statusCodeForException(
+          (error as Error)?.constructor?.name ?? String(error),
+        );
+        throw error;
+      } finally {
+        this.appendInfoToPayload(payload as Record<string, unknown>);
+      }
+    },
+  );
+}
 
 export interface Notifier {
   instrument(event: string, payload: Record<string, unknown>, block?: () => unknown): void;
-}
-
-export function instrumentAction(
-  controllerName: string,
-  actionName: string,
-  request: {
-    headers: unknown;
-    format?: { ref(): string };
-    requestMethod?: string;
-    filteredParameters(): Record<string, unknown>;
-    filteredPath(): string;
-  },
-  fn: () => Promise<unknown>,
-  notifier?: Notifier,
-): Promise<unknown> {
-  const start = now();
-  const rawPayload: Record<string, unknown> = {
-    controller: controllerName,
-    action: actionName,
-    request: request,
-    params: request.filteredParameters(),
-    headers: request.headers,
-    format: request.format?.ref(),
-    method: request.requestMethod,
-    path: request.filteredPath(),
-  };
-
-  notifier?.instrument("start_processing.action_controller", { ...rawPayload });
-
-  return Promise.resolve()
-    .then(fn)
-    .then(
-      (result) => {
-        notifier?.instrument("process_action.action_controller", {
-          ...rawPayload,
-          status: deriveStatus(result, 200),
-          duration: now() - start,
-        });
-        return result;
-      },
-      (error) => {
-        notifier?.instrument("process_action.action_controller", {
-          ...rawPayload,
-          status: deriveStatus(error, 500),
-          exception: error instanceof Error ? [error.name, error.message] : String(error),
-          duration: now() - start,
-        });
-        throw error;
-      },
-    );
-}
-
-function deriveStatus(obj: unknown, fallback: number): number {
-  if (obj && typeof obj === "object") {
-    const any = obj as Record<string, unknown>;
-    if (typeof any.status === "number") return any.status;
-    if (typeof any.statusCode === "number") return any.statusCode;
-  }
-  return fallback;
 }
 
 export function instrumentRender(
