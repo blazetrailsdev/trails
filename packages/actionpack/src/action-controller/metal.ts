@@ -8,6 +8,7 @@
 import { AbstractController } from "../abstract-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
+import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
 import { underscore } from "@blazetrails/activesupport";
@@ -108,6 +109,11 @@ export class Metal extends AbstractController {
   }
   set request(value: Request) {
     this._request = value;
+  }
+
+  /** Rails: `delegate :session, to: "@_request"` (`metal.rb:176`). */
+  get session(): Session {
+    return this.request.session;
   }
 
   get response(): Response {

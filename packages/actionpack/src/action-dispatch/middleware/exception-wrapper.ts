@@ -7,7 +7,87 @@ import { hasKey } from "@blazetrails/ruby-compat";
 
 import { ActionableError, type BacktraceCleaner } from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
+import {
+  PathRegistry,
+  type BacktraceLocation,
+  type Spot,
+  type Template,
+} from "@blazetrails/actionview";
 import { RoutingError } from "../../action-controller/metal/exceptions.js";
+
+/**
+ * Mirrors `ExceptionWrapper::SourceMapLocation` (`exception_wrapper.rb:232-250`).
+ *
+ * Ruby delegates a `Thread::Backtrace::Location`; a trails backtrace entry IS
+ * its own string form, so the delegated object is that string and `String` is
+ * the DelegateClass.
+ */
+/**
+ * A built backtrace entry: a raw V8 frame, or one remapped onto the template
+ * it was compiled from. Ruby's `build_backtrace` produces the same union of
+ * `Thread::Backtrace::Location` and `SourceMapLocation`.
+ *
+ * @noRailsEquivalent PERMANENT — the union Ruby expresses by duck typing.
+ */
+export type BacktraceLine = string | SourceMapLocation;
+
+class SourceMapLocation extends String {
+  private template: Template;
+
+  constructor(location: string, template: Template) {
+    super(location);
+    this.template = template;
+  }
+
+  /**
+   * Mirrors `SourceMapLocation#spot(exc)` (`exception_wrapper.rb:239-248`).
+   *
+   * Ruby's `else location = super` arm asks `ErrorHighlight` for the spot when
+   * the AST cannot supply one; V8 has no ErrorHighlight, so `exc` has nothing
+   * to be handed to and that arm yields no location.
+   *
+   * @missingRailsCall super — PERMANENT
+   */
+  spot(exc: Error): Spot | null {
+    let location: Spot | null = null;
+    const backtraceLocation = backtraceLocationFor(String(this));
+    if (backtraceLocation) {
+      location = this.template.spot(backtraceLocation);
+    }
+
+    if (location) {
+      return this.template.translateLocation(backtraceLocation!, location);
+    }
+    return null;
+  }
+}
+
+/**
+ * The line/column half of `__getobj__` — Ruby reads them off a
+ * `Thread::Backtrace::Location`, a V8 stack entry carries them in its text.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby's backtrace location is a parsed object;
+ * V8's is a formatted string, so the parse has no Ruby counterpart.
+ */
+/**
+ * `loc.label` (`exception_wrapper.rb:264`) — the name of the method a frame is
+ * inside. V8 spells it between `at ` and the opening paren.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby reads `label` off a backtrace location
+ * object; V8's frame is a formatted string, so the read has no counterpart.
+ */
+function labelFor(trace: string): string | null {
+  const match = /^at\s+([^\s(]+)\s*\(/.exec(trace.trim());
+  if (!match) return null;
+  const qualified = match[1];
+  return qualified.slice(qualified.lastIndexOf(".") + 1);
+}
+
+function backtraceLocationFor(trace: string): BacktraceLocation | null {
+  const match = /:(\d+):(\d+)\)?$/.exec(trace.trim());
+  if (!match) return null;
+  return { lineno: Number(match[1]), column: Number(match[2]) };
+}
 
 export interface ShowExceptionsRequest {
   getHeader(name: string): unknown;
@@ -203,7 +283,7 @@ export class ExceptionWrapper {
       const traceWithId: TraceWithId = {
         exceptionObjectId: _idFor(this.exception),
         id: idx,
-        trace,
+        trace: String(trace),
       };
 
       if (this.applicationTrace.includes(trace)) {
@@ -222,19 +302,19 @@ export class ExceptionWrapper {
     };
   }
 
-  get applicationTrace(): string[] {
+  get applicationTrace(): BacktraceLine[] {
     return this.cleanBacktrace("silent");
   }
 
-  get frameworkTrace(): string[] {
+  get frameworkTrace(): BacktraceLine[] {
     return this.cleanBacktrace("noise");
   }
 
-  get fullTrace(): string[] {
+  get fullTrace(): BacktraceLine[] {
     return this.cleanBacktrace("all");
   }
 
-  exceptionTrace(): string[] {
+  exceptionTrace(): BacktraceLine[] {
     const app = this.applicationTrace;
     if (app.length === 0 && !SILENT_EXCEPTIONS.has(this.exceptionClassName)) {
       return this.frameworkTrace;
@@ -310,22 +390,36 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  backtrace(): string[] {
+  backtrace(): BacktraceLine[] {
     return this.buildBacktrace();
   }
 
-  // Rails walks ActionView::PathRegistry to remap template frames; that
-  // registry isn't ported yet, so we return the raw stack and let the cleaner
-  // handle it.
+  /** Mirrors `ExceptionWrapper#build_backtrace` (`exception_wrapper.rb:254-275`). */
   /** @internal */
-  buildBacktrace(): string[] {
+  buildBacktrace(): BacktraceLine[] {
+    const builtMethods = new Map<string, Template>();
+
+    for (const resolver of PathRegistry.allResolvers()) {
+      for (const template of resolver.builtTemplates?.() ?? []) {
+        builtMethods.set(template.methodName(), template);
+      }
+    }
+
     const stack = this.exception.stack;
     if (!stack) return [];
     return stack
       .split("\n")
       .slice(1)
       .map((line) => line.trim())
-      .filter((line) => line.length > 0);
+      .filter((line) => line.length > 0)
+      .map((loc) => {
+        const label = labelFor(loc);
+        if (label !== null && builtMethods.has(label)) {
+          return new SourceMapLocation(loc, builtMethods.get(label)!);
+        } else {
+          return loc;
+        }
+      });
   }
 
   /** @internal */
@@ -356,21 +450,33 @@ export class ExceptionWrapper {
    * trace getters stay distinct, then let the cleaner post-process the slice.
    * @internal
    */
-  cleanBacktrace(args: "silent" | "noise" | "all"): string[] {
+  cleanBacktrace(args: "silent" | "noise" | "all"): BacktraceLine[] {
     const lines = this.backtrace();
     const partitioned =
       args === "silent"
-        ? lines.filter((l) => !l.includes("node_modules"))
+        ? lines.filter((l) => !String(l).includes("node_modules"))
         : args === "noise"
-          ? lines.filter((l) => l.includes("node_modules"))
+          ? lines.filter((l) => String(l).includes("node_modules"))
           : lines;
-    return this.backtraceCleaner ? this.backtraceCleaner.clean(partitioned) : partitioned;
+    return this.backtraceCleaner
+      ? this.backtraceCleaner.clean(partitioned.map(String))
+      : partitioned;
   }
 
+  /** Mirrors `ExceptionWrapper#extract_source(trace)` (`exception_wrapper.rb:294-320`). */
   /** @internal */
-  extractSource(trace: string): SourceExtract {
+  extractSource(trace: BacktraceLine): SourceExtract {
+    const spot = trace instanceof SourceMapLocation ? trace.spot(this.exception) : null;
+
+    if (spot) {
+      const line = spot.firstLineno;
+      const code = this.extractSourceFragmentLines(spot.scriptLines ?? [], line);
+
+      return { file: String(trace), line, code };
+    }
+
     const loc = this.extractFileAndLineNumber(trace);
-    if (!loc) return { file: trace, line: 0 };
+    if (!loc) return { file: String(trace), line: 0 };
     const code = this.sourceFragment(loc.file, loc.line);
     return code ? { ...loc, code } : loc;
   }
@@ -397,11 +503,12 @@ export class ExceptionWrapper {
   }
 
   /** @internal */
-  extractFileAndLineNumber(trace: string): TraceEntry | null {
+  extractFileAndLineNumber(trace: BacktraceLine): TraceEntry | null {
+    const text = String(trace);
     const match =
-      trace.match(/\((.+):(\d+):\d+\)/) ??
-      trace.match(/at\s+(.+):(\d+):\d+/) ??
-      trace.match(/(.+):(\d+):\d+/);
+      text.match(/\((.+):(\d+):\d+\)/) ??
+      text.match(/at\s+(.+):(\d+):\d+/) ??
+      text.match(/(.+):(\d+):\d+/);
     if (!match) return null;
     return { file: match[1], line: parseInt(match[2], 10) };
   }

@@ -22,7 +22,7 @@ export class Digestor {
     const prefix = slash >= 0 ? name.slice(0, slash) : "";
     const action = slash >= 0 ? name.slice(slash + 1) : name;
     const fmt = format ?? "html";
-    const source = finder.findTemplate(action, prefix, fmt)?.source ?? "";
+    const source = finder.findTemplate(action, [prefix], [fmt])?.source ?? "";
     return fnv1a64Hex(`${name}|${format ?? ""}|${source}`);
   }
 }

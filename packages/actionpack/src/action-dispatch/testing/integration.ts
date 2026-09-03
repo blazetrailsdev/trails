@@ -1018,17 +1018,8 @@ export class IntegrationTest {
     // Instantiate and dispatch
     this.controller = new ControllerClass();
 
-    // Set session on controller
-    if ("session" in this.controller) {
-      (this.controller as any).session = { ...this.session };
-    }
-
     await this.controller.dispatch(action, this.request, this.response);
 
-    // Persist session back
-    if ("session" in this.controller) {
-      Object.assign(this.session, (this.controller as any).session);
-    }
     // `Metal#dispatch` has run `request.commit_flash` (`metal.rb:253`), which
     // DELETES `rack.session`'s flash key once the flash is swept — so the
     // store's view has to carry forward with its deletions, or the flash never

@@ -124,11 +124,11 @@ export class AbstractStore extends Persisted {
 
   /** @internal Rails: `set_cookie(request, response, cookie)` (private). */
   setCookie(
-    request: PersistedRequest & { cookieJar: Record<string, unknown> },
+    request: PersistedRequest & { cookieJar(): { set(key: string, value: unknown): void } },
     _response: unknown,
     cookie: unknown,
   ): void {
-    request.cookieJar[this.key] = cookie;
+    request.cookieJar().set(this.key, cookie);
   }
 }
 includeMixin(AbstractStore, Compatibility);
@@ -148,11 +148,11 @@ export class AbstractSecureStore extends PersistedSecure {
 
   /** @internal Rails: `set_cookie(request, response, cookie)` (private). */
   setCookie(
-    request: PersistedRequest & { cookieJar: Record<string, unknown> },
+    request: PersistedRequest & { cookieJar(): { set(key: string, value: unknown): void } },
     _response: unknown,
     cookie: unknown,
   ): void {
-    request.cookieJar[this.key] = cookie;
+    request.cookieJar().set(this.key, cookie);
   }
 }
 includeMixin(AbstractSecureStore, Compatibility);

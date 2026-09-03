@@ -18,12 +18,16 @@ import { AbstractSecureStore } from "./abstract-store.js";
 export interface CookieStoreRequest {
   fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
   setHeader(key: string, value: unknown): void;
-  cookieJar: { signedOrEncrypted: CookieJarLike };
+  cookieJar(): { signedOrEncrypted: CookieJarLike };
 }
 
-/** @internal Minimum shape this store needs out of the cookie jar. */
+/**
+ * @internal Minimum shape this store needs out of the cookie jar. Ruby's
+ * `[]`/`[]=` (`cookie_store.rb:107,111`) are `get`/`set` in TS.
+ */
 export interface CookieJarLike {
-  [key: string]: unknown;
+  get(key: string): unknown;
+  set(key: string, value: unknown): void;
 }
 
 /**
@@ -74,8 +78,9 @@ export class SessionId {
  * Rails: `DEFAULT_SAME_SITE = proc { |request| request.cookies_same_site_protection }`.
  * @internal
  */
-export const DEFAULT_SAME_SITE = (request: { cookiesSameSiteProtection?: unknown }): unknown =>
-  request.cookiesSameSiteProtection;
+export const DEFAULT_SAME_SITE = (request: {
+  cookiesSameSiteProtection?: () => unknown;
+}): unknown => request.cookiesSameSiteProtection?.();
 
 export interface CookieStoreSessionOptions {
   cookieOnly?: boolean;
@@ -161,17 +166,17 @@ export class CookieStore extends AbstractSecureStore {
 
   /** @internal Rails: `set_cookie(request, session_id, cookie)` (private). */
   override setCookie(request: any, _sessionId: unknown, cookie: unknown): void {
-    this.cookieJar(request)[this.key] = cookie;
+    this.cookieJar(request).set(this.key, cookie);
   }
 
   /** @internal Rails: `get_cookie(req)` (private). */
   getCookie(req: CookieStoreRequest): unknown {
-    return this.cookieJar(req)[this.key];
+    return this.cookieJar(req).get(this.key);
   }
 
   /** @internal Rails: `cookie_jar(request)` (private). */
   cookieJar(request: CookieStoreRequest): CookieJarLike {
-    return request.cookieJar.signedOrEncrypted;
+    return request.cookieJar().signedOrEncrypted;
   }
 
   /** @internal Inherited from `StaleSessionCheck`; declared for type narrowing. */

@@ -50,7 +50,7 @@ class ActionPackAssertionsController extends Base {
     this.render({ plain: `Mr. ${name}` });
   }
   async sessionStuffing() {
-    this.session["xmas"] = "turkey";
+    this.session.set("xmas", "turkey");
     this.render({ plain: "ho ho ho" });
   }
   async raiseExceptionOnGet() {

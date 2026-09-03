@@ -549,15 +549,27 @@ export class LookupContext {
    *
    * @internal
    */
-  findTemplate(name: string, prefix: string, format: string): Template | null {
-    return (this.findAll(name, [prefix], false, [], { formats: [format] })[0] as Template) ?? null;
+  findTemplate(
+    name: string,
+    prefixes: ReadonlyArray<string> = [],
+    formats?: DetailValue,
+  ): Template | null {
+    return (
+      (this.findAll(name, prefixes, false, [], formats ? { formats } : {})[0] as Template) ?? null
+    );
   }
 
   /**
    * Find a partial template. Partials are prefixed with underscore.
    */
-  findPartial(name: string, prefix: string, format: string): Template | null {
-    return (this.findAll(name, [prefix], true, [], { formats: [format] })[0] as Template) ?? null;
+  findPartial(
+    name: string,
+    prefixes: ReadonlyArray<string> = [],
+    formats?: DetailValue,
+  ): Template | null {
+    return (
+      (this.findAll(name, prefixes, true, [], formats ? { formats } : {})[0] as Template) ?? null
+    );
   }
 
   /**
@@ -565,31 +577,38 @@ export class LookupContext {
    *
    * @internal
    */
-  findLayout(name: string, format: string): Template | null {
-    const template = this.findAll(name, ["layouts"], false, [], { formats: [format] })[0] as
+  findLayout(name: string, formats?: DetailValue): Template | null {
+    const template = this.findAll(name, ["layouts"], false, [], formats ? { formats } : {})[0] as
       | Template
       | undefined;
     return template ? template.asLayout() : null;
   }
 
   /**
-   * Render a template by controller/action.
+   * Render a template by prefixes/action.
    *
-   * @param controller Controller name (e.g., "posts")
-   * @param action     Action name (e.g., "index")
-   * @param format     Response format (e.g., "html")
-   * @param locals     Template variables
-   * @param options    Additional options
+   * `prefixes` is the controller's whole inheritance chain, as
+   * `ActionView::Rendering#_normalize_options` fills it from `_prefixes`, and
+   * `formats` is the registered-details cascade `LookupContext#formats=`
+   * (`lookup_context.rb:263-280`) computed — not one of each.
+   *
+   * @param prefixes Controller prefixes (e.g., ["posts", "application"])
+   * @param action   Action name (e.g., "index")
+   * @param formats  Response formats (e.g., ["html", "text"])
+   * @param locals   Template variables
+   * @param options  Additional options
    * @returns Rendered output string
    */
   async render(
-    controller: string,
+    prefixes: ReadonlyArray<string>,
     action: string,
-    format: string,
+    formats: DetailValue,
     locals: Record<string, unknown> = {},
     options: { layout?: string | false; view?: Base } = {},
   ): Promise<string> {
-    const template = this.findTemplate(action, controller, format);
+    const controller = String(prefixes[0] ?? "");
+    const format = String(formats[0] ?? "html");
+    const template = this.findTemplate(action, prefixes, formats);
     if (!template) {
       throw new MissingTemplate(
         controller,
@@ -615,7 +634,7 @@ export class LookupContext {
 
     const layoutName = options.layout !== undefined ? options.layout : this.layoutName;
     if (layoutName !== false && layoutName) {
-      const layoutTemplate = this.findLayout(layoutName, format);
+      const layoutTemplate = this.findLayout(layoutName, formats);
       if (layoutTemplate) {
         view.viewFlow.set("layout", output);
         output = await this.renderTemplate(layoutTemplate, locals, { ...context, view });
@@ -641,7 +660,7 @@ export class LookupContext {
     locals: Record<string, unknown> = {},
     view?: Base,
   ): Promise<string> {
-    const template = this.findPartial(name, prefix, format);
+    const template = this.findPartial(name, [prefix], [format]);
     if (!template) {
       throw new MissingTemplate(
         prefix,
@@ -733,7 +752,7 @@ export class LookupContext {
     const partialPrefix = slash === -1 ? prefix : name.slice(0, slash);
     const partialName = slash === -1 ? name : name.slice(slash + 1);
 
-    const template = this.findPartial(partialName, partialPrefix, format);
+    const template = this.findPartial(partialName, [partialPrefix], [format]);
     if (!template) {
       throw new MissingTemplate(
         partialPrefix,
@@ -769,7 +788,7 @@ export class LookupContext {
     const templatePrefix = slash === -1 ? prefix : name.slice(0, slash);
     const templateName = slash === -1 ? name : name.slice(slash + 1);
 
-    const template = this.findTemplate(templateName, templatePrefix, format);
+    const template = this.findTemplate(templateName, [templatePrefix], [format]);
     if (!template) {
       throw new MissingTemplate(
         templatePrefix,

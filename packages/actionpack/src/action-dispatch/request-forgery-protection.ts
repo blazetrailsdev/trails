@@ -5,6 +5,8 @@
  * Mirrors Rails' protect_from_forgery functionality.
  */
 
+import type { Session } from "./request/session.js";
+
 import { getCrypto } from "@blazetrails/activesupport";
 
 const AUTHENTICITY_TOKEN_LENGTH = 32;
@@ -65,11 +67,11 @@ export class RequestForgeryProtection {
   }
 
   /** Get or create the real (unmasked) token stored in the session. */
-  getRealToken(session: Record<string, unknown>): string {
-    let token = session[this.sessionKey] as string | undefined;
+  getRealToken(session: Session): string {
+    let token = session.get(this.sessionKey) as string | undefined;
     if (!token) {
       token = RequestForgeryProtection.generateToken();
-      session[this.sessionKey] = token;
+      session.set(this.sessionKey, token);
     }
     return token;
   }
@@ -87,11 +89,7 @@ export class RequestForgeryProtection {
   }
 
   /** Generate a per-form token for a specific action and method. */
-  generatePerFormToken(
-    session: Record<string, unknown>,
-    actionPath: string,
-    method: string,
-  ): string {
+  generatePerFormToken(session: Session, actionPath: string, method: string): string {
     const realToken = this.getRealToken(session);
     const normalizedPath = this.normalizePath(actionPath);
     const normalizedMethod = method.toUpperCase();
@@ -123,13 +121,13 @@ export class RequestForgeryProtection {
 
   /** Verify a submitted token against the session token. */
   verifyToken(
-    session: Record<string, unknown>,
+    session: Session,
     submittedToken: string | null | undefined,
     options?: { actionPath?: string; method?: string },
   ): boolean {
     if (!submittedToken || submittedToken.length === 0) return false;
 
-    const realToken = session[this.sessionKey] as string | undefined;
+    const realToken = session.get(this.sessionKey) as string | undefined;
     if (!realToken) return false;
 
     const unmasked = this.unmaskToken(submittedToken);
@@ -193,7 +191,7 @@ export class RequestForgeryProtection {
    */
   verifyRequest(params: {
     method: string;
-    session: Record<string, unknown>;
+    session: Session;
     token?: string | null;
     origin?: string | null;
     host: string;
@@ -231,15 +229,12 @@ export class RequestForgeryProtection {
    * Handle a failed verification according to the configured strategy.
    * Throws InvalidAuthenticityToken for "exception" strategy.
    */
-  handleUnverified(session: Record<string, unknown>): void {
+  handleUnverified(session: Session): void {
     switch (this.strategy) {
       case "exception":
         throw new InvalidAuthenticityToken();
       case "reset_session":
-        // Clear the session
-        for (const key of Object.keys(session)) {
-          delete session[key];
-        }
+        session.clear();
         break;
       case "null_session":
         // Caller is responsible for using an empty session for the
@@ -264,7 +259,7 @@ export class RequestForgeryProtection {
   }
 
   /** Generate a meta tag value for embedding in HTML. */
-  csrfMetaTag(session: Record<string, unknown>): { param: string; token: string } {
+  csrfMetaTag(session: Session): { param: string; token: string } {
     const realToken = this.getRealToken(session);
     return {
       param: this.paramName,
@@ -273,8 +268,8 @@ export class RequestForgeryProtection {
   }
 
   /** Reset the CSRF token (generates a new one). */
-  resetToken(session: Record<string, unknown>): string {
-    delete session[this.sessionKey];
+  resetToken(session: Session): string {
+    session.delete(this.sessionKey);
     return this.getRealToken(session);
   }
 

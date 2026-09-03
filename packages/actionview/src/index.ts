@@ -9,6 +9,7 @@ export {
 // Merged: `Template` is both the interface (data shape) and a namespace
 // exposing the Rails-spelled `Template.Error` class.
 export { Template } from "./template.js";
+export type { BacktraceLocation, Spot } from "./template/handlers/tse-translate-location.js";
 
 export { FileSystemResolver, Resolver } from "./template/resolver.js";
 export { FixtureResolver, NullResolver } from "./testing/resolvers.js";

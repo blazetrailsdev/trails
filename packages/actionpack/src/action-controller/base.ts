@@ -204,24 +204,6 @@ export class Base extends Metal {
     return this.request.flash!;
   }
 
-  /**
-   * Session store (simple object).
-   *
-   * Rails delegates this to the request (`delegate :session, to: "@_request"`,
-   * `metal.rb:176`); converging it is
-   * `converge-controller-session-delegation`. It is spelled as an ivar plus an
-   * accessor pair in the meantime, so `view_assigns` treats it as the
-   * delegated method Rails has rather than as an assign.
-   */
-  _session: Record<string, unknown> = {};
-
-  get session(): Record<string, unknown> {
-    return this._session;
-  }
-  set session(value: Record<string, unknown>) {
-    this._session = value;
-  }
-
   /** Template resolver (pluggable, legacy). */
   static templateResolver?: (controller: string, action: string, format: string) => string | null;
 
@@ -455,9 +437,9 @@ export class Base extends Metal {
     // `lookup_context.formats` — negotiated in `process_action` and already
     // expanded past `"*/*"` by `LookupContext#formats=`
     // (`lookup_context.rb:263-280`). Rails passes the whole details hash down
-    // to the resolver; trails' `LookupContext#render` takes one format —
-    // converged by lookup-context-render-takes-rails-prefixes-and-formats.
-    const format = String(this.formats[0] ?? "html");
+    // to the resolver, so the cascade goes through whole.
+    const formats = this.formats;
+    const format = String(formats[0] ?? "html");
     const locals = { ...options.locals };
     // `_render_template`'s `context = view_context` (`action_view/rendering.rb:130`).
     const view = this.viewContext();
@@ -490,17 +472,17 @@ export class Base extends Metal {
     } else {
       // `options[:template] ||= (options[:action] || action_name).to_s`, with
       // `:prefixes` left unset for an explicit `:template`
-      // (`action_view/rendering.rb#_normalize_options`). `normalize_name`
+      // (`action_view/rendering.rb#_normalize_options`, which otherwise fills
+      // them from `_prefixes` — the controller's whole inheritance chain,
+      // `action_view/view_paths.rb:96-104`). `normalize_name`
       // (`lookup_context.rb:209-225`) is what turns a qualified
-      // `"posts/show"` into its own prefix; trails' `LookupContext#render`
-      // takes one prefix rather than Rails' `_prefixes` chain — converged by
-      // lookup-context-render-takes-rails-prefixes-and-formats.
+      // `"posts/show"` into its own prefix.
       const template = String(options.template ?? options.action ?? this.actionName);
       const [action, prefixes] = ctx.normalizeName(
         template,
-        options.template !== undefined ? [] : [controllerPrefix],
+        options.template !== undefined ? [] : _prefixes.call(this as never),
       );
-      this.body = await ctx.render(String(prefixes[0]), action, format, locals, {
+      this.body = await ctx.render(prefixes, action, formats, locals, {
         layout: layout === false ? false : layout || undefined,
         view,
       });

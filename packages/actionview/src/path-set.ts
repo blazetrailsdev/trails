@@ -13,6 +13,7 @@
 
 import type { Requested, TemplateDetails } from "./template-details.js";
 import type { TemplatePath } from "./template-path.js";
+import type { Template } from "./template.js";
 
 /**
  * Argument shape for the `details` parameter of resolver lookups. Rails
@@ -37,6 +38,12 @@ export interface PathSetResolver {
 
   /** @internal Resolvers with internal caches implement this. */
   clearCache?(): void;
+
+  /**
+   * Templates this resolver has already built, keyed by method name in
+   * `ExceptionWrapper#build_backtrace` (`exception_wrapper.rb:257-261`).
+   */
+  builtTemplates?(): Template[];
 
   /**
    * Every template path this resolver knows, used by `MissingTemplate#corrections`

@@ -22,7 +22,7 @@ class PostsController extends Base {
   async create() {
     const title = this.params.get("title");
     this.flash.set("notice", "Post created!");
-    this.session.lastPost = title;
+    this.session.set("lastPost", title);
     this.status = "created";
     this.render({ json: { title, created: true } });
   }
@@ -64,7 +64,7 @@ class PostsController extends Base {
   }
 
   async readSession() {
-    const lastPost = this.session.lastPost ?? "none";
+    const lastPost = this.session.get("lastPost") ?? "none";
     this.render({ json: { lastPost } });
   }
 
@@ -116,17 +116,17 @@ class AdminPostsController extends Base {
 
 class SessionsController extends Base {
   async create() {
-    this.session.userId = 42;
+    this.session.set("userId", 42);
     this.redirectTo("/posts");
   }
 
   async show() {
-    const userId = this.session.userId ?? null;
+    const userId = this.session.get("userId") ?? null;
     this.render({ json: { userId } });
   }
 
   async destroy() {
-    this.session.userId = undefined;
+    this.session.set("userId", undefined);
     this.head(204);
   }
 }
