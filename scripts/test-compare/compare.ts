@@ -126,12 +126,10 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "rack-test") {
-    // The Ruby suite root is `spec`, so every file carries the gem's
-    // `lib/rack/test` root back as a leading `rack/` (and, below the top-level
-    // `rack/test_spec.rb`, a further `test/`). Drop both, the same
-    // redundant-leading-segment case as rack-session and i18n, so both sides
-    // land on `packages/rack-test/src/<x>`. rack-test names its specs with a
-    // `_spec` SUFFIX where rack uses a `spec_` prefix.
+    // Specs are reported relative to `spec`, so each repeats the gem's
+    // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
+    // `rack/test_spec.rb`). Drop both, the same redundant-leading-segment case
+    // as rack-session above, so both sides land on `packages/rack-test/src/<x>`.
     let rest = rubyFile.startsWith("rack/") ? rubyFile.slice("rack/".length) : rubyFile;
     if (rest.startsWith("test/")) rest = rest.slice("test/".length);
     const dir = path.dirname(rest);
