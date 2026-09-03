@@ -82,4 +82,12 @@ describe("StringIO", () => {
     io.puts([1, [2, 3]]);
     expect(io.string()).toBe("1\n2\n3\n");
   });
+
+  it("puts writes [...] for a self-referential array", () => {
+    const io = new StringIO();
+    const ary: unknown[] = [1];
+    ary.push(ary);
+    io.puts(ary);
+    expect(io.string()).toBe("1\n[...]\n");
+  });
 });

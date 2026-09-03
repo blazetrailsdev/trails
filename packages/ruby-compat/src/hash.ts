@@ -273,7 +273,9 @@ export function except<T>(hash: Record<string, T>, ...keys: string[]): Record<st
 export function dup<K, V>(hash: Hash<K, V>): Hash<K, V>;
 /**
  * The plain-object arm: a Hash with no `default` seat is an object literal in
- * trails, and `rb_obj_dup` over it is the spread.
+ * trails, and `rb_obj_dup` over it copies the pairs into a fresh
+ * `rb_hash_dup` allocation, which has no ancestors — so `__proto__` stays an
+ * ordinary key in the copy, as it does in `transformValues` and `except`.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/object.c:591`).
  */
 export function dup<T>(hash: Record<string, T>): Record<string, T>;
@@ -283,7 +285,9 @@ export function dup<T>(hash: Record<string, T>): Record<string, T>;
 export function dup(
   hash: Hash<unknown, unknown> | Record<string, unknown>,
 ): Hash<unknown, unknown> | Record<string, unknown> {
-  if (!(hash instanceof Hash)) return { ...hash };
+  if (!(hash instanceof Hash)) {
+    return Object.assign(Object.create(null) as Record<string, unknown>, hash);
+  }
   const ret = new Hash<unknown, unknown>();
   const defaultProc = hash.defaultProc();
   if (defaultProc) ret.setDefaultProc(defaultProc);

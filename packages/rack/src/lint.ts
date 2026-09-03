@@ -177,8 +177,7 @@ export class Lint {
     }
   }
 
-  private checkErrorStream(error: Record<string, any>): void {
-    // The error stream must respond to +puts+, +write+ and +flush+.
+  private checkErrorStream(error: Record<string, unknown>): void {
     for (const method of ["puts", "write", "flush"]) {
       if (typeof error[method] !== "function") {
         throw new LintError(`rack.error ${error} does not respond to #${method}`);

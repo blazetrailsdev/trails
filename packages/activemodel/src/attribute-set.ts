@@ -163,10 +163,7 @@ export class AttributeSet {
   }
 
   initializeClone(_other: AttributeSet): void {
-    this._attributes = Object.setPrototypeOf(dup(this._attributes), null) as Record<
-      string,
-      Attribute
-    >;
+    this._attributes = dup(this._attributes);
   }
 
   private assertNotFrozen(): void {

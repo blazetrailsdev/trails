@@ -1,3 +1,6 @@
+/** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/io.c:8880`) is called through. */
+const putsAryInFlight = new Set<unknown[]>();
+
 /**
  * Ruby's `StringIO` (stdlib), the readable/writable in-memory IO that
  * `XmlMini._parse_file` (`activesupport/lib/active_support/xml_mini.rb:180-186`)
@@ -86,8 +89,17 @@ export class StringIO {
 
   /** `io_puts_ary` (`vendor/ruby/io.c:8880`). */
   private ioPutsAry(ary: unknown[]): void {
-    for (let i = 0; i < ary.length; i++) {
-      this.puts(ary[i]);
+    if (putsAryInFlight.has(ary)) {
+      this.puts("[...]");
+      return;
+    }
+    putsAryInFlight.add(ary);
+    try {
+      for (let i = 0; i < ary.length; i++) {
+        this.puts(ary[i]);
+      }
+    } finally {
+      putsAryInFlight.delete(ary);
     }
   }
 
