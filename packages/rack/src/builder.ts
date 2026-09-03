@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { URLMap } from "./urlmap.js";
 
 type RackApp = (env: Record<string, any>) => any;
@@ -23,7 +23,7 @@ export class Builder {
   }
 
   static parseFile(path: string): RackApp {
-    let content = getFs().readFileSync(path, "utf-8");
+    let content = File.read(path);
 
     if (content.charCodeAt(0) === 0xfeff) {
       content = content.slice(1);

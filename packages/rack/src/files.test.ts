@@ -1,4 +1,5 @@
 import { it, expect, beforeAll, afterAll } from "vitest";
+import { File } from "@blazetrails/ruby-compat";
 import { Files } from "./files.js";
 import { Request } from "./request.js";
 import { MockRequest } from "./mock-request.js";
@@ -154,11 +155,13 @@ it("set last-modified header", async () => {
 
 it("return 304 if file isn't modified since last serve", async () => {
   const app = makeApp();
-  const futureDate = new Date(Date.now() + 86400000).toUTCString();
+  const path = File.join(tmpDir, "test.txt");
   const res = await new MockRequest((env) => app.call(env)).get("/test.txt", {
-    HTTP_IF_MODIFIED_SINCE: futureDate,
+    HTTP_IF_MODIFIED_SINCE: File.mtime(path).toUTCString(),
   });
+
   expect(res.status).toBe(304);
+  expect(res.bodyString).toBe("");
 });
 
 it("return the file if it's modified since last serve", async () => {

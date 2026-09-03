@@ -1,4 +1,4 @@
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { ArgumentError, escapePath } from "../utils.js";
 import { UploadedFile } from "./uploaded-file.js";
 
@@ -86,9 +86,7 @@ export class Generator {
   private contentForTempfile(io: UploadedFile, file: UploadedFile, name: string): string {
     const raw = io.read();
     const content = typeof raw === "string" ? raw : raw.toString("binary");
-    // Rails uses `File.stat(file.path).size` so the length reflects on-disk
-    // bytes rather than the (possibly re-encoded) string we just read.
-    const length = file.path !== undefined ? getFs().statSync(file.path).size : null;
+    const length = file.path !== undefined ? File.stat(file.path).size : null;
     const filename = `; filename="${escapePath(file.originalFilename)}"`;
     const lenLine = length !== null ? `content-length: ${length}\r\n` : "";
     return (

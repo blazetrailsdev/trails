@@ -1,7 +1,7 @@
 import * as path from "path";
 import { describe, expect, it } from "vitest";
 
-import { getFs } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 
 import { MockRequest } from "../mock-request.js";
 import { Generator, MULTIPART_BOUNDARY } from "./generator.js";
@@ -12,14 +12,17 @@ const logo = path.join(fixtureDir, "rack-logo.png");
 
 describe("Rack::Multipart::UploadedFile", () => {
   it("reads its tempfile as a binary String regardless of the binary flag", () => {
-    const size = getFs().statSync(logo).size;
+    const size = File.stat(logo).size;
 
     expect((new UploadedFile(logo).read() as string).length).toBe(size);
     expect((new UploadedFile(logo, { binary: true }).read() as string).length).toBe(size);
   });
 
   it("builds a body carrying the file's bytes, counted by CONTENT_LENGTH", () => {
-    const raw = getFs().readFileSync(logo) as Buffer;
+    const raw = Buffer.from(
+      File.open(logo, "rb", (f) => f.read(File.stat(logo).size) ?? ""),
+      "latin1",
+    );
     const files = new UploadedFile(logo);
     const data = new Generator({ "submit-name": "Larry", files }).dump() as string;
 

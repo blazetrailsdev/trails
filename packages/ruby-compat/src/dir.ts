@@ -128,6 +128,22 @@ export class Dir {
   }
 
   /**
+   * `vendor/ruby/dir.c:3288` `dir_foreach`, which yields `"."` and `".."`
+   * ahead of the entries `Dir.children` answers — the two `dir_each` reads
+   * out of the directory stream and `dir_each_entry` filters only for
+   * `each_child` — and raises rather than yielding nothing when the directory
+   * is missing.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.foreach`
+   * (`vendor/ruby/dir.c:3288`).
+   */
+  static foreach(dirname: string, block: (filename: string) => void): null {
+    const children = Dir.children(dirname);
+    for (const filename of [".", "..", ...children]) block(filename);
+    return null;
+  }
+
+  /**
    * `vendor/ruby/dir.c:3347` `dir_s_each_child`, which yields each of
    * `Dir.children`'s names.
    *

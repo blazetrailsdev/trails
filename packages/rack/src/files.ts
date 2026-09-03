@@ -1,5 +1,4 @@
-import { getFs, getPath } from "@blazetrails/ruby-compat";
-import type { FsStatResult } from "@blazetrails/ruby-compat";
+import { File, IO } from "@blazetrails/ruby-compat";
 import { CONTENT_TYPE, CONTENT_LENGTH } from "./constants.js";
 import { mimeType as lookupMime } from "./mime.js";
 import { Request } from "./request.js";
@@ -24,17 +23,13 @@ export class BaseIterator {
   }
 
   each(cb: (chunk: string) => void): void {
-    const fs = getFs();
-    const fd = fs.openSync(this.path, "r");
-    try {
+    File.open(this.path, "rb", (file) => {
       for (const range of this.ranges) {
         if (this.multipart()) cb(this.multipartHeading(range));
-        this.eachRangePart(fd, range, cb);
+        this.eachRangePart(file, range, cb);
       }
       if (this.multipart()) cb(`\r\n--${MULTIPART_BOUNDARY}--\r\n`);
-    } finally {
-      fs.closeSync(fd);
-    }
+    });
   }
 
   /**
@@ -77,17 +72,15 @@ export class BaseIterator {
   }
 
   /** @internal */
-  private eachRangePart(file: number, range: [number, number], cb: (chunk: string) => void): void {
-    let remaining = range[1] - range[0] + 1;
-    let offset = range[0];
-    while (remaining > 0) {
-      const len = Math.min(8192, remaining);
-      const buf = Buffer.alloc(len);
-      const read = getFs().readSync(file, buf, 0, len, offset);
-      if (read === 0) break;
-      cb(buf.slice(0, read).toString("binary"));
-      offset += read;
-      remaining -= read;
+  private eachRangePart(file: IO, range: [number, number], cb: (chunk: string) => void): void {
+    file.seek(range[0]);
+    let remainingLen = range[1] - range[0] + 1;
+    while (remainingLen > 0) {
+      const part = file.read(Math.min(8192, remainingLen));
+      if (part === null) break;
+      remainingLen -= part.length;
+
+      cb(part);
     }
   }
 }
@@ -108,7 +101,7 @@ export class Files {
     headers: Record<string, string> = {},
     defaultMime: string | null = "text/plain",
   ) {
-    this.root = root ? getPath().resolve(root) : "";
+    this.root = root ? File.expandPath(root) : "";
     this.headers = headers;
     this.defaultMime = defaultMime;
   }
@@ -134,21 +127,18 @@ export class Files {
     if (!this.validPath(pathInfo)) return this.fail(400, "Bad Request");
 
     const cleanPath = pathInfo;
-    const filePath = this.root ? getPath().join(this.root, cleanPath) : cleanPath;
-    const resolved = getPath().resolve(filePath);
+    const filePath = this.root ? File.join(this.root, cleanPath) : cleanPath;
+    const resolved = File.expandPath(filePath);
 
-    if (this.root && resolved !== this.root && !resolved.startsWith(this.root + getPath().sep)) {
+    if (this.root && resolved !== this.root && !resolved.startsWith(this.root + File.SEPARATOR)) {
       return this.fail(404, `File not found: ${pathInfo}`);
     }
 
-    let isFile = false;
-    try {
-      isFile = getFs().statSync(resolved).isFile();
-    } catch {
-      // not found or unreadable
-    }
+    const available = File.isFile(resolved) && File.isReadable(resolved);
 
-    return isFile ? this.serving(request, resolved) : this.fail(404, `File not found: ${pathInfo}`);
+    return available
+      ? this.serving(request, resolved)
+      : this.fail(404, `File not found: ${pathInfo}`);
   }
 
   serving(request: Request, path: string): [number, Record<string, any>, any] {
@@ -158,20 +148,10 @@ export class Files {
       return [200, { allow: ALLOW_HEADER, [CONTENT_LENGTH]: "0" }, []];
     }
 
-    let stat: FsStatResult;
-    try {
-      stat = getFs().statSync(path);
-    } catch {
-      return this.fail(404, "File not found");
-    }
+    const lastModified = File.mtime(path).toUTCString();
+    if (request.getHeader("HTTP_IF_MODIFIED_SINCE") === lastModified) return [304, {}, []];
 
-    if (!stat.isFile()) return this.fail(404, "File not found");
-
-    const lastModified = stat.mtime.toUTCString();
-    const ifModSince = request.getHeader("HTTP_IF_MODIFIED_SINCE");
     const headers: Record<string, string> = { "last-modified": lastModified };
-
-    if (ifModSince && new Date(ifModSince) >= stat.mtime) return [304, headers, []]; // boundary: HTTP-date vs mtime
     const mime = this.mimeType(path, this.defaultMime);
     if (mime) headers[CONTENT_TYPE] = mime;
     Object.assign(headers, this.headers);
@@ -225,16 +205,12 @@ export class Files {
 
   /** @internal */
   mimeType(path: string, defaultMime: string | null): string | null {
-    return lookupMime(getPath().extname(path), defaultMime);
+    return lookupMime(File.extname(path), defaultMime);
   }
 
   /** @internal */
   filesize(path: string): number {
-    try {
-      return getFs().statSync(path).size ?? 0;
-    } catch {
-      return 0;
-    }
+    return File.sizeQ(path) ?? Buffer.byteLength(File.read(path));
   }
 
   /** @internal */

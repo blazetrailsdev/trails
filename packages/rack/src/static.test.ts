@@ -1,4 +1,5 @@
 import { it, expect, beforeAll, afterAll } from "vitest";
+import { File } from "@blazetrails/ruby-compat";
 import { Static } from "./static.js";
 import { MockRequest } from "./mock-request.js";
 import * as fs from "fs";
@@ -136,22 +137,26 @@ it("serves regular files if client does not accept gzip encoding", async () => {
 
 it("returns 304 if gzipped file isn't modified since last serve", async () => {
   const app = new Static(fallbackApp, { urls: ["/static"], root: tmpDir, gzip: true });
-  const future = new Date(Date.now() + 86400000).toUTCString();
+  const path = File.join(tmpDir, "static", "test.txt");
   const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt", {
-    HTTP_ACCEPT_ENCODING: "gzip, deflate",
-    HTTP_IF_MODIFIED_SINCE: future,
+    HTTP_IF_MODIFIED_SINCE: File.mtime(path).toUTCString(),
   });
   expect(res.status).toBe(304);
+  expect(res.bodyString).toBe("");
+  expect(res.headers["content-encoding"]).toBeUndefined();
+  expect(res.headers["content-type"]).toBeUndefined();
 });
 
 it("return 304 if gzipped file isn't modified since last serve", async () => {
   const app = new Static(fallbackApp, { urls: ["/static"], root: tmpDir, gzip: true });
-  const future = new Date(Date.now() + 86400000).toUTCString();
+  const path = File.join(tmpDir, "static", "test.txt.gz");
   const res = await new MockRequest((env) => app.call(env)).get("/static/test.txt", {
-    HTTP_ACCEPT_ENCODING: "gzip",
-    HTTP_IF_MODIFIED_SINCE: future,
+    HTTP_IF_MODIFIED_SINCE: File.mtime(path).toUTCString(),
+    HTTP_ACCEPT_ENCODING: "deflate, gzip",
   });
+
   expect(res.status).toBe(304);
+  expect(res.bodyString).toBe("");
 });
 
 it("supports serving fixed cache-control (legacy option)", async () => {

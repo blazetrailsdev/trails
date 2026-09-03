@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 
 export interface UploadedFileTempfile {
   path?: string;
@@ -53,13 +53,13 @@ export class UploadedFile {
       this._tempfile = opts.io;
       this.originalFilename = opts.filename ?? "";
     } else {
-      if (!path || !getFs().existsSync(path)) {
+      if (!path || !File.isExist(path)) {
         // Mirrors Ruby's `raise "#{path} file does not exist"` — Rails emits
         // an empty path prefix when nil, so use "" instead of "null".
         throw new Error(`${path ?? ""} file does not exist`);
       }
-      this.originalFilename = opts.filename ?? getPath().basename(path);
-      const content = getFs().readFileSync(path, "latin1");
+      this.originalFilename = opts.filename ?? File.basename(path);
+      const content = File.open(path, "rb", (f) => f.read(File.stat(path).size) ?? "");
       this._tempfile = makeTempfile(content, path);
     }
     this.contentType = contentType;
