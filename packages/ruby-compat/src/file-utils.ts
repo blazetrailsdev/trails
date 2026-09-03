@@ -19,6 +19,16 @@ function statOrNull(path: string): FsStatResult | null {
   }
 }
 
+/**
+ * `Errno::EEXIST` (`vendor/ruby/lib/fileutils.rb:1163`) — a `SystemCallError`,
+ * whose `.code` the fs layer's own errors carry and callers branch on.
+ */
+function errnoEexist(path: string): NodeJS.ErrnoException {
+  const error: NodeJS.ErrnoException = new Error(`File exists - ${path}`);
+  error.code = "EEXIST";
+  return error;
+}
+
 /** `remove_trailing_slash` (`vendor/ruby/lib/fileutils.rb:276-278`). */
 function removeTrailingSlash(dir: string): string {
   return dir === "/" ? dir : dir.endsWith("/") ? dir.slice(0, -1) : dir;
@@ -87,17 +97,38 @@ function fuEachSrcDest(
   });
 }
 
+/**
+ * `Entry_#copy_metadata` (`vendor/ruby/lib/fileutils.rb:2285-2312`). The backend
+ * contract has no `lstatSync`, so the symlink arms — `File.lchown`,
+ * `File.lchmod` — cannot be reached and the regular-file arms stand alone; and
+ * `FsStatResult` carries `mtime` alone, so it stands in for Ruby's `st.atime`
+ * as well.
+ */
+function copyMetadata(src: string, path: string): void {
+  const st = getFs().statSync(src);
+  getFs().utimesSync?.(path, st.mtime, st.mtime);
+  let mode = st.mode ?? 0o644;
+  try {
+    if (st.uid != null && st.gid != null) getFs().chownSync?.(path, st.uid, st.gid);
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code !== "EPERM" && code !== "EACCES") throw error;
+    mode &= 0o1777;
+  }
+  getFs().chmodSync?.(path, mode);
+}
+
 /** `copy_file` (`vendor/ruby/lib/fileutils.rb:1076-1080`), whose `Entry_#copy_file`
  * (`fileutils.rb:2277-2283`) copies the bytes and `copy_metadata`
- * (`fileutils.rb:2285`) the mode. */
+ * (`fileutils.rb:2285-2312`) the timestamps, ownership and mode. */
 function copyFile(src: string, dest: string, preserve = false): void {
   getFs().copyFileSync(src, dest);
-  if (preserve) getFs().chmodSync?.(dest, getFs().statSync(src).mode ?? 0o644);
+  if (preserve) copyMetadata(src, dest);
 }
 
 /**
  * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
- * walks a directory tree and copies each entry, then its metadata under
+ * walks a directory tree and copies each entry, then its `copy_metadata` under
  * `preserve`.
  */
 function copyEntry(src: string, dest: string, preserve = false): void {
@@ -107,7 +138,7 @@ function copyEntry(src: string, dest: string, preserve = false): void {
     for (const name of getFs().readdirSync(src)) {
       copyEntry(getPath().join(src, name), getPath().join(dest, name), preserve);
     }
-    if (preserve) getFs().chmodSync?.(dest, ent.mode ?? 0o755);
+    if (preserve) copyMetadata(src, dest);
   } else {
     copyFile(src, dest, preserve);
   }
@@ -203,7 +234,11 @@ export class FileUtils {
     });
   }
 
-  /** `FileUtils.mv` (`vendor/ruby/lib/fileutils.rb:1157-1183`).
+  /** `FileUtils.mv` (`vendor/ruby/lib/fileutils.rb:1157-1183`). Ruby's `secure:`
+   * kwarg routes the cross-device fallback's teardown through
+   * `remove_entry_secure` (`fileutils.rb:1351-1447`), which is built on
+   * `Process.euid`; `process.*` is unavailable here, so the kwarg has no arm to
+   * select and is not accepted.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: a `FileUtils`
    * module function the interpreter defines and Rails bodies send.
@@ -218,7 +253,7 @@ export class FileUtils {
       try {
         const destent = statOrNull(d);
         if (destent) {
-          if (destent.isDirectory()) throw new Error(`File exists - ${d}`);
+          if (destent.isDirectory()) throw errnoEexist(d);
         }
         try {
           getFs().renameSync(s, d);

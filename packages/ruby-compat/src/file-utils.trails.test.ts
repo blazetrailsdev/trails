@@ -100,6 +100,28 @@ describe("FileUtils", () => {
     expect(() => FileUtils.cp(src, src)).toThrow(ArgumentError);
   });
 
+  it("cp with preserve copies the mtime and the mode", () => {
+    const src = nodePath.join(root, "src");
+    const dest = nodePath.join(root, "dest");
+    nodeFs.writeFileSync(src, "contents", { mode: 0o640 });
+    const mtime = new Date(Date.UTC(2001, 1, 3, 4, 5, 6));
+    nodeFs.utimesSync(src, mtime, mtime);
+
+    FileUtils.cp(src, dest, { preserve: true });
+
+    expect(nodeFs.statSync(dest).mtime.getTime()).toEqual(mtime.getTime());
+    expect(nodeFs.statSync(dest).mode & 0o777).toEqual(0o640);
+  });
+
+  it("mv raises an EEXIST-coded error when the destination is a directory", () => {
+    const src = nodePath.join(root, "src");
+    const dest = nodePath.join(root, "dest");
+    nodeFs.writeFileSync(src, "contents");
+    FileUtils.mkdirP(nodePath.join(dest, "src"));
+
+    expect(() => FileUtils.mv(src, dest)).toThrow(expect.objectContaining({ code: "EEXIST" }));
+  });
+
   it("mv renames the file", () => {
     const src = nodePath.join(root, "src");
     const dest = nodePath.join(root, "dest");
