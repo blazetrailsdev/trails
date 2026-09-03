@@ -188,7 +188,8 @@ export abstract class Attribute {
 
   equals(other: Attribute): boolean {
     const typeEqual =
-      this.type === other.type || this.type!.constructor === other.type!.constructor;
+      this.type === other.type ||
+      (this.type != null && other.type != null && this.type.constructor === other.type.constructor);
     return (
       this.constructor === other.constructor &&
       this.name === other.name &&
