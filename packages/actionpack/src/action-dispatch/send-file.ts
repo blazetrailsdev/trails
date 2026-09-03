@@ -66,13 +66,13 @@ export function lookupMimeType(typeOrExt: string): string {
 }
 
 /**
- * Generate headers and body for sending a file.
- * Mirrors Rails' send_file.
+ * Generate headers and body for sending a file. Mirrors Rails' `send_file`,
+ * whose guard is `File.file?(path) && File.readable?(path)`
+ * (`data_streaming.rb:77`).
  */
 export function sendFile(path: string, options: SendFileOptions = {}): SendResult {
   const resolvedPath = File.expandPath(path);
 
-  // `data_streaming.rb:77` — `File.file?(path) && File.readable?(path)`.
   if (!File.isFile(resolvedPath) || !File.isReadable(resolvedPath)) {
     throw new Error(`Cannot read file: ${path}`);
   }

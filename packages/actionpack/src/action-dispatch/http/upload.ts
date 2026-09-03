@@ -57,15 +57,15 @@ export class UploadedFile {
   }
 
   /**
-   * Read the file content.
+   * Read the file content. `File.open(path, "rb")` answers a binary String —
+   * one character per byte — which is the encoding node's "latin1" decodes
+   * back verbatim.
    *
    * @missingRailsArgs read — CONVERGEABLE uploaded-file-read-drops-rails-length-and-buffer-arguments
    */
   read(): Buffer {
     if (this._content) return this._content;
     if (this._tempfile) {
-      // `File.open(path, "rb")` reads a binary String — one character per
-      // byte — which is the encoding node's "latin1" decodes back verbatim.
       return Buffer.from(
         File.open(this._tempfile, "rb", (file) => file.read()),
         "latin1",

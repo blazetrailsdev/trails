@@ -33,7 +33,7 @@ export class FixtureResolver extends FileSystemResolver {
 
   /** @internal */
   protected override templateGlob(glob: string): string[] {
-    const regex = this.fnmatch(glob, false);
+    const regex = this.fnmatch(glob);
     return Object.keys(this.hash)
       .filter((path) => regex.test(path))
       .map((path) => `/${path}`);

@@ -109,28 +109,12 @@ export abstract class Resolver implements PathSetResolver {
 
   /**
    * @internal
-   * Ruby `File.fnmatch`, which JS has no equivalent of and no admissible
-   * third-party one. `pathname` selects the flag Ruby's two call sites use:
-   * `Dir.glob` (`resolver.rb:205`) matches path-wise, so `*` stops at a
-   * separator and `**` spans them, while `FixtureResolver`'s bare
-   * `File.fnmatch` (`testing/resolvers.rb:27`) passes no `FNM_PATHNAME` and
-   * lets `*` match `/` too — verified against MRI.
+   * Ruby `File.fnmatch` (`testing/resolvers.rb:27`), which JS has no
+   * equivalent of and no admissible third-party one. `FixtureResolver` passes
+   * no `FNM_PATHNAME`, so `*` matches `/` too — verified against MRI.
    */
-  protected fnmatch(glob: string, pathname = true): RegExp {
-    if (!pathname) return new RegExp(`^${fnmatchChars(glob, ".*", ".")}$`);
-
-    const segments = glob.split("/");
-    let pattern = "";
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i];
-      if (segment === "**") {
-        pattern += "(?:[^/]+/)*";
-        continue;
-      }
-      pattern += fnmatchChars(segment, "[^/]*", "[^/]");
-      if (i < segments.length - 1) pattern += "/";
-    }
-    return new RegExp(`^${pattern}$`);
+  protected fnmatch(glob: string): RegExp {
+    return new RegExp(`^${fnmatchChars(glob, ".*", ".")}$`);
   }
 
   /**
