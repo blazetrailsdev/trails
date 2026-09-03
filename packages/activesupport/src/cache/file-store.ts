@@ -169,7 +169,7 @@ export class FileStore extends Store implements CacheStore {
   // read failure is logged and treated as a miss.
   protected readSerializedEntry(key: string): string | null {
     try {
-      return File.isExist(key) ? File.read(key) : null;
+      return File.isExist(key) ? File.binread(key) : null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       Store.logger?.error?.(`FileStoreError (${message}): ${message}`);

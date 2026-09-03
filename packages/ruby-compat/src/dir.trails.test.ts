@@ -67,12 +67,11 @@ describe("Dir", () => {
     expect(seen).toEqual(["y.rb"]);
   });
 
-  it("mkdir is not recursive, delete removes an empty directory", () => {
+  it("delete removes an empty directory and refuses a full one", () => {
+    // MRI vendor/ruby/dir.c:1535.
     const root = fixture();
-    expect(Dir.mkdir(join(root, "made"))).toBe(0);
-    expect(Dir.isExist(join(root, "made"))).toBe(true);
+    mkdirSync(join(root, "made"));
     expect(Dir.delete(join(root, "made"))).toBe(0);
-    expect(Dir.isExist(join(root, "made"))).toBe(false);
-    expect(() => Dir.mkdir(join(root, "no", "deep"))).toThrow();
+    expect(() => Dir.delete(join(root, "a"))).toThrow();
   });
 });

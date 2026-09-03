@@ -49,7 +49,6 @@ function fnmatch(segment: string, name: string): boolean {
     } else source += char.replace(/[.*+?^${}()|[\]\\]/, "\\$&");
   }
   if (!new RegExp(`^${source}$`).test(name)) return false;
-  // A leading dot is matched only by a literal dot (`vendor/ruby/dir.c:325`).
   return !name.startsWith(".") || segment.startsWith(".");
 }
 
@@ -65,7 +64,6 @@ function segmentMatches(segment: string, name: string): boolean {
   return MAGIC.test(segment) ? fnmatch(segment, name) : segment === name;
 }
 
-// and MRI's glob answers with the entry (`vendor/ruby/dir.c:3421`).
 function globHelper(base: string, segments: string[], found: string[], enumerated: boolean): void {
   const [segment, ...rest] = segments;
   if (segment === undefined) {
@@ -142,35 +140,20 @@ export class Dir {
   }
 
   /**
-   * `vendor/ruby/dir.c:1494` `dir_s_mkdir`, which is NOT recursive — that is
-   * `FileUtils.mkdir_p` — and answers `0`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `Dir.mkdir`
-   * (`vendor/ruby/dir.c:1494`).
-   */
-  static mkdir(dirname: string): number {
-    getFs().mkdirSync(dirname);
-    return 0;
-  }
-
-  /**
-   * `vendor/ruby/dir.c:3670` `dir_s_exist_p`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `Dir.exist?`
-   * (`vendor/ruby/dir.c:3670`).
-   */
-  static isExist(dirname: string): boolean {
-    return File.isDirectory(dirname);
-  }
-
-  /**
-   * `vendor/ruby/dir.c:3227` `dir_s_glob`. Two things node's globbers get
-   * wrong: `**` descends INTERLEAVED with the match at each level rather than
-   * emitting a directory's own matches before its children's — so
+   * `vendor/ruby/dir.c:3227` `dir_s_glob`. Three things node's globbers get
+   * wrong. `**` matching ZERO directories is tried on each entry before that
+   * entry is descended into, so the two depths interleave rather than a
+   * directory's own matches all preceding its children's —
    * `Dir.glob("g/**\/*.rb")` answers `g/B.rb`, `g/a/x.rb`, `g/a.rb` in that
-   * order — and a leading dot is matched only by a literal dot
-   * (`dir.c:325`). Entries come out of each directory sorted, which is
-   * `sort: true`, the default since Ruby 3.0 (`dir.c:3210`).
+   * order. A leading dot is matched only by a literal dot (`dir.c:325`).
+   * And entries come out of each directory sorted, which is `sort: true`, the
+   * default since Ruby 3.0 (`dir.c:3210`).
+   *
+   * A broken symlink is answered, because it is a directory entry
+   * (`dir.c:3421`) rather than something `File.exist?` is asked about — which
+   * is what the `enumerated` argument below carries: a path reached purely
+   * through literal segments has never been proved to exist, so it is the one
+   * that still needs the stat.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.glob`
    * (`vendor/ruby/dir.c:3227`).

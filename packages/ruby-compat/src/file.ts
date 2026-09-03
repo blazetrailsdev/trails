@@ -91,6 +91,21 @@ export class File {
   }
 
   /**
+   * `vendor/ruby/io.c:12242` `rb_io_s_binread`, which answers an ASCII-8BIT
+   * String — the file's BYTES. A JS string has no ASCII-8BIT encoding to be
+   * in, so the bytes come back decoded with the encoding `File.write` put them
+   * in, which is what makes the pair round-trip; only a caller that treats the
+   * result as a byte sequence rather than as text can tell the difference, and
+   * trails has none.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.binread` (`IO.binread`,
+   * `vendor/ruby/io.c:12242`).
+   */
+  static binread(name: string): string {
+    return getFs().readFileSync(name, "utf-8");
+  }
+
+  /**
    * `vendor/ruby/io.c:12377` `rb_io_s_write`, which answers the number of
    * BYTES written rather than the string itself.
    *
@@ -112,17 +127,6 @@ export class File {
   static delete(...files: string[]): number {
     for (const file of files) getFs().unlinkSync(file);
     return files.length;
-  }
-
-  /**
-   * `vendor/ruby/file.c:3231` `rb_file_s_rename`, which answers `0`.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `File.rename`
-   * (`vendor/ruby/file.c:3231`).
-   */
-  static rename(oldName: string, newName: string): number {
-    getFs().renameSync(oldName, newName);
-    return 0;
   }
 
   /**
