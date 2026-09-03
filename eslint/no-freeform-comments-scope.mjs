@@ -121,7 +121,6 @@ export const sweptFilesInsideUnsweptTrees = [
   "packages/actionpack/src/action-dispatch/testing/test-helpers/page-dump-helper.ts",
   "packages/actionpack/src/action-dispatch/testing/test-process.test.ts",
   "packages/actionpack/src/action-dispatch/testing/test-request.ts",
-  "packages/actionpack/src/action-dispatch/uploaded-file.ts",
   "packages/actionpack/src/action-pack/gem-version.ts",
   "packages/actionpack/src/action-pack/index.ts",
   "packages/actionpack/src/action-pack/version.ts",
