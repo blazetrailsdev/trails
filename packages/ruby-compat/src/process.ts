@@ -1,3 +1,5 @@
+import { ArgumentError } from "./argument-error.js";
+
 /**
  * `Process` (`vendor/ruby/process.c:9129` `rb_mProcess`), the sliver of it
  * trails calls.
@@ -35,19 +37,51 @@ export class Process {
   static readonly CLOCK_THREAD_CPUTIME_ID = ":CLOCK_THREAD_CPUTIME_ID";
 
   /**
-   * `vendor/ruby/process.c:8283` `rb_clock_gettime`. `unit` defaults to
-   * `:float_second` (`process.c:8077`) and `:float_millisecond` is the other
-   * one Rails asks for; both are Floats, so no rounding happens on either arm.
+   * `vendor/ruby/process.c:8283` `rb_clock_gettime`, which reads the tick for
+   * `clockId` and then hands it to `make_clock_result` for `unit`.
    *
-   * `CLOCK_THREAD_CPUTIME_ID` has no JS reading — `performance.now()` is a wall
-   * clock, not a per-thread CPU clock — so it answers the monotonic reading,
-   * which is the closest a host without `clock_gettime(2)` can come.
+   * `CLOCK_THREAD_CPUTIME_ID` reads the monotonic tick — `performance.now()` is
+   * a wall clock, not a per-thread CPU clock, and a host without
+   * `clock_gettime(2)` has nothing closer. Every other clock id is the
+   * `Errno::EINVAL` MRI answers for one the host does not implement.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Process.clock_gettime`
    * (`vendor/ruby/process.c:8283`).
    */
   static clockGettime(clockId: string, unit = ":float_second"): number {
-    const milliseconds = performance.now();
-    return unit === ":float_millisecond" ? milliseconds : milliseconds / 1000;
+    if (clockId !== Process.CLOCK_MONOTONIC && clockId !== Process.CLOCK_THREAD_CPUTIME_ID) {
+      const error: NodeJS.ErrnoException = new Error(
+        `Invalid argument - clock_gettime(${clockId})`,
+      );
+      error.code = "EINVAL";
+      throw error;
+    }
+    return makeClockResult(performance.now(), unit);
+  }
+}
+
+/**
+ * `make_clock_result` (`vendor/ruby/process.c:8048-8080`) — seven unit arms and
+ * a raise, over a tick trails already holds as float milliseconds. The four
+ * Integer arms go through `timetick2integer` (`process.c:8000`), whose `/` is
+ * Ruby's integer division, and the three Float arms through `timetick2dblnum`.
+ */
+function makeClockResult(milliseconds: number, unit: string): number {
+  if (unit === ":nanosecond") {
+    return Math.floor(milliseconds * 1000000);
+  } else if (unit === ":microsecond") {
+    return Math.floor(milliseconds * 1000);
+  } else if (unit === ":millisecond") {
+    return Math.floor(milliseconds);
+  } else if (unit === ":second") {
+    return Math.floor(milliseconds / 1000);
+  } else if (unit === ":float_microsecond") {
+    return milliseconds * 1000;
+  } else if (unit === ":float_millisecond") {
+    return milliseconds;
+  } else if (unit == null || unit === ":float_second") {
+    return milliseconds / 1000;
+  } else {
+    throw new ArgumentError(`unexpected unit: ${unit.slice(1)}`);
   }
 }

@@ -100,7 +100,7 @@ export class RewindableInput {
 
   /** @internal */
   private isFilesystemHasPosixSemantics(): boolean {
-    return RUBY_PLATFORM() !== "win32";
+    return !/(mswin|mingw|cygwin|java)/.test(RUBY_PLATFORM());
   }
 }
 
