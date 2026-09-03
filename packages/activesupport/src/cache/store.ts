@@ -1,12 +1,11 @@
 import { Entry } from "./entry.js";
 import {
   ArgumentError,
-  FloatDomainError,
   NotImplementedError,
   TypeError,
   kernelFloat,
+  kernelInteger,
   regexpEscape,
-  rbBuiltinClassName,
 } from "@blazetrails/ruby-compat";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
 import { SerializerWithFallback, type Serializer } from "./serializer-with-fallback.js";
@@ -30,43 +29,6 @@ function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
   if (value === null || value === undefined) return "nil";
   return String(value);
-}
-
-/**
- * Mirrors Ruby's `Kernel#Integer` — the conversion `retrieve_pool_options`
- * applies to `pool_options[:size]` (cache.rb:213). Numerics truncate, Strings
- * are parsed with Ruby's literal grammar (leading/trailing whitespace and
- * underscore separators allowed, `0x`/`0b`/`0o`/`0` radix prefixes honoured, a
- * fractional or empty String rejected), and anything else is a TypeError.
- */
-function Integer(value: unknown): number {
-  if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new FloatDomainError(String(value));
-    return Math.trunc(value);
-  }
-  if (typeof value !== "string") {
-    // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new TypeError(`can't convert ${rbBuiltinClassName(value)} into Integer`);
-  }
-  const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
-  const body = digits.replace(/^[+-]/, "");
-  let magnitude: number;
-  if (/^0[xX][0-9a-fA-F]+$/.test(body)) {
-    magnitude = parseInt(body.slice(2), 16);
-  } else if (/^0[bB][01]+$/.test(body)) {
-    magnitude = parseInt(body.slice(2), 2);
-  } else if (/^0[oO][0-7]+$/.test(body)) {
-    magnitude = parseInt(body.slice(2), 8);
-  } else if (/^0[dD][0-9]+$/.test(body)) {
-    magnitude = parseInt(body.slice(2), 10);
-  } else if (/^0[0-7]*$/.test(body)) {
-    magnitude = parseInt(body, 8);
-  } else if (/^[1-9][0-9]*$/.test(body)) {
-    magnitude = parseInt(body, 10);
-  } else {
-    throw new ArgumentError(`invalid value for Integer(): ${inspect(value)}`);
-  }
-  return digits.startsWith("-") ? -magnitude : magnitude;
 }
 
 /** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
@@ -174,7 +136,7 @@ export abstract class Store {
       poolOptions = DEFAULT_POOL_OPTIONS;
     } else if (typeof poolOptions === "object" && !Array.isArray(poolOptions)) {
       const hash = poolOptions as StoreOptions;
-      if ("size" in hash) hash["size"] = Integer(hash["size"]);
+      if ("size" in hash) hash["size"] = kernelInteger(hash["size"]);
       if ("timeout" in hash) hash["timeout"] = kernelFloat(hash["timeout"]);
       poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
     } else {

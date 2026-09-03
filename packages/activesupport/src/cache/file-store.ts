@@ -3,7 +3,7 @@ import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store.js";
 import { atomicWrite } from "../core-ext/file/atomic.js";
-import { Integer } from "./integer.js";
+import { kernelInteger } from "@blazetrails/ruby-compat";
 import { hexdigest } from "../hexdigest.js";
 import { registerStoreClass } from "./store-registry.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
@@ -358,7 +358,7 @@ export class FileStore extends Store implements CacheStore {
     // Rails coerces `amount = Integer(amount)` once (file_store.rb:226) and uses
     // it uniformly for the seed write, the return, and the hit-path addition;
     // `Integer()` raises on NaN/Infinity rather than silently truncating.
-    amount = Integer(amount);
+    amount = kernelInteger(amount);
 
     return this.lockFile(key, () => {
       let entry = this.readEntry(key, options);

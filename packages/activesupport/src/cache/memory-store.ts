@@ -2,7 +2,7 @@ import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
 import { Store, inspectOptions, type StoreOptions } from "./store.js";
-import { Integer } from "./integer.js";
+import { kernelInteger } from "@blazetrails/ruby-compat";
 import { registerStoreClass } from "./store-registry.js";
 
 const PER_ENTRY_OVERHEAD = 240;
@@ -185,7 +185,7 @@ export class MemoryStore extends Store implements CacheStore {
       // Rails seeds with `Integer(amount)` (raises on NaN/Infinity) but returns
       // the raw `amount` (memory_store.rb:248-249), so `increment("foo", 1.5)`
       // writes 1 yet returns 1.5.
-      this.write(name, Integer(amount), options);
+      this.write(name, kernelInteger(amount), options);
       return amount;
     }
     // Hit path adds the raw `amount` — Rails never calls `Integer()` here
