@@ -19,7 +19,7 @@ import { getCrypto } from "./crypto-adapter.js";
 import { getFsAsync, getPathAsync } from "./fs-adapter.js";
 import { MessageEncryptor } from "./message-encryptor.js";
 import { env as processEnv } from "./process-adapter.js";
-import { chomp } from "./string-utils.js";
+import { chomp } from "@blazetrails/ruby-compat";
 import { Tempfile } from "./tempfile.js";
 
 const CIPHER = "aes-128-gcm";

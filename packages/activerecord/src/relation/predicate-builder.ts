@@ -1,6 +1,6 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { Nodes, sql } from "@blazetrails/arel";
-import { wrap, toS, Range } from "@blazetrails/activesupport";
+import { wrap, Range } from "@blazetrails/activesupport";
 
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";

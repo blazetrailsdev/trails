@@ -4,6 +4,7 @@
  */
 
 import { getCrypto } from "@blazetrails/activesupport";
+import { Headers } from "@blazetrails/rack";
 
 export {
   BasicAuth,
@@ -25,7 +26,7 @@ export interface BasicAuthRequestLike {
 
 /** Controller slice mutated by `authenticationRequest`. */
 export interface BasicAuthControllerLike {
-  headers: Record<string, string>;
+  headers: Headers;
   status: number | string;
   responseBody: string | string[] | Buffer | null | undefined;
 }
@@ -94,7 +95,7 @@ export function authenticationRequest(
   realm: string,
   message: string | null | undefined,
 ): void {
-  controller.headers["WWW-Authenticate"] = `Basic realm="${realm.replace(/"/g, "")}"`;
+  controller.headers.set("WWW-Authenticate", `Basic realm="${realm.replace(/"/g, "")}"`);
   controller.status = 401;
   controller.responseBody = message ?? "HTTP Basic: Access denied.\n";
 }
@@ -206,7 +207,7 @@ export interface DigestRequestLike {
   getHeader(name: string): string | undefined | null;
 }
 export interface DigestControllerLike {
-  headers: Record<string, string>;
+  headers: Headers;
   status: number | string;
   responseBody: string | string[] | Buffer | null | undefined;
   request: DigestRequestLike;
@@ -311,8 +312,10 @@ export function decodeDigestCredentials(header: string): DigestCredentials {
 
 export function authenticationHeader(controller: DigestControllerLike, realm: string): void {
   const sk = secretToken(controller.request);
-  controller.headers["WWW-Authenticate"] =
-    `Digest realm="${realm}", qop="auth", algorithm=MD5, nonce="${nonce(sk)}", opaque="${opaque(sk)}"`;
+  controller.headers.set(
+    "WWW-Authenticate",
+    `Digest realm="${realm}", qop="auth", algorithm=MD5, nonce="${nonce(sk)}", opaque="${opaque(sk)}"`,
+  );
 }
 
 export function digestAuthenticationRequest(

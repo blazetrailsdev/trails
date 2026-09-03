@@ -7,8 +7,8 @@ import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { isPlainObject } from "./hash-utils.js";
-import { inspect, toS } from "./core-ext/object/inspect.js";
-import { isEmpty } from "./ruby-empty.js";
+import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { isEmpty } from "@blazetrails/ruby-compat";
 import { rbObjClass } from "@blazetrails/ruby-compat";
 
 /**

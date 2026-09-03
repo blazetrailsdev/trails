@@ -23,7 +23,7 @@ import { Value as TimeValue } from "../../type/time.js";
 import { Temporal } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
-import { toS } from "@blazetrails/activesupport";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 
 export function quotedTrue(): string {
   return "1";

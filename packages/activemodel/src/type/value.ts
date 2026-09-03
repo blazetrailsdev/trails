@@ -1,4 +1,4 @@
-import { inspect } from "@blazetrails/activesupport";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 
 export abstract class Type<T = unknown> {

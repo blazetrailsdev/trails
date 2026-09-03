@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Headers } from "@blazetrails/rack";
 import {
   encodeCredentials,
   authenticateOrRequestWithHttpBasic,
@@ -13,7 +14,7 @@ import {
 function makeController(authHeader?: string): BasicControllerHost {
   return {
     request: { authorization: authHeader },
-    headers: {} as Record<string, string>,
+    headers: new Headers(),
     status: 200,
     responseBody: null,
   };
@@ -106,7 +107,7 @@ describe("HttpBasicAuthenticationTest", () => {
     requestHttpBasicAuthentication.call(c, "SuperSecret", "Authentication Failed\n");
     expect(c.status).toBe(401);
     expect(c.responseBody).toBe("Authentication Failed\n");
-    expect(c.headers["WWW-Authenticate"]).toBe('Basic realm="SuperSecret"');
+    expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
   });
 
   it("authentication request with invalid credential", () => {
@@ -121,7 +122,7 @@ describe("HttpBasicAuthenticationTest", () => {
     expect(result).toBe(false);
     expect(c.status).toBe(401);
     expect(c.responseBody).toBe("Authentication Failed\n");
-    expect(c.headers["WWW-Authenticate"]).toBe('Basic realm="SuperSecret"');
+    expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
   });
 
   it("authentication request with a missing password", () => {

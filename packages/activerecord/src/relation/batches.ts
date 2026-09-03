@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray as Array } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
+import { isEmpty } from "@blazetrails/ruby-compat";
 import { WhereClause } from "./where-clause.js";
 import { ActiveRecord } from "../ar-config.js";
 import { stripThenable } from "./thenable.js";

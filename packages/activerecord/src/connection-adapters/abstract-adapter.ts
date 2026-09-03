@@ -20,8 +20,8 @@ import {
   LoadInterlockAwareMonitor,
   Notifications,
   NullLock,
-  toS,
 } from "@blazetrails/activesupport";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
 

@@ -1,6 +1,6 @@
 import type { Duration, DurationParts } from "../duration.js";
 import { SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../duration.js";
-import { isEmpty } from "../ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 const DATE_COMPONENTS: (keyof DurationParts)[] = ["years", "months", "days"];
 

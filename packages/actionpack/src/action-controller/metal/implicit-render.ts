@@ -6,7 +6,7 @@
  * @see https://api.rubyonrails.org/classes/ActionController/ImplicitRender.html
  */
 
-import { inspect } from "@blazetrails/activesupport";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 

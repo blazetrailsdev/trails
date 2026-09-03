@@ -1,4 +1,4 @@
-import { StringIO } from "../string-io.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 
 const CONTENT_ROOT = "__content__";
 

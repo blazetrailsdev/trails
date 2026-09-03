@@ -18,11 +18,10 @@ import {
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Value as TimeValue } from "../../type/time.js";
 import { BinaryData } from "@blazetrails/activemodel";
-import { toS } from "@blazetrails/activesupport";
 
 export function unquotedTrue(): number {
   return 1;

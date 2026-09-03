@@ -1,4 +1,5 @@
-import { inspect, ParameterFilter, TimeWithZone, toFs } from "@blazetrails/activesupport";
+import { ParameterFilter, TimeWithZone, toFs } from "@blazetrails/activesupport";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { Temporal } from "@blazetrails/date";
 

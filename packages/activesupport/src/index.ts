@@ -237,8 +237,8 @@ export {
   from,
   to,
   indent,
-  chomp,
 } from "./string-utils.js";
+export { chomp } from "@blazetrails/ruby-compat";
 
 export {
   deepMerge,
@@ -567,7 +567,7 @@ export { TaggedLogging } from "./tagged-logging.js";
 export { DeepMergeable } from "./deep-mergeable.js";
 export { DelegationError, Delegation } from "./delegation.js";
 export { ActiveSupportJSON, parseJsonTimes, setParseJsonTimes } from "./json.js";
-export { JSON } from "./json-stdlib.js";
+export { JSON } from "@blazetrails/ruby-compat";
 export {
   presence,
   NilClass,
@@ -587,7 +587,7 @@ export {
 } from "./core-ext/object/duplicable.js";
 export { CurrentAttributes } from "./current-attributes.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
-export { StringIO } from "./string-io.js";
+export { StringIO } from "@blazetrails/ruby-compat";
 export { EnvironmentInquirer } from "./environment-inquirer.js";
 export { Reloader } from "./reloader.js";
 export { getEnv } from "./environment.js";
@@ -707,8 +707,8 @@ export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
 export { Range } from "@blazetrails/ruby-compat/range";
-export { rbEqual } from "./rb-equal.js";
-export { rbHash } from "./rb-hash.js";
+export { rbEqual } from "@blazetrails/ruby-compat";
+export { rbHash } from "@blazetrails/ruby-compat";
 export { caseEquals, isInclude } from "./core-ext/range/compare-range.js";
 export { overlap, overlaps } from "./core-ext/range/overlap.js";
 // Note: core-ext/range's conversions and each are intentionally kept as subpath
@@ -752,7 +752,6 @@ export { NumberToHumanConverter } from "./number-helper/number-to-human-converte
 export { NumberToHumanSizeConverter } from "./number-helper/number-to-human-size-converter.js";
 export { RoundingHelper } from "./number-helper/rounding-helper.js";
 export { Trailtie, registerTrailtie } from "./trailtie.js";
-export { inspect, toS } from "./core-ext/object/inspect.js";
 export {
   _ActionDispatchRequest,
   _setActionDispatchRequest,

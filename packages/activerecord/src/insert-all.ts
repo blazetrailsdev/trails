@@ -8,7 +8,7 @@ import type { Base } from "./base.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
-import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
+import { isEmpty } from "@blazetrails/ruby-compat";
 import { isPresent, many, reverseMerge } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { first } from "./ruby-first.js";

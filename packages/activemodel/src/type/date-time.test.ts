@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal, strftime } from "@blazetrails/date";
-import { TimeZone, setZoneDefault, toS } from "@blazetrails/activesupport";
+import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { Types } from "../index.js";
 
 describe("DateTimeTest", () => {

@@ -6,7 +6,7 @@
 import { Logger, taggedLogging as _taggedLogging } from "./logger.js";
 import type { TaggedLogger } from "./logger.js";
 import type { Temporal } from "@blazetrails/date";
-import { isEmpty } from "./ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 export class TagStack {
   private _tags: string[] = [];

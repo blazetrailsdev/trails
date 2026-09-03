@@ -1,7 +1,7 @@
 import { hasKey } from "@blazetrails/ruby-compat";
 import type { DurationParts } from "../duration.js";
-import { inspect } from "../core-ext/object/inspect.js";
-import { isEmpty } from "../ruby-empty.js";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 /**
  * Ruby's `strscan` has no JS counterpart, so the slice of `StringScanner`

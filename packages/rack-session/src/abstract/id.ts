@@ -1,4 +1,4 @@
-import { ArgumentError, getCrypto, inspect, KeyError, valuesAt } from "@blazetrails/activesupport";
+import { ArgumentError, getCrypto, KeyError, valuesAt } from "@blazetrails/activesupport";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   RACK_ERRORS,
@@ -7,7 +7,13 @@ import {
   Request,
   ResponseRaw,
 } from "@blazetrails/rack";
-import { kernelRand, NotImplementedError, SecureRandom, verbose } from "@blazetrails/ruby-compat";
+import {
+  kernelRand,
+  NotImplementedError,
+  SecureRandom,
+  verbose,
+  rbInspect as inspect,
+} from "@blazetrails/ruby-compat";
 
 import { getRubyClassPath } from "../ruby-class-path-slot.js";
 

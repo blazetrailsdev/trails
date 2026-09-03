@@ -1,5 +1,5 @@
 import { isBlank } from "../string-utils.js";
-import { StringIO } from "../string-io.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 // Ruby core `RuntimeError` — what this file's two bare `raise` forms raise
 // (nokogirisax.rb:34,38). `rexml/document.ts` is the one file that declares it.
 import { RuntimeError } from "../rexml/document.js";

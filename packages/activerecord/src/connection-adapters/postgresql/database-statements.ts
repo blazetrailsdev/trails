@@ -13,7 +13,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
+import { isEmpty } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 
 export const READ_QUERY =

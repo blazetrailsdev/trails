@@ -5,12 +5,12 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import {
   type DateInfinity as DateInfinityType,
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
-import { include, toS, type Included } from "@blazetrails/activesupport";
+import { include, type Included } from "@blazetrails/activesupport";
 import { ArgumentError } from "../attribute-assignment.js";
 import {
   AcceptsMultiparameterTime,

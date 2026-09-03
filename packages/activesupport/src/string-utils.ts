@@ -7,8 +7,6 @@
 // file's long-standing importers keep reaching them.
 export { isBlank, isPresent } from "./core-ext/object/blank.js";
 
-export { chomp } from "@blazetrails/ruby-compat";
-
 export function squish(str: string): string {
   return str.trim().replace(/\s+/g, " ");
 }

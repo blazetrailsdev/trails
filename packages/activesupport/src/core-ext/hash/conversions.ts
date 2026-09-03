@@ -6,12 +6,12 @@
 
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import * as XmlMini from "../../xml-mini.js";
-import { StringIO } from "../../string-io.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { isBlank, isPresent } from "../object/blank.js";
-import { isEmpty } from "../../ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 import { wrap } from "../../array-utils.js";
 import { isPlainObject } from "../../hash-utils.js";
-import { inspect } from "../object/inspect.js";
+import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 /**
  * Raised if the XML contains attributes with type="yaml" or
