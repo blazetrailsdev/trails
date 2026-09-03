@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import * as activesupport from "@blazetrails/activesupport";
-import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
+import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { stdout, stderr } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -61,16 +61,16 @@ describeIfSqlite("SqliteDBCreateTest", () => {
 
   it("db checks database exists", async () => {
     vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
-    const existsSync = vi.spyOn(getFs(), "existsSync").mockReturnValue(false);
+    const isExist = vi.spyOn(File, "isExist").mockReturnValue(false);
 
     await DatabaseTasks.create(configuration);
 
-    expect(existsSync).toHaveBeenCalledWith(database);
+    expect(isExist).toHaveBeenCalledWith(database);
   });
 
   it("when db created successfully outputs info to stdout", async () => {
     vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
-    vi.spyOn(getFs(), "existsSync").mockReturnValue(false);
+    vi.spyOn(File, "isExist").mockReturnValue(false);
 
     await DatabaseTasks.create(configuration);
 
@@ -78,7 +78,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
   });
 
   it("db create when file exists", async () => {
-    vi.spyOn(getFs(), "existsSync").mockReturnValue(true);
+    vi.spyOn(File, "isExist").mockReturnValue(true);
 
     await DatabaseTasks.create(configuration);
 
@@ -86,7 +86,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
   });
 
   it("db create with file does nothing", async () => {
-    vi.spyOn(getFs(), "existsSync").mockReturnValue(true);
+    vi.spyOn(File, "isExist").mockReturnValue(true);
     const establishConnection = vi.spyOn(Base, "establishConnection");
 
     await DatabaseTasks.create(configuration);
@@ -100,7 +100,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
       calls.push(args);
       return undefined as never;
     });
-    vi.spyOn(getFs(), "existsSync").mockReturnValue(false);
+    vi.spyOn(File, "isExist").mockReturnValue(false);
 
     await DatabaseTasks.create(configuration);
 
@@ -110,7 +110,7 @@ describeIfSqlite("SqliteDBCreateTest", () => {
   });
 
   it("db create with error prints message", async () => {
-    vi.spyOn(getFs(), "existsSync").mockReturnValue(false);
+    vi.spyOn(File, "isExist").mockReturnValue(false);
     vi.spyOn(Base, "establishConnection").mockImplementation(() => {
       throw new Error("boom");
     });
@@ -152,14 +152,13 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("checks db dir is absolute", async () => {
-    const pathAdapter = getPath() as { isAbsolute(p: string): boolean };
-    const isAbsolute = vi.spyOn(pathAdapter, "isAbsolute").mockReturnValue(false);
+    const isAbsolutePath = vi.spyOn(File, "isAbsolutePath").mockReturnValue(false);
     vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
     vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 
     await DatabaseTasks.drop(configuration);
 
-    expect(isAbsolute).toHaveBeenCalledWith(database);
+    expect(isAbsolutePath).toHaveBeenCalledWith(database);
   });
 
   it("removes file with absolute path", async () => {
@@ -173,7 +172,7 @@ describeIfSqlite("SqliteDBDropTest", () => {
   });
 
   it("generates absolute path with given root", async () => {
-    const join = vi.spyOn(getPath(), "join");
+    const join = vi.spyOn(File, "join");
     vi.spyOn(FileUtils, "rm").mockImplementation(() => undefined);
     vi.spyOn(FileUtils, "rmF").mockImplementation(() => undefined);
 

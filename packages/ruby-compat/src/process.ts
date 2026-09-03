@@ -54,9 +54,7 @@ export class Process {
    */
   static clockGettime(clockId: string, unit = ":float_second"): number {
     if (clockId !== Process.CLOCK_MONOTONIC && clockId !== Process.CLOCK_THREAD_CPUTIME_ID) {
-      const error: SystemCallError = new Error(
-        `Invalid argument - clock_gettime(${clockId})`,
-      );
+      const error: SystemCallError = new Error(`Invalid argument - clock_gettime(${clockId})`);
       error.code = "EINVAL";
       throw error;
     }
