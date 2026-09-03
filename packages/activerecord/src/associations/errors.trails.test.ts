@@ -86,7 +86,7 @@ describe("AssociationErrors", () => {
     );
   });
 
-  it("CompositePrimaryKeyMismatchError accepts a pre-resolved primaryKey for reflection-less guards", () => {
+  it("CompositePrimaryKeyMismatchError uses association_primary_key for non-collection reflections", () => {
     const reflection = {
       activeRecord: "CpkBrokenBook",
       name: "order",
