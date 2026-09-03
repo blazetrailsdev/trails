@@ -1,5 +1,5 @@
 import { isBlank } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Zlib } from "@blazetrails/ruby-compat";
 
 /**
  * `ActionView::Helpers::AssetUrlHelper`
@@ -156,7 +156,7 @@ export function computeAssetHost(
       if (request && host.length > 1) args.push(request);
       host = (host as (...a: unknown[]) => string)(...args);
     } else if (host.includes("%d")) {
-      host = host.replace("%d", String(crc32(source) % 4));
+      host = host.replace("%d", String(Zlib.crc32(source) % 4));
     }
   }
 
@@ -184,18 +184,6 @@ export function computeAssetHost(
     default:
       return `${protocol}://${host}`;
   }
-}
-
-/** Ruby `Zlib.crc32` (`asset_url_helper.rb:3`, `:295`). */
-function crc32(str: string): number {
-  let crc = 0xffffffff;
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i) & 0xff;
-    for (let bit = 0; bit < 8; bit++) {
-      crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
 }
 
 /** Mirrors `AssetUrlHelper#stylesheet_path` (`asset_url_helper.rb:348-350`). */

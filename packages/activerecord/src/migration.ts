@@ -14,6 +14,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rubyInspect } from "./relation/ruby-inspect.js";
+import { Zlib } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -88,18 +89,6 @@ export interface ColumnExistsOptions {
   null?: unknown;
   collation?: unknown;
   comment?: unknown;
-}
-
-function crc32(str: string): number {
-  const bytes = new TextEncoder().encode(str);
-  let crc = 0xffffffff;
-  for (const byte of bytes) {
-    crc ^= byte;
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
-    }
-  }
-  return (crc ^ 0xffffffff) >>> 0;
 }
 
 export class MigrationError extends ActiveRecordError {
@@ -1941,7 +1930,7 @@ export class Migrator {
 
   /** @internal */
   async generateMigratorAdvisoryLockId(): Promise<bigint> {
-    const dbNameHash = crc32(await this.connection.currentDatabase!());
+    const dbNameHash = Zlib.crc32(await this.connection.currentDatabase!());
     return BigInt(Migrator._MIGRATOR_SALT) * BigInt(dbNameHash);
   }
 
