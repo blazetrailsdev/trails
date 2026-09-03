@@ -112,7 +112,6 @@ import {
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import * as ModelSchema from "./model-schema.js";
-import { ModelSchema as _ModelSchema } from "./model-schema.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import {
   createOrUpdate as callbacksCreateOrUpdate,
@@ -3014,7 +3013,7 @@ include(Base, _BeforeTypeCast);
 include(Base, _Query);
 include(Base, _PrimaryKey);
 include(Base, _CompositePrimaryKey);
-include(Base, _ModelSchema);
+include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
 include(Base, AMDirty);
 include(Base, _Dirty);
