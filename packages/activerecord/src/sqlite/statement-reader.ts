@@ -1,5 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
-
 /**
  * Row-returning classification for drivers that cannot report a prepared
  * statement's real column count.

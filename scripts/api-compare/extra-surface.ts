@@ -2185,10 +2185,13 @@ function buildPackageReport(
 
     // `compare_range.rb` declares `CompareWithRange`: the container synthesized
     // from the FILENAME is a name nobody wrote (see `synthesizedFileModule`).
-    if (rubyFile !== null && (rubyFiles.get(rubyFile)?.length ?? 0) > 0) {
-      for (const c of [...classes, ...modules]) {
-        if (c.file === expectedTs && c.synthesizedFileModule === true) allowed.add(c.name);
-      }
+    // Unconditional on the Rails side (RFC 0130): the name is minted by the
+    // extractor from the file path in both cases, so a file with NO counterpart
+    // — `relation/thenable.ts` charged for `Thenable` — is charged for a name
+    // no author can delete, rename, or write a receipt against. The only real
+    // surface such a file has is its functions, and those stay scored.
+    for (const c of [...classes, ...modules]) {
+      if (c.file === expectedTs && c.synthesizedFileModule === true) allowed.add(c.name);
     }
 
     const scored: ExtraName[] = [];

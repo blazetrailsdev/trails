@@ -1,3 +1,5 @@
+/** @noRailsEquivalent CONVERGEABLE move-ruby-inspect-and-compact-uniq-to-ruby-compat */
+
 function dedupKey(value: unknown): unknown {
   return typeof value === "bigint" || typeof value === "number" ? String(value) : value;
 }

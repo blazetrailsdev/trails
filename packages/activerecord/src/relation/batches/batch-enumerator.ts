@@ -143,12 +143,6 @@ export class BatchEnumerator<T extends BatchRelation> {
     })();
   }
 
-  eachBatch(): AsyncGenerator<T>;
-  eachBatch(fn: (batch: T) => void | Promise<void>): Promise<void>;
-  eachBatch(fn?: (batch: T) => void | Promise<void>): AsyncGenerator<T> | Promise<void> {
-    return this.each(fn as any);
-  }
-
   async toArray(): Promise<T[]> {
     const batches: T[] = [];
     for await (const batch of this) {

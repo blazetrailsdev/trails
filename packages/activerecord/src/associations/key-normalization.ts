@@ -1,5 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
-
 const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
 const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
 

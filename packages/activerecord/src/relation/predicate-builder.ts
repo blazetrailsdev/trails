@@ -211,6 +211,7 @@ export class PredicateBuilder {
     return this.table.type(columnName).cast(value);
   }
 
+  /** @noRailsEquivalent CONVERGEABLE fold-build-composite-and-perform-merge */
   buildComposite(
     cols: string[],
     tuples: unknown[][],

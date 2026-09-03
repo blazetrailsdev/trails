@@ -1,3 +1,4 @@
+/** @noRailsEquivalent CONVERGEABLE converge-relation-deferred-and-thenable-machinery MOVED-BY-SHORT-NAME: constructor invert. */
 import { Nodes } from "@blazetrails/arel";
 
 export class DeferredDistinctPkIn extends Nodes.In {

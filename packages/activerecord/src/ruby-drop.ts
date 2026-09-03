@@ -1,4 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
 import { ArgumentError } from "@blazetrails/activemodel";
 
 /**

@@ -1,4 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { Quoting } from "./quoting.js";
 

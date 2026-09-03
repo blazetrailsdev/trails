@@ -1,4 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
 import type { Base } from "./base.js";
 
 /**

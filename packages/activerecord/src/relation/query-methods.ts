@@ -1023,7 +1023,7 @@ function assertStructurallyCompatible(
   }
 }
 
-export function areStructurallyCompatible(self: unknown, other: unknown): boolean {
+function areStructurallyCompatible(self: unknown, other: unknown): boolean {
   if (!isRelationForCombining(self) || !isRelationForCombining(other)) return false;
   return structurallyIncompatibleValuesFor.call(self, other).length === 0;
 }
@@ -1385,7 +1385,7 @@ export function assertModifiableBang(this: QueryMethodsHost): void {
   }
 }
 
-export function isBlankArgument(value: unknown): boolean {
+function isBlankArgument(value: unknown): boolean {
   if (value === null || value === undefined || value === false) return true;
   if (typeof value === "string") return value.trim() === "";
   if (Array.isArray(value)) return value.length === 0;
