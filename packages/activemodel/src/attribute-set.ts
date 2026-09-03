@@ -44,7 +44,7 @@ export class AttributeSet {
   }
 
   castTypes(): Record<string, Type> {
-    return transformValues(this.attributes(), (attr) => attr.type);
+    return transformValues(this.attributes(), (attr) => attr.type!);
   }
 
   valuesBeforeTypeCast(): Record<string, unknown> {

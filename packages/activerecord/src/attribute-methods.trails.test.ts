@@ -376,6 +376,8 @@ describe("AttributeMethodsTest (trails)", () => {
     }
     class Leaf extends Middle {}
 
+    (Middle as unknown as { defineAttributeMethods(): boolean }).defineAttributeMethods();
+
     const host = Leaf as unknown as { isInstanceMethodAlreadyImplemented(n: string): boolean };
     expect("nameChanged" in (Leaf.prototype as object)).toBe(true);
     expect(host.isInstanceMethodAlreadyImplemented("nameChanged")).toBe(false);
@@ -493,6 +495,7 @@ describe("define_attribute_methods abstract gate (trails)", () => {
       static tableName = "topics";
       static {
         this.abstractClass = true;
+        this.attribute("author_name", "string");
       }
     }
     class ConcreteTopic extends AbstractTopic {}

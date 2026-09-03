@@ -1,6 +1,6 @@
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
-import { AttributeSetCodecError } from "./codec.js";
-import type { AttributeSetCodec, AttributeSetEnvelope } from "./codec.js";
+import { AttributeSetCodecError, fromEnvelope, toEnvelope } from "./codec.js";
+import type { AttributeSetCodec, AttributeSetCoder, AttributeSetEnvelope } from "./codec.js";
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -8,16 +8,17 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 /** @noRailsEquivalent PERMANENT */
 export const yamlCodec: AttributeSetCodec = {
-  encode(envelope: AttributeSetEnvelope): string {
-    return yamlStringify(envelope, (_key, value) =>
+  encode(coder: AttributeSetCoder): string {
+    return yamlStringify(toEnvelope(coder), (_key, value) =>
       typeof value === "bigint" ? String(value) : value,
     );
   },
-  decode(input: string): AttributeSetEnvelope {
+  decode(input: string): AttributeSetCoder {
     const parsed: unknown = yamlParse(input);
     if (
       !isPlainObject(parsed) ||
       !("v" in parsed) ||
+      parsed.v !== 1 ||
       !isPlainObject(parsed.types) ||
       !isPlainObject(parsed.values)
     ) {
@@ -25,6 +26,6 @@ export const yamlCodec: AttributeSetCodec = {
         "yamlCodec.decode: input is not a valid AttributeSetEnvelope",
       );
     }
-    return parsed as unknown as AttributeSetEnvelope;
+    return fromEnvelope(parsed as unknown as AttributeSetEnvelope);
   },
 };

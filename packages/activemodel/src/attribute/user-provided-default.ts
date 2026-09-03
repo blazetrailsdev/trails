@@ -8,7 +8,12 @@ export class UserProvidedDefault extends FromUser {
   private _memoizedVBTC: unknown;
   private _hasMemoizedVBTC: boolean = false;
 
-  constructor(name: string, value: unknown, type: Type, databaseDefault: Attribute | null = null) {
+  constructor(
+    name: string,
+    value: unknown,
+    type: Type | null,
+    databaseDefault: Attribute | null = null,
+  ) {
     super(name, undefined, type, databaseDefault);
     this.userProvidedValue = value;
   }
@@ -24,15 +29,17 @@ export class UserProvidedDefault extends FromUser {
     return this.userProvidedValue;
   }
 
-  override withType(type: Type): Attribute {
+  override withType(type: Type | null): Attribute {
     return new UserProvidedDefault(this.name, this.userProvidedValue, type, this.originalAttribute);
   }
 
-  marshalDump(): [string, unknown, Type, Attribute | null] {
+  marshalDump(): [string, unknown, Type | null, Attribute | null] {
     return [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
   }
 
-  static marshalLoad(values: [string, unknown, Type, Attribute | null]): UserProvidedDefault {
+  static marshalLoad(
+    values: [string, unknown, Type | null, Attribute | null],
+  ): UserProvidedDefault {
     return new UserProvidedDefault(values[0], values[1], values[2], values[3]);
   }
 }

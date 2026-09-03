@@ -85,7 +85,7 @@ export class PendingDecorator implements PendingModification {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
-      const newType = this.decorator(name, existing.type);
+      const newType = this.decorator(name, existing.type!);
       if (newType) {
         attributeSet.set(name, existing.withType(newType));
       }

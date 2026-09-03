@@ -573,7 +573,7 @@ describe("DefineAttributeTest", () => {
     const before = Post._defaultAttributes();
     Post.defineAttribute("score", intType);
     expect(Post._defaultAttributes()).toBe(before);
-    expect(before.getAttribute("score").type.name).toBe("integer");
+    expect(before.getAttribute("score").type!.name).toBe("integer");
     expect(Post.typeForAttribute("score").name).toBe("integer");
   });
 });
@@ -660,7 +660,7 @@ describe("DefaultAttributesTest", () => {
     };
 
     const defaults = Post._defaultAttributes();
-    expect(defaults.getAttribute("score").type.name).toBe("string");
+    expect(defaults.getAttribute("score").type!.name).toBe("string");
   });
 
   it("resetDefaultAttributes reloads the schema from cache", () => {
@@ -688,7 +688,7 @@ describe("DefaultAttributesTest", () => {
     };
 
     const defaults = Post._defaultAttributes();
-    expect(defaults.getAttribute("score").type.name).toBe("string");
+    expect(defaults.getAttribute("score").type!.name).toBe("string");
     expect(defaults.getAttribute("score").value).toBe("5");
   });
 });

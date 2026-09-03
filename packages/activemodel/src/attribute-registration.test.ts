@@ -319,11 +319,11 @@ describe("AttributeRegistrationTest", () => {
     });
 
     expect(attributes.getAttribute("foo").type).toBeInstanceOf(MyDecorator);
-    expect(attributes.getAttribute("foo").type.name).toBe("foo");
+    expect(attributes.getAttribute("foo").type!.name).toBe("foo");
     expect((attributes.getAttribute("foo").type as MyDecorator).castType).toBe(TYPE_1);
 
     expect(attributes.getAttribute("bar").type).toBeInstanceOf(MyDecorator);
-    expect(attributes.getAttribute("bar").type.name).toBe("bar");
+    expect(attributes.getAttribute("bar").type!.name).toBe("bar");
     expect((attributes.getAttribute("bar").type as MyDecorator).castType).toBe(TYPE_2);
 
     expect(attributes.getAttribute("qux").type).toBe(TYPE_2);

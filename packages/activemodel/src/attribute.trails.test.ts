@@ -6,6 +6,16 @@ import { ValueType } from "./type/value.js";
 import "./attribute/user-provided-default.js";
 
 describe("Attribute — trails-only coverage", () => {
+  it("#== compares a nil type against a non-nil one without raising", () => {
+    const stringType = typeRegistry.lookup("string");
+    const nilTyped = Attribute.fromUser("name", "Alice", null);
+    const typed = Attribute.fromUser("name", "Alice", stringType);
+
+    expect(nilTyped.equals(typed)).toBe(false);
+    expect(typed.equals(nilTyped)).toBe(false);
+    expect(nilTyped.equals(Attribute.fromUser("name", "Alice", null))).toBe(true);
+  });
+
   it("#serializable? delegates to the type", () => {
     const attr = Attribute.fromDatabase("count", 42, typeRegistry.lookup("integer"));
     expect(attr.isSerializable()).toBe(true);

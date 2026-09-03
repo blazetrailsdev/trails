@@ -27,7 +27,7 @@ export abstract class Attribute {
 
   readonly name: string;
   protected _valueBeforeTypeCast: unknown;
-  readonly type: Type;
+  readonly type: Type | null;
   /** @internal */
   originalAttribute: Attribute | null;
   private _value: unknown;
@@ -38,7 +38,7 @@ export abstract class Attribute {
   static fromDatabase(
     name: string,
     valueBeforeTypeCast: unknown,
-    type: Type,
+    type: Type | null,
     value?: unknown,
   ): FromDatabase {
     return new FromDatabase(name, valueBeforeTypeCast, type, null, value);
@@ -47,13 +47,17 @@ export abstract class Attribute {
   static fromUser(
     name: string,
     valueBeforeTypeCast: unknown,
-    type: Type,
+    type: Type | null,
     originalAttribute: Attribute | null = null,
   ): FromUser {
     return new FromUser(name, valueBeforeTypeCast, type, originalAttribute);
   }
 
-  static withCastValue(name: string, valueBeforeTypeCast: unknown, type: Type): WithCastValue {
+  static withCastValue(
+    name: string,
+    valueBeforeTypeCast: unknown,
+    type: Type | null,
+  ): WithCastValue {
     return new WithCastValue(name, valueBeforeTypeCast, type);
   }
 
@@ -61,7 +65,7 @@ export abstract class Attribute {
     return new Null(name);
   }
 
-  static uninitialized(name: string, type: Type): Uninitialized {
+  static uninitialized(name: string, type: Type | null): Uninitialized {
     return new Uninitialized(name, type);
   }
 
@@ -72,7 +76,7 @@ export abstract class Attribute {
   constructor(
     name: string,
     valueBeforeTypeCast: unknown,
-    type: Type,
+    type: Type | null,
     originalAttribute: Attribute | null = null,
     value?: unknown,
   ) {
@@ -111,7 +115,7 @@ export abstract class Attribute {
   get valueForDatabase(): unknown {
     if (
       !this._hasValueForDatabase ||
-      this.type.isChangedInPlace(this._cachedValueForDatabase, this.value)
+      this.type!.isChangedInPlace(this._cachedValueForDatabase, this.value)
     ) {
       this._cachedValueForDatabase = this._valueForDatabase();
       this._hasValueForDatabase = true;
@@ -121,11 +125,11 @@ export abstract class Attribute {
 
   /** @internal */
   protected _valueForDatabase(): unknown {
-    return this.type.serialize(this.value);
+    return this.type!.serialize(this.value);
   }
 
   isSerializable(block?: (castValue: unknown) => void): boolean {
-    return this.type.isSerializable(this.value, block);
+    return this.type!.isSerializable(this.value, block);
   }
 
   isChanged(): boolean {
@@ -134,7 +138,7 @@ export abstract class Attribute {
 
   changedInPlace(): boolean {
     return (
-      this.hasBeenRead() && this.type.isChangedInPlace(this.originalValueForDatabase(), this.value)
+      this.hasBeenRead() && this.type!.isChangedInPlace(this.originalValueForDatabase(), this.value)
     );
   }
 
@@ -143,7 +147,7 @@ export abstract class Attribute {
   }
 
   withValueFromUser(value: unknown): Attribute {
-    this.type.assertValidValue(value);
+    this.type!.assertValidValue(value);
     return Attribute.fromUser(this.name, value, this.type, this.originalAttribute ?? this);
   }
 
@@ -155,14 +159,14 @@ export abstract class Attribute {
     return (this.constructor as typeof Attribute).withCastValue(this.name, value, this.type);
   }
 
-  withType(type: Type): Attribute {
+  withType(type: Type | null): Attribute {
     if (this.changedInPlace()) {
       return this.withValueFromUser(this.value).withType(type);
     }
     const Ctor = this.constructor as new (
       name: string,
       valueBeforeTypeCast: unknown,
-      type: Type,
+      type: Type | null,
       originalAttribute: Attribute | null,
     ) => Attribute;
     return new Ctor(this.name, this.valueBeforeTypeCast, type, this.originalAttribute);
@@ -183,7 +187,9 @@ export abstract class Attribute {
   }
 
   equals(other: Attribute): boolean {
-    const typeEqual = this.type === other.type || this.type.constructor === other.type.constructor;
+    const typeEqual =
+      this.type === other.type ||
+      (this.type != null && other.type != null && this.type.constructor === other.type.constructor);
     return (
       this.constructor === other.constructor &&
       this.name === other.name &&
@@ -201,7 +207,7 @@ export abstract class Attribute {
 
   /** @internal */
   protected _originalValueForDatabase(): unknown {
-    return this.type.serialize(this.originalValue);
+    return this.type!.serialize(this.originalValue);
   }
 
   private isAssigned(): boolean {
@@ -210,7 +216,7 @@ export abstract class Attribute {
 
   private changedFromAssignment(): boolean {
     if (!this.isAssigned()) return false;
-    return this.type.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
+    return this.type!.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
   }
 
   deepDup(): Attribute {
@@ -243,7 +249,7 @@ export class FromDatabase extends Attribute {
   /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
-    return this.type.deserialize(value);
+    return this.type!.deserialize(value);
   }
 
   override forgettingAssignment(): Attribute {
@@ -261,20 +267,20 @@ export class FromUser extends Attribute {
   /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
   typeCast(value: unknown): unknown {
-    return this.type.cast(value);
+    return this.type!.cast(value);
   }
 
   cameFromUser(): boolean {
-    return !this.type.isValueConstructedByMassAssignment(this.valueBeforeTypeCast);
+    return !this.type!.isValueConstructedByMassAssignment(this.valueBeforeTypeCast);
   }
 
   /** @internal */
   protected override _valueForDatabase(): unknown {
-    const compatible = this.type.itselfIfSerializeCastValueCompatible();
+    const compatible = this.type!.itselfIfSerializeCastValueCompatible();
     if (compatible === this.type) {
-      return this.type.serializeCastValue(this.value);
+      return this.type!.serializeCastValue(this.value);
     }
-    return this.type.serialize(this.value);
+    return this.type!.serialize(this.value);
   }
 }
 
@@ -301,7 +307,7 @@ export class Null extends Attribute {
     return null;
   }
 
-  override withType(type: Type): Attribute {
+  override withType(type: Type | null): Attribute {
     return Attribute.withCastValue(this.name, null, type);
   }
 
@@ -317,7 +323,7 @@ export class Null extends Attribute {
 export class Uninitialized extends Attribute {
   /** @noRailsEquivalent PERMANENT */
   static readonly [rubyNamespace]: string = "ActiveModel::Attribute";
-  constructor(name: string, type: Type) {
+  constructor(name: string, type: Type | null) {
     super(name, null, type);
   }
 
@@ -341,7 +347,7 @@ export class Uninitialized extends Attribute {
     return new Uninitialized(this.name, this.type);
   }
 
-  override withType(type: Type): Attribute {
+  override withType(type: Type | null): Attribute {
     return new Uninitialized(this.name, type);
   }
 

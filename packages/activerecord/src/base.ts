@@ -884,7 +884,6 @@ export class Base extends Model {
       typeName = undefined;
     }
     AttributeRegistration.ClassMethods.attribute.call(this as never, name, typeName, options);
-    this.defineAttributeMethod(name);
     ModelSchema.clearAttributeNamesMemo(this as never);
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
       delete (this.prototype as any).id;
@@ -905,7 +904,7 @@ export class Base extends Model {
       const attributeTypes = this.attributeTypes();
       return Object.hasOwn(attributeTypes, resolved) ? attributeTypes[resolved] : block();
     }
-    return this._defaultAttributes().getAttribute(resolved).type;
+    return this._defaultAttributes().getAttribute(resolved).type!;
   }
 
   static get arelTable(): Table {

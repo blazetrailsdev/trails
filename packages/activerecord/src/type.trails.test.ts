@@ -213,13 +213,13 @@ describe("attribute() resolves through the declaring model's adapter", () => {
 
     const type = model.resolveTypeName("string");
     expect(type.cast(true)).toBe("1");
-    expect(model._defaultAttributes().getAttribute("mystring").type.cast(true)).toBe("1");
+    expect(model._defaultAttributes().getAttribute("mystring").type!.cast(true)).toBe("1");
   });
 
   it("leaves a sqlite3 model on the generic string registration", () => {
     const model = modelForAdapter("sqlite3");
     model.attribute("mystring", "string");
 
-    expect(model._defaultAttributes().getAttribute("mystring").type.cast(true)).toBe("t");
+    expect(model._defaultAttributes().getAttribute("mystring").type!.cast(true)).toBe("t");
   });
 });
