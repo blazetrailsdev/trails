@@ -41,6 +41,29 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(new Legacy({ title: "t" }).heading).toBe("t");
   });
 
+  it("initializeGeneratedModules replaces a module ActiveModel built first", async () => {
+    class Legacy extends Base {
+      declare heading: unknown;
+      static {
+        this.attribute("title", "string");
+        this.aliasAttribute("heading", "title");
+      }
+    }
+    Legacy.generatedAttributeMethods().defineMethod("title", function () {
+      return "from the ActiveModel module";
+    });
+    Legacy.initializeGeneratedModules();
+    generatable(Legacy).defineAttributeMethods();
+
+    expect(Legacy._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+    expect("title" in Legacy.prototype).toBe(true);
+
+    Legacy.undefineAttributeMethods();
+
+    expect("title" in Legacy.prototype).toBe(false);
+    expect("heading" in Legacy.prototype).toBe(false);
+  });
+
   it("a class reached only through isInstanceMethodAlreadyImplemented holds a GeneratedAttributeMethods", () => {
     class Middle extends Base {
       static {

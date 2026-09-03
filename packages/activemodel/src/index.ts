@@ -7,7 +7,12 @@ export { NestedError } from "./nested-error.js";
 export { ValidationError, ValidationContext } from "./validations.js";
 export type { ModelWithErrors } from "./validations.js";
 export { Validator, EachValidator, BlockValidator } from "./validator.js";
-export { MissingAttributeError, AttributeMethodPattern, AttrNames } from "./attribute-methods.js";
+export {
+  MissingAttributeError,
+  AttributeMethodPattern,
+  AttrNames,
+  completeHalfAccessor,
+} from "./attribute-methods.js";
 export * as AttributeMethods from "./attribute-methods.js";
 export type { InstanceHost } from "./attribute-methods.js";
 export {

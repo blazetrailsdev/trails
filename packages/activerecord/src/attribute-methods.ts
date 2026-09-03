@@ -195,6 +195,12 @@ export function dangerousAttributeMethods(): Set<string> {
 }
 
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
+  const previous = Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")
+    ? this._generatedAttributeMethods
+    : undefined;
+  if (previous instanceof Module) {
+    previous.undefMethod(...previous.instanceMethods());
+  }
   this._generatedAttributeMethods = new GeneratedAttributeMethods();
   this._generatedAttributeMethods.ownerName = this.name;
   this._attributeMethodsGenerated = false;

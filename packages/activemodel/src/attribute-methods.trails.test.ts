@@ -153,4 +153,47 @@ describe("AttributeMethodsTest (trails)", () => {
       /undefined method 'nope' for an instance of Person/,
     );
   });
+
+  it("reads an attribute through method_missing after undefine_attribute_methods", () => {
+    class Person extends Model {
+      declare name: string;
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static undefineAttributeMethods: AttributesClassHalf["undefineAttributeMethods"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person({ name: "Alexander" });
+    Person.undefineAttributeMethods();
+
+    expect(person.methodMissing("name")).toBe("Alexander");
+    expect(person._readAttribute("name")).toBe("Alexander");
+    expect(person.respondTo("name")).toBe(true);
+  });
+
+  it("assigns through a generated writer when the class body defines the reader", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+      }
+
+      get name(): string {
+        return `OVERRIDE:${this.attribute("name") as string}`;
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person();
+    (person as { name: unknown }).name = "Alexander";
+
+    expect(person.attribute("name")).toBe("Alexander");
+    expect(person.name).toBe("OVERRIDE:Alexander");
+  });
 });

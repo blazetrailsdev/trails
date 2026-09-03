@@ -16,6 +16,7 @@ import {
   ClassMethods as AttributeMethodsClassMethods,
   InstanceMethods as AttributeMethodsInstanceMethods,
   defineMethodAttribute,
+  completeHalfAccessor,
   type AttributeMethodHost,
   type AttributeMethod,
 } from "./attribute-methods.js";
@@ -80,6 +81,14 @@ export function setDefineMethodAttribute(
     writer: true,
   });
   const tempMethodName = AttributeMethodsClassMethods.buildMangledName(methodName);
+  completeHalfAccessor(
+    this,
+    as,
+    "set",
+    function (this: { _writeAttribute(n: string, v: unknown): void }, value: unknown) {
+      this._writeAttribute(canonicalName, value);
+    },
+  );
   owner.defineCachedMethod(tempMethodName, { namespace: "active_model", as: `${as}=` }, (batch) => {
     batch.push((mod) => {
       Object.defineProperty(mod, tempMethodName, {

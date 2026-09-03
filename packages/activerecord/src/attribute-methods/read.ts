@@ -1,5 +1,5 @@
 import type { AttributeSet } from "@blazetrails/activemodel";
-import { AttrNames, AttributeMethods } from "@blazetrails/activemodel";
+import { AttrNames, AttributeMethods, completeHalfAccessor } from "@blazetrails/activemodel";
 import type { CodeGenerator } from "@blazetrails/activesupport";
 
 export interface Read {
@@ -88,18 +88,4 @@ interface ReadRecord {
 /** @internal */
 function readGeneratedAttribute(record: ReadRecord, canonicalName: string): unknown {
   return record._readAttribute(canonicalName, (n) => record.missingAttribute(n));
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function completeHalfAccessor(
-  klass: unknown,
-  name: string,
-  half: "get" | "set",
-  fn: (this: never, ...args: never[]) => unknown,
-): void {
-  const proto = (klass as { prototype?: object }).prototype;
-  if (proto == null) return;
-  const desc = Object.getOwnPropertyDescriptor(proto, name);
-  if (desc == null || "value" in desc || desc[half] != null) return;
-  Object.defineProperty(proto, name, { ...desc, [half]: fn, configurable: true });
 }
