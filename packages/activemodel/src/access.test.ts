@@ -1,54 +1,64 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
-import { describe, it, expect } from "vitest";
-import { Model } from "./index.js";
-import { withIndifferentAccess, include } from "@blazetrails/activesupport";
-import { Attributes, type AttributesClassHalf } from "./attributes.js";
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- `Point` spells `include ActiveModel::Access` in its class body the way the Rails test model does (access_test.rb:7); the class/interface merge beside it is how `include()` surfaces those members on the type side. */
+import { describe, it, expect, beforeEach } from "vitest";
+import { include, withIndifferentAccess } from "@blazetrails/activesupport";
+import { Access } from "./access.js";
 
 describe("AccessTest", () => {
-  class SliceModel extends Model {
-    declare age: number;
-    declare name: string;
-    declare static attribute: AttributesClassHalf["attribute"];
+  class Point {
+    #vector: unknown[];
 
     static {
-      include(this, Attributes);
-      this.attribute("name", "string");
-      this.attribute("age", "integer");
-      this.attribute("email", "string");
+      include(this, Access);
+    }
+
+    constructor(...vector: unknown[]) {
+      this.#vector = vector;
+    }
+
+    get x(): unknown {
+      return this.#vector[0];
+    }
+
+    get y(): unknown {
+      return this.#vector[1];
+    }
+
+    get z(): unknown {
+      return this.#vector[2];
     }
   }
-  interface SliceModel extends Attributes {}
+  interface Point extends Access {}
+
+  let point: Point;
+
+  beforeEach(() => {
+    point = new Point(123, 456, 789);
+  });
 
   it("slice", () => {
-    const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });
-    const expected = withIndifferentAccess({ name: m.name, age: m.age });
-    const actual = m.slice("name", "age");
+    const expected = withIndifferentAccess({ z: point.z, x: point.x });
+    const actual = point.slice("z", "x");
 
     expect([...actual.keys()]).toEqual([...expected.keys()]);
 
     expected.forEach((value, key) => {
       expect(actual.get(key)).toEqual(value);
+      expect(actual.get(`:${key}`)).toEqual(value);
     });
   });
 
   it("slice with array", () => {
-    const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });
-    const expected = withIndifferentAccess({ name: m.name, age: m.age });
-    const actual = m.slice(["name", "age"]);
-
-    expect([...actual.entries()]).toEqual([...expected.entries()]);
+    const expected = withIndifferentAccess({ z: point.z, x: point.x });
+    expect(point.slice(["z", "x"])).toEqual(expected);
   });
 
   it("values_at", () => {
-    const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });
-    expect(m.valuesAt("name", "age")).toEqual(["Alice", 30]);
+    expect(point.valuesAt("x", "z")).toEqual([point.x, point.z]);
+    expect(point.valuesAt("z", "x")).toEqual([point.z, point.x]);
   });
 
   it("values_at with array", () => {
-    const m = new SliceModel({ name: "Alice", age: 30, email: "a@b.com" });
-    expect(m.valuesAt(["name", "age"])).toEqual(["Alice", 30]);
+    expect(point.valuesAt(["x", "z"])).toEqual([point.x, point.z]);
+    expect(point.valuesAt(["z", "x"])).toEqual([point.z, point.x]);
   });
 });
