@@ -1,5 +1,4 @@
-import { Dir, File } from "@blazetrails/ruby-compat";
-import { getPathAsync } from "@blazetrails/ruby-compat";
+import { Dir, File, getPathAsync } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { AppGenerator } from "../generators/app-generator.js";
 import { generateCommand } from "./generate.js";

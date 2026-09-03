@@ -67,8 +67,7 @@ export abstract class AppBase extends GeneratorBase {
     // Mirrors AppBase#set_default_accessors!: destination_root resolves
     // app_path against the parent destination_root. Subclasses generate
     // into this directory, not the parent cwd.
-    const isAbs = File.isAbsolutePath(options.appPath);
-    this.destinationRoot = isAbs ? options.appPath : File.join(options.cwd, options.appPath);
+    this.destinationRoot = File.expandPath(options.appPath, options.cwd);
     this.cwd = this.destinationRoot;
     this.options = this.deduceImpliedOptions({ ...UNPORTED_SUBSYSTEM_SKIP_DEFAULTS, ...options });
   }
