@@ -1,5 +1,5 @@
 import { Type, ValueType } from "@blazetrails/activemodel";
-import { toS } from "@blazetrails/activesupport";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { enumTypeOf } from "../enum.js";
 
 export class Map {

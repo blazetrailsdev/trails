@@ -2,11 +2,11 @@ import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
 import { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
-import { StringIO } from "./string-io.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { Temporal, Date as RubyDate, DateTime } from "@blazetrails/date";
 import { Duration } from "./duration.js";
 import { ArgumentError } from "./hash-utils.js";
-import { toS } from "./core-ext/object/inspect.js";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { toF, toI } from "./core-ext/string/conversions.js";
 import * as XmlMini_REXML from "./xml-mini/rexml.js";
 

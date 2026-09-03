@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { Headers } from "@blazetrails/rack";
 import {
   authenticate,
   authenticationRequest,
@@ -33,7 +34,7 @@ import {
 const req = (auth?: string) => ({ authorization: auth });
 const ctrl = (auth?: string): BasicControllerHost => ({
   request: req(auth),
-  headers: {},
+  headers: new Headers(),
   status: 200,
   responseBody: null,
 });
@@ -71,9 +72,9 @@ describe("HttpAuthentication::Basic", () => {
   });
 
   it("authenticationRequest writes 401 + WWW-Authenticate and strips realm quotes", () => {
-    const c = { headers: {} as Record<string, string>, status: 200, responseBody: null };
+    const c = { headers: new Headers(), status: 200, responseBody: null };
     authenticationRequest(c, 'Evil"Realm', null);
-    expect(c.headers["WWW-Authenticate"]).toBe('Basic realm="EvilRealm"');
+    expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="EvilRealm"');
     expect(c.status).toBe(401);
     expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
   });
@@ -91,13 +92,13 @@ describe("HttpAuthentication::Basic::ControllerMethods", () => {
     const fail = ctrl();
     expect(authenticateOrRequestWithHttpBasic.call(fail, null, null, () => "OK")).toBe(false);
     expect(fail.status).toBe(401);
-    expect(fail.headers["WWW-Authenticate"]).toBe('Basic realm="Application"');
+    expect(fail.headers.get("WWW-Authenticate")).toBe('Basic realm="Application"');
   });
 
   it("requestHttpBasicAuthentication uses provided realm + message", () => {
     const c = ctrl();
     requestHttpBasicAuthentication.call(c, "Zone", "nope");
-    expect(c.headers["WWW-Authenticate"]).toBe('Basic realm="Zone"');
+    expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="Zone"');
     expect(c.responseBody).toBe("nope");
   });
 
@@ -163,7 +164,7 @@ function makeDigestRequest(auth?: string): DigestRequestLike {
 function makeDigestCtrl(auth?: string): DigestControllerHost {
   return {
     request: makeDigestRequest(auth),
-    headers: {},
+    headers: new Headers(),
     status: 200,
     responseBody: null,
   };
@@ -254,7 +255,7 @@ describe("HttpAuthentication::Digest", () => {
     const c = makeDigestCtrl();
     digestAuthenticationRequest(c, "SuperSecret", null);
     expect(c.status).toBe(401);
-    expect(c.headers["WWW-Authenticate"]).toMatch(/^Digest realm="SuperSecret"/);
+    expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
     expect(c.responseBody).toBe("HTTP Digest: Access denied.\n");
   });
 
@@ -290,7 +291,7 @@ describe("HttpAuthentication::Digest::ControllerMethods", () => {
     const c = makeDigestCtrl();
     requestHttpDigestAuthentication.call(c, "SuperSecret", "Auth Failed");
     expect(c.status).toBe(401);
-    expect(c.headers["WWW-Authenticate"]).toMatch(/^Digest realm="SuperSecret"/);
+    expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
     expect(c.responseBody).toBe("Auth Failed");
   });
 });

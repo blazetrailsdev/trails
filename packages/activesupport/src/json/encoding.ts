@@ -1,6 +1,6 @@
 import { fetch } from "@blazetrails/ruby-compat";
 import { asJson, Float, isPlainObject } from "../core-ext/object/json.js";
-import { isEmpty } from "../ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 /**
  * Serialization options threaded through `as_json` — only the subset Rails'

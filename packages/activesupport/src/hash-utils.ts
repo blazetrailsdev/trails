@@ -6,7 +6,7 @@ import { ArgumentError } from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
-import type { StringIO } from "./string-io.js";
+import type { StringIO } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
 

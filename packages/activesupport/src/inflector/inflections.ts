@@ -5,7 +5,7 @@
 
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { I18n } from "../i18n.js";
-import { isEmpty } from "../ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 export interface InflectionRule {
   rule: RegExp;

@@ -6,7 +6,7 @@ import { atomicWrite } from "../core-ext/file/atomic.js";
 import { Integer } from "./integer.js";
 import { hexdigest } from "../hexdigest.js";
 import { registerStoreClass } from "./store-registry.js";
-import { isEmpty } from "../ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 // max filename size on file system is 255, minus room for timestamp, pid, and
 // random characters appended by Tempfile (file_store.rb:16)

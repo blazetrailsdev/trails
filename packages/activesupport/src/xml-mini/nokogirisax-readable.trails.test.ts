@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { parse, _require } from "./nokogirisax.js";
 import { parse as parseDom, _require as _requireDom } from "./nokogiri.js";
-import { StringIO } from "../string-io.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 
 // trails-only coverage for the readable-IO and `eof?` arms of
 // `XmlMini_NokogiriSAX#parse` (nokogirisax.rb:69-80) and

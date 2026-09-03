@@ -52,6 +52,7 @@ describe("kernelFloat", () => {
     expect(kernelFloat("0x10p2")).toBe(64);
     expect(kernelFloat("-0x10")).toBe(-16);
     expect(kernelFloat("0x1_0")).toBe(16);
+    expect(kernelFloat("0x1.8p1")).toBe(3);
   });
 
   it("strips surrounding whitespace, as rb_cstr_to_dbl does", () => {
@@ -74,6 +75,7 @@ describe("kernelFloat", () => {
     expect(kernelFloat("0x10")).toBe(16);
     expect(kernelFloat("1.5e3")).toBe(1500);
     expect(kernelFloat(".5")).toBe(0.5);
+    expect(kernelFloat(".5e2")).toBe(50);
     expect(kernelFloat("07")).toBe(7);
     expect(kernelFloat("1_0.2_5")).toBe(10.25);
     expect(kernelFloat("1e5_0")).toBe(1e50);

@@ -1,5 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { pluralize, toS } from "@blazetrails/activesupport";
+import { pluralize } from "@blazetrails/activesupport";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type {
   AddForeignKeyOptions,

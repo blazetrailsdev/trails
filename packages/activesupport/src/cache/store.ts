@@ -4,6 +4,7 @@ import {
   FloatDomainError,
   NotImplementedError,
   TypeError,
+  kernelFloat,
   regexpEscape,
   rbBuiltinClassName,
 } from "@blazetrails/ruby-compat";
@@ -16,7 +17,7 @@ import { Notifications } from "../notifications.js";
 import { toParam } from "../hash-utils.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
-import { isEmpty } from "../ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 /** Mirrors Rails `Cache::DEFAULT_COMPRESS_LIMIT` (cache.rb:45). */
 const DEFAULT_COMPRESS_LIMIT = 1024;
@@ -66,47 +67,6 @@ function Integer(value: unknown): number {
     throw new ArgumentError(`invalid value for Integer(): ${inspect(value)}`);
   }
   return digits.startsWith("-") ? -magnitude : magnitude;
-}
-
-/**
- * Mirrors Ruby's `Kernel#Float` — the conversion `retrieve_pool_options`
- * applies to `pool_options[:timeout]` (cache.rb:214). Same String grammar as
- * {@link Integer} plus a fraction and exponent (including Ruby's hexadecimal
- * float literals); an empty or whitespace-only String is an ArgumentError, not
- * `0`.
- *
- * The accepted grammar was differential-tested against MRI 3.3.11 rather than
- * derived: a leading-dot mantissa (`".5"`, `".5e2"`) and a hexadecimal float
- * (`"0x1p4"`, `"0x1.8p1"`) convert, while a trailing-dot one (`"1."`,
- * `"1.e3"`, `"1_0."`) and a hexadecimal float with no integer part
- * (`"0x.8p1"`) raise — the trailing-dot form is `String#to_f`, not
- * `Kernel#Float`.
- */
-function Float(value: unknown): number {
-  if (typeof value === "number") return value;
-  if (typeof value !== "string") {
-    // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new TypeError(`can't convert ${rbBuiltinClassName(value)} into Float`);
-  }
-  const digits = value.trim().replace(/(?<=[0-9a-fA-F])_(?=[0-9a-fA-F])/g, "");
-  const decimal = /^[+-]?([0-9]+(\.[0-9]+)?|\.[0-9]+)([eE][+-]?[0-9]+)?$/;
-  if (decimal.test(digits)) return Number(digits);
-
-  // Ruby's Float literal grammar also admits hexadecimal floats — `0x1p4`,
-  // `0x1.8p1` — which `Number()` cannot read, so the mantissa and binary
-  // exponent are assembled here.
-  const hexadecimal =
-    /^([+-]?)0[xX]([0-9a-fA-F]+)(?:\.([0-9a-fA-F]+))?(?:[pP]([+-]?[0-9]+))?$/.exec(digits);
-  if (!hexadecimal) throw new ArgumentError(`invalid value for Float(): ${inspect(value)}`);
-  const [, sign, whole, fraction, exponent] = hexadecimal;
-  let magnitude = parseInt(whole, 16);
-  if (fraction !== undefined) {
-    for (let i = 0; i < fraction.length; i++) {
-      magnitude += parseInt(fraction[i], 16) * Math.pow(16, -(i + 1));
-    }
-  }
-  if (exponent !== undefined) magnitude *= Math.pow(2, parseInt(exponent, 10));
-  return sign === "-" ? -magnitude : magnitude;
 }
 
 /** Mirrors Ruby's `Zlib`, the default `:compressor` (cache.rb:305). */
@@ -215,7 +175,7 @@ export abstract class Store {
     } else if (typeof poolOptions === "object" && !Array.isArray(poolOptions)) {
       const hash = poolOptions as StoreOptions;
       if ("size" in hash) hash["size"] = Integer(hash["size"]);
-      if ("timeout" in hash) hash["timeout"] = Float(hash["timeout"]);
+      if ("timeout" in hash) hash["timeout"] = kernelFloat(hash["timeout"]);
       poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
     } else {
       // eslint-disable-next-line blazetrails/rails-error-parity

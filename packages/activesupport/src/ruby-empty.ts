@@ -1,7 +1,0 @@
-/**
- * Re-export shim: `empty?` is Ruby core and lives in
- * `@blazetrails/ruby-compat` (RFC 0129). Re-exported here so
- * `@blazetrails/activesupport`'s public surface is unchanged; the shim is
- * removed by `delete-second-round-ruby-compat-reexport-shims`.
- */
-export { isEmpty } from "@blazetrails/ruby-compat";

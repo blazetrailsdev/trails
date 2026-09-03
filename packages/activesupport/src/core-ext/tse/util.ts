@@ -5,7 +5,7 @@
 
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
 import { NotImplementedError } from "../../cache/store.js";
-import { isEmpty } from "../../ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 const HTML_ESCAPE: Record<string, string> = {
   "&": "&amp;",

@@ -1,5 +1,5 @@
 import type { Type } from "@blazetrails/activemodel";
-import { toS } from "@blazetrails/activesupport";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { defaultValue } from "../type.js";
 
 export class Connection {

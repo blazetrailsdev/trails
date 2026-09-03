@@ -1,6 +1,6 @@
 import type { ArelConnection } from "../visitors/connection.js";
 import { Temporal } from "@blazetrails/date";
-import { toS } from "@blazetrails/activesupport";
+import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 
 function defaultSanitizeAsSqlComment(value: string): string {
   return String(value)

@@ -142,10 +142,6 @@ const alias = {
     __dirname,
     "packages/activesupport/src/digest.ts",
   ),
-  "@blazetrails/activesupport/ruby-empty": path.resolve(
-    __dirname,
-    "packages/activesupport/src/ruby-empty.ts",
-  ),
   "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
   "@blazetrails/activesupport/message-pack": path.resolve(
     __dirname,

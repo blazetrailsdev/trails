@@ -9,7 +9,7 @@ import { clock, currentTimeInstant } from "../time-travel.js";
 import { zone as timeZone } from "../time-zone-config.js";
 import { midnight } from "../core-ext/date/calculations.js";
 import { change } from "../time-ext.js";
-import { isEmpty } from "../ruby-empty.js";
+import { isEmpty } from "@blazetrails/ruby-compat";
 
 /** Mirrors the `Stub` Struct (time_helpers.rb:10). */
 class Stub {

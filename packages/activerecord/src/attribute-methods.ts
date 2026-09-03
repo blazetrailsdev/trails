@@ -1,5 +1,5 @@
 import { CodeGenerator, include, Module } from "@blazetrails/activesupport";
-import { isEmpty } from "@blazetrails/activesupport/ruby-empty";
+import { isEmpty } from "@blazetrails/ruby-compat";
 import {
   AttributeMethods,
   type AttributeMethodPattern,
