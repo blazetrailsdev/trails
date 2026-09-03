@@ -55,7 +55,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.config.set("actionView", defaultActionViewConfig());
 
-    this.initializer("action_view.deprecator", { before: ":load_environment_config" }, (app) => {
+    this.initializer("action_view.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("actionView", deprecator());
     });
 

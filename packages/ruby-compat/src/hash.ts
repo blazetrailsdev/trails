@@ -8,8 +8,12 @@ const BLOCK = Symbol.for("@blazetrails/ruby-compat:block");
 export type Block<T> = ((key: string) => T) & { readonly [BLOCK]: true };
 
 /** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/eval.c:866`) TypeScript has no equivalent of. */
-export function block<T>(fn: (key: string) => T): Block<T> {
-  return Object.assign((key: string) => fn(key), { [BLOCK]: true as const });
+export function block<T>(fn: (key: string) => T): Block<T>;
+/** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/eval.c:866`) TypeScript has no equivalent of. */
+export function block<T>(fn: (key: string, oldValue: T, newValue: T) => T): ConflictBlock<T>;
+/** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/eval.c:866`) TypeScript has no equivalent of; one mark serves every yield signature. */
+export function block(fn: (...args: never[]) => unknown): unknown {
+  return Object.assign((...args: never[]) => fn(...args), { [BLOCK]: true as const });
 }
 
 function blockGivenP(value: unknown): value is Block<unknown> {
@@ -98,7 +102,9 @@ type PairBlock<T> = (key: string, value: T) => unknown;
  * (`vendor/ruby/hash.c:4012-4022` `rb_hash_update_block_i`), yielded the key,
  * the RECEIVER's value and the argument's, in that order.
  */
-export type ConflictBlock<T> = (key: string, oldValue: T, newValue: T) => T;
+export type ConflictBlock<T> = ((key: string, oldValue: T, newValue: T) => T) & {
+  readonly [BLOCK]: true;
+};
 
 /**
  * Ruby `Hash#merge` (`vendor/ruby/hash.c:4144` `rb_hash_merge`), which is
@@ -127,10 +133,9 @@ export function update<T>(
   hash: Record<string, T>,
   ...others: (Record<string, T> | ConflictBlock<T>)[]
 ): Record<string, T> {
-  const block =
-    typeof others[others.length - 1] === "function"
-      ? (others.pop() as ConflictBlock<T>)
-      : undefined;
+  const block = blockGivenP(others[others.length - 1])
+    ? (others.pop() as ConflictBlock<T>)
+    : undefined;
   for (const other of others as Record<string, T>[]) {
     for (const key of Object.keys(other)) {
       hash[key] =

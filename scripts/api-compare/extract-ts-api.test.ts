@@ -4239,6 +4239,37 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("drops a `block(fn)` marked block-pass from the list, like a bare callback", () => {
+    expect(
+      site(
+        `import { block, mergeBang } from "@blazetrails/ruby-compat";
+        class Foo {
+          create(other: unknown) {
+            mergeBang(this.data, other, block((_key: string, left: unknown) => left));
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "mergeBang", args: ["id:data", "id:other"], flags: ["block"] },
+      { name: "block", args: [], flags: ["block"] },
+    ]);
+  });
+
+  it("keeps a same-named local `block(fn)` argument, which carries no mark", () => {
+    expect(
+      site(
+        `class Foo {
+          create(block: (fn: unknown) => unknown) {
+            this.freezeTime(block((duration: number) => duration));
+          }
+        }`,
+      ),
+    ).toEqual([
+      { name: "freezeTime", args: ["call:block"], flags: [] },
+      { name: "block", args: [], flags: ["block"] },
+    ]);
+  });
+
   it("records `new Foo(...)` as constructor, matching the Ruby `new` mapping", () => {
     expect(
       site(

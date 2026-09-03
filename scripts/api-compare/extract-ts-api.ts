@@ -112,6 +112,14 @@ const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
  */
 let currentImportAliases: ReadonlyMap<string, string> | undefined;
 
+/**
+ * The local names a file binds `block` from `@blazetrails/ruby-compat` to —
+ * the mark a value-or-block argument position carries (`rb_block_given_p`,
+ * `vendor/ruby/eval.c:866`). Read by `isMarkedBlockArg`, so a same-named local
+ * parameter cannot pass for it.
+ */
+const blockMarkNames = new WeakMap<ts.SourceFile, ReadonlySet<string>>();
+
 interface CacheEntry {
   schemaVersion: string;
   fingerprint: string;
@@ -3788,6 +3796,34 @@ export function extractInternalFileConstants(sourceFile: ts.SourceFile): string[
 }
 
 /** Collect relative-module renamed-import aliases (`import { a as b }` → b→a). */
+function blockMarkNamesFor(sourceFile: ts.SourceFile): ReadonlySet<string> {
+  let names = blockMarkNames.get(sourceFile);
+  if (!names) {
+    names = collectBlockMarkNames(sourceFile);
+    blockMarkNames.set(sourceFile, names);
+  }
+  return names;
+}
+
+function collectBlockMarkNames(sourceFile: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  ts.forEachChild(sourceFile, (node) => {
+    if (
+      !ts.isImportDeclaration(node) ||
+      !node.importClause?.namedBindings ||
+      !ts.isNamedImports(node.importClause.namedBindings) ||
+      !ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      return;
+    }
+    if (!node.moduleSpecifier.text.startsWith("@blazetrails/ruby-compat")) return;
+    for (const el of node.importClause.namedBindings.elements) {
+      if ((el.propertyName ?? el.name).text === "block") names.add(el.name.text);
+    }
+  });
+  return names;
+}
+
 function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
   const aliases = new Map<string, string>();
   ts.forEachChild(sourceFile, (node) => {
@@ -4207,6 +4243,15 @@ function dispatchedCallName(call: ts.CallExpression): string | undefined {
   return name;
 }
 
+function isMarkedBlockArg(expr: ts.Expression): boolean {
+  if (!ts.isCallExpression(expr)) return false;
+  if (!ts.isIdentifier(expr.expression)) return false;
+  if (!blockMarkNamesFor(expr.getSourceFile()).has(expr.expression.text)) return false;
+  if (expr.arguments.length !== 1) return false;
+  const inner = expr.arguments[0];
+  return ts.isArrowFunction(inner) || ts.isFunctionExpression(inner);
+}
+
 function describeArgs(args: ts.NodeArray<ts.Expression> | undefined, flags: string[]): string[] {
   if (!args) return [];
   const out: string[] = [];
@@ -4216,6 +4261,13 @@ function describeArgs(args: ts.NodeArray<ts.Expression> | undefined, flags: stri
     // argument list and flags the site instead; the port's callback argument is
     // the same thing, so it is flagged and dropped here too.
     if (ts.isArrowFunction(expr) || ts.isFunctionExpression(expr)) {
+      flags.push("block");
+      continue;
+    }
+    // `block(fn)` is ruby-compat's brand for a block passed into a
+    // value-or-block argument position (`rb_block_given_p`,
+    // `vendor/ruby/eval.c:866`). It IS the block, so it drops like one.
+    if (isMarkedBlockArg(expr)) {
       flags.push("block");
       continue;
     }

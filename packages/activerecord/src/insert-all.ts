@@ -471,6 +471,11 @@ export class Builder implements InsertBuilder {
   }
 
   /** @internal */
+  private columnsList(): string {
+    return this.formatColumns(this._insertAll.keysIncludingTimestamps());
+  }
+
+  /** @internal */
   private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, Type> {
     const columns = this._insertAll.schemaCacheColumnsHash(tableName);
 
@@ -482,6 +487,16 @@ export class Builder implements InsertBuilder {
     const types: Record<string, Type> = {};
     for (const key of keys) types[key] = this.model.typeForAttribute(key);
     return types;
+  }
+
+  /** @internal */
+  private formatColumns(columns: string | Iterable<string>): string {
+    return typeof columns !== "string" ? this.quoteColumns(columns).join(",") : columns;
+  }
+
+  /** @internal */
+  private quoteColumns(columns: Iterable<string>): string[] {
+    return [...columns].map((column) => this.quoteColumn(column));
   }
 
   /** @internal */
@@ -535,9 +550,8 @@ export class Builder implements InsertBuilder {
       }
       return `INTO ${tableName} DEFAULT VALUES`;
     }
-    const columnsList = keys.map((k) => this.quoteColumn(k)).join(",");
     const compiledValues = this._visitor().compile(this.valuesList());
-    return `INTO ${tableName} (${columnsList}) ${compiledValues}`;
+    return `INTO ${tableName} (${this.columnsList()}) ${compiledValues}`;
   }
 
   valuesList(): Nodes.ValuesList {
@@ -557,23 +571,17 @@ export class Builder implements InsertBuilder {
   conflictTarget(): string {
     const index = this._insertAll.uniqueBy;
     if (index instanceof IndexDefinition) {
-      const rawCols = index.columns as unknown as string | string[];
-      const cols = Array.isArray(rawCols)
-        ? rawCols.map((c) => this.quoteColumn(c)).join(",")
-        : rawCols;
+      const cols = this.formatColumns(index.columns as unknown as string | string[]);
       return index.where ? `(${cols}) WHERE ${index.where}` : `(${cols})`;
     }
     if (this._insertAll.updateDuplicates()) {
-      return `(${this._insertAll
-        .primaryKeys()
-        .map((c) => this.quoteColumn(c))
-        .join(",")})`;
+      return `(${this.formatColumns(this._insertAll.primaryKeys())})`;
     }
     return "";
   }
 
   updatableColumns(): string[] {
-    return this._insertAll.updatableColumns().map((c) => this.quoteColumn(c));
+    return this.quoteColumns(this._insertAll.updatableColumns());
   }
 
   touchModelTimestampsUnless(block: (col: string) => string): string {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   Hash,
   block,
+  type ConflictBlock,
   deleteIf,
   dup,
   eachKey,
@@ -115,17 +116,35 @@ describe("Hash#merge! with a conflict block", () => {
   it("yields the key, the receiver's value and the argument's, and stores the result", () => {
     const yielded: unknown[][] = [];
     const hash = { a: 1, b: 2 };
-    mergeBang(hash, { b: 20, c: 30 }, (key, oldValue, newValue) => {
-      yielded.push([key, oldValue, newValue]);
-      return oldValue;
-    });
+    mergeBang(
+      hash,
+      { b: 20, c: 30 },
+      block((key: string, oldValue: number, newValue: number) => {
+        yielded.push([key, oldValue, newValue]);
+        return oldValue;
+      }),
+    );
     expect(hash).toEqual({ a: 1, b: 2, c: 30 });
     expect(yielded).toEqual([["b", 2, 20]]);
   });
 
+  it("detects the block by its mark, not by the argument's type", () => {
+    const hash = { a: 1 };
+    const unmarked = ((_key: string, left: number): number =>
+      left) as unknown as ConflictBlock<number>;
+    update(hash, { a: 2 }, unmarked);
+    expect(hash).toEqual({ a: 2 });
+  });
+
   it("leaves merge's copy semantics alone", () => {
     const hash = { a: 1 };
-    expect(merge(hash, { a: 2 }, (_key, left) => left)).toEqual({ a: 1 });
+    expect(
+      merge(
+        hash,
+        { a: 2 },
+        block((_key: string, left: number) => left),
+      ),
+    ).toEqual({ a: 1 });
     expect(hash).toEqual({ a: 1 });
   });
 });

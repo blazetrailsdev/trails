@@ -23,7 +23,7 @@ export class Trailtie extends BaseTrailtie {
   static {
     BaseTrailtie.register(this);
 
-    this.initializer("active_model.deprecator", { before: ":load_environment_config" }, (app) => {
+    this.initializer("active_model.deprecator", { before: "load_environment_config" }, (app) => {
       (app as TrailtieApp).deprecators.set("activeModel", deprecator());
     });
 

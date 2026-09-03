@@ -54,7 +54,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer(
       "action_controller.deprecator",
-      { before: ":load_environment_config" },
+      { before: "load_environment_config" },
       (app) => {
         (app as TrailtieApp).deprecators.set("actionController", ActionController.deprecator());
       },
