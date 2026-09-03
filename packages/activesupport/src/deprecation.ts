@@ -5,7 +5,7 @@ import { ArgumentError } from "./hash-utils.js";
 import { underscore } from "./inflector.js";
 import { Logger } from "./logger.js";
 import { Notifications } from "./notifications.js";
-import { stderr } from "./process-adapter.js";
+import { stderr } from "@blazetrails/ruby-compat";
 import { trailsLogger } from "./trails-logger-slot.js";
 import { ThreadLocalVar } from "./thread-local-var.js";
 

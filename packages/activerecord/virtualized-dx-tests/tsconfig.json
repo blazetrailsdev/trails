@@ -21,7 +21,6 @@
       "@blazetrails/activesupport/message-verifier": [
         "../../activesupport/src/message-verifier.ts"
       ],
-      "@blazetrails/activesupport/process-adapter": ["../../activesupport/src/process-adapter.ts"],
       "@blazetrails/activesupport/core-ext/date/conversions": [
         "../../activesupport/src/core-ext/date/conversions.ts"
       ],

@@ -1,5 +1,5 @@
 import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
-import { cwd } from "@blazetrails/activesupport/process-adapter";
+import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { Handler } from "@blazetrails/rack";
 import { requireApplicationBang } from "../command/actions.js";
@@ -21,7 +21,7 @@ export function serverCommand(): Command {
     .option("-p, --port <port>", "Port to listen on", "3000")
     .option("-b, --binding <host>", "Host to bind to", "127.0.0.1")
     .action(async (options) => {
-      const root = cwd();
+      const root = Dir.pwd();
       await requireApplicationBang();
       const app = await Trails.initialize();
       const port = parseInt(options.port, 10);

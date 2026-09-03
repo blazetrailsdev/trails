@@ -1,6 +1,6 @@
 import { hasKey } from "@blazetrails/ruby-compat";
 import { getPath } from "@blazetrails/ruby-compat";
-import { cwd } from "@blazetrails/activesupport/process-adapter";
+import { Dir } from "@blazetrails/ruby-compat";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
@@ -31,7 +31,7 @@ export class Static {
     this.index = options.index;
     this.cascade = options.cascade ?? false;
     this.gzip = options.gzip ?? false;
-    const root = options.root ? getPath().resolve(options.root) : cwd();
+    const root = options.root ? getPath().resolve(options.root) : Dir.pwd();
     this.headerRules = options.header_rules ? [...options.header_rules] : [];
     if (options.cache_control) {
       this.headerRules.unshift(["all", { [CACHE_CONTROL]: options.cache_control }]);

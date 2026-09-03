@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import * as activesupport from "@blazetrails/activesupport";
 import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
-import { stdout, stderr } from "@blazetrails/activesupport";
+import { stdout, stderr } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";

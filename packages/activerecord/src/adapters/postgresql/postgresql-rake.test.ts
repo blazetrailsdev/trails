@@ -3,9 +3,8 @@ import {
   getOsAsync,
   getChildProcessAsync,
   type ChildProcessAdapter,
-  stdout,
-  stderr,
 } from "@blazetrails/activesupport";
+import { stdout, stderr } from "@blazetrails/ruby-compat";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { describeIfPostgresqlAdapter } from "../../support/describe-if-postgresql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";

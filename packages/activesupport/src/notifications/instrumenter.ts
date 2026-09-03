@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Process } from "@blazetrails/ruby-compat";
 import { getCrypto } from "../crypto-adapter.js";
 
 export type EventPayload = Record<string, unknown>;
@@ -137,7 +137,7 @@ export class Event {
 
   /** instrumenter.rb:196-198 — `Process.clock_gettime(CLOCK_MONOTONIC, :float_millisecond)`. */
   private now(): number {
-    return performance.now();
+    return Process.clockGettime(Process.CLOCK_MONOTONIC, ":float_millisecond");
   }
 
   /**

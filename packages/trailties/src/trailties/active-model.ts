@@ -1,5 +1,5 @@
 import { type Deprecators } from "@blazetrails/activesupport";
-import { env as processEnv } from "@blazetrails/activesupport/process-adapter";
+import { env as processEnv } from "@blazetrails/ruby-compat";
 import { SecurePassword, Error as ActiveModelError, deprecator } from "@blazetrails/activemodel";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 

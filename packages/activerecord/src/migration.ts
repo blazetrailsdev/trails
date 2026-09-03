@@ -6,11 +6,11 @@ import {
   humanize,
   isPlainObject,
   extractOptionsBang,
-  stdout,
   FileUpdateChecker,
   Monitor,
   NameError,
 } from "@blazetrails/activesupport";
+import { stdout } from "@blazetrails/ruby-compat";
 import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rubyInspect } from "./relation/ruby-inspect.js";

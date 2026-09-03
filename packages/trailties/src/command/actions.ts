@@ -1,5 +1,5 @@
 import { getPathAsync } from "@blazetrails/ruby-compat";
-import { cwd } from "@blazetrails/activesupport/process-adapter";
+import { Dir } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_PATH } from "../app-path.js";
 import { Trails } from "../rails.js";
 
@@ -34,7 +34,7 @@ export async function requireApplicationBang(): Promise<void> {
  */
 export async function bootApplicationBang(): Promise<void> {
   if (APP_PATH == null) {
-    throw new Error(`No config/application.ts found in ${cwd()}.`);
+    throw new Error(`No config/application.ts found in ${Dir.pwd()}.`);
   }
   await requireApplicationBang();
   await Trails.initialize();

@@ -1,10 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from "vitest";
-import {
-  env,
-  setEnv,
-  getProcessAdapter,
-  registerProcessAdapter,
-} from "@blazetrails/activesupport/process-adapter";
+import { env, setEnv, getProcessAdapter, registerProcessAdapter } from "@blazetrails/ruby-compat";
 import { createProgram } from "../cli.js";
 import {
   loadDatabaseConfig,

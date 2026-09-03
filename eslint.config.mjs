@@ -226,6 +226,7 @@ export default defineConfig(
       "**/*.test.ts",
       // Adapter implementations — these ARE the abstraction layer
       "packages/ruby-compat/src/fs-adapter.ts",
+      "packages/ruby-compat/src/process-adapter.ts",
       "packages/activesupport/src/crypto-adapter.ts",
       "packages/activesupport/src/async-context-adapter.ts",
       "packages/activesupport/src/child-process-adapter.ts",
@@ -312,7 +313,7 @@ export default defineConfig(
   },
 
   // ── no-process-bypass: forbid direct process.* in browser-target src ──
-  // process.* must go through @blazetrails/activesupport/process-adapter
+  // process.* must go through @blazetrails/ruby-compat
   // so these packages can run on browser/non-Node hosts. Test files are
   // always exempt (legit mocking/inspection of the host process).
   // Per-package exemptions noted inline.
@@ -715,7 +716,11 @@ export default defineConfig(
   //    which is the enforcing run (it is the CI job that fetches vendor/ruby).
   {
     files: ["packages/ruby-compat/src/**/*.ts"],
-    ignores: ["**/*.test.ts", "packages/ruby-compat/src/fs-adapter.ts"],
+    ignores: [
+      "**/*.test.ts",
+      "packages/ruby-compat/src/fs-adapter.ts",
+      "packages/ruby-compat/src/process-adapter.ts",
+    ],
     rules: {
       "blazetrails/ruby-compat-needs-mri-citation": "error",
     },

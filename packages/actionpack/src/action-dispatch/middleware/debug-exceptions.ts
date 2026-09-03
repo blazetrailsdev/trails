@@ -5,7 +5,7 @@
  * in development mode.
  */
 
-import { stderr } from "@blazetrails/activesupport/process-adapter";
+import { stderr } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { ExceptionWrapper } from "./exception-wrapper.js";

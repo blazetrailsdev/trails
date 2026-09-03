@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { stdout } from "@blazetrails/activesupport/process-adapter";
+import { stdout } from "@blazetrails/ruby-compat";
 import { SourceAnnotationExtractor } from "../source-annotation-extractor.js";
 
 export function notesCommand(): Command {

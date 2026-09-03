@@ -16,9 +16,9 @@
  */
 
 import { getCrypto } from "./crypto-adapter.js";
-import { FileUtils, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { FileUtils, IO, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { MessageEncryptor } from "./message-encryptor.js";
-import { env as processEnv } from "./process-adapter.js";
+import { env as processEnv } from "@blazetrails/ruby-compat";
 import { chomp } from "@blazetrails/ruby-compat";
 import { Tempfile } from "./tempfile.js";
 
@@ -119,11 +119,9 @@ export class EncryptedFile {
   }
 
   async write(contents: string): Promise<void> {
-    const fs = await getFsAsync();
     const path = await this.resolveContentPath();
-    const tmp = `${path}.tmp`;
-    await fs.writeFile!(tmp, await this.encrypt(contents), { mode: 0o600 });
-    FileUtils.mv(tmp, path);
+    IO.binwrite(`${path}.tmp`, await this.encrypt(contents));
+    FileUtils.mv(`${path}.tmp`, path);
   }
 
   async change(block: (tmpPath: string) => void | Promise<void>): Promise<void> {

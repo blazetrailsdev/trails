@@ -143,7 +143,7 @@
   "packages/activesupport/src/ordered-options.ts",
   "packages/activesupport/src/os-adapter.ts",
   "packages/activesupport/src/prepend.ts",
-  "packages/activesupport/src/process-adapter.ts",
+  "packages/ruby-compat/src/process-adapter.ts",
   "packages/activesupport/src/string-utils.ts",
   "packages/activesupport/src/testing-helpers.ts",
   "packages/activesupport/src/time-ext.ts",

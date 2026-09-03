@@ -9,7 +9,7 @@ import {
   type FsAdapter,
   type PathAdapter,
 } from "@blazetrails/ruby-compat";
-import { env, setEnv } from "@blazetrails/activesupport/process-adapter";
+import { env, setEnv } from "@blazetrails/ruby-compat";
 import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { loaded } from "./__fixtures__/loaded.js";

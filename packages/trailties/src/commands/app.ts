@@ -1,4 +1,4 @@
-import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
+import { Dir } from "@blazetrails/ruby-compat";
 import { getPath } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { AppGenerator } from "../generators/app-generator.js";
@@ -15,11 +15,13 @@ export function appTemplateCommand(): Command {
       if (!path.pathToFileURL) throw new Error("app:template needs PathAdapter.pathToFileURL");
       // PathAdapter contract: undefined isAbsolute → treat all paths as absolute.
       const abs =
-        path.isAbsolute && !path.isAbsolute(location) ? path.resolve(getCwd(), location) : location;
+        path.isAbsolute && !path.isAbsolute(location)
+          ? path.resolve(Dir.pwd(), location)
+          : location;
       const mod = await import(path.pathToFileURL(abs).href);
       const tmpl: unknown = mod.default ?? mod.template ?? mod;
       if (typeof tmpl !== "function") throw new Error(`${location} does not export a function`);
-      const gen = new AppGenerator({ cwd: getCwd(), output: console.log });
+      const gen = new AppGenerator({ cwd: Dir.pwd(), output: console.log });
       await (tmpl as (g: AppGenerator) => unknown)(gen);
       for (const { what, args } of gen.pendingGenerators) {
         await generateCommand()

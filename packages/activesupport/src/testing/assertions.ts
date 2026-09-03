@@ -23,7 +23,7 @@
  */
 import { indexWith } from "../enumerable-utils.js";
 
-import { cwd, env } from "../process-adapter.js";
+import { Dir, env } from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 
 /**
@@ -166,7 +166,7 @@ export const Minitest: {
 function baseRe(): RegExp {
   let pwd: string;
   try {
-    pwd = cwd();
+    pwd = Dir.pwd();
   } catch {
     return /(?!)/g;
   }

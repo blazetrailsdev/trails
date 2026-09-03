@@ -1,5 +1,5 @@
 import { RACK_INPUT } from "./constants.js";
-import { platform } from "@blazetrails/activesupport/process-adapter";
+import { RUBY_PLATFORM } from "@blazetrails/ruby-compat";
 
 export class RewindableInput {
   private _io: any;
@@ -100,7 +100,7 @@ export class RewindableInput {
 
   /** @internal */
   private isFilesystemHasPosixSemantics(): boolean {
-    return platform() !== "win32";
+    return !/(mswin|mingw|cygwin|java)/.test(RUBY_PLATFORM());
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { stdout, stderr } from "@blazetrails/activesupport";
+import { stdout, stderr } from "@blazetrails/ruby-compat";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseAlreadyExists, NoDatabaseError } from "../errors.js";

@@ -1,4 +1,4 @@
-import { cwd as getCwd } from "@blazetrails/activesupport/process-adapter";
+import { Dir } from "@blazetrails/ruby-compat";
 import { getPathAsync } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import { CodeStatistics } from "../code-statistics.js";
@@ -10,7 +10,7 @@ export function statsCommand(): Command {
     .description("Report code statistics (KLOCs, etc) from the application or engine")
     .action(async () => {
       const path = await getPathAsync();
-      const cwd = getCwd();
+      const cwd = Dir.pwd();
       const pairs = CodeStatistics.directories.map(
         ([label, p]) => [label, path.join(cwd, p)] as [string, string],
       );

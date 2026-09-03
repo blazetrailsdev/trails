@@ -1,6 +1,6 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as activesupport from "@blazetrails/activesupport";
-import { stdout, stderr } from "@blazetrails/activesupport";
+import { stdout, stderr } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 import { DatabaseTasks } from "../../tasks/database-tasks.js";
 import { MySQLDatabaseTasks } from "../../tasks/mysql-database-tasks.js";

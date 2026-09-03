@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile, InvalidKeyLengthError, MissingKeyError } from "./encrypted-file.js";
 import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import { getOsAsync } from "./os-adapter.js";
-import { setEnv } from "./process-adapter.js";
+import { setEnv } from "@blazetrails/ruby-compat";
 import {
   assert,
   assertNot,
@@ -88,14 +88,16 @@ describe("EncryptedFileTest", () => {
     const ef = make();
     await ef.write(CONTENT);
     const fs = await getFsAsync();
-    const stat = await fs.stat!(contentPath);
     // Ruby's `File::Stat#owned?` is `uid == Process.uid`. `FsStatResult.uid` is
     // the only uid the adapters carry — neither ProcessAdapter nor OsAdapter
     // exposes the running process's — so the tmpdir this test just created
     // stands in for it, the same workaround core-ext/file/atomic.ts:57 uses.
     const tmpdirStat = await fs.stat!(tmpdir);
-    assertPredicate(stat, (s) => s.uid === tmpdirStat.uid);
-    expect(stat.mode!.toString(8)).toBe("100600");
+    await ef.change(async (file) => {
+      const stat = await fs.stat!(file);
+      assertPredicate(stat, (s) => s.uid === tmpdirStat.uid);
+      expect(stat.mode!.toString(8)).toBe("100600");
+    });
   });
 
   it("raise MissingKeyError when key is missing", async () => {

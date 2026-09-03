@@ -4,13 +4,13 @@ import { VfsModelGenerator, VfsMigrationGenerator, VfsAppGenerator } from "./vfs
 import type { Migration, MigrationProxy } from "@blazetrails/activerecord/migration";
 import { MigrationContext } from "@blazetrails/activerecord/migration";
 import { InternalMetadata, SchemaMigration } from "@blazetrails/activerecord";
+import { camelize } from "@blazetrails/activesupport";
 import {
-  camelize,
   getProcessAdapter,
   processAdapterConfig,
   registerProcessAdapter,
   type ProcessAdapter,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/ruby-compat";
 
 export interface CliResult {
   success: boolean;

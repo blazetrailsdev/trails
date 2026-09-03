@@ -3,7 +3,8 @@
  * `railties/lib/minitest/rails_plugin.rb`.
  */
 
-import { env, Minitest } from "@blazetrails/activesupport";
+import { Minitest } from "@blazetrails/activesupport";
+import { env } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
 
 /**

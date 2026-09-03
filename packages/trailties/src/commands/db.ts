@@ -1,12 +1,12 @@
 import { Command } from "commander";
-import { setEnv } from "@blazetrails/activesupport";
+import { setEnv } from "@blazetrails/ruby-compat";
 import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import {
   env,
   setExitCode,
   getProcessAdapter,
   registerProcessAdapter,
-} from "@blazetrails/activesupport/process-adapter";
+} from "@blazetrails/ruby-compat";
 import {
   loadDatabaseConfig,
   loadDatabaseConfigModule,

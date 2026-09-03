@@ -3086,7 +3086,7 @@ class ApiExtractor
   # appears. `Time`, `Date`, `String`, `Array`, … are deliberately absent: trails
   # does port those concepts, so a call on that constant can be a real port call.
   CORE_CLASS_RECEIVERS = %w[
-    File Dir IO Module Class Proc Kernel Marshal ObjectSpace GC Process Thread
+    File Dir Module Class Proc Kernel Marshal ObjectSpace GC Thread
     Mutex Encoding Random Signal Struct Method
   ].to_set.freeze
 

@@ -1,4 +1,4 @@
-import { cwd } from "@blazetrails/activesupport/process-adapter";
+import { Dir } from "@blazetrails/ruby-compat";
 import { Command } from "commander";
 import * as path from "node:path";
 import * as fs from "node:fs";
@@ -78,7 +78,7 @@ export function consoleCommand(): Command {
     // Copy globals into the REPL context
     r.context.console = console;
     r.context.process = process;
-    r.context.require = createRequire(path.join(cwd(), "package.json"));
+    r.context.require = createRequire(path.join(Dir.pwd(), "package.json"));
 
     r.on("exit", async () => {
       if (dbAdapter && typeof dbAdapter.close === "function") {
@@ -96,7 +96,7 @@ export function consoleCommand(): Command {
     }
 
     // Load models from the current project
-    const modelsDir = path.join(cwd(), "app", "models");
+    const modelsDir = path.join(Dir.pwd(), "app", "models");
     let loadedCount = 0;
     if (fs.existsSync(modelsDir)) {
       const files = fs

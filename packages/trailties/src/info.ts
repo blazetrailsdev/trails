@@ -1,4 +1,5 @@
-import { htmlEscape, env } from "@blazetrails/activesupport";
+import { htmlEscape } from "@blazetrails/activesupport";
+import { env } from "@blazetrails/ruby-compat";
 import { VERSION } from "./version.js";
 
 // Port of railties/lib/rails/info.rb. Builds the runtime properties shown

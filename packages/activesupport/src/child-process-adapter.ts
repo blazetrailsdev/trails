@@ -6,7 +6,7 @@
  * taking a direct dependency on `node:child_process`.
  */
 
-import { env as processEnv } from "./process-adapter.js";
+import { env as processEnv } from "@blazetrails/ruby-compat";
 import { getFs } from "@blazetrails/ruby-compat";
 
 export interface SpawnSyncOptions {
