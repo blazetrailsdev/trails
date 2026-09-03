@@ -20,7 +20,7 @@ function fixture(): string {
 
 describe("Dir", () => {
   it("glob interleaves ** with the match at each level", () => {
-    // MRI (vendor/ruby/dir.c:3417): Dir.glob("g/**/*.rb") #=>
+    // vendor/ruby/dir.c:3227, verified against ruby 3.3.11.
     const root = fixture();
     expect(Dir.glob(`${root}/**/*.rb`)).toEqual([
       `${root}/B.rb`,
@@ -33,7 +33,7 @@ describe("Dir", () => {
   });
 
   it("glob sorts each directory and leaves a dotfile to a literal dot", () => {
-    // MRI vendor/ruby/dir.c:1350 and its sort: true default (dir.c:3392).
+    // vendor/ruby/dir.c:325, and the sort: true default at dir.c:3210.
     const root = fixture();
     expect(Dir.glob(`${root}/*.rb`)).toEqual([`${root}/B.rb`, `${root}/a.rb`, `${root}/z.rb`]);
     expect(Dir.glob(`${root}/.*.rb`)).toEqual([`${root}/.hidden.rb`]);
@@ -59,7 +59,7 @@ describe("Dir", () => {
   });
 
   it("children excludes . and .., and each_child yields them", () => {
-    // MRI vendor/ruby/dir.c:1298.
+    // vendor/ruby/dir.c:3421.
     const root = fixture();
     expect(Dir.children(join(root, "a"))).toEqual(["x.rb"]);
     const seen: string[] = [];
@@ -68,7 +68,7 @@ describe("Dir", () => {
   });
 
   it("delete removes an empty directory and refuses a full one", () => {
-    // MRI vendor/ruby/dir.c:1535.
+    // vendor/ruby/dir.c:1535.
     const root = fixture();
     mkdirSync(join(root, "made"));
     expect(Dir.delete(join(root, "made"))).toBe(0);

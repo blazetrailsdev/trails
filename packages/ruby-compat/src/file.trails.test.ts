@@ -14,14 +14,14 @@ function fixture(): string {
 
 describe("File", () => {
   it("exist? follows the symlink, so a broken one is false", () => {
-    // (vendor/ruby/file.c:1697 stats the TARGET).
+    // vendor/ruby/file.c:1806 stats the symlink TARGET.
     const root = fixture();
     expect(File.isExist(join(root, "a.rb"))).toBe(true);
     expect(File.isExist(join(root, "broken"))).toBe(false);
   });
 
   it("join squeezes one separator at the boundary and does not normalize", () => {
-    // MRI (vendor/ruby/file.c:4600): File.join("a", "/b") #=> "a/b",
+    // vendor/ruby/file.c:5013, verified against ruby 3.3.11.
     expect(File.join("a", "/b")).toBe("a/b");
     expect(File.join("a/", "/b")).toBe("a/b");
     expect(File.join("a//", "/b")).toBe("a/b");
@@ -34,14 +34,14 @@ describe("File", () => {
   });
 
   it("extname keeps a trailing dot and skips a leading one", () => {
-    // MRI (vendor/ruby/file.c:4392).
+    // vendor/ruby/file.c:4954.
     expect(File.extname("a/b.tar.gz")).toBe(".gz");
     expect(File.extname("a/.bashrc")).toBe("");
     expect(File.extname("a/b.")).toBe(".");
   });
 
   it("basename strips a suffix, and .* strips whatever extension is there", () => {
-    // MRI (vendor/ruby/file.c:4174).
+    // vendor/ruby/file.c:4705.
     expect(File.basename("/a/b/")).toBe("b");
     expect(File.basename("/a/b.rb", ".rb")).toBe("b");
     expect(File.basename("/a/b.rb", ".*")).toBe("b");
@@ -56,11 +56,12 @@ describe("File", () => {
     expect(File.isAbsolutePath("/a")).toBe(true);
   });
 
-  it("read, write and delete round-trip a file", () => {
+  it("read, binread, write and delete round-trip a file", () => {
     const root = fixture();
     const path = join(root, "sub", "w.txt");
     expect(File.write(path, "héllo")).toBe(6);
     expect(File.read(path)).toBe("héllo");
+    expect(File.binread(path)).toBe("héllo");
     expect(File.isFile(path)).toBe(true);
     expect(File.isDirectory(join(root, "sub"))).toBe(true);
     expect(File.delete(path)).toBe(1);
@@ -68,7 +69,7 @@ describe("File", () => {
   });
 
   it("directory? and file? answer false rather than raising on a missing path", () => {
-    // MRI vendor/ruby/file.c:1834.
+    // vendor/ruby/file.c:1622.
     expect(File.isDirectory("/nope/nope")).toBe(false);
     expect(File.isFile("/nope/nope")).toBe(false);
   });
