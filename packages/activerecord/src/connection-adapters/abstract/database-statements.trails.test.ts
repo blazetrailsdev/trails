@@ -38,8 +38,11 @@ import {
   defaultInsertValue,
   returningColumnValues,
   DatabaseStatements,
+  castResult,
+  affectedRows,
   type DatabaseStatementsHost,
 } from "./database-statements.js";
+import { Transaction, TransactionManager } from "./transaction.js";
 import { Result } from "../../result.js";
 import { ActiveRecord } from "../../ar-config.js";
 import type { QueryTransformer } from "../../query-transformers.js";
@@ -74,7 +77,19 @@ const hostDefaults: Pick<
   | "disableReferentialIntegrity"
   | "transaction"
   | "buildTruncateStatements"
+  | "currentTransaction"
+  | "withinNewTransaction"
+  | "dirtyCurrentTransaction"
+  | "castResult"
+  | "affectedRows"
+  | "isWriteQuery"
 > = {
+  currentTransaction: () => TransactionManager.NULL_TRANSACTION,
+  withinNewTransaction: async (_options, block) => block() as never,
+  dirtyCurrentTransaction: () => {},
+  castResult,
+  affectedRows,
+  isWriteQuery: DatabaseStatements.isWriteQuery,
   execute: async () => undefined,
   buildTruncateStatements,
   executeBatch: async () => undefined,
@@ -120,14 +135,16 @@ describe("DatabaseStatements", () => {
         log,
         pool,
         typeCastedBinds,
-        beginDbTransaction: async () => {
+        async withinNewTransaction(_options, block) {
           calls.push("begin");
-        },
-        commitDbTransaction: async () => {
-          calls.push("commit");
-        },
-        rollbackDbTransaction: async () => {
-          calls.push("rollback");
+          try {
+            const value = await block();
+            calls.push("commit");
+            return value as never;
+          } catch (e) {
+            calls.push("rollback");
+            throw e;
+          }
         },
       };
 
@@ -227,7 +244,7 @@ describe("DatabaseStatements", () => {
 
   describe("mark transaction written if write", () => {
     it("sets written on open transaction for write queries", () => {
-      const txn = { open: true, written: false };
+      const txn = { open: true, written: false } as unknown as Transaction;
       const host: DatabaseStatementsHost = {
         ...hostDefaults,
         log,
@@ -241,7 +258,7 @@ describe("DatabaseStatements", () => {
     });
 
     it("does not set written for read queries", () => {
-      const txn = { open: true, written: false };
+      const txn = { open: true, written: false } as unknown as Transaction;
       const host: DatabaseStatementsHost = {
         ...hostDefaults,
         log,
@@ -262,7 +279,7 @@ describe("DatabaseStatements", () => {
         log,
         pool,
         typeCastedBinds,
-        currentTransaction: () => ({ open: true }),
+        currentTransaction: () => ({ open: true }) as unknown as Transaction,
       };
       expect(isTransactionOpen.call(host)).toBe(true);
     });
@@ -273,7 +290,7 @@ describe("DatabaseStatements", () => {
         log,
         pool,
         typeCastedBinds,
-        currentTransaction: () => ({ open: false }),
+        currentTransaction: () => ({ open: false }) as unknown as Transaction,
       };
       expect(isTransactionOpen.call(host)).toBe(false);
     });
@@ -298,6 +315,7 @@ describe("DatabaseStatements", () => {
         log,
         typeCastedBinds,
         internalExecute: async () => ({ rows: [[1]] }),
+        castResult: (raw: { rows: unknown[][] }) => new Result([], raw.rows),
       } as unknown as DatabaseStatementsHost;
       const result = await internalExecQuery.call(host, "SELECT 1", "SQL");
       expect((result as any).rows).toEqual([[1]]);
@@ -721,6 +739,7 @@ describe("select", () => {
       async internalExecute(_sql, _name, _binds) {
         return [{ id: 1 }];
       },
+      castResult: (raw) => Result.fromRowHashes(raw as Record<string, unknown>[]),
     };
     const result = await select.call(host, "SELECT 1");
     expect(result).toBeInstanceOf(Result);

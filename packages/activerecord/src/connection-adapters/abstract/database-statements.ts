@@ -25,11 +25,17 @@ import {
   RangeError as ARRangeError,
   AsynchronousQueryInsideTransactionError,
   ActiveRecordError,
+  Rollback,
 } from "../../errors.js";
 
 import type { Quoting } from "./quoting.js";
 import type { ConnectionPool, NullPool } from "./connection-pool.js";
-import { CURRENT_TRANSACTION_KEY, Transaction, TransactionManager } from "./transaction.js";
+import {
+  CURRENT_TRANSACTION_KEY,
+  NullTransaction,
+  Transaction,
+  TransactionManager,
+} from "./transaction.js";
 import { Transaction as UserTransaction } from "../../transaction.js";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { Result } from "../../result.js";
@@ -100,7 +106,7 @@ export interface DatabaseStatementsHost {
     opts?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<Result>;
   /** @internal */
-  dirtyCurrentTransaction?(): void;
+  dirtyCurrentTransaction(): void;
   /** @internal */
   rawExecute?(
     sql: string,
@@ -113,19 +119,17 @@ export interface DatabaseStatementsHost {
     batch?: boolean,
   ): Promise<unknown>;
   /** @internal */
-  castResult?(rawResult: unknown): Result;
+  castResult(rawResult: unknown): Result;
   /** @internal */
-  affectedRows?(rawResult: unknown): number;
+  affectedRows(rawResult: unknown): number;
   /** @internal */
   lastInsertedId?(result: Result): unknown;
-  isWriteQuery?(sql: string): boolean;
-  currentTransaction?(): {
-    open: boolean;
-    written?: boolean;
-    joinable?: boolean | (() => boolean);
-    userTransaction?: unknown;
-  };
-  withinNewTransaction?<T>(opts: unknown, fn: (tx?: unknown) => Promise<T> | T): Promise<T>;
+  isWriteQuery(sql: string): boolean;
+  currentTransaction(): Transaction | NullTransaction;
+  withinNewTransaction<T>(
+    options: { isolation?: string | null; joinable?: boolean },
+    block: (tx?: unknown) => Promise<T> | T,
+  ): Promise<T>;
   disableReferentialIntegrity(fn: () => Promise<void>): Promise<void>;
   /** @internal */
   executeBatch(
@@ -386,7 +390,7 @@ export async function transaction<T>(
     ) {
       internalTx = (userTx as { _internalTransaction: Transaction })._internalTransaction;
     } else {
-      const tmCurrent = this.currentTransaction?.();
+      const tmCurrent = this.currentTransaction();
       internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(this as never);
     }
     return IsolatedExecutionState.scope(CURRENT_TRANSACTION_KEY, internalTx, () => {
@@ -395,60 +399,39 @@ export async function transaction<T>(
     });
   };
 
-  const currentTxn = this.currentTransaction?.();
-  const currentTxnJoinable =
-    typeof currentTxn?.joinable === "function" ? currentTxn.joinable() : currentTxn?.joinable;
-
-  if (!requiresNew && joinable && currentTxnJoinable) {
-    if (isolation) {
-      throw new TransactionIsolationError("cannot set isolation when joining a transaction");
-    }
-    const userTx = currentTxn!.userTransaction;
-    try {
-      return await fn(userTx);
-    } catch (e: any) {
-      if (e?.name === "Rollback") return undefined;
-      throw e;
-    }
-  }
-
-  if (this.withinNewTransaction) {
-    try {
-      return await this.withinNewTransaction({ isolation, joinable }, fn);
-    } catch (e: any) {
-      if (e?.name === "Rollback") return undefined;
-      throw e;
-    }
-  }
-
-  if (isolation) {
-    await beginDeferredTransaction.call(this, isolation);
-  } else {
-    await (this.beginDbTransaction
-      ? this.beginDbTransaction.call(this)
-      : beginDbTransaction.call(this));
-  }
   try {
-    const result = await fn();
-    await (this.commitDbTransaction
-      ? this.commitDbTransaction.call(this)
-      : commitDbTransaction.call(this));
-    return result;
-  } catch (e: any) {
-    await (this.rollbackDbTransaction
-      ? this.rollbackDbTransaction.call(this)
-      : rollbackDbTransaction.call(this));
-    if (e?.name === "Rollback") return undefined;
-    throw e;
-  } finally {
-    if (isolation) {
-      await this.resetIsolationLevel?.call(this);
+    if (!requiresNew && this.currentTransaction().joinable) {
+      if (isolation) {
+        throw new TransactionIsolationError("cannot set isolation when joining a transaction");
+      }
+      return await fn(this.currentTransaction().userTransaction);
+    } else {
+      return await this.withinNewTransaction({ isolation, joinable }, fn);
     }
+  } catch (e) {
+    if (!(e instanceof Rollback)) throw e;
+    return undefined;
   }
 }
 
 export function transactionManager(this: DatabaseStatementsHost): TransactionManager | null {
   return (this as any)._transactionManager ?? null;
+}
+
+export async function withinNewTransaction<T>(
+  this: DatabaseStatementsHost,
+  options: { isolation?: string | null; joinable?: boolean },
+  block: (tx?: unknown) => Promise<T> | T,
+): Promise<T> {
+  return transactionManager.call(this)!.withinNewTransaction(options, block as never);
+}
+
+export function currentTransaction(this: DatabaseStatementsHost): Transaction | NullTransaction {
+  return transactionManager.call(this)!.currentTransaction;
+}
+
+export function dirtyCurrentTransaction(this: DatabaseStatementsHost): void {
+  transactionManager.call(this)!.dirtyCurrentTransaction();
 }
 
 export function resetTransaction(this: DatabaseStatementsHost): void;
@@ -493,17 +476,14 @@ export function resetTransaction(
 }
 
 export function markTransactionWrittenIfWrite(this: DatabaseStatementsHost, sql: string): void {
-  const txn = this.currentTransaction?.();
-  if (txn?.open) {
-    if (this.isWriteQuery?.(sql)) {
-      txn.written = true;
-    }
+  const transaction = this.currentTransaction();
+  if (transaction.open) {
+    (transaction as Transaction).written ||= this.isWriteQuery(sql);
   }
 }
 
 export function isTransactionOpen(this: DatabaseStatementsHost): boolean {
-  const txn = this.currentTransaction?.();
-  return txn?.open ?? false;
+  return this.currentTransaction().open;
 }
 
 export function addTransactionRecord(
@@ -511,10 +491,7 @@ export function addTransactionRecord(
   record: unknown,
   _ensureFinalize = true,
 ): void {
-  const txn = this.currentTransaction?.() as any;
-  if (txn?.addRecord) {
-    txn.addRecord(record, _ensureFinalize);
-  }
+  this.currentTransaction().addRecord(record, _ensureFinalize);
 }
 
 export async function beginDbTransaction(): Promise<void> {}
@@ -748,7 +725,7 @@ export async function rawExecQuery(
     opts?.materializeTransactions ?? true,
     opts?.batch ?? false,
   );
-  return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
+  return this.castResult(rawResult);
 }
 
 export async function internalExecQuery(
@@ -764,7 +741,7 @@ export async function internalExecQuery(
       allowRetry: options?.allowRetry,
       materializeTransactions: options?.materializeTransactions,
     });
-    return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
+    return this.castResult(rawResult);
   }
   if (binds && binds.length > 0) {
     throw new Error(
@@ -860,8 +837,7 @@ interface DatabaseStatementsDefaultsHost {
   ): Promise<[string, unknown[]]>;
 }
 
-/** @internal */
-async function insertStatement(
+export async function insert(
   this: any,
   arel: unknown,
   name: string | null = null,
@@ -880,6 +856,8 @@ async function insertStatement(
   if (idValue != null && idValue !== false) return idValue;
   return this.lastInsertedId(value);
 }
+
+export const create = insert;
 
 export const DatabaseStatements = {
   resetTransaction,
@@ -1010,9 +988,9 @@ export const DatabaseStatements = {
 
   cacheableQuery,
 
-  insert: insertStatement,
+  insert,
 
-  create: insertStatement,
+  create,
 
   async update(
     this: any,
@@ -1051,6 +1029,9 @@ export const DatabaseStatements = {
   truncate,
   truncateTables,
   transactionManager,
+  withinNewTransaction,
+  currentTransaction,
+  dirtyCurrentTransaction,
   isTransactionOpen,
   markTransactionWrittenIfWrite,
   addTransactionRecord,
@@ -1138,7 +1119,7 @@ export function performQuery(
 }
 
 /** @internal */
-function castResult(rawResult: any): never {
+export function castResult(rawResult: any): never {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:566
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result is not implemented",
@@ -1146,7 +1127,7 @@ function castResult(rawResult: any): never {
 }
 
 /** @internal */
-function affectedRows(rawResult: any): never {
+export function affectedRows(rawResult: any): never {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:570
   throw new NotImplementedError(
     "ActiveRecord::ConnectionAdapters::DatabaseStatements#affected_rows is not implemented",
@@ -1315,7 +1296,7 @@ export function select(
 ): Promise<Result> | FutureResult | FutureResultComplete {
   const async = options?.async;
   if (async != null && async !== false && this.asyncEnabled?.()) {
-    if (currentTransactionJoinable(this)) {
+    if (this.currentTransaction().joinable) {
       throw new AsynchronousQueryInsideTransactionError(
         "Asynchronous queries are not allowed inside transactions",
       );
@@ -1327,7 +1308,7 @@ export function select(
       [sql, name, binds],
       { prepare: options?.prepare },
     );
-    if (this.supportsConcurrentConnections?.() && !currentTransactionJoinable(this)) {
+    if (this.supportsConcurrentConnections?.() && !this.currentTransaction().joinable) {
       futureResult.scheduleBang(baseClass().asynchronousQueriesSession());
       return futureResult;
     } else {
@@ -1352,12 +1333,6 @@ type FutureResultClass = new (
   args: unknown[],
   kwargs: Record<string, unknown>,
 ) => FutureResult;
-
-function currentTransactionJoinable(host: DatabaseStatementsHost): boolean {
-  const txn = host.currentTransaction?.();
-  const joinable = txn?.joinable;
-  return typeof joinable === "function" ? joinable.call(txn) : joinable === true;
-}
 
 /** @internal */
 export async function sqlForInsert(
