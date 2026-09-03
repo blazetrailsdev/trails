@@ -11,12 +11,7 @@ export type Block<T> = ((key: string) => T) & { readonly [BLOCK]: true };
 export function block<T>(fn: (key: string) => T): Block<T>;
 /** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/eval.c:866`) TypeScript has no equivalent of. */
 export function block<T>(fn: (key: string, oldValue: T, newValue: T) => T): ConflictBlock<T>;
-/**
- * One mark, two yield signatures: every arm MRI dispatches with
- * `rb_block_given_p` (`vendor/ruby/eval.c:866`) reads the same brand back,
- * whatever the block's arity.
- * @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/eval.c:866`) TypeScript has no equivalent of.
- */
+/** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/eval.c:866`) TypeScript has no equivalent of; one mark serves every yield signature. */
 export function block(fn: (...args: never[]) => unknown): unknown {
   return Object.assign((...args: never[]) => fn(...args), { [BLOCK]: true as const });
 }
