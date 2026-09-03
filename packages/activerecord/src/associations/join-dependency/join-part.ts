@@ -7,11 +7,6 @@ export abstract class JoinPart {
 
   tableIndex = -1;
   tableAlias = "";
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy
-   */
-  arelTable: Table | Nodes.TableAlias | null = null;
   columns: string[] = [];
   assocName = "";
   assocType: "hasMany" | "hasOne" | "belongsTo" = "hasMany";
@@ -24,7 +19,7 @@ export abstract class JoinPart {
     if (children) this.children.push(...children);
   }
 
-  abstract get table(): Table | Nodes.TableAlias | string;
+  abstract get table(): Table | Nodes.TableAlias | null;
 
   get tableName(): string {
     return this.baseKlass.tableName;

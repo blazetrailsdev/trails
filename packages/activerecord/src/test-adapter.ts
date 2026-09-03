@@ -18,7 +18,7 @@ export type LeasedTestAdapter = DatabaseAdapter & {
     fn: (tx?: unknown) => Promise<T> | T,
   ): Promise<T>;
   currentTransaction(): unknown;
-  openTransactions: number;
+  openTransactions(): number;
 };
 
 const _primaryEnvConfig = (await testConfigurationHashes()).envConfig;

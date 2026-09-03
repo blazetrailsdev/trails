@@ -85,4 +85,29 @@ describe("MigrationProxy", () => {
     expect(migration.name).toBe("ValidPeopleHaveLastNames");
     expect(migration.version).toBe(1);
   });
+  it("loadMigration re-evaluates a migration file that changed on disk", async () => {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "trails-mig-reload-"));
+    const filename = path.join(root, "1_reloaded_migration.mjs");
+    const source = (marker: string) =>
+      `export class ReloadedMigration {\n` +
+      `  constructor(name, version) {\n` +
+      `    this.name = name;\n` +
+      `    this.version = version;\n` +
+      `    this.marker = ${JSON.stringify(marker)};\n` +
+      `  }\n` +
+      `}\n`;
+
+    await fs.writeFile(filename, source("v1"));
+    const first = await new MigrationProxy("ReloadedMigration", 1, filename, "").loadMigration();
+    expect((first as unknown as { marker: string }).marker).toBe("v1");
+
+    await fs.writeFile(filename, source("v2"));
+    const second = await new MigrationProxy("ReloadedMigration", 1, filename, "").loadMigration();
+    expect((second as unknown as { marker: string }).marker).toBe("v2");
+
+    await fs.rm(root, { recursive: true, force: true });
+  });
 });

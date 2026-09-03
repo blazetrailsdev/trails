@@ -114,7 +114,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
       new Nodes.SqlLiteral("commentsWithForeignKey"),
     ]);
     expect(target.effectiveSqlName).toBe("commentsWithForeignKey");
-    const targetTable = target.arelTable as Nodes.TableAlias;
+    const targetTable = target.table as Nodes.TableAlias;
     expect(targetTable.tableName).toBe("comments");
     expect(String(targetTable.tableAlias ?? targetTable.name)).toBe("commentsWithForeignKey");
 

@@ -1444,7 +1444,7 @@ export class PostgreSQLAdapter
 
   /** @internal */
   get inTransaction(): boolean {
-    return this.openTransactions > 0;
+    return this.openTransactions() > 0;
   }
 
   get raw(): pg.Client {
