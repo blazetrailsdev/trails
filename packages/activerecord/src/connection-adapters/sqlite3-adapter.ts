@@ -11,7 +11,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
-import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SQLite3AdapterOptions, SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { ActiveRecord } from "../ar-config.js";
@@ -23,7 +22,6 @@ import {
   type NativeDatabaseTypes,
 } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
-import { ExplainPrettyPrinter } from "./sqlite3/explain-pretty-printer.js";
 import {
   dataSourceSql as sqliteDataSourceSql,
   extractValueFromDefault as sqliteExtractValueFromDefault,
@@ -78,6 +76,7 @@ import {
   resetIsolationLevel as sqliteResetIsolationLevel,
   execute as sqliteExecute,
   defaultInsertValue as sqliteDefaultInsertValue,
+  explain as sqliteExplain,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
@@ -515,16 +514,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async rollbackToSavepoint(name: string): Promise<void> {
     await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION");
-  }
-
-  async explain(
-    arel: string,
-    binds: unknown[] = [],
-    _options: ExplainOption[] = [],
-  ): Promise<string> {
-    const result = await this.internalExecQuery(`EXPLAIN QUERY PLAN ${arel}`, "EXPLAIN", binds);
-    const printer = new ExplainPrettyPrinter();
-    return printer.pp(result);
   }
 
   override quote(value: unknown): string {
@@ -1623,8 +1612,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /** @internal */
-  override buildStatementPool(): GenericStatementPool<SqliteStatement> {
-    return new GenericStatementPool<SqliteStatement>(
+  override buildStatementPool(): StatementPool {
+    return new StatementPool(
       SQLite3Adapter.typeCastConfigToInteger(this._statementLimit) as number,
     );
   }
@@ -1903,7 +1892,16 @@ export class SQLite3Integer extends IntegerType {
   }
 }
 
-export class StatementPool extends GenericStatementPool<SqliteStatement> {}
+export class StatementPool extends GenericStatementPool<SqliteStatement> {
+  override reset(): void | Promise<void> {
+    return this.clear();
+  }
+
+  /** @internal */
+  protected override dealloc(stmt: SqliteStatement): void | Promise<void> {
+    return stmt.finalize?.();
+  }
+}
 
 /** @internal */
 function extractValueFromDefault(default_: string | null): unknown {
@@ -1955,6 +1953,7 @@ SQLite3Adapter.prototype.execRollbackDbTransaction = sqliteExecRollbackDbTransac
 SQLite3Adapter.prototype.resetIsolationLevel = sqliteResetIsolationLevel;
 SQLite3Adapter.prototype.execute = sqliteExecute;
 SQLite3Adapter.prototype.defaultInsertValue = sqliteDefaultInsertValue;
+SQLite3Adapter.prototype.explain = sqliteExplain;
 
 dirtiesQueryCache(SQLite3Adapter, "execute");
 
@@ -1973,6 +1972,7 @@ export interface SQLite3Adapter {
   resetIsolationLevel: typeof sqliteResetIsolationLevel;
   execute: typeof sqliteExecute;
   defaultInsertValue: typeof sqliteDefaultInsertValue;
+  explain: typeof sqliteExplain;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 

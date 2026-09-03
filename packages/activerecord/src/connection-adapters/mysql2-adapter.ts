@@ -7,7 +7,6 @@ import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
   StatementPool as MysqlStatementPool,
-  type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
@@ -45,27 +44,6 @@ import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-c
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { parseMysqlName as mysqlParseName } from "./mysql/schema-statements.js";
-
-class Mysql2StatementPool extends MysqlStatementPool {
-  private _conn: mysql.Connection | null;
-
-  constructor(conn: mysql.Connection, maxSize: number) {
-    super(maxSize);
-    this._conn = conn;
-  }
-
-  protected override dealloc(stmt: MysqlPreparedStatement): void {
-    const conn = this._conn;
-    if (!conn) return;
-    try {
-      (conn as unknown as { unprepare: (sql: string) => void }).unprepare(stmt.sql);
-    } catch {}
-  }
-
-  _detach(): void {
-    this._conn = null;
-  }
-}
 
 let mysql2TypeMap: TypeMap | null = null;
 
@@ -128,7 +106,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
   private _inTransaction = false;
   private _connectionConfigured = false;
-  override _statements: Mysql2StatementPool | null = null;
+  override _statements: MysqlStatementPool | null = null;
 
   _databaseTimezone: "utc" | "local" = "utc";
 
@@ -156,17 +134,25 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return translated;
   }
 
-  private _getStmtPool(conn: mysql.Connection): Mysql2StatementPool {
+  private _getStmtPool(): MysqlStatementPool {
     if (!this._statements) {
-      this._statements = new Mysql2StatementPool(conn, this._statementLimit);
+      this._statements = new MysqlStatementPool(this._statementLimit);
     }
     return this._statements;
   }
 
   _trackPrepared(conn: mysql.Connection, sql: string): void {
-    const pool = this._getStmtPool(conn);
+    const pool = this._getStmtPool();
     if (pool.get(sql)) return;
-    void pool.set(sql, { sql, key: pool.nextKey() });
+    void pool.set(sql, {
+      sql,
+      key: pool.nextKey(),
+      close(): void {
+        try {
+          (conn as unknown as { unprepare: (sql: string) => void }).unprepare(sql);
+        } catch {}
+      },
+    });
   }
 
   /** @internal */
@@ -783,7 +769,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _closeRawHandle(): void {
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statements?._detach();
     this._statements = null;
     if (this._client) {
       const ending = this._client.end().catch(() => {});
@@ -800,7 +785,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.discardBang();
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statements?._detach();
     this._statements = null;
     const conn = this._client;
     this._client = null;
@@ -812,7 +796,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connectGeneration++;
     this._inTransaction = false;
     this._connectionConfigured = false;
-    this._statements?._detach();
     this._statements = null;
     if (this._client) {
       await this._client.end();

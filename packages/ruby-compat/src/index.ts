@@ -64,6 +64,7 @@ export {
 export type { Extended, Included, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
 export { kernelFloat } from "./kernel-float.js";
+export { kernelInteger } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
 export { KeyError } from "./key-error.js";
 export { PROTOCOL_PROBES, methodMissingProxy } from "./method-missing-proxy.js";

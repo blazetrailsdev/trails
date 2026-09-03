@@ -17,8 +17,8 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import { RangeError as ActiveModelRangeError, ArgumentError } from "@blazetrails/activemodel";
-import { FloatDomainError } from "@blazetrails/ruby-compat";
+import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
+import { kernelInteger } from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
   NotImplementedError,
@@ -649,41 +649,7 @@ export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
   if ((typeof limit === "number" && Number.isInteger(limit)) || limit instanceof Nodes.SqlLiteral) {
     return limit;
   }
-  if (typeof limit === "string") {
-    return integerFromString(limit);
-  }
-  if (typeof limit === "number") {
-    if (!Number.isFinite(limit)) throw new FloatDomainError(String(limit));
-    return Math.trunc(limit);
-  }
-  throw new TypeError(`can't convert ${rubyClassName(limit)} into Integer`);
-}
-
-function integerFromString(str: string): number {
-  const invalid = () => new ArgumentError(`invalid value for Integer(): ${JSON.stringify(str)}`);
-  const signMatch = /^([+-]?)(.*)$/s.exec(str.trim())!;
-  const sign = signMatch[1];
-  let body = signMatch[2];
-
-  let radix = 10;
-  const prefix = /^0([xbod])/i.exec(body);
-  if (prefix) {
-    radix = { x: 16, b: 2, o: 8, d: 10 }[prefix[1].toLowerCase()]!;
-    body = body.slice(2);
-  } else if (/^0./.test(body)) {
-    radix = 8;
-    body = body.slice(1).replace(/^_/, "");
-  }
-
-  const digits = { 2: "[01]", 8: "[0-7]", 10: "[0-9]", 16: "[0-9a-fA-F]" }[radix]!;
-  if (!new RegExp(`^${digits}(?:_?${digits})*$`).test(body)) throw invalid();
-  return (sign === "-" ? -1 : 1) * Number.parseInt(body.replace(/_/g, ""), radix);
-}
-
-function rubyClassName(value: unknown): string {
-  if (value === null || value === undefined) return "nil";
-  if (typeof value === "boolean") return String(value);
-  return (value as object)?.constructor?.name ?? typeof value;
+  return kernelInteger(limit);
 }
 
 export function withYamlFallback(value: unknown): unknown {

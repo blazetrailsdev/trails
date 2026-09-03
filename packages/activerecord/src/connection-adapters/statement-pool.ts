@@ -52,7 +52,7 @@ export class StatementPool<T = unknown> {
     if (deallocating.length > 0) return Promise.all(deallocating).then(() => {});
   }
 
-  reset(): void {
+  reset(): void | Promise<void> {
     this.cache.clear();
   }
 

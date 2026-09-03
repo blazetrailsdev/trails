@@ -7,7 +7,9 @@ import {
   combineMultiStatements,
   execute as abstractExecute,
   type DatabaseStatementsHost,
+  type ExplainOption,
 } from "../abstract/database-statements.js";
+import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
 
 const READ_QUERY =
   /^(?:[(\s]|\/\*[\s\S]*?\*\/)*(?:begin|commit|explain|release|rollback|savepoint|select|with|pragma)\b/i;
@@ -28,6 +30,24 @@ export interface DatabaseStatements {
 
 export function isWriteQuery(sql: string): boolean {
   return !READ_QUERY.test(stripSqlComments(sql));
+}
+
+/** @missingRailsArgs internal_exec_query — CONVERGEABLE sqlite3-explain-passes-empty-binds */
+export async function explain(
+  this: ExplainHost,
+  arel: string,
+  binds: unknown[] = [],
+  _options: ExplainOption[] = [],
+): Promise<string> {
+  const sql = "EXPLAIN QUERY PLAN " + this.toSql(arel, binds);
+  const result = await this.internalExecQuery(sql, "EXPLAIN", binds);
+  return new ExplainPrettyPrinter().pp(result);
+}
+
+/** @internal */
+interface ExplainHost {
+  toSql(arel: unknown, binds?: unknown[]): string;
+  internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
 }
 
 export async function beginDeferredTransaction(

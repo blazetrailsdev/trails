@@ -23,7 +23,7 @@ import {
   strftime,
   timeToDf,
 } from "./date.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, kernelInteger } from "@blazetrails/ruby-compat";
 
 /**
  * MRI reads the process's zone once and caches it (`time.c`
@@ -288,10 +288,7 @@ const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "
  */
 function obj2vint(obj: number | string): number {
   if (typeof obj !== "string") return Math.trunc(obj);
-  if (!/^[+-]?\d+$/.test(obj.trim())) {
-    throw new ArgumentError(`invalid value for Integer(): ${JSON.stringify(obj)}`);
-  }
-  return parseInt(obj.trim(), 10);
+  return kernelInteger(obj, 10);
 }
 
 /**
