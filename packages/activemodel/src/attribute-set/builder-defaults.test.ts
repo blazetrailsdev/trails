@@ -9,7 +9,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
 
   it("returns the schema default attribute when key is in defaultAttributes but absent from values", () => {
     const types = new Map([["status", strType]]);
-    const defaults = new Map([["status", Attribute.withCastValue("status", "active", strType)]]);
+    const defaults = { status: Attribute.withCastValue("status", "active", strType) };
     const hash = new LazyAttributeHash(types, {}, new Map(), defaults);
 
     const attr = hash.getAttribute("status");
@@ -18,7 +18,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
 
   it("user-provided values override defaultAttributes", () => {
     const types = new Map([["status", strType]]);
-    const defaults = new Map([["status", Attribute.withCastValue("status", "active", strType)]]);
+    const defaults = { status: Attribute.withCastValue("status", "active", strType) };
     const hash = new LazyAttributeHash(types, { status: "archived" }, new Map(), defaults);
 
     expect(hash.getAttribute("status").value).toBe("archived");
@@ -29,7 +29,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
     const types = new Map([["tags", arrayType]]);
     const prototype = Attribute.withCastValue("tags", ["a"], arrayType);
     void prototype.value;
-    const defaults = new Map([["tags", prototype]]);
+    const defaults = { tags: prototype };
 
     const first = new LazyAttributeHash(types, {}, new Map(), defaults).getAttribute("tags");
     const second = new LazyAttributeHash(types, {}, new Map(), defaults).getAttribute("tags");
@@ -70,7 +70,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
       ["score", strType],
     ]);
     const additional = new Map([["score", intType]]);
-    const defaults = new Map([["status", Attribute.withCastValue("status", "active", strType)]]);
+    const defaults = { status: Attribute.withCastValue("status", "active", strType) };
     const original = new LazyAttributeHash(types, { score: "42" }, additional, defaults);
     original.getAttribute("score");
 
@@ -83,7 +83,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
   it("materialized default is detached from the prototype — mutation does not bleed across AttributeSets", () => {
     const types = new Map([["status", strType]]);
     const defaultProto = Attribute.withCastValue("status", "active", strType);
-    const defaults = new Map([["status", defaultProto]]);
+    const defaults = { status: defaultProto };
 
     const builder = new Builder(types, defaults);
     const setA = builder.buildFromDatabase({});

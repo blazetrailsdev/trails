@@ -27,16 +27,16 @@ describe("LazyAttributeSet", () => {
 
   it("only materializes an attribute when it is first read", () => {
     const types = new Map([["name", strType]]);
-    const lazy = new LazyAttributeSet({ name: "Alice" }, types, new Map(), new Map());
-    expect((lazy as any)._attributes.size).toBe(0);
+    const lazy = new LazyAttributeSet({ name: "Alice" }, types, new Map(), {});
+    expect(Object.keys((lazy as any)._attributes as object)).toHaveLength(0);
     expect(lazy.fetchValue("name")).toBe("Alice");
     expect(lazy.keys()).toEqual(["name"]);
-    expect((lazy as any)._attributes.has("name")).toBe(true);
+    expect(Object.hasOwn((lazy as any)._attributes as object, "name")).toBe(true);
   });
 
   it("key? reports values, types and materialized attributes", () => {
     const types = new Map([["name", strType]]);
-    const lazy = new LazyAttributeSet({ score: "42" }, types, new Map(), new Map());
+    const lazy = new LazyAttributeSet({ score: "42" }, types, new Map(), {});
     expect(lazy.isKey("score")).toBe(true);
     expect(lazy.isKey("name")).toBe(false);
     expect(lazy.isKey("missing")).toBe(false);
@@ -45,26 +45,26 @@ describe("LazyAttributeSet", () => {
   it("uses additional_types over the declared type", () => {
     const types = new Map([["score", strType]]);
     const additional = new Map([["score", intType]]);
-    const lazy = new LazyAttributeSet({ score: "42" }, types, additional, new Map());
+    const lazy = new LazyAttributeSet({ score: "42" }, types, additional, {});
     expect(lazy.fetchValue("score")).toBe(42);
   });
 
   it("falls back to a default attribute when the value is absent", () => {
     const types = new Map([["status", strType]]);
-    const defaults = new Map([["status", Attribute.fromDatabase("status", "draft", strType)]]);
+    const defaults = { status: Attribute.fromDatabase("status", "draft", strType) };
     const lazy = new LazyAttributeSet({}, types, new Map(), defaults);
     expect(lazy.fetchValue("status")).toBe("draft");
   });
 
   it("returns an uninitialized attribute for a known type with no value or default", () => {
     const types = new Map([["name", strType]]);
-    const lazy = new LazyAttributeSet({}, types, new Map(), new Map());
+    const lazy = new LazyAttributeSet({}, types, new Map(), {});
     expect(lazy.getAttribute("name").isInitialized()).toBe(false);
     expect(lazy.keys()).toEqual([]);
   });
 
   it("returns a null attribute for an unknown name", () => {
-    const lazy = new LazyAttributeSet({}, new Map(), new Map(), new Map());
+    const lazy = new LazyAttributeSet({}, new Map(), new Map(), {});
     expect(lazy.fetchValue("nope")).toBe(null);
   });
 });

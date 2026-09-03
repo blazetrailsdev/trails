@@ -2,7 +2,6 @@ import { DescendantsTracker, extend, included, registerSubclass } from "@blazetr
 import { Type } from "./type/value.js";
 import { defaultValue } from "./type.js";
 import { typeRegistry } from "./type/registry.js";
-import { Attribute } from "./attribute.js";
 import { AttributeSet } from "./attribute-set.js";
 import type { AttributeOptions } from "./attributes.js";
 
@@ -158,7 +157,7 @@ export const ClassMethods = {
   _defaultAttributes(this: AttributeHostInternals): AttributeSet {
     if (!this._cachedDefaultAttributes) {
       registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
-      const attributeSet = new AttributeSet(new Map<string, Attribute>());
+      const attributeSet = new AttributeSet({});
       this.applyPendingAttributeModifications(attributeSet);
       this._cachedDefaultAttributes = attributeSet;
     }

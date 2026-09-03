@@ -5,9 +5,9 @@ import { AttributeSet } from "../attribute-set.js";
 
 export class Builder {
   readonly types: Map<string, Type>;
-  readonly defaultAttributes: Map<string, Attribute>;
+  readonly defaultAttributes: Record<string, Attribute>;
 
-  constructor(types: Map<string, Type>, defaultAttributes: Map<string, Attribute> = new Map()) {
+  constructor(types: Map<string, Type>, defaultAttributes: Record<string, Attribute> = {}) {
     this.types = types;
     this.defaultAttributes = defaultAttributes;
   }
@@ -24,7 +24,7 @@ export class LazyAttributeSet extends AttributeSet {
   private values: Record<string, unknown>;
   private types: Map<string, Type>;
   private additionalTypes: Map<string, Type>;
-  private defaultAttributes: Map<string, Attribute>;
+  private defaultAttributes: Record<string, Attribute>;
   private castedValues: Map<string, unknown>;
   private materialized: boolean;
 
@@ -32,8 +32,8 @@ export class LazyAttributeSet extends AttributeSet {
     values: Record<string, unknown>,
     types: Map<string, Type>,
     additionalTypes: Map<string, Type>,
-    defaultAttributes: Map<string, Attribute>,
-    attributes: Map<string, Attribute> = new Map(),
+    defaultAttributes: Record<string, Attribute>,
+    attributes: Record<string, Attribute> = {},
   ) {
     super(attributes);
     this.values = values;
@@ -46,7 +46,9 @@ export class LazyAttributeSet extends AttributeSet {
 
   override isKey(name: string): boolean {
     return (
-      (Object.hasOwn(this.values, name) || this.types.has(name) || this._attributes.has(name)) &&
+      (Object.hasOwn(this.values, name) ||
+        this.types.has(name) ||
+        hasKey(this._attributes, name)) &&
       this.getAttribute(name).isInitialized()
     );
   }
@@ -55,13 +57,13 @@ export class LazyAttributeSet extends AttributeSet {
     const keys = new Set([
       ...Object.keys(this.values),
       ...this.types.keys(),
-      ...this._attributes.keys(),
+      ...Object.keys(this._attributes),
     ]);
     return [...keys].filter((name) => this.getAttribute(name).isInitialized());
   }
 
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
-    const attr = this._attributes.get(name);
+    const attr = this._attributes[name];
     if (attr) {
       if (block !== undefined && attr instanceof Uninitialized) return block(name);
       return attr.value;
@@ -91,7 +93,7 @@ export class LazyAttributeSet extends AttributeSet {
     }
   }
 
-  protected override attributes(): Map<string, Attribute> {
+  protected override attributes(): Record<string, Attribute> {
     if (!this.materialized) {
       eachKey(this.values, (key) => this.getAttribute(key));
       for (const key of this.types.keys()) this.getAttribute(key);
@@ -116,12 +118,12 @@ export class LazyAttributeSet extends AttributeSet {
 
     if (valuePresent) {
       const attr = Attribute.fromDatabase(name, value, type!, this.castedValues.get(name));
-      this._attributes.set(name, attr);
+      this._attributes[name] = attr;
       return attr;
     } else if (this.types.has(name)) {
-      const attr = this.defaultAttributes.get(name);
+      const attr = this.defaultAttributes[name];
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type!);
-      this._attributes.set(name, built);
+      this._attributes[name] = built;
       return built;
     } else {
       return Attribute.null(name);
@@ -134,7 +136,7 @@ export class LazyAttributeHash {
   private types: Map<string, Type>;
   private values: Record<string, unknown>;
   private additionalTypes: Map<string, Type>;
-  private defaultAttributes: Map<string, Attribute>;
+  private defaultAttributes: Record<string, Attribute>;
   private materialized: boolean;
 
   transformValues<T>(fn: (attr: Attribute) => T): Record<string, T> {
@@ -161,7 +163,7 @@ export class LazyAttributeHash {
     types: Map<string, Type>,
     values: Record<string, unknown>,
     additionalTypes: Map<string, Type> = new Map(),
-    defaultAttributes: Map<string, Attribute> = new Map(),
+    defaultAttributes: Record<string, Attribute> = {},
     delegateHash: Record<string, Attribute> = {},
   ) {
     this.types = types;
@@ -208,7 +210,7 @@ export class LazyAttributeHash {
     Map<string, Type>,
     Record<string, unknown>,
     Map<string, Type>,
-    Map<string, Attribute>,
+    Record<string, Attribute>,
     Record<string, Attribute>,
   ] {
     return [this.types, this.values, this.additionalTypes, this.defaultAttributes, this.delegate];
@@ -219,7 +221,7 @@ export class LazyAttributeHash {
       Map<string, Type>,
       Record<string, unknown>,
       (Map<string, Type> | undefined)?,
-      (Map<string, Attribute> | undefined)?,
+      (Record<string, Attribute> | undefined)?,
       (Record<string, Attribute> | undefined)?,
     ],
   ): LazyAttributeHash {
@@ -261,7 +263,7 @@ export class LazyAttributeHash {
       this.delegate[name] = attr;
       return attr;
     } else if (this.types.has(name)) {
-      const attr = this.defaultAttributes.get(name);
+      const attr = this.defaultAttributes[name];
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type!);
       this.delegate[name] = built;
       return built;

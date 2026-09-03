@@ -22,8 +22,10 @@
 
 import { ArgumentError } from "./argument-error.js";
 
-type AnyClass = new (...args: any[]) => any;
-type ModuleObject = Record<string, any>;
+type AnyClass = new (...args: never[]) => unknown;
+type ModuleObject = object;
+type AnyFunction = (...args: never) => unknown;
+type ModuleHooks = { [included]?: (klass: unknown) => void; [extended]?: (klass: unknown) => void };
 
 /**
  * Ruby's `Module.new` — an anonymous module built at runtime and populated
@@ -61,10 +63,11 @@ export class Module {
 
   include(mod: ModuleObject): void {
     const carrier = carrierOf(this);
-    for (const key of Object.keys(mod)) {
-      if (typeof mod[key] !== "function" || /^[A-Z]/.test(key)) continue;
+    const members = mod as Record<string, unknown>;
+    for (const key of Object.keys(members)) {
+      if (typeof members[key] !== "function" || /^[A-Z]/.test(key)) continue;
       Object.defineProperty(carrier, key, {
-        value: mod[key],
+        value: members[key],
         writable: true,
         configurable: true,
       });
@@ -77,7 +80,7 @@ export class Module {
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  defineMethod(name: string, body: (...args: any[]) => unknown): void {
+  defineMethod(name: string, body: (...args: never[]) => unknown): void {
     Object.defineProperty(carrierOf(this), name, {
       value: body,
       writable: true,
@@ -180,7 +183,7 @@ const includedModules = Symbol.for("@blazetrails/activesupport:includedModules")
 const STATIC_CLASS_KEYS = new Set(["prototype", "length", "name"]);
 
 function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string> {
-  let set = (proto as any)[registry] as Set<string> | undefined;
+  let set = (proto as Record<symbol, unknown>)[registry] as Set<string> | undefined;
   if (!Object.prototype.hasOwnProperty.call(proto, registry)) {
     set = new Set<string>();
     Object.defineProperty(proto, registry, {
@@ -194,7 +197,7 @@ function trackedKeys(proto: object, registry: symbol = includedKeys): Set<string
 }
 
 function trackIncludedModule(proto: object, mod: unknown): void {
-  let set = (proto as any)[includedModules] as Set<unknown> | undefined;
+  let set = (proto as Record<symbol, unknown>)[includedModules] as Set<unknown> | undefined;
   if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) {
     set = new Set<unknown>();
     Object.defineProperty(proto, includedModules, {
@@ -238,7 +241,7 @@ export function isModuleIncluded(
     proto = Object.getPrototypeOf(proto) as object | null
   ) {
     if (!Object.prototype.hasOwnProperty.call(proto, includedModules)) continue;
-    const mods = (proto as any)[includedModules] as Set<unknown>;
+    const mods = (proto as Record<symbol, unknown>)[includedModules] as Set<unknown>;
     if (mods.has(mod)) return true;
     const eq = (mod as { equals?: (other: unknown) => boolean }).equals;
     if (typeof eq === "function") {
@@ -364,10 +367,10 @@ export function publicInstanceMethods(
 
 type CallableMethods<M extends object> = {
   [K in keyof M as K extends string
-    ? M[K] extends (this: any, ...args: any[]) => any
+    ? M[K] extends AnyFunction
       ? K
       : never
-    : never]: M[K] extends (this: any, ...args: infer A) => infer R ? (...args: A) => R : never;
+    : never]: M[K] extends (this: never, ...args: infer A) => infer R ? (...args: A) => R : never;
 };
 
 export type Included<M extends object> = CallableMethods<M>;
@@ -395,8 +398,8 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
     Object.defineProperties(carrier, Object.getOwnPropertyDescriptors(carrierOf(mod)));
     carriers.set(mod, carrier);
     Object.setPrototypeOf(proto, carrier);
-    if (typeof (mod as any)[included] === "function") {
-      (mod as any)[included](klass);
+    if (typeof (mod as ModuleHooks)[included] === "function") {
+      (mod as ModuleHooks)[included]!(klass);
     }
     return;
   }
@@ -453,8 +456,8 @@ export function include(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
   }
   Object.defineProperties(klass.prototype, descriptors);
 
-  if (typeof (mod as any)[included] === "function") {
-    (mod as any)[included](klass);
+  if (typeof (mod as ModuleHooks)[included] === "function") {
+    (mod as ModuleHooks)[included]!(klass);
   }
 }
 
@@ -565,7 +568,7 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
     }
   }
 
-  if (typeof (mod as any)[extended] === "function") {
-    (mod as any)[extended](klass);
+  if (typeof (mod as ModuleHooks)[extended] === "function") {
+    (mod as ModuleHooks)[extended]!(klass);
   }
 }

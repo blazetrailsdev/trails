@@ -526,15 +526,11 @@ describe("AttributeSetTest", () => {
   it("#reverse_merge! fills missing attributes from target", () => {
     const strType = typeRegistry.lookup("string");
     const intType = typeRegistry.lookup("integer");
-    const a = new AttributeSet(
-      new Map([["name", Attribute.fromDatabase("name", "Alice", strType)]]),
-    );
-    const b = new AttributeSet(
-      new Map([
-        ["name", Attribute.fromDatabase("name", "Bob", strType)],
-        ["age", Attribute.fromDatabase("age", 30, intType)],
-      ]),
-    );
+    const a = new AttributeSet({ name: Attribute.fromDatabase("name", "Alice", strType) });
+    const b = new AttributeSet({
+      name: Attribute.fromDatabase("name", "Bob", strType),
+      age: Attribute.fromDatabase("age", 30, intType),
+    });
     a.reverseMergeBang(b);
     expect(a.fetchValue("name")).toBe("Alice");
     expect(a.fetchValue("age")).toBe(30);
@@ -543,48 +539,44 @@ describe("AttributeSetTest", () => {
   it("fetch returns the attribute for the given name", () => {
     const intType = typeRegistry.lookup("integer");
     const foo = Attribute.fromDatabase("foo", 1, intType);
-    const set = new AttributeSet(new Map([["foo", foo]]));
+    const set = new AttributeSet({ foo });
     expect(set.fetch("foo")).toBe(foo);
   });
 
   it("fetch raises for an unknown name without a block", () => {
-    const set = new AttributeSet(new Map());
+    const set = new AttributeSet({});
     expect(() => set.fetch("wibble")).toThrow();
   });
 
   it("fetch uses the given block for an unknown name", () => {
-    const set = new AttributeSet(new Map());
+    const set = new AttributeSet({});
     const fallback = Attribute.null("wibble");
     expect(set.fetch("wibble", () => fallback)).toBe(fallback);
   });
 
   it("fetch returns the given default value for an unknown name", () => {
-    const set = new AttributeSet(new Map());
+    const set = new AttributeSet({});
     const fallback = Attribute.null("wibble");
     expect(set.fetch("wibble", fallback)).toBe(fallback);
   });
 
   it("except returns a copy without the given names", () => {
     const intType = typeRegistry.lookup("integer");
-    const set = new AttributeSet(
-      new Map([
-        ["foo", Attribute.fromDatabase("foo", 1, intType)],
-        ["bar", Attribute.fromDatabase("bar", 2, intType)],
-      ]),
-    );
+    const set = new AttributeSet({
+      foo: Attribute.fromDatabase("foo", 1, intType),
+      bar: Attribute.fromDatabase("bar", 2, intType),
+    });
     const rest = set.except("foo");
-    expect(rest.has("foo")).toBe(false);
-    expect(rest.has("bar")).toBe(true);
+    expect(Object.hasOwn(rest, "foo")).toBe(false);
+    expect(Object.hasOwn(rest, "bar")).toBe(true);
   });
 
   it("each_value yields every attribute", () => {
     const intType = typeRegistry.lookup("integer");
-    const set = new AttributeSet(
-      new Map([
-        ["foo", Attribute.fromDatabase("foo", 1, intType)],
-        ["bar", Attribute.fromDatabase("bar", 2, intType)],
-      ]),
-    );
+    const set = new AttributeSet({
+      foo: Attribute.fromDatabase("foo", 1, intType),
+      bar: Attribute.fromDatabase("bar", 2, intType),
+    });
     const seen: unknown[] = [];
     set.eachValue((attr) => seen.push(attr.value));
     expect(seen).toEqual([1, 2]);
@@ -592,8 +584,24 @@ describe("AttributeSetTest", () => {
 
   it("include? returns true for initialized attributes", () => {
     const intType = typeRegistry.lookup("integer");
-    const set = new AttributeSet(new Map([["foo", Attribute.fromDatabase("foo", 1, intType)]]));
+    const set = new AttributeSet({ foo: Attribute.fromDatabase("foo", 1, intType) });
     expect(set.isInclude("foo")).toBe(true);
     expect(set.isInclude("bar")).toBe(false);
+  });
+  it("treats an Object.prototype name as an ordinary absent attribute", () => {
+    const set = new AttributeSet({});
+    expect(set.isKey("toString")).toBe(false);
+    expect(set.getAttribute("toString").value).toBeNull();
+    expect(set.getAttribute("constructor").value).toBeNull();
+  });
+
+  it("stores __proto__ as an ordinary key", () => {
+    const set = new AttributeSet({});
+    const attr = Attribute.fromDatabase("__proto__", 1, typeRegistry.lookup("integer"));
+    set.set("__proto__", attr);
+    expect(set.isKey("__proto__")).toBe(true);
+    expect(set.getAttribute("__proto__")).toBe(attr);
+    expect(set.deepDup().isKey("__proto__")).toBe(true);
+    expect(Object.hasOwn(set.except("foo"), "__proto__")).toBe(true);
   });
 });

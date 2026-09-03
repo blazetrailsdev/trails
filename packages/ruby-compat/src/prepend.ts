@@ -37,9 +37,9 @@
  *   });
  */
 export type PrependMethod = (
-  this: any,
+  this: never,
   super_: (...args: unknown[]) => unknown,
-  ...args: any[]
+  ...args: never[]
 ) => unknown;
 
 export interface PrependModule {
@@ -92,7 +92,11 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
       typeof existing === "function"
         ? (existing as (...args: unknown[]) => unknown)
         : NO_METHOD_ROOT;
-    const wrapper = mod[name];
+    const wrapper = mod[name] as (
+      this: unknown,
+      super_: (...args: unknown[]) => unknown,
+      ...args: unknown[]
+    ) => unknown;
     const wrapped = function (this: unknown, ...args: unknown[]) {
       return wrapper.call(this, original.bind(this), ...args);
     };

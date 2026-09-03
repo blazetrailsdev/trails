@@ -10,7 +10,7 @@ import { typeRegistry } from "./type/registry.js";
 import { ValueType } from "./type/value.js";
 
 function buildSet(values: Record<string, unknown>): AttributeSet {
-  const attrs = new Map<string, import("./attribute.js").Attribute>();
+  const attrs: Record<string, import("./attribute.js").Attribute> = {};
   const passthrough = new ValueType();
   for (const [name, value] of Object.entries(values)) {
     const type =
@@ -19,7 +19,7 @@ function buildSet(values: Record<string, unknown>): AttributeSet {
         : typeof value === "string"
           ? typeRegistry.lookup("string")
           : passthrough;
-    attrs.set(name, Attribute.fromUser(name, value, type));
+    attrs[name] = Attribute.fromUser(name, value, type);
   }
   return new AttributeSet(attrs);
 }
@@ -200,8 +200,9 @@ describe("ForcedMutationTracker", () => {
 describe("forceChange and type.isChanged independence", () => {
   it("forceChange marks attribute changed even when type.isChanged returns false — NaN-to-NaN case", () => {
     const floatType = typeRegistry.lookup("float");
-    const attrs = new Map<string, Attribute>();
-    attrs.set("ratio", Attribute.fromUser("ratio", NaN, floatType));
+    const attrs: Record<string, Attribute> = {
+      ratio: Attribute.fromUser("ratio", NaN, floatType),
+    };
     const set = new AttributeSet(attrs);
     const tracker = new AttributeMutationTracker(set);
 

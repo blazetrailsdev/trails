@@ -160,10 +160,7 @@ export class Lint {
     }
 
     // Validate rack.errors
-    const errors = env[RACK_ERRORS];
-    if (typeof errors.puts !== "function" && typeof errors.write !== "function") {
-      throw new LintError("rack.errors must respond to puts or write");
-    }
+    this.checkErrorStream(env[RACK_ERRORS]);
 
     // Validate rack.hijack
     if (env[RACK_IS_HIJACK]) {
@@ -176,6 +173,14 @@ export class Lint {
     for (const key of Object.keys(env)) {
       if (typeof key !== "string") {
         throw new LintError("env keys must be strings");
+      }
+    }
+  }
+
+  private checkErrorStream(error: Record<string, unknown>): void {
+    for (const method of ["puts", "write", "flush"]) {
+      if (typeof error[method] !== "function") {
+        throw new LintError(`rack.error ${error} does not respond to #${method}`);
       }
     }
   }

@@ -1,75 +1,62 @@
 import { Attribute, Uninitialized } from "./attribute.js";
-import { FrozenError, KeyError } from "@blazetrails/ruby-compat";
+import {
+  FrozenError,
+  KeyError,
+  dup,
+  eachKey,
+  except,
+  hasKey,
+  transformValues,
+} from "@blazetrails/ruby-compat";
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 
-function transformValues<T>(
-  attributes: Map<string, Attribute>,
-  block: (attr: Attribute) => T,
-): Map<string, T> {
-  const result = new Map<string, T>();
-  for (const [name, attr] of attributes) result.set(name, block(attr));
-  return result;
-}
-
-function eachKey(attributes: Map<string, Attribute>): string[] {
-  return [...attributes.keys()];
-}
-
 export class AttributeSet {
-  protected _attributes: Map<string, Attribute>;
+  protected _attributes: Record<string, Attribute>;
 
   eachValue(fn: (attr: Attribute) => void): void {
-    for (const attr of this.attributes().values()) fn(attr);
+    for (const attr of Object.values(this.attributes())) fn(attr);
   }
 
   fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
-    const attr = this.attributes().get(name);
-    if (attr !== undefined) return attr;
+    const attributes = this.attributes();
+    if (hasKey(attributes, name)) return attributes[name];
     if (typeof defaultOrBlock === "function") return (defaultOrBlock as (name: string) => T)(name);
     if (defaultOrBlock !== undefined) return defaultOrBlock;
     throw new KeyError(`key not found: ${JSON.stringify(name)}`);
   }
 
-  except(...names: string[]): Map<string, Attribute> {
-    const drop = new Set(names);
-    const result = new Map<string, Attribute>();
-    for (const [name, attr] of this.attributes()) {
-      if (!drop.has(name)) result.set(name, attr);
-    }
-    return result;
+  except(...names: string[]): Record<string, Attribute> {
+    return except(this.attributes(), ...names);
   }
 
-  constructor(attributes: Map<string, Attribute> = new Map()) {
-    this._attributes = attributes;
+  constructor(attributes: Record<string, Attribute> = {}) {
+    this._attributes = Object.setPrototypeOf(attributes, null) as Record<string, Attribute>;
   }
 
   getAttribute(name: string): Attribute {
-    return this._attributes.get(name) ?? this.defaultAttribute(name);
+    return this._attributes[name] ?? this.defaultAttribute(name);
   }
 
   set(name: string, value: Attribute): void {
     this.assertNotFrozen();
-    this._attributes.set(name, value);
+    this._attributes[name] = value;
   }
 
   castTypes(): Record<string, Type> {
-    return Object.fromEntries(transformValues(this.attributes(), (attr) => attr.type));
+    return transformValues(this.attributes(), (attr) => attr.type);
   }
 
   valuesBeforeTypeCast(): Record<string, unknown> {
-    return Object.fromEntries(
-      transformValues(this.attributes(), (attr) => attr.valueBeforeTypeCast),
-    );
+    return transformValues(this.attributes(), (attr) => attr.valueBeforeTypeCast);
   }
 
   valuesForDatabase(): Record<string, unknown> {
-    return Object.fromEntries(transformValues(this.attributes(), (attr) => attr.valueForDatabase));
+    return transformValues(this.attributes(), (attr) => attr.valueForDatabase);
   }
 
   isKey(name: string): boolean {
-    const attr = this.attributes().get(name);
-    return attr !== undefined && attr.isInitialized();
+    return hasKey(this.attributes(), name) && this.getAttribute(name).isInitialized();
   }
 
   isInclude(name: string): boolean {
@@ -77,7 +64,11 @@ export class AttributeSet {
   }
 
   keys(): string[] {
-    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).isInitialized());
+    const keys: string[] = [];
+    eachKey(this.attributes(), (name) => {
+      if (this.getAttribute(name).isInitialized()) keys.push(name);
+    });
+    return keys;
   }
 
   fetchValue(name: string, block?: (name: string) => unknown): unknown {
@@ -94,12 +85,12 @@ export class AttributeSet {
     type?: { deserialize(value: unknown): unknown },
   ): void {
     this.assertNotFrozen();
-    const existing = this._attributes.get(name);
+    const existing = this._attributes[name];
     if (existing) {
-      this._attributes.set(name, existing.withValueFromDatabase(value));
+      this._attributes[name] = existing.withValueFromDatabase(value);
     } else {
       const colType = (type as Type) ?? typeRegistry.lookup("value");
-      this._attributes.set(name, Attribute.fromDatabase(name, value, colType));
+      this._attributes[name] = Attribute.fromDatabase(name, value, colType);
     }
   }
 
@@ -107,13 +98,13 @@ export class AttributeSet {
     if (Object.isFrozen(this)) {
       throw new FrozenError("can't modify frozen attributes");
     }
-    this._attributes.set(name, this.getAttribute(name).withValueFromUser(value));
+    this._attributes[name] = this.getAttribute(name).withValueFromUser(value);
     return value;
   }
 
   writeCastValue(name: string, value: unknown): void {
     this.assertNotFrozen();
-    this._attributes.set(name, this.getAttribute(name).withCastValue(value));
+    this._attributes[name] = this.getAttribute(name).withCastValue(value);
   }
 
   deepDup(): AttributeSet {
@@ -127,7 +118,11 @@ export class AttributeSet {
   }
 
   accessed(): string[] {
-    return eachKey(this.attributes()).filter((name) => this.getAttribute(name).hasBeenRead());
+    const accessed: string[] = [];
+    eachKey(this.attributes(), (name) => {
+      if (this.getAttribute(name).hasBeenRead()) accessed.push(name);
+    });
+    return accessed;
   }
 
   map(fn: (attr: Attribute) => Attribute): AttributeSet {
@@ -137,15 +132,15 @@ export class AttributeSet {
 
   reverseMergeBang(targetAttributes: AttributeSet): this {
     this.assertNotFrozen();
-    for (const [name, attr] of targetAttributes.attributes()) {
-      if (!this._attributes.has(name)) {
-        this._attributes.set(name, attr);
+    for (const [name, attr] of Object.entries(targetAttributes.attributes())) {
+      if (!hasKey(this._attributes, name)) {
+        this._attributes[name] = attr;
       }
     }
     return this;
   }
 
-  protected attributes(): Map<string, Attribute> {
+  protected attributes(): Record<string, Attribute> {
     return this._attributes;
   }
 
@@ -168,7 +163,7 @@ export class AttributeSet {
   }
 
   initializeClone(_other: AttributeSet): void {
-    this._attributes = new Map(this._attributes);
+    this._attributes = dup(this._attributes);
   }
 
   private assertNotFrozen(): void {
