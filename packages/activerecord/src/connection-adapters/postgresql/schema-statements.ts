@@ -1342,6 +1342,57 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /** @internal */
+  async newColumnFromField(
+    tableName: string,
+    field: unknown[],
+    _definitions: unknown,
+  ): Promise<Column> {
+    const [columnName, type, default_, notnull, oid, fmod, collation, comment, identity, gen] =
+      field as [
+        string,
+        string,
+        string | null,
+        boolean,
+        number,
+        number,
+        string | null,
+        string | null,
+        string | null,
+        string | null,
+      ];
+    const typeMetadata = await (this as unknown as PostgreSQLAdapter).fetchTypeMetadata(
+      columnName,
+      type,
+      Number(oid),
+      Number(fmod),
+    );
+    const defaultValue = this.extractValueFromDefault(default_);
+
+    let defaultFunction: string | null;
+    if (gen) {
+      defaultFunction = default_;
+    } else {
+      defaultFunction = this.extractDefaultFunction(defaultValue, default_);
+    }
+
+    let serial: boolean | undefined;
+    const match = defaultFunction?.match(SERIAL_SEQUENCE_RE);
+    if (match) {
+      const { sequenceName, suffix } = match.groups!;
+      serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
+    }
+
+    return new Column(columnName, defaultValue, typeMetadata, !notnull, {
+      defaultFunction: defaultFunction ?? undefined,
+      collation: collation ?? undefined,
+      comment: comment || null,
+      serial,
+      identity: identity || null,
+      generated: gen,
+    }).deduplicate();
+  }
+
+  /** @internal */
   sequenceNameFromParts(tableName: string, columnName: string, suffix: string): string {
     const maxIdentifierLength = this.maxIdentifierLength();
     let overLength = tableName.length + columnName.length + suffix.length + 2 - maxIdentifierLength;
@@ -1412,57 +1463,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       `SELECT setval(${this.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk == null ? "false" : "true"})`,
       "SCHEMA",
     );
-  }
-
-  /** @internal */
-  async newColumnFromField(
-    tableName: string,
-    field: unknown[],
-    _definitions: unknown,
-  ): Promise<Column> {
-    const [columnName, type, default_, notnull, oid, fmod, collation, comment, identity, gen] =
-      field as [
-        string,
-        string,
-        string | null,
-        boolean,
-        number,
-        number,
-        string | null,
-        string | null,
-        string | null,
-        string | null,
-      ];
-    const typeMetadata = await (this as unknown as PostgreSQLAdapter).fetchTypeMetadata(
-      columnName,
-      type,
-      Number(oid),
-      Number(fmod),
-    );
-    const defaultValue = this.extractValueFromDefault(default_);
-
-    let defaultFunction: string | null;
-    if (gen) {
-      defaultFunction = default_;
-    } else {
-      defaultFunction = this.extractDefaultFunction(defaultValue, default_);
-    }
-
-    let serial: boolean | undefined;
-    const match = defaultFunction?.match(SERIAL_SEQUENCE_RE);
-    if (match) {
-      const { sequenceName, suffix } = match.groups!;
-      serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
-    }
-
-    return new Column(columnName, defaultValue, typeMetadata, !notnull, {
-      defaultFunction: defaultFunction ?? undefined,
-      collation: collation ?? undefined,
-      comment: comment || null,
-      serial,
-      identity: identity || null,
-      generated: gen || null,
-    }).deduplicate();
   }
 
   /** @internal */
