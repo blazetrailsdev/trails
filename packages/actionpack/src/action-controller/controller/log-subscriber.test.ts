@@ -11,8 +11,10 @@ class CaptureLogger {
   get "info?"(): boolean {
     return true;
   }
-  info(msg: string): void {
-    this.messages.push(msg);
+  // `Logger#info` evaluates a block argument (`vendor/ruby/logger.rb` `add`),
+  // which is the form `process_action` logs through.
+  info(msg: string | (() => string)): void {
+    this.messages.push(typeof msg === "function" ? msg() : msg);
   }
 }
 

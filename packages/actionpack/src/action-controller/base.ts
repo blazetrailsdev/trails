@@ -45,6 +45,7 @@ import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
+import { logProcessAction } from "./metal/instrumentation.js";
 import {
   contentSecurityPolicy,
   contentSecurityPolicyNonce,
@@ -739,6 +740,7 @@ export class Base extends Metal {
 
   /** Rails: `include Logging` (base.rb:302) — `log_at` (metal/logging.rb:17). */
   static logAt = logAt;
+  static logProcessAction = logProcessAction;
 
   /**
    * Per-request enforcement. Private in Rails; exposed as a prototype

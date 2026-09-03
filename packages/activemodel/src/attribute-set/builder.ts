@@ -1,5 +1,13 @@
 import { Attribute, Uninitialized } from "../attribute.js";
-import { KeyError, eachKey, except, hasKey, transformValues } from "@blazetrails/ruby-compat";
+import type { Block } from "@blazetrails/ruby-compat";
+import {
+  eachKey,
+  eachValue,
+  except,
+  fetch,
+  hasKey,
+  transformValues,
+} from "@blazetrails/ruby-compat";
 import { Type } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
 
@@ -144,15 +152,14 @@ export class LazyAttributeHash {
   }
 
   eachValue(fn: (attr: Attribute) => void): void {
-    for (const attr of Object.values(this.materialize())) fn(attr);
+    eachValue(this.materialize(), fn);
   }
 
-  fetch(name: string, defaultOrBlock?: Attribute | ((name: string) => Attribute)): Attribute {
+  fetch(name: string, ...rest: [] | [Attribute] | [Block<Attribute>]): Attribute {
     const materialized = this.materialize();
-    if (hasKey(materialized, name)) return materialized[name];
-    if (typeof defaultOrBlock === "function") return defaultOrBlock(name);
-    if (defaultOrBlock !== undefined) return defaultOrBlock;
-    throw new KeyError(`key not found: ${JSON.stringify(name)}`);
+    return rest.length === 0
+      ? fetch<Attribute>(materialized, name)
+      : fetch<Attribute>(materialized, name, rest[0] as Attribute);
   }
 
   except(...names: string[]): Record<string, Attribute> {
@@ -187,14 +194,15 @@ export class LazyAttributeHash {
   }
 
   deepDup(): LazyAttributeHash {
-    const delegateHash = transformValues(this.delegate, (attr) => attr.dup());
-    return new LazyAttributeHash(
+    const copy = new LazyAttributeHash(
       this.types,
       this.values,
       this.additionalTypes,
       this.defaultAttributes,
-      delegateHash,
+      transformValues(this.delegate, (attr) => attr.dup()),
     );
+    copy.materialized = this.materialized;
+    return copy;
   }
 
   eachKey(fn: (key: string) => void): void {
