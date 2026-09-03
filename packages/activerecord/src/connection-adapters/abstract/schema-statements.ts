@@ -1995,7 +1995,7 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  quotedScope(_name?: string, _options?: { type?: string }): Record<string, string> {
+  quotedScope(_name?: string | null, _options?: { type?: string }): Record<string, string> {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1894
     throw new NotImplementedError(
       "ActiveRecord::ConnectionAdapters::SchemaStatements#quoted_scope is not implemented",

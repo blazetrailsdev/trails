@@ -1890,27 +1890,6 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    nameOrOptions?: string | null | { type?: string },
-    options: { type?: string } = {},
-  ): string {
-    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
-    const name = kwargsOnly ? null : nameOrOptions;
-    const opts = kwargsOnly ? nameOrOptions : options;
-    const scope = this.quotedScope(name, { type: opts.type });
-    const type = scope.type ?? "'r','v','m','p','f'";
-    let sql = `SELECT c.relname FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace`;
-    sql += ` WHERE n.nspname = ${scope.schema}`;
-    if (scope.name) sql += ` AND c.relname = ${scope.name}`;
-    sql += ` AND c.relkind IN (${type})`;
-    return sql;
-  }
-
-  /** @internal */
   quotedScope(
     name?: string | null,
     options: { type?: string } = {},
@@ -2225,52 +2204,6 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  async newColumnFromField(
-    tableName: string,
-    field: unknown[],
-    _definitions: unknown,
-  ): Promise<Column> {
-    const [columnName, type, default_, notnull, oid, fmod, collation, comment, identity, gen] =
-      field as [
-        string,
-        string,
-        string | null,
-        boolean,
-        number,
-        number,
-        string | null,
-        string | null,
-        string | null,
-        string | null,
-      ];
-    const typeMetadata = await this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
-    const defaultValue = this.extractValueFromDefault(default_);
-
-    let defaultFunction: string | null;
-    if (gen) {
-      defaultFunction = default_;
-    } else {
-      defaultFunction = this.extractDefaultFunction(defaultValue, default_);
-    }
-
-    let serial: boolean | undefined;
-    const match = defaultFunction?.match(SERIAL_SEQUENCE_RE);
-    if (match) {
-      const { sequenceName, suffix } = match.groups!;
-      serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
-    }
-
-    return new Column(columnName, defaultValue, typeMetadata, !notnull, {
-      defaultFunction: defaultFunction ?? undefined,
-      collation: collation ?? undefined,
-      comment: comment || null,
-      serial,
-      identity: identity || null,
-      generated: gen || null,
-    }).deduplicate();
-  }
-
-  /** @internal */
   async addColumnForAlter(
     tableName: string,
     columnName: string,
@@ -2284,22 +2217,6 @@ export class PostgreSQLAdapter
       (await super.addColumnForAlter(tableName, columnName, type, options)) as string,
       () => this.changeColumnComment(tableName, columnName, options.comment ?? null),
     ];
-  }
-
-  /** @internal */
-  async changeColumnForAlter(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options: ColumnOptions & { using?: string; castAs?: string } = {},
-  ): Promise<Array<string | (() => Promise<void>)>> {
-    const changeColDef = this.buildChangeColumnDefinition(tableName, columnName, type, options);
-    const sqls: Array<string | (() => Promise<void>)> = [
-      await this.schemaCreation.accept(changeColDef),
-    ];
-    if ("comment" in options)
-      sqls.push(() => this.changeColumnComment(tableName, columnName, options.comment ?? null));
-    return sqls;
   }
 
   /** @internal */
@@ -2338,12 +2255,6 @@ export class PostgreSQLAdapter
   ): Promise<Map<string, string>> {
     quotedColumns = this.addIndexOpclass(quotedColumns, options);
     return super.addOptionsForIndexColumns(quotedColumns, options);
-  }
-
-  /** @internal */
-  extractSchemaQualifiedName(string: string): [string | null, string] {
-    const name = Utils.extractSchemaQualifiedName(string);
-    return [name.schema, name.identifier];
   }
 
   private deferrable(deferrable: "immediate" | "deferred" | undefined): string {
@@ -2669,6 +2580,25 @@ export interface PostgreSQLAdapter {
   /** @internal */
   columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]>;
 
+  /** @internal */
+  newColumnFromField(tableName: string, field: unknown[], _definitions: unknown): Promise<Column>;
+
+  /** @internal */
+  changeColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options?: ColumnOptions & { using?: string; castAs?: string },
+  ): Promise<Array<string | (() => Promise<void>)>>;
+
+  /** @internal */
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
+  /** @internal */
+  dataSourceSql(options: { type?: string }): string;
+
+  /** @internal */
+  extractSchemaQualifiedName(string: string): [string | null, string];
+
   tables(): Promise<string[]>;
 
   views(): Promise<string[]>;
@@ -2860,8 +2790,6 @@ function _assertPgAdvisoryLockId(lockId: number | bigint | string): void {
 }
 
 const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/;
-
-const SERIAL_SEQUENCE_RE = /^nextval\('"?(?<sequenceName>.+_(?<suffix>seq\d*))"?'::regclass\)$/;
 
 (PostgreSQLAdapter.prototype as any).explain = pgExplain;
 (PostgreSQLAdapter.prototype as any).isWriteQuery = pgIsWriteQuery;
