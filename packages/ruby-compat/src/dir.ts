@@ -66,10 +66,6 @@ function children(dirname: string): string[] {
   }
 }
 
-/**
- * `vendor/ruby/dir.c:329` — a backslash escapes the character after it, so
- * `Dir.glob("a\\,b/*")` walks the single directory named `a,b`.
- */
 function unescape(segment: string): string {
   return segment.replace(/\\(.)/g, "$1");
 }
@@ -189,6 +185,11 @@ export class Dir {
    * order. A leading dot is matched only by a literal dot (`dir.c:325`).
    * And entries come out of each directory sorted, which is `sort: true`, the
    * default since Ruby 3.0 (`dir.c:3210`).
+   *
+   * A backslash escapes the character after it (`dir.c:314`), in the brace
+   * expansion (`dir.c:3019`) as well as in a segment, so
+   * `Dir.glob("{a\\,b/*}")` walks the one directory named `a,b` rather than
+   * expanding to two patterns.
    *
    * A broken symlink is answered, because it is a directory entry
    * (`dir.c:3421`) rather than something `File.exist?` is asked about — which

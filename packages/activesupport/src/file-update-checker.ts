@@ -125,7 +125,7 @@ export class FileUpdateChecker {
   private watched(): string[] {
     if (this.watchedMemo) return this.watchedMemo;
     const all = this.files.filter((f) => File.isExist(f));
-    if (this.glob) all.push(...Dir.glob(this.glob));
+    if (this.glob != null) all.push(...Dir.glob(this.glob));
     return [...new Set(all)];
   }
 

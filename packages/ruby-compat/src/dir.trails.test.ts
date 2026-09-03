@@ -33,7 +33,7 @@ describe("Dir", () => {
   });
 
   it("glob reads a backslash as an escape rather than a brace separator", () => {
-    // vendor/ruby/dir.c:329, verified against ruby 3.3.11.
+    // vendor/ruby/dir.c:314 and dir.c:3019, verified against ruby 3.3.11.
     const root = mkdtempSync(join(tmpdir(), "trails-dir-"));
     mkdirSync(join(root, "a,b"));
     writeFileSync(join(root, "a,b", "x.rb"), "");
