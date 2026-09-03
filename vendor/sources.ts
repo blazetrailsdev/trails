@@ -202,15 +202,6 @@ export const SOURCES: readonly UpstreamSource[] = [
         libEntryFile: "lib/rack/test.rb",
         // rack-test's suite is `spec/`, not `test/`.
         testPath: "spec",
-        // test-compare tolerates a package with no `packages/<name>/src` — its
-        // Ruby tests are read and simply match nothing — but api-compare does
-        // not: `extract-ts-api.ts` refuses to measure a package whose `dist` is
-        // absent (`NotBuilt`), so leaving this on fails `parity:api` outright.
-        // The Ruby half is ready — `extract-ruby-api.rb` reports 5 classes, 4
-        // modules, 90 public methods over this clone — so the blocker is the
-        // missing TS workspace, which RFC 0137's
-        // `enroll-rack-test-in-compare-tooling` creates.
-        compareApi: false,
       },
     ],
   },

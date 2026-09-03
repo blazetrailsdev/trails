@@ -18,6 +18,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "activesupport",
     "rack",
     "rack-session",
+    "rack-test",
     "actionview",
     "trailties",
     "globalid",

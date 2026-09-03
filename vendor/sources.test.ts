@@ -75,7 +75,7 @@ describe("vendor/sources.ts", () => {
     expect(vendoredRoot("rack-session").endsWith("vendor/rack-session")).toBe(true);
   });
 
-  it("declares the rack-test source, enrolled in test-compare only", () => {
+  it("declares the rack-test source, enrolled in both api-compare and test-compare", () => {
     // actionpack declares `add_dependency "rack-test", ">= 0.6.3"`
     // (vendor/rails/actionpack/actionpack.gemspec:41); v2.2.0 is what
     // vendor/rails/Gemfile.lock:443 resolves.
@@ -92,11 +92,10 @@ describe("vendor/sources.ts", () => {
         libPath: "lib/rack/test",
         libEntryFile: "lib/rack/test.rb",
         testPath: "spec",
-        compareApi: false,
       },
     ]);
-    expect(apiComparePackages()).not.toContain("rack-test");
-    expect(Object.keys(libPathsManifest())).not.toContain("rack-test");
+    expect(apiComparePackages()).toContain("rack-test");
+    expect(Object.keys(libPathsManifest())).toContain("rack-test");
     expect(Object.keys(testPathsManifest())).toContain("rack-test");
     expect(resolvePath("rack-test").endsWith("vendor/rack-test/lib/rack/test")).toBe(true);
     expect(resolvePath("rack-test", "test").endsWith("vendor/rack-test/spec")).toBe(true);
@@ -181,7 +180,7 @@ describe("vendor/sources.ts", () => {
         testPath: "test",
       },
     ]);
-    expect(Object.keys(libEntryFilesManifest())).toEqual(["arel", "i18n"]);
+    expect(Object.keys(libEntryFilesManifest())).toEqual(["arel", "rack-test", "i18n"]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
     expect(Object.keys(testPathsManifest())).toContain("i18n");
@@ -303,6 +302,7 @@ describe("vendor/sources.ts", () => {
         "i18n",
         "rack",
         "rack-session",
+        "rack-test",
         "trailties",
       ].sort(),
     );

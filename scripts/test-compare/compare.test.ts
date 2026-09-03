@@ -153,6 +153,25 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("spec_body_proxy.rb", "rack")).toBe("body-proxy.test.ts");
   });
 
+  it("strips rack-test's leading rack/ and test/ segments and its _spec suffix", () => {
+    expect(rubyToConventionTs("rack/test_spec.rb", "rack-test")).toBe("test.test.ts");
+    expect(rubyToConventionTs("rack/test/cookie_jar_spec.rb", "rack-test")).toBe(
+      "cookie-jar.test.ts",
+    );
+    expect(rubyToConventionTs("rack/test/cookie_spec.rb", "rack-test")).toBe("cookie.test.ts");
+    expect(rubyToConventionTs("rack/test/cookie_object_spec.rb", "rack-test")).toBe(
+      "cookie-object.test.ts",
+    );
+    expect(rubyToConventionTs("rack/test/methods_spec.rb", "rack-test")).toBe("methods.test.ts");
+    expect(rubyToConventionTs("rack/test/multipart_spec.rb", "rack-test")).toBe(
+      "multipart.test.ts",
+    );
+    expect(rubyToConventionTs("rack/test/uploaded_file_spec.rb", "rack-test")).toBe(
+      "uploaded-file.test.ts",
+    );
+    expect(rubyToConventionTs("rack/test/utils_spec.rb", "rack-test")).toBe("utils.test.ts");
+  });
+
   it("strips rack-session's leading session_ segment, which mirrors its lib/rack/session root", () => {
     expect(rubyToConventionTs("spec_session_pool.rb", "rack-session")).toBe("pool.test.ts");
     expect(rubyToConventionTs("spec_session_cookie.rb", "rack-session")).toBe("cookie.test.ts");
