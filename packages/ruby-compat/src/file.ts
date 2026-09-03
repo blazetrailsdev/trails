@@ -151,7 +151,7 @@ export class File extends IO {
   static open(fileName: string, mode: string): File;
   static open<T>(fileName: string, mode: string, block: (file: File) => T): T;
   static open<T>(fileName: string, mode: string, block?: (file: File) => T): T | File {
-    const file = new File(getFs().openSync(fileName, mode.replace(/b/g, "")));
+    const file = new File(getFs().openSync(fileName, mode.replace(/b/g, "")), fileName);
     if (!block) return file;
     try {
       return block(file);

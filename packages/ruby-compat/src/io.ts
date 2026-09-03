@@ -108,6 +108,9 @@ export class IO {
    */
   protected fd: number;
 
+  /** `fptr->pathv` (`vendor/ruby/io.c:2943` reads it back as `IO#path`). */
+  protected pathv: string | null;
+
   /** @internal */
   private pos = 0;
 
@@ -116,8 +119,20 @@ export class IO {
    * is protected because `File.open` (`io.c:8148`) is the only way trails
    * opens a stream, and a public TS constructor is measured surface.
    */
-  protected constructor(fd: number) {
+  protected constructor(fd: number, pathv: string | null = null) {
     this.fd = fd;
+    this.pathv = pathv;
+  }
+
+  /**
+   * `vendor/ruby/io.c:2943` `rb_io_path`, registered as both `IO#path` and
+   * `IO#to_path` (`io.c:15544-15545`) — the path the stream was opened on.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#path`
+   * (`vendor/ruby/io.c:2943`).
+   */
+  path(): string | null {
+    return this.pathv;
   }
 
   /**
@@ -256,13 +271,21 @@ export class IO {
   }
 
   /**
-   * `vendor/ruby/io.c:5777` `rb_io_close_m`, which answers `nil`.
+   * `vendor/ruby/io.c:5777` `rb_io_close_m`, which answers `nil` — and answers
+   * it without closing anything when `fptr->fd < 0` (`io.c:5779-5781`), so a
+   * second close is a no-op rather than an error. `atomic_write` leans on
+   * that: it closes the temp file itself
+   * (`vendor/rails/activesupport/lib/active_support/core_ext/file/atomic.rb:30`)
+   * inside a `Tempfile.open` whose own `ensure` closes it again
+   * (`vendor/ruby/lib/tempfile.rb:372`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#close`
    * (`vendor/ruby/io.c:5777`).
    */
   close(): null {
+    if (this.fd < 0) return null;
     getFs().closeSync(this.fd);
+    this.fd = -1;
     return null;
   }
 }

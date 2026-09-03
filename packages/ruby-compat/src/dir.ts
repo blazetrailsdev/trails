@@ -3,6 +3,21 @@ import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
 import { env, stderr } from "./process-adapter.js";
 
+/** `W_OK` (`vendor/ruby/file.c:1898` `rb_file_writable_p`). */
+const W_OK = 2;
+
+/** `File::Stat#writable?` (`vendor/ruby/file.c:1898`), as `access(2)`. */
+function isWritable(dir: string): boolean {
+  const accessSync = getFs().accessSync;
+  if (!accessSync) return true;
+  try {
+    accessSync(dir, W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** `Dir::SYSTMPDIR` (`vendor/ruby/lib/tmpdir.rb:20`). */
 const SYSTMPDIR = "/tmp";
 
@@ -136,11 +151,11 @@ export class Dir {
    * `Etc.systmpdir`), `/tmp` and `.` that names a writable directory, and
    * `ArgumentError` when none does (`tmpdir.rb:43`).
    *
-   * `File.stat(dir).writable?` is `mode & 0o200` here rather than an
-   * effective-uid `access(2)`, and `world_writable?` / `sticky?` are the
-   * `0o002` and `0o1000` bits (`tmpdir.rb:33-39`); a stat that carries no
-   * `mode` is taken as writable, which is what a non-POSIX `FsAdapter`
-   * reports.
+   * `stat.writable?` (`tmpdir.rb:35`) is effective-process writability, so it
+   * goes through the adapter's `access(2)` with `W_OK`; an adapter without one
+   * reports every directory writable, which is what a non-POSIX filesystem
+   * does. `world_writable?` / `sticky?` (`tmpdir.rb:37`) are the `0o002` and
+   * `0o1000` bits of the stat's mode.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir.tmpdir`
    * (`vendor/ruby/lib/tmpdir.rb:26`), which Rails calls without defining.
@@ -171,7 +186,7 @@ export class Dir {
       const mode = stat.mode;
       if (!stat.isDirectory()) {
         stderr.write(`${name} is not a directory: ${dir}\n`);
-      } else if (mode != null && (mode & 0o200) === 0) {
+      } else if (!isWritable(dir)) {
         stderr.write(`${name} is not writable: ${dir}\n`);
       } else if (mode != null && (mode & 0o002) !== 0 && (mode & 0o1000) === 0) {
         stderr.write(`${name} is world-writable: ${dir}\n`);

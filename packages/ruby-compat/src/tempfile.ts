@@ -71,51 +71,52 @@ function createTmpname(
  * calls from `encrypted_file.rb:90`, `postgresql_database_tasks.rb:132` and
  * `core_ext/file/atomic.rb:24`.
  *
- * Writes are buffered in memory and flushed by {@link close} and {@link read},
- * the way Ruby's `IO` buffers them behind the descriptor: the fs adapter is
- * open-write-close per call, so there is no descriptor to hold between writes.
+ * `Tempfile < DelegateClass(File)` (`tempfile.rb:89`), so every stream method
+ * is the `File` opened at `tempfile.rb:157`, cursor and all — `write` advances
+ * the offset the same way `IO#write` does (`vendor/ruby/io.c:2263`). The
+ * delegation is spelled out per method here because TypeScript has no
+ * `method_missing`, which is the one shape `./method-missing-proxy.ts` exists
+ * for and which a typed stream cannot use.
  *
- * {@link open} and {@link create} run a synchronous block inline and return its
- * value directly, the way Ruby does (`vendor/ruby/lib/tempfile.rb:366`,
+ * {@link open} and {@link create} run a synchronous block inline and return
+ * its value directly, the way Ruby does (`vendor/ruby/lib/tempfile.rb:366`,
  * `:438`); an asynchronous block gets its `ensure` chained onto the returned
- * Promise instead. That is why creation goes through the fs adapter's
- * synchronous primitives: an `async` wrapper would defer a synchronous block's
- * value past every synchronous reader of it.
+ * Promise instead.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile`
  * (`vendor/ruby/lib/tempfile.rb:89`), which Rails calls without defining, so
  * no Rails or gem file declares this class.
  */
 export class Tempfile {
-  private readonly tmpname: string;
+  /** `__getobj__` (`vendor/ruby/lib/tempfile.rb:165`), the delegated `File`. */
+  private readonly tmpfile: File;
+  /** `@unlinked` (`vendor/ruby/lib/tempfile.rb:153`). */
   private unlinked = false;
-  private buffer: Uint8Array = new Uint8Array(0);
-  private flushed = true;
 
-  private constructor(tmpname: string) {
-    this.tmpname = tmpname;
+  private constructor(tmpfile: File) {
+    this.tmpfile = tmpfile;
   }
 
   /**
    * `Tempfile#initialize` (`vendor/ruby/lib/tempfile.rb:150`) — the name comes
-   * from `Dir::Tmpname.create`, and the file is opened `RDWR|CREAT|EXCL` with
-   * `perm: 0600` (`tempfile.rb:154-159`).
+   * from `Dir::Tmpname.create`, and the file is opened `RDWR|CREAT|EXCL`
+   * (`tempfile.rb:154`) with `perm: 0600` (`tempfile.rb:158`).
+   *
+   * `FsAdapter.openSync` takes no permission argument, so `0600` is a `chmod`
+   * behind the exclusive create rather than the `open(2)` mode — the file
+   * exists for the width of that call at the adapter's default permissions.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile.new`
    * (`vendor/ruby/lib/tempfile.rb:150`).
    */
   static new(basename: TempfileBasename = "", tmpdir?: string): Tempfile {
-    const tmpname = createTmpname(basename, tmpdir, (path) => {
-      File.open(path, "wx").close();
-      File.chmod(0o600, path);
-    });
-    return new Tempfile(tmpname);
+    return new Tempfile(openExclusive(basename, tmpdir));
   }
 
   /**
    * `Tempfile.open` (`vendor/ruby/lib/tempfile.rb:366`) — with a block, yields
-   * the tempfile and closes it in an `ensure`, leaving the file in place;
-   * without one, returns the tempfile.
+   * the tempfile and closes it in an `ensure` (`tempfile.rb:369-374`), leaving
+   * the file in place; without one, returns the tempfile.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile.open`
    * (`vendor/ruby/lib/tempfile.rb:366`).
@@ -144,31 +145,37 @@ export class Tempfile {
   }
 
   /**
-   * `Tempfile.create` (`vendor/ruby/lib/tempfile.rb:438`) — like
-   * {@link open}, except the `ensure` also unlinks (`tempfile.rb:447-461`).
+   * `Tempfile.create` (`vendor/ruby/lib/tempfile.rb:438`), which is NOT a
+   * `Tempfile`: it opens a plain `File` (`tempfile.rb:444`) and yields or
+   * returns that, so the caller gets no finalizer and no `Tempfile` surface.
+   * The `ensure` closes it and unlinks the path (`tempfile.rb:447-461`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile.create`
    * (`vendor/ruby/lib/tempfile.rb:438`).
    */
-  static create(basename?: TempfileBasename, tmpdir?: string): Tempfile;
+  static create(basename?: TempfileBasename, tmpdir?: string): File;
   static create<T>(
     basename: TempfileBasename | undefined,
     tmpdir: string | undefined,
-    block: (tmpfile: Tempfile) => T,
+    block: (tmpfile: File) => T,
   ): T;
   static create<T>(
     basename?: TempfileBasename,
     tmpdir?: string,
-    block?: (tmpfile: Tempfile) => T,
-  ): T | Tempfile {
-    const tmpfile = Tempfile.new(basename, tmpdir);
+    block?: (tmpfile: File) => T,
+  ): T | File {
+    const tmpfile = openExclusive(basename, tmpdir);
 
     if (block) {
       return ensure(
         () => block(tmpfile),
         () => {
           tmpfile.close();
-          tmpfile.unlink();
+          try {
+            File.delete(tmpfile.path()!);
+          } catch (error) {
+            if ((error as { code?: string }).code !== "ENOENT") throw error;
+          }
         },
       );
     } else {
@@ -177,61 +184,37 @@ export class Tempfile {
   }
 
   /**
-   * `Tempfile#path` (`vendor/ruby/lib/tempfile.rb:268`) — `nil` once
-   * {@link unlink} has run.
+   * `Tempfile#path` (`vendor/ruby/lib/tempfile.rb:268`) — `__getobj__.path`,
+   * and `nil` once {@link unlink} has run.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#path`
    * (`vendor/ruby/lib/tempfile.rb:268`).
    */
   get path(): string | null {
-    return this.unlinked ? null : this.tmpname;
+    return this.unlinked ? null : this.tmpfile.path();
   }
 
   /**
-   * `IO#write` (`vendor/ruby/io.c:2263` `io_write_m`), reached through
-   * `Tempfile`'s `DelegateClass(File)` (`vendor/ruby/lib/tempfile.rb:89`) —
-   * returns the number of bytes written.
+   * `IO#write` (`vendor/ruby/io.c:2263` `io_write_m`) on the delegated `File`
+   * (`vendor/ruby/lib/tempfile.rb:89`): the bytes go to the descriptor at the
+   * current offset, which the write then advances.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
    * (`vendor/ruby/io.c:2263`), delegated by Ruby stdlib `Tempfile`.
    */
-  write(contents: string | Uint8Array): number {
-    const chunk = typeof contents === "string" ? new TextEncoder().encode(contents) : contents;
-    const grown = new Uint8Array(this.buffer.length + chunk.length);
-    grown.set(this.buffer);
-    grown.set(chunk, this.buffer.length);
-    this.buffer = grown;
-    this.flushed = false;
-    return chunk.length;
+  write(string: string): number {
+    return this.tmpfile.write(string);
   }
 
   /**
-   * `IO#read` (`vendor/ruby/io.c:3774` `io_read`), reached through
-   * `Tempfile`'s `DelegateClass(File)` (`vendor/ruby/lib/tempfile.rb:89`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
-   * (`vendor/ruby/io.c:3774`), delegated by Ruby stdlib `Tempfile`.
-   */
-  read(): Uint8Array {
-    this.flush();
-    return File.open(this.tmpname, "rb", (f) => toBytes(f.read()));
-  }
-
-  private flush(): void {
-    if (this.flushed) return;
-    File.open(this.tmpname, "wb", (f) => f.write(fromBytes(this.buffer)));
-    this.flushed = true;
-  }
-
-  /**
-   * `Tempfile#close(unlink_now = false)`
-   * (`vendor/ruby/lib/tempfile.rb:208`).
+   * `Tempfile#close(unlink_now = false)` (`vendor/ruby/lib/tempfile.rb:208`),
+   * whose `_close` (`tempfile.rb:197`) closes the delegated `File`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#close`
    * (`vendor/ruby/lib/tempfile.rb:208`).
    */
   close(unlinkNow = false): void {
-    this.flush();
+    this.tmpfile.close();
     if (unlinkNow) this.unlink();
   }
 
@@ -247,7 +230,7 @@ export class Tempfile {
   unlink(): void {
     if (this.unlinked) return;
     try {
-      File.delete(this.tmpname);
+      File.delete(this.tmpfile.path()!);
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === "EACCES") return;
@@ -258,21 +241,18 @@ export class Tempfile {
 }
 
 /**
- * The byte-per-`charCode` String Ruby's binary `IO#read` returns
- * (`vendor/ruby/io.c:3774`), as bytes — the inverse of {@link fromBytes}, and
- * the same round trip `IO#read` already does at `./io.ts`.
+ * The `Dir::Tmpname.create` block both `Tempfile#initialize`
+ * (`vendor/ruby/lib/tempfile.rb:156-160`) and `Tempfile.create`
+ * (`vendor/ruby/lib/tempfile.rb:440-445`) pass: open the candidate name
+ * `RDWR|CREAT|EXCL` with `perm: 0600`, retrying the name on `Errno::EEXIST`.
  */
-function toBytes(string: string): Uint8Array {
-  const bytes = new Uint8Array(string.length);
-  for (let i = 0; i < string.length; i++) bytes[i] = string.charCodeAt(i) & 0xff;
-  return bytes;
-}
-
-/** Bytes as the String Ruby's binary `IO#write` takes (`vendor/ruby/io.c:2263`). */
-function fromBytes(bytes: Uint8Array): string {
-  let string = "";
-  for (const byte of bytes) string += String.fromCharCode(byte);
-  return string;
+function openExclusive(basename: TempfileBasename = "", tmpdir?: string): File {
+  let tmpfile: File | null = null;
+  createTmpname(basename, tmpdir, (path) => {
+    tmpfile = File.open(path, "wx+");
+    File.chmod(0o600, path);
+  });
+  return tmpfile!;
 }
 
 /**
