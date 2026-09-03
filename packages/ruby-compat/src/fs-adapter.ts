@@ -27,8 +27,6 @@ export interface FsAdapter {
   mkdirSync(path: string, options?: { recursive?: boolean }): void;
   appendFileSync(path: string, content: string): void;
   unlinkSync(path: string): void;
-  rm(list: string | string[]): void;
-  rmF(list: string | string[]): void;
   readdirSync(path: string): string[];
   readdirSync(path: string, options: { withFileTypes: true }): FsDirent[];
   rmSync(path: string, options?: { recursive?: boolean; force?: boolean }): void;
@@ -36,7 +34,9 @@ export interface FsAdapter {
   renameSync(src: string, dest: string): void;
   flockSync?(fd: number, operation: "ex" | "un"): void;
   statSync(path: string): FsStatResult;
+  lstatSync?(path: string): FsStatResult;
   chmodSync?(path: string, mode: number): void;
+  utimesSync?(path: string, atime: Date, mtime: Date): void;
   chownSync?(path: string, uid: number, gid: number): void;
   realpathSync?(path: string): string;
   openSync(path: string, flags: string): number;
@@ -205,18 +205,6 @@ function tryAutoRegisterNode(): boolean {
       mkdir(path: string, opts?: { recursive?: boolean }): Promise<string | undefined>;
     };
     const fs: FsAdapter = Object.assign({}, nodeFs, {
-      rm: (list: string | string[]) => {
-        for (const entry of Array.isArray(list) ? list : [list]) nodeFs.unlinkSync(entry);
-      },
-      rmF: (list: string | string[]) => {
-        for (const entry of Array.isArray(list) ? list : [list]) {
-          try {
-            nodeFs.unlinkSync(entry);
-          } catch {
-            continue;
-          }
-        }
-      },
       cwd: () => globalThis.process.cwd(),
       exists: (p: string) =>
         fsPromises.access(p).then(

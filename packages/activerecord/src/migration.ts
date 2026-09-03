@@ -10,7 +10,7 @@ import {
   FileUpdateChecker,
   Monitor,
 } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rubyInspect } from "./relation/ruby-inspect.js";
 import { Zlib } from "@blazetrails/ruby-compat";
@@ -1132,7 +1132,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     const path = getPath();
 
     if (!fs.existsSync(destination)) {
-      fs.mkdirSync(destination, { recursive: true });
+      FileUtils.mkdirP(destination);
     }
 
     const schemaMigration = new NullSchemaMigration();

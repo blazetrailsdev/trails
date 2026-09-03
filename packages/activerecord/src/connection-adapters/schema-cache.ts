@@ -1,4 +1,4 @@
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import { Gzip } from "@blazetrails/activesupport/gzip";
 import { Column } from "./column.js";
 import { deduplicate } from "./deduplicable.js";
@@ -384,7 +384,7 @@ export class SchemaCache {
   dumpTo(filename: string): void {
     const fs = getFs();
     const path = getPath();
-    fs.mkdirSync(path.dirname(filename), { recursive: true });
+    FileUtils.mkdirP(path.dirname(filename));
     const coder: Record<string, unknown> = {};
     this.encodeWith(coder);
     const payload = JSON.stringify(coder, null, 2);
@@ -794,7 +794,7 @@ export function open(
 ): void {
   const fs = getFs();
   const path = getPath();
-  fs.mkdirSync(path.dirname(filename), { recursive: true });
+  FileUtils.mkdirP(path.dirname(filename));
   let content = "";
   callback({
     write: (data: string) => {

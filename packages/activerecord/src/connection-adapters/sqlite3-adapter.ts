@@ -61,7 +61,7 @@ import type { DateTimeCastResult } from "@blazetrails/activemodel";
 import { defaultSqlTimezone } from "./abstract/sql-datetime.js";
 import { IntegerType, FloatType } from "@blazetrails/activemodel";
 import { isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -309,7 +309,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     }
     if (!dirExists) {
       try {
-        fs.mkdirSync(dirname, { recursive: true });
+        FileUtils.mkdirP(dirname);
       } catch (e) {
         throw new NoDatabaseError(`Could not create database directory '${dirname}'`, { cause: e });
       }

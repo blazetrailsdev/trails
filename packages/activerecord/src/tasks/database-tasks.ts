@@ -18,7 +18,7 @@ import {
   abort,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { FileUtils, getFs, getPath } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { ActiveRecordError, ConnectionNotDefined } from "../errors.js";
 import type { Base } from "../base.js";
@@ -521,20 +521,7 @@ export class DatabaseTasks {
   }
 
   static clearSchemaCache(filename: string): void {
-    const fs = getFs();
-    try {
-      fs.unlinkSync(filename);
-    } catch (error: unknown) {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code?: string }).code === "ENOENT"
-      ) {
-        return;
-      }
-      throw error;
-    }
+    FileUtils.rmF(filename, { verbose: false });
   }
 
   static async structureDump(
@@ -634,7 +621,7 @@ export class DatabaseTasks {
     const filename = this._resolveSchemaPath(rawFilename);
     const fs = getFs();
     const path = getPath();
-    fs.mkdirSync(path.dirname(filename), { recursive: true });
+    FileUtils.mkdirP(path.dirname(filename));
     if (format !== "sql") {
       const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
       const languageWas = SchemaDumper.language;
