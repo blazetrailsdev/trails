@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { NameError } from "@blazetrails/activesupport";
 import { Migration, MigrationProxy } from "./migration.js";
 
 class CreateUsers extends Migration {
@@ -69,5 +70,26 @@ describe("MigrationProxy", () => {
     expect(first).toBe(sentinel);
     expect(second).toBe(sentinel);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("loadMigration raises NameError when the file has no export named after the migration", async () => {
+    const filename = new URL(
+      "./test-helpers/migrations/valid/1_valid_people_have_last_names.ts",
+      import.meta.url,
+    ).pathname;
+    const proxy = new MigrationProxy("NoSuchMigration", 1, filename, "");
+    await expect(proxy.loadMigration()).rejects.toThrow(NameError);
+    await expect(proxy.loadMigration()).rejects.toThrow("uninitialized constant NoSuchMigration");
+  });
+
+  it("loadMigration instantiates the export named after the migration", async () => {
+    const filename = new URL(
+      "./test-helpers/migrations/valid/1_valid_people_have_last_names.ts",
+      import.meta.url,
+    ).pathname;
+    const proxy = new MigrationProxy("ValidPeopleHaveLastNames", 1, filename, "");
+    const migration = await proxy.loadMigration();
+    expect(migration.name).toBe("ValidPeopleHaveLastNames");
+    expect(migration.version).toBe(1);
   });
 });

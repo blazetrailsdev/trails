@@ -1,23 +1,22 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
-import { Migration as ActiveRecordMigration, Migrator, type MigrationProxy } from "../migration.js";
+import { Migration as ActiveRecordMigration, Migrator, MigrationProxy } from "../migration.js";
 import type { SchemaMigration } from "../schema-migration.js";
 import type { InternalMetadata } from "../internal-metadata.js";
 
-class MigrationStruct {
-  constructor(
-    readonly name: string,
-    readonly version: number,
-  ) {}
+class MigrationStruct extends MigrationProxy {
+  constructor(name: string, version: number) {
+    super(name, version, "", "");
+  }
 
-  get disableDdlTransaction(): boolean {
+  override get disableDdlTransaction(): boolean {
     return false;
   }
 
-  async migrate(_direction: "up" | "down"): Promise<void> {}
+  override async migrate(_direction: "up" | "down"): Promise<void> {}
 
-  migration(): ActiveRecordMigration {
-    return this as unknown as ActiveRecordMigration;
+  override migration(): Promise<ActiveRecordMigration> {
+    return Promise.resolve(this as unknown as ActiveRecordMigration);
   }
 }
 
@@ -44,7 +43,7 @@ describe("Migration", () => {
         new MigrationStruct("a", 1),
         new MigrationStruct("b", 2),
         new MigrationStruct("c", 3),
-      ] as unknown as MigrationProxy[];
+      ];
       try {
         await expect(
           new Migrator("up", migrations, schemaMigration, internalMetadata).migrate(),
