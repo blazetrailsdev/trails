@@ -24,7 +24,10 @@ describe("NamedRouteCollection", () => {
     expect(named.length()).toBe(2);
     expect(named.keyQ("posts")).toBe(true);
     expect(named.keyQ("nope")).toBe(false);
-    expect(named.routeDefinedQ("posts")).toBe(true);
+    // `route_defined?` takes the suffixed selector its Rails caller passes
+    // (`testing/assertions/routing.rb:266`), not the bare route name.
+    expect(named.routeDefinedQ("postsPath")).toBe(true);
+    expect(named.routeDefinedQ("posts")).toBe(false);
   });
 
   it("generates a path from a positional argument", () => {

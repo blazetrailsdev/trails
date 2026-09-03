@@ -359,6 +359,14 @@ describe("ActionView::Base#render", () => {
     );
   });
 
+  it("renders the plain:, html:, body: and renderable: options", () => {
+    const view = buildView();
+    expect(view.render({ body: "b" }).toString()).toBe("b");
+    expect(view.render({ plain: "p" }).toString()).toBe("p");
+    expect(view.render({ html: "<b>h</b>" }).toString()).toBe("<b>h</b>");
+    expect(view.render({ renderable: { renderIn: () => "r" } }).toString()).toBe("r");
+  });
+
   it("raises when given none of the render options", () => {
     expect(() => buildView().render({})).toThrow(
       "You invoked render but did not give any of :body, :file, :html, :inline, " +
@@ -372,6 +380,12 @@ describe("ActionView::Base#render", () => {
         .render({ template: "test/hello_world", formats: ["json"] })
         .toString(),
     ).toBe('{"hello":"world"}');
+  });
+
+  it("says so, rather than that no option was given, for file: and inline:", () => {
+    expect(() => buildView().render({ file: "/tmp/x.html" })).toThrow(
+      "render file: is not available on the synchronous view path",
+    );
   });
 
   it("restores the lookup context after in_rendering_context prepends formats", () => {

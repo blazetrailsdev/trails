@@ -429,20 +429,40 @@ export class Base {
           ),
         );
       }
-      if (!Object.hasOwn(hash, "template")) {
-        throw new ArgumentError(
-          "You invoked render but did not give any of :body, :file, :html, :inline, " +
-            ":partial, :plain, :renderable, or :template option.",
+      // Rails: `TemplateRenderer#determine_template`
+      // (`renderer/template_renderer.rb:16-52`) — a branch per option, in this
+      // order, raising only when none of them is given.
+      if (Object.hasOwn(hash, "body")) return htmlSafe(String(hash.body ?? ""));
+      if (Object.hasOwn(hash, "plain")) return htmlSafe(String(hash.plain ?? ""));
+      if (Object.hasOwn(hash, "html")) return htmlSafe(String(hash.html ?? ""));
+      if (Object.hasOwn(hash, "file") || Object.hasOwn(hash, "inline")) {
+        // `Template::RawFile` reads the file and `Template::Inline` compiles
+        // through a handler; both are built by the asynchronous `Renderer`
+        // this path cannot reach. Say so rather than claiming no option was
+        // given, which is what `determine_template`'s ArgumentError means.
+        throw new Error(
+          `render ${Object.hasOwn(hash, "file") ? "file:" : "inline:"} is not available on the ` +
+            "synchronous view path; render it through the controller.",
         );
       }
-      return htmlSafe(
-        renderer.renderTemplateSync(
-          String(hash.template),
-          prefix,
-          format,
-          { ...(hash.locals ?? {}) },
-          this,
-        ),
+      if (Object.hasOwn(hash, "renderable")) {
+        const renderable = hash.renderable as { renderIn(context: unknown): string };
+        return htmlSafe(renderable.renderIn(this));
+      }
+      if (Object.hasOwn(hash, "template")) {
+        return htmlSafe(
+          renderer.renderTemplateSync(
+            String(hash.template),
+            prefix,
+            format,
+            { ...(hash.locals ?? {}) },
+            this,
+          ),
+        );
+      }
+      throw new ArgumentError(
+        "You invoked render but did not give any of :body, :file, :html, :inline, " +
+          ":partial, :plain, :renderable, or :template option.",
       );
     });
   }
