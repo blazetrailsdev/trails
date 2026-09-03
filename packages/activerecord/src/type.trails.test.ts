@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   register,
   lookup,
+  defaultValue,
   registry,
   currentAdapterName,
   adapterNameFrom,
@@ -9,7 +10,7 @@ import {
 } from "./type.js";
 import { Base } from "./base.js";
 import { ConnectionNotDefined } from "./errors.js";
-import { Type, StringType } from "@blazetrails/activemodel";
+import { Type, StringType, ValueType } from "@blazetrails/activemodel";
 import "./connection-adapters/mysql2-adapter.js";
 import "./connection-adapters/postgresql/type-map-init.js";
 import { Bytea } from "./connection-adapters/postgresql/oid/bytea.js";
@@ -121,6 +122,13 @@ describe("Type.lookup under a non-sqlite configuration", () => {
     stubAdapter("sqlite3");
     expect(lookup("foo")).toBeInstanceOf(GenericType);
     expect(lookup("foo")).not.toBeInstanceOf(AdapterType);
+  });
+});
+
+describe("ActiveRecord::Type.lookup", () => {
+  it("does not register :value — Type.default_value is not a registry entry", () => {
+    expect(() => lookup("value", { adapter: "sqlite3" })).toThrow("Unknown type :value");
+    expect(defaultValue()).toBeInstanceOf(ValueType);
   });
 });
 

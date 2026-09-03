@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Types } from "../index.js";
+import { Types, defaultValue } from "../index.js";
 import { TypeRegistry } from "./registry.js";
 
 describe("TypeRegistry", () => {
@@ -19,6 +19,11 @@ describe("TypeRegistry", () => {
     expect(Types.typeRegistry.lookup("date")).toBeInstanceOf(Types.DateType);
     expect(Types.typeRegistry.lookup("datetime")).toBeInstanceOf(Types.DateTimeType);
     expect(Types.typeRegistry.lookup("decimal")).toBeInstanceOf(Types.DecimalType);
+  });
+
+  it(":value is not a registered name — Type.default_value is not a registry entry", () => {
+    expect(() => Types.typeRegistry.lookup("value")).toThrow("Unknown type :value");
+    expect(defaultValue()).toBeInstanceOf(Types.ValueType);
   });
 
   it("a reasonable error is given when no type is found", () => {
