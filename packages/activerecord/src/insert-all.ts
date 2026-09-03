@@ -471,6 +471,11 @@ export class Builder implements InsertBuilder {
   }
 
   /** @internal */
+  private columnsList(): string {
+    return this.formatColumns(this._insertAll.keysIncludingTimestamps());
+  }
+
+  /** @internal */
   private extractTypesFromColumnsOn(tableName: string, keys: string[]): Record<string, Type> {
     const columns = this._insertAll.schemaCacheColumnsHash(tableName);
 
@@ -482,11 +487,6 @@ export class Builder implements InsertBuilder {
     const types: Record<string, Type> = {};
     for (const key of keys) types[key] = this.model.typeForAttribute(key);
     return types;
-  }
-
-  /** @internal */
-  private columnsList(): string {
-    return this.formatColumns(this._insertAll.keysIncludingTimestamps());
   }
 
   /** @internal */
