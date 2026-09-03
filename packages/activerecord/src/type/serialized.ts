@@ -1,11 +1,11 @@
 import { Type, ValueType, BinaryData } from "@blazetrails/activemodel";
-import { HashWithIndifferentAccess, deepStringifyKeys } from "@blazetrails/activesupport";
+import { Hash } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 
 /** @internal */
 function isValueComparable(value: unknown): boolean {
   if (Array.isArray(value)) return true;
-  if (value instanceof HashWithIndifferentAccess) return true;
+  if (value instanceof Hash) return true;
   if (value !== null && typeof value === "object") {
     const proto = Object.getPrototypeOf(value);
     return proto === Object.prototype || proto === null;
@@ -39,8 +39,8 @@ function unwrapHash(value: unknown): unknown {
     typeof (value as { toHash?: unknown }).toHash === "function"
   ) {
     value = (value as { toHash(): unknown }).toHash();
-    if (value instanceof Map) value = deepStringifyKeys(value);
   }
+  if (value instanceof Hash) value = Object.fromEntries(value as Hash<string, unknown>);
   return value;
 }
 

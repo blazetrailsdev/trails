@@ -1,4 +1,8 @@
-import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import {
+  ActiveSupportJSON,
+  isPresent,
+  type HashWithIndifferentAccess,
+} from "@blazetrails/activesupport";
 import { Base } from "../../../base.js";
 import { YAMLColumn } from "../../../coders/yaml-column.js";
 
@@ -10,12 +14,13 @@ class Coder {
   }
 
   dump(o: unknown): string {
-    return JSON.stringify(o ?? this.#default);
+    return ActiveSupportJSON.encode(o != null && o !== false ? o : this.#default);
   }
 
   load(s: string | null | undefined): Record<string, unknown> {
-    if (!s) return { ...this.#default };
-    return JSON.parse(s);
+    return isPresent(s)
+      ? (ActiveSupportJSON.decode(s as string) as Record<string, unknown>)
+      : { ...this.#default };
   }
 }
 

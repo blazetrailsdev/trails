@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
+import { Hash } from "@blazetrails/ruby-compat";
 
 describe("HashWithIndifferentAccess", () => {
   it("dig with array", () => {
@@ -43,5 +44,15 @@ describe("HashWithIndifferentAccess", () => {
     h.setDefault(0);
     expect(h.symbolizeKeys().default()).toBe(0);
     expect(h.deepSymbolizeKeys().default()).toBe(0);
+  });
+  it("to_h does not convert nested values the way to_hash does", () => {
+    const h = new HashWithIndifferentAccess<unknown>({ a: { b: 1 } });
+    h.setDefault(0);
+    const toH = h.toH();
+    expect(toH).toBeInstanceOf(Hash);
+    expect(toH).not.toBeInstanceOf(HashWithIndifferentAccess);
+    expect(toH.get("a")).toBeInstanceOf(HashWithIndifferentAccess);
+    expect(toH.default()).toBe(0);
+    expect(h.toHash().get("a")).not.toBeInstanceOf(HashWithIndifferentAccess);
   });
 });

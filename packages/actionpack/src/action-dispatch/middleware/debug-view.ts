@@ -14,7 +14,6 @@
  */
 
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
-import { deepStringifyKeys } from "@blazetrails/activesupport";
 
 const TEMPLATES_URL = new URL("./templates", import.meta.url).href;
 
@@ -59,31 +58,30 @@ export class DebugView {
   }
 
   /**
-   * `debug_hash` (debug_view.rb:44-46) sorts `object.to_hash` and inspects each
-   * value. `HashWithIndifferentAccess#toHash` answers
-   * `@blazetrails/ruby-compat`'s `Hash`, so `deep_stringify_keys`
-   * (core_ext/hash/keys.rb:82-84) spells the tree the way `inspect` renders a
-   * Ruby Hash.
+   * Mirrors `debug_hash` (debug_view.rb:44-46) — `object.to_hash` sorted by
+   * `k.to_s` and each value inspected, `$!.message` when `inspect` raises.
+   * `HashWithIndifferentAccess#toHash` answers a `@blazetrails/ruby-compat`
+   * `Hash`, so the entries are read as a Ruby Hash's are.
    */
   debugHash(object: { toHash?: () => unknown } | Record<string, unknown>): string {
-    const converted =
+    const hash =
       typeof (object as { toHash?: () => unknown }).toHash === "function"
         ? (object as { toHash: () => unknown }).toHash()
         : object;
-    const hash = (converted instanceof Map ? deepStringifyKeys(converted) : converted) as Record<
-      string,
-      unknown
-    >;
-    const keys = Object.keys(hash).sort();
-    return keys
-      .map((k) => {
+    const entries =
+      hash instanceof Map
+        ? [...(hash as Map<unknown, unknown>)]
+        : Object.entries(hash as Record<string, unknown>);
+    return entries
+      .sort(([a], [b]) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0))
+      .map(([k, v]) => {
         let valueInspected: string;
         try {
-          valueInspected = inspect(hash[k]);
+          valueInspected = inspect(v);
         } catch (e) {
           valueInspected = (e as Error).message;
         }
-        return `${k}: ${valueInspected}`;
+        return `${String(k)}: ${valueInspected}`;
       })
       .join("\n");
   }

@@ -2,7 +2,7 @@ import { ConfigurationError } from "./errors.js";
 import type { Base } from "./base.js";
 import {
   HashWithIndifferentAccess,
-  deepStringifyKeys,
+  isPlainObject,
   withIndifferentAccess,
 } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
@@ -294,15 +294,11 @@ export function writeStoreAttribute(
 }
 
 /** @internal */
-function asRegularHash(obj: unknown): Record<string, unknown> {
-  if (obj == null) return {};
-  if (obj instanceof HashWithIndifferentAccess)
-    return deepStringifyKeys(obj.toHash()) as Record<string, unknown>;
-  if (typeof obj !== "object" || Array.isArray(obj)) return {};
-  const proto = Object.getPrototypeOf(obj);
-  return proto === Object.prototype || proto === null
-    ? { ...(obj as Record<string, unknown>) }
-    : {};
+function asRegularHash(obj: unknown): unknown {
+  if (typeof (obj as { toHash?: unknown } | null | undefined)?.toHash === "function") {
+    return (obj as { toHash(): unknown }).toHash();
+  }
+  return isPlainObject(obj) ? obj : {};
 }
 
 export function asIndifferentHash(obj: unknown): HashWithIndifferentAccess<unknown> {
