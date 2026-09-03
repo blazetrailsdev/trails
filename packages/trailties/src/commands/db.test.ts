@@ -1017,12 +1017,6 @@ describe("schema dump and load", () => {
   });
 });
 
-// Every case here shells the real CLI against an on-disk sqlite file in a
-// tmpdir, so the body is dominated by process + fsync latency rather than
-// compute. That is fine locally (slowest case ~230ms) and false-negatives on a
-// contended CI runner, where one case stalled past the 5s vitest default
-// (run 33745572737). Suite-level bump, matching activerecord-cli's
-// trails-models-dump.test.ts:110.
 describe("db subcommand CLI actions", { timeout: 30_000 }, () => {
   let tmpDir: string;
   let originalCwd: string;
