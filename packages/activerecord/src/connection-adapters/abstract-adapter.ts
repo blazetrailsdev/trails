@@ -670,7 +670,6 @@ export interface AbstractAdapter {
     kwargs?: { allowRetry?: boolean },
   ): Promise<Record<string, unknown>[]>;
   executeMutation(sql: string, binds?: unknown[], name?: string): Promise<number>;
-  beginTransaction(): Promise<void>;
   currentTransaction(): Transaction | NullTransaction;
   dirtyCurrentTransaction(): void;
   withinNewTransaction<T>(
@@ -1095,7 +1094,7 @@ export class AbstractAdapter implements Quoting {
     if (this._statements) {
       return this.lock.synchronize(() => {
         if (newConnection) {
-          this._statements!.reset();
+          return this._statements!.reset();
         } else {
           return this._statements!.clear();
         }
@@ -1310,6 +1309,12 @@ export class AbstractAdapter implements Quoting {
 
   get transactionManager(): TransactionManager {
     return this._transactionManager;
+  }
+
+  async beginTransaction(
+    options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
+  ): Promise<void> {
+    await this._transactionManager.beginTransaction(options);
   }
 
   async rollbackTransaction(): Promise<void> {

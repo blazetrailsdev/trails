@@ -1471,6 +1471,7 @@ export function parseTableOptions(
 export interface MysqlPreparedStatement {
   sql: string;
   key: string;
+  close(): void | Promise<void>;
 }
 
 export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatement> {
@@ -1478,6 +1479,11 @@ export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatemen
 
   nextKey(): string {
     return `a${++this._counter}`;
+  }
+
+  /** @internal */
+  protected override dealloc(stmt: MysqlPreparedStatement): void | Promise<void> {
+    return stmt.close();
   }
 }
 
