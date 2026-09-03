@@ -334,7 +334,8 @@ describe("body call capture", () => {
     // `lookup_cast_type_from_join_dependencies`), so the brand must not push
     // the body ahead of the call the way a value argument would.
     const branded = extractFromSource(
-      `class Foo {
+      `import { block, fetch } from "@blazetrails/ruby-compat";
+      class Foo {
         castType(name) {
           return fetch(this.attributeTypes(), name, block(() => this.lookupFromJoins(name)));
         }
@@ -345,6 +346,22 @@ describe("body call capture", () => {
       "fetch",
       "block",
       "lookupFromJoins",
+    ]);
+
+    // The brand is resolved through the file's imports, so a same-named local
+    // helper stays an ordinary value argument — evaluated, and recorded, first.
+    const impostor = extractFromSource(
+      `class Foo {
+        castType(name) {
+          return fetch(this.attributeTypes(), name, block(() => this.lookupFromJoins(name)));
+        }
+      }`,
+    );
+    expect(impostor.instanceMethods.find((m) => m.name === "castType")!.callSeq).toEqual([
+      "attributeTypes",
+      "block",
+      "lookupFromJoins",
+      "fetch",
     ]);
 
     const bare = extractFromSource(

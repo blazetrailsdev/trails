@@ -4380,17 +4380,13 @@ function describeObjectLiteral(node: ts.ObjectLiteralExpression, flags: string[]
  * The port's spelling of a Ruby block: an inline callback argument, bare or
  * wrapped in `@blazetrails/ruby-compat`'s `block(...)` brand — the one shape a
  * `Hash#fetch` / `Hash#dig` port can pass its `do … end` in, since the brand is
- * how the arm is dispatched at runtime.
+ * how the arm is dispatched at runtime. {@link isMarkedBlockArg} resolves the
+ * brand through the file's imports, so a same-named local cannot impersonate it
+ * and defer a value argument that Ruby evaluates before the call.
  */
 function isFunctionArgument(node: ts.Node): boolean {
   if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return true;
-  return (
-    ts.isCallExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    node.expression.text === "block" &&
-    node.arguments.length === 1 &&
-    isFunctionArgument(node.arguments[0])
-  );
+  return ts.isExpression(node) && isMarkedBlockArg(node);
 }
 
 function collectCalls(
