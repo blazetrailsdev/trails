@@ -14,16 +14,16 @@ export class Topic extends Model {
   declare static defineAttributeMethod: OmitThisParameter<
     (typeof AttributeMethodsClassMethods)["defineAttributeMethod"]
   >;
+  declare numberToCurrency: typeof NumberHelper.numberToCurrency;
   declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
 
   static {
     include(this, ValidationsCallbacks);
     include(this, AttributeMethods);
+    include(this, NumberHelper);
 
     this.attributeMethodSuffix("BeforeTypeCast", { parameters: false });
     this.defineAttributeMethod("price");
-
-    this.afterValidation(":performAfterValidation");
   }
 
   static _validatesDefaultKeys(): string[] {
@@ -90,6 +90,10 @@ export class Topic extends Model {
     this._price = value;
   }
 
+  static {
+    this.afterValidation(":performAfterValidation");
+  }
+
   conditionIsTrue(): boolean {
     return true;
   }
@@ -112,7 +116,7 @@ export class Topic extends Model {
   }
 
   get price(): unknown {
-    return NumberHelper.numberToCurrency(this._price);
+    return this.numberToCurrency(this._price);
   }
 
   get rawPrice(): unknown {
