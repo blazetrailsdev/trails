@@ -6,7 +6,6 @@ import {
   RuntimeError,
   TypeError,
 } from "@blazetrails/ruby-compat";
-import type { AttributeMethod } from "./attribute-methods.js";
 import { UnknownAttributeError } from "./errors.js";
 
 export function assignAttributes(this: AttributeAssignment, newAttributes: unknown): void {
@@ -68,9 +67,8 @@ export function _assignAttribute(
       const result: unknown = method.call(this, v);
       return result instanceof Promise ? (result as Promise<void>) : undefined;
     }
-    const match = this.matchedAttributeMethod?.(setter);
-    if (match) {
-      this.attributeMissing!(match, v);
+    if (this.methodMissing) {
+      this.methodMissing(setter, v);
       return;
     }
     throw new NoMethodError(
@@ -114,8 +112,7 @@ export interface AttributeAssignment {
   _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
   /** @internal */
   _assignAttribute(k: string, v: unknown): Promise<void> | void;
-  matchedAttributeMethod?(methodName: string): AttributeMethod | null;
-  attributeMissing?(match: AttributeMethod, ...args: unknown[]): unknown;
+  methodMissing?(method: string, ...args: unknown[]): unknown;
 }
 
 /**

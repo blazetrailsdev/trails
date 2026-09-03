@@ -14,6 +14,7 @@ import {
 import { NoMethodError } from "./attribute-assignment.js";
 
 export interface AttributeMethods {
+  methodMissing(method: string, ...args: unknown[]): unknown;
   attributeMissing(match: AttributeMethod, ...args: unknown[]): unknown;
   respondTo(method: string): boolean;
 }
@@ -448,6 +449,21 @@ export const ClassMethods = {
 };
 
 export const InstanceMethods = {
+  /** @missingRailsCall super — PERMANENT */
+  methodMissing(this: InstanceMethodsHost, method: string, ...args: unknown[]): unknown {
+    if (this.isRespondToWithoutAttributes(method)) {
+      throw new NoMethodError(
+        `undefined method '${method}' for an instance of ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+      );
+    } else {
+      const match = this.matchedAttributeMethod(method);
+      if (match) return this.attributeMissing(match, ...args);
+      throw new NoMethodError(
+        `undefined method '${method}' for an instance of ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+      );
+    }
+  },
+
   attributeMissing(
     this: Record<string, unknown>,
     match: AttributeMethod,
@@ -505,11 +521,7 @@ export const InstanceMethods = {
   /** @internal */
   _readAttribute(this: InstanceMethodsHost, attr: string): unknown {
     if (!this.isRespondToWithoutAttributes(attr)) {
-      const match = this.matchedAttributeMethod(attr);
-      if (match) return this.attributeMissing(match);
-      throw new NoMethodError(
-        `undefined method '${attr}' for an instance of ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-      );
+      return this.methodMissing(attr);
     }
     return (this as unknown as Record<string, unknown>)[attr];
   },
@@ -588,6 +600,20 @@ function isDefinedByAClassBody(klass: unknown, name: string): boolean {
     return Object.prototype.hasOwnProperty.call(link, "constructor");
   }
   return false;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function completeHalfAccessor(
+  klass: unknown,
+  name: string,
+  half: "get" | "set",
+  fn: (this: never, ...args: never[]) => unknown,
+): void {
+  const proto = (klass as { prototype?: object }).prototype;
+  if (proto == null) return;
+  const desc = Object.getOwnPropertyDescriptor(proto, name);
+  if (desc == null || "value" in desc || desc[half] != null) return;
+  Object.defineProperty(proto, name, { ...desc, [half]: fn, configurable: true });
 }
 
 /** @noRailsEquivalent PERMANENT */

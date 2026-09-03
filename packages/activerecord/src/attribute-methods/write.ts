@@ -4,9 +4,9 @@ import {
   MissingAttributeError,
   AttrNames,
   AttributeMethods,
+  completeHalfAccessor,
 } from "@blazetrails/activemodel";
 import { included, type CodeGenerator } from "@blazetrails/activesupport";
-import { completeHalfAccessor } from "./read.js";
 
 export interface Write {
   writeAttribute(name: string, value: unknown): void;
