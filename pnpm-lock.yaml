@@ -552,6 +552,9 @@ importers:
       '@blazetrails/rack-session':
         specifier: workspace:*
         version: link:../../packages/rack-session
+      '@blazetrails/rack-test':
+        specifier: workspace:*
+        version: link:../../packages/rack-test
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../../packages/ruby-compat
