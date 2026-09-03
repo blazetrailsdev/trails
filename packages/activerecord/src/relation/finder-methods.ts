@@ -610,8 +610,8 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   let relation = Array.isArray(pk)
     ? whereCompositePrimaryKeyIn(this, pk, ids)
     : (this as any).where({ [pk]: ids });
-  if ((this as any).selectValues.length > 0 && !Array.isArray(pk)) {
-    relation = relation.select(this.table.get(pk));
+  if ((this as any).selectValues.length > 0) {
+    relation = relation.select(this.table.get(pk as string));
   }
   const records = await relation.toArray();
 
@@ -648,7 +648,7 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   relation = Array.isArray(pk)
     ? whereCompositePrimaryKeyIn(relation, pk, ids)
     : relation.where({ [this.model.primaryKey as string]: ids });
-  if ((this as any).selectValues.length > 0 && !Array.isArray(pk)) {
+  if ((this as any).selectValues.length > 0) {
     relation = relation.select(this.table.get(this.model.primaryKey as string));
   }
   const result: any[] = await relation.records();
