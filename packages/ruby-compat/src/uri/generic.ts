@@ -308,7 +308,13 @@ export class Generic {
     v = v.replace(/[\t\r\n]/g, "");
     const invalid = /(%[^0-9a-fA-F][^0-9a-fA-F])/.exec(v);
     if (invalid) throw new InvalidURIError(`invalid percent escape: ${invalid[1]}`);
-    this._query = v.replace(/(?!%[0-9a-fA-F]{2}|[!$-&(-;=?-_a-~])[\s\S]/g, percentEncode);
+    this._query = v.replace(/(?!%[0-9a-fA-F]{2}|[!$-&(-;=?-_a-~])[\s\S]/g, (c) => {
+      let out = "";
+      for (const byte of b(c)) {
+        out += `%${byte.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`;
+      }
+      return out;
+    });
   }
 
   /** `set_opaque` (`vendor/ruby/lib/uri/generic.rb:898`). */
@@ -324,7 +330,13 @@ export class Generic {
     }
 
     v = v.replace(/[\t\r\n]/g, "");
-    this._fragment = v.replace(/(?!%[0-9a-fA-F]{2}|[!-~])[\s\S]/g, percentEncode);
+    this._fragment = v.replace(/(?!%[0-9a-fA-F]{2}|[!-~])[\s\S]/g, (c) => {
+      let out = "";
+      for (const byte of b(c)) {
+        out += `%${byte.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`;
+      }
+      return out;
+    });
   }
 
   /**
@@ -482,15 +494,4 @@ export class Generic {
     }
     return str;
   }
-}
-
-/** The `'%%%02X' % $&.ord` of `query=` and `fragment=`
- *  (`vendor/ruby/lib/uri/generic.rb:864,955`), over the character's UTF-8
- *  bytes — Ruby escapes a byte at a time, having forced ASCII-8BIT first. */
-function percentEncode(c: string): string {
-  let out = "";
-  for (const byte of b(c)) {
-    out += `%${byte.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`;
-  }
-  return out;
 }
