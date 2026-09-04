@@ -1,8 +1,8 @@
 import { Request } from "../http/request.js";
-import { Response } from "../http/response.js";
-import { TestSession } from "../../action-controller/test-case.js";
-import { Parameters } from "../../action-controller/metal/strong-parameters.js";
-import { CookieJar } from "../middleware/cookies.js";
+import { Headers } from "../http/headers.js";
+import { MimeType } from "../http/mime-type.js";
+import { isPresent } from "@blazetrails/activesupport";
+import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { Metal } from "../../action-controller/metal.js";
@@ -22,16 +22,13 @@ import * as urlForMod from "../routing/url-for.js";
 import * as polymorphicRoutes from "../routing/polymorphic-routes.js";
 import type { UrlForRoutes } from "../routing/url-for.js";
 import { RequestEncoder } from "./request-encoder.js";
-import { buildNestedQuery } from "@blazetrails/rack";
+import { Session as RackTestSession, type CookieJar } from "@blazetrails/rack-test";
+import type { RackApp } from "@blazetrails/rack";
 import type { UploadedFile } from "../http/upload.js";
-
-type ControllerClass = new () => Metal;
 
 export interface IntegrationRequestOptions {
   params?: Record<string, unknown>;
   headers?: Record<string, string>;
-  body?: string;
-  format?: string;
   xhr?: boolean;
   env?: Record<string, unknown>;
   as?: string;
@@ -61,6 +58,7 @@ function splitHostPort(host: string): [string, string | undefined] {
   const idx = host.indexOf(":");
   return idx === -1 ? [host, undefined] : [host.slice(0, idx), host.slice(idx + 1)];
 }
+
 const DEFAULT_REMOTE_ADDR = "127.0.0.1";
 const DEFAULT_ACCEPT =
   "text/xml,application/xml,application/xhtml+xml," +
@@ -69,8 +67,6 @@ const DEFAULT_ACCEPT =
 
 export class IntegrationTest {
   routes: RouteSet = new RouteSet();
-
-  private controllers: Map<string, ControllerClass> = new Map();
 
   session: Record<string, unknown> = {};
 
@@ -173,15 +169,92 @@ export class IntegrationTest {
     path: string,
     options: IntegrationRequestOptions = {},
   ): Promise<number> {
-    let expanded = path;
-    if (ABSOLUTE_URL_RE.test(path)) {
-      expanded = this.buildExpandedPath(path, (loc) => {
-        this.httpsBang(loc.protocol === "https:");
-        if (loc.host) this.host = loc.host;
+    const requestEncoder = RequestEncoder.encoder(options.as);
+    const headers: Record<string, string> = { ...(options.headers ?? {}) };
+    const params = options.params;
+
+    if (method === "GET" && options.as === "json" && params != null) {
+      headers["X-Http-Method-Override"] = "GET";
+      method = "POST";
+    }
+
+    if (path.includes("://")) {
+      path = this.buildExpandedPath(path, (location) => {
+        this.httpsBang(location.protocol === "https:");
+        if (location.host) this.host = location.host;
       });
     }
-    await this._processPath(method.toUpperCase(), expanded, options);
-    return this.status;
+
+    const [hostname, port] = splitHostPort(this.host);
+
+    const requestEnv: Record<string, unknown> = {
+      ":method": method,
+      ":params": requestEncoder.encodeParams(params),
+
+      SERVER_NAME: hostname,
+      SERVER_PORT: port ?? (this._https ? "443" : "80"),
+      HTTPS: this._https ? "on" : "off",
+      "rack.url_scheme": this._https ? "https" : "http",
+
+      REQUEST_URI: path,
+      HTTP_HOST: this.host,
+      REMOTE_ADDR: this.remoteAddr,
+      HTTP_ACCEPT: requestEncoder.acceptHeader ?? this.accept,
+    };
+
+    if (requestEncoder.contentType) {
+      requestEnv["CONTENT_TYPE"] = requestEncoder.contentType;
+    }
+
+    const wrappedHeaders = Headers.fromHash({});
+    wrappedHeaders.mergeBang(headers);
+
+    if (options.xhr) {
+      wrappedHeaders.set("HTTP_X_REQUESTED_WITH", "XMLHttpRequest");
+      if (wrappedHeaders.get("HTTP_ACCEPT") == null) {
+        wrappedHeaders.set(
+          "HTTP_ACCEPT",
+          [
+            MimeType.lookup("js").toString(),
+            MimeType.lookup("html").toString(),
+            MimeType.lookup("xml").toString(),
+            "text/xml",
+            "*/*",
+          ].join(", "),
+        );
+      }
+    }
+
+    if (isPresent(wrappedHeaders.env)) {
+      Headers.fromHash(requestEnv).mergeBang(wrappedHeaders.env);
+    }
+    if (isPresent(options.env)) {
+      Headers.fromHash(requestEnv).mergeBang(options.env!);
+    }
+
+    const session = RackTestSession.new(this._mockSession);
+
+    let uri = this.buildFullUri(path, requestEnv);
+
+    if (method === "GET" && typeof requestEnv[":params"] === "string") {
+      uri += `?${requestEnv[":params"]}`;
+      delete requestEnv[":params"];
+    }
+
+    await session.request(uri, requestEnv);
+
+    this.requestCount += 1;
+    this.request = new Request(session.lastRequest().env);
+    const response = this._mockSession.lastResponse();
+    this.response = TestResponse.fromResponse(response);
+    this.response.request = this.request;
+    this._htmlDocument?.dispose();
+    this._htmlDocument = undefined;
+    this._urlOptions = undefined;
+
+    this.controller = this.request.controllerInstance as Metal;
+
+    return response.status;
   }
 
   async followRedirectBang(options: IntegrationRequestOptions = {}): Promise<number> {
@@ -213,13 +286,13 @@ export class IntegrationTest {
     return this.status;
   }
 
-  private _mockSessionMemo?: MockSession;
+  private _mockSessionMemo?: RackTestSession;
 
   controller!: Metal;
 
   request!: Request;
 
-  response!: Response;
+  response!: TestResponse;
 
   get status(): number {
     return this.response?.statusCode ?? this.controller?.status ?? 0;
@@ -263,13 +336,9 @@ export class IntegrationTest {
   }
 
   /** @internal */
-  get _mockSession(): MockSession {
-    this._mockSessionMemo ??= new MockSession(this.app, this.host);
+  get _mockSession(): RackTestSession {
+    this._mockSessionMemo ??= new RackTestSession(this.app as RackApp, this.host);
     return this._mockSessionMemo;
-  }
-
-  registerController(name: string, klass: ControllerClass): void {
-    this.controllers.set(name, klass);
   }
 
   async get(path: string, options: IntegrationRequestOptions = {}): Promise<void> {
@@ -317,7 +386,6 @@ export class IntegrationTest {
     const Ctor = this.constructor as new () => IntegrationTest;
     const sess = new Ctor();
     sess.routes = this.routes;
-    sess.controllers = this.controllers;
     sess._app = app ?? this._app;
     return sess;
   }
@@ -571,197 +639,6 @@ export class IntegrationTest {
   reset(): void {
     this.resetBang();
   }
-
-  private async _processPath(
-    method: string,
-    path: string,
-    options: IntegrationRequestOptions,
-  ): Promise<void> {
-    this.requestCount += 1;
-    this._urlOptions = undefined;
-    this._htmlDocument?.dispose();
-    this._htmlDocument = undefined;
-
-    const qIdx = path.indexOf("?");
-    const pathInfo = qIdx >= 0 ? path.slice(0, qIdx) : path;
-    let queryString = qIdx >= 0 ? path.slice(qIdx + 1) : "";
-    if (options.params && (method === "GET" || method === "HEAD")) {
-      const extra = buildNestedQuery(options.params);
-      if (extra) queryString = queryString ? `${queryString}&${extra}` : extra;
-    }
-    const matched = this.routes.recognize(method, pathInfo);
-    if (!matched) {
-      const [noRouteHostname, noRoutePort] = splitHostPort(this.host);
-      const noRouteEnv: Record<string, unknown> = {
-        REQUEST_METHOD: method,
-        PATH_INFO: pathInfo,
-        QUERY_STRING: queryString,
-        HTTP_HOST: this.host,
-        SERVER_NAME: noRouteHostname,
-        SERVER_PORT: noRoutePort ?? (this._https ? "443" : "80"),
-        HTTPS: this._https ? "on" : "off",
-        "rack.url_scheme": this._https ? "https" : "http",
-        REMOTE_ADDR: this.remoteAddr,
-        HTTP_ACCEPT: this.accept,
-        ...(options.env ?? {}),
-      };
-      const noRouteCookieHeader = this._mockSession.httpCookie();
-      if (noRouteCookieHeader !== undefined) {
-        noRouteEnv.HTTP_COOKIE = noRouteCookieHeader;
-      }
-      if (options.headers) {
-        for (const [name, value] of Object.entries(options.headers)) {
-          const envKey = name.startsWith("HTTP_")
-            ? name
-            : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
-          noRouteEnv[envKey] = value;
-        }
-      }
-      if (options.body) {
-        noRouteEnv["rack.input"] = options.body;
-      }
-      noRouteEnv.REQUEST_URI = this.buildFullUri(
-        (noRouteEnv.PATH_INFO as string) +
-          (noRouteEnv.QUERY_STRING ? `?${noRouteEnv.QUERY_STRING as string}` : ""),
-        noRouteEnv,
-      );
-      this.request = new Request(noRouteEnv);
-      this.response = new Response();
-      this.response.status = 404;
-      this.response.body = `No route matches [${method}] "${pathInfo}"`;
-      this.controller = undefined!;
-      return;
-    }
-
-    const { route, params } = matched;
-    const controllerName = route.controller;
-    const action = route.action;
-
-    const ControllerClass = this.controllers.get(controllerName);
-    if (!ControllerClass) {
-      throw new Error(
-        `No controller registered for "${controllerName}". ` +
-          `Call registerController("${controllerName}", YourController) first.`,
-      );
-    }
-
-    const sessionSeed = { ...this.session };
-    const [hostname, port] = splitHostPort(this.host);
-    const env: Record<string, unknown> = {
-      REQUEST_METHOD: method,
-      PATH_INFO: pathInfo,
-      QUERY_STRING: queryString,
-      HTTP_HOST: this.host,
-      SERVER_NAME: hostname,
-      SERVER_PORT: port ?? (this._https ? "443" : "80"),
-      HTTPS: this._https ? "on" : "off",
-      "rack.url_scheme": this._https ? "https" : "http",
-      REMOTE_ADDR: this.remoteAddr,
-      HTTP_ACCEPT: this.accept,
-      "rack.session": new TestSession(sessionSeed),
-      "action_dispatch.request.path_parameters": {
-        controller: controllerName,
-        action,
-        ...params,
-      },
-      ...(options.env ?? {}),
-    };
-    const finalPath =
-      (env.PATH_INFO as string) + (env.QUERY_STRING ? `?${env.QUERY_STRING as string}` : "");
-    env.REQUEST_URI = this.buildFullUri(finalPath, env);
-
-    const cookieHeader = this._mockSession.httpCookie();
-    if (cookieHeader !== undefined) {
-      env.HTTP_COOKIE = cookieHeader;
-    }
-
-    if (options.format || options.as) {
-      const fmt = options.format ?? options.as;
-      env.HTTP_ACCEPT = formatToMime(fmt!);
-      if (fmt === "json" && (method === "POST" || method === "PUT" || method === "PATCH")) {
-        env.CONTENT_TYPE = "application/json";
-      }
-    }
-
-    if (options.xhr) {
-      env.HTTP_X_REQUESTED_WITH = "XMLHttpRequest";
-    }
-
-    if (options.headers) {
-      for (const [name, value] of Object.entries(options.headers)) {
-        const envKey = name.startsWith("HTTP_")
-          ? name
-          : "HTTP_" + name.toUpperCase().replace(/-/g, "_");
-        env[envKey] = value;
-      }
-    }
-
-    if (options.body) {
-      env["rack.input"] = options.body;
-    } else if (options.params && options.as === "json" && method !== "GET" && method !== "HEAD") {
-      env["rack.input"] = JSON.stringify(options.params);
-    }
-
-    this.request = new Request(env);
-    this.response = new Response();
-
-    const allParams: Record<string, unknown> = { ...params };
-    if (env.QUERY_STRING) {
-      Object.assign(allParams, this.request.queryParameters);
-    }
-    if (options.params) {
-      Object.assign(allParams, options.params);
-    }
-    (this.request as any).parameters = new Parameters(
-      Object.fromEntries(Object.entries(allParams).map(([k, v]) => [k, v])),
-    );
-
-    this.controller = new ControllerClass();
-
-    await this.controller.dispatch(action, this.request, this.response);
-
-    const committed = (env["rack.session"] as TestSession).toHash();
-    for (const key of Object.keys(sessionSeed)) {
-      if (!(key in committed)) delete this.session[key];
-    }
-    Object.assign(this.session, committed);
-
-    const cookieJar = this._mockSession.cookieJar;
-    const setCookies = this.response.getHeader("set-cookie");
-    if (setCookies) {
-      for (const cookie of setCookies.split(",")) {
-        const parts = cookie.trim().split(";")[0];
-        const eqIdx = parts.indexOf("=");
-        if (eqIdx > 0) {
-          const name = parts.slice(0, eqIdx).trim();
-          const value = parts.slice(eqIdx + 1).trim();
-          cookieJar.set(name, value);
-        }
-      }
-    }
-
-    cookieJar._request = this.request as unknown as CookieJar["_request"];
-
-    const updatedCookieHeader = this._mockSession.httpCookie();
-    if (updatedCookieHeader !== undefined) {
-      this.request.env.HTTP_COOKIE = updatedCookieHeader;
-    }
-  }
-}
-
-class MockSession {
-  readonly cookieJar: CookieJar = CookieJar.build(undefined, {});
-
-  constructor(
-    readonly app: unknown,
-    readonly host: string,
-  ) {}
-
-  httpCookie(): string | undefined {
-    const entries = Object.entries(this.cookieJar.toHash());
-    if (entries.length === 0) return undefined;
-    return entries.map(([k, v]) => `${k}=${v}`).join("; ");
-  }
 }
 
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
@@ -786,17 +663,3 @@ proto.polymorphicPathForAction = polymorphicRoutes.polymorphicPathForAction;
 proto.polymorphicMapping = polymorphicRoutes.polymorphicMapping;
 proto.parameterize = responseAssertions.parameterize;
 proto.normalizeArgumentToRedirection = responseAssertions.normalizeArgumentToRedirection;
-
-function formatToMime(format: string): string {
-  const MIMES: Record<string, string> = {
-    json: "application/json",
-    xml: "application/xml",
-    html: "text/html",
-    text: "text/plain",
-    js: "text/javascript",
-    css: "text/css",
-    csv: "text/csv",
-    any: "*/*",
-  };
-  return MIMES[format] ?? format;
-}

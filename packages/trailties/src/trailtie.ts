@@ -21,7 +21,7 @@ export class Trailtie extends Initializable {
   }
 
   /** @internal */
-  private static readonly _registry: Array<typeof Trailtie> = [];
+  static readonly _registry: Array<typeof Trailtie> = [];
 
   protected _config?: Configuration;
 
@@ -160,4 +160,20 @@ function eachRegisteredBlock(
     for (const block of klass.registeredBlocksFor(kind)) fn(block);
     klass = Object.getPrototypeOf(klass) as typeof Trailtie | null;
   }
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function resetTrailtieRegistry(): () => void {
+  const registry = [...Trailtie._registry];
+  const toPrepareBlocks = [...Configuration._toPrepareBlocks];
+  const options = { ...Configuration._options };
+
+  return () => {
+    Trailtie._registry.length = 0;
+    Trailtie._registry.push(...registry);
+    Configuration._toPrepareBlocks.length = 0;
+    Configuration._toPrepareBlocks.push(...toPrepareBlocks);
+    for (const key of Object.keys(Configuration._options)) delete Configuration._options[key];
+    Object.assign(Configuration._options, options);
+  };
 }

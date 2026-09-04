@@ -3,6 +3,20 @@ import { ContentSecurityPolicy, MAPPINGS } from "../content-security-policy.js";
 import { IntegrationTest } from "../testing/integration.js";
 import { Base } from "../../action-controller/base.js";
 import type { AbstractController } from "../../abstract-controller/base.js";
+import type { RackApp, RackEnv } from "@blazetrails/rack";
+import type { RouteSet } from "../routing/route-set.js";
+import { controllerConstants } from "../http/request.js";
+import { Cookies, COOKIES_APP_OPTIONS_KEY } from "../middleware/cookies.js";
+import { CookieStore } from "../middleware/session/cookie-store.js";
+
+function buildApp(routes: RouteSet): RackApp {
+  const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
+  const cookies = new Cookies((e: RackEnv) => store.call(e));
+  return (e: RackEnv) => {
+    e[COOKIES_APP_OPTIONS_KEY] = { secret: "a".repeat(64) };
+    return cookies.call(e);
+  };
+}
 
 describe("ContentSecurityPolicyTest", () => {
   it("build", () => {
@@ -456,7 +470,8 @@ function buildCspApp() {
     r.get("/api", { to: "csp#api" });
     r.get("/not-modified", { to: "csp#notModified" });
   });
-  app.registerController("csp", CspIntegrationController);
+  app.app = buildApp(app.routes);
+  controllerConstants.set("csp", CspIntegrationController);
   return app;
 }
 
@@ -584,6 +599,7 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
       r.get("/redirect", { to: "csp#redirect" });
       r.get("/", { to: "csp#index" });
     });
+    app.app = buildApp(app.routes);
 
     class RedirectController extends Base {
       async redirect() {
@@ -593,7 +609,7 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
         this.head("ok");
       }
     }
-    app.registerController("csp", RedirectController);
+    controllerConstants.set("csp", RedirectController);
 
     await app.get("/redirect", { env: cspEnv(dynamicPolicy) });
     expect(app.response.status).toBe(302);
@@ -614,13 +630,14 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
     app.routes.draw((r) => {
       r.get("/", { to: "csp#index" });
     });
+    app.app = buildApp(app.routes);
 
     class NdController extends Base {
       async index() {
         this.head("ok");
       }
     }
-    app.registerController("csp", NdController);
+    controllerConstants.set("csp", NdController);
 
     await app.get("/", {
       env: cspEnv(policy, {

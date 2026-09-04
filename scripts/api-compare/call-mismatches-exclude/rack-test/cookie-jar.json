@@ -1,0 +1,9 @@
+[
+  {
+    "package": "rack-test",
+    "tsFile": "cookie-jar.ts",
+    "rubyName": "for",
+    "call": "new",
+    "reason": "cookie_jar.rb:200 `buf = String.new`; JS has no mutable String object, so the buffer is a `let buf = \"\"` appended with `+=`."
+  }
+]
