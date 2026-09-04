@@ -11,6 +11,7 @@ import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
 import { Engine } from "./engine.js";
 import { loaded } from "./__fixtures__/loaded.js";
 import { EngineConfiguration } from "./engine/configuration.js";
+import { MiddlewareStackProxy } from "./configuration.js";
 import { Trailtie } from "./trailtie.js";
 import { Trailties } from "./engine/trailties.js";
 
@@ -148,7 +149,7 @@ describe("Engine", () => {
     it("defaults match Rails Engine::Configuration", () => {
       const cfg = new EngineConfiguration();
       expect(cfg.root).toBeNull();
-      expect(cfg.middleware.middlewares).toEqual([]);
+      expect(cfg.middleware).toBeInstanceOf(MiddlewareStackProxy);
       expect(cfg.javascriptPath).toBe("javascript");
       expect(cfg.routeSetClass).toBe(RouteSet);
       expect(cfg.defaultScope).toBeNull();

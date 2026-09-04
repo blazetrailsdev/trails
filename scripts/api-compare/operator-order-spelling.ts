@@ -160,6 +160,10 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // rack-session abstract/id.rb:462 `def [](key)` → abstract/id.ts
   // `SecureSessionHash#get`.
   "Rack::Session::Abstract::PersistedSecure::SecureSessionHash": { "[]": ["get"] },
+  // railties configuration.rb:94 `def +(other)` → trailties configuration.ts
+  // `MiddlewareStackProxy#plus`, the spelling `Relation::WhereClause` already
+  // uses for Ruby `+`.
+  "Rails::Configuration::MiddlewareStackProxy": { "+": ["plus"] },
 };
 
 // `fqn#operator` keys this process has actually resolved. A key that is never

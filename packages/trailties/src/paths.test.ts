@@ -119,4 +119,24 @@ describe("Rails::Paths", () => {
     root.add("bar.rb");
     await expect(root.get("bar.rb")!.existent()).rejects.toThrow(/symlink/);
   });
+
+  test("it is possible to remove a path that should be autoloaded only once", async () => {
+    root.add("app", { with: "/app" });
+    root.get("app")!.autoloadOnceBang();
+    expect(root.get("app")!.isAutoloadOnce()).toBe(true);
+
+    root.get("app")!.skipAutoloadOnceBang();
+    expect(root.get("app")!.isAutoloadOnce()).toBe(false);
+    expect(await root.autoloadOnce()).not.toContain((await root.get("app")!.expanded())[0]);
+  });
+
+  test("it is possible to skip a path from eager loading", async () => {
+    root.add("app", { with: "/app" });
+    root.get("app")!.eagerLoadBang();
+    expect(root.get("app")!.isEagerLoad()).toBe(true);
+
+    root.get("app")!.skipEagerLoadBang();
+    expect(root.get("app")!.isEagerLoad()).toBe(false);
+    expect(await root.eagerLoad()).not.toContain((await root.get("app")!.toA())[0]);
+  });
 });

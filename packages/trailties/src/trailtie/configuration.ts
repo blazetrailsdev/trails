@@ -1,4 +1,5 @@
 import { NoMethodError } from "@blazetrails/ruby-compat";
+import { MiddlewareStackProxy } from "../configuration.js";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
 
@@ -31,6 +32,9 @@ export class Configuration {
 
   /** @internal */
   static readonly _options: Record<string, unknown> = {};
+
+  /** @internal */
+  static _appMiddleware?: MiddlewareStackProxy;
 
   get eagerLoadNamespaces(): unknown[] {
     return Configuration._eagerLoadNamespaces;
@@ -90,8 +94,8 @@ export class Configuration {
     return LIFECYCLE_HOOKS;
   }
 
-  appMiddleware(): undefined {
-    return undefined;
+  appMiddleware(): MiddlewareStackProxy {
+    return (Configuration._appMiddleware ??= new MiddlewareStackProxy());
   }
   appGenerators(): undefined {
     return undefined;

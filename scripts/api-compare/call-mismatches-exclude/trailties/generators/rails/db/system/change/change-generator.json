@@ -2,6 +2,13 @@
   {
     "package": "trailties",
     "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "delete",
+    "reason": "change_generator.rb:127-129 `compose_config[\"services\"].delete(...)` — the receiver is a plain Hash, so the port spells it as the JS `delete` operator on a plain object; the flag is a homonym of the newly-ported `MiddlewareStackProxy#delete` (configuration.rb:70), not a dropped delegation."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
     "rubyName": "edit_dockerfile",
     "call": "gsub_file",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
