@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Encoding } from "./encoding.js";
 import { StringIO } from "./string-io.js";
 
 describe("StringIO", () => {
@@ -59,7 +60,7 @@ describe("StringIO", () => {
     const io = new StringIO(buffer);
 
     expect(io.size).toBe(256);
-    const read = io.read() as string;
+    const read = io.read();
     expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(bytes);
   });
   it("puts writes each argument on its own line, appending a newline only when absent", () => {
@@ -89,5 +90,22 @@ describe("StringIO", () => {
     ary.push(ary);
     io.puts(ary);
     expect(io.string()).toBe("1\n[...]\n");
+  });
+
+  it("set_encoding reads back the bytes write was handed unmodified", () => {
+    const bytes = Array.from({ length: 256 }, (_, i) => i);
+    const io = new StringIO();
+    expect(io.setEncoding(Encoding.BINARY)).toBe(io);
+    io.write(String.fromCharCode(...bytes));
+    io.rewind();
+    expect(Array.from(io.read(), (c) => c.charCodeAt(0))).toEqual(bytes);
+  });
+
+  it("set_encoding accepts an encoding name and raises on an unknown one", () => {
+    const io = new StringIO();
+    expect(io.setEncoding("BINARY")).toBe(io);
+    expect(() => io.setEncoding("no-such-encoding")).toThrow(
+      "unknown encoding name - no-such-encoding",
+    );
   });
 });
