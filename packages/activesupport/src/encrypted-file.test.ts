@@ -86,7 +86,7 @@ describe("EncryptedFileTest", () => {
     await ef.change(async (file) => {
       const stat = await fs.stat!(file);
       assertPredicate(stat, (s) => s.uid === tmpdirStat.uid);
-      expect(stat.mode!.toString(8)).toBe("100600");
+      expect(stat.mode.toString(8)).toBe("100600");
     });
   });
 

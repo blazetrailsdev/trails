@@ -15,6 +15,40 @@ function rbStat(file: IO | string): FsStatResult | null {
 }
 
 /**
+ * `isdirsep` (`vendor/ruby/file.c:3306,3311`) — `'/'` on every platform, and
+ * `FILE_ALT_SEPARATOR` as well where the build defines one (`file.c:3303`).
+ */
+function isdirsep(c: string): boolean {
+  return c === File.SEPARATOR || c === File.ALT_SEPARATOR;
+}
+
+/**
+ * `chompdirsep` (`vendor/ruby/file.c:3484`), which answers the path without
+ * the run of separators that terminates it, and the whole path where none
+ * does.
+ */
+function chompdirsep(path: string): string {
+  let end = path.length;
+  while (end > 0 && isdirsep(path[end - 1])) end--;
+  return path.slice(0, end);
+}
+
+/**
+ * `to_uid` (`vendor/ruby/file.c:2661`), which maps a `nil` owner onto `-1` —
+ * the id `chown(2)` reads as "leave this one unchanged".
+ */
+function toUid(u: number | null): number {
+  if (u == null) return -1;
+  return u;
+}
+
+/** `to_gid` (`vendor/ruby/file.c:2670`), `to_uid`'s group half. */
+function toGid(g: number | null): number {
+  if (g == null) return -1;
+  return g;
+}
+
+/**
  * `File` (`vendor/ruby/file.c:7354` `rb_cFile`), the sliver of it trails calls.
  *
  * Rails reaches the filesystem through this class — `File.exist?(key)` in
@@ -28,7 +62,7 @@ function rbStat(file: IO | string): FsStatResult | null {
  *
  * Only the members ported bodies call are here. `File::SEPARATOR` is `"/"` on
  * every platform (`vendor/ruby/file.c:7427`); the backslash is
- * `File::ALT_SEPARATOR`, which trails has no call site for.
+ * `File::ALT_SEPARATOR`, which is `nil` off DOSISH (`file.c:7435`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `File` (`vendor/ruby/file.c:7354`),
  * which Rails calls without defining, so no Rails or gem file declares the
@@ -41,6 +75,18 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File::SEPARATOR`.
    */
   static readonly SEPARATOR = "/";
+
+  /**
+   * `vendor/ruby/file.c:7433` — `File::ALT_SEPARATOR`, the `'\\'` of
+   * `FILE_ALT_SEPARATOR` (`file.c:3303`) where the build is DOSISH, and `nil`
+   * everywhere else (`file.c:7435`). The platform answer comes from the
+   * registered path backend's separator rather than from a runtime global.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::ALT_SEPARATOR`.
+   */
+  static get ALT_SEPARATOR(): string | null {
+    return getPath().sep === "\\" ? "\\" : null;
+  }
 
   /**
    * `vendor/ruby/file.c:7841` — `File::LOCK_EX`, the exclusive-lock operation
@@ -243,14 +289,18 @@ export class File extends IO {
 
   /**
    * `vendor/ruby/file.c:2706` `rb_file_s_chown`, which answers the number of
-   * files whose owner was set. A backend with no ownership has no
-   * `chownSync`, and there the call is a no-op.
+   * files whose owner was set. A `nil` owner or group is ignored
+   * (`file.c:2698`) — `File.chown(nil, 100, "testfile")` — which `to_uid` /
+   * `to_gid` (`file.c:2661,2670`) carry through as `-1`. A backend with no
+   * ownership has no `chownSync`, and there the call is a no-op.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.chown`
    * (`vendor/ruby/file.c:2706`).
    */
-  static chown(owner: number, group: number, ...files: string[]): number {
-    for (const file of files) getFs().chownSync?.(file, owner, group);
+  static chown(owner: number | null, group: number | null, ...files: string[]): number {
+    const uid = toUid(owner);
+    const gid = toGid(group);
+    for (const file of files) getFs().chownSync?.(file, uid, gid);
     return files.length;
   }
 
@@ -299,6 +349,9 @@ export class File extends IO {
    * node's `path.join` answers `"b"`. A separator at the boundary is squeezed
    * to one (`file.c:5061-5067`) — `File.join("a//", "/b")` is `"a/b"` — and an
    * empty component keeps its separator, so `File.join("a", "")` is `"a/"`.
+   * Both boundary arms test with `isdirsep`, so a `File::ALT_SEPARATOR` at the
+   * boundary is a separator too: `File.join("a\\", "b")` is `"a\\b"` on
+   * Windows and `"a\\/b"` on POSIX.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.join`
    * (`vendor/ruby/file.c:5013`).
@@ -307,8 +360,8 @@ export class File extends IO {
     if (args.length === 0) return "";
     let result = args[0];
     for (const tmp of args.slice(1)) {
-      const tail = result.replace(/\/+$/, "");
-      if (tmp.startsWith(File.SEPARATOR)) result = `${tail}${tmp}`;
+      const tail = chompdirsep(result);
+      if (isdirsep(tmp.charAt(0))) result = `${tail}${tmp}`;
       else if (tail.length === result.length) result = `${result}${File.SEPARATOR}${tmp}`;
       else result = `${result}${tmp}`;
     }

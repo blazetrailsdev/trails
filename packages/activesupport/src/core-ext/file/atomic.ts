@@ -19,10 +19,8 @@ export function atomicWrite<T>(
 
     if (oldStat) {
       try {
-        if (oldStat.uid != null && oldStat.gid != null) {
-          File.chown(oldStat.uid, oldStat.gid, tempFile.path!);
-        }
-        if (oldStat.mode != null) File.chmod(oldStat.mode, tempFile.path!);
+        File.chown(oldStat.uid ?? null, oldStat.gid ?? null, tempFile.path!);
+        File.chmod(oldStat.mode, tempFile.path!);
       } catch (error) {
         const code = (error as { code?: string }).code;
         if (code !== "EPERM" && code !== "EACCES") throw error;
