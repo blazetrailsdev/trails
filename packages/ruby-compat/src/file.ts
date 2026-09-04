@@ -174,8 +174,9 @@ export class File extends IO {
    * `vendor/ruby/io.c:15418`, where `rb_cFile` registers `rb_io_s_open`
    * (`io.c:8148`): with a block the stream is closed once the block returns
    * and the block's value is the answer. Ruby's mode string carries the
-   * binary flag node's `flags` has no letter for — a JS string read back
-   * one character per byte is already that encoding — so `b` is dropped.
+   * binary flag node's `flags` has no letter for, so `b` is dropped from the
+   * flags and recorded on the stream instead (`rb_io_binmode`, `io.c:6311`),
+   * where {@link IO#write} reads it.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
    * (`vendor/ruby/io.c:8148`).
@@ -184,6 +185,7 @@ export class File extends IO {
   static open<T>(fileName: string, mode: string, block: (file: File) => T): T;
   static open<T>(fileName: string, mode: string, block?: (file: File) => T): T | File {
     const file = new File(getFs().openSync(fileName, mode.replace(/b/g, "")), fileName);
+    if (mode.includes("b")) file.binmode();
     if (!block) return file;
     try {
       return block(file);

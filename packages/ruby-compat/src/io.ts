@@ -112,6 +112,9 @@ export class IO {
   /** `fptr->pathv` (`vendor/ruby/io.c:2943` reads it back as `IO#path`). */
   protected pathv: string | null;
 
+  /** `FMODE_BINMODE` (`vendor/ruby/io.c:6311` `rb_io_binmode` sets it). */
+  protected binary = false;
+
   /** @internal */
   private pos = 0;
 
@@ -123,6 +126,21 @@ export class IO {
   protected constructor(fd: number, pathv: string | null = null) {
     this.fd = fd;
     this.pathv = pathv;
+  }
+
+  /**
+   * `vendor/ruby/io.c:6379` `rb_io_binmode_m`, which puts the stream in binary
+   * mode and answers the stream. A String written to a binary stream goes out
+   * as its own bytes rather than being transcoded, so after this {@link write}
+   * takes an ASCII-8BIT String — one character per byte, the encoding
+   * {@link IO#read} already answers in.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode`
+   * (`vendor/ruby/io.c:6379`).
+   */
+  binmode(): this {
+    this.binary = true;
+    return this;
   }
 
   /**
@@ -291,15 +309,16 @@ export class IO {
 
   /**
    * `vendor/ruby/io.c:2263` `io_write_m` in its one-argument form, which
-   * answers the number of bytes written. `string` is a binary String — one
-   * character per byte, the encoding {@link IO#read} answers in — so its
-   * characters go to the stream as bytes.
+   * answers the number of bytes written. On a binary stream — {@link binmode},
+   * or a mode carrying `b` (`rb_io_binmode`, `io.c:6311`) — `string` is an
+   * ASCII-8BIT String and its characters go out as bytes; otherwise it is
+   * transcoded to the external encoding, which for trails is always UTF-8.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#write`
    * (`vendor/ruby/io.c:2263`).
    */
   write(string: string): number {
-    const buffer = binaryBytes(string);
+    const buffer = this.binary ? binaryBytes(string) : new TextEncoder().encode(string);
     let n = 0;
     while (n < buffer.length) {
       n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this.pos + n);

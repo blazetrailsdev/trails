@@ -207,6 +207,20 @@ export class Tempfile {
   }
 
   /**
+   * `IO#binmode` (`vendor/ruby/io.c:6379`) on the delegated `File`
+   * (`vendor/ruby/lib/tempfile.rb:89`), which answers the stream — so
+   * `atomic_write`'s `temp_file.binmode` (`core_ext/file/atomic.rb:25`) puts
+   * the held `File` in binary mode and {@link write} stops transcoding.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode`
+   * (`vendor/ruby/io.c:6379`), delegated by Ruby stdlib `Tempfile`.
+   */
+  binmode(): this {
+    this.tmpfile.binmode();
+    return this;
+  }
+
+  /**
    * `IO#write` (`vendor/ruby/io.c:2263` `io_write_m`) on the delegated `File`
    * (`vendor/ruby/lib/tempfile.rb:89`): the bytes go to the descriptor at the
    * current offset, which the write then advances.
