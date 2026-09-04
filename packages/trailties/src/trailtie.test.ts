@@ -1,9 +1,19 @@
-import { describe, it, expect } from "vitest";
-import { Trailtie } from "./trailtie.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Trailtie, resetTrailtieRegistry } from "./trailtie.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { sealAgainstInheritance } from "./trailtie/configurable.js";
 
 describe("Trailtie", () => {
+  let restoreRegistry: () => void;
+
+  beforeEach(() => {
+    restoreRegistry = resetTrailtieRegistry();
+  });
+
+  afterEach(() => {
+    restoreRegistry();
+  });
+
   it("cannot instantiate a Railtie object", () => {
     expect(() => new Trailtie()).toThrow(/abstract/);
   });

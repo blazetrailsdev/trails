@@ -1,6 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
+import type { RackApp, RackEnv } from "@blazetrails/rack";
+import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import { controllerConstants } from "../../action-dispatch/http/request.js";
+import { Cookies, COOKIES_APP_OPTIONS_KEY } from "../../action-dispatch/middleware/cookies.js";
+import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
+
+function buildApp(routes: RouteSet): RackApp {
+  const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
+  const cookies = new Cookies((e: RackEnv) => store.call(e));
+  return (e: RackEnv) => {
+    e[COOKIES_APP_OPTIONS_KEY] = { secret: "a".repeat(64) };
+    return cookies.call(e);
+  };
+}
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -194,7 +208,8 @@ describe("MetalIntegrationTest", () => {
       r.get("/success", { to: "poller#call" });
       r.get("/failure", { to: "poller#call" });
     });
-    t.registerController("poller", PollerController);
+    t.app = buildApp(t.routes);
+    controllerConstants.set("poller", PollerController);
   });
 
   it("successful get", async () => {

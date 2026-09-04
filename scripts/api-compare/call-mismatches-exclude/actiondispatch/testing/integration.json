@@ -10,21 +10,7 @@
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "process",
-    "call": "encoder",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
     "call": "from_hash",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/integration.ts",
-    "rubyName": "process",
-    "call": "from_response",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
