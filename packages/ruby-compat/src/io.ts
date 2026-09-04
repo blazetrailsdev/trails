@@ -305,7 +305,8 @@ export class IO {
    * `rb_scan_args`) receives the bytes, as `io_setstrbuf` (`io.c:3278`) fills
    * it. Ruby resizes the String to the byte count it read; a `Uint8Array` cannot
    * be resized, so it is filled up to its own length instead and the bytes
-   * still come back as the return value.
+   * still come back as the return value; at EOF, where `rb_str_resize(str, 0)`
+   * (`io.c:3800`) empties the String before the `nil`, it is zero-filled.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
    * (`vendor/ruby/io.c:3774`).
@@ -326,7 +327,10 @@ export class IO {
       if (read === 0) break;
       n += read;
     }
-    if (n === 0) return length === 0 ? "" : null;
+    if (n === 0) {
+      if (str) str.fill(0);
+      return length === 0 ? "" : null;
+    }
     this.pos += n;
     if (str) str.set(buffer.subarray(0, Math.min(n, str.length)));
     return binaryString(buffer, n);
