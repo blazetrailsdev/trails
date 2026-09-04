@@ -251,12 +251,14 @@ function copyMetadata(src: string, path: string, dereference: boolean): void {
 
 /**
  * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
- * walks a directory tree and copies each entry, then its `copy_metadata` under
- * `preserve`.
+ * walks a directory tree and copies each entry with `Entry_#copy`
+ * (`fileutils.rb:2239-2274`), then its `copy_metadata` under `preserve`.
  */
 function copyEntry(src: string, dest: string, preserve = false): void {
   const ent = entryLstat(src, false);
-  if (ent.isDirectory()) {
+  if (ent.isFile()) {
+    FileUtils.copyFile(src, dest, preserve, false);
+  } else if (ent.isDirectory()) {
     FileUtils.mkdirP(dest);
     for (const name of getFs().readdirSync(src)) {
       copyEntry(getPath().join(src, name), getPath().join(dest, name), preserve);
@@ -266,7 +268,7 @@ function copyEntry(src: string, dest: string, preserve = false): void {
     fileSymlink(fileReadlink(src), dest);
     if (preserve) copyMetadata(src, dest, false);
   } else {
-    FileUtils.copyFile(src, dest, preserve, false);
+    throw new Error(`unknown file type: ${src}`);
   }
 }
 
@@ -497,8 +499,8 @@ export class FileUtils {
 
   /** `FileUtils.rm_rf` (`vendor/ruby/lib/fileutils.rb:1328-1330`). Ruby's
    * `secure:` kwarg routes `rm_r` through `remove_entry_secure`
-   * (`fileutils.rb:1351-1447`), which is built on `Process.euid`; `process.*` is
-   * unavailable here, so the kwarg has no arm to select and is not accepted.
+   * (`fileutils.rb:1351-1447`), which is unported, so the kwarg has no arm to
+   * select and is not accepted — as on `rm_r` itself.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static rmRf(
@@ -536,7 +538,10 @@ export class FileUtils {
     }
   }
 
-  /** `FileUtils.touch` (`vendor/ruby/lib/fileutils.rb:2006-2026`).
+  /** `FileUtils.touch` (`vendor/ruby/lib/fileutils.rb:2006-2026`). The verbose
+   * line's `t.strftime('-t %Y%m%d%H%M.%S ')` is spelled out digit by digit:
+   * `strftime` lives in `@blazetrails/activesupport`, which this leaf cannot
+   * import.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static touch(
