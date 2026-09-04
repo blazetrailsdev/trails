@@ -24,6 +24,7 @@ import {
   httpAdapterConfig,
   osAdapterConfig,
   processAdapterConfig,
+  zlibAdapterConfig,
 } from "@blazetrails/ruby-compat";
 import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
 
@@ -75,6 +76,13 @@ export const ActiveSupport = {
   },
   set osAdapter(name: string | null) {
     osAdapterConfig.adapter = name;
+  },
+
+  get zlibAdapter(): string | null {
+    return zlibAdapterConfig.adapter;
+  },
+  set zlibAdapter(name: string | null) {
+    zlibAdapterConfig.adapter = name;
   },
 
   get processAdapter(): string | null {
