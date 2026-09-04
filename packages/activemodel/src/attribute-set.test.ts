@@ -385,7 +385,7 @@ describe("AttributeSetTest", () => {
   });
 
   it("freezing doesn't prevent the set from materializing", () => {
-    const builder = new Builder(new Map([["foo", typeRegistry.lookup("string")]]));
+    const builder = new Builder({ foo: typeRegistry.lookup("string") });
     const attributes = builder.buildFromDatabase({ foo: "1" });
 
     attributes.freeze();
@@ -446,12 +446,10 @@ describe("AttributeSetTest", () => {
   });
 
   it("comparison for equality is correctly implemented", () => {
-    const builder = new Builder(
-      new Map([
-        ["foo", typeRegistry.lookup("integer")],
-        ["bar", typeRegistry.lookup("integer")],
-      ]),
-    );
+    const builder = new Builder({
+      foo: typeRegistry.lookup("integer"),
+      bar: typeRegistry.lookup("integer"),
+    });
     const attributes = builder.buildFromDatabase({ foo: "1", bar: "2" });
     const attributes2 = builder.buildFromDatabase({ foo: "1", bar: "2" });
     const attributes3 = builder.buildFromDatabase({ foo: "2", bar: "2" });
