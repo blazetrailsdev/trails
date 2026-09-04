@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { File } from "@blazetrails/ruby-compat";
+import { File } from "./file.js";
 import { Tempfile } from "./tempfile.js";
 
 describe("Tempfile", () => {
@@ -12,7 +12,7 @@ describe("Tempfile", () => {
   it("create unlinks the file on block exit", () => {
     let path = "";
     Tempfile.create("foo", undefined, (tmpfile) => {
-      path = tmpfile.path!;
+      path = tmpfile.path()!;
     });
     expect(path).not.toBe("");
     expect(exists(path)).toBe(false);
@@ -22,7 +22,7 @@ describe("Tempfile", () => {
     let path = "";
     expect(() =>
       Tempfile.create("foo", undefined, (tmpfile) => {
-        path = tmpfile.path!;
+        path = tmpfile.path()!;
         throw new Error("boom");
       }),
     ).toThrow("boom");
@@ -31,7 +31,7 @@ describe("Tempfile", () => {
 
   it("create accepts a prefix and suffix pair", () => {
     Tempfile.create(["pre", "-post.yml"], undefined, (tmpfile) => {
-      const basename = tmpfile.path!.split(/[\\/]/).pop()!;
+      const basename = tmpfile.path()!.split(/[\\/]/).pop()!;
       expect(basename.startsWith("pre")).toBe(true);
       expect(basename.endsWith("-post.yml")).toBe(true);
     });
@@ -40,11 +40,12 @@ describe("Tempfile", () => {
   it("create awaits an async block before unlinking", async () => {
     let path = "";
     const value = await Tempfile.create("foo", undefined, async (tmpfile) => {
-      path = tmpfile.path!;
+      path = tmpfile.path()!;
       tmpfile.write("hello");
       await Promise.resolve();
       expect(exists(path)).toBe(true);
-      return tmpfile.read().toString("utf8");
+      tmpfile.rewind();
+      return tmpfile.read();
     });
     expect(value).toBe("hello");
     expect(exists(path)).toBe(false);
@@ -74,11 +75,11 @@ describe("Tempfile", () => {
 
   it("without a block returns the open temp file", () => {
     const tmpfile = Tempfile.create("baz");
-    expect(exists(tmpfile.path!)).toBe(true);
-    const path = tmpfile.path!;
-    tmpfile.close(true);
+    const path = tmpfile.path()!;
+    expect(exists(path)).toBe(true);
+    tmpfile.close();
+    File.delete(path);
     expect(exists(path)).toBe(false);
-    expect(tmpfile.path).toBeNull();
   });
 
   it("new gives each temp file a distinct name", () => {
@@ -90,11 +91,14 @@ describe("Tempfile", () => {
   });
 
   it("read gives back the bytes write was handed", () => {
-    // `Tempfile#write` is Ruby's binary `IO#write` (`vendor/ruby/io.c:2263`),
-    const bytes = Buffer.from([0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe]);
+    const bytes = [0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe];
     const tempfile = Tempfile.new("bin");
-    tempfile.write(bytes);
-    expect([...tempfile.read()]).toEqual([...bytes]);
+    tempfile.binmode();
+    tempfile.write(bytes.map((byte) => String.fromCharCode(byte)).join(""));
+    expect(tempfile.read()).toBe("");
+    tempfile.rewind();
+    expect([...tempfile.read()].map((c) => c.charCodeAt(0))).toEqual(bytes);
+    tempfile.close();
     tempfile.unlink();
   });
 
@@ -102,7 +106,7 @@ describe("Tempfile", () => {
     let path = "";
     await expect(
       Tempfile.create("foo", undefined, async (tmpfile) => {
-        path = tmpfile.path!;
+        path = tmpfile.path()!;
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");

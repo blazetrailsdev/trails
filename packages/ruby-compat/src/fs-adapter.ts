@@ -19,6 +19,8 @@ export interface FsStatResult {
   size: number;
   mtime: Date;
   mode?: number;
+  dev?: number;
+  ino?: number;
   uid?: number;
   gid?: number;
 }
@@ -48,6 +50,7 @@ export interface FsAdapter {
   renameSync(src: string, dest: string): void;
   flockSync?(fd: number, operation: "ex" | "un"): void;
   statSync(path: string): FsStatResult;
+  fstatSync?(fd: number): FsStatResult;
   lstatSync?(path: string): FsStatResult;
   chmodSync?(path: string, mode: number): void;
   utimesSync?(path: string, atime: Date, mtime: Date): void;

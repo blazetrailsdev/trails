@@ -120,7 +120,7 @@ export class EncryptedFile {
       ["", "-" + chomp(path.basename(contentPath), ".enc")],
       path.dirname(contentPath),
       async (tmpFile) => {
-        const tmpPath = tmpFile.path!;
+        const tmpPath = tmpFile.path()!;
         await fs.writeFile!(tmpPath, contents, { mode: 0o600 });
 
         await block(tmpPath);

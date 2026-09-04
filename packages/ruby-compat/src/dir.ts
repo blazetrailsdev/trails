@@ -1,5 +1,37 @@
+import { ArgumentError } from "./argument-error.js";
 import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
+import { env, stderr } from "./process-adapter.js";
+import { verbose } from "./verbose.js";
+
+/**
+ * `Kernel#warn` (`vendor/ruby/error.c:555` `rb_warn_m`), which writes nothing
+ * at all while `$VERBOSE` is `nil` (`error.c:561`, `!NIL_P(ruby_verbose)`) —
+ * `false` still warns, so the guard is against `nil` alone — and terminates
+ * the message with a newline where it lacks one (`error.c:573`).
+ */
+function warn(message: string): void {
+  if (verbose() == null) return;
+  stderr.write(`${message}\n`);
+}
+
+/** `W_OK` (`vendor/ruby/file.c:1898` `rb_file_writable_p`). */
+const W_OK = 2;
+
+/** `File::Stat#writable?` (`vendor/ruby/file.c:1898`), as `access(2)`. */
+function isWritable(dir: string): boolean {
+  const accessSync = getFs().accessSync;
+  if (!accessSync) return true;
+  try {
+    accessSync(dir, W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** `Dir::SYSTMPDIR` (`vendor/ruby/lib/tmpdir.rb:20`). */
+const SYSTMPDIR = "/tmp";
 
 const MAGIC = /[*?[{]/;
 
@@ -123,6 +155,57 @@ export class Dir {
    */
   static pwd(): string {
     return getFs().cwd();
+  }
+
+  /**
+   * `Dir.tmpdir` (`vendor/ruby/lib/tmpdir.rb:26`) — the first of `TMPDIR`,
+   * `TMP`, `TEMP`, `SYSTMPDIR` (`tmpdir.rb:20`, `/tmp` off a build without
+   * `Etc.systmpdir`), `/tmp` and `.` that names a writable directory, and
+   * `ArgumentError` when none does (`tmpdir.rb:43`).
+   *
+   * `stat.writable?` (`tmpdir.rb:35`) is effective-process writability, so it
+   * goes through the adapter's `access(2)` with `W_OK`; an adapter without one
+   * reports every directory writable. `world_writable?` / `sticky?`
+   * (`tmpdir.rb:37`) are the `0o002` and `0o1000` bits of the stat's mode.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir.tmpdir`
+   * (`vendor/ruby/lib/tmpdir.rb:26`), which Rails calls without defining.
+   */
+  static tmpdir(): string {
+    const candidates: [string, string | undefined][] = [
+      ["TMPDIR", undefined],
+      ["TMP", undefined],
+      ["TEMP", undefined],
+      ["system temporary path", SYSTMPDIR],
+      ["/tmp", "/tmp"],
+      [".", "."],
+    ];
+
+    for (const [name, fixed] of candidates) {
+      let dir = fixed;
+      if (dir == null) {
+        dir = env[name];
+        if (dir == null || dir === "") continue;
+      }
+      dir = File.expandPath(dir);
+      let stat;
+      try {
+        stat = File.stat(dir);
+      } catch {
+        continue;
+      }
+      const mode = stat.mode;
+      if (!stat.isDirectory()) {
+        warn(`${name} is not a directory: ${dir}`);
+      } else if (!isWritable(dir)) {
+        warn(`${name} is not writable: ${dir}`);
+      } else if (mode != null && (mode & 0o002) !== 0 && (mode & 0o1000) === 0) {
+        warn(`${name} is world-writable: ${dir}`);
+      } else {
+        return dir;
+      }
+    }
+    throw new ArgumentError("could not find a temporary directory");
   }
 
   /**

@@ -3,6 +3,18 @@ import type { FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 
 /**
+ * `rb_stat` (`vendor/ruby/file.c:1296`), which `fstat`s an open stream and
+ * `stat`s a name, answering `< 0` — `null` here — where the call fails.
+ */
+function rbStat(file: IO | string): FsStatResult | null {
+  try {
+    return typeof file === "string" ? getFs().statSync(file) : file.stat();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * `File` (`vendor/ruby/file.c:7354` `rb_cFile`), the sliver of it trails calls.
  *
  * Rails reaches the filesystem through this class — `File.exist?(key)` in
@@ -56,6 +68,26 @@ export class File extends IO {
    */
   static isExist(fileName: string): boolean {
     return getFs().existsSync(fileName);
+  }
+
+  /**
+   * `vendor/ruby/file.c:2196` `rb_file_identical_p` — `false` unless both
+   * names stat successfully and report the same `st_dev` and `st_ino`
+   * (`file.c:2201-2205`). Either argument may be an open stream, which
+   * `rb_stat` (`file.c:1296`) `fstat`s instead. An adapter that reports no
+   * device identity cannot answer, so it answers `false`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.identical?`
+   * (`vendor/ruby/file.c:2196`).
+   */
+  static isIdentical(fileName1: IO | string, fileName2: IO | string): boolean {
+    const st1 = rbStat(fileName1);
+    const st2 = rbStat(fileName2);
+    if (!st1 || !st2) return false;
+    if (st1.dev == null || st1.ino == null) return false;
+    if (st1.dev !== st2.dev) return false;
+    if (st1.ino !== st2.ino) return false;
+    return true;
   }
 
   /**
@@ -142,8 +174,9 @@ export class File extends IO {
    * `vendor/ruby/io.c:15418`, where `rb_cFile` registers `rb_io_s_open`
    * (`io.c:8148`): with a block the stream is closed once the block returns
    * and the block's value is the answer. Ruby's mode string carries the
-   * binary flag node's `flags` has no letter for — a JS string read back
-   * one character per byte is already that encoding — so `b` is dropped.
+   * binary flag node's `flags` has no letter for, so `b` is dropped from the
+   * flags and recorded on the stream instead (`rb_io_binmode`, `io.c:6311`),
+   * where {@link IO#write} reads it.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
    * (`vendor/ruby/io.c:8148`).
@@ -151,7 +184,8 @@ export class File extends IO {
   static open(fileName: string, mode: string): File;
   static open<T>(fileName: string, mode: string, block: (file: File) => T): T;
   static open<T>(fileName: string, mode: string, block?: (file: File) => T): T | File {
-    const file = new File(getFs().openSync(fileName, mode.replace(/b/g, "")));
+    const file = new File(getFs().openSync(fileName, mode.replace(/b/g, "")), fileName);
+    if (mode.includes("b")) file.binmode();
     if (!block) return file;
     try {
       return block(file);

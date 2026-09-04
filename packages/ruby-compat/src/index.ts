@@ -2,6 +2,7 @@ export { ArgumentError } from "./argument-error.js";
 export { Dir } from "./dir.js";
 export { File } from "./file.js";
 export { IO } from "./io.js";
+export { IOError } from "./io-error.js";
 export {
   cmp,
   cmpint,
@@ -140,6 +141,8 @@ export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
 export { succ } from "./string/succ.js";
 export { isSymbol, symbolToS } from "./symbol.js";
+export { Tempfile } from "./tempfile.js";
+export type { TempfileBasename } from "./tempfile.js";
 export { TypeError } from "./type-error.js";
 export { setVerbose, verbose } from "./verbose.js";
 export { Zlib } from "./zlib.js";

@@ -114,4 +114,14 @@ describe("File", () => {
     expect(File.isExist(path)).toBe(true);
     expect(File.isReadable(path)).toBe(accessible);
   });
+
+  it("identical? compares device and inode, and reads them off an open stream", () => {
+    const root = fixture();
+    const path = join(root, "ident.txt");
+    const file = File.open(path, "w+");
+    expect(File.isIdentical(file, path)).toBe(true);
+    expect(File.isIdentical(path, root)).toBe(false);
+    file.close();
+    expect(File.isIdentical(path, join(root, "missing.txt"))).toBe(false);
+  });
 });

@@ -49,4 +49,26 @@ describe("IO", () => {
     expect(puts.call(out, "a", ["b", ["c"]], 1)).toBe(null);
     expect(written.join("")).toBe("a\nb\nc\n1\n");
   });
+
+  it("read answers the external encoding, and ASCII-8BIT when given a length", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "utf8.txt");
+    const file = File.open(path, "w+");
+    expect(file.write("héllo")).toBe(6);
+    file.rewind();
+    expect(file.read()).toBe("héllo");
+    file.rewind();
+    expect(file.read(3)).toBe("h\u00c3\u00a9");
+    file.close();
+  });
+
+  it("read keeps the bytes on a binary stream, and write sends them unchanged", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bin.dat");
+    const file = File.open(path, "w+");
+    file.binmode();
+    expect(file.write("h\u00c3\u00a9llo")).toBe(6);
+    file.rewind();
+    expect(file.read()).toBe("h\u00c3\u00a9llo");
+    file.close();
+    expect(File.binread(path)).toBe("h\u00c3\u00a9llo");
+  });
 });
