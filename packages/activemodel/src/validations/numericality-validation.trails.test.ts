@@ -101,6 +101,22 @@ describe("NumericalityValidator (trails-only)", () => {
     expect(prepareValueForValidation.call(undefined, 0, rec as never, "score")).toBe("abc");
   });
 
+  it("returns the cast value when the attribute was changed in place", () => {
+    class MockRecord {
+      errors = { add: vi.fn() };
+      scoreCameFromUser = true;
+      scoreBeforeTypeCast = "abc";
+      attributeChangedInPlace(_name: string) {
+        return true;
+      }
+      _readAttribute(_name: string) {
+        return 0;
+      }
+    }
+    const rec = new MockRecord();
+    expect(prepareValueForValidation.call(undefined, 10, rec as never, "score")).toBe(10);
+  });
+
   it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", async () => {
     class Person extends Model {
       declare static attribute: AttributesClassHalf["attribute"];

@@ -11,11 +11,7 @@ export const MutableModule = {
   },
 
   isChangedInPlace(this: Type, rawOldValue: unknown, newValue: unknown): boolean {
-    const normalizedOld =
-      rawOldValue == null || typeof rawOldValue === "string"
-        ? rawOldValue
-        : this.serialize(rawOldValue);
-    return normalizedOld !== this.serialize(newValue);
+    return rawOldValue !== this.serialize(newValue);
   },
 
   isMutable(this: Type): boolean {
