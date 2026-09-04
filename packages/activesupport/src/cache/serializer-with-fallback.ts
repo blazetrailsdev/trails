@@ -9,6 +9,25 @@ import { CacheSerializer } from "../message-pack/cache-serializer.js";
 
 const messagePack = new CacheSerializer();
 
+/**
+ * `Marshal.dump` answers an ASCII-8BIT String (`vendor/ruby/marshal.c:1114`),
+ * so a serialized cache payload is BYTES: what `File.atomic_write` writes and
+ * `File.binread` reads back at `file_store.rb:124,127`. trails' Marshal stand-in
+ * answers JSON text, so its bytes are taken here — one character per byte —
+ * rather than leaving the payload a decoded String the byte-exact pair cannot
+ * round-trip.
+ *
+ * @internal
+ */
+function toBinary(text: string): string {
+  return Buffer.from(text, "utf8").toString("latin1");
+}
+
+/** @internal */
+function fromBinary(binary: string): string {
+  return Buffer.from(binary, "latin1").toString("utf8");
+}
+
 /** @internal */
 function marshalLoad(payload: string): unknown {
   try {
@@ -56,7 +75,7 @@ const passthroughWithFallback: Serializer = {
 
 const marshal70WithFallback: Serializer = {
   dump(entry: Entry | unknown): string {
-    return MARK_UNCOMPRESSED + coder.dump((entry as Entry).pack());
+    return MARK_UNCOMPRESSED + toBinary(coder.dump((entry as Entry).pack()));
   },
 
   dumpCompressed(entry: Entry, threshold: number): string {
@@ -68,14 +87,14 @@ const marshal70WithFallback: Serializer = {
         return MARK_COMPRESSED + compressed;
       }
     }
-    return MARK_UNCOMPRESSED + serialized;
+    return MARK_UNCOMPRESSED + toBinary(serialized);
   },
 
   _load(marked: string | Entry): Entry {
     const s = marked as string;
     const compressed = s[0] === MARK_COMPRESSED;
     const rest = s.slice(1);
-    const payload = compressed ? inflate(rest) : rest;
+    const payload = compressed ? inflate(rest) : fromBinary(rest);
     return Entry.unpack(marshalLoad(payload) as unknown[]);
   },
 
@@ -89,11 +108,11 @@ const marshal70WithFallback: Serializer = {
 
 const marshal71WithFallback: Serializer = {
   dump(value: Entry | unknown): string {
-    return MARSHAL_SIGNATURE + coder.dump(value);
+    return MARSHAL_SIGNATURE + toBinary(coder.dump(value));
   },
 
   _load(dumped: string | Entry): unknown {
-    return marshalLoad((dumped as string).slice(MARSHAL_SIGNATURE.length));
+    return marshalLoad(fromBinary((dumped as string).slice(MARSHAL_SIGNATURE.length)));
   },
 
   dumped(dumped: unknown): boolean {

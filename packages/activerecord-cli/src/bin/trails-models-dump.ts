@@ -1,4 +1,4 @@
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 
 import { generateModels } from "@blazetrails/activerecord";
 
@@ -125,7 +125,7 @@ export async function run(argv: readonly string[]): Promise<number> {
   if (args.schemaPath) {
     schemaFilePath = File.expandPath(args.schemaPath);
   } else {
-    const conventionPath = File.expandPath(File.join("db", "schema.ts"));
+    const conventionPath = File.join(Dir.pwd(), "db", "schema.ts");
     if (File.isExist(conventionPath)) {
       schemaFilePath = conventionPath;
     } else {

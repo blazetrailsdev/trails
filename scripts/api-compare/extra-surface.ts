@@ -1806,6 +1806,16 @@ export function isTestSupportFile(tsFile: string): boolean {
  * rather than as novel. The name is still reported; only its classification
  * changed, and it changed because a promise-returning `setX` is the faithful
  * rendering of a Rails writer that blocks on I/O (RFC 0068).
+ *
+ * An empty allowed set does NOT mean a receipt cannot exempt a name here. The
+ * per-declaration `@noRailsEquivalent` check runs BEFORE the novel/moved
+ * classification, so a tagged member scores `Allowed` and is subtracted from
+ * both dimensions in one of these files exactly as in a Rails-mapped one. The
+ * whole rule for a `NoCntrp` file is: every public member counts toward `total`
+ * unless it carries its own receipt — its Rails hit count and its novel/moved
+ * verdict are not inputs. That is what lets a Ruby-core class ported into
+ * `ruby-compat` (`file.ts`, `dir.ts`, `io.ts`, `process.ts`) grow a member per
+ * arriving call site without moving the RFC 0117 mark (RFC 0135).
  */
 export function uncoveredTsFiles(
   coveredTsFiles: Set<string>,

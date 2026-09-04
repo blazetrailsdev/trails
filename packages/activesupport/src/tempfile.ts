@@ -82,6 +82,7 @@ function createTmpname(
 export class Tempfile {
   private readonly tmpname: string;
   private unlinked = false;
+  private binary = false;
   private buffer: Buffer = Buffer.alloc(0);
   private flushed = true;
 
@@ -150,8 +151,26 @@ export class Tempfile {
     return this.unlinked ? null : this.tmpname;
   }
 
+  /**
+   * `rb_io_binmode_m` (`vendor/ruby/io.c:6379`), which puts the stream in
+   * binary mode and answers the stream. A String written to a binary stream
+   * goes out as its own bytes rather than being transcoded, so after this
+   * {@link write} takes an ASCII-8BIT String — one character per byte, the
+   * encoding `File.binread` answers in.
+   *
+   * @noRailsEquivalent PERMANENT — see {@link Tempfile}; Ruby core
+   *   `IO#binmode` (`vendor/ruby/io.c:6379`), which `Tempfile` delegates.
+   */
+  binmode(): this {
+    this.binary = true;
+    return this;
+  }
+
   write(contents: string | Buffer | Uint8Array): number {
-    const chunk = typeof contents === "string" ? Buffer.from(contents, "utf8") : contents;
+    const chunk =
+      typeof contents === "string"
+        ? Buffer.from(contents, this.binary ? "latin1" : "utf8")
+        : contents;
     this.buffer = Buffer.concat([this.buffer, chunk]);
     this.flushed = false;
     return chunk.length;
