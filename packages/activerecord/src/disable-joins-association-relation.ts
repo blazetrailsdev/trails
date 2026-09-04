@@ -1,4 +1,3 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Relation, type LoadedRelation } from "./relation.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
 import {
@@ -40,72 +39,30 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   constructor(klass: typeof Base, key: string[], ids: unknown[][]);
   constructor(klass: typeof Base, key: DjarKey, ids: DjarIds) {
     super(klass);
-    if (!Array.isArray(ids)) {
-      throw new ArgumentError(
-        `DisableJoinsAssociationRelation: ids must be an array (got ${ids === null ? "null" : typeof ids})`,
-      );
-    }
     let normalizedKey: DjarKey = key;
     let normalizedIds: DjarIds = ids;
-    if (Array.isArray(key)) {
-      if (key.length === 0) {
-        throw new ArgumentError(
-          "DisableJoinsAssociationRelation: key must have at least one column",
-        );
-      }
-      if (key.length === 1) {
-        normalizedKey = key[0];
-        normalizedIds = (ids as unknown[]).map((id, i) => {
-          if (!Array.isArray(id)) return id;
-          if (id.length !== 1) {
-            throw new ArgumentError(
-              `DisableJoinsAssociationRelation: single-column ids[${i}] must be a scalar or single-element array (got arity ${id.length})`,
-            );
-          }
-          return id[0];
-        });
-      }
+    if (Array.isArray(key) && key.length === 1) {
+      normalizedKey = key[0];
+      normalizedIds = (ids as unknown[]).map((id) => (Array.isArray(id) ? id[0] : id));
     }
     this.key = normalizedKey;
     this._composite = Array.isArray(normalizedKey);
     if (this._composite) {
-      const cols = normalizedKey as string[];
-      const arity = cols.length;
       const seen = new Set<string>();
       const out: unknown[][] = [];
       const keyStrings: string[] = [];
-      for (let i = 0; i < (normalizedIds as unknown[]).length; i++) {
-        const t = (normalizedIds as unknown[])[i];
-        if (!Array.isArray(t)) {
-          throw new ArgumentError(
-            `DisableJoinsAssociationRelation: composite ids[${i}] must be an array (got ${typeof t})`,
-          );
-        }
-        if (t.length !== arity) {
-          throw new ArgumentError(
-            `DisableJoinsAssociationRelation: composite ids[${i}] arity ${t.length} does not match key [${cols.join(", ")}] (arity ${arity})`,
-          );
-        }
-        const tuple = Array.from(t);
+      for (const tuple of normalizedIds as unknown[][]) {
         const k = serializeKey(tuple, true) as string;
         if (!seen.has(k)) {
           seen.add(k);
-          out.push(tuple);
+          out.push(Array.from(tuple));
           keyStrings.push(k);
         }
       }
       this._storedIds = out;
       this._storedKeyStrings = keyStrings;
     } else {
-      const scalarIds = normalizedIds as unknown[];
-      for (let i = 0; i < scalarIds.length; i++) {
-        if (Array.isArray(scalarIds[i])) {
-          throw new ArgumentError(
-            `DisableJoinsAssociationRelation: scalar ids[${i}] must not be an array when key is "${String(normalizedKey)}"`,
-          );
-        }
-      }
-      this._storedIds = Array.from(new Set(scalarIds));
+      this._storedIds = Array.from(new Set(normalizedIds as unknown[]));
       this._storedKeyStrings = null;
     }
   }

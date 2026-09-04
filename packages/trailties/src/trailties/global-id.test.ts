@@ -9,12 +9,16 @@ import { Verifier } from "@blazetrails/globalid";
 
 const SECRET_KEY_BASE = "x".repeat(30);
 
-function blogApp(
-  secretKeyBase: string | null = SECRET_KEY_BASE,
-): TrailtieApp & { config: { globalId: GlobalIdConfig } } {
+function blogApp(secretKeyBase: string | null = SECRET_KEY_BASE): TrailtieApp {
+  const options: Record<string, unknown> = { globalId: {} as GlobalIdConfig };
   return {
     railtieName: "blog_app_application",
-    config: { globalId: {} },
+    config: {
+      get: (key) => options[key],
+      set: (key, value) => {
+        options[key] = value;
+      },
+    },
     keyGenerator: () => {
       if (secretKeyBase === null) {
         throw new ArgumentError(
@@ -45,14 +49,14 @@ describe("RailtieTest", () => {
 
   it("GlobalID.app can be set with config.global_id.app =", () => {
     const app = blogApp();
-    app.config.globalId.app = "foo";
+    (app.config.get("globalId") as GlobalIdConfig).app = "foo";
     initializeApp(app);
     expect(getApp()).toBe("foo");
   });
 
   it("SignedGlobalID.expires_in can be explicitly set to nil with config.global_id.expires_in", () => {
     const app = blogApp();
-    app.config.globalId.expiresIn = null;
+    (app.config.get("globalId") as GlobalIdConfig).expiresIn = null;
     initializeApp(app);
     expect(SignedGlobalID.expiresIn).toBeNull();
   });
@@ -60,8 +64,8 @@ describe("RailtieTest", () => {
   it("config.global_id can be used to set configurations after the railtie has been loaded", () => {
     const app = blogApp();
     Trailtie.initialize(app);
-    app.config.globalId.app = "foobar";
-    app.config.globalId.expiresIn = months(12).toI();
+    (app.config.get("globalId") as GlobalIdConfig).app = "foobar";
+    (app.config.get("globalId") as GlobalIdConfig).expiresIn = months(12).toI();
     runLoadHooks("after_initialize", app);
 
     expect(getApp()).toBe("foobar");
@@ -71,7 +75,7 @@ describe("RailtieTest", () => {
   it("config.global_id can be used to explicitly set SignedGlobalID.expires_in to nil after the railtie has been loaded", () => {
     const app = blogApp();
     Trailtie.initialize(app);
-    app.config.globalId.expiresIn = null;
+    (app.config.get("globalId") as GlobalIdConfig).expiresIn = null;
     runLoadHooks("after_initialize", app);
 
     expect(SignedGlobalID.expiresIn).toBeNull();
@@ -91,7 +95,7 @@ describe("RailtieTest", () => {
   it("SignedGlobalID.verifier can be set with config.global_id.verifier =", () => {
     const app = blogApp();
     const customVerifier = new MessageVerifier("muchSECRETsoHIDDEN");
-    app.config.globalId.verifier = customVerifier;
+    (app.config.get("globalId") as GlobalIdConfig).verifier = customVerifier;
     initializeApp(app);
     const message = { id: 42 };
     const signedMessage = SignedGlobalID.verifier!.generate(message);
