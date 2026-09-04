@@ -63,6 +63,7 @@ export class Registration {
     return typeName === this.name && this.isMatchesAdapter(kwargs);
   }
 
+  /** @internal */
   get priority(): number {
     let result = 0;
     if (this.adapter) result |= 1;

@@ -601,12 +601,17 @@ type ReferenceColumnOptions = Omit<ColumnOptions, "index"> & {
 };
 
 export class ReferenceDefinition {
+  /** @internal */
   readonly name: string;
   /** @internal */
   readonly polymorphic: boolean | Record<string, unknown>;
+  /** @internal */
   readonly index: boolean | AddIndexOptions;
+  /** @internal */
   readonly foreignKey: boolean | ReferenceForeignKeyOptions;
+  /** @internal */
   readonly type: ColumnType;
+  /** @internal */
   readonly options: Omit<ColumnOptions, "index">;
 
   constructor(
@@ -902,6 +907,7 @@ export class TableDefinition {
     return this.createColumnDefinition(name, type, options);
   }
 
+  /** @internal */
   aliasedTypes(name: string, fallback: string): string {
     return name === "timestamp" ? "datetime" : fallback;
   }

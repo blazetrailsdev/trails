@@ -100,6 +100,7 @@ export class BlockValidator<TBase extends object = object> extends EachValidator
     this.block = block;
   }
 
+  /** @internal */
   validateEach(record: ValidatableRecord<TBase>, attribute: string, value: unknown): void {
     this.block(record, attribute, value);
   }
