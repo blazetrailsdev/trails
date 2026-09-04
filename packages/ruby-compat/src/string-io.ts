@@ -38,6 +38,18 @@ export class StringIO {
     return this._string.length;
   }
 
+  /**
+   * `strio_read` (`vendor/ruby/ext/stringio/stringio.c:1539`). The `str` buffer
+   * of its two-argument form (`stringio.c:1548-1552`) receives the bytes, and
+   * at EOF Ruby empties it with `rb_str_resize(str, 0)` (`stringio.c:1561`)
+   * before answering `nil`.
+   *
+   * A `Uint8Array` cannot be resized, so — exactly as {@link IO.read} already
+   * does for `io_read`'s identical `str` argument (`vendor/ruby/io.c:3800`) —
+   * it is filled up to its own length instead, and zero-filled where Ruby
+   * truncates. That deviation is recorded once there; this is the same fact
+   * about the same buffer.
+   */
   read(): string;
   read(length: number, str?: Uint8Array | null): string | null;
   read(length?: number, str?: Uint8Array | null): string | null {

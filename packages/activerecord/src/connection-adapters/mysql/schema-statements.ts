@@ -410,7 +410,7 @@ export function fetchTypeMetadata(
 
 /** @internal */
 export function extractForeignKeyAction(
-  this: unknown,
+  this: MysqlColumnReflectionHost,
   specifier: string,
 ): "cascade" | "nullify" | "restrict" | undefined {
   if (specifier === "RESTRICT") return undefined;

@@ -3,10 +3,12 @@ import {
   Encoding,
   File,
   FileUtils,
+  NoMethodError,
   RuntimeError,
   StringIO,
   Tempfile,
   methodMissingProxy,
+  rbObjClass,
 } from "@blazetrails/ruby-compat";
 
 export class UploadedFile {
@@ -37,7 +39,11 @@ export class UploadedFile {
   }
 
   get path(): string | null {
-    return (this.tempfile as Tempfile).path;
+    const tempfile = this.tempfile;
+    if (!("path" in tempfile)) {
+      throw new NoMethodError(`undefined method 'path' for an instance of ${rbObjClass(tempfile)}`);
+    }
+    return tempfile.path;
   }
 
   get localPath(): string | null {

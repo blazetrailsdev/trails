@@ -1,22 +1,21 @@
+import { expect } from "vitest";
+import { rbObjClass } from "@blazetrails/ruby-compat";
+
 /** @internal */
 export function mustBe(actual: Record<string, () => unknown>, operator: string): void {
-  if (!actual[operator]()) {
-    throw new Error(`Expected ${inspect(actual)} to be ${operator}`);
-  }
+  expect(actual[operator](), `Expected ${inspect(actual)} to be ${operator}`).toBeTruthy();
 }
 
 /** @internal */
 export function wontBe(actual: Record<string, () => unknown>, operator: string): void {
-  if (actual[operator]()) {
-    throw new Error(`Expected ${inspect(actual)} to not be ${operator}`);
-  }
+  expect(actual[operator](), `Expected ${inspect(actual)} to not be ${operator}`).toBeFalsy();
 }
 
 /** @internal */
 export function mustRespondTo(obj: object, meth: string): void {
-  if (!(meth in obj)) {
-    throw new Error(`Expected ${inspect(obj)} to respond to #${meth}`);
-  }
+  expect(meth in obj, `Expected ${inspect(obj)} (${rbObjClass(obj)}) to respond to #${meth}`).toBe(
+    true,
+  );
 }
 
 function inspect(value: unknown): string {

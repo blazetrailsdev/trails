@@ -319,9 +319,9 @@ describe("MySQL::SchemaStatements", () => {
   });
 
   it("extractForeignKeyAction: RESTRICT → undefined, others normalized", () => {
-    expect(extractForeignKeyAction("RESTRICT")).toBeUndefined();
-    expect(extractForeignKeyAction("CASCADE")).toBe("cascade");
-    expect(extractForeignKeyAction("SET NULL")).toBe("nullify");
+    expect(extractForeignKeyAction.call(reflectionHost(), "RESTRICT")).toBeUndefined();
+    expect(extractForeignKeyAction.call(reflectionHost(), "CASCADE")).toBe("cascade");
+    expect(extractForeignKeyAction.call(reflectionHost(), "SET NULL")).toBe("nullify");
   });
 
   const schemaStatements = (sortOrderSupported = true) =>
