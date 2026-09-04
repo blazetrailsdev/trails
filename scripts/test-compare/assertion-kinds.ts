@@ -184,6 +184,8 @@ export const NON_ASSERTION_TRAILS_HELPERS = new Set(["mustBeLike"]);
 // they stay unmapped, exactly as their `refute_*` spellings already do.
 const SPEC_FORM_ALIAS: Record<string, string> = {
   must_be_nil: "assert_nil",
+  must_include: "assert_includes",
+  wont_include: "refute_includes",
   wont_be_nil: "refute_nil",
   must_be_empty: "assert_empty",
   wont_be_empty: "refute_empty",

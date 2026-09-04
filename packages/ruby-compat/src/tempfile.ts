@@ -226,6 +226,34 @@ export class Tempfile {
   }
 
   /**
+   * `IO#pos` (`vendor/ruby/io.c:2039`) on the delegated `File`
+   * (`vendor/ruby/lib/tempfile.rb:89`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#pos`
+   * (`vendor/ruby/io.c:2039`), delegated by Ruby stdlib `Tempfile`.
+   */
+  get pos(): number {
+    return this.tmpfile.pos;
+  }
+
+  /**
+   * `Tempfile#size` (`vendor/ruby/lib/tempfile.rb:274`) — `File#size` of the
+   * delegated open stream, and `File.size` of the path once it is closed,
+   * which is how `Rack::Test::Utils#build_file_part` fills `content-length`
+   * (`vendor/rack-test/lib/rack/test/utils.rb:143`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile#size`
+   * (`vendor/ruby/lib/tempfile.rb:274`).
+   */
+  get size(): number {
+    if (!this.tmpfile.isClosed()) {
+      return this.tmpfile.size();
+    } else {
+      return File.size(this.tmpfile.path()!);
+    }
+  }
+
+  /**
    * `IO#binmode` (`vendor/ruby/io.c:6379`) on the delegated `File`
    * (`vendor/ruby/lib/tempfile.rb:89`), so `atomic_write`'s
    * `temp_file.binmode` (`core_ext/file/atomic.rb:25`) puts the held `File` in

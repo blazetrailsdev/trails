@@ -1,7 +1,21 @@
-import { MockRequest, MockResponse, Request, Utils, type RackApp } from "@blazetrails/rack";
+import { isPlainObject, type Included } from "@blazetrails/activesupport";
+import {
+  MockRequest,
+  MockResponse,
+  Request,
+  parseNestedQuery,
+  type RackApp,
+} from "@blazetrails/rack";
 import { CookieJar } from "./cookie-jar.js";
+import type { Utils } from "./utils.js";
 
 export const DEFAULT_HOST = "example.org";
+
+export const MULTIPART_BOUNDARY = "----------XnJLe9ZIbbGUYtzPQJ16u1";
+
+export const START_BOUNDARY = `--${MULTIPART_BOUNDARY}\r\n`;
+
+export const END_BOUNDARY = `--${MULTIPART_BOUNDARY}--\r\n`;
 
 export class Error extends globalThis.Error {}
 
@@ -12,6 +26,10 @@ const DEFAULT_ENV: Record<string, unknown> = {
   SERVER_PROTOCOL: "HTTP/1.0",
 };
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`vendor/rack-test/lib/rack/test.rb:55`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Session extends Included<typeof Utils> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Session {
   cookieJar!: CookieJar;
 
@@ -85,7 +103,7 @@ export class Session {
     }
     env["REQUEST_METHOD"] ??= env[":method"] != null ? String(env[":method"]).toUpperCase() : "GET";
 
-    const params = env[":params"];
+    let params = env[":params"];
     delete env[":params"];
     const queryArray: Array<string | null | undefined> = [uri.search.slice(1)];
 
@@ -93,10 +111,29 @@ export class Session {
       if (params != null && params !== false) this.appendQueryParams(queryArray, params);
     } else if (!(":input" in env)) {
       env["CONTENT_TYPE"] ??= "application/x-www-form-urlencoded";
-      if (typeof params === "object" && params !== null) {
-        env[":input"] = Utils.buildNestedQuery(params);
+      if (params == null || params === false) params = {};
+      let multipart: unknown;
+      if (":multipart" in env) {
+        multipart = env[":multipart"];
+        delete env[":multipart"];
       } else {
-        env[":input"] = params ?? "";
+        multipart = (env["CONTENT_TYPE"] as string).startsWith("multipart/");
+      }
+
+      if (isPlainObject(params)) {
+        let data: string | null;
+        if (
+          Object.keys(params).length !== 0 &&
+          (data = this.buildMultipart(params, false, multipart as boolean)) != null
+        ) {
+          env[":input"] = data;
+          env["CONTENT_LENGTH"] ??= String(data.length);
+          env["CONTENT_TYPE"] = `${this.multipartContentType(env)}; boundary=${MULTIPART_BOUNDARY}`;
+        } else {
+          env[":input"] = this.buildNestedQuery(params);
+        }
+      } else {
+        env[":input"] = params;
       }
     }
 
@@ -117,8 +154,18 @@ export class Session {
     queryArray: Array<string | null | undefined>,
     queryParams: unknown,
   ): void {
-    if (typeof queryParams === "string") queryParams = Utils.parseNestedQuery(queryParams);
-    queryArray.push(Utils.buildNestedQuery(queryParams));
+    if (typeof queryParams === "string") queryParams = parseNestedQuery(queryParams);
+    queryArray.push(this.buildNestedQuery(queryParams));
+  }
+
+  /** @internal */
+  private multipartContentType(env: Record<string, unknown>): string {
+    const requestedContentType = String(env["CONTENT_TYPE"]);
+    if (requestedContentType.startsWith("multipart/")) {
+      return requestedContentType;
+    } else {
+      return "multipart/form-data";
+    }
   }
 
   /** @internal */

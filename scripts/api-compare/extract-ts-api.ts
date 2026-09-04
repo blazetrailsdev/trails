@@ -3296,6 +3296,25 @@ function localCallableDeclaration(
   return decl;
 }
 
+/**
+ * The `@missingRailsCall` / `@missingRailsArgs` receipts on a file-local
+ * helper. A helper Rails extracts as a private method is a call-gate
+ * population member like any other, so the tag that stands in for a baseline
+ * row has to reach the artifact from here too.
+ */
+function missingRailsTagsOf(node: ts.Node): Partial<MethodInfo> {
+  const calls = missingRailsCallTags(node);
+  const args = missingRailsArgsTags(node);
+  const callReasons = missingRailsCallTagReasons(node);
+  const argReasons = missingRailsArgsTagReasons(node);
+  return {
+    ...(calls !== undefined ? { missingRailsCalls: calls } : {}),
+    ...(args !== undefined ? { missingRailsArgs: args } : {}),
+    ...(callReasons !== undefined ? { missingRailsCallReasons: callReasons } : {}),
+    ...(argReasons !== undefined ? { missingRailsArgsReasons: argReasons } : {}),
+  };
+}
+
 export function extractFileLocalHelpers(
   node: ts.FunctionDeclaration | ts.VariableStatement,
   relPath: string,
@@ -3316,6 +3335,7 @@ export function extractFileLocalHelpers(
       file: relPath,
       internal: true,
       ...(callArgs !== undefined ? { callArgs } : {}),
+      ...missingRailsTagsOf(node),
     });
     return out;
   }
@@ -3337,6 +3357,7 @@ export function extractFileLocalHelpers(
       file: relPath,
       internal: true,
       ...(callArgs !== undefined ? { callArgs } : {}),
+      ...missingRailsTagsOf(node),
     });
   }
   return out;
