@@ -14,7 +14,7 @@ import {
   strftime,
   timeToDf,
 } from "./date.js";
-import { Rational, kernelInteger } from "@blazetrails/ruby-compat";
+import { Rational, kernelInteger, stringInspect } from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
 
@@ -550,7 +550,7 @@ export class Time {
    */
   static zoneOffset(zone: string, year: number = Time.now().year): number | null {
     let off: number | null = null;
-    let t: Time;
+    let t: Time | undefined;
     zone = zone.toUpperCase();
     const m = /^([+-])(\d\d)(:?)(\d\d)(?:\3(\d\d))?$/.exec(zone);
     if (m) {
@@ -561,10 +561,26 @@ export class Time {
       off = parseInt(zone, 10) * 3600;
     } else if (zone in Time.ZoneOffset) {
       off = Time.ZoneOffset[zone] * 3600;
-    } else if ((t = Time.local(year, 1, 1)).zone?.toUpperCase() === zone) {
-      off = t.utcOffset;
-    } else if ((t = Time.local(year, 7, 1)).zone?.toUpperCase() === zone) {
-      off = t.utcOffset;
+    } else if (
+      (() => {
+        try {
+          return (t = Time.local(year, 1, 1)).zone!.toUpperCase() === zone;
+        } catch {
+          return false;
+        }
+      })()
+    ) {
+      off = t!.utcOffset;
+    } else if (
+      (() => {
+        try {
+          return (t = Time.local(year, 7, 1)).zone!.toUpperCase() === zone;
+        } catch {
+          return false;
+        }
+      })()
+    ) {
+      off = t!.utcOffset;
     }
     return off;
   }
@@ -684,7 +700,10 @@ export class Time {
    * `vendor/ruby/lib/time.rb:195-272`. Ruby's `now.respond_to?(:getlocal)`
    * guard admits any object answering `#mon`/`#day`/`#year`; `now` is typed
    * `Time` here, so the guard is statically true and the branch it protects is
-   * the only one reachable.
+   * the only one reachable. `offYear` is likewise `nil` in Ruby only when
+   * `year` and `now` are both absent, where `month_days(nil, mon)` raises; JS
+   * arithmetic on `undefined` cannot raise, so that arm skips its day
+   * correction instead of failing.
    */
   static #makeTime(
     date: string,
@@ -709,7 +728,7 @@ export class Time {
       sec == null &&
       secFraction == null
     ) {
-      throw new ArgumentError(`no time information in ${JSON.stringify(date)}`);
+      throw new ArgumentError(`no time information in ${stringInspect(date)}`);
     }
 
     let off: number | null = null;

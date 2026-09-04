@@ -494,4 +494,12 @@ describe("Time", () => {
     expect(Time.zoneOffset("+09:30")).toBe(34200);
     expect(Time.zoneOffset("-05")).toBe(-18000);
   });
+
+  it("Time.parse hands the uncompleted year to its block", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    expect(Time.parse("Feb 24 72", Time.now(), (y) => y + 2000).xmlschema()).toBe(
+      "2072-02-24T00:00:00-05:00",
+    );
+    expect(Time.parse("Feb 24 72").xmlschema()).toBe("1972-02-24T00:00:00-05:00");
+  });
 });
