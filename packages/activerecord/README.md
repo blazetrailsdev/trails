@@ -48,6 +48,14 @@ The drivers are optional peer dependencies (`better-sqlite3`, `pg`, `mysql2`,
 `expo-sqlite`); install only the one your target needs. `node:sqlite` needs no
 package.
 
+`typescript` is an optional peer too, at `^5.0.0`. Nothing in the runtime
+imports the compiler — the range exists for the `./type-virtualization/*`
+subpath (the engine behind `trails-tsc`), which builds a `ts.SourceFile` from
+source text via `ts.createSourceFile` and so cannot run on the TypeScript 7 API.
+The range stays on 5.x until that port lands; widening it to admit 7.x would
+invite in a user the subpath cannot serve. See RFC
+`0125-typescript-7-ground-floor` in the tasks repo.
+
 ## Quickstart
 
 The fastest path is the [`ar` CLI](#the-ar-cli) (the trails counterpart to
