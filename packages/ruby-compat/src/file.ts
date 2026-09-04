@@ -104,22 +104,46 @@ export class File extends IO {
    */
   static readonly LOCK_UN = 8;
 
-  /** `vendor/ruby/dir.c:3678` — a backslash is an ordinary character, not an escape. @noRailsEquivalent PERMANENT — Ruby core `File::FNM_NOESCAPE`. */
+  /**
+   * `vendor/ruby/dir.c:3678` — a backslash is an ordinary character, not an escape.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_NOESCAPE`.
+   */
   static readonly FNM_NOESCAPE = 0x01;
 
-  /** `vendor/ruby/dir.c:3682` — `*`, `?` and a bracket stop at `/`, and `**` + `/` walks elements. @noRailsEquivalent PERMANENT — Ruby core `File::FNM_PATHNAME`. */
+  /**
+   * `vendor/ruby/dir.c:3682` — `*`, `?` and a bracket stop at `/`, and `**` + `/` walks elements.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_PATHNAME`.
+   */
   static readonly FNM_PATHNAME = 0x02;
 
-  /** `vendor/ruby/dir.c:3686` — a wildcard may match a leading period. @noRailsEquivalent PERMANENT — Ruby core `File::FNM_DOTMATCH`. */
+  /**
+   * `vendor/ruby/dir.c:3686` — a wildcard may match a leading period.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_DOTMATCH`.
+   */
   static readonly FNM_DOTMATCH = 0x04;
 
-  /** `vendor/ruby/dir.c:3674` — case-insensitive matching. @noRailsEquivalent PERMANENT — Ruby core `File::FNM_CASEFOLD`. */
+  /**
+   * `vendor/ruby/dir.c:3674` — case-insensitive matching.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_CASEFOLD`.
+   */
   static readonly FNM_CASEFOLD = 0x08;
 
-  /** `vendor/ruby/dir.c:3690` — `{a,b}` alternation, expanded by `ruby_brace_expand` (`dir.c:3471-3478`). @noRailsEquivalent PERMANENT — Ruby core `File::FNM_EXTGLOB`. */
+  /**
+   * `vendor/ruby/dir.c:3690` — `{a,b}` alternation, expanded by `ruby_brace_expand` (`dir.c:3471-3478`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_EXTGLOB`.
+   */
   static readonly FNM_EXTGLOB = 0x10;
 
-  /** `vendor/ruby/dir.c:222-224` — `FNM_CASEFOLD` on a case-insensitive filesystem, `0` everywhere else, as on every non-Windows MRI. @noRailsEquivalent PERMANENT — Ruby core `File::FNM_SYSCASE`. */
+  /**
+   * `vendor/ruby/dir.c:222-224` — `FNM_CASEFOLD` on a case-insensitive filesystem, `0` everywhere else, as on every non-Windows MRI.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_SYSCASE`.
+   */
   static readonly FNM_SYSCASE = 0;
 
   /**
@@ -432,6 +456,10 @@ export class File extends IO {
    * glob `pattern`. Under `FNM_EXTGLOB` the pattern is brace-expanded first and
    * the first alternative that matches wins (`dir.c:3471-3478`).
    *
+   * MRI advances both cursors by `rb_enc_mbclen` (`dir.c:390`); a JS string
+   * indexes by UTF-16 code unit, so `?` and a bracket consume one unit rather
+   * than one astral character.
+   *
    * @noRailsEquivalent PERMANENT — Ruby core `File.fnmatch`
    * (`vendor/ruby/dir.c:3457`).
    */
@@ -481,7 +509,10 @@ export class File extends IO {
 /**
  * `bracket` (`vendor/ruby/dir.c:240`), which answers the pattern index just
  * past the closing `]` when `s` is in the class, and `null` when it is not or
- * the class never closes.
+ * the class never closes. Its `FNM_CASEFOLD` arm casefolds against `p` — the
+ * character AFTER `t1` (`dir.c:296`) — so MRI's `File.fnmatch("[ab]", "A",
+ * File::FNM_CASEFOLD)` is `false` while `"B"` is `true`; that is mirrored, not
+ * corrected.
  */
 function bracket(
   p: number,
@@ -526,7 +557,7 @@ function bracket(
         continue;
       }
       if (!nocase) continue;
-      if (compareChar(string[s], pattern[t1], nocase) !== 0) continue;
+      if (compareChar(string[s], pattern[p], nocase) !== 0) continue;
     }
     ok = true;
   }
@@ -547,7 +578,9 @@ function compareChar(a: string, b: string, nocase: number): number {
 /**
  * `fnmatch_helper` (`vendor/ruby/dir.c:317`), which matches one path element
  * under `FNM_PATHNAME` and the whole string without it. The cursors it
- * advances through `*pcur` / `*scur` are the returned pair.
+ * advances through `*pcur` / `*scur` are the returned pair, `unescape` /
+ * `isEndP` / `isEndS` / `ret` are its `UNESCAPE` / `ISEND` / `RETURN` macros
+ * (`dir.c:311-314`), and the `failed:` label is its `goto failed` (`dir.c:396`).
  */
 function fnmatchHelper(
   pcur: number,
@@ -575,7 +608,7 @@ function fnmatchHelper(
   if (period && string[s] === "." && pattern[unescape(p)] !== ".") return ret(false);
 
   for (;;) {
-    switchDone: {
+    failed: {
       switch (pattern[p]) {
         case "*":
           do {
@@ -604,20 +637,20 @@ function fnmatchHelper(
             s++;
             continue;
           }
-          break switchDone;
+          break failed;
         }
       }
 
       p = unescape(p);
       if (isEndS(s)) return ret(isEndP(p));
-      if (isEndP(p)) break switchDone;
+      if (isEndP(p)) break failed;
       if (pattern[p] === string[s]) {
         p++;
         s++;
         continue;
       }
-      if (!nocase) break switchDone;
-      if (compareChar(pattern[p], string[s], nocase) !== 0) break switchDone;
+      if (!nocase) break failed;
+      if (compareChar(pattern[p], string[s], nocase) !== 0) break failed;
       p++;
       s++;
       continue;

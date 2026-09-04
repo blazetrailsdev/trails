@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "./argument-error.js";
 import { pack } from "./array.js";
 
 describe("Array#pack", () => {
@@ -40,5 +41,18 @@ describe("Array#pack", () => {
 
   it("packs the HTTP Basic credential Rack::Test builds", () => {
     expect(pack(["user:pass"], "m0")).toBe("dXNlcjpwYXNz");
+  });
+
+  it("raises on an unknown directive", () => {
+    expect(() => pack(["a"], "Y")).toThrow(new ArgumentError("unknown pack directive 'Y' in 'Y'"));
+  });
+
+  it("raises when the array runs out", () => {
+    expect(() => pack([], "m0")).toThrow(new ArgumentError("too few arguments"));
+  });
+
+  it("skips whitespace and # comments in the format", () => {
+    expect(pack(["ab"], " m0")).toBe("YWI=");
+    expect(pack(["ab"], "#skip\nm0")).toBe("YWI=");
   });
 });

@@ -224,6 +224,9 @@ describe("File.fnmatch", () => {
     ["\\*", "*", File.FNM_NOESCAPE],
     ["A*", "abc", File.FNM_CASEFOLD],
     ["[]]", "]", 0],
+    ["[ab]", "A", File.FNM_CASEFOLD],
+    ["[ab]", "B", File.FNM_CASEFOLD],
+    ["[b]", "B", File.FNM_CASEFOLD],
     ["app/views/*/*.tse", "app/views/users/index.tse", 0],
   ];
 
@@ -250,6 +253,9 @@ describe("File.fnmatch", () => {
     true,
     false,
     true,
+    false,
+    true,
+    false,
     false,
     true,
     false,
