@@ -5,9 +5,7 @@ import { SecureRandom } from "./secure-random.js";
 
 /**
  * `OpenSSL::Cipher` (`vendor/ruby/ext/openssl/lib/openssl/cipher.rb:16`), the
- * sliver Rails drives: `cipher.encrypt` / `cipher.key =` / `cipher.random_iv` /
- * `cipher.auth_data =` / `cipher.update` / `cipher.final` / `cipher.auth_tag`
- * (`activesupport/lib/active_support/message_encryptor.rb:276-290`).
+ * sliver Rails drives (`message_encryptor.rb:276-290`).
  *
  * @noRailsEquivalent PERMANENT — Ruby's openssl extension
  * (`vendor/ruby/ext/openssl/lib/openssl/cipher.rb:16`), which Rails calls
@@ -128,10 +126,8 @@ export class Cipher {
 
 /**
  * `OpenSSL::HMAC` (`vendor/ruby/ext/openssl/lib/openssl/hmac.rb:4`), the two
- * class methods Rails calls — `OpenSSL::HMAC.digest(digest, key, data)`
- * (`actionpack/lib/action_controller/metal/request_forgery_protection.rb:466`)
- * and `OpenSSL::HMAC.hexdigest`
- * (`activesupport/lib/active_support/message_verifier.rb:246`).
+ * class methods Rails calls (`request_forgery_protection.rb:466`,
+ * `message_verifier.rb:353`).
  *
  * @noRailsEquivalent PERMANENT — Ruby's openssl extension
  * (`vendor/ruby/ext/openssl/lib/openssl/hmac.rb:4`), which Rails calls without
@@ -151,8 +147,7 @@ export const HMAC = {
 
 /**
  * `OpenSSL` (`vendor/ruby/ext/openssl/lib/openssl.rb:16`), so a ported body
- * spells `OpenSSL::HMAC.digest` the way the Ruby does rather than importing its
- * members loose.
+ * spells `OpenSSL::HMAC.digest` the way the Ruby does.
  *
  * `OpenSSL::Digest::MD5` / `SHA1` / `SHA256`
  * (`vendor/ruby/ext/openssl/ossl_digest.c:400`) are the same three algorithms

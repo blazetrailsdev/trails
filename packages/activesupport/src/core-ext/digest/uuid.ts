@@ -1,5 +1,5 @@
 import { ArgumentError } from "../../hash-utils.js";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { getCrypto, SecureRandom } from "@blazetrails/ruby-compat";
 
 function namespaceBytes(hex: string): Uint8Array {
   return Uint8Array.from(hex.match(/../g)!, (byte) => parseInt(byte, 16));
@@ -67,7 +67,7 @@ export function uuidV5(uuidNamespace: string | Uint8Array, name: string): string
 }
 
 export function uuidV4(): string {
-  return getCrypto().randomUUID();
+  return SecureRandom.uuid();
 }
 
 export function nilUuid(): string {

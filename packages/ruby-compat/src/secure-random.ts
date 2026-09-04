@@ -8,13 +8,10 @@ import { NotImplementedError } from "./not-implemented-error.js";
  * `uuid` are available on it the way every caller uses them.
  *
  * `gen_random` is the `Random.urandom` arm (`securerandom.rb:64-73`); the
- * crypto adapter is the system random device here. `Random.urandom` answers
- * `nil` when the host has no device where `getCrypto()` raises, so the raise is
- * caught back into that `nil` and the same
- * `NotImplementedError, "No random device"` Ruby raises comes out of the guard.
- *
- * Bytes are a Ruby binary String — the `Bytes` container the rest of the leaf
- * package answers with — so `unpack1("H*")` is `toString("hex")`.
+ * crypto adapter is the system random device. `Random.urandom` answers `nil`
+ * where `getCrypto()` raises, so the raise is caught back into that `nil` and
+ * the guard below raises the `NotImplementedError` Ruby raises. Bytes are a
+ * Ruby binary String, so `unpack1("H*")` is `toString("hex")`.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `SecureRandom` ships
  * with the interpreter and no Rails file defines it, but

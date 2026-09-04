@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 import { KeyGenerator as AsKeyGenerator } from "@blazetrails/activesupport/key-generator";
 
 import { Configurable } from "./configurable-slot.js";
@@ -17,7 +17,7 @@ export class KeyGenerator {
   }
 
   generateRandomKey({ length = this.keyLength() }: { length?: number } = {}): string {
-    return getCrypto().randomBytes(length).toString("base64");
+    return SecureRandom.randomBytes(length).toString("base64");
   }
 
   generateRandomHexKey({ length = this.keyLength() }: { length?: number } = {}): string {

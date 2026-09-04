@@ -1,16 +1,14 @@
-import { getCrypto } from "./crypto-adapter.js";
-import type { Bytes } from "./fs-adapter.js";
+import { getCrypto, type HashAdapter } from "./crypto-adapter.js";
 
 /**
- * One `Digest::Class` subclass (`vendor/ruby/ext/digest/lib/digest.rb:20`) —
- * the three class methods every Rails caller reaches for, over the algorithm
- * the constant names.
+ * One `Digest::Class` subclass (`vendor/ruby/ext/digest/lib/digest.rb:20`),
+ * over the algorithm the constant names.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Digest::Class`
  * (`vendor/ruby/ext/digest/lib/digest.rb:20`), which Rails calls
  * (`activerecord/lib/active_record/encryption/key.rb:24`) without defining.
  */
-class DigestClass {
+export class DigestClass {
   /** @noRailsEquivalent PERMANENT */
   readonly algorithm: string;
 
@@ -19,28 +17,49 @@ class DigestClass {
     this.algorithm = algorithm;
   }
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/digest/digest.c:614 */
-  digest(data: string | Uint8Array): Bytes {
-    return getCrypto().createHash(this.algorithm).update(data).digest();
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/digest/lib/digest.rb:26 */
+  new(): DigestInstance {
+    return new DigestInstance(this.algorithm);
   }
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/digest/digest.c:645 */
   hexdigest(data: string | Uint8Array): string {
     return getCrypto().createHash(this.algorithm).update(data).digest("hex");
   }
+}
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/digest/digest.c:676 */
-  base64digest(data: string | Uint8Array): string {
-    return getCrypto().createHash(this.algorithm).update(data).digest("base64");
+/**
+ * The running digest `Digest::Class.new` answers, which
+ * `Rack::ETag#digest_body` feeds part by part (`vendor/rack/lib/rack/etag.rb:65`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib `Digest::Instance`
+ * (`vendor/ruby/ext/digest/lib/digest.rb:60`), which Rack calls without
+ * defining.
+ */
+export class DigestInstance {
+  private readonly impl: HashAdapter;
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/digest/digest.c:339 */
+  constructor(algorithm: string) {
+    this.impl = getCrypto().createHash(algorithm);
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/digest/digest.c:143 */
+  update(data: string | Uint8Array): this {
+    this.impl.update(data);
+    return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/ext/digest/digest.c:245 */
+  hexdigest(): string {
+    return this.impl.digest("hex");
   }
 }
 
 /**
  * `Digest` (`vendor/ruby/ext/digest/lib/digest.rb:8`), the three constants
- * Rails names — `Digest::MD5` (`activesupport/lib/active_support/digest.rb:9`),
- * `Digest::SHA1` (`activerecord/lib/active_record/encryption/key.rb:24`) and
- * `Digest::SHA256`
- * (`activesupport/lib/active_support/notifications/fanout.rb`).
+ * Rails names — `Digest::MD5` (`digest.rb:9`), `Digest::SHA1`
+ * (`encryption/key.rb:24`) and `Digest::SHA256` (`rack/etag.rb:65`).
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Digest`
  * (`vendor/ruby/ext/digest/lib/digest.rb:8`), which no Rails file defines.

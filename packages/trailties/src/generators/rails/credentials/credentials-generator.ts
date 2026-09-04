@@ -1,6 +1,6 @@
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { EncryptedFile } from "@blazetrails/activesupport/encrypted-file";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 import { GeneratorBase, type GeneratorOptions } from "../../base.js";
 
 export interface CredentialsGeneratorOptions extends GeneratorOptions {
@@ -50,7 +50,7 @@ export class CredentialsGenerator extends GeneratorBase {
   }
 
   private secretKeyBase(): string {
-    return (this.memoSecretKeyBase ??= Buffer.from(getCrypto().randomBytes(64)).toString("hex"));
+    return (this.memoSecretKeyBase ??= SecureRandom.hex(64));
   }
 
   private renderTemplate(): string {
