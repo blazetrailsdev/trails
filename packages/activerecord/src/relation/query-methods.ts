@@ -10,6 +10,7 @@ import {
 import { PredicateBuilder } from "./predicate-builder.js";
 import { DeferredIdsNotIn } from "./predicate-builder/deferred-distinct-pk-in.js";
 import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
+import { Relation } from "../relation.js";
 import {
   ActiveRecordError,
   IrreversibleOrderError,
@@ -972,24 +973,6 @@ export function structurallyIncompatibleValuesFor(
   return incompat;
 }
 
-function isRelationForCombining(value: unknown): value is QueryMethodsHost {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  const wc = v.whereClause as Record<string, unknown> | undefined;
-  const hc = v.havingClause as Record<string, unknown> | undefined;
-  return (
-    typeof wc === "object" &&
-    wc !== null &&
-    typeof wc.merge === "function" &&
-    typeof wc.or === "function" &&
-    typeof hc === "object" &&
-    hc !== null &&
-    typeof hc.merge === "function" &&
-    typeof hc.or === "function" &&
-    Array.isArray(v.referencesValues)
-  );
-}
-
 function rubyClassNameOf(value: unknown): string {
   if (value === null) return "NilClass";
   if (Array.isArray(value)) return "Array";
@@ -1010,7 +993,7 @@ function rubyClassNameOf(value: unknown): string {
 }
 
 function assertRelationForCombining(other: unknown, methodName: string): void {
-  if (!isRelationForCombining(other)) {
+  if (!(other instanceof Relation)) {
     throw new ArgumentError(
       `You have passed ${rubyClassNameOf(other)} object to #${methodName}. Pass an ActiveRecord::Relation object instead.`,
     );
@@ -1286,9 +1269,9 @@ function uniqBang(this: QueryMethodsHost, name?: string): any {
 
 function excludingWithCallee(callee: "excluding" | "without") {
   return function (this: QueryMethodsHost, ...records: unknown[]): any {
-    const relations = records.filter((r) => isRelationForCombining(r)) as any[];
+    const relations = records.filter((r) => r instanceof Relation) as any[];
     records = records
-      .filter((r) => !isRelationForCombining(r))
+      .filter((r) => !(r instanceof Relation))
       .flat(1)
       .filter((r) => r != null);
 
