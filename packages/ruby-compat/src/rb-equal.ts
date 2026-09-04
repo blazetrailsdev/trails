@@ -1,3 +1,5 @@
+import { temporalTag, widenPlainDate } from "./temporal-tag.js";
+
 /**
  * Ruby's `rb_equal` (`vendor/ruby/object.c:147`) — the C primitive behind every `==` send: identity first,
  * then the receiver's own `==`. Ported callers (`Range#==`'s endpoint
@@ -12,8 +14,28 @@
 export function rbEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  /* Ruby's `Date#==` (`vendor/ruby/ext/date/date_core.c:6902` `d_lite_equal`) is
+     `<=>`-based (`vendor/ruby/ext/date/date_core.c:6810` `d_lite_cmp`), so it
+     answers `false` for an operand of another class instead of raising, and a
+     Date equals a DateTime at the same instant. Temporal's own `equals` has
+     neither half — it coerces its argument, so `PlainDate#equals` raises
+     `TypeError: year is required` for an Instant — which is why this is tried
+     before the `equals` arm below, mirroring `cmp`'s Temporal arm. */
+  const tag = temporalTag(a);
+  if (tag !== null) {
+    if (temporalTag(b) === null) return false;
+    const x = widenPlainDate(a);
+    const y = widenPlainDate(b);
+    if (temporalTag(x) !== temporalTag(y)) return false;
+    return (
+      (x as { constructor: { compare(l: unknown, r: unknown): number } }).constructor.compare(
+        x,
+        y,
+      ) === 0
+    );
+  }
   if (typeof (a as { equals?: unknown }).equals === "function") {
-    return dispatch(a as { equals(other: unknown): boolean }, "equals", b);
+    return (a as { equals(other: unknown): boolean }).equals(b);
   }
   /* `vendor/ruby/object.c:147`. A class whose Ruby `==` is `alias :== :eql?`
      (Arel::Nodes::Casted, arel/nodes/casted.rb:33; Arel::Table) has only the
@@ -21,7 +43,7 @@ export function rbEqual(a: unknown, b: unknown): boolean {
      carrying both spellings (Duration, TimeWithZone) means the two by their
      Ruby names, and `equals` above is the `==` of the pair. */
   if (typeof (a as { eql?: unknown }).eql === "function") {
-    return dispatch(a as { eql(other: unknown): boolean }, "eql", b);
+    return (a as { eql(other: unknown): boolean }).eql(b);
   }
   /* Ruby's `Array#==` (`vendor/ruby/array.c:5120` `rb_ary_equal`) compares
      elementwise with `==`, and `Date#==` / `Time#==` compare by value — both
@@ -55,30 +77,6 @@ export function rbEqual(a: unknown, b: unknown): boolean {
     );
   }
   return false;
-}
-
-/**
- * Ruby's `==` answers `false` for an operand it cannot compare — `Date.today ==
- * Time.now` is `false`, never an exception (`vendor/ruby/date_core.c`
- * `d_lite_equal` falls through `rb_cmpint`). A JS `equals` may instead coerce
- * and throw: `Temporal.PlainDate#equals` runs `ToTemporalDate` on its argument,
- * so it raises `TypeError: year is required` for the Instant that Ruby would
- * simply call unequal.
- *
- * @noRailsEquivalent PERMANENT — the `==` send of `rb_equal`
- *   (`vendor/ruby/object.c:147`), which is a C primitive rather than a Ruby
- *   method.
- */
-function dispatch<M extends "equals" | "eql">(
-  a: Record<M, (other: unknown) => boolean>,
-  method: M,
-  b: unknown,
-): boolean {
-  try {
-    return a[method](b);
-  } catch {
-    return false;
-  }
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

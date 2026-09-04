@@ -67,5 +67,7 @@ describe("ValueType#isChanged is Ruby value equality", () => {
     expect(type.isChanged(date, Temporal.Instant.fromEpochMilliseconds(0))).toBe(true);
     expect(type.isChanged(date, Temporal.PlainDate.from("2026-09-03"))).toBe(false);
     expect(type.isChanged(date, Temporal.PlainDate.from("2026-09-04"))).toBe(true);
+    expect(type.isChanged(date, Temporal.PlainDateTime.from("2026-09-03T00:00"))).toBe(false);
+    expect(type.isChanged(date, Temporal.PlainDateTime.from("2026-09-03T01:00"))).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -38,6 +38,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       )
     `);
     await adapter.loadAdditionalTypes();
+  });
+  afterEach(() => {
+    (
+      adapter as unknown as {
+        internalSchemaCache: { clearDataSourceCacheBang(connection: unknown, name: string): void };
+      }
+    ).internalSchemaCache.clearDataSourceCacheBang(null, "pg_arrays");
   });
   afterAll(async () => {
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`).catch(() => {});

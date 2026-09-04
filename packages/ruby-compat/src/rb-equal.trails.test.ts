@@ -10,16 +10,23 @@ describe("rbEqual over the values a Ruby binary String stands in for", () => {
     expect(rbEqual(new Uint8Array([0x80]), "")).toBe(false);
   });
 
-  it("answers false where a JS equals refuses to coerce, as Ruby's == does", () => {
-    const coercing = {
-      equals(other: unknown): boolean {
-        if (typeof other !== "number") throw new TypeError("year is required");
-        return other === 1;
+  it("compares two Temporal values by class and instant, never by their own equals", () => {
+    const at = (tag: string, value: number, widened?: unknown) => ({
+      [Symbol.toStringTag]: tag,
+      value,
+      ...(widened === undefined ? {} : { toPlainDateTime: () => widened }),
+      constructor: {
+        compare: (l: { value: number }, r: { value: number }) =>
+          l.value < r.value ? -1 : l.value > r.value ? 1 : 0,
       },
-    };
+      equals() {
+        throw new TypeError("year is required");
+      },
+    });
 
-    expect(rbEqual(coercing, 1)).toBe(true);
-    expect(rbEqual(coercing, 2)).toBe(false);
-    expect(rbEqual(coercing, {})).toBe(false);
+    expect(rbEqual(at("Temporal.PlainDate", 1), at("Temporal.PlainDate", 1))).toBe(true);
+    expect(rbEqual(at("Temporal.PlainDate", 1), at("Temporal.PlainDate", 2))).toBe(false);
+    expect(rbEqual(at("Temporal.PlainDate", 1), at("Temporal.Instant", 1))).toBe(false);
+    expect(rbEqual(at("Temporal.PlainDate", 1), { value: 1 })).toBe(false);
   });
 });

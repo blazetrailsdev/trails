@@ -19,6 +19,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { rbInspect, rbObjClass } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
+import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
 /**
  * The Ruby class name `rb_obj_class` reports in `rb_cmperr`'s message — Ruby's
@@ -114,24 +115,6 @@ export function cmp(a: unknown, b: unknown): number | null {
      `==` operand and nil otherwise, rather than JS relational coercion, which
      orders `false` before `true` where Ruby answers nil. */
   return rbEqual(a, b) ? 0 : null;
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-function temporalTag(value: unknown): string | null {
-  const tag = (value as { [Symbol.toStringTag]?: unknown })[Symbol.toStringTag];
-  return typeof tag === "string" && tag.startsWith("Temporal.") ? tag : null;
-}
-
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
-function widenPlainDate(value: unknown): unknown {
-  const toPlainDateTime = (value as { toPlainDateTime?: unknown }).toPlainDateTime;
-  return typeof toPlainDateTime === "function" ? toPlainDateTime.call(value) : value;
 }
 
 function isComparable(value: unknown): value is Comparable {
