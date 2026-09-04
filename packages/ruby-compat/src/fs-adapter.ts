@@ -16,14 +16,18 @@ export interface FsStatResult {
   isDirectory(): boolean;
   isFile(): boolean;
   isSymbolicLink?(): boolean;
+  isCharacterDevice?(): boolean;
+  isBlockDevice?(): boolean;
+  isSocket?(): boolean;
+  isFIFO?(): boolean;
   size: number;
   atime: Date;
   mtime: Date;
   mode: number;
   dev?: number;
   ino?: number;
-  uid?: number;
-  gid?: number;
+  uid: number;
+  gid: number;
 }
 
 export interface FsDirent {
@@ -310,7 +314,7 @@ function resolve(): FsRegistration {
   }
 
   throw new Error(
-    "No filesystem adapter configured. Under ESM, import '@blazetrails/activesupport/node' from your entry point; otherwise set ActiveSupport.fsAdapter or register a custom adapter.",
+    "No filesystem adapter configured. Node's filesystem could not be loaded automatically; call registerFsAdapter(name, fs, path) and set fsAdapterConfig.adapter to that name.",
   );
 }
 
@@ -321,16 +325,6 @@ export function getFs(): FsAdapter {
 
 /** @noRailsEquivalent CONVERGEABLE unexempt-file-and-dir-from-core-class-receivers */
 export function getPath(): PathAdapter {
-  return resolve().path;
-}
-
-/** @noRailsEquivalent CONVERGEABLE unexempt-file-and-dir-from-core-class-receivers */
-export async function getFsAsync(): Promise<FsAdapter> {
-  return resolve().fs;
-}
-
-/** @noRailsEquivalent CONVERGEABLE unexempt-file-and-dir-from-core-class-receivers */
-export async function getPathAsync(): Promise<PathAdapter> {
   return resolve().path;
 }
 

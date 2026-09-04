@@ -256,6 +256,28 @@ describe("FileUtils", () => {
     expect(nodeFs.readlinkSync(dest)).toEqual(target);
   });
 
+  it("copy_entry reports a FIFO it cannot handle", () => {
+    const src = nodePath.join(root, "fifo");
+    const dest = nodePath.join(root, "copy");
+    nodeFs.writeFileSync(src, "");
+    registerExdevFs();
+    const exdev = getFs();
+    registerFsAdapter(
+      "fifo",
+      Object.assign(Object.create(exdev) as typeof exdev, {
+        lstatSync: (path: string) =>
+          Object.assign(Object.create(nodeFs.lstatSync(path)) as nodeFs.Stats, {
+            isFile: () => false,
+            isFIFO: () => true,
+          }),
+      }),
+      getPath(),
+    );
+    fsAdapterConfig.adapter = "fifo";
+
+    expect(() => FileUtils.mv(src, dest)).toThrow("cannot handle FIFO");
+  });
+
   it("verbose prints the command line to the configured output", () => {
     const lines: string[] = [];
     FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };

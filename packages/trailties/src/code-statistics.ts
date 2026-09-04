@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
 export type DirectoryPair = readonly [label: string, path: string];
@@ -79,8 +79,8 @@ export class CodeStatistics {
 
   private async walk(directory: string): Promise<CodeStatisticsCalculator> {
     const stats = new CodeStatisticsCalculator();
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
+    const fs = getFs();
+    const path = getPath();
     if (!fs.readdir || !fs.stat || !fs.readFile) {
       throw new Error("CodeStatistics requires async fsAdapter (readdir/stat/readFile).");
     }

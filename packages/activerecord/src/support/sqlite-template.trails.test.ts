@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { getFsAsync, getOsAsync } from "@blazetrails/ruby-compat";
+import { getFs, getOsAsync } from "@blazetrails/ruby-compat";
 import {
   TEMPLATE_PATH_ENV,
   RUN_TOKEN_ENV,
@@ -34,7 +34,7 @@ describe("registerDbFileCleanupOnExit", () => {
   });
 
   it("runs its exit listener to unlink the DB file and its WAL sidecars", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     const base = await tmpPath();
     for (const suffix of SIDECARS) fs.writeFileSync(base + suffix, "");
 
@@ -52,7 +52,7 @@ describe("registerDbFileCleanupOnExit", () => {
   });
 
   it("tolerates a DB file that was never created", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     const base = await tmpPath();
     expect(() => unlinkDbFiles(base)).not.toThrow();
   });
@@ -62,14 +62,14 @@ describe("sweepRunDbFiles", () => {
   const token = () => `sweep${Math.random().toString(36).slice(2)}`;
 
   async function seed(name: string): Promise<string> {
-    const [fs, os] = [await getFsAsync(), await getOsAsync()];
+    const [fs, os] = [getFs(), await getOsAsync()];
     const target = `${os.tmpdir()}/${name}`;
     fs.writeFileSync(target, "");
     return target;
   }
 
   it("unlinks every temp DB stamped with the run token, sidecars included", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     const run = token();
     const seeded = await Promise.all([
       seed(`ar-test-template-${run}.sqlite`),
@@ -86,7 +86,7 @@ describe("sweepRunDbFiles", () => {
   });
 
   it("leaves a concurrent run's files alone", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     const other = await seed(`ar-test-worker-${token()}-1.sqlite`);
     try {
       await sweepRunDbFiles(token());
@@ -99,7 +99,7 @@ describe("sweepRunDbFiles", () => {
 
 describe("sweepStaleDbFiles", () => {
   it("keeps a temp DB that a running suite could still be using", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     const fresh = `${(await getOsAsync()).tmpdir()}/ar-test-worker-stale${Math.random()
       .toString(36)
       .slice(2)}-1.sqlite`;
@@ -118,7 +118,7 @@ describe.skipIf(!isSqliteRun())("sqlite template-clone (Phase 0 probe)", () => {
     const templatePath = process.env[TEMPLATE_PATH_ENV];
     expect(templatePath, "AR_TEST_TEMPLATE_PATH must be set by globalSetup").toBeTruthy();
 
-    const fs = await getFsAsync();
+    const fs = getFs();
     expect(await fs.exists(templatePath!), `template file must exist at ${templatePath}`).toBe(
       true,
     );
@@ -128,7 +128,7 @@ describe.skipIf(!isSqliteRun())("sqlite template-clone (Phase 0 probe)", () => {
     const workerDb = process.env[WORKER_DB_ENV];
     expect(workerDb, "AR_TEST_WORKER_DB must be set by test-setup-worker-db").toBeTruthy();
 
-    const fs = await getFsAsync();
+    const fs = getFs();
     expect(await fs.exists(workerDb!), `worker clone must exist at ${workerDb}`).toBe(true);
 
     const slot = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";

@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
-import { getPathAsync } from "@blazetrails/ruby-compat";
+import { getPath } from "@blazetrails/ruby-compat";
 import { PathRegistry } from "../../path-registry.js";
 import { PathSet } from "../../path-set.js";
 import { FileSystemResolver } from "../../template/resolver.js";
@@ -18,7 +18,7 @@ const FIXTURE_LOAD_PATH = "/fixtures";
 let expand: (paths: string[]) => string[];
 
 beforeAll(async () => {
-  const path = await getPathAsync();
+  const path = getPath();
   expand = (paths) => paths.map((p) => path.resolve(p));
 });
 

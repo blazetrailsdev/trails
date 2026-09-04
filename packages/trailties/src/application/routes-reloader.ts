@@ -1,5 +1,5 @@
 import { runLoadHooks } from "@blazetrails/activesupport";
-import { getPathAsync } from "@blazetrails/ruby-compat";
+import { getPath } from "@blazetrails/ruby-compat";
 import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {
@@ -53,7 +53,7 @@ export class RoutesReloader {
 }
 
 async function loadRoutesFile(this: RoutesReloader, path: string): Promise<void> {
-  const p = await getPathAsync();
+  const p = getPath();
   if (!p.pathToFileURL) {
     throw new Error("PathAdapter.pathToFileURL() is required to load a routes file.");
   }

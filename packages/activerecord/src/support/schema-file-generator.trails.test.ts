@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { getPathAsync, getFsAsync } from "@blazetrails/ruby-compat";
+import { getPath, getFs } from "@blazetrails/ruby-compat";
 import { getEnv } from "@blazetrails/activesupport";
 import { getOsAsync } from "@blazetrails/ruby-compat";
 import { generateSchemaFile } from "./schema-file-generator.js";
@@ -50,23 +50,24 @@ describe("generateSchemaFile", () => {
 
   beforeAll(async () => {
     filePath = await generateSchemaFile(MINI_SCHEMA);
-    const fs = await getFsAsync();
+    const fs = getFs();
     content = fs.readFileSync(filePath, "utf-8");
   });
 
   afterAll(async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     try {
       fs.unlinkSync(filePath);
     } catch {}
   });
 
   it("writes file to os.tmpdir keyed by VITEST_POOL_ID", async () => {
-    const [os, path] = await Promise.all([getOsAsync(), getPathAsync()]);
+    const os = await getOsAsync();
+    const path = getPath();
     const poolId = getEnv("VITEST_POOL_ID") ?? "0";
     expect(filePath).toContain(path.join(os.tmpdir(), `trails-schema-${poolId}-`));
     expect(filePath).toMatch(/\.ts$/);
-    const fs = await getFsAsync();
+    const fs = getFs();
     expect(await fs.exists(filePath)).toBe(true);
   });
 
@@ -128,12 +129,12 @@ describe("generateSchemaFile (MySQL adapter)", () => {
 
   beforeAll(async () => {
     filePath = await generateSchemaFile(MYSQL_SCHEMA, "mysql2");
-    const fs = await getFsAsync();
+    const fs = getFs();
     content = fs.readFileSync(filePath, "utf-8");
   });
 
   afterAll(async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     try {
       fs.unlinkSync(filePath);
     } catch {}
@@ -184,11 +185,11 @@ describe("generateSchemaFile foreign keys", () => {
   const generate = async (typeRegistryKey?: AdapterName): Promise<string> => {
     const filePath = await generateSchemaFile(FK_SCHEMA, typeRegistryKey);
     written.push(filePath);
-    return (await getFsAsync()).readFileSync(filePath, "utf-8");
+    return getFs().readFileSync(filePath, "utf-8");
   };
 
   afterAll(async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     for (const filePath of written) {
       try {
         fs.unlinkSync(filePath);
@@ -219,7 +220,7 @@ describe("generateSchemaFile single-column integer PK id type per adapter", () =
 
   it("uses serial on postgres (INT4 serial, not the bigint primary_key type)", async () => {
     const filePath = await generateSchemaFile(SCHEMA, "postgresql");
-    const fs = await getFsAsync();
+    const fs = getFs();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"gadget_id", "serial", { primaryKey: true }');
     fs.unlinkSync(filePath);
@@ -227,7 +228,7 @@ describe("generateSchemaFile single-column integer PK id type per adapter", () =
 
   it("uses integer (INT auto-increment) on mysql, not bigint", async () => {
     const filePath = await generateSchemaFile(SCHEMA, "mysql2");
-    const fs = await getFsAsync();
+    const fs = getFs();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"gadget_id", "integer", { primaryKey: true }');
     fs.unlinkSync(filePath);
@@ -241,7 +242,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
 
   it("uses bigserial on postgres (INT8 serial, not the plain bigint primary_key type)", async () => {
     const filePath = await generateSchemaFile(SCHEMA, "postgresql");
-    const fs = await getFsAsync();
+    const fs = getFs();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"widget_id", "bigserial", { primaryKey: true }');
     fs.unlinkSync(filePath);
@@ -249,7 +250,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
 
   it("uses bigint (BIGINT auto-increment) on mysql", async () => {
     const filePath = await generateSchemaFile(SCHEMA, "mysql2");
-    const fs = await getFsAsync();
+    const fs = getFs();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"widget_id", "bigint", { primaryKey: true }');
     fs.unlinkSync(filePath);
@@ -257,7 +258,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
 
   it("uses integer (rowid auto-increment) on sqlite", async () => {
     const filePath = await generateSchemaFile(SCHEMA, "sqlite3");
-    const fs = await getFsAsync();
+    const fs = getFs();
     const content = fs.readFileSync(filePath, "utf-8");
     expect(content).toContain('"widget_id", "integer", { primaryKey: true }');
     fs.unlinkSync(filePath);
@@ -267,7 +268,7 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
 describe("generateSchemaFile / define-schema.ts type-map parity", () => {
   async function readGenerated(schema: Schema, adapter: AdapterName): Promise<string> {
     const filePath = await generateSchemaFile(schema, adapter);
-    const fs = await getFsAsync();
+    const fs = getFs();
     const content = fs.readFileSync(filePath, "utf-8");
     fs.unlinkSync(filePath);
     return content;
@@ -384,12 +385,12 @@ async function generatorIndexes(
   supportsExpressionIndex?: boolean,
 ): Promise<RecordedIndex[]> {
   const filePath = await generateSchemaFile(schema, adapter, supportsExpressionIndex);
-  const path = await getPathAsync();
+  const path = getPath();
   const href = path.pathToFileURL!(filePath).href;
   const mod = (await import(href)) as { default: (ctx: unknown) => Promise<void> };
   const { recorded, ctx } = makeIndexRecorder();
   await mod.default(ctx);
-  const fs = await getFsAsync();
+  const fs = getFs();
   fs.unlinkSync(filePath);
   return recorded;
 }

@@ -1,10 +1,10 @@
-import { getPathAsync } from "@blazetrails/ruby-compat";
+import { getPath } from "@blazetrails/ruby-compat";
 import { Dir } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_PATH } from "../app-path.js";
 import { Trails } from "../rails.js";
 
 export async function requireApplicationBang(): Promise<void> {
-  const p = await getPathAsync();
+  const p = getPath();
   if (!p.pathToFileURL) {
     throw new Error("PathAdapter.pathToFileURL() is required to boot an application.");
   }

@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { createServer, type ViteDevServer } from "vite";
 import type { RackApp } from "@blazetrails/actionpack";
 import { trailsPlugin } from "./vite-plugin.js";
@@ -25,8 +25,8 @@ export class DevServer {
   }
 
   async start(): Promise<void> {
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
+    const fs = getFs();
+    const path = getPath();
     const tsConfig = path.join(this.cwd, "vite.config.ts");
     const jsConfig = path.join(this.cwd, "vite.config.js");
     const hasTsConfig = await fs.exists(tsConfig);

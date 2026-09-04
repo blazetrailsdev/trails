@@ -1,5 +1,5 @@
 import { it, expect, afterEach } from "vitest";
-import { getFsAsync } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
@@ -14,7 +14,7 @@ afterEach(async () => {
       await openAdapters.pop()!.close();
     } catch {}
   }
-  const fs = await getFsAsync();
+  const fs = getFs();
   for (const suffix of ["", "-wal", "-shm"]) {
     try {
       await fs.unlink!(SHARED_CACHE_DB + suffix);

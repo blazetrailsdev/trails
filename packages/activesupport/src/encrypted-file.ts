@@ -2,8 +2,8 @@ import {
   SecureRandom,
   FileUtils,
   IO,
-  getFsAsync,
-  getPathAsync,
+  getFs,
+  getPath,
   env as processEnv,
   chomp,
 } from "@blazetrails/ruby-compat";
@@ -89,7 +89,7 @@ export class EncryptedFile {
 
   async read(): Promise<string> {
     const key = await this.key();
-    const fs = await getFsAsync();
+    const fs = getFs();
     const path = await this.resolveContentPath();
     if (key !== null && (await fs.exists(path))) {
       return this.decrypt((await fs.readFile!(path, "utf8")).trim());
@@ -112,8 +112,8 @@ export class EncryptedFile {
     contents: string,
     block: (tmpPath: string) => void | Promise<void>,
   ): Promise<void> {
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
+    const fs = getFs();
+    const path = getPath();
     const contentPath = await this.resolveContentPath();
 
     await Tempfile.create(
@@ -160,7 +160,7 @@ export class EncryptedFile {
   private async readKeyFile(): Promise<string | null> {
     if (this.keyFileChecked) return this.keyFileContents;
     this.keyFileChecked = true;
-    const fs = await getFsAsync();
+    const fs = getFs();
     if (!(await fs.exists(this.keyPath))) return null;
     this.keyFileContents = (await fs.readFile!(this.keyPath, "utf8")).trim();
     return this.keyFileContents;
@@ -190,7 +190,7 @@ export class EncryptedFile {
 
   private async resolveContentPath(): Promise<string> {
     if (this.resolvedContentPath !== null) return this.resolvedContentPath;
-    const fs = await getFsAsync();
+    const fs = getFs();
     try {
       const lstat = fs.lstat ? await fs.lstat(this.contentPath) : null;
       if (lstat?.isSymbolicLink?.() && fs.realpath) {

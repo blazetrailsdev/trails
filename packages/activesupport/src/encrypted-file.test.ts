@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile, InvalidKeyLengthError, MissingKeyError } from "./encrypted-file.js";
-import { getFsAsync, getPathAsync, getOsAsync, setEnv } from "@blazetrails/ruby-compat";
+import { getFs, getPath, getOsAsync, setEnv } from "@blazetrails/ruby-compat";
 import {
   assert,
   assertNot,
@@ -29,8 +29,8 @@ describe("EncryptedFileTest", () => {
     originalEnv = process.env.CONTENT_KEY;
     setEnv("CONTENT_KEY", undefined);
 
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
+    const fs = getFs();
+    const path = getPath();
     const os = await getOsAsync();
     tmpdir = await fs.mkdtemp!(`${os.tmpdir()}${path.sep}encrypted-file-test-`);
     contentPath = path.join(tmpdir, "content.txt.enc");
@@ -40,7 +40,7 @@ describe("EncryptedFileTest", () => {
   });
 
   afterEach(async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     for (const p of [contentPath, keyPath]) {
       try {
         await fs.unlink!(p);
@@ -53,7 +53,7 @@ describe("EncryptedFileTest", () => {
   });
 
   it("reading content by env key", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     await fs.unlink!(keyPath);
     setEnv("CONTENT_KEY", key);
     const ef = make();
@@ -70,7 +70,7 @@ describe("EncryptedFileTest", () => {
   it("change content by key file", async () => {
     const ef = make();
     await ef.write(CONTENT);
-    const fs = await getFsAsync();
+    const fs = getFs();
     await ef.change(async (tmp) => {
       const current = await fs.readFile!(tmp, "utf8");
       await fs.writeFile!(tmp, `${current} and went by the lake`);
@@ -81,7 +81,7 @@ describe("EncryptedFileTest", () => {
   it("change sets restricted permissions", async () => {
     const ef = make();
     await ef.write(CONTENT);
-    const fs = await getFsAsync();
+    const fs = getFs();
     const tmpdirStat = await fs.stat!(tmpdir);
     await ef.change(async (file) => {
       const stat = await fs.stat!(file);
@@ -101,7 +101,7 @@ describe("EncryptedFileTest", () => {
   });
 
   it("raise MissingKeyError when env key is blank", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     await fs.unlink!(keyPath);
     setEnv("CONTENT_KEY", "");
     const ef = make();
@@ -114,7 +114,7 @@ describe("EncryptedFileTest", () => {
   });
 
   it("key can be added after MissingKeyError raised", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     await fs.unlink!(keyPath);
     const ef = make();
     await assertRaise([MissingKeyError], {}, () => ef.key());
@@ -131,14 +131,14 @@ describe("EncryptedFileTest", () => {
   });
 
   it("key? is true when env key is present", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     await fs.unlink!(keyPath);
     setEnv("CONTENT_KEY", key);
     assertPredicate(await make().isKey(), (k) => k);
   });
 
   it("key? is false and does not raise when the key is missing", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     await fs.unlink!(keyPath);
     await assertNothingRaised(async () => {
       assertNot(await make().isKey());
@@ -146,20 +146,20 @@ describe("EncryptedFileTest", () => {
   });
 
   it("raise InvalidKeyLengthError when key is too short", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     await fs.writeFile!(keyPath, EncryptedFile.generateKey().slice(0, -1));
     await assertRaise([InvalidKeyLengthError], {}, () => make().write(CONTENT));
   });
 
   it("raise InvalidKeyLengthError when key is too long", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     await fs.writeFile!(keyPath, EncryptedFile.generateKey() + "0");
     await assertRaise([InvalidKeyLengthError], {}, () => make().write(CONTENT));
   });
 
   it("respects existing content_path symlink", async () => {
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
+    const fs = getFs();
+    const path = getPath();
     const ef = make();
     await ef.write(CONTENT);
 
@@ -173,14 +173,14 @@ describe("EncryptedFileTest", () => {
   });
 
   it("creates new content_path symlink if it's dead", async () => {
-    const path = await getPathAsync();
+    const path = getPath();
     const symlinkPath = path.join(tmpdir, "content_symlink.txt.enc");
     await (await import("node:fs/promises")).symlink(contentPath, symlinkPath);
 
     const ef = make();
     await ef.write(CONTENT);
 
-    const fs = await getFsAsync();
+    const fs = getFs();
     assert(await fs.exists(contentPath));
     expect(await ef.read()).toBe(CONTENT);
   });

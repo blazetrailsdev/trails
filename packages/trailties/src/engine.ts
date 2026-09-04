@@ -8,7 +8,7 @@ import {
   type Extended,
   type Included,
 } from "@blazetrails/activesupport";
-import { File, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { File, getFs, getPath } from "@blazetrails/ruby-compat";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
 import type { RouteSetLike } from "./application/routes-reloader.js";
@@ -52,8 +52,8 @@ export class Engine extends Trailtie {
   }
 
   static async find(path: string): Promise<Engine | undefined> {
-    const p = await getPathAsync();
-    const fs = await getFsAsync();
+    const p = getPath();
+    const fs = getFs();
     const expanded = await realpathOr(fs, p.resolve(path));
     for (const klass of this.engineSubclasses()) {
       const engine = klass.instance();
@@ -145,7 +145,7 @@ export class Engine extends Trailtie {
   }
 
   async loadConfigInitializer(initializer: string): Promise<void> {
-    const { pathToFileURL } = await getPathAsync();
+    const { pathToFileURL } = getPath();
     await Notifications.instrumentAsync(
       "load_config_initializer.railties",
       { initializer },
@@ -158,7 +158,7 @@ export class Engine extends Trailtie {
   async loadSeed(): Promise<void> {
     const seedFile = ((await (await this.paths()).get("db/seeds.ts")?.existent()) ?? [])[0];
     if (seedFile !== undefined) {
-      const { pathToFileURL } = await getPathAsync();
+      const { pathToFileURL } = getPath();
       await this.runCallbacks("load_seed", async () => {
         await import(pathToFileURL!(seedFile).href);
       });
@@ -199,7 +199,7 @@ Engine.initializer(
   "load_environment_config",
   { before: "load_environment_hook", group: "all" },
   async function (this: Engine) {
-    const { pathToFileURL } = await getPathAsync();
+    const { pathToFileURL } = getPath();
     for (const environment of (await (await this.paths()).get("config/environments")?.existent()) ??
       []) {
       await import(pathToFileURL!(environment).href);
@@ -270,7 +270,7 @@ interface ActionControllerBaseLike {
   prependViewPath?: (views: string[]) => void;
 }
 
-type Fs = Awaited<ReturnType<typeof getFsAsync>>;
+type Fs = ReturnType<typeof getFs>;
 async function realpathOr(fs: Fs, p: string): Promise<string> {
   try {
     return fs.realpath ? await fs.realpath(p) : p;

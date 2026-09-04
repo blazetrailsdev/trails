@@ -1,4 +1,4 @@
-import { getFsAsync, getPathAsync, type FsAdapter } from "@blazetrails/ruby-compat";
+import { getFs, getPath, type FsAdapter } from "@blazetrails/ruby-compat";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { assertNoRubySource } from "../template-builder/no-ruby-source.js";
 
@@ -9,7 +9,7 @@ type AsyncFs = FsAdapter & {
 };
 
 async function requireAsyncFs(needs: ReadonlyArray<keyof AsyncFs>): Promise<AsyncFs> {
-  const fs = await getFsAsync();
+  const fs = getFs();
   for (const m of needs) {
     if (typeof (fs as unknown as Record<string, unknown>)[m] !== "function") {
       throw new Error(
@@ -40,7 +40,7 @@ export async function pkg(
     throw new Error(`package name must be non-empty, got ${JSON.stringify(name)}`);
   }
   const fs = await requireAsyncFs(["readFile", "writeFile"]);
-  const path = await getPathAsync();
+  const path = getPath();
   const pkgPath = path.join(this.cwd, "package.json");
   const raw = await fs.readFile(pkgPath, "utf-8");
   const parsed: unknown = JSON.parse(raw);
@@ -113,7 +113,7 @@ export async function initializer(
   }
   assertNoRubySource(content);
   const fs = await requireAsyncFs(["mkdir", "writeFile"]);
-  const path = await getPathAsync();
+  const path = getPath();
   const dir = path.join(this.cwd, "config/initializers");
   await fs.mkdir(dir, { recursive: true });
   const dest = path.join(dir, filename);
@@ -128,7 +128,7 @@ async function insertAtMarker(
   insertion: string,
 ): Promise<void> {
   const fs = await requireAsyncFs(["readFile", "writeFile"]);
-  const path = await getPathAsync();
+  const path = getPath();
   const full = path.join(host.cwd, relPath);
   const existing = await fs.readFile(full, "utf-8");
   const re = new RegExp(`^([\\t ]*)${regexpEscape(marker)}[\\t ]*$`, "gm");

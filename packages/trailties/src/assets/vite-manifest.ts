@@ -1,4 +1,4 @@
-import { getFsAsync } from "@blazetrails/ruby-compat";
+import { getFs } from "@blazetrails/ruby-compat";
 import {
   computeAssetPath as defaultComputeAssetPath,
   type AssetPathOptions,
@@ -35,7 +35,7 @@ export class ViteManifest {
 
 /** @noRailsEquivalent PERMANENT */
 export async function loadViteManifest(root: string): Promise<ViteManifest> {
-  const fs = await getFsAsync();
+  const fs = getFs();
   if (!fs.readFile) throw new Error("fsAdapter.readFile (async) is required");
   let contents: string;
   try {

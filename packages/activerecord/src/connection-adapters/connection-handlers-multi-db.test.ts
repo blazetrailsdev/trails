@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getFsAsync, getPathAsync, getOsAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
@@ -26,7 +26,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
   });
 
   async function asyncFs() {
-    const fs = await getFsAsync();
+    const fs = getFs();
     const { mkdtemp, writeFile, readdir, unlink, rmdir } = fs;
     if (!mkdtemp || !writeFile || !readdir || !unlink || !rmdir) {
       throw new Error("fs adapter is missing the async APIs this test requires");
@@ -36,7 +36,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
 
   beforeEach(async () => {
     const fs = await asyncFs();
-    const path = await getPathAsync();
+    const path = getPath();
     const os = await getOsAsync();
 
     dbDir = await fs.mkdtemp(path.join(os.tmpdir(), "trails-conn-multi-db-"));
@@ -62,7 +62,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       await restoreWorkerConnection();
     } finally {
       const fs = await asyncFs();
-      const path = await getPathAsync();
+      const path = getPath();
       for (const entry of await fs.readdir(dbDir)) {
         await fs.unlink(path.join(dbDir, entry));
       }

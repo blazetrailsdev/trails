@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile } from "./encrypted-file.js";
-import { getFsAsync, getPathAsync, getOsAsync } from "@blazetrails/ruby-compat";
+import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
 
 describe("EncryptedFile cipher", () => {
   let tmpdir: string;
@@ -8,8 +8,8 @@ describe("EncryptedFile cipher", () => {
   let keyPath: string;
 
   beforeEach(async () => {
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
+    const fs = getFs();
+    const path = getPath();
     const os = await getOsAsync();
     tmpdir = await fs.mkdtemp!(`${os.tmpdir()}${path.sep}encrypted-file-cipher-test-`);
     contentPath = path.join(tmpdir, "content.txt.enc");
@@ -17,7 +17,7 @@ describe("EncryptedFile cipher", () => {
   });
 
   afterEach(async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     try {
       fs.rmSync(tmpdir, { recursive: true, force: true });
     } catch {}
@@ -32,7 +32,7 @@ describe("EncryptedFile cipher", () => {
   });
 
   it("round-trips content under aes-128-gcm", async () => {
-    const fs = await getFsAsync();
+    const fs = getFs();
     await fs.writeFile!(keyPath, EncryptedFile.generateKey());
     const ef = new EncryptedFile({
       contentPath,

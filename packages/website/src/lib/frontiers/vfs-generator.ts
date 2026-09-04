@@ -73,6 +73,8 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
         atime: new Date(0),
         mtime: new Date(0),
         mode: 0o100644,
+        uid: 0,
+        gid: 0,
       };
     },
     cwd(): string {

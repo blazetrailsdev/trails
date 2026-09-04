@@ -127,7 +127,6 @@ async function main(): Promise<void> {
   // so Node ESM dedupes them with the fixture's own `@blazetrails/arel` import
   // to one module instance — that is what makes `Arel::Table.engine` visible to
   // the fixture's nodes.
-  const { getFsAsync, getPathAsync } = await import("@blazetrails/ruby-compat");
   const { Base } = await import("@blazetrails/activerecord");
 
   try {
@@ -149,12 +148,6 @@ async function main(): Promise<void> {
     //    sqlite3 visitor. A `{ connection: { visitor } }` stub cannot stand in:
     //    RFC 0007 deleted the connection-less quoters, so a visitor built with
     //    no connection dies on `quoteTableName` (to-sql.ts:1665-1667).
-    //
-    //    The sqlite3 adapter resolves the database path through the *sync*
-    //    `getFs()`, whose node auto-registration is async-only under pure ESM —
-    //    warm the registry first or it throws "No filesystem adapter configured".
-    await getFsAsync();
-    await getPathAsync();
     await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
     void Base.adapter; // checkout wires the dialect visitor (IS DISTINCT FROM → IS NOT)
 

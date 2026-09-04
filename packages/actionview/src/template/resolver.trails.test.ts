@@ -1,4 +1,4 @@
-import { getOsAsync, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
+import { getOsAsync, getFs, getPath } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { LookupContext } from "../lookup-context.js";
@@ -11,8 +11,8 @@ describe("FileSystemResolver", () => {
   let dir: string;
 
   beforeEach(async () => {
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
+    const fs = getFs();
+    const path = getPath();
     const os = await getOsAsync();
     dir = await fs.mkdtemp!(`${os.tmpdir()}${path.sep}fs-resolver-`);
     await fs.mkdir!(path.join(dir, "posts"), { recursive: true });
@@ -29,7 +29,7 @@ describe("FileSystemResolver", () => {
 
   afterEach(async () => {
     TemplateHandlers.clear();
-    const fs = await getFsAsync();
+    const fs = getFs();
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
@@ -82,8 +82,8 @@ describe("FileSystemResolver", () => {
     ctx.addResolver(new FileSystemResolver(dir));
     expect(ctx.isExists("index", ["posts"])).toBe(true);
 
-    const fs = await getFsAsync();
-    const path = await getPathAsync();
+    const fs = getFs();
+    const path = getPath();
     await fs.writeFile!(path.join(dir, "posts", "index.html+tablet.tse"), "<h1>Tablet</h1>");
 
     expect(
