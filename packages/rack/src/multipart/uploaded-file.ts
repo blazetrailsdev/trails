@@ -78,6 +78,8 @@ export class UploadedFile {
    * (`vendor/rack/lib/rack/multipart/uploaded_file.rb:39`) and so answered by
    * the tempfile — an `io:` stand-in that has no `binmode?` raises, as
    * `StringIO` does in Ruby.
+   *
+   * @noRailsEquivalent CONVERGEABLE rack-uploaded-file-publishes-tempfile-and-filename-readers
    */
   isBinmode(): boolean {
     return (this._tempfile as Tempfile).isBinmode();
