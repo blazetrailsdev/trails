@@ -246,14 +246,7 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   // A TS class or interface outside this set is a local helper type Rails does
   // not have, and `rails-private-jsdoc` leaves its members alone (RFC 0121).
   const fileEntities = new Map<string, Set<string>>();
-  // The instance fold run per ENTITY rather than per file: rubyFile → entity →
-  // name → status. A nested entity's private member is invisible to the
-  // file-wide fold whenever a sibling entity in the same `.rb` publishes the
-  // name — `Preloader::Association::LoaderRecords#load_records` is private
-  // (associations/preloader/association.rb:91, under the `private` at :75)
-  // while `Association#load_records` is public at :197 — so its privacy cannot
-  // be expressed at all. Keyed by the LAST FQN segment, which is the TS class
-  // name the port gives a nested Ruby entity.
+  // rubyFile → entity → name → status; see `entityInstanceFiles` above.
   const entityInstanceVis = new Map<string, Map<string, Map<string, "all-private" | "mixed">>>();
   const record = (m: Map<string, "all-private" | "mixed">, name: string, isPriv: boolean) => {
     const prev = m.get(name);
