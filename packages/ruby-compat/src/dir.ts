@@ -2,6 +2,18 @@ import { ArgumentError } from "./argument-error.js";
 import { File } from "./file.js";
 import { getFs } from "./fs-adapter.js";
 import { env, stderr } from "./process-adapter.js";
+import { verbose } from "./verbose.js";
+
+/**
+ * `Kernel#warn` (`vendor/ruby/error.c:555` `rb_warn_m`), which writes nothing
+ * at all while `$VERBOSE` is `nil` (`error.c:561`, `!NIL_P(ruby_verbose)`) —
+ * `false` still warns, so the guard is against `nil` alone — and terminates
+ * the message with a newline where it lacks one (`error.c:573`).
+ */
+function warn(message: string): void {
+  if (verbose() == null) return;
+  stderr.write(`${message}\n`);
+}
 
 /** `W_OK` (`vendor/ruby/file.c:1898` `rb_file_writable_p`). */
 const W_OK = 2;
@@ -184,11 +196,11 @@ export class Dir {
       }
       const mode = stat.mode;
       if (!stat.isDirectory()) {
-        stderr.write(`${name} is not a directory: ${dir}\n`);
+        warn(`${name} is not a directory: ${dir}`);
       } else if (!isWritable(dir)) {
-        stderr.write(`${name} is not writable: ${dir}\n`);
+        warn(`${name} is not writable: ${dir}`);
       } else if (mode != null && (mode & 0o002) !== 0 && (mode & 0o1000) === 0) {
-        stderr.write(`${name} is world-writable: ${dir}\n`);
+        warn(`${name} is world-writable: ${dir}`);
       } else {
         return dir;
       }
