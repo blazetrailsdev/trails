@@ -72,6 +72,7 @@ function createVfsFsAdapter(vfs: VirtualFS): FsAdapter {
         // boundary: epoch-zero placeholder for in-memory VFS file mtime.
         atime: new Date(0),
         mtime: new Date(0),
+        mode: 0o100644,
       };
     },
     cwd(): string {

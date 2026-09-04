@@ -194,12 +194,11 @@ export class Dir {
       } catch {
         continue;
       }
-      const mode = stat.mode;
       if (!stat.isDirectory()) {
         warn(`${name} is not a directory: ${dir}`);
       } else if (!isWritable(dir)) {
         warn(`${name} is not writable: ${dir}`);
-      } else if (mode != null && (mode & 0o002) !== 0 && (mode & 0o1000) === 0) {
+      } else if ((stat.mode & 0o002) !== 0 && (stat.mode & 0o1000) === 0) {
         warn(`${name} is world-writable: ${dir}`);
       } else {
         return dir;

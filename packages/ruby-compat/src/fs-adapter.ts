@@ -19,7 +19,7 @@ export interface FsStatResult {
   size: number;
   atime: Date;
   mtime: Date;
-  mode?: number;
+  mode: number;
   dev?: number;
   ino?: number;
   uid?: number;

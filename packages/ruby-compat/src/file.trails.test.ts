@@ -10,6 +10,12 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { File } from "./file.js";
+import {
+  fsAdapterConfig,
+  registerFsAdapter,
+  type FsAdapter,
+  type PathAdapter,
+} from "./fs-adapter.js";
 
 function fixture(): string {
   const root = mkdtempSync(join(tmpdir(), "trails-file-"));
@@ -17,6 +23,26 @@ function fixture(): string {
   writeFileSync(join(root, "a.rb"), "puts 1\n");
   symlinkSync(join(root, "nonexistent"), join(root, "broken"));
   return root;
+}
+
+const posixPath: PathAdapter = {
+  join: (...parts) => parts.join("/"),
+  dirname: (p) => p.slice(0, p.lastIndexOf("/")),
+  basename: (p) => p.slice(p.lastIndexOf("/") + 1),
+  resolve: (...parts) => parts.join("/"),
+  extname: () => "",
+  sep: "/",
+};
+
+function withWindowsPath(block: () => void): void {
+  const previous = fsAdapterConfig.adapter;
+  registerFsAdapter("windows-path", {} as unknown as FsAdapter, { ...posixPath, sep: "\\" });
+  fsAdapterConfig.adapter = "windows-path";
+  try {
+    block();
+  } finally {
+    fsAdapterConfig.adapter = previous;
+  }
 }
 
 describe("File", () => {
@@ -113,6 +139,51 @@ describe("File", () => {
 
     expect(File.isExist(path)).toBe(true);
     expect(File.isReadable(path)).toBe(accessible);
+  });
+
+  it("ALT_SEPARATOR is the backslash where the path backend is DOSISH, and nil elsewhere", () => {
+    expect(File.ALT_SEPARATOR).toBe(null);
+    expect(File.SEPARATOR).toBe("/");
+    withWindowsPath(() => {
+      expect(File.ALT_SEPARATOR).toBe("\\");
+      expect(File.SEPARATOR).toBe("/");
+    });
+  });
+
+  it("join treats ALT_SEPARATOR as a boundary separator where one is defined", () => {
+    expect(File.join("a\\", "b")).toBe("a\\/b");
+    expect(File.join("a", "\\b")).toBe("a/\\b");
+    withWindowsPath(() => {
+      expect(File.join("a\\", "b")).toBe("a\\b");
+      expect(File.join("a", "\\b")).toBe("a\\b");
+      expect(File.join("a/", "b")).toBe("a/b");
+    });
+  });
+
+  it("chown ignores a nil owner or group", () => {
+    const calls: [string, number, number][] = [];
+    const previous = fsAdapterConfig.adapter;
+    registerFsAdapter(
+      "chown-recorder",
+      {
+        chownSync: (path: string, uid: number, gid: number) => {
+          calls.push([path, uid, gid]);
+        },
+      } as unknown as FsAdapter,
+      posixPath,
+    );
+    fsAdapterConfig.adapter = "chown-recorder";
+    try {
+      expect(File.chown(null, 100, "testfile")).toBe(1);
+      expect(File.chown(500, null, "testfile")).toBe(1);
+      expect(File.chown(null, null)).toBe(0);
+    } finally {
+      fsAdapterConfig.adapter = previous;
+    }
+    expect(calls).toEqual([
+      ["testfile", -1, 100],
+      ["testfile", 500, -1],
+    ]);
   });
 
   it("identical? compares device and inode, and reads them off an open stream", () => {
