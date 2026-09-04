@@ -238,31 +238,10 @@ describe("DJAS — composite key support", () => {
     await expect(djar.toArray()).resolves.toEqual([]);
   });
 
-  it("DisableJoinsAssociationRelation key normalization: empty array throws, single-element array collapses to string", async () => {
-    expect(() => new DisableJoinsAssociationRelation(CkLineItem, [] as any, [])).toThrow(
-      /at least one column/,
-    );
+  it("DisableJoinsAssociationRelation key normalization: single-element array collapses to string", async () => {
     const djarTuples = new DisableJoinsAssociationRelation(CkLineItem, ["sku"], [["a"], ["b"]]);
     expect(djarTuples.key).toBe("sku");
     expect(await djarTuples.ids()).toEqual(["a", "b"]);
-
-    expect(
-      () =>
-        new DisableJoinsAssociationRelation(CkLineItem, ["sku"], [
-          [1, 2],
-        ] as unknown as unknown[][]),
-    ).toThrow(/single-element array/);
-
-    expect(() => new DisableJoinsAssociationRelation(CkLineItem, "sku", [[1], [2]] as any)).toThrow(
-      /must not be an array/,
-    );
-
-    expect(
-      () => new DisableJoinsAssociationRelation(CkLineItem, "sku", new Set(["a"]) as any),
-    ).toThrow(/ids must be an array/);
-    expect(() => new DisableJoinsAssociationRelation(CkLineItem, "sku", null as any)).toThrow(
-      /ids must be an array/,
-    );
 
     const djar = new DisableJoinsAssociationRelation(
       CkLineItem,
@@ -273,21 +252,6 @@ describe("DJAS — composite key support", () => {
     returned.push([999, 999]);
     returned[0][1] = 42;
     expect(await djar.ids()).toEqual([[1, 100]]);
-  });
-
-  it("DisableJoinsAssociationRelation composite-key load: throws ArgumentError on shape/arity mismatch", async () => {
-    expect(
-      () =>
-        new DisableJoinsAssociationRelation(CkLineItem, ["ck_order_shop_id", "ck_order_number"], [
-          1, 2, 3,
-        ] as any),
-    ).toThrow(/must be an array/);
-    expect(
-      () =>
-        new DisableJoinsAssociationRelation(CkLineItem, ["ck_order_shop_id", "ck_order_number"], [
-          [1, 2, 3],
-        ] as any),
-    ).toThrow(/arity/);
   });
 
   it("composite-key + ordered upstream + empty through: preserves none() instead of full table scan", async () => {

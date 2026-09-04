@@ -25,7 +25,7 @@ export interface GlobalIdConfig {
 
 export interface TrailtieApp {
   railtieName: string;
-  config: { globalId?: GlobalIdConfig };
+  config: { get(key: string): unknown; set(key: string, value: unknown): void };
   deprecators?: Deprecators;
   keyGenerator(): { generateKey(salt: string): string | Buffer };
 }
@@ -47,7 +47,11 @@ export class Trailtie extends BaseTrailtie {
   }
 
   static initialize(app: TrailtieApp): void {
-    const config = (app.config.globalId ??= Trailtie.config.get("globalId") as GlobalIdConfig);
+    let config = app.config.get("globalId") as GlobalIdConfig | undefined;
+    if (config === undefined) {
+      config = Trailtie.config.get("globalId") as GlobalIdConfig;
+      app.config.set("globalId", config);
+    }
     const defaultExpiresIn = months(1).toI();
     const defaultAppName = dasherize(app.railtieName.replace("_application", ""));
 
