@@ -720,3 +720,24 @@ describe("AbstractMysqlAdapter escaping state", () => {
     expect(a.quoteString("O'Reilly")).toBe("O\\'Reilly");
   });
 });
+
+describe("AbstractMysqlAdapter#beginIsolatedDbTransaction", () => {
+  it("raises KeyError naming the Symbol key for an unknown isolation level", async () => {
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter;
+    await expect(adapter.beginIsolatedDbTransaction(":bogus")).rejects.toThrow(
+      "key not found: :bogus",
+    );
+  });
+
+  it("looks the level up under its Symbol key", async () => {
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as AbstractMysqlAdapter & {
+      executeBatch(statements: string[], name: string, options: unknown): Promise<void>;
+    };
+    let seen: string[] = [];
+    adapter.executeBatch = async (statements: string[]) => {
+      seen = statements;
+    };
+    await adapter.beginIsolatedDbTransaction(":read_committed");
+    expect(seen).toEqual(["SET TRANSACTION ISOLATION LEVEL READ COMMITTED", "BEGIN"]);
+  });
+});

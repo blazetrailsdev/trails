@@ -485,8 +485,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.executeMutation(`INSERT INTO "ex_ser" (val) VALUES (0)`);
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
-        await adapter.beginIsolatedDbTransaction("serializable");
-        await adapter2.beginIsolatedDbTransaction("serializable");
+        await adapter.beginIsolatedDbTransaction(":serializable");
+        await adapter2.beginIsolatedDbTransaction(":serializable");
         try {
           await adapter.execute(`SELECT * FROM "ex_ser"`);
           await adapter2.execute(`SELECT * FROM "ex_ser"`);
@@ -1052,7 +1052,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("beginIsolatedDbTransaction starts a transaction with isolation level", async () => {
-      await adapter.beginIsolatedDbTransaction("serializable");
+      await adapter.beginIsolatedDbTransaction(":serializable");
       try {
         const rows = await adapter.execute(
           `SELECT current_setting('transaction_isolation') AS iso`,
@@ -1064,7 +1064,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("beginIsolatedDbTransaction raises KeyError for an unknown isolation level", async () => {
-      await expect(adapter.beginIsolatedDbTransaction("bogus")).rejects.toThrow(
+      await expect(adapter.beginIsolatedDbTransaction(":bogus")).rejects.toThrow(
         "key not found: :bogus",
       );
     });

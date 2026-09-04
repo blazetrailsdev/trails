@@ -547,10 +547,10 @@ export async function beginDeferredTransaction(
 
 export function transactionIsolationLevels(): Record<string, string> {
   return {
-    read_uncommitted: "READ UNCOMMITTED",
-    read_committed: "READ COMMITTED",
-    repeatable_read: "REPEATABLE READ",
-    serializable: "SERIALIZABLE",
+    ":read_uncommitted": "READ UNCOMMITTED",
+    ":read_committed": "READ COMMITTED",
+    ":repeatable_read": "REPEATABLE READ",
+    ":serializable": "SERIALIZABLE",
   };
 }
 

@@ -86,7 +86,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           );
         });
 
-        await adapter.transaction({ isolation: "read_committed" }, async () => {
+        await adapter.transaction({ isolation: ":read_committed" }, async () => {
           await adapter.materializeTransactions();
           await assertDifference(sampleCount, +1, null, () =>
             adapter2.execute("INSERT INTO `samples` (value) VALUES (1)"),
@@ -103,7 +103,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           return origInternalExecute(sql, ...args);
         };
         try {
-          await adapter.transaction({ isolation: "read_committed" }, async () => {
+          await adapter.transaction({ isolation: ":read_committed" }, async () => {
             await adapter.materializeTransactions();
             await assertDifference(sampleCount, +1, null, () =>
               adapter2.execute("INSERT INTO `samples` (value) VALUES (1)"),

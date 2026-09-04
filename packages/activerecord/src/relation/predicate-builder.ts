@@ -1,6 +1,6 @@
 import { ArgumentError, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
 import { Nodes, sql } from "@blazetrails/arel";
-import { wrap } from "@blazetrails/activesupport";
+import { kernelArray, wrap } from "@blazetrails/activesupport";
 
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
@@ -36,24 +36,39 @@ export class PredicateBuilder {
     this.registerHandler(Set, new ArrayHandler(this));
   }
 
-  buildFromHash(
-    attributes: Record<string, unknown>,
-    block?: (tableName: string) => unknown,
-  ): Nodes.Node[] {
+  buildFromHash(attributes: Attributes, block?: (tableName: string) => unknown): Nodes.Node[] {
     attributes = this.convertDotNotationToHash(attributes);
     return this.expandFromHash(attributes, block);
   }
 
+  /** @missingRailsArgs expand_from_hash — PERMANENT */
   protected expandFromHash(
-    attributes: Record<string, unknown>,
+    attributes: Attributes,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
-    if (Object.keys(attributes).length === 0) {
+    if (entriesOf(attributes).length === 0) {
       return [sql("1=0")];
     }
     const nodes: Nodes.Node[] = [];
-    for (const [key, value] of Object.entries(attributes)) {
-      if (isPlainObject(value) && !this.table.hasColumn(key)) {
+    for (let [key, value] of entriesOf(attributes)) {
+      if (Array.isArray(key) && key.length === 1) {
+        key = key[0];
+        value = (value as unknown[]).flat(Infinity);
+      }
+
+      if (Array.isArray(key)) {
+        const cols = key;
+        const queries = kernelArray(value).map((idsSet) => {
+          if (!Array.isArray(idsSet)) {
+            throw new ArgumentError(`Expected corresponding value for ${toS(cols)} to be an Array`);
+          }
+          return this.expandFromHash(
+            new Map(cols.map((col, index) => [col, idsSet[index]])),
+            block,
+          );
+        });
+        nodes.push(...this.groupingQueries(queries));
+      } else if (isPlainObject(value) && !this.table.hasColumn(key)) {
         const assocPb: PredicateBuilder = this.table.associatedTable(
           key,
           block as (name: string) => never,
@@ -64,7 +79,7 @@ export class PredicateBuilder {
           this.table.associatedTable(key),
           key,
           value,
-          attributes,
+          attributes as Record<string, unknown>,
         );
         nodes.push(...assocNodes);
       } else if (this.table.aggregatedWith(key)) {
@@ -282,12 +297,15 @@ export class PredicateBuilder {
     return builder;
   }
 
-  static references(attributes: string[] | Record<string, unknown>): Nodes.SqlLiteral[] {
+  static references(attributes: string[] | Attributes): Nodes.SqlLiteral[] {
     const refs: Nodes.SqlLiteral[] = [];
-    const entries: Array<[string, unknown]> = Array.isArray(attributes)
+    const entries: Array<[string | string[], unknown]> = Array.isArray(attributes)
       ? attributes.map((k) => [k, undefined] as [string, unknown])
-      : Object.entries(attributes);
+      : entriesOf(attributes);
     for (const [key, value] of entries) {
+      if (Array.isArray(key)) {
+        continue;
+      }
       if (isPlainObject(value)) {
         refs.push(sql(key, { retryable: true }));
       } else {
@@ -308,33 +326,38 @@ export class PredicateBuilder {
     return typeof value === "object" && value !== null && "_model" in value && "arel" in value;
   }
 
-  private convertDotNotationToHash(attributes: Record<string, unknown>): Record<string, unknown> {
-    const converted: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(attributes)) {
-      if (isPlainObject(value)) {
-        const existing = converted[key];
+  private convertDotNotationToHash(attributes: Attributes): Attributes {
+    const converted = new Map<string | string[], unknown>();
+    let arrayKeyed = false;
+    for (const [key, value] of entriesOf(attributes)) {
+      if (Array.isArray(key)) {
+        arrayKeyed = true;
+        converted.set(key, value);
+      } else if (isPlainObject(value)) {
+        const existing = converted.get(key);
         if (existing && isPlainObject(existing)) {
           Object.assign(existing, value);
         } else {
-          converted[key] = { ...value };
+          converted.set(key, { ...value });
         }
       } else {
         const dot = key.lastIndexOf(".");
         if (dot !== -1) {
           const tableName = key.slice(0, dot);
           const colName = key.slice(dot + 1);
-          const existing = converted[tableName];
+          const existing = converted.get(tableName);
           if (existing && isPlainObject(existing)) {
             existing[colName] = value;
           } else {
-            converted[tableName] = { [colName]: value };
+            converted.set(tableName, { [colName]: value });
           }
         } else {
-          converted[key] = value;
+          converted.set(key, value);
         }
       }
     }
-    return converted;
+    if (arrayKeyed) return converted as Map<unknown, unknown>;
+    return Object.fromEntries(converted as Map<string, unknown>);
   }
 
   /** @missingRailsCall last — PERMANENT */
@@ -352,6 +375,16 @@ export class PredicateBuilder {
 class BasicObject {}
 
 class Relation {}
+
+/** @noRailsEquivalent PERMANENT */
+type Attributes = Record<string, unknown> | Map<unknown, unknown>;
+
+/** @noRailsEquivalent PERMANENT */
+function entriesOf(attributes: Attributes): [string | string[], unknown][] {
+  return attributes instanceof Map
+    ? ([...attributes] as [string | string[], unknown][])
+    : Object.entries(attributes);
+}
 
 function respondsToId(value: unknown): value is { id: unknown } {
   return value != null && typeof value === "object" && "id" in value && !isPlainObject(value);

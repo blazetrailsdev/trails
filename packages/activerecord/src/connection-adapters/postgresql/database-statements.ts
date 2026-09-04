@@ -12,7 +12,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { isEmpty, KeyError } from "@blazetrails/ruby-compat";
+import { fetch, isEmpty } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 
 export const READ_QUERY =
@@ -178,13 +178,12 @@ export async function beginDbTransaction(this: TransactionHost): Promise<void> {
   }
 }
 
-/** @missingRailsCall fetch — PERMANENT */
+/** @missingRailsArgs fetch — PERMANENT */
 export async function beginIsolatedDbTransaction(
   this: TransactionHost,
   isolation: string,
 ): Promise<void> {
-  const level = transactionIsolationLevels()[isolation];
-  if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
+  const level = fetch<string>(transactionIsolationLevels(), isolation);
   this._client = await this._acquireFreshClient();
   try {
     await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", [], {

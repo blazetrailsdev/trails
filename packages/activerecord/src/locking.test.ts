@@ -797,9 +797,9 @@ describe("PessimisticLockingTest", () => {
   it.skipIf(adapterType !== "postgres")("with lock sets isolation", async () => {
     const adapter = Base.connection as any;
     const person = await Person.find(people("michael").id);
-    await person.withLock({ isolation: "read_uncommitted" }, async () => {
+    await person.withLock({ isolation: ":read_uncommitted" }, async () => {
       const currentTransaction = adapter.transactionManager.currentTransaction;
-      expect(currentTransaction.isolationLevel).toBe("read_uncommitted");
+      expect(currentTransaction.isolationLevel).toBe(":read_uncommitted");
     });
   });
 

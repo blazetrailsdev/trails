@@ -26,8 +26,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("raises SerializationFailure when a serialization failure occurs", async () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
-        await adapter.beginIsolatedDbTransaction("serializable");
-        await other.beginIsolatedDbTransaction("serializable");
+        await adapter.beginIsolatedDbTransaction(":serializable");
+        await other.beginIsolatedDbTransaction(":serializable");
         await adapter.execute(`SELECT sum(value) FROM ${SAMPLES}`);
         await other.execute(`SELECT sum(value) FROM ${SAMPLES}`);
         await other.execute(`UPDATE ${SAMPLES} SET value = 1 WHERE id = 1`);
