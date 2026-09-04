@@ -223,12 +223,16 @@ interface AdvanceOptions {
   seconds?: number;
 }
 
+export function advance(
+  date: Temporal.ZonedDateTime,
+  options: AdvanceOptions,
+): Temporal.ZonedDateTime;
 export function advance(date: Date, options: AdvanceOptions): Temporal.Instant;
 export function advance(date: RubyTime, options: AdvanceOptions): RubyTime;
 export function advance(
-  date: Date | RubyTime,
+  date: Date | RubyTime | Temporal.ZonedDateTime,
   options: AdvanceOptions,
-): Temporal.Instant | RubyTime {
+): Temporal.Instant | RubyTime | Temporal.ZonedDateTime {
   if (date instanceof RubyTime) return timeAdvance.call(date, options);
 
   options = { ...options };
@@ -245,18 +249,24 @@ export function advance(
     options.hours = (options.hours ?? 0) + 24 * partialDays;
   }
 
-  let d = toDate(date);
+  let d = date instanceof Temporal.ZonedDateTime ? date.toPlainDate() : toDate(date);
   if (options.years) d = d.add({ months: options.years * 12 });
   if (options.months) d = d.add({ months: options.months });
   if (options.weeks) d = d.add({ days: options.weeks * 7 });
   if (options.days) d = d.add({ days: options.days });
 
-  const timeAdvancedByDate = change(date, { year: d.year, month: d.month, day: d.day });
+  const timeAdvancedByDate = change(date as Date, {
+    year: d.year,
+    month: d.month,
+    day: d.day,
+  }) as Temporal.Instant | Temporal.ZonedDateTime;
   const secondsToAdvance =
     (options.seconds ?? 0) + (options.minutes ?? 0) * 60 + (options.hours ?? 0) * 3600;
 
   if (secondsToAdvance === 0) {
     return timeAdvancedByDate;
+  } else if (timeAdvancedByDate instanceof Temporal.ZonedDateTime) {
+    return timeAdvancedByDate.add({ seconds: secondsToAdvance });
   } else {
     return since(timeAdvancedByDate, secondsToAdvance);
   }
