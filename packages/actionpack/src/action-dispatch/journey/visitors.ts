@@ -262,12 +262,14 @@ export class Each extends FunctionalVisitor<(node: Node) => void> {
 export class String extends FunctionalVisitor<string> {
   static readonly INSTANCE = new String();
 
+  /** @internal */
   override binary(node: Node, seed: string): string {
     const left = (node as Node & { left: Node }).left;
     const right = (node as Node & { right: Node }).right;
     return this.visit(right, this.visit(left, seed));
   }
 
+  /** @internal */
   override nary(node: Node, seed: string): string {
     const children = node.children();
     let acc = seed;
@@ -278,11 +280,13 @@ export class String extends FunctionalVisitor<string> {
     return acc;
   }
 
+  /** @internal */
   override terminal(node: Node, seed: string): string {
     const left = node.left;
     return seed + (typeof left === "string" ? left : "");
   }
 
+  /** @internal */
   override visitGROUP(node: Node, seed: string): string {
     return this.visit((node as Node & { left: Node }).left, seed + "(") + ")";
   }
@@ -322,6 +326,7 @@ export class Dot extends FunctionalVisitor<DotSeed> {
 `;
   }
 
+  /** @internal */
   override binary(node: Node, seed: DotSeed): DotSeed {
     for (const c of node.children()) {
       seed[1].push(`${dotId(node)} -> ${dotId(c)};`);
@@ -329,6 +334,7 @@ export class Dot extends FunctionalVisitor<DotSeed> {
     return super.binary(node, seed);
   }
 
+  /** @internal */
   override nary(node: Node, seed: DotSeed): DotSeed {
     for (const c of node.children()) {
       seed[1].push(`${dotId(node)} -> ${dotId(c)};`);
@@ -336,31 +342,37 @@ export class Dot extends FunctionalVisitor<DotSeed> {
     return super.nary(node, seed);
   }
 
+  /** @internal */
   override unary(node: Node, seed: DotSeed): DotSeed {
     seed[1].push(`${dotId(node)} -> ${dotId((node as Node & { left: Node }).left)};`);
     return super.unary(node, seed);
   }
 
+  /** @internal */
   override visitGROUP(node: Node, seed: DotSeed): DotSeed {
     seed[0].push(`${dotId(node)} [label="()"];`);
     return super.visitGROUP(node, seed);
   }
 
+  /** @internal */
   override visitCAT(node: Node, seed: DotSeed): DotSeed {
     seed[0].push(`${dotId(node)} [label="○"];`);
     return super.visitCAT(node, seed);
   }
 
+  /** @internal */
   override visitSTAR(node: Node, seed: DotSeed): DotSeed {
     seed[0].push(`${dotId(node)} [label="*"];`);
     return super.visitSTAR(node, seed);
   }
 
+  /** @internal */
   override visitOR(node: Node, seed: DotSeed): DotSeed {
     seed[0].push(`${dotId(node)} [label="|"];`);
     return super.visitOR(node, seed);
   }
 
+  /** @internal */
   override terminal(node: Node, seed: DotSeed): DotSeed {
     const value = typeof node.left === "string" ? node.left : "";
     seed[0].push(`${dotId(node)} [label="${value}"];`);

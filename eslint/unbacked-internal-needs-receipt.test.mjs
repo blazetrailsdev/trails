@@ -16,18 +16,32 @@ const FIXTURE = {
     "packages/activerecord/src/inheritance.ts": ["computeType"],
     "packages/activerecord/src/base.ts": ["computeType"],
     "packages/activemodel/src/attributes.ts": [],
+    "packages/activerecord/src/associations/preloader/association.ts": [],
   },
   // `attribute` folds out of the file-wide union: private on the instance half
   // (activemodel/lib/active_model/attributes.rb:161), public on
   // `Attributes::ClassMethods` (attributes.rb:59).
   instanceFiles: {
     "packages/activemodel/src/attributes.ts": ["attribute"],
+    "packages/activerecord/src/associations/preloader/association.ts": [],
+  },
+  // `loadRecords` folds out of both file-wide unions: private on the nested
+  // `LoaderRecords` (activerecord/lib/active_record/associations/preloader/
+  // association.rb:91), public on `Association` (:197).
+  entityInstanceFiles: {
+    "packages/activerecord/src/associations/preloader/association.ts": {
+      LoaderRecords: ["loadRecords", "loaderQuery"],
+    },
   },
 };
 setManifestForTests(FIXTURE);
 const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/src/inheritance.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const attributesFile = path.join(REPO_ROOT, "packages/activemodel/src/attributes.ts");
+const preloaderAssociationFile = path.join(
+  REPO_ROOT,
+  "packages/activerecord/src/associations/preloader/association.ts",
+);
 
 const tester = new RuleTester({
   languageOptions: {
@@ -49,6 +63,13 @@ tester.run("unbacked-internal-needs-receipt", rule, {
     {
       filename: attributesFile,
       code: `class Attributes {\n  /** @internal */\n  attribute() {}\n}\n`,
+    },
+    // Backed by the nested entity's own fold alone: no receipt needed, and
+    // claiming one would be a false claim — `load_records` DOES have a Rails
+    // counterpart, private on the entity that owns the TS declaration.
+    {
+      filename: preloaderAssociationFile,
+      code: `class LoaderRecords {\n  /** @internal */\n  loadRecords() {}\n}\n`,
     },
     // Unbacked, but carries the receipt.
     {

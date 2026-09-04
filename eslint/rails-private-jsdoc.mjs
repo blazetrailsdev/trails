@@ -202,12 +202,32 @@ export function enclosingEntityName(node) {
  * module's methods there as `this`-typed functions) reads the file-wide union
  * alone, since its Ruby counterpart is on the class-method half the instance
  * fold excludes.
+ *
+ * An instance member of a class that IS a Ruby entity reads that entity's own
+ * fold too, from `entityInstanceFiles`. A nested entity's private member is
+ * invisible to both file-wide folds whenever a sibling entity in the same `.rb`
+ * publishes the name — `LoaderRecords#load_records` is private
+ * (associations/preloader/association.rb:91) beside a public
+ * `Association#load_records` (:197) — and the per-entity fold is the only place
+ * its privacy survives. It is read as an additional source, never a subtractive
+ * one, so nothing the file-wide union backs is lost.
  */
 export function manifestTags(manifest, rel, entity, name, instanceMember) {
   const entities = manifest.entities?.[rel];
   if (entity !== null && entities && !entities.includes(entity)) return false;
   if ((manifest.files?.[rel] ?? []).includes(name)) return true;
-  return instanceMember && (manifest.instanceFiles?.[rel] ?? []).includes(name);
+  if (!instanceMember) return false;
+  if ((manifest.instanceFiles?.[rel] ?? []).includes(name)) return true;
+  return entityPrivate(manifest, rel, entity, name);
+}
+
+/**
+ * Whether the Ruby entity the enclosing TS class mirrors declares `name`
+ * private on its own instance half.
+ */
+export function entityPrivate(manifest, rel, entity, name) {
+  if (entity === null) return false;
+  return (manifest.entityInstanceFiles?.[rel]?.[entity] ?? []).includes(name);
 }
 
 /**

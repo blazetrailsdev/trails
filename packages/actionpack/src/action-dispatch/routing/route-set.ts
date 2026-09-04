@@ -271,6 +271,7 @@ export class NamedRouteCollection {
   /** @internal */
   private readonly urlHelpers: Set<string> = new Set();
 
+  /** @internal */
   get routes(): ReadonlyMap<string, Route> {
     return this._routes;
   }

@@ -30,6 +30,8 @@
  */
 import {
   attachedJsDoc,
+  enclosingEntityName,
+  entityPrivate,
   isInstanceMember,
   loadManifest,
   manifestAvailable,
@@ -102,14 +104,16 @@ function check(context, node, name) {
   if (hasReceipt(comment.value)) return;
   if (hasFileLevelReceipt(sourceCode)) return;
 
-  // Backed either file-wide or on the instance half alone: a name private on the
-  // instance half and public on the `ClassMethods` half of one Concern folds out
-  // of the file-wide union (`attribute`, attributes.rb:59 vs :161), and the
-  // `@internal` the forward rule requires there is backed by `instanceFiles`.
+  // Backed either file-wide, on the instance half alone (`attribute`,
+  // attributes.rb:59 vs :161), or on the enclosing entity alone
+  // (`LoaderRecords#load_records`, association.rb:91 vs :197).
   const manifest = loadManifest();
   const rel = relFromRepoRoot(filename);
   if (manifest.files?.[rel]?.includes(name)) return;
-  if (isInstanceMember(node) && manifest.instanceFiles?.[rel]?.includes(name)) return;
+  if (isInstanceMember(node)) {
+    if (manifest.instanceFiles?.[rel]?.includes(name)) return;
+    if (entityPrivate(manifest, rel, enclosingEntityName(node), name)) return;
+  }
 
   context.report({ node: target, messageId: "unbackedInternal", data: { name } });
 }
