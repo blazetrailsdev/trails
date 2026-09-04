@@ -18,6 +18,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Application } from "./application.js";
 import { Configuration } from "./application/configuration.js";
+import type { MiddlewareStack } from "@blazetrails/actionpack";
 import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";
 import {
   ActionableExceptions,
@@ -349,8 +350,9 @@ describe("Application", () => {
       Application.register(IApp7);
       const app = IApp7.instance();
       await app.initialize();
-      expect(app.config.middleware.middlewares.length).toBeGreaterThan(0);
-      expect(app.config.middleware.middlewares.map((m) => m.klass)).toContain(RequestId);
+      const middleware = app.config.middleware as MiddlewareStack;
+      expect(middleware.middlewares.length).toBeGreaterThan(0);
+      expect(middleware.middlewares.map((m) => m.klass)).toContain(RequestId);
       expect(app.routes().isEmpty()).toBe(true);
       app.routes().draw((mapper) => {
         mapper.get("/hello", "hello#index");

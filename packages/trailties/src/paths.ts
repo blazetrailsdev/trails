@@ -88,10 +88,14 @@ export class Path {
     this._paths = [...paths];
     this.glob = options.glob;
     this._exclude = options.exclude;
-    this._autoloadOnce = !!options.autoloadOnce;
-    this._eagerLoad = !!options.eagerLoad;
-    this._autoload = !!options.autoload;
-    this._loadPath = !!options.loadPath;
+    if (options.autoloadOnce) this.autoloadOnceBang();
+    else this.skipAutoloadOnceBang();
+    if (options.eagerLoad) this.eagerLoadBang();
+    else this.skipEagerLoadBang();
+    if (options.autoload) this.autoloadBang();
+    else this.skipAutoloadBang();
+    if (options.loadPath) this.loadPathBang();
+    else this.skipLoadPathBang();
   }
 
   children(): Path[] {
@@ -104,12 +108,18 @@ export class Path {
   autoloadOnceBang(): void {
     this._autoloadOnce = true;
   }
+  skipAutoloadOnceBang(): void {
+    this._autoloadOnce = false;
+  }
   isAutoloadOnce(): boolean {
     return this._autoloadOnce;
   }
 
   eagerLoadBang(): void {
     this._eagerLoad = true;
+  }
+  skipEagerLoadBang(): void {
+    this._eagerLoad = false;
   }
   isEagerLoad(): boolean {
     return this._eagerLoad;
@@ -118,12 +128,18 @@ export class Path {
   autoloadBang(): void {
     this._autoload = true;
   }
+  skipAutoloadBang(): void {
+    this._autoload = false;
+  }
   isAutoload(): boolean {
     return this._autoload;
   }
 
   loadPathBang(): void {
     this._loadPath = true;
+  }
+  skipLoadPathBang(): void {
+    this._loadPath = false;
   }
   isLoadPath(): boolean {
     return this._loadPath;

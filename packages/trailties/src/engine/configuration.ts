@@ -1,7 +1,8 @@
-import { MiddlewareStack, RouteSet } from "@blazetrails/actionpack";
+import { RouteSet, type MiddlewareStack } from "@blazetrails/actionpack";
 import { File } from "@blazetrails/ruby-compat";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
+import { MiddlewareStackProxy } from "../configuration.js";
 import { resolveEnv } from "../database.js";
 
 export type RouteSetClass = { newWithConfig(config: EngineConfiguration): RouteSet };
@@ -10,7 +11,7 @@ export class EngineConfiguration extends RailtieConfiguration {
   private _root: string | null;
   private _paths?: Root;
 
-  middleware: MiddlewareStack = new MiddlewareStack();
+  middleware: MiddlewareStackProxy | MiddlewareStack = new MiddlewareStackProxy();
   javascriptPath = "javascript";
   routeSetClass: RouteSetClass = RouteSet;
   defaultScope: Record<string, unknown> | null = null;

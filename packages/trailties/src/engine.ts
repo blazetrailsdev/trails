@@ -16,6 +16,7 @@ import { Trailtie } from "./trailtie.js";
 import { setRubyClassPath } from "./ruby-class-path-slot.js";
 import { Trailties } from "./engine/trailties.js";
 import { EngineConfiguration } from "./engine/configuration.js";
+import type { MiddlewareStackProxy } from "./configuration.js";
 import { LazyRouteSet } from "./engine/lazy-route-set.js";
 import { _Trails } from "./trails-slot.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
@@ -162,6 +163,11 @@ export class Engine extends Trailtie {
         await import(pathToFileURL!(seedFile).href);
       });
     }
+  }
+
+  /** @internal */
+  buildMiddleware(): MiddlewareStackProxy {
+    return this.config.middleware as MiddlewareStackProxy;
   }
 
   /** @internal */

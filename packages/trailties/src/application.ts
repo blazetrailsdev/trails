@@ -14,6 +14,7 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Deprecators } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 import { Engine } from "./engine.js";
+import type { MiddlewareStackProxy } from "./configuration.js";
 import { Trailtie } from "./trailtie.js";
 import { setRubyClassPath } from "./ruby-class-path-slot.js";
 import { Bootstrap } from "./application/bootstrap.js";
@@ -152,25 +153,16 @@ export class Application extends Engine {
     return this;
   }
 
-  /**
-   * Mirrors `Engine#app` (`engine.rb:516-524`) — builds the middleware
-   * stack once and wraps the endpoint in it.
-   *
-   * @missingRailsCall build_middleware — CONVERGEABLE: Rails merges
-   * `config.app_middleware + config.middleware` (both
-   * `MiddlewareStackProxy`s) into the default stack. `MiddlewareStackProxy`
-   * is not ported (`trailtie/configuration.ts:87` — `appMiddleware()`
-   * returns undefined), so there are no queued operations to merge and the
-   * default stack is assigned to `config.middleware` directly.
-   * @missingRailsCall merge_into — CONVERGEABLE: same gap, the other half of
-   * `engine.rb:519` — with no `MiddlewareStackProxy` there is nothing to merge
-   * the default stack into.
-   */
   app(): RackApp {
     if (this._app) return this._app;
     const stack = this.defaultMiddlewareStack();
-    this.config.middleware = stack;
-    return (this._app = stack.build(this.endpoint()));
+    this.config.middleware = this.buildMiddleware().mergeInto(stack);
+    return (this._app = this.config.middleware.build(this.endpoint()));
+  }
+
+  /** @internal */
+  override buildMiddleware(): MiddlewareStackProxy {
+    return this.config.appMiddleware().plus(super.buildMiddleware());
   }
 
   /** @internal */

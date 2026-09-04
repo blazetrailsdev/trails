@@ -1,5 +1,6 @@
 import { onLoad } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/ruby-compat";
+import { MiddlewareStackProxy } from "../configuration.js";
 
 export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
 
@@ -14,6 +15,9 @@ export class Configuration {
   static readonly _toPrepareBlocks: ConfigurationBlock[] = [];
   /** @internal */
   static readonly _options: Record<string, unknown> = {};
+
+  /** @internal */
+  static _appMiddleware?: MiddlewareStackProxy;
 
   get eagerLoadNamespaces(): unknown[] {
     return Configuration._eagerLoadNamespaces;
@@ -52,8 +56,8 @@ export class Configuration {
     onLoad("after_routes_loaded", block);
   }
 
-  appMiddleware(): undefined {
-    return undefined;
+  appMiddleware(): MiddlewareStackProxy {
+    return (Configuration._appMiddleware ??= new MiddlewareStackProxy());
   }
   appGenerators(): undefined {
     return undefined;
