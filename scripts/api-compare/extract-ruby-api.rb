@@ -35,7 +35,7 @@ EXTRACTOR_HASH = Digest::SHA256.hexdigest(File.read(__FILE__))[0, 16]
 if __FILE__ == $PROGRAM_NAME
   LIB_PATHS_JSON = ENV.fetch("LIB_PATHS_JSON") do
     abort "extract-ruby-api.rb: LIB_PATHS_JSON env var not set. Caller must export " \
-          "it via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
+          "it via `LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths)`."
   end
   PACKAGE_DIRS =
     begin
@@ -47,7 +47,7 @@ if __FILE__ == $PROGRAM_NAME
       parsed
     rescue JSON::ParserError => e
       abort "extract-ruby-api.rb: LIB_PATHS_JSON is not valid JSON (#{e.message}). " \
-            "If you set it manually, re-run via `LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths)`."
+            "If you set it manually, re-run via `LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths)`."
     end
 
   # A package's top-level entry file (`activerecord/lib/arel.rb`), declared by
@@ -65,7 +65,7 @@ if __FILE__ == $PROGRAM_NAME
       parsed
     rescue JSON::ParserError => e
       abort "extract-ruby-api.rb: LIB_ENTRY_FILES_JSON is not valid JSON (#{e.message}). " \
-            "If you set it manually, re-run via `LIB_ENTRY_FILES_JSON=$(pnpm -s vendor:fetch --print-lib-entry-files)`."
+            "If you set it manually, re-run via `LIB_ENTRY_FILES_JSON=$(pnpm --silent vendor:fetch --print-lib-entry-files)`."
     end
 
   # Cache gate: invalidate on (a) a re-fetch (lockfile mtime bumped), (b) a

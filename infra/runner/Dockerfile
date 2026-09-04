@@ -6,13 +6,13 @@
 #
 # Pinned toolchain matches `.github/workflows/ci.yml`:
 #   - Node 24 (matches `actions/setup-node@v4` with `node-version: 24`)
-#   - pnpm 11.5.1 (matches `pnpm/action-setup@v4` with `version: 11.5.1`)
+#   - pnpm 12.3.4 (matches `pnpm/action-setup@v4` with `version: 12.3.4`)
 # Pre-installing both means jobs skip the install step entirely.
 FROM ubuntu:24.04
 
 ARG RUNNER_VERSION=2.334.0
 ARG NODE_MAJOR=24
-ARG PNPM_VERSION=11.5.1
+ARG PNPM_VERSION=12.3.4
 
 ENV DEBIAN_FRONTEND=noninteractive
 

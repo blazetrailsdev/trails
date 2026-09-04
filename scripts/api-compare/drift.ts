@@ -166,12 +166,12 @@ async function rebuildBaseManifest(): Promise<void> {
   );
   const { stdout: libPathsJson } = await execFileAsync(
     "pnpm",
-    ["-s", "vendor:fetch", "--print-lib-paths"],
+    ["--silent", "vendor:fetch", "--print-lib-paths"],
     { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 },
   );
   const { stdout: libEntryFilesJson } = await execFileAsync(
     "pnpm",
-    ["-s", "vendor:fetch", "--print-lib-entry-files"],
+    ["--silent", "vendor:fetch", "--print-lib-entry-files"],
     { cwd: ROOT, maxBuffer: 16 * 1024 * 1024 },
   );
   await execFileAsync("ruby", [join(DIR, "extract-ruby-api.rb")], {
