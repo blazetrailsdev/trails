@@ -184,9 +184,8 @@ export class MimeType {
     return this.symbol === ":html" || this.string.includes("html");
   }
 
-  equals(other: MimeType | string | symbol): boolean {
+  equals(other: MimeType | string): boolean {
     if (other instanceof MimeType) return this.string === other.string;
-    if (typeof other === "symbol") return this.symbol === other.toString();
     return this.string === other || this.symbol === other;
   }
 
@@ -220,6 +219,7 @@ export class MimeType {
   }
 
   static unregister(symbol: string): void {
+    symbol = symbol.toLowerCase();
     const type = MimeType.registry.get(symbolToS(symbol));
     if (!type) return;
     MimeType.SET.deleteIf((v) => v === type);
@@ -395,7 +395,7 @@ export class MimeType {
     return MimeType.lookup("gzip");
   }
 
-  static readonly ALL = new MimeType("*/*", ":all");
+  static readonly ALL = new MimeType("*/*", null);
 }
 
 registerDefaultMimeTypes(MimeType);

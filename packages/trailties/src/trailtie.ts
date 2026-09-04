@@ -15,7 +15,7 @@ let loadCounter = 0;
  * both read. A TypeScript class name carries no namespace, so the path each
  * Railtie is defined under is declared through {@link setRubyClassPath}.
  */
-function rubyName(klass: typeof Trailtie): string {
+function rubyClassPath(klass: typeof Trailtie): string {
   return getRubyClassPath(klass) ?? klass.name;
 }
 
@@ -61,14 +61,14 @@ export class Trailtie extends Initializable {
   }
 
   static isAbstractRailtie(): boolean {
-    return ABSTRACT_RAILTIES.includes(rubyName(this));
+    return ABSTRACT_RAILTIES.includes(rubyClassPath(this));
   }
 
   static railtieName(name?: string): string {
     if (name !== undefined) writeOwnState(this, "_railtieName", name);
     let existing = readOwnState<string>(this, "_railtieName");
     if (!existing) {
-      existing = generateRailtieName(rubyName(this));
+      existing = generateRailtieName(rubyClassPath(this));
       writeOwnState(this, "_railtieName", existing);
     }
     return existing;
