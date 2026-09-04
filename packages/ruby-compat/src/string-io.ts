@@ -96,6 +96,17 @@ export class StringIO {
     return this;
   }
 
+  /**
+   * `strio_get_pos` (`vendor/ruby/ext/stringio/stringio.c:940`), the offset
+   * {@link rewind} puts back to zero.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#pos`
+   * (`vendor/ruby/ext/stringio/stringio.c:940`).
+   */
+  get pos(): number {
+    return this._pos;
+  }
+
   rewind(): number {
     this._pos = 0;
     return 0;

@@ -60,6 +60,7 @@ export {
 } from "./constants.js";
 export { Files } from "./files.js";
 export { Lint, LintError } from "./lint.js";
+export { Multipart } from "./multipart.js";
 export { MockRequest, FatalWarning } from "./mock-request.js";
 export { MockResponse } from "./mock-response.js";
 export * as Mime from "./mime.js";

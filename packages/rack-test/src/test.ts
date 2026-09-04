@@ -3,6 +3,12 @@ import { CookieJar } from "./cookie-jar.js";
 
 export const DEFAULT_HOST = "example.org";
 
+export const MULTIPART_BOUNDARY = "----------XnJLe9ZIbbGUYtzPQJ16u1";
+
+export const START_BOUNDARY = `--${MULTIPART_BOUNDARY}\r\n`;
+
+export const END_BOUNDARY = `--${MULTIPART_BOUNDARY}--\r\n`;
+
 export class Error extends globalThis.Error {}
 
 /** @internal */

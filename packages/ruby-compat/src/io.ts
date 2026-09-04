@@ -120,7 +120,7 @@ export class IO {
   protected enc: Encoding | null = null;
 
   /** @internal */
-  private pos = 0;
+  private _pos = 0;
 
   /**
    * `rb_io_initialize` (`vendor/ruby/io.c:9207`), reached as `IO.new(fd)`. It
@@ -249,8 +249,20 @@ export class IO {
    * (`vendor/ruby/io.c:2495`).
    */
   seek(amount: number): number {
-    this.pos = amount;
+    this._pos = amount;
     return 0;
+  }
+
+  /**
+   * `vendor/ruby/io.c:2039` `rb_io_tell` — the offset the next read or write
+   * starts at, which is what `Rack::Test::UploadedFile#append_to` leaves at `0`
+   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:66`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#pos`
+   * (`vendor/ruby/io.c:2039`).
+   */
+  get pos(): number {
+    return this._pos;
   }
 
   /**
@@ -324,7 +336,7 @@ export class IO {
     const buffer = new Uint8Array(length);
     let n = 0;
     while (n < length) {
-      const read = getFs().readSync(this.fd, buffer, n, length - n, this.pos + n);
+      const read = getFs().readSync(this.fd, buffer, n, length - n, this._pos + n);
       if (read === 0) break;
       n += read;
     }
@@ -332,7 +344,7 @@ export class IO {
       if (str) str.fill(0);
       return length === 0 ? "" : null;
     }
-    this.pos += n;
+    this._pos += n;
     if (str) str.set(buffer.subarray(0, Math.min(n, str.length)));
     return binaryString(buffer, n);
   }
@@ -354,9 +366,9 @@ export class IO {
     const chunks: Uint8Array[] = [];
     let total = 0;
     for (;;) {
-      const read = getFs().readSync(this.fd, buffer, 0, buffer.length, this.pos);
+      const read = getFs().readSync(this.fd, buffer, 0, buffer.length, this._pos);
       if (read === 0) break;
-      this.pos += read;
+      this._pos += read;
       chunks.push(buffer.slice(0, read));
       total += read;
     }
@@ -401,7 +413,7 @@ export class IO {
    */
   isEof(): boolean {
     if (this.fd < 0) throw new IOError("closed stream");
-    return getFs().readSync(this.fd, new Uint8Array(1), 0, 1, this.pos) === 0;
+    return getFs().readSync(this.fd, new Uint8Array(1), 0, 1, this._pos) === 0;
   }
 
   /**
@@ -419,9 +431,9 @@ export class IO {
       this.enc === Encoding.ASCII_8BIT ? binaryBytes(string) : new TextEncoder().encode(string);
     let n = 0;
     while (n < buffer.length) {
-      n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this.pos + n);
+      n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this._pos + n);
     }
-    this.pos += n;
+    this._pos += n;
     return n;
   }
 

@@ -250,6 +250,17 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/file.c:1305` `rb_file_s_size` — the byte size of the named
+   * file, which is `File.stat(file_name).size`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.size`
+   * (`vendor/ruby/file.c:1305`).
+   */
+  static size(fileName: string): number {
+    return File.stat(fileName).size;
+  }
+
+  /**
    * `vendor/ruby/file.c:2047` `rb_file_size_p` — `File.size?`, `nil` both when
    * the file is missing AND when it is empty, which is what makes it a
    * three-state answer rather than a size.
@@ -512,6 +523,18 @@ export class File extends IO {
   flock(operation: number): number {
     getFs().flockSync?.(this.fd, operation === File.LOCK_UN ? "un" : "ex");
     return 0;
+  }
+
+  /**
+   * `vendor/ruby/file.c:1330` `rb_file_size` — `fstat(2)` of the open
+   * descriptor, which is why it answers the bytes already written rather than
+   * what a stale `File.stat` of the path would say.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File#size`
+   * (`vendor/ruby/file.c:1330`).
+   */
+  size(): number {
+    return this.stat().size;
   }
 }
 
