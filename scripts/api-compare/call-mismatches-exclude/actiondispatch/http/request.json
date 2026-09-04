@@ -37,6 +37,13 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
+    "rubyName": "read_body_stream",
+    "call": "order:read,resetStream",
+    "reason": "Surfaced by uploaded-file-read-drops-rails-length-and-buffer-arguments (a `read` that takes arguments now exists in actiondispatch, so gate 2 admits `read`): Rails calls `body_stream.read` INSIDE the `reset_stream` block (request.rb:511-517) and trails does the same (request.ts:694-696), but the extractor reads the arrow-function argument as a call that precedes its callee, so the order is an artifact of the TS spelling, not a reordering."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/request.ts",
     "rubyName": "request_parameters_list",
     "call": "get_header",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as path from "path";
+import { StringIO } from "@blazetrails/ruby-compat";
+
 import { UploadedFile } from "./uploaded-file.js";
 
 const fixtureDir = path.join(__dirname, "..", "..", "test", "multipart");
@@ -11,17 +13,12 @@ describe("Rack::Multipart::UploadedFile", () => {
   });
 
   it("supports uploading files in binary mode", () => {
-    expect(new UploadedFile(file1).binmode).toBe(false);
-    expect(new UploadedFile(file1, { binary: true }).binmode).toBe(true);
+    expect(new UploadedFile(file1).isBinmode()).toBe(false);
+    expect(new UploadedFile(file1, { binary: true }).isBinmode()).toBe(true);
   });
 
   it("builds multipart body from StringIO", () => {
-    const io = {
-      read(): string {
-        return "foo";
-      },
-    };
-    const f = new UploadedFile({ io, filename: "bar.txt" });
+    const f = new UploadedFile({ io: new StringIO("foo"), filename: "bar.txt" });
     expect(f.originalFilename).toBe("bar.txt");
     expect(f.read()).toBe("foo");
     expect(f.path).toBeUndefined();

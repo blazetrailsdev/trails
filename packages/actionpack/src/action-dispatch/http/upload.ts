@@ -15,6 +15,7 @@ export class UploadedFile {
   private _tempfile: string | null;
   private _content: Buffer | null;
   private _closed: boolean = false;
+  private _pos: number = 0;
 
   constructor(hash: UploadedFileOptions = {}) {
     if (!hash.tempfile && hash.content == null) {
@@ -48,16 +49,40 @@ export class UploadedFile {
     return 0;
   }
 
-  /** @missingRailsArgs read — CONVERGEABLE uploaded-file-read-drops-rails-length-and-buffer-arguments */
-  read(): Buffer {
-    if (this._content) return this._content;
-    if (this._tempfile) {
-      return Buffer.from(
-        File.open(this._tempfile, "rb", (file) => file.read()),
-        "latin1",
+  /**
+   * `UploadedFile#read(length = nil, buffer = nil)`
+   * (`vendor/rails/actionpack/lib/action_dispatch/http/upload.rb:62-64`),
+   * `@tempfile.read(length, buffer)` — `nil` length reads the rest of the
+   * stream, a positive length answers `nil` at EOF (`vendor/ruby/io.c:3774`
+   * `io_read`), and `buffer` receives the bytes.
+   *
+   * Rails' `@tempfile` is a `Tempfile` holding the read position; trails holds
+   * the path, so the position is {@link rewind}'s and the stream is seeked to
+   * it.
+   */
+  read(): Buffer;
+  read(length: number | null, buffer?: Uint8Array | null): Buffer | null;
+  read(length: number | null = null, buffer: Uint8Array | null = null): Buffer | null {
+    if (this._content) {
+      const bytes = this._content.subarray(
+        this._pos,
+        length == null ? undefined : this._pos + length,
       );
+      if (length != null && length > 0 && bytes.length === 0) return null;
+      this._pos += bytes.length;
+      if (buffer) buffer.set(bytes.subarray(0, Math.min(bytes.length, buffer.length)));
+      return Buffer.from(bytes);
     }
-    return Buffer.alloc(0);
+    if (this._tempfile) {
+      const string = File.open(this._tempfile, "rb", (file) => {
+        file.seek(this._pos);
+        return file.read(length, buffer);
+      });
+      if (string == null) return null;
+      this._pos += string.length;
+      return Buffer.from(string, "latin1");
+    }
+    return length != null && length > 0 ? null : Buffer.alloc(0);
   }
 
   readAsString(encoding: BufferEncoding = "utf-8"): string {
@@ -73,7 +98,15 @@ export class UploadedFile {
     }
   }
 
-  rewind(): void {}
+  /**
+   * `UploadedFile#rewind`
+   * (`vendor/rails/actionpack/lib/action_dispatch/http/upload.rb:87-89`),
+   * `@tempfile.rewind` (`vendor/ruby/io.c:2565`): the next {@link read} starts
+   * at byte 0 again.
+   */
+  rewind(): void {
+    this._pos = 0;
+  }
 
   close(unlinkNow = false): void {
     if (unlinkNow && this._tempfile) {
@@ -115,6 +148,7 @@ export class UploadedFile {
 
   open(): Buffer {
     this._closed = false;
+    this.rewind();
     return this.read();
   }
 

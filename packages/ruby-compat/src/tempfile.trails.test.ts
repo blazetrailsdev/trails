@@ -60,6 +60,14 @@ describe("Tempfile", () => {
     tempfile.unlink();
   });
 
+  it("write reaches the file before close", () => {
+    const tempfile = Tempfile.new("early");
+    tempfile.write("hi");
+    expect(File.read(tempfile.path!)).toBe("hi");
+    tempfile.close();
+    tempfile.unlink();
+  });
+
   it("open leaves the file in place on block exit", () => {
     let path = "";
     const value = Tempfile.open("bar", undefined, (tempfile) => {

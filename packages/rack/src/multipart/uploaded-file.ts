@@ -1,27 +1,18 @@
-import { File } from "@blazetrails/ruby-compat";
-
-export interface UploadedFileTempfile {
-  path?: string;
-  read(): string | Buffer;
-  rewind?(): void;
-  write?(data: string | Buffer): void;
-}
+import { Encoding, File, FileUtils, StringIO, Tempfile } from "@blazetrails/ruby-compat";
 
 export interface UploadedFileOptions {
   path?: string | null;
   contentType?: string;
   binary?: boolean;
   filename?: string;
-  io?: UploadedFileTempfile;
+  io?: StringIO;
 }
 
 export class UploadedFile {
   readonly originalFilename: string;
   contentType: string;
 
-  private _tempfile: UploadedFileTempfile;
-
-  private _binary: boolean;
+  private _tempfile: Tempfile | StringIO;
 
   constructor(
     filepath?: string | UploadedFileOptions | null,
@@ -49,22 +40,25 @@ export class UploadedFile {
         throw new Error(`${path ?? ""} file does not exist`);
       }
       this.originalFilename = opts.filename ?? File.basename(path);
-      const content = File.open(path, "rb", (f) => f.read(File.stat(path).size) ?? "");
-      this._tempfile = makeTempfile(content, path);
+      const tempfile = Tempfile.new([this.originalFilename, File.extname(path)], undefined, {
+        encoding: Encoding.BINARY,
+      });
+      if (binary) tempfile.binmode();
+      FileUtils.copyFile(path, tempfile.path!);
+      this._tempfile = tempfile;
     }
     this.contentType = contentType;
-    this._binary = binary;
   }
 
   get path(): string | undefined {
-    return this._tempfile.path;
+    return "path" in this._tempfile ? (this._tempfile.path ?? undefined) : undefined;
   }
 
   get localPath(): string | undefined {
-    return this._tempfile.path;
+    return this.path;
   }
 
-  read(): string | Buffer {
+  read(): string {
     return this._tempfile.read();
   }
 
@@ -74,12 +68,21 @@ export class UploadedFile {
    * `method_missing` delegation (uploaded_file.rb:39), which forwards to
    * `@tempfile` rather than exposing a reader.
    */
-  get tempfile(): UploadedFileTempfile {
+  get tempfile(): Tempfile | StringIO {
     return this._tempfile;
   }
 
-  get binmode(): boolean {
-    return this._binary;
+  /**
+   * `binmode?` (`vendor/ruby/io.c:6400`), reached through
+   * `UploadedFile#method_missing`
+   * (`vendor/rack/lib/rack/multipart/uploaded_file.rb:39`) and so answered by
+   * the tempfile — an `io:` stand-in that has no `binmode?` raises, as
+   * `StringIO` does in Ruby.
+   *
+   * @noRailsEquivalent CONVERGEABLE rack-uploaded-file-publishes-tempfile-and-filename-readers
+   */
+  isBinmode(): boolean {
+    return (this._tempfile as Tempfile).isBinmode();
   }
 
   /**
@@ -91,19 +94,4 @@ export class UploadedFile {
   get filename(): string {
     return this.originalFilename;
   }
-}
-
-function makeTempfile(content: string, path: string): UploadedFileTempfile {
-  let pos = 0;
-  return {
-    path,
-    read(): string {
-      const result = content.slice(pos);
-      pos = content.length;
-      return result;
-    },
-    rewind(): void {
-      pos = 0;
-    },
-  };
 }

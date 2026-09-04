@@ -276,6 +276,17 @@ export class FileUtils {
    */
   static makedirs = FileUtils.mkdirP;
 
+  /** `FileUtils.copy_file` (`vendor/ruby/lib/fileutils.rb:1076-1080`), whose
+   * `Entry_#copy_file` (`fileutils.rb:2277-2283`) copies the bytes and
+   * `copy_metadata` (`fileutils.rb:2285-2312`) the timestamps, ownership and
+   * mode.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static copyFile(src: string, dest: string, preserve = false): void {
+    getFs().copyFileSync(src, dest);
+    if (preserve) copyMetadata(src, dest);
+  }
+
   /** `FileUtils.cp` (`vendor/ruby/lib/fileutils.rb:873-879`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */

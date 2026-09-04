@@ -1,5 +1,6 @@
 import { getCrypto } from "./crypto-adapter.js";
 import { Dir } from "./dir.js";
+import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
 
 /**
@@ -12,6 +13,20 @@ import { File } from "./file.js";
  * without defining.
  */
 export type TempfileBasename = string | [string, string];
+
+/**
+ * The `**options` of `Tempfile.new` (`vendor/ruby/lib/tempfile.rb:150`), which
+ * Ruby forwards to `File.open` (`tempfile.rb:157`) — `Rack::Multipart::
+ * UploadedFile` passes `encoding: Encoding::BINARY`
+ * (`vendor/rack/lib/rack/multipart/uploaded_file.rb:24`).
+ *
+ * @noRailsEquivalent PERMANENT — the option hash of Ruby stdlib
+ * `Tempfile.new` (`vendor/ruby/lib/tempfile.rb:150`), which Rails calls
+ * without defining.
+ */
+export interface TempfileOptions {
+  encoding?: Encoding | string;
+}
 
 /** `Dir::Tmpname::UNUSABLE_CHARS` (`vendor/ruby/lib/tmpdir.rb:123`). */
 const UNUSABLE_CHARS = /[^,\-.0-9A-Z_a-z~]/g;
@@ -106,8 +121,12 @@ export class Tempfile {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile.new`
    * (`vendor/ruby/lib/tempfile.rb:150`).
    */
-  static new(basename: TempfileBasename = "", tmpdir?: string): Tempfile {
-    return new Tempfile(openExclusive(basename, tmpdir));
+  static new(
+    basename: TempfileBasename = "",
+    tmpdir?: string,
+    options: TempfileOptions = {},
+  ): Tempfile {
+    return new Tempfile(openExclusive(basename, tmpdir, options));
   }
 
   /**
@@ -224,6 +243,17 @@ export class Tempfile {
   }
 
   /**
+   * `IO#binmode?` (`vendor/ruby/io.c:6400`) on the delegated `File`
+   * (`vendor/ruby/lib/tempfile.rb:89`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode?`
+   * (`vendor/ruby/io.c:6400`), delegated by Ruby stdlib `Tempfile`.
+   */
+  isBinmode(): boolean {
+    return this.tmpfile.isBinmode();
+  }
+
+  /**
    * `IO#write` (`vendor/ruby/io.c:2263` `io_write_m`) on the delegated `File`
    * (`vendor/ruby/lib/tempfile.rb:89`): the bytes go to the descriptor at the
    * current offset, which the write then advances.
@@ -299,10 +329,15 @@ export class Tempfile {
  * (`vendor/ruby/lib/tempfile.rb:440-445`) pass: open the candidate name
  * `RDWR|CREAT|EXCL` with `perm: 0600`, retrying the name on `Errno::EEXIST`.
  */
-function openExclusive(basename: TempfileBasename = "", tmpdir?: string): File {
+function openExclusive(
+  basename: TempfileBasename = "",
+  tmpdir?: string,
+  options: TempfileOptions = {},
+): File {
   let tmpfile: File | null = null;
   createTmpname(basename, tmpdir, (path) => {
     tmpfile = File.open(path, "wx+");
+    if (options.encoding != null) tmpfile.setEncoding(options.encoding);
     File.chmod(0o600, path);
   });
   return tmpfile!;

@@ -1,3 +1,4 @@
+import { Encoding } from "./encoding.js";
 import { getFs, type FsStatResult } from "./fs-adapter.js";
 import { IOError } from "./io-error.js";
 
@@ -115,6 +116,8 @@ export class IO {
   /** `FMODE_BINMODE` (`vendor/ruby/io.c:6311` `rb_io_binmode` sets it). */
   protected binary = false;
 
+  protected enc: Encoding | null = null;
+
   /** @internal */
   private pos = 0;
 
@@ -140,7 +143,33 @@ export class IO {
    */
   binmode(): this {
     this.binary = true;
+    this.enc = Encoding.ASCII_8BIT;
     return this;
+  }
+
+  /**
+   * `vendor/ruby/io.c:13474` `rb_io_set_encoding` in its one-argument form —
+   * the external encoding the stream reads and writes through, which
+   * {@link binmode} also sets but which carries no `FMODE_BINMODE` of its own.
+   * It answers the stream.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#set_encoding`
+   * (`vendor/ruby/io.c:13474`).
+   */
+  setEncoding(extEnc: Encoding | string): this {
+    this.enc = Encoding.find(extEnc);
+    return this;
+  }
+
+  /**
+   * `vendor/ruby/io.c:6400` `rb_io_binmode_p`, which answers whether
+   * `FMODE_BINMODE` is set on the stream.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode?`
+   * (`vendor/ruby/io.c:6400`).
+   */
+  isBinmode(): boolean {
+    return this.binary;
   }
 
   /**
@@ -272,13 +301,24 @@ export class IO {
    * character at a time because no `TextDecoder` encoding gives ASCII-8BIT:
    * its "latin1" is windows-1252, and that remaps 0x80-0x9F.
    *
+   * The `str` buffer of `io_read`'s two-argument form (`io.c:3778`
+   * `rb_scan_args`) receives the bytes, as `io_setstrbuf` (`io.c:3278`) fills
+   * it. Ruby resizes the String to the byte count it read; a `Uint8Array` cannot
+   * be resized, so it is filled up to its own length instead and the bytes
+   * still come back as the return value; at EOF, where `rb_str_resize(str, 0)`
+   * (`io.c:3800`) empties the String before the `nil`, it is zero-filled.
+   *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
    * (`vendor/ruby/io.c:3774`).
    */
   read(): string;
-  read(length: number): string | null;
-  read(length?: number): string | null {
-    if (length === undefined) return this.readAll();
+  read(length: number | null, str?: Uint8Array | null): string | null;
+  read(length?: number | null, str?: Uint8Array | null): string | null {
+    if (length == null) {
+      const all = this.readAll();
+      if (str) str.set(binaryBytes(all).subarray(0, str.length));
+      return all;
+    }
 
     const buffer = new Uint8Array(length);
     let n = 0;
@@ -287,8 +327,12 @@ export class IO {
       if (read === 0) break;
       n += read;
     }
-    if (n === 0) return length === 0 ? "" : null;
+    if (n === 0) {
+      if (str) str.fill(0);
+      return length === 0 ? "" : null;
+    }
     this.pos += n;
+    if (str) str.set(buffer.subarray(0, Math.min(n, str.length)));
     return binaryString(buffer, n);
   }
 
@@ -321,7 +365,9 @@ export class IO {
       bytes.set(chunk, at);
       at += chunk.length;
     }
-    return this.binary ? binaryString(bytes, total) : new TextDecoder().decode(bytes);
+    return this.enc === Encoding.ASCII_8BIT
+      ? binaryString(bytes, total)
+      : new TextDecoder().decode(bytes);
   }
 
   /**
@@ -335,7 +381,8 @@ export class IO {
    * (`vendor/ruby/io.c:2263`).
    */
   write(string: string): number {
-    const buffer = this.binary ? binaryBytes(string) : new TextEncoder().encode(string);
+    const buffer =
+      this.enc === Encoding.ASCII_8BIT ? binaryBytes(string) : new TextEncoder().encode(string);
     let n = 0;
     while (n < buffer.length) {
       n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this.pos + n);
