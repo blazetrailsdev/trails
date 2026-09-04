@@ -5,6 +5,7 @@ import { Time, actsLikeDate, actsLikeTime } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
 import {
   IO,
+  Rational,
   StringIO,
   KeyError,
   block,
@@ -14,7 +15,7 @@ import {
   merge,
   mergeBang,
 } from "@blazetrails/ruby-compat";
-import { isBlank } from "@blazetrails/activesupport";
+import { BigDecimal, isBlank } from "@blazetrails/activesupport";
 
 import { UploadedFile } from "../../action-dispatch/http/upload.js";
 
@@ -78,7 +79,11 @@ const PERMITTED_SCALAR_TYPES: ((value: unknown) => boolean)[] = [
   (value) => typeof value === "string",
   (value) => typeof value === "string",
   (value) => value === null || value === undefined,
-  (value) => typeof value === "number",
+  (value) =>
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    value instanceof BigDecimal ||
+    value instanceof Rational,
   (value) => value === true,
   (value) => value === false,
   (value) => actsLikeDate(value),

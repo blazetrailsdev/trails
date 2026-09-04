@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { File, StringIO } from "@blazetrails/ruby-compat";
-import { Date, Time } from "@blazetrails/date";
+import { File, Rational, StringIO } from "@blazetrails/ruby-compat";
+import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
+import { BigDecimal } from "@blazetrails/activesupport";
 import { UploadedFile } from "../../../action-dispatch/http/upload.js";
 import { Parameters, UnfilteredParameters } from "../../metal/strong-parameters.js";
 
@@ -10,18 +11,29 @@ const thisFile = new URL(import.meta.url).pathname;
 function permittedScalarValues(): unknown[] {
   return [
     "a",
-    ":a",
+    "a",
     0,
     1.0,
+    2n ** 128n,
+    new BigDecimal(1),
+    new Rational(1, 2),
     true,
     false,
     Date.today(),
     Time.now(),
+    DateTime.now(),
     File.open(thisFile, "r"),
     new StringIO(),
     new UploadedFile({ tempfile: thisFile }),
     new RackTestUploadedFile(thisFile),
   ];
+}
+
+const structFields: string[] = [];
+for (const number of ["0", "1", "12"]) {
+  for (const suffix of ["", "i", "f"]) {
+    structFields.push(`sf(${number}${suffix})`);
+  }
 }
 
 describe("ParametersPermitTest", () => {
@@ -49,10 +61,21 @@ describe("ParametersPermitTest", () => {
       const params = new Parameters({ id: value });
       const permitted = params.permit("id");
       expect(permitted.get("id")).toBe(value);
+
+      for (const sf of structFields) {
+        const sfParams = new Parameters({ [sf]: value });
+        const sfPermitted = sfParams.permit("sf");
+        expect(sfPermitted.get(sf)).toBe(value);
+      }
     }
 
     const permittedNil = new Parameters({ id: null }).permit("id");
     expect(permittedNil.get("id")).toBeNull();
+
+    for (const sf of structFields) {
+      const sfPermitted = new Parameters({ [sf]: null }).permit("sf");
+      expect(sfPermitted.get(sf)).toBeNull();
+    }
   });
 
   it("key: unknown keys are filtered out", () => {
