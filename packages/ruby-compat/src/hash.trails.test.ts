@@ -99,6 +99,14 @@ describe("Hash#merge", () => {
   it("applies each argument in turn", () => {
     expect(merge({ a: 1 }, { b: 2 }, { b: 3 })).toEqual({ a: 1, b: 3 });
   });
+
+  it("carries a __proto__ key across as an ordinary key", () => {
+    const hash = Object.assign(Object.create(null) as Record<string, number>, { ["__proto__"]: 1 });
+    const merged = merge(hash, { a: 2 });
+    expect(hasKey(merged, "__proto__")).toBe(true);
+    expect("toString" in merged).toBe(false);
+    expect(Object.getPrototypeOf(merged)).toBeNull();
+  });
 });
 
 describe("Hash#update", () => {
@@ -192,12 +200,10 @@ describe("Hash#reject", () => {
 
   it("carries a __proto__ key across as an ordinary key", () => {
     const hash = Object.assign(Object.create(null) as Record<string, number>, { ["__proto__"]: 1 });
-    expect(
-      hasKey(
-        transformValues(hash, (v) => v * 2),
-        "__proto__",
-      ),
-    ).toBe(true);
+    const rejected = reject(hash, (k) => k === "nope");
+    expect(hasKey(rejected, "__proto__")).toBe(true);
+    expect("toString" in rejected).toBe(false);
+    expect(Object.getPrototypeOf(rejected)).toBeNull();
   });
 });
 
@@ -320,6 +326,14 @@ describe("Hash#default", () => {
     const copy = dup(hash);
     copy.a = 2;
     expect(hash.a).toBe(1);
+  });
+
+  it("dups a plain object without ancestors, as rb_hash_dup does", () => {
+    const hash = Object.assign(Object.create(null) as Record<string, number>, { ["__proto__"]: 1 });
+    const copy = dup(hash);
+    expect(hasKey(copy, "__proto__")).toBe(true);
+    expect("toString" in copy).toBe(false);
+    expect(Object.getPrototypeOf(copy)).toBeNull();
   });
 
   describe("inspect", () => {

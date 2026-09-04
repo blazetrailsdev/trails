@@ -104,7 +104,7 @@ get as close as the language allows.
   `Klass.prototype`. Skips methods already on the prototype. If the
   module exports a function keyed by the `included` `Symbol`, it runs
   that hook with the class as its argument. See
-  `packages/activesupport/src/include.ts`.
+  `packages/ruby-compat/src/include.ts`.
 - **`extend(Klass, mod)`** is the class-method equivalent. Copies onto
   the class itself and runs the `extended` `Symbol` hook.
 - **`Included<Mod>` / `Extended<Mod>`** are type helpers that translate
@@ -114,7 +114,7 @@ get as close as the language allows.
 
 Differences vs Ruby:
 
-- Hooks use `Symbol.for("@blazetrails/activesupport:included")` rather
+- Hooks use `Symbol.for("@blazetrails/ruby-compat:included")` rather
   than a magic method name. Symbol-based hooks play nicer with
   TypeScript tooling than stringly-typed method lookup.
 - Mixing happens once at class-declaration time in TS, rather than

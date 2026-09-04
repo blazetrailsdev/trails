@@ -548,8 +548,8 @@ When NOT to use this:
 `included` and `extended` themselves **do** have a TS equivalent, and the
 sentence above is only about the spelling. `include()` / `extend()` fire
 callbacks keyed by the exported `included` / `extended` symbols
-(`Symbol.for("@blazetrails/activesupport:included")`, see
-`activesupport/src/include.ts`), which is how you port an
+(`Symbol.for("@blazetrails/ruby-compat:included")`, see
+`ruby-compat/src/include.ts`), which is how you port an
 `included do ... end` block. Because they are symbol-keyed they are not public
 string-named members, so they never collide with the `SKIP_GROUPS` entry above.
 Only `inherited` has no equivalent — JS has no hook that fires when a subclass

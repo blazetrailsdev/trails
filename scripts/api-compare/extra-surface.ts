@@ -1312,14 +1312,14 @@ function foldClassMethodsModules(modules: Record<string, ClassInfo>): Set<string
  * The two symbol-keyed members trails uses to port a Ruby Concern's hooks —
  * `included do ... end` and `def self.extended(base)` — as
  * `static [included](base)` / `static [extended](base)`, keyed by the symbols
- * `packages/activesupport/src/include.ts` exports
- * (`Symbol.for("@blazetrails/activesupport:included")` and its `extended`
+ * `packages/ruby-compat/src/include.ts` exports
+ * (`Symbol.for("@blazetrails/ruby-compat:included")` and its `extended`
  * twin). CLAUDE.md § "Module mixins" ratifies the shape repo-wide.
  *
  * The extractor records a computed member by its source text
  * (`getMemberName`), so the manifest name IS the bracketed spelling below —
  * which is also how the symbol import resolves at every site in the repo,
- * since the binding is imported under the activesupport name.
+ * since the binding is imported under that bare name.
  *
  * The string-named `included` / `extended` / `inherited` methods are a
  * different thing and stay drift: `SKIP_GROUPS` in `scripts/parity/conventions.ts`
