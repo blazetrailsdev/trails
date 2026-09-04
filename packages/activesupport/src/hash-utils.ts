@@ -72,7 +72,7 @@ export function mergeBang<T extends AnyObject>(hash: T, otherHash: AnyObject): T
 }
 
 export function deepTransformKeys(obj: unknown, block: (key: string) => string): unknown {
-  return _deepTransformKeysInObject(obj, block);
+  return _deepTransformKeysInObject.call(obj as AnyObject, obj, block);
 }
 
 export function deepCamelizeKeys(obj: unknown): unknown {
@@ -176,23 +176,24 @@ export function deepSymbolizeKeysBang(
 
 /** @internal */
 export function _deepTransformKeysInObject(
+  this: AnyObject | Map<string, unknown>,
   object: unknown,
   block: (key: string) => string,
 ): unknown {
   if (object instanceof Map) {
-    const result = new (object.constructor as new () => Map<string, unknown>)();
+    const result = new (this.constructor as new () => Map<string, unknown>)();
     for (const [key, value] of object) {
-      result.set(block(String(key)), _deepTransformKeysInObject(value, block));
+      result.set(block(String(key)), _deepTransformKeysInObject.call(this, value, block));
     }
     return result;
   } else if (isPlainObject(object)) {
     const result: AnyObject = {};
     for (const key of Object.keys(object)) {
-      result[block(key)] = _deepTransformKeysInObject(object[key], block);
+      result[block(key)] = _deepTransformKeysInObject.call(this, object[key], block);
     }
     return result;
   } else if (Array.isArray(object)) {
-    return object.map((e) => _deepTransformKeysInObject(e, block));
+    return object.map((e) => _deepTransformKeysInObject.call(this, e, block));
   } else {
     return object;
   }

@@ -30,6 +30,16 @@ describe("HashExtTest (trails)", () => {
     expect((result.get("A") as Hash<string, unknown>).get("B")).toBe(1);
   });
 
+  it("deep transform keys builds every level from the receiver's class, not the nested one", () => {
+    const hash = new Hash<string, unknown>();
+    hash.set("a", new HashWithIndifferentAccess<unknown>({ b: 1 }));
+
+    const result = deepTransformKeys(hash, (k) => k.toUpperCase()) as Hash<string, unknown>;
+
+    expect(result.get("A")).toBeInstanceOf(Hash);
+    expect(result.get("A")).not.toBeInstanceOf(HashWithIndifferentAccess);
+  });
+
   it("deep transform keys over a HashWithIndifferentAccess answers one of those", () => {
     const hash = new HashWithIndifferentAccess<unknown>({ a: { b: 1 } });
 
