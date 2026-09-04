@@ -1,6 +1,6 @@
 import { ArgumentError, rbObjAsString as toS, Range } from "@blazetrails/ruby-compat";
 import { Nodes, sql } from "@blazetrails/arel";
-import { wrap } from "@blazetrails/activesupport";
+import { kernelArray, wrap } from "@blazetrails/activesupport";
 
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
@@ -53,12 +53,12 @@ export class PredicateBuilder {
     for (let [key, value] of entriesOf(attributes)) {
       if (Array.isArray(key) && key.length === 1) {
         key = key[0];
-        value = (value as unknown[]).flat();
+        value = (value as unknown[]).flat(Infinity);
       }
 
       if (Array.isArray(key)) {
         const cols = key;
-        const queries = wrap(value).map((idsSet) => {
+        const queries = kernelArray(value).map((idsSet) => {
           if (!Array.isArray(idsSet)) {
             throw new ArgumentError(`Expected corresponding value for ${toS(cols)} to be an Array`);
           }
