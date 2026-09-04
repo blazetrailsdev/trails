@@ -1492,7 +1492,7 @@ export class SchemaStatements {
   /**
    * @internal
    * @missingRailsCall first — PERMANENT
-   * @missingRailsCall limit — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
+   * @missingRailsCall limit — CONVERGEABLE port-multibyte-chars-and-string-mb-chars
    */
   generateIndexName(tableName: string, column: string | string[]): string {
     const cols = wrap(column);

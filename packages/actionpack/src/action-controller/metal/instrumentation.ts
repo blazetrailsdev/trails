@@ -1,5 +1,8 @@
 import { ExecutionContext, Notifications } from "@blazetrails/activesupport";
-import { ExceptionWrapper } from "../../action-dispatch/middleware/exception-wrapper.js";
+import {
+  ExceptionWrapper,
+  classNameOf,
+} from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
 
@@ -42,9 +45,7 @@ export async function processAction(
         payload.status = this.response.status;
         return result;
       } catch (error) {
-        payload.status = ExceptionWrapper.statusCodeForException(
-          (error as Error)?.constructor?.name ?? String(error),
-        );
+        payload.status = ExceptionWrapper.statusCodeForException(classNameOf(error as Error));
         throw error;
       } finally {
         this.appendInfoToPayload(payload as Record<string, unknown>);

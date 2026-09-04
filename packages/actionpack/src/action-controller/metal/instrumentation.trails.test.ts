@@ -3,6 +3,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
+import { ParamError } from "../../action-dispatch/http/param-error.js";
 
 function subscribeOnce(name: string, sink: Record<string, unknown>[]): () => void {
   const subscriber = Notifications.subscribe(
@@ -78,5 +79,23 @@ describe("ActionController::Instrumentation#process_action", () => {
     expect(events).toHaveLength(1);
     expect(events[0].status).toBe(204);
     expect(events[0].response).toBe(response);
+  });
+
+  it("publishes process_action with the status mapped from the raised error's class name", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends Base {
+      static actions = ["index"];
+      index(): void {
+        throw new ParamError("bad param");
+      }
+    }
+    await expect(
+      new WidgetsController().dispatch("index", newRequest(), new Response()),
+    ).rejects.toThrow(ParamError);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe(400);
   });
 });
