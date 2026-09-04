@@ -1,4 +1,13 @@
-import { Notifications, onLoad } from "@blazetrails/activesupport";
+import {
+  Callbacks as ASCallbacks,
+  defineCallbacks,
+  extend,
+  include,
+  Notifications,
+  onLoad,
+  type Extended,
+  type Included,
+} from "@blazetrails/activesupport";
 import { File, getFsAsync, getPathAsync } from "@blazetrails/ruby-compat";
 import type { DrawCallback, RackApp, RackAppObject, RouteSet } from "@blazetrails/actionpack";
 import { Root } from "./paths.js";
@@ -12,6 +21,9 @@ import { _Trails } from "./trails-slot.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
 export class Engine extends Trailtie {
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
+
   private _railtiesCollection?: Trailties;
   private _allLoadPathsCache?: string[];
   private _routes?: RouteSet;
@@ -142,6 +154,16 @@ export class Engine extends Trailtie {
     );
   }
 
+  async loadSeed(): Promise<void> {
+    const seedFile = ((await (await this.paths()).get("db/seeds.ts")?.existent()) ?? [])[0];
+    if (seedFile !== undefined) {
+      const { pathToFileURL } = await getPathAsync();
+      await this.runCallbacks("load_seed", async () => {
+        await import(pathToFileURL!(seedFile).href);
+      });
+    }
+  }
+
   /** @internal */
   async _allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
     if (this._allLoadPathsCache) return this._allLoadPathsCache;
@@ -221,7 +243,21 @@ Engine.initializer("load_config_initializers", async function (this: Engine) {
   }
 });
 
+Engine.initializer("wrap_reloader_around_load_seed", function (this: Engine, ...args: unknown[]) {
+  const app = args[0] as EngineReloaderApp;
+  (this.constructor as typeof Engine).setCallback(
+    "load_seed",
+    "around",
+    (_engine: Engine, seedsBlock: () => void | Promise<void>) => app.reloader.wrap(seedsBlock),
+  );
+});
+
 Engine.initializer("engines_blank_point", function () {});
+
+/** @internal */
+interface EngineReloaderApp {
+  reloader: { wrap(block: () => void | Promise<void>): void | Promise<void> };
+}
 
 /** @internal */
 interface ActionControllerBaseLike {
@@ -238,3 +274,7 @@ async function realpathOr(fs: Fs, p: string): Promise<string> {
 }
 
 setRubyClassPath(Engine, "Rails::Engine");
+
+include(Engine, ASCallbacks.InstanceMethods);
+extend(Engine, ASCallbacks.ClassMethods);
+defineCallbacks(Engine.prototype, "load_seed");

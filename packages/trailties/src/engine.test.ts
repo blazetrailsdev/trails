@@ -460,5 +460,48 @@ describe("Engine", () => {
 
       expect(app.config.helpersPaths).toEqual([]);
     });
+
+    it("loading seed data", async () => {
+      class SeedEngine extends Engine {}
+      Trailtie.register(SeedEngine);
+      const engine = SeedEngine.instance();
+      engine.config.setRoot(fixtureRoot);
+
+      await engine.loadSeed();
+
+      expect(loaded).toEqual(["seeds"]);
+    });
+
+    it("skips nonexistent seed data", async () => {
+      class NoSeedEngine extends Engine {}
+      Trailtie.register(NoSeedEngine);
+      const engine = NoSeedEngine.instance();
+      engine.config.setRoot("/nonexistent-engine-root");
+
+      await expect(engine.loadSeed()).resolves.toBeUndefined();
+      expect(loaded).toEqual([]);
+    });
+
+    it("loading seed data is wrapped by the executor", async () => {
+      class WrappedSeedEngine extends Engine {}
+      Trailtie.register(WrappedSeedEngine);
+      const engine = WrappedSeedEngine.instance();
+      engine.config.setRoot(new URL("./__fixtures__/seed-engine", import.meta.url).pathname);
+      const wrapped: string[] = [];
+      const app = {
+        reloader: {
+          wrap(block: () => void | Promise<void>): void | Promise<void> {
+            wrapped.push("wrap");
+            return block();
+          },
+        },
+      };
+
+      engine.initializers.find((i) => i.name === "wrap_reloader_around_load_seed")!.run(app);
+      await engine.loadSeed();
+
+      expect(wrapped).toEqual(["wrap"]);
+      expect(loaded).toEqual(["wrapped-seeds"]);
+    });
   });
 });

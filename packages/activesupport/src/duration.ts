@@ -6,10 +6,11 @@
  *   `Temporal.Instant`. The default reference is `Temporal.Now.instant()`.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { cmp, equals as cmpEquals, rbEqual, rubyClass } from "@blazetrails/ruby-compat";
 import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
+import { advance as timeAdvance, since as timeSince } from "./core-ext/time/calculations.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
@@ -280,19 +281,19 @@ export class Duration {
     return this.inSeconds() / SECONDS_PER_YEAR;
   }
 
+  since(time: RubyTime): RubyTime;
   since(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   since(time?: Date | Temporal.Instant): Temporal.Instant;
-  since(
-    time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
-  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+  since(time?: DurationReceiver): DurationResult;
+  since(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
     return this.sum(1, time);
   }
 
+  ago(time: RubyTime): RubyTime;
   ago(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   ago(time?: Date | Temporal.Instant): Temporal.Instant;
-  ago(
-    time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
-  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+  ago(time?: DurationReceiver): DurationResult;
+  ago(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
     return this.sum(-1, time);
   }
 
@@ -300,15 +301,24 @@ export class Duration {
     return this.since();
   }
 
-  until(time: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+  until(time: RubyTime): RubyTime;
+  until(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  until(time?: Date | Temporal.Instant): Temporal.Instant;
+  until(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
     return this.ago(time);
   }
 
-  after(time: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+  after(time: RubyTime): RubyTime;
+  after(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  after(time?: Date | Temporal.Instant): Temporal.Instant;
+  after(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
     return this.since(time);
   }
 
-  before(time: Date | Temporal.Instant = Temporal.Now.instant()): Temporal.Instant {
+  before(time: RubyTime): RubyTime;
+  before(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
+  before(time?: Date | Temporal.Instant): Temporal.Instant;
+  before(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
     return this.ago(time);
   }
 
@@ -380,15 +390,13 @@ export class Duration {
     return this.transformValues((number) => number);
   }
 
-  private sum(
-    sign: 1 | -1,
-    time: Date | Temporal.Instant | Temporal.PlainDate = Temporal.Now.instant(),
-  ): Temporal.Instant | Temporal.PlainDate | TimeWithZone {
+  private sum(sign: 1 | -1, time: DurationReceiver = Temporal.Now.instant()): DurationResult {
     if (
       !(
         time instanceof Date ||
         time instanceof Temporal.Instant ||
-        time instanceof Temporal.PlainDate
+        time instanceof Temporal.PlainDate ||
+        time instanceof RubyTime
       )
     ) {
       throw new ArgumentError(`expected a time or date, got ${inspect(time)}`);
@@ -396,10 +404,11 @@ export class Duration {
 
     if (isEmpty(this._partKeys)) {
       if (time instanceof Temporal.PlainDate) return dateSince(time, sign * this.inSeconds());
+      if (time instanceof RubyTime) return timeSince.call(time, sign * this.inSeconds());
       return applyDurationPreservingNs(time, this.parts, sign);
     }
 
-    if (time instanceof Temporal.PlainDate)
+    if (time instanceof Temporal.PlainDate || time instanceof RubyTime)
       return applyDurationToDate(time, this.parts, this._partKeys, sign);
     return applyDurationPreservingNs(time, this.parts, sign);
   }
@@ -495,6 +504,9 @@ export function years(n: number): Duration {
   return Duration.years(n);
 }
 
+type DurationReceiver = Date | Temporal.Instant | Temporal.PlainDate | RubyTime;
+type DurationResult = Temporal.Instant | Temporal.PlainDate | TimeWithZone | RubyTime;
+
 function singular(key: keyof DurationParts): string {
   switch (key) {
     case "years":
@@ -521,12 +533,12 @@ function toDateInput(date: Date | Temporal.Instant): Date {
 }
 
 function applyDurationToDate(
-  date: Temporal.PlainDate,
+  date: Temporal.PlainDate | RubyTime,
   parts: DurationParts,
   partKeys: readonly (keyof DurationParts)[],
   sign: 1 | -1,
-): Temporal.PlainDate | TimeWithZone {
-  let time: Temporal.PlainDate | TimeWithZone = date;
+): Temporal.PlainDate | TimeWithZone | RubyTime {
+  let time: Temporal.PlainDate | TimeWithZone | RubyTime = date;
 
   for (const type of partKeys) {
     const number = parts[type];
@@ -545,15 +557,22 @@ function applyDurationToDate(
   return time;
 }
 
-function dateOrTimeSince(t: Temporal.PlainDate | TimeWithZone, seconds: number): TimeWithZone {
-  return t instanceof Temporal.PlainDate ? dateSince(t, seconds) : t.since(seconds);
+function dateOrTimeSince(
+  t: Temporal.PlainDate | TimeWithZone | RubyTime,
+  seconds: number,
+): TimeWithZone | RubyTime {
+  if (t instanceof Temporal.PlainDate) return dateSince(t, seconds);
+  if (t instanceof RubyTime) return timeSince.call(t, seconds);
+  return t.since(seconds);
 }
 
 function dateOrTimeAdvance(
-  t: Temporal.PlainDate | TimeWithZone,
+  t: Temporal.PlainDate | TimeWithZone | RubyTime,
   options: Partial<DurationParts>,
-): Temporal.PlainDate | TimeWithZone {
-  return t instanceof Temporal.PlainDate ? dateAdvance(t, options) : t.advance(options);
+): Temporal.PlainDate | TimeWithZone | RubyTime {
+  if (t instanceof Temporal.PlainDate) return dateAdvance(t, options);
+  if (t instanceof RubyTime) return timeAdvance.call(t, options);
+  return t.advance(options);
 }
 
 function applyDurationPreservingNs(
