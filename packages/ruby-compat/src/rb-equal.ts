@@ -1,3 +1,5 @@
+import { temporalTag, widenPlainDate } from "./temporal-tag.js";
+
 /**
  * Ruby's `rb_equal` (`vendor/ruby/object.c:147`) — the C primitive behind every `==` send: identity first,
  * then the receiver's own `==`. Ported callers (`Range#==`'s endpoint
@@ -12,6 +14,26 @@
 export function rbEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  /* Ruby's `Date#==` (`vendor/ruby/ext/date/date_core.c:6902` `d_lite_equal`) is
+     `<=>`-based (`vendor/ruby/ext/date/date_core.c:6810` `d_lite_cmp`), so it
+     answers `false` for an operand of another class instead of raising, and a
+     Date equals a DateTime at the same instant. Temporal's own `equals` has
+     neither half — it coerces its argument, so `PlainDate#equals` raises
+     `TypeError: year is required` for an Instant — which is why this is tried
+     before the `equals` arm below, mirroring `cmp`'s Temporal arm. */
+  const tag = temporalTag(a);
+  if (tag !== null) {
+    if (temporalTag(b) === null) return false;
+    const x = widenPlainDate(a);
+    const y = widenPlainDate(b);
+    if (temporalTag(x) !== temporalTag(y)) return false;
+    return (
+      (x as { constructor: { compare(l: unknown, r: unknown): number } }).constructor.compare(
+        x,
+        y,
+      ) === 0
+    );
+  }
   if (typeof (a as { equals?: unknown }).equals === "function") {
     return (a as { equals(other: unknown): boolean }).equals(b);
   }
@@ -31,6 +53,13 @@ export function rbEqual(a: unknown, b: unknown): boolean {
     return (
       Array.isArray(b) && a.length === b.length && a.every((element, i) => rbEqual(element, b[i]))
     );
+  }
+  /* A `Uint8Array` stands in for a Ruby binary String (the representation
+     `ActiveModel::Type::Binary#cast` produces, binary.rb:20-27), whose `==`
+     (`vendor/ruby/string.c:3269` `rb_str_equal`) compares bytes rather than
+     identity. */
+  if (a instanceof Uint8Array) {
+    return b instanceof Uint8Array && a.length === b.length && a.every((byte, i) => byte === b[i]);
   }
   /* boundary: a JS Date is one of the values a ported `==` is handed, and
      Ruby's `Date#==` / `Time#==` (`vendor/ruby/time.c:3951` `time_cmp`)

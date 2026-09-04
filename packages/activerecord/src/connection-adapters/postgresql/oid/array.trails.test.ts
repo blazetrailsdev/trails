@@ -91,3 +91,13 @@ describe("PostgreSQL::OID::Array", () => {
     expect(type.userInputInTimeZone("ts")).toBe("ts@sub");
   });
 });
+
+describe("Array dirty tracking", () => {
+  it("inherits Value#changed?, so an element-equal reassignment is not a change", () => {
+    const type = new OidArray(stringSubtype);
+
+    expect(type.isChanged(["a", "b"], ["a", "b"])).toBe(false);
+    expect(type.isChanged(["a", "b"], ["a", "c"])).toBe(true);
+    expect(type.isChanged(["a"], ["a", "b"])).toBe(true);
+  });
+});

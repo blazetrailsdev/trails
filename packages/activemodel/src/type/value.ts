@@ -1,4 +1,4 @@
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { rbInspect as inspect, rbEqual } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
 
 export abstract class Type<T = unknown> {
@@ -56,7 +56,7 @@ export abstract class Type<T = unknown> {
   }
 
   isChanged(oldValue: unknown, newValue: unknown, _newValueBeforeTypeCast?: unknown): boolean {
-    return oldValue !== newValue;
+    return !rbEqual(oldValue, newValue);
   }
 
   isChangedInPlace(_rawOldValue: unknown, _newValue: unknown): boolean {

@@ -21,7 +21,7 @@ import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
 import type { ValidatableRecord } from "./validator.js";
-import type { ConditionalOptions } from "./validations.js";
+import type { ConditionalOptions, ValidateArgs } from "./validations.js";
 import * as Validates from "./validations/validates.js";
 import { ClassMethods as WithClassMethods } from "./validations/with.js";
 import type { ClassMethods as ConversionClassMethods } from "./conversion.js";
@@ -60,8 +60,7 @@ export class Model {
   declare static isAttributeMethod: Extended<typeof ValidationsClassMethods>["isAttributeMethod"];
 
   declare static validate: <T extends ValidatableRecord = ValidatableRecord>(
-    methodOrFn: string | ((record: T) => unknown),
-    options?: ConditionalOptions,
+    ...args: ValidateArgs<T>
   ) => void;
 
   declare static validatesEach: <T extends ValidatableRecord = ValidatableRecord>(

@@ -37,3 +37,23 @@ describe("binary type_casted_binds payload", () => {
     expect(() => conn.typeCast(bytes)).toThrow(TypeError);
   });
 });
+
+describe("binary dirty tracking", () => {
+  fixtures({});
+
+  it("does not report a byte-equal reassignment as changed", async () => {
+    const rec = await Binary.create({ name: "d", data: new Uint8Array([0x80, 0xde]) });
+    const found = await Binary.find(rec.id);
+    found.data = new Uint8Array([0x80, 0xde]);
+    expect(found.changed).toEqual([]);
+    expect(found.changedAttributeNamesToSave).toEqual([]);
+  });
+
+  it("reports an in-place mutation of an assigned value as changed", async () => {
+    const rec = await Binary.create({ name: "d", data: new Uint8Array([0x80, 0xde]) });
+    const found = await Binary.find(rec.id);
+    found.data = new Uint8Array([0x80, 0xde]);
+    found.data[0] = 0x01;
+    expect(found.changed).toEqual(["data"]);
+  });
+});

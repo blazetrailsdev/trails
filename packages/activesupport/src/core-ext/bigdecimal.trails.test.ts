@@ -58,3 +58,12 @@ describe("BigDecimalTrails", () => {
     expect(BigDecimal.NAN.mult(new BigDecimal("2")).isNan()).toBe(true);
   });
 });
+
+describe("BigDecimal#equals", () => {
+  it("is value equality, and NaN is never equal to NaN", () => {
+    expect(new BigDecimal("1.0").equals(new BigDecimal("1.00"))).toBe(true);
+    expect(new BigDecimal("1.0").equals(new BigDecimal("1.5"))).toBe(false);
+    expect(new BigDecimal("NaN").equals(new BigDecimal("NaN"))).toBe(false);
+    expect(new BigDecimal("1.0").equals("1.0")).toBe(false);
+  });
+});

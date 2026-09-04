@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/date";
 import { ValueType, IntegerType, FloatType, DecimalType, BigIntegerType } from "../index.js";
 
 describe("ValueType", () => {
@@ -40,5 +41,33 @@ describe("ValueType", () => {
     it("subclass and parent: not equal", () => {
       expect(new IntegerType().equals(new BigIntegerType())).toBe(false);
     });
+  });
+});
+
+describe("ValueType#isChanged is Ruby value equality", () => {
+  it("compares the object-valued casts that inherit it, and leaves unknown shapes changed", () => {
+    const type = new ValueType();
+
+    expect(type.isChanged([1, 2], [1, 2])).toBe(false);
+    expect(type.isChanged([1, 2], [1, 3])).toBe(true);
+    expect(type.isChanged({ a: 1 }, { a: 1 })).toBe(false);
+    expect(type.isChanged({ a: 1 }, { a: 2 })).toBe(true);
+    expect(type.isChanged(new Uint8Array([0x80]), new Uint8Array([0x80]))).toBe(false);
+    expect(type.isChanged(new Date(0), new Date(0))).toBe(false);
+    expect(type.isChanged(new Date(0), new Date(1))).toBe(true);
+    expect(type.isChanged("a", "a")).toBe(false);
+    expect(type.isChanged(1, 2)).toBe(true);
+    expect(type.isChanged(null, null)).toBe(false);
+  });
+
+  it("answers changed rather than raising when the two casts are unrelated Temporal shapes", () => {
+    const type = new ValueType();
+    const date = Temporal.PlainDate.from("2026-09-03");
+
+    expect(type.isChanged(date, Temporal.Instant.fromEpochMilliseconds(0))).toBe(true);
+    expect(type.isChanged(date, Temporal.PlainDate.from("2026-09-03"))).toBe(false);
+    expect(type.isChanged(date, Temporal.PlainDate.from("2026-09-04"))).toBe(true);
+    expect(type.isChanged(date, Temporal.PlainDateTime.from("2026-09-03T00:00"))).toBe(false);
+    expect(type.isChanged(date, Temporal.PlainDateTime.from("2026-09-03T01:00"))).toBe(true);
   });
 });
