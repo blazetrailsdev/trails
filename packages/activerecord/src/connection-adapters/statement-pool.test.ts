@@ -128,7 +128,7 @@ describe("SQLite3 StatementPool integration", () => {
   it.skipIf(!isSqliteRun())("caches prepared statements across execute calls", async () => {
     const { adapter, pool: adapterPool } = await checkoutRawTestAdapter();
     await adapter.connectBang();
-    const prepareSpy = vi.spyOn((adapter as any).driver, "prepare");
+    const prepareSpy = vi.spyOn((adapter as any)._rawConnection, "prepare");
 
     try {
       await adapter.executeMutation('DROP TABLE IF EXISTS "test_pool"');

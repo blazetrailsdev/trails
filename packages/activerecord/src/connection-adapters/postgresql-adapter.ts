@@ -24,6 +24,7 @@ import {
   disableReferentialIntegrity,
 } from "./postgresql/referential-integrity.js";
 import { Column } from "./postgresql/column.js";
+import type { TypeMetadata as PgTypeMetadata } from "./postgresql/type-metadata.js";
 import {
   quote as pgQuote,
   typeCast as pgTypeCast,
@@ -137,7 +138,6 @@ import {
   type ExclusionConstraintOptions,
   type UniqueConstraintOptions,
 } from "./postgresql/schema-definitions.js";
-import { TypeMetadata as PgTypeMetadata } from "./postgresql/type-metadata.js";
 import {
   CheckConstraintDefinition,
   ChangeColumnDefinition,
@@ -1890,32 +1890,6 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  quotedScope(
-    name?: string | null,
-    options: { type?: string } = {},
-  ): { schema: string; name: string | null; type: string | null } {
-    let schema: string | null;
-    [schema, name] = this.extractSchemaQualifiedName(name ?? "");
-    let type: string | null = null;
-    switch (options.type) {
-      case "BASE TABLE":
-        type = "'r','p'";
-        break;
-      case "VIEW":
-        type = "'v','m'";
-        break;
-      case "FOREIGN TABLE":
-        type = "'f'";
-        break;
-    }
-    return {
-      schema: schema ? this.quote(schema) : "ANY (current_schemas(false))",
-      name: name ? this.quote(name) : null,
-      type,
-    };
-  }
-
-  /** @internal */
   referenceNameForTable(tableName: string): string {
     const [, table] = this.extractSchemaQualifiedName(tableName);
     return singularize(table);
@@ -2181,26 +2155,6 @@ export class PostgreSQLAdapter
   /** @internal */
   createAlterTable(name: string): PgAlterTable {
     return new PgAlterTable(this.createTableDefinition(name));
-  }
-
-  /** @internal */
-  async fetchTypeMetadata(
-    columnName: string,
-    sqlType: string,
-    oid: number,
-    fmod: number,
-  ): Promise<PgTypeMetadata> {
-    const castType = await this.getOidType(oid, fmod, columnName, sqlType);
-    return new PgTypeMetadata(
-      {
-        sqlType,
-        type: castType.type(),
-        limit: castType.limit ?? null,
-        precision: castType.precision ?? null,
-        scale: castType.scale ?? null,
-      },
-      { oid, fmod },
-    );
   }
 
   /** @internal */
@@ -2595,6 +2549,20 @@ export interface PostgreSQLAdapter {
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   /** @internal */
   dataSourceSql(options: { type?: string }): string;
+
+  /** @internal */
+  fetchTypeMetadata(
+    columnName: string,
+    sqlType: string,
+    oid: number,
+    fmod: number,
+  ): Promise<PgTypeMetadata>;
+
+  /** @internal */
+  quotedScope(
+    name?: string | null,
+    options?: { type?: string },
+  ): { schema: string; name: string | null; type: string | null };
 
   /** @internal */
   extractSchemaQualifiedName(string: string): [string | null, string];

@@ -1,4 +1,5 @@
 import { Encoding } from "./encoding.js";
+import { EOFError } from "./eof-error.js";
 import { puts as ioPuts } from "./io.js";
 
 /**
@@ -38,16 +39,21 @@ export class StringIO {
   }
 
   read(): string;
-  read(length: number): string | null;
-  read(length?: number): string | null {
+  read(length: number, str?: Uint8Array | null): string | null;
+  read(length?: number, str?: Uint8Array | null): string | null {
     if (length == null) {
       const rest = this._string.slice(this._pos);
       this._pos = this._string.length;
       return rest;
     }
-    if (this.isEof()) return length === 0 ? "" : null;
+    if (this.isEof()) {
+      if (str) str.fill(0);
+      return length === 0 ? "" : null;
+    }
     const chunk = this._string.slice(this._pos, this._pos + length);
     this._pos += chunk.length;
+    if (str)
+      for (let i = 0; i < Math.min(chunk.length, str.length); i++) str[i] = chunk.charCodeAt(i);
     return chunk;
   }
 
@@ -84,6 +90,21 @@ export class StringIO {
   }
 
   /**
+   * `strio_binmode` (`vendor/ruby/ext/stringio/stringio.c:1863`) — it records
+   * ASCII-8BIT on the stream and, when the StringIO is writable, associates it
+   * with the buffer String, then answers the StringIO. The buffer already IS a
+   * Ruby binary String (see the class comment), so the association is the
+   * identity here, exactly as it is in {@link setEncoding}.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#binmode`
+   * (`vendor/ruby/ext/stringio/stringio.c:1879`).
+   */
+  binmode(): this {
+    this.enc = Encoding.ASCII_8BIT;
+    return this;
+  }
+
+  /**
    * `strio_set_encoding` (`vendor/ruby/ext/stringio/stringio.c:1801`) in its
    * one-argument form — the encoding is recorded on the stream and, when the
    * StringIO is writable, associated with the buffer String
@@ -102,6 +123,24 @@ export class StringIO {
   setEncoding(extEnc: Encoding | string): this {
     this.enc = Encoding.find(extEnc);
     return this;
+  }
+
+  /**
+   * `strio_sysread` (`vendor/ruby/ext/stringio/stringio.c:1664`), which
+   * `StringIO#readpartial` is defined as (`stringio.c:1949`): `read` with a
+   * `rb_eof_error()` (`vendor/ruby/io.c:756`) where that answers `nil` — the
+   * member
+   * `Rack::Test::UploadedFile#append_to`
+   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:64`) walks a StringIO
+   * body with.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#readpartial`
+   * (`vendor/ruby/ext/stringio/stringio.c:1949`).
+   */
+  readpartial(maxlen: number, outbuf?: Uint8Array | null): string {
+    const ret = this.read(maxlen, outbuf);
+    if (ret === null) throw new EOFError("end of file reached");
+    return ret;
   }
 
   isEof(): boolean {

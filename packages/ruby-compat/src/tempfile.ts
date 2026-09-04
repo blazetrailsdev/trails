@@ -297,6 +297,33 @@ export class Tempfile {
   }
 
   /**
+   * `IO#readpartial` (`vendor/ruby/io.c:3590`) on the delegated `File`
+   * (`vendor/ruby/lib/tempfile.rb:89`), which is how
+   * `Rack::Test::UploadedFile#append_to`
+   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:64`) walks the tempfile
+   * in 64K chunks.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#readpartial`
+   * (`vendor/ruby/io.c:3590`), delegated by Ruby stdlib `Tempfile`.
+   */
+  readpartial(maxlen: number, outbuf?: Uint8Array | null): string {
+    return this.tmpfile.readpartial(maxlen, outbuf);
+  }
+
+  /**
+   * `IO#eof?` (`vendor/ruby/io.c:2668`) on the delegated `File`
+   * (`vendor/ruby/lib/tempfile.rb:89`) — the `until` guard on
+   * `Rack::Test::UploadedFile#append_to`'s chunk loop
+   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:64`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#eof?`
+   * (`vendor/ruby/io.c:2668`), delegated by Ruby stdlib `Tempfile`.
+   */
+  isEof(): boolean {
+    return this.tmpfile.isEof();
+  }
+
+  /**
    * `IO#rewind` (`vendor/ruby/io.c:2565`) on the delegated `File`
    * (`vendor/ruby/lib/tempfile.rb:89`).
    *
