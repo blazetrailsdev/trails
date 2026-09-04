@@ -91,7 +91,7 @@ export class CreateMigration {
     this.sayStatus("remove", "red", sayDest);
     if (!e) return undefined;
     if (!this.pretend()) {
-      FileUtils.rmR(e, { force: true });
+      FileUtils.rmRf(e);
       this.invalidateExistingMigration();
     }
     return e;
@@ -109,7 +109,7 @@ export class CreateMigration {
       if (!this.pretend()) {
         const e = this.existingMigration();
         if (e) {
-          FileUtils.rmR(e, { force: true });
+          FileUtils.rmRf(e);
           this.invalidateExistingMigration();
         }
         await this.writeRendered();

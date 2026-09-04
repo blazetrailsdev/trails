@@ -17,6 +17,7 @@ export interface FsStatResult {
   isFile(): boolean;
   isSymbolicLink?(): boolean;
   size: number;
+  atime: Date;
   mtime: Date;
   mode?: number;
   dev?: number;
@@ -55,6 +56,10 @@ export interface FsAdapter {
   chmodSync?(path: string, mode: number): void;
   utimesSync?(path: string, atime: Date, mtime: Date): void;
   chownSync?(path: string, uid: number, gid: number): void;
+  lchmodSync?(path: string, mode: number): void;
+  lchownSync?(path: string, uid: number, gid: number): void;
+  readlinkSync?(path: string): string;
+  symlinkSync?(target: string, path: string): void;
   realpathSync?(path: string): string;
   accessSync?(path: string, mode: number): void;
   openSync(path: string, flags: string): number;

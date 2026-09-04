@@ -4,6 +4,24 @@ import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
 import { ArgumentError } from "./argument-error.js";
 import { FileUtils } from "./file-utils.js";
+import { fsAdapterConfig, getFs, getPath, registerFsAdapter } from "./fs-adapter.js";
+
+/** Forces `mv`'s cross-device fallback (`vendor/ruby/lib/fileutils.rb:1170-1173`). */
+function registerExdevFs(): void {
+  const fs = getFs();
+  registerFsAdapter(
+    "exdev",
+    Object.assign(Object.create(fs) as typeof fs, {
+      renameSync: () => {
+        const error: Error & { code?: string } = new Error("EXDEV");
+        error.code = "EXDEV";
+        throw error;
+      },
+    }),
+    getPath(),
+  );
+  fsAdapterConfig.adapter = "exdev";
+}
 
 describe("FileUtils", () => {
   let root: string;
@@ -13,6 +31,9 @@ describe("FileUtils", () => {
   });
 
   afterEach(() => {
+    fsAdapterConfig.adapter = null;
+    FileUtils.fileutilsOutput = undefined;
+    FileUtils.fileutilsLabel = undefined;
     nodeFs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -193,5 +214,76 @@ describe("FileUtils", () => {
 
     expect(nodeFs.existsSync(file)).toBe(false);
     expect(nodeFs.existsSync(nodePath.join(root, "unmade"))).toBe(false);
+  });
+
+  it("rm_rf removes a whole tree without raising on a missing path", () => {
+    const tree = nodePath.join(root, "tree");
+    FileUtils.mkdirP(nodePath.join(tree, "nested"));
+    nodeFs.writeFileSync(nodePath.join(tree, "nested", "file"), "contents");
+
+    FileUtils.rmRf(tree);
+    FileUtils.rmRf(nodePath.join(root, "never-existed"));
+
+    expect(nodeFs.existsSync(tree)).toBe(false);
+  });
+
+  it("copy_file preserves the source atime as well as its mtime", () => {
+    const src = nodePath.join(root, "src");
+    const dest = nodePath.join(root, "dest");
+    nodeFs.writeFileSync(src, "contents");
+    const mtime = new Date(Date.UTC(2002, 3, 5, 6, 7, 8));
+    nodeFs.utimesSync(src, new Date(Date.UTC(2001, 1, 3, 4, 5, 6)), mtime);
+
+    FileUtils.copyFile(src, dest, true);
+
+    const srcStat = nodeFs.statSync(src);
+    expect(srcStat.atime.getTime()).not.toEqual(mtime.getTime());
+    expect(nodeFs.statSync(dest).atime.getTime()).toEqual(srcStat.atime.getTime());
+    expect(nodeFs.statSync(dest).mtime.getTime()).toEqual(mtime.getTime());
+  });
+
+  it("copy_entry copies a symlink as a symlink and preserves its metadata", () => {
+    const target = nodePath.join(root, "target");
+    const src = nodePath.join(root, "link");
+    const dest = nodePath.join(root, "copy");
+    nodeFs.writeFileSync(target, "contents");
+    nodeFs.symlinkSync(target, src);
+    registerExdevFs();
+
+    FileUtils.mv(src, dest, { force: true });
+
+    expect(nodeFs.lstatSync(dest).isSymbolicLink()).toBe(true);
+    expect(nodeFs.readlinkSync(dest)).toEqual(target);
+  });
+
+  it("verbose prints the command line to the configured output", () => {
+    const lines: string[] = [];
+    FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+    const dir = nodePath.join(root, "verbose");
+    const file = nodePath.join(dir, "file");
+    FileUtils.mkdirP(dir, { verbose: true });
+    nodeFs.writeFileSync(file, "contents");
+    FileUtils.rm(file, { verbose: true });
+    FileUtils.rmF(file, { verbose: true });
+    FileUtils.mkdirP(dir, { mode: 0o755, verbose: true });
+
+    expect(lines).toEqual([
+      `mkdir -p ${dir}`,
+      `rm ${file}`,
+      `rm -f ${file}`,
+      `mkdir -p -m 755 ${dir}`,
+    ]);
+  });
+
+  it("verbose prefixes every message with the configured label", () => {
+    const lines: string[] = [];
+    FileUtils.fileutilsOutput = { puts: (msg) => lines.push(msg) };
+    FileUtils.fileutilsLabel = "** ";
+    const tree = nodePath.join(root, "labelled");
+    FileUtils.mkdirP(tree);
+
+    FileUtils.rmRf(tree, { verbose: true });
+
+    expect(lines).toEqual([`** rm -rf ${tree}`]);
   });
 });

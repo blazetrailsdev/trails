@@ -1,5 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
+import { NotImplementedError } from "./not-implemented-error.js";
+import { stdout } from "./process-adapter.js";
 
 /** `File.directory?` (`vendor/ruby/file.c:1615`). */
 function isDirectory(path: string): boolean {
@@ -166,41 +168,112 @@ function fuEachSrcDest(
 }
 
 /**
- * `Entry_#copy_metadata` (`vendor/ruby/lib/fileutils.rb:2285-2312`). The backend
- * contract has no `lstatSync`, so the symlink arms — `File.lchown`,
- * `File.lchmod` — cannot be reached and the regular-file arms stand alone; and
- * `FsStatResult` carries `mtime` alone, so it stands in for Ruby's `st.atime`
- * as well.
+ * `Entry_#lstat` (`vendor/ruby/lib/fileutils.rb:2192-2198`) — `File.stat` under
+ * `dereference?`, `File.lstat` otherwise. An adapter with no `lstatSync` cannot
+ * draw the distinction and stats either way.
  */
-function copyMetadata(src: string, path: string): void {
-  const st = getFs().statSync(src);
-  getFs().utimesSync?.(path, st.mtime, st.mtime);
+function entryLstat(path: string, dereference: boolean): FsStatResult {
+  const fs = getFs();
+  if (dereference || !fs.lstatSync) return fs.statSync(path);
+  return fs.lstatSync(path);
+}
+
+/**
+ * `File.lchown` (`vendor/ruby/file.c:3567`), which raises `NotImplementedError`
+ * on a platform whose C library has no `lchown` — spelled here as a backend
+ * with no `lchownSync`.
+ */
+function fileLchown(uid: number, gid: number, path: string): void {
+  const lchownSync = getFs().lchownSync;
+  if (!lchownSync)
+    throw new NotImplementedError("lchown() function is unimplemented on this machine");
+  lchownSync(path, uid, gid);
+}
+
+/** `File.lchmod` (`vendor/ruby/file.c:3211`), `NotImplementedError` as above. */
+function fileLchmod(mode: number, path: string): void {
+  const lchmodSync = getFs().lchmodSync;
+  if (!lchmodSync)
+    throw new NotImplementedError("lchmod() function is unimplemented on this machine");
+  lchmodSync(path, mode);
+}
+
+/** `File.readlink` (`vendor/ruby/file.c:3081`). */
+function fileReadlink(path: string): string {
+  const readlinkSync = getFs().readlinkSync;
+  if (!readlinkSync)
+    throw new NotImplementedError("readlink() function is unimplemented on this machine");
+  return readlinkSync(path);
+}
+
+/** `File.symlink` (`vendor/ruby/file.c:3033`). */
+function fileSymlink(old: string, newName: string): void {
+  const symlinkSync = getFs().symlinkSync;
+  if (!symlinkSync)
+    throw new NotImplementedError("symlink() function is unimplemented on this machine");
+  symlinkSync(old, newName);
+}
+
+/** `Entry_#copy_metadata` (`vendor/ruby/lib/fileutils.rb:2285-2312`). */
+function copyMetadata(src: string, path: string, dereference: boolean): void {
+  const st = entryLstat(src, dereference);
+  const symlink = st.isSymbolicLink?.() === true;
+  if (!symlink) {
+    fileUtime(st.atime, st.mtime, path);
+  }
   let mode = st.mode ?? 0o644;
   try {
-    if (st.uid != null && st.gid != null) getFs().chownSync?.(path, st.uid, st.gid);
+    if (symlink) {
+      try {
+        if (st.uid != null && st.gid != null) fileLchown(st.uid, st.gid, path);
+      } catch (error) {
+        if (!(error instanceof NotImplementedError)) throw error;
+      }
+    } else {
+      if (st.uid != null && st.gid != null) getFs().chownSync?.(path, st.uid, st.gid);
+    }
   } catch (error) {
     const code = (error as { code?: string }).code;
     if (code !== "EPERM" && code !== "EACCES") throw error;
     mode &= 0o1777;
   }
-  getFs().chmodSync?.(path, mode);
+  if (symlink) {
+    try {
+      fileLchmod(mode, path);
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (!(error instanceof NotImplementedError) && code !== "EOPNOTSUPP") throw error;
+    }
+  } else {
+    getFs().chmodSync?.(path, mode);
+  }
 }
 
 /**
  * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
- * walks a directory tree and copies each entry, then its `copy_metadata` under
- * `preserve`.
+ * walks a directory tree and copies each entry with `Entry_#copy`
+ * (`fileutils.rb:2239-2274`), then its `copy_metadata` under `preserve`.
+ *
+ * `FsStatResult` has no `chardev?` / `blockdev?` / `socket?` / `pipe?` / `door?`
+ * predicate, so `Entry_#copy`'s five raising arms (`fileutils.rb:2255-2271`) and
+ * its true `else` (`fileutils.rb:2273`) cannot be told apart and all land on the
+ * one `unknown file type` message.
  */
 function copyEntry(src: string, dest: string, preserve = false): void {
-  const ent = getFs().statSync(src);
-  if (ent.isDirectory()) {
+  const ent = entryLstat(src, false);
+  if (ent.isFile()) {
+    FileUtils.copyFile(src, dest, preserve, false);
+  } else if (ent.isDirectory()) {
     FileUtils.mkdirP(dest);
     for (const name of getFs().readdirSync(src)) {
       copyEntry(getPath().join(src, name), getPath().join(dest, name), preserve);
     }
-    if (preserve) copyMetadata(src, dest);
+    if (preserve) copyMetadata(src, dest, false);
+  } else if (ent.isSymbolicLink?.() === true) {
+    fileSymlink(fileReadlink(src), dest);
+    if (preserve) copyMetadata(src, dest, false);
   } else {
-    FileUtils.copyFile(src, dest, preserve);
+    throw new Error(`unknown file type: ${src}`);
   }
 }
 
@@ -222,6 +295,39 @@ function fileUtime(atime: Date, mtime: Date, path: string): void {
 }
 
 /**
+ * The `output.puts msg` receiver `fu_output_message`
+ * (`vendor/ruby/lib/fileutils.rb:2496-2503`) writes to — `$stdout` by default,
+ * or whatever `@fileutils_output` was set to.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `IO`, which Rails calls without
+ * defining.
+ */
+export interface FileUtilsOutput {
+  /** `IO#puts` (`vendor/ruby/io.c:8580`).
+   * @noRailsEquivalent PERMANENT — Ruby core `IO`, which Rails calls without
+   * defining.
+   */
+  puts(msg: string): void;
+}
+
+/** `$stdout` (`vendor/ruby/lib/fileutils.rb:2498`), reached through the process
+ * backend so the leaf writes without importing one. */
+const fuStdout: FileUtilsOutput = {
+  puts: (msg) => {
+    stdout.write(`${msg}\n`);
+  },
+};
+
+/** `fu_output_message` (`vendor/ruby/lib/fileutils.rb:2496-2503`). */
+function fuOutputMessage(msg: string): void {
+  const output = FileUtils.fileutilsOutput ?? fuStdout;
+  if (FileUtils.fileutilsLabel != null) {
+    msg = FileUtils.fileutilsLabel + msg;
+  }
+  output.puts(msg);
+}
+
+/**
  * Ruby's `FileUtils` (stdlib, `vendor/ruby/lib/fileutils.rb:1`), the file
  * operations Rails sends from ported bodies — `mkdir_p` when a schema dump or a
  * cache root has to exist, `rm`/`rm_f`/`rm_r` when one is torn down, `cp`, `mv`
@@ -231,24 +337,37 @@ function fileUtime(atime: Date, mtime: Date, path: string): void {
  * `FileUtils` is synchronous exactly as Ruby's is, and a caller reads the same
  * `FileUtils.mkdir_p(dir)` a Rails dev reads.
  *
- * The `verbose:` kwarg is accepted where Ruby accepts it — Rails passes
- * `verbose: false` (`activerecord/lib/active_record/tasks/database_tasks.rb:509`)
- * — but `fu_output_message` (`fileutils.rb:2496`) has no `$stdout` to write to
- * here, so nothing is printed.
- *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `FileUtils` ships with
  * the interpreter, so no Rails file defines it and no port can remove the need
  * for it while Rails bodies send `FileUtils.mkdir_p` and friends.
  */
 export class FileUtils {
+  /** `@fileutils_output` (`vendor/ruby/lib/fileutils.rb:2497`), the sink
+   * `fu_output_message` writes to when a host has set one.
+   * @noRailsEquivalent PERMANENT — the JS spelling of a Ruby module instance
+   * variable, which has no member of its own to mirror.
+   */
+  static fileutilsOutput?: FileUtilsOutput;
+
+  /** `@fileutils_label` (`vendor/ruby/lib/fileutils.rb:2500`), prefixed to
+   * every message when a host has set one.
+   * @noRailsEquivalent PERMANENT — the JS spelling of a Ruby module instance
+   * variable, which has no member of its own to mirror.
+   */
+  static fileutilsLabel?: string;
+
   /** `FileUtils.mkdir_p` (`vendor/ruby/lib/fileutils.rb:365-388`).
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static mkdirP(
     list: string | string[],
-    { mode, noop }: { mode?: number; noop?: boolean; verbose?: boolean } = {},
+    { mode, noop, verbose }: { mode?: number; noop?: boolean; verbose?: boolean } = {},
   ): string[] {
     list = fuList(list);
+    if (verbose === true)
+      fuOutputMessage(
+        `mkdir -p ${mode != null ? `-m ${mode.toString(8).padStart(3, "0")} ` : ""}${list.join(" ")}`,
+      );
     if (noop === true) return list;
 
     for (const item of list) {
@@ -282,8 +401,10 @@ export class FileUtils {
   static cp(
     src: string | string[],
     dest: string,
-    { preserve, noop }: { preserve?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { preserve, noop, verbose }: { preserve?: boolean; noop?: boolean; verbose?: boolean } = {},
   ): void {
+    if (verbose === true)
+      fuOutputMessage(`cp${preserve === true ? " -p" : ""} ${[src, dest].flat().join(" ")}`);
     if (noop === true) return;
     fuEachSrcDest(src, dest, (s, d) => {
       FileUtils.copyFile(s, d, preserve);
@@ -295,15 +416,12 @@ export class FileUtils {
    * `copy_metadata` (`fileutils.rb:2285-2312`) the timestamps, ownership and
    * mode. Ruby's `dereference` reaches only `Entry_#lstat`
    * (`fileutils.rb:2192-2198`), which `copy_metadata` calls, so it selects an
-   * arm under `preserve` alone and only for a symlink source. `copyMetadata`
-   * stats rather than lstats and so has neither arm to select yet — the gap
-   * `fileutils-copy-metadata-loses-atime-and-the-symlink-arms` closes — and
-   * the argument is not accepted until it does.
+   * arm under `preserve` alone and only for a symlink source.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
-  static copyFile(src: string, dest: string, preserve = false): void {
+  static copyFile(src: string, dest: string, preserve = false, dereference = true): void {
     getFs().copyFileSync(src, dest);
-    if (preserve) copyMetadata(src, dest);
+    if (preserve) copyMetadata(src, dest, dereference);
   }
 
   /** `FileUtils.mv` (`vendor/ruby/lib/fileutils.rb:1157-1183`). Ruby's `secure:`
@@ -316,8 +434,10 @@ export class FileUtils {
   static mv(
     src: string | string[],
     dest: string,
-    { force, noop }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
   ): void {
+    if (verbose === true)
+      fuOutputMessage(`mv${force === true ? " -f" : ""} ${[src, dest].flat().join(" ")}`);
     if (noop === true) return;
     fuEachSrcDest(src, dest, (s, d) => {
       try {
@@ -344,9 +464,10 @@ export class FileUtils {
    */
   static rm(
     list: string | string[],
-    { force, noop }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
   ): string[] | undefined {
     list = fuList(list);
+    if (verbose === true) fuOutputMessage(`rm${force === true ? " -f" : ""} ${list.join(" ")}`);
     if (noop === true) return;
 
     for (const path of list) {
@@ -370,14 +491,28 @@ export class FileUtils {
    */
   static rmR(
     list: string | string[],
-    { force, noop }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
+    { force, noop, verbose }: { force?: boolean; noop?: boolean; verbose?: boolean } = {},
   ): string[] | undefined {
     list = fuList(list);
+    if (verbose === true) fuOutputMessage(`rm -r${force === true ? "f" : ""} ${list.join(" ")}`);
     if (noop === true) return;
     for (const path of list) {
       FileUtils.removeEntry(path, force);
     }
     return list;
+  }
+
+  /** `FileUtils.rm_rf` (`vendor/ruby/lib/fileutils.rb:1328-1330`). Ruby's
+   * `secure:` kwarg routes `rm_r` through `remove_entry_secure`
+   * (`fileutils.rb:1351-1447`), which is unported, so the kwarg has no arm to
+   * select and is not accepted — as on `rm_r` itself.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static rmRf(
+    list: string | string[],
+    { noop, verbose }: { noop?: boolean; verbose?: boolean } = {},
+  ): string[] | undefined {
+    return FileUtils.rmR(list, { force: true, noop, verbose });
   }
 
   /** `FileUtils.remove_entry` (`vendor/ruby/lib/fileutils.rb:1449-1456`).
@@ -408,7 +543,10 @@ export class FileUtils {
     }
   }
 
-  /** `FileUtils.touch` (`vendor/ruby/lib/fileutils.rb:2006-2026`).
+  /** `FileUtils.touch` (`vendor/ruby/lib/fileutils.rb:2006-2026`). The verbose
+   * line's `t.strftime('-t %Y%m%d%H%M.%S ')` is spelled out digit by digit:
+   * `strftime` lives in `@blazetrails/activesupport`, which this leaf cannot
+   * import.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static touch(
@@ -417,10 +555,20 @@ export class FileUtils {
       noop,
       mtime,
       nocreate,
+      verbose,
     }: { noop?: boolean; verbose?: boolean; mtime?: Date; nocreate?: boolean } = {},
   ): void {
     list = fuList(list);
     const t = mtime;
+    if (verbose === true) {
+      const pad = (n: number): string => String(n).padStart(2, "0");
+      const at =
+        t != null
+          ? `-t ${t.getFullYear()}${pad(t.getMonth() + 1)}${pad(t.getDate())}` +
+            `${pad(t.getHours())}${pad(t.getMinutes())}.${pad(t.getSeconds())} `
+          : "";
+      fuOutputMessage(`touch ${nocreate === true ? "-c " : ""}${at}${list.join(" ")}`);
+    }
     if (noop === true) return;
     for (const path of list) {
       let created = nocreate;
