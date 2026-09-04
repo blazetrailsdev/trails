@@ -25,6 +25,13 @@ describe("FileStore atomic write and inspect", () => {
     });
   });
 
+  it("round-trips a non-ASCII payload through atomic_write and binread", () => {
+    withStore((store) => {
+      store.write("greeting", "héllo 日本 🚂");
+      expect(store.read("greeting")).toBe("héllo 日本 🚂");
+    });
+  });
+
   it("increments through lock_file", () => {
     withStore((store) => {
       expect(store.increment("counter")).toBe(1);

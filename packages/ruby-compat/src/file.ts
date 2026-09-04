@@ -171,21 +171,6 @@ export class File extends IO {
   }
 
   /**
-   * `vendor/ruby/io.c:12242` `rb_io_s_binread`, which answers an ASCII-8BIT
-   * String — the file's BYTES. A JS string has no ASCII-8BIT encoding to be
-   * in, so the bytes come back decoded with the encoding `File.write` put them
-   * in, which is what makes the pair round-trip; only a caller that treats the
-   * result as a byte sequence rather than as text can tell the difference, and
-   * trails has none.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `File.binread` (`IO.binread`,
-   * `vendor/ruby/io.c:12242`).
-   */
-  static binread(name: string): string {
-    return getFs().readFileSync(name, "utf-8");
-  }
-
-  /**
    * `vendor/ruby/io.c:12377` `rb_io_s_write`, which answers the number of
    * BYTES written rather than the string itself.
    *
@@ -195,19 +180,6 @@ export class File extends IO {
   static write(name: string, string: string): number {
     getFs().writeFileSync(name, string);
     return new TextEncoder().encode(string).length;
-  }
-
-  /**
-   * `vendor/ruby/io.c:12414` `rb_io_s_binwrite`, the binary twin of
-   * `File.write` — it opens in binary mode, so the String's bytes go through
-   * unchanged. `File.binread` decodes with the same encoding, which is what
-   * makes the pair round-trip.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `File.binwrite` (`IO.binwrite`,
-   * `vendor/ruby/io.c:12414`).
-   */
-  static binwrite(name: string, string: string): number {
-    return File.write(name, string);
   }
 
   /**

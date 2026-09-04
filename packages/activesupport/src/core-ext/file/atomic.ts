@@ -9,6 +9,7 @@ export function atomicWrite<T>(
   tempDir ??= File.dirname(fileName);
 
   return Tempfile.open(`.${File.basename(fileName)}`, tempDir, (tempFile) => {
+    tempFile.binmode();
     const returnVal = block(tempFile);
     tempFile.close();
 

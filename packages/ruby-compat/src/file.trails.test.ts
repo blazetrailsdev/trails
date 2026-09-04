@@ -68,7 +68,8 @@ describe("File", () => {
     const path = join(root, "sub", "w.txt");
     expect(File.write(path, "héllo")).toBe(6);
     expect(File.read(path)).toBe("héllo");
-    expect(File.binread(path)).toBe("héllo");
+    expect(File.binread(path)).toBe("h\xC3\xA9llo");
+    expect(File.binread(path).length).toBe(File.stat(path).size);
     expect(File.isFile(path)).toBe(true);
     expect(File.isDirectory(join(root, "sub"))).toBe(true);
     expect(File.delete(path)).toBe(1);

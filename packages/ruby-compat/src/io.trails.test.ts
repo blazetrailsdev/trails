@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { File } from "./file.js";
@@ -10,6 +10,19 @@ describe("IO", () => {
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "secret.enc");
     expect(IO.binwrite(path, "abc def")).toBe(7);
     expect(readFileSync(path, "utf-8")).toBe("abc def");
+  });
+
+  it("binread answers one character per byte, and binwrite writes them back", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bytes.bin");
+    writeFileSync(path, "héllo 日本");
+    const bytes = IO.binread(path);
+    expect(bytes.length).toBe(statSync(path).size);
+    expect(bytes).not.toBe("héllo 日本");
+
+    const copy = join(mkdtempSync(join(tmpdir(), "trails-io-")), "copy.bin");
+    expect(IO.binwrite(copy, bytes)).toBe(bytes.length);
+    expect(IO.binread(copy)).toBe(bytes);
+    expect(readFileSync(copy, "utf-8")).toBe("héllo 日本");
   });
 
   it("readlines answers every line, each keeping its separator", () => {

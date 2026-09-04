@@ -69,6 +69,25 @@ export function ioPutsAry(this: GenericWritable, ary: unknown[]): void {
 const READ_CHUNK = 8192;
 
 /**
+ * The ASCII-8BIT String a binary read answers (`rb_ascii8bit_encoding`,
+ * `vendor/ruby/io.c:12257`): one character per byte. It is assembled a
+ * character at a time because no `TextDecoder` encoding gives it — its
+ * "latin1" is windows-1252, which remaps 0x80-0x9F.
+ */
+function binaryString(bytes: Uint8Array, length: number): string {
+  let part = "";
+  for (let i = 0; i < length; i++) part += String.fromCharCode(bytes[i]);
+  return part;
+}
+
+/** The bytes `io_write_m` (`vendor/ruby/io.c:2263`) sends an ASCII-8BIT String as. */
+function binaryBytes(string: string): Uint8Array {
+  const buffer = new Uint8Array(string.length);
+  for (let i = 0; i < string.length; i++) buffer[i] = string.charCodeAt(i) & 0xff;
+  return buffer;
+}
+
+/**
  * `IO` (`vendor/ruby/io.c:15371` `rb_cIO`), the sliver of it trails calls.
  *
  * Rails writes a credentials file through this class —
@@ -117,18 +136,33 @@ export class IO {
   }
 
   /**
+   * `vendor/ruby/io.c:12242` `rb_io_s_binread`, which opens the stream
+   * `FMODE_BINMODE` under `rb_ascii8bit_encoding()` (`io.c:12257`) and so
+   * answers the file's BYTES — one character per byte, never a decoded
+   * String. `IO.read` (`io.c:12200`) is the member that decodes.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO.binread`
+   * (`vendor/ruby/io.c:12242`).
+   */
+  static binread(name: string): string {
+    const bytes = getFs().readFileSync(name);
+    return binaryString(bytes, bytes.length);
+  }
+
+  /**
    * `vendor/ruby/io.c:12396` `rb_io_s_binwrite`, which is `IO.write`
-   * (`io.c:12377`) with the stream opened in binary mode. The trails buffer is
-   * already a binary String — one character per byte — so the two differ only
-   * in the encoding they would apply, and the byte count is the return value
-   * either way (`io_s_write`, `io.c:12285`).
+   * (`io.c:12377`) with the stream opened in binary mode: `string` is an
+   * ASCII-8BIT String and its characters go to the file as bytes, so
+   * {@link IO.binread} answers it back unchanged. The byte count is the return
+   * value either way (`io_s_write`, `io.c:12285`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.binwrite`
    * (`vendor/ruby/io.c:12396`).
    */
   static binwrite(name: string, string: string): number {
-    getFs().writeFileSync(name, string);
-    return string.length;
+    const buffer = binaryBytes(string);
+    getFs().writeFileSync(name, buffer);
+    return buffer.length;
   }
 
   /**
@@ -182,9 +216,7 @@ export class IO {
     }
     if (n === 0) return length === 0 ? "" : null;
     this.pos += n;
-    let part = "";
-    for (let i = 0; i < n; i++) part += String.fromCharCode(buffer[i]);
-    return part;
+    return binaryString(buffer, n);
   }
 
   /**
@@ -200,7 +232,7 @@ export class IO {
       const read = getFs().readSync(this.fd, buffer, 0, buffer.length, this.pos);
       if (read === 0) return part;
       this.pos += read;
-      for (let i = 0; i < read; i++) part += String.fromCharCode(buffer[i]);
+      part += binaryString(buffer, read);
     }
   }
 
@@ -214,8 +246,7 @@ export class IO {
    * (`vendor/ruby/io.c:2263`).
    */
   write(string: string): number {
-    const buffer = new Uint8Array(string.length);
-    for (let i = 0; i < string.length; i++) buffer[i] = string.charCodeAt(i) & 0xff;
+    const buffer = binaryBytes(string);
     let n = 0;
     while (n < buffer.length) {
       n += getFs().writeSync(this.fd, buffer, n, buffer.length - n, this.pos + n);
