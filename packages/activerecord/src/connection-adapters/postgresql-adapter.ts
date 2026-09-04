@@ -24,7 +24,7 @@ import {
   disableReferentialIntegrity,
 } from "./postgresql/referential-integrity.js";
 import { Column } from "./postgresql/column.js";
-import type { TypeMetadata as PgTypeMetadata } from "./postgresql/type-metadata.js";
+import type { TypeMetadata } from "./postgresql/type-metadata.js";
 import {
   quote as pgQuote,
   typeCast as pgTypeCast,
@@ -2556,7 +2556,7 @@ export interface PostgreSQLAdapter {
     sqlType: string,
     oid: number,
     fmod: number,
-  ): Promise<PgTypeMetadata>;
+  ): Promise<TypeMetadata>;
 
   /** @internal */
   quotedScope(

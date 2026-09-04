@@ -1,10 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError, File, RuntimeError, StringIO, Tempfile } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "./uploaded-file.js";
+import { mustBe, mustRespondTo, wontBe } from "./test-helpers/assertions.js";
 
 describe("Rack::Test::UploadedFile", () => {
   function filePath(): string {
     return File.dirname(new URL(import.meta.url).pathname) + "/fixtures/foo.txt";
+  }
+
+  function binmodeHost(uploadedFile: UploadedFile): Record<string, () => unknown> {
+    return uploadedFile.tempfile as unknown as Record<string, () => unknown>;
   }
 
   it("returns an instance of `Rack::Test::UploadedFile`", () => {
@@ -18,7 +23,7 @@ describe("Rack::Test::UploadedFile", () => {
 
     for (const method of Object.getOwnPropertyNames(Tempfile.prototype)) {
       if (method === "constructor") continue;
-      expect(method in uploadedFile).toBe(true);
+      mustRespondTo(uploadedFile, method);
     }
   });
 
@@ -45,15 +50,9 @@ describe("Rack::Test::UploadedFile", () => {
   });
 
   it("respects binary argument", () => {
-    expect(
-      (new UploadedFile(filePath(), "text/plain", true).tempfile as Tempfile).isBinmode(),
-    ).toBe(true);
-    expect(
-      (new UploadedFile(filePath(), "text/plain", false).tempfile as Tempfile).isBinmode(),
-    ).toBe(false);
-    expect((new UploadedFile(filePath(), "text/plain").tempfile as Tempfile).isBinmode()).toBe(
-      false,
-    );
+    mustBe(binmodeHost(new UploadedFile(filePath(), "text/plain", true)), "isBinmode");
+    wontBe(binmodeHost(new UploadedFile(filePath(), "text/plain", false)), "isBinmode");
+    wontBe(binmodeHost(new UploadedFile(filePath(), "text/plain")), "isBinmode");
   });
 
   it("raises for invalid files", () => {

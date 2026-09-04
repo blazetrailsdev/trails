@@ -10,7 +10,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 export class UploadedFile {
-  originalFilename!: string | null;
+  originalFilename: string | null;
 
   tempfile!: Tempfile | StringIO;
 
