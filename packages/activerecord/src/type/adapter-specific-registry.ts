@@ -1,4 +1,4 @@
-import { Type } from "@blazetrails/activemodel";
+import { ArgumentError, Type } from "@blazetrails/activemodel";
 
 export class TypeConflictError extends Error {
   constructor(message?: string) {
@@ -173,7 +173,7 @@ export class AdapterSpecificRegistry {
     klass: new (subtype: Type) => Type,
     args?: { adapter?: string },
   ): void {
-    this._registrations.push(new DecorationRegistration(options, klass, args));
+    this.registrations.push(new DecorationRegistration(options, klass, args));
   }
 
   register(
@@ -182,11 +182,8 @@ export class AdapterSpecificRegistry {
     options?: { adapter?: string; override?: boolean },
     block?: (...args: unknown[]) => Type,
   ): void {
-    if (!block && klass == null) {
-      throw new TypeError("register requires either a klass or a block");
-    }
     const factory = block ?? ((_symbol: unknown, ...args: unknown[]) => new klass!(...args));
-    this._registrations.push(new Registration(typeName, factory, options));
+    this.registrations.push(new Registration(typeName, factory, options));
   }
 
   lookup(symbol: string, ...args: unknown[]): Type {
@@ -194,12 +191,12 @@ export class AdapterSpecificRegistry {
     if (registration) {
       return registration.call(this, symbol, ...args);
     }
-    throw new Error(`Unknown type :${String(symbol)}`);
+    throw new ArgumentError(`Unknown type :${String(symbol)}`);
   }
 
   /** @internal */
   private findRegistration(symbol: string, ...args: unknown[]): Registration | undefined {
-    const matching = this._registrations.filter((r) => r.matches(symbol, ...args));
+    const matching = this.registrations.filter((r) => r.matches(symbol, ...args));
     if (matching.length === 0) return undefined;
     return matching.reduce((best, current) => {
       const cmp = best.compareTo(current);

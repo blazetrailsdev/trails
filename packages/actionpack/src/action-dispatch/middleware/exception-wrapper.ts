@@ -99,7 +99,8 @@ const SILENT_EXCEPTIONS = new Set<string>([
   "ActionDispatch::Http::MimeNegotiation::InvalidType",
 ]);
 
-function classNameOf(e: Error): string {
+/** @noRailsEquivalent PERMANENT */
+export function classNameOf(e: Error): string {
   if (e.name && e.name !== "Error") return e.name;
   const ctor = e.constructor?.name;
   if (ctor && ctor !== "Error") return ctor;

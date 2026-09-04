@@ -1643,7 +1643,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /**
-   * @missingRailsCall new_client — CONVERGEABLE sqlite3-and-mysql-bare-missing-rails-call-receipts
+   * @missingRailsCall new_client — CONVERGEABLE sqlite3-connection-parameters-never-built
    * @internal
    */
   private connect(): void {
