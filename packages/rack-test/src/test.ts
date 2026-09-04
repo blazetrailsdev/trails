@@ -101,13 +101,13 @@ export class Session {
       if (params != null && params !== false) this.appendQueryParams(queryArray, params);
     } else if (!(":input" in env)) {
       env["CONTENT_TYPE"] ??= "application/x-www-form-urlencoded";
-      params ??= {};
+      if (params == null || params === false) params = {};
       let multipart: unknown;
       if (":multipart" in env) {
         multipart = env[":multipart"];
         delete env[":multipart"];
       } else {
-        multipart = String(env["CONTENT_TYPE"]).startsWith("multipart/");
+        multipart = (env["CONTENT_TYPE"] as string).startsWith("multipart/");
       }
 
       if (isPlainObject(params)) {

@@ -21,7 +21,7 @@ export function buildNestedQuery(value: unknown, prefix: string | null = null): 
   } else if (value == null) {
     return prefix ?? "";
   } else {
-    return `${prefix ?? ""}=${Utils.escape(value as string)}`;
+    return `${prefix ?? ""}=${Utils.escape(value as { toString(): string })}`;
   }
 }
 
@@ -36,10 +36,10 @@ export function buildMultipart(
     const query = (value: unknown): void => {
       if (Array.isArray(value)) {
         value.forEach(query);
-      } else if (value instanceof UploadedFile) {
-        multipart = true;
       } else if (isPlainObject(value)) {
         Object.values(value).forEach(query);
+      } else if (value instanceof UploadedFile) {
+        multipart = true;
       }
     };
     Object.values(params).forEach(query);
@@ -123,7 +123,11 @@ function buildPrimitivePart(buffer: StringIO, parameterName: string, value: unkn
 }
 
 /** @missingRailsArgs b — PERMANENT */
-function buildFilePart(buffer: StringIO, parameterName: string, uploadedFile: UploadedFile): void {
+function buildFilePart(
+  buffer: StringIO,
+  parameterName: string,
+  uploadedFile: UploadedFile,
+): StringIO {
   buffer.write(START_BOUNDARY);
   buffer.write('content-disposition: form-data; name="');
   buffer.write(b(String(parameterName)));
@@ -141,4 +145,5 @@ function buildFilePart(buffer: StringIO, parameterName: string, uploadedFile: Up
   }
 
   buffer.write("\r\n");
+  return buffer;
 }
