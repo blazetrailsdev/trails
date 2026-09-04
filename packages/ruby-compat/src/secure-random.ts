@@ -55,8 +55,21 @@ export const SecureRandom = {
     return SecureRandom.randomBytes(n).toString("hex");
   },
 
-  /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/random/formatter.rb:245 */
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/random/formatter.rb:170 */
   uuid(): string {
-    return getCrypto().randomUUID();
+    const bytes = SecureRandom.randomBytes(16);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const ary = [
+      view.getUint32(0),
+      view.getUint16(4),
+      view.getUint16(6),
+      view.getUint16(8),
+      view.getUint16(10),
+      view.getUint32(12),
+    ];
+    ary[2] = (ary[2] & 0x0fff) | 0x4000;
+    ary[3] = (ary[3] & 0x3fff) | 0x8000;
+    const hex = (value: number, width: number) => value.toString(16).padStart(width, "0");
+    return `${hex(ary[0], 8)}-${hex(ary[1], 4)}-${hex(ary[2], 4)}-${hex(ary[3], 4)}-${hex(ary[4], 4)}${hex(ary[5], 8)}`;
   },
 };
