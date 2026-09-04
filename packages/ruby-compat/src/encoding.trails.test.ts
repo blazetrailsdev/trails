@@ -237,6 +237,13 @@ describe("Encoding.find", () => {
     expect(unresolved).toEqual(["internal"]);
   });
 
+  it("leaves UTF-16 unlabelled: WHATWG's utf-16 is utf-16le, not MRI's BOM-dispatching dummy", () => {
+    const beBom = new Uint8Array([0xfe, 0xff, 0x00, 0x41]);
+    expect(new TextDecoder("utf-16").encoding).toBe("utf-16le");
+    expect(new TextDecoder("utf-16").decode(beBom)).not.toBe("A");
+    expect(Encoding.find("UTF-16").decoderLabel).toBeNull();
+  });
+
   it("registers a name MRI carries but JS cannot decode, with a null decoderLabel", () => {
     for (const name of ["UTF-7", "EUC-TW", "Emacs-Mule", "IBM437", "SJIS-DoCoMo"]) {
       expect(Encoding.find(name).decoderLabel).toBeNull();

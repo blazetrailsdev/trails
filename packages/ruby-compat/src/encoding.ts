@@ -125,9 +125,15 @@ const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string
  * the pinned ruby 3.3.11 ref — so a name resolves here exactly where it
  * resolves in Ruby and raises `ArgumentError` exactly where Ruby raises.
  *
- * Each entry names the `TextDecoder` label that implements it, `null` where JS
- * has no decoder for it at all (`ASCII-8BIT`, `UTF-7`, `EUC-TW`, the IBM code
- * pages, Emacs-Mule and the vendor Japanese sets). A `null` row still
+ * Each entry names the `TextDecoder` label that implements it, `null` where no
+ * JS decoder does — usually because none exists (`ASCII-8BIT`, `UTF-7`,
+ * `EUC-TW`, the IBM code pages, Emacs-Mule and the vendor Japanese sets), and
+ * for `UTF-16` because the label WHATWG accepts is not the encoding MRI
+ * registers: MRI's `UTF-16` is a dummy that dispatches on the BOM
+ * (`Encoding::UTF_16.dummy?` is true), while WHATWG's `utf-16` is a plain
+ * alias of `utf-16le` and decodes BE-BOM'd bytes to mojibake. An accepted
+ * label is not an implementation, so that row is `null` like the rest. A
+ * `null` row still
  * resolves, because the accept/reject criterion is the registry's and not the
  * decoder's — `Rack::Multipart::Parser#find_encoding`
  * (`vendor/rack/lib/rack/multipart/parser.rb:489-493`) asks the registry, and
