@@ -12,6 +12,7 @@ function permittedScalarValues(): unknown[] {
   return [
     "a",
     "a",
+    null,
     0,
     1.0,
     2n ** 128n,
@@ -67,14 +68,6 @@ describe("ParametersPermitTest", () => {
         const sfPermitted = sfParams.permit("sf");
         expect(sfPermitted.get(sf)).toBe(value);
       }
-    }
-
-    const permittedNil = new Parameters({ id: null }).permit("id");
-    expect(permittedNil.get("id")).toBeNull();
-
-    for (const sf of structFields) {
-      const sfPermitted = new Parameters({ [sf]: null }).permit("sf");
-      expect(sfPermitted.get(sf)).toBeNull();
     }
   });
 
