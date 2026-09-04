@@ -15,17 +15,16 @@
  */
 export const Zlib = {
   /**
-   * `vendor/ruby/ext/zlib/zlib.c:1004` — `Zlib::DEFAULT_COMPRESSION`, zlib.h's
-   * `Z_DEFAULT_COMPRESSION`, the level `ActiveSupport::Gzip.compress` defaults
-   * to (`vendor/rails/activesupport/lib/active_support/gzip.rb:32`).
+   * `vendor/ruby/ext/zlib/zlib.c:1004` — zlib.h's `Z_DEFAULT_COMPRESSION`, the
+   * level `ActiveSupport::Gzip.compress` defaults to (`gzip.rb:32`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::DEFAULT_COMPRESSION`.
    */
   DEFAULT_COMPRESSION: -1,
 
   /**
-   * `vendor/ruby/ext/zlib/zlib.c:1035` — `Zlib::DEFAULT_STRATEGY`, zlib.h's
-   * `Z_DEFAULT_STRATEGY` (`gzip.rb:32`).
+   * `vendor/ruby/ext/zlib/zlib.c:1035` — zlib.h's `Z_DEFAULT_STRATEGY`
+   * (`gzip.rb:32`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::DEFAULT_STRATEGY`.
    */

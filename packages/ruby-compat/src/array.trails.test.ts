@@ -20,7 +20,6 @@ describe("Array#pack", () => {
   });
 
   it("m6 wraps at the given input width rounded down to a multiple of three", () => {
-    expect(pack([long], "m6")).toBe(pack([long], "m6"));
     expect(pack(["abcdefghi"], "m6")).toBe("YWJjZGVm\nZ2hp\n");
   });
 

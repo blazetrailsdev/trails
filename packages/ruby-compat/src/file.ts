@@ -140,13 +140,6 @@ export class File extends IO {
   static readonly FNM_EXTGLOB = 0x10;
 
   /**
-   * `vendor/ruby/dir.c:222-224` — `FNM_CASEFOLD` on a case-insensitive filesystem, `0` everywhere else, as on every non-Windows MRI.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_SYSCASE`.
-   */
-  static readonly FNM_SYSCASE = 0;
-
-  /**
    * `vendor/ruby/file.c:1806` `rb_file_exist_p`, which is `rb_stat(fname)`
    * against a FOLLOWED symlink — so a broken symlink is `false` even though
    * `File.symlink?` is `true`.
@@ -509,10 +502,8 @@ export class File extends IO {
 /**
  * `bracket` (`vendor/ruby/dir.c:240`), which answers the pattern index just
  * past the closing `]` when `s` is in the class, and `null` when it is not or
- * the class never closes. Its `FNM_CASEFOLD` arm casefolds against `p` — the
- * character AFTER `t1` (`dir.c:296`) — so MRI's `File.fnmatch("[ab]", "A",
- * File::FNM_CASEFOLD)` is `false` while `"B"` is `true`; that is mirrored, not
- * corrected.
+ * the class never closes. Its `FNM_CASEFOLD` arm casefolds against `p`, the
+ * character AFTER `t1` (`dir.c:296`) — mirrored, not corrected.
  */
 function bracket(
   p: number,
@@ -578,9 +569,9 @@ function compareChar(a: string, b: string, nocase: number): number {
 /**
  * `fnmatch_helper` (`vendor/ruby/dir.c:317`), which matches one path element
  * under `FNM_PATHNAME` and the whole string without it. The cursors it
- * advances through `*pcur` / `*scur` are the returned pair, `unescape` /
- * `isEndP` / `isEndS` / `ret` are its `UNESCAPE` / `ISEND` / `RETURN` macros
- * (`dir.c:311-314`), and the `failed:` label is its `goto failed` (`dir.c:396`).
+ * advances through `*pcur` / `*scur` are the returned pair; `unescape` / `isEndP`
+ * / `isEndS` / `ret` are its `UNESCAPE` / `ISEND` / `RETURN` macros
+ * (`dir.c:311-314`) and `failed:` its `goto failed` (`dir.c:396`).
  */
 function fnmatchHelper(
   pcur: number,
