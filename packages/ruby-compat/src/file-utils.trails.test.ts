@@ -142,6 +142,29 @@ describe("FileUtils", () => {
     expect(nodeFs.statSync(dest).mode & 0o777).toEqual(0o640);
   });
 
+  it("copy_file copies the file's contents", () => {
+    const src = nodePath.join(root, "src");
+    const dest = nodePath.join(root, "dest");
+    nodeFs.writeFileSync(src, "contents");
+
+    FileUtils.copyFile(src, dest);
+
+    expect(nodeFs.readFileSync(dest, "utf-8")).toEqual("contents");
+  });
+
+  it("copy_file with preserve copies the mtime and the mode", () => {
+    const src = nodePath.join(root, "src");
+    const dest = nodePath.join(root, "dest");
+    nodeFs.writeFileSync(src, "contents", { mode: 0o640 });
+    const mtime = new Date(Date.UTC(2001, 1, 3, 4, 5, 6));
+    nodeFs.utimesSync(src, mtime, mtime);
+
+    FileUtils.copyFile(src, dest, true);
+
+    expect(nodeFs.statSync(dest).mtime.getTime()).toEqual(mtime.getTime());
+    expect(nodeFs.statSync(dest).mode & 0o777).toEqual(0o640);
+  });
+
   it("mv raises an EEXIST-coded error when the destination is a directory", () => {
     const src = nodePath.join(root, "src");
     const dest = nodePath.join(root, "dest");

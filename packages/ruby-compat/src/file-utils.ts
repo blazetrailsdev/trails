@@ -186,14 +186,6 @@ function copyMetadata(src: string, path: string): void {
   getFs().chmodSync?.(path, mode);
 }
 
-/** `copy_file` (`vendor/ruby/lib/fileutils.rb:1076-1080`), whose `Entry_#copy_file`
- * (`fileutils.rb:2277-2283`) copies the bytes and `copy_metadata`
- * (`fileutils.rb:2285-2312`) the timestamps, ownership and mode. */
-function copyFile(src: string, dest: string, preserve = false): void {
-  getFs().copyFileSync(src, dest);
-  if (preserve) copyMetadata(src, dest);
-}
-
 /**
  * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
  * walks a directory tree and copies each entry, then its `copy_metadata` under
@@ -208,7 +200,7 @@ function copyEntry(src: string, dest: string, preserve = false): void {
     }
     if (preserve) copyMetadata(src, dest);
   } else {
-    copyFile(src, dest, preserve);
+    FileUtils.copyFile(src, dest, preserve);
   }
 }
 
@@ -294,8 +286,21 @@ export class FileUtils {
   ): void {
     if (noop === true) return;
     fuEachSrcDest(src, dest, (s, d) => {
-      copyFile(s, d, preserve);
+      FileUtils.copyFile(s, d, preserve);
     });
+  }
+
+  /** `FileUtils.copy_file` (`vendor/ruby/lib/fileutils.rb:1076-1080`), whose
+   * `Entry_#copy_file` (`fileutils.rb:2277-2283`) copies the bytes and
+   * `copy_metadata` (`fileutils.rb:2285-2312`) the timestamps, ownership and
+   * mode. Ruby's `dereference` argument selects `Entry_#copy_file`'s symlink
+   * arm, which the filesystem backend has no `copyFileSync` flag for, so it is
+   * not accepted.
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static copyFile(src: string, dest: string, preserve = false): void {
+    getFs().copyFileSync(src, dest);
+    if (preserve) copyMetadata(src, dest);
   }
 
   /** `FileUtils.mv` (`vendor/ruby/lib/fileutils.rb:1157-1183`). Ruby's `secure:`
