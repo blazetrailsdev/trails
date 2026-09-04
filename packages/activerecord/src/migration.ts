@@ -44,7 +44,7 @@ import type { UniqueConstraintOptions } from "./connection-adapters/postgresql/s
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
-import { _DEFAULT_ENV } from "./connection-handling-slot.js";
+import { DEFAULT_ENV } from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { migrationArConfig } from "./migration/ar-config-source.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
@@ -1339,7 +1339,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
    * @missingRailsCall call — PERMANENT
    */
   static env(): string {
-    return _DEFAULT_ENV!();
+    return DEFAULT_ENV();
   }
 
   /** @internal */
@@ -1568,7 +1568,7 @@ export class MigrationContext<
 
   /** @missingRailsCall call — PERMANENT */
   get currentEnvironment(): string {
-    return _DEFAULT_ENV!();
+    return DEFAULT_ENV();
   }
 
   async protectedEnvironment(this: MigrationContext): Promise<boolean> {
@@ -2127,7 +2127,7 @@ export class CheckPending {
 
   /** @missingRailsCall call — PERMANENT */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
-    const currentEnvironment = _DEFAULT_ENV!();
+    const currentEnvironment = DEFAULT_ENV();
     const allConfigs = migrationArConfig()!.configurations().configsFor({
       envName: currentEnvironment,
     });

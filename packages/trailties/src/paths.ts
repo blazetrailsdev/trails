@@ -160,7 +160,9 @@ export class Path {
       const doesExist = File.isExist(f);
 
       if (!doesExist && File.isSymlink(f)) {
-        throw new Error(`File ${f} is a symlink that does not point to a valid file`);
+        throw new Error(
+          `File ${JSON.stringify(f)} is a symlink that does not point to a valid file`,
+        );
       }
       return doesExist;
     });

@@ -387,19 +387,11 @@ describe("AttributeSetTest", () => {
   });
 
   it("freezing doesn't prevent the set from materializing", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const builder = new Builder(new Map([["foo", typeRegistry.lookup("string")]]));
+    const attributes = builder.buildFromDatabase({ foo: "1" });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({ name: "Alice" });
-    const frozen = Object.freeze({ ...p.attributes });
-    expect(frozen.name).toBe("Alice");
+    attributes.freeze();
+    expect(attributes.toHash()).toEqual({ foo: "1" });
   });
 
   it("marshalling dump/load materialized attribute hash", () => {
