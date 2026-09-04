@@ -1,4 +1,4 @@
-import { File, getFsAsync } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { glob as fsGlob } from "@blazetrails/activesupport/glob";
 
 export interface PathOptions {
@@ -156,30 +156,19 @@ export class Path {
   }
 
   async existent(): Promise<string[]> {
-    const fs = await getFsAsync();
-    const out: string[] = [];
-    for (const f of await this.expanded()) {
-      if (await fs.exists(f)) {
-        out.push(f);
-      } else if (fs.lstat && (await isSymlink(fs, f))) {
-        throw new Error(`File "${f}" is a symlink that does not point to a valid file`);
+    return (await this.expanded()).filter((f) => {
+      const doesExist = File.isExist(f);
+
+      if (!doesExist && File.isSymlink(f)) {
+        throw new Error(`File ${f} is a symlink that does not point to a valid file`);
       }
-    }
-    return out;
+      return doesExist;
+    });
   }
 
   async existentDirectories(): Promise<string[]> {
     const out: string[] = [];
     for (const f of await this.expanded()) if (File.isDirectory(f)) out.push(f);
     return out;
-  }
-}
-
-type Fs = Awaited<ReturnType<typeof getFsAsync>>;
-async function isSymlink(fs: Fs, p: string): Promise<boolean> {
-  try {
-    return !!(await fs.lstat!(p)).isSymbolicLink?.();
-  } catch {
-    return false;
   }
 }

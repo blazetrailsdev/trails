@@ -456,35 +456,29 @@ describe("AttributeSetTest", () => {
   });
 
   it("comparison for equality is correctly implemented", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const builder = new Builder(
+      new Map([
+        ["foo", typeRegistry.lookup("integer")],
+        ["bar", typeRegistry.lookup("integer")],
+      ]),
+    );
+    const attributes = builder.buildFromDatabase({ foo: "1", bar: "2" });
+    const attributes2 = builder.buildFromDatabase({ foo: "1", bar: "2" });
+    const attributes3 = builder.buildFromDatabase({ foo: "2", bar: "2" });
+    const attributes4 = attributes.deepDup();
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const a = new Person({ name: "Alice" });
-    const b = new Person({ name: "Alice" });
-    expect(a.attributes).toEqual(b.attributes);
+    expect(attributes.equals(attributes2)).toBe(true);
+    expect(attributes2.equals(attributes3)).toBe(false);
+    expect(attributes.equals(attributes4)).toBe(true);
+    expect(attributes4.equals(attributes)).toBe(true);
   });
 
   it("==(other) is safe to use with any instance", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    const attributeSet = new AttributeSet({});
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    const a = new Person({ name: "Alice" });
-    expect(a.attributes).not.toBe(null);
-    expect(a.attributes).not.toBe(undefined);
+    expect(attributeSet.equals(null)).toBe(false);
+    expect(attributeSet.equals(1)).toBe(false);
+    expect(attributeSet.equals(attributeSet)).toBe(true);
   });
 
   it("#cast_types returns a hash of attribute types", () => {

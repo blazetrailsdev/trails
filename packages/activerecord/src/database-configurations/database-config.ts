@@ -1,4 +1,5 @@
 import { NotImplementedError } from "../errors.js";
+import { _DEFAULT_ENV } from "../connection-handling-slot.js";
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -26,13 +27,6 @@ export interface DatabaseConfigOptions {
   replica?: boolean;
   _hidden?: boolean;
   [key: string]: unknown;
-}
-
-let _defaultEnvGetter: (() => string) | null = null;
-
-/** @internal */
-export function _setDefaultEnvGetter(fn: () => string): void {
-  _defaultEnvGetter = fn;
 }
 
 type AdapterClassResolver = (adapterName: string) => Promise<new (...args: any[]) => unknown>;
@@ -214,9 +208,9 @@ export class DatabaseConfig {
     throw new NotImplementedError();
   }
 
+  /** @missingRailsCall call — PERMANENT */
   get forCurrentEnv(): boolean {
-    const defaultEnv = _defaultEnvGetter ? _defaultEnvGetter() : "default_env";
-    return this.envName === defaultEnv;
+    return this.envName === _DEFAULT_ENV!();
   }
 
   get schemaCachePath(): string | undefined {

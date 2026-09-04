@@ -44,7 +44,7 @@ import type { UniqueConstraintOptions } from "./connection-adapters/postgresql/s
 import { CommandRecorder } from "./migration/command-recorder.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
+import { _DEFAULT_ENV } from "./connection-handling-slot.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
 import { migrationArConfig } from "./migration/ar-config-source.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
@@ -1335,16 +1335,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   /**
-   * @internal Mirrors: `ActiveRecord::Migration.env` (`migration.rb:771-773`).
-   *
-   * @missingRailsCall call — CONVERGEABLE: Rails invokes the
-   *   `ActiveRecord::ConnectionHandling::DEFAULT_ENV` Proc
-   *   (`DEFAULT_ENV.call`, migration.rb:772); trails has no ported
-   *   `DEFAULT_ENV` Proc yet and reads the env vars here directly. Convergence
-   *   is RFC 0023 story `port-connection-handling-default-env-proc`.
+   * @internal
+   * @missingRailsCall call — PERMANENT
    */
   static env(): string {
-    return getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? "development";
+    return _DEFAULT_ENV!();
   }
 
   /** @internal */
@@ -1571,20 +1566,9 @@ export class MigrationContext<
     });
   }
 
-  /**
-   * Mirrors: ActiveRecord::MigrationContext#current_environment
-   * (`migration.rb:1340-1342`) — `ConnectionHandling::DEFAULT_ENV.call`, whose
-   * trails counterpart is {@link DatabaseConfigurations.defaultEnv}.
-   *
-   * @missingRailsCall call — CONVERGEABLE: Rails invokes the
-   *   `ActiveRecord::ConnectionHandling::DEFAULT_ENV` Proc
-   *   (`DEFAULT_ENV.call`, migration.rb:1341); trails has no ported
-   *   `DEFAULT_ENV` Proc yet, so this reads
-   *   `DatabaseConfigurations.defaultEnv` instead. Convergence is RFC 0023
-   *   story `port-connection-handling-default-env-proc`.
-   */
+  /** @missingRailsCall call — PERMANENT */
   get currentEnvironment(): string {
-    return DatabaseConfigurations.defaultEnv;
+    return _DEFAULT_ENV!();
   }
 
   async protectedEnvironment(this: MigrationContext): Promise<boolean> {
@@ -2141,8 +2125,9 @@ export class CheckPending {
     return this.app(env);
   }
 
+  /** @missingRailsCall call — PERMANENT */
   private buildWatcher(block: () => Promise<void> | void): FileUpdateChecker {
-    const currentEnvironment = DatabaseConfigurations.defaultEnv;
+    const currentEnvironment = _DEFAULT_ENV!();
     const allConfigs = migrationArConfig()!.configurations().configsFor({
       envName: currentEnvironment,
     });

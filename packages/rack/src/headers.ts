@@ -99,10 +99,6 @@ export class Headers extends Hash<string, string> {
     return obj;
   }
 
-  toH(): Record<string, string> {
-    return this.toHash();
-  }
-
   fetch(key: string, ...args: any[]): string {
     if (args.length > 1) throw new Error("ArgumentError: wrong number of arguments");
     const k = this._key(key);

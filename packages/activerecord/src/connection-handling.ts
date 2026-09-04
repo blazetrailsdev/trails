@@ -3,7 +3,6 @@ import { _Base } from "./base-slot.js";
 import { WRITING_ROLE, READING_ROLE } from "./roles.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
 import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { resolve as resolveConnectionAdapter } from "./connection-adapters.js";
@@ -18,7 +17,8 @@ import {
   isApplicationRecordClass as coreIsApplicationRecordClass,
   configurations as baseConfigurations,
 } from "./core.js";
-import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, getEnv } from "@blazetrails/activesupport";
+import { _railsEnv, _setDefaultEnv } from "./connection-handling-slot.js";
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
@@ -560,7 +560,13 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
   return resolveConnectionAdapter(name);
 }
 
-export const DEFAULT_ENV = (): string => DatabaseConfigurations.defaultEnv;
+/** @missingRailsCall call — PERMANENT */
+export const DEFAULT_ENV = (): string => {
+  const trailsEnv = getEnv("TRAILS_ENV");
+  if (trailsEnv) return trailsEnv;
+  if (_railsEnv !== null) return _railsEnv || "default_env";
+  return getEnv("NODE_ENV") || "default_env";
+};
 
 /**
  * @missingRailsCall call — PERMANENT
@@ -675,3 +681,5 @@ export function resolveConfigForConnection(this: typeof Base, configOrEnv: unkno
     : this.name;
   return baseConfigurations().resolve(configOrEnv);
 }
+
+_setDefaultEnv(DEFAULT_ENV);

@@ -137,6 +137,12 @@ export class LazyAttributeSet extends AttributeSet {
       return Attribute.null(name);
     }
   }
+
+  /** @noRailsEquivalent PERMANENT */
+  override freeze(): this {
+    Object.freeze(this);
+    return this;
+  }
 }
 
 export class LazyAttributeHash {
