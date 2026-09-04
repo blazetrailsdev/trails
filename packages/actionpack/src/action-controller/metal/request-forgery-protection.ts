@@ -1,4 +1,4 @@
-import { getCrypto, chomp } from "@blazetrails/ruby-compat";
+import { getCrypto, chomp, OpenSSL, SecureRandom, type Bytes } from "@blazetrails/ruby-compat";
 import {
   CookieJar,
   cookieJar,
@@ -310,16 +310,16 @@ const GLOBAL_CSRF_TOKEN_IDENTIFIER = "!real_csrf_token";
 
 /** @internal */
 export function generateCsrfToken(): string {
-  return encodeCsrfToken(Buffer.from(getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH)));
+  return encodeCsrfToken(SecureRandom.randomBytes(AUTHENTICITY_TOKEN_LENGTH));
 }
 
 /** @internal */
-export function encodeCsrfToken(csrfToken: Buffer): string {
+export function encodeCsrfToken(csrfToken: Bytes): string {
   return csrfToken.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 /** @internal */
-export function decodeCsrfToken(encodedCsrfToken: string): Buffer {
+export function decodeCsrfToken(encodedCsrfToken: string): Bytes {
   if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(encodedCsrfToken)) throw new TypeError("invalid base64");
   const stripped = encodedCsrfToken.replace(/=+$/, "");
   if (stripped.length % 4 === 1) throw new TypeError("invalid base64 length");
@@ -327,14 +327,14 @@ export function decodeCsrfToken(encodedCsrfToken: string): Buffer {
 }
 
 /** @internal */
-export function xorByteStrings(s1: Buffer, s2: Buffer): Buffer {
+export function xorByteStrings(s1: Bytes, s2: Bytes): Bytes {
   const out = Buffer.alloc(s1.length);
   for (let i = 0; i < s1.length; i++) out[i] = s1[i] ^ s2[i];
   return out;
 }
 
 /** @internal */
-export function realCsrfToken(this: CsrfController, _session?: unknown): Buffer {
+export function realCsrfToken(this: CsrfController, _session?: unknown): Bytes {
   const env = (this.request.env ??= {});
   let encoded = env[CSRF_TOKEN_ENV_KEY] as string | undefined;
   if (encoded == null) {
@@ -347,14 +347,15 @@ export function realCsrfToken(this: CsrfController, _session?: unknown): Buffer 
 }
 
 /** @internal */
-export function csrfTokenHmac(this: CsrfController, session: unknown, identifier: string): Buffer {
-  return Buffer.from(
-    getCrypto().createHmac("sha256", realCsrfToken.call(this, session)).update(identifier).digest(),
-  ).subarray(0, AUTHENTICITY_TOKEN_LENGTH);
+export function csrfTokenHmac(this: CsrfController, session: unknown, identifier: string): Bytes {
+  return OpenSSL.HMAC.digest("SHA256", realCsrfToken.call(this, session), identifier).subarray(
+    0,
+    AUTHENTICITY_TOKEN_LENGTH,
+  ) as Bytes;
 }
 
 /** @internal */
-export function globalCsrfToken(this: CsrfController, session?: unknown): Buffer {
+export function globalCsrfToken(this: CsrfController, session?: unknown): Bytes {
   return csrfTokenHmac.call(this, session, GLOBAL_CSRF_TOKEN_IDENTIFIER);
 }
 
@@ -364,18 +365,18 @@ export function perFormCsrfToken(
   session: unknown,
   actionPath: string,
   method: string,
-): Buffer {
+): Bytes {
   return csrfTokenHmac.call(this, session, `${actionPath}#${method.toLowerCase()}`);
 }
 
 /** @internal */
-export function maskToken(rawToken: Buffer): string {
-  const otp = Buffer.from(getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH));
+export function maskToken(rawToken: Bytes): string {
+  const otp = SecureRandom.randomBytes(AUTHENTICITY_TOKEN_LENGTH);
   return encodeCsrfToken(Buffer.concat([otp, xorByteStrings(otp, rawToken)]));
 }
 
 /** @internal */
-export function unmaskToken(maskedToken: Buffer): Buffer {
+export function unmaskToken(maskedToken: Bytes): Bytes {
   return xorByteStrings(
     maskedToken.subarray(0, AUTHENTICITY_TOKEN_LENGTH),
     maskedToken.subarray(AUTHENTICITY_TOKEN_LENGTH),
@@ -388,7 +389,7 @@ export function maskedAuthenticityToken(
   formOptions: { action?: string; method?: string } = {},
 ): string {
   const { action, method } = formOptions;
-  let rawToken: Buffer;
+  let rawToken: Bytes;
   if (this.perFormCsrfTokens && action != null && method != null) {
     const actionPath = normalizeActionPath.call(this, action);
     rawToken = perFormCsrfToken.call(this, null, actionPath, method);
@@ -408,14 +409,14 @@ export function requestAuthenticityTokens(this: CsrfController): unknown[] {
   return [formAuthenticityParam.call(this), this.request.xCsrfToken];
 }
 
-function compareBuffers(a: Buffer, b: Buffer): boolean {
+function compareBuffers(a: Bytes, b: Bytes): boolean {
   return a.length === b.length && getCrypto().timingSafeEqual(a, b);
 }
 
 /** @internal */
 export function compareWithRealToken(
   this: CsrfController,
-  token: Buffer,
+  token: Bytes,
   session?: unknown,
 ): boolean {
   return compareBuffers(token, realCsrfToken.call(this, session));
@@ -424,7 +425,7 @@ export function compareWithRealToken(
 /** @internal */
 export function compareWithGlobalToken(
   this: CsrfController,
-  token: Buffer,
+  token: Bytes,
   session?: unknown,
 ): boolean {
   return compareBuffers(token, globalCsrfToken.call(this, session));
@@ -433,7 +434,7 @@ export function compareWithGlobalToken(
 /** @internal */
 export function isValidPerFormCsrfToken(
   this: CsrfController,
-  token: Buffer,
+  token: Bytes,
   session?: unknown,
 ): boolean {
   if (!this.perFormCsrfTokens) return false;
@@ -449,7 +450,7 @@ export function isValidAuthenticityToken(
   encodedMaskedToken: unknown,
 ): boolean {
   if (typeof encodedMaskedToken !== "string" || encodedMaskedToken.length === 0) return false;
-  let masked: Buffer;
+  let masked: Bytes;
   try {
     masked = decodeCsrfToken(encodedMaskedToken);
   } catch {

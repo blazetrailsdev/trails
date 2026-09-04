@@ -1,3 +1,4 @@
+import type { Bytes } from "@blazetrails/ruby-compat";
 import { kernelArray as Array } from "@blazetrails/activesupport";
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
@@ -5,14 +6,14 @@ import { Decryption } from "./errors.js";
 import { Message } from "./message.js";
 
 export class Cipher {
-  encrypt(cleanText: string | Buffer, options: { key: string; deterministic?: boolean }): Message {
+  encrypt(cleanText: string | Bytes, options: { key: string; deterministic?: boolean }): Message {
     return this.cipherFor(options.key, options.deterministic ?? false).encrypt(cleanText);
   }
 
   decrypt(
     encryptedMessage: Message,
     options: { key: string | string[]; [k: string]: unknown },
-  ): Buffer {
+  ): Bytes {
     return this.tryToDecryptWithEach(encryptedMessage, { keys: Array(options.key) });
   }
 
@@ -25,7 +26,7 @@ export class Cipher {
   }
 
   /** @internal */
-  private tryToDecryptWithEach(encryptedText: Message, { keys }: { keys: string[] }): Buffer {
+  private tryToDecryptWithEach(encryptedText: Message, { keys }: { keys: string[] }): Bytes {
     if (keys.length === 0) throw new Decryption("No decryption keys provided");
     let lastError: unknown;
     for (let i = 0; i < keys.length; i++) {

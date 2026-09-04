@@ -247,16 +247,16 @@ describe("P20b/P20c smoke", () => {
 
   it("mask/unmask round-trips and realCsrfToken is stable per request", () => {
     const raw = decodeCsrfToken(generateCsrfToken());
-    expect(unmaskToken(decodeCsrfToken(maskToken(raw))).equals(raw)).toBe(true);
+    expect(Buffer.from(unmaskToken(decodeCsrfToken(maskToken(raw)))).equals(raw)).toBe(true);
     const c = tokenC();
-    expect(realCsrfToken.call(c).equals(realCsrfToken.call(c))).toBe(true);
+    expect(Buffer.from(realCsrfToken.call(c)).equals(realCsrfToken.call(c))).toBe(true);
   });
 
   it("encode/decodeCsrfToken use urlsafe base64 without padding; reject garbage", () => {
     const raw = Buffer.from("?".repeat(32));
     const encoded = maskToken(raw);
     expect(encoded).not.toMatch(/[+/=]/);
-    expect(unmaskToken(decodeCsrfToken(encoded)).equals(raw)).toBe(true);
+    expect(Buffer.from(unmaskToken(decodeCsrfToken(encoded))).equals(raw)).toBe(true);
     expect(() => decodeCsrfToken("!!! not base64 !!!")).toThrow();
   });
 

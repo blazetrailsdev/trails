@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { cryptoAdapterConfig } from "./crypto-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { SecureRandom } from "./secure-random.js";
 
@@ -18,12 +19,11 @@ describe("SecureRandom", () => {
   });
 
   it("gen_random raises NotImplementedError without a random device", () => {
-    const crypto = globalThis.crypto;
-    Reflect.deleteProperty(globalThis, "crypto");
+    cryptoAdapterConfig.adapter = "no-such-random-device";
     try {
       expect(() => SecureRandom.genRandom(4)).toThrow(NotImplementedError);
     } finally {
-      Object.defineProperty(globalThis, "crypto", { value: crypto, configurable: true });
+      cryptoAdapterConfig.adapter = null;
     }
   });
 });

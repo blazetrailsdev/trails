@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
@@ -35,6 +35,6 @@ export class RequestId {
 
   /** @internal */
   private internalRequestId(): string {
-    return getCrypto().randomUUID();
+    return SecureRandom.uuid();
   }
 }

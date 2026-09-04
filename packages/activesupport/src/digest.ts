@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat";
 
 type HashDigestClass = {
   hexdigest(data: string): string;
@@ -6,7 +6,7 @@ type HashDigestClass = {
 
 const MD5: HashDigestClass = {
   hexdigest(data: string): string {
-    return getCrypto().createHash("md5").update(data).digest("hex");
+    return OpenSSL.Digest.MD5.hexdigest(data);
   },
 };
 

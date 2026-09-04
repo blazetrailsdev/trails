@@ -1,4 +1,4 @@
-import { Cipher, getCrypto } from "@blazetrails/ruby-compat";
+import { Cipher, OpenSSL, type Bytes } from "@blazetrails/ruby-compat";
 import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
 
@@ -6,12 +6,12 @@ const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
-function isBytes(value: unknown): value is string | Buffer {
-  return typeof value === "string" || Buffer.isBuffer(value);
+function isBytes(value: unknown): value is string | Bytes {
+  return typeof value === "string" || value instanceof Uint8Array;
 }
 
-function toBytes(value: string | Buffer): Buffer {
-  return Buffer.isBuffer(value) ? value : Buffer.from(value, "latin1");
+function toBytes(value: string | Bytes): Bytes {
+  return typeof value === "string" ? Buffer.from(value, "latin1") : value;
 }
 
 export class Aes256Gcm {
@@ -41,7 +41,7 @@ export class Aes256Gcm {
     return { deterministic: this.deterministic };
   }
 
-  encrypt(clearText: string | Buffer): Message {
+  encrypt(clearText: string | Bytes): Message {
     this._validateKeyLength(this.secret);
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
     if (typeof clearText === "string") clearText = Buffer.from(clearText, "utf-8");
@@ -53,17 +53,16 @@ export class Aes256Gcm {
     const iv = this.generateIv(cipher, clearText);
     cipher.iv = iv;
 
-    let encryptedData =
-      clearText.length === 0 ? Buffer.from(clearText) : Buffer.from(cipher.update(clearText));
-    encryptedData = Buffer.concat([encryptedData, Buffer.from(cipher.final())]);
+    let encryptedData = clearText.length === 0 ? clearText : cipher.update(clearText);
+    encryptedData = Buffer.concat([encryptedData, cipher.final()]);
 
     const message = new Message({ payload: encryptedData });
     message.headers.iv = iv;
-    message.headers.authTag = Buffer.from(cipher.authTag);
+    message.headers.authTag = cipher.authTag;
     return message;
   }
 
-  decrypt(encryptedMessage: Message): Buffer {
+  decrypt(encryptedMessage: Message): Bytes {
     const iv = encryptedMessage.headers.get("iv");
     const authTag = encryptedMessage.headers.get("at");
     if (!isBytes(iv) || !isBytes(authTag)) throw new EncryptedContentIntegrity();
@@ -84,10 +83,8 @@ export class Aes256Gcm {
 
       const encryptedData = toBytes(encryptedMessage.payload);
       const decryptedData =
-        encryptedData.length === 0
-          ? Buffer.from(encryptedData)
-          : Buffer.from(cipher.update(encryptedData));
-      return Buffer.concat([decryptedData, Buffer.from(cipher.final())]);
+        encryptedData.length === 0 ? encryptedData : cipher.update(encryptedData);
+      return Buffer.concat([decryptedData, cipher.final()]);
     } catch {
       throw new Decryption("The provided key could not decrypt the data");
     }
@@ -103,21 +100,19 @@ export class Aes256Gcm {
   }
 
   /** @internal */
-  private generateIv(cipher: Cipher, clearText: Buffer): Buffer {
+  private generateIv(cipher: Cipher, clearText: Bytes): Bytes {
     if (this.deterministic) {
       return this.generateDeterministicIv(clearText);
     }
-    return Buffer.from(cipher.randomIv());
+    return cipher.randomIv();
   }
 
   /**
    * @internal
    * @missingRailsCall new — PERMANENT
    */
-  private generateDeterministicIv(clearText: Buffer): Buffer {
+  private generateDeterministicIv(clearText: Bytes): Bytes {
     const keyBuf = Buffer.from(this.secret, "base64").subarray(0, KEY_LENGTH);
-    return Buffer.from(
-      getCrypto().createHmac("sha256", keyBuf).update(clearText).digest(),
-    ).subarray(0, IV_LENGTH);
+    return OpenSSL.HMAC.digest("SHA256", keyBuf, clearText).subarray(0, IV_LENGTH) as Bytes;
   }
 }

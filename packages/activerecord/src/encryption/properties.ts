@@ -1,3 +1,4 @@
+import type { Bytes } from "@blazetrails/ruby-compat";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
 
 const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
@@ -115,9 +116,9 @@ export interface Properties {
   get compressed(): boolean | undefined;
   set compressed(value: boolean | undefined);
   get iv(): string | undefined;
-  set iv(value: string | Buffer | undefined);
+  set iv(value: string | Bytes | undefined);
   get authTag(): string | undefined;
-  set authTag(value: string | Buffer | undefined);
+  set authTag(value: string | Bytes | undefined);
   get encoding(): string | undefined;
   set encoding(value: string | undefined);
 }

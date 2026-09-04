@@ -22,7 +22,7 @@ import {
   Notifications,
   NullLock,
 } from "@blazetrails/activesupport";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { Process, rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "../future-result.js";
 
@@ -766,7 +766,7 @@ export class AbstractAdapter implements Quoting {
   private _inUse = false;
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
-  private _idleSince = Date.now();
+  private _idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
   protected _lastActivity = 0;
   protected _verified = false;
   protected _unconfiguredConnection: AbstractAdapter | null = null;
@@ -949,7 +949,7 @@ export class AbstractAdapter implements Quoting {
     }
     this._inUse = false;
     this._owner = null;
-    this._idleSince = Date.now();
+    this._idleSince = Process.clockGettime(Process.CLOCK_MONOTONIC);
   }
 
   protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
@@ -1009,7 +1009,10 @@ export class AbstractAdapter implements Quoting {
 
   async reconnectBang(opts: { restoreTransactions?: boolean } = {}): Promise<void> {
     let retriesAvailable = this.connectionRetries;
-    const deadline = this.retryDeadline !== null ? Date.now() + this.retryDeadline * 1000 : null;
+    const deadline =
+      this.retryDeadline !== null
+        ? Process.clockGettime(Process.CLOCK_MONOTONIC) + this.retryDeadline
+        : null;
 
     return this.lock.synchronize(async () => {
       for (;;) {
@@ -1018,7 +1021,7 @@ export class AbstractAdapter implements Quoting {
 
           this.enableLazyTransactionsBang();
           this._rawConnectionDirty = false;
-          this._lastActivity = Date.now();
+          this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
           this._verified = true;
 
           await this.resetTransaction({ restore: opts.restoreTransactions ?? false }, async () => {
@@ -1032,7 +1035,8 @@ export class AbstractAdapter implements Quoting {
             undefined,
             undefined,
           );
-          const retryDeadlineExceeded = deadline !== null && deadline < Date.now();
+          const retryDeadlineExceeded =
+            deadline !== null && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
 
           if (!retryDeadlineExceeded && retriesAvailable > 0) {
             retriesAvailable -= 1;
@@ -1090,7 +1094,7 @@ export class AbstractAdapter implements Quoting {
           this._connection = this._unconfiguredConnection;
           this._unconfiguredConnection = null;
           await this.attemptConfigureConnection();
-          this._lastActivity = Date.now();
+          this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
           this._verified = true;
           return true;
         }
@@ -1417,12 +1421,12 @@ export class AbstractAdapter implements Quoting {
 
   get secondsIdle(): number {
     if (this._inUse) return 0;
-    return (Date.now() - this._idleSince) / 1000;
+    return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._idleSince;
   }
 
   get secondsSinceLastActivity(): number | null {
     if (!this._connection || !this._lastActivity) return null;
-    return (Date.now() - this._lastActivity) / 1000;
+    return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._lastActivity;
   }
 
   discardBang(): void {}
@@ -1833,7 +1837,10 @@ export class AbstractAdapter implements Quoting {
       if (materializeTransactions) await this.materializeTransactions();
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
-      const deadline = this.retryDeadline !== null ? Date.now() + this.retryDeadline * 1000 : null;
+      const deadline =
+        this.retryDeadline !== null
+          ? Process.clockGettime(Process.CLOCK_MONOTONIC) + this.retryDeadline
+          : null;
       let reconnectable = this.isReconnectCanRestoreState();
       const last = this.secondsSinceLastActivity;
       const recent = last !== null && last < this.verifyTimeout;
@@ -1849,7 +1856,8 @@ export class AbstractAdapter implements Quoting {
             null,
           ) as Error;
           this.invalidateTransaction(translatedException);
-          const retryDeadlineExceeded = deadline !== null && deadline < Date.now();
+          const retryDeadlineExceeded =
+            deadline !== null && deadline < Process.clockGettime(Process.CLOCK_MONOTONIC);
           if (!retryDeadlineExceeded && retriesAvailable > 0) {
             retriesAvailable -= 1;
             if (this.isRetryableQueryError(translatedException)) {
@@ -1886,7 +1894,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   verifiedBang(): void {
-    this._lastActivity = Date.now();
+    this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
     this._verified = true;
   }
 

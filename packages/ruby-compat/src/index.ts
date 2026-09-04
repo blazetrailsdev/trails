@@ -42,7 +42,6 @@ export type { Block, ConflictBlock } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
 export { FileUtils } from "./file-utils.js";
 export {
-  Cipher,
   cryptoAdapterConfig,
   getCrypto,
   getCryptoAsync,
@@ -83,7 +82,7 @@ export { pack } from "./array.js";
 export type { OsAdapter } from "./os-adapter.js";
 export { FrozenError } from "./frozen-error.js";
 export { fsAdapterConfig, getFsAsync, getPathAsync, registerFsAdapter } from "./fs-adapter.js";
-export type { FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs-adapter.js";
+export type { Bytes, FsAdapter, FsDirent, FsStatResult, PathAdapter } from "./fs-adapter.js";
 export {
   Module,
   defineModule,
@@ -137,6 +136,8 @@ export { rbHash } from "./rb-hash.js";
 export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { SecureRandom } from "./secure-random.js";
+export { Digest } from "./digest.js";
+export { Cipher, HMAC, OpenSSL } from "./openssl.js";
 export { StringIO } from "./string-io.js";
 export { b } from "./string/b.js";
 export { chomp } from "./string/chomp.js";

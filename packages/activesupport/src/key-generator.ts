@@ -1,5 +1,5 @@
 import { ArgumentError } from "./hash-utils.js";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { getCrypto, type Bytes } from "@blazetrails/ruby-compat";
 
 const OPENSSL_DIGESTS = new Set(["md5", "sha1", "sha256", "sha384", "sha512"]);
 
@@ -28,9 +28,13 @@ export class KeyGenerator {
     this.hashDigestClass = options.hashDigestClass ?? KeyGenerator.hashDigestClass;
   }
 
-  generateKey(salt: string, keySize: number = 64): Buffer {
-    return Buffer.from(
-      getCrypto().pbkdf2Sync(this.secret, salt, this.iterations, keySize, this.hashDigestClass),
+  generateKey(salt: string, keySize: number = 64): Bytes {
+    return getCrypto().pbkdf2Sync(
+      this.secret,
+      salt,
+      this.iterations,
+      keySize,
+      this.hashDigestClass,
     );
   }
 
@@ -41,13 +45,13 @@ export class KeyGenerator {
 
 export class CachingKeyGenerator {
   private readonly keyGenerator: KeyGenerator;
-  private readonly cacheKeys = new Map<string, Buffer>();
+  private readonly cacheKeys = new Map<string, Bytes>();
 
   constructor(keyGenerator: KeyGenerator) {
     this.keyGenerator = keyGenerator;
   }
 
-  generateKey(...args: [salt: string, keySize?: number]): Buffer {
+  generateKey(...args: [salt: string, keySize?: number]): Bytes {
     const key = args.join("|");
     let cached = this.cacheKeys.get(key);
     if (cached == null) {

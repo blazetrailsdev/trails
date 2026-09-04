@@ -1,4 +1,4 @@
-import { block, fetch, KeyError, getCrypto } from "@blazetrails/ruby-compat";
+import { block, fetch, KeyError, OpenSSL } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { CommandRecorder } from "../../migration/command-recorder.js";
@@ -1499,8 +1499,7 @@ export class SchemaStatements {
     const name = `index_${tableName}_on_${cols.join("_and_")}`;
     if (new TextEncoder().encode(name).length <= this.maxIndexNameSize()) return name;
 
-    const hashedIdentifier =
-      "_" + getCrypto().createHash("sha256").update(name).digest("hex").slice(0, 10);
+    const hashedIdentifier = "_" + OpenSSL.Digest.SHA256.hexdigest(name).slice(0, 10);
     const shortName = `idx_on_${cols.join("_")}`;
 
     const shortLimit = this.maxIndexNameSize() - new TextEncoder().encode(hashedIdentifier).length;
@@ -1739,7 +1738,7 @@ export class SchemaStatements {
     }
     const cols = wrap(options.column);
     const identifier = `${tableName}_${cols.join("_and_")}_fk`;
-    const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    const hex = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
     return `fk_rails_${hex}`;
   }
 
@@ -1805,7 +1804,7 @@ export class SchemaStatements {
     }
     const expression = options.expression;
     const identifier = `${tableName}_${expression ?? ""}_chk`;
-    const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    const hex = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
     return `chk_rails_${hex}`;
   }
 
