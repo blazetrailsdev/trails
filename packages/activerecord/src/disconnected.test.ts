@@ -17,9 +17,9 @@ describe.skipIf(inMemoryDb())("TestDisconnectedAdapter", () => {
   });
 
   function rawConnection(conn: AbstractAdapter): unknown {
-    const sqlite = conn as unknown as { driver?: { isOpen(): boolean } };
+    const sqlite = conn as unknown as { _rawConnection?: { isOpen(): boolean } };
     if (adapterType === "sqlite") {
-      return sqlite.driver?.isOpen() ? sqlite.driver : null;
+      return sqlite._rawConnection?.isOpen() ? sqlite._rawConnection : null;
     }
     return (conn as unknown as { _connection: unknown })._connection;
   }

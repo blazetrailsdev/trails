@@ -213,22 +213,19 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return 999;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE async-overrides-of-synchronous-rails-adapter-methods
-   */
-  driver!: SqliteConnection;
+  /** @internal */
+  _rawConnection!: SqliteConnection;
   private _asyncConnectPending = false;
   private _connectingPromise: Promise<void> | null = null;
   private _closingDriver: Promise<void> | null = null;
   override async active(): Promise<boolean> {
     await this.whenClosed();
-    return this.driver?.isOpen() ?? false;
+    return this._rawConnection?.isOpen() ?? false;
   }
   /** @internal */
   protected async sqliteConnection(): Promise<SqliteConnection> {
     await this.ensureConnected();
-    return this.driver;
+    return this._rawConnection;
   }
 
   private _readonly: boolean;
@@ -321,7 +318,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   async _freshStatement(sql: string): Promise<SqliteStatement> {
     await this.ensureConnected();
-    const stmt = await this.driver.prepare(sql);
+    const stmt = await this._rawConnection.prepare(sql);
     this._maybeEnableReadBigInts(sql, stmt);
     return stmt;
   }
@@ -329,13 +326,13 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async _cachedStatement(sql: string): Promise<SqliteStatement> {
     await this.ensureConnected();
     if (!this.preparedStatements) {
-      const stmt = await this.driver.prepare(sql);
+      const stmt = await this._rawConnection.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
       return stmt;
     }
     let stmt = this._statements.get(sql);
     if (!stmt) {
-      stmt = await this.driver.prepare(sql);
+      stmt = await this._rawConnection.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
       void this._statements.set(sql, stmt);
     }
@@ -392,7 +389,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         async (payload) => {
           try {
             const counters = { affectedRows: 0, insertRowid: 0 as number | bigint };
-            await this.performQuery(this.driver, sql, binds, driverBinds, {
+            await this.performQuery(this._rawConnection, sql, binds, driverBinds, {
               prepare: false,
               notificationPayload: payload,
               counters,
@@ -463,7 +460,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         async,
         async (payload) => {
           try {
-            return await this.performQuery(this.driver, sql, binds, driverBinds, {
+            return await this.performQuery(this._rawConnection, sql, binds, driverBinds, {
               prepare,
               notificationPayload: payload,
               batch,
@@ -583,7 +580,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       this._closingDriver = null;
       await closing;
     } else {
-      await this.driver?.close();
+      await this._rawConnection?.close();
     }
   }
 
@@ -593,16 +590,16 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   get isOpen(): boolean {
-    return this.driver?.isOpen() ?? false;
+    return this._rawConnection?.isOpen() ?? false;
   }
 
   async exec(sql: string): Promise<void> {
     await this.ensureConnected();
-    await this.driver.exec(sql);
+    await this._rawConnection.exec(sql);
   }
 
   get raw(): unknown {
-    return this.driver?.raw;
+    return this._rawConnection?.raw;
   }
 
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
@@ -734,11 +731,11 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   override isConnected(): boolean {
-    return this.driver?.isOpen() ?? false;
+    return this._rawConnection?.isOpen() ?? false;
   }
 
   isActive(): boolean {
-    return this.driver?.isOpen() ?? false;
+    return this._rawConnection?.isOpen() ?? false;
   }
 
   override disconnectBang(): void {
@@ -753,8 +750,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   /** @internal */
   private _disconnect(): void {
     super.disconnectBang();
-    if (this.driver?.isOpen()) {
-      const closing = this.driver.close();
+    if (this._rawConnection?.isOpen()) {
+      const closing = this._rawConnection.close();
       if (closing) this._chainClose(closing);
     }
   }
@@ -769,7 +766,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   override async reconnect(): Promise<void> {
     if (await this.active()) {
       try {
-        await this.driver.exec("ROLLBACK");
+        await this._rawConnection.exec("ROLLBACK");
       } catch {}
     } else {
       this.connect();
@@ -786,7 +783,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   get encoding(): string {
     if (this._encoding !== null) return this._encoding;
-    return SQLite3Adapter.parseEncoding(this.driver?.pragma("encoding"));
+    return SQLite3Adapter.parseEncoding(this._rawConnection?.pragma("encoding"));
   }
 
   private _encoding: string | null = null;
@@ -806,8 +803,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @missingRailsCall query_value — CONVERGEABLE sqlite-get-database-version-uses-query-value */
   override getDatabaseVersion(): Version | Promise<Version> {
-    if (this.driver === undefined && !this._asyncConnectPending) this.connect();
-    const driver = this.driver as SqliteConnection | undefined;
+    if (this._rawConnection === undefined && !this._asyncConnectPending) this.connect();
+    const driver = this._rawConnection as SqliteConnection | undefined;
     if (!driver) return new Version("0.0.0");
     const toVersion = (row: unknown) => new Version((row as { v?: string })?.v ?? "0.0.0");
     // eslint-disable-next-line blazetrails/sqlite-driver-await -- both arms handled below: an in-process driver answers directly, an async-only one with a Promise.
@@ -1656,7 +1653,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       }
       const syncConn = factory.openSync(openConfig);
       this._encoding = SQLite3Adapter.parseEncoding(syncConn.pragma("encoding"));
-      this.driver = syncConn as SqliteConnection;
+      this._rawConnection = syncConn as SqliteConnection;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (_isSqliteMissingDbError(e)) {
@@ -1689,7 +1686,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       const factory = this.resolveDriverFactory();
       const conn = await factory.open(openConfig);
       this._encoding = SQLite3Adapter.parseEncoding(await conn.pragma("encoding"));
-      this.driver = conn;
+      this._rawConnection = conn;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (_isSqliteMissingDbError(e)) {
@@ -1834,7 +1831,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
         await checked;
         for (const [sql, label] of stmts) {
           try {
-            await this.driver.pragma(sql);
+            await this._rawConnection.pragma(sql);
           } catch (e) {
             warn(label, e);
           }
@@ -1843,7 +1840,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
     for (const [sql, label] of stmts) {
       try {
-        this.driver.pragma(sql);
+        this._rawConnection.pragma(sql);
       } catch (e) {
         warn(label, e);
       }

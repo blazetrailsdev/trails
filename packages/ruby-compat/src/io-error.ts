@@ -8,8 +8,8 @@
  * rather than defines.
  */
 export class IOError extends Error {
-  constructor(message: string = "IOError") {
-    super(message);
-    this.name = "IOError";
+  constructor(message?: string) {
+    super(message ?? new.target.name);
+    this.name = new.target.name;
   }
 }

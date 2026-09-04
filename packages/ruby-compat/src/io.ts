@@ -1,5 +1,6 @@
 import { Encoding } from "./encoding.js";
 import { getFs, type FsStatResult } from "./fs-adapter.js";
+import { EOFError } from "./eof-error.js";
 import { IOError } from "./io-error.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/io.c:8880`) is called through. */
@@ -368,6 +369,39 @@ export class IO {
     return this.enc === Encoding.ASCII_8BIT
       ? binaryString(bytes, total)
       : new TextDecoder().decode(bytes);
+  }
+
+  /**
+   * `vendor/ruby/io.c:3590` `io_readpartial`, which is `io_getpartial` with a
+   * `rb_eof_error()` (`io.c:756`) where that answers `nil` — so it reads at
+   * most `maxlen` bytes and raises `EOFError` rather than returning `nil` at
+   * the end of the stream. `outbuf` is the buffer `io_getpartial` fills, the
+   * same `str` {@link read} takes.
+   *
+   * A blocking descriptor read already returns what is available, so
+   * `io_getpartial`'s short read IS {@link read}'s length arm here.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#readpartial`
+   * (`vendor/ruby/io.c:3590`).
+   */
+  readpartial(maxlen: number, outbuf?: Uint8Array | null): string {
+    const ret = this.read(maxlen, outbuf);
+    if (ret === null) throw new EOFError("end of file reached");
+    return ret;
+  }
+
+  /**
+   * `vendor/ruby/io.c:2668` `rb_io_eof` — true when `io_fillbuf` cannot get a
+   * byte at the current offset. There is no read buffer behind an `FsAdapter`,
+   * so the two `READ_*_PENDING` short-circuits (`io.c:2674-2675`) have nothing
+   * to answer for and the fill is a one-byte read that leaves the offset alone.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#eof?`
+   * (`vendor/ruby/io.c:2668`).
+   */
+  isEof(): boolean {
+    if (this.fd < 0) throw new IOError("closed stream");
+    return getFs().readSync(this.fd, new Uint8Array(1), 0, 1, this.pos) === 0;
   }
 
   /**

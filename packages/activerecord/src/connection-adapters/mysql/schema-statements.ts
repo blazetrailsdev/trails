@@ -17,6 +17,7 @@ import type { TableDefinitionOf } from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
 import type { Result } from "../../result.js";
+import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
@@ -401,22 +402,19 @@ export function fetchTypeMetadata(
   sqlType: string,
   extra: string = "",
 ): TypeMetadata {
-  return new TypeMetadata(BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType), {
-    extra,
-  });
+  return new TypeMetadata(
+    BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType) as SqlTypeMetadata,
+    { extra },
+  );
 }
 
 /** @internal */
-export function extractForeignKeyAction(specifier: string): "cascade" | "nullify" | undefined {
+export function extractForeignKeyAction(
+  this: MysqlColumnReflectionHost,
+  specifier: string,
+): "cascade" | "nullify" | "restrict" | undefined {
   if (specifier === "RESTRICT") return undefined;
-  switch (specifier) {
-    case "CASCADE":
-      return "cascade";
-    case "SET NULL":
-      return "nullify";
-    default:
-      return undefined;
-  }
+  return BaseSchemaStatements.prototype.extractForeignKeyAction.call(this, specifier);
 }
 
 export function tableAliasLength(): number {
@@ -577,7 +575,7 @@ interface ForeignKeysHost {
   internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   quote(value: unknown): string;
   /** @internal */
-  extractForeignKeyAction(specifier: string): "cascade" | "nullify" | undefined;
+  extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
 }
 
 /**

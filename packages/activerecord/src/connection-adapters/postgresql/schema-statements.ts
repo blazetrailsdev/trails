@@ -17,6 +17,7 @@ import {
 } from "../abstract/schema-definitions.js";
 import type { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { Column } from "./column.js";
+import { TypeMetadata } from "./type-metadata.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { Name, Utils } from "./utils.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
@@ -63,6 +64,7 @@ export interface SchemaStatements
       | "extractDefaultFunction"
       | "extractValueFromDefault"
       | "databaseVersion"
+      | "getOidType"
       | "internalExecQuery"
       | "internalExecute"
       | "loadAdditionalTypes"
@@ -1361,12 +1363,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         string | null,
         string | null,
       ];
-    const typeMetadata = await (this as unknown as PostgreSQLAdapter).fetchTypeMetadata(
-      columnName,
-      type,
-      Number(oid),
-      Number(fmod),
-    );
+    const typeMetadata = await this.fetchTypeMetadata(columnName, type, Number(oid), Number(fmod));
     const defaultValue = this.extractValueFromDefault(default_);
 
     let defaultFunction: string | null;
@@ -1391,6 +1388,26 @@ export class SchemaStatements extends AbstractSchemaStatements {
       identity: identity || null,
       generated: gen,
     }).deduplicate();
+  }
+
+  /** @internal */
+  override async fetchTypeMetadata(
+    columnName: string,
+    sqlType: string,
+    oid: number,
+    fmod: number,
+  ): Promise<TypeMetadata> {
+    const castType = await this.getOidType(oid, fmod, columnName, sqlType);
+    return new TypeMetadata(
+      {
+        sqlType,
+        type: castType.type(),
+        limit: castType.limit ?? null,
+        precision: castType.precision ?? null,
+        scale: castType.scale ?? null,
+      },
+      { oid, fmod },
+    );
   }
 
   /** @internal */
@@ -1501,6 +1518,32 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (scope.name) sql += ` AND c.relname = ${scope.name}`;
     sql += ` AND c.relkind IN (${type})`;
     return sql;
+  }
+
+  /** @internal */
+  override quotedScope(
+    name?: string | null,
+    options: { type?: string } = {},
+  ): { schema: string; name: string | null; type: string | null } {
+    let schema: string | null;
+    [schema, name] = this.extractSchemaQualifiedName(name ?? "");
+    let type: string | null = null;
+    switch (options.type) {
+      case "BASE TABLE":
+        type = "'r','p'";
+        break;
+      case "VIEW":
+        type = "'v','m'";
+        break;
+      case "FOREIGN TABLE":
+        type = "'f'";
+        break;
+    }
+    return {
+      schema: schema ? this.quote(schema) : "ANY (current_schemas(false))",
+      name: name ? this.quote(name) : null,
+      type,
+    };
   }
 
   /** @internal */
