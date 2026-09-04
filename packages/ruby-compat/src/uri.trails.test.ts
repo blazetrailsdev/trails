@@ -84,13 +84,6 @@ describe("URI::Generic#merge", () => {
   });
 });
 
-describe("URI.join", () => {
-  it("merges each string in turn", () => {
-    expect(URI.join("http://example.com", "/foo", "bar").toString()).toBe("http://example.com/bar");
-    expect(URI.join("http://example.com", "foo").toString()).toBe("http://example.com/foo");
-  });
-});
-
 describe("URI::RFC2396_Parser#escape", () => {
   it("escapes only what is neither unreserved nor reserved", () => {
     expect(RFC2396_PARSER.escape("a b/c?d=e&f[]")).toBe("a%20b/c?d=e&f[]");
@@ -104,12 +97,5 @@ describe("URI::RFC2396_Parser#escape", () => {
 
   it("takes a String unsafe set as well as a Regexp", () => {
     expect(RFC2396_PARSER.escape("a@b:c/d", "@:/")).toBe("a%40b%3Ac%2Fd");
-  });
-});
-
-describe("URI.scheme_list", () => {
-  it("holds the classes register_scheme registered", () => {
-    expect(URI.schemeList().HTTP).toBe(HTTP);
-    expect(URI.schemeList().HTTPS).toBe(HTTPS);
   });
 });

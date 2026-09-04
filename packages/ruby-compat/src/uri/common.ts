@@ -75,7 +75,9 @@ const Schemes = new Map<string, GenericClass>();
 
 /**
  * `URI` (`vendor/ruby/lib/uri/common.rb:15`), the module `parse` and the
- * scheme registry live on. Only the members trails sends are ported.
+ * scheme registry live on. Only the members trails sends are ported —
+ * `scheme_list` (`common.rb:99`), `split` (`common.rb:172`) and `join`
+ * (`common.rb:213`) have no call site in this repo and are not.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI`
  * (`vendor/ruby/lib/uri/common.rb:15`) ships with the interpreter.
@@ -90,16 +92,6 @@ export class URI {
   static registerScheme(scheme: string, klass: GenericClass): GenericClass {
     Schemes.set(scheme.toUpperCase(), klass);
     return klass;
-  }
-
-  /**
-   * `URI.scheme_list` (`vendor/ruby/lib/uri/common.rb:99`).
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI.scheme_list`
-   * (`vendor/ruby/lib/uri/common.rb:99`).
-   */
-  static schemeList(): Record<string, GenericClass> {
-    return Object.fromEntries([...Schemes].map(([name, klass]) => [name.toUpperCase(), klass]));
   }
 
   /**
@@ -120,18 +112,8 @@ export class URI {
     return new (uriClass as unknown as new (...a: unknown[]) => Generic)(scheme, ...args);
   }
 
-  /** `URI.split` (`vendor/ruby/lib/uri/common.rb:172`). */
-  static split(uri: string): SplitComponents {
-    return RFC3986_PARSER.split(uri);
-  }
-
   /** `URI.parse` (`vendor/ruby/lib/uri/common.rb:186`). */
   static parse(uri: string): Generic {
     return RFC3986_PARSER.parse(uri);
-  }
-
-  /** `URI.join` (`vendor/ruby/lib/uri/common.rb:213`). */
-  static join(...str: (Generic | string)[]): Generic {
-    return RFC3986_PARSER.join(...str);
   }
 }

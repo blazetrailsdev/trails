@@ -94,8 +94,9 @@ export type SplitComponents = [
 /**
  * `URI::RFC3986_Parser` (`vendor/ruby/lib/uri/rfc3986_parser.rb:3`), the parser
  * `URI.parse` uses and the one every parsed URI carries. Only the members
- * trails sends are ported: `split`, `parse`, `join` and the private
- * `convert_to_uri` `URI::Generic#merge` reaches through.
+ * trails sends are ported: `split`, `parse` and the private `convert_to_uri`
+ * that `URI::Generic#merge` reaches through. `join` (`rfc3986_parser.rb:135`)
+ * has no call site in this repo and is not.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::RFC3986_Parser`
  * (`vendor/ruby/lib/uri/rfc3986_parser.rb:3`) ships with the interpreter.
@@ -165,12 +166,6 @@ export class RFC3986Parser {
   /** `parse` (`vendor/ruby/lib/uri/rfc3986_parser.rb:130`). */
   parse(uri: string): Generic {
     return URI.for(...this.split(uri), this);
-  }
-
-  /** `join` (`vendor/ruby/lib/uri/rfc3986_parser.rb:135`). */
-  join(...uris: (Generic | string)[]): Generic {
-    uris[0] = this.convertToUri(uris[0]);
-    return uris.reduce((base, oth) => (base as Generic).merge(oth)) as Generic;
   }
 
   /**

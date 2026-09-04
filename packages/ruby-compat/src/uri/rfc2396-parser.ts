@@ -29,7 +29,13 @@ export class RFC2396Parser {
     UNSAFE: new RegExp(`[^${UNRESERVED}${RESERVED}]`, "g"),
   };
 
-  /** `escape` (`vendor/ruby/lib/uri/rfc2396_parser.rb:287`). */
+  /**
+   * `escape` (`vendor/ruby/lib/uri/rfc2396_parser.rb:287`).
+   *
+   * The second `else if` arm is not in the Ruby: `gsub` replaces every match
+   * whatever the Regexp is, where a JS `replace` replaces one unless the
+   * Regexp carries `g`, so a caller's own unsafe set is re-made global here.
+   */
   escape(str: string, unsafe: RegExp | string = this.regexp.UNSAFE): string {
     if (!(unsafe instanceof RegExp)) {
       unsafe = new RegExp(`[${regexpEscape(unsafe)}]`, "g");

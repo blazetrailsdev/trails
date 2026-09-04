@@ -162,8 +162,6 @@ export {
   InvalidComponentError,
   InvalidURIError,
   RFC2396_PARSER,
-  RFC2396Parser,
   RFC3986_PARSER,
-  RFC3986Parser,
   URI,
 } from "./uri.js";
