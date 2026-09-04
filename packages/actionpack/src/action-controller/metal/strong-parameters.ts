@@ -1,7 +1,11 @@
 /** @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
+import { Time, actsLikeDate, actsLikeTime } from "@blazetrails/date";
+import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
 import {
+  IO,
+  StringIO,
   KeyError,
   block,
   type ConflictBlock,
@@ -11,6 +15,8 @@ import {
   mergeBang,
 } from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
+
+import { UploadedFile } from "../../action-dispatch/http/upload.js";
 
 export class ParameterMissing extends Error {
   readonly param: string;
@@ -68,10 +74,24 @@ export class InvalidParameterKey extends Error {
 }
 
 /** @internal */
+const PERMITTED_SCALAR_TYPES: ((value: unknown) => boolean)[] = [
+  (value) => typeof value === "string",
+  (value) => typeof value === "string",
+  (value) => value === null || value === undefined,
+  (value) => typeof value === "number",
+  (value) => value === true,
+  (value) => value === false,
+  (value) => actsLikeDate(value),
+  (value) => value instanceof Time || actsLikeTime(value),
+  (value) => value instanceof StringIO,
+  (value) => value instanceof IO,
+  (value) => value instanceof UploadedFile,
+  (value) => value instanceof RackTestUploadedFile,
+];
+
+/** @internal */
 function isPermittedScalar(value: unknown): boolean {
-  if (value === null || value === undefined) return true;
-  const t = typeof value;
-  return t === "string" || t === "number" || t === "boolean";
+  return PERMITTED_SCALAR_TYPES.some((type) => type(value));
 }
 
 export class Parameters {

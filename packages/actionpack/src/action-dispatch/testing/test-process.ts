@@ -2,7 +2,7 @@ import { File } from "@blazetrails/ruby-compat";
 
 import { CookieJar, type CookieJarOptions } from "../middleware/cookies.js";
 import type { FlashHash } from "../middleware/flash.js";
-import { UploadedFile } from "../http/upload.js";
+import { UploadedFile } from "@blazetrails/rack-test";
 
 /** @internal */
 export interface TestProcessRequest {
@@ -45,12 +45,7 @@ export function fileFixtureUpload(
     }
     resolved = this.fileFixture(path);
   }
-  return new UploadedFile({
-    filename: File.basename(resolved),
-    type: mimeType ?? undefined,
-    tempfile: resolved,
-    head: binary ? "Content-Transfer-Encoding: binary" : undefined,
-  });
+  return new UploadedFile(resolved, mimeType ?? null, binary);
 }
 
 export const fixtureFileUpload = fileFixtureUpload;

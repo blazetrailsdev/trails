@@ -11,6 +11,7 @@
     { "path": "../actionview" },
     { "path": "../activemodel" },
     { "path": "../activesupport" },
+    { "path": "../date" },
     { "path": "../did-you-mean" },
     { "path": "../i18n" },
     { "path": "../rack" },

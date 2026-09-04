@@ -1,5 +1,28 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { File, StringIO } from "@blazetrails/ruby-compat";
+import { Date, Time } from "@blazetrails/date";
+import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
+import { UploadedFile } from "../../../action-dispatch/http/upload.js";
 import { Parameters, UnfilteredParameters } from "../../metal/strong-parameters.js";
+
+const thisFile = new URL(import.meta.url).pathname;
+
+function permittedScalarValues(): unknown[] {
+  return [
+    "a",
+    ":a",
+    0,
+    1.0,
+    true,
+    false,
+    Date.today(),
+    Time.now(),
+    File.open(thisFile, "r"),
+    new StringIO(),
+    new UploadedFile({ tempfile: thisFile }),
+    new RackTestUploadedFile(thisFile),
+  ];
+}
 
 describe("ParametersPermitTest", () => {
   afterEach(() => {
@@ -22,12 +45,14 @@ describe("ParametersPermitTest", () => {
   });
 
   it("key: permitted scalar values", () => {
-    const params = new Parameters({ name: "John", age: 22, active: true });
-    const permitted = params.permit("name", "age", "active");
-    expect(permitted.get("name")).toBe("John");
-    expect(permitted.get("age")).toBe(22);
-    expect(permitted.get("active")).toBe(true);
-    expect(permitted.permitted).toBe(true);
+    for (const value of permittedScalarValues()) {
+      const params = new Parameters({ id: value });
+      const permitted = params.permit("id");
+      expect(permitted.get("id")).toBe(value);
+    }
+
+    const permittedNil = new Parameters({ id: null }).permit("id");
+    expect(permittedNil.get("id")).toBeNull();
   });
 
   it("key: unknown keys are filtered out", () => {

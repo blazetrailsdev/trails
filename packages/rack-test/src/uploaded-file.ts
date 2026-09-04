@@ -16,11 +16,11 @@ export class UploadedFile {
 
   tempfile!: Tempfile | StringIO;
 
-  contentType: string;
+  contentType: string | null;
 
   constructor(
     content: StringIO | string,
-    contentType: string = "text/plain",
+    contentType: string | null = "text/plain",
     binary: boolean = false,
     { originalFilename = null }: { originalFilename?: string | null } = {},
   ) {
