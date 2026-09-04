@@ -120,7 +120,7 @@ describeIfPg("PostgreSQLAdapter", () => {
                 { requiresNew: true },
               );
             },
-            { isolation: "serializable", requiresNew: false },
+            { isolation: ":serializable", requiresNew: false },
           ),
         );
 
@@ -145,7 +145,7 @@ describeIfPg("PostgreSQLAdapter", () => {
               startRight.set();
               await commitLeft.wait(1);
             },
-            { isolation: "serializable", requiresNew: false },
+            { isolation: ":serializable", requiresNew: false },
           );
           finishRight.set();
         }),
@@ -171,7 +171,7 @@ describeIfPg("PostgreSQLAdapter", () => {
               ).rejects.toThrow(SerializationFailure);
               await Bit.create({ value: 1 });
             },
-            { isolation: "serializable", requiresNew: false },
+            { isolation: ":serializable", requiresNew: false },
           );
         });
       } finally {

@@ -59,7 +59,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     const conn = await withConn();
     let error: Error | undefined;
     await expect(
-      conn.beginIsolatedDbTransaction("read_uncommitted").catch((e: Error) => {
+      conn.beginIsolatedDbTransaction(":read_uncommitted").catch((e: Error) => {
         error = e;
         throw e;
       }),
@@ -75,7 +75,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     await conn1.executeMutation(`INSERT INTO "zines" ("title") VALUES ('foo')`);
 
     const conn2 = await withConn({ sharedCache: true });
-    await conn2.beginIsolatedDbTransaction("read_uncommitted");
+    await conn2.beginIsolatedDbTransaction(":read_uncommitted");
     const rows = await conn2.execute(`SELECT * FROM "zines" WHERE title = 'foo'`);
     expect(rows.length).toBeGreaterThan(0);
     await conn2.rollbackDbTransaction();
@@ -88,7 +88,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
   it("reset the read_uncommitted PRAGMA when a transaction is rolled back", async () => {
     const conn = await withConn({ sharedCache: true });
     expect(readUncommitted(conn)).toBe(false);
-    await conn.beginIsolatedDbTransaction("read_uncommitted");
+    await conn.beginIsolatedDbTransaction(":read_uncommitted");
     expect(readUncommitted(conn)).toBe(true);
     await conn.rollbackDbTransaction();
     await conn.resetIsolationLevel();
@@ -98,7 +98,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
   it("reset the read_uncommitted PRAGMA when a transaction is committed", async () => {
     const conn = await withConn({ sharedCache: true });
     expect(readUncommitted(conn)).toBe(false);
-    await conn.beginIsolatedDbTransaction("read_uncommitted");
+    await conn.beginIsolatedDbTransaction(":read_uncommitted");
     expect(readUncommitted(conn)).toBe(true);
     await conn.commitDbTransaction();
     await conn.resetIsolationLevel();
@@ -109,7 +109,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
     const conn = await withConn({ sharedCache: true });
     (conn as any).driver.exec("PRAGMA read_uncommitted=ON");
     expect(readUncommitted(conn)).toBe(true);
-    await conn.beginIsolatedDbTransaction("read_uncommitted");
+    await conn.beginIsolatedDbTransaction(":read_uncommitted");
     expect(readUncommitted(conn)).toBe(true);
     await conn.commitDbTransaction();
     await conn.resetIsolationLevel();

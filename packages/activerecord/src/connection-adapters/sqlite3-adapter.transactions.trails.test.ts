@@ -123,13 +123,13 @@ describe("SQLite3Adapter transaction control", () => {
 
   describe("isolation level guards", () => {
     it("rejects unsupported isolation levels", async () => {
-      await expect(adapter.beginIsolatedDbTransaction("serializable")).rejects.toBeInstanceOf(
+      await expect(adapter.beginIsolatedDbTransaction(":serializable")).rejects.toBeInstanceOf(
         TransactionIsolationError,
       );
     });
 
     it("rejects read_uncommitted without shared-cache mode", async () => {
-      await expect(adapter.beginIsolatedDbTransaction("read_uncommitted")).rejects.toThrow(
+      await expect(adapter.beginIsolatedDbTransaction(":read_uncommitted")).rejects.toThrow(
         "You need to enable the shared-cache mode",
       );
     });

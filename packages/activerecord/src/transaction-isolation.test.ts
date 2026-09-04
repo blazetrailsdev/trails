@@ -23,7 +23,7 @@ describe("TransactionIsolationUnsupportedTest", () => {
           async () => {
             await Tag.count();
           },
-          { isolation: "serializable" },
+          { isolation: ":serializable" },
         ),
       ).rejects.toThrow(TransactionIsolationError);
     },
@@ -70,7 +70,7 @@ describe("TransactionIsolationTest", () => {
   it.skipIf(
     adapterType === "sqlite" ||
       !adapterSupports("transaction_isolation") ||
-      !("read_uncommitted" in transactionIsolationLevels()),
+      !(":read_uncommitted" in transactionIsolationLevels()),
   )("read uncommitted", async () => {
     await Tag.transaction(
       async () => {
@@ -78,7 +78,7 @@ describe("TransactionIsolationTest", () => {
         await Tag2.create({});
         expect(await Tag.count()).toBe(1);
       },
-      { isolation: "read_uncommitted" },
+      { isolation: ":read_uncommitted" },
     );
   });
 
@@ -93,7 +93,7 @@ describe("TransactionIsolationTest", () => {
             expect(await Tag.count()).toBe(0);
           });
         },
-        { isolation: "read_committed" },
+        { isolation: ":read_committed" },
       );
       expect(await Tag.count()).toBe(1);
     },
@@ -102,7 +102,7 @@ describe("TransactionIsolationTest", () => {
   it.skipIf(
     adapterType === "sqlite" ||
       !adapterSupports("transaction_isolation") ||
-      !("repeatable_read" in transactionIsolationLevels()),
+      !(":repeatable_read" in transactionIsolationLevels()),
   )("repeatable read", async () => {
     const tag = await Tag.create({ name: "jon" });
 
@@ -115,7 +115,7 @@ describe("TransactionIsolationTest", () => {
         await tag.reload();
         expect(tag.name).toBe("jon");
       },
-      { isolation: "repeatable_read" },
+      { isolation: ":repeatable_read" },
     );
 
     await tag.reload();
@@ -129,7 +129,7 @@ describe("TransactionIsolationTest", () => {
         async () => {
           await Tag.create({});
         },
-        { isolation: "serializable" },
+        { isolation: ":serializable" },
       );
     },
   );
@@ -139,7 +139,7 @@ describe("TransactionIsolationTest", () => {
     async () => {
       await Tag.transaction(async () => {
         await expect(
-          Tag.transaction(async () => {}, { isolation: "serializable" }),
+          Tag.transaction(async () => {}, { isolation: ":serializable" }),
         ).rejects.toThrow(TransactionIsolationError);
       });
     },
@@ -150,7 +150,7 @@ describe("TransactionIsolationTest", () => {
     async () => {
       await Tag.transaction(async () => {
         await expect(
-          Tag.transaction(async () => {}, { requiresNew: true, isolation: "serializable" }),
+          Tag.transaction(async () => {}, { requiresNew: true, isolation: ":serializable" }),
         ).rejects.toThrow(TransactionIsolationError);
       });
     },

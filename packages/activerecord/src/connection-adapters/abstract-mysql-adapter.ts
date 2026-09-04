@@ -9,7 +9,7 @@ import {
   buildExplainClause as mysqlBuildExplainClause,
 } from "./mysql/database-statements.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { fetch, KeyError } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import { isRubyTruthy } from "../ruby-truthy.js";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
@@ -417,10 +417,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
   async beginDbTransaction(): Promise<void> {}
 
-  /** @missingRailsCall fetch — PERMANENT */
+  /** @missingRailsArgs fetch — PERMANENT */
   async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    const level = transactionIsolationLevels()[isolation];
-    if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
+    const level = fetch<string>(transactionIsolationLevels(), isolation);
     await this.executeBatch([`SET TRANSACTION ISOLATION LEVEL ${level}`, "BEGIN"], "TRANSACTION", {
       allowRetry: true,
       materializeTransactions: false,

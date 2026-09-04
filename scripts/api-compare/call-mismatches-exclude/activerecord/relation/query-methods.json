@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_where_clause",
+    "call": "order:constructor,references",
+    "reason": "Rails' only constructor call is the closing `Relation::WhereClause.new` (query_methods.rb:1651), after `PredicateBuilder.references` (rb:1639). The Hash arm's `transform_keys` (rb:1631-1638) can yield an Array key, which a JS object literal cannot hold, so the port builds a `Map` before the references call."
+  }
+]

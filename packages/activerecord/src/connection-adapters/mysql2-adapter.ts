@@ -43,7 +43,7 @@ import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-c
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { parseMysqlName as mysqlParseName } from "./mysql/schema-statements.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { fetch } from "@blazetrails/ruby-compat";
 
 let mysql2TypeMap: TypeMap | null = null;
 
@@ -537,8 +537,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   override async beginIsolatedDbTransaction(isolation: string): Promise<void> {
-    const level = transactionIsolationLevels()[isolation];
-    if (level === undefined) throw new KeyError(`key not found: :${isolation}`);
+    const level = fetch<string>(transactionIsolationLevels(), isolation);
     await this.withRawConnection({ allowRetry: true, materializeTransactions: false }, async () => {
       await this.internalExecute(`SET TRANSACTION ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
         materializeTransactions: false,

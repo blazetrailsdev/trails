@@ -756,12 +756,18 @@ export function buildWhereClause(
   } else if (isHash(opts)) {
     const mc = this.model;
     const aliases: Record<string, string> = mc?.attributeAliases ?? {};
-    const transformed: Record<string, unknown> = {};
+    const transformed: Record<string, unknown> | Map<unknown, unknown> =
+      opts instanceof Map ? new Map() : {};
     for (const [rawKey, value] of toA(opts) as [unknown, unknown][]) {
-      const key = String(rawKey);
-      const name = isRubySymbol(key) ? symbolToName(key) : key;
-      const resolved = aliases[name] ?? name;
-      transformed[resolved] = value;
+      let key: string | string[];
+      if (Array.isArray(rawKey)) {
+        key = rawKey.map((k) => aliases[toS(k)] ?? toS(k));
+      } else {
+        const name = toS(rawKey);
+        key = aliases[name] ?? name;
+      }
+      if (transformed instanceof Map) transformed.set(key, value);
+      else transformed[key as string] = value;
     }
     opts = transformed;
     const references = PredicateBuilder.references(opts as Record<string, unknown>);
@@ -1627,6 +1633,12 @@ export function extractTableNameFrom(string: string): string | null {
 
 function isRubySymbol(value: unknown): value is string {
   return typeof value === "string" && value.startsWith(":");
+}
+
+/** @noRailsEquivalent PERMANENT */
+function toS(key: unknown): string {
+  const s = String(key);
+  return isRubySymbol(s) ? symbolToName(s) : s;
 }
 
 function symbolToName(s: string): string {

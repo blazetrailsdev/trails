@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "relation/predicate-builder.ts",
+    "rubyName": "expand_from_hash",
+    "call": "order:wrap,map",
+    "reason": "Rails' first `map` is the one inside `Array(value).map` (predicate_builder.rb:94) and its first `Array.wrap` is in the aggregate arm (rb:128), which trails extracts into `buildFromHashAggregate`; the extracted arm takes its `wrap`/`map` out of this body, so the surviving `wrap(value).map` reverses the pair's order without reordering anything Rails does."
+  }
+]

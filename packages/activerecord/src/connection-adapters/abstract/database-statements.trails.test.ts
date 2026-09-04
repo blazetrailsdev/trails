@@ -182,10 +182,10 @@ describe("DatabaseStatements", () => {
   describe("transaction isolation", () => {
     it("transaction isolation levels", () => {
       const levels = transactionIsolationLevels();
-      expect(levels.read_uncommitted).toBe("READ UNCOMMITTED");
-      expect(levels.read_committed).toBe("READ COMMITTED");
-      expect(levels.repeatable_read).toBe("REPEATABLE READ");
-      expect(levels.serializable).toBe("SERIALIZABLE");
+      expect(levels[":read_uncommitted"]).toBe("READ UNCOMMITTED");
+      expect(levels[":read_committed"]).toBe("READ COMMITTED");
+      expect(levels[":repeatable_read"]).toBe("REPEATABLE READ");
+      expect(levels[":serializable"]).toBe("SERIALIZABLE");
     });
 
     it("begin deferred transaction forwards the isolation level name verbatim", async () => {
@@ -195,13 +195,13 @@ describe("DatabaseStatements", () => {
           seen.push(isolation);
         },
       };
-      await beginDeferredTransaction.call(host as never, "read_committed");
-      await beginDeferredTransaction.call(host as never, "bogus");
-      expect(seen).toEqual(["read_committed", "bogus"]);
+      await beginDeferredTransaction.call(host as never, ":read_committed");
+      await beginDeferredTransaction.call(host as never, ":bogus");
+      expect(seen).toEqual([":read_committed", ":bogus"]);
     });
 
     it("begin isolated db transaction raises by default", async () => {
-      await expect(beginIsolatedDbTransaction.call(undefined, "serializable")).rejects.toThrow(
+      await expect(beginIsolatedDbTransaction.call(undefined, ":serializable")).rejects.toThrow(
         "adapter does not support setting transaction isolation",
       );
     });

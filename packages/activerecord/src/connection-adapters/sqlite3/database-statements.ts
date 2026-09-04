@@ -157,7 +157,7 @@ export async function internalBeginTransaction(
   isolation: string | null,
 ): Promise<void> {
   if (isolation) {
-    if (isolation !== "read_uncommitted") {
+    if (isolation !== ":read_uncommitted") {
       throw new TransactionIsolationError(
         "SQLite3 only supports the `read_uncommitted` transaction isolation level",
       );
