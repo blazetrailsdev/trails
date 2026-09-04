@@ -30,7 +30,6 @@ export class Configuration {
   };
 
   /** @internal */
-  /** @internal */
   static readonly _options: Record<string, unknown> = {};
 
   get eagerLoadNamespaces(): unknown[] {

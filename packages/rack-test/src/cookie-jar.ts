@@ -82,12 +82,14 @@ export class Cookie {
 
   isValid(uri: URL | null): boolean {
     uri ??= this.defaultUri();
-    const host = uri.hostname || this._defaultHost;
+
+    if (uri.hostname === "") uri.hostname = this._defaultHost;
+
     const pattern = new RegExp(
       `${this._exactDomainMatch ? "^" : ""}${regexpEscape(this.domain())}$`,
       "i",
     );
-    return (!this.isSecure() || uri.protocol === "https:") && pattern.test(host);
+    return (!this.isSecure() || uri.protocol === "https:") && pattern.test(uri.hostname);
   }
 
   matches(uri: URL | null): boolean {
