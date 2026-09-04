@@ -412,11 +412,6 @@ describe("ActionDispatch::IntegrationTest", () => {
       expect(app.request.getHeader("Authorization")).toBe("Bearer token");
     });
 
-    it("format option sets accept header", async () => {
-      await app.get("/posts", { format: "json" });
-      expect(app.request.accept).toContain("application/json");
-    });
-
     it("as option is alias for format", async () => {
       await app.get("/posts", { as: "json" });
       expect(app.request.accept).toContain("application/json");
@@ -675,13 +670,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("merges options.env into 404 request env", async () => {
       await app.get("/no-such-route", { env: { "X-CUSTOM-ENV": "env-value" } });
       expect(app.status).toBe(404);
-      expect(app.request.env["X-CUSTOM-ENV"]).toBe("env-value");
-    });
-
-    it("sets rack.input on 404 request when body option is provided", async () => {
-      await app.get("/no-such-route", { body: "test-body" });
-      expect(app.status).toBe(404);
-      expect(app.request.env["rack.input"]).toBe("test-body");
+      expect(app.request.env["HTTP_X_CUSTOM_ENV"]).toBe("env-value");
     });
   });
 

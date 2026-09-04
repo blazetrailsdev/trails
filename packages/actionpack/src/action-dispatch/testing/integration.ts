@@ -1,4 +1,7 @@
 import { Request } from "../http/request.js";
+import { Headers } from "../http/headers.js";
+import { MimeType } from "../http/mime-type.js";
+import { isPresent } from "@blazetrails/activesupport";
 import { TestResponse } from "./test-response.js";
 import { FlashHash } from "../middleware/flash.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -26,8 +29,6 @@ import type { UploadedFile } from "../http/upload.js";
 export interface IntegrationRequestOptions {
   params?: Record<string, unknown>;
   headers?: Record<string, string>;
-  body?: string;
-  format?: string;
   xhr?: boolean;
   env?: Record<string, unknown>;
   as?: string;
@@ -57,14 +58,6 @@ function splitHostPort(host: string): [string, string | undefined] {
   const idx = host.indexOf(":");
   return idx === -1 ? [host, undefined] : [host.slice(0, idx), host.slice(idx + 1)];
 }
-
-/** @internal */
-function envKeyFor(name: string): string {
-  if (name === "CONTENT_TYPE" || name === "CONTENT_LENGTH" || name.startsWith("HTTP_")) return name;
-  return `HTTP_${name.toUpperCase().replace(/-/g, "_")}`;
-}
-
-const XHR_ACCEPT = "text/javascript, text/html, application/xml, text/xml, */*";
 
 const DEFAULT_REMOTE_ADDR = "127.0.0.1";
 const DEFAULT_ACCEPT =
@@ -176,7 +169,7 @@ export class IntegrationTest {
     path: string,
     options: IntegrationRequestOptions = {},
   ): Promise<number> {
-    const requestEncoder = RequestEncoder.encoder(options.as ?? options.format);
+    const requestEncoder = RequestEncoder.encoder(options.as);
     const headers: Record<string, string> = { ...(options.headers ?? {}) };
     const params = options.params;
 
@@ -213,25 +206,30 @@ export class IntegrationTest {
       requestEnv["CONTENT_TYPE"] = requestEncoder.contentType;
     }
 
-    const wrappedHeaders: Record<string, string> = {};
-    for (const [name, value] of Object.entries(headers)) {
-      wrappedHeaders[envKeyFor(name)] = value;
-    }
+    const wrappedHeaders = Headers.fromHash({});
+    wrappedHeaders.mergeBang(headers);
 
     if (options.xhr) {
-      wrappedHeaders["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest";
-      wrappedHeaders["HTTP_ACCEPT"] ??= XHR_ACCEPT;
-    }
-
-    if (options.body != null) {
-      requestEnv["rack.input"] = options.body;
-    }
-
-    Object.assign(requestEnv, wrappedHeaders);
-    if (options.env) {
-      for (const [name, value] of Object.entries(options.env)) {
-        requestEnv[name] = value;
+      wrappedHeaders.set("HTTP_X_REQUESTED_WITH", "XMLHttpRequest");
+      if (wrappedHeaders.get("HTTP_ACCEPT") == null) {
+        wrappedHeaders.set(
+          "HTTP_ACCEPT",
+          [
+            MimeType.lookup("js").toString(),
+            MimeType.lookup("html").toString(),
+            MimeType.lookup("xml").toString(),
+            "text/xml",
+            "*/*",
+          ].join(", "),
+        );
       }
+    }
+
+    if (isPresent(wrappedHeaders.env)) {
+      Headers.fromHash(requestEnv).mergeBang(wrappedHeaders.env);
+    }
+    if (isPresent(options.env)) {
+      Headers.fromHash(requestEnv).mergeBang(options.env!);
     }
 
     const session = RackTestSession.new(this._mockSession);

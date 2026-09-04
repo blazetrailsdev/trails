@@ -1,4 +1,5 @@
 import { Utils } from "@blazetrails/rack";
+import { regexpEscape } from "@blazetrails/ruby-compat";
 import { DEFAULT_HOST } from "./test.js";
 
 /** @internal */
@@ -83,7 +84,7 @@ export class Cookie {
     uri ??= this.defaultUri();
     const host = uri.hostname || this._defaultHost;
     const pattern = new RegExp(
-      `${this._exactDomainMatch ? "^" : ""}${escapeRegexp(this.domain())}$`,
+      `${this._exactDomainMatch ? "^" : ""}${regexpEscape(this.domain())}$`,
       "i",
     );
     return (!this.isSecure() || uri.protocol === "https:") && pattern.test(host);
@@ -180,11 +181,6 @@ export class CookieJar {
 /** @internal */
 function reverseString(value: string): string {
   return [...value].reverse().join("");
-}
-
-/** @internal */
-function escapeRegexp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** @internal */
