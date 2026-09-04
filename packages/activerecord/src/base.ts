@@ -1886,9 +1886,7 @@ export class Base extends Model {
         delete (this as any)._suppressAbstractCheck;
       }
     }
-    const additionalTypes = new Map<string, any>();
-    for (const [key, type] of Object.entries(columnTypes ?? {})) additionalTypes.set(key, type);
-    for (const [key, type] of Object.entries(overrideTypes ?? {})) additionalTypes.set(key, type);
+    const additionalTypes = { ...(columnTypes ?? {}), ...(overrideTypes ?? {}) };
     (record as any).initWithAttributes(
       (this as any).attributesBuilder().buildFromDatabase(row, additionalTypes),
     );

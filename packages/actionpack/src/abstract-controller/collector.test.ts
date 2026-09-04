@@ -1,3 +1,4 @@
+import { symbolToS } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { MimeType } from "../action-dispatch/http/mime-type.js";
 import { Collector, generateMethodForMime } from "./collector.js";
@@ -26,17 +27,17 @@ describe("TestCollector", () => {
   });
 
   it("register mime types on method missing", () => {
-    MimeType.unregister("js");
+    MimeType.unregister(":js");
     try {
       const collector = new MyCollector();
       expect("js" in collector).toBe(false);
-      MimeType.register("text/javascript", "js", ["application/javascript"], ["js"]);
+      MimeType.register("text/javascript", ":js", ["application/javascript"], ["js"]);
       const c = collector as MyCollector & { js: (...a: unknown[]) => unknown };
       c.js();
       expect("js" in c).toBe(true);
     } finally {
       if (!MimeType.isRegistered("js")) {
-        MimeType.register("text/javascript", "js", ["application/javascript"], ["js"]);
+        MimeType.register("text/javascript", ":js", ["application/javascript"], ["js"]);
       }
     }
   });
@@ -67,8 +68,8 @@ describe("TestCollector", () => {
 class TestCollector extends Collector {
   readonly calls: [string, unknown[]][] = [];
   custom(mime: MimeType, ...args: unknown[]): unknown {
-    this.calls.push([mime.symbol!, args]);
-    return `dispatched:${mime.symbol}`;
+    this.calls.push([symbolToS(mime.symbol!), args]);
+    return `dispatched:${symbolToS(mime.symbol!)}`;
   }
 }
 
@@ -91,11 +92,11 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
       latefmt?: (...args: unknown[]) => unknown;
     };
     expect(MimeType.isRegistered("latefmt")).toBe(false);
-    MimeType.register("application/latefmt", "latefmt");
+    MimeType.register("application/latefmt", ":latefmt");
     try {
       expect(c.latefmt!("ok")).toBe("dispatched:latefmt");
     } finally {
-      MimeType.unregister("latefmt");
+      MimeType.unregister(":latefmt");
     }
   });
 
@@ -150,12 +151,12 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
 
   it("`has` returns false for reserved keys even when a MIME type collides", () => {
     const c = new TestCollector();
-    MimeType.register("application/then", "then");
+    MimeType.register("application/then", ":then");
     try {
       expect("then" in c).toBe(false);
       expect((c as unknown as { then?: unknown }).then).toBeUndefined();
     } finally {
-      MimeType.unregister("then");
+      MimeType.unregister(":then");
     }
   });
 

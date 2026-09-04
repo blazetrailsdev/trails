@@ -3,23 +3,31 @@ import { Initializable } from "./initializable.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { ownState, readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 import { assertNotSealed } from "./trailtie/configurable.js";
+import { getRubyClassPath, setRubyClassPath } from "./ruby-class-path-slot.js";
 
-/** @noRailsEquivalent PERMANENT */
-export const ABSTRACT_RAILTIES: unknown[] = [];
+const ABSTRACT_RAILTIES = ["Rails::Railtie", "Rails::Engine", "Rails::Application"];
 
-export function abstractRailtie(klass: unknown): void {
-  ABSTRACT_RAILTIES.push(klass);
-}
 let loadCounter = 0;
+
+/**
+ * Ruby's `Module#name` (`vendor/ruby/variable.c:130` `rb_mod_name`), which
+ * `abstract_railtie?` (`railtie.rb:173`) and `railtie_name` (`railtie.rb:178`)
+ * both read. A TypeScript class name carries no namespace, so the path each
+ * Railtie is defined under is declared through {@link setRubyClassPath}.
+ */
+function rubyClassPath(klass: typeof Trailtie): string {
+  return getRubyClassPath(klass) ?? klass.name;
+}
+
+/** @internal */
+function generateRailtieName(string: string): string {
+  return underscore(string).replace(/\//g, "_");
+}
 
 export type BlockRunnerKind = "rakeTasks" | "console" | "runner" | "generators" | "server";
 export type TrailtieBlock = (this: Trailtie, app: unknown) => void;
 
 export class Trailtie extends Initializable {
-  static {
-    abstractRailtie(this);
-  }
-
   /** @internal */
   static readonly _registry: Array<typeof Trailtie> = [];
 
@@ -53,14 +61,14 @@ export class Trailtie extends Initializable {
   }
 
   static isAbstractRailtie(): boolean {
-    return ABSTRACT_RAILTIES.includes(this);
+    return ABSTRACT_RAILTIES.includes(rubyClassPath(this));
   }
 
   static railtieName(name?: string): string {
     if (name !== undefined) writeOwnState(this, "_railtieName", name);
     let existing = readOwnState<string>(this, "_railtieName");
     if (!existing) {
-      existing = underscore(this.name).replace(/\//g, "_");
+      existing = generateRailtieName(rubyClassPath(this));
       writeOwnState(this, "_railtieName", existing);
     }
     return existing;
@@ -177,3 +185,5 @@ export function resetTrailtieRegistry(): () => void {
     Object.assign(Configuration._options, options);
   };
 }
+
+setRubyClassPath(Trailtie, "Rails::Railtie");

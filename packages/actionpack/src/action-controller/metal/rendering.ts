@@ -1,3 +1,4 @@
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { htmlEscape, isPresent } from "@blazetrails/activesupport";
 import {
   DoubleRenderError,
@@ -150,7 +151,7 @@ export function processAction<
   for (const f of reqFormats) {
     const ref = (f as { ref?: unknown }).ref;
     const v = typeof ref === "function" ? (ref as () => unknown).call(f) : ref;
-    if (v != null) out.push(v);
+    if (v != null) out.push(isSymbol(v) ? symbolToS(v) : v);
   }
   this.formats = out;
 }

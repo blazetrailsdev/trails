@@ -9,9 +9,9 @@ describe("MimeTypeTest", () => {
   });
 
   it("unregister", () => {
-    const custom = MimeType.register("text/x-custom-test", "x_custom_test");
+    const custom = MimeType.register("text/x-custom-test", ":x_custom_test");
     expect(MimeType.lookup("x_custom_test")).toBe(custom);
-    MimeType.unregister("x_custom_test");
+    MimeType.unregister(":x_custom_test");
     expect(MimeType.lookupByExtension("x_custom_test")).toBeUndefined();
   });
 
@@ -99,19 +99,19 @@ describe("MimeTypeTest", () => {
   });
 
   it("custom type", () => {
-    const custom = MimeType.register("application/x-testing123", "testing123");
+    const custom = MimeType.register("application/x-testing123", ":testing123");
     expect(custom.string).toBe("application/x-testing123");
-    expect(custom.symbol).toBe("testing123");
+    expect(custom.symbol).toBe(":testing123");
     expect(MimeType.lookup("testing123")).toBe(custom);
-    MimeType.unregister("testing123");
+    MimeType.unregister(":testing123");
   });
 
   it("custom type with type aliases", () => {
-    const custom = MimeType.register("application/x-testaliased", "testaliased", [
+    const custom = MimeType.register("application/x-testaliased", ":testaliased", [
       "text/x-testaliased",
     ]);
     expect(MimeType.lookup("text/x-testaliased")).toBe(custom);
-    MimeType.unregister("testaliased");
+    MimeType.unregister(":testaliased");
   });
 
   it("register callbacks", () => {
@@ -119,20 +119,20 @@ describe("MimeTypeTest", () => {
     MimeType.onRegister(() => {
       called = true;
     });
-    MimeType.register("application/x-callback-test", "callback_test");
+    MimeType.register("application/x-callback-test", ":callback_test");
     expect(called).toBe(true);
-    MimeType.unregister("callback_test");
+    MimeType.unregister(":callback_test");
   });
 
   it("register alias", () => {
-    MimeType.registerAlias("html", "xhtml");
+    MimeType.registerAlias(":html", ":xhtml");
     expect(MimeType.lookup("xhtml")).toBe(MimeType.lookup("html"));
   });
 
   it("type should be equal to symbol", () => {
     const html = MimeType.lookup("html");
     expect(html).toBeDefined();
-    expect(html?.equals("html")).toBe(true);
+    expect(html?.equals(":html")).toBe(true);
   });
 
   it("type convenience methods", () => {
@@ -144,7 +144,7 @@ describe("MimeTypeTest", () => {
 
   it("references gives preference to symbols before strings", () => {
     const html = MimeType.lookup("html");
-    expect(html?.ref()).toBe("html");
+    expect(html?.ref()).toBe(":html");
   });
 
   it("regexp matcher", () => {
@@ -190,17 +190,17 @@ describe("MimeTypeTest", () => {
   });
 
   it("unregister sweeps extensionMap so lookupByExtension can't resolve a removed type", () => {
-    MimeType.register("application/ext-test", "exttest", [], ["exttest"]);
-    expect(MimeType.lookupByExtension("exttest")?.symbol).toBe("exttest");
-    MimeType.unregister("exttest");
+    MimeType.register("application/ext-test", ":exttest", [], ["exttest"]);
+    expect(MimeType.lookupByExtension("exttest")?.symbol).toBe(":exttest");
+    MimeType.unregister(":exttest");
     expect(MimeType.lookupByExtension("exttest")).toBeUndefined();
   });
 
   it("unregister sweeps aliases too — type is no longer reachable via any key", () => {
-    MimeType.register("application/aliased", "aliased");
-    MimeType.registerAlias("aliased", "aliased_alias");
-    expect(MimeType.lookup("aliased_alias")?.symbol).toBe("aliased");
-    MimeType.unregister("aliased");
+    MimeType.register("application/aliased", ":aliased");
+    MimeType.registerAlias(":aliased", ":aliased_alias");
+    expect(MimeType.lookup("aliased_alias")?.symbol).toBe(":aliased");
+    MimeType.unregister(":aliased");
     expect(MimeType.isRegistered("aliased")).toBe(false);
     expect(MimeType.isRegistered("aliased_alias")).toBe(false);
     expect(MimeType.isRegistered("application/aliased")).toBe(false);
@@ -209,13 +209,13 @@ describe("MimeTypeTest", () => {
 
   it("all() picks up a newly registered type and drops it on unregister", () => {
     const before = MimeType.all().length;
-    MimeType.register("application/all-test", "alltest");
+    MimeType.register("application/all-test", ":alltest");
     try {
       const fresh = MimeType.all();
       expect(fresh.length).toBe(before + 1);
-      expect(fresh.map((t) => t.symbol)).toContain("alltest");
+      expect(fresh.map((t) => t.symbol)).toContain(":alltest");
     } finally {
-      MimeType.unregister("alltest");
+      MimeType.unregister(":alltest");
     }
     expect(MimeType.all().length).toBe(before);
   });

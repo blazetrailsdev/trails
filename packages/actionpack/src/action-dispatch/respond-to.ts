@@ -1,3 +1,4 @@
+import { symbolToS } from "@blazetrails/ruby-compat";
 import { MimeType } from "./http/mime-type.js";
 
 export class UnknownFormat extends Error {
@@ -120,7 +121,7 @@ export class Collector {
 
         if (MimeType.isRegistered(type)) {
           const mimeType = MimeType.lookup(type);
-          const result = this.resolveFormat(mimeType.symbol!);
+          const result = this.resolveFormat(symbolToS(mimeType.symbol!));
           if (result) return result;
         }
 

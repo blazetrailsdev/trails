@@ -6,7 +6,7 @@ describe("LazyAttributeHash", () => {
   const intType = typeRegistry.lookup("integer");
 
   it("deep_dup carries the receiver's materialized flag", () => {
-    const hash = new LazyAttributeHash(new Map([["age", intType]]), { age: "42" });
+    const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
     hash.transformValues((attr) => attr);
     expect((hash.deepDup() as unknown as { materialized: boolean }).materialized).toBe(true);
   });

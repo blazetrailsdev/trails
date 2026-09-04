@@ -22,6 +22,18 @@ describe("Store.retrievePoolOptions", () => {
     expect(() => Store.retrievePoolOptions({ pool: "12" })).toThrow(
       'Invalid :pool argument, expected Hash, got: "12"',
     );
+    expect(() => Store.retrievePoolOptions({ pool: 12 })).toThrow(
+      "Invalid :pool argument, expected Hash, got: 12",
+    );
+  });
+
+  it("reports an Array :pool argument through Ruby's Object#inspect", () => {
+    expect(() => Store.retrievePoolOptions({ pool: [] })).toThrow(
+      "Invalid :pool argument, expected Hash, got: []",
+    );
+    expect(() => Store.retrievePoolOptions({ pool: [1, "a", null, { size: 5 }] })).toThrow(
+      'Invalid :pool argument, expected Hash, got: [1, "a", nil, {"size"=>5}]',
+    );
   });
 
   it("raises for pool size and timeout that cannot be converted", () => {

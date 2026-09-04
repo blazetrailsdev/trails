@@ -14,7 +14,8 @@ import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Deprecators } from "@blazetrails/activesupport";
 import { deprecator } from "./deprecator.js";
 import { Engine } from "./engine.js";
-import { Trailtie, abstractRailtie } from "./trailtie.js";
+import { Trailtie } from "./trailtie.js";
+import { setRubyClassPath } from "./ruby-class-path-slot.js";
 import { Bootstrap } from "./application/bootstrap.js";
 import { DefaultMiddlewareStack } from "./application/default-middleware-stack.js";
 import { Finisher } from "./application/finisher.js";
@@ -31,10 +32,6 @@ let _appClass: typeof Application | null = null;
 const _registered = new WeakSet<typeof Application>();
 
 export class Application extends Engine {
-  static {
-    abstractRailtie(this);
-  }
-
   private _initialized = false;
   private _routesReloader?: RoutesReloader;
   private _orderedRailties?: Array<Trailtie | Trailtie[] | string>;
@@ -282,3 +279,5 @@ async function defaultCredentialPaths(
     keyPath: path.resolve(root, "config", "master.key"),
   };
 }
+
+setRubyClassPath(Application, "Rails::Application");

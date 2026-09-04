@@ -3,6 +3,7 @@ import "./action-view.js";
 import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
 export interface ActionControllerConfig {
   raiseOnOpenRedirects: boolean;
@@ -51,3 +52,5 @@ export class Trailtie extends BaseTrailtie {
     );
   }
 }
+
+setRubyClassPath(Trailtie, "ActionController::Railtie");

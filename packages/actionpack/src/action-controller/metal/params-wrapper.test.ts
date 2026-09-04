@@ -28,7 +28,7 @@ function makeHost(
   );
   const request: ParamsWrapperHost["request"] = {
     hasContentType: () => true,
-    contentMimeType: { ref: () => "json" },
+    contentMimeType: { ref: () => ":json" },
     requestParameters: {},
     filteredParameters: () => ({}),
     params: {},
@@ -44,7 +44,10 @@ describe("ParamsWrapper privates", () => {
   });
 
   it("_wrapperFormats returns Options.format", () => {
-    expect(_wrapperFormats.call(makeHost({ format: ["json", "xml"] }))).toEqual(["json", "xml"]);
+    expect(_wrapperFormats.call(makeHost({ format: [":json", ":xml"] }))).toEqual([
+      ":json",
+      ":xml",
+    ]);
   });
 
   it("_extractParameters slices by include when set", () => {
@@ -83,33 +86,33 @@ describe("ParamsWrapper privates", () => {
 
   it("_wrapperEnabled true when format matches and key absent", () => {
     const host = makeHost(
-      { name: "user", format: ["json"] },
+      { name: "user", format: [":json"] },
       { requestParameters: { name: "a" }, params: { name: "a" } },
     );
     expect(_wrapperEnabled.call(host)).toBe(true);
   });
 
   it("_wrapperEnabled false when wrapper key already present", () => {
-    const host = makeHost({ name: "user", format: ["json"] }, { params: { user: {} } });
+    const host = makeHost({ name: "user", format: [":json"] }, { params: { user: {} } });
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 
   it("_wrapperEnabled false when format does not match", () => {
     const host = makeHost(
-      { name: "user", format: ["xml"] },
-      { contentMimeType: { ref: () => "json" } },
+      { name: "user", format: [":xml"] },
+      { contentMimeType: { ref: () => ":json" } },
     );
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 
   it("_wrapperEnabled false when no content type", () => {
-    const host = makeHost({ name: "user", format: ["json"] }, { hasContentType: () => false });
+    const host = makeHost({ name: "user", format: [":json"] }, { hasContentType: () => false });
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 
   it("_wrapperEnabled false on ParseError (rescue ActionDispatch::Http::Parameters::ParseError)", () => {
     const host = makeHost(
-      { name: "user", format: ["json"] },
+      { name: "user", format: [":json"] },
       {
         hasContentType: () => {
           throw new ParseError("bad json");
@@ -121,7 +124,7 @@ describe("ParamsWrapper privates", () => {
 
   it("_wrapperEnabled rethrows non-ParseError exceptions", () => {
     const host = makeHost(
-      { name: "user", format: ["json"] },
+      { name: "user", format: [":json"] },
       {
         hasContentType: () => {
           throw new Error("boom");
@@ -151,9 +154,9 @@ describe("ParamsWrapper privates", () => {
 
   it("_setWrapperOptions replaces _wrapperOptions via Options.fromHash", () => {
     const host: { _wrapperOptions: Options } = { _wrapperOptions: new Options() };
-    _setWrapperOptions.call(host, { name: "user", format: ["json"] });
+    _setWrapperOptions.call(host, { name: "user", format: [":json"] });
     expect(host._wrapperOptions.name).toBe("user");
-    expect(host._wrapperOptions.format).toEqual(["json"]);
+    expect(host._wrapperOptions.format).toEqual([":json"]);
   });
 
   it("_defaultWrapModel derives snake_case singular from controller class name", () => {

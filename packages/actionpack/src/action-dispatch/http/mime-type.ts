@@ -1,5 +1,5 @@
 import { registerDefaultMimeTypes } from "./mime-types.js";
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, symbolToS } from "@blazetrails/ruby-compat";
 
 export class Mimes {
   /** @internal */
@@ -181,12 +181,11 @@ export class MimeType {
   }
 
   isHtml(): boolean {
-    return this.symbol === "html" || this.string.includes("html");
+    return this.symbol === ":html" || this.string.includes("html");
   }
 
-  equals(other: MimeType | string | symbol): boolean {
+  equals(other: MimeType | string): boolean {
     if (other instanceof MimeType) return this.string === other.string;
-    if (typeof other === "symbol") return this.symbol === other.toString();
     return this.string === other || this.symbol === other;
   }
 
@@ -198,12 +197,12 @@ export class MimeType {
   ): MimeType {
     const type = new MimeType(string, symbol, synonyms);
     MimeType.SET.push(type);
-    MimeType.registry.set(symbol, type);
+    MimeType.registry.set(symbolToS(symbol), type);
     MimeType.registry.set(string, type);
     for (const syn of synonyms) {
       MimeType.registry.set(syn, type);
     }
-    for (const ext of [symbol, ...extensions]) {
+    for (const ext of [symbolToS(symbol), ...extensions]) {
       MimeType.extensionMap.set(ext, type);
     }
     for (const cb of MimeType.callbacks) {
@@ -213,14 +212,15 @@ export class MimeType {
   }
 
   static registerAlias(symbol: string, aliasSymbol: string): void {
-    const type = MimeType.registry.get(symbol);
+    const type = MimeType.registry.get(symbolToS(symbol));
     if (type) {
-      MimeType.registry.set(aliasSymbol, type);
+      MimeType.registry.set(symbolToS(aliasSymbol), type);
     }
   }
 
   static unregister(symbol: string): void {
-    const type = MimeType.registry.get(symbol);
+    symbol = symbol.toLowerCase();
+    const type = MimeType.registry.get(symbolToS(symbol));
     if (!type) return;
     MimeType.SET.deleteIf((v) => v === type);
     for (const [key, value] of MimeType.registry) {
@@ -395,7 +395,7 @@ export class MimeType {
     return MimeType.lookup("gzip");
   }
 
-  static readonly ALL = new MimeType("*/*", "all");
+  static readonly ALL = new MimeType("*/*", null);
 }
 
 registerDefaultMimeTypes(MimeType);
