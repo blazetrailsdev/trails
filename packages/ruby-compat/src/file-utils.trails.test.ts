@@ -23,6 +23,27 @@ function registerExdevFs(): void {
   fsAdapterConfig.adapter = "exdev";
 }
 
+/**
+ * Answers `predicate` for every `lstat`, so `Entry_#copy`'s arms after
+ * `symlink?` (`vendor/ruby/lib/fileutils.rb:2255-2273`) can be reached against
+ * a backend no test can make a real device, socket or door on.
+ */
+function registerSpecialLstatFs(predicate: string): void {
+  const fs = getFs();
+  registerFsAdapter(
+    "special",
+    Object.assign(Object.create(fs) as typeof fs, {
+      lstatSync: (path: string) =>
+        Object.assign(Object.create(nodeFs.lstatSync(path)) as nodeFs.Stats, {
+          isFile: () => false,
+          [predicate]: () => true,
+        }),
+    }),
+    getPath(),
+  );
+  fsAdapterConfig.adapter = "special";
+}
+
 describe("FileUtils", () => {
   let root: string;
 
@@ -256,26 +277,20 @@ describe("FileUtils", () => {
     expect(nodeFs.readlinkSync(dest)).toEqual(target);
   });
 
-  it("copy_entry reports a FIFO it cannot handle", () => {
-    const src = nodePath.join(root, "fifo");
+  it.each([
+    ["a device file", "isCharacterDevice", "cannot handle device file"],
+    ["a device file", "isBlockDevice", "cannot handle device file"],
+    ["a socket", "isSocket", "cannot handle socket"],
+    ["a FIFO", "isFIFO", "cannot handle FIFO"],
+    ["an unknown file type", "isDoor", "unknown file type"],
+  ])("copy_entry reports %s it cannot handle", (_what, predicate, message) => {
+    const src = nodePath.join(root, "special");
     const dest = nodePath.join(root, "copy");
     nodeFs.writeFileSync(src, "");
     registerExdevFs();
-    const exdev = getFs();
-    registerFsAdapter(
-      "fifo",
-      Object.assign(Object.create(exdev) as typeof exdev, {
-        lstatSync: (path: string) =>
-          Object.assign(Object.create(nodeFs.lstatSync(path)) as nodeFs.Stats, {
-            isFile: () => false,
-            isFIFO: () => true,
-          }),
-      }),
-      getPath(),
-    );
-    fsAdapterConfig.adapter = "fifo";
+    registerSpecialLstatFs(predicate);
 
-    expect(() => FileUtils.mv(src, dest)).toThrow("cannot handle FIFO");
+    expect(() => FileUtils.mv(src, dest)).toThrow(message);
   });
 
   it("verbose prints the command line to the configured output", () => {

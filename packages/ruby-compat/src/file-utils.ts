@@ -253,6 +253,12 @@ function copyMetadata(src: string, path: string, dereference: boolean): void {
  * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
  * walks a directory tree and copies each entry with `Entry_#copy`
  * (`fileutils.rb:2239-2274`), then its `copy_metadata` under `preserve`.
+ *
+ * `Entry_#copy`'s `socket?` and `pipe?` arms each raise before their copy under
+ * an interpreter that answers no `UNIXServer` (`fileutils.rb:2258-2263`) and no
+ * `File.mkfifo` (`fileutils.rb:2267`); neither constant exists here, so those
+ * are the arms taken. `door?` (`:2269`) is Solaris-only and no backend answers
+ * a predicate for it, so a door reaches the true `else` (`:2273`).
  */
 function copyEntry(src: string, dest: string, preserve = false): void {
   const ent = entryLstat(src, false);
