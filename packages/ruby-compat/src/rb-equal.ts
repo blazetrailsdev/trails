@@ -13,7 +13,7 @@ export function rbEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
   if (typeof (a as { equals?: unknown }).equals === "function") {
-    return (a as { equals(other: unknown): boolean }).equals(b);
+    return dispatch(a as { equals(other: unknown): boolean }, "equals", b);
   }
   /* `vendor/ruby/object.c:147`. A class whose Ruby `==` is `alias :== :eql?`
      (Arel::Nodes::Casted, arel/nodes/casted.rb:33; Arel::Table) has only the
@@ -21,7 +21,7 @@ export function rbEqual(a: unknown, b: unknown): boolean {
      carrying both spellings (Duration, TimeWithZone) means the two by their
      Ruby names, and `equals` above is the `==` of the pair. */
   if (typeof (a as { eql?: unknown }).eql === "function") {
-    return (a as { eql(other: unknown): boolean }).eql(b);
+    return dispatch(a as { eql(other: unknown): boolean }, "eql", b);
   }
   /* Ruby's `Array#==` (`vendor/ruby/array.c:5120` `rb_ary_equal`) compares
      elementwise with `==`, and `Date#==` / `Time#==` compare by value — both
@@ -55,6 +55,30 @@ export function rbEqual(a: unknown, b: unknown): boolean {
     );
   }
   return false;
+}
+
+/**
+ * Ruby's `==` answers `false` for an operand it cannot compare — `Date.today ==
+ * Time.now` is `false`, never an exception (`vendor/ruby/date_core.c`
+ * `d_lite_equal` falls through `rb_cmpint`). A JS `equals` may instead coerce
+ * and throw: `Temporal.PlainDate#equals` runs `ToTemporalDate` on its argument,
+ * so it raises `TypeError: year is required` for the Instant that Ruby would
+ * simply call unequal.
+ *
+ * @noRailsEquivalent PERMANENT — the `==` send of `rb_equal`
+ *   (`vendor/ruby/object.c:147`), which is a C primitive rather than a Ruby
+ *   method.
+ */
+function dispatch<M extends "equals" | "eql">(
+  a: Record<M, (other: unknown) => boolean>,
+  method: M,
+  b: unknown,
+): boolean {
+  try {
+    return a[method](b);
+  } catch {
+    return false;
+  }
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

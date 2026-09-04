@@ -9,4 +9,17 @@ describe("rbEqual over the values a Ruby binary String stands in for", () => {
     expect(rbEqual(new Uint8Array([]), new Uint8Array([]))).toBe(true);
     expect(rbEqual(new Uint8Array([0x80]), "")).toBe(false);
   });
+
+  it("answers false where a JS equals refuses to coerce, as Ruby's == does", () => {
+    const coercing = {
+      equals(other: unknown): boolean {
+        if (typeof other !== "number") throw new TypeError("year is required");
+        return other === 1;
+      },
+    };
+
+    expect(rbEqual(coercing, 1)).toBe(true);
+    expect(rbEqual(coercing, 2)).toBe(false);
+    expect(rbEqual(coercing, {})).toBe(false);
+  });
 });

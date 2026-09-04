@@ -133,13 +133,17 @@ Validations.prototype.validate = Validations.prototype.isValid;
 
 type ValidatorLike = Validator | EachValidator | { validate(record: ValidatableRecord): unknown };
 
+type ValidateFilter<T extends ValidatableRecord> = string | ((record: T) => unknown);
+
+export type ValidateArgs<T extends ValidatableRecord = ValidatableRecord> =
+  | [...filters: Array<ValidateFilter<T>>, options: ConditionalOptions]
+  | Array<ValidateFilter<T>>;
+
 export interface ValidationsClassHost {
   _validators: Map<string | null, ValidatorLike[]>;
   _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
   validatesWith(...args: unknown[]): void;
-  validate(
-    ...args: Array<string | ((record: ValidatableRecord) => unknown) | ConditionalOptions>
-  ): void;
+  validate(...args: ValidateArgs<ValidatableRecord>): void;
   setCallback(
     name: string,
     ...filterList: Array<((record: object) => unknown) | CallbackConditions>
@@ -164,7 +168,7 @@ export const ClassMethods = {
   /** @missingRailsArgs set_callback — CONVERGEABLE validate-set-callback-narrows-options-and-wraps-filters */
   validate<T extends ValidatableRecord = ValidatableRecord>(
     this: ValidationsClassHost,
-    ...args: Array<string | ((record: T) => unknown) | ConditionalOptions>
+    ...args: ValidateArgs<T>
   ): void {
     const [filters, extracted] = extractOptionsBang(args as unknown[]);
     let options = extracted as ConditionalOptions;
