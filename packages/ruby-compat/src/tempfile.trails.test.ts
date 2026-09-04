@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
 import { Tempfile } from "./tempfile.js";
 
@@ -119,5 +120,26 @@ describe("Tempfile", () => {
       }),
     ).rejects.toThrow("boom");
     expect(exists(path)).toBe(false);
+  });
+
+  it("set_encoding reads back the bytes write was handed unmodified", () => {
+    const bytes = [0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe];
+    const tempfile = Tempfile.new("enc");
+    tempfile.setEncoding(Encoding.BINARY);
+    tempfile.write(bytes.map((byte) => String.fromCharCode(byte)).join(""));
+    tempfile.rewind();
+    expect([...tempfile.read()].map((c) => c.charCodeAt(0))).toEqual(bytes);
+    tempfile.close();
+    tempfile.unlink();
+  });
+
+  it("set_encoding accepts an encoding name and answers the delegated File", () => {
+    const tempfile = Tempfile.new("enc");
+    expect(tempfile.setEncoding("BINARY")).toBeInstanceOf(File);
+    expect(() => tempfile.setEncoding("no-such-encoding")).toThrow(
+      "unknown encoding name - no-such-encoding",
+    );
+    tempfile.close();
+    tempfile.unlink();
   });
 });

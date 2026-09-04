@@ -243,6 +243,24 @@ export class Tempfile {
   }
 
   /**
+   * `IO#set_encoding` (`vendor/ruby/io.c:13474` `rb_io_set_encoding`) on the
+   * delegated `File` (`vendor/ruby/lib/tempfile.rb:89`), which is how
+   * `Rack::Test::UploadedFile#initialize_from_file_path`
+   * (`vendor/rack-test/lib/rack/test/uploaded_file.rb:93`) puts the tempfile
+   * in binary before `FileUtils.copy_file` writes the bytes in.
+   *
+   * `rb_io_set_encoding` answers the stream it was sent and `DelegateClass`
+   * forwards that through untouched, so this answers the `File`, not the
+   * `Tempfile` — the same way {@link binmode} does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#set_encoding`
+   * (`vendor/ruby/io.c:13474`), delegated by Ruby stdlib `Tempfile`.
+   */
+  setEncoding(extEnc: Encoding | string): File {
+    return this.tmpfile.setEncoding(extEnc);
+  }
+
+  /**
    * `IO#binmode?` (`vendor/ruby/io.c:6400`) on the delegated `File`
    * (`vendor/ruby/lib/tempfile.rb:89`).
    *

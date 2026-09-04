@@ -1,3 +1,4 @@
+import { Encoding } from "./encoding.js";
 import { puts as ioPuts } from "./io.js";
 
 /**
@@ -21,6 +22,8 @@ export class StringIO {
   private _string: string;
   private _pos = 0;
   private _closed = false;
+  /** `ptr->enc` (`vendor/ruby/ext/stringio/stringio.c:1823`). */
+  private enc: Encoding | null = null;
 
   constructor(string = "") {
     this._string = string;
@@ -78,6 +81,27 @@ export class StringIO {
   rewind(): number {
     this._pos = 0;
     return 0;
+  }
+
+  /**
+   * `strio_set_encoding` (`vendor/ruby/ext/stringio/stringio.c:1801`) in its
+   * one-argument form — the encoding is recorded on the stream and, when the
+   * StringIO is writable, associated with the buffer String
+   * (`stringio.c:1823-1826`); it answers the StringIO. `int_enc` and `opt` are
+   * ignored by MRI itself (`stringio.c:1796-1797`), so neither is ported.
+   *
+   * The buffer already IS a Ruby binary String — one character per byte, see
+   * the class comment — so the association `rb_enc_associate` performs is the
+   * identity here, and the recorded encoding is what
+   * `Rack::Test::Utils.build_file_part`'s `set_encoding(Encoding::BINARY)`
+   * (`vendor/rack-test/lib/rack/test/utils.rb:148`) is asking for.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `StringIO#set_encoding`
+   * (`vendor/ruby/ext/stringio/stringio.c:1801`).
+   */
+  setEncoding(extEnc: Encoding | string): this {
+    this.enc = Encoding.find(extEnc);
+    return this;
   }
 
   isEof(): boolean {
