@@ -6,6 +6,28 @@ The goal is **100% API compatible with Rails**, with behavior matched **test for
 
 > **Milestone — May 2026: ActiveRecord public API at 100%.** Every public method, class, and module from `activerecord/lib/active_record/**/*.rb` has a TypeScript counterpart (`parity:api` 4969/4969). Behavior parity (test-for-test) continues — the post-100% Rails-fidelity work is tracked as stories in the tasks repo (`pnpm tasks ready`).
 
+## Requirements
+
+**TypeScript 5.x** (`^5.0.0`; 5.9.3 is the version CI runs). Three packages
+declare a `typescript` peer dependency and all three are pinned to the 5.x line
+today:
+
+| package                     | peer range | why                                                                                                                                                  |
+| --------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@blazetrails/activerecord` | `^5.0.0`   | the `./type-virtualization/*` subpath builds a `ts.SourceFile` from source text (`ts.createSourceFile`), which the TypeScript 7 API does not expose. |
+| `@blazetrails/trails-tsc`   | `^5.0.0`   | it is a `tsc` replacement: it drives a programmatic `--build` and hosts a language-service plugin, neither of which TypeScript 7 offers.             |
+| `@blazetrails/trailties`    | `^5.0.0`   | `./template-builder/testing`'s `parseTs()` uses `ts.transpileModule`.                                                                                |
+
+For `activerecord` and `trailties` the peer is **optional** — neither runtime
+needs the compiler, only the two subpaths named above do — so a project that
+imports neither never has to install TypeScript at all. `trails-tsc` requires it
+outright, because compiling is the whole package.
+
+TypeScript 7 support is tracked by RFC
+`0125-typescript-7-ground-floor` in the tasks repo; the ranges above will widen
+package by package as each port lands, and are deliberately narrow until then
+rather than admitting a version the code cannot run on.
+
 ## Zero-declare models — `trails-tsc`
 
 Rails models look like this:

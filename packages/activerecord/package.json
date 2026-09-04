@@ -74,7 +74,7 @@
     "libsql": "^0.5.29",
     "mysql2": "^3.18.2",
     "pg": "^8.19.0",
-    "typescript": ">=5.0.0"
+    "typescript": "^5.0.0"
   },
   "peerDependenciesMeta": {
     "better-sqlite3": {
@@ -90,6 +90,9 @@
       "optional": true
     },
     "pg": {
+      "optional": true
+    },
+    "typescript": {
       "optional": true
     }
   },
