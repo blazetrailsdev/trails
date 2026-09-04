@@ -1,5 +1,4 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
-import { regexpEscape } from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
 import { TemplateHandlers } from "../template/handlers.js";
@@ -79,11 +78,6 @@ export abstract class Resolver implements PathSetResolver {
   }
 
   /** @internal */
-  protected fnmatch(glob: string): RegExp {
-    return new RegExp(`^${fnmatchChars(glob, ".*", ".")}$`);
-  }
-
-  /** @internal */
   protected filterAndSortByDetails(
     templates: ReadonlyArray<TemplateWithDetails>,
     requestedDetails: Requested,
@@ -101,18 +95,6 @@ export abstract class Resolver implements PathSetResolver {
 
     return filteredTemplates.map((t) => t.template);
   }
-}
-
-function fnmatchChars(text: string, star: string, question: string): string {
-  let pattern = "";
-  for (let c = 0; c < text.length; c++) {
-    const char = text[c];
-    if (char === "\\" && c + 1 < text.length) pattern += regexpEscape(text[++c]);
-    else if (char === "*") pattern += star;
-    else if (char === "?") pattern += question;
-    else pattern += regexpEscape(char);
-  }
-  return pattern;
 }
 
 function compareSortKeys(

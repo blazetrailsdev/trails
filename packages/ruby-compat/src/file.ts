@@ -105,6 +105,41 @@ export class File extends IO {
   static readonly LOCK_UN = 8;
 
   /**
+   * `vendor/ruby/dir.c:3678` — a backslash is an ordinary character, not an escape.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_NOESCAPE`.
+   */
+  static readonly FNM_NOESCAPE = 0x01;
+
+  /**
+   * `vendor/ruby/dir.c:3682` — `*`, `?` and a bracket stop at `/`, and `**` + `/` walks elements.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_PATHNAME`.
+   */
+  static readonly FNM_PATHNAME = 0x02;
+
+  /**
+   * `vendor/ruby/dir.c:3686` — a wildcard may match a leading period.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_DOTMATCH`.
+   */
+  static readonly FNM_DOTMATCH = 0x04;
+
+  /**
+   * `vendor/ruby/dir.c:3674` — case-insensitive matching.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_CASEFOLD`.
+   */
+  static readonly FNM_CASEFOLD = 0x08;
+
+  /**
+   * `vendor/ruby/dir.c:3690` — `{a,b}` alternation, expanded by `ruby_brace_expand` (`dir.c:3471-3478`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::FNM_EXTGLOB`.
+   */
+  static readonly FNM_EXTGLOB = 0x10;
+
+  /**
    * `vendor/ruby/file.c:1806` `rb_file_exist_p`, which is `rb_stat(fname)`
    * against a FOLLOWED symlink — so a broken symlink is `false` even though
    * `File.symlink?` is `true`.
@@ -410,6 +445,25 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/dir.c:3457` `file_s_fnmatch` — `true` when `path` matches the
+   * glob `pattern`. Under `FNM_EXTGLOB` the pattern is brace-expanded first and
+   * the first alternative that matches wins (`dir.c:3471-3478`).
+   *
+   * MRI advances both cursors by `rb_enc_mbclen` (`dir.c:390`); a JS string
+   * indexes by UTF-16 code unit, so `?` and a bracket consume one unit rather
+   * than one astral character.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.fnmatch`
+   * (`vendor/ruby/dir.c:3457`).
+   */
+  static fnmatch(pattern: string, path: string, flags: number = 0): boolean {
+    if (flags & File.FNM_EXTGLOB) {
+      return rubyBraceExpand(pattern, flags, (expanded) => fnmatch(expanded, path, flags));
+    }
+    return fnmatch(pattern, path, flags);
+  }
+
+  /**
    * `vendor/ruby/file.c:4126` `rb_file_s_expand_path`, which resolves
    * `fileName` against `dirString` — the working directory when it is omitted.
    *
@@ -443,4 +497,261 @@ export class File extends IO {
     getFs().flockSync?.(this.fd, operation === File.LOCK_UN ? "un" : "ex");
     return 0;
   }
+}
+
+/**
+ * `bracket` (`vendor/ruby/dir.c:240`), which answers the pattern index just
+ * past the closing `]` when `s` is in the class, and `null` when it is not or
+ * the class never closes. Its `FNM_CASEFOLD` arm casefolds against `p`, the
+ * character AFTER `t1` (`dir.c:296`) — mirrored, not corrected.
+ */
+function bracket(
+  p: number,
+  pattern: string,
+  s: number,
+  string: string,
+  flags: number,
+): number | null {
+  const nocase = flags & File.FNM_CASEFOLD;
+  const escape = !(flags & File.FNM_NOESCAPE);
+  let ok = false;
+  let not = false;
+
+  if (p >= pattern.length) return null;
+  if (pattern[p] === "!" || pattern[p] === "^") {
+    not = true;
+    p++;
+  }
+
+  while (pattern[p] !== "]") {
+    let t1 = p;
+    if (escape && pattern[t1] === "\\") t1++;
+    if (t1 >= pattern.length) return null;
+    p = t1 + 1;
+    if (p >= pattern.length) return null;
+    if (pattern[p] === "-" && pattern[p + 1] !== "]") {
+      let t2 = p + 1;
+      if (escape && pattern[t2] === "\\") t2++;
+      if (t2 >= pattern.length) return null;
+      p = t2 + 1;
+      if (ok) continue;
+      if (pattern[t1] === string[s] || pattern[t2] === string[s]) {
+        ok = true;
+        continue;
+      }
+      if (compareChar(string[s], pattern[t1], nocase) < 0) continue;
+      if (compareChar(string[s], pattern[t2], nocase) > 0) continue;
+    } else {
+      if (ok) continue;
+      if (pattern[t1] === string[s]) {
+        ok = true;
+        continue;
+      }
+      if (!nocase) continue;
+      if (compareChar(string[s], pattern[p], nocase) !== 0) continue;
+    }
+    ok = true;
+  }
+
+  return ok === not ? null : p + 1;
+}
+
+/**
+ * The `rb_enc_toupper` comparison `bracket` and `fnmatch_helper` share
+ * (`vendor/ruby/dir.c:281-297,383-386`).
+ */
+function compareChar(a: string, b: string, nocase: number): number {
+  const x = nocase ? a.toUpperCase() : a;
+  const y = nocase ? b.toUpperCase() : b;
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+/**
+ * `fnmatch_helper` (`vendor/ruby/dir.c:317`), which matches one path element
+ * under `FNM_PATHNAME` and the whole string without it. The cursors it
+ * advances through `*pcur` / `*scur` are the returned pair; `unescape` / `isEndP`
+ * / `isEndS` / `ret` are its `UNESCAPE` / `ISEND` / `RETURN` macros
+ * (`dir.c:311-314`) and `failed:` its `goto failed` (`dir.c:396`).
+ */
+function fnmatchHelper(
+  pcur: number,
+  pattern: string,
+  scur: number,
+  string: string,
+  flags: number,
+): { matched: boolean; p: number; s: number } {
+  const period = !(flags & File.FNM_DOTMATCH);
+  const pathname = flags & File.FNM_PATHNAME;
+  const escape = !(flags & File.FNM_NOESCAPE);
+  const nocase = flags & File.FNM_CASEFOLD;
+
+  let ptmp: number | null = null;
+  let stmp: number | null = null;
+
+  let p = pcur;
+  let s = scur;
+
+  const unescape = (i: number): number => (escape && pattern[i] === "\\" ? i + 1 : i);
+  const isEndP = (i: number): boolean => i >= pattern.length || (!!pathname && pattern[i] === "/");
+  const isEndS = (i: number): boolean => i >= string.length || (!!pathname && string[i] === "/");
+  const ret = (matched: boolean) => ({ matched, p, s });
+
+  if (period && string[s] === "." && pattern[unescape(p)] !== ".") return ret(false);
+
+  for (;;) {
+    failed: {
+      switch (pattern[p]) {
+        case "*":
+          do {
+            p++;
+          } while (pattern[p] === "*");
+          if (isEndP(unescape(p))) {
+            p = unescape(p);
+            return ret(true);
+          }
+          if (isEndS(s)) return ret(false);
+          ptmp = p;
+          stmp = s;
+          continue;
+
+        case "?":
+          if (isEndS(s)) return ret(false);
+          p++;
+          s++;
+          continue;
+
+        case "[": {
+          if (isEndS(s)) return ret(false);
+          const t = bracket(p + 1, pattern, s, string, flags);
+          if (t !== null) {
+            p = t;
+            s++;
+            continue;
+          }
+          break failed;
+        }
+      }
+
+      p = unescape(p);
+      if (isEndS(s)) return ret(isEndP(p));
+      if (isEndP(p)) break failed;
+      if (pattern[p] === string[s]) {
+        p++;
+        s++;
+        continue;
+      }
+      if (!nocase) break failed;
+      if (compareChar(pattern[p], string[s], nocase) !== 0) break failed;
+      p++;
+      s++;
+      continue;
+    }
+
+    if (ptmp !== null && stmp !== null) {
+      p = ptmp;
+      stmp++;
+      s = stmp;
+      continue;
+    }
+    return ret(false);
+  }
+}
+
+/**
+ * `fnmatch` (`vendor/ruby/dir.c:411`) — the `FNM_PATHNAME` element walk with
+ * its `**` + `/` backtrack, falling through to a single `fnmatch_helper` without.
+ */
+function fnmatch(pattern: string, string: string, flags: number): boolean {
+  let p = 0;
+  let s = 0;
+  const period = !(flags & File.FNM_DOTMATCH);
+  const pathname = flags & File.FNM_PATHNAME;
+
+  let ptmp: number | null = null;
+  let stmp: number | null = null;
+
+  if (pathname) {
+    for (;;) {
+      if (pattern.startsWith("**/", p)) {
+        do {
+          p += 3;
+        } while (pattern.startsWith("**/", p));
+        ptmp = p;
+        stmp = s;
+      }
+      const r = fnmatchHelper(p, pattern, s, string, flags);
+      p = r.p;
+      s = r.s;
+      if (r.matched) {
+        while (s < string.length && string[s] !== "/") s++;
+        if (p < pattern.length && s < string.length) {
+          p++;
+          s++;
+          continue;
+        }
+        if (p >= pattern.length && s >= string.length) return true;
+      }
+      if (ptmp !== null && stmp !== null && !(period && string[stmp] === ".")) {
+        while (stmp < string.length && string[stmp] !== "/") stmp++;
+        if (stmp < string.length) {
+          p = ptmp;
+          stmp++;
+          s = stmp;
+          continue;
+        }
+      }
+      return false;
+    }
+  } else {
+    return fnmatchHelper(p, pattern, s, string, flags).matched;
+  }
+}
+
+/**
+ * `ruby_brace_expand` (`vendor/ruby/dir.c:3019`), which calls back once per
+ * `{a,b}` alternative and stops at the first non-zero status — for
+ * `fnmatch_brace` (`dir.c:3430`), the first alternative that matches.
+ */
+function rubyBraceExpand(str: string, flags: number, func: (s: string) => boolean): boolean {
+  const escape = !(flags & File.FNM_NOESCAPE);
+  let p = 0;
+  let lbrace = -1;
+  let rbrace = -1;
+  let nest = 0;
+
+  while (p < str.length) {
+    if (str[p] === "{" && nest++ === 0) lbrace = p;
+    if (str[p] === "}" && lbrace >= 0 && --nest === 0) {
+      rbrace = p;
+      break;
+    }
+    if (str[p] === "\\" && escape) {
+      if (++p >= str.length) break;
+    }
+    p++;
+  }
+
+  if (lbrace >= 0 && rbrace >= 0) {
+    const prefix = str.slice(0, lbrace);
+    let status = false;
+    p = lbrace;
+    while (p < rbrace) {
+      const t = ++p;
+      nest = 0;
+      while (p < rbrace && !(str[p] === "," && nest === 0)) {
+        if (str[p] === "{") nest++;
+        if (str[p] === "}") nest--;
+        if (str[p] === "\\" && escape) {
+          if (++p === rbrace) break;
+        }
+        p++;
+      }
+      status = rubyBraceExpand(prefix + str.slice(t, p) + str.slice(rbrace + 1), flags, func);
+      if (status) break;
+    }
+    return status;
+  } else if (lbrace < 0 && rbrace < 0) {
+    return func(str);
+  }
+  return false;
 }

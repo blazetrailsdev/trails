@@ -5,6 +5,7 @@ import {
   getHttpAsync,
   getOsAsync,
   getPathAsync,
+  getZlibAsync,
 } from "@blazetrails/ruby-compat";
 
 await Promise.all([
@@ -14,4 +15,5 @@ await Promise.all([
   getPathAsync(),
   getHttpAsync(),
   getOsAsync(),
+  getZlibAsync(),
 ]);
