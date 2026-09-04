@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as path from "path";
 import { Generator, MULTIPART_BOUNDARY } from "./generator.js";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "./uploaded-file.js";
 
 const fixtureDir = path.join(__dirname, "..", "..", "test", "multipart");
@@ -49,14 +50,7 @@ describe("Rack::Multipart::Generator", () => {
   });
 
   it("builds multipart body from StringIO", () => {
-    const files = new UploadedFile({
-      io: {
-        read(): string {
-          return "foo";
-        },
-      },
-      filename: "bar.txt",
-    });
+    const files = new UploadedFile({ io: new StringIO("foo"), filename: "bar.txt" });
     const data = new Generator({ "submit-name": "Larry", files }).dump() as string;
     expect(data).toContain(`name="files"; filename="bar.txt"`);
     expect(data).toContain("foo\r\n");

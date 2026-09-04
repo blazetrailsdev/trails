@@ -105,9 +105,11 @@ describe("UploadedFileTest", () => {
   });
 
   it("delegates read to tempfile with params", () => {
-    const file = new UploadedFile({ tempfile: path.join(tmpDir, "test.txt") });
-    const data = file.read();
-    expect(data.length).toBe(11);
+    const tf = path.join(tmpDir, "thunderhorse.txt");
+    fs.writeFileSync(tf, "thunderhorse");
+    const file = new UploadedFile({ tempfile: tf });
+    expect(file.read(7)!.toString("binary")).toBe("thunder");
+    expect(file.read(5, Buffer.alloc(5))!.toString("binary")).toBe("horse");
   });
 
   it("delegate eof to tempfile", () => {

@@ -34,6 +34,8 @@ export class StringIO {
     return this._string.length;
   }
 
+  read(): string;
+  read(length: number): string | null;
   read(length?: number): string | null {
     if (length == null) {
       const rest = this._string.slice(this._pos);

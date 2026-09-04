@@ -14,6 +14,13 @@
   {
     "package": "actiondispatch",
     "tsFile": "system-testing/test-helpers/screenshot-helper.ts",
+    "rubyName": "display_image",
+    "call": "read",
+    "reason": "Surfaced by uploaded-file-read-drops-rails-length-and-buffer-arguments (a `read` that takes arguments now exists in actiondispatch, so gate 2 admits `read`): Rails inline output base64-encodes `File.read(absolute_image_path)` (screenshot_helper.rb:143); trails takes the bytes as an invented `imageData` parameter instead (screenshot-helper.ts:157) — convergeable, filed as screenshot-helper-display-image-reads-imagedata-instead-of-the-file."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "system-testing/test-helpers/screenshot-helper.ts",
     "rubyName": "save_html",
     "call": "save_page",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

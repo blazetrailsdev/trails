@@ -77,8 +77,7 @@ export class Generator {
 
   /** @internal */
   private contentForTempfile(io: UploadedFile, file: UploadedFile, name: string): string {
-    const raw = io.read();
-    const content = typeof raw === "string" ? raw : raw.toString("binary");
+    const content = io.read();
     const length = file.path !== undefined ? File.stat(file.path).size : null;
     const filename = `; filename="${escapePath(file.originalFilename)}"`;
     const lenLine = length !== null ? `content-length: ${length}\r\n` : "";

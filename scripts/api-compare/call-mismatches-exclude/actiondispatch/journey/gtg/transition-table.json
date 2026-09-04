@@ -11,5 +11,12 @@
       "str:visualizer"
     ],
     "reason": "Rails reads fsm.js/fsm.css/index.html.erb off disk from `File.join __dir__, \"..\", \"visualizer\"` (transition_table.rb:128); trails ships those assets inlined in journey/visualizer.ts, so there is no asset directory to join."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "journey/gtg/transition-table.ts",
+    "rubyName": "visualizer",
+    "call": "read",
+    "reason": "Same deviation as the `join` row above: Rails reads fsm.js/fsm.css/index.html.erb off disk (transition_table.rb:128-133); trails ships those assets inlined in journey/visualizer.ts, so there is nothing to read."
   }
 ]

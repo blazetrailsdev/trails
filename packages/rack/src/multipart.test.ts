@@ -66,9 +66,9 @@ it("raises a RuntimeError for invalid file path", () => {
 
 it("supports uploading files in binary mode", () => {
   const file1 = new UploadedFile(path.join(fixtureDir, "file1.txt"));
-  expect(file1.binmode).toBe(false);
+  expect(file1.isBinmode()).toBe(false);
   const file2 = new UploadedFile(path.join(fixtureDir, "file1.txt"), { binary: true });
-  expect(file2.binmode).toBe(true);
+  expect(file2.isBinmode()).toBe(true);
 });
 
 it("builds multipart body", () => {
