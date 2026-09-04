@@ -122,6 +122,7 @@ function buildPrimitivePart(buffer: StringIO, parameterName: string, value: unkn
   return buffer;
 }
 
+/** @missingRailsArgs b — PERMANENT */
 function buildFilePart(buffer: StringIO, parameterName: string, uploadedFile: UploadedFile): void {
   buffer.write(START_BOUNDARY);
   buffer.write('content-disposition: form-data; name="');

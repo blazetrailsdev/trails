@@ -1,5 +1,7 @@
+import { isPlainObject } from "@blazetrails/activesupport";
 import { MockRequest, MockResponse, Request, Utils, type RackApp } from "@blazetrails/rack";
 import { CookieJar } from "./cookie-jar.js";
+import { buildMultipart, buildNestedQuery } from "./utils.js";
 
 export const DEFAULT_HOST = "example.org";
 
@@ -91,7 +93,7 @@ export class Session {
     }
     env["REQUEST_METHOD"] ??= env[":method"] != null ? String(env[":method"]).toUpperCase() : "GET";
 
-    const params = env[":params"];
+    let params = env[":params"];
     delete env[":params"];
     const queryArray: Array<string | null | undefined> = [uri.search.slice(1)];
 
@@ -99,10 +101,29 @@ export class Session {
       if (params != null && params !== false) this.appendQueryParams(queryArray, params);
     } else if (!(":input" in env)) {
       env["CONTENT_TYPE"] ??= "application/x-www-form-urlencoded";
-      if (typeof params === "object" && params !== null) {
-        env[":input"] = Utils.buildNestedQuery(params);
+      params ??= {};
+      let multipart: unknown;
+      if (":multipart" in env) {
+        multipart = env[":multipart"];
+        delete env[":multipart"];
       } else {
-        env[":input"] = params ?? "";
+        multipart = String(env["CONTENT_TYPE"]).startsWith("multipart/");
+      }
+
+      if (isPlainObject(params)) {
+        let data: string | null;
+        if (
+          Object.keys(params).length !== 0 &&
+          (data = buildMultipart(params, false, multipart as boolean)) != null
+        ) {
+          env[":input"] = data;
+          env["CONTENT_LENGTH"] ??= String(data.length);
+          env["CONTENT_TYPE"] = `${this.multipartContentType(env)}; boundary=${MULTIPART_BOUNDARY}`;
+        } else {
+          env[":input"] = buildNestedQuery(params);
+        }
+      } else {
+        env[":input"] = params;
       }
     }
 
@@ -124,7 +145,17 @@ export class Session {
     queryParams: unknown,
   ): void {
     if (typeof queryParams === "string") queryParams = Utils.parseNestedQuery(queryParams);
-    queryArray.push(Utils.buildNestedQuery(queryParams));
+    queryArray.push(buildNestedQuery(queryParams));
+  }
+
+  /** @internal */
+  private multipartContentType(env: Record<string, unknown>): string {
+    const requestedContentType = String(env["CONTENT_TYPE"]);
+    if (requestedContentType.startsWith("multipart/")) {
+      return requestedContentType;
+    } else {
+      return "multipart/form-data";
+    }
   }
 
   /** @internal */
