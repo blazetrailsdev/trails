@@ -458,26 +458,6 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return copy;
   }
 
-  /**
-   * `Hash#to_h` (`vendor/ruby/hash.c:3018` `rb_hash_to_h`) with no block,
-   * inherited rather than defined in `hash_with_indifferent_access.rb`: a
-   * subclass receiver is `hash_dup`ed into a bare Hash, so the entries and the
-   * defaults come across but `convert_value_to_hash` does NOT run — a nested
-   * `HashWithIndifferentAccess` value stays one, where `to_hash` (:375-381)
-   * converts it. `write_hash_with_indifferent_access`
-   * (`message_pack/extensions.rb:236-238`) depends on the difference.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#to_h` (`vendor/ruby/hash.c:3018`), inherited by `ActiveSupport::HashWithIndifferentAccess`.
-   */
-  toH(): Hash<string, V> {
-    const copy = new Hash<string, V>();
-    for (const [key, value] of this) {
-      copy.set(key, value);
-    }
-    this.setDefaults(copy);
-    return copy;
-  }
-
   toProc(): (key: string) => V | undefined {
     return (key: string) => this.get(key);
   }

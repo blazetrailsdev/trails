@@ -1,7 +1,15 @@
 /** @internal */
 
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { KeyError, block, eachPair, hasKey, merge, mergeBang } from "@blazetrails/ruby-compat";
+import {
+  KeyError,
+  block,
+  type ConflictBlock,
+  eachPair,
+  hasKey,
+  merge,
+  mergeBang,
+} from "@blazetrails/ruby-compat";
 import { isBlank } from "@blazetrails/activesupport";
 
 export class ParameterMissing extends Error {
@@ -253,18 +261,9 @@ export class Parameters {
     return this._newWithInheritedPermitted({ ...this._data, ...otherData });
   }
 
-  mergeBang(
-    otherHash: Parameters | Record<string, unknown>,
-    block?: (key: string, left: unknown, right: unknown) => unknown,
-  ): this {
+  mergeBang(otherHash: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this {
     const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
-    for (const [k, v] of Object.entries(otherData)) {
-      if (block && k in this._data) {
-        this._data[k] = block(k, this._data[k], v);
-      } else {
-        this._data[k] = v;
-      }
-    }
+    mergeBang(this._data, otherData, ...(block ? [block] : []));
     return this;
   }
 

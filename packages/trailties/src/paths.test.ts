@@ -106,9 +106,11 @@ describe("Rails::Paths", () => {
       {
         cwd: () => "/",
         exists: async () => false,
+        existsSync: () => false,
         stat: async () => stat(false),
         statSync: () => stat(false),
         lstat: async () => ({ ...stat(false), isSymbolicLink: () => true }),
+        lstatSync: () => ({ ...stat(false), isSymbolicLink: () => true }),
       } as unknown as FsAdapter,
       posixPath,
     );

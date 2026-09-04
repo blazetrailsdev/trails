@@ -467,6 +467,19 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   /**
+   * `Hash#to_h` (`vendor/ruby/hash.c:3018` `rb_hash_to_h`) with no block: the
+   * receiver itself when it IS a Hash (`hash.c:3024`), otherwise a `hash_dup`
+   * (`hash.c:3026`, `rb_hash_to_h_block`'s sibling arm) into a bare Hash that
+   * carries the same entries and the same `default` / `default_proc`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#to_h` (`vendor/ruby/hash.c:3018`).
+   */
+  toH(): Hash<K, V> {
+    if (this.constructor === Hash) return this;
+    return dup(this);
+  }
+
+  /**
    * `Hash#default=` (`vendor/ruby/hash.c:2265` `rb_hash_set_default`), whose
    * `SET_DEFAULT` clears `RHASH_PROC_DEFAULT`. A TS `set` accessor cannot
    * share a name with the `default()` reader, so it takes the conventions'

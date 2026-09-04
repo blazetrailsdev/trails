@@ -187,6 +187,22 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/file.c:1723` `rb_file_symlink_p`, which `lstat`s the name and
+   * answers `false` rather than raising when the `lstat` fails
+   * (`file.c:1730`), the way its {@link File.isDirectory} neighbour does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.symlink?`
+   * (`vendor/ruby/file.c:1723`).
+   */
+  static isSymlink(fileName: string): boolean {
+    try {
+      return getFs().lstatSync!(fileName).isSymbolicLink?.() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * `vendor/ruby/file.c:2009` `rb_file_file_p`, `false` on a failed stat.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.file?`

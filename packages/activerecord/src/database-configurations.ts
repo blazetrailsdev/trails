@@ -4,8 +4,8 @@ import { AdapterNotSpecified } from "./errors.js";
 import {
   DatabaseConfig,
   type DatabaseConfigOptions,
-  _setDefaultEnvGetter,
 } from "./database-configurations/database-config.js";
+import { _DEFAULT_ENV, _setRailsEnv } from "./connection-handling-slot.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
 
@@ -57,25 +57,23 @@ export function setConfigurationsStore(configs: DatabaseConfigurations): void {
 }
 
 export class DatabaseConfigurations {
-  private static _defaultEnv: string | null = null;
-
   static dbConfigHandlers: DbConfigHandler[] = [];
 
   static registerDbConfigHandler(handler: DbConfigHandler): void {
     this.dbConfigHandlers.push(handler);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall call — PERMANENT
+   */
   static get defaultEnv(): string {
-    const trailsEnv = getEnv("TRAILS_ENV");
-    if (trailsEnv) return trailsEnv;
-    if (this._defaultEnv !== null) return this._defaultEnv || "default_env";
-    return getEnv("NODE_ENV") || "default_env";
+    return String(_DEFAULT_ENV!());
   }
 
   /** @internal */
   static set defaultEnv(value: string | null) {
-    this._defaultEnv = value;
+    _setRailsEnv(value);
   }
 
   private _configurations: HashConfig[];
@@ -331,5 +329,3 @@ DatabaseConfigurations.registerDbConfigHandler((envName, name, url, config) => {
   if (url) return new UrlConfig(envName, name, url, config);
   return new HashConfig(envName, name, config);
 });
-
-_setDefaultEnvGetter(() => DatabaseConfigurations.defaultEnv);

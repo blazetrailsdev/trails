@@ -149,6 +149,17 @@ export class AttributeSet {
     return Attribute.null(name);
   }
 
+  equals(other: unknown): boolean {
+    if (!(other instanceof AttributeSet)) return false;
+    const attributes = this.attributes();
+    const otherAttributes = other.attributes();
+    const names = Object.keys(attributes);
+    if (names.length !== Object.keys(otherAttributes).length) return false;
+    return names.every(
+      (name) => hasKey(otherAttributes, name) && attributes[name].equals(otherAttributes[name]),
+    );
+  }
+
   toHash(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const name of this.keys()) {
@@ -158,8 +169,13 @@ export class AttributeSet {
   }
 
   freeze(): this {
+    Object.freeze(this.attributes());
     Object.freeze(this);
     return this;
+  }
+
+  initializeDup(_other: AttributeSet): void {
+    this._attributes = dup(this._attributes);
   }
 
   initializeClone(_other: AttributeSet): void {
