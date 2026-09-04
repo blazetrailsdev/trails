@@ -327,38 +327,37 @@ export class PredicateBuilder {
   }
 
   private convertDotNotationToHash(attributes: Attributes): Attributes {
-    const converted: Record<string, unknown> = {};
-    const arrayKeyed: [unknown, unknown][] = [];
+    const converted = new Map<string | string[], unknown>();
+    let arrayKeyed = false;
     for (const [key, value] of entriesOf(attributes)) {
       if (Array.isArray(key)) {
-        arrayKeyed.push([key, value]);
-        continue;
-      }
-      if (isPlainObject(value)) {
-        const existing = converted[key];
+        arrayKeyed = true;
+        converted.set(key, value);
+      } else if (isPlainObject(value)) {
+        const existing = converted.get(key);
         if (existing && isPlainObject(existing)) {
           Object.assign(existing, value);
         } else {
-          converted[key] = { ...value };
+          converted.set(key, { ...value });
         }
       } else {
         const dot = key.lastIndexOf(".");
         if (dot !== -1) {
           const tableName = key.slice(0, dot);
           const colName = key.slice(dot + 1);
-          const existing = converted[tableName];
+          const existing = converted.get(tableName);
           if (existing && isPlainObject(existing)) {
             existing[colName] = value;
           } else {
-            converted[tableName] = { [colName]: value };
+            converted.set(tableName, { [colName]: value });
           }
         } else {
-          converted[key] = value;
+          converted.set(key, value);
         }
       }
     }
-    if (arrayKeyed.length === 0) return converted;
-    return new Map<unknown, unknown>([...Object.entries(converted), ...arrayKeyed]);
+    if (arrayKeyed) return converted as Map<unknown, unknown>;
+    return Object.fromEntries(converted as Map<string, unknown>);
   }
 
   /** @missingRailsCall last — PERMANENT */
