@@ -196,3 +196,69 @@ describe("File", () => {
     expect(File.isIdentical(path, join(root, "missing.txt"))).toBe(false);
   });
 });
+
+describe("File.fnmatch", () => {
+  const cases: Array<[string, string, number]> = [
+    ["*/*.tse", "foo/bar.tse", 0],
+    ["*.tse", "foo/bar.tse", 0],
+    ["**/*.tse", "a/b/c.tse", 0],
+    ["**/*.tse", "c.tse", 0],
+    ["a?c", "abc", 0],
+    ["a[bc]d", "abd", 0],
+    ["a[!bc]d", "aed", 0],
+    ["a[!bc]d", "abd", 0],
+    ["[a-c]x", "bx", 0],
+    ["{a,b}.rb", "b.rb", 0],
+    ["{a,b}.rb", "b.rb", File.FNM_EXTGLOB],
+    ["{a,{b,c}}x", "cx", File.FNM_EXTGLOB],
+    ["*", ".foo", 0],
+    ["*", ".foo", File.FNM_DOTMATCH],
+    ["a/*", "a/.foo", 0],
+    ["?foo", ".foo", 0],
+    ["a*", "a/b", 0],
+    ["a*", "a/b", File.FNM_PATHNAME],
+    ["**/foo", "a/b/foo", File.FNM_PATHNAME],
+    ["**/foo", "foo", File.FNM_PATHNAME],
+    ["*/foo", "a/b/foo", File.FNM_PATHNAME],
+    ["\\*", "*", 0],
+    ["\\*", "*", File.FNM_NOESCAPE],
+    ["A*", "abc", File.FNM_CASEFOLD],
+    ["[]]", "]", 0],
+    ["app/views/*/*.tse", "app/views/users/index.tse", 0],
+  ];
+
+  const expected = [
+    true,
+    true,
+    true,
+    false,
+    true,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true,
+    true,
+    false,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true,
+    true,
+    false,
+    true,
+    false,
+    true,
+    false,
+    true,
+  ];
+
+  cases.forEach(([pattern, path, flags], i) => {
+    it(`matches ${pattern} against ${path} with flags ${flags}`, () => {
+      expect(File.fnmatch(pattern, path, flags)).toBe(expected[i]);
+    });
+  });
+});

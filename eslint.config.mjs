@@ -233,12 +233,16 @@ export default defineConfig(
       "packages/ruby-compat/src/http-adapter.ts",
       "packages/ruby-compat/src/os-adapter.ts",
       "packages/ruby-compat/src/process-adapter.ts",
+      "packages/ruby-compat/src/zlib-adapter.ts",
       "packages/activesupport/src/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activerecord-cli/src/tsc-wrapper/**",
       "packages/activerecord/src/sqlite/node-sqlite.ts",
       "packages/activerecord/src/sqlite/expo-sqlite.ts",
-      "packages/activesupport/src/gzip.ts",
+      // `flip-rack-deflater-onto-the-zlib-seam` flips this onto the ruby-compat
+      // Zlib seam; today's `new Promise` credits `Zlib::GzipWriter.new`
+      // (`vendor/rack/lib/rack/deflater.rb:101`) to the call-set gate, so the
+      // flip has to converge that call rather than drop it.
       "packages/rack/src/deflater.ts",
       "packages/activerecord/src/encryption/config.ts",
       "packages/activerecord/src/encryption/context.ts",
@@ -729,6 +733,7 @@ export default defineConfig(
       "packages/ruby-compat/src/http-adapter.ts",
       "packages/ruby-compat/src/os-adapter.ts",
       "packages/ruby-compat/src/process-adapter.ts",
+      "packages/ruby-compat/src/zlib-adapter.ts",
     ],
     rules: {
       "blazetrails/ruby-compat-needs-mri-citation": "error",

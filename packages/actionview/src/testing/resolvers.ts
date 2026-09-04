@@ -1,3 +1,4 @@
+import { File } from "@blazetrails/ruby-compat";
 import type { LookupDetails } from "../path-set.js";
 import { Template } from "../template.js";
 import { TemplatePath } from "../template-path.js";
@@ -23,9 +24,8 @@ export class FixtureResolver extends FileSystemResolver {
 
   /** @internal */
   protected override templateGlob(glob: string): string[] {
-    const regex = this.fnmatch(glob);
     return Object.keys(this.hash)
-      .filter((path) => regex.test(path))
+      .filter((path) => File.fnmatch(glob, path))
       .map((path) => `/${path}`);
   }
 

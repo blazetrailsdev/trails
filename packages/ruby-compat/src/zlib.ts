@@ -15,6 +15,23 @@
  */
 export const Zlib = {
   /**
+   * `vendor/ruby/ext/zlib/zlib.c:1004` — `Zlib::DEFAULT_COMPRESSION`, zlib.h's
+   * `Z_DEFAULT_COMPRESSION`, the level `ActiveSupport::Gzip.compress` defaults
+   * to (`vendor/rails/activesupport/lib/active_support/gzip.rb:32`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::DEFAULT_COMPRESSION`.
+   */
+  DEFAULT_COMPRESSION: -1,
+
+  /**
+   * `vendor/ruby/ext/zlib/zlib.c:1035` — `Zlib::DEFAULT_STRATEGY`, zlib.h's
+   * `Z_DEFAULT_STRATEGY` (`gzip.rb:32`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::DEFAULT_STRATEGY`.
+   */
+  DEFAULT_STRATEGY: 0,
+
+  /**
    * `vendor/ruby/ext/zlib/zlib.c:507` `rb_zlib_crc32`, which is
    * `do_checksum(argc, argv, crc32)` (`zlib.c:410`): `crc` seeds `sum`, an
    * omitted `string` answers that seed unchanged (`zlib.c:428`), and otherwise
