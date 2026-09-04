@@ -59,7 +59,7 @@ describe("StringIO", () => {
     const io = new StringIO(buffer);
 
     expect(io.size).toBe(256);
-    const read = io.read() as string;
+    const read = io.read();
     expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(bytes);
   });
   it("puts writes each argument on its own line, appending a newline only when absent", () => {

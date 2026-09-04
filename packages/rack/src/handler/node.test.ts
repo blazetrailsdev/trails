@@ -95,7 +95,7 @@ describe("Rack::Handler::Node", () => {
 
     const input = env["rack.input"] as StringIO;
     expect(input.size).toBe(png.length);
-    const read = input.read() as string;
+    const read = input.read();
     expect(Array.from(read, (c) => c.charCodeAt(0))).toEqual(Array.from(png));
   });
 
