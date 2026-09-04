@@ -1,6 +1,6 @@
 import type { MiddlewareStack } from "@blazetrails/actionpack";
 
-type MiddlewareOperation = (middleware: MiddlewareStack) => void;
+type MiddlewareOperation = (middleware: any) => void;
 
 export class MiddlewareStackProxy {
   private _operations: MiddlewareOperation[];
@@ -15,9 +15,7 @@ export class MiddlewareStackProxy {
   }
 
   insertBefore(...args: any[]): void {
-    this._operations.push((middleware) =>
-      (middleware.insertBefore as (...a: any[]) => void)(...args),
-    );
+    this._operations.push((middleware) => middleware.insertBefore(...args));
   }
 
   insert(...args: any[]): void {
@@ -25,29 +23,23 @@ export class MiddlewareStackProxy {
   }
 
   insertAfter(...args: any[]): void {
-    this._operations.push((middleware) =>
-      (middleware.insertAfter as (...a: any[]) => void)(...args),
-    );
+    this._operations.push((middleware) => middleware.insertAfter(...args));
   }
 
   swap(...args: any[]): void {
-    this._operations.push((middleware) => (middleware.swap as (...a: any[]) => void)(...args));
+    this._operations.push((middleware) => middleware.swap(...args));
   }
 
   use(...args: any[]): void {
-    this._operations.push((middleware) => (middleware.use as (...a: any[]) => void)(...args));
+    this._operations.push((middleware) => middleware.use(...args));
   }
 
   delete(...args: any[]): void {
-    this._deleteOperations.push((middleware) =>
-      (middleware.delete as (...a: any[]) => void)(...args),
-    );
+    this._deleteOperations.push((middleware) => middleware.delete(...args));
   }
 
   moveBefore(...args: any[]): void {
-    this._deleteOperations.push((middleware) =>
-      (middleware.moveBefore as (...a: any[]) => void)(...args),
-    );
+    this._deleteOperations.push((middleware) => middleware.moveBefore(...args));
   }
 
   move(...args: any[]): void {
@@ -55,13 +47,11 @@ export class MiddlewareStackProxy {
   }
 
   moveAfter(...args: any[]): void {
-    this._deleteOperations.push((middleware) =>
-      (middleware.moveAfter as (...a: any[]) => void)(...args),
-    );
+    this._deleteOperations.push((middleware) => middleware.moveAfter(...args));
   }
 
   unshift(...args: any[]): void {
-    this._operations.push((middleware) => (middleware.unshift as (...a: any[]) => void)(...args));
+    this._operations.push((middleware) => middleware.unshift(...args));
   }
 
   mergeInto(other: MiddlewareStack): MiddlewareStack {
