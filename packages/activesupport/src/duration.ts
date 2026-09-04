@@ -303,21 +303,21 @@ export class Duration {
   until(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   until(time?: Date | Temporal.Instant): Temporal.Instant;
   until(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
-    return this.ago(time as Date);
+    return this.sum(-1, time);
   }
 
   after(time: RubyTime): RubyTime;
   after(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   after(time?: Date | Temporal.Instant): Temporal.Instant;
   after(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
-    return this.since(time as Date);
+    return this.sum(1, time);
   }
 
   before(time: RubyTime): RubyTime;
   before(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   before(time?: Date | Temporal.Instant): Temporal.Instant;
   before(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
-    return this.ago(time as Date);
+    return this.sum(-1, time);
   }
 
   inspect(): string {

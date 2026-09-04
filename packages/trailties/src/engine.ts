@@ -21,6 +21,9 @@ import { _Trails } from "./trails-slot.js";
 import { readOwnState, writeOwnState } from "./trailtie/per-class-state.js";
 
 export class Engine extends Trailtie {
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
+
   private _railtiesCollection?: Trailties;
   private _allLoadPathsCache?: string[];
   private _routes?: RouteSet;
@@ -152,17 +155,14 @@ export class Engine extends Trailtie {
   }
 
   async loadSeed(): Promise<void> {
-    const { pathToFileURL } = await getPathAsync();
     const seedFile = ((await (await this.paths()).get("db/seeds.ts")?.existent()) ?? [])[0];
     if (seedFile !== undefined) {
+      const { pathToFileURL } = await getPathAsync();
       await this.runCallbacks("load_seed", async () => {
         await import(pathToFileURL!(seedFile).href);
       });
     }
   }
-
-  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
-  declare runCallbacks: Included<typeof ASCallbacks.InstanceMethods>["runCallbacks"];
 
   /** @internal */
   async _allLoadPaths(addAutoloadPathsToLoadPath = true): Promise<string[]> {
