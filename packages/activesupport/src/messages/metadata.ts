@@ -159,7 +159,7 @@ export abstract class Metadata {
 
   /**
    * @missingRailsCall iso8601 — PERMANENT
-   * @missingRailsCall parse — PERMANENT
+   * @missingRailsCall parse — CONVERGEABLE wire-messages-metadata-parse-expiry-onto-time-parse
    */
   protected parseExpiry(expiresAt: string | Temporal.Instant): Temporal.Instant {
     if (typeof expiresAt !== "string") {
@@ -167,7 +167,7 @@ export abstract class Metadata {
     } else if (Encoding.useStandardJsonTimeFormat) {
       return Temporal.Instant.from(expiresAt);
     } else {
-      // boundary: Ruby's lenient `Time.parse` has no Temporal equivalent; `Date` parses
+      // boundary: pending wire-messages-metadata-parse-expiry-onto-time-parse, which lands Time.parse here
       const parsed = new Date(expiresAt).getTime();
       if (Number.isNaN(parsed))
         throw new ArgumentError(`no time information in ${JSON.stringify(expiresAt)}`);

@@ -444,4 +444,62 @@ describe("Time", () => {
       });
     }
   });
+
+  it("Time.parse reads an RFC 2822 / RFC 1123 cookie Expires value", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    const time = Time.parse("Wed, 13 Jan 2021 22:23:01 GMT");
+    expect(time.xmlschema()).toBe("2021-01-13T22:23:01+00:00");
+    expect(time.utcOffset).toBe(0);
+  });
+
+  it("Time.parse honours an explicit numeric zone offset", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    const time = Time.parse("Fri, 01 Jan 2021 00:00:00 -0500");
+    expect(time.xmlschema()).toBe("2021-01-01T00:00:00-05:00");
+    expect(time.utcOffset).toBe(-18000);
+  });
+
+  it("Time.parse reads a zoneless date as a local time where JS Date reads UTC", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    const time = Time.parse("2010-10-31");
+    expect(time.xmlschema()).toBe("2010-10-31T00:00:00-04:00");
+  });
+
+  it("Time.parse fills the missing pieces from its now argument", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    const now = Time.parse("Thu Nov 29 14:33:20 2001");
+    expect(now.xmlschema()).toBe("2001-11-29T14:33:20-05:00");
+    expect(Time.parse("16:30", now).xmlschema()).toBe("2001-11-29T16:30:00-05:00");
+    expect(Time.parse("7/23", now).xmlschema()).toBe("2001-07-23T00:00:00-04:00");
+    expect(Time.parse("Aug 2000", now).xmlschema()).toBe("2000-08-01T00:00:00-04:00");
+  });
+
+  it("Time.parse understands the RFC 822 zone abbreviations", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    expect(Time.parse("10 Feb 2020 12:00:00 EST").xmlschema()).toBe("2020-02-10T12:00:00-05:00");
+  });
+
+  it("Time.parse keeps the sub-second part", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    expect(Time.parse("2010-10-31T12:34:56.789Z").xmlschema(3)).toBe("2010-10-31T12:34:56.789Z");
+  });
+
+  it("Time.parse raises ArgumentError when there is no time information", () => {
+    expect(() => Time.parse("")).toThrow(ArgumentError);
+  });
+
+  it("Time.zoneOffset answers the seconds a zone differs from UTC", () => {
+    expect(Time.zoneOffset("EST")).toBe(-18000);
+    expect(Time.zoneOffset("Z")).toBe(0);
+    expect(Time.zoneOffset("+09:30")).toBe(34200);
+    expect(Time.zoneOffset("-05")).toBe(-18000);
+  });
+
+  it("Time.parse hands the uncompleted year to its block", () => {
+    vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("America/New_York");
+    expect(Time.parse("Feb 24 72", Time.now(), (y) => y + 2000).xmlschema()).toBe(
+      "2072-02-24T00:00:00-05:00",
+    );
+    expect(Time.parse("Feb 24 72").xmlschema()).toBe("1972-02-24T00:00:00-05:00");
+  });
 });

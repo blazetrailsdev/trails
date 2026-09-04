@@ -14,7 +14,7 @@ import {
   strftime,
   timeToDf,
 } from "./date.js";
-import { Rational, kernelInteger } from "@blazetrails/ruby-compat";
+import { Rational, kernelInteger, stringInspect } from "@blazetrails/ruby-compat";
 
 let localTimeZoneId: string | null = null;
 
@@ -29,6 +29,11 @@ function systemEpochNs(): bigint {
 /** @noRailsEquivalent PERMANENT */
 export function resetLocalTimeZoneId(): void {
   localTimeZoneId = null;
+}
+
+function divmod(a: number, b: number): [number, number] {
+  const q = Math.floor(a / b);
+  return [q, a - q * b];
 }
 
 function isZoneIdentifier(zone: string): boolean {
@@ -494,6 +499,370 @@ export class Time {
 
   static local(...args: Parameters<typeof Time.mktime>): Time {
     return Time.mktime(...args);
+  }
+
+  /**
+   * `vendor/ruby/lib/time.rb:39-54` — a hash of timezones mapped to hour
+   * differences from UTC, the set RFC 2822 and ISO 8601 specify.
+   */
+  static readonly ZoneOffset: Record<string, number> = {
+    UTC: 0,
+    Z: 0,
+    UT: 0,
+    GMT: 0,
+    EST: -5,
+    EDT: -4,
+    CST: -6,
+    CDT: -5,
+    MST: -7,
+    MDT: -6,
+    PST: -8,
+    PDT: -7,
+    A: +1,
+    B: +2,
+    C: +3,
+    D: +4,
+    E: +5,
+    F: +6,
+    G: +7,
+    H: +8,
+    I: +9,
+    K: +10,
+    L: +11,
+    M: +12,
+    N: -1,
+    O: -2,
+    P: -3,
+    Q: -4,
+    R: -5,
+    S: -6,
+    T: -7,
+    U: -8,
+    V: -9,
+    W: -10,
+    X: -11,
+    Y: -12,
+  };
+
+  /**
+   * `vendor/ruby/lib/time.rb:81-96` — the number of seconds the specified time
+   * zone differs from UTC, or `nil` when the offset cannot be determined.
+   */
+  static zoneOffset(zone: string, year: number = Time.now().year): number | null {
+    let off: number | null = null;
+    let t: Time | undefined;
+    zone = zone.toUpperCase();
+    const m = /^([+-])(\d\d)(:?)(\d\d)(?:\3(\d\d))?$/.exec(zone);
+    if (m) {
+      off =
+        (m[1] === "-" ? -1 : 1) *
+        ((Number(m[2]) * 60 + Number(m[4])) * 60 + (m[5] === undefined ? 0 : Number(m[5])));
+    } else if (/^[+-]\d\d$/.test(zone)) {
+      off = parseInt(zone, 10) * 3600;
+    } else if (zone in Time.ZoneOffset) {
+      off = Time.ZoneOffset[zone] * 3600;
+    } else if (
+      (() => {
+        try {
+          return (t = Time.local(year, 1, 1)).zone!.toUpperCase() === zone;
+        } catch {
+          return false;
+        }
+      })()
+    ) {
+      off = t!.utcOffset;
+    } else if (
+      (() => {
+        try {
+          return (t = Time.local(year, 7, 1)).zone!.toUpperCase() === zone;
+        } catch {
+          return false;
+        }
+      })()
+    ) {
+      off = t!.utcOffset;
+    }
+    return off;
+  }
+
+  /** `vendor/ruby/lib/time.rb:98-121` */
+  static #isZoneUtc(zone: string): boolean {
+    return /^(?:-00:00|-0000|-00|UTC|Z|UT)$/i.test(zone);
+  }
+
+  /** `vendor/ruby/lib/time.rb:124-140` */
+  static #forceZone(t: Time, zone: string, offset: number | null = null): Time {
+    if (Time.#isZoneUtc(zone)) {
+      return t.getutc();
+    } else if ((offset ??= Time.zoneOffset(zone)) != null) {
+      t = t.getlocal();
+      if (t.utcOffset !== offset) {
+        t = t.getlocal(offset);
+      }
+      return t;
+    } else {
+      return t.getlocal();
+    }
+  }
+
+  /** `vendor/ruby/lib/time.rb:142` */
+  static readonly #LeapYearMonthDays = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  /** `vendor/ruby/lib/time.rb:143` */
+  static readonly #CommonYearMonthDays = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+  /** `vendor/ruby/lib/time.rb:144-150` */
+  static #monthDays(y: number, m: number): number {
+    if ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) {
+      return Time.#LeapYearMonthDays[m - 1];
+    } else {
+      return Time.#CommonYearMonthDays[m - 1];
+    }
+  }
+
+  /** `vendor/ruby/lib/time.rb:153-193` */
+  static #applyOffset(
+    year: number,
+    mon: number,
+    day: number,
+    hour: number,
+    min: number,
+    sec: number,
+    off: number,
+  ): [number, number, number, number, number, number] {
+    let o: number;
+    if (off < 0) {
+      off = -off;
+      [off, o] = divmod(off, 60);
+      if (o !== 0) {
+        sec += o;
+        [o, sec] = divmod(sec, 60);
+        off += o;
+      }
+      [off, o] = divmod(off, 60);
+      if (o !== 0) {
+        min += o;
+        [o, min] = divmod(min, 60);
+        off += o;
+      }
+      [off, o] = divmod(off, 24);
+      if (o !== 0) {
+        hour += o;
+        [o, hour] = divmod(hour, 24);
+        off += o;
+      }
+      if (off !== 0) {
+        day += off;
+        const days = Time.#monthDays(year, mon);
+        if (days < day) {
+          mon += 1;
+          if (12 < mon) {
+            mon = 1;
+            year += 1;
+          }
+          day = 1;
+        }
+      }
+    } else if (0 < off) {
+      [off, o] = divmod(off, 60);
+      if (o !== 0) {
+        sec -= o;
+        [o, sec] = divmod(sec, 60);
+        off -= o;
+      }
+      [off, o] = divmod(off, 60);
+      if (o !== 0) {
+        min -= o;
+        [o, min] = divmod(min, 60);
+        off -= o;
+      }
+      [off, o] = divmod(off, 24);
+      if (o !== 0) {
+        hour -= o;
+        [o, hour] = divmod(hour, 24);
+        off -= o;
+      }
+      if (off !== 0) {
+        day -= off;
+        if (day < 1) {
+          mon -= 1;
+          if (mon < 1) {
+            year -= 1;
+            mon = 12;
+          }
+          day = Time.#monthDays(year, mon);
+        }
+      }
+    }
+    return [year, mon, day, hour, min, sec];
+  }
+
+  /**
+   * `vendor/ruby/lib/time.rb:195-272`. Ruby's `now.respond_to?(:getlocal)`
+   * guard admits any object answering `#mon`/`#day`/`#year`; `now` is typed
+   * `Time` here, so the guard is statically true and the branch it protects is
+   * the only one reachable. `offYear` is likewise `nil` in Ruby only when
+   * `year` and `now` are both absent, where `month_days(nil, mon)` raises; JS
+   * arithmetic on `undefined` cannot raise, so that arm skips its day
+   * correction instead of failing.
+   */
+  static #makeTime(
+    date: string,
+    year: number | undefined,
+    yday: number | undefined,
+    mon: number | undefined,
+    day: number | undefined,
+    hour: number | undefined,
+    min: number | undefined,
+    sec: number | undefined,
+    secFraction: Rational | undefined,
+    zone: string | undefined,
+    now: Time | null,
+  ): Time {
+    if (
+      year == null &&
+      yday == null &&
+      mon == null &&
+      day == null &&
+      hour == null &&
+      min == null &&
+      sec == null &&
+      secFraction == null
+    ) {
+      throw new ArgumentError(`no time information in ${stringInspect(date)}`);
+    }
+
+    let off: number | null = null;
+    let offYear: number | undefined;
+    if (year != null || now != null) {
+      offYear = year ?? now!.year;
+      if (zone != null) off = Time.zoneOffset(zone, offYear);
+    }
+
+    if (yday != null) {
+      if (!(1 <= yday && yday <= 366)) {
+        throw new ArgumentError(`yday ${yday} out of range`);
+      }
+      [mon, day] = divmod(yday - 1, 31);
+      mon += 1;
+      day += 1;
+      const t = Time.#makeTime(
+        date,
+        year,
+        undefined,
+        mon,
+        day,
+        hour,
+        min,
+        sec,
+        secFraction,
+        zone,
+        now,
+      );
+      const diff = yday - t.yday;
+      if (diff === 0) return t;
+      day += diff;
+      let mday: number;
+      if (day > 28 && day > (mday = Time.#monthDays(offYear!, mon))) {
+        if ((mon += 1) > 12) {
+          throw new ArgumentError(`yday ${yday} out of range`);
+        }
+        day -= mday;
+      }
+      return Time.#makeTime(
+        date,
+        year,
+        undefined,
+        mon,
+        day,
+        hour,
+        min,
+        sec,
+        secFraction,
+        zone,
+        now,
+      );
+    }
+
+    if (now != null) {
+      if (off != null) {
+        if (now.utcOffset !== off) now = now.getlocal(off);
+      } else {
+        now = now.getlocal();
+      }
+    }
+
+    let usec: number | Rational | undefined;
+    if (secFraction != null) usec = secFraction.mul(1_000_000);
+
+    if (now != null) {
+      fill: {
+        if (year != null) break fill;
+        year = now.year;
+        if (mon != null) break fill;
+        mon = now.mon;
+        if (day != null) break fill;
+        day = now.day;
+        if (hour != null) break fill;
+        hour = now.hour;
+        if (min != null) break fill;
+        min = now.min;
+        if (sec != null) break fill;
+        sec = now.sec;
+        if (secFraction != null) break fill;
+        usec = now.usec;
+      }
+    }
+
+    year ??= 1970;
+    mon ??= 1;
+    day ??= 1;
+    hour ??= 0;
+    min ??= 0;
+    sec ??= 0;
+    usec ??= 0;
+
+    if (year !== offYear) {
+      off = null;
+      if (zone != null) off = Time.zoneOffset(zone, year);
+    }
+
+    if (off != null) {
+      [year, mon, day, hour, min, sec] = Time.#applyOffset(year, mon, day, hour, min, sec, off);
+      const t = Time.utc(year, mon, day, hour, min, sec, usec);
+      return Time.#forceZone(t, zone!, off);
+    } else {
+      return Time.local(year, mon, day, hour, min, sec, usec);
+    }
+  }
+
+  /**
+   * `vendor/ruby/lib/time.rb:381-387` — takes a string representation of a
+   * Time and attempts to parse it using a heuristic. Missing pieces of the
+   * date are inferred from `now`. Ruby's `block_given?` is the trailing
+   * `block` parameter, so `comp` is `!block_given?` as in Ruby.
+   */
+  static parse(
+    date: string,
+    now: Time | null = Time.now(),
+    block?: (year: number) => number,
+  ): Time {
+    const comp = block === undefined;
+    const d = Date._parse(date, comp);
+    let year = d.year === undefined ? undefined : Number(d.year);
+    if (year != null && !comp) year = block(year);
+    return Time.#makeTime(
+      date,
+      year,
+      d.yday,
+      d.mon,
+      d.mday,
+      d.hour,
+      d.min,
+      d.sec,
+      d.secFraction === undefined ? undefined : numExact(d.secFraction),
+      d.zone,
+      now,
+    );
   }
 
   constructor(
