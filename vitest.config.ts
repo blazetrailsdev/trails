@@ -142,8 +142,8 @@ const alias = {
     __dirname,
     "packages/activesupport/src/digest.ts",
   ),
-  // The trailing-slash entry must sit ABOVE the bare one: Vite's object alias
-  // is a prefix match, so "…/cache" alone would also swallow "…/cache/*".
+  // Above the bare entry: Vite's object alias is a prefix match, so "…/cache"
+  // alone would also swallow "…/cache/*".
   "@blazetrails/activesupport/cache/":
     path.resolve(__dirname, "packages/activesupport/src/cache/") + "/",
   "@blazetrails/activesupport/cache": path.resolve(

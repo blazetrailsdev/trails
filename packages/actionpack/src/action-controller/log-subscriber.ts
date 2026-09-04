@@ -83,16 +83,20 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   /** @missingRailsArgs round — PERMANENT */
   sendFile(event: Event): void {
-    this._info(() => `Sent file ${event.payload.path} (${round(event.duration, 1)}ms)`);
+    this._info(
+      () => `Sent file ${rbObjAsString(event.payload.path)} (${round(event.duration, 1)}ms)`,
+    );
   }
 
   redirectTo(event: Event): void {
-    this._info(() => `Redirected to ${event.payload.location}`);
+    this._info(() => `Redirected to ${rbObjAsString(event.payload.location)}`);
   }
 
   /** @missingRailsArgs round — PERMANENT */
   sendData(event: Event): void {
-    this._info(() => `Sent data ${event.payload.filename} (${round(event.duration, 1)}ms)`);
+    this._info(
+      () => `Sent data ${rbObjAsString(event.payload.filename)} (${round(event.duration, 1)}ms)`,
+    );
   }
 
   unpermittedParameters(event: Event): void {

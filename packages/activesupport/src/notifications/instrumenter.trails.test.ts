@@ -145,4 +145,11 @@ describe("Instrumenter (trails)", () => {
     });
     expect(order).toEqual(["start", "block", "finish"]);
   });
+
+  it("allocations answers zero on the fallback arm", () => {
+    const event = new Event("span", 0, 0, "x", {});
+    event.startBang();
+    event.finishBang();
+    expect(event.allocations).toBe(0);
+  });
 });
