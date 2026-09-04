@@ -14,6 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   }

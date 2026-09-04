@@ -1,3 +1,4 @@
+import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { DEFAULT_HOST } from "./test.js";
@@ -58,6 +59,10 @@ export class Cookie {
     );
   }
 
+  isEmpty(): boolean {
+    return this.value == null || this.value === "";
+  }
+
   domain(): string {
     return this._options["domain"]!;
   }
@@ -66,18 +71,22 @@ export class Cookie {
     return "secure" in this._options;
   }
 
+  isHttpOnly(): boolean {
+    return "httponly" in this._options;
+  }
+
   path(): string {
     return (this._options["path"] ?? "/").split(",")[0].trim() || "/";
   }
 
-  expires(): Date | undefined {
+  expires(): Time | undefined {
     const expires = this._options["expires"];
-    return expires == null ? undefined : new Date(expires);
+    return expires == null ? undefined : Time.parse(expires);
   }
 
   isExpired(): boolean {
     const expires = this.expires();
-    return expires != null && expires.getTime() < Date.now();
+    return expires != null && expires.toI() < Time.now().toI();
   }
 
   isValid(uri: URL | null): boolean {
@@ -103,6 +112,21 @@ export class Cookie {
     );
   }
 
+  toH(): Record<string, string | boolean | undefined> {
+    const hash: Record<string, string | boolean | undefined> = {
+      ...this._options,
+      value: this.value,
+      HttpOnly: this.isHttpOnly(),
+      secure: this.isSecure(),
+    };
+    delete hash["httponly"];
+    return hash;
+  }
+
+  toHash(): Record<string, string | boolean | undefined> {
+    return this.toH();
+  }
+
   /** @internal */
   private defaultUri(): URL {
     return new URL(`http://${this._defaultHost}/`);
@@ -114,7 +138,7 @@ export class CookieJar {
   static readonly DELIMITER = "; ";
 
   /** @internal */
-  private readonly _defaultHost: string;
+  private _defaultHost: string;
 
   /** @internal */
   private _cookies: Cookie[];
@@ -124,7 +148,14 @@ export class CookieJar {
     this._cookies = cookies.sort((a, b) => a.spaceship(b));
   }
 
+  initializeCopy(other: CookieJar): this {
+    this._defaultHost = other._defaultHost;
+    this._cookies = other._cookies.slice();
+    return this;
+  }
+
   get(name: string): string | undefined {
+    name = String(name);
     for (const cookie of this._cookies) {
       if (cookie.name === name) return cookie.value;
     }
@@ -133,6 +164,17 @@ export class CookieJar {
 
   set(name: string, value: string): void {
     this.merge(`${name}=${Utils.escape(value)}`);
+  }
+
+  getCookie(name: string): Cookie | undefined {
+    for (const cookie of this._cookies) {
+      if (cookie.name === name) return cookie;
+    }
+    return undefined;
+  }
+
+  delete(name: string): void {
+    this._cookies = this._cookies.filter((cookie) => cookie.name !== name);
   }
 
   merge(rawCookies: string | string[] | null | undefined, uri: URL | null = null): void {
