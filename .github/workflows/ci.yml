@@ -691,6 +691,7 @@ jobs:
           scripts/closing-story-references.test.ts
           scripts/non-transactional-row-writes.test.ts
           scripts/ruby-compat-leaf.test.ts
+          scripts/rack-activesupport-free.test.ts
           scripts/generate-canonical-zone-identifiers.test.ts
           scripts/generate-tzdata-isdst.test.ts
           vendor/sources.test.ts

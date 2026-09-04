@@ -4,7 +4,7 @@ import { MockRequest, type RackApp } from "./mock-request.js";
 import { MockResponse } from "./mock-response.js";
 import { UploadedFile } from "./multipart/uploaded-file.js";
 import { Request } from "./request.js";
-import { StringIO } from "@blazetrails/activesupport";
+import { StringIO } from "@blazetrails/ruby-compat";
 import * as path from "path";
 
 const fixtureDir = path.join(__dirname, "..", "test", "multipart");

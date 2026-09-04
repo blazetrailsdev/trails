@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, valuesAt } from "@blazetrails/ruby-compat";
 import { isBlank } from "./core-ext/object/blank.js";
 import * as XmlMini from "./xml-mini.js";
 import { XMLConverter } from "./core-ext/hash/conversions.js";
@@ -6,17 +6,7 @@ import type { StringIO } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
 
-export { ArgumentError };
-
-export function valuesAt<T>(hash: Record<string, T>, ...keys: string[]): (T | undefined)[];
-export function valuesAt<K, T>(hash: Map<K, T>, ...keys: K[]): (T | undefined)[];
-export function valuesAt(
-  hash: Record<string, unknown> | Map<unknown, unknown>,
-  ...keys: unknown[]
-) {
-  if (hash instanceof Map) return keys.map((key) => hash.get(key));
-  return keys.map((key) => hash[key as string]);
-}
+export { ArgumentError, valuesAt };
 
 export function deepMerge<T extends AnyObject>(target: T, other: AnyObject): T {
   const result = { ...target } as AnyObject;

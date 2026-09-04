@@ -1,4 +1,4 @@
-import { StringIO } from "@blazetrails/activesupport";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { Request, ResponseRaw } from "@blazetrails/rack";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";

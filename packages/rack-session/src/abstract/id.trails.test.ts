@@ -1,7 +1,7 @@
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { bodyFromString } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS, ResponseRaw } from "@blazetrails/rack";
-import { StringIO } from "@blazetrails/activesupport";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { Request } from "@blazetrails/rack";
 import { setVerbose } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";

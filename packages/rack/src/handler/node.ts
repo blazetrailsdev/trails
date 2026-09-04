@@ -1,5 +1,4 @@
-import { StringIO } from "@blazetrails/activesupport";
-import { getHttpAsync, stderr } from "@blazetrails/ruby-compat";
+import { getHttpAsync, stderr, StringIO } from "@blazetrails/ruby-compat";
 import type { HttpRequest, HttpResponse, HttpServer } from "@blazetrails/ruby-compat";
 import {
   HTTPS,

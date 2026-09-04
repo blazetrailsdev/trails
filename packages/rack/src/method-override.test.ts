@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { MethodOverride } from "./method-override.js";
 import { MockRequest } from "./mock-request.js";
-import { StringIO } from "@blazetrails/activesupport";
+import { StringIO } from "@blazetrails/ruby-compat";
 
 const echoApp = async (env: Record<string, any>) => {
   return [200, { "content-type": "text/plain" }, [env["REQUEST_METHOD"]]] as [
