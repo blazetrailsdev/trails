@@ -2323,3 +2323,43 @@ describe("ValidationsTest (trails)", () => {
     });
   });
 });
+
+describe("validate with several filters", () => {
+  it("registers every filter in the order one set_callback would", async () => {
+    const ran: string[] = [];
+    class Topic extends Model {
+      first(): void {
+        ran.push("first");
+      }
+      second(): void {
+        ran.push("second");
+      }
+      static {
+        this.validate("first", "second");
+      }
+    }
+
+    await new Topic().isValid();
+    expect(ran).toEqual(["first", "second"]);
+  });
+
+  it("raises on an unknown key only when every filter is a method name", () => {
+    expect(() => {
+      class Bad extends Model {
+        static {
+          this.validate("first", "second", { presence: true } as never);
+        }
+      }
+      void Bad;
+    }).toThrow(/Unknown key: :presence/);
+
+    expect(() => {
+      class Blocky extends Model {
+        static {
+          this.validate(() => undefined, { presence: true } as never);
+        }
+      }
+      void Blocky;
+    }).not.toThrow();
+  });
+});

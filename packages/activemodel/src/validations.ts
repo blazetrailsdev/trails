@@ -2,6 +2,7 @@ import {
   classAttribute,
   defineCallbacks,
   extend,
+  extractOptionsBang,
   include,
   included,
   kernelArray,
@@ -137,10 +138,12 @@ export interface ValidationsClassHost {
   _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
   validatesWith(...args: unknown[]): void;
   validate(
-    methodOrFn: string | ((record: ValidatableRecord) => unknown),
-    options?: ConditionalOptions,
+    ...args: Array<string | ((record: ValidatableRecord) => unknown) | ConditionalOptions>
   ): void;
-  setCallback(name: string, fn: (record: object) => unknown, options: CallbackConditions): void;
+  setCallback(
+    name: string,
+    ...filterList: Array<((record: object) => unknown) | CallbackConditions>
+  ): void;
   resetCallbacks(name: string): void;
   /** @internal */
   predicateForValidationContext(
@@ -160,10 +163,12 @@ export const ClassMethods = {
 
   validate<T extends ValidatableRecord = ValidatableRecord>(
     this: ValidationsClassHost,
-    methodOrFn: string | ((record: T) => unknown),
-    options: ConditionalOptions = {},
+    ...args: Array<string | ((record: T) => unknown) | ConditionalOptions>
   ): void {
-    if (typeof methodOrFn === "string") {
+    const [filters, extracted] = extractOptionsBang(args as unknown[]);
+    let options = extracted as ConditionalOptions;
+
+    if (filters.every((arg) => typeof arg === "string")) {
       for (const k of Object.keys(options)) {
         if (!(VALID_OPTIONS_FOR_VALIDATE as readonly string[]).includes(k)) {
           throw new ArgumentError(
@@ -173,43 +178,56 @@ export const ClassMethods = {
       }
     }
 
-    const fn: CallbackFn = (record: object) => {
-      const r = record as T & Record<string, unknown>;
-      if (typeof methodOrFn === "function") {
-        return methodOrFn.call(r, r) as void;
-      } else if (typeof r[methodOrFn] === "function") {
-        return (r[methodOrFn] as () => void)();
-      }
-      throw new NoMethodError(
-        `undefined method '${methodOrFn}' for an instance of ${r.constructor.name}`,
-      );
-    };
-    let ifConds = kernelArray(options.if as CallbackConditions["if"]);
-    let unlessConds = kernelArray(options.unless as CallbackConditions["unless"]);
-
     if (options.on !== undefined) {
       const pred = this.predicateForValidationContext(options.on);
-      ifConds = [(record: object) => pred(record as ValidationsContextHost), ...ifConds];
+      options = {
+        ...options,
+        if: [
+          (record: object) => pred(record as ValidationsContextHost),
+          ...kernelArray(options.if as CallbackConditions["if"]),
+        ] as ConditionalOptions["if"],
+      };
     }
 
     if (options.exceptOn !== undefined) {
       const exceptOn = kernelArray(options.exceptOn);
-      unlessConds = [
-        (record: object) => {
-          const current = kernelArray(
-            (record as unknown as ValidationsContextHost).validationContext,
-          );
-          return exceptOn.some((c) => current.includes(c));
-        },
-        ...unlessConds,
-      ];
+      options = {
+        ...options,
+        exceptOn,
+        unless: [
+          (record: object) => {
+            const current = kernelArray(
+              (record as unknown as ValidationsContextHost).validationContext,
+            );
+            return exceptOn.some((c) => current.includes(c));
+          },
+          ...kernelArray(options.unless as CallbackConditions["unless"]),
+        ] as ConditionalOptions["unless"],
+      };
     }
 
-    this.setCallback("validate", fn, {
-      ...(ifConds.length > 0 ? { if: ifConds } : {}),
-      ...(unlessConds.length > 0 ? { unless: unlessConds } : {}),
-      ...(options.prepend ? { prepend: true } : {}),
-    });
+    this.setCallback(
+      "validate",
+      ...(filters as Array<string | ((record: T) => unknown)>).map(
+        (filter): CallbackFn =>
+          (record: object) => {
+            const r = record as T & Record<string, unknown>;
+            if (typeof filter === "function") {
+              return filter.call(r, r) as void;
+            } else if (typeof r[filter] === "function") {
+              return (r[filter] as () => void)();
+            }
+            throw new NoMethodError(
+              `undefined method '${filter}' for an instance of ${r.constructor.name}`,
+            );
+          },
+      ),
+      {
+        ...(options.if !== undefined ? { if: kernelArray(options.if) } : {}),
+        ...(options.unless !== undefined ? { unless: kernelArray(options.unless) } : {}),
+        ...(options.prepend ? { prepend: true } : {}),
+      } as CallbackConditions,
+    );
   },
 
   validators(this: ValidationsClassHost): ValidatorLike[] {

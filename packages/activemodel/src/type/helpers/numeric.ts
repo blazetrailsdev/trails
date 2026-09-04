@@ -30,10 +30,6 @@ export function isNonNumericString(value: unknown): boolean {
   return !NUMERIC_REGEX.test(String(value));
 }
 
-function normalizeBigDecimal(value: unknown): unknown {
-  return value instanceof BigDecimal ? value.toString("F") : value;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AbstractValueTypeCtor<T = unknown> = abstract new (...args: any[]) => ValueType<T>;
 
@@ -82,11 +78,7 @@ export function applyNumericMixin<TBase extends AbstractValueTypeCtor>(
       newValueBeforeTypeCast?: unknown,
     ): boolean {
       return (
-        (super.isChanged(
-          normalizeBigDecimal(oldValue),
-          normalizeBigDecimal(newValue),
-          newValueBeforeTypeCast,
-        ) ||
+        (super.isChanged(oldValue, newValue, newValueBeforeTypeCast) ||
           isNumberToNonNumber(oldValue, newValueBeforeTypeCast)) &&
         !isEqualNan(oldValue, newValueBeforeTypeCast)
       );

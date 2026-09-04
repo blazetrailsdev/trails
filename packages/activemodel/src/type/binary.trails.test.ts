@@ -39,3 +39,22 @@ describe("BinaryTypeTrails", () => {
     expect(data.equals(data)).toBe(true);
   });
 });
+
+describe("BinaryType dirty tracking against Ruby value equality", () => {
+  it("reports a byte-equal reassignment as unchanged", () => {
+    const type = new Types.BinaryType();
+    expect(type.isChanged(new Uint8Array([0x80, 0xde]), new Uint8Array([0x80, 0xde]), null)).toBe(
+      false,
+    );
+    expect(type.isChanged(new Uint8Array([0x80, 0xde]), new Uint8Array([0x80, 0x01]), null)).toBe(
+      true,
+    );
+  });
+
+  it("isChangedInPlace deserializes the raw value and compares it by value", () => {
+    const type = new Types.BinaryType();
+    const raw = new Uint8Array([0x80, 0xde]);
+    expect(type.isChangedInPlace(raw, new Uint8Array([0x80, 0xde]))).toBe(false);
+    expect(type.isChangedInPlace(raw, new Uint8Array([0x80, 0xde, 0x7a]))).toBe(true);
+  });
+});

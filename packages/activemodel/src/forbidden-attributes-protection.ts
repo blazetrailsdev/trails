@@ -10,43 +10,31 @@ interface PermittedAttributes {
   toH?(): Record<string, unknown>;
 }
 
-export const ForbiddenAttributesProtection = {
-  /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown> {
-    const attrs = attributes as Record<string, unknown> & PermittedAttributes;
-    if (respondToPermitted(attrs)) {
-      if (!readPermitted(attrs)) {
-        throw new ForbiddenAttributesError();
-      }
-      return attrs.toH!();
+/** @internal */
+export function sanitizeForMassAssignment(
+  attributes: Record<string, unknown>,
+): Record<string, unknown> {
+  const attrs = attributes as Record<string, unknown> & PermittedAttributes;
+  if (respondToPermitted(attrs)) {
+    if (!readPermitted(attrs)) {
+      throw new ForbiddenAttributesError();
     }
-    return attributes;
-  },
+    return attrs.toH!();
+  }
+  return attributes;
+}
 
-  /** @internal */
-  sanitizeForbiddenAttributes(
-    this: ForbiddenAttributesProtectionHost,
-    attributes: Record<string, unknown>,
-  ): Record<string, unknown> {
-    return this.sanitizeForMassAssignment(attributes);
-  },
+/** @internal */
+export const sanitizeForbiddenAttributes = sanitizeForMassAssignment;
+
+export const ForbiddenAttributesProtection = {
+  sanitizeForMassAssignment,
+  sanitizeForbiddenAttributes,
 };
-
-/** @internal */
-export const sanitizeForMassAssignment = ForbiddenAttributesProtection.sanitizeForMassAssignment;
-
-/** @internal */
-export const sanitizeForbiddenAttributes =
-  ForbiddenAttributesProtection.sanitizeForbiddenAttributes;
 
 function readPermitted(attrs: PermittedAttributes): boolean {
   const permitted = attrs.permitted;
   return typeof permitted === "function" ? permitted.call(attrs) : Boolean(permitted);
-}
-
-export interface ForbiddenAttributesProtectionHost {
-  /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
 }
 
 function respondToPermitted(attrs: object): boolean {

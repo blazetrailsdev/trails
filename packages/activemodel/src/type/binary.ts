@@ -1,3 +1,4 @@
+import { rbEqual } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 const textEncoder = new TextEncoder();
@@ -31,15 +32,7 @@ export class BinaryType extends ValueType<unknown> {
 
   isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
     const oldValue = this.deserialize(rawOldValue);
-    const cur = this.cast(value);
-    if (oldValue instanceof Uint8Array && cur instanceof Uint8Array) {
-      if (oldValue.length !== cur.length) return true;
-      for (let i = 0; i < oldValue.length; i++) {
-        if (oldValue[i] !== cur[i]) return true;
-      }
-      return false;
-    }
-    return oldValue !== cur;
+    return !rbEqual(oldValue, value);
   }
 }
 

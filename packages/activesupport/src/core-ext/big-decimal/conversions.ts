@@ -125,6 +125,12 @@ export class BigDecimal {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  equals(other: unknown): boolean {
+    if (!(other instanceof BigDecimal)) return false;
+    return this.compare(other) === 0;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   compare(other: BigDecimal): number | null {
     if (this.isNan() || other.isNan()) return null;
     if (this.nonFinite !== null || other.nonFinite !== null) {

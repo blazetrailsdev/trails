@@ -60,8 +60,7 @@ export class Model {
   declare static isAttributeMethod: Extended<typeof ValidationsClassMethods>["isAttributeMethod"];
 
   declare static validate: <T extends ValidatableRecord = ValidatableRecord>(
-    methodOrFn: string | ((record: T) => unknown),
-    options?: ConditionalOptions,
+    ...args: Array<string | ((record: T) => unknown) | ConditionalOptions>
   ) => void;
 
   declare static validatesEach: <T extends ValidatableRecord = ValidatableRecord>(

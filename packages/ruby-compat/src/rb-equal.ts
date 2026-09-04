@@ -32,6 +32,13 @@ export function rbEqual(a: unknown, b: unknown): boolean {
       Array.isArray(b) && a.length === b.length && a.every((element, i) => rbEqual(element, b[i]))
     );
   }
+  /* A `Uint8Array` stands in for a Ruby binary String (the representation
+     `ActiveModel::Type::Binary#cast` produces, binary.rb:20-27), whose `==`
+     (`vendor/ruby/string.c:3269` `rb_str_equal`) compares bytes rather than
+     identity. */
+  if (a instanceof Uint8Array) {
+    return b instanceof Uint8Array && a.length === b.length && a.every((byte, i) => byte === b[i]);
+  }
   /* boundary: a JS Date is one of the values a ported `==` is handed, and
      Ruby's `Date#==` / `Time#==` (`vendor/ruby/time.c:3951` `time_cmp`)
      compare by value where JS `===` does not. */
