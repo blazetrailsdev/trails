@@ -293,9 +293,12 @@ export class FileUtils {
   /** `FileUtils.copy_file` (`vendor/ruby/lib/fileutils.rb:1076-1080`), whose
    * `Entry_#copy_file` (`fileutils.rb:2277-2283`) copies the bytes and
    * `copy_metadata` (`fileutils.rb:2285-2312`) the timestamps, ownership and
-   * mode. Ruby's `dereference` argument selects `Entry_#copy_file`'s symlink
-   * arm, which the filesystem backend has no `copyFileSync` flag for, so it is
-   * not accepted.
+   * mode. Ruby's `dereference` reaches only `Entry_#lstat`
+   * (`fileutils.rb:2192-2198`), which `copy_metadata` calls, so it selects an
+   * arm under `preserve` alone and only for a symlink source. `copyMetadata`
+   * stats rather than lstats and so has neither arm to select yet — the gap
+   * `fileutils-copy-metadata-loses-atime-and-the-symlink-arms` closes — and
+   * the argument is not accepted until it does.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
   static copyFile(src: string, dest: string, preserve = false): void {
