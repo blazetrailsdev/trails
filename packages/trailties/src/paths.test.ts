@@ -23,6 +23,7 @@ const stat = (d: boolean) => ({
   isDirectory: () => d,
   isFile: () => !d,
   size: 0,
+  atime: new Date(),
   mtime: new Date(),
 });
 function install(isDir = false): void {

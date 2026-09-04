@@ -63,6 +63,7 @@ const stat = (d: boolean) => ({
   isDirectory: () => d,
   isFile: () => !d,
   size: 0,
+  atime: FIXED_MTIME,
   mtime: FIXED_MTIME,
 });
 
