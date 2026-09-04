@@ -43,6 +43,21 @@ describe("IO", () => {
     });
   });
 
+  it("read fills the str buffer it is handed, and empties it at EOF", () => {
+    // vendor/ruby/io.c:3778 — `read(length, str)` fills str; io.c:3800 resizes
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "buffered");
+    writeFileSync(path, "abcdef");
+    const str = new Uint8Array(3);
+    File.open(path, "rb", (file) => {
+      expect(file.read(3, str)).toBe("abc");
+      expect([...str]).toEqual([0x61, 0x62, 0x63]);
+      expect(file.read(null, str)).toBe("def");
+      expect([...str]).toEqual([0x64, 0x65, 0x66]);
+      expect(file.read(3, str)).toBe(null);
+      expect([...str]).toEqual([0, 0, 0]);
+    });
+  });
+
   it("puts is one body, mixed into any receiver carrying a write", () => {
     const written: string[] = [];
     const out = { write: (string: string) => written.push(string) };
