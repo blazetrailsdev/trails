@@ -1,6 +1,6 @@
 import type { Session } from "./request/session.js";
 
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { OpenSSL, SecureRandom, type Bytes } from "@blazetrails/ruby-compat";
 
 const AUTHENTICITY_TOKEN_LENGTH = 32;
 const CSRF_TOKEN_HEADER = "X-CSRF-Token";
@@ -47,7 +47,7 @@ export class RequestForgeryProtection {
   }
 
   static generateToken(): string {
-    return getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH).toString("base64");
+    return SecureRandom.randomBytes(AUTHENTICITY_TOKEN_LENGTH).toString("base64");
   }
 
   getRealToken(session: Session): string {
@@ -61,7 +61,7 @@ export class RequestForgeryProtection {
 
   maskToken(rawToken: string): string {
     const tokenBytes = Buffer.from(rawToken, "base64");
-    const otp = Buffer.from(getCrypto().randomBytes(AUTHENTICITY_TOKEN_LENGTH));
+    const otp = Buffer.from(SecureRandom.randomBytes(AUTHENTICITY_TOKEN_LENGTH));
     const masked = Buffer.alloc(AUTHENTICITY_TOKEN_LENGTH * 2);
     otp.copy(masked, 0);
     for (let i = 0; i < AUTHENTICITY_TOKEN_LENGTH; i++) {
@@ -75,8 +75,8 @@ export class RequestForgeryProtection {
     const normalizedPath = this.normalizePath(actionPath);
     const normalizedMethod = method.toUpperCase();
     const message = `${normalizedPath}#${normalizedMethod}`;
-    const hmac = Buffer.from(getCrypto().createHmac("sha256", realToken).update(message).digest());
-    const perFormToken = hmac.subarray(0, AUTHENTICITY_TOKEN_LENGTH).toString("base64");
+    const hmac = OpenSSL.HMAC.digest("SHA256", realToken, message);
+    const perFormToken = (hmac.subarray(0, AUTHENTICITY_TOKEN_LENGTH) as Bytes).toString("base64");
     return this.maskToken(perFormToken);
   }
 
@@ -116,10 +116,10 @@ export class RequestForgeryProtection {
       const normalizedPath = this.normalizePath(options.actionPath);
       const normalizedMethod = options.method.toUpperCase();
       const message = `${normalizedPath}#${normalizedMethod}`;
-      const hmac = Buffer.from(
-        getCrypto().createHmac("sha256", realToken).update(message).digest(),
+      const hmac = OpenSSL.HMAC.digest("SHA256", realToken, message);
+      const expectedPerForm = (hmac.subarray(0, AUTHENTICITY_TOKEN_LENGTH) as Bytes).toString(
+        "base64",
       );
-      const expectedPerForm = hmac.subarray(0, AUTHENTICITY_TOKEN_LENGTH).toString("base64");
       if (this.secureCompare(unmasked, expectedPerForm)) return true;
     }
 

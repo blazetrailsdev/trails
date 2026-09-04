@@ -1,7 +1,7 @@
 import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { singularize } from "@blazetrails/activesupport";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat";
 import { rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
@@ -1011,7 +1011,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (options.name) return options.name as string;
     const expression = (options.expression as string | undefined) ?? "";
     const identifier = `${tableName}_${expression}_excl`;
-    const hashed = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    const hashed = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
     return `excl_rails_${hashed}`;
   }
 
@@ -1135,7 +1135,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
           ? [options.usingIndex as string]
           : [];
     const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
-    const hashed = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+    const hashed = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
     return `uniq_rails_${hashed}`;
   }
 

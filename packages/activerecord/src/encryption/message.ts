@@ -1,15 +1,16 @@
+import type { Bytes } from "@blazetrails/ruby-compat";
 import { Properties } from "./properties.js";
 import { ForbiddenClass } from "./errors.js";
 
 export class Message {
-  payload: string | Buffer;
+  payload: string | Bytes;
   headers: Properties;
 
   constructor({
     payload,
     headers = {},
   }: {
-    payload?: string | Buffer | null;
+    payload?: string | Bytes | null;
     headers?: Record<string, unknown> | Properties;
   } = {}) {
     this.validatePayloadType(payload);
@@ -17,7 +18,7 @@ export class Message {
     this.headers = new Properties(headers);
   }
 
-  equals(otherMessage: { payload: string | Buffer; headers: Properties | object }): boolean {
+  equals(otherMessage: { payload: string | Bytes; headers: Properties | object }): boolean {
     return (
       Buffer.from(this.payload).equals(Buffer.from(otherMessage.payload)) &&
       this.headers.equals(otherMessage.headers)

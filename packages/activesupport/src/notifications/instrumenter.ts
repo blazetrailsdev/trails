@@ -1,4 +1,4 @@
-import { ArgumentError, Process, getCrypto } from "@blazetrails/ruby-compat";
+import { ArgumentError, Process, SecureRandom } from "@blazetrails/ruby-compat";
 
 export type EventPayload = Record<string, unknown>;
 
@@ -204,7 +204,7 @@ export class Instrumenter {
   }
 
   private uniqueId(): string {
-    return getCrypto().randomBytes(10).toString("hex");
+    return SecureRandom.hex(10);
   }
 }
 

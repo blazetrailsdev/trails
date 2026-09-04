@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { cryptoAdapterConfig } from "./crypto-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { SecureRandom } from "./secure-random.js";
 
@@ -17,13 +18,27 @@ describe("SecureRandom", () => {
     expect(SecureRandom.bytes(20)).toHaveLength(20);
   });
 
+  it("uuid sets the version 4 and variant bits over random_bytes(16)", () => {
+    expect(SecureRandom.uuid()).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("uuid raises NotImplementedError without a random device", () => {
+    cryptoAdapterConfig.adapter = "no-such-random-device";
+    try {
+      expect(() => SecureRandom.uuid()).toThrow(NotImplementedError);
+    } finally {
+      cryptoAdapterConfig.adapter = null;
+    }
+  });
+
   it("gen_random raises NotImplementedError without a random device", () => {
-    const crypto = globalThis.crypto;
-    Reflect.deleteProperty(globalThis, "crypto");
+    cryptoAdapterConfig.adapter = "no-such-random-device";
     try {
       expect(() => SecureRandom.genRandom(4)).toThrow(NotImplementedError);
     } finally {
-      Object.defineProperty(globalThis, "crypto", { value: crypto, configurable: true });
+      cryptoAdapterConfig.adapter = null;
     }
   });
 });

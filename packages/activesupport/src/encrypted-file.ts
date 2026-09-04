@@ -1,5 +1,5 @@
 import {
-  getCrypto,
+  SecureRandom,
   FileUtils,
   IO,
   getFsAsync,
@@ -66,7 +66,7 @@ export class EncryptedFile {
   }
 
   static generateKey(): string {
-    return Buffer.from(getCrypto().randomBytes(MessageEncryptor.keyLen(CIPHER))).toString("hex");
+    return SecureRandom.hex(MessageEncryptor.keyLen(CIPHER));
   }
 
   static expectedKeyLength(): number {

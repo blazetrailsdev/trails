@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { OpenSSL } from "@blazetrails/ruby-compat";
 import type { Headers } from "@blazetrails/rack";
 
 export {
@@ -173,7 +173,7 @@ export type DigestCredentials = Record<string, string | undefined>;
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface DigestControllerHost extends DigestControllerLike {}
 
-const md5Hex = (data: string) => getCrypto().createHash("md5").update(data).digest("hex");
+const md5Hex = (data: string) => OpenSSL.Digest.MD5.hexdigest(data);
 
 export function digestAuthenticate(
   request: DigestRequestLike,

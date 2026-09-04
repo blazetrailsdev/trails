@@ -1,16 +1,17 @@
+import { getCrypto } from "./crypto-adapter.js";
+import type { Bytes } from "./fs-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 
 /**
  * `SecureRandom` (`vendor/ruby/lib/securerandom.rb:41`), extended with
- * `Random::Formatter` (`securerandom.rb:93`) so `random_bytes` and `hex` are
- * available on it the way every caller uses them.
+ * `Random::Formatter` (`securerandom.rb:93`) so `random_bytes`, `hex` and
+ * `uuid` are available on it the way every caller uses them.
  *
- * `gen_random` is the `Random.urandom` arm (`securerandom.rb:64-73`); Web
- * Crypto's `getRandomValues` is the system random device here, and its absence
- * raises the same `NotImplementedError, "No random device"` Ruby raises.
- *
- * Bytes are a Ruby binary String — one character per byte — as
- * `StringIO`'s buffer is, so `unpack1("H*")` is a per-character hex render.
+ * `gen_random` is the `Random.urandom` arm (`securerandom.rb:64-73`); the
+ * crypto adapter is the system random device. `Random.urandom` answers `nil`
+ * where `getCrypto()` raises, so the raise is caught back into that `nil` and
+ * the guard below raises the `NotImplementedError` Ruby raises. Bytes are a
+ * Ruby binary String, so `unpack1("H*")` is `toString("hex")`.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `SecureRandom` ships
  * with the interpreter and no Rails file defines it, but
@@ -20,13 +21,18 @@ import { NotImplementedError } from "./not-implemented-error.js";
  */
 export const SecureRandom = {
   /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/securerandom.rb:50 */
-  bytes(n: number): string {
+  bytes(n: number): Bytes {
     return SecureRandom.genRandom(n);
   },
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/securerandom.rb:64 */
-  genRandom(n: number): string {
-    const ret = (globalThis as { crypto?: Crypto }).crypto?.getRandomValues(new Uint8Array(n));
+  genRandom(n: number): Bytes {
+    let ret: Bytes | undefined;
+    try {
+      ret = getCrypto().randomBytes(n);
+    } catch {
+      ret = undefined;
+    }
     if (!ret) {
       throw new NotImplementedError("No random device");
     }
@@ -35,19 +41,35 @@ export const SecureRandom = {
         `Unexpected partial read from random device: only ${ret.length} for ${n} bytes`,
       );
     }
-    return String.fromCharCode(...ret);
+    return ret;
   },
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/random/formatter.rb:72 */
-  randomBytes(n: number | null = null): string {
+  randomBytes(n: number | null = null): Bytes {
     n = n != null ? n : 16;
     return SecureRandom.genRandom(n);
   },
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/random/formatter.rb:93 */
   hex(n: number | null = null): string {
-    return Array.from(SecureRandom.randomBytes(n), (char) =>
-      char.charCodeAt(0).toString(16).padStart(2, "0"),
-    ).join("");
+    return SecureRandom.randomBytes(n).toString("hex");
+  },
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/lib/random/formatter.rb:170 */
+  uuid(): string {
+    const bytes = SecureRandom.randomBytes(16);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const ary = [
+      view.getUint32(0),
+      view.getUint16(4),
+      view.getUint16(6),
+      view.getUint16(8),
+      view.getUint16(10),
+      view.getUint32(12),
+    ];
+    ary[2] = (ary[2] & 0x0fff) | 0x4000;
+    ary[3] = (ary[3] & 0x3fff) | 0x8000;
+    const hex = (value: number, width: number) => value.toString(16).padStart(width, "0");
+    return `${hex(ary[0], 8)}-${hex(ary[1], 4)}-${hex(ary[2], 4)}-${hex(ary[3], 4)}-${hex(ary[4], 4)}${hex(ary[5], 8)}`;
   },
 };

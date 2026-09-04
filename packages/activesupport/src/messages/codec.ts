@@ -1,3 +1,4 @@
+import type { Bytes } from "@blazetrails/ruby-compat";
 import { Metadata } from "./metadata.js";
 import {
   ArgumentError,
@@ -36,7 +37,7 @@ export class Codec extends Metadata {
   }
 
   protected override encode(
-    data: string | Buffer,
+    data: string | Bytes,
     { urlSafe = this.urlSafe }: { urlSafe?: boolean } = {},
   ): string {
     const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;

@@ -1,5 +1,5 @@
 import { ETAG, CACHE_CONTROL } from "./constants.js";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { Digest } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 
 const DEFAULT_CACHE_CONTROL = "max-age=0, private, must-revalidate";
@@ -52,7 +52,7 @@ export class ETag {
 
   /** @internal */
   private digestBody(body: string[]): string | null {
-    const sha = getCrypto().createHash("sha256");
+    const sha = Digest.SHA256.new();
     let hasContent = false;
     for (const part of body) {
       if (part.length > 0) {
@@ -60,6 +60,6 @@ export class ETag {
         hasContent = true;
       }
     }
-    return hasContent ? sha.digest("hex").substring(0, 32) : null;
+    return hasContent ? sha.hexdigest().substring(0, 32) : null;
   }
 }

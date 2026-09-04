@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { Digest } from "@blazetrails/ruby-compat";
 import { Configurable } from "./configurable-slot.js";
 import type { KeyGenerator } from "./key-generator.js";
 import { Properties } from "./properties.js";
@@ -14,7 +14,7 @@ export class Key {
 
   /** @missingRailsCall first — PERMANENT */
   get id(): string {
-    return getCrypto().createHash("sha1").update(this.secret).digest("hex").slice(0, 4);
+    return Digest.SHA1.hexdigest(this.secret).slice(0, 4);
   }
 
   static deriveFrom(password: string): Key {

@@ -1,3 +1,4 @@
+import type { Bytes } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import type { Properties } from "./properties.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
@@ -160,7 +161,7 @@ export class Encryptor {
     }
     if (keys.length === 0) throw new Decryption("No decryption key provided");
 
-    let decrypted: Buffer;
+    let decrypted: Bytes;
     try {
       decrypted = this.cipher().decrypt(message, { ...options?.cipherOptions, key: keys });
     } catch (e) {
@@ -277,7 +278,7 @@ export class Encryptor {
   }
 
   /** @internal */
-  private uncompressIfNeeded(data: Buffer, compressed: boolean): string {
+  private uncompressIfNeeded(data: Bytes, compressed: boolean): string {
     if (compressed) {
       return this.uncompress(data);
     }

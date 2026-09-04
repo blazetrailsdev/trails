@@ -2,7 +2,7 @@ import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
 import { Store, inspectOptions, type StoreOptions } from "./store.js";
-import { kernelInteger } from "@blazetrails/ruby-compat";
+import { kernelInteger, Process } from "@blazetrails/ruby-compat";
 import { registerStoreClass } from "./store-registry.js";
 
 const PER_ENTRY_OVERHEAD = 240;
@@ -156,14 +156,14 @@ export class MemoryStore extends Store implements CacheStore {
     if (this.isPruning()) return;
     this._pruning = true;
     try {
-      const startTime = Date.now();
+      const startTime = Process.clockGettime(Process.CLOCK_MONOTONIC);
       this.cleanup();
       this.instrument("prune", targetSize, { from: this.cacheSize }, () => {
         for (const key of [...this.data.keys()]) {
           this.deleteEntry(key, {});
           if (
             this.cacheSize <= targetSize ||
-            (maxTime != null && (Date.now() - startTime) / 1000 > maxTime)
+            (maxTime != null && Process.clockGettime(Process.CLOCK_MONOTONIC) - startTime > maxTime)
           ) {
             return;
           }

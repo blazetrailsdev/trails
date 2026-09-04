@@ -1,5 +1,5 @@
 import { include as includeMixin } from "@blazetrails/activesupport";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 import type { RackApp } from "@blazetrails/rack";
 import type { PersistedRequest } from "@blazetrails/rack-session";
 import { Persisted, PersistedSecure, SessionId } from "@blazetrails/rack-session";
@@ -26,7 +26,7 @@ export const Compatibility = {
   },
 
   generateSid(this: unknown): string {
-    return getCrypto().randomBytes(16).toString("hex");
+    return SecureRandom.hex(16);
   },
 
   /** @internal */
@@ -109,7 +109,7 @@ export class AbstractSecureStore extends PersistedSecure {
   }
 
   override generateSid(): SessionId {
-    return new SessionId(getCrypto().randomBytes(16).toString("hex"));
+    return new SessionId(SecureRandom.hex(16));
   }
 
   /** @internal */

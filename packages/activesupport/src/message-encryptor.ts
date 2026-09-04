@@ -1,4 +1,4 @@
-import { getCrypto, prepend } from "@blazetrails/ruby-compat";
+import { getCrypto, prepend, SecureRandom, type Bytes } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "./message-verifier.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
@@ -136,18 +136,15 @@ export class MessageEncryptor extends Codec {
   private encrypt(data: string): string {
     const spec = this.newCipher();
     const key = this.secret.slice(0, spec.keyLen);
-    const iv = Buffer.from(getCrypto().randomBytes(spec.ivLen));
+    const iv = SecureRandom.randomBytes(spec.ivLen);
 
     const cipher = getCrypto().createCipheriv(this.cipher, key, iv);
     if (this.aeadMode) cipher.setAAD?.(Buffer.alloc(0));
 
-    const encryptedData = Buffer.concat([
-      Buffer.from(cipher.update(data, "latin1")),
-      Buffer.from(cipher.final()),
-    ]);
+    const encryptedData = Buffer.concat([cipher.update(data, "latin1"), cipher.final()]);
 
-    const parts = [encryptedData, iv];
-    if (this.aeadMode) parts.push(Buffer.from(cipher.getAuthTag!()));
+    const parts: Bytes[] = [encryptedData, iv];
+    if (this.aeadMode) parts.push(cipher.getAuthTag!());
 
     return this.joinParts(parts);
   }
@@ -189,7 +186,7 @@ export class MessageEncryptor extends Codec {
     return this.memoLengthOfEncodedAuthTag;
   }
 
-  private joinParts(parts: Buffer[]): string {
+  private joinParts(parts: Bytes[]): string {
     return parts.map((part) => this.encode(part)).join(SEPARATOR);
   }
 
@@ -203,7 +200,7 @@ export class MessageEncryptor extends Codec {
     }
   }
 
-  private extractParts(encryptedMessage: string): Buffer[] {
+  private extractParts(encryptedMessage: string): Bytes[] {
     const parts: string[] = [];
     let rindex = encryptedMessage.length;
 

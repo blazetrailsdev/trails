@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { Cipher, getCrypto } from "./crypto-adapter.js";
+import { getCrypto } from "./crypto-adapter.js";
+import { Cipher } from "./openssl.js";
 
 describe("Cipher", () => {
   it("mints a random iv of the cipher's iv length before the underlying cipher exists", () => {

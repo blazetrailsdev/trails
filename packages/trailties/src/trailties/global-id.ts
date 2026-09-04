@@ -1,3 +1,4 @@
+import type { Bytes } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
   dasherize,
@@ -28,7 +29,7 @@ export interface TrailtieApp {
   railtieName: string;
   config: { get(key: string): unknown; set(key: string, value: unknown): void };
   deprecators?: Deprecators;
-  keyGenerator(): { generateKey(salt: string): string | Buffer };
+  keyGenerator(): { generateKey(salt: string): string | Bytes };
 }
 
 export class Trailtie extends BaseTrailtie {

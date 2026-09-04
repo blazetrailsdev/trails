@@ -1,4 +1,4 @@
-import { getCrypto, prepend } from "@blazetrails/ruby-compat";
+import { getCrypto, OpenSSL, prepend, type Bytes } from "@blazetrails/ruby-compat";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
 import {
@@ -39,10 +39,10 @@ export class MessageVerifier extends Codec {
   declare onRotation: (callback: OnRotation) => this;
   declare fallBackTo: (fallback: MessageVerifier) => this;
 
-  private secret: string | Buffer;
+  private secret: string | Bytes;
   private digest: string;
 
-  constructor(secret: string | Buffer, options: MessageVerifierOptions = {}) {
+  constructor(secret: string | Bytes, options: MessageVerifierOptions = {}) {
     if (secret == null) throw new ArgumentError("Secret should not be nil.");
     super({
       serializer: options.serializer,
@@ -126,9 +126,8 @@ export class MessageVerifier extends Codec {
     }
   }
 
-  /** @missingRailsCall hexdigest — PERMANENT */
   private generateDigest(data: string): string {
-    return getCrypto().createHmac(this.digest, this.secret).update(data).digest("hex");
+    return OpenSSL.HMAC.hexdigest(this.digest, this.secret, data);
   }
 
   protected override decode(

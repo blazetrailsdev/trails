@@ -1,6 +1,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../../abstract-adapter.js";
 import { ConnectionTimeoutError } from "../../../errors.js";
 import { include, type Included } from "@blazetrails/activesupport";
+import { Process } from "@blazetrails/ruby-compat";
 
 interface Waiter {
   resolve: () => void;
@@ -217,7 +218,7 @@ export class Queue {
   private async waitPoll(timeout: number): Promise<DatabaseAdapter> {
     this._numWaiting += 1;
 
-    const t0 = Date.now();
+    const t0 = Process.clockGettime(Process.CLOCK_MONOTONIC);
     let elapsed = 0;
     try {
       for (;;) {
@@ -225,7 +226,7 @@ export class Queue {
 
         if (this.any) return this.remove()!;
 
-        elapsed = (Date.now() - t0) / 1000;
+        elapsed = Process.clockGettime(Process.CLOCK_MONOTONIC) - t0;
         if (elapsed >= timeout) {
           const msg =
             `could not obtain a connection from the pool within ${timeout.toFixed(3)} seconds ` +

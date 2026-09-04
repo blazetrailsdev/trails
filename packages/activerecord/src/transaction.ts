@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 import { Transaction as InternalTransaction } from "./connection-adapters/abstract/transaction.js";
 
 export class Transaction {
@@ -35,7 +35,7 @@ export class Transaction {
   uuid(): string | null {
     if (this.isClosed()) return null;
     if (!this._uuid) {
-      this._uuid = getCrypto().randomUUID();
+      this._uuid = SecureRandom.uuid();
     }
     return this._uuid;
   }

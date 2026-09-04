@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { SecureRandom } from "@blazetrails/ruby-compat";
 
 const DIGITS = "0123456789".split("");
 const UPPERCASE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -20,14 +20,14 @@ export const BASE36_ALPHABET = [...DIGITS, ...LOWERCASE];
 function randomNumber(n: number): number {
   const limit = Math.floor(0x100000000 / n) * n;
   for (;;) {
-    const bytes = getCrypto().randomBytes(4);
+    const bytes = SecureRandom.randomBytes(4);
     const value = new DataView(bytes.buffer, bytes.byteOffset, 4).getUint32(0);
     if (value < limit) return value % n;
   }
 }
 
 export function base58(n: number | null = 16): string {
-  return Array.from(getCrypto().randomBytes(n ?? 16))
+  return Array.from(SecureRandom.randomBytes(n))
     .map((byte) => {
       let idx = byte % 64;
       if (idx >= 58) idx = randomNumber(58);
@@ -37,7 +37,7 @@ export function base58(n: number | null = 16): string {
 }
 
 export function base36(n: number | null = 16): string {
-  return Array.from(getCrypto().randomBytes(n ?? 16))
+  return Array.from(SecureRandom.randomBytes(n))
     .map((byte) => {
       let idx = byte % 64;
       if (idx >= 36) idx = randomNumber(36);

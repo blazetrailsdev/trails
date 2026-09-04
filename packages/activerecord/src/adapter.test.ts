@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { Process } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AdapterError, ConnectionFailed } from "./errors.js";
@@ -772,7 +773,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       connection.cleanBang();
 
       (connection as unknown as { _lastActivity: number })._lastActivity =
-        Date.now() - 5 * 60 * 1000;
+        Process.clockGettime(Process.CLOCK_MONOTONIC) - 5 * 60;
 
       expect(await activePredicate(connection)).toBe(false);
 
@@ -803,7 +804,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
       connection.cleanBang();
 
       (connection as unknown as { _lastActivity: number })._lastActivity =
-        Date.now() - 5 * 60 * 1000;
+        Process.clockGettime(Process.CLOCK_MONOTONIC) - 5 * 60;
 
       expect(await activePredicate(connection)).toBe(false);
 

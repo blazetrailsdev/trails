@@ -1,4 +1,4 @@
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { getCrypto, OpenSSL, SecureRandom } from "@blazetrails/ruby-compat";
 
 export interface BasicAuthCredentials {
   username: string;
@@ -199,7 +199,7 @@ export const DigestAuth = {
   },
 
   ha1(username: string, realm: string, password: string): string {
-    return getCrypto().createHash("md5").update(`${username}:${realm}:${password}`).digest("hex");
+    return OpenSSL.Digest.MD5.hexdigest(`${username}:${realm}:${password}`);
   },
 
   hasDigestCredentials(authHeader: string | undefined): boolean {
@@ -212,7 +212,7 @@ export const DigestAuth = {
     options: { qop?: string; opaque?: string } = {},
   ): [number, Record<string, string>, string] {
     const nonce = DigestAuth.generateNonce(secret);
-    const opaque = options.opaque ?? getCrypto().randomBytes(16).toString("hex");
+    const opaque = options.opaque ?? SecureRandom.hex(16);
     const qop = options.qop ?? "auth";
     return [
       401,
