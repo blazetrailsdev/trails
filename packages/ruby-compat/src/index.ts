@@ -135,6 +135,7 @@ export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { SecureRandom } from "./secure-random.js";
 export { StringIO } from "./string-io.js";
+export { b } from "./string/b.js";
 export { chomp } from "./string/chomp.js";
 export { forceEncoding } from "./string/force-encoding.js";
 export { Encoding } from "./encoding.js";
