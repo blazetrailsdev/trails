@@ -13,7 +13,6 @@ describe("IO", () => {
   });
 
   it("binread answers one character per byte, and binwrite writes them back", () => {
-    // vendor/ruby/io.c:12242 opens under rb_ascii8bit_encoding (vendor/ruby/io.c:12257), so the answer is the file's bytes rather than a decoded String.
     const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "bytes.bin");
     writeFileSync(path, "héllo 日本");
     const bytes = IO.binread(path);

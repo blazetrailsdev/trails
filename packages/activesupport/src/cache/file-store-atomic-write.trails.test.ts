@@ -26,7 +26,6 @@ describe("FileStore atomic write and inspect", () => {
   });
 
   it("round-trips a non-ASCII payload through atomic_write and binread", () => {
-    // file_store.rb:127 writes through File.atomic_write, binmode at core_ext/file/atomic.rb:25, and :124 reads it back with File.binread (vendor/ruby/io.c:12242) — a BYTE round-trip on both sides.
     withStore((store) => {
       store.write("greeting", "héllo 日本 🚂");
       expect(store.read("greeting")).toBe("héllo 日本 🚂");

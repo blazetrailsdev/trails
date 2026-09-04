@@ -157,9 +157,6 @@ export class Tempfile {
    * goes out as its own bytes rather than being transcoded, so after this
    * {@link write} takes an ASCII-8BIT String — one character per byte, the
    * encoding `File.binread` answers in.
-   *
-   * @noRailsEquivalent PERMANENT — see {@link Tempfile}; Ruby core
-   *   `IO#binmode` (`vendor/ruby/io.c:6379`), which `Tempfile` delegates.
    */
   binmode(): this {
     this.binary = true;
