@@ -253,6 +253,11 @@ function copyMetadata(src: string, path: string, dereference: boolean): void {
  * `copy_entry` (`vendor/ruby/lib/fileutils.rb:1040-1053`), whose `wrap_traverse`
  * walks a directory tree and copies each entry with `Entry_#copy`
  * (`fileutils.rb:2239-2274`), then its `copy_metadata` under `preserve`.
+ *
+ * `FsStatResult` has no `chardev?` / `blockdev?` / `socket?` / `pipe?` / `door?`
+ * predicate, so `Entry_#copy`'s five raising arms (`fileutils.rb:2255-2271`) and
+ * its true `else` (`fileutils.rb:2273`) cannot be told apart and all land on the
+ * one `unknown file type` message.
  */
 function copyEntry(src: string, dest: string, preserve = false): void {
   const ent = entryLstat(src, false);
