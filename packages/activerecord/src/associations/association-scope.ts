@@ -243,7 +243,7 @@ export class AssociationScope {
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
-        primaryKey: joinPks,
+        associationPrimaryKey: () => joinPks,
         foreignKey: joinFks,
       });
     }
@@ -318,7 +318,7 @@ export class AssociationScope {
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ownerName,
         name,
-        primaryKey: joinPks,
+        associationPrimaryKey: () => joinPks,
         foreignKey: joinFks,
       });
     }

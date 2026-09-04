@@ -469,7 +469,7 @@ export function scope(
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
-        primaryKey,
+        associationPrimaryKey: () => primaryKey,
         foreignKey,
       });
     }
@@ -477,7 +477,7 @@ export function scope(
       throw new CompositePrimaryKeyMismatchError({
         activeRecord: ctor.name,
         name: assocName,
-        primaryKey,
+        associationPrimaryKey: () => primaryKey,
         foreignKey,
       });
     }
@@ -509,7 +509,7 @@ export function scope(
         throw new CompositePrimaryKeyMismatchError({
           activeRecord: ctor.name,
           name: assocName,
-          primaryKey: pkCols,
+          associationPrimaryKey: () => pkCols,
           foreignKey,
         });
       }

@@ -62,6 +62,67 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     return rubyField(fixtures, "calls");
   }
 
+  // Class fqn -> the module names recorded as `includes` on it.
+  function rubyIncludes(fixtures: Record<string, string>): Record<string, string[]> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "includes-rb-"));
+    try {
+      for (const [rel, src] of Object.entries(fixtures)) {
+        const p = path.join(dir, rel);
+        fs.mkdirSync(path.dirname(p), { recursive: true });
+        fs.writeFileSync(p, src);
+      }
+      const rels = JSON.stringify(Object.keys(fixtures));
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        JSON.parse(${JSON.stringify(rels)}).each do |rel|
+          ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
+        end
+        out = {}
+        ex.classes.each { |fqn, info| out[fqn] = info[:includes] }
+        puts JSON.generate(out)
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("does not attribute an on_load block's include to the enclosing class", () => {
+    // railtie.rb:271-273 — the module is included into ActiveJob::Base when
+    // active_job loads, NOT into ActiveRecord::Railtie. Attributing it to the
+    // enclosing class credits JobRuntime#instrument to a class Rails never
+    // puts it on, which is an expectation no faithful port can satisfy.
+    const includes = rubyIncludes({
+      "railtie.rb": `
+        module ActiveRecord
+          class Railtie < Rails::Railtie
+            initializer "active_record.log_runtime" do
+              ActiveSupport.on_load(:active_job) do
+                include ActiveRecord::Railties::JobRuntime
+              end
+            end
+          end
+        end
+      `,
+    });
+    expect(includes["ActiveRecord::Railtie"]).toEqual([]);
+  });
+
+  it("still attributes a class-body include to the enclosing class", () => {
+    const includes = rubyIncludes({
+      "base.rb": `
+        module ActiveRecord
+          class Base
+            include ActiveRecord::Core
+          end
+        end
+      `,
+    });
+    expect(includes["ActiveRecord::Base"]).toEqual(["ActiveRecord::Core"]);
+  });
+
   function rubySkeletons(fixtures: Record<string, string>): Record<string, string[] | undefined> {
     return rubyField(fixtures, "skeleton");
   }
