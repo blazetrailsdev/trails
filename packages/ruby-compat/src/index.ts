@@ -154,3 +154,16 @@ export type { TempfileBasename } from "./tempfile.js";
 export { TypeError } from "./type-error.js";
 export { setVerbose, verbose } from "./verbose.js";
 export { Zlib } from "./zlib.js";
+export {
+  BadURIError,
+  Generic,
+  HTTP,
+  HTTPS,
+  InvalidComponentError,
+  InvalidURIError,
+  RFC2396_PARSER,
+  RFC2396Parser,
+  RFC3986_PARSER,
+  RFC3986Parser,
+  URI,
+} from "./uri.js";

@@ -15,13 +15,6 @@
     "tsFile": "routing/inspector.ts",
     "rubyName": "normalize_filter",
     "call": "escape",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "routing/inspector.ts",
-    "rubyName": "normalize_filter",
-    "call": "escape",
     "kind": "rubyCompat",
     "tsExport": "regexpEscape",
     "reason": "Baseline (RFC 0129): the call is `URI::RFC2396_PARSER.escape` (inspector.rb:104), URI percent-escaping — not `Regexp.escape`; the name-keyed table cannot tell the two receivers apart."

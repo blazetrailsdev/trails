@@ -20,13 +20,6 @@
     "tsFile": "utils.ts",
     "rubyName": "escape_path",
     "call": "escape",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "utils.ts",
-    "rubyName": "escape_path",
-    "call": "escape",
     "kind": "rubyCompat",
     "tsExport": "regexpEscape",
     "reason": "Baseline (RFC 0129): the call is `URI_PARSER.escape` (rack utils.rb:47), URI percent-escaping — not `Regexp.escape`; the name-keyed table cannot tell the two receivers apart."
