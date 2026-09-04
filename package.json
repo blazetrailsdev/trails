@@ -2,7 +2,7 @@
   "name": "trails",
   "private": true,
   "license": "SEE LICENSE IN LICENSES.md",
-  "packageManager": "pnpm@11.5.1",
+  "packageManager": "pnpm@12.3.4",
   "scripts": {
     "build": "tsc --build",
     "tasks": "scripts/tasks/tasks.sh",
