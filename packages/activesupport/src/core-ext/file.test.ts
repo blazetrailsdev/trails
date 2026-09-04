@@ -72,7 +72,7 @@ describe("AtomicWriteTest", () => {
   it("atomic write preserves file permissions same directory", () => {
     chmodSync(dir, 0o700);
 
-    const probedPermissions = probeStatIn(dir)!.mode!.toString(8);
+    const probedPermissions = probeStatIn(dir)!.mode.toString(8);
 
     atomicWrite(join(dir, "atomic.file"), undefined, () => undefined);
 
