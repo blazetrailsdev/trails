@@ -1,6 +1,6 @@
 import { underscore } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
-import { escapePath } from "../journey/router/utils.js";
+import { RFC2396_PARSER } from "@blazetrails/ruby-compat";
 import type { Route } from "./route.js";
 
 export interface InspectedRoute {
@@ -177,7 +177,8 @@ export class RoutesInspector {
     }
     if (filter.grep) {
       const re = new RegExp(filter.grep);
-      const normalizedPath = ("/" + escapePath(filter.grep)).replace(/\/+/g, "/");
+      const path = RFC2396_PARSER.escape(filter.grep);
+      const normalizedPath = ("/" + path).replace(/\/+/g, "/");
       return {
         controller: re,
         action: re,

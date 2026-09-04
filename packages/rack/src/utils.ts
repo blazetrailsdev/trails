@@ -7,7 +7,7 @@ import {
   QueryLimitError,
   ParamsTooDeepError,
 } from "./query-parser.js";
-import { ArgumentError, Process } from "@blazetrails/ruby-compat";
+import { ArgumentError, Process, RFC2396_PARSER } from "@blazetrails/ruby-compat";
 
 export { ArgumentError };
 
@@ -85,8 +85,10 @@ export function escape(s: string | { toString(): string }): string {
   return encodeURIComponent(String(s)).replace(/%20/g, "+");
 }
 
+const URI_PARSER = RFC2396_PARSER;
+
 export function escapePath(s: string): string {
-  return encodeURI(s);
+  return URI_PARSER.escape(s);
 }
 
 export function unescapePath(s: string): string {
