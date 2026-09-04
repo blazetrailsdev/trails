@@ -231,13 +231,14 @@ describe("FileUtils", () => {
     const src = nodePath.join(root, "src");
     const dest = nodePath.join(root, "dest");
     nodeFs.writeFileSync(src, "contents");
-    const atime = new Date(Date.UTC(2001, 1, 3, 4, 5, 6));
     const mtime = new Date(Date.UTC(2002, 3, 5, 6, 7, 8));
-    nodeFs.utimesSync(src, atime, mtime);
+    nodeFs.utimesSync(src, new Date(Date.UTC(2001, 1, 3, 4, 5, 6)), mtime);
 
     FileUtils.copyFile(src, dest, true);
 
-    expect(nodeFs.statSync(dest).atime.getTime()).toEqual(atime.getTime());
+    const srcStat = nodeFs.statSync(src);
+    expect(srcStat.atime.getTime()).not.toEqual(mtime.getTime());
+    expect(nodeFs.statSync(dest).atime.getTime()).toEqual(srcStat.atime.getTime());
     expect(nodeFs.statSync(dest).mtime.getTime()).toEqual(mtime.getTime());
   });
 
