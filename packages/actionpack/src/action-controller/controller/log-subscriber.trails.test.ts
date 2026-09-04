@@ -77,6 +77,10 @@ describe("ACLogSubscriberTest", () => {
       "send_file",
       "redirect_to",
       "send_data",
+      "write_fragment",
+      "read_fragment",
+      "exist_fragment?",
+      "expire_fragment",
     ]);
     expect(silencedBy({ "info?": true, "debug?": false, "error?": true })).toEqual([
       "unpermitted_parameters",

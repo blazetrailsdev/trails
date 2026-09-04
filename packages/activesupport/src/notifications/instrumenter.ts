@@ -10,6 +10,8 @@ export class Event {
   private _end: number | null;
   private _cpuTimeStart = 0.0;
   private _cpuTimeFinish = 0.0;
+  private _allocationCountStart = 0;
+  private _allocationCountFinish = 0;
   private _gcTimeStart = 0;
   private _gcTimeFinish = 0;
 
@@ -66,12 +68,14 @@ export class Event {
     this._time = this.now();
     this._cpuTimeStart = this.nowCpu();
     this._gcTimeStart = this.nowGc();
+    this._allocationCountStart = this.nowAllocations();
   }
 
   finishBang(): void {
     this._cpuTimeFinish = this.nowCpu();
     this._gcTimeFinish = this.nowGc();
     this._end = this.now();
+    this._allocationCountFinish = this.nowAllocations();
   }
 
   get cpuTime(): number {
@@ -81,6 +85,10 @@ export class Event {
   get idleTime(): number {
     const diff = this.duration - this.cpuTime;
     return diff > 0.0 ? diff : 0.0;
+  }
+
+  get allocations(): number {
+    return this._allocationCountFinish - this._allocationCountStart;
   }
 
   get gcTime(): number {
@@ -100,6 +108,10 @@ export class Event {
   }
 
   private nowGc(): number {
+    return 0;
+  }
+
+  private nowAllocations(): number {
     return 0;
   }
 }

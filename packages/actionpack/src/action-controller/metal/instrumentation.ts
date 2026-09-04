@@ -81,18 +81,16 @@ export function cleanupViewRuntime<T>(block: () => T): T {
 
 /** @internal */
 export function appendInfoToPayload(
-  this: { viewRuntime?: number } | undefined,
+  this: { viewRuntime?: number | null } | undefined,
   payload: Record<string, unknown>,
 ): void {
-  if (this && this.viewRuntime !== undefined) {
-    payload.viewRuntime = this.viewRuntime;
-  }
+  payload.view_runtime = this?.viewRuntime;
 }
 
 export function logProcessAction(payload: Record<string, unknown>): string[] {
   const messages: string[] = [];
-  const viewRuntime = payload.view_runtime ?? payload.viewRuntime;
-  if (viewRuntime !== undefined && viewRuntime !== null) {
+  const viewRuntime = payload.view_runtime;
+  if (viewRuntime != null && viewRuntime !== false) {
     messages.push(`Views: ${Number(viewRuntime).toFixed(1)}ms`);
   }
   return messages;

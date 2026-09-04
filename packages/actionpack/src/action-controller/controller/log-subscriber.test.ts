@@ -79,7 +79,7 @@ describe("ACLogSubscriberTest", () => {
     subscriber.haltedCallback(
       makeEvent("halted_callback.action_controller", { filter: ":redirector" }),
     );
-    expect(logger.messages[0]).toBe('Filter chain halted as ":redirector" rendered or redirected');
+    expect(logger.messages[0]).toBe("Filter chain halted as :redirector rendered or redirected");
   });
 
   it("process action", () => {

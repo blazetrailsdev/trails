@@ -382,7 +382,9 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * whose `rb_hash_aref` yields to the default_proc on a miss the way `[]`
    * does, and whose remaining keys go to `rb_obj_dig`
    * (`vendor/ruby/object.c:3906`): `nil` ends the walk, an Array is indexed
-   * through `rb_ary_at`, an object that answers `dig` is handed the rest, and
+   * through `rb_ary_at` — whose index goes through `NUM2LONG`
+   * (`vendor/ruby/array.c:1881-1883`), so a String identifier is a TypeError
+   * there and not an index — an object that answers `dig` is handed the rest, and
    * anything else is `no_dig_method`'s TypeError (`object.c:3897-3900`).
    */
   dig(key: string, ...identifiers: (string | number)[]): unknown {
@@ -391,8 +393,11 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
       const identifier = identifiers[i];
       if (obj == null) return undefined;
       if (Array.isArray(obj)) {
-        const index = Number(identifier);
-        obj = obj[index < 0 ? obj.length + index : index];
+        if (typeof identifier !== "number") {
+          // eslint-disable-next-line blazetrails/rails-error-parity
+          throw new TypeError(`no implicit conversion of ${rbObjClass(identifier)} into Integer`);
+        }
+        obj = obj[identifier < 0 ? obj.length + identifier : identifier];
         continue;
       }
       const dig = (obj as { dig?: unknown }).dig;

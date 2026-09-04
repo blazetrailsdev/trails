@@ -191,7 +191,7 @@ export class Metal extends AbstractController {
     const reqParams = request.parameters;
     this.params = reqParams instanceof Parameters ? reqParams : new Parameters(reqParams);
 
-    await this.processAction(name);
+    await this.process(name);
 
     request.commitFlash();
 

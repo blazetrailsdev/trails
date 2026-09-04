@@ -2,7 +2,11 @@ import "./trailties/active-support.js";
 import "./trailties/action-dispatch.js";
 import { EnvironmentInquirer } from "@blazetrails/activesupport";
 import { getEnv } from "@blazetrails/activesupport";
-import { trailsLogger, _setTrailsLogger } from "@blazetrails/activesupport";
+import {
+  trailsLogger,
+  _setTrailsLogger,
+  _setTrails as _setTrailsConst,
+} from "@blazetrails/activesupport";
 import type { CacheStore, Logger } from "@blazetrails/activesupport";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
@@ -124,3 +128,4 @@ export function _resetTrailsEnv(): void {
 }
 
 _setTrails(Trails);
+_setTrailsConst(Trails as unknown as { env: { "development?"(): boolean } });

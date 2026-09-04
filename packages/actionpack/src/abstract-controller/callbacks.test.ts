@@ -24,7 +24,7 @@ Callback1.beforeAction((c) => (c as Callback1).first());
 describe("TestCallbacks1", () => {
   it("basic callbacks work", async () => {
     const controller = new Callback1();
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.responseBody).toBe("Hello world");
   });
 });
@@ -65,23 +65,23 @@ describe("TestCallbacks2", () => {
   });
 
   it("before_action works", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.responseBody).toBe("Hello world");
   });
 
   it("after_action works", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.second).toBe("Goodbye");
   });
 
   it("around_action works", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.aroundz).toBe("FIRSTSECOND");
   });
 
   it("before_action with overwritten condition", async () => {
     const overwriteController = new Callback2Overwrite();
-    await overwriteController.processAction("index");
+    await overwriteController.process("index");
     expect(overwriteController.responseBody).toBe("");
   });
 });
@@ -107,12 +107,12 @@ describe("TestCallbacks3", () => {
   });
 
   it("before_action works with procs", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.responseBody).toBe("Hello world");
   });
 
   it("after_action works with procs", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.second).toBe("Goodbye");
   });
 });
@@ -148,17 +148,17 @@ describe("TestCallbacksWithConditions", () => {
   });
 
   it("when :only is specified, a before action is triggered on that action", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.responseBody).toBe("Hello, World");
   });
 
   it("when :only is specified, a before action is not triggered on other actions", async () => {
-    await controller.processAction("sekrit_data");
+    await controller.process("sekrit_data");
     expect(controller.responseBody).toBe("true");
   });
 
   it("when :except is specified, an after action is not triggered on that action", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.authenticated).toBeUndefined();
   });
 });
@@ -198,13 +198,13 @@ describe("TestCallbacksWithReusedConditions", () => {
   });
 
   it("when :only is specified, both actions triggered on that action", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.responseBody).toBe("Hello, World");
     expect(controller.authenticated).toBe("true");
   });
 
   it("when :only is specified, both actions are not triggered on other actions", async () => {
-    await controller.processAction("public_data");
+    await controller.process("public_data");
     expect(controller.responseBody).toBe("false");
   });
 });
@@ -241,17 +241,17 @@ describe("TestCallbacksWithArrayConditions", () => {
   });
 
   it("when :only is specified with an array, a before action is triggered on that action", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.responseBody).toBe("Hello, World");
   });
 
   it("when :only is specified with an array, a before action is not triggered on other actions", async () => {
-    await controller.processAction("sekrit_data");
+    await controller.process("sekrit_data");
     expect(controller.responseBody).toBe("true");
   });
 
   it("when :except is specified with an array, an after action is not triggered on that action", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.authenticated).toBeUndefined();
   });
 });
@@ -273,12 +273,12 @@ describe("TestCallbacksWithChangedConditions", () => {
   });
 
   it("when a callback is modified in a child with :only, it works for the :only action", async () => {
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.responseBody).toBe("Hello world");
   });
 
   it("when a callback is modified in a child with :only, it does not work for other actions", async () => {
-    await controller.processAction("not_index");
+    await controller.process("not_index");
     expect(controller.responseBody).toBe("");
   });
 });
@@ -296,7 +296,7 @@ SetsResponseBody.beforeAction((c) => (c as SetsResponseBody).setBody());
 describe("TestHalting", () => {
   it("when a callback sets the response body, the action should not be invoked", async () => {
     const controller = new SetsResponseBody();
-    await controller.processAction("index");
+    await controller.process("index");
     expect(controller.responseBody).toBe("Success");
   });
 });
@@ -315,7 +315,7 @@ CallbacksWithArgs.beforeAction((c) => (c as CallbacksWithArgs).first());
 describe("TestCallbacksWithArgs", () => {
   it("callbacks still work when invoking process with multiple arguments", async () => {
     const controller = new CallbacksWithArgs();
-    await controller.processAction("index", " Howdy!");
+    await controller.process("index", " Howdy!");
     expect(controller.responseBody).toBe("Hello world Howdy!");
   });
 });
@@ -336,11 +336,11 @@ describe("TestCallbacksWithMissingConditions", () => {
   async function runAndCatch(C: typeof AbstractController): Promise<Error> {
     const c = new C();
     try {
-      await c.processAction("index");
+      await c.process("index");
     } catch (e) {
       return e as Error;
     }
-    throw new Error("expected processAction to throw");
+    throw new Error("expected process to throw");
   }
 
   it("callbacks raise exception when their 'only' condition is a missing action", async () => {
@@ -397,7 +397,7 @@ describe("AbstractController::Base — trails-only", () => {
       async index() {}
     }
     const c = new TestController();
-    await c.processAction("index");
+    await c.process("index");
     expect(c.actionName).toBe("index");
   });
 
@@ -410,7 +410,7 @@ describe("AbstractController::Base — trails-only", () => {
   it("throws ActionNotFound for missing action", async () => {
     class EmptyController extends AbstractController {}
     const c = new EmptyController();
-    await expect(c.processAction("missing")).rejects.toThrow(ActionNotFound);
+    await expect(c.process("missing")).rejects.toThrow(ActionNotFound);
   });
 
   it("available actions lists instance methods", () => {

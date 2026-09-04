@@ -101,4 +101,21 @@ describe("ActionController::Instrumentation#process_action", () => {
     expect(events).toHaveLength(1);
     expect(events[0].status).toBe(400);
   });
+
+  it("publishes process_action with the view_runtime the render measured", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends Base {
+      static actions = ["index"];
+      index(): void {
+        this.render({ plain: "hello" });
+      }
+    }
+    await new WidgetsController().dispatch("index", newRequest(), new Response());
+
+    expect(events).toHaveLength(1);
+    expect(typeof events[0].view_runtime).toBe("number");
+    expect(events[0].view_runtime).toBeGreaterThanOrEqual(0);
+  });
 });

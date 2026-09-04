@@ -1,15 +1,19 @@
 import {
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent as Event,
+  trails,
 } from "@blazetrails/activesupport";
+import { expandCacheKey } from "@blazetrails/activesupport/cache";
 import { HTTP_STATUS_CODES } from "@blazetrails/rack";
 import { Base } from "./base.js";
+import type { CachingClassMethods } from "../abstract-controller/caching.js";
 import { ExceptionWrapper } from "../action-dispatch/middleware/exception-wrapper.js";
 import {
   eachPair,
   inspect,
   isEmpty,
   isSymbol,
+  rbInspect,
   rbObjAsString,
   round,
   symbolToS,
@@ -65,55 +69,72 @@ export class LogSubscriber extends BaseLogSubscriber {
       let message =
         `Completed ${rbObjAsString(status)} ${rbObjAsString(HTTP_STATUS_CODES[status!])} in ${round(event.duration)}ms` +
         ` (${additions.join(" | ")})`;
-      const Trails = (globalThis as { Trails?: { env?: { isDevelopment(): boolean } } }).Trails;
-      if (Trails?.env != null && Trails.env.isDevelopment()) message += "\n\n";
+      if (trails != null && trails.env["development?"]()) message += "\n\n";
 
       return message;
     });
   }
 
-  halted(event: Event): void {
-    const { filter } = event.payload as { filter: string };
-    this._info(`Filter chain halted as ${filter} rendered or redirected`);
-  }
-
-  sendFile(event: Event): void {
-    const { path } = event.payload as { path: string };
-    this._info(`Sent file ${path} (${event.duration.toFixed(1)}ms)`);
-  }
-
-  sendData(event: Event): void {
-    const { filename } = event.payload as { filename?: string };
-    this._info(`Sent data ${filename ?? "(inline)"} (${event.duration.toFixed(1)}ms)`);
-  }
-
-  redirect(event: Event): void {
-    const { status, location } = event.payload as { status: number | string; location: string };
-    this._info(`Redirected to ${location} (${status})`);
-  }
-
   haltedCallback(event: Event): void {
-    const { filter } = event.payload as { filter: string };
-    this._info(`Filter chain halted as "${filter}" rendered or redirected`);
+    this._info(
+      () => `Filter chain halted as ${rbInspect(event.payload.filter)} rendered or redirected`,
+    );
+  }
+
+  /** @missingRailsArgs round — PERMANENT */
+  sendFile(event: Event): void {
+    this._info(() => `Sent file ${event.payload.path} (${round(event.duration, 1)}ms)`);
   }
 
   redirectTo(event: Event): void {
-    const { location } = event.payload as { location: string };
-    this._info(`Redirected to ${location}`);
+    this._info(() => `Redirected to ${event.payload.location}`);
+  }
+
+  /** @missingRailsArgs round — PERMANENT */
+  sendData(event: Event): void {
+    this._info(() => `Sent data ${event.payload.filename} (${round(event.duration, 1)}ms)`);
   }
 
   unpermittedParameters(event: Event): void {
-    const { keys, context } = event.payload as {
-      keys: string[];
-      context?: Record<string, string>;
-    };
-    const displayKeys = keys.map((k) => `:${k}`).join(", ");
-    const contextStr = context
-      ? `. Context: { ${Object.entries(context)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(", ")} }`
-      : "";
-    this._debug(`Unpermitted parameter${keys.length > 1 ? "s" : ""}: ${displayKeys}${contextStr}`);
+    this._debug(() => {
+      const unpermittedKeys = event.payload.keys as string[];
+      const displayUnpermittedKeys = unpermittedKeys.map((e) => `:${e}`).join(", ");
+      const context = Object.entries(event.payload.context as Record<string, unknown>)
+        .map(([k, v]) => `${k}: ${rbObjAsString(v)}`)
+        .join(", ");
+      return this.color(
+        `Unpermitted parameter${unpermittedKeys.length > 1 ? "s" : ""}: ${displayUnpermittedKeys}. Context: { ${context} }`,
+        LogSubscriber.RED,
+      );
+    });
+  }
+
+  writeFragment(event: Event): void {
+    if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
+    const key = expandCacheKey(event.payload.key ?? event.payload.path);
+    const humanName = "Write fragment";
+    this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
+  }
+
+  readFragment(event: Event): void {
+    if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
+    const key = expandCacheKey(event.payload.key ?? event.payload.path);
+    const humanName = "Read fragment";
+    this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
+  }
+
+  "existFragment?"(event: Event): void {
+    if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
+    const key = expandCacheKey(event.payload.key ?? event.payload.path);
+    const humanName = "Exist fragment?";
+    this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
+  }
+
+  expireFragment(event: Event): void {
+    if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
+    const key = expandCacheKey(event.payload.key ?? event.payload.path);
+    const humanName = "Expire fragment";
+    this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 }
 
@@ -124,5 +145,9 @@ LogSubscriber.subscribeLogLevel("send_file", "info");
 LogSubscriber.subscribeLogLevel("redirect_to", "info");
 LogSubscriber.subscribeLogLevel("send_data", "info");
 LogSubscriber.subscribeLogLevel("unpermitted_parameters", "debug");
+LogSubscriber.subscribeLogLevel("write_fragment", "info");
+LogSubscriber.subscribeLogLevel("read_fragment", "info");
+LogSubscriber.subscribeLogLevel("exist_fragment?", "info");
+LogSubscriber.subscribeLogLevel("expire_fragment", "info");
 
 LogSubscriber.attachTo("action_controller");

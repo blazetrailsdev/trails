@@ -1,3 +1,4 @@
+import { Benchmark } from "./benchmark.js";
 import { assertValidKeys } from "./hash-utils.js";
 
 export interface BenchmarkLogger {
@@ -60,24 +61,26 @@ export function benchmark<T>(
     options.level ||= "info";
 
     let result: T | Promise<T>;
-    const start = monotonicNow();
+    let start = 0;
+    let ms = Benchmark.realtime(":float_millisecond", () => {
+      start = monotonicNow();
+      if (options.silence && typeof logger.silence === "function") {
+        logger.silence(undefined, () => {
+          result = block();
+        });
+      } else {
+        result = block();
+      }
+    });
     const finish = (): T | Promise<Awaited<T>> => {
-      const ms = monotonicNow() - start;
       logger[options.level!](`${message} (${ms.toFixed(1)}ms)`);
       return result as Awaited<T>;
     };
 
-    if (options.silence && typeof logger.silence === "function") {
-      logger.silence(undefined, () => {
-        result = block();
-      });
-    } else {
-      result = block();
-    }
-
     if (result! instanceof Promise) {
       return (result as Promise<Awaited<T>>).then((val) => {
         result = val as T;
+        ms = monotonicNow() - start;
         finish();
         return val;
       });
