@@ -281,14 +281,14 @@ describe("RequestMimeType", () => {
 
   it("content type is XML", () => {
     const req = new Request({ CONTENT_TYPE: "application/xml" });
-    expect(req.contentMimeType?.symbol).toBe("xml");
+    expect(req.contentMimeType?.symbol).toBe(":xml");
     expect(req.mediaType).toBe("application/xml");
     expect(req.contentType).toBe("application/xml");
   });
 
   it("content type with charset", () => {
     const req = new Request({ CONTENT_TYPE: "application/xml; charset=UTF-8" });
-    expect(req.contentMimeType?.symbol).toBe("xml");
+    expect(req.contentMimeType?.symbol).toBe(":xml");
     expect(req.mediaType).toBe("application/xml");
   });
 
@@ -312,7 +312,7 @@ describe("RequestMimeType", () => {
     expect(req.negotiateMime([xml, json])).toBeNull();
     expect(req.negotiateMime([xml, MimeType.HTML])).toBe(MimeType.HTML);
     const all = MimeType.parse("*/*")[0];
-    expect(req.negotiateMime([xml, all])?.symbol).toBe("html");
+    expect(req.negotiateMime([xml, all])?.symbol).toBe(":html");
   });
 
   it("negotiate_mime with content_type", () => {
@@ -323,7 +323,7 @@ describe("RequestMimeType", () => {
     const xml = MimeType.lookup("xml");
     const csv = MimeType.lookup("csv");
     expect(req.negotiateMime([xml, csv])).toBe(xml);
-    expect(req.contentMimeType?.symbol).toBe("xml");
+    expect(req.contentMimeType?.symbol).toBe(":xml");
   });
 });
 
@@ -355,27 +355,27 @@ describe("RequestParamsParsing", () => {
 describe("RequestFormat", () => {
   it("xml format", () => {
     const req = new Request({ HTTP_ACCEPT: "application/xml" });
-    expect(req.format.symbol).toBe("xml");
+    expect(req.format.symbol).toBe(":xml");
   });
 
   it("xhtml format", () => {
     const req = new Request({ HTTP_ACCEPT: "application/xhtml+xml" });
-    expect(req.format.symbol).toBe("html");
+    expect(req.format.symbol).toBe(":html");
   });
 
   it("txt format", () => {
     const req = new Request({ HTTP_ACCEPT: "text/plain" });
-    expect(req.format.symbol).toBe("text");
+    expect(req.format.symbol).toBe(":text");
   });
 
   it("formats text/html with accept header", () => {
     const req = new Request({ HTTP_ACCEPT: "text/html" });
-    expect(req.format.symbol).toBe("html");
+    expect(req.format.symbol).toBe(":html");
   });
 
   it("formats blank with accept header", () => {
     const req = new Request({ HTTP_ACCEPT: "" });
-    expect(req.format.symbol).toBe("html");
+    expect(req.format.symbol).toBe(":html");
   });
 
   it("formats XMLHttpRequest with accept header", () => {
@@ -384,12 +384,12 @@ describe("RequestFormat", () => {
       HTTP_ACCEPT: "application/json",
     });
     expect(req.xhr).toBe(true);
-    expect(req.format.symbol).toBe("json");
+    expect(req.format.symbol).toBe(":json");
   });
 
   it("formats application/xml with accept header", () => {
     const req = new Request({ HTTP_ACCEPT: "application/xml" });
-    expect(req.format.symbol).toBe("xml");
+    expect(req.format.symbol).toBe(":xml");
   });
 
   it("XMLHttpRequest", () => {
@@ -408,7 +408,7 @@ describe("RequestFormat", () => {
       HTTP_ACCEPT: "text/html",
       "action_dispatch.request.parameters": { format: "json" },
     });
-    expect(req.format.symbol).toBe("json");
+    expect(req.format.symbol).toBe(":json");
   });
 
   it("formats with xhr request", () => {
@@ -421,7 +421,7 @@ describe("RequestFormat", () => {
 
   it("format taken from the path extension", () => {
     const r1 = new Request({ PATH_INFO: "/foo.xml", QUERY_STRING: "" });
-    expect(r1.formats.map((m) => m.symbol)).toEqual(["xml"]);
+    expect(r1.formats.map((m) => m.symbol)).toEqual([":xml"]);
     const r2 = new Request({ PATH_INFO: "/foo.123", QUERY_STRING: "" });
     expect(r2.formats).toEqual([MimeType.HTML]);
   });
@@ -432,17 +432,17 @@ describe("RequestFormat", () => {
       PATH_INFO: "/foo.xml",
       QUERY_STRING: "",
     });
-    expect(req.formats.map((m) => m.symbol)).toEqual(["json"]);
+    expect(req.formats.map((m) => m.symbol)).toEqual([":json"]);
   });
 
   it("can override format with parameter negative", () => {
     const req = new Request({ QUERY_STRING: "format=txt" });
-    expect(req.format.symbol).not.toBe("xml");
+    expect(req.format.symbol).not.toBe(":xml");
   });
 
   it("formats format:text with accept header", () => {
     const req = new Request({ QUERY_STRING: "format=txt" });
-    expect(req.formats.map((m) => m.symbol)).toEqual(["text"]);
+    expect(req.formats.map((m) => m.symbol)).toEqual([":text"]);
   });
 
   it("formats format:unknown with accept header", () => {
@@ -472,7 +472,7 @@ describe("RequestFormat", () => {
         HTTP_X_REQUESTED_WITH: "XMLHttpRequest",
         "action_dispatch.request.parameters": { format: "json" },
       });
-      expect(r4.formats.map((m) => m?.symbol)).toEqual(["json"]);
+      expect(r4.formats.map((m) => m?.symbol)).toEqual([":json"]);
     } finally {
       Request.ignoreAcceptHeader = prev;
     }

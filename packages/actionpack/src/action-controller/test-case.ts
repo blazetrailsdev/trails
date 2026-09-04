@@ -472,11 +472,11 @@ export class TestRequest extends AbstractTestRequest {
         const mediaType = ct.split(";")[0].trim().toLowerCase();
         const mimeSymbol = MimeType.lookup(mediaType).symbol ?? mediaType;
 
-        if (mimeSymbol === "json") {
+        if (mimeSymbol === ":json") {
           data = JSON.stringify(nonPathParameters);
         } else if (
-          mimeSymbol === "xml" ||
-          mimeSymbol === "url_encoded_form" ||
+          mimeSymbol === ":xml" ||
+          mimeSymbol === ":url_encoded_form" ||
           ct.includes("application/x-www-form-urlencoded")
         ) {
           data = buildNestedQuery(nonPathParameters);

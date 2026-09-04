@@ -137,9 +137,9 @@ describe("parameterParsers registry", () => {
 
   it("normalizes MimeType keys via .symbol (Rails transform_keys parity)", () => {
     const xml: ParameterParser = () => ({});
-    const fakeMime = { symbol: "xml" };
+    const fakeMime = { symbol: ":xml" };
     Parameters.parameterParsers = new Map<unknown, ParameterParser>([[fakeMime, xml]]);
-    expect(Parameters.parameterParsers).toEqual({ xml });
+    expect(Parameters.parameterParsers).toEqual({ ":xml": xml });
   });
 
   it("paramsParsers host helper forwards to the registry", () => {
@@ -170,8 +170,8 @@ describe("parameterParsers registry", () => {
 
   it("Request.parameterParsers static accessor drives Request#requestParameters", () => {
     const xml: ParameterParser = (raw) => ({ parsed: raw });
-    Request.parameterParsers = { ...DEFAULT_PARSERS, xml };
-    expect(Request.parameterParsers).toMatchObject({ xml });
+    Request.parameterParsers = { ...DEFAULT_PARSERS, ":xml": xml };
+    expect(Request.parameterParsers).toMatchObject({ ":xml": xml });
     const req = new Request({
       REQUEST_METHOD: "POST",
       CONTENT_TYPE: "application/xml",

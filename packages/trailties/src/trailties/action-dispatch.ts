@@ -16,6 +16,7 @@ import {
   MiddlewareStack,
 } from "@blazetrails/actionpack";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
 export interface ActionDispatchConfig {
   xSendfileHeader: string | null;
@@ -144,3 +145,5 @@ export class Trailtie extends BaseTrailtie {
     csp.contentSecurityPolicyNonceDirectives = cfg.nonceDirectives;
   }
 }
+
+setRubyClassPath(Trailtie, "ActionDispatch::Railtie");

@@ -77,12 +77,10 @@ describe("AttributeSetTest", () => {
   });
 
   it("deep_duping creates a new hash and dups each attribute", () => {
-    const builder = new Builder(
-      new Map([
-        ["foo", typeRegistry.lookup("integer")],
-        ["bar", typeRegistry.lookup("string")],
-      ]),
-    );
+    const builder = new Builder({
+      foo: typeRegistry.lookup("integer"),
+      bar: typeRegistry.lookup("string"),
+    });
     const attributes = builder.buildFromDatabase({ foo: 1, bar: "foo" });
 
     void attributes.getAttribute("foo").value;

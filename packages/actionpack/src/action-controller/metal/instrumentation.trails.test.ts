@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
+import { isSymbol } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
@@ -60,6 +61,8 @@ describe("ActionController::Instrumentation#process_action", () => {
     expect(events[0].method).toBe("GET");
     expect(events[0].path).toBe(request.filteredPath());
     expect(events[0].format).toBe(request.format.ref());
+    expect(events[0].format).toBe(":html");
+    expect(isSymbol(events[0].format)).toBe(true);
   });
 
   it("publishes process_action with the response status", async () => {

@@ -1,5 +1,5 @@
 import { ArgumentError, Notifications, runLoadHooks } from "@blazetrails/activesupport";
-import { File, getCrypto } from "@blazetrails/ruby-compat";
+import { File, getCrypto, symbolToS } from "@blazetrails/ruby-compat";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import { FlashHash } from "../action-dispatch/middleware/flash.js";
@@ -438,7 +438,8 @@ export class Base extends Metal {
     const collector = new Collector(mimes as string[], this.request?.variant ?? null);
     if (block) block(collector);
 
-    const format = this.request?.format?.symbol ?? undefined;
+    const symbol = this.request?.format?.symbol;
+    const format = symbol != null ? symbolToS(symbol) : undefined;
     const accept = this.request?.getHeader("accept") ?? undefined;
 
     const result = collector.negotiate({ format, accept });
@@ -782,7 +783,7 @@ export class Base extends Metal {
     if (!resolver) return;
 
     const controllerPrefix = this.controllerPath();
-    const format = this.request?.format?.symbol ?? "html";
+    const format = symbolToS(this.request?.format?.symbol ?? ":html");
     const template = resolver(controllerPrefix, action, format);
     if (template) {
       this.contentType = "text/html; charset=utf-8";

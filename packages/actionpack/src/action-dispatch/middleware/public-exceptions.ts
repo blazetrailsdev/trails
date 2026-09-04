@@ -46,10 +46,10 @@ export class PublicExceptions {
 
   private render(status: number, contentType: MimeType | undefined, body: ErrorBody): RackResponse {
     const sym = contentType?.symbol;
-    if (sym === "json") {
+    if (sym === ":json") {
       return this.renderFormat(status, contentType!, JSON.stringify(body));
     }
-    if (sym === "xml") {
+    if (sym === ":xml") {
       return this.renderFormat(status, contentType!, toXml(body));
     }
     return this.renderHtml(status);

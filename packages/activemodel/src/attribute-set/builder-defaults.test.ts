@@ -9,31 +9,31 @@ describe("LazyAttributeHash defaultAttributes", () => {
   const intType = typeRegistry.lookup("integer");
 
   it("returns the schema default attribute when key is in defaultAttributes but absent from values", () => {
-    const types = new Map([["status", strType]]);
+    const types = { status: strType };
     const defaults = { status: Attribute.withCastValue("status", "active", strType) };
-    const hash = new LazyAttributeHash(types, {}, new Map(), defaults);
+    const hash = new LazyAttributeHash(types, {}, {}, defaults);
 
     const attr = hash.getAttribute("status");
     expect(attr.value).toBe("active");
   });
 
   it("user-provided values override defaultAttributes", () => {
-    const types = new Map([["status", strType]]);
+    const types = { status: strType };
     const defaults = { status: Attribute.withCastValue("status", "active", strType) };
-    const hash = new LazyAttributeHash(types, { status: "archived" }, new Map(), defaults);
+    const hash = new LazyAttributeHash(types, { status: "archived" }, {}, defaults);
 
     expect(hash.getAttribute("status").value).toBe("archived");
   });
 
   it("materializing a mutable schema default twice does not share the value", () => {
     const arrayType = Object.create(new ValueType()) as typeof strType;
-    const types = new Map([["tags", arrayType]]);
+    const types = { tags: arrayType };
     const prototype = Attribute.withCastValue("tags", ["a"], arrayType);
     void prototype.value;
     const defaults = { tags: prototype };
 
-    const first = new LazyAttributeHash(types, {}, new Map(), defaults).getAttribute("tags");
-    const second = new LazyAttributeHash(types, {}, new Map(), defaults).getAttribute("tags");
+    const first = new LazyAttributeHash(types, {}, {}, defaults).getAttribute("tags");
+    const second = new LazyAttributeHash(types, {}, {}, defaults).getAttribute("tags");
     (first.value as string[]).push("b");
 
     expect(first.value).toEqual(["a", "b"]);
@@ -42,35 +42,28 @@ describe("LazyAttributeHash defaultAttributes", () => {
   });
 
   it("returns Uninitialized when key is absent from both values and defaultAttributes", () => {
-    const types = new Map([["age", intType]]);
+    const types = { age: intType };
     const hash = new LazyAttributeHash(types, {});
 
     expect(hash.getAttribute("age").isInitialized()).toBe(false);
   });
 
   it("Builder#buildFromDatabase casts a present value using additionalTypes override", () => {
-    const types = new Map([["score", strType]]);
+    const types = { score: strType };
     const builder = new Builder(types);
-    const additional = new Map([["score", intType]]);
+    const additional = { score: intType };
     const set = builder.buildFromDatabase({ score: "42" }, additional);
     expect(set.fetchValue("score")).toBe(42);
   });
 
   it("LazyAttributeHash uses additionalTypes for present values", () => {
-    const hash = new LazyAttributeHash(
-      new Map([["score", strType]]),
-      { score: "42" },
-      new Map([["score", intType]]),
-    );
+    const hash = new LazyAttributeHash({ score: strType }, { score: "42" }, { score: intType });
     expect(hash.getAttribute("score").value).toBe(42);
   });
 
   it("marshalDump/marshalLoad round-trips all five fields", () => {
-    const types = new Map([
-      ["status", strType],
-      ["score", strType],
-    ]);
-    const additional = new Map([["score", intType]]);
+    const types = { status: strType, score: strType };
+    const additional = { score: intType };
     const defaults = { status: Attribute.withCastValue("status", "active", strType) };
     const original = new LazyAttributeHash(types, { score: "42" }, additional, defaults);
     original.getAttribute("score");
@@ -82,7 +75,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
   });
 
   it("materialized default is detached from the prototype — mutation does not bleed across AttributeSets", () => {
-    const types = new Map([["status", strType]]);
+    const types = { status: strType };
     const defaultProto = Attribute.withCastValue("status", "active", strType);
     const defaults = { status: defaultProto };
 

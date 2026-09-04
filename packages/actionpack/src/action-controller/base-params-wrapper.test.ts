@@ -21,24 +21,24 @@ describe("Base ParamsWrapper wiring", () => {
 
   it("wrapParameters with hash merges format from current", () => {
     class A extends Base {}
-    A.wrapParameters({ format: ["json"] });
+    A.wrapParameters({ format: [":json"] });
     class B extends A {}
-    expect(B._wrapperOptions.format).toEqual(["json"]);
+    expect(B._wrapperOptions.format).toEqual([":json"]);
     B.wrapParameters({ include: ["x"] });
-    expect(B._wrapperOptions.format).toEqual(["json"]);
+    expect(B._wrapperOptions.format).toEqual([":json"]);
     expect(B._wrapperOptions.include).toEqual(["x"]);
   });
 
   it("wrapParameters derives default name from controller class when format enabled", () => {
     class UsersController extends Base {}
-    UsersController.wrapParameters({ format: ["json"] });
+    UsersController.wrapParameters({ format: [":json"] });
     expect(UsersController._wrapperOptions.name).toBe("user");
-    expect(UsersController._wrapperOptions.format).toEqual(["json"]);
+    expect(UsersController._wrapperOptions.format).toEqual([":json"]);
   });
 
   it("wrapParameters(false) disables wrapping by zeroing format", () => {
     class C extends Base {}
-    C.wrapParameters({ format: ["json"] });
+    C.wrapParameters({ format: [":json"] });
     C.wrapParameters(false);
     expect(C._wrapperOptions.format).toEqual([]);
   });
@@ -53,18 +53,18 @@ describe("Base ParamsWrapper wiring", () => {
 
   it("inheritedParamsWrapper rebinds klass when format is enabled", () => {
     class Parent extends Base {}
-    Parent.wrapParameters({ format: ["json"], name: "parent" });
+    Parent.wrapParameters({ format: [":json"], name: "parent" });
     class Child extends Parent {}
     Child.inheritedParamsWrapper();
     expect(Child._wrapperOptions.klass).toBe(Child);
     expect(Child._wrapperOptions.name).toBe("parent");
-    expect(Child._wrapperOptions.format).toEqual(["json"]);
+    expect(Child._wrapperOptions.format).toEqual([":json"]);
     expect(Parent._wrapperOptions.klass).toBe(Parent);
   });
 
   it("inheritedParamsWrapper re-derives auto-derived name from subclass klass", () => {
     class UsersController extends Base {}
-    UsersController.wrapParameters({ format: ["json"] });
+    UsersController.wrapParameters({ format: [":json"] });
     expect(UsersController._wrapperOptions.name).toBe("user");
     expect(UsersController._wrapperOptions.nameSet).toBe(false);
     class AdminsController extends UsersController {}
@@ -96,7 +96,7 @@ describe("Base ParamsWrapper wiring", () => {
         this.head(204);
       }
     }
-    WidgetsController.wrapParameters({ format: ["json"], name: "widget" });
+    WidgetsController.wrapParameters({ format: [":json"], name: "widget" });
     const request = new Request({
       REQUEST_METHOD: "POST",
       PATH_INFO: "/widgets",
@@ -123,7 +123,7 @@ describe("Base ParamsWrapper wiring", () => {
         this.head(204);
       }
     }
-    ThingsController.wrapParameters({ format: ["xml"], name: "thing" });
+    ThingsController.wrapParameters({ format: [":xml"], name: "thing" });
     const request = new Request({
       REQUEST_METHOD: "POST",
       PATH_INFO: "/things",

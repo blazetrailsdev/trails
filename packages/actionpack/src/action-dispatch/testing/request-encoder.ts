@@ -1,3 +1,4 @@
+import { symbolToS } from "@blazetrails/ruby-compat";
 import { MimeType } from "../http/mime-type.js";
 
 export type ResponseParser = (body: string) => unknown;
@@ -60,7 +61,7 @@ export class RequestEncoder {
   static parser(contentType: string | undefined): ResponseParser {
     const type =
       contentType && MimeType.isRegistered(contentType)
-        ? (MimeType.lookup(contentType).symbol ?? undefined)
+        ? symbolToS(MimeType.lookup(contentType).symbol ?? "")
         : undefined;
     return RequestEncoder.encoder(type).responseParser;
   }

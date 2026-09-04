@@ -5,6 +5,7 @@ import {
   TypeError,
   kernelFloat,
   kernelInteger,
+  rbInspect,
   regexpEscape,
 } from "@blazetrails/ruby-compat";
 import { Coder, type CoderCompressor, type CoderSerializer } from "./coder.js";
@@ -21,12 +22,6 @@ import { isEmpty } from "@blazetrails/ruby-compat";
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
 const DEFAULT_POOL_OPTIONS: StoreOptions = { size: 5, timeout: 5 };
-
-function inspect(value: unknown): string {
-  if (typeof value === "string") return JSON.stringify(value);
-  if (value === null || value === undefined) return "nil";
-  return String(value);
-}
 
 const Zlib: CoderCompressor = { deflate, inflate };
 
@@ -119,7 +114,7 @@ export abstract class Store {
       poolOptions = { ...DEFAULT_POOL_OPTIONS, ...hash };
     } else {
       // eslint-disable-next-line blazetrails/rails-error-parity
-      throw new TypeError(`Invalid :pool argument, expected Hash, got: ${inspect(poolOptions)}`);
+      throw new TypeError(`Invalid :pool argument, expected Hash, got: ${rbInspect(poolOptions)}`);
     }
 
     const result = poolOptions as StoreOptions;

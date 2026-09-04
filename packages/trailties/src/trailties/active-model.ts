@@ -2,6 +2,7 @@ import { type Deprecators } from "@blazetrails/activesupport";
 import { env as processEnv } from "@blazetrails/ruby-compat";
 import { SecurePassword, Error as ActiveModelError, deprecator } from "@blazetrails/activemodel";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
 export interface ActiveModelConfig {
   i18nCustomizeFullMessage?: boolean;
@@ -56,3 +57,5 @@ export class Trailtie extends BaseTrailtie {
     return processEnv.TRAILS_ENV || "development";
   }
 }
+
+setRubyClassPath(Trailtie, "ActiveModel::Railtie");

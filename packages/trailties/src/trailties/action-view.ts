@@ -1,6 +1,7 @@
 import { type Deprecators } from "@blazetrails/activesupport";
 import { Base, deprecator } from "@blazetrails/actionview";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
 export interface ActionViewConfig {
   embedAuthenticityTokenInRemoteForms: boolean | null;
@@ -47,3 +48,5 @@ export class Trailtie extends BaseTrailtie {
     });
   }
 }
+
+setRubyClassPath(Trailtie, "ActionView::Railtie");

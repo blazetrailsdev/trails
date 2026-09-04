@@ -17,6 +17,7 @@ import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-ada
 import { Configurable as EncryptionConfigurable } from "@blazetrails/activerecord/encryption";
 import { installExtendedQueriesIfConfigured } from "@blazetrails/activerecord/encryption/install";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { setRubyClassPath } from "../ruby-class-path-slot.js";
 
 type FrameworkDefaultsEntry = {
   partialInserts?: boolean;
@@ -190,3 +191,5 @@ export class Trailtie extends BaseTrailtie {
     });
   }
 }
+
+setRubyClassPath(Trailtie, "ActiveRecord::Railtie");
