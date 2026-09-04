@@ -55,7 +55,7 @@
     "parity:api:moves": "pnpm tsx scripts/api-compare/moves.ts",
     "parity:legacy-names": "pnpm tsx scripts/parity/lint-legacy-script-names.ts",
     "parity:api:conventions": "pnpm tsx scripts/parity/conventions-doc.ts",
-    "parity:api:deps": "pnpm vendor:fetch && LIB_PATHS_JSON=$(pnpm -s vendor:fetch --print-lib-paths) LOCKFILE_PATH=$PWD/vendor/sources.lock.json ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",
+    "parity:api:deps": "pnpm vendor:fetch && LIB_PATHS_JSON=$(pnpm --silent vendor:fetch --print-lib-paths) LOCKFILE_PATH=$PWD/vendor/sources.lock.json ruby scripts/api-compare/extract-ruby-api.rb && pnpm tsx scripts/api-compare/lint-deps.ts",
     "parity:test": "bash scripts/test-compare/run.sh",
     "parity:test:assertions": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts",
     "parity:test:assertions:reseed": "pnpm tsx scripts/test-compare/lint-assertion-mismatches.ts --write",

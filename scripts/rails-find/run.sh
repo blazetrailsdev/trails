@@ -20,14 +20,14 @@ done
 
 if [[ ! -f "$TEST_JSON" ]]; then
   echo "==> rails:find: building test manifest (one-time)…" >&2
-  TEST_PATHS_JSON="$(pnpm -s vendor:fetch --print-test-paths)" \
+  TEST_PATHS_JSON="$(pnpm --silent vendor:fetch --print-test-paths)" \
     ruby "$ROOT/scripts/test-compare/extract-ruby-tests.rb" >&2
 fi
 
 if [[ ! -f "$API_JSON" ]]; then
   echo "==> rails:find: building api manifest (one-time)…" >&2
-  LIB_PATHS_JSON="$(pnpm -s vendor:fetch --print-lib-paths)" \
-  LIB_ENTRY_FILES_JSON="$(pnpm -s vendor:fetch --print-lib-entry-files)" \
+  LIB_PATHS_JSON="$(pnpm --silent vendor:fetch --print-lib-paths)" \
+  LIB_ENTRY_FILES_JSON="$(pnpm --silent vendor:fetch --print-lib-entry-files)" \
     LOCKFILE_PATH="$ROOT/vendor/sources.lock.json" \
     ruby "$ROOT/scripts/api-compare/extract-ruby-api.rb" >&2
 fi

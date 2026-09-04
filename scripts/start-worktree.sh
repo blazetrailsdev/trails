@@ -185,7 +185,7 @@ echo "==> Linking upstream Ruby sources from main worktree"
 # back to fetching that source directly in the new worktree (slower; only
 # this worktree, not future ones). When local main catches up, future
 # worktrees will symlink as usual.
-VENDOR_PATHS="$(cd "$TARGET" && pnpm -s tsx vendor/fetch.ts --print-paths)"
+VENDOR_PATHS="$(cd "$TARGET" && pnpm --silent tsx vendor/fetch.ts --print-paths)"
 LOCK_JSON="$TARGET/vendor/sources.lock.json"
 while IFS= read -r src; do
   name="$(basename "$src")"
@@ -201,13 +201,13 @@ while IFS= read -r src; do
     want_sha="$(LOCKFILE="$LOCK_JSON" SOURCE_NAME="$name" node -e 'const fs=require("fs"); const lock=JSON.parse(fs.readFileSync(process.env.LOCKFILE,"utf8")); process.stdout.write(lock.sources[process.env.SOURCE_NAME]?.sha ?? "")')"
     if [[ -n "$want_sha" && "$main_sha" != "$want_sha" ]]; then
       echo "    $rel: main's clone HEAD ($main_sha) differs from target lockfile ($want_sha) — fetching into $TARGET"
-      ( cd "$TARGET" && pnpm -s vendor:fetch --source "$name" )
+      ( cd "$TARGET" && pnpm --silent vendor:fetch --source "$name" )
     else
       link_source "$rel"
     fi
   else
     echo "    $rel missing from main worktree — fetching into $TARGET (local main is behind)"
-    ( cd "$TARGET" && pnpm -s vendor:fetch --source "$name" )
+    ( cd "$TARGET" && pnpm --silent vendor:fetch --source "$name" )
   fi
 done <<< "$VENDOR_PATHS"
 

@@ -49,7 +49,7 @@ describe("vendor/fetch.ts parseArgs", () => {
 
   it("--print-test-paths emits valid JSON matching testPathsManifest()", async () => {
     // Spawn the CLI for real (not just parseArgs) so the integration that
-    // ruby relies on — `TEST_PATHS_JSON=$(pnpm -s vendor:fetch --print-test-paths)`
+    // ruby relies on — `TEST_PATHS_JSON=$(pnpm --silent vendor:fetch --print-test-paths)`
     // — gets exercised end-to-end. Catches regressions in stdout shape that
     // unit-testing the parser alone would miss (extra log lines, banner output,
     // newline trimming bugs, etc.).
@@ -57,9 +57,13 @@ describe("vendor/fetch.ts parseArgs", () => {
     const { fileURLToPath } = await import("node:url");
     const { dirname, join } = await import("node:path");
     const here = dirname(fileURLToPath(import.meta.url));
-    const out = execFileSync("pnpm", ["-s", "tsx", join(here, "fetch.ts"), "--print-test-paths"], {
-      encoding: "utf8",
-    });
+    const out = execFileSync(
+      "pnpm",
+      ["--silent", "tsx", join(here, "fetch.ts"), "--print-test-paths"],
+      {
+        encoding: "utf8",
+      },
+    );
     const { testPathsManifest } = await import("./sources.js");
     expect(JSON.parse(out)).toEqual(testPathsManifest());
   });
@@ -71,9 +75,13 @@ describe("vendor/fetch.ts parseArgs", () => {
     const { fileURLToPath } = await import("node:url");
     const { dirname, join } = await import("node:path");
     const here = dirname(fileURLToPath(import.meta.url));
-    const out = execFileSync("pnpm", ["-s", "tsx", join(here, "fetch.ts"), "--print-lib-paths"], {
-      encoding: "utf8",
-    });
+    const out = execFileSync(
+      "pnpm",
+      ["--silent", "tsx", join(here, "fetch.ts"), "--print-lib-paths"],
+      {
+        encoding: "utf8",
+      },
+    );
     const { libPathsManifest } = await import("./sources.js");
     expect(JSON.parse(out)).toEqual(libPathsManifest());
   });
@@ -85,7 +93,7 @@ describe("vendor/fetch.ts parseArgs", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const out = execFileSync(
       "pnpm",
-      ["-s", "tsx", join(here, "fetch.ts"), "--print-lib-entry-files"],
+      ["--silent", "tsx", join(here, "fetch.ts"), "--print-lib-entry-files"],
       { encoding: "utf8" },
     );
     const { libEntryFilesManifest } = await import("./sources.js");

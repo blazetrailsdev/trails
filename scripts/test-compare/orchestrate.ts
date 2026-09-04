@@ -7,8 +7,8 @@
  *   fetch ──┬─> ruby-extract ─┬─> compare   (needs both extracts)
  *           └─> ts-extract  ──┘
  *
- * Historically each node ran as its own process — `pnpm -s vendor:fetch`,
- * a second `pnpm -s vendor:fetch --print-test-paths` for the TEST_PATHS_JSON
+ * Historically each node ran as its own process — `pnpm --silent vendor:fetch`,
+ * a second `pnpm --silent vendor:fetch --print-test-paths` for the TEST_PATHS_JSON
  * handoff, `pnpm tsx extract-ts-tests.ts`, `pnpm tsx compare.ts` — so the
  * pipeline paid the ~1.7s tsx/Node cold start four times over. This entrypoint
  * pays it ONCE: every TypeScript phase runs in-process, and only the Ruby
