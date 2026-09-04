@@ -7,6 +7,6 @@ export {
   Error,
   Session,
 } from "./test.js";
-export * as Utils from "./utils.js";
+export { Utils } from "./utils.js";
 export { Cookie, CookieJar } from "./cookie-jar.js";
 export { UploadedFile } from "./uploaded-file.js";

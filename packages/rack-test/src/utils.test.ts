@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError, File, StringIO, b } from "@blazetrails/ruby-compat";
 import { MockRequest, Multipart } from "@blazetrails/rack";
-import { buildMultipart, buildNestedQuery } from "./utils.js";
+import { Utils } from "./utils.js";
 import { MULTIPART_BOUNDARY } from "./test.js";
 import { UploadedFile } from "./uploaded-file.js";
 
@@ -21,64 +21,64 @@ function parseData(data: string) {
 
 describe("Rack::Test::Utils#build_nested_query", () => {
   it("converts empty strings to =", () => {
-    expect(buildNestedQuery("")).toBe("=");
+    expect(Utils.buildNestedQuery("")).toBe("=");
   });
 
   it("converts nil to an empty string", () => {
-    expect(buildNestedQuery(null)).toBe("");
+    expect(Utils.buildNestedQuery(null)).toBe("");
   });
 
   it("converts hashes with nil values", () => {
-    expect(buildNestedQuery({ a: null })).toBe("a");
+    expect(Utils.buildNestedQuery({ a: null })).toBe("a");
   });
 
   it("converts hashes", () => {
-    expect(buildNestedQuery({ a: 1 })).toBe("a=1");
+    expect(Utils.buildNestedQuery({ a: 1 })).toBe("a=1");
   });
 
   it("converts hashes with multiple keys", () => {
     const hash = { a: 1, b: 2 };
-    expect(buildNestedQuery(hash)).toBe("a=1&b=2");
+    expect(Utils.buildNestedQuery(hash)).toBe("a=1&b=2");
   });
 
   it("converts empty arrays", () => {
-    expect(buildNestedQuery({ a: [] })).toBe("a[]=");
+    expect(Utils.buildNestedQuery({ a: [] })).toBe("a[]=");
   });
 
   it("converts arrays with one element", () => {
-    expect(buildNestedQuery({ a: [1] })).toBe("a[]=1");
+    expect(Utils.buildNestedQuery({ a: [1] })).toBe("a[]=1");
   });
 
   it("converts arrays with multiple elements", () => {
-    expect(buildNestedQuery({ a: [1, 2] })).toBe("a[]=1&a[]=2");
+    expect(Utils.buildNestedQuery({ a: [1, 2] })).toBe("a[]=1&a[]=2");
   });
 
   it("converts arrays with brackets '[]' in the name", () => {
-    expect(buildNestedQuery({ "a[]": [1, 2] })).toBe("a%5B%5D=1&a%5B%5D=2");
+    expect(Utils.buildNestedQuery({ "a[]": [1, 2] })).toBe("a%5B%5D=1&a%5B%5D=2");
   });
 
   it("converts nested hashes", () => {
-    expect(buildNestedQuery({ a: { b: 1 } })).toBe("a[b]=1");
+    expect(Utils.buildNestedQuery({ a: { b: 1 } })).toBe("a[b]=1");
   });
 
   it("converts arrays nested in a hash", () => {
-    expect(buildNestedQuery({ a: { b: [1, 2] } })).toBe("a[b][]=1&a[b][]=2");
+    expect(Utils.buildNestedQuery({ a: { b: [1, 2] } })).toBe("a[b][]=1&a[b][]=2");
   });
 
   it("converts arrays of hashes", () => {
-    expect(buildNestedQuery({ a: [{ b: 2 }, { c: 3 }] })).toBe("a[][b]=2&a[][c]=3");
+    expect(Utils.buildNestedQuery({ a: [{ b: 2 }, { c: 3 }] })).toBe("a[][b]=2&a[][c]=3");
   });
 
   it("supports hash keys with empty arrays", () => {
     const input = { collection: [] };
-    expect(buildNestedQuery(input)).toBe("collection[]=");
+    expect(Utils.buildNestedQuery(input)).toBe("collection[]=");
   });
 });
 
 describe("Rack::Test::Utils.build_multipart", () => {
   it("builds multipart bodies", () => {
     const files = new UploadedFile(multipartFile("foo.txt"));
-    const data = buildMultipart({ "submit-name": "Larry", files: files })!;
+    const data = Utils.buildMultipart({ "submit-name": "Larry", files: files })!;
 
     const params = parseData(data);
     expect(params["submit-name"]).toBe("Larry");
@@ -103,7 +103,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
       }
     }
 
-    const data = buildMultipart({ "submit-name": "Larry", files: new C() })!;
+    const data = Utils.buildMultipart({ "submit-name": "Larry", files: new C() })!;
     const params = parseData(data);
     expect(params["submit-name"]).toBe("Larry");
     expect(params["files"]).toBeUndefined();
@@ -116,7 +116,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
       new UploadedFile(multipartFile("foo.txt")),
       new UploadedFile(multipartFile("bar.txt")),
     ];
-    const data = buildMultipart({ "submit-name": "Larry", files: files })!;
+    const data = Utils.buildMultipart({ "submit-name": "Larry", files: files })!;
 
     const params = parseData(data);
     expect(params["submit-name"]).toBe("Larry");
@@ -130,7 +130,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
 
   it("builds multipart bodies from mixed array of a file and a primitive", () => {
     const files = [new UploadedFile(multipartFile("foo.txt")), "baz"];
-    const data = buildMultipart({ files: files })!;
+    const data = Utils.buildMultipart({ files: files })!;
 
     const params = parseData(data);
 
@@ -142,7 +142,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
 
   it("builds nested multipart bodies", () => {
     const files = new UploadedFile(multipartFile("foo.txt"));
-    const data = buildMultipart({
+    const data = Utils.buildMultipart({
       people: [{ "submit-name": "Larry", files: files }],
       foo: ["1", "2"],
     })!;
@@ -156,7 +156,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
 
   it("builds nested multipart bodies with UTF-8 data", () => {
     let files = new UploadedFile(multipartFile("mb.txt"));
-    let data = buildMultipart({
+    let data = Utils.buildMultipart({
       people: [{ "submit-name": "ሴ", files: files }],
       foo: ["1", "2"],
     })!;
@@ -168,7 +168,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
     expect(params["foo"]).toEqual(["1", "2"]);
 
     files = new UploadedFile(multipartFile("mb.txt"));
-    data = buildMultipart({
+    data = Utils.buildMultipart({
       people: [{ files: files, "submit-name": "ሴ" }],
       foo: ["1", "2"],
     })!;
@@ -182,7 +182,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
 
   it("builds nested multipart bodies with an array of hashes", () => {
     const files = new UploadedFile(multipartFile("foo.txt"));
-    const data = buildMultipart({
+    const data = Utils.buildMultipart({
       files: files,
       foo: [
         { id: "1", name: "Dave" },
@@ -202,7 +202,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
   it.skip("builds nested multipart bodies with arbitrarily nested array of hashes", () => {
     // BLOCKED: converge-rack-query-parser-normalize-params — the multipart body
     const files = new UploadedFile(multipartFile("foo.txt"));
-    const data = buildMultipart({
+    const data = Utils.buildMultipart({
       files: files,
       foo: {
         bar: [
@@ -239,7 +239,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
 
   it("does not break with params that look nested, but are not", () => {
     const files = new UploadedFile(multipartFile("foo.txt"));
-    const data = buildMultipart({ "foo[]": "1", "bar[]": { qux: "2" }, "files[]": files })!;
+    const data = Utils.buildMultipart({ "foo[]": "1", "bar[]": { qux: "2" }, "files[]": files })!;
 
     const params = parseData(data);
     expect(params["files"][0]["filename"]).toBe("foo.txt");
@@ -251,7 +251,7 @@ describe("Rack::Test::Utils.build_multipart", () => {
   it.skip("allows for nested files", () => {
     // BLOCKED: converge-rack-query-parser-normalize-params — the multipart body
     const files = new UploadedFile(multipartFile("foo.txt"));
-    const data = buildMultipart({
+    const data = Utils.buildMultipart({
       foo: [
         { id: "1", data: files },
         { id: "2", data: ["3", "4"] },
@@ -266,18 +266,20 @@ describe("Rack::Test::Utils.build_multipart", () => {
   });
 
   it("returns nil if no UploadedFiles were used", () => {
-    expect(buildMultipart({ people: [{ "submit-name": "Larry", files: "contents" }] })).toBeNull();
+    expect(
+      Utils.buildMultipart({ people: [{ "submit-name": "Larry", files: "contents" }] }),
+    ).toBeNull();
   });
 
   it.skip("allows for forcing multipart uploads even without a file", () => {
     // BLOCKED: converge-rack-query-parser-normalize-params — the multipart body
-    const data = buildMultipart({ foo: [{ id: "2", data: ["3", "4"] }] }, true, true)!;
+    const data = Utils.buildMultipart({ foo: [{ id: "2", data: ["3", "4"] }] }, true, true)!;
 
     const params = parseData(data);
     expect(params["foo"][0]).toEqual({ id: "2", data: ["3", "4"] });
   });
 
   it("raises ArgumentErrors if params is not a Hash", () => {
-    expect(() => buildMultipart("foo=bar")).toThrow(ArgumentError);
+    expect(() => Utils.buildMultipart("foo=bar")).toThrow(ArgumentError);
   });
 });

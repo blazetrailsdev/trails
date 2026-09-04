@@ -1,7 +1,13 @@
-import { isPlainObject } from "@blazetrails/activesupport";
-import { MockRequest, MockResponse, Request, Utils, type RackApp } from "@blazetrails/rack";
+import { isPlainObject, type Included } from "@blazetrails/activesupport";
+import {
+  MockRequest,
+  MockResponse,
+  Request,
+  parseNestedQuery,
+  type RackApp,
+} from "@blazetrails/rack";
 import { CookieJar } from "./cookie-jar.js";
-import { buildMultipart, buildNestedQuery } from "./utils.js";
+import type { Utils } from "./utils.js";
 
 export const DEFAULT_HOST = "example.org";
 
@@ -20,6 +26,10 @@ const DEFAULT_ENV: Record<string, unknown> = {
   SERVER_PROTOCOL: "HTTP/1.0",
 };
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Test::Utils` (`vendor/rack-test/lib/rack/test.rb:55`); the class/interface merge is how a mixin surfaces on the type side. */
+export interface Session extends Included<typeof Utils> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Session {
   cookieJar!: CookieJar;
 
@@ -114,13 +124,13 @@ export class Session {
         let data: string | null;
         if (
           Object.keys(params).length !== 0 &&
-          (data = buildMultipart(params, false, multipart as boolean)) != null
+          (data = this.buildMultipart(params, false, multipart as boolean)) != null
         ) {
           env[":input"] = data;
           env["CONTENT_LENGTH"] ??= String(data.length);
           env["CONTENT_TYPE"] = `${this.multipartContentType(env)}; boundary=${MULTIPART_BOUNDARY}`;
         } else {
-          env[":input"] = buildNestedQuery(params);
+          env[":input"] = this.buildNestedQuery(params);
         }
       } else {
         env[":input"] = params;
@@ -144,8 +154,8 @@ export class Session {
     queryArray: Array<string | null | undefined>,
     queryParams: unknown,
   ): void {
-    if (typeof queryParams === "string") queryParams = Utils.parseNestedQuery(queryParams);
-    queryArray.push(buildNestedQuery(queryParams));
+    if (typeof queryParams === "string") queryParams = parseNestedQuery(queryParams);
+    queryArray.push(this.buildNestedQuery(queryParams));
   }
 
   /** @internal */

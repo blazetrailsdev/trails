@@ -1,31 +1,29 @@
-import { isPlainObject } from "@blazetrails/activesupport";
-import { Utils } from "@blazetrails/rack";
+import { defineModule, include, isPlainObject } from "@blazetrails/activesupport";
+import { escape, escapePath, unescape } from "@blazetrails/rack";
 import { ArgumentError, Encoding, StringIO, b } from "@blazetrails/ruby-compat";
 import { UploadedFile } from "./uploaded-file.js";
-import { END_BOUNDARY, START_BOUNDARY } from "./test.js";
+import { END_BOUNDARY, START_BOUNDARY, Session } from "./test.js";
 
-export function buildNestedQuery(value: unknown, prefix: string | null = null): string {
+function buildNestedQuery(value: unknown, prefix: string | null = null): string {
   if (Array.isArray(value)) {
     if (value.length === 0) {
       return `${prefix ?? ""}[]=`;
     } else {
-      if (!Utils.unescape(prefix ?? "").endsWith("[]")) prefix = `${prefix ?? ""}[]`;
-      return value.map((v) => buildNestedQuery(v, prefix ?? "")).join("&");
+      if (!unescape(prefix!).endsWith("[]")) prefix = `${prefix}[]`;
+      return value.map((v) => buildNestedQuery(v, String(prefix))).join("&");
     }
   } else if (isPlainObject(value)) {
     return Object.entries(value)
-      .map(([k, v]) =>
-        buildNestedQuery(v, prefix != null ? `${prefix}[${Utils.escape(k)}]` : Utils.escape(k)),
-      )
+      .map(([k, v]) => buildNestedQuery(v, prefix != null ? `${prefix}[${escape(k)}]` : escape(k)))
       .join("&");
   } else if (value == null) {
     return prefix ?? "";
   } else {
-    return `${prefix ?? ""}=${Utils.escape(value as { toString(): string })}`;
+    return `${prefix ?? ""}=${escape(value as { toString(): string })}`;
   }
 }
 
-export function buildMultipart(
+function buildMultipart(
   params: unknown,
   _first: boolean = true,
   multipart: boolean = false,
@@ -93,7 +91,7 @@ function buildParts(buffer: StringIO, parameters: Record<string, unknown>): void
 
 function _buildParts(buffer: StringIO, parameters: Record<string, unknown>): void {
   Object.entries(parameters).map(([name, value]) => {
-    if (/\[\]$/.test(name) && Array.isArray(value) && value.every((v) => isPlainObject(v))) {
+    if (/\[\]\n?$/.test(name) && Array.isArray(value) && value.every((v) => isPlainObject(v))) {
       value.forEach((hash) => {
         const newValue: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(hash as Record<string, unknown>))
@@ -132,7 +130,7 @@ function buildFilePart(
   buffer.write('content-disposition: form-data; name="');
   buffer.write(b(String(parameterName)));
   buffer.write('"; filename="');
-  buffer.write(b(Utils.escapePath(uploadedFile.originalFilename ?? "")));
+  buffer.write(b(escapePath(uploadedFile.originalFilename ?? "")));
   buffer.write('"\r\ncontent-type: ');
   buffer.write(b(uploadedFile.contentType == null ? "" : String(uploadedFile.contentType)));
   buffer.write("\r\ncontent-length: ");
@@ -147,3 +145,17 @@ function buildFilePart(
   buffer.write("\r\n");
   return buffer;
 }
+
+export const Utils = defineModule(
+  { buildNestedQuery, buildMultipart },
+  {},
+  {
+    normalizeMultipartParams,
+    buildParts,
+    _buildParts,
+    buildPrimitivePart,
+    buildFilePart,
+  },
+);
+
+include(Session, Utils);

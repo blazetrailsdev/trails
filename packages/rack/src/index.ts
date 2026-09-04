@@ -46,6 +46,8 @@ export {
   setCookieHeader,
   deleteSetCookieHeaderBang,
   unescape,
+  escape,
+  escapePath,
 } from "./utils.js";
 export { Headers } from "./headers.js";
 export { BodyProxy } from "./body-proxy.js";
