@@ -265,10 +265,12 @@ export class IO {
    * retries `read(2)` until `length` bytes are in hand or the stream hits EOF
    * (`io.c:3760-3763`) — a short read is not an answer. It answers `nil` —
    * never `""` — once the stream is at EOF and `length` is positive. The bytes
-   * come back as a binary String, one character per byte, which is the
-   * ASCII-8BIT `File.open(path, "rb")` reads in — assembled a character at a
-   * time because no `TextDecoder` encoding gives it: its "latin1" is
-   * windows-1252, and that remaps 0x80-0x9F.
+   * come back as a binary String, one character per byte, whatever the
+   * stream's mode: the `length` arm buffers into `rb_str_new`
+   * (`io_setstrbuf`, `io.c:3278`), which is ASCII-8BIT, and never re-tags it —
+   * only the no-argument arm reaches the external encoding. It is assembled a
+   * character at a time because no `TextDecoder` encoding gives ASCII-8BIT:
+   * its "latin1" is windows-1252, and that remaps 0x80-0x9F.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
    * (`vendor/ruby/io.c:3774`).
@@ -295,16 +297,31 @@ export class IO {
    * when `length` is `nil`: the rest of the stream, and `""` rather than `nil`
    * at EOF. Ruby sizes the read from `remain_size(fptr)`, an `fstat` the
    * `FsAdapter` contract has no member for, so the bytes come in chunks.
+   *
+   * This is the arm that answers the external encoding — `io_enc_str`
+   * (`io.c:3349`) over `io_read_encoding` (`io.c:3358`), UTF-8 for trails —
+   * where the `length` arm answers ASCII-8BIT whatever the mode. A binary
+   * stream keeps the bytes. The chunks are joined before decoding because a
+   * multi-byte character can straddle two of them.
    */
   private readAll(): string {
     const buffer = new Uint8Array(READ_CHUNK);
-    let part = "";
+    const chunks: Uint8Array[] = [];
+    let total = 0;
     for (;;) {
       const read = getFs().readSync(this.fd, buffer, 0, buffer.length, this.pos);
-      if (read === 0) return part;
+      if (read === 0) break;
       this.pos += read;
-      part += binaryString(buffer, read);
+      chunks.push(buffer.slice(0, read));
+      total += read;
     }
+    const bytes = new Uint8Array(total);
+    let at = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, at);
+      at += chunk.length;
+    }
+    return this.binary ? binaryString(bytes, total) : new TextDecoder().decode(bytes);
   }
 
   /**

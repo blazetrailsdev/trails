@@ -92,7 +92,8 @@ describe("Tempfile", () => {
 
   it("read gives back the bytes write was handed", () => {
     const bytes = [0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe];
-    const tempfile = Tempfile.new("bin").binmode();
+    const tempfile = Tempfile.new("bin");
+    tempfile.binmode();
     tempfile.write(bytes.map((byte) => String.fromCharCode(byte)).join(""));
     expect(tempfile.read()).toBe("");
     tempfile.rewind();

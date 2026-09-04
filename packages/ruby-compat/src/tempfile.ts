@@ -208,16 +208,19 @@ export class Tempfile {
 
   /**
    * `IO#binmode` (`vendor/ruby/io.c:6379`) on the delegated `File`
-   * (`vendor/ruby/lib/tempfile.rb:89`), which answers the stream — so
-   * `atomic_write`'s `temp_file.binmode` (`core_ext/file/atomic.rb:25`) puts
-   * the held `File` in binary mode and {@link write} stops transcoding.
+   * (`vendor/ruby/lib/tempfile.rb:89`), so `atomic_write`'s
+   * `temp_file.binmode` (`core_ext/file/atomic.rb:25`) puts the held `File` in
+   * binary mode and {@link write} stops transcoding.
+   *
+   * `rb_io_binmode_m` answers the stream it was sent, and `DelegateClass`
+   * forwards that through untouched — so this answers the `File`, not the
+   * `Tempfile`. MRI agrees: `Tempfile.new("x").binmode.class` is `File`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#binmode`
    * (`vendor/ruby/io.c:6379`), delegated by Ruby stdlib `Tempfile`.
    */
-  binmode(): this {
-    this.tmpfile.binmode();
-    return this;
+  binmode(): File {
+    return this.tmpfile.binmode();
   }
 
   /**
