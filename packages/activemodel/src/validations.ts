@@ -161,6 +161,7 @@ export const ClassMethods = {
     this.validatesWith(BlockValidator, this._mergeAttributes([...attrNames, options]), block);
   },
 
+  /** @missingRailsArgs set_callback — CONVERGEABLE validate-set-callback-narrows-options-and-wraps-filters */
   validate<T extends ValidatableRecord = ValidatableRecord>(
     this: ValidationsClassHost,
     ...args: Array<string | ((record: T) => unknown) | ConditionalOptions>
