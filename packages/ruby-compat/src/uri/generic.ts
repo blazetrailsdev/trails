@@ -7,10 +7,24 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
  * scheme class and what `URI.parse` answers for a scheme it does not know.
  * Only the members trails sends are ported: the component readers and their
  * mutable setters, `merge` and the private helpers it reaches through. The
- * unsent ones are not — `COMPONENT` / `component` (`generic.rb:46,313`),
- * `opaque` (`generic.rb:277`), `user` / `password` (`generic.rb:568,573`),
- * `hierarchical?` (`generic.rb:976`) and `relative?` (`generic.rb:999`) among
- * them.
+ * unsent ones are not, and the list is exhaustive: `build` / `build2`
+ * (`generic.rb:78,116`), `COMPONENT` / `component` (`generic.rb:46,313`),
+ * `registry` and its `check_` / `set_` / `=` trio
+ * (`generic.rb:252,750,755,760`), `opaque` and `opaque=`
+ * (`generic.rb:277,916`), `check_userinfo` / `check_user` / `check_password`
+ * and the `userinfo=` / `user=` / `password=` setters
+ * (`generic.rb:375,393,417,441,471,498`), `set_user` / `set_password`
+ * (`generic.rb:524,534`), `escape_userpass` (`generic.rb:551`), `user` /
+ * `password` (`generic.rb:568,573`), `decoded_user` / `decoded_password`
+ * (`generic.rb:584,589`), `hostname` / `hostname=` (`generic.rb:668,685`),
+ * `hierarchical?` (`generic.rb:976`), `relative?` (`generic.rb:999`),
+ * `merge!` (`generic.rb:1096`), `route_from_path` / `route_from0` /
+ * `route_from` / `route_to` (`generic.rb:1167,1206,1274,1314`), `normalize` /
+ * `normalize!` (`generic.rb:1331,1340`), `==` / `hash` / `eql?` /
+ * `component_ary` (`generic.rb:1396,1404,1408,1428`), `select`
+ * (`generic.rb:1452`), `inspect` (`generic.rb:1463`), `coerce`
+ * (`generic.rb:1486`), `replace!` (`generic.rb:299`), and `find_proxy` /
+ * `use_proxy?` (`generic.rb:1512,1578`).
  *
  * `initialize`'s `arg_check` branch (`generic.rb:190-198`) is not ported with
  * it: its only callers are `build` / `build2` (`generic.rb:78,116`), which are
@@ -249,9 +263,18 @@ export class Generic {
     return true;
   }
 
-  /** `set_port` (`vendor/ruby/lib/uri/generic.rb:716`). */
+  /**
+   * `set_port` (`vendor/ruby/lib/uri/generic.rb:716`).
+   *
+   * The conversion is `String#to_i` (`rb_str_to_i`,
+   * `vendor/ruby/string.c:6602`), which answers `0` for a string with no
+   * leading digit run — `regexp[:PORT]` admits one made only of whitespace —
+   * where `parseInt` would answer `NaN`.
+   */
   protected setPort(v: string | number | null): void {
-    if (v != null && typeof v !== "number") v = v === "" ? null : parseInt(v, 10);
+    if (v != null && typeof v !== "number") {
+      v = v === "" ? null : Number(/^\s*[+-]?\d+/.exec(v)?.[0] ?? 0);
+    }
     this._port = v;
   }
 

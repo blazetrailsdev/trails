@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { BadURIError, Generic, HTTP, HTTPS, InvalidURIError, RFC2396_PARSER, URI } from "./uri.js";
+import {
+  BadURIError,
+  Error as URIError,
+  Generic,
+  HTTP,
+  HTTPS,
+  InvalidComponentError,
+  InvalidURIError,
+  RFC2396_PARSER,
+  URI,
+} from "./uri.js";
 
 describe("URI.parse", () => {
   it("answers the registered scheme class, and URI::Generic for a scheme-less reference", () => {
@@ -23,6 +33,7 @@ describe("URI.parse", () => {
 
   it("raises URI::InvalidURIError on a string that is not a URI", () => {
     expect(() => URI.parse("http://example.com/\\")).toThrow(InvalidURIError);
+    expect(new InvalidURIError("x")).toBeInstanceOf(URIError);
   });
 });
 
@@ -49,6 +60,17 @@ describe("URI::Generic", () => {
     expect(uri.toString()).toBe("http://example.org//foo");
     expect(uri.port).toBe(null);
     expect(uri.defaultPort).toBe(null);
+  });
+
+  it("converts a port string with String#to_i, so a whitespace-only one is 0", () => {
+    const uri = URI.parse("http://example.com/x");
+    uri.port = "   ";
+    expect(uri.port).toBe(0);
+    uri.port = 8080;
+    expect(uri.port).toBe(8080);
+    expect(() => {
+      uri.port = "8080abc";
+    }).toThrow(InvalidComponentError);
   });
 
   it("does not normalize the case of the host or path, as a WHATWG URL would", () => {

@@ -23,6 +23,17 @@ export const RFC3986_PARSER = new RFC3986Parser();
 export const RFC2396_PARSER = new RFC2396Parser();
 
 /**
+ * `URI::Error` (`vendor/ruby/lib/uri/common.rb:140`), the base class of every
+ * URI exception. It extends `globalThis.Error` rather than a bare `Error`
+ * because the class's own binding shadows the global inside its own heritage
+ * clause; `StandardError`, Ruby's superclass here, is the JS `Error`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::Error`
+ * (`vendor/ruby/lib/uri/common.rb:140`).
+ */
+export class Error extends globalThis.Error {}
+
+/**
  * `URI::InvalidURIError` (`vendor/ruby/lib/uri/common.rb:144`) — not a URI.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
