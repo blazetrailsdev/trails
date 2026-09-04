@@ -1,3 +1,4 @@
+import { assertEmpty } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
 import { Cookie, CookieJar } from "./cookie-jar.js";
 
@@ -15,8 +16,8 @@ describe("Rack::Test::CookieJar", () => {
 
     jar.set("a", "b");
     expect(jar.toHash()).toEqual({ a: "b" });
-    expect(jarDup.toHash()).toEqual({});
-    expect(jarClone.toHash()).toEqual({});
+    assertEmpty(jarDup.toHash());
+    assertEmpty(jarClone.toHash());
   });
 
   it("ignores leading dot in domain", () => {

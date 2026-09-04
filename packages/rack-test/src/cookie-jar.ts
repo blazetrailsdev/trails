@@ -76,7 +76,8 @@ export class Cookie {
   }
 
   path(): string {
-    return (this._options["path"] ?? "/").split(",")[0].trim() || "/";
+    const parts = (this._options["path"] ?? "/").split(",");
+    return ((parts[0] === "" ? undefined : parts[0]) ?? "/").trim();
   }
 
   expires(): Time | undefined {
@@ -101,8 +102,8 @@ export class Cookie {
     return (!this.isSecure() || uri.protocol === "https:") && pattern.test(uri.hostname);
   }
 
-  matches(uri: URL | null): boolean {
-    return !this.isExpired() && this.isValid(uri) && (uri?.pathname ?? "/").startsWith(this.path());
+  matches(uri: URL): boolean {
+    return !this.isExpired() && this.isValid(uri) && uri.pathname.startsWith(this.path());
   }
 
   spaceship(other: Cookie): number {
