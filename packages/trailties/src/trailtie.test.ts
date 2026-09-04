@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { runLoadHooks } from "@blazetrails/activesupport";
+import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { Trailtie, resetTrailtieRegistry } from "./trailtie.js";
 import { Configuration } from "./trailtie/configuration.js";
 import { sealAgainstInheritance } from "./trailtie/configurable.js";
@@ -123,6 +123,10 @@ describe("Trailtie", () => {
     ["afterInitialize", "after_initialize"],
     ["afterRoutesLoaded", "after_routes_loaded"],
   ] as const;
+  afterEach(() => {
+    resetLoadHooks();
+  });
+
   for (const [hook, rubyName] of HOOKS) {
     it(`Configuration#${hook} block runs when ${hook} hook fires`, () => {
       const seen: unknown[] = [];

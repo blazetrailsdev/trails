@@ -284,6 +284,7 @@ export class Duration {
   since(time: RubyTime): RubyTime;
   since(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   since(time?: Date | Temporal.Instant): Temporal.Instant;
+  since(time?: DurationReceiver): DurationResult;
   since(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
     return this.sum(1, time);
   }
@@ -291,6 +292,7 @@ export class Duration {
   ago(time: RubyTime): RubyTime;
   ago(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   ago(time?: Date | Temporal.Instant): Temporal.Instant;
+  ago(time?: DurationReceiver): DurationResult;
   ago(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
     return this.sum(-1, time);
   }
@@ -303,21 +305,21 @@ export class Duration {
   until(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   until(time?: Date | Temporal.Instant): Temporal.Instant;
   until(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
-    return this.sum(-1, time);
+    return this.ago(time);
   }
 
   after(time: RubyTime): RubyTime;
   after(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   after(time?: Date | Temporal.Instant): Temporal.Instant;
   after(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
-    return this.sum(1, time);
+    return this.since(time);
   }
 
   before(time: RubyTime): RubyTime;
   before(time: Temporal.PlainDate): Temporal.PlainDate | TimeWithZone;
   before(time?: Date | Temporal.Instant): Temporal.Instant;
   before(time: DurationReceiver = Temporal.Now.instant()): DurationResult {
-    return this.sum(-1, time);
+    return this.ago(time);
   }
 
   inspect(): string {
