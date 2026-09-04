@@ -30,10 +30,6 @@ function blogApp(secretKeyBase: string | null = SECRET_KEY_BASE): TrailtieApp {
   };
 }
 
-function globalIdConfig(app: TrailtieApp): GlobalIdConfig {
-  return app.config.get("globalId") as GlobalIdConfig;
-}
-
 function initializeApp(app: TrailtieApp): void {
   Trailtie.initialize(app);
   runLoadHooks("after_initialize", app);
@@ -53,14 +49,14 @@ describe("RailtieTest", () => {
 
   it("GlobalID.app can be set with config.global_id.app =", () => {
     const app = blogApp();
-    globalIdConfig(app).app = "foo";
+    (app.config.get("globalId") as GlobalIdConfig).app = "foo";
     initializeApp(app);
     expect(getApp()).toBe("foo");
   });
 
   it("SignedGlobalID.expires_in can be explicitly set to nil with config.global_id.expires_in", () => {
     const app = blogApp();
-    globalIdConfig(app).expiresIn = null;
+    (app.config.get("globalId") as GlobalIdConfig).expiresIn = null;
     initializeApp(app);
     expect(SignedGlobalID.expiresIn).toBeNull();
   });
@@ -68,8 +64,8 @@ describe("RailtieTest", () => {
   it("config.global_id can be used to set configurations after the railtie has been loaded", () => {
     const app = blogApp();
     Trailtie.initialize(app);
-    globalIdConfig(app).app = "foobar";
-    globalIdConfig(app).expiresIn = months(12).toI();
+    (app.config.get("globalId") as GlobalIdConfig).app = "foobar";
+    (app.config.get("globalId") as GlobalIdConfig).expiresIn = months(12).toI();
     runLoadHooks("after_initialize", app);
 
     expect(getApp()).toBe("foobar");
@@ -79,7 +75,7 @@ describe("RailtieTest", () => {
   it("config.global_id can be used to explicitly set SignedGlobalID.expires_in to nil after the railtie has been loaded", () => {
     const app = blogApp();
     Trailtie.initialize(app);
-    globalIdConfig(app).expiresIn = null;
+    (app.config.get("globalId") as GlobalIdConfig).expiresIn = null;
     runLoadHooks("after_initialize", app);
 
     expect(SignedGlobalID.expiresIn).toBeNull();
@@ -99,7 +95,7 @@ describe("RailtieTest", () => {
   it("SignedGlobalID.verifier can be set with config.global_id.verifier =", () => {
     const app = blogApp();
     const customVerifier = new MessageVerifier("muchSECRETsoHIDDEN");
-    globalIdConfig(app).verifier = customVerifier;
+    (app.config.get("globalId") as GlobalIdConfig).verifier = customVerifier;
     initializeApp(app);
     const message = { id: 42 };
     const signedMessage = SignedGlobalID.verifier!.generate(message);
