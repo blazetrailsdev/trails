@@ -15,7 +15,7 @@ export class Cookie {
   private readonly _defaultHost: string;
 
   /** @internal */
-  private readonly _options: Record<string, string | undefined>;
+  private readonly _options: Record<string, string | string[] | undefined>;
 
   /** @internal */
   private readonly _exactDomainMatch: boolean;
@@ -35,14 +35,16 @@ export class Cookie {
     this.value = first == null || first[1] == null ? undefined : String(first[1]);
     this._options = {};
     for (const [k, v] of Object.entries(Utils.parseQuery(options, ";"))) {
-      this._options[k.toLowerCase()] = v == null ? undefined : String(v);
+      this._options[k.toLowerCase()] = v ?? undefined;
     }
 
-    let domain = this._options["domain"];
+    const domain = this._options["domain"];
     if (domain != null) {
       this._exactDomainMatch = false;
-      if (domain[0] === ".") domain = domain.slice(1);
-      this._options["domain"] = domain;
+      if (domain[0] === ".") {
+        this._options["domain"] =
+          typeof domain === "string" ? domain.slice(1) : ["", ...domain.slice(1)];
+      }
     } else {
       this._exactDomainMatch = true;
       this._options["domain"] = uri.hostname || defaultHost;
@@ -64,7 +66,7 @@ export class Cookie {
   }
 
   domain(): string {
-    return this._options["domain"]!;
+    return this._options["domain"] as string;
   }
 
   isSecure(): boolean {
@@ -76,18 +78,18 @@ export class Cookie {
   }
 
   path(): string {
-    const parts = (this._options["path"] ?? "/").split(",");
-    return ((parts[0] === "" ? undefined : parts[0]) ?? "/").trim();
+    const head = [this._options["path"] ?? "/"].flat()[0].split(",")[0];
+    return (head === "" ? "/" : head).trim();
   }
 
   expires(): Time | undefined {
     const expires = this._options["expires"];
-    return expires == null ? undefined : Time.parse(expires);
+    return expires == null ? undefined : Time.parse(expires as string);
   }
 
   isExpired(): boolean {
     const expires = this.expires();
-    return expires != null && expires.toI() < Time.now().toI();
+    return expires != null && (expires.minus(Time.now()) as number) < 0;
   }
 
   isValid(uri: URL | null): boolean {
@@ -99,7 +101,10 @@ export class Cookie {
       `${this._exactDomainMatch ? "^" : ""}${regexpEscape(this.domain())}$`,
       "i",
     );
-    return (!this.isSecure() || uri.protocol === "https:") && pattern.test(uri.hostname);
+    return (
+      (!this.isSecure() || (this.isSecure() && uri.protocol === "https:")) &&
+      pattern.test(uri.hostname)
+    );
   }
 
   matches(uri: URL): boolean {
@@ -113,8 +118,8 @@ export class Cookie {
     );
   }
 
-  toH(): Record<string, string | boolean | undefined> {
-    const hash: Record<string, string | boolean | undefined> = {
+  toH(): Record<string, string | string[] | boolean | undefined> {
+    const hash: Record<string, string | string[] | boolean | undefined> = {
       ...this._options,
       value: this.value,
       HttpOnly: this.isHttpOnly(),
@@ -124,7 +129,7 @@ export class Cookie {
     return hash;
   }
 
-  toHash(): Record<string, string | boolean | undefined> {
+  toHash(): Record<string, string | string[] | boolean | undefined> {
     return this.toH();
   }
 
