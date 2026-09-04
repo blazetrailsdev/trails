@@ -30,6 +30,8 @@
  */
 import {
   attachedJsDoc,
+  enclosingEntityName,
+  entityPrivate,
   isInstanceMember,
   loadManifest,
   manifestAvailable,
@@ -109,7 +111,15 @@ function check(context, node, name) {
   const manifest = loadManifest();
   const rel = relFromRepoRoot(filename);
   if (manifest.files?.[rel]?.includes(name)) return;
-  if (isInstanceMember(node) && manifest.instanceFiles?.[rel]?.includes(name)) return;
+  if (isInstanceMember(node)) {
+    if (manifest.instanceFiles?.[rel]?.includes(name)) return;
+    // Backed on the enclosing entity alone: a nested Rails entity's private
+    // member folds out of both file-wide unions when a sibling entity in the
+    // same `.rb` publishes the name (`LoaderRecords#load_records`, private at
+    // associations/preloader/association.rb:91, beside the public
+    // `Association#load_records` at :197).
+    if (entityPrivate(manifest, rel, enclosingEntityName(node), name)) return;
+  }
 
   context.report({ node: target, messageId: "unbackedInternal", data: { name } });
 }

@@ -23,13 +23,30 @@ const FIXTURE = {
     // half (activemodel/lib/active_model/attributes.rb:161), public on
     // `Attributes::ClassMethods` (attributes.rb:59).
     "packages/activemodel/src/attributes.ts": [],
+    // `loadRecords` folds out of both file-wide unions: private on the nested
+    // `LoaderRecords` (activerecord/lib/active_record/associations/preloader/
+    // association.rb:91), public on `Association` (:197).
+    "packages/activerecord/src/associations/preloader/association.ts": [],
   },
   entities: {
     "packages/rack/src/lock.ts": ["Lock", "Rack"],
+    "packages/activerecord/src/associations/preloader/association.ts": [
+      "ActiveRecord",
+      "Associations",
+      "Association",
+      "LoaderRecords",
+      "Preloader",
+    ],
     "packages/activemodel/src/attributes.ts": ["ActiveModel", "Attributes", "ClassMethods"],
   },
   instanceFiles: {
     "packages/activemodel/src/attributes.ts": ["attribute"],
+    "packages/activerecord/src/associations/preloader/association.ts": [],
+  },
+  entityInstanceFiles: {
+    "packages/activerecord/src/associations/preloader/association.ts": {
+      LoaderRecords: ["loadRecords", "loaderQuery"],
+    },
   },
 };
 setManifestForTests(FIXTURE);
@@ -37,6 +54,10 @@ const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/src/inherita
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const lockFile = path.join(REPO_ROOT, "packages/rack/src/lock.ts");
 const attributesFile = path.join(REPO_ROOT, "packages/activemodel/src/attributes.ts");
+const preloaderAssociationFile = path.join(
+  REPO_ROOT,
+  "packages/activerecord/src/associations/preloader/association.ts",
+);
 
 const tester = new RuleTester({
   languageOptions: {
@@ -84,6 +105,12 @@ tester.run("rails-private-jsdoc", rule, {
       filename: attributesFile,
       code: `export function attribute() {}\n`,
     },
+    // The sibling entity that PUBLISHES the name is not gated by the nested
+    // entity's private one.
+    {
+      filename: preloaderAssociationFile,
+      code: `class Association {\n  loadRecords() {}\n}\n`,
+    },
     // Class method that's already tagged.
     {
       filename: baseFile,
@@ -97,6 +124,13 @@ tester.run("rails-private-jsdoc", rule, {
       code: `class Attributes {\n  attribute() {}\n}\n`,
       errors: [{ messageId: "missingInternal" }],
       output: `class Attributes {\n  /** @internal */\n  attribute() {}\n}\n`,
+    },
+    // The nested entity's own fold is the only place its privacy survives.
+    {
+      filename: preloaderAssociationFile,
+      code: `class LoaderRecords {\n  loadRecords() {}\n}\n`,
+      errors: [{ messageId: "missingInternal" }],
+      output: `class LoaderRecords {\n  /** @internal */\n  loadRecords() {}\n}\n`,
     },
     // The entity Rails DOES have in that file is still gated.
     {

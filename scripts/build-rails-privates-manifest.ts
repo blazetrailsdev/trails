@@ -52,6 +52,20 @@
  * `@internal` on members a sibling entity publishes — the #7057 over-tagging
  * regression, in the other direction.
  *
+ * `entityInstanceFiles` is the fourth: the same instance fold run per ENTITY,
+ * keyed TS file → entity → names, where the entity is the LAST segment of the
+ * host FQN — the name the port gives a nested Ruby entity its own TS class.
+ * The file-wide fold cannot express a nested entity's privacy at all when a
+ * sibling in the same `.rb` publishes the name:
+ * `Preloader::Association::LoaderRecords#load_records` is private
+ * (activerecord/lib/active_record/associations/preloader/association.rb:91,
+ * under the `private` at :75) while `Association#load_records` is public at
+ * :197. Both rules read it as an ADDITIONAL private source, never a subtractive
+ * one, so a member the file-wide union already backs stays backed and #7057's
+ * over-tagging stays fixed. An entity that folds a sibling in through `include`
+ * carries the sibling's public spelling through `ancestorsFor`, so
+ * `Rack::Request` still publishes what `Rack::Request::Helpers` publishes.
+ *
  * Run after `pnpm parity:api` (or `ruby scripts/api-compare/extract-ruby-api.rb`):
  *   pnpm rails-privates:manifest
  */
@@ -113,7 +127,7 @@ emitDeprecatedManifest();
 emitCallbackInvocationsManifest();
 
 if (!hasRailsApi) {
-  writeJsonManifest(OUT, { files: {}, entities: {}, instanceFiles: {} });
+  writeJsonManifest(OUT, { files: {}, entities: {}, instanceFiles: {}, entityInstanceFiles: {} });
   flushManifestBatch();
   process.exit(0);
 }
@@ -211,8 +225,9 @@ interface Manifest {
   files: Record<string, string[]>;
   entities: Record<string, string[]>;
   instanceFiles: Record<string, string[]>;
+  entityInstanceFiles: Record<string, Record<string, string[]>>;
 }
-const manifest: Manifest = { files: {}, entities: {}, instanceFiles: {} };
+const manifest: Manifest = { files: {}, entities: {}, instanceFiles: {}, entityInstanceFiles: {} };
 
 for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   const pkgDir = PACKAGE_DIRS[pkg];
@@ -231,6 +246,15 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   // A TS class or interface outside this set is a local helper type Rails does
   // not have, and `rails-private-jsdoc` leaves its members alone (RFC 0121).
   const fileEntities = new Map<string, Set<string>>();
+  // The instance fold run per ENTITY rather than per file: rubyFile → entity →
+  // name → status. A nested entity's private member is invisible to the
+  // file-wide fold whenever a sibling entity in the same `.rb` publishes the
+  // name — `Preloader::Association::LoaderRecords#load_records` is private
+  // (associations/preloader/association.rb:91, under the `private` at :75)
+  // while `Association#load_records` is public at :197 — so its privacy cannot
+  // be expressed at all. Keyed by the LAST FQN segment, which is the TS class
+  // name the port gives a nested Ruby entity.
+  const entityInstanceVis = new Map<string, Map<string, Map<string, "all-private" | "mixed">>>();
   const record = (m: Map<string, "all-private" | "mixed">, name: string, isPriv: boolean) => {
     const prev = m.get(name);
     if (prev === undefined) m.set(name, isPriv ? "all-private" : "mixed");
@@ -252,6 +276,19 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     }
     record(m, name, vis !== "public");
   };
+  const noteEntityInstance = (file: string, entity: string, name: string, vis: string) => {
+    let byEntity = entityInstanceVis.get(file);
+    if (!byEntity) {
+      byEntity = new Map();
+      entityInstanceVis.set(file, byEntity);
+    }
+    let m = byEntity.get(entity);
+    if (!m) {
+      m = new Map();
+      byEntity.set(entity, m);
+    }
+    record(m, name, vis !== "public");
+  };
   const noteEntity = (file: string, fqn: string) => {
     let s = fileEntities.get(file);
     if (!s) {
@@ -270,11 +307,15 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       // *instance* methods become class methods on whoever includes the
       // concern, so they contribute to the file-wide union but never to the
       // instance fold.
-      const isClassMethodsHalf = host.fqn.split("::").at(-1) === "ClassMethods";
+      const hostName = host.fqn.split("::").at(-1)!;
+      const isClassMethodsHalf = hostName === "ClassMethods";
       for (const ent of instance) {
         for (const m of ent.instanceMethods ?? []) {
           note(host.file, m.name, m.visibility);
-          if (!isClassMethodsHalf) noteInstance(host.file, m.name, m.visibility);
+          if (!isClassMethodsHalf) {
+            noteInstance(host.file, m.name, m.visibility);
+            noteEntityInstance(host.file, hostName, m.name, m.visibility);
+          }
         }
       }
       // Extend / extended-via-Concern: a module's *instance* methods
@@ -312,6 +353,16 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     manifest.instanceFiles[tsRel] = [...new Set([...existing, ...tsNames])].sort();
   }
 
+  for (const [rubyFile, byEntity] of entityInstanceVis) {
+    const tsRel = tsRelFor(rubyFile);
+    for (const [entity, names] of byEntity) {
+      const tsNames = projectPrivateNames(names);
+      if (tsNames.size === 0) continue;
+      const perFile = (manifest.entityInstanceFiles[tsRel] ??= {});
+      perFile[entity] = [...new Set([...(perFile[entity] ?? []), ...tsNames])].sort();
+    }
+  }
+
   entitiesByTsFile(fileEntities, tsRelFor, manifest.entities);
 }
 
@@ -322,10 +373,18 @@ for (const k of Object.keys(manifest.entities).sort()) sortedEntities[k] = manif
 const sortedInstanceFiles: Record<string, string[]> = {};
 for (const k of Object.keys(manifest.instanceFiles).sort())
   sortedInstanceFiles[k] = manifest.instanceFiles[k];
+const sortedEntityInstanceFiles: Record<string, Record<string, string[]>> = {};
+for (const k of Object.keys(manifest.entityInstanceFiles).sort()) {
+  const byEntity = manifest.entityInstanceFiles[k];
+  const inner: Record<string, string[]> = {};
+  for (const e of Object.keys(byEntity).sort()) inner[e] = byEntity[e];
+  sortedEntityInstanceFiles[k] = inner;
+}
 const final: Manifest = {
   files: sortedFiles,
   entities: sortedEntities,
   instanceFiles: sortedInstanceFiles,
+  entityInstanceFiles: sortedEntityInstanceFiles,
 };
 
 writeJsonManifest(OUT, final);

@@ -427,6 +427,7 @@ export class LoaderQuery {
 }
 
 export class LoaderRecords {
+  /** @internal */
   readonly loaderQuery: LoaderQuery;
   /** @internal */
   readonly loaders: Association[];
@@ -466,6 +467,7 @@ export class LoaderRecords {
     }
   }
 
+  /** @internal */
   loadRecords(): Promise<Base[]> {
     return this.loaderQuery.loadRecordsForKeys([...this.keysToLoad], (record) => {
       for (const l of this.loaders) l.setInverse(record);
