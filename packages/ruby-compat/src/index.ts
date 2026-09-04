@@ -142,6 +142,9 @@ export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
 export { succ } from "./string/succ.js";
 export { isSymbol, symbolToS } from "./symbol.js";
+export { Monitor, synchronize } from "./monitor.js";
+export type { MonitorMixin } from "./monitor.js";
+
 export { Tempfile } from "./tempfile.js";
 export type { TempfileBasename } from "./tempfile.js";
 export { TypeError } from "./type-error.js";
