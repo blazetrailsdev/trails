@@ -550,6 +550,7 @@ export class Time {
    */
   static zoneOffset(zone: string, year: number = Time.now().year): number | null {
     let off: number | null = null;
+    let t: Time;
     zone = zone.toUpperCase();
     const m = /^([+-])(\d\d)(:?)(\d\d)(?:\3(\d\d))?$/.exec(zone);
     if (m) {
@@ -560,14 +561,10 @@ export class Time {
       off = parseInt(zone, 10) * 3600;
     } else if (zone in Time.ZoneOffset) {
       off = Time.ZoneOffset[zone] * 3600;
-    } else {
-      let t = Time.local(year, 1, 1);
-      if (t.zone?.toUpperCase() === zone) {
-        off = t.utcOffset;
-      } else {
-        t = Time.local(year, 7, 1);
-        if (t.zone?.toUpperCase() === zone) off = t.utcOffset;
-      }
+    } else if ((t = Time.local(year, 1, 1)).zone?.toUpperCase() === zone) {
+      off = t.utcOffset;
+    } else if ((t = Time.local(year, 7, 1)).zone?.toUpperCase() === zone) {
+      off = t.utcOffset;
     }
     return off;
   }
@@ -578,10 +575,10 @@ export class Time {
   }
 
   /** `vendor/ruby/lib/time.rb:124-140` */
-  static #forceZone(t: Time, zone: string | null, offset: number | null = null): Time {
-    if (zone != null && Time.#isZoneUtc(zone)) {
+  static #forceZone(t: Time, zone: string, offset: number | null = null): Time {
+    if (Time.#isZoneUtc(zone)) {
       return t.getutc();
-    } else if ((offset ??= zone == null ? null : Time.zoneOffset(zone)) != null) {
+    } else if ((offset ??= Time.zoneOffset(zone)) != null) {
       t = t.getlocal();
       if (t.utcOffset !== offset) {
         t = t.getlocal(offset);
@@ -683,7 +680,12 @@ export class Time {
     return [year, mon, day, hour, min, sec];
   }
 
-  /** `vendor/ruby/lib/time.rb:195-272` */
+  /**
+   * `vendor/ruby/lib/time.rb:195-272`. Ruby's `now.respond_to?(:getlocal)`
+   * guard admits any object answering `#mon`/`#day`/`#year`; `now` is typed
+   * `Time` here, so the guard is statically true and the branch it protects is
+   * the only one reachable.
+   */
   static #makeTime(
     date: string,
     year: number | undefined,
@@ -770,7 +772,7 @@ export class Time {
       }
     }
 
-    let usec: Rational | undefined;
+    let usec: number | Rational | undefined;
     if (secFraction != null) usec = secFraction.mul(1_000_000);
 
     if (now != null) {
@@ -788,7 +790,7 @@ export class Time {
         if (sec != null) break fill;
         sec = now.sec;
         if (secFraction != null) break fill;
-        usec = new Rational(BigInt(now.usec), 1n);
+        usec = now.usec;
       }
     }
 
@@ -798,7 +800,7 @@ export class Time {
     hour ??= 0;
     min ??= 0;
     sec ??= 0;
-    usec ??= new Rational(0n, 1n);
+    usec ??= 0;
 
     if (year !== offYear) {
       off = null;
@@ -808,7 +810,7 @@ export class Time {
     if (off != null) {
       [year, mon, day, hour, min, sec] = Time.#applyOffset(year, mon, day, hour, min, sec, off);
       const t = Time.utc(year, mon, day, hour, min, sec, usec);
-      return Time.#forceZone(t, zone ?? null, off);
+      return Time.#forceZone(t, zone!, off);
     } else {
       return Time.local(year, mon, day, hour, min, sec, usec);
     }
@@ -817,7 +819,8 @@ export class Time {
   /**
    * `vendor/ruby/lib/time.rb:381-387` — takes a string representation of a
    * Time and attempts to parse it using a heuristic. Missing pieces of the
-   * date are inferred from `now`.
+   * date are inferred from `now`. Ruby's `block_given?` is the trailing
+   * `block` parameter, so `comp` is `!block_given?` as in Ruby.
    */
   static parse(
     date: string,
