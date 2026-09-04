@@ -17,7 +17,7 @@ import {
   isApplicationRecordClass as coreIsApplicationRecordClass,
   configurations as baseConfigurations,
 } from "./core.js";
-import { IsolatedExecutionState, getEnv } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, getEnv, presence } from "@blazetrails/activesupport";
 import { _railsEnv, _setDefaultEnv } from "./connection-handling-slot.js";
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
@@ -560,13 +560,13 @@ async function _loadAdapter(name: string): Promise<new (arg: unknown) => Databas
   return resolveConnectionAdapter(name);
 }
 
+export const RAILS_ENV = (): string | undefined =>
+  presence(getEnv("TRAILS_ENV")) ??
+  (_railsEnv !== null ? _railsEnv : undefined) ??
+  presence(getEnv("NODE_ENV"));
+
 /** @missingRailsCall call — PERMANENT */
-export const DEFAULT_ENV = (): string => {
-  const trailsEnv = getEnv("TRAILS_ENV");
-  if (trailsEnv) return trailsEnv;
-  if (_railsEnv !== null) return _railsEnv || "default_env";
-  return getEnv("NODE_ENV") || "default_env";
-};
+export const DEFAULT_ENV = (): string => RAILS_ENV() || "default_env";
 
 /**
  * @missingRailsCall call — PERMANENT
