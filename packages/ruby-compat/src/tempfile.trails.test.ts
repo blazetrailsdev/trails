@@ -44,7 +44,8 @@ describe("Tempfile", () => {
       tmpfile.write("hello");
       await Promise.resolve();
       expect(exists(path)).toBe(true);
-      return File.open(path, "rb", (f) => f.read());
+      tmpfile.rewind();
+      return tmpfile.read();
     });
     expect(value).toBe("hello");
     expect(exists(path)).toBe(false);
@@ -93,9 +94,10 @@ describe("Tempfile", () => {
     const bytes = [0x00, 0xff, 0x80, 0xc3, 0x28, 0xfe];
     const tempfile = Tempfile.new("bin");
     tempfile.write(bytes.map((byte) => String.fromCharCode(byte)).join(""));
+    expect(tempfile.read()).toBe("");
+    tempfile.rewind();
+    expect([...tempfile.read()].map((c) => c.charCodeAt(0))).toEqual(bytes);
     tempfile.close();
-    const readBack = File.open(tempfile.path!, "rb", (f) => f.read());
-    expect([...readBack].map((c) => c.charCodeAt(0))).toEqual(bytes);
     tempfile.unlink();
   });
 

@@ -2,6 +2,7 @@ export { ArgumentError } from "./argument-error.js";
 export { Dir } from "./dir.js";
 export { File } from "./file.js";
 export { IO } from "./io.js";
+export { IOError } from "./io-error.js";
 export {
   cmp,
   cmpint,

@@ -153,9 +153,8 @@ export class Dir {
    *
    * `stat.writable?` (`tmpdir.rb:35`) is effective-process writability, so it
    * goes through the adapter's `access(2)` with `W_OK`; an adapter without one
-   * reports every directory writable, which is what a non-POSIX filesystem
-   * does. `world_writable?` / `sticky?` (`tmpdir.rb:37`) are the `0o002` and
-   * `0o1000` bits of the stat's mode.
+   * reports every directory writable. `world_writable?` / `sticky?`
+   * (`tmpdir.rb:37`) are the `0o002` and `0o1000` bits of the stat's mode.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Dir.tmpdir`
    * (`vendor/ruby/lib/tmpdir.rb:26`), which Rails calls without defining.

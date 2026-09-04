@@ -74,14 +74,12 @@ function createTmpname(
  * `Tempfile < DelegateClass(File)` (`tempfile.rb:89`), so every stream method
  * is the `File` opened at `tempfile.rb:157`, cursor and all — `write` advances
  * the offset the same way `IO#write` does (`vendor/ruby/io.c:2263`). The
- * delegation is spelled out per method here because TypeScript has no
- * `method_missing`, which is the one shape `./method-missing-proxy.ts` exists
- * for and which a typed stream cannot use.
+ * delegation is spelled out per method because TypeScript has no
+ * `method_missing` a typed stream can use.
  *
  * {@link open} and {@link create} run a synchronous block inline and return
  * its value directly, the way Ruby does (`vendor/ruby/lib/tempfile.rb:366`,
- * `:438`); an asynchronous block gets its `ensure` chained onto the returned
- * Promise instead.
+ * `:438`); an asynchronous block chains its `ensure` onto the Promise.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile`
  * (`vendor/ruby/lib/tempfile.rb:89`), which Rails calls without defining, so
@@ -103,8 +101,7 @@ export class Tempfile {
    * (`tempfile.rb:154`) with `perm: 0600` (`tempfile.rb:158`).
    *
    * `FsAdapter.openSync` takes no permission argument, so `0600` is a `chmod`
-   * behind the exclusive create rather than the `open(2)` mode — the file
-   * exists for the width of that call at the adapter's default permissions.
+   * behind the exclusive create rather than the `open(2)` mode.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile.new`
    * (`vendor/ruby/lib/tempfile.rb:150`).
@@ -148,7 +145,10 @@ export class Tempfile {
    * `Tempfile.create` (`vendor/ruby/lib/tempfile.rb:438`), which is NOT a
    * `Tempfile`: it opens a plain `File` (`tempfile.rb:444`) and yields or
    * returns that, so the caller gets no finalizer and no `Tempfile` surface.
-   * The `ensure` closes it and unlinks the path (`tempfile.rb:447-461`).
+   * The `ensure` unlinks BEFORE closing while the path still names the open
+   * file (`tempfile.rb:449-453`), which is the unlink-after-creation practice
+   * `Tempfile.create` exists to give on POSIX, and falls back to unlinking
+   * after the close when that did not happen (`tempfile.rb:455-460`).
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Tempfile.create`
    * (`vendor/ruby/lib/tempfile.rb:438`).
@@ -170,11 +170,23 @@ export class Tempfile {
       return ensure(
         () => block(tmpfile),
         () => {
-          tmpfile.close();
-          try {
-            File.delete(tmpfile.path()!);
-          } catch (error) {
-            if ((error as { code?: string }).code !== "ENOENT") throw error;
+          let unlinked: number | null = null;
+          if (!tmpfile.isClosed()) {
+            if (File.isIdentical(tmpfile, tmpfile.path()!)) {
+              try {
+                unlinked = File.delete(tmpfile.path()!);
+              } catch {
+                unlinked = null;
+              }
+            }
+            tmpfile.close();
+          }
+          if (unlinked == null) {
+            try {
+              File.delete(tmpfile.path()!);
+            } catch (error) {
+              if ((error as { code?: string }).code !== "ENOENT") throw error;
+            }
           }
         },
       );
@@ -204,6 +216,30 @@ export class Tempfile {
    */
   write(string: string): number {
     return this.tmpfile.write(string);
+  }
+
+  /**
+   * `IO#read` (`vendor/ruby/io.c:3774` `io_read`) on the delegated `File`
+   * (`vendor/ruby/lib/tempfile.rb:89`): the rest of the stream FROM THE
+   * CURRENT OFFSET, so a read straight after a write answers `""` until
+   * {@link rewind} moves the cursor back.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#read`
+   * (`vendor/ruby/io.c:3774`), delegated by Ruby stdlib `Tempfile`.
+   */
+  read(): string {
+    return this.tmpfile.read();
+  }
+
+  /**
+   * `IO#rewind` (`vendor/ruby/io.c:2565`) on the delegated `File`
+   * (`vendor/ruby/lib/tempfile.rb:89`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#rewind`
+   * (`vendor/ruby/io.c:2565`), delegated by Ruby stdlib `Tempfile`.
+   */
+  rewind(): number {
+    return this.tmpfile.rewind();
   }
 
   /**

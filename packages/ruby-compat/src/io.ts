@@ -1,4 +1,5 @@
-import { getFs } from "./fs-adapter.js";
+import { getFs, type FsStatResult } from "./fs-adapter.js";
+import { IOError } from "./io-error.js";
 
 /** The `rb_exec_recursive` guard `io_puts_ary` (`vendor/ruby/io.c:8880`) is called through. */
 const putsAryInFlight = new Set<unknown[]>();
@@ -205,6 +206,43 @@ export class IO {
   }
 
   /**
+   * `vendor/ruby/io.c:2565` `rb_io_rewind` — the offset goes back to the start
+   * of the stream, and it answers `0`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#rewind`
+   * (`vendor/ruby/io.c:2565`).
+   */
+  rewind(): number {
+    return this.seek(0);
+  }
+
+  /**
+   * `vendor/ruby/io.c:5842` `rb_io_closed_p`, which is `fptr->fd < 0` — the
+   * same test `rb_io_close_m` (`io.c:5779`) short-circuits on.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#closed?`
+   * (`vendor/ruby/io.c:5842`).
+   */
+  isClosed(): boolean {
+    return this.fd < 0;
+  }
+
+  /**
+   * `vendor/ruby/io.c:2075` `rb_io_stat` — `fstat(2)` of the descriptor, where
+   * `File.stat` names a path. It raises on a closed stream, and on an adapter
+   * with no `fstat` there is no descriptor identity to answer with.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#stat`
+   * (`vendor/ruby/io.c:2075`).
+   */
+  stat(): FsStatResult {
+    const fstatSync = getFs().fstatSync;
+    if (this.fd < 0) throw new IOError("closed stream");
+    if (!fstatSync) throw new IOError("fstat is unavailable in this runtime");
+    return fstatSync(this.fd);
+  }
+
+  /**
    * `vendor/ruby/io.c:3774` `io_read`, which behaves like C's `fread` and so
    * retries `read(2)` until `length` bytes are in hand or the stream hits EOF
    * (`io.c:3760-3763`) — a short read is not an answer. It answers `nil` —
@@ -273,11 +311,9 @@ export class IO {
   /**
    * `vendor/ruby/io.c:5777` `rb_io_close_m`, which answers `nil` — and answers
    * it without closing anything when `fptr->fd < 0` (`io.c:5779-5781`), so a
-   * second close is a no-op rather than an error. `atomic_write` leans on
-   * that: it closes the temp file itself
-   * (`vendor/rails/activesupport/lib/active_support/core_ext/file/atomic.rb:30`)
-   * inside a `Tempfile.open` whose own `ensure` closes it again
-   * (`vendor/ruby/lib/tempfile.rb:372`).
+   * second close is a no-op rather than an error — which `atomic_write` leans
+   * on, closing the temp file at `core_ext/file/atomic.rb:30` inside a
+   * `Tempfile.open` whose `ensure` closes it again (`tempfile.rb:372`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO#close`
    * (`vendor/ruby/io.c:5777`).
