@@ -1,5 +1,41 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { File, Rational, StringIO } from "@blazetrails/ruby-compat";
+import { Date, DateTime, Time } from "@blazetrails/date";
+import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { UploadedFile } from "../../../action-dispatch/http/upload.js";
 import { Parameters, UnfilteredParameters } from "../../metal/strong-parameters.js";
+
+const thisFile = new URL(import.meta.url).pathname;
+
+function permittedScalarValues(): unknown[] {
+  return [
+    "a",
+    "a",
+    null,
+    0,
+    1.0,
+    2n ** 128n,
+    new BigDecimal(1),
+    new Rational(1, 2),
+    true,
+    false,
+    Date.today(),
+    Time.now(),
+    DateTime.now(),
+    File.open(thisFile, "r"),
+    new StringIO(),
+    new UploadedFile({ tempfile: thisFile }),
+    new RackTestUploadedFile(thisFile),
+  ];
+}
+
+const structFields: string[] = [];
+for (const number of ["0", "1", "12"]) {
+  for (const suffix of ["", "i", "f"]) {
+    structFields.push(`sf(${number}${suffix})`);
+  }
+}
 
 describe("ParametersPermitTest", () => {
   afterEach(() => {
@@ -22,12 +58,17 @@ describe("ParametersPermitTest", () => {
   });
 
   it("key: permitted scalar values", () => {
-    const params = new Parameters({ name: "John", age: 22, active: true });
-    const permitted = params.permit("name", "age", "active");
-    expect(permitted.get("name")).toBe("John");
-    expect(permitted.get("age")).toBe(22);
-    expect(permitted.get("active")).toBe(true);
-    expect(permitted.permitted).toBe(true);
+    for (const value of permittedScalarValues()) {
+      const params = new Parameters({ id: value });
+      const permitted = params.permit("id");
+      expect(permitted.get("id")).toBe(value);
+
+      for (const sf of structFields) {
+        const sfParams = new Parameters({ [sf]: value });
+        const sfPermitted = sfParams.permit("sf");
+        expect(sfPermitted.get(sf)).toBe(value);
+      }
+    }
   });
 
   it("key: unknown keys are filtered out", () => {

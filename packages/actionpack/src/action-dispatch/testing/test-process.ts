@@ -2,7 +2,7 @@ import { File } from "@blazetrails/ruby-compat";
 
 import { CookieJar, type CookieJarOptions } from "../middleware/cookies.js";
 import type { FlashHash } from "../middleware/flash.js";
-import { UploadedFile } from "../http/upload.js";
+import { UploadedFile } from "@blazetrails/rack-test";
 
 /** @internal */
 export interface TestProcessRequest {
@@ -23,7 +23,6 @@ export interface TestProcessHost {
   response: TestProcessResponse;
   _cookieJar?: CookieJar;
   fileFixture?(path: string): string;
-  fileFixturePath?: string | null;
   constructor: {
     fileFixturePath?: string | null;
   };
@@ -35,22 +34,11 @@ export function fileFixtureUpload(
   mimeType?: string | null,
   binary: boolean = false,
 ): UploadedFile {
-  const fixturePath = this.fileFixturePath ?? this.constructor.fileFixturePath;
-  let resolved = path;
-  if (fixturePath && !File.isExist(path)) {
-    if (!this.fileFixture) {
-      throw new Error(
-        "TestProcess#fileFixtureUpload: host does not implement fileFixture(); include ActiveSupport::Testing::FileFixtures.",
-      );
-    }
-    resolved = this.fileFixture(path);
+  if (this.constructor.fileFixturePath != null && !File.isExist(path)) {
+    path = this.fileFixture!(path);
   }
-  return new UploadedFile({
-    filename: File.basename(resolved),
-    type: mimeType ?? undefined,
-    tempfile: resolved,
-    head: binary ? "Content-Transfer-Encoding: binary" : undefined,
-  });
+
+  return new UploadedFile(path, mimeType ?? null, binary);
 }
 
 export const fixtureFileUpload = fileFixtureUpload;

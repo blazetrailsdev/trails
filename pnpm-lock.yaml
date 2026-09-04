@@ -243,6 +243,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
       '@blazetrails/did-you-mean':
         specifier: workspace:*
         version: link:../did-you-mean

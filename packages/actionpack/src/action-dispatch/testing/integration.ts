@@ -24,7 +24,7 @@ import type { UrlForRoutes } from "../routing/url-for.js";
 import { RequestEncoder } from "./request-encoder.js";
 import { Session as RackTestSession, type CookieJar } from "@blazetrails/rack-test";
 import type { RackApp } from "@blazetrails/rack";
-import type { UploadedFile } from "../http/upload.js";
+import type { UploadedFile } from "@blazetrails/rack-test";
 
 export interface IntegrationRequestOptions {
   params?: Record<string, unknown>;
