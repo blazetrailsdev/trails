@@ -186,6 +186,17 @@ describe("TimeZoneConverter#serialize containers", () => {
     );
   });
 
+  it("is_changed? compares two Times by instant when Time.zone is unset", () => {
+    const converter = TimeZoneConverter.wrap(new Types.DateTimeType({}));
+    const a = converter.cast(RubyTime.utc(2024, 6, 15, 14, 30, 0));
+    const b = converter.cast(RubyTime.utc(2024, 6, 15, 14, 30, 0));
+
+    expect(a).toBeInstanceOf(RubyTime);
+    expect(a).not.toBe(b);
+    expect(converter.isChanged(a, b)).toBe(false);
+    expect(converter.isChanged(a, converter.cast(RubyTime.utc(2024, 6, 15, 14, 30, 1)))).toBe(true);
+  });
+
   it("leaves an infinite range bound untouched", () => {
     const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
     const serialized = converter.serialize(new Range<unknown>(-Infinity, twz(), false)) as Range;

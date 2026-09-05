@@ -121,9 +121,6 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     if (oldValue instanceof RubyTime && newValue instanceof RubyTime) {
       return oldValue.toR().cmp(newValue.toR()) !== 0;
     }
-    if (oldValue instanceof Temporal.Instant && newValue instanceof Temporal.Instant) {
-      return !oldValue.equals(newValue);
-    }
     return oldValue !== newValue;
   }
 }

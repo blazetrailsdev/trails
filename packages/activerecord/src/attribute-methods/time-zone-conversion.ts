@@ -119,18 +119,8 @@ export class TimeZoneConverter extends ValueType<unknown> {
   }
 
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
-    const oldInstant =
-      oldValue instanceof TimeWithZone
-        ? oldValue.utc().toTime().toInstant()
-        : oldValue instanceof Temporal.Instant
-          ? oldValue
-          : null;
-    const newInstant =
-      newValue instanceof TimeWithZone
-        ? newValue.utc().toTime().toInstant()
-        : newValue instanceof Temporal.Instant
-          ? newValue
-          : null;
+    const oldInstant = toInstantOrNull(oldValue);
+    const newInstant = toInstantOrNull(newValue);
     if (oldInstant !== null && newInstant !== null) {
       return (
         this._nsAtPrecision(oldInstant.epochNanoseconds) !==
@@ -180,6 +170,14 @@ export class TimeZoneConverter extends ValueType<unknown> {
 
     return this.map(value, (v) => this.convertTimeToTimeZone(v));
   }
+}
+
+/** @internal */
+function toInstantOrNull(value: unknown): Temporal.Instant | null {
+  if (value instanceof TimeWithZone) return value.utc().toTime().toInstant();
+  if (value instanceof RubyTime) return value.toTime().toInstant();
+  if (value instanceof Temporal.Instant) return value;
+  return null;
 }
 
 /** @internal */

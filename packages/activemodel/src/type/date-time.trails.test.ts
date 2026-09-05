@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { instant, plainDateTime } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Types, ValueType } from "../index.js";
 
@@ -319,43 +320,35 @@ describe("DateTimeType cast and serialize coverage", () => {
 });
 
 describe("DateTimeType#isChanged", () => {
-  const MS1 = 1_000_000n;
+  const at = (nsec: number) => RubyTime.utc(2024, 1, 2, 3, 4, 5, new Rational(nsec, 1000));
 
-  it("two identical Temporal.Instant references are unchanged", () => {
+  it("two identical Time references are unchanged", () => {
     const t = new Types.DateTimeType();
-    const a = Temporal.Instant.fromEpochNanoseconds(MS1);
+    const a = at(0);
     expect(t.isChanged(a, a)).toBe(false);
   });
 
-  it("two distinct Temporal.Instant objects with same epoch are unchanged (precision=null)", () => {
+  it("two distinct Time objects with same epoch are unchanged (precision=null)", () => {
     const t = new Types.DateTimeType();
-    const a = Temporal.Instant.fromEpochNanoseconds(MS1);
-    const b = Temporal.Instant.fromEpochNanoseconds(MS1);
-    expect(t.isChanged(a, b)).toBe(false);
+    expect(t.isChanged(at(0), at(0))).toBe(false);
   });
 
-  it("instants differing by one full microsecond are changed (precision=null)", () => {
+  it("times differing by one full microsecond are changed (precision=null)", () => {
     const t = new Types.DateTimeType();
-    const a = Temporal.Instant.fromEpochNanoseconds(MS1);
-    const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 1000n);
-    expect(t.isChanged(a, b)).toBe(true);
+    expect(t.isChanged(at(0), at(1000))).toBe(true);
   });
 
-  it("instants differing by one full millisecond are changed (precision=3)", () => {
+  it("times differing by one full millisecond are changed (precision=3)", () => {
     const t = new Types.DateTimeType({ precision: 3 });
-    const a = Temporal.Instant.fromEpochNanoseconds(MS1);
-    const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 1_000_000n);
-    expect(t.isChanged(a, b)).toBe(true);
+    expect(t.isChanged(at(0), at(1_000_000))).toBe(true);
   });
 
-  it("instants differing by one full nanosecond are changed (precision=9)", () => {
+  it("times differing by one full nanosecond are changed (precision=9)", () => {
     const t = new Types.DateTimeType({ precision: 9 });
-    const a = Temporal.Instant.fromEpochNanoseconds(MS1);
-    const b = Temporal.Instant.fromEpochNanoseconds(MS1 + 1n);
-    expect(t.isChanged(a, b)).toBe(true);
+    expect(t.isChanged(at(0), at(1))).toBe(true);
   });
 
-  it("non-Instant values fall back to reference equality", () => {
+  it("non-Time values fall back to reference equality", () => {
     const t = new Types.DateTimeType();
     expect(t.isChanged(null, null)).toBe(false);
     expect(t.isChanged(null, "2024-01-01")).toBe(true);
