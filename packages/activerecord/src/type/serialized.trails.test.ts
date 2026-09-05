@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { StringType } from "@blazetrails/activemodel";
+import { BinaryType, StringType } from "@blazetrails/activemodel";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Serialized, type Coder } from "./serialized.js";
 
@@ -96,5 +96,12 @@ describe("Serialized#isChanged", () => {
     const newValue = new Custom();
     expect(type.isChanged(oldValue, newValue)).toBe(true);
     expect(type.isChanged(oldValue, oldValue)).toBe(false);
+  });
+});
+
+describe("Serialized#type", () => {
+  it("forwards to the subtype, as DelegateClass(Type::Value) does", () => {
+    expect(new Serialized(new StringType(), jsonCoder).type()).toBe("string");
+    expect(new Serialized(new BinaryType(), jsonCoder).type()).toBe("binary");
   });
 });

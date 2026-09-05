@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
 import { describe, it, expect, afterEach } from "vitest";
 import {
   assert,
@@ -12,13 +8,11 @@ import {
   assertNotPredicate,
   assertPredicate,
   assertRaises,
-  include,
   ActiveSupportJSON,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   LengthValidator,
-  Model,
   NoMethodError,
   PresenceValidator,
   StrictValidationFailed,
@@ -26,93 +20,11 @@ import {
   Validator,
 } from "./index.js";
 import type { ConditionalOptions } from "./validations.js";
-import { Callbacks as ValidationsCallbacks } from "./validations/callbacks.js";
 import { FormatValidator } from "./validations/format.js";
-import { Attributes, type AttributesClassHalf } from "./attributes.js";
-
-class Topic extends Model {
-  declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
-  declare static afterValidation: (typeof ValidationsCallbacks.ClassMethods)["afterValidation"];
-  declare static attribute: AttributesClassHalf["attribute"];
-
-  static {
-    include(this, ValidationsCallbacks);
-    include(this, Attributes);
-    this.attribute("title", "string");
-    this.attribute("author_name", "string");
-    this.attribute("content", "string");
-    this.afterValidation(":performAfterValidation");
-  }
-
-  declare title: string | null;
-  declare author_name: string | null;
-  declare content: string | null;
-
-  afterValidationPerformed = false;
-
-  performAfterValidation(): void {
-    this.afterValidationPerformed = true;
-  }
-}
-interface Topic extends Attributes {}
-
-class Reply extends Topic {
-  static {
-    this.validate("errorsOnEmptyContent");
-    this.validate("titleIsWrongCreate", { on: "create" });
-
-    this.validate("checkEmptyTitle");
-    this.validate("checkContentMismatch", { on: "create" });
-    this.validate("checkWrongUpdate", { on: "update" });
-  }
-
-  checkEmptyTitle(): void {
-    if (!(this.title != null && this.title.length > 0)) this.errors.add("title", "is Empty");
-  }
-
-  errorsOnEmptyContent(): void {
-    if (!(this.content != null && this.content.length > 0)) this.errors.add("content", "is Empty");
-  }
-
-  checkContentMismatch(): void {
-    if (this.title != null && this.content != null && this.content === "Mismatch") {
-      this.errors.add("title", "is Content Mismatch");
-    }
-  }
-
-  titleIsWrongCreate(): void {
-    if (this.title != null && this.title === "Wrong Create")
-      this.errors.add("title", "is Wrong Create");
-  }
-
-  checkWrongUpdate(): void {
-    if (this.title != null && this.title === "Wrong Update")
-      this.errors.add("title", "is Wrong Update");
-  }
-}
-
-class Person extends Model {
-  declare static attribute: AttributesClassHalf["attribute"];
-
-  static {
-    include(this, Attributes);
-    this.attribute("title", "string");
-  }
-}
-interface Person extends Attributes {}
-
-class CustomReader extends Model {
-  data: Record<string, unknown>;
-
-  constructor(data: Record<string, unknown> = {}) {
-    super();
-    this.data = data;
-  }
-
-  override readAttributeForValidation(key: string): unknown {
-    return this.data[key];
-  }
-}
+import { Topic } from "./test-helpers/models/topic.js";
+import { Reply } from "./test-helpers/models/reply.js";
+import { Person } from "./test-helpers/models/person.js";
+import { CustomReader } from "./test-helpers/models/custom-reader.js";
 
 describe("ValidationsTest", () => {
   afterEach(() => {
@@ -293,7 +205,7 @@ describe("ValidationsTest", () => {
     let t = new Topic({ title: "" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
     expect(t.errors.messagesFor("title")[0]).toEqual("can't be blank");
-    Topic.validatesPresenceOf("title", "author_name");
+    Topic.validatesPresenceOf("title", "authorName");
     Topic.validate(function (this: Topic) {
       this.errors.add("author_email_address", "will never be valid");
     });
@@ -306,7 +218,7 @@ describe("ValidationsTest", () => {
     expect((key = t.errors.attributeNames[0])).toEqual("title");
     expect(t.errors.messagesFor(key)[0]).toEqual("can't be blank");
     expect(t.errors.messagesFor(key)[1]).toEqual("is too short (minimum is 2 characters)");
-    expect((key = t.errors.attributeNames[1])).toEqual("author_name");
+    expect((key = t.errors.attributeNames[1])).toEqual("authorName");
     expect(t.errors.messagesFor(key)[0]).toEqual("can't be blank");
     expect((key = t.errors.attributeNames[2])).toEqual("author_email_address");
     expect(t.errors.messagesFor(key)[0]).toEqual("will never be valid");
@@ -317,7 +229,7 @@ describe("ValidationsTest", () => {
   it("validation with if and on", async () => {
     Topic.validatesPresenceOf("title", {
       if: (x: Topic) => {
-        x.author_name = "bad";
+        x.authorName = "bad";
         return true;
       },
       on: "update",
@@ -326,25 +238,16 @@ describe("ValidationsTest", () => {
     const t = new Topic({ title: "" });
 
     assertPredicate(await t.isValid(), (valid) => valid);
-    assertPredicate(t.author_name, (authorName) => authorName == null);
+    assertPredicate(t.authorName, (authorName) => authorName == null);
 
     assert(await t.isInvalid("update"));
-    assert(t.author_name === "bad");
+    assert(t.authorName === "bad");
   });
 
   it("strict validation in validates", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validates("title", { strict: true, presence: true });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, strict: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    await expect(new Person({}).isValid()).rejects.toThrow();
+    await expect(new Topic().isValid()).rejects.toThrow();
   });
 
   it("strict validation not fails", async () => {
@@ -375,7 +278,7 @@ describe("ValidationsTest", () => {
 
   it("list of validators will be empty when empty", () => {
     Topic.validates("title", { length: { minimum: 10 } });
-    expect(Topic.validatorsOn("author_name")).toEqual([]);
+    expect(Topic.validatorsOn("authorName")).toEqual([]);
   });
 
   it("validate with bang", async () => {
@@ -398,18 +301,8 @@ describe("ValidationsTest", () => {
   });
 
   it("does not modify options argument", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
     const opts = { presence: true };
-    Person.validates("name", opts);
+    Topic.validates("title", opts);
     expect(opts).toEqual({ presence: true });
   });
 
@@ -419,19 +312,10 @@ describe("ValidationsTest", () => {
   });
 
   it("validates with bang", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validates("title", { presence: true });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person();
-    await expect(p.validateBang()).rejects.toThrow(/Validation failed/);
+    const t = new Topic();
+    await expect(t.validateBang()).rejects.toThrow(/Validation failed/);
   });
 
   it("validate with bang and context", async () => {
@@ -456,10 +340,10 @@ describe("ValidationsTest", () => {
 
   it("validation with message as proc that takes a record as a parameter", async () => {
     Topic.validatesPresenceOf("title", {
-      message: (record: Topic) => `You have failed me for the last time, ${record.author_name}.`,
+      message: (record: Topic) => `You have failed me for the last time, ${record.authorName}.`,
     });
 
-    const t = new Topic({ author_name: "Admiral" });
+    const t = new Topic({ authorName: "Admiral" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
     expect(t.errors.messagesFor("title")).toEqual([
       "You have failed me for the last time, Admiral.",
@@ -546,28 +430,18 @@ describe("ValidationsTest", () => {
   });
 
   it("strict validation in custom validator helper", async () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesPresenceOf("title", { strict: true });
 
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-        this.validates("name", { presence: true, strict: true });
-      }
-    }
-    interface Person extends Attributes {}
-
-    const p = new Person({});
-    await expect(p.isValid()).rejects.toThrow();
+    await expect(new Topic().isValid()).rejects.toThrow();
   });
 
   it("validation with message as proc that takes record and data as a parameters", async () => {
     Topic.validatesPresenceOf("title", {
       message: (record: Topic, data: { attribute: string }) =>
-        `${data.attribute} is missing. You have failed me for the last time, ${record.author_name}.`,
+        `${data.attribute} is missing. You have failed me for the last time, ${record.authorName}.`,
     });
 
-    const t = new Topic({ author_name: "Admiral" });
+    const t = new Topic({ authorName: "Admiral" });
     assertPredicate(await t.isInvalid(), (invalid) => invalid);
     expect(t.errors.messagesFor("title")).toEqual([
       "Title is missing. You have failed me for the last time, Admiral.",
@@ -592,7 +466,7 @@ describe("ValidationsTest", () => {
   });
 
   it("validations on the instance level", async () => {
-    Topic.validates("title", "author_name", { presence: true });
+    Topic.validates("title", "authorName", { presence: true });
     Topic.validates("content", { length: { minimum: 10 } });
 
     const topic = new Topic();
@@ -600,7 +474,7 @@ describe("ValidationsTest", () => {
     expect(topic.errors.size).toEqual(3);
 
     topic.title = "Some Title";
-    topic.author_name = "Some Author";
+    topic.authorName = "Some Author";
     topic.content = "Some Content Whose Length is more than 10.";
     assertPredicate(await topic.isValid(), (valid) => valid);
   });
@@ -626,9 +500,9 @@ describe("ValidationsTest", () => {
 
   it("list of validators on multiple attributes", () => {
     Topic.validates("title", { length: { minimum: 10 } });
-    Topic.validates("author_name", { presence: true, format: { with: /a/ } });
+    Topic.validates("authorName", { presence: true, format: { with: /a/ } });
 
-    const validators = Topic.validatorsOn("title", "author_name");
+    const validators = Topic.validatorsOn("title", "authorName");
 
     expect(validators.map((v) => v.constructor).sort((a, b) => (a.name < b.name ? -1 : 1))).toEqual(
       [FormatValidator, LengthValidator, PresenceValidator],
@@ -637,7 +511,7 @@ describe("ValidationsTest", () => {
 
   it("validate", async () => {
     Topic.validate(async function (this: Topic) {
-      await this.validatesPresenceOf("title", "author_name");
+      await this.validatesPresenceOf("title", "authorName");
       await this.validatesLengthOf("content", { minimum: 10 });
     });
 
@@ -649,32 +523,14 @@ describe("ValidationsTest", () => {
   });
 
   it("strict validation particular validator", async () => {
-    class Topic extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validates("title", { presence: { strict: true } });
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { presence: true, strict: true });
-      }
-    }
-    interface Topic extends Attributes {}
-
-    await expect(new Topic({}).isValid()).rejects.toThrow();
+    await expect(new Topic().isValid()).rejects.toThrow();
   });
 
   it("strict validation custom exception", async () => {
-    class Topic extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
+    Topic.validatesPresenceOf("title", { strict: true });
 
-      static {
-        include(this, Attributes);
-        this.attribute("title", "string");
-        this.validates("title", { presence: true, strict: true });
-      }
-    }
-    interface Topic extends Attributes {}
-
-    await expect(new Topic({}).isValid()).rejects.toThrow(/title/i);
+    await expect(new Topic().isValid()).rejects.toThrow(/title/i);
   });
 });

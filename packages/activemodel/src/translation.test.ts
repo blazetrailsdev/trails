@@ -1,149 +1,184 @@
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
-   Each model below spells `include ActiveModel::Attributes` in its class body, the way the Rails
-   test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
-   how `include()` surfaces those members on the type side. */
-import { describe, it, expect } from "vitest";
-import { Model } from "./index.js";
-import { Attributes, type AttributesClassHalf } from "./attributes.js";
-import { include } from "@blazetrails/activesupport";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { I18n } from "./i18n.js";
+import { raiseOnMissingTranslations } from "./translation.js";
+import { resetI18n } from "./test-helpers/i18n.js";
+import { Person, Child, Gender } from "./test-helpers/models/person.js";
 
 describe("ActiveModelI18nTests", () => {
+  beforeEach(() => {
+    resetI18n();
+  });
+
+  afterEach(() => {
+    resetI18n();
+  });
+
   it("translated model attributes", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("first_name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(Person.humanAttributeName("first_name")).toBe("First name");
+    I18n.backend().storeTranslations("en", {
+      activemodel: { attributes: { person: { name: "person name attribute" } } },
+    });
+    expect(Person.humanAttributeName("name")).toBe("person name attribute");
   });
 
   it("translated model attributes with default", () => {
-    class Person extends Model {
-      declare static attribute: AttributesClassHalf["attribute"];
-
-      static {
-        include(this, Attributes);
-        this.attribute("name", "string");
-      }
-    }
-    interface Person extends Attributes {}
-
-    expect(Person.humanAttributeName("name")).toBe("Name");
-  });
-
-  it("translated model names", () => {
-    class Person extends Model {}
-    expect(Person.modelName.singular).toBe("person");
-    expect(Person.modelName.plural).toBe("people");
-  });
-
-  it("translated model when missing translation", () => {
-    class Person extends Model {}
-    expect(Person.humanAttributeName("unknown_attr")).toBe("Unknown attr");
+    I18n.backend().storeTranslations("en", { attributes: { name: "name default attribute" } });
+    expect(Person.humanAttributeName("name")).toBe("name default attribute");
   });
 
   it("translated model attributes using default option", () => {
-    expect(Model.humanAttributeName("first_name")).toBe("First name");
+    expect(Person.humanAttributeName("name", { default: "name default attribute" })).toBe(
+      "name default attribute",
+    );
   });
 
   it("translated model attributes using default option as symbol", () => {
-    expect(Model.humanAttributeName("last_name")).toBe("Last name");
+    I18n.backend().storeTranslations("en", { default_name: "name default attribute" });
+    expect(Person.humanAttributeName("name", { default: ":default_name" })).toBe(
+      "name default attribute",
+    );
   });
 
   it("translated model attributes falling back to default", () => {
-    expect(Model.humanAttributeName("email")).toBe("Email");
+    expect(Person.humanAttributeName("name")).toBe("Name");
   });
 
   it("translated model attributes using default option as symbol and falling back to default", () => {
-    expect(Model.humanAttributeName("phone_number")).toBe("Phone number");
+    expect(Person.humanAttributeName("name", { default: ":default_name" })).toBe("Name");
+  });
+
+  it("translated model attributes with symbols", () => {
+    I18n.backend().storeTranslations("en", {
+      activemodel: { attributes: { person: { name: "person name attribute" } } },
+    });
+    expect(Person.humanAttributeName("name")).toBe("person name attribute");
+  });
+
+  it("translated model attributes with ancestor", () => {
+    I18n.backend().storeTranslations("en", {
+      activemodel: { attributes: { child: { name: "child name attribute" } } },
+    });
+    expect(Child.humanAttributeName("name")).toBe("child name attribute");
   });
 
   it("translated model attributes with ancestors fallback", () => {
-    expect(Model.humanAttributeName("created_at")).toBe("Created at");
+    I18n.backend().storeTranslations("en", {
+      activemodel: { attributes: { person: { name: "person name attribute" } } },
+    });
+    expect(Child.humanAttributeName("name")).toBe("person name attribute");
   });
 
   it("translated model attributes with attribute matching namespaced model name", () => {
-    expect(Model.humanAttributeName("model_name")).toBe("Model name");
+    I18n.backend().storeTranslations("en", {
+      activemodel: {
+        attributes: {
+          person: { gender: "person gender" },
+          "person/gender": { attribute: "person gender attribute" },
+        },
+      },
+    });
+
+    expect(Person.humanAttributeName("gender")).toBe("person gender");
+    expect(Gender.humanAttributeName("attribute")).toBe("person gender attribute");
   });
 
   it("translated deeply nested model attributes", () => {
-    expect(Model.humanAttributeName("nested_attribute")).toBe("Nested attribute");
+    I18n.backend().storeTranslations("en", {
+      activemodel: {
+        attributes: { "person/contacts/addresses": { street: "Deeply Nested Address Street" } },
+      },
+    });
+    expect(Person.humanAttributeName("contacts.addresses.street")).toBe(
+      "Deeply Nested Address Street",
+    );
   });
 
   it("translated nested model attributes", () => {
-    expect(Model.humanAttributeName("parent_id")).toBe("Parent");
+    I18n.backend().storeTranslations("en", {
+      activemodel: { attributes: { "person/addresses": { street: "Person Address Street" } } },
+    });
+    expect(Person.humanAttributeName("addresses.street")).toBe("Person Address Street");
   });
 
   it("translated nested model attributes with namespace fallback", () => {
-    expect(Model.humanAttributeName("admin_role")).toBe("Admin role");
+    I18n.backend().storeTranslations("en", {
+      activemodel: { attributes: { addresses: { street: "Cool Address Street" } } },
+    });
+    expect(Person.humanAttributeName("addresses.street")).toBe("Cool Address Street");
+  });
+
+  it("translated model names", () => {
+    I18n.backend().storeTranslations("en", { activemodel: { models: { person: "person model" } } });
+    expect(Person.modelName.human()).toBe("person model");
+  });
+
+  it("translated model when missing translation", () => {
+    expect(Person.modelName.human()).toBe("Person");
   });
 
   it("translated model with namespace", () => {
-    expect(Model.humanAttributeName("namespace_attr")).toBe("Namespace attr");
+    I18n.backend().storeTranslations("en", {
+      activemodel: { models: { "person/gender": "gender model" } },
+    });
+    expect(Gender.modelName.human()).toBe("gender model");
   });
 
   it("translated subclass model", () => {
-    class Person extends Model {}
-    expect(Person.humanAttributeName("first_name")).toBe("First name");
+    I18n.backend().storeTranslations("en", { activemodel: { models: { child: "child model" } } });
+    expect(Child.modelName.human()).toBe("child model");
   });
 
   it("translated subclass model when ancestor translation", () => {
-    class Person extends Model {}
-    expect(Person.humanAttributeName("last_name")).toBe("Last name");
+    I18n.backend().storeTranslations("en", { activemodel: { models: { person: "person model" } } });
+    expect(Child.modelName.human()).toBe("person model");
   });
 
   it("translated attributes when nil", () => {
-    expect(Model.humanAttributeName("nil_attr")).toBe("Nil attr");
+    I18n.backend().storeTranslations("en", {
+      activemodel: { attributes: { "person/addresses": { street: "Person Address Street" } } },
+    });
+    expect(Person.humanAttributeName("addresses.")).toBe("Addresses");
   });
 
   it("translated deeply nested attributes when nil", () => {
-    expect(Model.humanAttributeName("deep_nil")).toBe("Deep nil");
+    I18n.backend().storeTranslations("en", {
+      activemodel: {
+        attributes: { "person/contacts/addresses": { street: "Deeply Nested Address Street" } },
+      },
+    });
+    expect(Person.humanAttributeName("addresses.contacts.")).toBe("Addresses/contacts");
   });
 
   it("translated subclass model when missing translation", () => {
-    class Person extends Model {}
-    expect(Person.humanAttributeName("missing")).toBe("Missing");
+    expect(Child.modelName.human()).toBe("Child");
   });
 
   it("translated model with default value when missing translation", () => {
-    class Person extends Model {}
     expect(Person.modelName.human({ default: "dude" })).toBe("dude");
   });
 
   it("translated model with default key when missing both translations", () => {
-    class Person extends Model {}
     expect(Person.modelName.human({ default: ":this_key_does_not_exist" })).toBe("Person");
   });
 
   it("human does not modify options", () => {
-    class Person extends Model {}
     const options = { default: "person model" };
     Person.modelName.human(options);
     expect(options).toEqual({ default: "person model" });
   });
 
   it("human attribute name does not modify options", () => {
-    const opts = {};
-    Model.humanAttributeName("name");
-    expect(opts).toEqual({});
+    const options = { default: "Cool gender" };
+    Person.humanAttributeName("gender", options);
+    expect(options).toEqual({ default: "Cool gender" });
   });
 
   it("raise on missing translations", () => {
-    expect(Model.humanAttributeName("missing_field")).toBe("Missing field");
-  });
-
-  it("translated model attributes with symbols", () => {
-    expect(Model.humanAttributeName("first_name")).toBe("First name");
-  });
-
-  it("translated model attributes with ancestor", () => {
-    class Parent extends Model {}
-    class Child extends Parent {}
-    expect(Child.humanAttributeName("first_name")).toBe("First name");
+    const original = raiseOnMissingTranslations();
+    raiseOnMissingTranslations(true);
+    try {
+      expect(() => Person.humanAttributeName("name")).toThrow();
+    } finally {
+      raiseOnMissingTranslations(original);
+    }
   });
 });

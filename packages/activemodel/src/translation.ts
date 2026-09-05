@@ -1,7 +1,7 @@
-import { humanize, isPresent } from "@blazetrails/activesupport";
+import { extend, humanize, isPresent } from "@blazetrails/activesupport";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
-import type { ModelName } from "./naming.js";
+import { Naming, type ModelName } from "./naming.js";
 
 export function raiseOnMissingTranslations(value?: boolean): boolean {
   if (value !== undefined) {
@@ -25,6 +25,8 @@ export class Translation {
 
   static humanAttributeName = humanAttributeName;
 }
+
+extend(Translation, Naming);
 
 export interface HumanAttributeNameOptions {
   default?: string | string[];

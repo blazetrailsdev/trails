@@ -8,7 +8,7 @@ import {
   type SerializeOptions,
   type SerializationRecord,
 } from "../serialization.js";
-import { ModelName, Naming, detectRelativeModelNamingParent } from "../naming.js";
+import { ModelName, Naming } from "../naming.js";
 import {
   ActiveSupportJSON,
   include,
@@ -23,10 +23,7 @@ import {
 export class JSON {
   static includeRootInJson: boolean | string = false;
 
-  declare protected static _modelName?: ModelName;
-
-  /** @noRailsEquivalent PERMANENT */
-  declare static moduleName?: string;
+  declare static modelName: ModelName;
 
   declare readonly attributes: Record<string, unknown>;
 
@@ -58,14 +55,6 @@ export class JSON {
     }
     void this.setAttributes(hash);
     return this;
-  }
-
-  static get modelName(): ModelName {
-    if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-      const namespace = detectRelativeModelNamingParent(this);
-      this._modelName = new ModelName(this, namespace);
-    }
-    return this._modelName;
   }
 
   serializableHash(options?: SerializeOptions): Record<string, unknown> {

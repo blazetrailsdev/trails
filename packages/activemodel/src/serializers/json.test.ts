@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { extend } from "@blazetrails/activesupport";
 import { JSON as JSONHost } from "./json.js";
+import { Naming } from "../naming.js";
 
 describe("Serializers::JSON host", () => {
   class Person extends JSONHost {
     static {
+      extend(this, Naming);
       Object.defineProperty(this.prototype, "attributes", {
         get() {
           return { name: this._name, age: this._age };
@@ -30,7 +33,11 @@ describe("Serializers::JSON host", () => {
     expect(Person.modelName.name).toBe("Person");
     expect(Person.modelName).toBe(Person.modelName);
 
-    class Other extends JSONHost {}
+    class Other extends JSONHost {
+      static {
+        extend(this, Naming);
+      }
+    }
     expect(Other.modelName.name).toBe("Other");
     expect(Other.modelName).not.toBe(Person.modelName);
   });
@@ -68,6 +75,7 @@ describe("Serializers::JSON host", () => {
   it("includeRootInJson default applies when no root option passed", () => {
     class Rooted extends JSONHost {
       static {
+        extend(this, Naming);
         this.includeRootInJson = true;
         Object.defineProperty(this.prototype, "attributes", {
           get() {
