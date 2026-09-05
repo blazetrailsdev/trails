@@ -14,7 +14,7 @@
  *   branches via the `quoted_date` self-send.
  */
 
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type Type } from "@blazetrails/activemodel";
 import type { TypeMap } from "../../type/type-map.js";
@@ -49,10 +49,12 @@ export type QuotedTimeValue =
   | TimeValue
   | Temporal.PlainTime
   | Temporal.PlainDateTime
-  | TimeWithZone;
+  | TimeWithZone
+  | RubyTime;
 
 export type TemporalDateLike =
   | TimeWithZone
+  | RubyTime
   | Temporal.Instant
   | Temporal.ZonedDateTime
   | Temporal.PlainDateTime
@@ -90,6 +92,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     return `'${this.quotedTime(value)}'`;
   if (
     value instanceof TimeWithZone ||
+    value instanceof RubyTime ||
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
@@ -119,6 +122,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     return this.quotedTime(value);
   if (
     value instanceof TimeWithZone ||
+    value instanceof RubyTime ||
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
@@ -240,7 +244,8 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
 }
 
 export function quotedDate(value: TemporalDateLike): string {
-  if (value instanceof TimeWithZone) value = value.utc().toTime().toInstant();
+  if (value instanceof TimeWithZone) value = value.utc();
+  if (value instanceof RubyTime) value = value.toTime().toInstant();
   if (value instanceof Temporal.Instant) return formatInstantForSql(value);
   if (value instanceof Temporal.ZonedDateTime) return formatInstantForSql(value.toInstant());
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
@@ -268,10 +273,11 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
   if (value instanceof TimeValue) {
     const obj = value.getobj();
     value =
-      obj instanceof TimeWithZone
+      obj instanceof TimeWithZone || obj instanceof RubyTime
         ? obj
         : obj.toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
   }
+  if (value instanceof RubyTime) value = value.toTime().toPlainDateTime();
   value =
     value instanceof TimeWithZone
       ? value.change({ year: 2000, month: 1, day: 1 })

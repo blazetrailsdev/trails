@@ -27,7 +27,7 @@ export interface DateTimeType
   extends
     Omit<InstanceMethods<DateTimeCastResult>, "valueFromMultiparameterAssignment">,
     Omit<Included<typeof TimeValue>, "serializeCastValue"> {
-  serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null;
+  serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | RubyTime | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

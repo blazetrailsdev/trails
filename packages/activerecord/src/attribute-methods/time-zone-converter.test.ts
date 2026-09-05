@@ -4,7 +4,7 @@ import { DateTime } from "../type/date-time.js";
 import { ActiveRecord } from "../ar-config.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
-import { Temporal, resetLocalTimeZoneId } from "@blazetrails/date";
+import { Temporal, Time as RubyTime, resetLocalTimeZoneId } from "@blazetrails/date";
 
 describe("TimeZoneConverterTest", () => {
   afterEach(() => {
@@ -119,10 +119,8 @@ describe("TimeZoneConverterTest", () => {
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const twz = new TimeWithZone(instant, eastern);
     const result = converter.serialize(twz);
-    expect(result).toBeInstanceOf(TimeWithZone);
-    expect((result as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
-      "2024-06-15T14:00:00Z",
-    );
+    expect(result).toBeInstanceOf(RubyTime);
+    expect((result as RubyTime).toTime().toInstant().toString()).toBe("2024-06-15T14:00:00Z");
   });
 
   it("serialize round-trips: deserialize then serialize returns the cast value", () => {
@@ -131,10 +129,8 @@ describe("TimeZoneConverterTest", () => {
     const deserialized = converter.deserialize("2024-06-15 14:00:00");
     expect(deserialized).toBeInstanceOf(TimeWithZone);
     const serialized = converter.serialize(deserialized);
-    expect(serialized).toBeInstanceOf(TimeWithZone);
-    expect((serialized as TimeWithZone).utc().toTime().toInstant().toString()).toBe(
-      "2024-06-15T14:00:00Z",
-    );
+    expect(serialized).toBeInstanceOf(RubyTime);
+    expect((serialized as RubyTime).toTime().toInstant().toString()).toBe("2024-06-15T14:00:00Z");
   });
 
   it("falls back to ActiveRecord.default_timezone when the subtype has no is_utc?", () => {

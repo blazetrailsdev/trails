@@ -20,7 +20,7 @@ import {
 } from "../abstract/quoting.js";
 import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Value as TimeValue } from "../../type/time.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { BinaryData } from "@blazetrails/activemodel";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
@@ -80,10 +80,11 @@ export function quotedTime(value: QuotedTimeValue): string {
   if (value instanceof TimeValue) {
     const obj = value.getobj();
     value =
-      obj instanceof TimeWithZone
+      obj instanceof TimeWithZone || obj instanceof RubyTime
         ? obj
         : obj.toZonedDateTimeISO(defaultSqlTimezone()).toPlainDateTime();
   }
+  if (value instanceof RubyTime) value = value.toTime().toPlainDateTime();
   value =
     value instanceof TimeWithZone
       ? value.change({ year: 2000, month: 1, day: 1 })

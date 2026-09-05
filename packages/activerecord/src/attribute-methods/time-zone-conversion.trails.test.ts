@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { typeRegistry, Types } from "@blazetrails/activemodel";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSchemaFromAdapter } from "../model-schema.js";
@@ -168,8 +168,8 @@ describe("TimeZoneConverter#serialize containers", () => {
   it("forwards TimeWithZone range bounds to the subtype untouched", () => {
     const converter = TimeZoneConverter.wrap(new RangeType(new Types.DateTimeType({})));
     const serialized = converter.serialize(new Range(twz(), twz(), true)) as Range;
-    expect(serialized.begin).toBeInstanceOf(TimeWithZone);
-    expect((serialized.begin as TimeWithZone).utc().toTime().toInstant().epochNanoseconds).toBe(
+    expect(serialized.begin).toBeInstanceOf(RubyTime);
+    expect((serialized.begin as RubyTime).toTime().toInstant().epochNanoseconds).toBe(
       instant.epochNanoseconds,
     );
   });
@@ -180,8 +180,8 @@ describe("TimeZoneConverter#serialize containers", () => {
     );
     const serialized = converter.serialize([new Range(twz(), twz(), true)]) as { values: Range[] };
     const begin = serialized.values[0].begin;
-    expect(begin).toBeInstanceOf(TimeWithZone);
-    expect((begin as TimeWithZone).utc().toTime().toInstant().epochNanoseconds).toBe(
+    expect(begin).toBeInstanceOf(RubyTime);
+    expect((begin as RubyTime).toTime().toInstant().epochNanoseconds).toBe(
       instant.epochNanoseconds,
     );
   });

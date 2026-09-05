@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { TimeZoneConverter } from "../attribute-methods/time-zone-conversion.js";
 import { RangeType } from "../connection-adapters/postgresql/oid/range.js";
@@ -10,6 +10,24 @@ import { Range } from "@blazetrails/ruby-compat";
 afterEach(() => {
   ActiveRecord.defaultTimezone = "utc";
   setZone(null);
+});
+
+describe("ActiveRecord::Type::DateTime serialize_cast_value normalization", () => {
+  it("leaves an already-UTC value alone when is_utc?", () => {
+    const type = new DateTime();
+    const value = type.cast("1999-12-31 12:34:56") as Temporal.Instant;
+    expect(type.serializeCastValue(value)).toBe(value);
+  });
+
+  it("getlocal's the value when default_timezone is :local", () => {
+    ActiveRecord.defaultTimezone = "local";
+    const type = new DateTime();
+    const value = type.cast("1999-12-31 12:34:56") as Temporal.Instant;
+    const serialized = type.serializeCastValue(value) as RubyTime;
+    expect(serialized).toBeInstanceOf(RubyTime);
+    expect(serialized.isUtc()).toBe(false);
+    expect(serialized.strftime("%Y-%m-%d %H:%M:%S")).toBe("1999-12-31 12:34:56");
+  });
 });
 
 describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
