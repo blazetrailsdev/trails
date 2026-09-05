@@ -43,7 +43,7 @@ export class TypeRegistry {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  keyFor(type: Type): string | null {
+  keyFor(type: ValueType): string | null {
     return this.#keysByClass.get(type.constructor as TypeClass) ?? null;
   }
 }
