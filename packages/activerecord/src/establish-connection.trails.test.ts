@@ -49,7 +49,7 @@ describe("Base.establishConnection", () => {
   });
 
   it("accepts a config object with adapter name", async () => {
-    await Base.establishConnection({ adapter: "sqlite", database: ":memory:" });
+    await Base.establishConnection({ adapter: "sqlite3", database: ":memory:" });
     const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
     expect(await pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
@@ -77,8 +77,8 @@ describe("Base.establishConnection", () => {
     expect(await pool!.checkout()).toBeInstanceOf(BetterSQLite3Adapter);
   });
 
-  it("accepts postgres as an adapter name alias", async () => {
-    await Base.establishConnection({ adapter: "postgres", url: "postgres://localhost/db" });
+  it("accepts a postgres:// URL", async () => {
+    await Base.establishConnection("postgres://localhost/db");
     const pool = Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base");
     expect(await pool!.checkout()).toBeInstanceOf(PostgreSQLAdapter);
   });

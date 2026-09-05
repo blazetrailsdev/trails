@@ -863,6 +863,169 @@ export class Time {
   }
 
   /**
+   * `vendor/ruby/lib/time.rb:456-506` — parses `date` according to `format`.
+   * Ruby's `block_given?` is the trailing `block` parameter. Ruby's
+   * `Date.strptime(date, format).to_time` has no counterpart here because
+   * trails' `Date.strptime` answers a `Temporal.PlainDate`, so `Date#to_time`'s
+   * body (`date.rb`, a local-zone `PlainDateTime`) is spelled inline.
+   */
+  static strptime(
+    date: string,
+    format: string,
+    now: Time | null = Time.now(),
+    block?: (year: number) => number,
+  ): Time {
+    const d = Date._strptime(date, format);
+    if (d == null) {
+      throw new ArgumentError(`invalid date or strptime format - \`${date}' \`${format}'`);
+    }
+    let t: Time;
+    const seconds = d.seconds;
+    if (seconds != null) {
+      let usec: number | Rational;
+      const secFraction = d.secFraction;
+      if (secFraction != null) {
+        usec = numExact(secFraction).mul(1000000);
+        if (numExact(seconds).cmp(0) < 0) usec = usec.mul(-1);
+      } else {
+        usec = 0;
+      }
+      t = Time.at(seconds, usec);
+      const zone = d.zone;
+      if (zone != null) {
+        t = Time.#forceZone(t, zone);
+      }
+    } else {
+      let year = d.year === undefined ? undefined : Number(d.year);
+      if (year != null && block !== undefined) year = block(year);
+      let yday = d.yday;
+      if (
+        (d.cwyear != null && year == null) ||
+        ((d.cwday != null || d.cweek != null) && !(d.mon != null && d.mday != null))
+      ) {
+        const date_ = Date.strptime(date, format);
+        return Time.local(date_.year, date_.month, date_.day);
+      }
+      if (
+        (d.wnum0 != null || d.wnum1 != null) &&
+        yday == null &&
+        !(d.mon != null && d.mday != null)
+      ) {
+        yday = Date.strptime(date, format).dayOfYear;
+      }
+      t = Time.#makeTime(
+        date,
+        year,
+        yday,
+        d.mon,
+        d.mday,
+        d.hour,
+        d.min,
+        d.sec,
+        d.secFraction === undefined ? undefined : numExact(d.secFraction),
+        d.zone,
+        now,
+      );
+    }
+    return t;
+  }
+
+  /** `vendor/ruby/lib/time.rb:485-488` */
+  static readonly MonthValue: Record<string, number> = {
+    JAN: 1,
+    FEB: 2,
+    MAR: 3,
+    APR: 4,
+    MAY: 5,
+    JUN: 6,
+    JUL: 7,
+    AUG: 8,
+    SEP: 9,
+    OCT: 10,
+    NOV: 11,
+    DEC: 12,
+  };
+
+  /**
+   * `vendor/ruby/lib/time.rb:508-563` — parses `date` as a date-time defined by
+   * RFC 2822 and converts it to a Time object. Aliased as `rfc822`.
+   */
+  static rfc2822(date: string): Time {
+    const m =
+      /^\s*(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s*,\s*)?(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{2,})\s+(\d{2})\s*:\s*(\d{2})(?:\s*:\s*(\d\d))?\s+([+-]\d{4}|UT|GMT|EST|EDT|CST|CDT|MST|MDT|PST|PDT|[A-IK-Z])/i.exec(
+        date,
+      );
+    if (m != null) {
+      let day = Number(m[1]);
+      let mon = Time.MonthValue[m[2].toUpperCase()];
+      let year = Number(m[3]);
+      const shortYearP = m[3].length <= 3;
+      let hour = Number(m[4]);
+      let min = Number(m[5]);
+      let sec = m[6] ? Number(m[6]) : 0;
+      const zone = m[7];
+
+      if (shortYearP) {
+        year = year < 50 ? 2000 + year : 1900 + year;
+      }
+
+      const off = Time.zoneOffset(zone);
+      [year, mon, day, hour, min, sec] = Time.#applyOffset(year, mon, day, hour, min, sec, off!);
+      const t = Time.utc(year, mon, day, hour, min, sec);
+      return Time.#forceZone(t, zone, off);
+    } else {
+      throw new ArgumentError(`not RFC 2822 compliant date: ${stringInspect(date)}`);
+    }
+  }
+
+  /** `vendor/ruby/lib/time.rb:564` */
+  declare static rfc822: (date: string) => Time;
+
+  /**
+   * `vendor/ruby/lib/time.rb:566-598` — parses `date` as an HTTP-date defined
+   * by RFC 2616 and converts it to a Time object.
+   */
+  static httpdate(date: string): Time {
+    let m: RegExpExecArray | null;
+    if (
+      /^\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), (\d{2}) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT\s*$/i.test(
+        date,
+      )
+    ) {
+      return Time.rfc2822(date).getutc();
+    } else if (
+      (m =
+        /^\s*(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), (\d\d)-(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-(\d\d) (\d\d):(\d\d):(\d\d) GMT\s*$/i.exec(
+          date,
+        )) != null
+    ) {
+      let year = Number(m[3]);
+      if (year < 50) {
+        year += 2000;
+      } else {
+        year += 1900;
+      }
+      return Time.utc(year, m[2], Number(m[1]), Number(m[4]), Number(m[5]), Number(m[6]));
+    } else if (
+      (m =
+        /^\s*(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d\d| \d) (\d\d):(\d\d):(\d\d) (\d{4})\s*$/i.exec(
+          date,
+        )) != null
+    ) {
+      return Time.utc(
+        Number(m[6]),
+        Time.MonthValue[m[1].toUpperCase()],
+        Number(m[2]),
+        Number(m[3]),
+        Number(m[4]),
+        Number(m[5]),
+      );
+    } else {
+      throw new ArgumentError(`not RFC 2616 compliant date: ${stringInspect(date)}`);
+    }
+  }
+
+  /**
    * `vendor/ruby/lib/time.rb:620-653` — parses `time` as a dateTime defined by
    * the XML Schema and converts it to a Time object. Aliased as `iso8601`.
    */
@@ -1212,5 +1375,6 @@ export class Time {
   }
 }
 
+Time.rfc822 = Time.rfc2822;
 Time.iso8601 = Time.xmlschema;
 Time.prototype.iso8601 = Time.prototype.xmlschema;

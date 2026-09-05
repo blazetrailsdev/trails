@@ -106,10 +106,6 @@ register("libsql-replica", libsqlReplicaLoader);
 register("mysql2", mysql2Loader);
 register("postgresql", postgresqlLoader);
 
-register("sqlite", sqlite3Loader);
-register("mysql", mysql2Loader);
-register("postgres", postgresqlLoader);
-
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";

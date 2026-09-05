@@ -150,15 +150,10 @@ export type AdapterName = "sqlite3" | "postgresql" | "mysql2";
 export function adapterNameFromConfig(configAdapter: string | undefined): AdapterName {
   switch (configAdapter) {
     case "postgresql":
-    case "postgres":
-    case "pg":
       return "postgresql";
     case "mysql2":
-    case "mysql":
-    case "mariadb":
       return "mysql2";
     case "sqlite3":
-    case "sqlite":
     case "node-sqlite":
     case "expo-sqlite":
     case "libsql":

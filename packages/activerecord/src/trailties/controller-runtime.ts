@@ -115,6 +115,7 @@ export const ControllerRuntime = {
     });
     supers.set(base, supers.get(proto)!);
     Object.assign(proto, { processAction, cleanupViewRuntime, appendInfoToPayload });
+    proto.dbRuntime = null;
     base.logProcessAction = logProcessAction;
   },
 };

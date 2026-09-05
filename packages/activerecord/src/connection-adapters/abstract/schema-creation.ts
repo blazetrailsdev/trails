@@ -166,17 +166,7 @@ export class SchemaCreation {
   }
 
   protected async visitColumnDefinition(o: ColumnDefinition): Promise<string> {
-    try {
-      o.sqlType ??= this.typeToSql(o.type, o.options);
-    } catch (e) {
-      if (e instanceof Error && /empty or blank type/.test(e.message)) {
-        throw new Error(
-          `Column ${JSON.stringify(o.name)} has an empty or blank type — specify a valid SQL type`,
-          { cause: e },
-        );
-      }
-      throw e;
-    }
+    o.sqlType ??= this.typeToSql(o.type, o.options);
     let columnSql = `${this.conn.quoteColumnName(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
       columnSql = await this.addColumnOptionsBang(

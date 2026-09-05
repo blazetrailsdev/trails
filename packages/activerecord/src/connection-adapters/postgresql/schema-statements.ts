@@ -642,10 +642,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
         if (enumType == null) throw new ArgumentError("enum_type is required for enums");
         sql = enumType;
         break;
-      default: {
-        const { precision, scale } = options;
-        sql = super.typeToSql(type as ColumnType, { limit, precision, scale });
-      }
+      default:
+        sql = super.typeToSql(type as ColumnType, options);
     }
     return array && type !== "primary_key" ? `${sql}[]` : sql;
   }

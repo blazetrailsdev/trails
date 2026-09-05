@@ -522,4 +522,94 @@ describe("Time", () => {
   it("Time.iso8601 is an alias of Time.xmlschema", () => {
     expect(Time.iso8601).toBe(Time.xmlschema);
   });
+
+  describe("Time.strptime", () => {
+    it("parses a date with an explicit format", () => {
+      vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("UTC");
+      resetLocalTimeZoneId();
+      expect(Time.strptime("2000-10-31", "%Y-%m-%d").strftime("%Y-%m-%d %H:%M:%S %z")).toBe(
+        "2000-10-31 00:00:00 +0000",
+      );
+    });
+
+    it("honours a parsed zone offset", () => {
+      expect(
+        Time.strptime("2001-02-03T04:05:06+09:00", "%Y-%m-%dT%H:%M:%S%z").strftime(
+          "%Y-%m-%d %H:%M:%S %z",
+        ),
+      ).toBe("2001-02-03 04:05:06 +0900");
+    });
+
+    it("parses seconds since the Epoch", () => {
+      vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("UTC");
+      resetLocalTimeZoneId();
+      expect(Time.strptime("1234567890", "%s").strftime("%Y-%m-%d %H:%M:%S %z")).toBe(
+        "2009-02-13 23:31:30 +0000",
+      );
+    });
+
+    it("falls back to Date.strptime for week-number formats", () => {
+      vi.spyOn(Temporal.Now, "timeZoneId").mockReturnValue("UTC");
+      resetLocalTimeZoneId();
+      expect(Time.strptime("2015-32", "%Y-%W").strftime("%Y-%m-%d")).toBe("2015-08-10");
+    });
+
+    it("raises ArgumentError on an unparsable date", () => {
+      expect(() => Time.strptime("bogus", "%Y")).toThrow(
+        new ArgumentError("invalid date or strptime format - `bogus' `%Y'"),
+      );
+    });
+  });
+
+  describe("Time.rfc2822", () => {
+    it("parses an RFC 2822 date", () => {
+      expect(Time.rfc2822("Wed, 05 Oct 2011 22:26:12 -0400").strftime("%Y-%m-%d %H:%M:%S %z")).toBe(
+        "2011-10-05 22:26:12 -0400",
+      );
+    });
+
+    it("completes a two-digit year and defaults the seconds", () => {
+      expect(Time.rfc2822("5 Oct 11 22:26 -0400").strftime("%Y-%m-%d %H:%M:%S %z")).toBe(
+        "2011-10-05 22:26:00 -0400",
+      );
+    });
+
+    it("is aliased as rfc822", () => {
+      expect(Time.rfc822("Thu, 06 Oct 2011 02:26:12 GMT").strftime("%Y-%m-%d %H:%M:%S %z")).toBe(
+        "2011-10-06 02:26:12 +0000",
+      );
+    });
+
+    it("raises ArgumentError on a non-compliant date", () => {
+      expect(() => Time.rfc2822("bogus")).toThrow(
+        new ArgumentError('not RFC 2822 compliant date: "bogus"'),
+      );
+    });
+  });
+
+  describe("Time.httpdate", () => {
+    it("parses the RFC 1123 form", () => {
+      const t = Time.httpdate("Thu, 06 Oct 2011 02:26:12 GMT");
+      expect(t.zone).toBe("UTC");
+      expect(t.strftime("%Y-%m-%d %H:%M:%S")).toBe("2011-10-06 02:26:12");
+    });
+
+    it("parses the RFC 850 form", () => {
+      const t = Time.httpdate("Thursday, 06-Oct-11 02:26:12 GMT");
+      expect(t.zone).toBe("UTC");
+      expect(t.strftime("%Y-%m-%d %H:%M:%S")).toBe("2011-10-06 02:26:12");
+    });
+
+    it("parses the asctime form", () => {
+      const t = Time.httpdate("Thu Oct  6 02:26:12 2011");
+      expect(t.zone).toBe("UTC");
+      expect(t.strftime("%Y-%m-%d %H:%M:%S")).toBe("2011-10-06 02:26:12");
+    });
+
+    it("raises ArgumentError on a non-compliant date", () => {
+      expect(() => Time.httpdate("bogus")).toThrow(
+        new ArgumentError('not RFC 2616 compliant date: "bogus"'),
+      );
+    });
+  });
 });
