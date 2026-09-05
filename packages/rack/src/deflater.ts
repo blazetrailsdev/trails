@@ -59,7 +59,7 @@ export class Deflater {
     headers["content-encoding"] = encoding;
 
     const compressed = await this.compress(body, encoding);
-    headers[CONTENT_LENGTH] = String(Buffer.byteLength(compressed));
+    headers[CONTENT_LENGTH] = String(Buffer.byteLength(compressed, "binary"));
 
     return [status, headers, [compressed]];
   }

@@ -113,6 +113,22 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
   return nodeModule.createRequire("file:///ruby-compat");
 }
 
+/**
+ * `gzfile_make_header` writes the mtime as a 4-byte little-endian field at
+ * offset 4 of the 10-byte gzip header (`vendor/ruby/ext/zlib/zlib.c:2648,2672`).
+ * Node's `createGzip` has no option for it, so the backend patches the field
+ * into the first emitted chunk — which carries that header — to reproduce
+ * `Zlib::GzipWriter#mtime=` (`vendor/ruby/ext/zlib/zlib.c:3356`).
+ */
+const GZIP_HEADER_LENGTH = 10;
+
+function setGzipHeaderMtime(header: Uint8Array, mtime: number): void {
+  header[4] = mtime & 0xff;
+  header[5] = (mtime >>> 8) & 0xff;
+  header[6] = (mtime >>> 16) & 0xff;
+  header[7] = (mtime >>> 24) & 0xff;
+}
+
 type NodeGzipStream = {
   on(event: string, listener: (arg?: unknown) => void): void;
   write(data: Uint8Array): void;
@@ -136,12 +152,8 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
     inflate: (data) => zlib.inflateSync(data),
     gzipWriter: (io) => {
       const stream = zlib.createGzip();
-      stream.on("data", (chunk) => io.write(chunk as Uint8Array));
-      const ended = new Promise<void>((res, rej) => {
-        stream.on("end", () => res());
-        stream.on("error", (err) => rej(err as Error));
-      });
-      return {
+      let headerSeen = false;
+      const handle: GzipWriterHandle = {
         mtime: null,
         write: (data) => stream.write(data),
         flush: () => stream.flush(),
@@ -150,6 +162,21 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
           await ended;
         },
       };
+      stream.on("data", (chunk) => {
+        const bytes = chunk as Uint8Array;
+        if (!headerSeen) {
+          headerSeen = true;
+          if (handle.mtime !== null && bytes.length >= GZIP_HEADER_LENGTH) {
+            setGzipHeaderMtime(bytes, handle.mtime);
+          }
+        }
+        io.write(bytes);
+      });
+      const ended = new Promise<void>((res, rej) => {
+        stream.on("end", () => res());
+        stream.on("error", (err) => rej(err as Error));
+      });
+      return handle;
     },
   };
 }

@@ -2097,6 +2097,16 @@ function buildPackageReport(
     tsDeclFileByName.set(c.name, c.file);
   }
 
+  const declaresLocally = (
+    name: string,
+    classes: ClassInfo[],
+    modules: ClassInfo[],
+    fileFns: MethodInfo[] | undefined,
+  ): boolean =>
+    classes.some((c) => c.name === name) ||
+    modules.some((m) => m.name === name) ||
+    (fileFns ?? []).some((f) => f.name === name && f.reExportedFrom === undefined);
+
   const reExportSourceOf = (
     name: string,
     fileFns: MethodInfo[] | undefined,
@@ -2211,6 +2221,11 @@ function buildPackageReport(
     // so gathering the twelve renamed type classes re-charged every one as novel.
     for (const name of tsNames) {
       if (allowed.has(name)) continue;
+      // A name this file DECLARES is its own surface, whatever another file
+      // declares under the same short name — so only names that arrive from
+      // elsewhere (a re-export, or a namespace object gathering imports) are
+      // scored at their declaring file.
+      if (declaresLocally(name, classes, modules, fileFns)) continue;
       const reExport = reExportSourceOf(name, fileFns);
       const sourceTs = reExport ?? tsDeclFileByName.get(name);
       if (sourceTs === undefined || sourceTs === expectedTs) continue;
