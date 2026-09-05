@@ -5,10 +5,11 @@ import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
 import { underscore } from "@blazetrails/activesupport";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,
+  type MiddlewareBlock,
   type MiddlewareFactory,
   type RackApp,
   type RackAppObject,
@@ -30,15 +31,6 @@ import {
 } from "./metal/rendering.js";
 
 export class MiddlewareStack extends AbstractMiddlewareStack {
-  /** @internal */
-  buildMiddleware(
-    klass: MiddlewareFactory,
-    args: unknown[],
-    block?: (app: RackApp) => RackApp,
-  ): Middleware {
-    return Metal.buildMiddleware(klass, args, block);
-  }
-
   build(action: string | RackApp | RackAppObject, app?: RackApp | RackAppObject): RackApp {
     if (typeof action !== "string") return super.build(action);
     let current: RackApp =
@@ -49,6 +41,36 @@ export class MiddlewareStack extends AbstractMiddlewareStack {
       current = middleware.valid(action) ? middleware.build(current) : current;
     }
     return current;
+  }
+
+  /** @internal */
+  override buildMiddleware(
+    klass: MiddlewareFactory,
+    args: unknown[],
+    block?: MiddlewareBlock,
+  ): Middleware {
+    const next = [...args];
+    const last = next[next.length - 1];
+    const options: Record<string, unknown> =
+      last && typeof last === "object" && !Array.isArray(last)
+        ? { ...(next.pop() as Record<string, unknown>) }
+        : {};
+    const only = ([] as string[]).concat((options.only as string | string[]) ?? []).map(String);
+    const except = ([] as string[]).concat((options.except as string | string[]) ?? []).map(String);
+    delete options.only;
+    delete options.except;
+    if (Object.keys(options).length > 0) next.push(options);
+
+    let strategy: Strategy = NULL;
+    let list: string[] | null = null;
+    if (only.length > 0) {
+      strategy = INCLUDE;
+      list = only;
+    } else if (except.length > 0) {
+      strategy = EXCLUDE;
+      list = except;
+    }
+    return new Middleware(klass, next, list, strategy, block);
   }
 }
 
@@ -61,7 +83,7 @@ export class Middleware extends AbstractMiddleware {
     args: unknown[],
     actions: string[] | null,
     strategy: Strategy,
-    block?: (app: RackApp) => RackApp,
+    block?: MiddlewareBlock,
   ) {
     super(klass, args, block);
     this.actions = actions;
@@ -263,7 +285,7 @@ export class Metal extends AbstractController {
 
   head(status: number | string | null, options?: Record<string, unknown>): true {
     if (status !== null && typeof status === "object") {
-      throw new Error(`${rbInspect(status)} is not a valid value for \`status\`.`);
+      throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
     }
     const resolvedStatus = status ?? "ok";
     let location: unknown;
@@ -332,36 +354,6 @@ export class Metal extends AbstractController {
   }
 
   static resolveStatus = resolveStatus;
-
-  /** @internal */
-  static buildMiddleware(
-    klass: MiddlewareFactory,
-    args: unknown[],
-    block?: (app: RackApp) => RackApp,
-  ): Middleware {
-    const next = [...args];
-    const last = next[next.length - 1];
-    const options: Record<string, unknown> =
-      last && typeof last === "object" && !Array.isArray(last)
-        ? { ...(next.pop() as Record<string, unknown>) }
-        : {};
-    const only = ([] as string[]).concat((options.only as string | string[]) ?? []).map(String);
-    const except = ([] as string[]).concat((options.except as string | string[]) ?? []).map(String);
-    delete options.only;
-    delete options.except;
-    if (Object.keys(options).length > 0) next.push(options);
-
-    let strategy: Strategy = NULL;
-    let list: string[] | null = null;
-    if (only.length > 0) {
-      strategy = INCLUDE;
-      list = only;
-    } else if (except.length > 0) {
-      strategy = EXCLUDE;
-      list = except;
-    }
-    return new Middleware(klass, next, list, strategy, block);
-  }
 
   /** @internal */
   renderToBody(options: Record<string, unknown> = {}): unknown {

@@ -6,6 +6,8 @@ export type RackApp = (env: RackEnv) => Promise<RackResponse>;
 export interface RackAppObject {
   call(env: RackEnv): Promise<RackResponse>;
 }
+export type MiddlewareBlock = (...args: any[]) => unknown;
+
 export type MiddlewareFactory = new (
   app: RackApp,
   ...args: any[]
@@ -15,16 +17,17 @@ export class Middleware {
   constructor(
     readonly klass: MiddlewareFactory,
     readonly args: unknown[],
-    readonly block?: (app: RackApp) => RackApp,
+    readonly block?: MiddlewareBlock,
   ) {}
 
   inspect(): string {
-    return this.klass.name;
+    return typeof this.klass === "function"
+      ? this.klass.name
+      : (this.klass as object).constructor.name;
   }
 
   build(app: RackApp): RackApp {
-    if (this.block) return this.block(app);
-    const mw = new this.klass(app, ...this.args);
+    const mw = new this.klass(app, ...this.args, ...(this.block ? [this.block] : []));
     return (env: RackEnv) => mw.call(env);
   }
 }
@@ -80,14 +83,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
   /** @missingRailsArgs build_middleware — PERMANENT */
   use(klass: MiddlewareFactory, ...args: unknown[]): void {
     this.entries.push(this.buildMiddleware(klass, args));
-  }
-
-  useWithBlock(
-    klass: MiddlewareFactory,
-    block: (app: RackApp) => RackApp,
-    ...args: unknown[]
-  ): void {
-    this.entries.push(this.buildMiddleware(klass, args, block));
   }
 
   /** @missingRailsArgs build_middleware — PERMANENT */
@@ -194,11 +189,7 @@ export class MiddlewareStack implements Iterable<Middleware> {
   }
 
   /** @internal */
-  buildMiddleware(
-    klass: MiddlewareFactory,
-    args: unknown[],
-    block?: (app: RackApp) => RackApp,
-  ): Middleware {
+  buildMiddleware(klass: MiddlewareFactory, args: unknown[], block?: MiddlewareBlock): Middleware {
     return new Middleware(klass, args, block);
   }
 

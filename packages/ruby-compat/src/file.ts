@@ -544,6 +544,11 @@ function inc(str: string, i: number): number {
   return i + (cp !== undefined && cp > 0xffff ? 2 : 1);
 }
 
+/**
+ * The one whole character at `i` — what MRI's `memcmp(t1, s, r)`
+ * (`vendor/ruby/dir.c:277`) and `rb_enc_codepoint` (`dir.c:281`) read, where a
+ * JS index reads one code unit.
+ */
 function charAt(str: string, i: number): string {
   const cp = str.codePointAt(i);
   return cp === undefined ? "" : String.fromCodePoint(cp);

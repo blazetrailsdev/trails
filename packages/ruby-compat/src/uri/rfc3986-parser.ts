@@ -4,6 +4,17 @@ import { InvalidURIError, URI } from "./common.js";
 import { Generic } from "./generic.js";
 
 /**
+ * An atomic group, which is how the possessive quantifiers of
+ * `vendor/ruby/lib/uri/rfc3986_parser.rb:5-71` (`*+`, `++`) are spelled in a
+ * language with no possessive form: a lookahead that captures what it matched,
+ * followed by an immediate backreference to that capture, matches `source`
+ * once and never gives any of it back.
+ */
+function atomic(name: string, source: string): string {
+  return `(?=(?<${name}>${source}))\\k<${name}>`;
+}
+
+/**
  * `URI::RFC3986_Parser`'s component patterns (`vendor/ruby/lib/uri/rfc3986_parser.rb:5-34`),
  * as sources rather than Regexps so the two whole-URI patterns below can
  * interpolate them the way Ruby's `//x` literals do.
@@ -14,13 +25,8 @@ import { Generic } from "./generic.js";
  * call. The expanded copies are non-capturing — a JS pattern may not repeat a
  * group NAME — and only the groups `split` reads keep theirs.
  *
- * Ruby's possessive quantifiers (`*+`, `++`) come through {@link atomic}.
+ * Ruby's possessive quantifiers come through {@link atomic}.
  */
-
-function atomic(name: string, source: string): string {
-  return `(?=(?<${name}>${source}))\\k<${name}>`;
-}
-
 const DEC_OCTET = "(?:[1-9]\\d|1\\d{2}|2[0-4]\\d|25[0-5]|\\d)";
 const IPV4ADDRESS = `(?:${DEC_OCTET}\\.${DEC_OCTET}\\.${DEC_OCTET}\\.${DEC_OCTET})`;
 const H16 = "[0-9a-fA-F]{1,4}";
@@ -37,7 +43,6 @@ const IPV6ADDRESS =
   `|(?:(?:${H16}:){0,5}${H16})?::${H16}` +
   `|(?:(?:${H16}:){0,6}${H16})?::` +
   ")";
-/** `IPvFuture` (`vendor/ruby/lib/uri/rfc3986_parser.rb:22`), possessive twice. */
 const IPVFUTURE = `v${atomic("ipvFutureHex", "[0-9a-fA-F]+")}\\.${atomic("ipvFutureTail", "[!$&-.0-9:;=A-Z_a-z~]+")}`;
 const IP_LITERAL = `\\[(?:${IPV6ADDRESS}|${IPVFUTURE})\\]`;
 const REG_NAME = atomic("regName", "(?:%[0-9a-fA-F]{2}|[!$&-.0-9;=A-Z_a-z~])*");
@@ -119,7 +124,6 @@ export class RFC3986Parser {
     QUERY: new RegExp(`^${atomic("query", "(?:%[0-9a-fA-F]{2}|[!$&-.0-9:;=@A-Z_a-z~/?])*")}$`),
     FRAGMENT: new RegExp(`^${FRAGMENT}$`),
     OPAQUE: new RegExp("^(?:[^/].*)?$"),
-
     PORT: new RegExp(
       `^${atomic("portLead", "[\\x09\\x0a\\x0c\\x0d ]*")}\\d*[\\x09\\x0a\\x0c\\x0d ]*$`,
     ),
