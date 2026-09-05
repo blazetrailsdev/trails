@@ -81,15 +81,6 @@ export class MiddlewareStack implements Iterable<Middleware> {
     return this.entries[this.entries.length - 1];
   }
 
-  deleteBang(target: MiddlewareFactory): void {
-    const idx = this.indexOf(target);
-    if (idx === -1) {
-      const name = (target as { name?: string }).name;
-      throw new Error(`No such middleware to remove: ${name || String(target)}`);
-    }
-    this.entries.splice(idx, 1);
-  }
-
   /** @missingRailsArgs build_middleware — PERMANENT */
   use(klass: MiddlewareFactory, ...args: unknown[]): void {
     this.entries.push(this.buildMiddleware(klass, args));
@@ -125,17 +116,23 @@ export class MiddlewareStack implements Iterable<Middleware> {
     this.middlewares.splice(index + 1, 1);
   }
 
-  delete(target: MiddlewareFactory): void {
-    const idx = this.indexOf(target);
-    if (idx !== -1) {
-      this.entries.splice(idx, 1);
+  delete(target: MiddlewareFactory): Middleware[] | null {
+    let rejected = false;
+    for (let i = this.entries.length - 1; i >= 0; i--) {
+      if (this.entries[i].name === target.name) {
+        this.entries.splice(i, 1);
+        rejected = true;
+      }
     }
+    return rejected ? this.entries : null;
   }
 
-  deleteStrict(target: MiddlewareFactory): void {
-    const idx = this.indexOf(target);
-    if (idx === -1) throw new Error("No such middleware to delete");
-    this.entries.splice(idx, 1);
+  deleteBang(target: MiddlewareFactory): Middleware[] {
+    const rejected = this.delete(target);
+    if (rejected === null) {
+      throw new Error(`No such middleware to remove: ${target.name}`);
+    }
+    return rejected;
   }
 
   move(target: MiddlewareFactory | number, source: MiddlewareFactory | number): void {

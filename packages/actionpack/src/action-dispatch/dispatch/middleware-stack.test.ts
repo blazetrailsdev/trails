@@ -142,13 +142,13 @@ describe("MiddlewareStackTest", () => {
   it("delete! deletes the middleware", () => {
     const stack = new MiddlewareStack();
     stack.use(FooMiddleware);
-    stack.deleteStrict(FooMiddleware);
+    stack.deleteBang(FooMiddleware);
     expect(stack.length).toBe(0);
   });
 
   it("delete! requires the middleware to be in the stack", () => {
     const stack = new MiddlewareStack();
-    expect(() => stack.deleteStrict(FooMiddleware)).toThrow();
+    expect(() => stack.deleteBang(FooMiddleware)).toThrow();
   });
 
   it("move moves middleware at the integer index", () => {
