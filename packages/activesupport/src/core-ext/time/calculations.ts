@@ -40,17 +40,7 @@ export function current(): TimeWithZone | RubyTime {
 
 const atWithoutCoercion = RubyTime.at.bind(RubyTime);
 
-export function atWithCoercion(
-  timeOrNumber:
-    | number
-    | bigint
-    | Rational
-    | RubyTime
-    | TimeWithZone
-    | Temporal.PlainDateTime
-    | Temporal.ZonedDateTime,
-  ...args: (number | bigint | Rational)[]
-): RubyTime {
+export function atWithCoercion(timeOrNumber: unknown, ...args: unknown[]): RubyTime {
   if (args.length === 0) {
     if (timeOrNumber instanceof TimeWithZone) {
       return atWithoutCoercion(timeOrNumber.toR()).getlocal();
@@ -63,7 +53,7 @@ export function atWithCoercion(
       return atWithoutCoercion(timeOrNumber);
     }
   } else {
-    return atWithoutCoercion(timeOrNumber as number, ...args);
+    return atWithoutCoercion(timeOrNumber, ...args);
   }
 }
 
@@ -324,10 +314,7 @@ declare module "@blazetrails/date" {
     export function daysInMonth(month: number, year?: number): number;
     export function daysInYear(year?: number): number;
     export function rfc3339(str: string): Time;
-    export function atWithCoercion(
-      timeOrNumber: unknown,
-      ...args: (number | bigint | Rational)[]
-    ): Time;
+    export function atWithCoercion(timeOrNumber: unknown, ...args: unknown[]): Time;
   }
 }
 
@@ -370,4 +357,4 @@ Object.assign(RubyTime.prototype, {
 
 Object.assign(RubyTime, { current, daysInMonth, daysInYear, rfc3339, atWithCoercion });
 
-RubyTime.at = atWithCoercion as typeof RubyTime.at;
+RubyTime.at = atWithCoercion;
