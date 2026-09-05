@@ -26,6 +26,8 @@ import { Reply } from "./test-helpers/models/reply.js";
 import { Person } from "./test-helpers/models/person.js";
 import { CustomReader } from "./test-helpers/models/custom-reader.js";
 
+class CustomStrictValidationException extends Error {}
+
 describe("ValidationsTest", () => {
   afterEach(() => {
     Topic.clearValidatorsBang();
@@ -247,7 +249,9 @@ describe("ValidationsTest", () => {
   it("strict validation in validates", async () => {
     Topic.validates("title", { strict: true, presence: true });
 
-    await expect(new Topic().isValid()).rejects.toThrow();
+    await assertRaises([StrictValidationFailed], {}, async () => {
+      await new Topic().isValid();
+    });
   });
 
   it("strict validation not fails", async () => {
@@ -312,10 +316,11 @@ describe("ValidationsTest", () => {
   });
 
   it("validates with bang", async () => {
-    Topic.validates("title", { presence: true });
+    Topic.validatesBang("title", { presence: true });
 
-    const t = new Topic();
-    await expect(t.validateBang()).rejects.toThrow(/Validation failed/);
+    await assertRaises([StrictValidationFailed], {}, async () => {
+      await new Topic().isValid();
+    });
   });
 
   it("validate with bang and context", async () => {
@@ -432,7 +437,9 @@ describe("ValidationsTest", () => {
   it("strict validation in custom validator helper", async () => {
     Topic.validatesPresenceOf("title", { strict: true });
 
-    await expect(new Topic().isValid()).rejects.toThrow();
+    await assertRaises([StrictValidationFailed], {}, async () => {
+      await new Topic().isValid();
+    });
   });
 
   it("validation with message as proc that takes record and data as a parameters", async () => {
@@ -525,12 +532,16 @@ describe("ValidationsTest", () => {
   it("strict validation particular validator", async () => {
     Topic.validates("title", { presence: { strict: true } });
 
-    await expect(new Topic().isValid()).rejects.toThrow();
+    await assertRaises([StrictValidationFailed], {}, async () => {
+      await new Topic().isValid();
+    });
   });
 
   it("strict validation custom exception", async () => {
-    Topic.validatesPresenceOf("title", { strict: true });
+    Topic.validatesPresenceOf("title", { strict: CustomStrictValidationException });
 
-    await expect(new Topic().isValid()).rejects.toThrow(/title/i);
+    await assertRaises([CustomStrictValidationException], {}, async () => {
+      await new Topic().isValid();
+    });
   });
 });
