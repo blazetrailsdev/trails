@@ -72,6 +72,29 @@ describe("compareArms", () => {
     expect(compareArms(row(["if", "ref:save"], ["ref:helper"]))?.missing).toEqual(["if"]);
   });
 
+  it("never lets a helper's own arms raise a flag the two bodies did not raise", () => {
+    // The helper diverges, and its own row says so; charging it to each of its
+    // callers would report the one divergence once per call site.
+    const caller = {
+      ...row(["ref:helper"], ["ref:helper"]),
+      rubyHelpers: { helper: [] },
+      tsHelpers: { helper: ["if"] },
+    };
+
+    expect(compareArms(caller)).toBeUndefined();
+  });
+
+  it("reports the body's OWN arms when the splice does not discharge the flag", () => {
+    const caller = {
+      ...row(["if", "ref:helper"], ["ref:helper"]),
+      rubyHelpers: { helper: [] },
+      tsHelpers: { helper: ["throw"] },
+    };
+
+    expect(compareArms(caller)?.missing).toEqual(["if"]);
+    expect(compareArms(caller)?.invented).toEqual([]);
+  });
+
   it("reads an arm Rails keeps in a same-file helper against the port's inline one", () => {
     const delegating = {
       ...row(["ref:helper"], ["if", "ref:save"]),

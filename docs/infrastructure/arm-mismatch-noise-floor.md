@@ -203,3 +203,36 @@ Rows are numbered as `--sample=80 --seed=113` prints them.
 - The two extraction bugs are worth fixing regardless of the gate decision —
   they cost the report roughly a twentieth of its rows outright, and the
   `||=` one silently biases every memoised reader in the corpus.
+
+## Addendum — what the per-clause count and the helper splice cleared
+
+RFC 0113's `skeleton-emits-one-arm-per-when-elsif-and-rescue-clause` and
+`arms-report-unions-same-file-helper-skeletons` shipped together. Measured over
+the same corpus on the same commit, the report moved **2,746 → 2,673 mismatched
+pairs** (6,040 pairs compared; the population has grown since the 2,718/5,614
+this document's sample was drawn from, so the row numbering above no longer
+re-draws).
+
+Two of this document's classifications turned out to be finer-grained than the
+sample's shorthand, and are corrected here rather than silently:
+
+- **`case` lowering.** One `if` per `when` CLAUSE is the right count, and it
+  clears row 77 (`arel select-manager.ts#lock`). It does not clear rows 34, 53,
+  60 or 74: each of those is a single `when` with several VALUES
+  (`when nil, "tiny", "medium", "long"`,
+  `mysql/schema_statements.rb:273`) or a `case` mixed with another artefact
+  class, and a multi-value `when` is one arm in Ruby however many `===` tests
+  its port spells.
+- **Helper delegation.** Row 77's sibling class splices as designed, but neither
+  row 32 nor row 59 does. Row 59 (`attribute-methods.ts#formatForInspect`)
+  delegates ACROSS files, to `attribute-inspection.ts`, which the splice
+  deliberately does not credit — the same line `effectiveTsCalls` draws. Row 32
+  (`has-many-through-association.ts#markOccurrence`) is a same-file delegation
+  from a method to a top-level function of the SAME name, so the reach resolves
+  ambiguously under the per-(file, name) scoping compare.ts keys on; filed as
+  `arms-splice-same-name-same-file-delegation`.
+
+The splice is one-directional by construction: it can discharge a flag, never
+raise one (`report-arms.ts#compareArms`). Taken naively in both directions it
+charged every divergent helper's arms to each of its callers and inflated the
+report to 3,684 rows.

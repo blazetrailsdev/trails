@@ -127,9 +127,14 @@ export function spliceHelperSkeletons(
   if (sameFileSkeletons === undefined) return [...skeleton];
   const out: string[] = [];
   for (const token of skeleton) {
-    const helper = token.startsWith("ref:")
-      ? sameFileSkeletons[token.slice("ref:".length)]
-      : undefined;
+    // Own-property, because a reach is a Ruby/TS method name and
+    // `ref:constructor` / `ref:toString` would otherwise resolve against
+    // Object.prototype.
+    const name = token.startsWith("ref:") ? token.slice("ref:".length) : undefined;
+    const helper =
+      name !== undefined && Object.hasOwn(sameFileSkeletons, name)
+        ? sameFileSkeletons[name]
+        : undefined;
     if (helper === undefined) out.push(token);
     else out.push(...helper);
   }
@@ -149,17 +154,41 @@ function multisetDifference(a: readonly string[], b: readonly string[]): string[
   return out;
 }
 
-/** The verdict for one pair, or undefined when its arms agree exactly. */
-export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
-  const rubyArms = controlArms(spliceHelperSkeletons(row.ruby, row.rubyHelpers));
-  const tsArms = controlArms(spliceHelperSkeletons(row.ts, row.tsHelpers));
+function armVerdict(row: SkeletonRow, ruby: readonly string[], ts: readonly string[]) {
+  const rubyArms = controlArms(ruby);
+  const tsArms = controlArms(ts);
   const missing = multisetDifference(rubyArms, tsArms);
   const invented = multisetDifference(tsArms, rubyArms);
   if (missing.length > 0 || invented.length > 0) {
-    return { ...row, kind: "count", rubyArms, tsArms, missing, invented };
+    return { ...row, kind: "count" as const, rubyArms, tsArms, missing, invented };
   }
   if (rubyArms.join(" ") === tsArms.join(" ")) return undefined;
-  return { ...row, kind: "order", rubyArms, tsArms, missing: [], invented: [] };
+  return { ...row, kind: "order" as const, rubyArms, tsArms, missing: [], invented: [] };
+}
+
+/**
+ * The verdict for one pair, or undefined when its arms agree exactly.
+ *
+ * Taken TWICE: once over the two bodies' own streams, and — only if that
+ * flagged — again over the streams with their same-file helpers spliced in
+ * ({@link spliceHelperSkeletons}). The splice can only DISCHARGE a flag, never
+ * raise one, which is the contract `effectiveTsCalls`' union carries by being a
+ * set union: unioning a helper's calls in can satisfy a Rails call the body
+ * omitted but can never invent one. A sequence splice has no such guarantee —
+ * it charges the helper's own arms to every caller, so one divergent helper
+ * would report once on its own row and again on each of its callers — so the
+ * one-directional reading is imposed here instead. The verdict reported is the
+ * body's OWN, for the same reason: the helper's divergence is the helper row's.
+ */
+export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
+  const plain = armVerdict(row, row.ruby, row.ts);
+  if (plain === undefined) return undefined;
+  const spliced = armVerdict(
+    row,
+    spliceHelperSkeletons(row.ruby, row.rubyHelpers),
+    spliceHelperSkeletons(row.ts, row.tsHelpers),
+  );
+  return spliced === undefined ? undefined : plain;
 }
 
 /** The RFC 0113 cluster a `count` row belongs to; an `order` row is `arm-order`. */
