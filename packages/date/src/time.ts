@@ -897,7 +897,8 @@ export class Time {
     }
   }
 
-  static iso8601 = Time.xmlschema;
+  /** `vendor/ruby/lib/time.rb:653` */
+  declare static iso8601: (time: string) => Time;
 
   constructor(
     year: number | string,
@@ -1211,4 +1212,5 @@ export class Time {
   }
 }
 
+Time.iso8601 = Time.xmlschema;
 Time.prototype.iso8601 = Time.prototype.xmlschema;
