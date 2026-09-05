@@ -289,6 +289,9 @@ export class File extends IO {
    * `rb_io_s_open` takes the `opt` hash Ruby's `File.open(filename, mode, opt)`
    * form passes through to `open(2)`, of which `perm:` is the mode
    * `Tempfile#initialize` sets to `0600` (`vendor/ruby/lib/tempfile.rb:158`).
+   * Ruby's block is a block and its `opt` a trailing argument; TypeScript has
+   * only the one trailing position for both, so the third parameter is either,
+   * discriminated by `typeof`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.open`
    * (`vendor/ruby/io.c:8148`).
