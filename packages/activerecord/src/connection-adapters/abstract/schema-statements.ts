@@ -859,7 +859,7 @@ export class SchemaStatements {
       name?: string;
       unique?: boolean;
       valid?: boolean;
-      include?: string[];
+      include?: string | string[];
       nullsNotDistinct?: boolean;
       [key: string]: unknown;
     } = {},
@@ -1274,7 +1274,7 @@ export class SchemaStatements {
       lengths: (options.length ?? {}) as Record<string, number>,
       orders: (options.order ?? {}) as Record<string, string>,
       opclasses: (options.opclass ?? {}) as Record<string, string>,
-      include: options.include as string[] | undefined,
+      include: options.include as string | string[] | undefined,
       nullsNotDistinct: options.nullsNotDistinct as boolean | undefined,
       comment: options.comment as string | undefined,
     });

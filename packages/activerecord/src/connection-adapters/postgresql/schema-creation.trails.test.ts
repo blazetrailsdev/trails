@@ -5,6 +5,8 @@ import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./sch
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import {
+  CreateIndexDefinition,
+  IndexDefinition,
   ForeignKeyDefinition,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
@@ -178,7 +180,7 @@ describe("PostgreSQL SchemaCreation", () => {
   });
 
   it("quotedIncludeColumns + tableModifierInCreate", async () => {
-    expect(await s().quotedIncludeColumnsForIndex("a, b")).toBe("a, b");
+    expect(await s().quotedIncludeColumnsForIndex(":a")).toBe('"a"');
     expect(await s().quotedIncludeColumnsForIndex(["a", "b"])).toBe('"a", "b"');
     expect(await s().quotedIncludeColumns("raw, expr")).toBe("raw, expr");
     expect(await s().quotedIncludeColumns(["a", "b"])).toBe('"a", "b"');
@@ -196,5 +198,22 @@ describe("PostgreSQL SchemaCreation", () => {
       quotedIncludeColumnsForIndex: () => "<<delegated>>",
     } as any) as any;
     expect(await sc.quotedIncludeColumnsForIndex(["a", "b"])).toBe("<<delegated>>");
+  });
+});
+
+describe("PostgreSQL SchemaCreation index include:", () => {
+  const createIndexSql = async (include: string | string[]): Promise<string> => {
+    const index = new IndexDefinition("posts", "idx_posts_on_title", false, ["title"], { include });
+    return s().visitCreateIndexDefinition(new CreateIndexDefinition(index));
+  };
+
+  it("quotes a Symbol include but passes a String include through raw", async () => {
+    expect(await createIndexSql(":foo")).toContain('INCLUDE ("foo")');
+    expect(await createIndexSql("foo")).toContain("INCLUDE (foo)");
+    expect(await createIndexSql(":foo")).not.toBe(await createIndexSql("foo"));
+  });
+
+  it("quotes every column of an Array include", async () => {
+    expect(await createIndexSql(["foo", "bar"])).toContain('INCLUDE ("foo", "bar")');
   });
 });

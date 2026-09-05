@@ -372,6 +372,17 @@ describe("IndexDefinition#defined_for?", () => {
     expect(idx.isDefinedFor("", { column: "a" })).toBe(true);
     expect(idx.isDefinedFor([], { column: "b" })).toBe(false);
   });
+
+  it("matches a Symbol, a String or an Array include: against the stored column names", () => {
+    const idx = new IndexDefinition("t", "i", false, ["a"], { include: ["b", "c"] });
+    expect(idx.isDefinedFor(["a"], { include: ["b", "c"] })).toBe(true);
+    expect(idx.isDefinedFor(["a"], { include: ["b"] })).toBe(false);
+
+    const single = new IndexDefinition("t", "i", false, ["a"], { include: ["b"] });
+    expect(single.isDefinedFor(["a"], { include: ":b" })).toBe(true);
+    expect(single.isDefinedFor(["a"], { include: "b" })).toBe(true);
+    expect(single.isDefinedFor(["a"], { include: ":c" })).toBe(false);
+  });
 });
 
 describe("ForeignKeyDefinition#defined_for?", () => {

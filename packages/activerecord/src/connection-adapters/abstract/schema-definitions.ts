@@ -1,4 +1,4 @@
-import { block, fetch } from "@blazetrails/ruby-compat";
+import { block, fetch, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
 import type { Column } from "../column.js";
@@ -375,7 +375,7 @@ export interface AddIndexOptions {
   ifNotExists?: boolean;
   length?: number | null | Record<string, number>;
   opclass?: Record<string, string>;
-  include?: string[];
+  include?: string | string[];
   nullsNotDistinct?: boolean;
   algorithm?: string;
 }
@@ -407,7 +407,7 @@ export class IndexDefinition {
   readonly opclasses: Record<string, string> | string;
   readonly type?: string;
   readonly using?: string;
-  readonly include?: string[];
+  readonly include?: string | string[];
   readonly nullsNotDistinct?: boolean;
   readonly comment?: string;
   readonly valid: boolean;
@@ -426,7 +426,7 @@ export class IndexDefinition {
       opclasses?: Record<string, string> | string;
       type?: string;
       using?: string;
-      include?: string[];
+      include?: string | string[];
       algorithm?: string;
       ifNotExists?: boolean;
       nullsNotDistinct?: boolean;
@@ -474,21 +474,22 @@ export class IndexDefinition {
       name?: string;
       unique?: boolean;
       valid?: boolean;
-      include?: string[];
+      include?: string | string[];
       nullsNotDistinct?: boolean;
     } = {},
   ): boolean {
     const { name, unique, valid, include, nullsNotDistinct } = options;
     const equals = (a: string[], b: string[]): boolean =>
       a.length === b.length && a.every((v, i) => v === b[i]);
+    const toS = (v: unknown): string => (isSymbol(v) ? symbolToS(v) : String(v));
 
     if (isBlank(columns)) columns = options.column;
     return (
-      (columns == null || equals(wrap(this.columns), wrap(columns).map(String))) &&
+      (columns == null || equals(wrap(this.columns), wrap(columns).map(toS))) &&
       (name == null || this.name === String(name)) &&
       (unique == null || this.unique === unique) &&
       (valid == null || this.valid === valid) &&
-      (include == null || equals(wrap(this.include), wrap(include).map(String))) &&
+      (include == null || equals(wrap(this.include), wrap(include).map(toS))) &&
       (nullsNotDistinct == null || this.nullsNotDistinct === nullsNotDistinct)
     );
   }

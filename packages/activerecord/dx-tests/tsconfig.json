@@ -22,6 +22,9 @@
       "@blazetrails/activesupport/core-ext/date/calculations": [
         "../../activesupport/src/core-ext/date/calculations.ts"
       ],
+      "@blazetrails/activesupport/core-ext/date-and-time/zones": [
+        "../../activesupport/src/core-ext/date-and-time/zones.ts"
+      ],
       "@blazetrails/activesupport/core-ext/hash/slice": [
         "../../activesupport/src/core-ext/hash/slice.ts"
       ],

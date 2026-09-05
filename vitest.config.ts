@@ -122,6 +122,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/core-ext/date/conversions.ts",
   ),
+  "@blazetrails/activesupport/core-ext/date-and-time/zones": path.resolve(
+    __dirname,
+    "packages/activesupport/src/core-ext/date-and-time/zones.ts",
+  ),
   "@blazetrails/activesupport/core-ext/hash/slice": path.resolve(
     __dirname,
     "packages/activesupport/src/core-ext/hash/slice.ts",

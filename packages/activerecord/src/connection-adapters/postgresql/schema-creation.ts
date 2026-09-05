@@ -1,3 +1,4 @@
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { wrap } from "@blazetrails/activesupport";
 import {
   SchemaCreation as AbstractSchemaCreation,
@@ -225,13 +226,13 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (typeof host.quotedIncludeColumnsForIndex === "function") {
       return host.quotedIncludeColumnsForIndex(o);
     }
-    if (typeof o === "string") return o;
-    return o.map((c) => this.conn.quoteColumnName(c)).join(", ");
+    if (typeof o === "string") return this.conn.quoteColumnName(isSymbol(o) ? symbolToS(o) : o);
+    return o.map((c) => this.conn.quoteColumnName(isSymbol(c) ? symbolToS(c) : c)).join(", ");
   }
 
   /** @internal */
   protected override async quotedIncludeColumns(o: string | string[]): Promise<string> {
-    return typeof o === "string" ? o : this.quotedIncludeColumnsForIndex(o);
+    return typeof o === "string" && !isSymbol(o) ? o : this.quotedIncludeColumnsForIndex(o);
   }
 
   /** @internal */

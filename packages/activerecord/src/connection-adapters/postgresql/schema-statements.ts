@@ -1,3 +1,4 @@
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { compactBlank, first, singularize, wrap } from "@blazetrails/activesupport";
@@ -216,8 +217,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
+    if (isSymbol(columnNames)) return this.quoteColumnName(symbolToS(columnNames));
     if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
-    const quotedColumns = new Map(columnNames.map((name) => [name, this.quoteColumnName(name)]));
+    const quotedColumns = new Map(
+      columnNames.map((name) => [
+        name,
+        this.quoteColumnName(isSymbol(name) ? symbolToS(name) : name),
+      ]),
+    );
     return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
   }
 
