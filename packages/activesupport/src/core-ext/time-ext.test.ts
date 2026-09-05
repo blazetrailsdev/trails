@@ -34,9 +34,14 @@ import {
   isPast,
   isFuture,
   nextWeek,
+  nextMonth,
+  prevMonth,
+  nextYear,
+  prevYear,
 } from "../time-ext.js";
 import { toFs, DATE_FORMATS, formattedOffset, xmlschema } from "./time/conversions.js";
 import { toTime } from "./time/compatibility.js";
+import { lastQuarter } from "./date-and-time/calculations.js";
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
@@ -44,6 +49,18 @@ function asDate(instant: Temporal.Instant): Date {
 
 function d(year: number, month: number, day: number, hour = 0, min = 0, sec = 0, ms = 0): Date {
   return new Date(year, month - 1, day, hour, min, sec, ms);
+}
+
+function dateTimeInit(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+  usec = 0,
+): Date {
+  return new Date(year, month - 1, day, hour, minute, second, usec / 1000);
 }
 
 function utc(year: number, month = 1, day = 1, hour = 0, min = 0, sec = 0, ms = 0): Date {
@@ -99,7 +116,152 @@ afterEach(() => {
   resetLocalTimeZoneId();
 });
 
+const NSEC_999999999_OVER_1000 = new Rational(999999999, 1000);
+
 describe("TimeExtCalculationsTest", () => {
+  it("seconds since midnight", () => {
+    expect(RubyTime.local(2005, 1, 1, 0, 0, 1).secondsSinceMidnight()).toBe(1);
+    expect(RubyTime.local(2005, 1, 1, 0, 1, 0).secondsSinceMidnight()).toBe(60);
+    expect(RubyTime.local(2005, 1, 1, 1, 1, 0).secondsSinceMidnight()).toBe(3660);
+    expect(RubyTime.local(2005, 1, 1, 23, 59, 59).secondsSinceMidnight()).toBe(86399);
+    expect(RubyTime.local(2005, 1, 1, 0, 1, 0, 10).secondsSinceMidnight()).toBe(60.00001);
+  });
+
+  it("seconds until end of day", () => {
+    expect(RubyTime.local(2005, 1, 1, 23, 59, 59).secondsUntilEndOfDay()).toBe(0);
+    expect(RubyTime.local(2005, 1, 1, 23, 59, 58).secondsUntilEndOfDay()).toBe(1);
+    expect(RubyTime.local(2005, 1, 1, 23, 58, 59).secondsUntilEndOfDay()).toBe(60);
+    expect(RubyTime.local(2005, 1, 1, 22, 58, 59).secondsUntilEndOfDay()).toBe(3660);
+    expect(RubyTime.local(2005, 1, 1, 0, 0, 0).secondsUntilEndOfDay()).toBe(86399);
+  });
+
+  it("beginning of day", () => {
+    expect(
+      RubyTime.local(2005, 2, 4, 10, 10, 10).beginningOfDay().toTime().toInstant().epochNanoseconds,
+    ).toBe(RubyTime.local(2005, 2, 4, 0, 0, 0).toTime().toInstant().epochNanoseconds);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2006, 4, 2, 10, 10, 10).beginningOfDay().toTime().toInstant()
+          .epochNanoseconds,
+      ).toBe(RubyTime.local(2006, 4, 2, 0, 0, 0).toTime().toInstant().epochNanoseconds);
+      expect(
+        RubyTime.local(2006, 10, 29, 10, 10, 10).beginningOfDay().toTime().toInstant()
+          .epochNanoseconds,
+      ).toBe(RubyTime.local(2006, 10, 29, 0, 0, 0).toTime().toInstant().epochNanoseconds);
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 3, 19, 10, 10, 10).beginningOfDay().toTime().toInstant()
+          .epochNanoseconds,
+      ).toBe(RubyTime.local(2006, 3, 19, 0, 0, 0).toTime().toInstant().epochNanoseconds);
+      expect(
+        RubyTime.local(2006, 10, 1, 10, 10, 10).beginningOfDay().toTime().toInstant()
+          .epochNanoseconds,
+      ).toBe(RubyTime.local(2006, 10, 1, 0, 0, 0).toTime().toInstant().epochNanoseconds);
+    });
+  });
+
+  it("middle of day", () => {
+    expect(
+      RubyTime.local(2005, 2, 4, 10, 10, 10).middleOfDay().toTime().toInstant().epochNanoseconds,
+    ).toBe(RubyTime.local(2005, 2, 4, 12, 0, 0).toTime().toInstant().epochNanoseconds);
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2006, 4, 2, 10, 10, 10).middleOfDay().toTime().toInstant().epochNanoseconds,
+      ).toBe(RubyTime.local(2006, 4, 2, 12, 0, 0).toTime().toInstant().epochNanoseconds);
+      expect(
+        RubyTime.local(2006, 10, 29, 10, 10, 10).middleOfDay().toTime().toInstant()
+          .epochNanoseconds,
+      ).toBe(RubyTime.local(2006, 10, 29, 12, 0, 0).toTime().toInstant().epochNanoseconds);
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 3, 19, 10, 10, 10).middleOfDay().toTime().toInstant().epochNanoseconds,
+      ).toBe(RubyTime.local(2006, 3, 19, 12, 0, 0).toTime().toInstant().epochNanoseconds);
+      expect(
+        RubyTime.local(2006, 10, 1, 10, 10, 10).middleOfDay().toTime().toInstant().epochNanoseconds,
+      ).toBe(RubyTime.local(2006, 10, 1, 12, 0, 0).toTime().toInstant().epochNanoseconds);
+    });
+  });
+
+  it("beginning of hour", () => {
+    expect(
+      RubyTime.local(2005, 2, 4, 19, 30, 10).beginningOfHour().toTime().toInstant()
+        .epochNanoseconds,
+    ).toBe(RubyTime.local(2005, 2, 4, 19, 0, 0).toTime().toInstant().epochNanoseconds);
+  });
+
+  it("beginning of minute", () => {
+    expect(
+      RubyTime.local(2005, 2, 4, 19, 30, 10).beginningOfMinute().toTime().toInstant()
+        .epochNanoseconds,
+    ).toBe(RubyTime.local(2005, 2, 4, 19, 30, 0).toTime().toInstant().epochNanoseconds);
+  });
+
+  it("end of day", () => {
+    expect(
+      RubyTime.local(2007, 8, 12, 10, 10, 10).endOfDay().toTime().toInstant().epochNanoseconds,
+    ).toBe(
+      RubyTime.local(2007, 8, 12, 23, 59, 59, NSEC_999999999_OVER_1000).toTime().toInstant()
+        .epochNanoseconds,
+    );
+    withEnvTz("US/Eastern", () => {
+      expect(
+        RubyTime.local(2007, 4, 2, 10, 10, 10).endOfDay().toTime().toInstant().epochNanoseconds,
+      ).toBe(
+        RubyTime.local(2007, 4, 2, 23, 59, 59, NSEC_999999999_OVER_1000).toTime().toInstant()
+          .epochNanoseconds,
+      );
+      expect(
+        RubyTime.local(2007, 10, 29, 10, 10, 10).endOfDay().toTime().toInstant().epochNanoseconds,
+      ).toBe(
+        RubyTime.local(2007, 10, 29, 23, 59, 59, NSEC_999999999_OVER_1000).toTime().toInstant()
+          .epochNanoseconds,
+      );
+    });
+    withEnvTz("NZ", () => {
+      expect(
+        RubyTime.local(2006, 3, 19, 10, 10, 10).endOfDay().toTime().toInstant().epochNanoseconds,
+      ).toBe(
+        RubyTime.local(2006, 3, 19, 23, 59, 59, NSEC_999999999_OVER_1000).toTime().toInstant()
+          .epochNanoseconds,
+      );
+      expect(
+        RubyTime.local(2006, 10, 1, 10, 10, 10).endOfDay().toTime().toInstant().epochNanoseconds,
+      ).toBe(
+        RubyTime.local(2006, 10, 1, 23, 59, 59, NSEC_999999999_OVER_1000).toTime().toInstant()
+          .epochNanoseconds,
+      );
+    });
+    withEnvTz("Asia/Yekaterinburg", () => {
+      expect(
+        RubyTime.new(2015, 2, 8, 8, 0, 0, "+05:00").endOfDay().toTime().toInstant()
+          .epochNanoseconds,
+      ).toBe(
+        RubyTime.local(2015, 2, 8, 23, 59, 59, NSEC_999999999_OVER_1000).toTime().toInstant()
+          .epochNanoseconds,
+      );
+    });
+  });
+
+  it("end of hour", () => {
+    expect(
+      RubyTime.local(2005, 2, 4, 19, 30, 10).endOfHour().toTime().toInstant().epochNanoseconds,
+    ).toBe(
+      RubyTime.local(2005, 2, 4, 19, 59, 59, NSEC_999999999_OVER_1000).toTime().toInstant()
+        .epochNanoseconds,
+    );
+  });
+
+  it("end of minute", () => {
+    expect(
+      RubyTime.local(2005, 2, 4, 19, 30, 10).endOfMinute().toTime().toInstant().epochNanoseconds,
+    ).toBe(
+      RubyTime.local(2005, 2, 4, 19, 30, 59, NSEC_999999999_OVER_1000).toTime().toInstant()
+        .epochNanoseconds,
+    );
+  });
+
   it("seconds since midnight at daylight savings time start", () => {
     withEnvTz("America/New_York", () => {
       expect(secondsSinceMidnight(new Date(2005, 3, 3, 1, 59, 59))).toBe(2 * 3600 - 1);
@@ -493,10 +655,128 @@ describe("TimeExtCalculationsTest", () => {
     expect(asDate(advance(d(1582, 10, 14, 15, 15, 10), { days: 1 })).getDate()).toBe(15);
   });
 
-  it.skip("advance preserves offset for local times around end of dst");
-  it.skip("advance preserves offset for zoned times around end of dst");
-  it.skip("advance preserves fractional hour offset for local times around end of dst");
-  it.skip("advance preserves fractional hour offset for zoned times around end of dst");
+  it("advance preserves offset for local times around end of dst", () => {
+    withEnvTz("US/Eastern", () => {
+      const midnight = RubyTime.local(2005, 10, 30, 0, 0, 0);
+      const oneAm1 = RubyTime.local(2005, 10, 30, 0, 59, 59).plus(1);
+      const oneAm2 = RubyTime.local(2005, 10, 30, 1, 0, 0);
+      const twoAm = RubyTime.local(2005, 10, 30, 2, 0, 0);
+      expect(oneAm1.toTime().epochNanoseconds).toBeLessThan(oneAm2.toTime().epochNanoseconds);
+
+      const at = (time: RubyTime): bigint => time.toTime().epochNanoseconds;
+      const second = 1_000_000_000n;
+
+      expect(at(advance(midnight, { hours: 1 }))).toBe(at(oneAm1));
+      expect(at(advance(midnight, { hours: 2 }))).toBe(at(oneAm2));
+      expect(at(advance(midnight, { hours: 3 }))).toBe(at(twoAm));
+
+      expect(at(advance(oneAm1, { hours: -1 }))).toBe(at(midnight));
+      expect(at(advance(oneAm1, { seconds: 0 }))).toBe(at(oneAm1));
+      expect(at(advance(oneAm1, { seconds: 1 }))).toBe(at(oneAm1) + second);
+      expect(at(advance(oneAm1, { hours: 1 }))).toBe(at(oneAm2));
+      expect(at(advance(oneAm1, { hours: 2 }))).toBe(at(twoAm));
+
+      expect(at(advance(oneAm2, { hours: -2 }))).toBe(at(midnight));
+      expect(at(advance(oneAm2, { hours: -1 }))).toBe(at(oneAm1));
+      expect(at(advance(oneAm2, { seconds: 0 }))).toBe(at(oneAm2));
+      expect(at(advance(oneAm2, { seconds: 1 }))).toBe(at(oneAm2) + second);
+      expect(at(advance(oneAm2, { hours: 1 }))).toBe(at(twoAm));
+
+      expect(at(advance(twoAm, { hours: -1 }))).toBe(at(oneAm2));
+      expect(at(advance(twoAm, { hours: -2 }))).toBe(at(oneAm1));
+      expect(at(advance(twoAm, { hours: -3 }))).toBe(at(midnight));
+    });
+  });
+
+  it("advance preserves offset for zoned times around end of dst", () => {
+    const midnight = zoned("US/Eastern", 2005, 10, 30, 0, 0, 0);
+    const oneAm1 = zoned("US/Eastern", 2005, 10, 30, 1, 0, 0);
+    const oneAm2 = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0).subtract({ seconds: 3600 });
+    const twoAm = zoned("US/Eastern", 2005, 10, 30, 2, 0, 0);
+    expect(oneAm1.epochNanoseconds).toBeLessThan(oneAm2.epochNanoseconds);
+
+    expect(advance(midnight, { hours: 1 }).equals(oneAm1)).toBe(true);
+    expect(advance(midnight, { hours: 2 }).equals(oneAm2)).toBe(true);
+    expect(advance(midnight, { hours: 3 }).equals(twoAm)).toBe(true);
+
+    expect(advance(oneAm1, { hours: -1 }).equals(midnight)).toBe(true);
+    expect(advance(oneAm1, { seconds: 0 }).equals(oneAm1)).toBe(true);
+    expect(advance(oneAm1, { seconds: 1 }).equals(oneAm1.add({ seconds: 1 }))).toBe(true);
+    expect(advance(oneAm1, { hours: 1 }).equals(oneAm2)).toBe(true);
+    expect(advance(oneAm1, { hours: 2 }).equals(twoAm)).toBe(true);
+
+    expect(advance(oneAm2, { hours: -2 }).equals(midnight)).toBe(true);
+    expect(advance(oneAm2, { hours: -1 }).equals(oneAm1)).toBe(true);
+    expect(advance(oneAm2, { seconds: 0 }).equals(oneAm2)).toBe(true);
+    expect(advance(oneAm2, { seconds: 1 }).equals(oneAm2.add({ seconds: 1 }))).toBe(true);
+    expect(advance(oneAm2, { hours: 1 }).equals(twoAm)).toBe(true);
+
+    expect(advance(twoAm, { hours: -1 }).equals(oneAm2)).toBe(true);
+    expect(advance(twoAm, { hours: -2 }).equals(oneAm1)).toBe(true);
+    expect(advance(twoAm, { hours: -3 }).equals(midnight)).toBe(true);
+  });
+
+  it("advance preserves fractional hour offset for local times around end of dst", () => {
+    withEnvTz("Australia/Lord_Howe", () => {
+      const oneAm = RubyTime.local(2005, 3, 27, 1, 0, 0);
+      const one30Am1 = RubyTime.local(2005, 3, 27, 1, 29, 59).plus(1);
+      const one30Am2 = RubyTime.local(2005, 3, 27, 1, 30, 0);
+      const twoAm = RubyTime.local(2005, 3, 27, 2, 0, 0);
+      expect(one30Am1.toTime().epochNanoseconds).toBeLessThan(one30Am2.toTime().epochNanoseconds);
+
+      const at = (time: RubyTime): bigint => time.toTime().epochNanoseconds;
+      const second = 1_000_000_000n;
+
+      expect(at(advance(oneAm, { minutes: 30 }))).toBe(at(one30Am1));
+      expect(at(advance(oneAm, { minutes: 60 }))).toBe(at(one30Am2));
+      expect(at(advance(oneAm, { minutes: 90 }))).toBe(at(twoAm));
+
+      expect(at(advance(one30Am1, { minutes: -30 }))).toBe(at(oneAm));
+      expect(at(advance(one30Am1, { seconds: 0 }))).toBe(at(one30Am1));
+      expect(at(advance(one30Am1, { seconds: 1 }))).toBe(at(one30Am1) + second);
+      expect(at(advance(one30Am1, { minutes: 30 }))).toBe(at(one30Am2));
+      expect(at(advance(one30Am1, { minutes: 60 }))).toBe(at(twoAm));
+
+      expect(at(advance(one30Am2, { minutes: -60 }))).toBe(at(oneAm));
+      expect(at(advance(one30Am2, { minutes: -30 }))).toBe(at(one30Am1));
+      expect(at(advance(one30Am2, { seconds: 0 }))).toBe(at(one30Am2));
+      expect(at(advance(one30Am2, { seconds: 1 }))).toBe(at(one30Am2) + second);
+      expect(at(advance(one30Am2, { minutes: 30 }))).toBe(at(twoAm));
+
+      expect(at(advance(twoAm, { minutes: -30 }))).toBe(at(one30Am2));
+      expect(at(advance(twoAm, { minutes: -60 }))).toBe(at(one30Am1));
+      expect(at(advance(twoAm, { minutes: -90 }))).toBe(at(oneAm));
+    });
+  });
+
+  it("advance preserves fractional hour offset for zoned times around end of dst", () => {
+    const tz = "Australia/Lord_Howe";
+    const oneAm = zoned(tz, 2005, 3, 27, 1, 0, 0);
+    const one30Am1 = zoned(tz, 2005, 3, 27, 1, 30, 0);
+    const one30Am2 = zoned(tz, 2005, 3, 27, 2, 0, 0).subtract({ seconds: 1800 });
+    const twoAm = zoned(tz, 2005, 3, 27, 2, 0, 0);
+    expect(one30Am1.epochNanoseconds).toBeLessThan(one30Am2.epochNanoseconds);
+
+    expect(advance(oneAm, { minutes: 30 }).equals(one30Am1)).toBe(true);
+    expect(advance(oneAm, { minutes: 60 }).equals(one30Am2)).toBe(true);
+    expect(advance(oneAm, { minutes: 90 }).equals(twoAm)).toBe(true);
+
+    expect(advance(one30Am1, { minutes: -30 }).equals(oneAm)).toBe(true);
+    expect(advance(one30Am1, { seconds: 0 }).equals(one30Am1)).toBe(true);
+    expect(advance(one30Am1, { seconds: 1 }).equals(one30Am1.add({ seconds: 1 }))).toBe(true);
+    expect(advance(one30Am1, { minutes: 30 }).equals(one30Am2)).toBe(true);
+    expect(advance(one30Am1, { minutes: 60 }).equals(twoAm)).toBe(true);
+
+    expect(advance(one30Am2, { minutes: -60 }).equals(oneAm)).toBe(true);
+    expect(advance(one30Am2, { minutes: -30 }).equals(one30Am1)).toBe(true);
+    expect(advance(one30Am2, { seconds: 0 }).equals(one30Am2)).toBe(true);
+    expect(advance(one30Am2, { seconds: 1 }).equals(one30Am2.add({ seconds: 1 }))).toBe(true);
+    expect(advance(one30Am2, { minutes: 30 }).equals(twoAm)).toBe(true);
+
+    expect(advance(twoAm, { minutes: -30 }).equals(one30Am2)).toBe(true);
+    expect(advance(twoAm, { minutes: -60 }).equals(one30Am1)).toBe(true);
+    expect(advance(twoAm, { minutes: -90 }).equals(oneAm)).toBe(true);
+  });
 
   it("last week", () => {
     withEnvTz("America/New_York", () => {
@@ -940,5 +1220,211 @@ describe("TimeExtCalculationsTest", () => {
     const result = asDate(nextDay(t));
     expect(result.getDate()).toBe(16);
     expect(result.getMonth()).toBe(5);
+  });
+
+  it("prev day", () => {
+    const at = (instant: Temporal.Instant): number => instant.epochMilliseconds;
+    expect(at(prevDay(dateTimeInit(2005, 2, 22, 10, 10, 10), -2))).toBe(
+      dateTimeInit(2005, 2, 24, 10, 10, 10).getTime(),
+    );
+    expect(at(prevDay(dateTimeInit(2005, 2, 22, 10, 10, 10), -1))).toBe(
+      dateTimeInit(2005, 2, 23, 10, 10, 10).getTime(),
+    );
+    expect(at(prevDay(dateTimeInit(2005, 2, 22, 10, 10, 10), 0))).toBe(
+      dateTimeInit(2005, 2, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(prevDay(dateTimeInit(2005, 2, 22, 10, 10, 10), 1))).toBe(
+      dateTimeInit(2005, 2, 21, 10, 10, 10).getTime(),
+    );
+    expect(at(prevDay(dateTimeInit(2005, 2, 22, 10, 10, 10), 2))).toBe(
+      dateTimeInit(2005, 2, 20, 10, 10, 10).getTime(),
+    );
+    expect(at(prevDay(dateTimeInit(2005, 2, 22, 10, 10, 10)))).toBe(
+      dateTimeInit(2005, 2, 21, 10, 10, 10).getTime(),
+    );
+    expect(at(prevDay(asDate(prevDay(dateTimeInit(2005, 3, 2, 10, 10, 10)))))).toBe(
+      dateTimeInit(2005, 2, 28, 10, 10, 10).getTime(),
+    );
+  });
+
+  it("next day", () => {
+    const at = (instant: Temporal.Instant): number => instant.epochMilliseconds;
+    expect(at(nextDay(dateTimeInit(2005, 2, 22, 10, 10, 10), -2))).toBe(
+      dateTimeInit(2005, 2, 20, 10, 10, 10).getTime(),
+    );
+    expect(at(nextDay(dateTimeInit(2005, 2, 22, 10, 10, 10), -1))).toBe(
+      dateTimeInit(2005, 2, 21, 10, 10, 10).getTime(),
+    );
+    expect(at(nextDay(dateTimeInit(2005, 2, 22, 10, 10, 10), 0))).toBe(
+      dateTimeInit(2005, 2, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(nextDay(dateTimeInit(2005, 2, 22, 10, 10, 10), 1))).toBe(
+      dateTimeInit(2005, 2, 23, 10, 10, 10).getTime(),
+    );
+    expect(at(nextDay(dateTimeInit(2005, 2, 22, 10, 10, 10), 2))).toBe(
+      dateTimeInit(2005, 2, 24, 10, 10, 10).getTime(),
+    );
+    expect(at(nextDay(dateTimeInit(2005, 2, 22, 10, 10, 10)))).toBe(
+      dateTimeInit(2005, 2, 23, 10, 10, 10).getTime(),
+    );
+    expect(at(nextDay(asDate(nextDay(dateTimeInit(2005, 2, 28, 10, 10, 10)))))).toBe(
+      dateTimeInit(2005, 3, 2, 10, 10, 10).getTime(),
+    );
+  });
+
+  it("prev month", () => {
+    const at = (instant: Temporal.Instant): number => instant.epochMilliseconds;
+    expect(at(prevMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), -2))).toBe(
+      dateTimeInit(2005, 4, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(prevMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), -1))).toBe(
+      dateTimeInit(2005, 3, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(prevMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), 0))).toBe(
+      dateTimeInit(2005, 2, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(prevMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), 1))).toBe(
+      dateTimeInit(2005, 1, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(prevMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), 2))).toBe(
+      dateTimeInit(2004, 12, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(prevMonth(dateTimeInit(2005, 2, 22, 10, 10, 10)))).toBe(
+      dateTimeInit(2005, 1, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(prevMonth(asDate(prevMonth(dateTimeInit(2005, 2, 22, 10, 10, 10)))))).toBe(
+      dateTimeInit(2004, 12, 22, 10, 10, 10).getTime(),
+    );
+  });
+
+  it("next month", () => {
+    const at = (instant: Temporal.Instant): number => instant.epochMilliseconds;
+    expect(at(nextMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), -2))).toBe(
+      dateTimeInit(2004, 12, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(nextMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), -1))).toBe(
+      dateTimeInit(2005, 1, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(nextMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), 0))).toBe(
+      dateTimeInit(2005, 2, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(nextMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), 1))).toBe(
+      dateTimeInit(2005, 3, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(nextMonth(dateTimeInit(2005, 2, 22, 10, 10, 10), 2))).toBe(
+      dateTimeInit(2005, 4, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(nextMonth(dateTimeInit(2005, 2, 22, 10, 10, 10)))).toBe(
+      dateTimeInit(2005, 3, 22, 10, 10, 10).getTime(),
+    );
+    expect(at(nextMonth(asDate(nextMonth(dateTimeInit(2005, 2, 22, 10, 10, 10)))))).toBe(
+      dateTimeInit(2005, 4, 22, 10, 10, 10).getTime(),
+    );
+  });
+
+  it("prev year", () => {
+    const at = (instant: Temporal.Instant): number => instant.epochMilliseconds;
+    expect(at(prevYear(dateTimeInit(2005, 6, 5, 10, 10, 10), -2))).toBe(
+      dateTimeInit(2007, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(prevYear(dateTimeInit(2005, 6, 5, 10, 10, 10), -1))).toBe(
+      dateTimeInit(2006, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(prevYear(dateTimeInit(2005, 6, 5, 10, 10, 10), 0))).toBe(
+      dateTimeInit(2005, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(prevYear(dateTimeInit(2005, 6, 5, 10, 10, 10), 1))).toBe(
+      dateTimeInit(2004, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(prevYear(dateTimeInit(2005, 6, 5, 10, 10, 10), 2))).toBe(
+      dateTimeInit(2003, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(prevYear(dateTimeInit(2005, 6, 5, 10, 10, 10)))).toBe(
+      dateTimeInit(2004, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(prevYear(asDate(prevYear(dateTimeInit(2005, 6, 5, 10, 10, 10)))))).toBe(
+      dateTimeInit(2003, 6, 5, 10, 10, 10).getTime(),
+    );
+  });
+
+  it("next year", () => {
+    const at = (instant: Temporal.Instant): number => instant.epochMilliseconds;
+    expect(at(nextYear(dateTimeInit(2005, 6, 5, 10, 10, 10), -2))).toBe(
+      dateTimeInit(2003, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(nextYear(dateTimeInit(2005, 6, 5, 10, 10, 10), -1))).toBe(
+      dateTimeInit(2004, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(nextYear(dateTimeInit(2005, 6, 5, 10, 10, 10), 0))).toBe(
+      dateTimeInit(2005, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(nextYear(dateTimeInit(2005, 6, 5, 10, 10, 10), 1))).toBe(
+      dateTimeInit(2006, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(nextYear(dateTimeInit(2005, 6, 5, 10, 10, 10), 2))).toBe(
+      dateTimeInit(2007, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(nextYear(dateTimeInit(2005, 6, 5, 10, 10, 10)))).toBe(
+      dateTimeInit(2006, 6, 5, 10, 10, 10).getTime(),
+    );
+    expect(at(nextYear(asDate(nextYear(dateTimeInit(2005, 6, 5, 10, 10, 10)))))).toBe(
+      dateTimeInit(2007, 6, 5, 10, 10, 10).getTime(),
+    );
+  });
+});
+
+function marshalDump(t: RubyTime): string {
+  return JSON.stringify({
+    nanoseconds: t.toTime().epochNanoseconds.toString(),
+    utc: t.isUtc(),
+  });
+}
+
+function marshalLoad(dumped: string): RubyTime {
+  const { nanoseconds, utc } = JSON.parse(dumped) as { nanoseconds: string; utc: boolean };
+  const at = RubyTime.at(new Rational(BigInt(nanoseconds), 1_000_000_000n));
+  return utc ? at.getutc() : at.getlocal();
+}
+
+describe("TimeExtMarshalingTest", () => {
+  it("marshalling with utc instance", () => {
+    const t = RubyTime.utc(2000);
+    const unmarshalled = marshalLoad(marshalDump(t));
+    expect(unmarshalled.zone).toBe("UTC");
+    expect(unmarshalled.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+  });
+
+  it("marshalling with local instance", () => {
+    const t = RubyTime.local(2000);
+    const unmarshalled = marshalLoad(marshalDump(t));
+    expect(unmarshalled.zone).toBe(t.zone);
+    expect(unmarshalled.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+  });
+
+  it("marshalling with frozen utc instance", () => {
+    const t = RubyTime.utc(2000);
+    Object.freeze(t);
+    const unmarshalled = marshalLoad(marshalDump(t));
+    expect(unmarshalled.zone).toBe("UTC");
+    expect(unmarshalled.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+  });
+
+  it("marshalling with frozen local instance", () => {
+    const t = RubyTime.local(2000);
+    Object.freeze(t);
+    const unmarshalled = marshalLoad(marshalDump(t));
+    expect(unmarshalled.zone).toBe(t.zone);
+    expect(unmarshalled.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+  });
+
+  it("marshalling preserves fractional seconds", () => {
+    const t = RubyTime.parse("00:00:00.500");
+    const unmarshalled = marshalLoad(marshalDump(t));
+    expect(unmarshalled.toR().toF()).toBe(t.toR().toF());
+    expect(unmarshalled.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+  });
+
+  it("last quarter on 31st", () => {
+    expect(lastQuarter(d(2004, 5, 31)).epochMilliseconds).toBe(d(2004, 2, 29).getTime());
   });
 });

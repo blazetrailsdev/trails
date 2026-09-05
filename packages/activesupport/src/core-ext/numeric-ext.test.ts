@@ -1,13 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { Temporal } from "@blazetrails/date";
+import { Temporal } from "@blazetrails/date";
 import { numberToHuman } from "../number-helper.js";
 import { Duration } from "../duration.js";
 import { Numeric } from "./numeric/bytes.js";
 import { NumericWithFormat } from "./numeric/conversions.js";
 import { BigDecimal } from "./big-decimal/conversions.js";
+import * as DateExt from "./date/calculations.js";
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
+}
+
+function pd(year: number, month: number, day: number): Temporal.PlainDate {
+  return new Temporal.PlainDate(year, month, day);
 }
 
 describe("NumericExtTimeAndDateTimeTest", () => {
@@ -86,6 +91,26 @@ describe("NumericExtDateTest", () => {
 
     const plus1sec = Duration.seconds(1).since(today);
     expect(plus1sec.epochMilliseconds).toBe(today.getTime() + 1000);
+  });
+
+  it("chaining duration operations", () => {
+    const today = DateExt.current();
+    expect(
+      DateExt.minusWithDuration(
+        DateExt.plusWithDuration(today, Duration.days(2)) as Temporal.PlainDate,
+        Duration.months(3),
+      ),
+    ).toEqual(DateExt.advance(DateExt.advance(today, { days: 2 }), { months: -3 }));
+    expect(
+      DateExt.plusWithDuration(
+        DateExt.plusWithDuration(today, Duration.days(1)) as Temporal.PlainDate,
+        Duration.months(2),
+      ),
+    ).toEqual(DateExt.advance(DateExt.advance(today, { days: 1 }), { months: 2 }));
+  });
+
+  it("add one year to leap day", () => {
+    expect(DateExt.plusWithDuration(pd(2004, 2, 29), Duration.years(1))).toEqual(pd(2005, 2, 28));
   });
 });
 
