@@ -51,7 +51,6 @@ export class Person extends Model {
 }
 
 export class Gender {
-  /** @noRailsEquivalent PERMANENT */
   static moduleName = "Person";
 
   declare static humanAttributeName: TranslationClassMethods["humanAttributeName"];

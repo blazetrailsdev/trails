@@ -1,4 +1,4 @@
-import { extend, humanize, isPresent } from "@blazetrails/activesupport";
+import { humanize, isPresent } from "@blazetrails/activesupport";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName } from "./naming.js";
@@ -26,7 +26,13 @@ export class Translation {
   static humanAttributeName = humanAttributeName;
 }
 
-extend(Translation, Naming);
+for (const moduleMethod of Object.keys(Naming)) {
+  Object.defineProperty(
+    Translation,
+    moduleMethod,
+    Object.getOwnPropertyDescriptor(Naming, moduleMethod)!,
+  );
+}
 
 export interface HumanAttributeNameOptions {
   default?: string | string[];
