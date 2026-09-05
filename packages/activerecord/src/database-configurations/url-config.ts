@@ -39,16 +39,13 @@ export class UrlConfig extends HashConfig {
   private buildUrlHash(): DatabaseConfigOptions {
     const url = this.url;
     if (
-      !url ||
+      url == null ||
       url.startsWith("jdbc:") ||
       url.startsWith("http:") ||
       url.startsWith("https:") ||
       /^[A-Za-z]:[\\/]/.test(url)
     ) {
       return { url };
-    }
-    if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(url)) {
-      return { database: url };
     }
     return new ConnectionUrlResolver(url).toHash();
   }

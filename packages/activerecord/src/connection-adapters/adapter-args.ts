@@ -11,12 +11,9 @@ function isRemoteLibsqlUrl(url: string): boolean {
 function normalizeAdapterName(name: string): string {
   switch (name) {
     case "postgresql":
-    case "postgres":
       return "postgresql";
-    case "mysql":
     case "mysql2":
       return "mysql";
-    case "sqlite":
     case "sqlite3":
     case "node-sqlite":
     case "expo-sqlite":
