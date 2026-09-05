@@ -4,6 +4,7 @@ import type { RawConfigurations } from "../database-configurations.js";
 import { AdapterNotFound } from "../errors.js";
 import "../connection-handling.js";
 import { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
   const configs = new DatabaseConfigurations(config);
@@ -13,11 +14,11 @@ function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
 describe("PoolConfig", () => {
   describe("ResolverTest", () => {
     beforeEach(() => {
-      DatabaseConfigurations.defaultEnv = "development";
+      DatabaseTasks.env = "development";
     });
 
     afterEach(() => {
-      DatabaseConfigurations.defaultEnv = "development";
+      DatabaseTasks.env = "development";
     });
 
     it("url invalid adapter", () => {

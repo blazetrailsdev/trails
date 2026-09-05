@@ -62,7 +62,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "compares the stored environment against the global default environment",
     async () => {
-      await stampedConfig(DatabaseConfigurations.defaultEnv);
+      await stampedConfig(DatabaseTasks.env);
       await DatabaseTasks.checkProtectedEnvironmentsBang(env);
     },
   );
@@ -70,7 +70,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "reports the global default environment as current on a mismatch",
     async () => {
-      const current = DatabaseConfigurations.defaultEnv;
+      const current = DatabaseTasks.env;
       expect(current).not.toBe(env);
       await stampedConfig("otherenv");
       const error = await DatabaseTasks.checkProtectedEnvironmentsBang(env).catch(
@@ -178,7 +178,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   });
 
   it.skipIf(skipUnlessFileSqlite)("passes when environments match", async () => {
-    const config = await seededConfig({ storedEnv: DatabaseConfigurations.defaultEnv });
+    const config = await seededConfig({ storedEnv: DatabaseTasks.env });
     await expect(checkCurrentProtectedEnvironmentBang(config)).resolves.toBeUndefined();
   });
 
@@ -203,7 +203,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   );
 
   it.skipIf(skipUnlessFileSqlite)("passes for an unprotected stored environment", async () => {
-    const current = DatabaseConfigurations.defaultEnv;
+    const current = DatabaseTasks.env;
     const config = await seededConfig({ storedEnv: current });
     const protectedEnvironments = Base.protectedEnvironments;
     Base.protectedEnvironments = ["production"];

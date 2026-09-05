@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, DatabaseConfigurations, MigrationContext } from "@blazetrails/activerecord";
+import { DatabaseTasks, MigrationContext } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = {
@@ -31,7 +31,7 @@ describe("DbVersionTest", () => {
   beforeEach(() => {
     out = [];
     err = [];
-    priorDefaultEnv = DatabaseConfigurations.defaultEnv;
+    priorDefaultEnv = DatabaseTasks.env;
     priorTrailsEnv = process.env["TRAILS_ENV"];
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
@@ -42,12 +42,12 @@ describe("DbVersionTest", () => {
       .mockImplementation(async (_config: unknown, fn: () => unknown) => fn());
     vi.spyOn(DatabaseTasks, "withTemporaryPool").mockImplementation(withTemporaryPoolFn);
     vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    DatabaseConfigurations.defaultEnv = priorDefaultEnv;
+    DatabaseTasks.env = priorDefaultEnv;
     if (priorTrailsEnv === undefined) delete process.env["TRAILS_ENV"];
     else process.env["TRAILS_ENV"] = priorTrailsEnv;
     DatabaseTasks.databaseConfiguration = null;
@@ -133,7 +133,7 @@ export default config;
   it("--env overrides TRAILS_ENV for the invocation", async () => {
     const dir = await makeFakeProject();
     delete process.env["TRAILS_ENV"];
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     await run(["db:version", "--env", "test"], dir);
     expect(process.env["TRAILS_ENV"]).toBe("test");
   });

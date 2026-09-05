@@ -2,10 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
+import { type RawConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { currentRole } from "../core.js";
 import { restoreWorkerConnection } from "../support/connection.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 describe("ConnectionHandlersMultiDbTest", () => {
   let handler: ConnectionHandler;
@@ -76,9 +77,9 @@ describe("ConnectionHandlersMultiDbTest", () => {
     opts: { defaultEnv?: string } = {},
   ): void {
     const prevConfigs = Base.configurations();
-    const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
+    const prevDefaultEnv = DatabaseTasks.env;
     if (opts.defaultEnv) {
-      DatabaseConfigurations.defaultEnv = opts.defaultEnv;
+      DatabaseTasks.env = opts.defaultEnv;
       vi.stubEnv("TRAILS_ENV", opts.defaultEnv);
     }
     Base.configurations(raw);
@@ -86,7 +87,7 @@ describe("ConnectionHandlersMultiDbTest", () => {
       fn();
     } finally {
       Base.configurations(prevConfigs);
-      DatabaseConfigurations.defaultEnv = prevDefaultEnv;
+      DatabaseTasks.env = prevDefaultEnv;
       if (opts.defaultEnv) vi.unstubAllEnvs();
       void Base.connectionHandler.clearAllConnectionsBang().catch(() => {});
     }

@@ -15,7 +15,7 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   DatabaseTasks.databaseConfiguration = configs;
   DatabaseTasks.root = cwd;
   Migrator.migrationsPaths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));
-  await establishEnvironmentConnection(DatabaseConfigurations.defaultEnv);
+  await establishEnvironmentConnection(DatabaseTasks.env);
   return configs;
 }
 

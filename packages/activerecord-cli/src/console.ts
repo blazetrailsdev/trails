@@ -1,4 +1,4 @@
-import { Base, DatabaseConfigurations } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { loadDatabaseConfig, tryLoadModels } from "./db-helpers.js";
 import { environmentDbConfig, establishEnvironmentConnection } from "./environment.js";
 
@@ -26,7 +26,7 @@ export async function arConsole(
     return 1;
   }
 
-  const env = DatabaseConfigurations.defaultEnv;
+  const env = DatabaseTasks.env;
   if (!environmentDbConfig(env)) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;

@@ -9,6 +9,7 @@ import { InternalMetadata } from "../internal-metadata.js";
 import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
 import { camelize, Logger } from "@blazetrails/activesupport";
 import { currentAdapter, inMemoryDb } from "../support/adapter-helper.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 const MIGRATION_MODULE = new URL("../migration.js", import.meta.url).pathname;
 
@@ -26,7 +27,7 @@ describe.skipIf(skip)("Migration", () => {
       path.join(tmpDir, `${databaseName}-migrations`);
 
     const baseConfig = (): RawConfigurations => ({
-      [DatabaseConfigurations.defaultEnv]: {
+      [DatabaseTasks.env]: {
         primary: {
           adapter: "sqlite3",
           database: databasePathFor("primary"),

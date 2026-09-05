@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../base.js";
 import { Migration } from "../migration.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import type { DatabaseTasks } from "../tasks/database-tasks.js";
 import type { ConnectionHandler } from "../connection-adapters/abstract/connection-handler.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import {
@@ -11,6 +10,7 @@ import {
   type MigrationArConfig,
 } from "./ar-config-source.js";
 import { currentAdapter } from "../support/adapter-helper.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendingBang", () => {
   let originalArConfig: MigrationArConfig;
@@ -23,7 +23,7 @@ describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendin
     upToDate = true;
     originalConfigurations = Base.configurations();
     Base.configurations({
-      [DatabaseConfigurations.defaultEnv]: {
+      [DatabaseTasks.env]: {
         primary: { adapter: "sqlite3", database: ":memory:" },
       },
     });

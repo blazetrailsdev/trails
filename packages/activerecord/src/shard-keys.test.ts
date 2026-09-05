@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
+import { DatabaseTasks } from "./tasks/database-tasks.js";
 
 describe("ShardsKeysTest", () => {
   class UnshardedBase extends Base {
@@ -21,8 +22,8 @@ describe("ShardsKeysTest", () => {
   beforeEach(() => {
     baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
     prevConfigs = Base.configurations();
-    prevDefaultEnv = DatabaseConfigurations.defaultEnv;
-    DatabaseConfigurations.defaultEnv = "default_env";
+    prevDefaultEnv = DatabaseTasks.env;
+    DatabaseTasks.env = "default_env";
     vi.stubEnv("TRAILS_ENV", "default_env");
     Base.configurations({
       default_env: {
@@ -54,7 +55,7 @@ describe("ShardsKeysTest", () => {
       });
     }
     Base.configurations(prevConfigs);
-    DatabaseConfigurations.defaultEnv = prevDefaultEnv;
+    DatabaseTasks.env = prevDefaultEnv;
     (Base as any)._shardKeys = undefined;
     vi.unstubAllEnvs();
   });

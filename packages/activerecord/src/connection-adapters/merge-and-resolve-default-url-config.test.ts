@@ -5,6 +5,7 @@ import {
   type RawConfigurations,
 } from "../database-configurations.js";
 import { ActiveRecord } from "../ar-config.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 const DEFAULT_ENV = "default_env";
 
@@ -25,9 +26,9 @@ beforeEach(() => {
     savedEnv[key] = process.env[key];
     delete process.env[key];
   }
-  savedDefaultEnv = DatabaseConfigurations.defaultEnv;
+  savedDefaultEnv = DatabaseTasks.env;
   savedProtocolMapping = { ...ActiveRecord.protocolAdapters };
-  DatabaseConfigurations.defaultEnv = DEFAULT_ENV;
+  DatabaseTasks.env = DEFAULT_ENV;
 });
 
 afterEach(() => {
@@ -35,7 +36,7 @@ afterEach(() => {
     if (savedEnv[key] !== undefined) process.env[key] = savedEnv[key];
     else delete process.env[key];
   }
-  DatabaseConfigurations.defaultEnv = savedDefaultEnv;
+  DatabaseTasks.env = savedDefaultEnv;
   ActiveRecord.protocolAdapters = savedProtocolMapping;
 });
 
@@ -79,7 +80,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
 
   it("resolver with database uri and current env symbol key and rails env", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
-    DatabaseConfigurations.defaultEnv = "foo";
+    DatabaseTasks.env = "foo";
     const config = { not_production: { adapter: "abstract", database: "not_foo" } };
     const actual = resolveDbConfig("foo", config);
     expect(actual.configurationHash).toEqual({
@@ -90,7 +91,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   });
 
   it("resolver with nil database url and current env", () => {
-    DatabaseConfigurations.defaultEnv = "foo";
+    DatabaseTasks.env = "foo";
     const config = { foo: { adapter: "postgresql", url: undefined } };
     const actual = resolveDbConfig("foo", config);
     expect(actual.configurationHash).toEqual({ adapter: "postgresql" });
@@ -98,7 +99,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
 
   it("resolver with database uri and current env symbol key and rack env", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
-    DatabaseConfigurations.defaultEnv = "foo";
+    DatabaseTasks.env = "foo";
     const config = { not_production: { adapter: "abstract", database: "not_foo" } };
     const actual = resolveDbConfig("foo", config);
     expect(actual.configurationHash).toEqual({
@@ -121,7 +122,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
 
   it("resolver with database uri and multiple envs", () => {
     process.env["DATABASE_URL"] = "postgres://localhost";
-    DatabaseConfigurations.defaultEnv = "test";
+    DatabaseTasks.env = "test";
     const config = {
       production: { adapter: "postgresql", database: "foo_prod" },
       test: { adapter: "postgresql", database: "foo_test" },
@@ -154,7 +155,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("resolver with database uri containing only database name", () => {
     process.env["DATABASE_URL"] = "foo";
     process.env["RAILS_ENV"] = "test";
-    DatabaseConfigurations.defaultEnv = "test";
+    DatabaseTasks.env = "test";
 
     const config = { test: { adapter: "postgres", database: "not_foo", host: "localhost" } };
     const actual = resolveDbConfig("test", config);
@@ -252,14 +253,14 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
 
   it("blank with database url with rails env", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
-    DatabaseConfigurations.defaultEnv = "not_production";
+    DatabaseTasks.env = "not_production";
     const actual = resolveConfig({}, "not_production");
     expect(actual).toEqual({ adapter: "postgresql", database: "foo", host: "localhost" });
   });
 
   it("blank with database url with rack env", () => {
     process.env["DATABASE_URL"] = "postgres://localhost/foo";
-    DatabaseConfigurations.defaultEnv = "not_production";
+    DatabaseTasks.env = "not_production";
     const actual = resolveConfig({}, "not_production");
     expect(actual).toEqual({ adapter: "postgresql", database: "foo", host: "localhost" });
   });
@@ -400,7 +401,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
 
   it("protocol adapter mapping is used", () => {
     process.env["DATABASE_URL"] = "mysql://localhost/exampledb";
-    DatabaseConfigurations.defaultEnv = "production";
+    DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "mysql2",
@@ -411,7 +412,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
 
   it("protocol adapter mapping falls through if non found", () => {
     process.env["DATABASE_URL"] = "unknown://localhost/exampledb";
-    DatabaseConfigurations.defaultEnv = "production";
+    DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "unknown",
@@ -423,7 +424,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("protocol adapter mapping is used and can be updated", () => {
     ActiveRecord.protocolAdapters.potato = "postgresql";
     process.env["DATABASE_URL"] = "potato://localhost/exampledb";
-    DatabaseConfigurations.defaultEnv = "production";
+    DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "postgresql",
@@ -435,7 +436,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("protocol adapter mapping translates underscores to dashes", () => {
     ActiveRecord.protocolAdapters.custom_protocol = "postgresql";
     process.env["DATABASE_URL"] = "custom-protocol://localhost/exampledb";
-    DatabaseConfigurations.defaultEnv = "production";
+    DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "postgresql",
@@ -447,7 +448,7 @@ describe("MergeAndResolveDefaultUrlConfigTest", () => {
   it("protocol adapter mapping handles sqlite3 file urls", () => {
     ActiveRecord.protocolAdapters.custom_protocol = "sqlite3";
     process.env["DATABASE_URL"] = "custom-protocol:/path/to/db.sqlite3";
-    DatabaseConfigurations.defaultEnv = "production";
+    DatabaseTasks.env = "production";
     const actual = resolveDbConfig("production", {});
     expect(actual.configurationHash).toEqual({
       adapter: "sqlite3",
