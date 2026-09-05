@@ -6,8 +6,6 @@ import {
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
 
-const now = (): number => globalThis.performance?.now() ?? Date.now();
-
 interface InstrumentationHost {
   actionName?: string;
   request: Request;
@@ -56,17 +54,6 @@ export async function processAction(
 
 export interface Notifier {
   instrument(event: string, payload: Record<string, unknown>, block?: () => unknown): void;
-}
-
-export function instrumentRender(
-  fn: () => unknown,
-  notifier?: Notifier,
-): { result: unknown; viewRuntime: number } {
-  const start = now();
-  const result = fn();
-  const viewRuntime = now() - start;
-  notifier?.instrument("render.action_controller", { duration: viewRuntime });
-  return { result, viewRuntime };
 }
 
 /** @internal */
