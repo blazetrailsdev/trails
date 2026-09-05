@@ -927,9 +927,13 @@ export class Time {
         ? utcOffset
         : Number(this.#plain.toZonedDateTime(utcOffset, disambiguation).offsetNanoseconds) /
           1_000_000_000;
-    this.#instant = this.#plain
-      .toZonedDateTime(this.#timeZoneId ?? of2str(this.#utcOffset), disambiguation)
-      .toInstant();
+    this.#instant =
+      this.#timeZoneId == null
+        ? this.#plain
+            .toZonedDateTime("UTC")
+            .toInstant()
+            .subtract({ nanoseconds: Math.round(this.#utcOffset * 1_000_000_000) })
+        : this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
   }
 
   get year(): number {
@@ -1012,6 +1016,10 @@ export class Time {
     const nanoseconds = this.#instant.epochNanoseconds;
     const seconds = nanoseconds / 1_000_000_000n - (nanoseconds % 1_000_000_000n < 0n ? 1n : 0n);
     return Number(seconds);
+  }
+
+  toF(): number {
+    return this.toR().toF();
   }
 
   toR(): Rational {

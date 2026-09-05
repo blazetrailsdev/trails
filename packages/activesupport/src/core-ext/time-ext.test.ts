@@ -1420,7 +1420,7 @@ describe("TimeExtMarshalingTest", () => {
   it("marshalling preserves fractional seconds", () => {
     const t = RubyTime.parse("00:00:00.500");
     const unmarshalled = marshalLoad(marshalDump(t));
-    expect(unmarshalled.toR().toF()).toBe(t.toR().toF());
+    expect(unmarshalled.toF()).toBe(t.toF());
     expect(unmarshalled.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
   });
 

@@ -1,5 +1,5 @@
-import { Temporal } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Temporal, Time } from "@blazetrails/date";
+import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import {
   TimeWithZone,
   inTimeZone as stringInTimeZone,
@@ -120,19 +120,15 @@ export function fastStringToTime(
   string: string,
 ): Temporal.Instant | null {
   if (!string.includes("-")) return null;
-  const normalized = string
-    .replace(" ", "T")
-    .replace(/(T\d{2}:\d{2}:\d{2}(?:\.\d+)?)([-+]\d{2})$/, "$1$2:00");
-  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return null;
-  const datetimeString = normalized.replace(/(\.\d{9})\d+/, "$1");
-  const hasOffset = /Z$|[+-]\d{2}:\d{2}$/.test(datetimeString);
+
   try {
-    if (hasOffset) return Temporal.Instant.from(datetimeString);
-    return Temporal.PlainDateTime.from(datetimeString, { overflow: "reject" })
-      .toZonedDateTime((this?.isUtc ?? isUtc()) ? "UTC" : Temporal.Now.timeZoneId())
-      .toInstant();
-  } catch {
-    return null;
+    const time = (this?.isUtc ?? isUtc()) ? Time.new(string, { in: "UTC" }) : Time.new(string);
+    return Temporal.Instant.fromEpochNanoseconds(
+      BigInt(time.toI()) * NANOS_PER_SECOND + BigInt(time.nsec),
+    );
+  } catch (error) {
+    if (error instanceof ArgumentError) return null;
+    throw error;
   }
 }
 
@@ -142,6 +138,7 @@ export const TimeValue = {
   typeCastForSchema,
   userInputInTimeZone,
   newTime,
+  /** @missingRailsCall new — CONVERGEABLE call-gate-credits-ruby-new-only-as-constructor */
   fastStringToTime,
 };
 

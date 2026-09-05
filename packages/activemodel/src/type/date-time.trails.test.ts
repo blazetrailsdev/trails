@@ -74,8 +74,8 @@ describe("DateTimeType date-only strings with a zone token", () => {
     expect(cast("2013-09-04 EAT")).toBe("2013-09-04T00:00:00Z");
   });
 
-  it("ignores a trailing numeric offset on a date-only string", () => {
-    expect(cast("2013-09-04-10")).toBe("2013-09-04T00:00:00Z");
+  it("applies a trailing numeric offset on a date-only string", () => {
+    expect(cast("2013-09-04-10")).toBe("2013-09-04T10:00:00Z");
   });
 
   it("still applies the offset when a time is present", () => {

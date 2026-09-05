@@ -102,11 +102,26 @@ describe("ACLogSubscriberTest", () => {
 
       caching.enableFragmentCacheLogging = true;
       subscriber.writeFragment(event);
-      subscriber["existFragment?"](event);
+      subscriber.isExistFragment(event);
       expect(logger.messages).toEqual([
         "Write fragment views/foo (10.2ms)",
         "Exist fragment? views/foo (10.2ms)",
       ]);
+    } finally {
+      caching.enableFragmentCacheLogging = previous;
+    }
+  });
+
+  it("dispatches exist_fragment?.action_controller onto the conventions spelling", () => {
+    const caching = Base as unknown as CachingClassMethods;
+    const previous = caching.enableFragmentCacheLogging;
+    const event = new NotificationEvent("exist_fragment?.action_controller", 0, 0.0102, "x", {
+      key: "views/foo",
+    });
+    try {
+      caching.enableFragmentCacheLogging = true;
+      subscriber.call(event);
+      expect(logger.messages).toEqual(["Exist fragment? views/foo (10.2ms)"]);
     } finally {
       caching.enableFragmentCacheLogging = previous;
     }

@@ -12,6 +12,23 @@ function camelCase(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 }
 
+const ALREADY_PREDICATE_RE = /^(has|supports|can|should|needs|includes|responds|allows|uses)/;
+
+function eventMethodCandidates(snakeMethod: string): string[] {
+  const camel = camelCase(snakeMethod);
+  if (!snakeMethod.endsWith("?")) return [camel, snakeMethod];
+  const base = snakeMethod.slice(0, -1);
+  const baseCamel = camelCase(base);
+  const isPrefixed = "is" + baseCamel.charAt(0).toUpperCase() + baseCamel.slice(1);
+  const query = baseCamel + "Q";
+  const named = base.startsWith("is_")
+    ? [baseCamel, query]
+    : ALREADY_PREDICATE_RE.test(base)
+      ? [baseCamel, isPrefixed, query]
+      : [isPrefixed, baseCamel, query];
+  return [...named, camel, snakeMethod];
+}
+
 interface ClassState {
   namespace?: string;
   subscriber?: Subscriber;
@@ -97,13 +114,10 @@ export class Subscriber {
     const dotIdx = event.name.indexOf(".");
     if (dotIdx === -1) return;
     const snakeMethod = event.name.slice(0, dotIdx);
-    const camelMethod = camelCase(snakeMethod);
     const method =
-      typeof (this as any)[camelMethod] === "function"
-        ? camelMethod
-        : typeof (this as any)[snakeMethod] === "function"
-          ? snakeMethod
-          : null;
+      eventMethodCandidates(snakeMethod).find(
+        (candidate) => typeof (this as any)[candidate] === "function",
+      ) ?? null;
     if (method) (this as any)[method](event);
   }
 
@@ -111,13 +125,10 @@ export class Subscriber {
     const dotIdx = event.name.indexOf(".");
     if (dotIdx === -1) return;
     const snakeMethod = event.name.slice(0, dotIdx);
-    const camelMethod = camelCase(snakeMethod);
     const method =
-      typeof (this as any)[camelMethod] === "function"
-        ? camelMethod
-        : typeof (this as any)[snakeMethod] === "function"
-          ? snakeMethod
-          : null;
+      eventMethodCandidates(snakeMethod).find(
+        (candidate) => typeof (this as any)[candidate] === "function",
+      ) ?? null;
     if (method) (this as any)[method](event);
   }
 
