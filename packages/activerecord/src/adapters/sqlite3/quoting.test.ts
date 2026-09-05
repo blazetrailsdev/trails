@@ -120,9 +120,12 @@ describeIfSqlite("SQLite3QuotingTest", () => {
   it("quote numeric infinity", () => {
     expect(conn.quote(Infinity)).toBe("'Infinity'");
     expect(conn.quote(-Infinity)).toBe("'-Infinity'");
+    expect(conn.quote(new BigDecimal(Infinity))).toBe("'Infinity'");
+    expect(conn.quote(new BigDecimal(-Infinity))).toBe("'-Infinity'");
   });
 
   it("quote float nan", () => {
     expect(conn.quote(NaN)).toBe("'NaN'");
+    expect(conn.quote(new BigDecimal(NaN))).toBe("'NaN'");
   });
 });

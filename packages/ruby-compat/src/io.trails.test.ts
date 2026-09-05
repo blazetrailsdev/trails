@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Encoding } from "./encoding.js";
 import { File } from "./file.js";
 import { IO, puts } from "./io.js";
 
@@ -85,5 +86,13 @@ describe("IO", () => {
     expect(file.read()).toBe("h\u00c3\u00a9llo");
     file.close();
     expect(File.binread(path)).toBe("h\u00c3\u00a9llo");
+  });
+
+  it("set_encoding('internal') leaves no external encoding while default_internal is unset", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "trails-io-")), "enc.txt");
+    const file = File.open(path, "w+");
+    expect(file.setEncoding("internal").externalEncoding()).toBeNull();
+    expect(file.setEncoding("external").externalEncoding()).toBe(Encoding.defaultExternal);
+    file.close();
   });
 });

@@ -70,10 +70,19 @@ export async function resolve(adapterName: string): Promise<AdapterClass> {
     .catch((err) => {
       resolved.delete(adapterName);
       const message = err instanceof Error ? err.message : String(err);
-      const loadError = new Error(
-        `Error loading the '${adapterName}' Active Record adapter. Missing a package it depends on? ${message}`,
-        { cause: err },
-      );
+      const errorPath = /^Cannot find (?:module|package) '([^']+)'/.exec(message)?.[1] ?? null;
+      const pathToAdapter =
+        /import[\w$]*\(\s*["']([^"']+)["']/.exec(loader.toString())?.[1] ?? null;
+      const loadError =
+        errorPath !== null && errorPath === pathToAdapter
+          ? new Error(
+              `Error loading the '${adapterName}' Active Record adapter. Ensure that the path registered by the adapter package is correct. ${message}`,
+              { cause: err },
+            )
+          : new Error(
+              `Error loading the '${adapterName}' Active Record adapter. Missing a package it depends on? ${message}`,
+              { cause: err },
+            );
       resolveErrors.set(adapterName, loadError);
       throw loadError;
     });

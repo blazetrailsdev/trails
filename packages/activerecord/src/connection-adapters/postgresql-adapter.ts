@@ -362,29 +362,25 @@ export class PostgreSQLAdapter
     config: string | (pg.PoolConfig & PostgreSQLAdapterOptions) | pg.Client,
     deprecatedConfig?: Record<string, unknown> | null,
   ) {
-    super();
-    if (PostgreSQLAdapter._isDeprecatedRawConnectionArg(config)) {
-      deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
-      this._acceptDeprecatedRawConnection(config, deprecatedConfig);
-      this._statements = this.buildStatementPool();
-      return;
-    }
-    if (deprecatedConfig != null) {
+    const deprecatedRawConnection = PostgreSQLAdapter._isDeprecatedRawConnectionArg(config);
+    if (!deprecatedRawConnection && deprecatedConfig != null) {
       throw new ArgumentError(
         "when initializing an Active Record adapter with a config hash, that should be the only argument",
       );
     }
-    if (typeof config === "object" && config !== null) {
-      this._config = { ...(config as Record<string, unknown>) };
+    super(
+      deprecatedRawConnection
+        ? { ...deprecatedConfig }
+        : typeof config === "object" && config !== null
+          ? { ...(config as Record<string, unknown>) }
+          : {},
+    );
+    if (deprecatedRawConnection) {
+      deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
+      this._acceptDeprecatedRawConnection(config);
+      this._statements = this.buildStatementPool();
+      return;
     }
-    this.preparedStatements =
-      !ActiveRecord.disablePreparedStatements &&
-      PostgreSQLAdapter.typeCastConfigToBoolean(
-        "preparedStatements" in this._config
-          ? this._config.preparedStatements
-          : this.defaultPreparedStatements(),
-      );
-    this._defaultTimezone = PostgreSQLAdapter.validateDefaultTimezone(this._config.defaultTimezone);
     if (typeof config === "string") {
       this._minMessages = "warning";
       this._pgClientOptions = {
@@ -422,11 +418,10 @@ export class PostgreSQLAdapter
       ...pgConfig
     } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
     if (statementLimit !== undefined) this._statementLimit = statementLimit;
-    if (advisoryLocks !== undefined) {
-      this._advisoryLocksEnabled =
-        PostgreSQLAdapter.typeCastConfigToBoolean(advisoryLocks) !== false;
+    if (insertReturning !== undefined) {
+      const cast = PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning);
+      this._useInsertReturning = cast != null && cast !== false;
     }
-    if (insertReturning !== undefined) this._useInsertReturning = insertReturning;
     if (minMessages !== undefined && typeof minMessages !== "string") {
       throw new TypeError(`minMessages must be a string, got ${typeof minMessages}`);
     }

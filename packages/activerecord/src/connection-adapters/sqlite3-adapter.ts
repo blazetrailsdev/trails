@@ -250,7 +250,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     filenameOrConfig: string | ":memory:" | SQLite3Config = ":memory:",
     options: SQLite3AdapterOptions = {},
   ) {
-    super();
     let filename: string;
     if (typeof filenameOrConfig === "object") {
       const { database, ...rest } = filenameOrConfig;
@@ -262,25 +261,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     } else {
       filename = filenameOrConfig;
     }
+    const strict = hasKey(options, "strict")
+      ? options.strict!
+      : SQLite3Adapter.strictStringsByDefault;
+    super({ ...options, strict });
     this._memoryDatabase = isInMemoryDatabase(filename);
     if (!this._memoryDatabase && !filename.startsWith("file:")) {
       filename = this.prepareDatabasePath(filename);
     }
-    this._config = { ...options };
     this._filename = filename;
     this._readonly = options.readonly ?? false;
-    this._strict = hasKey(options, "strict")
-      ? options.strict!
-      : SQLite3Adapter.strictStringsByDefault;
-    (this._config as SQLite3AdapterOptions).strict = this._strict;
-    this.preparedStatements =
-      !ActiveRecord.disablePreparedStatements &&
-      SQLite3Adapter.typeCastConfigToBoolean(
-        options.preparedStatements !== undefined
-          ? options.preparedStatements
-          : this.defaultPreparedStatements(),
-      );
-    this._defaultTimezone = SQLite3Adapter.validateDefaultTimezone(this._config.defaultTimezone);
+    this._strict = strict;
     if (options.statementLimit !== undefined) {
       this._statementLimit = options.statementLimit;
       this._statements = this.buildStatementPool();

@@ -95,6 +95,13 @@ describe("Time", () => {
     expect(new Time(2008, 3, 1, 6, 0, 0, 32430.5).utcOffset).toBe(32430.5);
   });
 
+  it("toTime keeps the instant a sub-minute offset names, as MRI's to_i does", () => {
+    const time = Time.new("2013-09-04 03:00:00 -00:44:30");
+    expect(time.utcOffset).toBe(-2670);
+    expect(time.toI()).toBe(1378266270);
+    expect(time.toTime().epochNanoseconds).toBe(1378266270000000000n);
+  });
+
   it("Time.new rejects an out-of-range offset", () => {
     expect(() => new Time(2008, 3, 1, 6, 0, 0, 86400)).toThrow(ArgumentError);
     expect(() => new Time(2008, 3, 1, 6, 0, 0, -86400)).toThrow(ArgumentError);
