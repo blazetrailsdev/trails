@@ -539,7 +539,91 @@ describe("body call capture", () => {
       "try",
       "ref:save",
       "ref:get",
+      "rescue",
       "ref:rollback",
+    ]);
+  });
+
+  it("emits one if per case clause of a switch, and none for the default", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        lock(kind: string) {
+          switch (kind) {
+            case "a": return this.a();
+            case "b": return this.b();
+            case "c": return this.c();
+            default: return this.z();
+          }
+        }
+      }`,
+    );
+    const lock = cls.instanceMethods.find((m) => m.name === "lock")!;
+    expect(lock.skeleton).toEqual(["if", "ref:a", "if", "ref:b", "if", "ref:c", "ref:z"]);
+  });
+
+  it("reads an if/else if chain port of the same case as the same arm count", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        lock(kind: string) {
+          if (kind === "a") return this.a();
+          else if (kind === "b") return this.b();
+          else if (kind === "c") return this.c();
+          return this.z();
+        }
+      }`,
+    );
+    const lock = cls.instanceMethods.find((m) => m.name === "lock")!;
+    expect(lock.skeleton!.filter((t) => t === "if")).toEqual(["if", "if", "if"]);
+  });
+
+  it("emits one rescue per instanceof arm of a catch, in place of its if", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        translateException(e: Error) {
+          try {
+            this.run();
+          } catch (error) {
+            if (error instanceof Busy) return this.busy();
+            else if (error instanceof Locked) return this.locked();
+            throw error;
+          }
+        }
+      }`,
+    );
+    const translate = cls.instanceMethods.find((m) => m.name === "translateException")!;
+    expect(translate.skeleton).toEqual([
+      "try",
+      "ref:run",
+      "rescue",
+      "ref:busy",
+      "rescue",
+      "ref:locked",
+      "throw",
+    ]);
+  });
+
+  it("emits exactly one rescue for a catch with no instanceof chain", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        run() {
+          try {
+            this.work();
+          } catch (error) {
+            if (this.strict) throw error;
+            this.log(error);
+          }
+        }
+      }`,
+    );
+    const run = cls.instanceMethods.find((m) => m.name === "run")!;
+    expect(run.skeleton).toEqual([
+      "try",
+      "ref:work",
+      "rescue",
+      "if",
+      "ref:strict",
+      "throw",
+      "ref:log",
     ]);
   });
 

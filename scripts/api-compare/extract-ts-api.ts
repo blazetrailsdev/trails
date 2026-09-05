@@ -4231,6 +4231,13 @@ function isSkeletonLogicalOp(kind: ts.SyntaxKind): boolean {
   }
 }
 
+function isInstanceOfTest(expression: ts.Expression): boolean {
+  return (
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword
+  );
+}
+
 /**
  * The body as an ordered CONTROL + call skeleton — the stream a call-SEQUENCE
  * comparison reads (RFC 0084). Neither `calls` nor `callSeq`
@@ -4239,6 +4246,16 @@ function isSkeletonLogicalOp(kind: ts.SyntaxKind): boolean {
  * Rails calls it twice is invisible to them. Names are raw, as `calls` records
  * them — the Ruby↔TS conventions live in compare.ts. Signal only; nothing gates
  * on it yet.
+ *
+ * Arms are counted per CLAUSE, matching extract-ruby-api.rb#walk_for_skeleton
+ * (RFC 0113). A SwitchStatement itself emits nothing and each of its
+ * CaseClauses emits one arm, so the `switch` port and the `if`/`else if` port
+ * of one Ruby `case` read as the same arm count its `when` clauses do; a
+ * DefaultClause emits nothing, as Ruby's `else` does. A CatchClause's typed
+ * arms are Ruby's `rescue` clauses, so each top-level `instanceof` arm tokens
+ * as `rescue` IN PLACE OF the `if` its lowering spells, before that arm's own
+ * reaches — where the Ruby `:rescue` clause node sits. A catch with no
+ * `instanceof` chain is a bare Ruby `rescue` and emits exactly one.
  */
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
@@ -4247,7 +4264,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     switch (n.kind) {
       case ts.SyntaxKind.IfStatement:
       case ts.SyntaxKind.ConditionalExpression:
-      case ts.SyntaxKind.SwitchStatement:
+      case ts.SyntaxKind.CaseClause:
         tokens.push("if");
         break;
       case ts.SyntaxKind.BinaryExpression: {
@@ -4270,6 +4287,9 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       case ts.SyntaxKind.TryStatement:
         tokens.push("try");
         break;
+      case ts.SyntaxKind.CatchClause:
+        visitCatchClause(n as ts.CatchClause);
+        return;
       case ts.SyntaxKind.ThrowStatement:
         tokens.push("throw");
         break;
@@ -4321,6 +4341,30 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       }
     }
     ts.forEachChild(n, visit);
+  };
+  const visitCatchClause = (clause: ts.CatchClause): void => {
+    const statements = clause.block.statements;
+    const chain = statements.find((s) => ts.isIfStatement(s) && isInstanceOfTest(s.expression));
+    if (chain === undefined) {
+      tokens.push("rescue");
+      statements.forEach(visit);
+      return;
+    }
+    for (const statement of statements) {
+      if (statement === chain) visitCatchArms(statement as ts.IfStatement);
+      else visit(statement);
+    }
+  };
+  const visitCatchArms = (arm: ts.IfStatement): void => {
+    tokens.push("rescue");
+    visit(arm.thenStatement);
+    const alternate = arm.elseStatement;
+    if (alternate === undefined) return;
+    if (ts.isIfStatement(alternate) && isInstanceOfTest(alternate.expression)) {
+      visitCatchArms(alternate);
+      return;
+    }
+    visit(alternate);
   };
   // The body ITSELF, not just its children: an expression-bodied arrow
   // (`= (x) => where(x)`) IS the call site, and Ruby's walk_for_skeleton covers it.

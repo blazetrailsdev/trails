@@ -5,6 +5,7 @@ import {
   compareArms,
   controlArms,
   renderReport,
+  spliceHelperSkeletons,
   renderSample,
   sampleRows,
   type ArmMismatch,
@@ -31,7 +32,77 @@ describe("controlArms", () => {
   });
 });
 
+describe("controlArms rescue", () => {
+  it("keeps a rescue clause arm alongside the try it hangs off", () => {
+    expect(controlArms(["try", "ref:save", "rescue", "rescue", "throw"])).toEqual([
+      "try",
+      "rescue",
+      "rescue",
+      "throw",
+    ]);
+  });
+});
+
+describe("spliceHelperSkeletons", () => {
+  it("replaces a same-file reach with that helper's own skeleton, in place", () => {
+    expect(
+      spliceHelperSkeletons(["ref:a", "ref:helper", "throw"], { helper: ["if", "ref:b"] }),
+    ).toEqual(["ref:a", "if", "ref:b", "throw"]);
+  });
+
+  it("leaves a reach that resolves to nothing alone, and splices every occurrence", () => {
+    expect(
+      spliceHelperSkeletons(["ref:helper", "ref:elsewhere", "ref:helper"], { helper: ["if"] }),
+    ).toEqual(["if", "ref:elsewhere", "if"]);
+  });
+
+  it("does not resolve the spliced skeleton's own reaches", () => {
+    expect(spliceHelperSkeletons(["ref:a"], { a: ["ref:b"], b: ["if"] })).toEqual(["ref:b"]);
+  });
+});
+
 describe("compareArms", () => {
+  it("reads an arm the port moved into a same-file helper as no mismatch", () => {
+    const delegating = {
+      ...row(["if", "ref:save"], ["ref:helper"]),
+      tsHelpers: { helper: ["if"] },
+    };
+
+    expect(compareArms(delegating)).toBeUndefined();
+    expect(compareArms(row(["if", "ref:save"], ["ref:helper"]))?.missing).toEqual(["if"]);
+  });
+
+  it("never lets a helper's own arms raise a flag the two bodies did not raise", () => {
+    const caller = {
+      ...row(["ref:helper"], ["ref:helper"]),
+      rubyHelpers: { helper: [] },
+      tsHelpers: { helper: ["if"] },
+    };
+
+    expect(compareArms(caller)).toBeUndefined();
+  });
+
+  it("reports the body's OWN arms when the splice does not discharge the flag", () => {
+    const caller = {
+      ...row(["if", "ref:helper"], ["ref:helper"]),
+      rubyHelpers: { helper: [] },
+      tsHelpers: { helper: ["throw"] },
+    };
+
+    expect(compareArms(caller)?.missing).toEqual(["if"]);
+    expect(compareArms(caller)?.invented).toEqual([]);
+  });
+
+  it("reads an arm Rails keeps in a same-file helper against the port's inline one", () => {
+    const delegating = {
+      ...row(["ref:helper"], ["if", "ref:save"]),
+      rubyHelpers: { helper: ["if"] },
+    };
+
+    expect(compareArms(delegating)).toBeUndefined();
+    expect(compareArms(row(["ref:helper"], ["if", "ref:save"]))?.invented).toEqual(["if"]);
+  });
+
   it("returns undefined when the two projections agree exactly", () => {
     expect(
       compareArms(row(["if", "ref:save", "throw"], ["ref:load", "if", "throw"])),

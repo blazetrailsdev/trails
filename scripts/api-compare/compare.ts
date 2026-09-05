@@ -1150,7 +1150,7 @@ interface CallResult {
  * construction, and a sequence needs its own merge rule; RFC 0113 decided it
  * (`report-arms.ts:ArmVerdict`, which carries why the two rejected options
  * were rejected): project each stream onto its CONTROL tokens — if / loop /
- * try / throw — take the multiset difference for a `count` verdict, and let
+ * try / rescue / throw — take the multiset difference for a `count` verdict, and let
  * the projection's order decide only when the multisets agree. Both unions
  * above stay out of this artifact deliberately: the rule reads the reaches only
  * to discard them, so carrying the body's own stream and nothing else remains
@@ -1167,6 +1167,43 @@ export interface CallSkeleton {
   tsName: string;
   ruby: string[];
   ts: string[];
+  /** The SAME-FILE methods this pair's own `ref:` reaches resolve to, folded
+   *  like the two streams above, one entry per reached name — the splice input
+   *  `report-arms.ts#spliceHelperSkeletons` reads (RFC 0113). Recorded here
+   *  rather than resolved in the report because the resolution is compare.ts'
+   *  own: exactly the per-(file, name) scoping `effectiveTsCalls` unions a call
+   *  set over, so the arms report forgives an extracted helper on the same
+   *  terms and no wider. Absent when nothing resolves. */
+  rubyHelpers?: Record<string, string[]>;
+  tsHelpers?: Record<string, string[]>;
+}
+
+/**
+ * The folded skeletons of the same-file methods `skeleton`'s `ref:` reaches
+ * resolve to, excluding the body's own name so a self-recursive call cannot
+ * splice a body into itself. One hop only: the entries are recorded as their
+ * authors wrote them, so a helper's own reaches stay reaches and the splice
+ * cannot walk a mutual-recursion cycle.
+ *
+ * Accumulated in a Map, because a reach is a method name and `ref:constructor`
+ * / `ref:toString` would read as already-present against a plain object's
+ * prototype; `report-arms.ts#spliceHelperSkeletons` reads the record back with
+ * the matching own-property test.
+ */
+export function sameFileHelperSkeletons(
+  ownName: string,
+  skeleton: readonly string[],
+  resolve: (name: string) => string[] | undefined,
+): Record<string, string[]> | undefined {
+  const helpers = new Map<string, string[]>();
+  for (const token of skeleton) {
+    if (!token.startsWith("ref:")) continue;
+    const name = token.slice("ref:".length);
+    if (name === ownName || helpers.has(name)) continue;
+    const resolved = resolve(name);
+    if (resolved !== undefined) helpers.set(name, foldSkeletonTokens(resolved));
+  }
+  return helpers.size === 0 ? undefined : Object.fromEntries(helpers);
 }
 
 /** A flag a `@missingRailsCall` tag suppressed. Reported in the artifact
@@ -4015,6 +4052,10 @@ export function main() {
         const rubySkeleton = rubySkeletonByName.get(rubyName);
         const tsSkeletons = tsSkeletonByFileName.get(tsFile)?.get(tsName);
         if (rubySkeleton !== undefined && tsSkeletons?.length === 1) {
+          const tsSkeletonOf = (name: string) => {
+            const sets = tsSkeletonByFileName.get(tsFile)?.get(name);
+            return sets?.length === 1 ? sets[0] : undefined;
+          };
           callSkeletons.push({
             rubyFile,
             rubyName,
@@ -4022,6 +4063,10 @@ export function main() {
             tsName,
             ruby: foldSkeletonTokens(rubySkeleton),
             ts: foldSkeletonTokens(tsSkeletons[0]),
+            rubyHelpers: sameFileHelperSkeletons(rubyName, rubySkeleton, (n) =>
+              rubySkeletonByName.get(n),
+            ),
+            tsHelpers: sameFileHelperSkeletons(tsName, tsSkeletons[0], tsSkeletonOf),
           });
         }
         const seqSets = tsCallSeqByFileName.get(tsFile)?.get(tsName);
@@ -5076,7 +5121,7 @@ export function main() {
       JSON.stringify(
         {
           generatedAt: new Date().toISOString(),
-          note: "Advisory, ungated. Ordered control + call skeleton per name-matched pair, both sides uncollapsed: if/loop/try/throw, new:Ctor, ref:<name>, in source order with duplicates. Ruby block iteration folds onto loop.",
+          note: "Advisory, ungated. Ordered control + call skeleton per name-matched pair, both sides uncollapsed: if/loop/try/rescue/throw, new:Ctor, ref:<name>, in source order with duplicates. Ruby block iteration folds onto loop. rubyHelpers/tsHelpers carry the same-file skeletons the report splices at each reach.",
           packages: [...new Set(results.map((r) => r.package))].sort(),
           skeletons: skeletonsFlat,
         },

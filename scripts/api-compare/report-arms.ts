@@ -36,10 +36,20 @@ export interface SkeletonArtifact {
 
 /**
  * The skeleton stream's CONTROL tokens — the arms. Both extractors emit exactly
- * these four (`extract-ruby-api.rb:2382-2429`, `extract-ts-api.ts:3064-3091`);
- * everything else in a stream is a `ref:<name>` / `new:<Ctor>` reach.
+ * these five (`extract-ruby-api.rb#walk_for_skeleton`,
+ * `extract-ts-api.ts#extractSkeleton`); everything else in a stream is a
+ * `ref:<name>` / `new:<Ctor>` reach. `rescue` is the per-CLAUSE arm of a
+ * `begin`/`rescue` chain, sitting after the `try` its `:bodystmt` emits, so a
+ * two-clause Ruby `rescue` reads against the two `instanceof` arms of its TS
+ * `catch` rather than against one opaque `try` apiece.
  */
-export const CONTROL_TOKENS: ReadonlySet<string> = new Set(["if", "loop", "try", "throw"]);
+export const CONTROL_TOKENS: ReadonlySet<string> = new Set([
+  "if",
+  "loop",
+  "try",
+  "rescue",
+  "throw",
+]);
 
 /**
  * THE MERGE RULE (RFC 0113 open question 3, decided here): project each stream
@@ -57,9 +67,11 @@ export const CONTROL_TOKENS: ReadonlySet<string> = new Set(["if", "loop", "try",
  *   them re-reports that debt here and buries the arm signal under it. Worse,
  *   they arrive here with none of the forgiveness the call gate applies to
  *   them: `effectiveTsCalls`' same-file-helper and delegate unions are set
- *   operations that a sequence cannot take, so a faithful port that merely
+ *   operations that a sequence cannot take WHOLE, so a faithful port that merely
  *   extracts a helper — the single most common false positive the call gate was
- *   built to absorb — would flag on every one of its moved reaches.
+ *   built to absorb — would flag on every one of its moved reaches. The
+ *   same-file half of that forgiveness IS taken here, at the reach rather than
+ *   over the stream: see {@link spliceHelperSkeletons}.
  * - **Multiset equality over the whole stream plus a `reordered` verdict** (the
  *   retired prism-codegen scorer's `matched` / `reordered` split, and
  *   `catalog.ts:skeletonDiff`'s two-directional difference). The verdict split
@@ -93,6 +105,42 @@ export function controlArms(skeleton: readonly string[]): string[] {
   return skeleton.filter((token) => CONTROL_TOKENS.has(token));
 }
 
+/**
+ * `skeleton` with every `ref:<helper>` reach that resolves to a SAME-FILE
+ * method replaced, in place, by that method's own skeleton — the sequence
+ * analogue of the union `effectiveTsCalls` (`compare.ts`) already takes over
+ * call SETS, and taken on the same terms: only a same-file reach splices, so a
+ * cross-file delegation still cannot credit an arm, and the resolution itself
+ * was done by compare.ts (`sameFileHelperSkeletons`), which owns the
+ * per-(file, name) scoping.
+ *
+ * `ArmVerdict`'s rejected option 1 rejected a union over the WHOLE stream
+ * because a set operation cannot be taken over a sequence. It can be taken at
+ * the reach: the splice is positional, so the `order` verdict survives it. Once
+ * per reach and one hop deep — the spliced skeletons carry their own reaches
+ * unresolved, so mutual recursion terminates by construction.
+ *
+ * Resolved as an OWN property: a reach is a method name, so `ref:constructor`
+ * and `ref:toString` would otherwise resolve against Object.prototype.
+ */
+export function spliceHelperSkeletons(
+  skeleton: readonly string[],
+  sameFileSkeletons: Readonly<Record<string, readonly string[]>> | undefined,
+): string[] {
+  if (sameFileSkeletons === undefined) return [...skeleton];
+  const out: string[] = [];
+  for (const token of skeleton) {
+    const name = token.startsWith("ref:") ? token.slice("ref:".length) : undefined;
+    const helper =
+      name !== undefined && Object.hasOwn(sameFileSkeletons, name)
+        ? sameFileSkeletons[name]
+        : undefined;
+    if (helper === undefined) out.push(token);
+    else out.push(...helper);
+  }
+  return out;
+}
+
 /** The multiset difference `a - b`, in `a`'s own order. */
 function multisetDifference(a: readonly string[], b: readonly string[]): string[] {
   const remaining = new Map<string, number>();
@@ -106,10 +154,13 @@ function multisetDifference(a: readonly string[], b: readonly string[]): string[
   return out;
 }
 
-/** The verdict for one pair, or undefined when its arms agree exactly. */
-export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
-  const rubyArms = controlArms(row.ruby);
-  const tsArms = controlArms(row.ts);
+function armVerdict(
+  row: SkeletonRow,
+  ruby: readonly string[],
+  ts: readonly string[],
+): ArmMismatch | undefined {
+  const rubyArms = controlArms(ruby);
+  const tsArms = controlArms(ts);
   const missing = multisetDifference(rubyArms, tsArms);
   const invented = multisetDifference(tsArms, rubyArms);
   if (missing.length > 0 || invented.length > 0) {
@@ -117,6 +168,31 @@ export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
   }
   if (rubyArms.join(" ") === tsArms.join(" ")) return undefined;
   return { ...row, kind: "order", rubyArms, tsArms, missing: [], invented: [] };
+}
+
+/**
+ * The verdict for one pair, or undefined when its arms agree exactly.
+ *
+ * Taken TWICE: once over the two bodies' own streams, and — only if that
+ * flagged — again over the streams with their same-file helpers spliced in
+ * ({@link spliceHelperSkeletons}). The splice can only DISCHARGE a flag, never
+ * raise one, which is the contract `effectiveTsCalls`' union carries by being a
+ * set union: unioning a helper's calls in can satisfy a Rails call the body
+ * omitted but can never invent one. A sequence splice has no such guarantee —
+ * it charges the helper's own arms to every caller, so one divergent helper
+ * would report once on its own row and again on each of its callers — so the
+ * one-directional reading is imposed here instead. The verdict reported is the
+ * body's OWN, for the same reason: the helper's divergence is the helper row's.
+ */
+export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
+  const plain = armVerdict(row, row.ruby, row.ts);
+  if (plain === undefined) return undefined;
+  const spliced = armVerdict(
+    row,
+    spliceHelperSkeletons(row.ruby, row.rubyHelpers),
+    spliceHelperSkeletons(row.ts, row.tsHelpers),
+  );
+  return spliced === undefined ? undefined : plain;
 }
 
 /** The RFC 0113 cluster a `count` row belongs to; an `order` row is `arm-order`. */

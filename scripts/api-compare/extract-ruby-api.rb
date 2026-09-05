@@ -2705,13 +2705,13 @@ class ApiExtractor
     sites
   end
 
-  SKELETON_IF_NODES = %i[if elsif unless if_mod unless_mod ifop case].freeze
+  SKELETON_IF_NODES = %i[if elsif unless if_mod unless_mod ifop when in].freeze
   SKELETON_LOOP_NODES = %i[while until while_mod until_mod for].freeze
   SKELETON_LOGICAL_OPS = [:"||", :"&&", :and, :or].freeze
 
   # The body's ordered control + call skeleton — `if` / `loop` / `try` /
-  # `throw`, `new:Const` and `ref:<name>` reaches, in source order and WITH
-  # duplicates. The TS counterpart is extract-ts-api.ts#extractSkeleton and the
+  # `rescue` / `throw`, `new:Const` and `ref:<name>` reaches, in source order
+  # and WITH duplicates. The TS counterpart is extract-ts-api.ts#extractSkeleton and the
   # vocabulary is deliberately identical; `calls` cannot stand in for it,
   # because `calls.uniq` drops both the repeats and the control flow.
   #
@@ -2721,8 +2721,17 @@ class ApiExtractor
   # protected calls where the TS TryStatement puts it before them. And `raise`
   # tokens as `throw` rather than `ref:raise`, to line up with the port's
   # `throw new X(...)` — a ThrowStatement on the TS side, never a call. And a
-  # modifier `rescue` tokens as `try`, which Ripper hangs off `:rescue_mod`
-  # rather than a `:bodystmt` (RFC 0113).
+  # modifier `rescue` tokens as `try` + `rescue`, which Ripper hangs off
+  # `:rescue_mod` rather than a `:bodystmt` (RFC 0113).
+  #
+  # Arms are counted per CLAUSE, not per statement (RFC 0113): a `case` itself
+  # emits nothing and each of its `:when` (or `:in`) clauses emits one `if`, so
+  # a six-arm `case` reads as six arms against the six `case` clauses of its
+  # `switch` port or the six arms of its `if`/`elsif` chain port; and each
+  # `:rescue` clause of a `:bodystmt` emits one `rescue` after that
+  # `:bodystmt`'s `try`, against the TS `catch`'s `instanceof` arms. Ripper
+  # chains both clause kinds through the clause's own last slot, so the
+  # ordinary child descent already visits every one of them exactly once.
   def collect_method_skeleton(body_node)
     tokens = []
     with_capture_locals { walk_for_skeleton(body_node, tokens) }
@@ -2739,8 +2748,19 @@ class ApiExtractor
       tokens << "loop"
     elsif kind == :bodystmt && (node[2] || node[4])
       tokens << "try"
+    elsif kind == :rescue
+      tokens << "rescue"
     elsif kind == :rescue_mod
+      # Protected expression BEFORE the `rescue` token, as the `:bodystmt` path
+      # gets for free by hanging its `:rescue` clause off a later slot — and as
+      # the TS `try { … } catch { … }` port emits, its CatchClause coming after
+      # the try block. Ripper hands `:rescue_mod` both halves as slots 1 and 2,
+      # so the ordering has to be spelled out here.
       tokens << "try"
+      walk_for_skeleton(node[1], tokens)
+      tokens << "rescue"
+      walk_for_skeleton(node[2], tokens)
+      return
     elsif kind == :binary && SKELETON_LOGICAL_OPS.include?(node[2])
       walk_for_skeleton(node[1], tokens)
       tokens << "if"
