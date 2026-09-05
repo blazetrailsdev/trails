@@ -194,8 +194,7 @@ export class Session {
   authorize = this.basicAuthorize;
 
   /** @internal */
-  // eslint-disable-next-line unused-imports/no-unused-vars -- `def close_body(body); end` (`vendor/rack-test/lib/rack/test.rb:266`) names the argument and does nothing with it.
-  private closeBody(body: unknown): void {}
+  private closeBody(body: unknown): void {} // eslint-disable-line unused-imports/no-unused-vars -- `def close_body(body); end` (`vendor/rack-test/lib/rack/test.rb:266`) names the argument and does nothing with it.
 
   /** @internal */
   private parseUri(path: string, env: RackEnv): Generic {
