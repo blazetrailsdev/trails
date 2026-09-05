@@ -293,14 +293,22 @@ function parseRational(value: RationalLike, ndigits: number): Parsed | null {
   if (intPartDigits > 0n) {
     fracNeeded = Math.max(ndigits - intPartDigits.toString().length, 0) + 2;
   } else {
-    let leadingZeros = 0;
-    for (let x = n * 10n; x < d; x *= 10n) leadingZeros++;
-    fracNeeded = leadingZeros + ndigits + 2;
+    fracNeeded = leadingZeroCount(n, d) + ndigits + 2;
   }
-  const scaled = ((n * 10n ** BigInt(fracNeeded)) / d).toString().padStart(fracNeeded + 1, "0");
-  return parse(
-    `${sign}${scaled.slice(0, scaled.length - fracNeeded)}.${scaled.slice(scaled.length - fracNeeded)}`,
-  );
+  const scaled = ((n * 10n ** BigInt(fracNeeded)) / d).toString();
+  const digits = scaled === "0" ? "" : scaled.replace(/0+$/, "");
+  if (digits === "") return { sign: "", digits: "", exp: 0, nonFinite: null };
+  return { sign, digits, exp: scaled.length - fracNeeded, nonFinite: null };
+}
+
+function leadingZeroCount(n: bigint, d: bigint): number {
+  const sn = n.toString();
+  const sd = d.toString();
+  const zeros = sd.length - sn.length - 1;
+  if (zeros < 0) return 0;
+  const head = sd.slice(0, sn.length);
+  const covers = sn > head || (sn === head && !/[1-9]/.test(sd.slice(sn.length)));
+  return covers ? zeros : zeros + 1;
 }
 
 function parse(value: string | number | bigint): Parsed | null {

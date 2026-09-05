@@ -67,6 +67,13 @@ describe("BigDecimalTrails", () => {
     expect(new BigDecimal("1e-10000000").exponent()).toBe(-9999999);
   });
 
+  it("carries a Rational's exponent without expanding the digits", () => {
+    const tiny = new BigDecimal({ numerator: 1n, denominator: 10n ** 10000n }, 10);
+
+    expect(tiny.exponent()).toBe(-9999);
+    expect(tiny.toString("E")).toBe("0.1e-9999");
+  });
+
   it("mult propagates the non-finite forms", () => {
     expect(BigDecimal.INFINITY.mult(new BigDecimal("2")).toString("F")).toBe("Infinity");
     expect(BigDecimal.INFINITY.mult(new BigDecimal("-2")).toString("F")).toBe("-Infinity");
