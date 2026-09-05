@@ -1,7 +1,7 @@
 import { ValueType, ArgumentError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
-import { singularize } from "@blazetrails/activesupport";
-import { OpenSSL } from "@blazetrails/ruby-compat";
+import { compactBlank, first, singularize, wrap } from "@blazetrails/activesupport";
+import { OpenSSL, valuesAt } from "@blazetrails/ruby-compat";
 import { rubyInspectHash } from "../../relation/ruby-inspect.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
@@ -576,28 +576,24 @@ export class SchemaStatements extends AbstractSchemaStatements {
       "SCHEMA",
     );
     const map = new Map(rows.map((r) => [Number(r[0]), r[1] as string]));
-    return safeNums.map((n) => map.get(n)).filter((name): name is string => name != null);
+    return valuesAt(map, ...safeNums).filter((name): name is string => name != null);
   }
 
   override columnsForDistinct(
     columns: string | string[],
     orders?: (string | Nodes.Node)[],
   ): string {
-    const base = Array.isArray(columns) ? columns.join(", ") : columns;
     const visitor = this.visitor;
-    const orderColumns = (orders ?? [])
-      .map((o) => (typeof o === "string" ? o : visitor.compile(o)))
-      .filter((o) => o.trim().length > 0)
-      .map((o) =>
-        o
-          .replace(/\s+(?:ASC|DESC)\b/gi, "")
-          .replace(/\s+NULLS\s+(?:FIRST|LAST)\b/gi, "")
-          .trim(),
-      )
-      .filter((col) => col.length > 0)
-      .map((col, i) => `${col} AS alias_${i}`);
-    if (orderColumns.length === 0) return base;
-    return [...orderColumns, base].join(", ");
+    const orderColumns = compactBlank(
+      compactBlank(orders ?? []).map((s) => {
+        s = typeof s === "string" ? s : visitor.compile(s);
+        return s.replace(/\s+(?:ASC|DESC)\b/gi, "").replace(/\s+NULLS\s+(?:FIRST|LAST)\b/gi, "");
+      }),
+    ).map((column, i) => `${column} AS alias_${i}`);
+
+    return [...orderColumns, super.columnsForDistinct(columns, orders as string[])]
+      .flat(Infinity)
+      .join(", ");
   }
 
   override typeToSql(
@@ -1011,7 +1007,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (options.name) return options.name as string;
     const expression = (options.expression as string | undefined) ?? "";
     const identifier = `${tableName}_${expression}_excl`;
-    const hashed = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
+    const hashed = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
     return `excl_rails_${hashed}`;
   }
 
@@ -1127,15 +1123,9 @@ export class SchemaStatements extends AbstractSchemaStatements {
   /** @internal */
   uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
     if (options.name) return options.name as string;
-    const columnOrIndex = Array.isArray(options.column)
-      ? (options.column as string[])
-      : options.column
-        ? [options.column as string]
-        : options.usingIndex
-          ? [options.usingIndex as string]
-          : [];
+    const columnOrIndex = wrap(options.column ?? options.usingIndex).map(String);
     const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
-    const hashed = OpenSSL.Digest.SHA256.hexdigest(identifier).slice(0, 10);
+    const hashed = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
     return `uniq_rails_${hashed}`;
   }
 

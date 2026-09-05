@@ -609,3 +609,33 @@ describe("finder not-found message fidelity", () => {
     }
   });
 });
+
+describe("raise_record_not_found_exception! — composite key id rendering", () => {
+  const orderModelStub = { name: "Order", primaryKey: ["shop_id", "id"] };
+
+  it("renders composite ids the way Ruby's Array#join does — flattened", () => {
+    const rel: any = {
+      _model: orderModelStub,
+      model: orderModelStub,
+      primaryKey: orderModelStub.primaryKey,
+      raiseRecordNotFoundExceptionBang,
+      whereClause: { isEmpty: () => true },
+    };
+    try {
+      rel.raiseRecordNotFoundExceptionBang(
+        [
+          [1, 2],
+          [3, 4],
+        ],
+        0,
+        2,
+      );
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err.message).toBe(
+        "Couldn't find all Orders with 'shop_id,id': (1, 2, 3, 4) (found 0 results, but was looking for 2).",
+      );
+    }
+  });
+});
