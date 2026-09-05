@@ -1,7 +1,7 @@
 import { ParameterFilter, TimeWithZone, toFs } from "@blazetrails/activesupport";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 /** @internal */
 export class InspectionMask {
@@ -72,7 +72,7 @@ export function formatForInspect(this: any, name: string, value: unknown): strin
       inspectedValue = inspect(`${value.substring(0, 50)}...`);
     } else if (value instanceof Temporal.PlainDate) {
       inspectedValue = `"${dateToFs(value, "inspect")}"`;
-    } else if (value instanceof Temporal.Instant) {
+    } else if (value instanceof Temporal.Instant || value instanceof RubyTime) {
       inspectedValue = `"${toFs(value, "inspect")}"`;
     } else if (value instanceof TimeWithZone) {
       inspectedValue = `"${value.toFs("inspect")}"`;

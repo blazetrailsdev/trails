@@ -1,11 +1,13 @@
 import { quotingHost } from "../../support/quoting-host.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Rational } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
-import { SQLite3Adapter, SQLite3DateTime } from "../sqlite3-adapter.js";
+import { SQLite3Adapter } from "../sqlite3-adapter.js";
+import { DateTime as ARDateTimeType } from "../../type/date-time.js";
 import { TypeMap } from "../../type/type-map.js";
 import { lookupCastType, quotedDate } from "../abstract/quoting.js";
 import { Date as DateType } from "../../type/date.js";
@@ -369,9 +371,11 @@ describe("SQLite3::Quoting", () => {
       );
       const rows = await adapter.execute(`SELECT "ts" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].ts as string;
-      const cast = new SQLite3DateTime().cast(raw);
-      expect(cast).toBeInstanceOf(Temporal.Instant);
-      expect((cast as Temporal.Instant).epochNanoseconds).toBe(instant.epochNanoseconds);
+      const cast = new ARDateTimeType().cast(raw);
+      expect(cast).toBeInstanceOf(RubyTime);
+      expect(
+        (cast as RubyTime).toR().cmp(new Rational(instant.epochNanoseconds, 1_000_000_000n)),
+      ).toBe(0);
     });
 
     it("Temporal.PlainDateTime with microseconds survives INSERT → SELECT as Instant", async () => {
@@ -379,11 +383,9 @@ describe("SQLite3::Quoting", () => {
       await adapter.executeMutation(`INSERT INTO "quoting_events" ("dt") VALUES (${quote(dt)})`);
       const rows = await adapter.execute(`SELECT "dt" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].dt as string;
-      const cast = new SQLite3DateTime().cast(raw) as Temporal.Instant;
-      expect(cast).toBeInstanceOf(Temporal.Instant);
-      const zdt = cast.toZonedDateTimeISO("UTC");
-      expect(zdt.microsecond).toBe(654321 % 1000);
-      expect(zdt.millisecond).toBe(Math.floor(654321 / 1000));
+      const cast = new ARDateTimeType().cast(raw) as RubyTime;
+      expect(cast).toBeInstanceOf(RubyTime);
+      expect(cast.usec).toBe(654321);
     });
 
     it("Temporal.PlainDate survives INSERT → SELECT", async () => {
@@ -404,8 +406,8 @@ describe("SQLite3::Quoting", () => {
       await adapter.executeMutation(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
       const rows = await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`);
       const raw = rows[0].t as string;
-      const cast = new TimeType().cast(raw) as Temporal.Instant;
-      expect(cast.toString()).toBe("2000-01-01T14:23:55.654321Z");
+      const cast = new TimeType().cast(raw) as RubyTime;
+      expect(cast.getutc().xmlschema(6)).toBe("2000-01-01T14:23:55.654321Z");
     });
   });
 });

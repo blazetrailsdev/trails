@@ -247,15 +247,23 @@ async function main(): Promise<void> {
           // rules. This keeps `? count = binds.length` and matches
           // adapter-specific rendering.
           //
-          // trails' Time analogue is Temporal, not JS Date (the adapter's
-          // `quote` rejects a Date outright), so the datetime probe is
-          // `epochMilliseconds` — carried by Temporal.Instant and
-          // Temporal.ZonedDateTime alike.
+          // trails' Time analogue is a Ruby ::Time or a Temporal value, not a JS
+          // Date (the adapter's `quote` rejects a Date outright), so the datetime
+          // probe is `to_f` — carried by Time and TimeWithZone — or
+          // `epochMilliseconds`, carried by Temporal.Instant and ZonedDateTime.
           const epochMsOf = (v: unknown): number | null => {
             if (v instanceof Date) return v.getTime();
             if (v != null && typeof v === "object" && "epochMilliseconds" in v) {
               const ms = (v as { epochMilliseconds: unknown }).epochMilliseconds;
               if (typeof ms === "number") return ms;
+            }
+            if (
+              v != null &&
+              typeof v === "object" &&
+              typeof (v as { toF?: unknown }).toF === "function"
+            ) {
+              const secs = (v as { toF: () => unknown }).toF();
+              if (typeof secs === "number") return secs * 1000;
             }
             return null;
           };

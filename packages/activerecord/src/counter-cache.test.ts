@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel, registerSubclass } from "./index.js";
 import { association } from "./associations.js";
@@ -78,6 +78,7 @@ for (const klass of [SpecialTopic, SpecialReply]) {
 }
 
 function epochMs(v: unknown): number {
+  if (v instanceof RubyTime) return v.toF() * 1000;
   if (v instanceof Temporal.Instant) return v.epochMilliseconds;
   if (v instanceof Temporal.PlainDateTime) {
     return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
@@ -631,7 +632,7 @@ describe("CounterCacheTest", () => {
     await assertTouching(topic, ["updated_at"], async () => {
       await Topic.updateCounters(topic.id, { replies_count: 1, unique_replies_count: 1 });
       await Topic.resetCounters(topic.id, "replies", "uniqueReplies", {
-        touch: { time: Temporal.Now.instant() },
+        touch: { time: RubyTime.now() },
       });
     });
   });

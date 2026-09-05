@@ -1,5 +1,6 @@
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
+import { Rational } from "@blazetrails/ruby-compat";
 import { CachedDeveloper, Developer } from "./test-helpers/models/developer.js";
 import { Client, Firm } from "./test-helpers/models/company.js";
 import { Owner } from "./test-helpers/models/owner.js";
@@ -13,8 +14,8 @@ registerModel(Owner);
 registerModel(Pet);
 
 function toFs(ts: unknown, fmt: "usec" | "number"): string {
-  if (!(ts instanceof Temporal.Instant)) throw new Error("expected an Instant");
-  const dt = ts.toZonedDateTimeISO("UTC");
+  if (!(ts instanceof RubyTime)) throw new Error("expected a Time");
+  const dt = ts.getutc().toTime();
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const day = dt.day.toString().padStart(2, "0");
@@ -179,11 +180,11 @@ describe("IntegrationTest", () => {
     const owner = owners("blackbeard");
     const pet = pets("parrot");
 
-    const now = Temporal.Now.instant();
+    const now = RubyTime.now();
     await owner.updateColumn("updated_at", now);
     const key = owner.cacheKey();
 
-    expect(await pet.touch({ time: now.add({ seconds: 1 }) })).toBeTruthy();
+    expect(await pet.touch({ time: now.plus(1) })).toBeTruthy();
     await owner.reload();
     expect(owner.cacheKey()).not.toBe(key);
   });
@@ -204,14 +205,14 @@ describe("IntegrationTest", () => {
 
   it("cache key for newer updated at", async () => {
     const dev = await Developer.first();
-    const updatedAt = (dev!.readAttribute("updated_at") as Temporal.Instant).add({ seconds: 3600 });
+    const updatedAt = (dev!.readAttribute("updated_at") as RubyTime).plus(3600);
     dev!.writeAttribute("updated_at", updatedAt);
     expect(dev!.cacheKey()).toBe(`developers/${dev!.id}-${toFs(updatedAt, "usec")}`);
   });
 
   it("cache key for newer updated on", async () => {
     const dev = await Developer.first();
-    const updatedOn = (dev!.readAttribute("updated_on") as Temporal.Instant).add({ seconds: 3600 });
+    const updatedOn = (dev!.readAttribute("updated_on") as RubyTime).plus(3600);
     dev!.writeAttribute("updated_on", updatedOn);
     expect(dev!.cacheKey()).toBe(`developers/${dev!.id}-${toFs(updatedOn, "usec")}`);
   });
@@ -220,7 +221,7 @@ describe("IntegrationTest", () => {
     const dev = await Developer.first();
     const key = dev!.cacheKey();
     await dev!.touch({
-      time: (dev!.readAttribute("updated_at") as Temporal.Instant).add({ microseconds: 1 }),
+      time: (dev!.readAttribute("updated_at") as RubyTime).plus(new Rational(1, 1_000_000)),
     });
     expect(dev!.cacheKey()).not.toBe(key);
   });
@@ -238,7 +239,7 @@ describe("IntegrationTest", () => {
       const dev = await Developer.first();
       const version = dev!.cacheVersion();
       await dev!.touch({
-        time: (dev!.readAttribute("updated_at") as Temporal.Instant).add({ microseconds: 1 }),
+        time: (dev!.readAttribute("updated_at") as RubyTime).plus(new Rational(1, 1_000_000)),
       });
       expect(dev!.cacheVersion()).not.toBe(version);
     });
@@ -269,7 +270,7 @@ describe("IntegrationTest", () => {
       const developer = await Developer.first();
       const firstVersion = developer!.cacheVersion();
       await developer!.touch({
-        time: (developer!.readAttribute("updated_at") as Temporal.Instant).add({ seconds: 10 }),
+        time: (developer!.readAttribute("updated_at") as RubyTime).plus(10),
       });
       const secondVersion = developer!.cacheVersion();
       expect(secondVersion).not.toBe(firstVersion);
@@ -281,7 +282,7 @@ describe("IntegrationTest", () => {
       const developer = await Developer.first();
       const firstKey = developer!.cacheKeyWithVersion();
       await developer!.touch({
-        time: (developer!.readAttribute("updated_at") as Temporal.Instant).add({ seconds: 10 }),
+        time: (developer!.readAttribute("updated_at") as RubyTime).plus(10),
       });
       const secondKey = developer!.cacheKeyWithVersion();
       expect(secondKey).not.toBe(firstKey);

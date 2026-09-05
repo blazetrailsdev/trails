@@ -1,4 +1,4 @@
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
 
 export class UnencryptedBook extends Base {
@@ -7,12 +7,12 @@ export class UnencryptedBook extends Base {
 
 export class EncryptedBook extends Base {
   declare author_id: number;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
   declare format: string;
   declare logo: Uint8Array;
   declare name: string | null;
   declare original_name: string;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static _tableName = "encrypted_books";
 

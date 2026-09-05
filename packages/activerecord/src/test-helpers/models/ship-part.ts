@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
@@ -11,7 +11,7 @@ export class ShipPart extends Base {
   declare loadBelongsTo: (name: "ship") => Promise<Ship | null>;
   declare name: string;
   declare ship_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.belongsTo("ship");

@@ -1,7 +1,7 @@
 import { throwAbort } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Pirate } from "./pirate.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
@@ -14,8 +14,8 @@ export class Parrot extends Base {
   declare cancelSaveFromCallback: boolean;
   declare breed: "african" | "australian" | null;
   declare color: string;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare created_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
+  declare created_on: RubyTime | Temporal.PlainDateTime;
   declare killer_id: number;
   declare name: string;
   declare nameChange: [unknown, unknown] | null;
@@ -23,9 +23,9 @@ export class Parrot extends Base {
   declare titleChange: [unknown, unknown] | null;
   declare titleWas: string | null;
   declare parrot_sti_class: string;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
   declare updated_count: number | null;
-  declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_on: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.inheritanceColumn = "parrot_sti_class";

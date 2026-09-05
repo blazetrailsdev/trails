@@ -1,5 +1,5 @@
 import type { Relation } from "../../relation.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Company } from "./company.js";
 import type { Firm } from "./company.js";
 import { Base } from "../../base.js";
@@ -15,7 +15,7 @@ export class Account extends Base {
   declare firm_id: number;
   declare firm_name: string;
   declare status: string;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static _destroyedAccountIds: Map<number | string, (number | string)[]> = new Map();
 

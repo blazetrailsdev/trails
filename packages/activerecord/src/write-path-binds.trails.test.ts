@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Notifications, NotificationEvent as Event } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { Task } from "./test-helpers/models/task.js";
 
@@ -9,8 +9,8 @@ describe("write-path prepared-statement binds", () => {
 
   it("binds non-string column values on INSERT and UPDATE", async (ctx) => {
     ctx.skip(!(await Task.leaseConnection()).preparedStatements);
-    const starting = Temporal.Instant.from("2024-03-05T07:08:09.123456Z");
-    const ending = Temporal.Instant.from("2025-03-05T07:08:09.123456Z");
+    const starting = RubyTime.utc(2024, 3, 5, 7, 8, 9, 123456);
+    const ending = RubyTime.utc(2025, 3, 5, 7, 8, 9, 123456);
     const events: Record<string, unknown>[] = [];
     const sub = Notifications.subscribe("sql.active_record", (e: Event) =>
       events.push(e.payload as Record<string, unknown>),

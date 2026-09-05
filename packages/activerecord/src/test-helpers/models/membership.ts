@@ -1,5 +1,5 @@
 import type { Relation } from "../../relation.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Club } from "./club.js";
 import type { Member } from "./member.js";
 import { Base } from "../../base.js";
@@ -32,9 +32,9 @@ export class Membership extends Base {
   declare loadBelongsTo: ((name: "member") => Promise<Member | null>) &
     ((name: "club") => Promise<Club | null>);
   declare club_id: number;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
   declare favorite: boolean | null;
-  declare joined_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare joined_on: RubyTime | Temporal.PlainDateTime;
   declare member_id: number;
   declare "type":
     | "Membership"
@@ -43,7 +43,7 @@ export class Membership extends Base {
     | "SelectedMembership"
     | "TenantMembership"
     | null;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.enum("type", [

@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { hexdigest, isBlank, toFs } from "@blazetrails/activesupport";
 import { except, Range } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/ruby-compat";
@@ -1365,9 +1365,7 @@ export class Relation<T extends Base> {
 
     const touch = touchFromCounters as CounterCacheTouchOption | undefined;
     if (touch) {
-      let names = wrap(touch !== true ? touch : undefined) as Array<
-        string | { time?: Temporal.Instant }
-      >;
+      let names = wrap(touch !== true ? touch : undefined) as Array<string | { time?: RubyTime }>;
       const last = names[names.length - 1];
       const options = last !== undefined && typeof last === "object" ? last : {};
       if (last !== undefined && typeof last === "object") names = names.slice(0, -1);

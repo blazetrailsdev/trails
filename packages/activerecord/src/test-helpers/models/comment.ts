@@ -1,6 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Author } from "./author.js";
 import type { Company } from "./company.js";
 import type { Developer } from "./developer.js";
@@ -58,7 +58,7 @@ export class Comment extends Base {
   declare body: string;
   declare children_count: number | null;
   declare comments: number;
-  declare deleted_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare deleted_at: RubyTime | Temporal.PlainDateTime;
   declare developer_id: number;
   declare label: "default" | "child" | null;
   declare origin_id: number;
@@ -69,7 +69,7 @@ export class Comment extends Base {
   declare resource_type: string;
   declare tags_count: number | null;
   declare "type": string;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   declare author_id: number | null;
   declare author_type: string | null;

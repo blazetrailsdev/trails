@@ -1,4 +1,4 @@
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Account } from "./account.js";
 import { Base } from "../../base.js";
 
@@ -8,7 +8,7 @@ export class Entry extends Base {
   declare account_id: number;
   declare entryable_id: number;
   declare entryable_type: string;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.delegatedType("entryable", { types: ["Message", "Comment"] });

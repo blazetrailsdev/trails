@@ -1,10 +1,11 @@
+import { Rational } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
 import { TimeWithZone, TimeZone, setZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
 import { ValueType } from "@blazetrails/activemodel";
 
@@ -645,9 +646,9 @@ describeIfPg("PostgreSQLAdapter", () => {
         .toInstant();
       const record = await (PgArrays as any).create({ timestamps: [time] });
       expect(record.timestamps).toHaveLength(1);
-      expect((record.timestamps[0] as Temporal.Instant).epochNanoseconds % 1000000n).toBe(123000n);
+      expect((record.timestamps[0] as RubyTime).nsec % 1_000_000).toBe(123000);
       await record.reload();
-      expect((record.timestamps[0] as Temporal.Instant).epochNanoseconds % 1000000n).toBe(123000n);
+      expect((record.timestamps[0] as RubyTime).nsec % 1_000_000).toBe(123000);
     });
   });
 
@@ -664,7 +665,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       const record = await (PgArrays as any).create({ datetimes: [bc] });
       await record.reload();
       expect(record.datetimes).toHaveLength(1);
-      expect((record.datetimes[0] as Temporal.Instant).epochNanoseconds).toBe(bc.epochNanoseconds);
+      expect(
+        (record.datetimes[0] as RubyTime)
+          .toR()
+          .cmp(new Rational(bc.epochNanoseconds, 1_000_000_000n)),
+      ).toBe(0);
     });
   });
 });

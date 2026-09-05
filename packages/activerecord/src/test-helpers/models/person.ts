@@ -1,6 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Author } from "./author.js";
 import type { BadReference } from "./reference.js";
 import type { Comment } from "./comment.js";
@@ -62,10 +62,10 @@ export class Person extends Base {
     ((name: "favoriteReferenceJob") => Promise<Job | null>);
   declare best_friend_id: number;
   declare best_friend_of_id: number;
-  declare born_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare born_at: RubyTime | Temporal.PlainDateTime;
   declare cars_count: number | null;
   declare comments: string;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
   declare followers_count: number | null;
   declare friends_too_count: number | null;
   declare gender: string | null;
@@ -73,7 +73,7 @@ export class Person extends Base {
   declare lock_version: number;
   declare number1_fan_id: number;
   declare primary_contact_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   declare followers: CollectionProxy<Person>;
 
@@ -311,7 +311,7 @@ export class SerializedPerson extends Base {
 registerModel(Person);
 
 export class PersonWithTimestampInCreate extends Base {
-  declare born_at: Temporal.Instant | Temporal.PlainDateTime | null;
+  declare born_at: RubyTime | Temporal.PlainDateTime | null;
 
   static {
     this._tableName = "people";
@@ -322,7 +322,7 @@ export class PersonWithTimestampInCreate extends Base {
 }
 
 export class PersonWithTimestampInUpdate extends Base {
-  declare born_at: Temporal.Instant | Temporal.PlainDateTime | null;
+  declare born_at: RubyTime | Temporal.PlainDateTime | null;
 
   static {
     this._tableName = "people";
@@ -333,7 +333,7 @@ export class PersonWithTimestampInUpdate extends Base {
 }
 
 export class PersonWithTimestampInSave extends Base {
-  declare born_at: Temporal.Instant | Temporal.PlainDateTime | null;
+  declare born_at: RubyTime | Temporal.PlainDateTime | null;
 
   static {
     this._tableName = "people";

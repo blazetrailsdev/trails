@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
-import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -40,6 +39,7 @@ for (const klass of [
 }
 
 function epochMs(v: unknown): number {
+  if (v instanceof RubyTime) return v.toF() * 1000;
   if (v instanceof Temporal.Instant) return v.epochMilliseconds;
   if (v instanceof Temporal.PlainDateTime)
     return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
@@ -231,14 +231,14 @@ describe("UpdateAllTest", () => {
     const developer = developers("david");
     const previouslyCreatedAt = developer.legacy_created_at;
     const previouslyUpdatedAt = developer.legacy_updated_at;
-    const newTime = instant("2015-02-16T04:54:00Z");
+    const newTime = RubyTime.utc(2015, 2, 16, 4, 54, 0);
     await Developer.where({ name: "David" }).touchAll("created_at", { time: newTime });
     await developer.reload();
 
     expect(epochMs(developer.legacy_created_at)).not.toBe(epochMs(previouslyCreatedAt));
     expect(epochMs(developer.legacy_updated_at)).not.toBe(epochMs(previouslyUpdatedAt));
-    expect(epochMs(developer.legacy_created_at)).toBe(newTime.epochMilliseconds);
-    expect(epochMs(developer.legacy_updated_at)).toBe(newTime.epochMilliseconds);
+    expect(epochMs(developer.legacy_created_at)).toBe(epochMs(newTime));
+    expect(epochMs(developer.legacy_updated_at)).toBe(epochMs(newTime));
   });
 
   it("update on relation", async () => {
@@ -356,15 +356,15 @@ describe("UpdateAllTest", () => {
   it("update all cares about optimistic locking", async () => {
     const david = people("david");
 
-    const now = instant("2015-01-01T12:00:00Z");
-    expect(epochMs(david.updated_at)).not.toBe(now.epochMilliseconds);
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
+    expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
 
     const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
     const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
     await pplScope.updateAll({ updated_at: now });
 
     const updatedAts = await pplScope.pluck("updated_at");
-    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(now.epochMilliseconds));
+    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(epochMs(now)));
     expect(await pplScope.pluck("lock_version")).toEqual(expected);
 
     await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
@@ -373,15 +373,15 @@ describe("UpdateAllTest", () => {
   it("update counters cares about optimistic locking", async () => {
     const david = people("david");
 
-    const now = instant("2015-01-01T12:00:00Z");
-    expect(epochMs(david.updated_at)).not.toBe(now.epochMilliseconds);
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
+    expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
 
     const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
     const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
     await pplScope.updateCounters({ touch: { time: now } } as any);
 
     const updatedAts = await pplScope.pluck("updated_at");
-    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(now.epochMilliseconds));
+    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(epochMs(now)));
     expect(await pplScope.pluck("lock_version")).toEqual(expected);
 
     await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
@@ -390,50 +390,50 @@ describe("UpdateAllTest", () => {
   it("touch all cares about optimistic locking", async () => {
     const david = people("david");
 
-    const now = instant("2015-01-01T12:00:00Z");
-    expect(epochMs(david.updated_at)).not.toBe(now.epochMilliseconds);
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
+    expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
 
     const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
     const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
 
-    vi.useFakeTimers({ now: now.epochMilliseconds });
+    vi.useFakeTimers({ now: epochMs(now) });
     await pplScope.touchAll();
     vi.useRealTimers();
 
     const updatedAts = await pplScope.pluck("updated_at");
-    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(now.epochMilliseconds));
+    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(epochMs(now)));
     expect(await pplScope.pluck("lock_version")).toEqual(expected);
 
     await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
   });
 
   it("klass level update all", async () => {
-    const now = instant("2015-01-01T12:00:00Z");
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
 
     for (const person of await Person.all()) {
-      expect(epochMs((person as any).updated_at)).not.toBe(now.epochMilliseconds);
+      expect(epochMs((person as any).updated_at)).not.toBe(epochMs(now));
     }
 
     await Person.updateAll({ updated_at: now });
 
     for (const person of await Person.all()) {
-      expect(epochMs((person as any).updated_at)).toBe(now.epochMilliseconds);
+      expect(epochMs((person as any).updated_at)).toBe(epochMs(now));
     }
   });
 
   it("klass level touch all", async () => {
-    const now = instant("2015-01-01T12:00:00Z");
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
 
     for (const person of await Person.all()) {
-      expect(epochMs((person as any).updated_at)).not.toBe(now.epochMilliseconds);
+      expect(epochMs((person as any).updated_at)).not.toBe(epochMs(now));
     }
 
-    vi.useFakeTimers({ now: now.epochMilliseconds });
+    vi.useFakeTimers({ now: epochMs(now) });
     await Person.touchAll();
     vi.useRealTimers();
 
     for (const person of await Person.all()) {
-      expect(epochMs((person as any).updated_at)).toBe(now.epochMilliseconds);
+      expect(epochMs((person as any).updated_at)).toBe(epochMs(now));
     }
   });
 

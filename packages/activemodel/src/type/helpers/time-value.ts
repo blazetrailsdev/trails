@@ -3,6 +3,7 @@ import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import {
   ActsLikeObject,
   TimeWithZone,
+  change as timeChange,
   inTimeZone as stringInTimeZone,
   toFs,
   zone,
@@ -24,7 +25,7 @@ export function serializeCastValue(this: TimeValueHost, value: unknown): unknown
   value = this.applySecondsPrecision(value);
 
   if (ActsLikeObject.actsLike(value, "time")) {
-    const time = toTime(value);
+    const time = value as Time | TimeWithZone;
     if (this.isUtc) {
       if (!time.isUtc()) value = time.getutc();
     } else {
@@ -36,6 +37,7 @@ export function serializeCastValue(this: TimeValueHost, value: unknown): unknown
 }
 
 type NsecBearing =
+  | Time
   | TimeWithZone
   | Temporal.Instant
   | Temporal.PlainDateTime
@@ -64,9 +66,13 @@ export function typeCastForSchema(value: unknown): string {
 
 export function userInputInTimeZone(
   value: unknown,
-): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | null {
+): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | Time | null {
   if (value === null || value === undefined) return null;
   if (value instanceof TimeWithZone) return value.inTimeZone();
+  if (value instanceof Time) {
+    const timeZone = zone();
+    return timeZone ? new TimeWithZone(value.toTime().toInstant(), timeZone) : value;
+  }
   if (value instanceof Temporal.ZonedDateTime) return value;
   if (value instanceof Temporal.Instant) {
     const timeZone = zone();
@@ -85,59 +91,46 @@ export function newTime(
   min: number | null | undefined,
   sec: number | null | undefined,
   microsec: number | bigint | Rational | null | undefined,
-  offset?: number | Rational | null,
-): Temporal.Instant | null {
+  offset: number | Rational | null = null,
+): Time | null {
   if (year == null || (year === 0 && mon === 0 && mday === 0)) return null;
-  if (mon == null || mday == null) return null;
-  const totalNano =
-    microsec instanceof Rational
-      ? microsec.mul(1000).toI()
-      : typeof microsec === "bigint"
-        ? Number(microsec * 1000n)
-        : Math.trunc((microsec ?? 0) * 1000);
-  const components = {
-    year: Number(year),
-    month: mon,
-    day: mday,
-    hour: hour ?? 0,
-    minute: min ?? 0,
-    second: sec ?? 0,
-    millisecond: Math.trunc(totalNano / 1_000_000),
-    microsecond: Math.trunc(totalNano / 1000) % 1000,
-    nanosecond: totalNano % 1000,
-  };
-  try {
-    if (offset != null) {
-      const instant = Temporal.PlainDateTime.from(components, { overflow: "reject" })
-        .toZonedDateTime("UTC")
-        .toInstant();
-      if (offset instanceof Rational) {
-        return offset.isZero()
-          ? instant
-          : instant.subtract({ nanoseconds: offset.mul(1_000_000_000).toI() });
-      }
-      return offset === 0 ? instant : instant.subtract({ seconds: offset });
+
+  const usec = typeof microsec === "bigint" ? Number(microsec) : (microsec ?? 0);
+
+  if (offset != null) {
+    let time: Time | null;
+    try {
+      time = Time.utc(Number(year), mon, mday, hour, min, sec, usec);
+    } catch {
+      time = null;
     }
-    return Temporal.PlainDateTime.from(components, { overflow: "reject" })
-      .toZonedDateTime((this?.isUtc ?? isUtc()) ? "UTC" : Temporal.Now.timeZoneId())
-      .toInstant();
-  } catch {
-    return null;
+    if (!time) return null;
+
+    if (!(offset === 0 || (offset instanceof Rational && offset.isZero()))) {
+      time = time.minus(offset) as Time;
+    }
+    return (this?.isUtc ?? isUtc()) ? time : time.getlocal();
+  } else if (this?.isUtc ?? isUtc()) {
+    try {
+      return Time.utc(Number(year), mon, mday, hour, min, sec, usec);
+    } catch {
+      return null;
+    }
+  } else {
+    try {
+      return Time.local(Number(year), mon, mday, hour, min, sec, usec);
+    } catch {
+      return null;
+    }
   }
 }
 
 /** @internal */
-export function fastStringToTime(
-  this: TimezoneAware | void,
-  string: string,
-): Temporal.Instant | null {
+export function fastStringToTime(this: TimezoneAware | void, string: string): Time | null {
   if (!string.includes("-")) return null;
 
   try {
-    const time = (this?.isUtc ?? isUtc()) ? Time.new(string, { in: "UTC" }) : Time.new(string);
-    return Temporal.Instant.fromEpochNanoseconds(
-      BigInt(time.toI()) * NANOS_PER_SECOND + BigInt(time.nsec),
-    );
+    return (this?.isUtc ?? isUtc()) ? Time.new(string, { in: "UTC" }) : Time.new(string);
   } catch (error) {
     if (error instanceof ArgumentError) return null;
     throw error;
@@ -154,23 +147,9 @@ export const TimeValue = {
   fastStringToTime,
 };
 
-function toTime(value: unknown): TimeWithZone | Time {
-  if (value instanceof TimeWithZone || value instanceof Time) return value;
-  // boundary: a JS `Date` is one of the values `acts_like?(:time)` admits.
-  if (value instanceof Date) return timeAt(Temporal.Instant.fromEpochMilliseconds(value.getTime()));
-  if (value instanceof Temporal.PlainDateTime) {
-    return timeAt(value.toZonedDateTime(Temporal.Now.timeZoneId()).toInstant());
-  }
-  if (value instanceof Temporal.ZonedDateTime) return timeAt(value.toInstant()).getutc();
-  return timeAt(value as Temporal.Instant).getutc();
-}
-
-function timeAt(value: Temporal.Instant): Time {
-  return Time.at(new Rational(value.epochNanoseconds, 1_000_000_000n));
-}
-
 function respondToNsec(value: unknown): value is NsecBearing {
   return (
+    value instanceof Time ||
     value instanceof TimeWithZone ||
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
@@ -180,7 +159,7 @@ function respondToNsec(value: unknown): value is NsecBearing {
 }
 
 function nsec(value: NsecBearing): bigint {
-  if (value instanceof TimeWithZone) return BigInt(value.nsec);
+  if (value instanceof Time || value instanceof TimeWithZone) return BigInt(value.nsec);
   if (value instanceof Temporal.Instant) {
     return ((value.epochNanoseconds % NANOS_PER_SECOND) + NANOS_PER_SECOND) % NANOS_PER_SECOND;
   }
@@ -192,6 +171,9 @@ function nsec(value: NsecBearing): bigint {
 }
 
 function changeNsec<T extends NsecBearing>(value: T, newNsec: bigint): T {
+  if (value instanceof Time) {
+    return timeChange(value, { nsec: Number(newNsec) }) as T;
+  }
   if (value instanceof TimeWithZone) {
     return value.change({ nsec: Number(newNsec) }) as T;
   }

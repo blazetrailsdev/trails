@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Comment } from "./comment.js";
 import type { Company } from "./company.js";
 import type { Computer } from "./computer.js";
@@ -54,10 +54,10 @@ export class Developer extends Base {
     ((name: "strictLoadingShip") => Promise<Ship | null>);
   declare firm_id: number;
   declare first_name: string;
-  declare legacy_created_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare legacy_created_on: Temporal.Instant | Temporal.PlainDateTime;
-  declare legacy_updated_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare legacy_updated_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare legacy_created_at: RubyTime | Temporal.PlainDateTime;
+  declare legacy_created_on: RubyTime | Temporal.PlainDateTime;
+  declare legacy_updated_at: RubyTime | Temporal.PlainDateTime;
+  declare legacy_updated_on: RubyTime | Temporal.PlainDateTime;
   declare mentor_id: number;
   declare name: string;
   declare salary: number | null;

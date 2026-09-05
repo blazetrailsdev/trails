@@ -94,7 +94,7 @@ describe("TimeZoneConverterTest", () => {
     const converter = new TimeZoneConverter(new DateTime());
     const instant = Temporal.Instant.from("2024-06-15T14:00:00Z");
     const result = converter.cast(instant);
-    expect(result).toBeInstanceOf(Temporal.Instant);
+    expect(result).toBeInstanceOf(RubyTime);
   });
 
   it("cast raises for plain object with non-multiparameter keys", () => {

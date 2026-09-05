@@ -1,9 +1,9 @@
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
 
 export class Task extends Base {
-  declare ending: Temporal.Instant | Temporal.PlainDateTime;
-  declare starting: Temporal.Instant | Temporal.PlainDateTime;
+  declare ending: RubyTime | Temporal.PlainDateTime;
+  declare starting: RubyTime | Temporal.PlainDateTime;
 
   get updatedAt() {
     return this.readAttribute("ending");

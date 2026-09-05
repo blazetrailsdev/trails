@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { include } from "@blazetrails/activesupport";
 import { Types, ValueType } from "../../index.js";
 import { AcceptsMultiparameterTime } from "./accepts-multiparameter-time.js";
@@ -53,7 +53,8 @@ describe("AcceptsMultiparameterTime defaults", () => {
     expect(time.nsec).toBe(999_999_999);
     expect(time.sec).toBe(40);
 
-    const instant = new Types.DateTimeType().cast(parts) as Temporal.Instant;
-    expect(instant.epochNanoseconds).toBe(-14_182_940n * 1_000_000_000n + 999_999_999n);
+    const cast = new Types.DateTimeType().cast(parts) as RubyTime;
+    expect(cast.toI()).toBe(-14_182_940);
+    expect(cast.nsec).toBe(999_999_999);
   });
 });

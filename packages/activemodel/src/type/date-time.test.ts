@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal, strftime } from "@blazetrails/date";
+import { Temporal, Time as RubyTime, strftime } from "@blazetrails/date";
 import { TimeZone, setZoneDefault } from "@blazetrails/activesupport";
 import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
 import { Types } from "../index.js";
@@ -16,7 +16,7 @@ describe("DateTimeTest", () => {
     expect(type.cast(" ".repeat(129))).toBeNull();
 
     const datetimeString = strftime(Temporal.Now.instant(), "%FT%T");
-    expect(strftime(type.cast(datetimeString) as Temporal.Instant, "%FT%T")).toBe(datetimeString);
+    expect((type.cast(datetimeString) as RubyTime).strftime("%FT%T")).toBe(datetimeString);
   });
 
   it("string to time with timezone", () => {
@@ -24,8 +24,8 @@ describe("DateTimeTest", () => {
       setZoneDefault(TimeZone.find(zone));
       try {
         const t = new Types.DateTimeType();
-        expect((t.cast("Wed, 04 Sep 2013 03:00:00 EAT") as Temporal.Instant).toString()).toBe(
-          "2013-09-04T00:00:00Z",
+        expect((t.cast("Wed, 04 Sep 2013 03:00:00 EAT") as RubyTime).getutc()).toEqual(
+          RubyTime.utc(2013, 9, 4, 0, 0, 0),
         );
       } finally {
         setZoneDefault(null);
@@ -35,9 +35,7 @@ describe("DateTimeTest", () => {
 
   it("hash to time", () => {
     const type = new Types.DateTimeType();
-    expect(type.cast({ 1: 2018, 2: 10, 3: 15 })).toEqual(
-      Temporal.Instant.from("2018-10-15T00:00:00Z"),
-    );
+    expect(type.cast({ 1: 2018, 2: 10, 3: 15 })).toEqual(RubyTime.utc(2018, 10, 15));
   });
 
   it("hash with wrong keys", () => {

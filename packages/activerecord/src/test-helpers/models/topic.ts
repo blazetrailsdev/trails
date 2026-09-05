@@ -4,7 +4,7 @@ import type { Reply } from "./reply.js";
 import type { SillyUniqueReply } from "./reply.js";
 import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
@@ -42,8 +42,8 @@ export class Topic extends Base {
   declare author_email_address: string;
   declare author_name: string;
   declare binary_content: Uint8Array;
-  declare bonus_time: (Temporal.Instant | TimeWithZone) | null;
-  declare created_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
+  declare bonus_time: (RubyTime | TimeWithZone) | null;
+  declare created_at: (RubyTime | Temporal.PlainDateTime) | null;
   declare group: string;
   declare important: string;
   declare last_read: Temporal.PlainDate;
@@ -53,8 +53,8 @@ export class Topic extends Base {
   declare title: string | null;
   declare "type": string;
   declare unique_replies_count: number | null;
-  declare updated_at: (Temporal.Instant | Temporal.PlainDateTime) | null;
-  declare written_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: (RubyTime | Temporal.PlainDateTime) | null;
+  declare written_on: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.scope("base", function (this: any) {

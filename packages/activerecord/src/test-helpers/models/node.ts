@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Tree } from "./tree.js";
 import { Base } from "../../base.js";
 
@@ -12,7 +12,7 @@ export class Node extends Base {
   declare name: string;
   declare parent_id: number;
   declare tree_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.belongsTo("tree", { touch: true });

@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { squish, parameterize, toFs, truncate } from "@blazetrails/activesupport";
 import { ActiveRecord } from "./ar-config.js";
@@ -11,7 +11,7 @@ interface Identifiable {
   readAttributeBeforeTypeCast(name: string): unknown;
 }
 
-type TemporalTimestamp = Temporal.Instant;
+type TemporalTimestamp = RubyTime;
 
 export function toParam(this: Identifiable): string | null {
   const pk = this.id;
@@ -27,13 +27,13 @@ function maxUpdatedColumnTimestamp(record: any): TemporalTimestamp | null {
     const col = aliases[name] ?? name;
     if (record.hasAttribute?.(col)) {
       const val = record._readAttribute(col);
-      if (val instanceof Temporal.Instant) {
+      if (val instanceof RubyTime) {
         candidates.push(val);
       }
     }
   }
   if (candidates.length === 0) return null;
-  return candidates.reduce((a, b) => (Temporal.Instant.compare(a, b) >= 0 ? a : b));
+  return candidates.reduce((a, b) => (a.toR().cmp(b.toR()) >= 0 ? a : b));
 }
 
 export function cacheKey(this: Identifiable): string {
@@ -71,7 +71,7 @@ export function cacheVersion(this: Identifiable): string | null {
       return rawTimestampToCacheVersion(timestamp as string);
     }
     timestamp = this.readAttribute("updated_at");
-    if (timestamp instanceof Temporal.Instant) {
+    if (timestamp instanceof RubyTime || timestamp instanceof Temporal.Instant) {
       const cacheTimestampFormat: string = klass.cacheTimestampFormat ?? "usec";
       return toFs(timestamp, cacheTimestampFormat);
     }

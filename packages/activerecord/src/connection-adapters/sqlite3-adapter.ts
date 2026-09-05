@@ -53,9 +53,6 @@ import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
 import { TypeMap } from "../type/type-map.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
-import { Temporal } from "@blazetrails/date";
-import type { DateTimeCastResult } from "@blazetrails/activemodel";
-import { defaultSqlTimezone } from "./abstract/sql-datetime.js";
 import { IntegerType, FloatType } from "@blazetrails/activemodel";
 import { isBlank, runLoadHooks, trailsRoot } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
@@ -107,17 +104,6 @@ import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js";
-
-/** @noRailsEquivalent PERMANENT */
-export class SQLite3DateTime extends ARDateTimeType {
-  override cast(value: unknown): DateTimeCastResult | null {
-    const result = super.cast(value);
-    if (result instanceof Temporal.PlainDateTime) {
-      return result.toZonedDateTime(defaultSqlTimezone()).toInstant();
-    }
-    return result;
-  }
-}
 
 function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
   let bindsAsFloat = false;
@@ -1778,7 +1764,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
     this.registerClassWithLimit(m, /int/i, SQLite3Integer);
-    this.registerClassWithPrecision(m, /datetime/i, SQLite3DateTime);
+    this.registerClassWithPrecision(m, /datetime/i, ARDateTimeType);
     m.aliasType(/timestamp/i, "datetime");
   }
 
@@ -1798,7 +1784,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
    */
   static override extendedTypeMap(options: { defaultTimezone?: string }): TypeMap {
     const m = super.extendedTypeMap(options);
-    this.registerClassWithPrecision(m, /^[^(]*datetime/i, SQLite3DateTime, {
+    this.registerClassWithPrecision(m, /^[^(]*datetime/i, ARDateTimeType, {
       timezone: options.defaultTimezone,
     });
     m.aliasType(/^[^(]*timestamp/i, "datetime");

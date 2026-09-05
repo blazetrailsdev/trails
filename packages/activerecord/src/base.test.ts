@@ -7,7 +7,7 @@ import { quoteColumnName } from "./support/quote-regex.js";
 import { association } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { IntegerType, ValueType } from "@blazetrails/activemodel";
@@ -811,35 +811,28 @@ describe("BasicsTest", () => {
         this.attribute("bonus_time", "time");
       }
     }
-    const inst1 = Temporal.Instant.from("2003-07-16T14:28:11.223300Z");
-    const inst2 = Temporal.Instant.from("2003-07-16T14:28:11.009900Z");
-    const inst3 = Temporal.Instant.from("2003-07-16T14:28:11.129346Z");
-    const bonusTime = new Temporal.PlainDateTime(2000, 1, 1, 11, 30, 45)
-      .toZonedDateTime("UTC")
-      .toInstant();
+    const inst1 = RubyTime.utc(2003, 7, 16, 14, 28, 11, 223300);
+    const inst2 = RubyTime.utc(2003, 7, 16, 14, 28, 11, 9900);
+    const inst3 = RubyTime.utc(2003, 7, 16, 14, 28, 11, 129346);
+    const bonusTime = RubyTime.utc(2000, 1, 1, 11, 30, 45);
     const t1 = await Topic.create({ written_on: inst1, bonus_time: bonusTime });
     const t2 = await Topic.create({ written_on: inst2 });
     const t3 = await Topic.create({ written_on: inst3 });
     const topic1 = await Topic.find(t1.id);
-    const reloadedBonusTime = topic1.readAttribute("bonus_time") as Temporal.Instant;
-    expect(reloadedBonusTime).toBeInstanceOf(Temporal.Instant);
-    expect(reloadedBonusTime.epochNanoseconds).toBe(bonusTime.epochNanoseconds);
-    const wo1 = topic1.readAttribute("written_on") as Temporal.Instant;
-    expect(wo1).toBeInstanceOf(Temporal.Instant);
-    expect(wo1.epochNanoseconds).toBe(inst1.epochNanoseconds);
-    const zdt1 = wo1.toZonedDateTimeISO("UTC");
-    expect(zdt1.second).toBe(11);
-    expect(zdt1.millisecond * 1000 + zdt1.microsecond).toBe(223300);
-    const wo2 = (await Topic.find(t2.id)).readAttribute("written_on") as Temporal.Instant;
-    expect(wo2.epochNanoseconds).toBe(inst2.epochNanoseconds);
-    expect(
-      wo2.toZonedDateTimeISO("UTC").millisecond * 1000 + wo2.toZonedDateTimeISO("UTC").microsecond,
-    ).toBe(9900);
-    const wo3 = (await Topic.find(t3.id)).readAttribute("written_on") as Temporal.Instant;
-    expect(wo3.epochNanoseconds).toBe(inst3.epochNanoseconds);
-    expect(
-      wo3.toZonedDateTimeISO("UTC").millisecond * 1000 + wo3.toZonedDateTimeISO("UTC").microsecond,
-    ).toBe(129346);
+    const reloadedBonusTime = topic1.readAttribute("bonus_time") as RubyTime;
+    expect(reloadedBonusTime).toBeInstanceOf(RubyTime);
+    expect(reloadedBonusTime).toEqual(bonusTime);
+    const wo1 = topic1.readAttribute("written_on") as RubyTime;
+    expect(wo1).toBeInstanceOf(RubyTime);
+    expect(wo1).toEqual(inst1);
+    expect(wo1.sec).toBe(11);
+    expect(wo1.usec).toBe(223300);
+    const wo2 = (await Topic.find(t2.id)).readAttribute("written_on") as RubyTime;
+    expect(wo2).toEqual(inst2);
+    expect(wo2.usec).toBe(9900);
+    const wo3 = (await Topic.find(t3.id)).readAttribute("written_on") as RubyTime;
+    expect(wo3).toEqual(inst3);
+    expect(wo3.usec).toBe(129346);
   });
   it("preserving time objects with local time conversion to default timezone utc", async () => {
     await withTimezoneConfig({ default: "utc" }, async () => {
@@ -849,12 +842,12 @@ describe("BasicsTest", () => {
           this.attribute("written_on", "datetime");
         }
       }
-      const expectedUtc = Temporal.Instant.from("2000-01-01T05:00:00Z");
+      const expectedUtc = RubyTime.utc(2000, 1, 1, 5, 0, 0);
       const topic = await Topic.create({ written_on: "2000-01-01 00:00:00-05:00" });
       const saved = await Topic.find(topic.id);
-      const savedTime = saved.readAttribute("written_on") as Temporal.Instant;
-      expect(savedTime.epochNanoseconds).toBe(expectedUtc.epochNanoseconds);
-      expect(savedTime.toZonedDateTimeISO("UTC").hour).toBe(5);
+      const savedTime = saved.readAttribute("written_on") as RubyTime;
+      expect(savedTime).toEqual(expectedUtc);
+      expect(savedTime.getutc().hour).toBe(5);
     });
   });
   it("preserving time objects with time with zone conversion to default timezone utc", async () => {
@@ -865,12 +858,12 @@ describe("BasicsTest", () => {
           this.attribute("written_on", "datetime");
         }
       }
-      const expectedUtc = Temporal.Instant.from("2000-01-01T06:00:00Z");
+      const expectedUtc = RubyTime.utc(2000, 1, 1, 6, 0, 0);
       const topic = await Topic.create({ written_on: "2000-01-01 00:00:00-06:00" });
       const saved = await Topic.find(topic.id);
-      const savedTime = saved.readAttribute("written_on") as Temporal.Instant;
-      expect(savedTime.epochNanoseconds).toBe(expectedUtc.epochNanoseconds);
-      expect(savedTime.toZonedDateTimeISO("UTC").hour).toBe(6);
+      const savedTime = saved.readAttribute("written_on") as RubyTime;
+      expect(savedTime).toEqual(expectedUtc);
+      expect(savedTime.getutc().hour).toBe(6);
     });
   });
   it("preserving time objects with utc time conversion to default timezone local", async () => {
@@ -955,9 +948,7 @@ describe("BasicsTest", () => {
       const created = await Topic.create({});
       const topic = await Topic.find(created.id);
       await topic.assignAttributes({ bonus_time: "5:42:00AM" });
-      expect(topic.readAttribute("bonus_time")).toEqual(
-        new Temporal.PlainDateTime(2000, 1, 1, 5, 42, 0).toZonedDateTime("UTC").toInstant(),
-      );
+      expect(topic.readAttribute("bonus_time")).toEqual(RubyTime.utc(2000, 1, 1, 5, 42, 0));
     });
   });
   it("utc as time zone and new", async () => {
@@ -977,9 +968,7 @@ describe("BasicsTest", () => {
         "bonus_time(6i)": "50",
       };
       const topic = new Topic(attributes);
-      expect(topic.readAttribute("bonus_time")).toEqual(
-        new Temporal.PlainDateTime(2000, 1, 1, 10, 35, 50).toZonedDateTime("UTC").toInstant(),
-      );
+      expect(topic.readAttribute("bonus_time")).toEqual(RubyTime.utc(2000, 1, 1, 10, 35, 50));
     });
   });
   it("out of range slugs", async () => {
@@ -1195,11 +1184,7 @@ describe("BasicsTest", () => {
       const created = await Topic.create({});
       const topic = await Topic.find(created.id);
       await topic.assignAttributes({ bonus_time: "5:42:00AM" });
-      expect(topic.readAttribute("bonus_time")).toEqual(
-        new Temporal.PlainDateTime(2000, 1, 1, 5, 42, 0)
-          .toZonedDateTime(Temporal.Now.timeZoneId())
-          .toInstant(),
-      );
+      expect(topic.readAttribute("bonus_time")).toEqual(RubyTime.local(2000, 1, 1, 5, 42, 0));
 
       await topic.saveBang();
       const found = await Topic.findBy({ bonus_time: "5:42:00AM" });
@@ -1208,7 +1193,7 @@ describe("BasicsTest", () => {
   });
   it("attributes on dummy time with invalid time", async () => {
     class DummyTopic extends Base {
-      declare bonus_time: Temporal.Instant | TimeWithZone | null;
+      declare bonus_time: RubyTime | TimeWithZone | null;
       static tableName = "topics";
       static {
         this.attribute("bonus_time", "time");
@@ -1300,10 +1285,8 @@ describe("BasicsTest", () => {
       expect(fd.year).toBe(2004);
       expect(fd.month).toBe(1);
       expect(fd.day).toBe(1);
-      const ft = d.readAttribute("fixed_time") as Temporal.Instant;
-      expect(ft.epochNanoseconds).toBe(
-        Temporal.Instant.from("2004-01-01T00:00:00Z").epochNanoseconds,
-      );
+      const ft = d.readAttribute("fixed_time") as RubyTime;
+      expect(ft).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0));
     });
   });
   it("default in utc with time zone", async () => {
@@ -1320,10 +1303,8 @@ describe("BasicsTest", () => {
       expect(fd.year).toBe(2004);
       expect(fd.month).toBe(1);
       expect(fd.day).toBe(1);
-      const ft = d.readAttribute("fixed_time") as Temporal.Instant;
-      expect(ft.epochNanoseconds).toBe(
-        Temporal.Instant.from("2004-01-01T00:00:00Z").epochNanoseconds,
-      );
+      const ft = d.readAttribute("fixed_time") as RubyTime;
+      expect(ft).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0));
     });
   });
   it("connection in local time", async () => {
@@ -1349,11 +1330,8 @@ describe("BasicsTest", () => {
       expect(fd.year).toBe(2004);
       expect(fd.month).toBe(1);
       expect(fd.day).toBe(1);
-      const ft = d.readAttribute("fixed_time") as Temporal.Instant;
-      const expected = Temporal.PlainDateTime.from("2004-01-01T00:00:00")
-        .toZonedDateTime(Temporal.Now.timeZoneId())
-        .toInstant();
-      expect(ft.epochNanoseconds).toBe(expected.epochNanoseconds);
+      const ft = d.readAttribute("fixed_time") as RubyTime;
+      expect(ft).toEqual(RubyTime.local(2004, 1, 1, 0, 0, 0));
     });
   });
   it("connection in utc time", async () => {
@@ -1379,10 +1357,8 @@ describe("BasicsTest", () => {
       expect(fd.year).toBe(2004);
       expect(fd.month).toBe(1);
       expect(fd.day).toBe(1);
-      const ft = d.readAttribute("fixed_time") as Temporal.Instant;
-      expect(ft.epochNanoseconds).toBe(
-        Temporal.Instant.from("2004-01-01T00:00:00Z").epochNanoseconds,
-      );
+      const ft = d.readAttribute("fixed_time") as RubyTime;
+      expect(ft).toEqual(RubyTime.utc(2004, 1, 1, 0, 0, 0));
     });
   });
   it("column name properly quoted", () => {

@@ -1,6 +1,6 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { CollectionProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Bird } from "./bird.js";
 import type { Bulb } from "./bulb.js";
 import type { FamousShip } from "./ship.js";
@@ -52,9 +52,9 @@ export class Pirate extends Base {
     ((name: "nonValidatedShip") => Promise<Ship | null>) &
     ((name: "fooBulb") => Promise<Bulb | null>) &
     ((name: "attackerMatey") => Promise<Matey | null>);
-  declare created_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_on: RubyTime | Temporal.PlainDateTime;
   declare non_validated_parrot_id: number;
-  declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_on: RubyTime | Temporal.PlainDateTime;
 
   static postTreasuresExtension = {
     build(this: CollectionProxy<Base>, ...args: unknown[]): Base {

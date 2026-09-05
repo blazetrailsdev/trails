@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import "./encryption.js";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
@@ -1741,19 +1741,23 @@ describe("CalculationsTest", () => {
   it("minimum and maximum on time attributes", async () => {
     const min = await Topic.minimum("written_on");
     const max = await Topic.maximum("written_on");
-    expect(min).toBeInstanceOf(Temporal.Instant);
-    expect(max).toBeInstanceOf(Temporal.Instant);
-    expect(Temporal.Instant.from("2003-07-16T14:28:11.2233Z").equals(min as Temporal.Instant)).toBe(
-      true,
-    );
-    expect(Temporal.Instant.from("2013-07-13T11:11:00.0099Z").equals(max as Temporal.Instant)).toBe(
-      true,
-    );
+    expect(min).toBeInstanceOf(RubyTime);
+    expect(max).toBeInstanceOf(RubyTime);
+    expect(
+      RubyTime.utc(2003, 7, 16, 14, 28, 11, 223300)
+        .toR()
+        .cmp((min as RubyTime).toR()) === 0,
+    ).toBe(true);
+    expect(
+      RubyTime.utc(2013, 7, 13, 11, 11, 0, 9900)
+        .toR()
+        .cmp((max as RubyTime).toR()) === 0,
+    ).toBe(true);
   });
 
   it("minimum and maximum on tz aware attributes", async () => {
     const min = await Topic.minimum("written_on");
-    expect(min).toBeInstanceOf(Temporal.Instant);
+    expect(min).toBeInstanceOf(RubyTime);
   });
 
   it("select avg with group by as virtual attribute with sql", async () => {

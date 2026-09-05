@@ -20,14 +20,14 @@ import { isUtc } from "./helpers/timezone.js";
 import { TimeValue } from "./helpers/time-value.js";
 import { ValueType } from "./value.js";
 
-export type DateTimeCastResult = Temporal.Instant | DateInfinityType | DateNegativeInfinityType;
+export type DateTimeCastResult = RubyTime | DateInfinityType | DateNegativeInfinityType;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (date_time.rb:44-46); the class/interface merge is how `include()` surfaces on the type side.
 export interface DateTimeType
   extends
     Omit<InstanceMethods<DateTimeCastResult>, "valueFromMultiparameterAssignment">,
     Omit<Included<typeof TimeValue>, "serializeCastValue"> {
-  serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | RubyTime | null;
+  serializeCastValue(value: DateTimeCastResult | null): DateTimeCastResult | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -38,10 +38,21 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
 
   /** @internal */
   protected castValue(value: unknown): DateTimeCastResult | null {
-    // boundary: a JS Date assigned to a datetime attribute is Ruby's ::Time.
-    if (value instanceof Date) value = Temporal.Instant.fromEpochMilliseconds(value.getTime());
-    if (value instanceof Temporal.PlainDateTime) {
-      value = value.toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId()).toInstant();
+    let seconds: Rational | null = null;
+    // boundary: a JS `Date`, a `Temporal.Instant` and a `Temporal.PlainDateTime` each stand for the zoneless Ruby ::Time `cast_value` receives.
+    if (value instanceof Date) {
+      seconds = new Rational(value.getTime(), 1000);
+    } else if (value instanceof Temporal.Instant) {
+      seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
+    } else if (value instanceof Temporal.PlainDateTime) {
+      seconds = new Rational(
+        value.toZonedDateTime(this.isUtc ? "UTC" : Temporal.Now.timeZoneId()).epochNanoseconds,
+        1_000_000_000n,
+      );
+    }
+    if (seconds != null) {
+      const time = RubyTime.at(seconds);
+      value = this.isUtc ? time.getutc() : time.getlocal();
     }
     if (typeof value !== "string")
       return this.applySecondsPrecision(value) as DateTimeCastResult | null;
@@ -60,7 +71,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   }
 
   /** @internal */
-  protected fallbackStringToTime(string: string): Temporal.Instant | null {
+  protected fallbackStringToTime(string: string): RubyTime | null {
     let timeHash: DateParts | undefined;
     try {
       timeHash = RubyDate._parse(string);
@@ -99,7 +110,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
         valuesHash: Record<string, unknown>,
       ) => RubyTime | null
     ).call(this, valuesHash as Record<string, unknown>);
-    return time && time.toTime().toInstant();
+    return time;
   }
 
   get isUtc(): boolean {
@@ -107,6 +118,9 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   }
 
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
+    if (oldValue instanceof RubyTime && newValue instanceof RubyTime) {
+      return oldValue.toR().cmp(newValue.toR()) !== 0;
+    }
     if (oldValue instanceof Temporal.Instant && newValue instanceof Temporal.Instant) {
       return !oldValue.equals(newValue);
     }

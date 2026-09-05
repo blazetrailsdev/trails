@@ -67,6 +67,12 @@ export class TimeZoneConverter extends ValueType<unknown> {
       );
       return casted != null && casted !== false ? casted : this._subtype.cast(value);
     }
+    if (value instanceof RubyTime) {
+      const casted = this._subtype.cast(
+        (this._subtype as TimeValueSubtype).userInputInTimeZone(value),
+      );
+      return casted != null && casted !== false ? casted : this._subtype.cast(value);
+    }
     if (value instanceof Temporal.ZonedDateTime) {
       return this.convertTimeToTimeZone(value.toInstant());
     }
@@ -198,6 +204,7 @@ function setTimeZoneWithoutConversion(value: unknown, subtypeIsUtc?: boolean): u
   if (value == null) return null;
   const zone = timeZone();
   if (!zone) return value;
+  if (value instanceof RubyTime) value = value.toTime().toInstant();
   if (value instanceof Temporal.Instant) {
     const zoned = value.toZonedDateTimeISO(zoneForIsUtc(subtypeIsUtc));
     const pdt = zoned.toPlainDateTime();

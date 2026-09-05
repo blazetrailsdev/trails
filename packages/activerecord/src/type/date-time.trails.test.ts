@@ -15,14 +15,14 @@ afterEach(() => {
 describe("ActiveRecord::Type::DateTime serialize_cast_value normalization", () => {
   it("leaves an already-UTC value alone when is_utc?", () => {
     const type = new DateTime();
-    const value = type.cast("1999-12-31 12:34:56") as Temporal.Instant;
+    const value = type.cast("1999-12-31 12:34:56") as RubyTime;
     expect(type.serializeCastValue(value)).toBe(value);
   });
 
   it("getlocal's the value when default_timezone is :local", () => {
     ActiveRecord.defaultTimezone = "local";
     const type = new DateTime();
-    const value = type.cast("1999-12-31 12:34:56") as Temporal.Instant;
+    const value = type.cast("1999-12-31 12:34:56") as RubyTime;
     const serialized = type.serializeCastValue(value) as RubyTime;
     expect(serialized).toBeInstanceOf(RubyTime);
     expect(serialized.isUtc()).toBe(false);
@@ -47,24 +47,16 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
 
   it("casts bare strings in the zone chosen by is_utc?", () => {
     const bare = "2024-01-02T12:00:00";
-    const utc = Temporal.PlainDateTime.from(bare).toZonedDateTime("UTC").toInstant();
-    const local = Temporal.PlainDateTime.from(bare)
-      .toZonedDateTime(Temporal.Now.timeZoneId())
-      .toInstant();
+    const utc = RubyTime.utc(2024, 1, 2, 12, 0, 0);
+    const local = RubyTime.local(2024, 1, 2, 12, 0, 0);
 
     ActiveRecord.defaultTimezone = "utc";
-    expect((new DateTime().cast(bare) as Temporal.Instant).epochNanoseconds).toBe(
-      utc.epochNanoseconds,
-    );
+    expect((new DateTime().cast(bare) as RubyTime).toI()).toBe(utc.toI());
 
     ActiveRecord.defaultTimezone = "local";
-    expect((new DateTime().cast(bare) as Temporal.Instant).epochNanoseconds).toBe(
-      local.epochNanoseconds,
-    );
+    expect((new DateTime().cast(bare) as RubyTime).toI()).toBe(local.toI());
 
-    expect(
-      (new DateTime({ timezone: "utc" }).cast(bare) as Temporal.Instant).epochNanoseconds,
-    ).toBe(utc.epochNanoseconds);
+    expect((new DateTime({ timezone: "utc" }).cast(bare) as RubyTime).toI()).toBe(utc.toI());
   });
 
   it("preserves wall clock through the time zone aware wrapper", () => {

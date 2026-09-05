@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
 import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
@@ -49,6 +49,7 @@ async function assertInsertAllReturningAlias(): Promise<void> {
 
 function getYear(val: unknown): number {
   if (val == null) return 0;
+  if (val instanceof RubyTime) return val.getutc().year;
   if (val instanceof Temporal.Instant) return val.toZonedDateTimeISO("UTC").year;
   if (typeof val === "string") return parseInt(val.slice(0, 4), 10);
   if (val instanceof Date) return val.getUTCFullYear();
@@ -58,8 +59,8 @@ function getYear(val: unknown): number {
   return 0;
 }
 
-function usec(instant: Temporal.Instant): number {
-  return Number((instant.epochNanoseconds % 1_000_000_000n) / 1000n);
+function usec(instant: RubyTime): number {
+  return instant.usec;
 }
 
 async function withRecordTimestamps(
@@ -665,7 +666,7 @@ describe("InsertAllTest", () => {
       let hasSubsecond = false;
       for (let i = 1; i <= 100 && !hasSubsecond; i++) {
         await Book.upsertAll([{ id: 101, name: `Out of the Silent Planet (Edition ${i})` }]);
-        const ua = ((await Book.find(101)) as any).updated_at as Temporal.Instant | null;
+        const ua = ((await Book.find(101)) as any).updated_at as RubyTime | null;
         if (ua) hasSubsecond = usec(ua) > 0;
       }
       expect(hasSubsecond).toBe(true);
@@ -801,7 +802,7 @@ describe("InsertAllTest", () => {
       await withRecordTimestamps(Ship, true, async () => {
         for (let i = 1; i <= 100 && !hasSubsecond; i++) {
           await Ship.upsertAll([{ id: 200 + i, name: "Boaty" }]);
-          const ca = ((await Ship.find(200 + i)) as any).created_at as Temporal.Instant | null;
+          const ca = ((await Ship.find(200 + i)) as any).created_at as RubyTime | null;
           if (ca) hasSubsecond = usec(ca) > 0;
         }
       });

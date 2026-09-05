@@ -4,7 +4,7 @@ import { parseRange } from "./pg-range.js";
 import { Range } from "../../relation.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone, TimeZone, setZone, BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../../test-fixtures.js";
 
@@ -558,8 +558,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       const result = r.tstz_range as Range;
       expect(result).toBeInstanceOf(Range);
-      expect((result.begin as Temporal.Instant).epochMilliseconds).toBe(begin.epochMilliseconds);
-      expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
+      expect((result.begin as RubyTime).toF() * 1000).toBe(begin.epochMilliseconds);
+      expect((result.end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
       expect(result.excludeEnd).toBe(true);
     });
     it("update tstzrange", async () => {
@@ -567,12 +567,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       const end = Temporal.Instant.from("2011-02-02T13:30:00Z");
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
       await r.reload();
-      expect(((r.tstz_range as Range).begin as Temporal.Instant).epochMilliseconds).toBe(
+      expect(((r.tstz_range as Range).begin as RubyTime).toF() * 1000).toBe(
         begin.epochMilliseconds,
       );
-      expect(((r.tstz_range as Range).end as Temporal.Instant).epochMilliseconds).toBe(
-        end.epochMilliseconds,
-      );
+      expect(((r.tstz_range as Range).end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
       const sameInstant = Temporal.Instant.from("2010-01-01T13:30:00Z");
       r.tstz_range = new Range(sameInstant, sameInstant, true);
       await r.saveBang();
@@ -588,22 +586,22 @@ describeIfPg("PostgreSQLAdapter", () => {
       const r = await PostgresqlRanges.create({ tstz_range: new Range(bcBegin, end, true) });
       await r.reload();
       const result = r.tstz_range as Range;
-      expect((result.begin as Temporal.Instant).epochMilliseconds).toBe(bcBegin.epochMilliseconds);
-      expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
+      expect((result.begin as RubyTime).toF() * 1000).toBe(bcBegin.epochMilliseconds);
+      expect((result.end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
     });
     it("unbounded tstzrange", async () => {
       const t = Temporal.Instant.from("2010-01-01T19:30:00Z");
       const r1 = await PostgresqlRanges.create({ tstz_range: new Range(t, null, true) });
       await r1.reload();
       const res1 = r1.tstz_range as Range;
-      expect((res1.begin as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
+      expect((res1.begin as RubyTime).toF() * 1000).toBe(t.epochMilliseconds);
       expect(res1.end).toBeNull();
       expect(res1.excludeEnd).toBe(true);
       const r2 = await PostgresqlRanges.create({ tstz_range: new Range(null, t, false) });
       await r2.reload();
       const res2 = r2.tstz_range as Range;
       expect(res2.begin).toBeNull();
-      expect((res2.end as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
+      expect((res2.end as RubyTime).toF() * 1000).toBe(t.epochMilliseconds);
       expect(res2.excludeEnd).toBe(false);
     });
     it("create tsrange", async () => {
@@ -613,8 +611,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       await r.reload();
       const result = r.ts_range as Range;
       expect(result).toBeInstanceOf(Range);
-      expect((result.begin as Temporal.Instant).epochMilliseconds).toBe(begin.epochMilliseconds);
-      expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
+      expect((result.begin as RubyTime).toF() * 1000).toBe(begin.epochMilliseconds);
+      expect((result.end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
       expect(result.excludeEnd).toBe(true);
     });
     it("update tsrange", async () => {
@@ -622,12 +620,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       const end = Temporal.Instant.from("2011-02-02T14:30:00Z");
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
       await r.reload();
-      expect(((r.ts_range as Range).begin as Temporal.Instant).epochMilliseconds).toBe(
-        begin.epochMilliseconds,
-      );
-      expect(((r.ts_range as Range).end as Temporal.Instant).epochMilliseconds).toBe(
-        end.epochMilliseconds,
-      );
+      expect(((r.ts_range as Range).begin as RubyTime).toF() * 1000).toBe(begin.epochMilliseconds);
+      expect(((r.ts_range as Range).end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
       r.ts_range = new Range(begin, begin, true);
       await r.saveBang();
       await r.reload();
@@ -642,22 +636,22 @@ describeIfPg("PostgreSQLAdapter", () => {
       const r = await PostgresqlRanges.create({ ts_range: new Range(bcBegin, end, true) });
       await r.reload();
       const result = r.ts_range as Range;
-      expect((result.begin as Temporal.Instant).epochMilliseconds).toBe(bcBegin.epochMilliseconds);
-      expect((result.end as Temporal.Instant).epochMilliseconds).toBe(end.epochMilliseconds);
+      expect((result.begin as RubyTime).toF() * 1000).toBe(bcBegin.epochMilliseconds);
+      expect((result.end as RubyTime).toF() * 1000).toBe(end.epochMilliseconds);
     });
     it("unbounded tsrange", async () => {
       const t = Temporal.Instant.from("2010-01-01T14:30:00Z");
       const r1 = await PostgresqlRanges.create({ ts_range: new Range(t, null, true) });
       await r1.reload();
       const res1 = r1.ts_range as Range;
-      expect((res1.begin as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
+      expect((res1.begin as RubyTime).toF() * 1000).toBe(t.epochMilliseconds);
       expect(res1.end).toBeNull();
       expect(res1.excludeEnd).toBe(true);
       const r2 = await PostgresqlRanges.create({ ts_range: new Range(null, t, false) });
       await r2.reload();
       const res2 = r2.ts_range as Range;
       expect(res2.begin).toBeNull();
-      expect((res2.end as Temporal.Instant).epochMilliseconds).toBe(t.epochMilliseconds);
+      expect((res2.end as RubyTime).toF() * 1000).toBe(t.epochMilliseconds);
       expect(res2.excludeEnd).toBe(false);
     });
     it("timezone awareness tsrange", async () => {
@@ -783,16 +777,24 @@ describeIfPg("PostgreSQLAdapter", () => {
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
       await r.reload();
       const result = r.tstz_range as Range;
-      expect((result.begin as Temporal.Instant).toString()).toBe(begin.toString());
-      expect((result.end as Temporal.Instant).toString()).toBe(end.toString());
+      expect((result.begin as RubyTime).getutc().xmlschema(9)).toBe(
+        begin.toString({ fractionalSecondDigits: 9 }),
+      );
+      expect((result.end as RubyTime).getutc().xmlschema(9)).toBe(
+        end.toString({ fractionalSecondDigits: 9 }),
+      );
     });
     it("update tstzrange preserve usec", async () => {
       const begin = Temporal.Instant.from("2010-01-01T19:30:00.245124Z");
       const end = Temporal.Instant.from("2011-02-02T13:30:00.451274Z");
       const r = await PostgresqlRanges.create({ tstz_range: new Range(begin, end, true) });
       await r.reload();
-      expect(((r.tstz_range as Range).begin as Temporal.Instant).toString()).toBe(begin.toString());
-      expect(((r.tstz_range as Range).end as Temporal.Instant).toString()).toBe(end.toString());
+      expect(((r.tstz_range as Range).begin as RubyTime).getutc().xmlschema(9)).toBe(
+        begin.toString({ fractionalSecondDigits: 9 }),
+      );
+      expect(((r.tstz_range as Range).end as RubyTime).getutc().xmlschema(9)).toBe(
+        end.toString({ fractionalSecondDigits: 9 }),
+      );
       const sameInstant = Temporal.Instant.from("2010-01-01T13:30:00.245124Z");
       r.tstz_range = new Range(sameInstant, sameInstant, true);
       await r.saveBang();
@@ -805,16 +807,24 @@ describeIfPg("PostgreSQLAdapter", () => {
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
       await r.reload();
       const result = r.ts_range as Range;
-      expect((result.begin as Temporal.Instant).toString()).toBe(begin.toString());
-      expect((result.end as Temporal.Instant).toString()).toBe(end.toString());
+      expect((result.begin as RubyTime).getutc().xmlschema(9)).toBe(
+        begin.toString({ fractionalSecondDigits: 9 }),
+      );
+      expect((result.end as RubyTime).getutc().xmlschema(9)).toBe(
+        end.toString({ fractionalSecondDigits: 9 }),
+      );
     });
     it("update tsrange preserve usec", async () => {
       const begin = Temporal.Instant.from("2010-01-01T14:30:00.142432Z");
       const end = Temporal.Instant.from("2011-02-02T14:30:00.224242Z");
       const r = await PostgresqlRanges.create({ ts_range: new Range(begin, end, true) });
       await r.reload();
-      expect(((r.ts_range as Range).begin as Temporal.Instant).toString()).toBe(begin.toString());
-      expect(((r.ts_range as Range).end as Temporal.Instant).toString()).toBe(end.toString());
+      expect(((r.ts_range as Range).begin as RubyTime).getutc().xmlschema(9)).toBe(
+        begin.toString({ fractionalSecondDigits: 9 }),
+      );
+      expect(((r.ts_range as Range).end as RubyTime).getutc().xmlschema(9)).toBe(
+        end.toString({ fractionalSecondDigits: 9 }),
+      );
       r.ts_range = new Range(begin, begin, true);
       await r.saveBang();
       await r.reload();

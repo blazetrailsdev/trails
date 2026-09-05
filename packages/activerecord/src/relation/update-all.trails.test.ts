@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "../test-fixtures.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -48,8 +48,8 @@ describe("update_all value substitution", () => {
     );
 
     expect(sql).not.toContain("2004-04-15T10:20:30Z");
-    expect(binds[0]).toBeInstanceOf(Temporal.Instant);
-    expect((binds[0] as Temporal.Instant).toString()).toBe("2004-04-15T10:20:30Z");
+    expect(binds[0]).toBeInstanceOf(RubyTime);
+    expect((binds[0] as RubyTime).getutc().xmlschema()).toBe("2004-04-15T10:20:30Z");
   });
 
   it("sends values as bind params rather than inline literals", async (ctx) => {

@@ -1,6 +1,6 @@
 import { DateTimeType } from "@blazetrails/activemodel";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 
 import { DateTime } from "./date-time.js";
@@ -26,33 +26,32 @@ describe("PostgreSQL::OID::DateTime", () => {
   });
 
   it("rewrites BC-era timestamps with a biased year", () => {
-    const result = type.castValue("0044-03-15 12:00:00 BC") as Temporal.Instant;
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    const zdt = result.toZonedDateTimeISO("UTC");
-    expect(zdt.year).toBe(-43);
-    expect(zdt.month).toBe(3);
-    expect(zdt.day).toBe(15);
+    const result = type.castValue("0044-03-15 12:00:00 BC") as RubyTime;
+    expect(result).toBeInstanceOf(RubyTime);
+    expect(result.year).toBe(-43);
+    expect(result.mon).toBe(3);
+    expect(result.mday).toBe(15);
   });
 
   it("serialize returns the cast Instant (quoting renders the SQL literal)", () => {
-    const instant = type.castValue("0044-01-01 00:00:00 BC") as Temporal.Instant;
+    const instant = type.castValue("0044-01-01 00:00:00 BC") as RubyTime;
     expect(type.serialize(instant)).toBe(instant);
   });
 
   it("quoted_date converts BC Temporal.Instant to PG BC format", () => {
-    const instant = type.castValue("0044-01-01 00:00:00 BC") as Temporal.Instant;
-    expect(instant.toZonedDateTimeISO("UTC").year).toBe(-43);
+    const instant = type.castValue("0044-01-01 00:00:00 BC") as RubyTime;
+    expect(instant.year).toBe(-43);
     expect(quotedDate(instant)).toBe("0044-01-01 00:00:00 BC");
   });
 
   it("quoted_date converts ISO year 0 to 1 BC", () => {
-    const instant = type.castValue("0001-04-07 00:00:00 BC") as Temporal.Instant;
-    expect(instant.toZonedDateTimeISO("UTC").year).toBe(0);
+    const instant = type.castValue("0001-04-07 00:00:00 BC") as RubyTime;
+    expect(instant.year).toBe(0);
     expect(quotedDate(instant)).toBe("0001-04-07 00:00:00 BC");
   });
 
   it("quoted_date preserves microseconds in BC format", () => {
-    const instant = type.castValue("0005-02-29 12:34:56.123456 BC") as Temporal.Instant;
+    const instant = type.castValue("0005-02-29 12:34:56.123456 BC") as RubyTime;
     expect(quotedDate(instant)).toBe("0005-02-29 12:34:56.123456 BC");
   });
 
@@ -84,11 +83,9 @@ describe("PostgreSQL::OID::DateTime", () => {
   });
 
   it("preserves microsecond precision in BC timestamps", () => {
-    const result = type.castValue("0044-03-15 12:00:00.123456 BC") as Temporal.Instant;
-    expect(result).toBeInstanceOf(Temporal.Instant);
-    const zdt = result.toZonedDateTimeISO("UTC");
-    expect(zdt.millisecond).toBe(123);
-    expect(zdt.microsecond).toBe(456);
+    const result = type.castValue("0044-03-15 12:00:00.123456 BC") as RubyTime;
+    expect(result).toBeInstanceOf(RubyTime);
+    expect(result.usec).toBe(123456);
   });
 });
 

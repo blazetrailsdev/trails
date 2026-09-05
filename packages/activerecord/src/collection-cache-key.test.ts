@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "./index.js";
@@ -21,9 +21,13 @@ registerModel(Post);
 registerModel(Project);
 registerModel(Ship);
 
-function expectedUsec(ts: Temporal.Instant | Temporal.PlainDateTime): string {
+function expectedUsec(ts: RubyTime | Temporal.Instant | Temporal.PlainDateTime): string {
   const dt =
-    ts instanceof Temporal.Instant ? ts.toZonedDateTimeISO("UTC") : ts.toZonedDateTime("UTC");
+    ts instanceof RubyTime
+      ? ts.getutc().toTime()
+      : ts instanceof Temporal.Instant
+        ? ts.toZonedDateTimeISO("UTC")
+        : ts.toZonedDateTime("UTC");
   const y = dt.year.toString().padStart(4, "0");
   const mo = dt.month.toString().padStart(2, "0");
   const day = dt.day.toString().padStart(2, "0");
@@ -59,8 +63,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key for relation", async () => {
     const developers = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
-    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
-      .updated_at as Temporal.Instant;
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer).updated_at as RubyTime;
 
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
@@ -72,8 +75,7 @@ describe("CollectionCacheKeyTest", () => {
 
   it("cache_key for relation with limit", async () => {
     const developers = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
-    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
-      .updated_at as Temporal.Instant;
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer).updated_at as RubyTime;
 
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
@@ -86,8 +88,7 @@ describe("CollectionCacheKeyTest", () => {
   it("cache_key for relation with custom select and limit", async () => {
     const developers = Developer.where({ salary: 100000 }).order({ updated_at: "desc" }).limit(5);
     const developersWithSelect = developers.select("developers.*");
-    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
-      .updated_at as Temporal.Instant;
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer).updated_at as RubyTime;
 
     expect(await developersWithSelect.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
@@ -104,8 +105,7 @@ describe("CollectionCacheKeyTest", () => {
       .order({ updated_at: "desc" })
       .limit(5)
       .load();
-    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
-      .updated_at as Temporal.Instant;
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer).updated_at as RubyTime;
 
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
@@ -120,8 +120,7 @@ describe("CollectionCacheKeyTest", () => {
 
     let developers = new Relation(Developer, tableAlias);
     developers = developers.where({ salary: 100000 }).order({ updated_at: "desc" });
-    const lastDeveloperTimestamp = ((await developers.first()) as Developer)
-      .updated_at as Temporal.Instant;
+    const lastDeveloperTimestamp = ((await developers.first()) as Developer).updated_at as RubyTime;
 
     expect(await developers.cacheKey()).toMatch(/^developers\/query-[0-9a-f]+-\d+-\d+$/);
 
@@ -290,7 +289,7 @@ describe("CollectionCacheKeyTest", () => {
     await withCollectionCacheVersioning(async () => {
       const developers = Developer.where({ salary: 100000 }).order({ updated_at: "desc" });
       const lastDeveloperTimestamp = ((await developers.first()) as Developer)
-        .updated_at as Temporal.Instant;
+        .updated_at as RubyTime;
 
       const version = await developers.cacheVersion();
       expect(version).toMatch(/(\d+)-(\d+)$/);

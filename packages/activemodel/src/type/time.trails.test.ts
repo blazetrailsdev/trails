@@ -1,19 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone, useZone } from "@blazetrails/activesupport";
 import { Types, ValueType } from "../index.js";
 
-function timeUtc(
-  year: number,
-  mon: number,
-  mday: number,
-  hour = 0,
-  min = 0,
-  sec = 0,
-): Temporal.Instant {
-  return new Temporal.PlainDateTime(year, mon, mday, hour, min, sec)
-    .toZonedDateTime("UTC")
-    .toInstant();
+function timeUtc(year: number, mon: number, mday: number, hour = 0, min = 0, sec = 0): RubyTime {
+  return RubyTime.utc(year, mon, mday, hour, min, sec);
 }
 
 describe("TimeTypeTrails", () => {
@@ -21,7 +12,9 @@ describe("TimeTypeTrails", () => {
     const type = new Types.TimeType({ precision: 1 });
     const value = type.cast("1999-12-31T12:34:56.789-10:00");
 
-    expect(String(type.serializeCastValue(value))).toBe("2000-01-01T22:34:56.7Z");
+    expect((type.serializeCastValue(value) as RubyTime).getutc().xmlschema(1)).toBe(
+      "2000-01-01T22:34:56.7Z",
+    );
   });
 });
 
@@ -124,13 +117,13 @@ describe("TimeType cast and serialize coverage", () => {
   });
 
   it("microsecond precision is preserved through cast", () => {
-    const result = type.cast("14:23:55.123456") as Temporal.Instant;
-    expect(result.toString()).toBe("2000-01-01T14:23:55.123456Z");
+    const result = type.cast("14:23:55.123456") as RubyTime;
+    expect(result.getutc().xmlschema(6)).toBe("2000-01-01T14:23:55.123456Z");
   });
 
   it("Temporal.Instant passthrough", () => {
     const original = timeUtc(2000, 1, 1, 14, 23, 55);
-    expect(type.cast(original)).toBe(original);
+    expect(type.cast(original)).toEqual(original);
   });
 
   it("has name 'time'", () => {
@@ -142,8 +135,10 @@ describe("TimeType cast and serialize coverage", () => {
   });
 
   it("serialize returns the cast Instant (not a SQL string)", () => {
-    const t = type.cast("14:23:55.123456") as Temporal.Instant;
-    expect(String(type.serialize(t))).toBe("2000-01-01T14:23:55.123456Z");
+    const t = type.cast("14:23:55.123456") as RubyTime;
+    expect((type.serialize(t) as RubyTime).getutc().xmlschema(6)).toBe(
+      "2000-01-01T14:23:55.123456Z",
+    );
   });
 
   it("serialize null returns null", () => {
@@ -152,7 +147,9 @@ describe("TimeType cast and serialize coverage", () => {
 
   it("serialize respects column precision", () => {
     const t = new Types.TimeType({ precision: 3 });
-    expect(String(t.serialize("14:23:55.123456"))).toBe("2000-01-01T14:23:55.123Z");
+    expect((t.serialize("14:23:55.123456") as RubyTime).getutc().xmlschema(3)).toBe(
+      "2000-01-01T14:23:55.123Z",
+    );
   });
 
   it("PlainDateTime input extracts time (multiparameter support)", () => {
@@ -199,7 +196,7 @@ describe("TimeType cast and serialize coverage", () => {
   });
 
   it("sec_fraction reaches new_time as Time.utc's microsecond argument", () => {
-    const result = type.cast("3:30:15.5 PM") as Temporal.Instant;
-    expect(result.toString()).toBe("2000-01-01T15:30:15.0000005Z");
+    const result = type.cast("3:30:15.5 PM") as RubyTime;
+    expect(result.getutc().xmlschema(7)).toBe("2000-01-01T15:30:15.0000005Z");
   });
 });

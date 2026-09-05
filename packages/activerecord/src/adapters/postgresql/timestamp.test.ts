@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import {
@@ -140,12 +140,10 @@ describeIfPg("PostgreSQLAdapter", () => {
           }
           await PostgresqlTimestampWithZone.loadSchema();
           const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
-            time: Temporal.Instant;
+            time: RubyTime;
           };
-          expect(record.time).toBeInstanceOf(Temporal.Instant);
-          expect(record.time.epochNanoseconds).toBe(
-            Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
-          );
+          expect(record.time).toBeInstanceOf(RubyTime);
+          expect(record.time).toEqual(RubyTime.utc(2010, 1, 1, 11, 0, 0));
         });
       } finally {
         await adapter.reconnect();
@@ -166,12 +164,10 @@ describeIfPg("PostgreSQLAdapter", () => {
           }
           await PostgresqlTimestampWithZone.loadSchema();
           const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
-            time: Temporal.Instant;
+            time: RubyTime;
           };
-          expect(record.time).toBeInstanceOf(Temporal.Instant);
-          expect(record.time.epochNanoseconds).toBe(
-            Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
-          );
+          expect(record.time).toBeInstanceOf(RubyTime);
+          expect(record.time).toEqual(RubyTime.utc(2010, 1, 1, 11, 0, 0));
         });
       } finally {
         await adapter.reconnect();
@@ -235,12 +231,10 @@ describeIfPg("PostgreSQLAdapter", () => {
               }
               await PostgresqlTimestampWithZone.loadSchema();
               const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
-                time: Temporal.Instant;
+                time: RubyTime;
               };
-              expect(record.time).toBeInstanceOf(Temporal.Instant);
-              expect(record.time.epochNanoseconds).toBe(
-                Temporal.Instant.from("2010-01-01T11:00:00Z").epochNanoseconds,
-              );
+              expect(record.time).toBeInstanceOf(RubyTime);
+              expect(record.time).toEqual(RubyTime.utc(2010, 1, 1, 11, 0, 0));
             },
           );
         });
@@ -293,7 +287,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         ).keys(),
       ];
       expect(keys.length).toBeGreaterThan(0);
-      for (const k of keys) expect(k).toBeInstanceOf(Temporal.Instant);
+      for (const k of keys) expect(k).toBeInstanceOf(RubyTime);
     });
     it("load infinity and beyond", async () => {
       class Dev extends Base {
@@ -349,36 +343,36 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("bc timestamp", async () => {
       const oidType = new OidDateTime();
-      const instant = oidType.castValue("0002-12-25 00:00:00 BC") as Temporal.Instant;
-      expect(instant.toZonedDateTimeISO("UTC").year).toBe(-1);
+      const instant = oidType.castValue("0002-12-25 00:00:00 BC") as RubyTime;
+      expect(instant.year).toBe(-1);
       const serialized = adapter.quotedDate(instant);
       expect(serialized).toBe("0002-12-25 00:00:00 BC");
       const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
       const roundTripped = rows[0].val as Temporal.Instant;
       expect(roundTripped).toBeInstanceOf(Temporal.Instant);
-      expect(roundTripped.epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect(roundTripped.epochMilliseconds).toBe(instant.toI() * 1000);
     });
     it("bc timestamp leap year", async () => {
       const oidType = new OidDateTime();
-      const instant = oidType.castValue("0005-02-29 00:00:00 BC") as Temporal.Instant;
-      expect(instant.toZonedDateTimeISO("UTC").year).toBe(-4);
+      const instant = oidType.castValue("0005-02-29 00:00:00 BC") as RubyTime;
+      expect(instant.year).toBe(-4);
       const serialized = adapter.quotedDate(instant);
       expect(serialized).toBe("0005-02-29 00:00:00 BC");
       const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
       const roundTripped = rows[0].val as Temporal.Instant;
       expect(roundTripped).toBeInstanceOf(Temporal.Instant);
-      expect(roundTripped.epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect(roundTripped.epochMilliseconds).toBe(instant.toI() * 1000);
     });
     it("bc timestamp year zero", async () => {
       const oidType = new OidDateTime();
-      const instant = oidType.castValue("0001-04-07 00:00:00 BC") as Temporal.Instant;
-      expect(instant.toZonedDateTimeISO("UTC").year).toBe(0);
+      const instant = oidType.castValue("0001-04-07 00:00:00 BC") as RubyTime;
+      expect(instant.year).toBe(0);
       const serialized = adapter.quotedDate(instant);
       expect(serialized).toBe("0001-04-07 00:00:00 BC");
       const rows = await adapter.execute(`SELECT '${serialized}'::timestamp AS val`);
       const roundTripped = rows[0].val as Temporal.Instant;
       expect(roundTripped).toBeInstanceOf(Temporal.Instant);
-      expect(roundTripped.epochMilliseconds).toBe(instant.epochMilliseconds);
+      expect(roundTripped.epochMilliseconds).toBe(instant.toI() * 1000);
     });
   });
 

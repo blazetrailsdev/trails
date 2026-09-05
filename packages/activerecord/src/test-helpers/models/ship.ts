@@ -1,6 +1,6 @@
 import { throwAbort } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
 import type { FamousPirate } from "./pirate.js";
 import type { Pirate } from "./pirate.js";
@@ -19,15 +19,15 @@ export class Ship extends Base {
   declare loadBelongsTo: ((name: "pirate") => Promise<Pirate | null>) &
     ((name: "updateOnlyPirate") => Promise<Pirate | null>) &
     ((name: "developer") => Promise<Developer | null>);
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare created_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
+  declare created_on: RubyTime | Temporal.PlainDateTime;
   declare developer_id: number;
   declare name: string;
   declare pirate_id: number;
   declare treasures_count: number | null;
   declare update_only_pirate_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
+  declare updated_on: RubyTime | Temporal.PlainDateTime;
 
   cancelSaveFromCallback: boolean = false;
 

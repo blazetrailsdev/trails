@@ -64,14 +64,14 @@ import {
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { ActiveRecord } from "../ar-config.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { travelTo, travelBack } from "@blazetrails/activesupport";
 
 class CarPolymorphicName extends Base {
   declare wheels: AssociationProxy<Wheel>;
 
   declare wheels_count: number;
-  declare wheels_owned_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare wheels_owned_at: RubyTime | Temporal.PlainDateTime;
   static {
     this.tableName = "cars";
     this.hasMany("wheels", { as: "wheelable" });
@@ -1038,17 +1038,17 @@ describe("BelongsToAssociationsTest", () => {
       parent_title: "debate2",
     });
 
-    const time = Temporal.Instant.fromEpochMilliseconds(Date.now() - 86400000);
+    const time = RubyTime.now().minus(86400) as RubyTime;
     await debate.touch({ time });
     await debate2.touch({ time });
 
     (reply as any).parent_title = "debate";
     await reply.save();
 
-    const debateAt = (await debate.reload()).updated_at as Temporal.Instant;
-    const debate2At = (await debate2.reload()).updated_at as Temporal.Instant;
-    expect(Temporal.Instant.compare(debateAt, time)).toBeGreaterThan(0);
-    expect(Temporal.Instant.compare(debate2At, time)).toBeGreaterThan(0);
+    const debateAt = (await debate.reload()).updated_at as RubyTime;
+    const debate2At = (await debate2.reload()).updated_at as RubyTime;
+    expect(debateAt.toF()).toBeGreaterThan(time.toF());
+    expect(debate2At.toF()).toBeGreaterThan(time.toF());
 
     await debate.touch({ time });
     await debate2.touch({ time });
@@ -1056,10 +1056,10 @@ describe("BelongsToAssociationsTest", () => {
     (reply as any).topicWithPrimaryKey = debate2;
     await reply.save();
 
-    const debateAt2 = (await debate.reload()).updated_at as Temporal.Instant;
-    const debate2At2 = (await debate2.reload()).updated_at as Temporal.Instant;
-    expect(Temporal.Instant.compare(debateAt2, time)).toBeGreaterThan(0);
-    expect(Temporal.Instant.compare(debate2At2, time)).toBeGreaterThan(0);
+    const debateAt2 = (await debate.reload()).updated_at as RubyTime;
+    const debate2At2 = (await debate2.reload()).updated_at as RubyTime;
+    expect(debateAt2.toF()).toBeGreaterThan(time.toF());
+    expect(debate2At2.toF()).toBeGreaterThan(time.toF());
   });
 
   it("belongs to with touch option on touch", async () => {
@@ -1089,7 +1089,7 @@ describe("BelongsToAssociationsTest", () => {
 
     const lineItem = await LineItem.create({});
     const invoice = await Invoice.create({ lineItems: [lineItem] });
-    const initial = invoice.updated_at as Temporal.Instant;
+    const initial = invoice.updated_at as RubyTime;
     travelTo(new Date(Date.now() + 1000));
     try {
       await lineItem.touch();
@@ -1097,8 +1097,8 @@ describe("BelongsToAssociationsTest", () => {
       travelBack();
     }
 
-    const reloadedAt = (await invoice.reload()).updated_at as Temporal.Instant;
-    expect(reloadedAt.equals(initial)).toBe(false);
+    const reloadedAt = (await invoice.reload()).updated_at as RubyTime;
+    expect(reloadedAt).not.toEqual(initial);
   });
 
   it("belongs to with touch option on touch and removed parent", async () => {
@@ -1709,9 +1709,7 @@ describe("BelongsToAssociationsTest", () => {
     }
 
     const reloaded = await CarPolymorphicName.find(car.id);
-    expect((reloaded.wheels_owned_at as Temporal.Instant).epochMilliseconds).toBe(
-      touchTime.getTime(),
-    );
+    expect((reloaded.wheels_owned_at as RubyTime).toF() * 1000).toBe(touchTime.getTime());
   });
 
   it("build with conditions", async () => {

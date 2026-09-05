@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { LineItem } from "./line-item.js";
 import type { ShippingLine } from "./shipping-line.js";
 import { Base } from "../../base.js";
@@ -9,7 +9,7 @@ export class Invoice extends Base {
   declare lineItems: AssociationProxy<LineItem>;
   declare shippingLines: AssociationProxy<ShippingLine>;
   declare balance: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.hasMany("lineItems", { autosave: true });

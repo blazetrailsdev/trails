@@ -1,5 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Recipe } from "./recipe.js";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
@@ -8,13 +8,13 @@ export class Chef extends Base {
   declare employable: Base | null;
   declare recipes: AssociationProxy<Recipe>;
   declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
   declare department_id: number;
   declare employable_id: number;
   declare employable_list_id: number;
   declare employable_list_type: string;
   declare employable_type: string;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.belongsTo("employable", { polymorphic: true });

@@ -5,7 +5,14 @@ import {
   Time as RubyTime,
   type DateParts,
 } from "@blazetrails/date";
-import { TimeWithZone, isBlank, include, type Included } from "@blazetrails/activesupport";
+import {
+  TimeWithZone,
+  change as timeChange,
+  isBlank,
+  include,
+  type Included,
+} from "@blazetrails/activesupport";
+import { Rational } from "@blazetrails/ruby-compat";
 import {
   AcceptsMultiparameterTime,
   type InstanceMethods,
@@ -17,23 +24,20 @@ import { ValueType } from "./value.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (time.rb:40-42); the class/interface merge is how `include()` surfaces on the type side.
 export interface TimeType
   extends
-    Omit<
-      InstanceMethods<Temporal.Instant | TimeWithZone | RubyTime>,
-      "valueFromMultiparameterAssignment"
-    >,
+    InstanceMethods<TimeWithZone | RubyTime>,
     Omit<Included<typeof TimeValue>, "userInputInTimeZone" | "serializeCastValue"> {
-  serializeCastValue(value: Temporal.Instant | TimeWithZone | RubyTime | null): unknown;
+  serializeCastValue(value: TimeWithZone | RubyTime | null): unknown;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class TimeType extends ValueType<Temporal.Instant | TimeWithZone | RubyTime> {
+export class TimeType extends ValueType<TimeWithZone | RubyTime> {
   type(): string {
     return "time";
   }
 
   userInputInTimeZone(
     value: unknown,
-  ): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | null {
+  ): TimeWithZone | Temporal.ZonedDateTime | Temporal.Instant | RubyTime | null {
     if (value == null || value === false) return null;
     if (typeof value === "string" && isBlank(value)) return null;
 
@@ -48,23 +52,31 @@ export class TimeType extends ValueType<Temporal.Instant | TimeWithZone | RubyTi
       if (timeHash == null || timeHash.hour == null) return null;
     } else if (value instanceof TimeWithZone) {
       value = value.change({ year: 2000, day: 1, month: 1 });
-    } else if (value instanceof Temporal.Instant) {
-      value = value
-        .toZonedDateTimeISO(this.#zoneId())
-        .with({ year: 2000, day: 1, month: 1 })
-        .toInstant();
+    } else if (value instanceof RubyTime) {
+      value = timeChange(value, { year: 2000, day: 1, month: 1 });
     }
 
     return TimeValue.userInputInTimeZone.call(this, value);
   }
 
   /** @internal */
-  protected castValue(value: unknown): Temporal.Instant | TimeWithZone | RubyTime | null {
+  protected castValue(value: unknown): TimeWithZone | RubyTime | null {
     if (typeof value !== "string") {
-      if (value instanceof Temporal.PlainDateTime) {
-        value = value.toZonedDateTime(this.#zoneId()).toInstant();
+      // boundary: a `Temporal.Instant` and a `Temporal.PlainDateTime` each stand for the zoneless Ruby ::Time `cast_value` receives.
+      let seconds: Rational | null = null;
+      if (value instanceof Temporal.Instant) {
+        seconds = new Rational(value.epochNanoseconds, 1_000_000_000n);
+      } else if (value instanceof Temporal.PlainDateTime) {
+        seconds = new Rational(
+          value.toZonedDateTime(this.#zoneId()).epochNanoseconds,
+          1_000_000_000n,
+        );
       }
-      return this.applySecondsPrecision(value) as Temporal.Instant | TimeWithZone | RubyTime | null;
+      if (seconds != null) {
+        const time = RubyTime.at(seconds);
+        value = this.isUtc ? time.getutc() : time.getlocal();
+      }
+      return this.applySecondsPrecision(value) as TimeWithZone | RubyTime | null;
     }
     if (value.trim() === "") return null;
 
@@ -100,19 +112,6 @@ export class TimeType extends ValueType<Temporal.Instant | TimeWithZone | RubyTi
   /** @internal */
   #zoneId(): string {
     return this.isUtc ? "UTC" : Temporal.Now.timeZoneId();
-  }
-
-  /** @internal */
-  protected valueFromMultiparameterAssignment(
-    values: Record<string, unknown>,
-  ): Temporal.Instant | null {
-    const time = (
-      acceptsMultiparameterTime.instanceMethod("valueFromMultiparameterAssignment")!.value as (
-        this: unknown,
-        valuesHash: Record<string, unknown>,
-      ) => RubyTime | null
-    ).call(this, values);
-    return time && time.toTime().toInstant();
   }
 }
 

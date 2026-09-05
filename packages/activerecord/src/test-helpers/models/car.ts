@@ -9,7 +9,7 @@ import type { PriceEstimate } from "./price-estimate.js";
 import type { Tyre } from "./tyre.js";
 import type { Wheel } from "./wheel.js";
 import { Base } from "../../base.js";
-import { Temporal } from "@blazetrails/date";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 export class Car extends Base {
   declare person: Person | null;
@@ -30,17 +30,17 @@ export class Car extends Base {
   declare static inclTyres: () => Relation<Car>;
   declare static inclEngines: () => Relation<Car>;
   declare static orderUsingNewStyle: () => Relation<Car>;
-  declare wheels_owned_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare wheels_owned_at: RubyTime | Temporal.PlainDateTime;
   declare loadBelongsTo: (name: "person") => Promise<Person | null>;
   declare loadHasOne: (name: "bulb") => Promise<Bulb | null>;
   declare bulbs_count: number;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
   declare custom_tyres_count: number;
   declare engines_count: number;
   declare lock_version: number;
   declare name: string;
   declare person_id: number;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
   declare wheels_count: number;
 
   static {

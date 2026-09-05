@@ -1,5 +1,5 @@
 import { describe, expect, beforeEach, afterEach } from "vitest";
-import { Temporal } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -7,14 +7,14 @@ import { adapterType } from "./test-adapter.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { fixtures } from "./test-fixtures.js";
 import { itIfSupports } from "./support/supports.js";
+import { Rational } from "@blazetrails/ruby-compat";
 
-function nsecTime(v: Temporal.Instant): number {
-  return Number(v.epochNanoseconds % 1_000_000_000n);
+function nsecTime(v: RubyTime): number {
+  return v.nsec;
 }
 
-function timeNowChangeNsec(nsec: number): Temporal.Instant {
-  const now = Temporal.Now.instant().epochNanoseconds;
-  return Temporal.Instant.fromEpochNanoseconds(now - (now % 1_000_000_000n) + BigInt(nsec));
+function timeNowChangeNsec(nsec: number): RubyTime {
+  return RubyTime.at(new Rational(RubyTime.now().toI(), 1)).plus(new Rational(nsec, 1_000_000_000));
 }
 
 describe("TimePrecisionTest", () => {

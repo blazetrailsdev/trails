@@ -1,11 +1,11 @@
-import type { Temporal } from "@blazetrails/date";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
 
 export class LockWithCustomColumnWithoutDefault extends Base {
   declare title: string;
   declare custom_lock_version: number;
-  declare created_at: Temporal.Instant | Temporal.PlainDateTime;
-  declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
 
   static {
     this._tableName = "lock_without_defaults_cust";
