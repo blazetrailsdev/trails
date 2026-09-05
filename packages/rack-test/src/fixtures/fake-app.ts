@@ -88,7 +88,7 @@ export class FakeApp {
       const additionalInfo =
         method === "GET"
           ? `, session ${inspect(session as Record<string, unknown>)} with options ${inspect(env["rack.session.options"] as Record<string, unknown>)}`
-          : ` using ${method.toLowerCase()} with ${params}`;
+          : ` using ${method.toLowerCase()} with ${inspect(params as Record<string, unknown>)}`;
       return [200, {}, [`You've been redirected${additionalInfo}`]];
     }
 

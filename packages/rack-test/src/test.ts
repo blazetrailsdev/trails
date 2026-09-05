@@ -130,6 +130,10 @@ export class Session {
     return this.customRequest("HEAD", uri, params, env, block);
   }
 
+  afterRequest(block: () => void): void {
+    this._afterRequest.push(block);
+  }
+
   clearCookies(): void {
     this.cookieJar = new CookieJar([], this.defaultHost);
   }
@@ -192,6 +196,50 @@ export class Session {
   }
 
   authorize = this.basicAuthorize;
+
+  async followRedirectBang(): Promise<MockResponse> {
+    if (!this.lastResponse().isRedirect) {
+      throw new Error("Last response was not a redirect. Cannot follow_redirect!");
+    }
+
+    let requestMethod: string;
+    let params: unknown;
+    if (this.lastResponse().status === 307) {
+      requestMethod = this.lastRequest().requestMethod;
+      params = this.lastRequest().params;
+    } else {
+      requestMethod = "GET";
+      params = {};
+    }
+
+    const nextLocation = URI.parse(this.lastRequest().url).merge(
+      URI.parse(this.lastResponse().getHeader("Location")),
+    );
+
+    return this.customRequest(requestMethod, nextLocation.toString(), params, {
+      HTTP_REFERER: this.lastRequest().url,
+      "rack.session": this.lastRequest().session,
+      "rack.session.options": this.lastRequest().sessionOptions,
+    });
+  }
+
+  async restoreState<T>(block: () => T | Promise<T>): Promise<T> {
+    const request = this._lastRequest;
+    const response = this._lastResponse;
+    const cookieJar = (Object.create(CookieJar.prototype) as CookieJar).initializeCopy(
+      this.cookieJar,
+    );
+    const afterRequest = this._afterRequest.slice();
+
+    try {
+      return await block();
+    } finally {
+      this._lastRequest = request;
+      this._lastResponse = response;
+      this.cookieJar = cookieJar;
+      this._afterRequest = afterRequest;
+    }
+  }
 
   /** @internal */
   private closeBody(body: unknown): void {} // eslint-disable-line unused-imports/no-unused-vars -- `def close_body(body); end` (`vendor/rack-test/lib/rack/test.rb:266`) names the argument and does nothing with it.

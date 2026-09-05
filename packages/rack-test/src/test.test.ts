@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { MockResponse, Request } from "@blazetrails/rack";
 import { FAKE_APP } from "./fixtures/fake-app.js";
 import { Error as RackTestError, Session } from "./index.js";
-import { mustBe } from "./test-helpers/assertions.js";
+import { mustBe, wontBe } from "./test-helpers/assertions.js";
 
 const app = FAKE_APP;
 
@@ -389,6 +389,75 @@ describe("Rack::Test::Session#basic_authorize", () => {
   });
 });
 
+describe("Rack::Test::Session#follow_redirect!", () => {
+  it("follows redirects", async () => {
+    await session.get("/redirect");
+    await session.followRedirectBang();
+
+    wontBe(lastResponse(), "isRedirect");
+    expect(lastResponse().bodyString).toBe("You've been redirected, session {} with options {}");
+    expect(lastRequest().env["HTTP_REFERER"]).toBe("http://example.org/redirect");
+  });
+
+  it("follows absolute redirects", async () => {
+    await session.get("/absolute/redirect");
+    expect(lastResponse().getHeader("location")).toBe("https://www.google.com");
+    await session.followRedirectBang();
+    expect(lastRequest().env["PATH_INFO"]).toBe("/");
+    expect(lastRequest().env["HTTP_HOST"]).toBe("www.google.com");
+    expect(lastRequest().env["HTTPS"]).toBe("on");
+  });
+
+  it("follows nested redirects", async () => {
+    await session.get("/nested/redirect");
+
+    expect(lastResponse().getHeader("location")).toBe("redirected");
+    await session.followRedirectBang();
+
+    mustBe(lastResponse(), "isOk");
+    expect(lastRequest().env["PATH_INFO"]).toBe("/nested/redirected");
+  });
+
+  it("does not include params when following the redirect", async () => {
+    await session.get("/redirect", { foo: "bar" });
+    await session.followRedirectBang();
+
+    assertEmpty(lastRequest().GET);
+  });
+
+  it("includes session when following the redirect", async () => {
+    await session.get("/redirect", {}, { "rack.session": { foo: "bar" } });
+    await session.followRedirectBang();
+
+    expect(lastResponse().bodyString).toMatch(/session \{"foo" ?=> ?"bar"\}/);
+  });
+
+  it("includes session options when following the redirect", async () => {
+    await session.get("/redirect", {}, { "rack.session.options": { foo: "bar" } });
+    await session.followRedirectBang();
+
+    expect(lastResponse().bodyString).toMatch(/session \{\} with options \{"foo" ?=> ?"bar"\}/);
+  });
+
+  it("raises an error if the last_response is not set", async () => {
+    await expect(session.followRedirectBang()).rejects.toThrow(RackTestError);
+  });
+
+  it("raises an error if the last_response is not a redirect", async () => {
+    await session.get("/");
+
+    await expect(session.followRedirectBang()).rejects.toThrow(RackTestError);
+  });
+
+  it("keeps the original method and params for HTTP 307", async () => {
+    await session.post("/redirect?status=307", { foo: "bar" });
+    await session.followRedirectBang();
+    expect(lastResponse().bodyString).toContain("post");
+    expect(lastResponse().bodyString).toContain("foo");
+    expect(lastResponse().bodyString).toContain("bar");
+  });
+});
+
 describe("Rack::Test::Session#last_request", () => {
   it("returns the most recent request", async () => {
     await request("/");
@@ -412,6 +481,32 @@ describe("Rack::Test::Session#last_response", () => {
     expect(() => {
       lastResponse();
     }).toThrow(RackTestError);
+  });
+});
+
+describe("Rack::Test::Session#after_request", () => {
+  it("runs callbacks after each request", async () => {
+    let ran = false;
+
+    session.afterRequest(() => {
+      ran = true;
+    });
+
+    await session.get("/");
+    expect(ran).toBe(true);
+  });
+
+  it("runs multiple callbacks", async () => {
+    let count = 0;
+
+    for (let i = 0; i < 2; i++) {
+      session.afterRequest(() => {
+        count += 1;
+      });
+    }
+
+    await session.get("/");
+    expect(count).toBe(2);
   });
 });
 
@@ -663,5 +758,35 @@ describe("Rack::Test::Session#custom_request", () => {
     await session.customRequest("link", "/", {}, { ":xhr": true });
     expect(lastRequest().env["HTTP_X_REQUESTED_WITH"]).toBe("XMLHttpRequest");
     mustBe(lastRequest(), "xhr");
+  });
+});
+
+describe("Rack::Test::Session#restore_state", () => {
+  it("restores last request, last response, cookies, and hooks after block", async () => {
+    const afterRequest: number[] = [];
+    session.afterRequest(() => afterRequest.push(1));
+
+    await session.get("/");
+    const request = lastRequest();
+    const response = lastResponse();
+    expect(session.cookieJar.get("simple")).toBeUndefined();
+    expect(afterRequest).toEqual([1]);
+
+    await session.restoreState(async () => {
+      session.afterRequest(() => afterRequest.push(2));
+      await session.get("/cookies/set-simple?value=foo");
+      expect(session.cookieJar.get("simple")).toBe("foo");
+
+      expect(lastRequest()).not.toBe(request);
+      expect(lastResponse()).not.toBe(response);
+      expect(afterRequest).toEqual([1, 1, 2]);
+    });
+
+    expect(lastRequest()).toBe(request);
+    expect(lastResponse()).toBe(response);
+    expect(session.cookieJar.get("simple")).toBeUndefined();
+
+    await session.get("/");
+    expect(afterRequest).toEqual([1, 1, 2, 1]);
   });
 });

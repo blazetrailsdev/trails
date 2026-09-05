@@ -401,10 +401,7 @@ export class Time {
     return new Time(0);
   }
 
-  static at(
-    seconds: number | bigint | Rational | Time,
-    microsecondsWithFrac?: number | bigint | Rational,
-  ): Time {
+  static at(seconds: unknown, microsecondsWithFrac?: unknown): Time {
     if (seconds instanceof Time) {
       if (microsecondsWithFrac !== undefined) {
         throw new TypeError("can't convert Time into an exact number");

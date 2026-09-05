@@ -1,5 +1,6 @@
-import { OpenSSL } from "@blazetrails/ruby-compat";
-import type { Headers } from "@blazetrails/rack";
+import { ArgumentError, OpenSSL, rbObjClass } from "@blazetrails/ruby-compat";
+import type { Metal } from "../metal.js";
+import type { Request } from "../../action-dispatch/http/request.js";
 
 export {
   BasicAuth,
@@ -10,27 +11,17 @@ export {
   type DigestAuthParams,
 } from "../../action-dispatch/http-authentication.js";
 
-export interface BasicAuthRequestLike {
-  authorization?: string | null;
-}
-
-export interface BasicAuthControllerLike {
-  headers: Headers;
-  status: number | string;
-  responseBody: string | string[] | Buffer | null | undefined;
-}
-
 function splitOnFirstWhitespace(s: string): [string, string?] {
   const trimmed = s.replace(/^\s+/, "");
   const m = /\s+/.exec(trimmed);
   return m ? [trimmed.slice(0, m.index), trimmed.slice(m.index + m[0].length)] : [trimmed];
 }
 
-const reqAuth = (request: BasicAuthRequestLike): string =>
+const reqAuth = (request: Request): string =>
   request.authorization == null ? "" : String(request.authorization);
 
 export function authenticate<T>(
-  request: BasicAuthRequestLike,
+  request: Request,
   loginProcedure: (userName: string, password: string) => T,
 ): T | undefined {
   if (!hasBasicCredentials(request)) return undefined;
@@ -38,17 +29,17 @@ export function authenticate<T>(
   return loginProcedure(user, pass);
 }
 
-export function hasBasicCredentials(request: BasicAuthRequestLike): boolean {
+export function hasBasicCredentials(request: Request): boolean {
   return reqAuth(request).trim().length > 0 && authScheme(request).toLowerCase() === "basic";
 }
 
-export function userNameAndPassword(request: BasicAuthRequestLike): [string, string] {
+export function userNameAndPassword(request: Request): [string, string] {
   const decoded = decodeCredentials(request);
   const idx = decoded.indexOf(":");
   return idx === -1 ? [decoded, ""] : [decoded.slice(0, idx), decoded.slice(idx + 1)];
 }
 
-export function decodeCredentials(request: BasicAuthRequestLike): string {
+export function decodeCredentials(request: Request): string {
   try {
     return Buffer.from(authParam(request) ?? "", "base64").toString("utf-8");
   } catch {
@@ -56,11 +47,11 @@ export function decodeCredentials(request: BasicAuthRequestLike): string {
   }
 }
 
-export function authScheme(request: BasicAuthRequestLike): string {
+export function authScheme(request: Request): string {
   return splitOnFirstWhitespace(reqAuth(request))[0];
 }
 
-export function authParam(request: BasicAuthRequestLike): string | undefined {
+export function authParam(request: Request): string | undefined {
   return splitOnFirstWhitespace(reqAuth(request))[1];
 }
 
@@ -69,7 +60,7 @@ export function encodeCredentials(userName: string, password: string): string {
 }
 
 export function authenticationRequest(
-  controller: BasicAuthControllerLike,
+  controller: Metal,
   realm: string,
   message: string | null | undefined,
 ): void {
@@ -78,12 +69,8 @@ export function authenticationRequest(
   controller.responseBody = message ?? "HTTP Basic: Access denied.\n";
 }
 
-export interface BasicControllerHost extends BasicAuthControllerLike {
-  request: BasicAuthRequestLike;
-}
-
 export function httpBasicAuthenticateOrRequestWith(
-  this: BasicControllerHost,
+  this: Metal,
   options: { name: string; password: string; realm?: string | null; message?: string | null },
 ): boolean {
   const { name, password, realm = null, message = null } = options;
@@ -100,30 +87,29 @@ export function httpBasicAuthenticateOrRequestWith(
 }
 
 export function authenticateOrRequestWithHttpBasic<T>(
-  this: BasicControllerHost,
+  this: Metal,
   realm: string | null | undefined,
   message: string | null | undefined,
   loginProcedure: (userName: string, password: string) => T,
 ): T | false {
-  const result = authenticateWithHttpBasic.call<
-    BasicControllerHost,
-    [typeof loginProcedure],
-    T | undefined
-  >(this, loginProcedure);
+  const result = authenticateWithHttpBasic.call<Metal, [typeof loginProcedure], T | undefined>(
+    this,
+    loginProcedure,
+  );
   if (result) return result;
   requestHttpBasicAuthentication.call(this, realm ?? "Application", message);
   return false;
 }
 
 export function authenticateWithHttpBasic<T>(
-  this: BasicControllerHost,
+  this: Metal,
   loginProcedure: (userName: string, password: string) => T,
 ): T | undefined {
   return authenticate(this.request, loginProcedure);
 }
 
 export function requestHttpBasicAuthentication(
-  this: BasicControllerHost,
+  this: Metal,
   realm: string = "Application",
   message: string | null | undefined = null,
 ): void {
@@ -131,7 +117,7 @@ export function requestHttpBasicAuthentication(
 }
 
 export interface BasicClassDSLHost {
-  beforeAction(cb: (controller: BasicControllerHost) => unknown, options?: unknown): unknown;
+  beforeAction(cb: (controller: Metal) => unknown, options?: unknown): unknown;
 }
 
 export function httpBasicAuthenticateWith(
@@ -139,10 +125,12 @@ export function httpBasicAuthenticateWith(
   options: { name: string; password: string; realm?: string | null; [filter: string]: unknown },
 ): void {
   if (typeof options.name !== "string") {
-    throw new TypeError(`Expected name: to be a String, got ${typeof options.name}`);
+    throw new ArgumentError(`Expected name: to be a String, got ${rbObjClass(options.name)}`);
   }
   if (typeof options.password !== "string") {
-    throw new TypeError(`Expected password: to be a String, got ${typeof options.password}`);
+    throw new ArgumentError(
+      `Expected password: to be a String, got ${rbObjClass(options.password)}`,
+    );
   }
   const { name, password, realm = null, ...rest } = options;
   this.beforeAction(function (controller) {
@@ -157,26 +145,12 @@ function secureCompare(a: string, b: string): 0 | 1 {
   return diff === 0 ? 1 : 0;
 }
 
-export interface DigestRequestLike {
-  authorization?: string | null;
-  keyGenerator: { generateKey(salt: string, keySize?: number): Buffer | string };
-  httpAuthSalt: string;
-  getHeader(name: string): string | undefined | null;
-}
-export interface DigestControllerLike {
-  headers: Headers;
-  status: number | string;
-  responseBody: string | string[] | Buffer | null | undefined;
-  request: DigestRequestLike;
-}
 export type DigestCredentials = Record<string, string | undefined>;
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface DigestControllerHost extends DigestControllerLike {}
 
 const md5Hex = (data: string) => OpenSSL.Digest.MD5.hexdigest(data);
 
 export function digestAuthenticate(
-  request: DigestRequestLike,
+  request: Request,
   realm: string,
   passwordProcedure: (username: string) => string | null | undefined,
 ): boolean {
@@ -184,7 +158,7 @@ export function digestAuthenticate(
 }
 
 export function validateDigestResponse(
-  request: DigestRequestLike,
+  request: Request,
   realm: string,
   passwordProcedure: (username: string) => string | null | undefined,
 ): boolean {
@@ -246,7 +220,7 @@ export function encodeDigestCredentials(
   );
 }
 
-export function decodeCredentialsHeader(request: DigestRequestLike): DigestCredentials {
+export function decodeCredentialsHeader(request: Request): DigestCredentials {
   return decodeDigestCredentials(request.authorization ?? "");
 }
 
@@ -267,7 +241,7 @@ export function decodeDigestCredentials(header: string): DigestCredentials {
   return result;
 }
 
-export function authenticationHeader(controller: DigestControllerLike, realm: string): void {
+export function authenticationHeader(controller: Metal, realm: string): void {
   const sk = secretToken(controller.request);
   controller.headers.set(
     "WWW-Authenticate",
@@ -276,7 +250,7 @@ export function authenticationHeader(controller: DigestControllerLike, realm: st
 }
 
 export function digestAuthenticationRequest(
-  controller: DigestControllerLike,
+  controller: Metal,
   realm: string,
   message?: string | null,
 ): void {
@@ -285,8 +259,10 @@ export function digestAuthenticationRequest(
   controller.responseBody = message ?? "HTTP Digest: Access denied.\n";
 }
 
-export function secretToken(request: DigestRequestLike): string {
-  const key = request.keyGenerator.generateKey(request.httpAuthSalt);
+export function secretToken(request: Request): string {
+  const keyGenerator = request.keyGenerator!;
+  const httpAuthSalt = request.httpAuthSalt as string;
+  const key = keyGenerator.generateKey(httpAuthSalt);
   return Buffer.isBuffer(key) ? key.toString("binary") : key;
 }
 
@@ -297,7 +273,7 @@ export function nonce(secretKey: string, time?: number): string {
 
 export function validateNonce(
   secretKey: string,
-  _request: DigestRequestLike,
+  _request: Request,
   value: string | null | undefined,
   secondsToTimeout = 5 * 60,
 ): boolean {
@@ -315,7 +291,7 @@ export function opaque(secretKey: string): string {
 }
 
 export function authenticateOrRequestWithHttpDigest(
-  this: DigestControllerHost,
+  this: Metal,
   realm = "Application",
   message: string | null | undefined,
   passwordProcedure: (username: string) => string | null | undefined,
@@ -327,7 +303,7 @@ export function authenticateOrRequestWithHttpDigest(
 }
 
 export function authenticateWithHttpDigest(
-  this: DigestControllerHost,
+  this: Metal,
   realm = "Application",
   passwordProcedure: (username: string) => string | null | undefined,
 ): boolean {
@@ -337,7 +313,7 @@ export function authenticateWithHttpDigest(
 }
 
 export function requestHttpDigestAuthentication(
-  this: DigestControllerHost,
+  this: Metal,
   realm = "Application",
   message: string | null | undefined = null,
 ): void {

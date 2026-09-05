@@ -1,21 +1,23 @@
 import { describe, it, expect } from "vitest";
-import { Headers } from "@blazetrails/rack";
+import { Base } from "../base.js";
+import type { Metal } from "../metal.js";
+import { Request } from "../../action-dispatch/http/request.js";
 import {
   encodeCredentials,
   authenticateOrRequestWithHttpBasic,
   authenticateWithHttpBasic,
   requestHttpBasicAuthentication,
   httpBasicAuthenticateWith,
-  type BasicControllerHost,
 } from "../metal/http-authentication.js";
 
-function makeController(authHeader?: string): BasicControllerHost {
-  return {
-    request: { authorization: authHeader },
-    headers: new Headers(),
-    status: 200,
-    responseBody: null,
-  };
+class TestController extends Base {}
+
+function makeController(authHeader?: string): TestController {
+  const request = new Request(authHeader === undefined ? {} : { HTTP_AUTHORIZATION: authHeader });
+  const controller = new TestController();
+  controller.setRequestBang(request);
+  controller.setResponseBang(TestController.makeResponseBang(request));
+  return controller;
 }
 
 describe("HttpBasicAuthenticationTest", () => {
@@ -169,9 +171,9 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authenticate with class method", () => {
-    const beforeActionCalls: Array<(c: BasicControllerHost) => unknown> = [];
+    const beforeActionCalls: Array<(c: Metal) => unknown> = [];
     const host = {
-      beforeAction(cb: (c: BasicControllerHost) => unknown) {
+      beforeAction(cb: (c: Metal) => unknown) {
         beforeActionCalls.push(cb);
       },
     };

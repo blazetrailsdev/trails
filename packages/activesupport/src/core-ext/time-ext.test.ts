@@ -1031,49 +1031,41 @@ describe("TimeExtCalculationsTest", () => {
 
   it("at with datetime", () => {
     expect(
-      RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0) as never)
+      RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0))
         .toR()
         .toString(),
     ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
 
-    expect(() => RubyTime.at(RubyTime.now() as never, 0)).toThrow(TypeError);
-    expect(() => RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0) as never, 0)).toThrow(
-      TypeError,
-    );
+    expect(() => RubyTime.at(RubyTime.now(), 0)).toThrow(TypeError);
+    expect(() => RubyTime.at(RubyDateTime.civil(2000, 1, 1, 0, 0, 0), 0)).toThrow(TypeError);
   });
 
   it("at with datetime returns local time", () => {
     withEnvTz("US/Eastern", () => {
       let dt = RubyDateTime.civil(2000, 1, 1, 0, 0, 0, 0);
-      expect(
-        RubyTime.at(dt as never)
-          .toR()
-          .toString(),
-      ).toBe(RubyTime.local(1999, 12, 31, 19, 0, 0).toR().toString());
-      expect(RubyTime.at(dt as never).zone).toBe("EST");
-      expect(RubyTime.at(dt as never).utcOffset).toBe(-18000);
+      expect(RubyTime.at(dt).toR().toString()).toBe(
+        RubyTime.local(1999, 12, 31, 19, 0, 0).toR().toString(),
+      );
+      expect(RubyTime.at(dt).zone).toBe("EST");
+      expect(RubyTime.at(dt).utcOffset).toBe(-18000);
 
       dt = RubyDateTime.civil(2000, 7, 1, 1, 0, 0, new Rational(1, 24));
-      expect(
-        RubyTime.at(dt as never)
-          .toR()
-          .toString(),
-      ).toBe(RubyTime.local(2000, 6, 30, 20, 0, 0).toR().toString());
-      expect(RubyTime.at(dt as never).zone).toBe("EDT");
-      expect(RubyTime.at(dt as never).utcOffset).toBe(-14400);
+      expect(RubyTime.at(dt).toR().toString()).toBe(
+        RubyTime.local(2000, 6, 30, 20, 0, 0).toR().toString(),
+      );
+      expect(RubyTime.at(dt).zone).toBe("EDT");
+      expect(RubyTime.at(dt).utcOffset).toBe(-14400);
     });
   });
 
   it("at with time with zone", () => {
     const twz = new TimeWithZone(RubyTime.utc(2000, 1, 1, 0, 0, 0), TimeZone.find("UTC")!);
-    expect(
-      RubyTime.at(twz as never)
-        .toR()
-        .toString(),
-    ).toBe(RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString());
+    expect(RubyTime.at(twz).toR().toString()).toBe(
+      RubyTime.utc(2000, 1, 1, 0, 0, 0).toR().toString(),
+    );
 
-    expect(() => RubyTime.at(RubyTime.now() as never, 0)).toThrow(TypeError);
-    expect(() => RubyTime.at(twz as never, 0)).toThrow(TypeError);
+    expect(() => RubyTime.at(RubyTime.now(), 0)).toThrow(TypeError);
+    expect(() => RubyTime.at(twz, 0)).toThrow(TypeError);
   });
 
   it("at with in option", () => {
@@ -1086,22 +1078,18 @@ describe("TimeExtCalculationsTest", () => {
   it("at with time with zone returns local time", () => {
     withEnvTz("US/Eastern", () => {
       let twz = new TimeWithZone(RubyTime.utc(2000, 1, 1, 0, 0, 0), TimeZone.find("London")!);
-      expect(
-        RubyTime.at(twz as never)
-          .toR()
-          .toString(),
-      ).toBe(RubyTime.local(1999, 12, 31, 19, 0, 0).toR().toString());
-      expect(RubyTime.at(twz as never).zone).toBe("EST");
-      expect(RubyTime.at(twz as never).utcOffset).toBe(-18000);
+      expect(RubyTime.at(twz).toR().toString()).toBe(
+        RubyTime.local(1999, 12, 31, 19, 0, 0).toR().toString(),
+      );
+      expect(RubyTime.at(twz).zone).toBe("EST");
+      expect(RubyTime.at(twz).utcOffset).toBe(-18000);
 
       twz = new TimeWithZone(RubyTime.utc(2000, 7, 1, 0, 0, 0), TimeZone.find("London")!);
-      expect(
-        RubyTime.at(twz as never)
-          .toR()
-          .toString(),
-      ).toBe(RubyTime.local(2000, 6, 30, 20, 0, 0).toR().toString());
-      expect(RubyTime.at(twz as never).zone).toBe("EDT");
-      expect(RubyTime.at(twz as never).utcOffset).toBe(-14400);
+      expect(RubyTime.at(twz).toR().toString()).toBe(
+        RubyTime.local(2000, 6, 30, 20, 0, 0).toR().toString(),
+      );
+      expect(RubyTime.at(twz).zone).toBe("EDT");
+      expect(RubyTime.at(twz).utcOffset).toBe(-14400);
     });
   });
 

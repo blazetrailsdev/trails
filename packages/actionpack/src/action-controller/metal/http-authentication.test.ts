@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { Headers } from "@blazetrails/rack";
+import { Base } from "../base.js";
+import { Request } from "../../action-dispatch/http/request.js";
 import {
   authenticate,
   authenticationRequest,
@@ -14,7 +15,6 @@ import {
   httpBasicAuthenticateOrRequestWith,
   httpBasicAuthenticateWith,
   requestHttpBasicAuthentication,
-  type BasicControllerHost,
   decodeDigestCredentials,
   expectedResponse,
   ha1,
@@ -26,17 +26,20 @@ import {
   secretToken,
   validateDigestResponse,
   requestHttpDigestAuthentication,
-  type DigestControllerHost,
-  type DigestRequestLike,
 } from "./http-authentication.js";
 
-const req = (auth?: string) => ({ authorization: auth });
-const ctrl = (auth?: string): BasicControllerHost => ({
-  request: req(auth),
-  headers: new Headers(),
-  status: 200,
-  responseBody: null,
-});
+class TestController extends Base {}
+
+const req = (auth?: string) => new Request(auth === undefined ? {} : { HTTP_AUTHORIZATION: auth });
+
+function controllerFor(request: Request): TestController {
+  const controller = new TestController();
+  controller.setRequestBang(request);
+  controller.setResponseBang(TestController.makeResponseBang(request));
+  return controller;
+}
+
+const ctrl = (auth?: string): TestController => controllerFor(req(auth));
 
 describe("HttpAuthentication::Basic", () => {
   it("encode/decode round-trip, including colons in password", () => {
@@ -71,7 +74,7 @@ describe("HttpAuthentication::Basic", () => {
   });
 
   it("authenticationRequest writes 401 + WWW-Authenticate and strips realm quotes", () => {
-    const c = { headers: new Headers(), status: 200, responseBody: null };
+    const c = ctrl();
     authenticationRequest(c, 'Evil"Realm', null);
     expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="EvilRealm"');
     expect(c.status).toBe(401);
@@ -145,22 +148,17 @@ function makeKeyGenerator(secret: string) {
   };
 }
 
-function makeDigestRequest(auth?: string): DigestRequestLike {
-  return {
-    authorization: auth,
-    keyGenerator: makeKeyGenerator(SECRET),
-    httpAuthSalt: SALT,
-    getHeader: () => null,
+function makeDigestRequest(auth?: string): Request {
+  const env: Record<string, unknown> = {
+    "action_dispatch.key_generator": makeKeyGenerator(SECRET),
+    "action_dispatch.http_auth_salt": SALT,
   };
+  if (auth !== undefined) env["HTTP_AUTHORIZATION"] = auth;
+  return new Request(env);
 }
 
-function makeDigestCtrl(auth?: string): DigestControllerHost {
-  return {
-    request: makeDigestRequest(auth),
-    headers: new Headers(),
-    status: 200,
-    responseBody: null,
-  };
+function makeDigestCtrl(auth?: string): TestController {
+  return controllerFor(makeDigestRequest(auth));
 }
 
 describe("HttpAuthentication::Digest", () => {
@@ -274,7 +272,7 @@ describe("HttpAuthentication::Digest", () => {
     };
     const response = expectedResponse("GET", "/", creds, "world", false);
     const header = `Digest username="lifo", realm="SuperSecret", nonce="${nonceVal}", uri="/", nc=00000001, cnonce="0a4f113b", qop=auth, response="${response}", opaque="${opaqueVal}"`;
-    const req = { ...makeDigestRequest(header) };
+    const req = makeDigestRequest(header);
     expect(validateDigestResponse(req, "SuperSecret", () => null)).toBe(false);
   });
 });
