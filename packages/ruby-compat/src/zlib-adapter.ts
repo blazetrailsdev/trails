@@ -114,7 +114,7 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
 }
 
 type NodeGzipStream = {
-  on(event: string, listener: (chunk?: Uint8Array) => void): void;
+  on(event: string, listener: (arg?: unknown) => void): void;
   write(data: Uint8Array): void;
   flush(): void;
   end(): void;
@@ -137,7 +137,10 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
     gzipWriter: (io) => {
       const stream = zlib.createGzip();
       stream.on("data", (chunk) => io.write(chunk as Uint8Array));
-      const ended = new Promise<void>((res) => stream.on("end", () => res()));
+      const ended = new Promise<void>((res, rej) => {
+        stream.on("end", () => res());
+        stream.on("error", (err) => rej(err as Error));
+      });
       return {
         mtime: null,
         write: (data) => stream.write(data),

@@ -154,11 +154,10 @@ export class GzipStream {
           if (this.sync) gzip.flush();
         }
       } else {
-        const eachPart: (visit: (part: string) => void) => void =
-          typeof this.body.each === "function"
-            ? (visit) => this.body.each(visit)
-            : (visit) => this.body.forEach(visit);
-        eachPart((part: string) => {
+        const each = (this.body.each ?? this.body.forEach) as (
+          visit: (part: string) => void,
+        ) => void;
+        each.call(this.body, (part: string) => {
           if (part.length === 0) return;
           gzip.write(Buffer.from(String(part), "binary"));
           if (this.sync) gzip.flush();

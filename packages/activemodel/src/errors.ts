@@ -104,9 +104,8 @@ export class Errors<TBase extends object = object> {
   }
 
   delete(attribute: string, type?: string, options?: Record<string, unknown>): string[] | null {
-    let normType: string | undefined;
-    [attribute, normType, options] = this.normalizeArguments(attribute, type, options);
-    const matches = this.where(attribute, normType, options);
+    [attribute, type, options] = this.normalizeArguments(attribute, type, options);
+    const matches = this.where(attribute, type, options);
     for (const error of matches) {
       this._errors = this._errors.filter((e) => !rbEqual(e, error));
     }
