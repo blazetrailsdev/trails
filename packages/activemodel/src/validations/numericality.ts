@@ -277,15 +277,6 @@ export function prepareValueForValidation(
   return rawValue !== undefined && rawValue !== null && rawValue !== false ? rawValue : value;
 }
 
-function respondTo(obj: RecordWithRawAttribute, method: string): boolean {
-  return method in obj;
-}
-
-function publicSend(obj: RecordWithRawAttribute, method: string): unknown {
-  const value = obj[method];
-  return typeof value === "function" ? (value as () => unknown).call(obj) : value;
-}
-
 interface RecordWithRawAttribute {
   attributeChangedInPlace?: (name: string) => boolean;
   readAttribute?: (name: string) => unknown;
@@ -305,6 +296,15 @@ export function isRecordAttributeChangedInPlace(
 function parseFloat(num: number, precision: number, scale?: number): number {
   if (!Number.isFinite(num)) return num;
   return Number(new BigDecimal(round(num, scale), precision).toString("F"));
+}
+
+function respondTo(obj: RecordWithRawAttribute, method: string): boolean {
+  return method in obj;
+}
+
+function publicSend(obj: RecordWithRawAttribute, method: string): unknown {
+  const value = obj[method];
+  return typeof value === "function" ? (value as () => unknown).call(obj) : value;
 }
 
 NumericalityValidator.prototype.optionAsNumber = optionAsNumber;

@@ -5,12 +5,10 @@
 import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
 import { JSON as JSONHost } from "./json.js";
-import type { ModelName } from "../naming.js";
 
 describe("Serializers::JSON host", () => {
   class Person {
-    declare static modelName: ModelName;
-    declare static includeRootInJson: boolean | string;
+    declare static modelName: (typeof JSONHost)["modelName"];
 
     static {
       include(this, JSONHost);
@@ -42,8 +40,7 @@ describe("Serializers::JSON host", () => {
     expect(Person.modelName).toBe(Person.modelName);
 
     class Other {
-      declare static modelName: ModelName;
-      declare static includeRootInJson: boolean | string;
+      declare static modelName: (typeof JSONHost)["modelName"];
 
       static {
         include(this, JSONHost);
@@ -86,8 +83,8 @@ describe("Serializers::JSON host", () => {
 
   it("includeRootInJson default applies when no root option passed", () => {
     class Rooted {
-      declare static modelName: ModelName;
-      declare static includeRootInJson: boolean | string;
+      declare static modelName: (typeof JSONHost)["modelName"];
+      declare static includeRootInJson: (typeof JSONHost)["includeRootInJson"];
 
       static {
         include(this, JSONHost);
@@ -128,9 +125,6 @@ describe("Serializers::JSON host", () => {
 
   it("asJson coerces JSON-unsafe values (e.g. bigint)", () => {
     class Big {
-      declare static modelName: ModelName;
-      declare static includeRootInJson: boolean | string;
-
       static {
         include(this, JSONHost);
         Object.defineProperty(this.prototype, "attributes", {
@@ -157,8 +151,7 @@ describe("Serializers::JSON host", () => {
 
   it("includeRootInJson accepts a string custom root", () => {
     class CustomRooted {
-      declare static modelName: ModelName;
-      declare static includeRootInJson: boolean | string;
+      declare static includeRootInJson: (typeof JSONHost)["includeRootInJson"];
 
       static {
         include(this, JSONHost);
@@ -187,8 +180,7 @@ describe("Serializers::JSON host", () => {
 
   it("fromJson always unwraps via first-value semantics (Rails hash.values.first)", () => {
     class Keyed {
-      declare static modelName: ModelName;
-      declare static includeRootInJson: boolean | string;
+      declare static includeRootInJson: (typeof JSONHost)["includeRootInJson"];
 
       static {
         include(this, JSONHost);
@@ -216,8 +208,7 @@ describe("Serializers::JSON host", () => {
 
   it("fromJson treats an explicitly passed nil includeRoot as nil, not the class default", () => {
     class ExplicitNil {
-      declare static modelName: ModelName;
-      declare static includeRootInJson: boolean | string;
+      declare static includeRootInJson: (typeof JSONHost)["includeRootInJson"];
 
       static {
         include(this, JSONHost);
@@ -244,8 +235,7 @@ describe("Serializers::JSON host", () => {
 
   it("fromJson uses class-level includeRootInJson default when no second arg passed", () => {
     class Defaulted {
-      declare static modelName: ModelName;
-      declare static includeRootInJson: boolean | string;
+      declare static includeRootInJson: (typeof JSONHost)["includeRootInJson"];
 
       static {
         include(this, JSONHost);

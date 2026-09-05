@@ -32,7 +32,7 @@ export class AttributeSetCodecError extends Error {
   }
 }
 
-const UNKNOWN_TYPE_KEY = "?";
+const UNKNOWN_TYPE_KEY = "?unregistered";
 
 const warnedKeys = new Set<string>();
 
