@@ -19,7 +19,6 @@ import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {
-  ActiveRecordError,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
@@ -1005,9 +1004,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /** @internal */
   protected mismatchedForeignKey(
     message: string,
-    sql: string | null,
-    binds: unknown[],
-    connectionPool: AbstractAdapter["pool"],
+    {
+      sql,
+      binds,
+      connectionPool,
+    }: { sql: string | null; binds: unknown[]; connectionPool: AbstractAdapter["pool"] },
   ): MismatchedForeignKey {
     if (sql) {
       const details = this.mismatchedForeignKeyDetails({ message, sql });
@@ -1088,74 +1089,62 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
-  protected _translateException(e: unknown, sql: string, binds: unknown[]): Error {
-    if (e instanceof ActiveRecordError) return e;
-    const build = (): Error => {
-      if (!(e instanceof Error))
-        return new StatementInvalid(String(e), { sql, binds, connectionPool: this.pool });
-      const errno = this.errorNumber(e) ?? undefined;
-      const msg = e.message;
-      if (typeof errno !== "number") {
-        if (/MySQL client is not connected/i.test(msg)) {
-          return new ConnectionNotEstablished(e, { connectionPool: this.pool });
-        }
-      }
-      switch (errno) {
-        case ER_DB_CREATE_EXISTS:
-          return new DatabaseAlreadyExists(msg, { sql, binds, connectionPool: this.pool });
-        case ER_DUP_ENTRY:
-          return new RecordNotUnique(msg, { sql, binds, connectionPool: this.pool });
-        case ER_NO_REFERENCED_ROW:
-        case ER_ROW_IS_REFERENCED:
-        case ER_ROW_IS_REFERENCED_2:
-        case ER_NO_REFERENCED_ROW_2:
-          return new InvalidForeignKey(msg, { sql, binds, connectionPool: this.pool });
-        case ER_CANNOT_ADD_FOREIGN:
-        case ER_FK_INCOMPATIBLE_COLUMNS:
-          return this.mismatchedForeignKey(msg, sql, binds, this.pool);
-        case ER_CANNOT_CREATE_TABLE:
-          if (msg.includes("errno: 150") || msg.includes("errno 150")) {
-            return this.mismatchedForeignKey(msg, sql, binds, this.pool);
-          }
-          return new StatementInvalid(msg, { sql, binds, connectionPool: this.pool });
-        case ER_NOT_NULL_VIOLATION:
-        case ER_DO_NOT_HAVE_DEFAULT:
-          return new NotNullViolation(msg, { sql, binds, connectionPool: this.pool });
-        case ER_DATA_TOO_LONG:
-          return new ValueTooLong(msg, { sql, binds, connectionPool: this.pool });
-        case ER_OUT_OF_RANGE:
-          return new ARRangeError(msg, { sql, binds, connectionPool: this.pool });
-        case ER_LOCK_DEADLOCK:
-          return new Deadlocked(msg, { sql, binds, connectionPool: this.pool });
-        case ER_LOCK_WAIT_TIMEOUT:
-          return new LockWaitTimeout(msg, { sql, binds, connectionPool: this.pool });
-        case ER_QUERY_TIMEOUT:
-        case ER_FILSORT_ABORT:
-          return new StatementTimeout(msg, { sql, binds, connectionPool: this.pool });
-        case ER_QUERY_INTERRUPTED:
-          return new QueryCanceled(msg, { sql, binds, connectionPool: this.pool });
-        case ER_CONNECTION_KILLED:
-        case ER_SERVER_SHUTDOWN:
-        case CR_SERVER_GONE_ERROR:
-        case CR_SERVER_LOST:
-        case ER_CLIENT_INTERACTION_TIMEOUT:
-          return new ConnectionFailed(msg, { sql, binds, connectionPool: this.pool });
-        default:
-          return typeof errno === "number" && errno > 0 && e instanceof StatementInvalid === false
-            ? new StatementInvalid(msg, { sql, binds, connectionPool: this.pool })
-            : e;
-      }
-    };
-    const translated = build();
-    if (translated !== e && (translated as { cause?: unknown }).cause === undefined) {
-      (translated as { cause?: unknown }).cause = e;
-    }
-    return translated;
-  }
-
   /** @internal */
-  translateException(exception: unknown, opts: { sql: string; binds: unknown[] }): Error {
-    return this._translateException(exception, opts.sql, opts.binds);
+  translateException(
+    exception: unknown,
+    { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
+  ): unknown {
+    const exceptionMessage = exception instanceof Error ? exception.message : String(exception);
+    switch (this.errorNumber(exception as Error & { errno?: number })) {
+      case null:
+        if (/MySQL client is not connected/i.test(exceptionMessage)) {
+          return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
+        } else {
+          return super.translateException(exception, { message, sql, binds });
+        }
+      case ER_CONNECTION_KILLED:
+      case ER_SERVER_SHUTDOWN:
+      case CR_SERVER_GONE_ERROR:
+      case CR_SERVER_LOST:
+      case ER_CLIENT_INTERACTION_TIMEOUT:
+        return new ConnectionFailed(message, { sql, binds, connectionPool: this.pool });
+      case ER_DB_CREATE_EXISTS:
+        return new DatabaseAlreadyExists(message, { sql, binds, connectionPool: this.pool });
+      case ER_DUP_ENTRY:
+        return new RecordNotUnique(message, { sql, binds, connectionPool: this.pool });
+      case ER_NO_REFERENCED_ROW:
+      case ER_ROW_IS_REFERENCED:
+      case ER_ROW_IS_REFERENCED_2:
+      case ER_NO_REFERENCED_ROW_2:
+        return new InvalidForeignKey(message, { sql, binds, connectionPool: this.pool });
+      case ER_CANNOT_ADD_FOREIGN:
+      case ER_FK_INCOMPATIBLE_COLUMNS:
+        return this.mismatchedForeignKey(message, { sql, binds, connectionPool: this.pool });
+      case ER_CANNOT_CREATE_TABLE:
+        if (message.includes("errno: 150")) {
+          return this.mismatchedForeignKey(message, { sql, binds, connectionPool: this.pool });
+        } else {
+          return super.translateException(exception, { message, sql, binds });
+        }
+      case ER_DATA_TOO_LONG:
+        return new ValueTooLong(message, { sql, binds, connectionPool: this.pool });
+      case ER_OUT_OF_RANGE:
+        return new ARRangeError(message, { sql, binds, connectionPool: this.pool });
+      case ER_NOT_NULL_VIOLATION:
+      case ER_DO_NOT_HAVE_DEFAULT:
+        return new NotNullViolation(message, { sql, binds, connectionPool: this.pool });
+      case ER_LOCK_DEADLOCK:
+        return new Deadlocked(message, { sql, binds, connectionPool: this.pool });
+      case ER_LOCK_WAIT_TIMEOUT:
+        return new LockWaitTimeout(message, { sql, binds, connectionPool: this.pool });
+      case ER_QUERY_TIMEOUT:
+      case ER_FILSORT_ABORT:
+        return new StatementTimeout(message, { sql, binds, connectionPool: this.pool });
+      case ER_QUERY_INTERRUPTED:
+        return new QueryCanceled(message, { sql, binds, connectionPool: this.pool });
+      default:
+        return super.translateException(exception, { message, sql, binds });
+    }
   }
 
   /** @internal */

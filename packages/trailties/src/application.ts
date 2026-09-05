@@ -146,7 +146,7 @@ export class Application extends Engine {
 
   async initialize(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
-    const bootRoot = await this.resolvedRoot();
+    const bootRoot = await this.root();
     setTrailsRoot(() => this.config.root ?? bootRoot);
     await this.runInitializers(group, this);
     this._initialized = true;
@@ -221,7 +221,7 @@ export class Application extends Engine {
   async credentials(): Promise<EncryptedFile> {
     if (this._credentials) return this._credentials;
     const c = this.config.credentials;
-    const def = await defaultCredentialPaths(await this.resolvedRoot());
+    const def = await defaultCredentialPaths(await this.root());
     return (this._credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
       keyPath: c.keyPath ?? def.keyPath,
     }));
@@ -232,7 +232,7 @@ export class Application extends Engine {
     opts: { keyPath?: string; envKey?: string } = {},
   ): Promise<EncryptedFile> {
     const p = getPath();
-    const root = await this.resolvedRoot();
+    const root = await this.root();
     return new EncryptedFile({
       contentPath: p.resolve(root, path),
       keyPath: p.resolve(root, opts.keyPath ?? "config/master.key"),
@@ -245,11 +245,7 @@ export class Application extends Engine {
     if (name !== "database") {
       throw new Error(`configFor: only "database" is supported in trailties (got "${name}").`);
     }
-    return loadDatabaseConfig(opts.env ?? resolveEnv(), await this.resolvedRoot());
-  }
-
-  async resolvedRoot(): Promise<string> {
-    return this.config.root ?? (await this.root());
+    return loadDatabaseConfig(opts.env ?? resolveEnv(), await this.root());
   }
 }
 

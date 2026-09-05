@@ -121,4 +121,15 @@ describe("RailtieTest", () => {
     await runTrailtieInitializers(Trailtie, app);
     expect(Digest.hashDigestClass).toBe(before);
   });
+
+  it("runInitializers reads hashDigestClass off the yielded application's config", async () => {
+    const custom = { hexdigest: (data: string): string => `custom:${data}` };
+    const appConfig: Record<string, unknown> = {
+      activeSupport: { hashDigestClass: custom } satisfies ActiveSupportConfig,
+    };
+    const yieldedApp = { config: { get: (key: string): unknown => appConfig[key] }, deprecators };
+    Trailtie.config.set("activeSupport", {} satisfies ActiveSupportConfig);
+    await runTrailtieInitializers(Trailtie, yieldedApp);
+    expect(Digest.hashDigestClass).toBe(custom);
+  });
 });

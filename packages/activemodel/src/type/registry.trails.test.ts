@@ -30,6 +30,12 @@ describe("TypeRegistry", () => {
     expect(() => Types.typeRegistry.lookup("imaginary")).toThrow("Unknown type :imaginary");
   });
 
+  it("a new registry is empty — the defaults are registered by type.ts, not the constructor", () => {
+    const fresh = new TypeRegistry();
+    expect(() => fresh.lookup("string")).toThrow("Unknown type :string");
+    expect(() => fresh.lookup("integer")).toThrow("Unknown type :integer");
+  });
+
   it("uuid, json, array are not in AM TypeRegistry defaults (PG-specific types live in AR's OID layer)", () => {
     const fresh = new TypeRegistry();
     expect(() => fresh.lookup("uuid")).toThrow("Unknown type :uuid");

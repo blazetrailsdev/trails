@@ -50,7 +50,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       AbstractMysqlAdapter.ER_CLIENT_INTERACTION_TIMEOUT,
     ]) {
       const driverErr = Object.assign(new Error("conn lost"), { errno });
-      const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
+      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(ConnectionFailed);
       expect((translated as ConnectionFailed).cause).toBe(driverErr);
     }
@@ -77,7 +77,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     ];
     for (const [errno, klass] of cases) {
       const driverErr = Object.assign(new Error("fail"), { errno });
-      const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
+      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(klass);
       expect((translated as Error & { cause?: unknown }).cause).toBe(driverErr);
     }
@@ -87,11 +87,11 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     const codedErr = Object.assign(new Error("MySQL client is not connected"), {
       code: "PROTOCOL_CONNECTION_LOST",
     });
-    expect(adapter.translateException(codedErr, { sql: "SELECT 1", binds: [] })).toBeInstanceOf(
+    expect(adapter.translateExceptionClass(codedErr, "SELECT 1", [])).toBeInstanceOf(
       ConnectionNotEstablished,
     );
     const plainErr = new Error("MySQL client is not connected");
-    expect(adapter.translateException(plainErr, { sql: "SELECT 1", binds: [] })).toBeInstanceOf(
+    expect(adapter.translateExceptionClass(plainErr, "SELECT 1", [])).toBeInstanceOf(
       ConnectionNotEstablished,
     );
   });
@@ -111,7 +111,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
       "EPIPE",
     ]) {
       const driverErr = Object.assign(new Error("connection lost"), { code });
-      const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
+      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(ConnectionFailed);
     }
   });

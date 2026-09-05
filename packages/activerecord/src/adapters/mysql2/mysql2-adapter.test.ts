@@ -285,10 +285,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
     const driverErr = Object.assign(new Error("read ETIMEDOUT"), {
       code: "PROTOCOL_SEQUENCE_TIMEOUT",
     });
-    const translated = adapter.translateException(driverErr, {
-      sql: "SELECT SLEEP(2)",
-      binds: [],
-    });
+    const translated = adapter.translateExceptionClass(driverErr, "SELECT SLEEP(2)", []);
     expect(translated).toBeInstanceOf(AdapterTimeout);
     expect(translated).toBeInstanceOf(QueryAborted);
     expect((translated as AdapterTimeout).cause).toBe(driverErr);
@@ -301,7 +298,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
       AbstractMysqlAdapter.ER_FILSORT_ABORT,
     ]) {
       const driverErr = Object.assign(new Error("fail"), { errno });
-      const translated = adapter.translateException(driverErr, { sql: "SELECT 1", binds: [] });
+      const translated = adapter.translateExceptionClass(driverErr, "SELECT 1", []);
       expect(translated).toBeInstanceOf(StatementTimeout);
       expect((translated as StatementTimeout).cause).toBe(driverErr);
       expect((translated as StatementTimeout).connectionPool).toBe(adapter.pool);

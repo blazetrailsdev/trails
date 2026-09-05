@@ -8,7 +8,6 @@ export class NumberToPercentageConverter extends NumberConverter<NumberToPercent
   protected convert(): string {
     const options = this.options;
     const roundedNumber = NumberToRoundedConverter.convert(this.number, options);
-    const format = (options.format ?? "%n%") as string;
-    return format.replaceAll("%n", roundedNumber);
+    return (options.format as string).replaceAll("%n", roundedNumber);
   }
 }
