@@ -255,11 +255,7 @@ export function advance(
   if (options.weeks) d = d.add({ days: options.weeks * 7 });
   if (options.days) d = d.add({ days: options.days });
 
-  const timeAdvancedByDate = change(date as Date, {
-    year: d.year,
-    month: d.month,
-    day: d.day,
-  }) as Temporal.Instant | Temporal.ZonedDateTime;
+  const timeAdvancedByDate = change(date, { year: d.year, month: d.month, day: d.day });
   const secondsToAdvance =
     (options.seconds ?? 0) + (options.minutes ?? 0) * 60 + (options.hours ?? 0) * 3600;
 
@@ -349,6 +345,10 @@ export function change(
 ): Temporal.ZonedDateTime;
 export function change(date: Date, options: ChangeOptions): Temporal.Instant;
 export function change(date: RubyTime, options: ChangeOptions): RubyTime;
+export function change(
+  date: Date | Temporal.ZonedDateTime,
+  options: ChangeOptions,
+): Temporal.Instant | Temporal.ZonedDateTime;
 export function change(
   date: Date | RubyTime | Temporal.ZonedDateTime,
   options: ChangeOptions,

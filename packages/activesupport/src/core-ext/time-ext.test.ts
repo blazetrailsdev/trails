@@ -41,6 +41,7 @@ import {
 } from "../time-ext.js";
 import { toFs, DATE_FORMATS, formattedOffset, xmlschema } from "./time/conversions.js";
 import { toTime } from "./time/compatibility.js";
+import { lastQuarter } from "./date-and-time/calculations.js";
 
 function asDate(instant: Temporal.Instant): Date {
   return new Date(instant.epochMilliseconds);
@@ -1421,5 +1422,9 @@ describe("TimeExtMarshalingTest", () => {
     const unmarshalled = marshalLoad(marshalDump(t));
     expect(unmarshalled.toR().toF()).toBe(t.toR().toF());
     expect(unmarshalled.toTime().epochNanoseconds).toBe(t.toTime().epochNanoseconds);
+  });
+
+  it("last quarter on 31st", () => {
+    expect(lastQuarter(d(2004, 5, 31)).epochMilliseconds).toBe(d(2004, 2, 29).getTime());
   });
 });
