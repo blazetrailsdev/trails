@@ -127,7 +127,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     this._info(`${humanName} ${key} (${round(event.duration, 1)}ms)`);
   }
 
-  "existFragment?"(event: Event): void {
+  isExistFragment(event: Event): void {
     if (!(Base as unknown as CachingClassMethods).enableFragmentCacheLogging) return;
     const key = expandCacheKey(event.payload.key ?? event.payload.path);
     const humanName = "Exist fragment?";

@@ -243,12 +243,12 @@ export function isAllowOnlyInteger(
 
 /** @internal */
 export function prepareValueForValidation(
-  this: unknown,
+  this: { isRecordAttributeChangedInPlace: typeof isRecordAttributeChangedInPlace },
   value: unknown,
   record: ValidatableRecord,
   attrName: string,
 ): unknown {
-  if (isRecordAttributeChangedInPlace(record, attrName)) return value;
+  if (this.isRecordAttributeChangedInPlace(record, attrName)) return value;
 
   const r = record as unknown as RecordWithRawAttribute;
   let rawValue: unknown;
@@ -256,8 +256,8 @@ export function prepareValueForValidation(
   if (cameFromUser in r) {
     if (r[cameFromUser]) {
       rawValue = r[`${attrName}BeforeTypeCast`];
-    } else if (typeof r._readAttribute === "function") {
-      rawValue = r._readAttribute(attrName);
+    } else if (typeof r.readAttribute === "function") {
+      rawValue = r.readAttribute(attrName);
     }
   } else {
     const beforeTypeCast = `${attrName}BeforeTypeCast`;
@@ -270,7 +270,7 @@ export function prepareValueForValidation(
 
 interface RecordWithRawAttribute {
   attributeChangedInPlace?: (name: string) => boolean;
-  _readAttribute?: (name: string) => unknown;
+  readAttribute?: (name: string) => unknown;
   [key: string]: unknown;
 }
 

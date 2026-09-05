@@ -685,8 +685,15 @@ export class Base extends Metal {
         await super.processAction(action, ...args);
 
         if (this._pendingRender && !this.performed) {
-          await this.renderAsync(this._pendingRender.options);
+          const { options } = this._pendingRender;
           this._pendingRender = null;
+          this.viewRuntime =
+            (this.viewRuntime ?? 0) +
+            (await this.cleanupViewRuntime(async () =>
+              Benchmark.realtime(":float_millisecond", async () => {
+                await this.renderAsync(options);
+              }),
+            ));
         }
       } catch (error) {
         if (error instanceof Error) {

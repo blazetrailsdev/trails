@@ -1,11 +1,12 @@
 import "./active-model.js";
 import "./action-controller.js";
-import { onLoad, type Deprecators } from "@blazetrails/activesupport";
+import { include, onLoad, type Deprecators } from "@blazetrails/activesupport";
 import {
   ActiveRecord,
   AsynchronousQueriesTracker,
   Base,
   ConnectionPool,
+  ControllerRuntime,
   QueryCache,
   AutoFilteredParameters,
   type AutoFilteredParametersApp,
@@ -175,6 +176,12 @@ export class Trailtie extends BaseTrailtie {
       QueryCache.installExecutorHooks();
       AsynchronousQueriesTracker.installExecutorHooks();
       ConnectionPool.installExecutorHooks();
+    });
+
+    this.initializer("active_record.log_runtime", () => {
+      onLoad("action_controller", (base: unknown) => {
+        include(base as never, ControllerRuntime);
+      });
     });
 
     this.initializer("active_record_encryption.configuration", (app) => {

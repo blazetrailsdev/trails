@@ -6,6 +6,7 @@ import { logProcessAction } from "./instrumentation.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 import { ParamError } from "../../action-dispatch/http/param-error.js";
+import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
 
 function subscribeOnce(name: string, sink: Record<string, unknown>[]): () => void {
   const subscriber = Notifications.subscribe(
@@ -118,6 +119,35 @@ describe("ActionController::Instrumentation#process_action", () => {
     expect(events).toHaveLength(1);
     expect(typeof events[0].view_runtime).toBe("number");
     expect(events[0].view_runtime).toBeGreaterThanOrEqual(0);
+  });
+
+  it("publishes a view_runtime that covers a template render deferred to renderAsync", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    TemplateHandlers.registerTemplateHandler("html", {
+      extensions: ["html"],
+      call: (_template: unknown, source: string) => {
+        const until = Date.now() + 20;
+        while (Date.now() < until);
+        return JSON.stringify(source);
+      },
+    });
+    class SlowWidgetsController extends Base {
+      static actions = ["index"];
+      index(): void {
+        this.render({ template: "slow_widgets/index" });
+      }
+    }
+    SlowWidgetsController.layout = false;
+    SlowWidgetsController.prependViewPath(
+      new FixtureResolver({ "slow_widgets/index.html.html": "hello" }),
+    );
+
+    await new SlowWidgetsController().dispatch("index", newRequest(), new Response());
+
+    expect(events).toHaveLength(1);
+    expect(events[0].view_runtime).toBeGreaterThanOrEqual(20);
   });
 
   it("log_process_action formats a String view_runtime through to_f", () => {

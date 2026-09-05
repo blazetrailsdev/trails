@@ -93,12 +93,19 @@ describe("NumericalityValidator (trails-only)", () => {
       errors = { add: vi.fn() };
       scoreCameFromUser = true;
       scoreBeforeTypeCast = "abc";
-      _readAttribute(_name: string) {
+      readAttribute(_name: string) {
         return 0;
       }
     }
     const rec = new MockRecord();
-    expect(prepareValueForValidation.call(undefined, 0, rec as never, "score")).toBe("abc");
+    expect(
+      prepareValueForValidation.call(
+        new NumericalityValidator({ attributes: ["score"] }),
+        0,
+        rec as never,
+        "score",
+      ),
+    ).toBe("abc");
   });
 
   it("returns the cast value when the attribute was changed in place", () => {
@@ -109,12 +116,36 @@ describe("NumericalityValidator (trails-only)", () => {
       attributeChangedInPlace(_name: string) {
         return true;
       }
-      _readAttribute(_name: string) {
+      readAttribute(_name: string) {
         return 0;
       }
     }
     const rec = new MockRecord();
-    expect(prepareValueForValidation.call(undefined, 10, rec as never, "score")).toBe(10);
+    expect(
+      prepareValueForValidation.call(
+        new NumericalityValidator({ attributes: ["score"] }),
+        10,
+        rec as never,
+        "score",
+      ),
+    ).toBe(10);
+  });
+
+  it("dispatches the changed-in-place guard through the receiver, so a subclass override wins", () => {
+    class MockRecord {
+      errors = { add: vi.fn() };
+      scoreCameFromUser = true;
+      scoreBeforeTypeCast = "abc";
+      attributeChangedInPlace(_name: string) {
+        return true;
+      }
+    }
+    class NeverChangedInPlaceValidator extends NumericalityValidator {
+      override isRecordAttributeChangedInPlace = (): boolean => false;
+    }
+    const validator = new NeverChangedInPlaceValidator({ attributes: ["score"] });
+    const rec = new MockRecord();
+    expect(prepareValueForValidation.call(validator, 10, rec as never, "score")).toBe("abc");
   });
 
   it("isAllowOnlyInteger honors a record-method onlyInteger (Ruby truthiness)", async () => {
@@ -209,12 +240,17 @@ describe("NumericalityValidator (trails-only)", () => {
       errors = { add: vi.fn() };
       scoreCameFromUser = false;
       scoreBeforeTypeCast = "not-a-number-string";
-      _readAttribute(_name: string) {
+      readAttribute(_name: string) {
         return 42;
       }
     }
     const rec = new MockRecord();
-    const result = prepareValueForValidation.call(undefined, "initial", rec as never, "score");
+    const result = prepareValueForValidation.call(
+      new NumericalityValidator({ attributes: ["score"] }),
+      "initial",
+      rec as never,
+      "score",
+    );
     expect(result).toBe(42);
   });
 
@@ -224,7 +260,12 @@ describe("NumericalityValidator (trails-only)", () => {
       scoreBeforeTypeCast = "raw-value";
     }
     const rec = new MockRecord();
-    const result = prepareValueForValidation.call(undefined, "fallback", rec as never, "score");
+    const result = prepareValueForValidation.call(
+      new NumericalityValidator({ attributes: ["score"] }),
+      "fallback",
+      rec as never,
+      "score",
+    );
     expect(result).toBe("raw-value");
   });
 
@@ -232,12 +273,17 @@ describe("NumericalityValidator (trails-only)", () => {
     class MockRecord {
       errors = { add: vi.fn() };
       scoreCameFromUser = false;
-      _readAttribute(_name: string) {
+      readAttribute(_name: string) {
         return 99;
       }
     }
     const rec = new MockRecord();
-    const result = prepareValueForValidation.call(undefined, "initial", rec as never, "score");
+    const result = prepareValueForValidation.call(
+      new NumericalityValidator({ attributes: ["score"] }),
+      "initial",
+      rec as never,
+      "score",
+    );
     expect(result).toBe(99);
   });
 });
