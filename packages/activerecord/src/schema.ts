@@ -3,7 +3,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Current } from "./migration.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { InternalMetadata } from "./internal-metadata.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
+import { DEFAULT_ENV } from "./connection-handling.js";
 
 export interface SchemaDefineInfo {
   version?: string | number;
@@ -47,10 +47,7 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
         await connection.assumeMigratedUptoVersion(info.version!);
       }
       const currentEnvironment =
-        info.environment ??
-        getEnv("TRAILS_ENV") ??
-        getEnv("NODE_ENV") ??
-        DatabaseConfigurations.defaultEnv;
+        info.environment ?? getEnv("TRAILS_ENV") ?? getEnv("NODE_ENV") ?? DEFAULT_ENV();
       const internalMetadata = new InternalMetadata(this.connectionPool);
       await internalMetadata.createTableAndSetFlags(currentEnvironment);
     });

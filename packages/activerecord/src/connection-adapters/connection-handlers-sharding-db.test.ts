@@ -4,8 +4,9 @@ import * as path from "node:path";
 import { mkdtemp, rm } from "node:fs/promises";
 import { Base } from "../base.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
-import { DatabaseConfigurations, type RawConfigurations } from "../database-configurations.js";
+import { type RawConfigurations } from "../database-configurations.js";
 import { currentRole, connectedToStack } from "../core.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 async function withBaseConfigs(
   raw: RawConfigurations,
@@ -13,9 +14,9 @@ async function withBaseConfigs(
   opts: { defaultEnv?: string } = {},
 ): Promise<void> {
   const prevConfigs = Base.configurations();
-  const prevDefaultEnv = DatabaseConfigurations.defaultEnv;
+  const prevDefaultEnv = DatabaseTasks.env;
   if (opts.defaultEnv) {
-    DatabaseConfigurations.defaultEnv = opts.defaultEnv;
+    DatabaseTasks.env = opts.defaultEnv;
     vi.stubEnv("TRAILS_ENV", opts.defaultEnv);
   }
   Base.configurations(raw);
@@ -23,7 +24,7 @@ async function withBaseConfigs(
     await fn();
   } finally {
     Base.configurations(prevConfigs);
-    DatabaseConfigurations.defaultEnv = prevDefaultEnv;
+    DatabaseTasks.env = prevDefaultEnv;
     if (opts.defaultEnv) vi.unstubAllEnvs();
     await Base.connectionHandler.clearAllConnectionsBang();
   }

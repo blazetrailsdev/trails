@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, DatabaseConfigurations, MigrationContext } from "@blazetrails/activerecord";
+import { DatabaseTasks, MigrationContext } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = {
@@ -28,7 +28,7 @@ describe("DbMigrateStatusTest", () => {
 
   beforeEach(() => {
     err = [];
-    priorDefaultEnv = DatabaseConfigurations.defaultEnv;
+    priorDefaultEnv = DatabaseTasks.env;
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
     migrateStatusSpy = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(DatabaseTasks, "migrateStatus").mockImplementation(migrateStatusSpy);
@@ -37,12 +37,12 @@ describe("DbMigrateStatusTest", () => {
       .mockImplementation(async (_config: unknown, fn: (p: never) => unknown) => fn({} as never));
     vi.spyOn(DatabaseTasks, "withTemporaryPool").mockImplementation(withTemporaryPoolFn);
     vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    DatabaseConfigurations.defaultEnv = priorDefaultEnv;
+    DatabaseTasks.env = priorDefaultEnv;
     DatabaseTasks.databaseConfiguration = null;
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
@@ -61,7 +61,7 @@ describe("DbMigrateStatusTest", () => {
   });
 
   it("calls migrateStatus once per database config", async () => {
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     const dir = await makeFakeProject();
     const code = await run(["db:migrate:status"], dir);
     expect(code).toBe(0);

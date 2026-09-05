@@ -18,6 +18,7 @@ import {
 } from "./core.js";
 import { adapterType } from "./test-adapter.js";
 import { restoreWorkerConnection } from "./support/connection.js";
+import { DatabaseTasks } from "./tasks/database-tasks.js";
 
 describe("ConnectionHandlingTest", () => {
   fixtures(["posts"], {
@@ -481,7 +482,7 @@ describe("ConnectionHandlingTest", () => {
   it("autoConnect honors an in-memory DatabaseConfigurations registry", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { HashConfig } = await import("./database-configurations/hash-config.js");
-    const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
+    const env = process.env.NODE_ENV || DatabaseTasks.env;
 
     const priorConfigs = Base.configurations();
     class InMemoryModel extends Base {}
@@ -507,7 +508,7 @@ describe("ConnectionHandlingTest", () => {
   it("autoConnect reconnects via mutated configuration.database for UrlConfig", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { UrlConfig } = await import("./database-configurations/url-config.js");
-    const env = process.env.NODE_ENV || DatabaseConfigurations.defaultEnv;
+    const env = process.env.NODE_ENV || DatabaseTasks.env;
 
     const priorConfigs = Base.configurations();
     class WorkerModel extends Base {}
@@ -534,7 +535,7 @@ describe("ConnectionHandlingTest", () => {
   it("establishConnection raises AdapterNotSpecified for an adapter-less HashConfig", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { HashConfig } = await import("./database-configurations/hash-config.js");
-    const env = DatabaseConfigurations.defaultEnv;
+    const env = DatabaseTasks.env;
 
     const { AdapterNotSpecified } = await import("./errors.js");
     const configurationHash = { url: "sqlite3:db/foo.sqlite3" };
@@ -761,7 +762,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     try {
       __resetPrimaryAbstractClass();
       primaryAbstractClass(AppRecord);
-      const env = DatabaseConfigurations.defaultEnv;
+      const env = DatabaseTasks.env;
       priorConfigs = Base.configurations();
       Base.configurations({
         [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },

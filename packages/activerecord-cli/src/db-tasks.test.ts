@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, DatabaseConfigurations } from "@blazetrails/activerecord";
+import { DatabaseTasks } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = {
@@ -50,7 +50,7 @@ describe("DbTasksTest", () => {
 
   it("db:create loads config and calls DatabaseTasks.create for current env", async () => {
     const dir = await makeFakeProject();
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     const code = await run(["db:create"], dir);
     expect(code).toBe(0);
     expect(createAll).toHaveBeenCalledOnce();
@@ -65,7 +65,7 @@ describe("DbTasksTest", () => {
 
   it("db:drop loads config and calls DatabaseTasks.drop for current env", async () => {
     const dir = await makeFakeProject();
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     const code = await run(["db:drop"], dir);
     expect(code).toBe(0);
     expect(dropAll).toHaveBeenCalledOnce();

@@ -5,7 +5,7 @@ import {
   DatabaseConfig,
   type DatabaseConfigOptions,
 } from "./database-configurations/database-config.js";
-import { _DEFAULT_ENV, _setRailsEnv } from "./connection-handling-slot.js";
+import { _DEFAULT_ENV } from "./connection-handling-slot.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { UrlConfig } from "./database-configurations/url-config.js";
 
@@ -63,19 +63,6 @@ export class DatabaseConfigurations {
     this.dbConfigHandlers.push(handler);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall call — PERMANENT
-   */
-  static get defaultEnv(): string {
-    return String(_DEFAULT_ENV!());
-  }
-
-  /** @internal */
-  static set defaultEnv(value: string | null) {
-    _setRailsEnv(value);
-  }
-
   private _configurations: HashConfig[];
 
   constructor(configurations: RawConfigurations | HashConfig[] = {}) {
@@ -122,8 +109,7 @@ export class DatabaseConfigurations {
       includeHidden?: boolean;
     } = {},
   ): HashConfig[] | HashConfig | undefined {
-    const envName =
-      options.envName ?? (options.name ? DatabaseConfigurations.defaultEnv : undefined);
+    const envName = options.envName ?? (options.name ? this.defaultEnv() : undefined);
     let configs = this.envWithConfigs(envName);
 
     if (!options.includeHidden) {
@@ -154,7 +140,7 @@ export class DatabaseConfigurations {
 
   isPrimary(name: string): boolean {
     if (name === "primary") return true;
-    const firstConfig = this.findDbConfig(DatabaseConfigurations.defaultEnv);
+    const firstConfig = this.findDbConfig(this.defaultEnv());
     return !!firstConfig && name === firstConfig.name;
   }
 
@@ -164,11 +150,11 @@ export class DatabaseConfigurations {
       if (symbolConnectionName(config) != null) {
         return this.resolveSymbolConnection(config);
       }
-      return this.buildDbConfigFromRawConfig(DatabaseConfigurations.defaultEnv, "primary", config);
+      return this.buildDbConfigFromRawConfig(this.defaultEnv(), "primary", config);
     }
     if (typeof config === "object" && config !== null) {
       return this.buildDbConfigFromRawConfig(
-        DatabaseConfigurations.defaultEnv,
+        this.defaultEnv(),
         "primary",
         config as DatabaseConfigOptions,
       );
@@ -178,9 +164,17 @@ export class DatabaseConfigurations {
     );
   }
 
+  /**
+   * @internal
+   * @missingRailsCall call — PERMANENT
+   */
+  private defaultEnv(): string {
+    return String(_DEFAULT_ENV!());
+  }
+
   private buildConfigs(configs: RawConfigurations | HashConfig[]): HashConfig[] {
     if (Array.isArray(configs)) return configs;
-    const defaultEnv = DatabaseConfigurations.defaultEnv;
+    const defaultEnv = this.defaultEnv();
 
     const dbConfigs = Object.entries(configs).flatMap(([envName, config]) =>
       this._isThreeLevelConfig(config)
@@ -232,7 +226,7 @@ export class DatabaseConfigurations {
   private resolveSymbolConnection(name: string): HashConfig {
     const dbConfig = this.findDbConfig(name);
     if (dbConfig) return dbConfig;
-    const defaultEnv = DatabaseConfigurations.defaultEnv;
+    const defaultEnv = this.defaultEnv();
     throw new AdapterNotSpecified(
       `The \`${name}\` database is not configured for the \`${defaultEnv}\` environment.\n\n  Available database configurations are:\n\n  ${this.buildConfigurationSentence()}`,
     );

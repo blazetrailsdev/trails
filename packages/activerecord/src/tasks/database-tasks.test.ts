@@ -35,7 +35,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
     "raises an error when called with protected environment",
     async () => {
       const protectedEnvironments = Base.protectedEnvironments;
-      const currentEnv = DatabaseConfigurations.defaultEnv;
+      const currentEnv = DatabaseTasks.env;
       const env = "arunit";
       const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-protected-env-"));
       const dbFile = path.join(tmp, "primary.sqlite3");

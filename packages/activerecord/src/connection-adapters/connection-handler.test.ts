@@ -5,6 +5,7 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { AdapterNotFound } from "../errors.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
   const writingRole = Base.writingRole;
@@ -26,14 +27,14 @@ describe("ConnectionHandlerTest", () => {
 
   beforeEach(async () => {
     handler = new ConnectionHandler();
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
   });
 
   it("default env fall back to default env when rails env or rack env is empty string", async () => {
-    DatabaseConfigurations.defaultEnv = "";
-    expect(DatabaseConfigurations.defaultEnv).toBe("default_env");
-    DatabaseConfigurations.defaultEnv = "development";
-    expect(DatabaseConfigurations.defaultEnv).toBe("development");
+    DatabaseTasks.env = "";
+    expect(DatabaseTasks.env).toBe("default_env");
+    DatabaseTasks.env = "development";
+    expect(DatabaseTasks.env).toBe("development");
   });
 
   it("establish connection using 3 levels config", async () => {
@@ -48,8 +49,8 @@ describe("ConnectionHandlerTest", () => {
       },
       common: { adapter: "sqlite3", database: "test/db/common.sqlite3" },
     };
-    const prevEnv = DatabaseConfigurations.defaultEnv;
-    DatabaseConfigurations.defaultEnv = "default_env";
+    const prevEnv = DatabaseTasks.env;
+    DatabaseTasks.env = "default_env";
     const prevConfigs = Base.configurations();
     Base.configurations(config);
 
@@ -71,7 +72,7 @@ describe("ConnectionHandlerTest", () => {
       expect(commonPool!.dbConfig.database).toBe("test/db/common.sqlite3");
     } finally {
       Base.configurations(prevConfigs);
-      DatabaseConfigurations.defaultEnv = prevEnv;
+      DatabaseTasks.env = prevEnv;
     }
   });
 

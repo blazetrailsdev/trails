@@ -3,6 +3,7 @@ import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { currentRole, currentPreventingWrites } from "../core.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 
 describe("ConnectionSwappingNestedTest", () => {
   class PrimaryBase extends Base {
@@ -76,8 +77,8 @@ describe("ConnectionSwappingNestedTest", () => {
     }
 
     prevConfigs = Base.configurations();
-    prevDefaultEnv = DatabaseConfigurations.defaultEnv;
-    DatabaseConfigurations.defaultEnv = "default_env";
+    prevDefaultEnv = DatabaseTasks.env;
+    DatabaseTasks.env = "default_env";
     vi.stubEnv("TRAILS_ENV", "default_env");
   });
 
@@ -91,7 +92,7 @@ describe("ConnectionSwappingNestedTest", () => {
       });
     }
     Base.configurations(prevConfigs);
-    DatabaseConfigurations.defaultEnv = prevDefaultEnv;
+    DatabaseTasks.env = prevDefaultEnv;
     (PrimaryBase as any).connectionClass = false;
     (SecondaryBase as any).connectionClass = false;
     (TertiaryBase as any).connectionClass = false;

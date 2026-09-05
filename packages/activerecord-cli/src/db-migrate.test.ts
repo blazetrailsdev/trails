@@ -3,12 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import {
-  Base,
-  DatabaseTasks,
-  DatabaseConfigurations,
-  MigrationContext,
-} from "@blazetrails/activerecord";
+import { Base, DatabaseTasks, MigrationContext } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = { development: { adapter: "sqlite3", database: ":memory:", pool: 1 } };
@@ -71,7 +66,7 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:migrate calls migrate with no args", async () => {
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
     expect(migrateSpy).toHaveBeenCalledWith({ skipInitialize: true });
   });
@@ -90,7 +85,7 @@ describe("DbMigrateTest", () => {
 
   it("db:migrate calls MigrationContext#migrations before migrate", async () => {
     vi.mocked(DatabaseTasks.migrate).mockRestore();
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     const discoverSpy = vi
       .spyOn(MigrationContext.prototype, "migrations", "get")
       .mockReturnValue([]);
@@ -99,7 +94,7 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:migrate takes the multi-database path when the env has several configs", async () => {
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     expect(await run(["db:migrate"], await makeMultiDbFakeProject())).toBe(0);
     expect(DatabaseTasks.configsFor({ envName: "development" })).toHaveLength(2);
     expect(migrateSpy).not.toHaveBeenCalled();
@@ -118,13 +113,13 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:rollback calls rollback with step 1 by default", async () => {
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     expect(await run(["db:rollback"], await makeFakeProject())).toBe(0);
     expect(rollbackSpy).toHaveBeenCalledWith(1);
   });
 
   it("db:rollback runs with the environment connection established", async () => {
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     let connected = false;
     rollbackSpy.mockImplementationOnce(() => {
       connected = Base.connectionPool() != null;
@@ -146,7 +141,7 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:schema:load calls loadSchemaCurrent", async () => {
-    DatabaseConfigurations.defaultEnv = "development";
+    DatabaseTasks.env = "development";
     expect(await run(["db:schema:load"], await makeFakeProject())).toBe(0);
     expect(loadSchemaCurrentSpy).toHaveBeenCalledOnce();
   });

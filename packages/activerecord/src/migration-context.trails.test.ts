@@ -10,8 +10,8 @@ import { ActiveRecord } from "./ar-config.js";
 import { Base } from "./base.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
-import { DatabaseConfigurations } from "./database-configurations.js";
 import { fixtures } from "./test-fixtures.js";
+import { DatabaseTasks } from "./tasks/database-tasks.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
@@ -201,7 +201,7 @@ describe("MigrationContext connected surface", () => {
   });
 
   it("currentEnvironment answers the resolved default env", () => {
-    expect(context.currentEnvironment).toBe(DatabaseConfigurations.defaultEnv);
+    expect(context.currentEnvironment).toBe(DatabaseTasks.env);
   });
 
   it("lastStoredEnvironment is null until a version has been recorded", async () => {
