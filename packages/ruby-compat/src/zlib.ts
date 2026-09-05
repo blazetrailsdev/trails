@@ -1,3 +1,84 @@
+import { File } from "./file.js";
+import { getZlib } from "./zlib-adapter.js";
+
+/**
+ * `Zlib::GzipFile` (`vendor/ruby/ext/zlib/zlib.c:4838`), the shared seat
+ * `GzipReader` and `GzipWriter` are opened through: `gzfile_s_open`
+ * (`zlib.c:3233`) opens `filename` in the subclass' mode and hands the stream
+ * to `gzfile_wrap` (`zlib.c:3178`), which yields the gzip stream and closes it
+ * on the way out (`gzfile_ensure_close`) when a block is given.
+ */
+class GzipFile {
+  constructor(protected io: File) {}
+
+  close(): void {
+    this.io.close();
+  }
+}
+
+/**
+ * `Zlib::GzipReader` (`vendor/ruby/ext/zlib/zlib.c:4877`), the decompressing
+ * half — `ActiveRecord::ConnectionAdapters::SchemaCache.read` reads a `.gz`
+ * schema cache through its `open` (`schema_cache.rb:246`).
+ */
+class GzipReader extends GzipFile {
+  static open(filename: string): GzipReader;
+  static open<T>(filename: string, block: (gz: GzipReader) => T): T;
+  static open<T>(filename: string, block?: (gz: GzipReader) => T): T | GzipReader {
+    const io = File.open(filename, "rb");
+    const gz = new GzipReader(io);
+    if (!block) return gz;
+    try {
+      return block(gz);
+    } finally {
+      gz.close();
+    }
+  }
+
+  read(): string {
+    const raw = this.io.read();
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i) & 0xff;
+    return new TextDecoder().decode(getZlib().gunzip(bytes));
+  }
+}
+
+/**
+ * `Zlib::GzipWriter` (`vendor/ruby/ext/zlib/zlib.c:4859`), the compressing
+ * half — the mirror `SchemaCache#dump_to` writes a `.gz` schema cache through
+ * (`schema_cache.rb:466`).
+ */
+class GzipWriter extends GzipFile {
+  private buffer = "";
+
+  static open(filename: string): GzipWriter;
+  static open<T>(filename: string, block: (gz: GzipWriter) => T): T;
+  static open<T>(filename: string, block?: (gz: GzipWriter) => T): T | GzipWriter {
+    const io = File.open(filename, "wb");
+    const gz = new GzipWriter(io);
+    if (!block) return gz;
+    try {
+      return block(gz);
+    } finally {
+      gz.close();
+    }
+  }
+
+  write(string: string): number {
+    this.buffer += string;
+    return string.length;
+  }
+
+  close(): void {
+    const bytes = new TextEncoder().encode(this.buffer);
+    const gzipped = getZlib().gzip(bytes, Zlib.DEFAULT_COMPRESSION, Zlib.DEFAULT_STRATEGY);
+    let out = "";
+    for (const byte of gzipped) out += String.fromCharCode(byte);
+    this.io.write(out);
+    super.close();
+  }
+}
+
 /**
  * `Zlib` (`vendor/ruby/ext/zlib/zlib.c:4659`), the sliver of it trails calls.
  *
@@ -29,6 +110,20 @@ export const Zlib = {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::DEFAULT_STRATEGY`.
    */
   DEFAULT_STRATEGY: 0,
+
+  /**
+   * `vendor/ruby/ext/zlib/zlib.c:4877` `rb_cGzipReader`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipReader`.
+   */
+  GzipReader,
+
+  /**
+   * `vendor/ruby/ext/zlib/zlib.c:4859` `rb_cGzipWriter`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::GzipWriter`.
+   */
+  GzipWriter,
 
   /**
    * `vendor/ruby/ext/zlib/zlib.c:507` `rb_zlib_crc32`, which is

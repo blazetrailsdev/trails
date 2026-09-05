@@ -51,6 +51,22 @@ describe("BigDecimalTrails", () => {
     expect(BigDecimal.INFINITY.compare(BigDecimal.INFINITY)).toBe(0);
   });
 
+  it("to_i raises FloatDomainError for the non-finite forms", () => {
+    expect(() => BigDecimal.NAN.toI()).toThrow("Computation results in 'NaN' (Not a Number)");
+    expect(() => BigDecimal.INFINITY.toI()).toThrow("Computation results in 'Infinity'");
+    expect(() => new BigDecimal("-Infinity").toI()).toThrow("Computation results in '-Infinity'");
+    expect(new BigDecimal("42").toI()).toBe(42);
+  });
+
+  it("carries a large exponent instead of expanding the digits", () => {
+    const big = new BigDecimal("1e10000000");
+
+    expect(big.isInfinite()).toBeNull();
+    expect(big.isNan()).toBe(false);
+    expect(big.exponent()).toBe(10000001);
+    expect(new BigDecimal("1e-10000000").exponent()).toBe(-9999999);
+  });
+
   it("mult propagates the non-finite forms", () => {
     expect(BigDecimal.INFINITY.mult(new BigDecimal("2")).toString("F")).toBe("Infinity");
     expect(BigDecimal.INFINITY.mult(new BigDecimal("-2")).toString("F")).toBe("-Infinity");

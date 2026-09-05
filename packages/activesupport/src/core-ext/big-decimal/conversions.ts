@@ -1,4 +1,4 @@
-const MAX_EXPONENT_EXPANSION = 4000;
+import { FloatDomainError } from "@blazetrails/ruby-compat";
 
 const NON_FINITE_REGEX = /^\s*(?:(NaN)|([+-]?)Infinity)\s*$/;
 
@@ -6,16 +6,30 @@ type RationalLike = { numerator: bigint; denominator: bigint };
 
 type Parsed = {
   sign: "" | "-";
-  intDigits: string;
-  fracDigits: string;
+  digits: string;
+  exp: number;
   nonFinite: "NaN" | "Infinity" | null;
 };
 
 export class BigDecimal {
   readonly sign: "" | "-";
-  readonly intDigits: string;
-  readonly fracDigits: string;
+  private digits: string;
+  private exp: number;
   private readonly nonFinite: "NaN" | "Infinity" | null;
+
+  /** @noRailsEquivalent PERMANENT */
+  get intDigits(): string {
+    if (this.digits === "" || this.exp <= 0) return "0";
+    return this.exp >= this.digits.length
+      ? this.digits.padEnd(this.exp, "0")
+      : this.digits.slice(0, this.exp);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get fracDigits(): string {
+    if (this.digits === "" || this.exp >= this.digits.length) return "";
+    return this.exp >= 0 ? this.digits.slice(this.exp) : "0".repeat(-this.exp) + this.digits;
+  }
 
   constructor(
     value: string | number | bigint | BigDecimal | { numerator: bigint; denominator: bigint },
@@ -29,14 +43,14 @@ export class BigDecimal {
       throw new TypeError(`BigDecimal: cannot parse ${String(value)}`);
     }
     this.sign = parsed.sign;
-    this.intDigits = parsed.intDigits;
-    this.fracDigits = parsed.fracDigits;
+    this.digits = parsed.digits;
+    this.exp = parsed.exp;
     this.nonFinite = parsed.nonFinite;
     if (parsed.nonFinite === null && ndigits > 0 && (isRational || typeof value === "number")) {
       const rounded = this.round(ndigits - this.exponent());
       this.sign = rounded.sign;
-      this.intDigits = rounded.intDigits;
-      this.fracDigits = rounded.fracDigits;
+      this.digits = rounded.digits;
+      this.exp = rounded.exp;
     }
   }
 
@@ -79,6 +93,12 @@ export class BigDecimal {
 
   /** @noRailsEquivalent PERMANENT */
   toI(): number {
+    if (this.isNan()) {
+      throw new FloatDomainError("Computation results in 'NaN' (Not a Number)");
+    }
+    if (this.nonFinite !== null) {
+      throw new FloatDomainError(`Computation results in '${this.sign}Infinity'`);
+    }
     const magnitude = BigInt(this.intDigits === "" ? "0" : this.intDigits);
     const signed = this.sign === "-" ? -magnitude : magnitude;
     const num = Number(signed);
@@ -93,7 +113,7 @@ export class BigDecimal {
   /** @noRailsEquivalent PERMANENT */
   isZero(): boolean {
     if (this.nonFinite !== null) return false;
-    return !/[1-9]/.test(this.intDigits + this.fracDigits);
+    return this.digits === "";
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -158,11 +178,9 @@ export class BigDecimal {
     return BigDecimal.fromUnscaled(this.sign === "-" ? -value : value, Math.max(n, 0));
   }
 
-  private exponent(): number {
-    const allDigits = this.intDigits + this.fracDigits;
-    const stripped = allDigits.replace(/^0+/, "");
-    if (stripped === "") return 0;
-    return this.intDigits.length - (allDigits.length - stripped.length);
+  /** @noRailsEquivalent PERMANENT */
+  exponent(): number {
+    return this.digits === "" ? 0 : this.exp;
   }
 
   private unscaled(signum = 1): bigint {
@@ -190,10 +208,8 @@ export class BigDecimal {
   }
 
   private toScientific(group: number): string {
-    const allDigits = this.intDigits + this.fracDigits;
-    const mantissa = allDigits.replace(/^0+/, "").replace(/0+$/, "");
-    if (mantissa === "") return "0.0";
-    const digits = group > 0 ? groupFromLeft(mantissa, group) : mantissa;
+    if (this.digits === "") return "0.0";
+    const digits = group > 0 ? groupFromLeft(this.digits, group) : this.digits;
     return `0.${digits}e${this.exponent()}`;
   }
 }
@@ -270,7 +286,7 @@ function parseRational(value: RationalLike, ndigits: number): Parsed | null {
   const n = value.numerator < 0n ? -value.numerator : value.numerator;
   const d = value.denominator < 0n ? -value.denominator : value.denominator;
   if (d === 0n) return null;
-  if (n === 0n) return { sign: "", intDigits: "0", fracDigits: "", nonFinite: null };
+  if (n === 0n) return { sign: "", digits: "", exp: 0, nonFinite: null };
 
   let fracNeeded: number;
   const intPartDigits = n / d;
@@ -278,7 +294,7 @@ function parseRational(value: RationalLike, ndigits: number): Parsed | null {
     fracNeeded = Math.max(ndigits - intPartDigits.toString().length, 0) + 2;
   } else {
     let leadingZeros = 0;
-    for (let x = n * 10n; x < d && leadingZeros < MAX_EXPONENT_EXPANSION; x *= 10n) leadingZeros++;
+    for (let x = n * 10n; x < d; x *= 10n) leadingZeros++;
     fracNeeded = leadingZeros + ndigits + 2;
   }
   const scaled = ((n * 10n ** BigInt(fracNeeded)) / d).toString().padStart(fracNeeded + 1, "0");
@@ -290,28 +306,30 @@ function parseRational(value: RationalLike, ndigits: number): Parsed | null {
 function parse(value: string | number | bigint): Parsed | null {
   if (typeof value === "bigint") {
     const negative = value < 0n;
+    const magnitude = (negative ? -value : value).toString();
+    const digits = magnitude === "0" ? "" : magnitude.replace(/0+$/, "");
     return {
-      sign: negative ? "-" : "",
-      intDigits: (negative ? -value : value).toString(),
-      fracDigits: "",
+      sign: digits === "" ? "" : negative ? "-" : "",
+      digits,
+      exp: digits === "" ? 0 : magnitude.length,
       nonFinite: null,
     };
   }
   if (typeof value === "number" && !Number.isFinite(value)) {
     return Number.isNaN(value)
-      ? { sign: "", intDigits: "0", fracDigits: "", nonFinite: "NaN" }
-      : { sign: value < 0 ? "-" : "", intDigits: "0", fracDigits: "", nonFinite: "Infinity" };
+      ? { sign: "", digits: "", exp: 0, nonFinite: "NaN" }
+      : { sign: value < 0 ? "-" : "", digits: "", exp: 0, nonFinite: "Infinity" };
   }
   const raw = String(value).trim();
   if (raw === "") return null;
   const special = NON_FINITE_REGEX.exec(raw);
   if (special !== null) {
     return special[1] !== undefined
-      ? { sign: "", intDigits: "0", fracDigits: "", nonFinite: "NaN" }
+      ? { sign: "", digits: "", exp: 0, nonFinite: "NaN" }
       : {
           sign: special[2] === "-" ? "-" : "",
-          intDigits: "0",
-          fracDigits: "",
+          digits: "",
+          exp: 0,
           nonFinite: "Infinity",
         };
   }
@@ -326,36 +344,14 @@ function parse(value: string | number | bigint): Parsed | null {
   const m = s.match(/^(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/);
   if (!m) return null;
   if (m[1] === "" && (m[2] ?? "") === "") return null;
-  let intPart = m[1] || "0";
-  let fracPart = m[2] ?? "";
-  const exp = m[3] ? Number(m[3]) : 0;
-  if (Math.abs(exp) > MAX_EXPONENT_EXPANSION) {
-    throw new RangeError(
-      `BigDecimal: exponent magnitude exceeds the ${MAX_EXPONENT_EXPANSION}-digit expansion limit (TS-specific guard against unbounded allocation)`,
-    );
-  }
-  if (exp > 0) {
-    if (fracPart.length >= exp) {
-      intPart += fracPart.slice(0, exp);
-      fracPart = fracPart.slice(exp);
-    } else {
-      intPart += fracPart.padEnd(exp, "0");
-      fracPart = "";
-    }
-  } else if (exp < 0) {
-    const shift = -exp;
-    if (intPart.length > shift) {
-      fracPart = intPart.slice(intPart.length - shift) + fracPart;
-      intPart = intPart.slice(0, intPart.length - shift);
-    } else {
-      fracPart = intPart.padStart(shift, "0") + fracPart;
-      intPart = "0";
-    }
-  }
-  intPart = intPart.replace(/^0+(?=\d)/, "") || "0";
-  fracPart = fracPart.replace(/0+$/, "");
-  if (intPart === "0" && fracPart === "") sign = "";
-  return { sign, intDigits: intPart, fracDigits: fracPart, nonFinite: null };
+  const intPart = m[1] || "";
+  const fracPart = m[2] ?? "";
+  const all = intPart + fracPart;
+  const stripped = all.replace(/^0+/, "");
+  const digits = stripped.replace(/0+$/, "");
+  if (digits === "") return { sign: "", digits: "", exp: 0, nonFinite: null };
+  const exp = intPart.length - (all.length - stripped.length) + (m[3] ? Number(m[3]) : 0);
+  return { sign, digits, exp, nonFinite: null };
 }
 
 const INTERPRET_LOOSELY_REGEX =

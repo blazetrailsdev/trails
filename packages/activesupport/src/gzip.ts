@@ -1,45 +1,13 @@
-import { Zlib, getZlib } from "@blazetrails/ruby-compat";
+import { StringIO, Zlib, getZlib } from "@blazetrails/ruby-compat";
 
-export class Stream {
-  private _buffer: Buffer;
-  private _position: number;
-
-  constructor(data?: Buffer | string) {
-    this._buffer = data
-      ? Buffer.isBuffer(data)
-        ? data
-        : Buffer.from(data, "latin1")
-      : Buffer.alloc(0);
-    this._position = 0;
+export class Stream extends StringIO {
+  constructor(string = "") {
+    super(string);
+    this.setEncoding("BINARY");
   }
 
-  get string(): string {
-    return this._buffer.toString("latin1");
-  }
-
-  get buffer(): Buffer {
-    return this._buffer;
-  }
-
-  write(data: Buffer | string): number {
-    const buf = Buffer.isBuffer(data) ? data : Buffer.from(data, "latin1");
-    this._buffer = Buffer.concat([this._buffer, buf]);
-    this._position = this._buffer.length;
-    return buf.length;
-  }
-
-  rewind(): void {
-    this._position = 0;
-  }
-
-  close(): void {
+  override close(): void {
     this.rewind();
-  }
-
-  read(): Buffer {
-    const result = this._buffer.subarray(this._position);
-    this._position = this._buffer.length;
-    return result;
   }
 }
 

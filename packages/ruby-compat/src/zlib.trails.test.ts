@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { File } from "./file.js";
 import { Zlib } from "./zlib.js";
 
 /**
@@ -27,5 +32,37 @@ describe("Zlib.crc32", () => {
   it("continues from the given crc", () => {
     expect(Zlib.crc32("abc", 42)).toBe(16679668);
     expect(Zlib.crc32("lo", Zlib.crc32("hel"))).toBe(Zlib.crc32("hello"));
+  });
+});
+
+/**
+ * `Zlib::GzipWriter.open` / `Zlib::GzipReader.open`
+ * (`vendor/ruby/ext/zlib/zlib.c:3661,3871`, both `gzfile_s_open`), the pair
+ * `SchemaCache.read` and `#dump_to` open a `.gz` through.
+ */
+describe("Zlib::GzipFile.open", () => {
+  it("round-trips a string through a gzip file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      const filename = join(dir, "schema_cache.json.gz");
+      Zlib.GzipWriter.open(filename, (gz) => gz.write('{"version":1}'));
+
+      expect(Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe('{"version":1}');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("closes the stream on the way out of the block", () => {
+    const dir = mkdtempSync(join(tmpdir(), "trails-zlib-"));
+    try {
+      const filename = join(dir, "empty.gz");
+      Zlib.GzipWriter.open(filename, (gz) => gz.write(""));
+
+      expect(File.size(filename) > 0).toBe(true);
+      expect(Zlib.GzipReader.open(filename, (gz) => gz.read())).toBe("");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

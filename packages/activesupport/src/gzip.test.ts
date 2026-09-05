@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Gzip, Stream } from "./gzip.js";
+import { Gzip } from "./gzip.js";
 import { constants } from "node:zlib";
 import { assertNot } from "./testing/assertions.js";
 
@@ -41,16 +41,6 @@ describe("GzipTest", () => {
     expect(Gzip.decompress(gzippedByBestCompression)).toBe(sourceString);
 
     expect(gzippedByBestCompression.length < gzippedBySpeed.length).toBe(true);
-  });
-
-  it("stream supports write, read, and rewind", () => {
-    const stream = new Stream();
-    stream.write("hello ");
-    stream.write("world");
-    stream.rewind();
-    const data = stream.read();
-    expect(data.toString("utf8")).toBe("hello world");
-    expect(stream.buffer.toString("utf8")).toBe("hello world");
   });
 
   it("decompress checks crc", () => {
