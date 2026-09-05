@@ -69,14 +69,20 @@ async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<
   expect(empty.first()).toBeUndefined();
 }
 
-async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
+type RawDriverHandle = { query(sql: string): Promise<unknown> } | null;
+
+function rawDriverHandle(conn: DatabaseAdapter): RawDriverHandle {
   if (adapterType === "postgres") {
-    return Boolean((conn as unknown as { _inTransaction?: boolean })._inTransaction);
+    return (
+      conn as unknown as { _rawConnectionForTest(): RawDriverHandle }
+    )._rawConnectionForTest();
   }
-  if (adapterType === "mysql") {
-    const raw = (
-      conn as unknown as { _clientForTest(): { query(sql: string): Promise<unknown> } | null }
-    )._clientForTest();
+  return (conn as unknown as { _clientForTest(): RawDriverHandle })._clientForTest();
+}
+
+async function rawTransactionOpen(conn: DatabaseAdapter): Promise<boolean> {
+  if (adapterType === "postgres" || adapterType === "mysql") {
+    const raw = rawDriverHandle(conn);
     if (!raw) return false;
     try {
       await raw.query("SAVEPOINT transaction_test");
@@ -113,7 +119,7 @@ async function remoteDisconnect(conn: DatabaseAdapter): Promise<void> {
       }
     )._rawConnectionForTest();
     if (!raw) return;
-    if (!(conn as unknown as { _inTransaction?: boolean })._inTransaction) {
+    if (!(await rawTransactionOpen(conn))) {
       await raw.query("begin");
     }
     await raw.query("set idle_in_transaction_session_timeout = '10ms'");

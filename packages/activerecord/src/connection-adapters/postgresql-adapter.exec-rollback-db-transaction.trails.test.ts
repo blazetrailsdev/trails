@@ -2,8 +2,20 @@ import { expect, it } from "vitest";
 import { describeIfPg, PG_TEST_URL } from "../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
-function inTransaction(adapter: PostgreSQLAdapter): boolean {
-  return (adapter as unknown as { _inTransaction: boolean })._inTransaction;
+async function inTransaction(adapter: PostgreSQLAdapter): Promise<boolean> {
+  const raw = (
+    adapter as unknown as {
+      _rawConnectionForTest(): { query(sql: string): Promise<unknown> } | null;
+    }
+  )._rawConnectionForTest();
+  if (!raw) return false;
+  try {
+    await raw.query("SAVEPOINT transaction_test");
+    await raw.query("RELEASE SAVEPOINT transaction_test");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function client(adapter: PostgreSQLAdapter): unknown {
@@ -15,12 +27,12 @@ describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
     const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       await adapter.beginDbTransaction();
-      expect(inTransaction(adapter)).toBe(true);
+      expect(await inTransaction(adapter)).toBe(true);
       expect(client(adapter)).not.toBeNull();
 
       await adapter.execRollbackDbTransaction();
 
-      expect(inTransaction(adapter)).toBe(false);
+      expect(await inTransaction(adapter)).toBe(false);
       expect(client(adapter)).toBeNull();
 
       await adapter.execute("SELECT 1");
@@ -39,7 +51,7 @@ describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
         /Client was closed and is not queryable/,
       );
 
-      expect(inTransaction(adapter)).toBe(false);
+      expect(await inTransaction(adapter)).toBe(false);
       expect(client(adapter)).toBeNull();
 
       await adapter.execute("SELECT 1");

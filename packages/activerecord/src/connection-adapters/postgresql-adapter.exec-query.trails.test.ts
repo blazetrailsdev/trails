@@ -292,7 +292,10 @@ describe("PostgreSQLAdapter#executeMutation", () => {
       "_acquireFreshClient",
     ).mockResolvedValue(fakeClient);
     adapter.verifiedBang();
-    (adapter as unknown as { _inTransaction: boolean })._inTransaction = true;
+    vi.spyOn(
+      adapter as unknown as { openTransactions: () => number },
+      "openTransactions",
+    ).mockReturnValue(1);
 
     const result = await adapter.executeMutation(
       "INSERT INTO posts (title) VALUES ('test')",

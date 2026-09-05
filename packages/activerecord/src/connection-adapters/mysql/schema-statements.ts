@@ -21,7 +21,6 @@ import type { TableDefinitionOf } from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { VisitorHostAdapter } from "./schema-creation.js";
 import type { Result } from "../../result.js";
-import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
@@ -349,10 +348,9 @@ export function fetchTypeMetadata(
   sqlType: string,
   extra: string = "",
 ): TypeMetadata {
-  return new TypeMetadata(
-    BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType) as SqlTypeMetadata,
-    { extra },
-  );
+  return new TypeMetadata(BaseSchemaStatements.prototype.fetchTypeMetadata.call(this, sqlType), {
+    extra,
+  });
 }
 
 /** @internal */

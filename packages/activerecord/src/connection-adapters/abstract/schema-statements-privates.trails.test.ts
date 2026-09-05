@@ -14,7 +14,6 @@ import { NotImplementedError } from "../../errors.js";
 import { Result } from "../../result.js";
 import { Table, Visitors } from "@blazetrails/arel";
 import { KeyError } from "@blazetrails/ruby-compat";
-import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 function makeStatements(
   adapterOverrides: Record<string, unknown> = {},
@@ -436,14 +435,14 @@ describe("SchemaStatements privates (PR 8)", () => {
   });
 
   it("fetchTypeMetadata returns SqlTypeMetadata with sqlType", () => {
-    const meta = makeStatements().fetchTypeMetadata("varchar(255)") as SqlTypeMetadata;
+    const meta = makeStatements().fetchTypeMetadata("varchar(255)");
     expect(meta.sqlType).toBe("varchar(255)");
     expect(meta.type).toBe("string");
     expect(meta.limit).toBe(255);
   });
 
   it("fetchTypeMetadata keeps a nil sql_type nil", () => {
-    const meta = makeStatements().fetchTypeMetadata(null) as SqlTypeMetadata;
+    const meta = makeStatements().fetchTypeMetadata(null);
     expect(meta.sqlType).toBeNull();
     expect(meta.type).toBeUndefined();
   });

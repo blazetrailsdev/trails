@@ -328,7 +328,6 @@ export class PostgreSQLAdapter
 
   private _pgClientOptions: pg.ClientConfig | null = null;
   private _client: pg.Client | null = null;
-  private _inTransaction = false;
   private _readyForQueryStatus = "I";
   private _typeMap: HashLookupTypeMap | null = null;
 
@@ -542,16 +541,11 @@ export class PostgreSQLAdapter
     await this.loadAdditionalTypes();
   }
 
-  /** @internal */
-  async getOidType(
-    oid: number,
-    fmod: number,
-    columnName: string,
-    sqlType: string = "",
-  ): Promise<ValueType> {
-    if (!this.typeMap.isKey(oid)) {
-      await this.loadAdditionalTypes([oid]);
-    }
+  /**
+   * @internal
+   * @missingRailsCall load_additional_types — CONVERGEABLE pg-get-oid-type-drops-the-on-demand-load-additional-types
+   */
+  getOidType(oid: number, fmod: number, columnName: string, sqlType: string = ""): ValueType {
     return this.typeMap.fetch(oid, fmod, sqlType, () => {
       if (!this._warnedOids.has(oid)) {
         this._warnedOids.add(oid);
@@ -675,7 +669,7 @@ export class PostgreSQLAdapter
     const columnTypes: Record<string | number, ValueType> = {};
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];
-      const type = await this.getOidType(f.dataTypeID, -1, f.name, "");
+      const type = this.getOidType(f.dataTypeID, -1, f.name, "");
       columnTypes[i] = type;
       if (!/^\d+$/.test(f.name)) {
         columnTypes[f.name] = type;
@@ -896,7 +890,7 @@ export class PostgreSQLAdapter
             !upper.includes("RETURNING")
           ) {
             const withReturning = `${pgSql} RETURNING id`;
-            const useSavepoint = this._inTransaction;
+            const useSavepoint = this.isInTransaction();
             const spName = useSavepoint ? `_bt_ret_${++PostgreSQLAdapter._spCounter}` : "";
             payload.sql = withReturning;
             try {
@@ -972,15 +966,7 @@ export class PostgreSQLAdapter
       return this._transactionManager.commitTransaction();
     }
     if (!this._client) throw new ActiveRecordError("No active transaction");
-    try {
-      await this.internalExecute("COMMIT", "TRANSACTION");
-    } catch (e) {
-      if (PostgreSQLAdapter._isConnectionError(e)) this._discardRawConnection();
-      throw e;
-    } finally {
-      this._client = null;
-      this._inTransaction = false;
-    }
+    return this.commitDbTransaction();
   }
 
   async rollback(): Promise<void> {
@@ -1001,7 +987,6 @@ export class PostgreSQLAdapter
       throw e;
     } finally {
       this._client = null;
-      this._inTransaction = false;
     }
   }
 
@@ -1303,7 +1288,6 @@ export class PostgreSQLAdapter
   async close(): Promise<void> {
     void this._statements.reset();
     this._client = null;
-    this._inTransaction = false;
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     this._closed = true;
@@ -1327,7 +1311,6 @@ export class PostgreSQLAdapter
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     void this._statements.reset();
-    this._inTransaction = false;
     this._closed = false;
     conn?.end().catch(() => {});
   }
@@ -1351,7 +1334,6 @@ export class PostgreSQLAdapter
       }
       if (this._client) {
         this._client = null;
-        this._inTransaction = false;
       }
       await live.query("DISCARD ALL");
       if (this._rawConnection === live && !this._closed) {
@@ -1385,7 +1367,6 @@ export class PostgreSQLAdapter
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     void this._statements.reset();
-    this._inTransaction = false;
     if (this._acquiring) this._acquireGeneration++;
     this._closingDriver = conn?.end().catch(() => {}) ?? null;
     this.resetTransaction();
@@ -1404,7 +1385,6 @@ export class PostgreSQLAdapter
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     void this._statements.reset();
-    this._inTransaction = false;
     this._closed = true;
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
     this._acquireGeneration++;
@@ -1418,7 +1398,7 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  get inTransaction(): boolean {
+  isInTransaction(): boolean {
     return this.openTransactions() > 0;
   }
 
@@ -2520,12 +2500,7 @@ export interface PostgreSQLAdapter {
   dataSourceSql(options: { type?: string }): string;
 
   /** @internal */
-  fetchTypeMetadata(
-    columnName: string,
-    sqlType: string,
-    oid: number,
-    fmod: number,
-  ): Promise<TypeMetadata>;
+  fetchTypeMetadata(columnName: string, sqlType: string, oid: number, fmod: number): TypeMetadata;
 
   /** @internal */
   quotedScope(
